@@ -514,35 +514,6 @@ struct InOutSendingNotDisconnectedInfo {
         actorIsolatedRegionInfo(actorIsolatedRegionInfo) {}
 };
 
-struct TransferredNonTransferrableInfo {
-  /// The use that actually caused the transfer.
-  Operand *transferredOperand;
-
-  /// The non-transferrable value that is in the same region as \p
-  /// transferredOperand.get().
-  llvm::PointerUnion<SILValue, SILInstruction *> nonTransferrable;
-
-  /// The region info that describes the dynamic dataflow derived isolation
-  /// region info for the non-transferrable value.
-  ///
-  /// This is equal to the merge of the IsolationRegionInfo from all elements in
-  /// nonTransferrable's region when the error was diagnosed.
-  SILDynamicMergedIsolationInfo isolationRegionInfo;
-
-  TransferredNonTransferrableInfo(
-      Operand *transferredOperand, SILValue nonTransferrableValue,
-      SILDynamicMergedIsolationInfo isolationRegionInfo)
-      : transferredOperand(transferredOperand),
-        nonTransferrable(nonTransferrableValue),
-        isolationRegionInfo(isolationRegionInfo) {}
-  TransferredNonTransferrableInfo(
-      Operand *transferredOperand, SILInstruction *nonTransferrableInst,
-      SILDynamicMergedIsolationInfo isolationRegionInfo)
-      : transferredOperand(transferredOperand),
-        nonTransferrable(nonTransferrableInst),
-        isolationRegionInfo(isolationRegionInfo) {}
-};
-
 struct AssignIsolatedIntoOutSendingParameterInfo {
   /// The user that actually caused the transfer.
   Operand *srcOperand;
@@ -602,19 +573,17 @@ public:
 };
 
 class TransferNonSendableImpl {
-  RegionAnalysisFunctionInfo *regionInfo;
+  RegionAnalysisFunctionInfo *info;
   SmallFrozenMultiMap<Operand *, RequireInst, 8>
       transferOpToRequireInstMultiMap;
-  SmallVector<TransferredNonTransferrableInfo, 8>
-      transferredNonTransferrableInfoList;
+  SmallVector<PartitionOpError, 8> foundVerbatimErrors;
   SmallVector<InOutSendingNotDisconnectedInfo, 8>
       inoutSendingNotDisconnectedInfoList;
   SmallVector<AssignIsolatedIntoOutSendingParameterInfo, 8>
       assignIsolatedIntoOutSendingParameterInfoList;
 
 public:
-  TransferNonSendableImpl(RegionAnalysisFunctionInfo *regionInfo)
-      : regionInfo(regionInfo) {}
+  TransferNonSendableImpl(RegionAnalysisFunctionInfo *info) : info(info) {}
 
   void emitDiagnostics();
 
@@ -622,9 +591,9 @@ private:
   void runDiagnosticEvaluator();
 
   void emitUseAfterTransferDiagnostics();
-  void emitTransferredNonTransferrableDiagnostics();
   void emitInOutSendingNotDisconnectedInfoList();
   void emitAssignIsolatedIntoSendingResultDiagnostics();
+  void emitVerbatimErrors();
 };
 
 } // namespace
@@ -1228,7 +1197,7 @@ void UseAfterTransferDiagnosticInferrer::infer() {
 
 // Top level entrypoint for use after transfer diagnostics.
 void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
-  auto *function = regionInfo->getFunction();
+  auto *function = info->getFunction();
   BasicBlockData<BlockLivenessInfo> blockLivenessInfo(function);
   // We use a generation counter so we can lazily reset blockLivenessInfo
   // since we cannot clear it without iterating over it.
@@ -1287,8 +1256,8 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
     }
 
     UseAfterTransferDiagnosticInferrer diagnosticInferrer(
-        transferOp, requireInstsForError, regionInfo->getValueMap(),
-        regionInfo->getTransferringOpToStateMap());
+        transferOp, requireInstsForError, info->getValueMap(),
+        info->getTransferringOpToStateMap());
     diagnosticInferrer.infer();
   }
 }
@@ -1299,35 +1268,52 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
 
 namespace {
 
-class TransferNonTransferrableDiagnosticEmitter {
-  TransferredNonTransferrableInfo info;
+class SentNeverSendableDiagnosticEmitter {
+  /// The use that actually caused the transfer.
+  Operand *transferredOperand;
+
+  /// The non-transferrable value that is in the same region as \p
+  /// transferredOperand.get().
+  llvm::PointerUnion<SILValue, SILInstruction *> nonTransferrable;
+
+  /// The region info that describes the dynamic dataflow derived isolation
+  /// region info for the non-transferrable value.
+  ///
+  /// This is equal to the merge of the IsolationRegionInfo from all elements in
+  /// nonTransferrable's region when the error was diagnosed.
+  SILDynamicMergedIsolationInfo isolationRegionInfo;
+
   bool emittedErrorDiagnostic = false;
 
 public:
-  TransferNonTransferrableDiagnosticEmitter(
-      TransferredNonTransferrableInfo info)
-      : info(info) {}
+  SentNeverSendableDiagnosticEmitter(
+      Operand *transferredOperand,
+      llvm::PointerUnion<SILValue, SILInstruction *> nonTransferrable,
+      SILDynamicMergedIsolationInfo isolationRegionInfo)
+      : transferredOperand(transferredOperand),
+        nonTransferrable(nonTransferrable),
+        isolationRegionInfo(isolationRegionInfo) {}
 
-  ~TransferNonTransferrableDiagnosticEmitter() {
+  ~SentNeverSendableDiagnosticEmitter() {
     if (!emittedErrorDiagnostic) {
       emitUnknownPatternError();
     }
   }
 
-  Operand *getOperand() const { return info.transferredOperand; }
+  Operand *getOperand() const { return transferredOperand; }
 
   SILFunction *getFunction() const { return getOperand()->getFunction(); }
 
   SILValue getNonTransferrableValue() const {
-    return info.nonTransferrable.dyn_cast<SILValue>();
+    return nonTransferrable.dyn_cast<SILValue>();
   }
 
   SILInstruction *getNonTransferringActorIntroducingInst() const {
-    return info.nonTransferrable.dyn_cast<SILInstruction *>();
+    return nonTransferrable.dyn_cast<SILInstruction *>();
   }
 
   std::optional<DiagnosticBehavior> getBehaviorLimit() const {
-    return info.transferredOperand->get()
+    return transferredOperand->get()
         ->getType()
         .getConcurrencyDiagnosticBehavior(getOperand()->getFunction());
   }
@@ -1335,16 +1321,14 @@ public:
   /// If we can find a callee decl name, return that. None otherwise.
   std::optional<std::pair<DescriptiveDeclKind, DeclName>>
   getTransferringCalleeInfo() const {
-    return getTransferringApplyCalleeInfo(info.transferredOperand->getUser());
+    return getTransferringApplyCalleeInfo(transferredOperand->getUser());
   }
 
-  SILLocation getLoc() const {
-    return info.transferredOperand->getUser()->getLoc();
-  }
+  SILLocation getLoc() const { return transferredOperand->getUser()->getLoc(); }
 
   /// Return the isolation region info for \p getNonTransferrableValue().
   SILDynamicMergedIsolationInfo getIsolationRegionInfo() const {
-    return info.isolationRegionInfo;
+    return isolationRegionInfo;
   }
 
   void emitUnknownPatternError() {
@@ -1672,16 +1656,21 @@ private:
   }
 };
 
-class TransferNonTransferrableDiagnosticInferrer {
+class SentNeverSendableDiagnosticInferrer {
   struct AutoClosureWalker;
 
   RegionAnalysisValueMap &valueMap;
-  TransferNonTransferrableDiagnosticEmitter diagnosticEmitter;
+  SentNeverSendableDiagnosticEmitter diagnosticEmitter;
+
+  using SentNeverSendableError = PartitionOpError::SentNeverSendableError;
 
 public:
-  TransferNonTransferrableDiagnosticInferrer(
-      RegionAnalysisValueMap &valueMap, TransferredNonTransferrableInfo info)
-      : valueMap(valueMap), diagnosticEmitter(info) {}
+  SentNeverSendableDiagnosticInferrer(RegionAnalysisValueMap &valueMap,
+                                      SentNeverSendableError error)
+      : valueMap(valueMap),
+        diagnosticEmitter(error.op->getSourceOp(),
+                          valueMap.getRepresentative(error.sentElement),
+                          error.isolationRegionInfo) {}
 
   /// Gathers diagnostics. Returns false if we emitted a "I don't understand
   /// error". If we emit such an error, we should bail without emitting any
@@ -1718,7 +1707,7 @@ private:
 
 } // namespace
 
-bool TransferNonTransferrableDiagnosticInferrer::initForSendingPartialApply(
+bool SentNeverSendableDiagnosticInferrer::initForSendingPartialApply(
     FullApplySite fas, Operand *paiOp) {
   auto *pai =
       dyn_cast<PartialApplyInst>(stripFunctionConversions(paiOp->get()));
@@ -1783,7 +1772,7 @@ bool TransferNonTransferrableDiagnosticInferrer::initForSendingPartialApply(
   return true;
 }
 
-bool TransferNonTransferrableDiagnosticInferrer::initForIsolatedPartialApply(
+bool SentNeverSendableDiagnosticInferrer::initForIsolatedPartialApply(
     Operand *op, AbstractClosureExpr *ace,
     std::optional<ActorIsolation> actualCallerIsolation) {
   SmallVector<std::tuple<CapturedValue, unsigned, ApplyIsolationCrossing>, 8>
@@ -1814,16 +1803,15 @@ bool TransferNonTransferrableDiagnosticInferrer::initForIsolatedPartialApply(
 
 /// This walker visits an AutoClosureExpr and looks for uses of a specific
 /// captured value. We want to error on the uses in the autoclosure.
-struct TransferNonTransferrableDiagnosticInferrer::AutoClosureWalker
-    : ASTWalker {
-  TransferNonTransferrableDiagnosticEmitter &foundTypeInfo;
+struct SentNeverSendableDiagnosticInferrer::AutoClosureWalker : ASTWalker {
+  SentNeverSendableDiagnosticEmitter &foundTypeInfo;
   ValueDecl *targetDecl;
   SILIsolationInfo targetDeclIsolationInfo;
   SmallPtrSet<Expr *, 8> visitedCallExprDeclRefExprs;
   SILLocation captureLoc;
   bool isAsyncLet;
 
-  AutoClosureWalker(TransferNonTransferrableDiagnosticEmitter &foundTypeInfo,
+  AutoClosureWalker(SentNeverSendableDiagnosticEmitter &foundTypeInfo,
                     ValueDecl *targetDecl,
                     SILIsolationInfo targetDeclIsolationInfo,
                     SILLocation captureLoc, bool isAsyncLet)
@@ -1880,7 +1868,7 @@ struct TransferNonTransferrableDiagnosticInferrer::AutoClosureWalker
   }
 };
 
-bool TransferNonTransferrableDiagnosticInferrer::run() {
+bool SentNeverSendableDiagnosticInferrer::run() {
   // We need to find the isolation info.
   auto *op = diagnosticEmitter.getOperand();
   auto loc = op->getUser()->getLoc();
@@ -2024,21 +2012,6 @@ bool TransferNonTransferrableDiagnosticInferrer::run() {
 
   diagnosticEmitter.emitUnknownUse(loc);
   return true;
-}
-
-// Top level emission for transfer non transferable diagnostic.
-void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
-  if (transferredNonTransferrableInfoList.empty())
-    return;
-
-  REGIONBASEDISOLATION_LOG(llvm::dbgs()
-                           << "Emitting Error. Kind: Send Never Sendable.\n");
-
-  for (auto info : transferredNonTransferrableInfoList) {
-    TransferNonTransferrableDiagnosticInferrer diagnosticInferrer(
-        regionInfo->getValueMap(), info);
-    diagnosticInferrer.run();
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -2383,10 +2356,11 @@ struct DiagnosticEvaluator final
   SmallFrozenMultiMap<Operand *, RequireInst, 8>
       &transferOpToRequireInstMultiMap;
 
-  /// First value is the operand that was transferred... second value is the
-  /// non-transferrable value in the same region as that value. The second value
-  /// is what is non-transferrable.
-  SmallVectorImpl<TransferredNonTransferrableInfo> &transferredNonTransferrable;
+  /// An error that we know how to emit verbatim without needing to preprocess.
+  ///
+  /// A contrasting case here is the use after send error where we need to pair
+  /// sending operands to require insts.
+  SmallVectorImpl<PartitionOpError> &foundVerbatimErrors;
 
   /// A list of state that tracks specific 'inout sending' parameters that were
   /// actor isolated on function exit with the necessary state to emit the
@@ -2404,8 +2378,7 @@ struct DiagnosticEvaluator final
                       RegionAnalysisFunctionInfo *info,
                       SmallFrozenMultiMap<Operand *, RequireInst, 8>
                           &transferOpToRequireInstMultiMap,
-                      SmallVectorImpl<TransferredNonTransferrableInfo>
-                          &transferredNonTransferrable,
+                      SmallVectorImpl<PartitionOpError> &foundVerbatimErrors,
                       SmallVectorImpl<InOutSendingNotDisconnectedInfo>
                           &inoutSendingNotDisconnectedInfoList,
                       SmallVectorImpl<AssignIsolatedIntoOutSendingParameterInfo>
@@ -2415,7 +2388,7 @@ struct DiagnosticEvaluator final
             workingPartition, info->getOperandSetFactory(), operandToStateMap),
         info(info),
         transferOpToRequireInstMultiMap(transferOpToRequireInstMultiMap),
-        transferredNonTransferrable(transferredNonTransferrable),
+        foundVerbatimErrors(foundVerbatimErrors),
         inoutSendingNotDisconnectedInfoList(
             inoutSendingNotDisconnectedInfoList),
         assignIsolatedIntoOutSendingParameterInfoList(
@@ -2455,33 +2428,6 @@ struct DiagnosticEvaluator final
     transferOpToRequireInstMultiMap.insert(
         sendingOp,
         RequireInst::forUseAfterTransfer(partitionOp.getSourceInst()));
-  }
-
-  void handleTransferNonTransferrable(SentNeverSendableError error) const {
-    const PartitionOp &partitionOp = *error.op;
-    Element transferredVal = error.sentElement;
-    auto isolationRegionInfo = error.isolationRegionInfo;
-
-    REGIONBASEDISOLATION_LOG(
-        llvm::dbgs() << "    Emitting Error. Kind: Send Non Sendable\n"
-                     << "        ID:  %%" << transferredVal << "\n"
-                     << "        Rep: "
-                     << *info->getValueMap().getRepresentative(transferredVal)
-                     << "        Dynamic Isolation Region: ";
-        isolationRegionInfo.printForOneLineLogging(llvm::dbgs());
-        llvm::dbgs() << '\n';
-        if (auto isolatedValue = isolationRegionInfo->maybeGetIsolatedValue()) {
-          llvm::dbgs() << "        Isolated Value: " << isolatedValue;
-          auto name = inferNameHelper(isolatedValue);
-          llvm::dbgs() << "        Isolated Value Name: "
-                       << (name.has_value() ? name->get() : "none") << '\n';
-        } else { llvm::dbgs() << "        Isolated Value: none\n"; });
-    auto *self = const_cast<DiagnosticEvaluator *>(this);
-    auto nonTransferrableValue =
-        info->getValueMap().getRepresentative(transferredVal);
-
-    self->transferredNonTransferrable.emplace_back(
-        partitionOp.getSourceOp(), nonTransferrableValue, isolationRegionInfo);
   }
 
   void handleInOutSendingNotDisconnectedAtExitError(
@@ -2572,7 +2518,8 @@ struct DiagnosticEvaluator final
       return handleLocalUseAfterTransfer(error.getLocalUseAfterSendError());
     }
     case PartitionOpError::SentNeverSendable: {
-      return handleTransferNonTransferrable(error.getSentNeverSendableError());
+      foundVerbatimErrors.emplace_back(error);
+      return;
     }
     case PartitionOpError::AssignNeverSendableIntoSendingResult: {
       return handleAssignTransferNonTransferrableIntoSendingResult(
@@ -2637,7 +2584,7 @@ struct DiagnosticEvaluator final
 void TransferNonSendableImpl::runDiagnosticEvaluator() {
   // Then for each block...
   REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Walking blocks for diagnostics.\n");
-  for (auto [block, blockState] : regionInfo->getRange()) {
+  for (auto [block, blockState] : info->getRange()) {
     REGIONBASEDISOLATION_LOG(llvm::dbgs()
                              << "|--> Block bb" << block.getDebugID() << "\n");
 
@@ -2653,12 +2600,11 @@ void TransferNonSendableImpl::runDiagnosticEvaluator() {
     // Grab its entry partition and setup an evaluator for the partition that
     // has callbacks that emit diagnsotics...
     Partition workingPartition = blockState.getEntryPartition();
-    DiagnosticEvaluator eval(workingPartition, regionInfo,
-                             transferOpToRequireInstMultiMap,
-                             transferredNonTransferrableInfoList,
-                             inoutSendingNotDisconnectedInfoList,
-                             assignIsolatedIntoOutSendingParameterInfoList,
-                             regionInfo->getTransferringOpToStateMap());
+    DiagnosticEvaluator eval(
+        workingPartition, info, transferOpToRequireInstMultiMap,
+        foundVerbatimErrors, inoutSendingNotDisconnectedInfoList,
+        assignIsolatedIntoOutSendingParameterInfoList,
+        info->getTransferringOpToStateMap());
 
     // And then evaluate all of our partition ops on the entry partition.
     for (auto &partitionOp : blockState.getPartitionOps()) {
@@ -2680,19 +2626,61 @@ void TransferNonSendableImpl::runDiagnosticEvaluator() {
 //                         MARK: Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
+void TransferNonSendableImpl::emitVerbatimErrors() {
+  for (auto &erasedError : foundVerbatimErrors) {
+    switch (erasedError.getKind()) {
+    case PartitionOpError::UnknownCodePattern:
+    case PartitionOpError::LocalUseAfterSend:
+      llvm_unreachable("Handled elsewhere");
+    case PartitionOpError::AssignNeverSendableIntoSendingResult:
+    case PartitionOpError::InOutSendingNotInitializedAtExit:
+    case PartitionOpError::InOutSendingNotDisconnectedAtExit:
+      llvm_unreachable("Not implemented yet");
+    case PartitionOpError::SentNeverSendable: {
+      auto e = erasedError.getSentNeverSendableError();
+      auto errorLog = [&] {
+        llvm::dbgs() << "    Emitting Error. Kind: Send Non Sendable\n"
+                     << "        ID:  %%" << e.sentElement << "\n"
+                     << "        Rep: "
+                     << *info->getValueMap().getRepresentative(e.sentElement)
+                     << "        Dynamic Isolation Region: ";
+        e.isolationRegionInfo.printForOneLineLogging(llvm::dbgs());
+        llvm::dbgs() << '\n';
+        if (auto isolatedValue =
+                e.isolationRegionInfo->maybeGetIsolatedValue()) {
+          llvm::dbgs() << "        Isolated Value: " << isolatedValue;
+          auto name = inferNameHelper(isolatedValue);
+          llvm::dbgs() << "        Isolated Value Name: "
+                       << (name.has_value() ? name->get() : "none") << '\n';
+        } else {
+          llvm::dbgs() << "        Isolated Value: none\n";
+        };
+      };
+      REGIONBASEDISOLATION_LOG(errorLog());
+
+      SentNeverSendableDiagnosticInferrer diagnosticInferrer(
+          info->getValueMap(), e);
+      diagnosticInferrer.run();
+      continue;
+    }
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+}
+
 /// Once we have reached a fixpoint, this routine runs over all blocks again
 /// reporting any failures by applying our ops to the converged dataflow
 /// state.
 void TransferNonSendableImpl::emitDiagnostics() {
-  auto *function = regionInfo->getFunction();
+  auto *function = info->getFunction();
   REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Emitting diagnostics for function "
                                         << function->getName() << "\n");
 
   runDiagnosticEvaluator();
-  emitTransferredNonTransferrableDiagnostics();
   emitUseAfterTransferDiagnostics();
   emitInOutSendingNotDisconnectedInfoList();
   emitAssignIsolatedIntoSendingResultDiagnostics();
+  emitVerbatimErrors();
 }
 
 namespace {
