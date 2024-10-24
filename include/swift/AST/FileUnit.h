@@ -345,6 +345,11 @@ public:
     return {};
   }
 
+  /// Returns the version of the Swift compiler used to create this module.
+  virtual llvm::VersionTuple getSwiftCompilerVersion() const {
+    return {};
+  }
+
   SWIFT_DEBUG_DUMPER(dumpDisplayDecls());
   SWIFT_DEBUG_DUMPER(dumpTopLevelDecls());
 

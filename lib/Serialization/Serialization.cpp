@@ -864,6 +864,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
   BLOCK_RECORD(options_block, CXX_STDLIB_KIND);
   BLOCK_RECORD(options_block, PUBLIC_MODULE_NAME);
+  BLOCK_RECORD(options_block, SWIFT_COMPILER_VERSION);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -1138,6 +1139,10 @@ void Serializer::writeHeader() {
         options_block::PublicModuleNameLayout PublicModuleName(Out);
         PublicModuleName.emit(ScratchRecord, publicModuleName.str());
       }
+
+      llvm::VersionTuple compilerVersion = M->getSwiftCompilerVersion();
+      options_block::SwiftCompilerVersionLayout SwiftCompilerVersion(Out);
+      SwiftCompilerVersion.emit(ScratchRecord, compilerVersion.getAsString());
 
       if (M->isConcurrencyChecked()) {
         options_block::IsConcurrencyCheckedLayout IsConcurrencyChecked(Out);

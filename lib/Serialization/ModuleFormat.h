@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 897; // Builtin.FixedArray
+const uint16_t SWIFTMODULE_VERSION_MINOR = 898; // swift-compiler-version
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -966,6 +966,7 @@ namespace options_block {
     SERIALIZE_PACKAGE_ENABLED,
     CXX_STDLIB_KIND,
     PUBLIC_MODULE_NAME,
+    SWIFT_COMPILER_VERSION,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1065,6 +1066,11 @@ namespace options_block {
   using PublicModuleNameLayout = BCRecordLayout<
     PUBLIC_MODULE_NAME,
     BCBlob
+  >;
+
+    using SwiftCompilerVersionLayout = BCRecordLayout<
+    SWIFT_COMPILER_VERSION,
+    BCBlob // version tuple
   >;
 }
 

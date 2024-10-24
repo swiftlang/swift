@@ -1035,6 +1035,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
+    M.setSwiftCompilerVersion(loadedModuleFile->getSwiftCompilerVersion());
     for (auto name: loadedModuleFile->getAllowableClientNames()) {
       M.addAllowableClientName(Ctx.getIdentifier(name));
     }
