@@ -124,6 +124,9 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
         !Opts.PackageFlags.IgnorableFlags.empty())
       ignorableFlags.push_back(Opts.PackageFlags.IgnorableFlags);
 
+    ignorableFlags.push_back("-swift-compiler-version");
+    ignorableFlags.push_back(version::getCompilerVersion());
+
     if (!ignorableFlags.empty()) {
       out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": ";
       llvm::interleave(
