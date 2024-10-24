@@ -2289,6 +2289,20 @@ synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
   return synthesizeCoroutineAccessorBody(modify, ctx);
 }
 
+/// Synthesize the body of a modify coroutine.
+static std::pair<BraceStmt *, bool>
+synthesizeModify2CoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
+#ifndef NDEBUG
+  auto storage = modify->getStorage();
+  auto impl = storage->getReadWriteImpl();
+  auto hasWrapper = isa<VarDecl>(storage) &&
+                    cast<VarDecl>(storage)->hasAttachedPropertyWrapper();
+  assert((hasWrapper || impl != ReadWriteImplKind::Modify2) &&
+         impl != ReadWriteImplKind::Immutable);
+#endif
+  return synthesizeCoroutineAccessorBody(modify, ctx);
+}
+
 static std::pair<BraceStmt *, bool>
 synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   auto *accessor = cast<AccessorDecl>(fn);
@@ -2312,8 +2326,10 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
     return synthesizeRead2CoroutineBody(accessor, ctx);
 
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
     return synthesizeModifyCoroutineBody(accessor, ctx);
+
+  case AccessorKind::Modify2:
+    return synthesizeModify2CoroutineBody(accessor, ctx);
 
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
