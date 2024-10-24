@@ -80,8 +80,11 @@ struct SourceCompleteResult {
 };
 
 SourceCompleteResult
-isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf, SourceFileKind SFKind);
-SourceCompleteResult isSourceInputComplete(StringRef Text, SourceFileKind SFKind);
+isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
+                      SourceFileKind SFKind, const LangOptions &LangOpts);
+SourceCompleteResult isSourceInputComplete(StringRef Text,
+                                           SourceFileKind SFKind,
+                                           const LangOptions &LangOpts);
 
 /// Visits all overridden declarations exhaustively from VD, including protocol
 /// conformances and clang declarations.

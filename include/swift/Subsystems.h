@@ -321,8 +321,7 @@ namespace swift {
   class ParserUnit {
   public:
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-               const LangOptions &LangOpts, const TypeCheckerOptions &TyOpts,
-               const SILOptions &SILOpts, StringRef ModuleName);
+               const LangOptions &LangOpts, StringRef ModuleName);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                unsigned Offset, unsigned EndOffset);
