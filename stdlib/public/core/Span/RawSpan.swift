@@ -258,12 +258,6 @@ extension RawSpan {
     return _extracting(unchecked: bounds)
   }
 
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public mutating func _shrink(to bounds: Range<Int>) {
-    self = _extracting(bounds)
-  }
-
   /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
   ///
@@ -289,13 +283,6 @@ extension RawSpan {
     )
   }
 
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @unsafe
-  @_alwaysEmitIntoClient
-  public mutating func _shrink(toUnchecked bounds: Range<Int>) {
-    self = _extracting(unchecked: bounds)
-  }
-
   /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
   ///
@@ -313,12 +300,6 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   public func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
     _extracting(bounds.relative(to: byteOffsets))
-  }
-
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public mutating func _shrink(_ bounds: some RangeExpression<Int>) {
-    self = _extracting(bounds)
   }
 
   /// Constructs a new span over the bytes within the supplied range of
@@ -343,13 +324,6 @@ extension RawSpan {
     unchecked bounds: some RangeExpression<Int>
   ) -> Self {
     _extracting(unchecked: bounds.relative(to: byteOffsets))
-  }
-
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @unsafe
-  @_alwaysEmitIntoClient
-  public mutating func _shrink(toUnchecked bounds: some RangeExpression<Int>) {
-    self = _extracting(unchecked: bounds)
   }
 
   /// Constructs a new span over all the bytes of this span.
@@ -606,12 +580,6 @@ extension RawSpan {
     return Self(_unchecked: _pointer, byteCount: newCount)
   }
 
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public mutating func _shrink(toFirst maxLength: Int) {
-    self = _extracting(first: maxLength)
-  }
-
   /// Returns a span over all but the given number of trailing bytes.
   ///
   /// If the number of elements to drop exceeds the number of elements in
@@ -632,12 +600,6 @@ extension RawSpan {
     _precondition(k >= 0, "Can't drop a negative number of elements.")
     let dc = min(k, byteCount)
     return Self(_unchecked: _pointer, byteCount: byteCount&-dc)
-  }
-
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public mutating func _shrink(droppingLast k: Int) {
-    self = _extracting(droppingLast: k)
   }
 
   /// Returns a span containing the trailing bytes of the span,
@@ -664,12 +626,6 @@ extension RawSpan {
     return Self(_unchecked: newStart, byteCount: newCount)
   }
 
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public mutating func _shrink(toLast maxLength: Int) {
-    self = _extracting(last: maxLength)
-  }
-
   /// Returns a span over all but the given number of initial bytes.
   ///
   /// If the number of elements to drop exceeds the number of bytes in
@@ -691,11 +647,5 @@ extension RawSpan {
     let dc = min(k, byteCount)
     let newStart = _pointer?.advanced(by: dc)
     return Self(_unchecked: newStart, byteCount: byteCount&-dc)
-  }
-
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public mutating func _shrink(droppingFirst k: Int) {
-    self = _extracting(droppingFirst: k)
   }
 }
