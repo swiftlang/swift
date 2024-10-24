@@ -568,14 +568,13 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   public func byteOffsets(of span: borrowing Self) -> Range<Int>? {
     if span._count > _count { return nil }
-    guard let subspanStart = span._pointer, _count > 0 else {
-      return _pointer == span._pointer ? Range(uncheckedBounds: (0, 0)) : nil
+    guard let spanStart = span._pointer, _count > 0 else {
+      return _pointer == span._pointer ? Range(_uncheckedBounds: (0, 0)) : nil
     }
-    if subspanStart < _start { return nil }
-    let lower = _start.distance(to: subspanStart)
-    let upper = lower + span._count
-    guard upper <= _count else { return nil }
-    return Range(uncheckedBounds: (lower, upper))
+    let spanEnd = spanStart + span._count
+    if spanStart < _start || (_start + _count) < spanEnd { return nil }
+    let lower = _start.distance(to: spanStart)
+    return Range(_uncheckedBounds: (lower, lower &+ span._count))
   }
 }
 

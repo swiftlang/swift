@@ -695,17 +695,16 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public func indices(of span: borrowing Self) -> Range<Index>? {
     if span._count > _count { return nil }
-    guard let subspanStart = span._pointer, _count > 0 else {
+    guard let spanStart = span._pointer, _count > 0 else {
       return _pointer == span._pointer ? Range(_uncheckedBounds: (0, 0)) : nil
     }
-    if subspanStart < _start { return nil }
-    let byteOffset = _start.distance(to: subspanStart)
     let stride = MemoryLayout<Element>.stride
+    let spanEnd = spanStart + stride&*span._count
+    if spanStart < _start || spanEnd > (_start + stride&*_count) { return nil }
+    let byteOffset = _start.distance(to: spanStart)
     let (lower, r) = byteOffset.quotientAndRemainder(dividingBy: stride)
     guard r == 0 else { return nil }
-    let upper = lower + span._count
-    guard upper <= _count else { return nil }
-    return Range(_uncheckedBounds: (lower, upper))
+    return Range(_uncheckedBounds: (lower, lower &+ span._count))
   }
 }
 
