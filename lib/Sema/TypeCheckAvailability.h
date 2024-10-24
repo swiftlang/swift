@@ -156,6 +156,8 @@ public:
 
   DeclContext *getDeclContext() const { return DC; }
 
+  AvailabilityContext getAvailability() const { return Availability; }
+
   AvailabilityRange getAvailabilityRange() const {
     return Availability.getPlatformRange();
   }

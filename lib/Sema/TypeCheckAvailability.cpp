@@ -345,8 +345,9 @@ static bool computeContainedByDeploymentTarget(TypeRefinementContext *TRC,
 /// Returns true if the reference or any of its parents is an
 /// unconditional unavailable declaration for the same platform.
 static bool isInsideCompatibleUnavailableDeclaration(
-    const Decl *D, const ExportContext &where, const AvailableAttr *attr) {
-  auto referencedPlatform = where.getUnavailablePlatformKind();
+    const Decl *D, AvailabilityContext availabilityContext,
+    const AvailableAttr *attr) {
+  auto referencedPlatform = availabilityContext.getUnavailablePlatformKind();
   if (!referencedPlatform)
     return false;
 
@@ -374,7 +375,7 @@ ExportContext::shouldDiagnoseDeclAsUnavailable(const Decl *D) const {
   if (!attr)
     return nullptr;
 
-  if (isInsideCompatibleUnavailableDeclaration(D, *this, attr))
+  if (isInsideCompatibleUnavailableDeclaration(D, Availability, attr))
     return nullptr;
 
   return attr;
@@ -1496,7 +1497,8 @@ TypeChecker::checkDeclarationAvailability(const Decl *D,
   // Skip computing potential unavailability if the declaration is explicitly
   // unavailable and the context is also unavailable.
   if (const AvailableAttr *Attr = AvailableAttr::isUnavailable(D))
-    if (isInsideCompatibleUnavailableDeclaration(D, Where, Attr))
+    if (isInsideCompatibleUnavailableDeclaration(D, Where.getAvailability(),
+                                                 Attr))
       return std::nullopt;
 
   if (isDeclarationUnavailable(D, Where.getDeclContext(), [&Where] {
