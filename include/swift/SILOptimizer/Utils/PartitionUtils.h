@@ -975,14 +975,11 @@ public:
     const PartitionOp *op;
     Element sentElement;
     SILDynamicMergedIsolationInfo isolationRegionInfo;
-    std::optional<Element> actualSentElement;
 
     SentNeverSendableError(const PartitionOp &op, Element sentElement,
-                           SILDynamicMergedIsolationInfo isolationRegionInfo,
-                           std::optional<Element> actualSentElement)
+                           SILDynamicMergedIsolationInfo isolationRegionInfo)
         : op(&op), sentElement(sentElement),
-          isolationRegionInfo(isolationRegionInfo),
-          actualSentElement(actualSentElement) {}
+          isolationRegionInfo(isolationRegionInfo) {}
   };
 
   struct AssignNeverSendableIntoSendingResultError {
@@ -1561,7 +1558,7 @@ private:
 
     // Ok, we actually need to emit a call to the callback.
     return handleError(
-        SentNeverSendableError(op, elt, dynamicMergedIsolationInfo, {}));
+        SentNeverSendableError(op, elt, dynamicMergedIsolationInfo));
   }
 };
 

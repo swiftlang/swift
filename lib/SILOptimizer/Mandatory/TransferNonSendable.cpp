@@ -2509,51 +2509,6 @@ struct DiagnosticEvaluator final
         isolationRegionInfo);
   }
 
-  void handleTransferNonTransferrableWithActualValue(
-      SentNeverSendableError error) const {
-    const PartitionOp &partitionOp = *error.op;
-    Element transferredVal = error.sentElement;
-    Element actualNonTransferrableValue = *error.actualSentElement;
-    auto isolationRegionInfo = error.isolationRegionInfo;
-    REGIONBASEDISOLATION_LOG(
-        llvm::dbgs() << "    Emitting Error. Kind: Send Non Sendable\n"
-                     << "        ID:  %%" << transferredVal << "\n"
-                     << "        Rep: "
-                     << *info->getValueMap().getRepresentative(transferredVal)
-                     << "        Dynamic Isolation Region: ";
-        isolationRegionInfo.printForOneLineLogging(llvm::dbgs());
-        llvm::dbgs() << '\n');
-
-    auto *self = const_cast<DiagnosticEvaluator *>(this);
-    // If we have a non-actor introducing fake representative value, just use
-    // the value that actually introduced the actor isolation.
-    if (auto nonTransferrableValue = info->getValueMap().maybeGetRepresentative(
-            actualNonTransferrableValue)) {
-      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "        ActualTransfer: "
-                                            << nonTransferrableValue);
-      self->transferredNonTransferrable.emplace_back(partitionOp.getSourceOp(),
-                                                     nonTransferrableValue,
-                                                     isolationRegionInfo);
-    } else if (auto *nonTransferrableInst =
-                   info->getValueMap().maybeGetActorIntroducingInst(
-                       actualNonTransferrableValue)) {
-      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "        ActualTransfer: "
-                                            << *nonTransferrableInst);
-      self->transferredNonTransferrable.emplace_back(
-          partitionOp.getSourceOp(), nonTransferrableInst, isolationRegionInfo);
-    } else {
-      // Otherwise, just use the actual value.
-      //
-      // TODO: We are eventually going to want to be able to say that it is b/c
-      // of the actor isolated parameter. Maybe we should put in the actual
-      // region isolation info here.
-      self->transferredNonTransferrable.emplace_back(
-          partitionOp.getSourceOp(),
-          info->getValueMap().getRepresentative(transferredVal),
-          isolationRegionInfo);
-    }
-  }
-
   void handleAssignTransferNonTransferrableIntoSendingResult(
       AssignNeverSendableIntoSendingResultError error) const {
     const PartitionOp &partitionOp = *error.op;
@@ -2617,11 +2572,7 @@ struct DiagnosticEvaluator final
       return handleLocalUseAfterTransfer(error.getLocalUseAfterSendError());
     }
     case PartitionOpError::SentNeverSendable: {
-      auto e = error.getSentNeverSendableError();
-      if (auto otherElt = e.actualSentElement) {
-        return handleTransferNonTransferrableWithActualValue(e);
-      }
-      return handleTransferNonTransferrable(e);
+      return handleTransferNonTransferrable(error.getSentNeverSendableError());
     }
     case PartitionOpError::AssignNeverSendableIntoSendingResult: {
       return handleAssignTransferNonTransferrableIntoSendingResult(
