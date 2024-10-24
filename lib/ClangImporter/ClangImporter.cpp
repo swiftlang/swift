@@ -7635,21 +7635,21 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
         sawCopyCtor = true;
     }
     
-    if (llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-          return ctor->isCopyConstructor() &&
-                 (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
-        })) {
-      llvm::errs() << "!!! ===================== FALSE!!! \n\n";
-      return false;
-    }
-    if (!sawCopyCtor) {
-      decl->dump();
-      llvm::errs() << "decl->needsImplicitCopyConstructor() =" << decl->needsImplicitCopyConstructor() << "\n";
-      llvm::errs() << "decl->isTriviallyCopyable() =" << decl->isTriviallyCopyable() << "\n";
-      return false;
-    }
-    llvm::errs() << "!!! =====================\n\n";
-    return true;
+//    if (llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+//          return ctor->isCopyConstructor() &&
+//                 (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
+//        })) {
+//      llvm::errs() << "!!! ===================== FALSE!!! \n\n";
+//      return false;
+//    }
+//    if (!sawCopyCtor) {
+//      decl->dump();
+//      llvm::errs() << "decl->needsImplicitCopyConstructor() =" << decl->needsImplicitCopyConstructor() << "\n";
+//      llvm::errs() << "decl->isTriviallyCopyable() =" << decl->isTriviallyCopyable() << "\n";
+//      return false;
+//    }
+//    llvm::errs() << "!!! =====================\n\n";
+//    return true;
   }
 
   // If we have no way of copying the type we can't import the class
