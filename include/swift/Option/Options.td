@@ -304,8 +304,8 @@ def package_description_version: Separate<["-"], "package-description-version">,
   MetaVarName<"<vers>">;
 
 def swift_compiler_version : Separate<["-"], "swift-compiler-version">,
-  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOptionIgnorable]>,
-  HelpText<"The version of the Swift compiler used to emit swift interface and module">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"The version of the Swift compiler used to build swift interface and module">,
   MetaVarName<"<compvers>">;
 
 def tools_directory : Separate<["-"], "tools-directory">,
