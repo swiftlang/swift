@@ -494,26 +494,6 @@ void RequireLiveness::process(Collection requireInstList) {
 
 namespace {
 
-struct InOutSendingNotDisconnectedInfo {
-  /// The function exiting inst where the 'inout sending' parameter was actor
-  /// isolated.
-  TermInst *functionExitingInst;
-
-  /// The 'inout sending' param that we are emitting an error for.
-  SILValue inoutSendingParam;
-
-  /// The dynamic actor isolated region info of our 'inout sending' value's
-  /// region at the terminator inst.
-  SILDynamicMergedIsolationInfo actorIsolatedRegionInfo;
-
-  InOutSendingNotDisconnectedInfo(
-      SILInstruction *functionExitingInst, SILValue inoutSendingParam,
-      SILDynamicMergedIsolationInfo actorIsolatedRegionInfo)
-      : functionExitingInst(cast<TermInst>(functionExitingInst)),
-        inoutSendingParam(inoutSendingParam),
-        actorIsolatedRegionInfo(actorIsolatedRegionInfo) {}
-};
-
 struct AssignIsolatedIntoOutSendingParameterInfo {
   /// The user that actually caused the transfer.
   Operand *srcOperand;
@@ -577,8 +557,6 @@ class TransferNonSendableImpl {
   SmallFrozenMultiMap<Operand *, RequireInst, 8>
       transferOpToRequireInstMultiMap;
   SmallVector<PartitionOpError, 8> foundVerbatimErrors;
-  SmallVector<InOutSendingNotDisconnectedInfo, 8>
-      inoutSendingNotDisconnectedInfoList;
   SmallVector<AssignIsolatedIntoOutSendingParameterInfo, 8>
       assignIsolatedIntoOutSendingParameterInfoList;
 
@@ -591,7 +569,6 @@ private:
   void runDiagnosticEvaluator();
 
   void emitUseAfterTransferDiagnostics();
-  void emitInOutSendingNotDisconnectedInfoList();
   void emitAssignIsolatedIntoSendingResultDiagnostics();
   void emitVerbatimErrors();
 };
@@ -2021,13 +1998,26 @@ bool SentNeverSendableDiagnosticInferrer::run() {
 namespace {
 
 class InOutSendingNotDisconnectedDiagnosticEmitter {
-  InOutSendingNotDisconnectedInfo info;
+  /// The function exiting inst where the 'inout sending' parameter was actor
+  /// isolated.
+  TermInst *functionExitingInst;
+
+  /// The 'inout sending' param that we are emitting an error for.
+  SILValue inoutSendingParam;
+
+  /// The dynamic actor isolated region info of our 'inout sending' value's
+  /// region at the terminator inst.
+  SILDynamicMergedIsolationInfo actorIsolatedRegionInfo;
+
   bool emittedErrorDiagnostic = false;
 
 public:
   InOutSendingNotDisconnectedDiagnosticEmitter(
-      InOutSendingNotDisconnectedInfo info)
-      : info(info) {}
+      TermInst *functionExitingInst, SILValue inoutSendingParam,
+      SILDynamicMergedIsolationInfo actorIsolatedRegionInfo)
+      : functionExitingInst(functionExitingInst),
+        inoutSendingParam(inoutSendingParam),
+        actorIsolatedRegionInfo(actorIsolatedRegionInfo) {}
 
   ~InOutSendingNotDisconnectedDiagnosticEmitter() {
     // If we were supposed to emit a diagnostic and didn't emit an unknown
@@ -2036,12 +2026,10 @@ public:
       emitUnknownPatternError();
   }
 
-  SILFunction *getFunction() const {
-    return info.inoutSendingParam->getFunction();
-  }
+  SILFunction *getFunction() const { return inoutSendingParam->getFunction(); }
 
   std::optional<DiagnosticBehavior> getBehaviorLimit() const {
-    return info.inoutSendingParam->getType().getConcurrencyDiagnosticBehavior(
+    return inoutSendingParam->getType().getConcurrencyDiagnosticBehavior(
         getFunction());
   }
 
@@ -2051,7 +2039,7 @@ public:
           "RegionIsolation: Aborting on unknown pattern match error");
     }
 
-    diagnoseError(info.functionExitingInst,
+    diagnoseError(functionExitingInst,
                   diag::regionbasedisolation_unknown_pattern)
         .limitBehaviorIf(getBehaviorLimit());
   }
@@ -2059,7 +2047,7 @@ public:
   void emit();
 
   ASTContext &getASTContext() const {
-    return info.functionExitingInst->getFunction()->getASTContext();
+    return functionExitingInst->getFunction()->getASTContext();
   }
 
   template <typename... T, typename... U>
@@ -2106,7 +2094,7 @@ public:
 void InOutSendingNotDisconnectedDiagnosticEmitter::emit() {
   // We should always be able to find a name for an inout sending param. If we
   // do not, emit an unknown pattern error.
-  auto varName = inferNameHelper(info.inoutSendingParam);
+  auto varName = inferNameHelper(inoutSendingParam);
   if (!varName) {
     return emitUnknownPatternError();
   }
@@ -2115,27 +2103,20 @@ void InOutSendingNotDisconnectedDiagnosticEmitter::emit() {
   SmallString<64> descriptiveKindStr;
   {
     llvm::raw_svector_ostream os(descriptiveKindStr);
-    info.actorIsolatedRegionInfo.printForDiagnostics(os);
+    actorIsolatedRegionInfo.printForDiagnostics(os);
     os << ' ';
   }
 
   diagnoseError(
-      info.functionExitingInst,
+      functionExitingInst,
       diag::regionbasedisolation_inout_sending_cannot_be_actor_isolated,
       *varName, descriptiveKindStr)
       .limitBehaviorIf(getBehaviorLimit());
 
   diagnoseNote(
-      info.functionExitingInst,
+      functionExitingInst,
       diag::regionbasedisolation_inout_sending_cannot_be_actor_isolated_note,
       *varName, descriptiveKindStr);
-}
-
-void TransferNonSendableImpl::emitInOutSendingNotDisconnectedInfoList() {
-  for (auto &info : inoutSendingNotDisconnectedInfoList) {
-    InOutSendingNotDisconnectedDiagnosticEmitter emitter(info);
-    emitter.emit();
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -2365,12 +2346,6 @@ struct DiagnosticEvaluator final
   /// A list of state that tracks specific 'inout sending' parameters that were
   /// actor isolated on function exit with the necessary state to emit the
   /// error.
-  SmallVectorImpl<InOutSendingNotDisconnectedInfo>
-      &inoutSendingNotDisconnectedInfoList;
-
-  /// A list of state that tracks specific 'inout sending' parameters that were
-  /// actor isolated on function exit with the necessary state to emit the
-  /// error.
   SmallVectorImpl<AssignIsolatedIntoOutSendingParameterInfo>
       &assignIsolatedIntoOutSendingParameterInfoList;
 
@@ -2379,8 +2354,6 @@ struct DiagnosticEvaluator final
                       SmallFrozenMultiMap<Operand *, RequireInst, 8>
                           &transferOpToRequireInstMultiMap,
                       SmallVectorImpl<PartitionOpError> &foundVerbatimErrors,
-                      SmallVectorImpl<InOutSendingNotDisconnectedInfo>
-                          &inoutSendingNotDisconnectedInfoList,
                       SmallVectorImpl<AssignIsolatedIntoOutSendingParameterInfo>
                           &assignIsolatedIntoOutSendingParameterInfo,
                       TransferringOperandToStateMap &operandToStateMap)
@@ -2389,8 +2362,6 @@ struct DiagnosticEvaluator final
         info(info),
         transferOpToRequireInstMultiMap(transferOpToRequireInstMultiMap),
         foundVerbatimErrors(foundVerbatimErrors),
-        inoutSendingNotDisconnectedInfoList(
-            inoutSendingNotDisconnectedInfoList),
         assignIsolatedIntoOutSendingParameterInfoList(
             assignIsolatedIntoOutSendingParameterInfo) {}
 
@@ -2428,31 +2399,6 @@ struct DiagnosticEvaluator final
     transferOpToRequireInstMultiMap.insert(
         sendingOp,
         RequireInst::forUseAfterTransfer(partitionOp.getSourceInst()));
-  }
-
-  void handleInOutSendingNotDisconnectedAtExitError(
-      InOutSendingNotDisconnectedAtExitError error) const {
-    const PartitionOp &partitionOp = *error.op;
-    Element inoutSendingVal = error.inoutSendingElement;
-    auto isolationRegionInfo = error.isolationInfo;
-
-    REGIONBASEDISOLATION_LOG(
-        llvm::dbgs() << "    Emitting Error. Kind: InOut Sending ActorIsolated "
-                        "at end of "
-                        "Function Error!\n"
-                     << "        ID:  %%" << inoutSendingVal << "\n"
-                     << "        Rep: "
-                     << *info->getValueMap().getRepresentative(inoutSendingVal)
-                     << "        Dynamic Isolation Region: ";
-        isolationRegionInfo.printForOneLineLogging(llvm::dbgs());
-        llvm::dbgs() << '\n');
-    auto *self = const_cast<DiagnosticEvaluator *>(this);
-    auto nonTransferrableValue =
-        info->getValueMap().getRepresentative(inoutSendingVal);
-
-    self->inoutSendingNotDisconnectedInfoList.emplace_back(
-        partitionOp.getSourceInst(), nonTransferrableValue,
-        isolationRegionInfo);
   }
 
   void handleAssignTransferNonTransferrableIntoSendingResult(
@@ -2517,10 +2463,10 @@ struct DiagnosticEvaluator final
     case PartitionOpError::LocalUseAfterSend: {
       return handleLocalUseAfterTransfer(error.getLocalUseAfterSendError());
     }
-    case PartitionOpError::SentNeverSendable: {
+    case PartitionOpError::InOutSendingNotDisconnectedAtExit:
+    case PartitionOpError::SentNeverSendable:
       foundVerbatimErrors.emplace_back(error);
       return;
-    }
     case PartitionOpError::AssignNeverSendableIntoSendingResult: {
       return handleAssignTransferNonTransferrableIntoSendingResult(
           error.getAssignNeverSendableIntoSendingResultError());
@@ -2528,10 +2474,6 @@ struct DiagnosticEvaluator final
     case PartitionOpError::InOutSendingNotInitializedAtExit: {
       return handleInOutSendingNotInitializedAtExitError(
           error.getInOutSendingNotInitializedAtExitError());
-    }
-    case PartitionOpError::InOutSendingNotDisconnectedAtExit: {
-      return handleInOutSendingNotDisconnectedAtExitError(
-          error.getInOutSendingNotDisconnectedAtExitError());
     }
     case PartitionOpError::UnknownCodePattern: {
       return handleUnknownCodePattern(error.getUnknownCodePatternError());
@@ -2602,8 +2544,7 @@ void TransferNonSendableImpl::runDiagnosticEvaluator() {
     Partition workingPartition = blockState.getEntryPartition();
     DiagnosticEvaluator eval(
         workingPartition, info, transferOpToRequireInstMultiMap,
-        foundVerbatimErrors, inoutSendingNotDisconnectedInfoList,
-        assignIsolatedIntoOutSendingParameterInfoList,
+        foundVerbatimErrors, assignIsolatedIntoOutSendingParameterInfoList,
         info->getTransferringOpToStateMap());
 
     // And then evaluate all of our partition ops on the entry partition.
@@ -2634,8 +2575,30 @@ void TransferNonSendableImpl::emitVerbatimErrors() {
       llvm_unreachable("Handled elsewhere");
     case PartitionOpError::AssignNeverSendableIntoSendingResult:
     case PartitionOpError::InOutSendingNotInitializedAtExit:
-    case PartitionOpError::InOutSendingNotDisconnectedAtExit:
       llvm_unreachable("Not implemented yet");
+    case PartitionOpError::InOutSendingNotDisconnectedAtExit: {
+      auto error = erasedError.getInOutSendingNotDisconnectedAtExitError();
+      auto inoutSendingVal =
+          info->getValueMap().getRepresentative(error.inoutSendingElement);
+      auto isolationRegionInfo = error.isolationInfo;
+
+      REGIONBASEDISOLATION_LOG(
+          llvm::dbgs()
+              << "    Emitting Error. Kind: InOut Sending ActorIsolated "
+                 "at end of "
+                 "Function Error!\n"
+              << "        ID:  %%" << error.inoutSendingElement << "\n"
+              << "        Rep: " << *inoutSendingVal
+              << "        Dynamic Isolation Region: ";
+          isolationRegionInfo.printForOneLineLogging(llvm::dbgs());
+          llvm::dbgs() << '\n');
+
+      InOutSendingNotDisconnectedDiagnosticEmitter emitter(
+          cast<TermInst>(error.op->getSourceInst()), inoutSendingVal,
+          isolationRegionInfo);
+      emitter.emit();
+      continue;
+    }
     case PartitionOpError::SentNeverSendable: {
       auto e = erasedError.getSentNeverSendableError();
       auto errorLog = [&] {
@@ -2678,7 +2641,6 @@ void TransferNonSendableImpl::emitDiagnostics() {
 
   runDiagnosticEvaluator();
   emitUseAfterTransferDiagnostics();
-  emitInOutSendingNotDisconnectedInfoList();
   emitAssignIsolatedIntoSendingResultDiagnostics();
   emitVerbatimErrors();
 }
