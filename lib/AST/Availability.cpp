@@ -580,12 +580,18 @@ static const AvailableAttr *attrForAvailableRange(const Decl *D) {
   return nullptr;
 }
 
-AvailabilityRange AvailabilityInference::availableRange(const Decl *D) {
-  if (auto attr = attrForAvailableRange(D))
-    return availableRange(attr, D->getASTContext());
+std::pair<AvailabilityRange, const AvailableAttr *>
+AvailabilityInference::availableRangeAndAttr(const Decl *D) {
+  if (auto attr = attrForAvailableRange(D)) {
+    return {availableRange(attr, D->getASTContext()), attr};
+  }
 
   // Treat unannotated declarations as always available.
-  return AvailabilityRange::alwaysAvailable();
+  return {AvailabilityRange::alwaysAvailable(), nullptr};
+}
+
+AvailabilityRange AvailabilityInference::availableRange(const Decl *D) {
+  return availableRangeAndAttr(D).first;
 }
 
 bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
