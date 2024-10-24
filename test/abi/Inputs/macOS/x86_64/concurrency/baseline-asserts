@@ -997,7 +997,6 @@ _swift_task_getMainExecutor
 _swift_task_hasTaskGroupStatusRecord
 _swift_task_isCancelled
 _swift_task_isCurrentExecutor
-_swift_task_isCurrentExecutorWithFlags
 _swift_task_isOnExecutor
 _swift_task_isOnExecutor_hook
 _swift_task_localValueGet
