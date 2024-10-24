@@ -74,7 +74,7 @@ class WASILibc(product.Product):
             '-C', self.source_dir,
             'OBJDIR=' + os.path.join(self.build_dir, 'obj-' + thread_model),
             'SYSROOT=' + sysroot_build_dir,
-            'INSTALL_DIR=' + WASILibc.sysroot_install_path(build_root, target_triple),
+            'INSTALL_DIR=' + WASILibc.sysroot_install_path(build_root),
             'CC=' + os.path.join(clang_tools_path, 'clang'),
             'AR=' + os.path.join(llvm_tools_path, 'llvm-ar'),
             'NM=' + os.path.join(llvm_tools_path, 'llvm-nm'),
@@ -97,12 +97,12 @@ class WASILibc(product.Product):
                             'sysroot', target_triple)
 
     @classmethod
-    def sysroot_install_path(cls, build_root, target_triple):
+    def sysroot_install_path(cls, build_root):
         """
         Returns the path to the sysroot install directory, which contains artifacts
         of wasi-libc and LLVM runtimes.
         """
-        return os.path.join(build_root, 'wasi-sysroot', target_triple)
+        return os.path.join(build_root, 'wasi-sysroot')
 
 
 class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
@@ -223,7 +223,7 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
         self.build_with_cmake([], self.args.build_variant, [],
                               prefer_native_toolchain=True)
         self.install_with_cmake(
-            ["install"], WASILibc.sysroot_install_path(build_root, target_triple))
+            ["install"], WASILibc.sysroot_install_path(build_root))
 
     @classmethod
     def get_dependencies(cls):

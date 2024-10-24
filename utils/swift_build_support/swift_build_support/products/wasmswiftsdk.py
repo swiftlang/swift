@@ -120,16 +120,16 @@ class WasmSwiftSDK(product.Product):
         #    and header paths from the sysroot
         #    https://github.com/llvm/llvm-project/blob/73ef397fcba35b7b4239c00bf3e0b4e689ca0add/clang/lib/Driver/ToolChains/WebAssembly.cpp#L29-L36
         # 3. short_triple: The triple used by build-script to name the build directory
-        for swift_host_triple, clang_multiarch_triple, short_triple, build_basename in [
-            ('wasm32-unknown-wasi', 'wasm32-wasi', 'wasi-wasm32', 'wasmstdlib'),
+        for swift_host_triple, short_triple, build_basename in [
+            ('wasm32-unknown-wasi', 'wasi-wasm32', 'wasmstdlib'),
             # TODO: Enable threads stdlib once sdk-generator supports multi-target SDK
-            # ('wasm32-unknown-wasip1-threads', 'wasm32-wasip1-threads',
+            # ('wasm32-unknown-wasip1-threads',
             #  'wasip1-threads-wasm32', 'wasmthreadsstdlib'),
         ]:
             stdlib_build_path = os.path.join(
                 build_root, '%s-%s' % (build_basename, host_target))
             wasi_sysroot = wasisysroot.WASILibc.sysroot_install_path(
-                build_root, clang_multiarch_triple)
+                build_root)
             package_path = self._build_target_package(
                 swift_host_triple, short_triple, stdlib_build_path,
                 llvm_runtime_libs_build_path, wasi_sysroot)
