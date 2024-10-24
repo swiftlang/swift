@@ -4933,6 +4933,12 @@ ERROR(capture_across_type_decl,none,
 ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
 
+WARNING(implicit_nonstrong_to_strong_capture, none,
+      "weak/unowned capture implicitly captured as strong reference in outer scope",
+      ())
+NOTE(implicit_nonstrong_to_strong_capture_loc,none,
+     "weak/unowned capture implicitly captured here",())
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Statements
 //------------------------------------------------------------------------------
