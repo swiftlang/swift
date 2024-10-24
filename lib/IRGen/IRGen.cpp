@@ -200,6 +200,23 @@ static void align(llvm::Module *Module) {
     }
 }
 
+static void populatePGOOptions(std::optional<PGOOptions> &Out,
+                               const IRGenOptions &Opts) {
+  if (!Opts.UseSampleProfile.empty()) {
+    Out = PGOOptions(
+      /*ProfileFile=*/ Opts.UseSampleProfile,
+      /*CSProfileGenFile=*/ "",
+      /*ProfileRemappingFile=*/ "",
+      /*MemoryProfile=*/ "",
+      /*FS=*/ llvm::vfs::getRealFileSystem(), // TODO: is this fine?
+      /*Action=*/ PGOOptions::SampleUse,
+      /*CSPGOAction=*/ PGOOptions::NoCSAction,
+      /*DebugInfoForProfiling=*/ false
+    );
+    return;
+  }
+}
+
 void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                      llvm::Module *Module,
                                      llvm::TargetMachine *TargetMachine,
@@ -222,6 +239,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     PTO.LoopVectorization = true;
     PTO.SLPVectorization = true;
     PTO.MergeFunctions = true;
+    populatePGOOptions(PGOOpt, Opts);
     // Splitting trades code size to enhance memory locality, avoid in -Osize.
     DoHotColdSplit = Opts.EnableHotColdSplit && !Opts.optimizeForSize();
     level = llvm::OptimizationLevel::Os;
