@@ -7634,46 +7634,47 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
       if (c->isCopyConstructor())
         sawCopyCtor = true;
     }
-    
-//    if (llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-//          return ctor->isCopyConstructor() &&
-//                 (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
-//        })) {
-//      llvm::errs() << "!!! ===================== FALSE!!! \n\n";
-//      return false;
-//    }
-//    if (!sawCopyCtor) {
-//      decl->dump();
-//      llvm::errs() << "decl->needsImplicitCopyConstructor() =" << decl->needsImplicitCopyConstructor() << "\n";
-//      llvm::errs() << "decl->isTriviallyCopyable() =" << decl->isTriviallyCopyable() << "\n";
-//      return false;
-//    }
-//    llvm::errs() << "!!! =====================\n\n";
-//    return true;
+
+    for (auto member : decl->decls()) {
+      if (auto memberTemplate = dyn_cast<clang::FunctionTemplateDecl>(member))
+        if (auto c = dyn_cast<clang::CXXConstructorDecl>(
+                memberTemplate->getTemplatedDecl())) {
+          llvm::errs() << "TEMPLATED ctor:\n";
+          c->dump(llvm::errs());
+          llvm::errs() << "isCopyCtor = " << c->isCopyConstructor() << "\n";
+          llvm::errs() << "isDeleted = " << c->isDeleted() << "\n";
+          llvm::errs() << "access = " << c->getAccess() << "\n";
+          llvm::errs() << "\n";
+          if (c->isCopyConstructor())
+            sawCopyCtor = true;
+        }
+    }
+
+    if (!sawCopyCtor) {
+      decl->dump();
+      llvm::errs() << "decl->needsImplicitCopyConstructor() =" << decl->needsImplicitCopyConstructor() << "\n";
+      llvm::errs() << "decl->isTriviallyCopyable() =" << decl->isTriviallyCopyable() << "\n";
+    }
   }
 
   // If we have no way of copying the type we can't import the class
   // at all because we cannot express the correct semantics as a swift
   // struct.
-  if (llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-        return ctor->isCopyConstructor() &&
-               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
-      }))
-    return false;
+  for (auto member : decl->decls()) {
+    clang::CXXConstructorDecl *ctor =
+        dyn_cast<clang::CXXConstructorDecl>(member);
+    // The copy constructor might be templated.
+    if (auto memberTemplate = dyn_cast<clang::FunctionTemplateDecl>(member))
+      ctor = dyn_cast<clang::CXXConstructorDecl>(
+          memberTemplate->getTemplatedDecl());
+    if (!ctor)
+      continue;
 
-  // The copy constructor might be templated.
-  if (decl->hasUserDeclaredConstructor())
-    for (auto member : decl->decls())
-      if (auto memberTemplate = dyn_cast<clang::FunctionTemplateDecl>(member))
-        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(
-                memberTemplate->getTemplatedDecl()))
-          if (ctor->isCopyConstructor() && !ctor->isDeleted() &&
-              ctor->getAccess() == clang::AccessSpecifier::AS_public)
-            return true;
-
-  return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-    return ctor->isCopyConstructor();
-  });
+    if (ctor->isCopyConstructor() && !ctor->isDeleted() &&
+        ctor->getAccess() == clang::AccessSpecifier::AS_public)
+      return true;
+  }
+  return false;
 }
 
 static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
