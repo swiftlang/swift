@@ -12,6 +12,7 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftDiagnostics
+import SwiftOperators
 import SwiftSyntaxBuilder
 
 public struct ObservableMacro {
@@ -36,33 +37,52 @@ public struct ObservableMacro {
 
   static let registrarVariableName = "_$observationRegistrar"
   
-  static func registrarVariable(_ observableType: TokenSyntax) -> DeclSyntax {
+  static func registrarVariable(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
     return
       """
       @\(raw: ignoredMacroName) private let \(raw: registrarVariableName) = \(raw: qualifiedRegistrarTypeName)()
       """
   }
   
-  static func accessFunction(_ observableType: TokenSyntax) -> DeclSyntax {
-    return 
+  static func accessFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
+    let memberGeneric = context.makeUniqueName("Member")
+    return
       """
-      internal nonisolated func access<Member>(
-      keyPath: KeyPath<\(observableType), Member>
+      internal nonisolated func access<\(memberGeneric)>(
+        keyPath: KeyPath<\(observableType), \(memberGeneric)>
       ) {
-      \(raw: registrarVariableName).access(self, keyPath: keyPath)
+        \(raw: registrarVariableName).access(self, keyPath: keyPath)
       }
       """
   }
   
-  static func withMutationFunction(_ observableType: TokenSyntax) -> DeclSyntax {
-    return 
+  static func withMutationFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
+    let memberGeneric = context.makeUniqueName("Member")
+    let mutationGeneric = context.makeUniqueName("MutationResult")
+    return
       """
-      internal nonisolated func withMutation<Member, MutationResult>(
-      keyPath: KeyPath<\(observableType), Member>,
-      _ mutation: () throws -> MutationResult
-      ) rethrows -> MutationResult {
-      try \(raw: registrarVariableName).withMutation(of: self, keyPath: keyPath, mutation)
+      internal nonisolated func withMutation<\(memberGeneric), \(mutationGeneric)>(
+        keyPath: KeyPath<\(observableType), \(memberGeneric)>,
+        _ mutation: () throws -> \(mutationGeneric)
+      ) rethrows -> \(mutationGeneric) {
+        try \(raw: registrarVariableName).withMutation(of: self, keyPath: keyPath, mutation)
       }
+      """
+  }
+
+  static func observationComparisonNonEquatableFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
+    let memberGeneric = context.makeUniqueName("Member")
+    return
+      """
+       private nonisolated func observationComparison<\(memberGeneric)>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { false }
+      """
+  }
+
+  static func observationComparisonEquatableFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
+    let memberGeneric = context.makeUniqueName("Member")
+    return
+      """
+      private nonisolated func observationComparison<\(memberGeneric): Equatable>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { lhs == rhs }
       """
   }
 
@@ -220,9 +240,24 @@ extension ObservableMacro: MemberMacro {
     
     var declarations = [DeclSyntax]()
 
-    declaration.addIfNeeded(ObservableMacro.registrarVariable(observableType), to: &declarations)
-    declaration.addIfNeeded(ObservableMacro.accessFunction(observableType), to: &declarations)
-    declaration.addIfNeeded(ObservableMacro.withMutationFunction(observableType), to: &declarations)
+    declaration.addIfNeeded(ObservableMacro.registrarVariable(observableType, context: context), to: &declarations)
+    declaration.addIfNeeded(ObservableMacro.accessFunction(observableType, context: context), to: &declarations)
+    declaration.addIfNeeded(ObservableMacro.withMutationFunction(observableType, context: context), to: &declarations)
+    declaration.addIfNeeded(ObservableMacro.observationComparisonNonEquatableFunction(observableType, context: context), to: &declarations)
+    declaration.addIfNeeded(ObservableMacro.observationComparisonEquatableFunction(observableType, context: context), to: &declarations)
+    
+    var cachedKeypaths = [String]()
+    for member in declaration.memberBlock.members {
+      if let property = member.decl.as(VariableDeclSyntax.self) {
+        if property.isValidForObservation, let identifier = property.identifier?.trimmed {
+          cachedKeypaths.append("  static let \(identifier.text): KeyPath & Sendable = \\\(observableType.trimmed.text).\(identifier.text)")
+        }
+      }
+    }
+    
+      let cachedKeyPaths: DeclSyntax = "struct _$ObservationCachedKeyPaths {\n\(raw: cachedKeypaths.joined(separator: "\n"))\n}"
+      declaration.addIfNeeded(cachedKeyPaths, to: &declarations)
+    
 
     return declarations
   }
@@ -307,34 +342,45 @@ public struct ObservationTrackedMacro: AccessorMacro {
       """
       @storageRestrictions(initializes: _\(identifier))
       init(initialValue) {
-      _\(identifier) = initialValue
+        _\(identifier) = initialValue
       }
       """
 
     let getAccessor: AccessorDeclSyntax =
       """
       get {
-      access(keyPath: \\.\(identifier))
-      return _\(identifier)
+        access(keyPath: _$ObservationCachedKeyPaths.\(identifier))
+        return _\(identifier)
       }
       """
 
     let setAccessor: AccessorDeclSyntax =
       """
       set {
-      withMutation(keyPath: \\.\(identifier)) {
-      _\(identifier) = newValue
-      }
+        guard !observationComparison(_\(identifier), newValue) else {
+          return
+        }
+        withMutation(keyPath: _$ObservationCachedKeyPaths.\(identifier)) {
+          _\(identifier) = newValue
+        }
       }
       """
-      
+    
+    // Note: this accessor cannot test the equality since it would incur
+    // additional CoW's on structural types. Most mutations in-place do
+    // not leave the value equal so this is "fine"-ish.
+    // Warning to future maintence: adding equality checks here can make
+    // container mutation O(N) instead of O(1).
+    // e.g. observable.array.append(element) should just emit a change
+    // to the new array, and NOT cause a copy of each element of the
+    // array to an entirely new array.
     let modifyAccessor: AccessorDeclSyntax =
       """
       _modify {
-      access(keyPath: \\.\(identifier))
-      \(raw: ObservableMacro.registrarVariableName).willSet(self, keyPath: \\.\(identifier))
-      defer { \(raw: ObservableMacro.registrarVariableName).didSet(self, keyPath: \\.\(identifier)) } 
-      yield &_\(identifier)
+        access(keyPath: \\.\(identifier))
+        \(raw: ObservableMacro.registrarVariableName).willSet(self, keyPath: _$ObservationCachedKeyPaths.\(identifier))
+        defer { \(raw: ObservableMacro.registrarVariableName).didSet(self, keyPath: _$ObservationCachedKeyPaths.\(identifier)) }
+        yield &_\(identifier)
       }
       """
 
