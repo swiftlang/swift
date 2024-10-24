@@ -460,7 +460,7 @@ enum class PartitionOpKind : uint8_t {
   /// parameter is reinitialized with a disconnected value.
   ///
   /// Takes one parameter, the inout parameter that we need to check.
-  RequireInOutSendingAtFunctionExit,
+  InOutSendingAtFunctionExit,
 };
 
 /// PartitionOp represents a primitive operation that can be performed on
@@ -568,9 +568,9 @@ public:
     return PartitionOp(PartitionOpKind::UnknownPatternError, elt, sourceInst);
   }
 
-  static PartitionOp
-  RequireInOutSendingAtFunctionExit(Element elt, SILInstruction *sourceInst) {
-    return PartitionOp(PartitionOpKind::RequireInOutSendingAtFunctionExit, elt,
+  static PartitionOp InOutSendingAtFunctionExit(Element elt,
+                                                SILInstruction *sourceInst) {
+    return PartitionOp(PartitionOpKind::InOutSendingAtFunctionExit, elt,
                        sourceInst);
   }
 
@@ -1399,7 +1399,7 @@ public:
         }
       }
       return;
-    case PartitionOpKind::RequireInOutSendingAtFunctionExit: {
+    case PartitionOpKind::InOutSendingAtFunctionExit: {
       assert(op.getOpArgs().size() == 1 &&
              "Require PartitionOp should be passed 1 argument");
       assert(p.isTrackingElement(op.getOpArgs()[0]) &&
