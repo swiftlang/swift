@@ -179,13 +179,13 @@ class OverridableGetter : ReadableTitle {
   var title: String = ""
 }
 //   The read witness thunk does a direct call to the concrete read accessor.
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s19coroutine_accessors17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW
-// CHECK:       function_ref @$s19coroutine_accessors17OverridableGetterC5titleSSvr
-// CHECK-LABEL: // end sil function '$s19coroutine_accessors17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW'
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s19coroutine_accessors17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvyTW
+// CHECK:       function_ref @$s19coroutine_accessors17OverridableGetterC5titleSSvy
+// CHECK-LABEL: // end sil function '$s19coroutine_accessors17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvyTW'
 //   The concrete read accessor is generated on-demand and does a class dispatch to the getter.
-// CHECK-LABEL: sil shared [ossa] @$s19coroutine_accessors17OverridableGetterC5titleSSvr
+// CHECK-LABEL: sil shared [ossa] @$s19coroutine_accessors17OverridableGetterC5titleSSvy
 // CHECK:       class_method %0 : $OverridableGetter, #OverridableGetter.title!getter
-// CHECK-LABEL: // end sil function '$s19coroutine_accessors17OverridableGetterC5titleSSvr'
+// CHECK-LABEL: // end sil function '$s19coroutine_accessors17OverridableGetterC5titleSSvy'
 
 class ImplementedReader : ReadableTitle {
   var _title: String = ""
@@ -214,10 +214,11 @@ protocol GettableTitle {
 // CHECK:       bb0(
 // CHECK-SAME:      [[SELF:%[^,]+]] :
 // CHECK-SAME:  ):
-// CHECK:         [[READER:%[^,]+]] = class_method [[SELF]] : $OverridableReader, #OverridableReader.title!read
-// CHECK:         ([[TITLE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[READER]]([[SELF]])
+// CHECK:         [[READER:%[^,]+]] = class_method [[SELF]] : $OverridableReader, #OverridableReader.title!read2
+// CHECK:         ([[TITLE:%[^,]+]], [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]]]) = begin_apply [[READER]]([[SELF]])
 // CHECK:         [[RETVAL:%[^,]+]] = copy_value [[TITLE]]
 // CHECK:         end_apply [[TOKEN]] as $()
+// CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function '$s19coroutine_accessors17OverridableReaderC5titleSSvg'
 
