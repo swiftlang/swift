@@ -23,6 +23,7 @@
 #include "IRBuilder.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -2391,6 +2392,24 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
           Scope = getOrCreateModule(*SubModuleDesc, nullptr);
       }
     }
+
+    if (TypeDecl) {
+      // If the type has the @_originallyDefinedIn attribute, IRGenDebugInfo
+      // emits it as a child of the original module. We do this so LLDB has
+      // enough information to both find the type in reflection metadata (the
+      // parent module name) and find it in the swiftmodule (the module name in
+      // the type mangled name).
+      if (auto Attribute =
+              TypeDecl->getAttrs().getAttribute<OriginallyDefinedInAttr>()) {
+        auto Identifier = IGM.getSILModule().getASTContext().getIdentifier(
+            Attribute->OriginalModuleName);
+
+        void *Key = (void *)Identifier.get();
+        Scope =
+            getOrCreateModule(Key, TheCU, Attribute->OriginalModuleName, {});
+      }
+    }
+
     if (!Scope)
       Scope = getOrCreateContext(Context);
 
