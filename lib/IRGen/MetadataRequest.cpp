@@ -272,7 +272,7 @@ static bool usesExtendedExistentialMetadata(CanType type) {
   // should turn them into unparameterized protocol types.  If the
   // structure makes it to IRGen, we have to honor that decision that
   // they represent different types.
-  return layout.containsParameterized;
+  return !layout.getParameterizedProtocols().empty();
 }
 
 static std::optional<std::pair<CanExistentialType, /*depth*/ unsigned>>
@@ -2064,7 +2064,7 @@ namespace {
     llvm::Value *emitExistentialTypeMetadata(CanExistentialType type) {
       auto layout = type.getExistentialLayout();
 
-      if (layout.containsParameterized) {
+      if (!layout.getParameterizedProtocols().empty()) {
         return emitExtendedExistentialTypeMetadata(type);
       }
 
