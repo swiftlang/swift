@@ -1,10 +1,12 @@
 // RUN: %target-swift-emit-silgen                           \
 // RUN:     %s                                              \
+// RUN:     -enable-library-evolution                       \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-NOUNWIND
 
 // RUN: %target-swift-emit-silgen                                              \
 // RUN:     %s                                                                 \
+// RUN:     -enable-library-evolution                                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors                    \
 // RUN:     -enable-experimental-feature CoroutineAccessorsUnwindOnCallerError \
 // RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-UNWIND
@@ -19,23 +21,25 @@
 // - a get accessor
 // - an unsafeAddress accessor
 
-struct U : ~Copyable {}
+@frozen
+public struct U : ~Copyable {}
 
 // Protocols are split up to improve the ordering of the functions in the output
 // (implementation, then conformance thunk).
-protocol P1 : ~Copyable {
+public protocol P1 : ~Copyable {
   @_borrowed
   var ubgs: U { get set }
 }
-protocol P2 : ~Copyable {
+public protocol P2 : ~Copyable {
   var urs: U { read set }
 }
-protocol P3 : ~Copyable {
+public protocol P3 : ~Copyable {
   var ur: U { read }
 }
 
-struct ImplAStored : ~Copyable & P1 {
-  var ubgs: U
+@frozen
+public struct ImplAStored : ~Copyable & P1 {
+  public var ubgs: U
 // CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements11ImplAStoredV4ubgsAA1UVvr : {{.*}} {
 // CHECK:       bb0(
 // CHECK-SAME:      [[SELF:%[^:]+]]
@@ -78,9 +82,10 @@ struct ImplAStored : ~Copyable & P1 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements11ImplAStoredVAA2P1A2aDP4ubgsAA1UVvrTW'
 }
 
-struct ImplBStored : ~Copyable & P2 {
+@frozen
+public struct ImplBStored : ~Copyable & P2 {
   var dummy: ()
-  var urs: U
+  public var urs: U
 // CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements11ImplBStoredV3ursAA1UVvr : {{.*}} {
 // CHECK:       bb0(
 // CHECK-SAME:      [[SELF:%[^:]+]]
@@ -124,9 +129,10 @@ struct ImplBStored : ~Copyable & P2 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements11ImplBStoredVAA2P2A2aDP3ursAA1UVvrTW'
 }
 
-struct ImplCStored : ~Copyable & P3 {
+@frozen
+public struct ImplCStored : ~Copyable & P3 {
   var dummy: ()
-  var ur: U
+  public var ur: U
 // CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements11ImplCStoredV2urAA1UVvr : {{.*}} {
 // CHECK:       bb0(
 // CHECK-SAME:      [[SELF:%[^:]+]]
@@ -169,10 +175,10 @@ struct ImplCStored : ~Copyable & P3 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements11ImplCStoredVAA2P3A2aDP2urAA1UVvrTW'
 }
 
-struct ImplAUnderscoredCoroutineAccessors : ~Copyable & P1 {
-  typealias Property = U
+@frozen
+public struct ImplAUnderscoredCoroutineAccessors : ~Copyable & P1 {
   var _i: U
-  var ubgs: U {
+  public var ubgs: U {
     _read {
       yield _i
     }
@@ -222,10 +228,10 @@ struct ImplAUnderscoredCoroutineAccessors : ~Copyable & P1 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvrTW'
 }
 
-struct ImplBUnderscoredCoroutineAccessors : ~Copyable & P2 {
-  typealias Property = U
+@frozen
+public struct ImplBUnderscoredCoroutineAccessors : ~Copyable & P2 {
   var _i: U
-  var urs: U {
+  public var urs: U {
     _read {
       yield _i
     }
@@ -275,10 +281,10 @@ struct ImplBUnderscoredCoroutineAccessors : ~Copyable & P2 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvrTW'
 }
 
-struct ImplCUnderscoredCoroutineAccessors : ~Copyable & P3 {
-  typealias Property = U
+@frozen
+public struct ImplCUnderscoredCoroutineAccessors : ~Copyable & P3 {
   var _i: U
-  var ur: U {
+  public var ur: U {
     _read {
       yield _i
     }
@@ -388,9 +394,10 @@ struct ImplACoroutineAccessors : ~Copyable & P1 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements23ImplACoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvrTW'
 }
 
-struct ImplBCoroutineAccessors : ~Copyable & P2 {
+@frozen
+public struct ImplBCoroutineAccessors : ~Copyable & P2 {
   var _i: U
-  var urs: U {
+  public var urs: U {
     read {
       yield _i
     }
@@ -472,9 +479,10 @@ struct ImplBCoroutineAccessors : ~Copyable & P2 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements23ImplBCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvrTW'
 }
 
-struct ImplCCoroutineAccessors : ~Copyable & P3 {
+@frozen
+public struct ImplCCoroutineAccessors : ~Copyable & P3 {
   var _i: U
-  var ur: U {
+  public var ur: U {
     read {
       yield _i
     }
@@ -553,12 +561,13 @@ struct ImplCCoroutineAccessors : ~Copyable & P3 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements23ImplCCoroutineAccessorsVAA2P3A2aDP2urAA1UVvrTW'
 }
 
-struct ImplAGetSet : P1 {
+@frozen
+public struct ImplAGetSet : P1 {
   var _i: U {
     get { return U() }
     set {}
   }
-  var ubgs: U {
+  public var ubgs: U {
     get {
       return _i
     }
@@ -612,12 +621,13 @@ struct ImplAGetSet : P1 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvrTW'
 }
 
-struct ImplBGetSet : P2 {
+@frozen
+public struct ImplBGetSet : P2 {
   var _i: U {
     get { return U() }
     set {}
   }
-  var urs: U {
+  public var urs: U {
     get {
       return _i
     }
@@ -671,12 +681,13 @@ struct ImplBGetSet : P2 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvrTW'
 }
 
-struct ImplCGetSet : P3 {
+@frozen
+public struct ImplCGetSet : P3 {
   var _i: U {
     get { return U() }
     set {}
   }
-  var ur: U {
+  public var ur: U {
     get {
       return _i
     }
@@ -727,12 +738,13 @@ struct ImplCGetSet : P3 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements11ImplCGetSetVAA2P3A2aDP2urAA1UVvrTW'
 }
 
-struct ImplAUnsafeAddressors : P1 {
+@frozen
+public struct ImplAUnsafeAddressors : P1 {
   var iAddr: UnsafePointer<U>
   var iMutableAddr: UnsafeMutablePointer<U> {
     .init(mutating: iAddr)
   }
-  var ubgs: U {
+  public var ubgs: U {
     unsafeAddress {
       return iAddr
     }
@@ -790,12 +802,13 @@ struct ImplAUnsafeAddressors : P1 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvrTW'
 }
 
-struct ImplBUnsafeAddressors : P2 {
+@frozen
+public struct ImplBUnsafeAddressors : P2 {
   var iAddr: UnsafePointer<U>
   var iMutableAddr: UnsafeMutablePointer<U> {
     .init(mutating: iAddr)
   }
-  var urs: U {
+  public var urs: U {
     unsafeAddress {
       return iAddr
     }
@@ -854,12 +867,13 @@ struct ImplBUnsafeAddressors : P2 {
 // CHECK-LABEL: } // end sil function '$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvrTW'
 }
 
-struct ImplCUnsafeAddressors : P3 {
+@frozen
+public struct ImplCUnsafeAddressors : P3 {
   var iAddr: UnsafePointer<U>
   var iMutableAddr: UnsafeMutablePointer<U> {
     .init(mutating: iAddr)
   }
-  var ur: U {
+  public var ur: U {
     unsafeAddress {
       return iAddr
     }

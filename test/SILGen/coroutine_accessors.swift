@@ -1,16 +1,19 @@
 // RUN: %target-swift-emit-silgen                           \
 // RUN:     %s                                              \
+// RUN:     -enable-library-evolution                       \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-NOUNWIND
 
 // RUN: %target-swift-emit-silgen                                              \
 // RUN:     %s                                                                 \
+// RUN:     -enable-library-evolution                                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors                    \
 // RUN:     -enable-experimental-feature CoroutineAccessorsUnwindOnCallerError \
 // RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-UNWIND
 
 // REQUIRES: asserts
 
+@frozen
 public struct S {
 public var o: any AnyObject
 public var _i: Int = 0
