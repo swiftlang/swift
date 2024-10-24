@@ -16,17 +16,19 @@
 @available(SwiftStdlib 6.1, *)
 @frozen
 public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
-  @usableFromInline let _pointer: UnsafeRawPointer?
+  @usableFromInline internal let _pointer: UnsafeRawPointer?
 
-  @usableFromInline @inline(__always)
-  var _start: UnsafeRawPointer { _pointer.unsafelyUnwrapped }
+  @_alwaysEmitIntoClient
+  internal func _start() -> UnsafeRawPointer {
+    _pointer._unsafelyUnwrappedUnchecked
+  }
 
-  @usableFromInline let _count: Int
+  @usableFromInline internal let _count: Int
 
   @_disallowFeatureSuppression(NonescapableTypes)
-  @usableFromInline @inline(__always)
+  @_alwaysEmitIntoClient
   @lifetime(immortal)
-  init(
+  internal init(
     _unchecked pointer: UnsafeRawPointer?,
     byteCount: Int
   ) {
@@ -194,7 +196,7 @@ extension RawSpan {
     _unsafeSpan span: borrowing Span<Element>
   ) {
     self.init(
-      _unchecked: UnsafeRawPointer(span._start),
+      _unchecked: span._pointer,
       byteCount: span.count &* MemoryLayout<Element>.stride
     )
   }
@@ -459,7 +461,7 @@ extension RawSpan {
   public func unsafeLoad<T>(
     fromUncheckedByteOffset offset: Int, as: T.Type
   ) -> T {
-    _start.load(fromByteOffset: offset, as: T.self)
+    _start().load(fromByteOffset: offset, as: T.self)
   }
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -515,7 +517,7 @@ extension RawSpan {
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
     fromUncheckedByteOffset offset: Int, as: T.Type
   ) -> T {
-    _start.loadUnaligned(fromByteOffset: offset, as: T.self)
+    _start().loadUnaligned(fromByteOffset: offset, as: T.self)
   }
 }
 
@@ -545,9 +547,10 @@ extension RawSpan {
     guard let spanStart = span._pointer, _count > 0 else {
       return _pointer == span._pointer ? Range(_uncheckedBounds: (0, 0)) : nil
     }
+    let start = _start()
     let spanEnd = spanStart + span._count
-    if spanStart < _start || (_start + _count) < spanEnd { return nil }
-    let lower = _start.distance(to: spanStart)
+    if spanStart < start || (start + _count) < spanEnd { return nil }
+    let lower = start.distance(to: spanStart)
     return Range(_uncheckedBounds: (lower, lower &+ span._count))
   }
 }
