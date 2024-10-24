@@ -242,4 +242,7 @@ public func testMetatypes() {
 
 // --- Generic<Void>.self ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper7GenericVTwS"()
-// CHECK:   ret i1 and (i1 icmp ne (ptr @"$s17has_symbol_helper7GenericVMn", ptr null), i1 icmp ne (ptr @"$s17has_symbol_helper7GenericVMa", ptr null))
+// CHECK:   [[V0:%.*]] = icmp ne ptr @"$s17has_symbol_helper7GenericVMn", null
+// CHECK:   [[V1:%.*]] = icmp ne ptr @"$s17has_symbol_helper7GenericVMa", null
+// CHECK:   [[RES:%.*]] = and i1 [[V0]], [[V1]]
+// CHECK:   ret i1 [[RES]]
