@@ -850,6 +850,10 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
   if (type->is<SILPackType>())
     return true;
 
+  if (type->is<SILTokenType>()) {
+    return true;
+  }
+
   // The SIL types in the AST do not have real conformances, and should have
   // been handled in SILType instead.
   assert(!(type->is<SILBoxType,

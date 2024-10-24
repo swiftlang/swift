@@ -4944,6 +4944,8 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
             && !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
           diagnoseInvalid(repr, repr->getLoc(),
                           diag::escapable_requires_feature_flag);
+          repr->setInvalid();
+          return ErrorType::get(getASTContext());
         }
       }
     }

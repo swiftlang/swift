@@ -684,9 +684,6 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::inferMutatingSelf(
 
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfo::get(AbstractFunctionDecl *afd) {
-  if (!afd->getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
-    return std::nullopt;
-  }
   assert(isa<FuncDecl>(afd) || isa<ConstructorDecl>(afd));
 
   if (afd->getAttrs().hasAttribute<LifetimeAttr>()) {
@@ -706,9 +703,6 @@ std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfo::get(FunctionTypeRepr *funcRepr,
                             ArrayRef<SILParameterInfo> params,
                             ArrayRef<SILResultInfo> results, DeclContext *dc) {
-  if (!dc->getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
-    return std::nullopt;
-  }
   SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
 
   auto getLifetimeDependenceFromDependsOnTypeModifier =

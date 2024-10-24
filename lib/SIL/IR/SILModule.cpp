@@ -920,7 +920,7 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
   SmallVector<ModuleDecl *, 8> importedModules;
   // Add the Swift module.
   if (!isStdlibModule()) {
-    auto *SwiftStdlib = getASTContext().getStdlibModule(true);
+    auto *SwiftStdlib = getASTContext().getStdlibModule();
     if (SwiftStdlib)
       importedModules.push_back(SwiftStdlib);
   }

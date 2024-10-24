@@ -2114,9 +2114,13 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
 static ValueDecl *getPolymorphicBinaryOperation(ASTContext &ctx,
                                                 Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
-  builder.addParameter(makeGenericParam());
-  builder.addParameter(makeGenericParam());
-  builder.setResult(makeGenericParam());
+
+  // Builtins of the form: func binOp<T>(_ t: T, _ t: T) -> T
+  auto genericParam = makeGenericParam();
+  builder.addConformanceRequirement(genericParam, KnownProtocolKind::Escapable);
+  builder.addParameter(genericParam);
+  builder.addParameter(genericParam);
+  builder.setResult(genericParam);
   return builder.build(id);
 }
 

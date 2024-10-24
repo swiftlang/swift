@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -parse-stdlib -module-name ExportedLib
+// swift-module-flags: -module-name ExportedLib
 
 @_exported import SomeCModule
 
