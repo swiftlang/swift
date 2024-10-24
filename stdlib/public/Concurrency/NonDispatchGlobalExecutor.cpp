@@ -45,7 +45,7 @@ void swift_task_enqueueGlobalImpl(SwiftJob *job) {
 }
 
 SWIFT_CC(swift)
-void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
+void swift_task_enqueueGlobalWithDelayImpl(uint64_t delay,
                                            SwiftJob *job) {
   assert(job && "no job provided");
 
@@ -54,11 +54,10 @@ void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
 }
 
 SWIFT_CC(swift)
-void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
-                                              long long nsec,
-                                              long long tsec,
-                                              long long tnsec,
-                                              int clock, SwiftJob *job) {
+void swift_task_enqueueGlobalWithDeadlineImpl(SwiftTime deadline,
+                                              SwiftTolerance tolerance,
+                                              SwiftClockId clock,
+                                              SwiftJob *job) {
   assert(job && "no job provided");
 
   swift_reportError(0, "operation unsupported without libdispatch: "
