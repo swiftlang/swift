@@ -1464,18 +1464,6 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
     }
-    case 'V': {
-      NodePointer element = popNode(Node::Kind::Type);
-      if (!element)
-        return nullptr;
-      NodePointer size = popNode(Node::Kind::Type);
-      if (!size)
-        return nullptr;
-      Ty = createNode(Node::Kind::BuiltinFixedArray);
-      Ty->addChild(size, *this);
-      Ty->addChild(element, *this);
-      break;
-    }
     case 'O':
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                BUILTIN_TYPE_NAME_UNKNOWNOBJECT);

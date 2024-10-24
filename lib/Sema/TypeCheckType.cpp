@@ -907,45 +907,6 @@ static Type applyGenericArguments(Type type,
 
     return parameterized;
   }
-  
-  // Builtins have special handling.
-  if (auto bug = type->getAs<BuiltinUnboundGenericType>()) {
-    // We don't have any variadic builtins yet, but we do have value arguments.
-    auto argOptions = options.withoutContext()
-      .withContext(TypeResolverContext::ValueGenericArgument);
-    auto genericResolution = resolution.withOptions(argOptions);
-
-    // Resolve the types of the generic arguments.
-    SmallVector<Type, 2> args;
-    for (auto tyR : genericArgs) {
-      // Propagate failure.
-      Type substTy = genericResolution.resolveType(tyR, silContext);
-      if (!substTy || substTy->hasError())
-        return ErrorType::get(ctx);
-
-      args.push_back(substTy);
-    }
-    
-    // Try to form a substitution map.
-    auto subs = SubstitutionMap::get(bug->getGenericSignature(),
-                                     args,
-                                     [&](CanType dependentType,
-                                         Type conformingReplacementType,
-                                         ProtocolDecl *conformedProtocol)
-                                     -> ProtocolConformanceRef {
-                                       // no generic builtins have conformance
-                                       // requirements yet.
-                                       llvm_unreachable("not implemented yet");
-                                     });
-                                     
-    auto bound = bug->getBound(subs);
-    
-    if (bound->hasError()) {
-      diags.diagnose(loc, diag::invalid_generic_builtin_type, type);
-      return ErrorType::get(ctx);
-    }
-    return bound;
-  }
 
   // We must either have an unbound generic type, or a generic type alias.
   if (!type->is<UnboundGenericType>()) {

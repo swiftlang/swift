@@ -693,7 +693,6 @@ Types
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= 'Bt'                              // Builtin.SILToken
   type ::= type 'Bv' NATURAL '_'             // Builtin.Vec<n>x<type>
-  type ::= type type 'BV'                    // Builtin.FixedArray<N, T>
   type ::= 'Bw'                              // Builtin.Word
   type ::= function-signature 'c'            // function type (escaping)
   type ::= function-signature 'X' FUNCTION-KIND // special function type

@@ -2585,31 +2585,6 @@ public:
     return nom;
   }
   
-  CanType visitBuiltinFixedArrayType(CanBuiltinFixedArrayType bfa,
-                                     AbstractionPattern pattern) {
-    auto orig = pattern.getAs<BuiltinFixedArrayType>();
-
-    // If there are no loose type parameters in the pattern here, we don't need
-    // to do a recursive visit at all.
-    if (!orig->hasTypeParameter()
-        && !orig->hasArchetype()
-        && !orig->hasOpaqueArchetype()) {
-      return bfa;
-    }
-    
-    CanType newSize = visit(bfa->getSize(),
-                         AbstractionPattern(pattern.getGenericSubstitutions(),
-                                            pattern.getGenericSignatureOrNull(),
-                                            orig->getSize()));
-    CanType newElement = visit(bfa->getElementType(),
-                         AbstractionPattern(pattern.getGenericSubstitutions(),
-                                            pattern.getGenericSignatureOrNull(),
-                                            orig->getElementType()));
-                                
-    return BuiltinFixedArrayType::get(newSize, newElement)
-      ->getCanonicalType();
-  }
-  
   CanType visitBoundGenericType(CanBoundGenericType bgt,
                                 AbstractionPattern pattern) {
     return handleGenericNominalType(pattern, bgt);

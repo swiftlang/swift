@@ -1126,13 +1126,6 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(DistributedActorAsAnyActor, "distributedActor
 /// lowered away at IRGen, no sooner.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(AddressOfRawLayout, "addressOfRawLayout", "n", Special)
 
-/// emplace<T>((Builtin.RawPointer) -> Void) -> T
-///
-/// Passes a pointer to an uninitialized result value to the given function,
-/// which must initialize the memory before finishing execution. The value in
-/// memory becomes the result of the call.
-BUILTIN_SIL_OPERATION(Emplace, "emplace", Special)
-
 /// Builtins for instrumentation added by sanitizers during SILGen.
 #ifndef BUILTIN_SANITIZER_OPERATION
 #define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs) BUILTIN(Id, Name, Attrs)

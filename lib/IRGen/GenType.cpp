@@ -2313,12 +2313,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
     return new PrimitiveTypeInfo(ty, size, std::move(spareBits), align);
   }
-  case TypeKind::BuiltinUnboundGeneric:
-    llvm_unreachable("not a real type");
-    
-  case TypeKind::BuiltinFixedArray: {
-    return convertBuiltinFixedArrayType(cast<BuiltinFixedArrayType>(ty));
-  }
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:

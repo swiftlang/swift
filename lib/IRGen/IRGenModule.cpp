@@ -1002,14 +1002,6 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
-  RuntimeAvailability ValueGenericTypeAvailability(ASTContext &Context) {
-    auto featureAvailability = Context.getValueGenericTypeAvailability();
-    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
-      return RuntimeAvailability::ConditionallyAvailable;
-    }
-    return RuntimeAvailability::AlwaysAvailable;
-  }
-
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the

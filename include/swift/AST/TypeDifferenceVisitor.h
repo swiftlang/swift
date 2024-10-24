@@ -129,19 +129,6 @@ public:
       return asImpl().visitDifferentTypeStructure(type1, type2);
     return asImpl().visit(type1.getElementType(), type2.getElementType());
   }
-  
-  bool visitBuiltinUnboundGenericType(CanBuiltinUnboundGenericType type1,
-                                      CanBuiltinUnboundGenericType type2) {
-    return asImpl().visitDifferentTypeStructure(type1, type2);
-  }
-  
-  bool visitBuiltinFixedArrayType(CanBuiltinFixedArrayType type1,
-                                  CanBuiltinFixedArrayType type2) {
-    if (asImpl().visit(type1->getSize(), type2->getSize())) {
-      return true;
-    }
-    return asImpl().visit(type1->getElementType(), type2->getElementType());
-  }
 
   bool visitPackType(CanPackType type1, CanPackType type2) {
     return visitComponentArray(type1, type2,

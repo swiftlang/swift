@@ -5437,15 +5437,6 @@ public:
   void visitBuiltinType(BuiltinType *ty) {
     visitBuiltinTypeImpl(ty);
   }
-  
-  void visitBuiltinFixedArrayType(BuiltinFixedArrayType *ty) {
-    using namespace decls_block;
-    unsigned abbrCode = S.DeclTypeAbbrCodes[BuiltinFixedArrayTypeLayout::Code];
-    BuiltinFixedArrayTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode,
-        S.addTypeRef(ty->getSize()),
-        S.addTypeRef(ty->getElementType()));
-  }
 
   void visitSILTokenType(SILTokenType *ty) {
     // This is serialized like a BuiltinType, even though it isn't one.

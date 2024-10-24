@@ -258,8 +258,6 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
-  case TypeKind::BuiltinUnboundGeneric:
-  case TypeKind::BuiltinFixedArray:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -4335,8 +4333,6 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
-  case TypeKind::BuiltinUnboundGeneric:
-  case TypeKind::BuiltinFixedArray:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -4913,25 +4909,4 @@ TypeBase::getConcurrencyDiagnosticBehaviorLimit(DeclContext *declCtx) const {
   }
 
   return {};
-}
-
-GenericTypeParamKind
-TypeBase::getMatchingParamKind() {
-  if (auto gtpt = dyn_cast<GenericTypeParamType>(this)) {
-    return gtpt->getParamKind();
-  }
-  
-  if (auto arch = dyn_cast<ArchetypeType>(this)) {
-    return arch->mapTypeOutOfContext()->getMatchingParamKind();
-  }
-  
-  if (isa<IntegerType>(this)) {
-    return GenericTypeParamKind::Value;
-  }
-  
-  if (isa<PackType>(this)) {
-    return GenericTypeParamKind::Pack;
-  }
-  
-  return GenericTypeParamKind::Type;
 }

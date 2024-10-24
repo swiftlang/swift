@@ -1794,16 +1794,6 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
 
     // Here goes!
     switch (BaseTy->getKind()) {
-    case TypeKind::BuiltinUnboundGeneric:
-      llvm_unreachable("not a real type");
-      
-    case TypeKind::BuiltinFixedArray: {
-      // TODO: provide proper array debug info
-      unsigned FwdDeclLine = 0;
-      return createOpaqueStruct(Scope, "Builtin.FixedArray", MainFile, FwdDeclLine,
-                                SizeInBits, AlignInBits, Flags, MangledName);
-    }
-    
     case TypeKind::BuiltinPackIndex:
     case TypeKind::BuiltinInteger: {
       Encoding = llvm::dwarf::DW_ATE_unsigned;

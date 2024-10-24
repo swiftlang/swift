@@ -1313,17 +1313,6 @@ FUNCTION(GetTupleLayout3, swift_getTupleTypeLayout3, SwiftCC, AlwaysAvailable,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// MetadataResponse swift_getFixedArrayTypeMetadata(MetadataRequest request,
-//                                                  intptr_t size,
-//                                                  Metadata *elt);
-FUNCTION(GetFixedArrayTypeMetadata, swift_getFixedArrayTypeMetadata, SwiftCC,
-         ValueGenericTypeAvailability,
-         RETURNS(TypeMetadataResponseTy),
-         ARGS(SizeTy, SizeTy, TypeMetadataPtrTy),
-         ATTRS(NoUnwind, WillReturn),
-         EFFECT(MetaData),
-         MEMEFFECTS(ReadOnly))
-
 // Metadata *swift_getExistentialTypeMetadata(
 //                              ProtocolClassConstraint classConstraint,
 //                              const Metadata *superclassConstraint,
