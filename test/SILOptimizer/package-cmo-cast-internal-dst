@@ -1,0 +1,29 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+
+// RUN: %target-swift-frontend -emit-sil %t/Lib.swift -package-name pkg \
+// RUN:   -wmo -allow-non-resilient-access -package-cmo \
+// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -Xllvm -sil-print-function=topFunc -o %t/Lib.sil
+
+// RUN: %FileCheck %s < %t/Lib.sil
+
+/// Verify that `InternalKlass` is visited and the instruction containing it is not serialized.
+// CHECK: sil @$s3Lib7topFuncySiAA3PubCF : $@convention(thin) (@guaranteed Pub) -> Int {
+// CHECK:   checked_cast_br Pub in %0 : $Pub to InternalKlass
+
+
+//--- Lib.swift
+public class Pub {
+  public var pubVar: Int
+  public init(_ arg: Int) {
+    pubVar = arg
+  }
+}
+
+class InternalKlass: Pub {}
+
+public func topFunc(_ arg: Pub) -> Int {
+  let x = arg as? InternalKlass
+  return x != nil ? 1 : 0
+}
