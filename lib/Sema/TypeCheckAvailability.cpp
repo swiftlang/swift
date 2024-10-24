@@ -4037,6 +4037,14 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (isa<GenericTypeParamDecl>(D))
     return false;
 
+  if (R.isValid()) {
+    if (TypeChecker::diagnoseInlinableDeclRefAccess(R.Start, D, Where))
+      return true;
+
+    if (TypeChecker::diagnoseDeclRefExportability(R.Start, D, Where))
+      return true;
+  }
+
   // Keep track if this is an accessor.
   auto accessor = dyn_cast<AccessorDecl>(D);
 
@@ -4045,14 +4053,6 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
     // with any of the rest of this.
     if (AvailableAttr::isUnavailable(accessor->getStorage()))
       return false;
-  }
-
-  if (R.isValid()) {
-    if (TypeChecker::diagnoseInlinableDeclRefAccess(R.Start, D, Where))
-      return true;
-
-    if (TypeChecker::diagnoseDeclRefExportability(R.Start, D, Where))
-      return true;
   }
 
   if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
