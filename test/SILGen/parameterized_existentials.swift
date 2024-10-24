@@ -6,20 +6,12 @@ protocol P<T, U, V> {
   associatedtype V
 }
 
-protocol Q<X, Y, Z> : P {
-  associatedtype X
-  associatedtype Y
-  associatedtype Z
-}
+protocol Q<T, U, V> : P {}
 
 struct S: Q {
   typealias T = Int
   typealias U = String
   typealias V = Float
-
-  typealias X = Int
-  typealias Y = String
-  typealias Z = Float
 }
 
 struct R<T, U, V> {
@@ -83,9 +75,9 @@ func upcastResult() {
 
   reuse({ () -> S in S() })
 
-  // CHECK: [[RES_Q_FN:%.*]] = function_ref @$s13parameterized12upcastResultyyFAA1Q_pSi1XAaCPRts_SS1YAERtsSf1ZAERtsXPyXEfU0_ : $@convention(thin) () -> @out any Q<Int, String, Float>
+  // CHECK: [[RES_Q_FN:%.*]] = function_ref @$s13parameterized12upcastResultyyFAA1Q_pSi1TAA1PPRts_SS1UAFRtsSf1VAFRtsXPyXEfU0_ : $@convention(thin) () -> @out any Q<Int, String, Float>
   // CHECK: [[THICK_NOESCAPE_RES_Q_FN:%.*]] = thin_to_thick_function [[RES_Q_FN]] : $@convention(thin) () -> @out any Q<Int, String, Float> to $@noescape @callee_guaranteed () -> @out any Q<Int, String, Float>
-  // CHECK: [[P_TO_Q_RES_THUNK_FN:%.*]] = function_ref @$s13parameterized1Q_pSi1XAaBPRts_SS1YADRtsSf1ZADRtsXPIgr_AA1P_pSi1TAaJPRts_SS1UALRtsSf1VALRtsXPIegr_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @out any Q<Int, String, Float>) -> @out any P<Int, String, Float>
+  // CHECK: [[P_TO_Q_RES_THUNK_FN:%.*]] = function_ref @$s13parameterized1Q_pSi1TAA1PPRts_SS1UAERtsSf1VAERtsXPIgr_AaD_pSiAFRS_SSAHRSSfAJRSXPIegr_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @out any Q<Int, String, Float>) -> @out any P<Int, String, Float>
   // CHECK: [[PARTIAL_P_TO_Q_RES_THUNK_FN:%.*]] = partial_apply [callee_guaranteed] [[P_TO_Q_RES_THUNK_FN]]([[THICK_NOESCAPE_RES_Q_FN]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @out any Q<Int, String, Float>) -> @out any P<Int, String, Float>
   // CHECK: [[NOESCAPE_PARTIAL_P_TO_Q_RES_THUNK_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PARTIAL_P_TO_Q_RES_THUNK_FN]] : $@callee_guaranteed () -> @out any P<Int, String, Float> to $@noescape @callee_guaranteed () -> @out any P<Int, String, Float>
   // CHECK: [[REUSE_FN:%.*]] = function_ref @$s13parameterized5reuseyyAA1P_pSi1TAaCPRts_SS1UAERtsSf1VAERtsXPyXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @out any P<Int, String, Float>) -> ()
