@@ -42,6 +42,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
@@ -2854,14 +2855,12 @@ ClangImporter::Implementation::exportSourceLoc(SourceLoc loc) {
 
 SourceLoc
 ClangImporter::Implementation::importSourceLoc(clang::SourceLocation loc) {
-  // FIXME: Implement!
-  return SourceLoc();
+  return BuffersForDiagnostics.resolveSourceLocation(Instance->getSourceManager(), loc);
 }
 
 SourceRange
-ClangImporter::Implementation::importSourceRange(clang::SourceRange loc) {
-  // FIXME: Implement!
-  return SourceRange();
+ClangImporter::Implementation::importSourceRange(clang::SourceRange range) {
+  return SourceRange(importSourceLoc(range.getBegin()), importSourceLoc(range.getEnd()));
 }
 
 #pragma mark Importing names
@@ -5975,9 +5974,10 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   if (auto typeAlias = dyn_cast<TypeAliasDecl>(decl)) {
     auto rawMemory = allocateMemoryForDecl<TypeAliasDecl>(
         typeAlias->getASTContext(), sizeof(TypeAliasDecl), false);
-    auto out = new (rawMemory) TypeAliasDecl(
-        typeAlias->getLoc(), typeAlias->getEqualLoc(), typeAlias->getName(),
-        typeAlias->getNameLoc(), typeAlias->getGenericParams(), newContext);
+    auto out = new (rawMemory)
+        TypeAliasDecl(typeAlias->getStartLoc(), typeAlias->getEqualLoc(),
+                      typeAlias->getName(), typeAlias->getNameLoc(),
+                      typeAlias->getGenericParams(), newContext);
     out->setUnderlyingType(typeAlias->getUnderlyingType());
     out->copyFormalAccessFrom(typeAlias);
     return out;
