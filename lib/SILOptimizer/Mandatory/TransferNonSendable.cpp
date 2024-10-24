@@ -2421,10 +2421,12 @@ struct DiagnosticEvaluator final
         assignIsolatedIntoOutSendingParameterInfoList(
             assignIsolatedIntoOutSendingParameterInfo) {}
 
-  void handleLocalUseAfterTransfer(const PartitionOp &partitionOp,
-                                   Element transferredVal,
-                                   Operand *transferringOp) const {
-    auto &operandState = operandToStateMap.get(transferringOp);
+  void handleLocalUseAfterTransfer(LocalUseAfterSendError error) const {
+    const auto &partitionOp = *error.op;
+    Element sentElement = error.sentElement;
+    Operand *sendingOp = error.sendingOp;
+
+    auto &operandState = operandToStateMap.get(sendingOp);
     // Ignore this if we have a gep like instruction that is returning a
     // sendable type and transferringOp was not set with closure
     // capture.
@@ -2440,24 +2442,26 @@ struct DiagnosticEvaluator final
       }
     }
 
-    auto rep = info->getValueMap().getRepresentative(transferredVal);
+    auto rep = info->getValueMap().getRepresentative(sentElement);
     REGIONBASEDISOLATION_LOG(
-        llvm::dbgs()
-        << "    Emitting Error. Kind: Use After Send\n"
-        << "        Transferring Inst: " << *transferringOp->getUser()
-        << "        Transferring Op Value: " << transferringOp->get()
-        << "        Require Inst: " << *partitionOp.getSourceInst()
-        << "        ID:  %%" << transferredVal << "\n"
-        << "        Rep: " << *rep << "        Transferring Op Num: "
-        << transferringOp->getOperandNumber() << '\n');
+        llvm::dbgs() << "    Emitting Error. Kind: Use After Send\n"
+                     << "        Transferring Inst: " << *sendingOp->getUser()
+                     << "        Transferring Op Value: " << sendingOp->get()
+                     << "        Require Inst: " << *partitionOp.getSourceInst()
+                     << "        ID:  %%" << sentElement << "\n"
+                     << "        Rep: " << *rep
+                     << "        Transferring Op Num: "
+                     << sendingOp->getOperandNumber() << '\n');
     transferOpToRequireInstMultiMap.insert(
-        transferringOp,
+        sendingOp,
         RequireInst::forUseAfterTransfer(partitionOp.getSourceInst()));
   }
 
-  void handleTransferNonTransferrable(
-      const PartitionOp &partitionOp, Element transferredVal,
-      SILDynamicMergedIsolationInfo isolationRegionInfo) const {
+  void handleTransferNonTransferrable(SentNeverSendableError error) const {
+    const PartitionOp &partitionOp = *error.op;
+    Element transferredVal = error.sentElement;
+    auto isolationRegionInfo = error.isolationRegionInfo;
+
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs() << "    Emitting Error. Kind: Send Non Sendable\n"
                      << "        ID:  %%" << transferredVal << "\n"
@@ -2481,8 +2485,11 @@ struct DiagnosticEvaluator final
   }
 
   void handleInOutSendingNotDisconnectedAtExitError(
-      const PartitionOp &partitionOp, Element inoutSendingVal,
-      SILDynamicMergedIsolationInfo isolationRegionInfo) const {
+      InOutSendingNotDisconnectedAtExitError error) const {
+    const PartitionOp &partitionOp = *error.op;
+    Element inoutSendingVal = error.inoutSendingElement;
+    auto isolationRegionInfo = error.isolationInfo;
+
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs() << "    Emitting Error. Kind: InOut Sending ActorIsolated "
                         "at end of "
@@ -2502,10 +2509,12 @@ struct DiagnosticEvaluator final
         isolationRegionInfo);
   }
 
-  void handleTransferNonTransferrable(
-      const PartitionOp &partitionOp, Element transferredVal,
-      Element actualNonTransferrableValue,
-      SILDynamicMergedIsolationInfo isolationRegionInfo) const {
+  void handleTransferNonTransferrableWithActualValue(
+      SentNeverSendableError error) const {
+    const PartitionOp &partitionOp = *error.op;
+    Element transferredVal = error.sentElement;
+    Element actualNonTransferrableValue = *error.actualSentElement;
+    auto isolationRegionInfo = error.isolationRegionInfo;
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs() << "    Emitting Error. Kind: Send Non Sendable\n"
                      << "        ID:  %%" << transferredVal << "\n"
@@ -2546,9 +2555,13 @@ struct DiagnosticEvaluator final
   }
 
   void handleAssignTransferNonTransferrableIntoSendingResult(
-      const PartitionOp &partitionOp, Element destElement,
-      SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
-      SILDynamicMergedIsolationInfo srcIsolationRegionInfo) const {
+      AssignNeverSendableIntoSendingResultError error) const {
+    const PartitionOp &partitionOp = *error.op;
+    Element destElement = error.destElement;
+    SILFunctionArgument *destValue = error.destValue;
+    Element srcElement = error.srcElement;
+    SILValue srcValue = error.srcValue;
+    auto srcIsolationRegionInfo = error.srcIsolationRegionInfo;
     auto srcRep = info->getValueMap().getRepresentativeValue(srcElement);
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
@@ -2564,10 +2577,12 @@ struct DiagnosticEvaluator final
         partitionOp.getSourceOp(), destValue, srcValue, srcIsolationRegionInfo);
   }
 
-  void
-  handleInOutSendingNotInitializedAtExitError(const PartitionOp &partitionOp,
-                                              Element inoutSendingVal,
-                                              Operand *transferringOp) const {
+  void handleInOutSendingNotInitializedAtExitError(
+      InOutSendingNotInitializedAtExitError error) const {
+    const PartitionOp &partitionOp = *error.op;
+    Element inoutSendingVal = error.sentElement;
+    Operand *transferringOp = error.sendingOp;
+
     auto rep = info->getValueMap().getRepresentative(inoutSendingVal);
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
@@ -2584,7 +2599,9 @@ struct DiagnosticEvaluator final
                             partitionOp.getSourceInst()));
   }
 
-  void handleUnknownCodePattern(const PartitionOp &op) const {
+  void handleUnknownCodePattern(UnknownCodePatternError error) const {
+    const PartitionOp &op = *error.op;
+
     if (shouldAbortOnUnknownPatternMatchError()) {
       llvm::report_fatal_error(
           "RegionIsolation: Aborting on unknown pattern match error");
@@ -2592,6 +2609,37 @@ struct DiagnosticEvaluator final
 
     diagnoseError(op.getSourceInst(),
                   diag::regionbasedisolation_unknown_pattern);
+  }
+
+  void handleError(PartitionOpError error) {
+    switch (error.getKind()) {
+    case PartitionOpError::LocalUseAfterSend: {
+      return handleLocalUseAfterTransfer(error.getLocalUseAfterSendError());
+    }
+    case PartitionOpError::SentNeverSendable: {
+      auto e = error.getSentNeverSendableError();
+      if (auto otherElt = e.actualSentElement) {
+        return handleTransferNonTransferrableWithActualValue(e);
+      }
+      return handleTransferNonTransferrable(e);
+    }
+    case PartitionOpError::AssignNeverSendableIntoSendingResult: {
+      return handleAssignTransferNonTransferrableIntoSendingResult(
+          error.getAssignNeverSendableIntoSendingResultError());
+    }
+    case PartitionOpError::InOutSendingNotInitializedAtExit: {
+      return handleInOutSendingNotInitializedAtExitError(
+          error.getInOutSendingNotInitializedAtExitError());
+    }
+    case PartitionOpError::InOutSendingNotDisconnectedAtExit: {
+      return handleInOutSendingNotDisconnectedAtExitError(
+          error.getInOutSendingNotDisconnectedAtExitError());
+    }
+    case PartitionOpError::UnknownCodePattern: {
+      return handleUnknownCodePattern(error.getUnknownCodePatternError());
+    }
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
   }
 
   bool isActorDerived(Element element) const {

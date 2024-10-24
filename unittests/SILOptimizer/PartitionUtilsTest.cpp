@@ -90,9 +90,19 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
                                      operandToStateMap),
         failureCallback(failureCallback) {}
 
-  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
-                                   Operand *transferringOp) const {
-    failureCallback(op, elt, transferringOp);
+  void handleError(PartitionOpError error) {
+    switch (error.getKind()) {
+    case PartitionOpError::UnknownCodePattern:
+    case PartitionOpError::SentNeverSendable:
+    case PartitionOpError::AssignNeverSendableIntoSendingResult:
+    case PartitionOpError::InOutSendingNotInitializedAtExit:
+    case PartitionOpError::InOutSendingNotDisconnectedAtExit:
+      llvm_unreachable("Unsupported");
+    case PartitionOpError::LocalUseAfterSend: {
+      auto state = error.getLocalUseAfterSendError();
+      failureCallback(state.op, state.sentElement, state.sendingOp);
+    }
+    }
   }
 
   // Just say that we always have a disconnected value.
