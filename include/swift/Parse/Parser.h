@@ -2061,7 +2061,7 @@ public:
   parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   /// Parse the availability macros definitions passed as arguments.
-  AvailabilityMacroMap &parseAllAvailabilityMacroArguments();
+  AvailabilityMacroMap parseAllAvailabilityMacroArguments();
 
   /// Result of parsing an availability macro definition.
   struct AvailabilityMacroDefinition {

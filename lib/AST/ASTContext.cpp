@@ -427,9 +427,6 @@ struct ASTContext::Implementation {
   /// Singleton used to cache the import graph.
   swift::namelookup::ImportCache TheImportCache;
 
-  /// Cache of availability macros parsed from the command line.
-  AvailabilityMacroMap TheAvailabilityMacroCache;
-
   /// The module loader used to load Clang modules.
   ClangModuleLoader *TheClangModuleLoader = nullptr;
 
@@ -2290,10 +2287,6 @@ void ASTContext::verifyAllLoadedModules() const {
 
 swift::namelookup::ImportCache &ASTContext::getImportCache() const {
   return getImpl().TheImportCache;
-}
-
-AvailabilityMacroMap &ASTContext::getAvailabilityMacroCache() const {
-  return getImpl().TheAvailabilityMacroCache;
 }
 
 ClangModuleLoader *ASTContext::getClangModuleLoader() const {
