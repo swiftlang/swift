@@ -757,6 +757,8 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
 
   NodePointer topLevel = createNode(Node::Kind::Global);
 
+  NodePointer suffix = popNode(Node::Kind::Suffix);
+
   NodePointer Parent = topLevel;
   while (NodePointer FuncAttr = popNode(isFunctionAttr)) {
     Parent->addChild(FuncAttr, *this);
@@ -774,6 +776,9 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
         break;
     }
   }
+  if (suffix)
+    topLevel->addChild(suffix, *this);
+
   if (topLevel->getNumChildren() == 0)
     return nullptr;
 
