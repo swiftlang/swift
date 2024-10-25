@@ -339,5 +339,18 @@ unsigned getUpcomingCxxInteropCompatVersion() {
   return SWIFT_VERSION_MAJOR + 1;
 }
 
+std::string getCompilerVersion() {
+  std::string buf;
+  llvm::raw_string_ostream OS(buf);
+
+#if defined(SWIFT_COMPILER_VERSION)
+  OS << SWIFT_COMPILER_VERSION;
+#else
+  OS << SWIFT_VERSION_STRING;
+#endif
+
+  return OS.str();
+}
+
 } // end namespace version
 } // end namespace swift

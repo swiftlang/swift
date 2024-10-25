@@ -214,6 +214,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::PUBLIC_MODULE_NAME:
       extendedInfo.setPublicModuleName(blobData);
       break;
+    case options_block::SWIFT_COMPILER_VERSION:
+      extendedInfo.setSwiftCompilerVersion(blobData);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1496,6 +1499,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       ModulePackageName = extInfo.getModulePackageName();
       ModuleExportAsName = extInfo.getExportAsName();
       PublicModuleName = extInfo.getPublicModuleName();
+      SwiftCompilerVersion = extInfo.getSwiftCompilerVersion();
 
       hasValidControlBlock = true;
       break;
