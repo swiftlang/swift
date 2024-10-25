@@ -5338,6 +5338,8 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
     // fn(argX, argY):
     //   fn(argX, argY[, argMissing])
     if (args->empty()) {
+      if (!args->getRParenLoc().isValid())
+        return false;  
       insertLoc = args->getRParenLoc();
     } else if (position != 0) {
       auto argPos = std::min(args->size(), position) - 1;
@@ -5376,9 +5378,6 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
           Lexer::getLocForEndOfToken(ctx.SourceMgr, fnExpr->getEndLoc());
     }
   }
-
-  if (insertLoc.isInvalid())
-    return false;
 
   // If we are trying to insert a trailing closure but the parameter
   // corresponding to the missing argument doesn't support a trailing closure,
