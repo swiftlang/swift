@@ -2203,10 +2203,11 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   // C++ operators +=, -=, *=, /= may return a reference to self. This is not
   // idiomatic in Swift, let's drop these return values.
   clang::OverloadedOperatorKind op = clangDecl->getOverloadedOperator();
-  if (op == clang::OverloadedOperatorKind::OO_PlusEqual ||
-      op == clang::OverloadedOperatorKind::OO_MinusEqual ||
-      op == clang::OverloadedOperatorKind::OO_StarEqual ||
-      op == clang::OverloadedOperatorKind::OO_SlashEqual)
+  if ((op == clang::OverloadedOperatorKind::OO_PlusEqual ||
+       op == clang::OverloadedOperatorKind::OO_MinusEqual ||
+       op == clang::OverloadedOperatorKind::OO_StarEqual ||
+       op == clang::OverloadedOperatorKind::OO_SlashEqual) &&
+      clangDecl->getReturnType()->isReferenceType())
     return {SwiftContext.getVoidType(), false};
 
   // Fix up optionality.

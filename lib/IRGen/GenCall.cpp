@@ -1471,9 +1471,15 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   // Generate function info for this signature.
   auto extInfo = clang::FunctionType::ExtInfo();
 
-  auto &FI = clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
-                                             clangResultTy, paramTys, extInfo,
-                                             clang::CodeGen::RequiredArgs::All);
+  bool isCXXMethod =
+      FnType->getRepresentation() == SILFunctionTypeRepresentation::CXXMethod;
+  auto &FI = isCXXMethod ?
+      clang::CodeGen::arrangeCXXMethodCall(IGM.ClangCodeGen->CGM(),
+          clangResultTy, paramTys, extInfo, {},
+          clang::CodeGen::RequiredArgs::All) :
+      clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
+          clangResultTy, paramTys, extInfo, {},
+          clang::CodeGen::RequiredArgs::All);
   ForeignInfo.ClangInfo = &FI;
 
   assert(FI.arg_size() == paramTys.size() &&
@@ -1595,9 +1601,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   if (returnInfo.isIndirect()) {
     auto resultType = getSILFuncConventions().getSingleSILResultType(
         IGM.getMaximalTypeExpansionContext());
-    if (IGM.Triple.isWindowsMSVCEnvironment() &&
-        FnType->getRepresentation() ==
-            SILFunctionTypeRepresentation::CXXMethod) {
+    if (returnInfo.isSRetAfterThis()) {
       // Windows ABI places `this` before the
       // returned indirect values.
       emitArg(0);
@@ -2577,11 +2581,12 @@ public:
 
         // Windows ABI places `this` before the
         // returned indirect values.
-        bool isThisFirst = IGF.IGM.Triple.isWindowsMSVCEnvironment();
-        if (!isThisFirst)
+        auto &returnInfo =
+            getCallee().getForeignInfo().ClangInfo->getReturnInfo();
+        if (returnInfo.isIndirect() && !returnInfo.isSRetAfterThis())
           passIndirectResults();
         adjusted.add(arg);
-        if (isThisFirst)
+        if (returnInfo.isIndirect() && returnInfo.isSRetAfterThis())
           passIndirectResults();
       }
 
@@ -3171,9 +3176,10 @@ void CallEmission::emitToUnmappedMemory(Address result) {
   assert(LastArgWritten == 1 && "emitting unnaturally to indirect result");
 
   Args[0] = result.getAddress();
-  if (IGF.IGM.Triple.isWindowsMSVCEnvironment() &&
-      getCallee().getRepresentation() ==
-          SILFunctionTypeRepresentation::CXXMethod &&
+
+  auto *FI = getCallee().getForeignInfo().ClangInfo;
+  if (FI && FI->getReturnInfo().isIndirect() &&
+      FI->getReturnInfo().isSRetAfterThis() &&
       Args[1] == getCallee().getCXXMethodSelf()) {
     // C++ methods in MSVC ABI pass `this` before the
     // indirectly returned value.
@@ -3566,10 +3572,10 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
       emitToMemory(temp, substResultTI, isOutlined);
       return;
     }
-    if (IGF.IGM.Triple.isWindowsMSVCEnvironment() &&
-        getCallee().getRepresentation() ==
-            SILFunctionTypeRepresentation::CXXMethod &&
-        substResultType.isVoid()) {
+
+    auto *FI = getCallee().getForeignInfo().ClangInfo;
+    if (FI && FI->getReturnInfo().isIndirect() &&
+        FI->getReturnInfo().isSRetAfterThis() && substResultType.isVoid()) {
       // Some C++ methods return a value but are imported as
       // returning `Void` (e.g. `operator +=`). In this case
       // we should allocate the correct temp indirect return
