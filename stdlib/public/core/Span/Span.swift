@@ -30,10 +30,10 @@ public struct Span<Element: ~Copyable & ~Escapable>
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   internal init(
-    _unchecked pointer: UnsafeRawPointer?,
+    _unchecked pointer: borrowing UnsafeRawPointer?,
     count: Int
   ) {
-    _pointer = pointer
+    _pointer = copy pointer
     _count = count
   }
 }
@@ -59,14 +59,15 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeElements buffer: UnsafeBufferPointer<Element>
+    _unsafeElements buffer: borrowing UnsafeBufferPointer<Element>
   ) {
+    let baseAddress = buffer.baseAddress //FIXME: rdar://138665760
     _precondition(
-      ((Int(bitPattern: buffer.baseAddress) &
+      ((Int(bitPattern: baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
       "baseAddress must be properly aligned to access Element"
     )
-    self.init(_unchecked: buffer.baseAddress, count: buffer.count)
+    self.init(_unchecked: baseAddress, count: buffer.count)
   }
 
   /// Unsafely creates a `Span` over initialized memory.
@@ -82,7 +83,7 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
+    _unsafeElements buffer: borrowing UnsafeMutableBufferPointer<Element>
   ) {
     self.init(_unsafeElements: UnsafeBufferPointer(buffer))
   }
@@ -102,11 +103,11 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeStart pointer: UnsafePointer<Element>,
+    _unsafeStart pointer: borrowing UnsafePointer<Element>,
     count: Int
   ) {
     _precondition(count >= 0, "Count must not be negative")
-    self.init(_unsafeElements: .init(start: pointer, count: count))
+    self.init(_unsafeElements: .init(start: copy pointer, count: count))
   }
 }
 
@@ -127,7 +128,7 @@ extension Span {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeElements buffer: Slice<UnsafeBufferPointer<Element>>
+    _unsafeElements buffer: borrowing Slice<UnsafeBufferPointer<Element>>
   ) {
     self.init(_unsafeElements: UnsafeBufferPointer(rebasing: buffer))
   }
@@ -145,7 +146,7 @@ extension Span {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeElements buffer: Slice<UnsafeMutableBufferPointer<Element>>
+    _unsafeElements buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>
   ) {
     self.init(_unsafeElements: UnsafeBufferPointer(rebasing: buffer))
   }
@@ -173,10 +174,11 @@ extension Span where Element: BitwiseCopyable {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeBytes buffer: UnsafeRawBufferPointer
+    _unsafeBytes buffer: borrowing UnsafeRawBufferPointer
   ) {
+    let baseAddress = buffer.baseAddress //FIXME: rdar://138665760
     _precondition(
-      ((Int(bitPattern: buffer.baseAddress) &
+      ((Int(bitPattern: baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
       "baseAddress must be properly aligned to access Element"
     )
@@ -185,7 +187,7 @@ extension Span where Element: BitwiseCopyable {
     _precondition(
       remainder == 0, "Span must contain a whole number of elements"
     )
-    self.init(_unchecked: buffer.baseAddress, count: count)
+    self.init(_unchecked: baseAddress, count: count)
   }
 
   /// Unsafely creates a `Span` over initialized memory.
@@ -206,7 +208,7 @@ extension Span where Element: BitwiseCopyable {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeBytes buffer: UnsafeMutableRawBufferPointer
+    _unsafeBytes buffer: borrowing UnsafeMutableRawBufferPointer
   ) {
     self.init(_unsafeBytes: UnsafeRawBufferPointer(buffer))
   }
@@ -230,11 +232,11 @@ extension Span where Element: BitwiseCopyable {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeStart pointer: UnsafeRawPointer,
+    _unsafeStart pointer: borrowing UnsafeRawPointer,
     byteCount: Int
   ) {
     _precondition(byteCount >= 0, "Count must not be negative")
-    self.init(_unsafeBytes: .init(start: pointer, count: byteCount))
+    self.init(_unsafeBytes: .init(start: copy pointer, count: byteCount))
   }
 
   /// Unsafely creates a `Span` over initialized memory.
@@ -255,7 +257,7 @@ extension Span where Element: BitwiseCopyable {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeBytes buffer: Slice<UnsafeRawBufferPointer>
+    _unsafeBytes buffer: borrowing Slice<UnsafeRawBufferPointer>
   ) {
     self.init(_unsafeBytes: UnsafeRawBufferPointer(rebasing: buffer))
   }
@@ -278,7 +280,7 @@ extension Span where Element: BitwiseCopyable {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeBytes buffer: Slice<UnsafeMutableRawBufferPointer>
+    _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
   ) {
     self.init(_unsafeBytes: UnsafeRawBufferPointer(rebasing: buffer))
   }

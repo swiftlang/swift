@@ -29,10 +29,10 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   internal init(
-    _unchecked pointer: UnsafeRawPointer?,
+    _unchecked pointer: borrowing UnsafeRawPointer?,
     byteCount: Int
   ) {
-    _pointer = pointer
+    _pointer = copy pointer
     _count = byteCount
   }
 }
@@ -58,7 +58,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeBytes buffer: UnsafeRawBufferPointer
+    _unsafeBytes buffer: borrowing UnsafeRawBufferPointer
   ) {
     self.init(
       _unchecked: buffer.baseAddress, byteCount: buffer.count
@@ -69,7 +69,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeBytes buffer: Slice<UnsafeRawBufferPointer>
+    _unsafeBytes buffer: borrowing Slice<UnsafeRawBufferPointer>
   ) {
     self.init(_unsafeBytes: UnsafeRawBufferPointer(rebasing: buffer))
   }
@@ -87,7 +87,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeBytes buffer: UnsafeMutableRawBufferPointer
+    _unsafeBytes buffer: borrowing UnsafeMutableRawBufferPointer
   ) {
     self.init(_unsafeBytes: UnsafeRawBufferPointer(buffer))
   }
@@ -96,7 +96,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeBytes buffer: Slice<UnsafeMutableRawBufferPointer>
+    _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
   ) {
     self.init(_unsafeBytes: UnsafeRawBufferPointer(rebasing: buffer))
   }
@@ -116,11 +116,11 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init(
-    _unsafeStart pointer: UnsafeRawPointer,
+    _unsafeStart pointer: borrowing UnsafeRawPointer,
     byteCount: Int
   ) {
     _precondition(byteCount >= 0, "Count must not be negative")
-    self.init(_unchecked: pointer, byteCount: byteCount)
+    self.init(_unchecked: copy pointer, byteCount: byteCount)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -136,7 +136,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init<T: BitwiseCopyable>(
-    _unsafeElements buffer: UnsafeBufferPointer<T>
+    _unsafeElements buffer: borrowing UnsafeBufferPointer<T>
   ) {
     self.init(_unsafeBytes: UnsafeRawBufferPointer(buffer))
   }
@@ -172,7 +172,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init<T: BitwiseCopyable>(
-    _unsafeElements buffer: UnsafeMutableBufferPointer<T>
+    _unsafeElements buffer: borrowing UnsafeMutableBufferPointer<T>
   ) {
     self.init(_unsafeElements: UnsafeBufferPointer(buffer))
   }
@@ -210,12 +210,12 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init<T: BitwiseCopyable>(
-    _unsafeStart pointer: UnsafePointer<T>,
+    _unsafeStart pointer: borrowing UnsafePointer<T>,
     count: Int
   ) {
     _precondition(count >= 0, "Count must not be negative")
     self.init(
-      _unchecked: pointer, byteCount: count * MemoryLayout<T>.stride
+      _unchecked: copy pointer, byteCount: count * MemoryLayout<T>.stride
     )
   }
 
