@@ -43,6 +43,13 @@ SwiftInt BridgedData_count(BridgedData data) {
 // MARK: BridgedStringRef
 //===----------------------------------------------------------------------===//
 
+BridgedStringRef::BridgedStringRef(llvm::StringRef sref)
+    : Data(sref.data()), Length(sref.size()) {}
+
+llvm::StringRef BridgedStringRef::unbridged() const {
+  return llvm::StringRef(Data, Length);
+}
+
 const uint8_t *_Nullable BridgedStringRef_data(BridgedStringRef str) {
   return (const uint8_t *)str.unbridged().data();
 }
@@ -58,6 +65,8 @@ bool BridgedStringRef_empty(BridgedStringRef str) {
 //===----------------------------------------------------------------------===//
 // MARK: BridgedOwnedString
 //===----------------------------------------------------------------------===//
+
+llvm::StringRef BridgedOwnedString::unbridgedRef() const { return llvm::StringRef(Data, Length); }
 
 const uint8_t *_Nullable BridgedOwnedString_data(BridgedOwnedString str) {
   auto *data = str.unbridgedRef().data();
@@ -76,12 +85,42 @@ bool BridgedOwnedString_empty(BridgedOwnedString str) {
 // MARK: BridgedSourceLoc
 //===----------------------------------------------------------------------===//
 
+BridgedSourceLoc::BridgedSourceLoc(swift::SourceLoc loc)
+  : Raw(loc.getOpaquePointerValue()) {}
+
+swift::SourceLoc BridgedSourceLoc::unbridged() const {
+  return swift::SourceLoc(
+      llvm::SMLoc::getFromPointer(static_cast<const char *>(Raw)));
+}
+
 bool BridgedSourceLoc_isValid(BridgedSourceLoc loc) {
   return loc.getOpaquePointerValue() != nullptr;
 }
 
 BridgedSourceLoc BridgedSourceLoc::advancedBy(size_t n) const {
   return BridgedSourceLoc(unbridged().getAdvancedLoc(n));
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedSourceRange
+//===----------------------------------------------------------------------===//
+
+BridgedSourceRange::BridgedSourceRange(swift::SourceRange range)
+    : Start(range.Start), End(range.End) {}
+
+swift::SourceRange BridgedSourceRange::unbridged() const {
+  return swift::SourceRange(Start.unbridged(), End.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedCharSourceRange
+//===----------------------------------------------------------------------===//
+
+BridgedCharSourceRange::BridgedCharSourceRange(swift::CharSourceRange range)
+    : Start(range.getStart()), ByteLength(range.getByteLength()) {}
+
+swift::CharSourceRange BridgedCharSourceRange::unbridged() const {
+  return swift::CharSourceRange(Start.unbridged(), ByteLength);
 }
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
