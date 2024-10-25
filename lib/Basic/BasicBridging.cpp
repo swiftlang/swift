@@ -60,7 +60,7 @@ void BridgedStringRef::write(BridgedOStream os) const {
 // MARK: BridgedOwnedString
 //===----------------------------------------------------------------------===//
 
-BridgedOwnedString::BridgedOwnedString(const std::string &stringToCopy)
+BridgedOwnedString::BridgedOwnedString(llvm::StringRef stringToCopy)
     : Data(nullptr), Length(stringToCopy.size()) {
   if (Length != 0) {
     Data = new char[Length];

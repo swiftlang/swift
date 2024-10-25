@@ -45,6 +45,14 @@ bool BridgedAliasAnalysis::unused(BridgedValue address1, BridgedValue address2) 
 static_assert(sizeof(BridgedCalleeAnalysis::CalleeList) >= sizeof(swift::CalleeList),
               "BridgedCalleeAnalysis::CalleeList has wrong size");
 
+BridgedCalleeAnalysis::CalleeList::CalleeList(swift::CalleeList list) {
+  *reinterpret_cast<swift::CalleeList *>(&storage) = list;
+}
+
+swift::CalleeList BridgedCalleeAnalysis::CalleeList::unbridged() const {
+  return *reinterpret_cast<const swift::CalleeList *>(&storage);
+}
+
 bool BridgedCalleeAnalysis::CalleeList::isIncomplete() const {
   return unbridged().isIncomplete();
 }
@@ -509,7 +517,7 @@ void BridgedPassContext::SSAUpdater_initialize(
     BridgedFunction function, BridgedType type,
     BridgedValue::Ownership ownership) const {
   invocation->initializeSSAUpdater(function.getFunction(), type.unbridged(),
-                                   BridgedValue::castToOwnership(ownership));
+                                   BridgedValue::unbridge(ownership));
 }
 
 void BridgedPassContext::addFunctionToPassManagerWorklist(

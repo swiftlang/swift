@@ -23,11 +23,7 @@
 #include "swift/AST/ASTBridging.h"
 #include "swift/SIL/SILBridging.h"
 
-#ifdef USED_IN_CPP_SOURCE
-
-#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
-
-#else // USED_IN_CPP_SOURCE
+#ifndef USED_IN_CPP_SOURCE
 
 // Pure bridging mode does not permit including any C++/llvm/swift headers.
 // See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
@@ -45,6 +41,7 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 namespace swift {
 class AliasAnalysis;
 class BasicCalleeAnalysis;
+class CalleeList;
 class DeadEndBlocks;
 class DominanceInfo;
 class PostDominanceInfo;
@@ -94,18 +91,8 @@ struct BridgedCalleeAnalysis {
   struct CalleeList {
     uint64_t storage[3];
 
-    // Ensure that this struct value type will be indirectly returned on
-    // Windows ARM64
-    CalleeList() {}
-
-#ifdef USED_IN_CPP_SOURCE
-    CalleeList(swift::CalleeList list) {
-      *reinterpret_cast<swift::CalleeList *>(&storage) = list;
-    }
-    swift::CalleeList unbridged() const {
-      return *reinterpret_cast<const swift::CalleeList *>(&storage);
-    }
-#endif
+    BRIDGED_INLINE CalleeList(swift::CalleeList list);
+    BRIDGED_INLINE swift::CalleeList unbridged() const;
 
     BRIDGED_INLINE bool isIncomplete() const;
     BRIDGED_INLINE SwiftInt getCount() const;
