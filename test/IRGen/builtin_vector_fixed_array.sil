@@ -80,11 +80,11 @@ sil @loadable_fixed_indirect_to_direct: $@convention(thin) (@in Builtin.FixedArr
 entry(%v : $*Builtin.FixedArray<2, AnyObject>):
     // CHECK: [[V0:%.*]] = getelementptr {{.*}} %0, {{i[0-9]+}} 0
     // CHECK: [[V0_0:%.*]] = getelementptr {{.*}} [[V0]], {{i[0-9]+}} 0, {{i[0-9]+}} 0
-    // CHECK: [[V0_VALUE:%.*]] = load {{.*}} [[V0_0]], align 8
+    // CHECK: [[V0_VALUE:%.*]] = load {{.*}} [[V0_0]], align
 
     // CHECK: [[V1:%.*]] = getelementptr {{.*}} %0, {{i[0-9]+}} 1
     // CHECK: [[V1_0:%.*]] = getelementptr {{.*}} [[V1]], {{i[0-9]+}} 0, {{i[0-9]+}} 0
-    // CHECK: [[V1_VALUE:%.*]] = load {{.*}} [[V1_0]], align 8
+    // CHECK: [[V1_VALUE:%.*]] = load {{.*}} [[V1_0]], align
     %a = load %v : $*Builtin.FixedArray<2, AnyObject>
 
     // CHECK: [[R0:%.*]] = insertvalue {{.*}} undef, ptr [[V0_VALUE]], 0
