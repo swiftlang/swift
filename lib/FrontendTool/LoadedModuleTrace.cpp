@@ -838,6 +838,12 @@ public:
           continue;
         }
         out.object([&] {
+          if (auto *parent = dyn_cast_or_null<clang::NamedDecl>(clangD
+                                                              ->getParent())) {
+            auto pName = parent->getName();
+            if (!pName.empty())
+              out.attribute("type", pName);
+          }
           out.attribute("method",  clangD->getNameAsString());
           out.attribute("location", Loc.printToString(SM));
         });
