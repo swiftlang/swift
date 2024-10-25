@@ -155,7 +155,8 @@ extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable & ~Escapabl
   /// initializer behind the scenes.
   @_transparent
   @_preInverseGenerics
-  public init(nilLiteral: ()) -> dependsOn(immortal) Self {
+  @lifetime(immortal)
+  public init(nilLiteral: ()) {
     self = .none
   }
 }
