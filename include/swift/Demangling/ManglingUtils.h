@@ -127,7 +127,8 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
     // with an initial '00' and Punycode the identifier string.
     std::string punycodeBuf;
     Punycode::encodePunycodeUTF8(ident, punycodeBuf,
-                                 /*mapNonSymbolChars*/ true);
+                                 /*mapNonSymbolChars*/ true,
+                                 /*repairInvalidUTF8*/ true);
     StringRef pcIdent = punycodeBuf;
     M.Buffer << "00" << pcIdent.size();
     if (isDigit(pcIdent[0]) || pcIdent[0] == '_')
