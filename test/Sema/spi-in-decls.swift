@@ -36,7 +36,7 @@ public struct IntLike: ExpressibleByIntegerLiteral, Equatable { // expected-note
 @_spi(X)
 @propertyWrapper
 public struct BadWrapper { // expected-note {{type declared here}}
-    public var wrappedValue: Int
+    public var wrappedValue: Int // expected-note {{type declared here}}
     public init(wrappedValue: Int) {
         self.wrappedValue = wrappedValue
     }
@@ -87,6 +87,7 @@ public struct TestInit {
 
 public struct TestPropertyWrapper {
   @BadWrapper public var BadProperty: Int // expected-error {{cannot use struct 'BadWrapper' as property wrapper here; it is SPI}}
+  // expected-error@-1 {{cannot use property 'wrappedValue' here; it is SPI}}
 }
 
 public protocol TestInherited: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; it is SPI}}

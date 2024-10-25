@@ -311,13 +311,6 @@ void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
                                        const ValueDecl *base,
                                        const AvailableAttr *attr);
 
-/// Emit a diagnostic for references to declarations that have been
-/// marked as unavailable, either through "unavailable" or "obsoleted:".
-bool diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
-                                    const ExportContext &Where,
-                                    const Expr *call,
-                                    DeclAvailabilityFlags Flags = std::nullopt);
-
 /// Checks whether a declaration should be considered unavailable when referred
 /// to in the given declaration context and availability context and, if so,
 /// returns a result that describes the unmet availability requirements.
