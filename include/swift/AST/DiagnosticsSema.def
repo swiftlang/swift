@@ -2302,6 +2302,13 @@ ERROR(pattern_type_access,none,
       "because its type uses "
       "%select{a private|a fileprivate|an internal|a package|%error|%error}5 type",
       (bool, bool, bool, AccessLevel, bool, AccessLevel))
+ERROR(pattern_type_access_leak,none,
+      "%select{%select{variable|constant}0|property}1 "
+      "%select{must be declared %select{public|private or fileprivate}4"
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|package|public|open}3}2 "
+      "because its type is non-public and its enclosing type's layout is exposed to clients",
+      (bool, bool, bool, AccessLevel, bool, AccessLevel))
 WARNING(pattern_type_access_warn,none,
         "%select{%select{variable|constant}0|property}1 "
         "%select{should be declared %select{private|fileprivate|internal|package|%error|%error}5"
@@ -2340,6 +2347,11 @@ ERROR(pattern_type_not_usable_from_inline_frozen,none,
       "type referenced from a stored property in a '@frozen' struct must "
       "be '@usableFromInline' or public",
       (/*ignored*/bool, /*ignored*/bool))
+ERROR(pattern_type_not_usable_from_inline_implicit_frozen,none,
+      "type referenced from a stored property in a public struct must "
+      "be '@usableFromInline' or public when building "
+      "with '-diagnose-escaping-implementation-only-properties'",
+      (/*ignored*/bool, /*ignored*/bool))
 ERROR(pattern_type_not_usable_from_inline_inferred,none,
       "type referenced from a '@usableFromInline' "
       "%select{%select{variable|constant}0|property}1 "
@@ -2355,6 +2367,11 @@ WARNING(pattern_type_not_usable_from_inline_inferred_warn,none,
 ERROR(pattern_type_not_usable_from_inline_inferred_frozen,none,
       "type referenced from a stored property with inferred type %2 in a "
       "'@frozen' struct must be '@usableFromInline' or public",
+      (/*ignored*/bool, /*ignored*/bool, Type))
+ERROR(pattern_type_not_usable_from_inline_inferred_implicit_frozen,none,
+      "type referenced from a stored property with inferred type %2 in a "
+      "public struct must be '@usableFromInline' or public when building "
+      "with '-non-resilient-hide-internal-dependencies'",
       (/*ignored*/bool, /*ignored*/bool, Type))
 
 ERROR(pattern_binds_no_variables,none,
@@ -6962,6 +6979,18 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "%2 was not imported publicly}3",
       (const ValueDecl *, unsigned, Identifier, unsigned))
 
+ERROR(inlinable_decl_ref_from_hidden_module_leak,
+      none, "%kind0 cannot be used here "
+      "because %select{%2 was imported implementation-only|"
+      "it is an SPI imported from %2|"
+      "it is SPI|"
+      "%2 was imported for SPI only|"
+      "%2 was not imported by this file|"
+      "C++ APIs from imported module %2 do not support library evolution|"
+      "%2 was not imported publicly}3 "
+      "and its layout is exposed to clients",
+      (const ValueDecl *, unsigned, Identifier, unsigned))
+
 ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       none, "%0 aliases '%1.%2' and cannot be used in " FRAGILE_FUNC_KIND "3 "
       "because %select{%4 has been imported as implementation-only|"
@@ -7274,9 +7303,25 @@ ERROR(property_wrapper_type_access,none,
       "because its property wrapper type uses "
       "%select{a private|a fileprivate|an internal|a package|%error|%error}5 type",
       (bool, bool, bool, AccessLevel, bool, AccessLevel))
+ERROR(property_wrapper_type_access_leak,none,
+      "%select{%select{variable|constant}0|property}1 "
+      "%select{must be declared %select{"
+      "public|private or fileprivate}4"
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|package|public|open}3}2 "
+      "because its property wrapper type uses "
+      "%select{a private|a fileprivate|an internal|a package|%error|%error}5 type "
+      "and its enclosing type's layout is exposed to clients",
+      (bool, bool, bool, AccessLevel, bool, AccessLevel))
 ERROR(property_wrapper_type_not_usable_from_inline,none,
       "property wrapper type referenced from a '@usableFromInline' "
       "%select{%select{variable|constant}0|property}1 "
+      "must be '@usableFromInline' or public",
+      (bool, bool))
+ERROR(property_wrapper_type_not_usable_from_inline_leak,none,
+      "property wrapper type referenced from a "
+      "%select{%select{variable|constant}0|property}1 "
+      "visible to clients "
       "must be '@usableFromInline' or public",
       (bool, bool))
 WARNING(property_wrapper_wrapperValue,Deprecation,

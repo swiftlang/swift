@@ -1277,10 +1277,13 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
                             D->getDescriptiveKind());
     }
 
+    auto &context = VD->getASTContext();
+
     // Forbid stored properties marked SPI in frozen types.
     if (auto property = dyn_cast<VarDecl>(VD)) {
       if (auto NTD = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
-        if (property->isLayoutExposedToClients() && !NTD->isSPI()) {
+        if (property->isLayoutExposedToClients(context.TypeCheckerOpts.DiagnoseEscapingImplementationOnlyProperties) 
+            && !NTD->isSPI()) {
           diagnoseAndRemoveAttr(attr,
                                 diag::spi_attribute_on_frozen_stored_properties,
                                 VD);

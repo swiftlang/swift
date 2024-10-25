@@ -6471,12 +6471,11 @@ public:
   /// @frozen and resides in a resilient module.
   bool isInitExposedToClients() const;
 
-  /// Determines if this var is exposed as part of the layout of a
-  /// @frozen struct.
-  ///
-  /// From the standpoint of access control and exportability checking, this
-  /// var will behave as if it was public, even if it is internal or private.
-  bool isLayoutExposedToClients() const;
+  /// Determines if this var is exposed as part of the layout of its
+  /// containing type. If true is passed for the inFrozenContext
+  /// parameter, a stored var will behave as if it was public, even if
+  /// declared internal or private.
+  bool isLayoutExposedToClients(bool inFrozenContext) const;
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }

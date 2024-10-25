@@ -1809,6 +1809,9 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.PrintFullConvention |=
       Args.hasArg(OPT_experimental_print_full_convention);
 
+  Opts.DiagnoseEscapingImplementationOnlyProperties |=
+      Args.hasArg(OPT_diagnose_escaping_implementation_only_properties); 
+
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
 
   for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
