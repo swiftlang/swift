@@ -16,6 +16,7 @@ a json .config file and a series of .git repos with "fake commits".
 import copy
 import json
 import os
+import random
 import subprocess
 import tempfile
 import unittest
@@ -179,12 +180,24 @@ def setup_mock_remote(test_case, base_dir, base_config, remotes_path, local_path
         call_quietly(
             ["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=local_repo_path
         )
-        for i, (filename, contents) in enumerate(changes):
+        for filename, contents in changes:
             filename_path = os.path.join(local_repo_path, filename)
             with open(filename_path, "w") as f:
                 f.write(contents)
             call_quietly(["git", "add", filename], cwd=local_repo_path)
-            call_quietly(["git", "commit", "-m", "Commit %d" % i], cwd=local_repo_path)
+            call_quietly(
+                [
+                  "git",
+                  "commit",
+                  "-m",
+                  # Equal commits created in different repositories at these
+                  # short time intervals tend to get the same SHA, which can
+                  # compromise tests. Supplying a random commit message makes
+                  # these SHA collisions far less likely.
+                  str(random.random()),
+                ],
+                cwd=local_repo_path
+            )
             call_quietly(["git", "push", "origin", "main"], cwd=local_repo_path)
 
     https_clone_pattern = os.path.join(f"file://{remotes_path}", "%s")
