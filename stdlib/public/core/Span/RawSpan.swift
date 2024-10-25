@@ -143,6 +143,24 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
+  /// The memory in `buffer` must be valid and initialized
+  /// for at least as long as the returned `RawSpan` exists.
+  ///
+  /// - Parameters:
+  ///   - buffer: a raw buffer to initialized memory.
+  @_disallowFeatureSuppression(NonescapableTypes)
+  @_alwaysEmitIntoClient
+  @lifetime(immortal)
+  public init<T: BitwiseCopyable>(
+    _unsafeElements buffer: borrowing Slice<UnsafeBufferPointer<T>>
+  ) {
+    self.init(
+      _unsafeBytes: .init(UnsafeBufferPointer(rebasing: buffer))
+    )
+  }
+
+  /// Unsafely create a `RawSpan` over initialized memory.
+  ///
   /// The memory in `buffer` must be owned by the instance `owner`,
   /// meaning that as long as `owner` is alive the memory will remain valid.
   ///
@@ -157,6 +175,24 @@ extension RawSpan {
     _unsafeElements buffer: UnsafeMutableBufferPointer<T>
   ) {
     self.init(_unsafeElements: UnsafeBufferPointer(buffer))
+  }
+
+  /// Unsafely create a `RawSpan` over initialized memory.
+  ///
+  /// The memory in `buffer` must be valid and initialized
+  /// for at least as long as the returned `RawSpan` exists.
+  ///
+  /// - Parameters:
+  ///   - buffer: a raw buffer to initialized memory.
+  @_disallowFeatureSuppression(NonescapableTypes)
+  @_alwaysEmitIntoClient
+  @lifetime(immortal)
+  public init<T: BitwiseCopyable>(
+    _unsafeElements buffer: borrowing Slice<UnsafeMutableBufferPointer<T>>
+  ) {
+    self.init(
+      _unsafeBytes: .init(UnsafeBufferPointer(rebasing: buffer))
+    )
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
