@@ -774,3 +774,26 @@ Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UI
 Added: _$sSS5IndexV16debugDescriptionSSvpMV
 Added: _$sSS5IndexVs28CustomDebugStringConvertiblesMc
 Added: _$sSS5IndexVs28CustomDebugStringConvertiblesWP
+
+// SE-0447 Span and RawSpan
+Added: _$ss4SpanVMa
+Added: _$ss4SpanVMn
+Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivg
+Added: _$ss4SpanVsRi_zRi0_zrlE6_countSivpMV
+Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvg
+Added: _$ss4SpanVsRi_zRi0_zrlE8_pointerSVSgvpMV
+Added: _$ss4SpanVsRi_zrlE5countSivpMV
+Added: _$ss4SpanVsRi_zrlE7indicesSnySiGvpMV
+Added: _$ss4SpanVsRi_zrlE7isEmptySbvpMV
+Added: _$ss4SpanVss15BitwiseCopyableRzlE9uncheckedxSi_tcipMV
+Added: _$ss4SpanVss15BitwiseCopyableRzlEyxSicipMV
+Added: _$ss7RawSpanV11byteOffsetsSnySiGvpMV
+Added: _$ss7RawSpanV6_countSivg
+Added: _$ss7RawSpanV6_countSivpMV
+Added: _$ss7RawSpanV7isEmptySbvpMV
+Added: _$ss7RawSpanV8_pointerSVSgvg
+Added: _$ss7RawSpanV8_pointerSVSgvpMV
+Added: _$ss7RawSpanV9byteCountSivpMV
+Added: _$ss7RawSpanVMa
+Added: _$ss7RawSpanVMn
+Added: _$ss7RawSpanVN
