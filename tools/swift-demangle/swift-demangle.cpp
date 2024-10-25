@@ -346,7 +346,7 @@ static bool findMaybeMangled(llvm::StringRef input, llvm::StringRef &match) {
       while (ptr < end) {
         char ch = *ptr++;
 
-        if (ch == 'S' || ch == 's') {
+        if (ch == 'S' || ch == 's' || ch == 'e') {
           state = FoundPrefix;
           break;
         } else if (ch == '_') {
