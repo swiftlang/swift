@@ -260,6 +260,8 @@ ERROR(failed_base_method_call_synthesis,none,
 
 ERROR(both_returns_retained_returns_unretained,none,
       "%0 cannot be annotated with both swift_attr('returns_retained') and swift_attr('returns_unretained') attributes", (const clang::NamedDecl*))
+ERROR(redundant_conformance_protocol,none,
+      "redundant conformance of %0 to protocol %1", (Type, Identifier))
 
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
 NOTE(record_field_not_imported, none, "field %0 unavailable (cannot import)", (const clang::NamedDecl*))
