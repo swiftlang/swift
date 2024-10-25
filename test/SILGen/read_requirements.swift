@@ -9,6 +9,9 @@
 // RUN:     -enable-experimental-feature CoroutineAccessorsUnwindOnCallerError \
 // RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-UNWIND
 
+// For CoroutineAccessorsUnwindOnCallerError
+// REQUIRES: asserts
+
 // A read requirement may be satisfied by
 // - a stored property
 // - a _read accessor
