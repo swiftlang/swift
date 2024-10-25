@@ -1288,6 +1288,38 @@ bb0(%0 : $Builtin.RawPointer):
   return %99 : $(Int, Int, Int, Int)
 }
 
+// CHECK-LABEL: sil [ossa] @non_const_index :
+// CHECK:         [[L:%.*]] = load
+// CHECK-NOT:     load
+// CHECK:         tuple ([[L]] : $Int, [[L]] : $Int)
+// CHECK-LABEL: } // end sil function 'non_const_index'
+sil [ossa] @non_const_index : $@convention(thin) (@guaranteed B, Builtin.Word) -> (Int, Int) {
+bb0(%0 : @guaranteed $B, %1 : $Builtin.Word):
+  %2 = ref_tail_addr %0 : $B, $Int
+  %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+  %4 = load [trivial] %3 : $*Int
+  %5 = load [trivial] %3 : $*Int
+  %6 = tuple (%4 : $Int, %5 : $Int)
+  return %6 : $(Int, Int)
+}
+
+// CHECK-LABEL: sil [ossa] @non_const_index_aliasing :
+// CHECK:         [[L1:%.*]] = load
+// CHECK:         store
+// CHECK:         [[L2:%.*]] = load
+// CHECK:         tuple ([[L1]] : $Int, [[L2]] : $Int)
+// CHECK-LABEL: } // end sil function 'non_const_index_aliasing'
+sil [ossa] @non_const_index_aliasing : $@convention(thin) (@guaranteed B, Builtin.Word, Int) -> (Int, Int) {
+bb0(%0 : @guaranteed $B, %1 : $Builtin.Word, %2 : $Int):
+  %3 = ref_tail_addr %0 : $B, $Int
+  %4 = index_addr %3 : $*Int, %1 : $Builtin.Word
+  %5 = load [trivial] %3 : $*Int
+  store %2 to [trivial] %4: $*Int
+  %7 = load [trivial] %3 : $*Int
+  %8 = tuple (%5 : $Int, %7 : $Int)
+  return %8 : $(Int, Int)
+}
+
 sil [ossa] @overwrite_int : $@convention(thin) (@inout Int, Int) -> ()
 
 // Make sure that the store is forwarded to the load, ie. the load is
