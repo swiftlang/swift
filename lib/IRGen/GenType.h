@@ -183,9 +183,7 @@ private:
 #define REF_STORAGE(Name, ...) \
   const TypeInfo *convert##Name##StorageType(Name##StorageType *T);
 #include "swift/AST/ReferenceStorage.def"
-  const TypeInfo *convertBuiltinFixedArrayType(BuiltinFixedArrayType *T);
-
-
+  
 public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();

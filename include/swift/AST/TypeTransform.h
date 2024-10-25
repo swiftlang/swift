@@ -106,7 +106,7 @@ public:
     TypeBase *base = t.getPointer();
 
     switch (base->getKind()) {
-#define BUILTIN_CONCRETE_TYPE(Id, Parent) \
+#define BUILTIN_TYPE(Id, Parent) \
 case TypeKind::Id:
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
@@ -119,31 +119,6 @@ case TypeKind::Id:
     case TypeKind::BuiltinTuple:
     case TypeKind::Integer:
       return t;
-
-    case TypeKind::BuiltinFixedArray: {
-      auto bfaTy = cast<BuiltinFixedArrayType>(base);
-      
-      Type transSize = doIt(bfaTy->getSize(),
-                            TypePosition::Invariant);
-      if (!transSize) {
-        return Type();
-      }
-      
-      Type transElement = doIt(bfaTy->getElementType(),
-                               TypePosition::Invariant);
-      if (!transElement) {
-        return Type();
-      }
-      
-      CanType canTransSize = transSize->getCanonicalType();
-      CanType canTransElement = transElement->getCanonicalType();
-      if (canTransSize != bfaTy->getSize()
-          || canTransElement != bfaTy->getElementType()) {
-        return BuiltinFixedArrayType::get(canTransSize, canTransElement);
-      }
-      
-      return bfaTy;
-    }
 
     case TypeKind::PrimaryArchetype:
     case TypeKind::PackArchetype: {

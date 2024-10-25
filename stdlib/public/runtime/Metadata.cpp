@@ -1710,343 +1710,6 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
 }
 
 /***************************************************************************/
-/*** Vectors ****************************************************************/
-/***************************************************************************/
-
-namespace {
-
-class FixedArrayCacheEntry
-  : public MetadataCacheEntryBase<FixedArrayCacheEntry, int>
-{
-public:
-  // We have to give MetadataCacheEntryBase a non-empty list of trailing
-  // objects or else it gets annoyed.
-  template<typename...Etc>
-  static size_t numTrailingObjects(OverloadToken<int>, Etc &&...) { return 0; }
-
-  AllocationResult allocate() {
-    swift_unreachable("allocated during construction");
-  }
-
-  ValueWitnessTable Witnesses;
-  FullMetadata<FixedArrayTypeMetadata> Data;
-
-  struct Key {
-    intptr_t Count;
-    const Metadata *Element;
-
-
-    static llvm::hash_code hash_value(intptr_t count, const Metadata *elt) {
-      return llvm::hash_combine(count, elt);
-    }
-
-    friend llvm::hash_code hash_value(const Key &key) {
-      return hash_value(key.Count, key.Element);
-    }
-  };
-  
-  static const char *getName() { return "FixedArrayCache"; }
-  
-  ValueType getValue() {
-    return &Data;
-  }
-  void setValue(ValueType value) {
-    assert(value == &Data);
-  }
-  
-  FixedArrayCacheEntry(const Key &key, MetadataWaitQueue::Worker &worker,
-                   MetadataRequest request);
-
-  MetadataStateWithDependency tryInitialize(Metadata *metadata,
-                                    PrivateMetadataState state,
-                                    PrivateMetadataCompletionContext *context);
-
-  MetadataStateWithDependency checkTransitiveCompleteness() {
-    auto dependency = ::checkTransitiveCompleteness(&Data);
-    return { dependency ? PrivateMetadataState::NonTransitiveComplete
-                        : PrivateMetadataState::Complete,
-             dependency };
-  }
-
-  intptr_t getKeyIntValueForDump() {
-    return 0; // No single meaningful value
-  }
-
-  friend llvm::hash_code hash_value(const FixedArrayCacheEntry &value) {
-    return Key::hash_value(value.Data.Count, value.Data.Element);
-  }
-
-  bool matchesKey(const Key &key) {
-    return Data.Count == key.Count && Data.Element == key.Element;
-  }
-
-};
-
-class FixedArrayCacheStorage :
-  public LockingConcurrentMapStorage<FixedArrayCacheEntry, FixedArrayCacheTag> {
-public:
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Winvalid-offsetof"
-  static FixedArrayCacheEntry *
-  resolveExistingEntry(const FixedArrayTypeMetadata *metadata) {
-    // The correctness of this arithmetic is verified by an assertion in
-    // the TupleCacheEntry constructor.
-    auto bytes = reinterpret_cast<const char*>(asFullMetadata(metadata));
-    bytes -= offsetof(FixedArrayCacheEntry, Data);
-    auto entry = reinterpret_cast<const FixedArrayCacheEntry*>(bytes);
-    return const_cast<FixedArrayCacheEntry*>(entry);
-  }
-#pragma clang diagnostic pop
-};
-
-class FixedArrayCache :
-  public LockingConcurrentMap<FixedArrayCacheEntry, FixedArrayCacheStorage> {
-};
-
-static Lazy<FixedArrayCache> FixedArrayTypes;
-
-} // end anonymous namespace
-
-MetadataResponse
-swift::swift_getFixedArrayTypeMetadata(MetadataRequest request,
-                                   intptr_t count,
-                                   const Metadata *element) {
-  // An empty array is laid out like an empty tuple.
-  // Since Builtin.FixedArray is a builtin type, we don't try to guarantee it a
-  // unique runtime identity.
-  if (count <= 0) {
-    return MetadataResponse{&METADATA_SYM(EMPTY_TUPLE_MANGLING),
-                            MetadataState::Complete};
-  }
-  
-  // If the element type has no tail padding, then its metadata is good enough
-  // to hold space for the vector.
-  if (count == 1
-      && element->getValueWitnesses()->size == element->getValueWitnesses()->stride) {
-    return MetadataResponse{element, MetadataState::Complete};
-  }
-  
-  auto &cache = FixedArrayTypes.get();
-  FixedArrayCacheEntry::Key key{count, element};
-  return cache.getOrInsert(key, request).second;
-}
-
-FixedArrayCacheEntry::FixedArrayCacheEntry(const Key &key,
-                                   MetadataWaitQueue::Worker &worker,
-                                   MetadataRequest request)
-  : MetadataCacheEntryBase(worker, PrivateMetadataState::Abstract) {
-  Data.setKind(MetadataKind::FixedArray);
-  Data.Count = key.Count;
-  Data.Element = key.Element;
-
-  assert(FixedArrayCacheStorage::resolveExistingEntry(&Data) == this);
-}
-
-/// Given a metatype pointer, produce the value-witness table for it.
-static const ValueWitnessTable *generic_getValueWitnesses(const Metadata *metatype) {
-  return asFullMetadata(metatype)->ValueWitnesses;
-}
-
-/// Generic value witness for 'projectBuffer'.
-template <bool IsInline>
-static OpaqueValue *generic_projectBuffer(ValueBuffer *buffer,
-                                          const Metadata *metatype) {
-  assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
-
-  if (IsInline)
-    return reinterpret_cast<OpaqueValue*>(buffer);
-
-  auto wtable = generic_getValueWitnesses(metatype);
-  unsigned alignMask = wtable->getAlignmentMask();
-  // Compute the byte offset of the object in the box.
-  unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-  auto *bytePtr =
-      reinterpret_cast<char *>(*reinterpret_cast<HeapObject **>(buffer));
-  return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-}
-
-static void
-vector_destroy(OpaqueValue *dest, const Metadata *metatype) {
-  if (metatype->getValueWitnesses()->isPOD()) {
-    return;
-  }
-  
-  auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
-  auto destBytes = (char*)dest;
-  
-  for (unsigned i = 0, end = vectorType->getRealizedCount(),
-                stride = vectorType->Element->vw_stride();
-       i < end;
-       ++i, destBytes += stride) {
-    vectorType->Element->vw_destroy((OpaqueValue*)destBytes);
-  }
-}
-
-namespace {
-template<typename ElementFn>
-OpaqueValue *
-vector_elementwise_transfer(OpaqueValue *dest, OpaqueValue *src,
-                            const Metadata *metatype,
-                            ElementFn &&elementFn) {
-  if (metatype->getValueWitnesses()->isPOD()) {
-    memcpy(dest, src, metatype->vw_size());
-    return dest;
-  }
-  
-  auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
-  auto destBytes = (char*)dest;
-  auto srcBytes = (char*)src;
-  
-  for (unsigned i = 0, end = vectorType->getRealizedCount(),
-                stride = vectorType->Element->vw_stride();
-       i < end;
-       ++i, destBytes += stride, srcBytes += stride) {
-    elementFn(
-      (OpaqueValue*)destBytes,
-      (OpaqueValue*)srcBytes,
-      vectorType->Element);
-  }
-  return dest;
-}
-}
-static OpaqueValue *
-vector_initializeWithCopy(OpaqueValue *dest, OpaqueValue *src,
-                          const Metadata *metatype) {
-  return vector_elementwise_transfer(dest, src, metatype,
-    [&](OpaqueValue *destElt, OpaqueValue *srcElt, const Metadata *eltType) {
-      eltType->vw_initializeWithCopy(destElt, srcElt);
-    });
-}
-static OpaqueValue *
-vector_assignWithCopy(OpaqueValue *dest, OpaqueValue *src,
-                          const Metadata *metatype) {
-  return vector_elementwise_transfer(dest, src, metatype,
-    [&](OpaqueValue *destElt, OpaqueValue *srcElt, const Metadata *eltType) {
-      eltType->vw_assignWithCopy(destElt, srcElt);
-    });
-}
-static OpaqueValue *
-vector_initializeWithTake(OpaqueValue *dest, OpaqueValue *src,
-                          const Metadata *metatype) {
-  return vector_elementwise_transfer(dest, src, metatype,
-    [&](OpaqueValue *destElt, OpaqueValue *srcElt, const Metadata *eltType) {
-      eltType->vw_initializeWithTake(destElt, srcElt);
-    });
-}
-static OpaqueValue *
-vector_assignWithTake(OpaqueValue *dest, OpaqueValue *src,
-                      const Metadata *metatype) {
-  return vector_elementwise_transfer(dest, src, metatype,
-    [&](OpaqueValue *destElt, OpaqueValue *srcElt, const Metadata *eltType) {
-      eltType->vw_assignWithTake(destElt, srcElt);
-    });
-}
-
-static OpaqueValue *vector_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
-                                                            ValueBuffer *src,
-                                                            const Metadata *metatype) {
-  if (metatype->getValueWitnesses()->isValueInline()) {
-    return vector_initializeWithCopy(
-      generic_projectBuffer<true>(dest, metatype),
-      generic_projectBuffer<true>(src, metatype),
-      metatype);
-  }
-  
-  auto *srcReference = *reinterpret_cast<HeapObject**>(src);
-  *reinterpret_cast<HeapObject**>(dest) = srcReference;
-  swift_retain(srcReference);
-  return generic_projectBuffer<false>(dest, metatype);
-}
-
-static unsigned
-vector_getEnumTagSinglePayload(const OpaqueValue *theEnum,
-                               unsigned numEmptyCases,
-                               const Metadata *metatype) {
-  auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
-  return vectorType->Element->vw_getEnumTagSinglePayload(theEnum,
-                                                         numEmptyCases);
-}
-
-static void
-vector_storeEnumTagSinglePayload(OpaqueValue *theEnum,
-                                 unsigned whichCase,
-                                 unsigned numEmptyCases,
-                                 const Metadata *metatype) {
-  auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
-  vectorType->Element->vw_storeEnumTagSinglePayload(theEnum,
-                                                    whichCase,
-                                                    numEmptyCases);
-}
-
-MetadataStateWithDependency
-FixedArrayCacheEntry::tryInitialize(Metadata *metadata,
-                                PrivateMetadataState state,
-                                PrivateMetadataCompletionContext *context) {
-  // If we've already reached non-transitive completeness, just check that.
-  if (state == PrivateMetadataState::NonTransitiveComplete) {
-    return checkTransitiveCompleteness();
-  }
-
-  // Otherwise, we must still be abstract, because vectors don't have an
-  // intermediate state between that and non-transitive completeness.
-  assert(state == PrivateMetadataState::Abstract);
-
-  // Require the element type to be layout-complete.
-  const Metadata *element = Data.Element;
-  auto eltRequest = MetadataRequest(MetadataState::LayoutComplete,
-                                    /*nonblocking*/ true);
-  auto eltResponse = swift_checkMetadataState(eltRequest, element);
-  
-  // If the element is not layout-complete, we have to suspend.
-  if (!isAtLeast(eltResponse.State, MetadataState::LayoutComplete)) {
-    return {PrivateMetadataState::Abstract,
-            MetadataDependency(element, MetadataState::LayoutComplete)};
-  }
-  
-  // We can derive the array's layout from the element's.
-  intptr_t count = Data.Count;
-  // We should have checked for empty and uninhabited cases before getting this
-  // far.
-  assert(count > 0);
-  Data.ValueWitnesses = &Witnesses;
-  auto eltWitnesses = element->getValueWitnesses();
-  auto arraySize
-    = Witnesses.size = Witnesses.stride = eltWitnesses->stride * count;
-  // We take on most of the properties of the element type, except that an array
-  // of elements might end up larger than an inline buffer.
-  Witnesses.flags = eltWitnesses->flags
-    .withInlineStorage(
-              ValueWitnessTable::isValueInline(eltWitnesses->isBitwiseTakable(),
-                                               arraySize,
-                                               eltWitnesses->getAlignment()));
-  // We get extra inhabitants from the first element.
-  Witnesses.extraInhabitantCount = eltWitnesses->extraInhabitantCount;
-  
-  // Copy in the value witnesses.
-  // TODO: Specialize witnesses for POD etc.?
-#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
-#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
-  Witnesses.LOWER_ID = vector_##LOWER_ID;
-#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
-#include "swift/ABI/ValueWitness.def"
-
-  // If the element type is complete, so are we.
-  if (eltResponse.State == MetadataState::Complete) {
-    return {PrivateMetadataState::Complete, MetadataDependency()};
-  }
-  
-  // If it isn't at least non-transitively complete, wait for it to be.
-  if (!isAtLeast(eltResponse.State, MetadataState::NonTransitiveComplete)) {
-    return {PrivateMetadataState::NonTransitiveComplete,
-            MetadataDependency(element,
-                               MetadataState::NonTransitiveComplete) };
-  }
-  
-  // Otherwise, do a full completeness check.
-  return checkTransitiveCompleteness();
-}
-
-/***************************************************************************/
 /*** Tuples ****************************************************************/
 /***************************************************************************/
 
@@ -2058,6 +1721,8 @@ class TupleCacheEntry
 public:
   static const char *getName() { return "TupleCache"; }
 
+  // NOTE: if you change the layout of this type, you'll also need
+  // to update tuple_getValueWitnesses().
   unsigned ExtraInhabitantProvidingElement;
   ValueWitnessTable Witnesses;
   FullMetadata<TupleTypeMetadata> Data;
@@ -2159,6 +1824,7 @@ public:
 class TupleCacheStorage :
   public LockingConcurrentMapStorage<TupleCacheEntry, TupleCacheTag> {
 public:
+// FIXME: https://github.com/apple/swift/issues/43763.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
   static TupleCacheEntry *
@@ -2182,12 +1848,37 @@ class TupleCache :
 /// The uniquing structure for tuple type metadata.
 static Lazy<TupleCache> TupleTypes;
 
+/// Given a metatype pointer, produce the value-witness table for it.
+/// This is equivalent to metatype->ValueWitnesses but more efficient.
+static const ValueWitnessTable *tuple_getValueWitnesses(const Metadata *metatype) {
+  return asFullMetadata(metatype)->ValueWitnesses;
+}
+
+/// Generic tuple value witness for 'projectBuffer'.
+template <bool IsPOD, bool IsInline>
+static OpaqueValue *tuple_projectBuffer(ValueBuffer *buffer,
+                                        const Metadata *metatype) {
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  if (IsInline)
+    return reinterpret_cast<OpaqueValue*>(buffer);
+
+  auto wtable = tuple_getValueWitnesses(metatype);
+  unsigned alignMask = wtable->getAlignmentMask();
+  // Compute the byte offset of the object in the box.
+  unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
+  auto *bytePtr =
+      reinterpret_cast<char *>(*reinterpret_cast<HeapObject **>(buffer));
+  return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
+}
+
 /// Generic tuple value witness for 'allocateBuffer'
 template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
                                          const Metadata *metatype) {
-  assert(IsPOD == generic_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
 
   if (IsInline)
     return reinterpret_cast<OpaqueValue*>(buffer);
@@ -2200,8 +1891,8 @@ static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
 template <bool IsPOD, bool IsInline>
 static void tuple_destroy(OpaqueValue *tuple, const Metadata *_metadata) {
   auto &metadata = *(const TupleTypeMetadata*) _metadata;
-  assert(IsPOD == generic_getValueWitnesses(&metadata)->isPOD());
-  assert(IsInline == generic_getValueWitnesses(&metadata)->isValueInline());
+  assert(IsPOD == tuple_getValueWitnesses(&metadata)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(&metadata)->isValueInline());
 
   if (IsPOD) return;
 
@@ -2247,8 +1938,8 @@ template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeWithCopy(OpaqueValue *dest,
                                              OpaqueValue *src,
                                              const Metadata *metatype) {
-  assert(IsPOD == generic_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
 
   if (IsPOD) return tuple_memcpy(dest, src, metatype);
   return tuple_forEachField(dest, src, metatype,
@@ -2262,8 +1953,8 @@ template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeWithTake(OpaqueValue *dest,
                                              OpaqueValue *src,
                                              const Metadata *metatype) {
-  assert(IsPOD == generic_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
 
   if (IsPOD) return tuple_memcpy(dest, src, metatype);
   return tuple_forEachField(dest, src, metatype,
@@ -2277,8 +1968,8 @@ template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_assignWithCopy(OpaqueValue *dest,
                                          OpaqueValue *src,
                                          const Metadata *metatype) {
-  assert(IsPOD == generic_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
 
   if (IsPOD) return tuple_memcpy(dest, src, metatype);
   return tuple_forEachField(dest, src, metatype,
@@ -2304,18 +1995,18 @@ template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                            ValueBuffer *src,
                                                      const Metadata *metatype) {
-  assert(IsPOD == generic_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
   if (IsInline) {
     return tuple_initializeWithCopy<IsPOD, IsInline>(
-        generic_projectBuffer<IsInline>(dest, metatype),
-        generic_projectBuffer<IsInline>(src, metatype), metatype);
+        tuple_projectBuffer<IsPOD, IsInline>(dest, metatype),
+        tuple_projectBuffer<IsPOD, IsInline>(src, metatype), metatype);
   }
 
   auto *srcReference = *reinterpret_cast<HeapObject**>(src);
   *reinterpret_cast<HeapObject**>(dest) = srcReference;
   swift_retain(srcReference);
-  return generic_projectBuffer<IsInline>(dest, metatype);
+  return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
 }
 
 SWIFT_CC(swift)
@@ -2356,7 +2047,7 @@ static unsigned tuple_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
                                               unsigned numEmptyCases,
                                               const Metadata *self) {
   
-  auto *witnesses = generic_getValueWitnesses(self);
+  auto *witnesses = tuple_getValueWitnesses(self);
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
   auto getExtraInhabitantTag = tuple_getExtraInhabitantTag;
@@ -2370,7 +2061,7 @@ template <bool IsPOD, bool IsInline>
 static void
 tuple_storeEnumTagSinglePayload(OpaqueValue *enumAddr, unsigned whichCase,
                                 unsigned numEmptyCases, const Metadata *self) {
-  auto *witnesses = generic_getValueWitnesses(self);
+  auto *witnesses = tuple_getValueWitnesses(self);
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
   auto storeExtraInhabitantTag = tuple_storeExtraInhabitantTag;

@@ -6825,32 +6825,6 @@ DESERIALIZE_TYPE(BUILTIN_ALIAS_TYPE)(
   return alias->getDeclaredInterfaceType();
 }
 
-Expected<Type>
-DESERIALIZE_TYPE(BUILTIN_FIXED_ARRAY_TYPE)(
-    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData)
-{
-  TypeID sizeID;
-  TypeID elementTypeID;
-  decls_block::BuiltinFixedArrayTypeLayout::readRecord(scratch, sizeID,
-                                                       elementTypeID);
-                                                       
-  
-  auto sizeOrError = MF.getTypeChecked(sizeID);
-  if (!sizeOrError) {
-    return sizeOrError.takeError();
-  }
-  auto size = sizeOrError.get()->getCanonicalType();
-  
-  auto elementTypeOrError = MF.getTypeChecked(elementTypeID);
-  if (!elementTypeOrError) {
-    return elementTypeOrError.takeError();
-  }
-  auto elementType = elementTypeOrError.get()->getCanonicalType();
-  
-  return BuiltinFixedArrayType::get(size, elementType);
-}
-
-
 Expected<Type> DESERIALIZE_TYPE(NAME_ALIAS_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
   DeclID typealiasID;

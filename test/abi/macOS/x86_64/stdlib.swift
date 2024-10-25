@@ -570,7 +570,6 @@ Added: __swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstruments
 Added: _swift_clearSensitive
 Added: _swift_updatePureObjCClassMetadata
 Added: _swift_initRawStructMetadata2
-Added: _swift_getFixedArrayTypeMetadata
 
 // Runtime bincompat functions for Concurrency runtime to detect legacy mode
 Added: _swift_bincompat_useLegacyNonCrashingExecutorChecks

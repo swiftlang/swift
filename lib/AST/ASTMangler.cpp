@@ -1291,15 +1291,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendOperator("Bb");
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
-    case TypeKind::BuiltinUnboundGeneric:
-      llvm_unreachable("not a real type");
-    case TypeKind::BuiltinFixedArray: {
-      auto bfa = cast<BuiltinFixedArrayType>(tybase);
-      appendType(bfa->getSize(), sig, forDecl);
-      appendType(bfa->getElementType(), sig, forDecl);
-      return appendOperator("BV");
-    }
-    
     case TypeKind::SILToken:
       return appendOperator("Bt");
     case TypeKind::BuiltinVector:

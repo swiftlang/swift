@@ -897,12 +897,6 @@ ManglingError Remangler::mangleBoundGenericFunction(Node *node,
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleBuiltinFixedArray(Node *node, unsigned depth) {
-  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
-  Buffer << "BV";
-  return ManglingError::Success;
-}
-
 ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
   Buffer << 'B';
   StringRef text = node->getText();

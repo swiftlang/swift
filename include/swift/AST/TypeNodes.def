@@ -27,14 +27,6 @@
 ///   This type is a builtin type. The default behavior is
 ///   ALWAYS_CANONICAL_TYPE(id, parent).
 
-/// BUILTIN_CONCRETE_TYPE(id, parent)
-///   This type is a builtin type without generic parameters. The default
-///   behavior is BUILTIN_TYPE(id, parent).
-
-/// BUILTIN_GENERIC_TYPE(id, parent)
-///   This type is a builtin type with generic parameters. The default
-///   behavior is BUILTIN_TYPE(id, parent).
-
 /// SUGARED_TYPE(id, parent)
 ///   This type is never canonical.  It provides an efficient accessor,
 ///   getSinglyDesugaredType(), which removes one level of sugar.  This
@@ -80,14 +72,6 @@
 #define BUILTIN_TYPE(id, parent) ALWAYS_CANONICAL_TYPE(id, parent)
 #endif
 
-#ifndef BUILTIN_CONCRETE_TYPE
-#define BUILTIN_CONCRETE_TYPE(id, parent) BUILTIN_TYPE(id, parent)
-#endif
-
-#ifndef BUILTIN_GENERIC_TYPE
-#define BUILTIN_GENERIC_TYPE(id, parent) BUILTIN_TYPE(id, parent)
-#endif
-
 #ifndef SUGARED_TYPE
 #define SUGARED_TYPE(id, parent) TYPE(id, parent)
 #endif
@@ -127,24 +111,22 @@ UNCHECKED_TYPE(Unresolved, Type)
 UNCHECKED_TYPE(Placeholder, Type)
 ABSTRACT_TYPE(Builtin, Type)
   ABSTRACT_TYPE(AnyBuiltinInteger, BuiltinType)
-    BUILTIN_CONCRETE_TYPE(BuiltinInteger, AnyBuiltinIntegerType)
-    BUILTIN_CONCRETE_TYPE(BuiltinIntegerLiteral, AnyBuiltinIntegerType)
+    BUILTIN_TYPE(BuiltinInteger, AnyBuiltinIntegerType)
+    BUILTIN_TYPE(BuiltinIntegerLiteral, AnyBuiltinIntegerType)
     TYPE_RANGE(AnyBuiltinInteger, BuiltinInteger, BuiltinIntegerLiteral)
-  BUILTIN_CONCRETE_TYPE(BuiltinExecutor, BuiltinType)
-  BUILTIN_CONCRETE_TYPE(BuiltinFloat, BuiltinType)
-  BUILTIN_CONCRETE_TYPE(BuiltinJob, BuiltinType)
-  BUILTIN_CONCRETE_TYPE(BuiltinPackIndex, BuiltinType)
-  BUILTIN_CONCRETE_TYPE(BuiltinRawPointer, BuiltinType)
-  BUILTIN_CONCRETE_TYPE(BuiltinRawUnsafeContinuation, BuiltinType)
-  BUILTIN_CONCRETE_TYPE(BuiltinNativeObject, BuiltinType)
-  BUILTIN_CONCRETE_TYPE(BuiltinBridgeObject, BuiltinType)
-  BUILTIN_CONCRETE_TYPE(BuiltinUnsafeValueBuffer, BuiltinType)
-  BUILTIN_CONCRETE_TYPE(BuiltinDefaultActorStorage, BuiltinType)
-  BUILTIN_CONCRETE_TYPE(BuiltinNonDefaultDistributedActorStorage, BuiltinType)
-  BUILTIN_CONCRETE_TYPE(BuiltinVector, BuiltinType)
-  BUILTIN_GENERIC_TYPE(BuiltinFixedArray, BuiltinType)
-  BUILTIN_CONCRETE_TYPE(BuiltinUnboundGeneric, BuiltinType)
-  TYPE_RANGE(Builtin, BuiltinInteger, BuiltinUnboundGeneric)
+  BUILTIN_TYPE(BuiltinExecutor, BuiltinType)
+  BUILTIN_TYPE(BuiltinFloat, BuiltinType)
+  BUILTIN_TYPE(BuiltinJob, BuiltinType)
+  BUILTIN_TYPE(BuiltinPackIndex, BuiltinType)
+  BUILTIN_TYPE(BuiltinRawPointer, BuiltinType)
+  BUILTIN_TYPE(BuiltinRawUnsafeContinuation, BuiltinType)
+  BUILTIN_TYPE(BuiltinNativeObject, BuiltinType)
+  BUILTIN_TYPE(BuiltinBridgeObject, BuiltinType)
+  BUILTIN_TYPE(BuiltinUnsafeValueBuffer, BuiltinType)
+  BUILTIN_TYPE(BuiltinDefaultActorStorage, BuiltinType)
+  BUILTIN_TYPE(BuiltinNonDefaultDistributedActorStorage, BuiltinType)
+  BUILTIN_TYPE(BuiltinVector, BuiltinType)
+  TYPE_RANGE(Builtin, BuiltinInteger, BuiltinVector)
 TYPE(Tuple, Type)
 ABSTRACT_TYPE(ReferenceStorage, Type)
 #define REF_STORAGE(Name, ...) \
@@ -246,8 +228,6 @@ SINGLETON_TYPE(SILToken, SILToken)
 #undef UNCHECKED_TYPE
 #undef ARTIFICIAL_TYPE
 #undef SUGARED_TYPE
-#undef BUILTIN_GENERIC_TYPE
-#undef BUILTIN_CONCRETE_TYPE
 #undef BUILTIN_TYPE
 #undef ALWAYS_CANONICAL_TYPE
 #undef ALWAYS_CANONICAL_ARTIFICIAL_TYPE

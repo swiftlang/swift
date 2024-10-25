@@ -49,6 +49,5 @@ TAG(ExtendedExistentialTypeShapes, 23)
 TAG(MetadataPack, 24)
 TAG(WitnessTablePack, 25)
 TAG(LayoutString, 26)
-TAG(FixedArrayCache, 27)
 
 #undef TAG
