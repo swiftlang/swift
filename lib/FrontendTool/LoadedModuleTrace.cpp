@@ -24,11 +24,12 @@
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/IDE/SourceEntityWalker.h"
 
-#include "clang/Basic/Module.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/FileUtilities.h"
@@ -814,49 +815,50 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   return false;
 }
 
-
-bool swift::emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
-                                             const FrontendOptions &opts) {
-  ASTContext &ctxt = mainModule->getASTContext();
-  assert(!ctxt.hadError() &&
-         "We should've already exited earlier if there was an error.");
-  class ObjcMethodRefereceCollector: public SourceEntityWalker {
-    std::set<const clang::ObjCMethodDecl*> results;
-    bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
-                            Type T, ReferenceMetaData Data) override {
-      if (!Range.isValid())
-        return true;
-      if (auto *clangD = dyn_cast_or_null<clang::ObjCMethodDecl>(D->getClangDecl())) {
-        results.insert(clangD);
-      }
+class ObjcMethodReferenceCollector: public SourceEntityWalker {
+  llvm::DenseSet<const clang::ObjCMethodDecl*> results;
+  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
+                          Type T, ReferenceMetaData Data) override {
+    if (!Range.isValid())
       return true;
+    if (auto *clangD = dyn_cast_or_null<clang::ObjCMethodDecl>(D->getClangDecl())) {
+      results.insert(clangD);
     }
-  public:
-    void dump(llvm::raw_ostream &OS) {
-      OS << "[\n";
+    return true;
+  }
+public:
+  void serializeAsJson(llvm::raw_ostream &OS) {
+    llvm::json::OStream out(OS, /*IndentSize=*/4);
+    out.array([&] {
       for (const clang::ObjCMethodDecl* clangD: results) {
         auto &SM = clangD->getASTContext().getSourceManager();
         clang::SourceLocation Loc = clangD->getLocation();
         if (!Loc.isValid()) {
           continue;
         }
-        OS << "\t{\n";
-        OS << "\t\t\"method_name\": \"" << clangD->getNameAsString() << "\",\n";
-        OS << "\t\t\"location\": \"" << Loc.printToString(SM) << "\"\n";
-        OS << "\t}";
-        OS << ",\n";
+        out.object([&] {
+          out.attribute("method",  clangD->getNameAsString());
+          out.attribute("location", Loc.printToString(SM));
+        });
       }
-      OS << "{} ]\n";
-    }
-  };
+    });
+  }
+};
+
+bool swift::emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
+                                             const FrontendOptions &opts) {
+  ASTContext &ctxt = mainModule->getASTContext();
+  assert(!ctxt.hadError() &&
+         "We should've already exited earlier if there was an error.");
+
   opts.InputsAndOutputs.forEachInput([&](const InputFile &input) {
     auto loadedModuleTracePath = input.getLoadedModuleTracePath();
     if (loadedModuleTracePath.empty())
       return false;
     llvm::SmallString<128> tracePath {loadedModuleTracePath};
     llvm::sys::path::remove_filename(tracePath);
-    llvm::sys::path::append(tracePath, "SWIFT_OBJC_MESSAGE_TRACE");
+    llvm::sys::path::append(tracePath, ".SWIFT_OBJC_MESSAGE_TRACE");
     if (!llvm::sys::fs::exists(tracePath)) {
       if (llvm::sys::fs::create_directory(tracePath))
         return false;
@@ -868,13 +870,13 @@ bool swift::emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
     }
     // Write the contents of the buffer.
     llvm::raw_fd_ostream out(tmpFD, /*shouldClose=*/true);
-    ObjcMethodRefereceCollector collector;
+    ObjcMethodReferenceCollector collector;
     for (auto *FU : mainModule->getFiles()) {
       if (auto *SF = dyn_cast<SourceFile>(FU)) {
         collector.walk(*SF);
       }
     }
-    collector.dump(out);
+    collector.serializeAsJson(out);
     return true;
   });
   return false;
