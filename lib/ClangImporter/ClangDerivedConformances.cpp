@@ -419,6 +419,13 @@ void swift::conformToCxxIteratorIfNeeded(
   ASTContext &ctx = decl->getASTContext();
   clang::ASTContext &clangCtx = clangDecl->getASTContext();
 
+  if (clangDecl->getIdentifier() &&
+      clangDecl->getName() == "__normal_iterator") {
+    llvm::errs() << "//// conforming __normal_iterator to UnsafeCxxIter\n";
+    decl->dump(llvm::errs(), 2);
+    llvm::errs() << "\n";
+  }
+  
   if (!ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator))
     return;
 
@@ -428,6 +435,10 @@ void swift::conformToCxxIteratorIfNeeded(
   auto iteratorCategory = getIteratorCategoryDecl(clangDecl);
   if (!iteratorCategory)
     return;
+  if (clangDecl->getIdentifier() &&
+      clangDecl->getName() == "__normal_iterator") {
+    llvm::errs() << "//// conforming __normal_iterator to UnsafeCxxIter: past iterator_tag\n";
+  }
 
   auto unwrapUnderlyingTypeDecl =
       [](clang::TypeDecl *typeDecl) -> clang::CXXRecordDecl * {
@@ -449,6 +460,11 @@ void swift::conformToCxxIteratorIfNeeded(
   auto underlyingCategoryDecl = unwrapUnderlyingTypeDecl(iteratorCategory);
   if (!underlyingCategoryDecl)
     return;
+  
+  if (clangDecl->getIdentifier() &&
+      clangDecl->getName() == "__normal_iterator") {
+    llvm::errs() << "//// conforming __normal_iterator to UnsafeCxxIter: unwrapped\n";
+  }
 
   auto isIteratorTagDecl = [&](const clang::CXXRecordDecl *base,
                                StringRef tag) {
@@ -484,6 +500,10 @@ void swift::conformToCxxIteratorIfNeeded(
 
   if (!isInputIterator)
     return;
+  if (clangDecl->getIdentifier() &&
+      clangDecl->getName() == "__normal_iterator") {
+    llvm::errs() << "//// conforming __normal_iterator to UnsafeCxxIter: is input iterator\n";
+  }
 
   bool isContiguousIterator = false;
   // In C++20, `std::contiguous_iterator_tag` is specified as a type called
@@ -505,17 +525,32 @@ void swift::conformToCxxIteratorIfNeeded(
             });
     }
   }
+  
+  if (clangDecl->getIdentifier() &&
+      clangDecl->getName() == "__normal_iterator") {
+    llvm::errs() << "//// conforming __normal_iterator to UnsafeCxxIter: checking pointee\n";
+  }
 
   // Check if present: `var pointee: Pointee { get }`
   auto pointeeId = ctx.getIdentifier("pointee");
   auto pointee = lookupDirectSingleWithoutExtensions<VarDecl>(decl, pointeeId);
   if (!pointee || pointee->isGetterMutating() || pointee->getTypeInContext()->hasError())
     return;
+  
+  if (clangDecl->getIdentifier() &&
+      clangDecl->getName() == "__normal_iterator") {
+    llvm::errs() << "//// conforming __normal_iterator to UnsafeCxxIter: checking pointee settable\n";
+  }
 
   // Check if `var pointee: Pointee` is settable. This is required for the
   // conformance to UnsafeCxxMutableInputIterator but is not necessary for
   // UnsafeCxxInputIterator.
   bool pointeeSettable = pointee->isSettable(nullptr);
+  
+  if (clangDecl->getIdentifier() &&
+      clangDecl->getName() == "__normal_iterator") {
+    llvm::errs() << "//// conforming __normal_iterator to UnsafeCxxIter: checking successor\n";
+  }
 
   // Check if present: `func successor() -> Self`
   auto successorId = ctx.getIdentifier("successor");
@@ -526,6 +561,11 @@ void swift::conformToCxxIteratorIfNeeded(
   auto successorTy = successor->getResultInterfaceType();
   if (!successorTy || successorTy->getAnyNominal() != decl)
     return;
+  
+  if (clangDecl->getIdentifier() &&
+      clangDecl->getName() == "__normal_iterator") {
+    llvm::errs() << "//// conforming __normal_iterator to UnsafeCxxIter: checking ==\n";
+  }
 
   // Check if present: `func ==`
   auto equalEqual = getEqualEqualOperator(decl);
@@ -551,6 +591,11 @@ void swift::conformToCxxIteratorIfNeeded(
   }
   if (!equalEqual)
     return;
+  
+  if (clangDecl->getIdentifier() &&
+      clangDecl->getName() == "__normal_iterator") {
+    llvm::errs() << "//// conforming __normal_iterator to UnsafeCxxIter: done for input\n";
+  }
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Pointee"),
                                pointee->getTypeInContext());
@@ -566,6 +611,10 @@ void swift::conformToCxxIteratorIfNeeded(
     return;
 
   // Try to conform to UnsafeCxxRandomAccessIterator if possible.
+  if (clangDecl->getIdentifier() &&
+      clangDecl->getName() == "__normal_iterator") {
+    llvm::errs() << "//// conforming __normal_iterator to UnsafeCxxIter: trying rac\n";
+  }
 
   // Check if present: `func -`
   auto minus = getMinusOperator(decl);

@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend %t/test.swift -I %t/Inputs -c -index-system-modules -index-store-path %t/store -enable-experimental-cxx-interop 2>&1
 // RUN: cat %t/store/interfaces/CxxModule* | %FileCheck --check-prefix=CHECK %s
 
+// UNSUPPORTED: OS=linux-gnu
 //--- Inputs/module.modulemap
 module CxxModule {
     header "header.h"
