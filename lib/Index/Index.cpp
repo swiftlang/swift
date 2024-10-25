@@ -850,12 +850,12 @@ private:
     if (Loc.isInvalid() || isSuppressed(Loc))
       return true;
 
+    IndexSymbol Info;
+
     // Dig back to the original captured variable
     if (auto *VD = dyn_cast<VarDecl>(D)) {
-      D = firstDecl(D);
+      Info.originalDecl = firstDecl(D);
     }
-
-    IndexSymbol Info;
 
     if (Data.isImplicit)
       Info.roles |= (unsigned)SymbolRole::Implicit;
@@ -1580,13 +1580,17 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
     if (!reportRef(shadowedDecl, loc, info, AccessKind::Read))
       return false;
 
-    // Suppress the reference if there is any (it is implicit and hence
-    // already skipped in the shorthand if let case, but explicit in the
-    // captured case).
-    suppressRefAtLoc(loc);
+    // Keep the refs and definition for the real decl when indexing locals,
+    // so the references to the shadowing variable are distinct.
+    if (!IdxConsumer.indexLocals()) {
+      // Suppress the reference if there is any (it is implicit and hence
+      // already skipped in the shorthand if let case, but explicit in the
+      // captured case).
+      suppressRefAtLoc(loc);
 
-    // Skip the definition of a shadowed decl
-    return true;
+      // Skip the definition of a shadowed decl
+      return true;
+    }
   }
 
   if (startEntityDecl(D)) {
