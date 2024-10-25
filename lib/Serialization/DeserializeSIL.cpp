@@ -609,6 +609,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // We can't deserialize function bodies after IRGen lowering passes have
   // happened since other definitions in the module will no longer be in
   // canonical SIL form.
+  assert(!forDebugScope || declarationOnly); // debug scopes must always be read
+                                             // declaration only
   switch (SILMod.getStage()) {
   case SILStage::Raw:
   case SILStage::Canonical:
@@ -628,12 +630,29 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   auto &cacheEntry = Funcs[FID - 1];
 
   if (cacheEntry.isFullyDeserialized() ||
-      (cacheEntry.isDeserialized() && (declarationOnly || forDebugScope))) {
+      (cacheEntry.isDeserialized() && declarationOnly)) {
     auto fn = cacheEntry.get();
 
-    if (fn->isZombie() && !forDebugScope)
-      return nullptr;
-    return fn;
+    // Functions onlyReferencedByDebugInfo (A) are a subset of functions
+    // referred to by debug scopes forDebugScope=true (B)
+
+    // I) Functions in A U B only ever get deserialized as zombies
+
+    // II) For rest of functions (B - A), there are two orders of
+    // deserialization:
+    //  i) Deserialized for debugging -> deserialized by linker/optimizer:
+    //    a) Deserialize as zombie. When referenced by linker/optimizer,
+    //    createDeclaration would resurrect function as normal
+    //  ii) Deserialized by linker/optimizer -> deserialized for debugging ->
+    //  no zombie created
+
+    if (fn->isZombie() && !forDebugScope) {
+      if (cacheEntry.isFullyDeserialized())
+        return nullptr;
+      // else function resurrected below by createDeclaration
+    } else {
+      return fn;
+    }
   }
 
   BCOffsetRAII restoreOffset(SILCursor);
@@ -836,7 +855,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
 
     // TODO: for functions deserialized for debug scopes, set linkage to private
     // as public symbols make into the final binary even when zombies?
-    fn->setLinkage(onlyReferencedByDebugInfo ? SILLinkage::Private : linkage);
+    fn->setLinkage(forDebugScope ? SILLinkage::Private : linkage);
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
     fn->setSerializedKind(SerializedKind_t(serializedKind));
     fn->setThunk(IsThunk_t(isThunk));
@@ -873,10 +892,9 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     for (auto ID : SemanticsIDs) {
       fn->addSemanticsAttr(MF->getIdentifierText(ID));
     }
-    if (onlyReferencedByDebugInfo) {
+    if (forDebugScope)
       SILMod.eraseFunction(fn);
-    }
-    if (Callback && !onlyReferencedByDebugInfo)
+    if (Callback && !forDebugScope)
       Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
 
@@ -1013,7 +1031,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // Remember this in our cache in case it's a recursive function.
   // Increase the reference count to keep it alive.
   bool isFullyDeserialized =
-      (isEmptyFunction || !declarationOnly) && !onlyReferencedByDebugInfo;
+      (isEmptyFunction || !declarationOnly || onlyReferencedByDebugInfo);
   if (cacheEntry.isDeserialized()) {
     assert(fn == cacheEntry.get() && "changing SIL function during deserialization!");
   } else {
