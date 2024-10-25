@@ -32,6 +32,9 @@ bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                                    const FrontendOptions &opts,
                                    const InputFile &input);
 
+bool emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
+                                      const FrontendOptions &opts);
+
 } // end namespace swift
 
 #endif
