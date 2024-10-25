@@ -350,15 +350,20 @@ public:
 
   static AvailabilityRange inferForType(Type t);
 
-  /// Returns the context where a declaration is available
-  /// We assume a declaration without an annotation is always available.
+  /// Returns the range of platform versions in which the decl is available.
   static AvailabilityRange availableRange(const Decl *D);
+
+  /// Returns the range of platform versions in which the decl is available and
+  /// the attribute which determined this range (which may be `nullptr` if the
+  /// declaration is always available.
+  static std::pair<AvailabilityRange, const AvailableAttr *>
+  availableRangeAndAttr(const Decl *D);
 
   /// Returns true is the declaration is `@_spi_available`.
   static bool isAvailableAsSPI(const Decl *D);
 
-  /// Returns the availability context for a declaration with the given
-  /// @available attribute.
+  /// Returns the range of platform versions in which a declaration with the
+  /// given `@available` attribute is available.
   ///
   /// NOTE: The attribute must be active on the current platform.
   static AvailabilityRange availableRange(const AvailableAttr *attr,

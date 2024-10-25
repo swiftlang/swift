@@ -156,6 +156,8 @@ public:
 
   DeclContext *getDeclContext() const { return DC; }
 
+  AvailabilityContext getAvailability() const { return Availability; }
+
   AvailabilityRange getAvailabilityRange() const {
     return Availability.getPlatformRange();
   }
@@ -196,6 +198,74 @@ public:
   /// `@available` attribute that makes the decl unavailable. Otherwise, returns
   /// nullptr.
   const AvailableAttr *shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
+};
+
+/// Represents the reason a declaration is considered unavailable in a certain
+/// context.
+class UnmetAvailabilityRequirement {
+public:
+  enum class Kind {
+    /// The declaration is referenced in a context in which it is
+    /// generally unavailable. For example, a reference to a declaration that is
+    /// unavailable on macOS from a context that may execute on macOS has this
+    /// unmet requirement.
+    AlwaysUnavailable,
+
+    /// The declaration is referenced in a context in which it is considered
+    /// obsolete. For example, a reference to a declaration that is obsolete in
+    /// macOS 13 from a context that may execute on macOS 13 or later has this
+    /// unmet requirement.
+    Obsoleted,
+
+    /// The declaration is only available in a different version. For example,
+    /// the declaration might only be introduced in the Swift 6 language mode
+    /// while the module is being compiled in the Swift 5 language mode.
+    RequiresVersion,
+
+    /// The declaration is referenced in a context that does not have an
+    /// adequate minimum version constraint. For example, a reference to a
+    /// declaration that is introduced in macOS 13 from a context that may
+    /// execute on earlier versions of macOS has this unmet requirement. This
+    /// kind of unmet requirement can be addressed by tightening the minimum
+    /// version of the context with `if #available(...)` or by adding or
+    /// adjusting an `@available` attribute.
+    IntroducedInNewerVersion,
+  };
+
+private:
+  Kind kind;
+  const AvailableAttr *attr;
+
+  UnmetAvailabilityRequirement(Kind kind, const AvailableAttr *attr)
+      : kind(kind), attr(attr){};
+
+public:
+  static UnmetAvailabilityRequirement
+  forAlwaysUnavailable(const AvailableAttr *attr) {
+    return UnmetAvailabilityRequirement(Kind::AlwaysUnavailable, attr);
+  }
+
+  static UnmetAvailabilityRequirement forObsoleted(const AvailableAttr *attr) {
+    return UnmetAvailabilityRequirement(Kind::Obsoleted, attr);
+  }
+
+  static UnmetAvailabilityRequirement
+  forRequiresVersion(const AvailableAttr *attr) {
+    return UnmetAvailabilityRequirement(Kind::RequiresVersion, attr);
+  }
+
+  static UnmetAvailabilityRequirement
+  forIntroducedInNewerVersion(const AvailableAttr *attr) {
+    return UnmetAvailabilityRequirement(Kind::IntroducedInNewerVersion, attr);
+  }
+
+  Kind getKind() const { return kind; }
+  const AvailableAttr *getAttr() const { return attr; }
+
+  /// Returns the required range for `IntroducedInNewerVersion` requirements, or
+  /// `std::nullopt` otherwise.
+  std::optional<AvailabilityRange>
+  getRequiredNewerAvailabilityRange(ASTContext &ctx) const;
 };
 
 /// Check if a declaration is exported as part of a module's external interface.
@@ -247,6 +317,14 @@ bool diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
                                     const ExportContext &Where,
                                     const Expr *call,
                                     DeclAvailabilityFlags Flags = std::nullopt);
+
+/// Checks whether a declaration should be considered unavailable when referred
+/// to in the given declaration context and availability context and, if so,
+/// returns a result that describes the unmet availability requirements.
+/// Returns `std::nullopt` if the declaration is available.
+std::optional<UnmetAvailabilityRequirement>
+checkDeclarationAvailability(const Decl *decl, const DeclContext *declContext,
+                             AvailabilityContext availabilityContext);
 
 /// Diagnose uses of the runtime support of the given type, such as
 /// type metadata and dynamic casting.
