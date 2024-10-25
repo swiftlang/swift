@@ -366,7 +366,7 @@ extension LifetimeDependence.Scope {
         return nil
       }
       self = scope
-    case .pointer, .unidentified:
+    case .pointer, .index, .unidentified:
       self = .unknown(address)
     }
   }
@@ -1094,7 +1094,7 @@ extension LifetimeDependenceDefUseWalker {
       break
     case .yield:
       return storeToYieldDependence(address: address, of: operand)
-    case .global, .class, .tail, .storeBorrow, .pointer, .unidentified:
+    case .global, .class, .tail, .storeBorrow, .pointer, .index, .unidentified:
       // An address produced by .storeBorrow should never be stored into.
       //
       // TODO: allow storing an immortal value into a global.

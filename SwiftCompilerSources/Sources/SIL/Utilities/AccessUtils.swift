@@ -78,6 +78,11 @@ public enum AccessBase : CustomStringConvertible, Hashable {
   /// An address which is derived from a `Builtin.RawPointer`.
   case pointer(PointerToAddressInst)
 
+  // The result of an `index_addr` with a non-constant index.
+  // This can only occur in access paths returned by `Value.constantAccessPath`.
+  // In "regular" access paths such `index_addr` projections are contained in the `projectionPath` (`i*`).
+  case index(IndexAddrInst)
+
   /// The access base is some SIL pattern which does not fit into any other case.
   /// This should be a very rare situation.
   case unidentified
@@ -115,6 +120,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       case .yield(let result): return "yield - \(result)"
       case .storeBorrow(let sb): return "storeBorrow - \(sb)"
       case .pointer(let p):    return "pointer - \(p)"
+      case .index(let ia):     return "index - \(ia)"
     }
   }
 
@@ -123,7 +129,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     switch self {
       case .class, .tail:
         return true
-      case .box, .stack, .global, .argument, .yield, .storeBorrow, .pointer, .unidentified:
+      case .box, .stack, .global, .argument, .yield, .storeBorrow, .pointer, .index, .unidentified:
         return false
     }
   }
@@ -134,7 +140,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       case .box(let pbi):      return pbi.box
       case .class(let rea):    return rea.instance
       case .tail(let rta):     return rta.instance
-      case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .unidentified:
+      case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .index, .unidentified:
         return nil
     }
   }
@@ -162,7 +168,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     switch self {
       case .class(let rea):    return rea.fieldIsLet
       case .global(let g):     return g.isLet
-      case .box, .stack, .tail, .argument, .yield, .storeBorrow, .pointer, .unidentified:
+      case .box, .stack, .tail, .argument, .yield, .storeBorrow, .pointer, .index, .unidentified:
         return false
     }
   }
@@ -174,7 +180,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     case .class(let rea):    return rea.instance.referenceRoot is AllocRefInstBase
     case .tail(let rta):     return rta.instance.referenceRoot is AllocRefInstBase
     case .stack, .storeBorrow: return true
-    case .global, .argument, .yield, .pointer, .unidentified:
+    case .global, .argument, .yield, .pointer, .index, .unidentified:
       return false
     }
   }
@@ -184,7 +190,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     switch self {
       case .box, .class, .tail, .stack, .storeBorrow, .global:
         return true
-      case .argument, .yield, .pointer, .unidentified:
+      case .argument, .yield, .pointer, .index, .unidentified:
         return false
     }
   }
@@ -216,6 +222,8 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       return sb1 == sb2
     case (.pointer(let p1), .pointer(let p2)):
       return p1 == p2
+    case (.index(let ia1), .index(let ia2)):
+      return ia1 == ia2
     default:
       return false
     }
@@ -258,7 +266,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
 
     switch (self, other) {
     
-    // First handle all pairs of the same kind (except `yield` and `pointer`).
+    // First handle all pairs of the same kind (except `yield`, `pointer` and `index`).
     case (.box(let pb), .box(let otherPb)):
       return pb.fieldIndex != otherPb.fieldIndex ||
         isDifferentAllocation(pb.box.referenceRoot, otherPb.box.referenceRoot) ||
@@ -303,7 +311,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
 
 /// An `AccessPath` is a pair of a `base: AccessBase` and a `projectionPath: Path`
 /// which denotes the offset of the access from the base in terms of projections.
-public struct AccessPath : CustomStringConvertible {
+public struct AccessPath : CustomStringConvertible, Hashable {
   public let base: AccessBase
 
   /// address projections only
@@ -475,6 +483,11 @@ public enum EnclosingScope {
 private struct AccessPathWalker : AddressUseDefWalker {
   var result = AccessPath.unidentified()
   var foundBeginAccess: BeginAccessInst?
+  let enforceConstantProjectionPath: Bool
+
+  init(enforceConstantProjectionPath: Bool = false) {
+    self.enforceConstantProjectionPath = enforceConstantProjectionPath
+  }
 
   mutating func walk(startAt address: Value, initialPath: SmallProjectionPath = SmallProjectionPath()) {
     if walkUp(address: address, path: Path(projectionPath: initialPath)) == .abortWalk {
@@ -533,9 +546,13 @@ private struct AccessPathWalker : AddressUseDefWalker {
   }
 
   mutating func walkUp(address: Value, path: Path) -> WalkResult {
-    if address is IndexAddrInst {
+    if let indexAddr = address as? IndexAddrInst {
+      if !(indexAddr.index is IntegerLiteralInst) && enforceConstantProjectionPath {
+        self.result = AccessPath(base: .index(indexAddr), projectionPath: path.projectionPath)
+        return .continueWalk
+      }
       // Track that we crossed an `index_addr` during the walk-up
-      return walkUpDefault(address: address, path: path.with(indexAddr: true))
+      return walkUpDefault(address: indexAddr, path: path.with(indexAddr: true))
     } else if path.indexAddr && !canBeOperandOfIndexAddr(address) {
       // An `index_addr` instruction cannot be derived from an address
       // projection. Bail out
@@ -561,6 +578,25 @@ extension Value {
   /// Computes the access path of this address value.
   public var accessPath: AccessPath {
     var walker = AccessPathWalker()
+    walker.walk(startAt: self)
+    return walker.result
+  }
+
+  /// Like `accessPath`, but ensures that the projectionPath only contains "constant" elements.
+  /// This means: if the access contains an `index_addr` projection with a non-constant index,
+  /// the `projectionPath` does _not_ contain the `index_addr`.
+  /// Instead, the `base` is an `AccessBase.index` which refers to the `index_addr`.
+  /// For example:
+  /// ```
+  ///    %1 = ref_tail_addr %some_reference
+  ///    %2 = index_addr %1, %some_non_const_value
+  ///    %3 = struct_element_addr %2, #field2
+  /// ```
+  /// `%3.accessPath`         = base: tail(`%1`),  projectionPath: `i*.s2`
+  /// `%3.constantAccessPath` = base: index(`%2`), projectionPath: `s2`
+  ///
+  public var constantAccessPath: AccessPath {
+    var walker = AccessPathWalker(enforceConstantProjectionPath: true)
     walker.walk(startAt: self)
     return walker.result
   }
@@ -637,7 +673,7 @@ extension ValueUseDefWalker where Path == SmallProjectionPath {
         return walkUp(value: rea.instance, path: path.push(.classField, index: rea.fieldIndex)) != .abortWalk
       case .tail(let rta):
         return walkUp(value: rta.instance, path: path.push(.tailElements, index: 0)) != .abortWalk
-      case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .unidentified:
+      case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .index, .unidentified:
         return false
     }
   }

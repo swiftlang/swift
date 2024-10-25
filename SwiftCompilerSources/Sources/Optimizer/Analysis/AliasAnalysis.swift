@@ -334,7 +334,7 @@ struct AliasAnalysis {
     case .stack, .global, .argument, .storeBorrow:
       // Those access bases cannot be interior pointers of a borrowed value
       return .noEffects
-    case .pointer, .unidentified, .yield:
+    case .pointer, .index, .unidentified, .yield:
       // We don't know anything about this address -> get the conservative effects
       return defaultEffects(of: endBorrow, on: memLoc)
     case .box, .class, .tail:
