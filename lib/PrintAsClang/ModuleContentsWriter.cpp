@@ -350,7 +350,8 @@ public:
     }
   }
 
-  bool forwardDeclareMemberTypes(DeclRange members, const Decl *container) {
+  bool forwardDeclareMemberTypes(ArrayRef<Decl *> members,
+                                 const Decl *container) {
     PrettyStackTraceDecl
         entry("printing forward declarations needed by members of", container);
     switch (container->getKind()) {
@@ -480,7 +481,7 @@ public:
     if (!allRequirementsSatisfied)
       return false;
 
-    (void)forwardDeclareMemberTypes(CD->getMembers(), CD);
+    (void)forwardDeclareMemberTypes(CD->getAllMembers(), CD);
     auto [it, inserted] =
         seenTypes.try_emplace(CD, EmissionState::NotYetDefined, false);
     if (outputLangMode == OutputLanguageMode::Cxx &&
@@ -515,10 +516,10 @@ public:
     if (addImport(SD))
       return true;
     if (outputLangMode == OutputLanguageMode::Cxx) {
-      (void)forwardDeclareMemberTypes(SD->getMembers(), SD);
+      (void)forwardDeclareMemberTypes(SD->getAllMembers(), SD);
       for (const auto *ed :
            printer.getInteropContext().getExtensionsForNominalType(SD)) {
-        (void)forwardDeclareMemberTypes(ed->getMembers(), SD);
+        (void)forwardDeclareMemberTypes(ed->getAllMembers(), SD);
       }
       forwardDeclareCxxValueTypeIfNeeded(SD);
     }
@@ -545,7 +546,7 @@ public:
     if (!allRequirementsSatisfied)
       return false;
 
-    if (!forwardDeclareMemberTypes(PD->getMembers(), PD))
+    if (!forwardDeclareMemberTypes(PD->getAllMembers(), PD))
       return false;
 
     seenTypes[PD] = { EmissionState::Defined, true };
@@ -572,7 +573,7 @@ public:
     // This isn't rolled up into the previous set of requirements because
     // it /also/ prints forward declarations, and the header is a little
     // prettier if those are as close as possible to the necessary extension.
-    if (!forwardDeclareMemberTypes(ED->getMembers(), ED))
+    if (!forwardDeclareMemberTypes(ED->getAllMembers(), ED))
       return false;
 
     os << '\n';
@@ -585,7 +586,7 @@ public:
       return true;
 
     if (outputLangMode == OutputLanguageMode::Cxx) {
-      forwardDeclareMemberTypes(ED->getMembers(), ED);
+      forwardDeclareMemberTypes(ED->getAllMembers(), ED);
       forwardDeclareCxxValueTypeIfNeeded(ED);
     }
 
@@ -617,7 +618,7 @@ public:
 
   void write() {
     SmallVector<Decl *, 64> decls;
-    M.getTopLevelDecls(decls);
+    M.getTopLevelDeclsWithAuxiliaryDecls(decls);
     llvm::DenseSet<const ValueDecl *> removedValueDecls;
 
     auto newEnd =
@@ -649,7 +650,7 @@ public:
         if (!ext ||
             ext->getExtendedNominal() != M.getASTContext().getStringDecl())
           continue;
-        for (auto *m : ext->getMembers()) {
+        for (auto *m : ext->getAllMembers()) {
           if (auto *sd = dyn_cast<StructDecl>(m)) {
             if (sd->getBaseIdentifier().str() == "UTF8View" ||
                 sd->getBaseIdentifier().str() == "Index") {
@@ -761,8 +762,8 @@ public:
       // Break ties in extensions by putting smaller extensions last (in reverse
       // order).
       // FIXME: This will end up taking linear time.
-      auto lhsMembers = cast<ExtensionDecl>(*lhs)->getMembers();
-      auto rhsMembers = cast<ExtensionDecl>(*rhs)->getMembers();
+      auto lhsMembers = cast<ExtensionDecl>(*lhs)->getAllMembers();
+      auto rhsMembers = cast<ExtensionDecl>(*rhs)->getAllMembers();
       unsigned numLHSMembers = std::distance(lhsMembers.begin(),
                                              lhsMembers.end());
       unsigned numRHSMembers = std::distance(rhsMembers.begin(),
@@ -794,18 +795,19 @@ public:
       // Still nothing? Fine, we'll pick the one with the alphabetically first
       // member instead.
       {
-        auto mismatch =
-          std::mismatch(cast<ExtensionDecl>(*lhs)->getMembers().begin(),
-                        cast<ExtensionDecl>(*lhs)->getMembers().end(),
-                        cast<ExtensionDecl>(*rhs)->getMembers().begin(),
-                        [] (const Decl *nextLHSDecl, const Decl *nextRHSDecl) {
-          if (isa<ValueDecl>(nextLHSDecl) && isa<ValueDecl>(nextRHSDecl)) {
-            return cast<ValueDecl>(nextLHSDecl)->getName() !=
-                     cast<ValueDecl>(nextRHSDecl)->getName();
-          }
-          return isa<ValueDecl>(nextLHSDecl) != isa<ValueDecl>(nextRHSDecl);
-        });
-        if (mismatch.first != cast<ExtensionDecl>(*lhs)->getMembers().end()) {
+        auto mismatch = std::mismatch(
+            cast<ExtensionDecl>(*lhs)->getAllMembers().begin(),
+            cast<ExtensionDecl>(*lhs)->getAllMembers().end(),
+            cast<ExtensionDecl>(*rhs)->getAllMembers().begin(),
+            [](const Decl *nextLHSDecl, const Decl *nextRHSDecl) {
+              if (isa<ValueDecl>(nextLHSDecl) && isa<ValueDecl>(nextRHSDecl)) {
+                return cast<ValueDecl>(nextLHSDecl)->getName() !=
+                       cast<ValueDecl>(nextRHSDecl)->getName();
+              }
+              return isa<ValueDecl>(nextLHSDecl) != isa<ValueDecl>(nextRHSDecl);
+            });
+        if (mismatch.first !=
+            cast<ExtensionDecl>(*lhs)->getAllMembers().end()) {
           auto *lhsMember = dyn_cast<ValueDecl>(*mismatch.first),
                *rhsMember = dyn_cast<ValueDecl>(*mismatch.second);
           if (!rhsMember && lhsMember)

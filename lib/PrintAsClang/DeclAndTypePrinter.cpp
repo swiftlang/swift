@@ -188,7 +188,7 @@ public:
   }
 
   bool isEmptyExtensionDecl(const ExtensionDecl *ED) {
-    auto members = ED->getMembers();
+    auto members = ED->getAllMembers();
     auto hasMembers = std::any_of(members.begin(), members.end(),
                                   [this](const Decl *D) -> bool {
       if (auto VD = dyn_cast<ValueDecl>(D))
@@ -349,7 +349,7 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Non objc class.
       ClangClassTypePrinter(os).printClassTypeDecl(
-          CD, [&]() { printMembers(CD->getMembers()); }, owningPrinter);
+          CD, [&]() { printMembers(CD->getAllMembers()); }, owningPrinter);
       recordEmittedDeclInCurrentCxxLexicalScope(CD);
       return;
     }
@@ -389,7 +389,7 @@ private:
       os << " : " << getNameForObjC(superDecl);
     printProtocols(CD->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
-    printMembers(CD->getMembers());
+    printMembers(CD->getAllMembers());
     os << "@end\n";
   }
 
@@ -402,13 +402,13 @@ private:
     printer.printValueTypeDecl(
         SD, /*bodyPrinter=*/
         [&]() {
-          printMembers(SD->getMembers());
+          printMembers(SD->getAllMembers());
           for (const auto *ed :
                owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
             if (!cxx_translation::isExposableToCxx(ed->getGenericSignature()))
               continue;
 
-            printMembers(ed->getMembers());
+            printMembers(ed->getAllMembers());
           }
         },
         owningPrinter);
@@ -428,7 +428,7 @@ private:
     os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
-    printMembers(ED->getMembers());
+    printMembers(ED->getAllMembers());
     os << "@end\n";
   }
 
@@ -449,7 +449,7 @@ private:
 
     printProtocols(PD->getInheritedProtocols());
     os << "\n";
-    printMembers(PD->getMembers());
+    printMembers(PD->getAllMembers());
     os << "@end\n";
   }
 
@@ -884,14 +884,14 @@ private:
           os << "  }\n"; // operator cases()'s closing bracket
           os << "\n";
 
-          printMembers(ED->getMembers());
+          printMembers(ED->getAllMembers());
 
           for (const auto *ext :
                owningPrinter.interopContext.getExtensionsForNominalType(ED)) {
             if (!cxx_translation::isExposableToCxx(ext->getGenericSignature()))
               continue;
 
-            printMembers(ext->getMembers());
+            printMembers(ext->getAllMembers());
           }
         },
         owningPrinter);
