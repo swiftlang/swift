@@ -7031,8 +7031,8 @@ bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
   llvm::SaveAndRestore<std::optional<StableHasher>> T(CurrentTokenHash,
                                                       std::nullopt);
 
-  bool HasOperatorDeclarations;
-  bool HasNestedClassDeclarations;
+  bool HasOperatorDeclarations = false;
+  bool HasNestedClassDeclarations = false;
 
   if (canDelayMemberDeclParsing(HasOperatorDeclarations,
                                 HasNestedClassDeclarations)) {
@@ -7040,6 +7040,8 @@ bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
       IDC->setMaybeHasOperatorDeclarations();
     if (HasNestedClassDeclarations)
       IDC->setMaybeHasNestedClassDeclarations();
+    if (InFreestandingMacroArgument)
+      IDC->setInFreestandingMacroArgument();
 
     if (delayParsingDeclList(LBLoc, RBLoc, IDC))
       return true;

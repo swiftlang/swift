@@ -75,6 +75,8 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
   // Lexer diagnostics have been emitted during skipping, so we disable lexer's
   // diagnostic engine here.
   Parser parser(bufferID, *sf, /*No Lexer Diags*/nullptr, nullptr, nullptr);
+  parser.InFreestandingMacroArgument = idc->inFreestandingMacroArgument();
+
   auto declsAndHash = parser.parseDeclListDelayed(idc);
   FingerprintAndMembers fingerprintAndMembers = {declsAndHash.second,
                                                  declsAndHash.first};
