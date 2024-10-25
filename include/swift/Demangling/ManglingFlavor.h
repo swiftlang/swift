@@ -1,8 +1,8 @@
-//===--- ManglingUtils.h - Utilities for Swift name mangling ----*- C++ -*-===//
+//===--- ManglingFlavor.h - Swift name mangling -----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,7 +23,7 @@ SWIFT_BEGIN_INLINE_NAMESPACE
 
 /// Which mangling style and prefix to use.
 enum class ManglingFlavor: uint8_t {
-  /// Default manling with the ABI stable $s prefix
+  /// Default mangling with the ABI stable $s prefix
   Default,
   /// Embedded Swift's mangling with $e prefix
   Embedded,
