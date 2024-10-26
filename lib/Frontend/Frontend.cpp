@@ -563,7 +563,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     return true;
   }
 
-  setupStatsReporter();
+  if (hasASTContext()) {
+    setupStatsReporter();
+  }
 
   if (setupDiagnosticVerifierIfNeeded()) {
     Error = "Setting up diagnostics verifier failed";
