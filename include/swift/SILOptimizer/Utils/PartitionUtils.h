@@ -460,7 +460,7 @@ enum class PartitionOpKind : uint8_t {
   /// parameter is reinitialized with a disconnected value.
   ///
   /// Takes one parameter, the inout parameter that we need to check.
-  RequireInOutSendingAtFunctionExit,
+  InOutSendingAtFunctionExit,
 };
 
 /// PartitionOp represents a primitive operation that can be performed on
@@ -568,9 +568,9 @@ public:
     return PartitionOp(PartitionOpKind::UnknownPatternError, elt, sourceInst);
   }
 
-  static PartitionOp
-  RequireInOutSendingAtFunctionExit(Element elt, SILInstruction *sourceInst) {
-    return PartitionOp(PartitionOpKind::RequireInOutSendingAtFunctionExit, elt,
+  static PartitionOp InOutSendingAtFunctionExit(Element elt,
+                                                SILInstruction *sourceInst) {
+    return PartitionOp(PartitionOpKind::InOutSendingAtFunctionExit, elt,
                        sourceInst);
   }
 
@@ -943,6 +943,143 @@ private:
   }
 };
 
+/// Swift style enum we use to decouple and reduce boilerplate in between the
+/// diagnostic and non-diagnostic part of the infrastructure.
+class PartitionOpError {
+public:
+  using Element = PartitionPrimitives::Element;
+  using Region = PartitionPrimitives::Region;
+
+  enum Kind {
+#define PARTITION_OP_ERROR(NAME) NAME,
+#include "PartitionOpError.def"
+  };
+
+  struct UnknownCodePatternError {
+    const PartitionOp *op;
+
+    UnknownCodePatternError(const PartitionOp &op) : op(&op) {}
+  };
+
+  struct LocalUseAfterSendError {
+    const PartitionOp *op;
+    Element sentElement;
+    Operand *sendingOp;
+
+    LocalUseAfterSendError(const PartitionOp &op, Element elt,
+                           Operand *sendingOp)
+        : op(&op), sentElement(elt), sendingOp(sendingOp) {}
+  };
+
+  struct SentNeverSendableError {
+    const PartitionOp *op;
+    Element sentElement;
+    SILDynamicMergedIsolationInfo isolationRegionInfo;
+
+    SentNeverSendableError(const PartitionOp &op, Element sentElement,
+                           SILDynamicMergedIsolationInfo isolationRegionInfo)
+        : op(&op), sentElement(sentElement),
+          isolationRegionInfo(isolationRegionInfo) {}
+  };
+
+  struct AssignNeverSendableIntoSendingResultError {
+    const PartitionOp *op;
+    Element destElement;
+    SILFunctionArgument *destValue;
+    Element srcElement;
+    SILValue srcValue;
+    SILDynamicMergedIsolationInfo srcIsolationRegionInfo;
+
+    AssignNeverSendableIntoSendingResultError(
+        const PartitionOp &op, Element destElement,
+        SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
+        SILDynamicMergedIsolationInfo srcIsolationRegionInfo)
+        : op(&op), destElement(destElement), destValue(destValue),
+          srcElement(srcElement), srcValue(srcValue),
+          srcIsolationRegionInfo(srcIsolationRegionInfo) {}
+  };
+
+  struct InOutSendingNotInitializedAtExitError {
+    const PartitionOp *op;
+    Element sentElement;
+    Operand *sendingOp;
+
+    InOutSendingNotInitializedAtExitError(const PartitionOp &op, Element elt,
+                                          Operand *sendingOp)
+        : op(&op), sentElement(elt), sendingOp(sendingOp) {}
+  };
+
+  struct InOutSendingNotDisconnectedAtExitError {
+    const PartitionOp *op;
+    Element inoutSendingElement;
+    SILDynamicMergedIsolationInfo isolationInfo;
+
+    InOutSendingNotDisconnectedAtExitError(
+        const PartitionOp &op, Element elt,
+        SILDynamicMergedIsolationInfo isolation)
+        : op(&op), inoutSendingElement(elt), isolationInfo(isolation) {}
+  };
+
+#define PARTITION_OP_ERROR(NAME)                                               \
+  static_assert(std::is_copy_constructible_v<NAME##Error>,                     \
+                #NAME " must be copy constructable");
+#include "PartitionOpError.def"
+#define PARTITION_OP_ERROR(NAME)                                               \
+  static_assert(std::is_copy_assignable_v<NAME##Error>,                        \
+                #NAME " must be copy assignable");
+#include "PartitionOpError.def"
+
+private:
+  Kind kind;
+  std::variant<
+#define PARTITION_OP_ERROR(NAME) NAME##Error,
+#include "PartitionOpError.def"
+      bool // sentinel value to avoid syntax issues.
+      >
+      data;
+
+public:
+#define PARTITION_OP_ERROR(NAME)                                               \
+  PartitionOpError(NAME##Error error) : kind(Kind::NAME), data(error) {}
+#include "PartitionOpError.def"
+
+  PartitionOpError(const PartitionOpError &error)
+      : kind(error.kind), data(error.data) {
+    switch (getKind()) {
+#define PARTITION_OP_ERROR(NAME)                                               \
+  case NAME:                                                                   \
+    assert(std::holds_alternative<NAME##Error>(data) &&                        \
+           "Data has value that does not match kind?!");                       \
+    break;
+#include "PartitionOpError.def"
+    }
+  }
+
+  PartitionOpError &operator=(const PartitionOpError &error) {
+    kind = error.kind;
+    data = error.data;
+
+    switch (getKind()) {
+#define PARTITION_OP_ERROR(NAME)                                               \
+  case NAME:                                                                   \
+    assert(std::holds_alternative<NAME##Error>(data) &&                        \
+           "Data has value that does not match kind?!");                       \
+    break;
+#include "PartitionOpError.def"
+    }
+    return *this;
+  }
+
+  Kind getKind() const { return kind; }
+
+#define PARTITION_OP_ERROR(NAME)                                               \
+  NAME##Error get##NAME##Error() const {                                       \
+    assert(getKind() == Kind::NAME);                                           \
+    return std::get<NAME##Error>(data);                                        \
+  }
+#include "PartitionOpError.def"
+};
+
 /// A data structure that applies a series of PartitionOps to a single Partition
 /// that it modifies.
 ///
@@ -960,6 +1097,10 @@ public:
   using Region = PartitionPrimitives::Region;
   using TransferringOperandSetFactory =
       Partition::TransferringOperandSetFactory;
+
+#define PARTITION_OP_ERROR(NAME)                                               \
+  using NAME##Error = PartitionOpError::NAME##Error;
+#include "PartitionOpError.def"
 
 protected:
   TransferringOperandSetFactory &ptrSetFactory;
@@ -979,56 +1120,7 @@ public:
     return asImpl().shouldEmitVerboseLogging();
   }
 
-  /// Call handleUnknownCodePattern on our CRTP subclass.
-  void handleUnknownCodePattern(const PartitionOp &op) const {
-    return asImpl().handleUnknownCodePattern(op);
-  }
-
-  /// Call handleLocalUseAfterTransfer on our CRTP subclass.
-  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
-                                   Operand *transferringOp) const {
-    return asImpl().handleLocalUseAfterTransfer(op, elt, transferringOp);
-  }
-
-  /// Call handleTransferNonTransferrable on our CRTP subclass.
-  void handleTransferNonTransferrable(
-      const PartitionOp &op, Element elt,
-      SILDynamicMergedIsolationInfo isolationRegionInfo) const {
-    return asImpl().handleTransferNonTransferrable(op, elt,
-                                                   isolationRegionInfo);
-  }
-  /// Just call our CRTP subclass.
-  void handleTransferNonTransferrable(
-      const PartitionOp &op, Element elt, Element otherElement,
-      SILDynamicMergedIsolationInfo isolationRegionInfo) const {
-    return asImpl().handleTransferNonTransferrable(op, elt, otherElement,
-                                                   isolationRegionInfo);
-  }
-
-  /// Just call our CRTP subclass.
-  void handleAssignTransferNonTransferrableIntoSendingResult(
-      const PartitionOp &op, Element destElement,
-      SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
-      SILDynamicMergedIsolationInfo srcIsolationRegionInfo) const {
-    return asImpl().handleAssignTransferNonTransferrableIntoSendingResult(
-        op, destElement, destValue, srcElement, srcValue,
-        srcIsolationRegionInfo);
-  }
-
-  /// Call our CRTP subclass.
-  void handleInOutSendingNotInitializedAtExitError(
-      const PartitionOp &op, Element elt, Operand *transferringOp) const {
-    return asImpl().handleInOutSendingNotInitializedAtExitError(op, elt,
-                                                                transferringOp);
-  }
-
-  /// Call our CRTP subclass.
-  void handleInOutSendingNotDisconnectedAtExitError(
-      const PartitionOp &op, Element elt,
-      SILDynamicMergedIsolationInfo isolation) const {
-    return asImpl().handleInOutSendingNotDisconnectedAtExitError(op, elt,
-                                                                 isolation);
-  }
+  void handleError(PartitionOpError error) { asImpl().handleError(error); }
 
   /// Call isActorDerived on our CRTP subclass.
   bool isActorDerived(Element elt) const {
@@ -1117,7 +1209,7 @@ public:
   }
 
   /// Apply \p op to the partition op.
-  void apply(const PartitionOp &op) const {
+  void apply(const PartitionOp &op) {
     if (shouldEmitVerboseLogging()) {
       REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
                                        op.print(llvm::dbgs()));
@@ -1158,9 +1250,9 @@ public:
                 // assign an actor introducing inst.
                 auto rep = getRepresentativeValue(op.getOpArgs()[1]).getValue();
                 if (!dynamicRegionIsolation.isDisconnected()) {
-                  handleAssignTransferNonTransferrableIntoSendingResult(
+                  handleError(AssignNeverSendableIntoSendingResultError(
                       op, op.getOpArgs()[0], fArg, op.getOpArgs()[1], rep,
-                      dynamicRegionIsolation);
+                      dynamicRegionIsolation));
                 }
               }
             }
@@ -1210,8 +1302,7 @@ public:
       auto pairOpt =
           getIsolationRegionInfo(transferredRegion, op.getSourceOp());
       if (!pairOpt) {
-        handleUnknownCodePattern(op);
-        return;
+        return handleError(UnknownCodePatternError(op));
       }
       std::tie(transferredRegionIsolation, isClosureCapturedElt) = *pairOpt;
 
@@ -1245,7 +1336,7 @@ public:
               state.isolationInfo.merge(transferredRegionIsolation)) {
         state.isolationInfo = *newInfo;
       } else {
-        handleUnknownCodePattern(op);
+        handleError(UnknownCodePatternError(op));
       }
       assert(state.isolationInfo && "Cannot have unknown");
       state.isolationHistory.pushCFGHistoryJoin(p.getIsolationHistory());
@@ -1283,9 +1374,9 @@ public:
                 // assign an actor introducing inst.
                 auto rep = getRepresentativeValue(op.getOpArgs()[1]).getValue();
                 if (!dynamicRegionIsolation.isDisconnected()) {
-                  handleAssignTransferNonTransferrableIntoSendingResult(
+                  handleError(AssignNeverSendableIntoSendingResultError(
                       op, op.getOpArgs()[0], fArg, op.getOpArgs()[1], rep,
-                      dynamicRegionIsolation);
+                      dynamicRegionIsolation));
                 }
               }
             }
@@ -1308,7 +1399,7 @@ public:
         }
       }
       return;
-    case PartitionOpKind::RequireInOutSendingAtFunctionExit: {
+    case PartitionOpKind::InOutSendingAtFunctionExit: {
       assert(op.getOpArgs().size() == 1 &&
              "Require PartitionOp should be passed 1 argument");
       assert(p.isTrackingElement(op.getOpArgs()[0]) &&
@@ -1318,8 +1409,8 @@ public:
       // transferred. In that case, we emit a special use after free error.
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
-          handleInOutSendingNotInitializedAtExitError(op, op.getOpArgs()[0],
-                                                      transferredOperand);
+          handleError(InOutSendingNotInitializedAtExitError(
+              op, op.getOpArgs()[0], transferredOperand));
         }
         return;
       }
@@ -1331,15 +1422,15 @@ public:
 
       // If we failed to merge emit an unknown pattern error so we fail.
       if (!dynamicRegionIsolation) {
-        handleUnknownCodePattern(op);
+        handleError(UnknownCodePatternError(op));
         return;
       }
 
       // Otherwise, emit the error if the dynamic region isolation is not
       // disconnected.
       if (!dynamicRegionIsolation.isDisconnected()) {
-        handleInOutSendingNotDisconnectedAtExitError(op, op.getOpArgs()[0],
-                                                     dynamicRegionIsolation);
+        handleError(InOutSendingNotDisconnectedAtExitError(
+            op, op.getOpArgs()[0], dynamicRegionIsolation));
       }
       return;
     }
@@ -1348,8 +1439,7 @@ public:
       p.trackNewElement(op.getOpArgs()[0]);
 
       // Then emit an unknown code pattern error.
-      handleUnknownCodePattern(op);
-      return;
+      return handleError(UnknownCodePatternError(op));
     }
 
     llvm_unreachable("Covered switch isn't covered?!");
@@ -1394,7 +1484,7 @@ private:
   // Private helper that squelches the error if our transfer instruction and our
   // use have the same isolation.
   void handleLocalUseAfterTransferHelper(const PartitionOp &op, Element elt,
-                                         Operand *transferringOp) const {
+                                         Operand *transferringOp) {
     if (shouldTryToSquelchErrors()) {
       if (SILValue equivalenceClassRep =
               getRepresentative(transferringOp->get())) {
@@ -1433,14 +1523,14 @@ private:
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleLocalUseAfterTransfer(op, elt, transferringOp);
+    return handleError(LocalUseAfterSendError(op, elt, transferringOp));
   }
 
   // Private helper that squelches the error if our transfer instruction and our
   // use have the same isolation.
   void handleTransferNonTransferrableHelper(
       const PartitionOp &op, Element elt,
-      SILDynamicMergedIsolationInfo dynamicMergedIsolationInfo) const {
+      SILDynamicMergedIsolationInfo dynamicMergedIsolationInfo) {
     if (shouldTryToSquelchErrors()) {
       if (SILValue equivalenceClassRep =
               getRepresentative(op.getSourceOp()->get())) {
@@ -1467,7 +1557,8 @@ private:
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleTransferNonTransferrable(op, elt, dynamicMergedIsolationInfo);
+    return handleError(
+        SentNeverSendableError(op, elt, dynamicMergedIsolationInfo));
   }
 };
 
@@ -1491,57 +1582,6 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// PartitionOps.
   bool shouldEmitVerboseLogging() const { return true; }
 
-  /// A function called if we discover a transferred value was used after it
-  /// was transferred.
-  ///
-  /// The arguments passed to the closure are:
-  ///
-  /// 1. The PartitionOp that required the element to be alive.
-  ///
-  /// 2. The element in the PartitionOp that was asked to be alive.
-  ///
-  /// 3. The operand of the instruction that originally transferred the
-  /// region. Can be used to get the immediate value transferred or the
-  /// transferring instruction.
-  void handleLocalUseAfterTransfer(const PartitionOp &op, Element elt,
-                                   Operand *transferringOp) const {}
-
-  /// This is called if we detect a never transferred element that was passed to
-  /// a transfer instruction.
-  void handleTransferNonTransferrable(
-      const PartitionOp &op, Element elt,
-      SILDynamicMergedIsolationInfo regionInfo) const {}
-
-  /// Please see documentation on the CRTP version of this call for information
-  /// about this entrypoint.
-  void handleTransferNonTransferrable(
-      const PartitionOp &op, Element elt, Element otherElement,
-      SILDynamicMergedIsolationInfo isolationRegionInfo) const {}
-
-  /// Please see documentation on the CRTP version of this call for information
-  /// about this entrypoint.
-  void handleAssignTransferNonTransferrableIntoSendingResult(
-      const PartitionOp &partitionOp, Element destElement,
-      SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
-      SILDynamicMergedIsolationInfo srcIsolationRegionInfo) const {}
-
-  /// Used to signify an "unknown code pattern" has occured while performing
-  /// dataflow.
-  ///
-  /// DISCUSSION: Our dataflow cannot emit errors itself so this is a callback
-  /// to our user so that we can emit that error as we process.
-  void handleUnknownCodePattern(const PartitionOp &op) const {}
-
-  /// Called if we find an 'inout sending' parameter that is not live at exit.
-  void handleInOutSendingNotInitializedAtExitError(
-      const PartitionOp &op, Element elt, Operand *transferringOp) const {}
-
-  /// Called if we find an 'inout sending' parameter that is live at excit but
-  /// is actor isolated instead of disconnected.
-  void handleInOutSendingNotDisconnectedAtExitError(
-      const PartitionOp &op, Element elt,
-      SILDynamicMergedIsolationInfo actorIsolation) const {}
-
   /// This is used to determine if an element is actor derived. If we determine
   /// that a region containing such an element is transferred, we emit an error
   /// since actor regions cannot be transferred.
@@ -1550,6 +1590,9 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// This is used to determine if an element is in the same region as a task
   /// isolated value.
   bool isTaskIsolatedDerived(Element elt) const { return false; }
+
+  /// By default, do nothing upon error.
+  void handleError(PartitionOpError error) {}
 
   /// Returns the information about \p elt's isolation that we ascertained from
   /// SIL and the AST.
