@@ -316,19 +316,6 @@ ExportContext::getExportabilityReason() const {
   return std::nullopt;
 }
 
-std::optional<AvailabilityRange>
-UnmetAvailabilityRequirement::getRequiredNewerAvailabilityRange(
-    ASTContext &ctx) const {
-  switch (kind) {
-  case Kind::AlwaysUnavailable:
-  case Kind::RequiresVersion:
-  case Kind::Obsoleted:
-    return std::nullopt;
-  case Kind::IntroducedInNewerVersion:
-    return AvailabilityInference::availableRange(attr, ctx);
-  }
-}
-
 /// Returns the first availability attribute on the declaration that is active
 /// on the target platform.
 static const AvailableAttr *getActiveAvailableAttribute(const Decl *D,
