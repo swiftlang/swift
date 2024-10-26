@@ -1202,13 +1202,10 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
         // Check for availability of wrappedValue.
         if (accessor->getAccessorKind() == AccessorKind::Get ||
             isYieldingDefaultNonmutatingAccessor(accessor->getAccessorKind())) {
-          if (wrappedValue->getAttrs().getUnavailable(ctx)) {
-            ExportContext where = ExportContext::forDeclSignature(var);
-            diagnoseExplicitUnavailability(
-                wrappedValue,
-                var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
-                where, nullptr);
-          }
+          diagnoseDeclAvailability(
+              wrappedValue,
+              var->getAttachedPropertyWrappers()[i]->getRangeWithAt(), nullptr,
+              ExportContext::forDeclSignature(accessor));
         }
 
         underlyingVars.push_back({ wrappedValue, isWrapperRefLValue });

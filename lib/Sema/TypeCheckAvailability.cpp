@@ -2903,7 +2903,7 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
-bool swift::diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
+static bool diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
                                            const ExportContext &Where,
                                            const Expr *call,
                                            DeclAvailabilityFlags Flags) {
@@ -4091,8 +4091,6 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
                                      const Expr *call,
                                      const ExportContext &Where,
                                      DeclAvailabilityFlags Flags) {
-  assert(!Where.isImplicit());
-
   // Generic parameters are always available.
   if (isa<GenericTypeParamDecl>(D))
     return false;
