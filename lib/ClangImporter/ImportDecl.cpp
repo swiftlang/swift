@@ -3007,7 +3007,7 @@ namespace {
           if (existingProtocol == protocol) {
             HeaderLoc attrLoc(conformsToAttr->getLocation());
             Impl.diagnose(attrLoc, diag::redundant_conformance_protocol,
-                          decl->getDeclaredInterfaceType(), existingProtocol->getName());
+                          decl->getDeclaredInterfaceType(), econformsToValue);
             return;
           }
         }
