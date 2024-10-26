@@ -28,6 +28,7 @@ public struct Span<Element: ~Copyable & ~Escapable>
 
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  //FIXME: should be @lifetime(borrow pointer) rdar://138672380
   @lifetime(immortal)
   internal init(
     _unchecked pointer: borrowing UnsafeRawPointer?,
@@ -57,6 +58,7 @@ extension Span where Element: ~Copyable {
   ///            the newly created `Span`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
   @lifetime(immortal)
   public init(
     _unsafeElements buffer: borrowing UnsafeBufferPointer<Element>
@@ -81,6 +83,7 @@ extension Span where Element: ~Copyable {
   ///            the newly created `Span`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
   @lifetime(immortal)
   public init(
     _unsafeElements buffer: borrowing UnsafeMutableBufferPointer<Element>
@@ -101,6 +104,7 @@ extension Span where Element: ~Copyable {
   ///            the newly created `Span`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
   @lifetime(immortal)
   public init(
     _unsafeStart pointer: borrowing UnsafePointer<Element>,
@@ -126,6 +130,7 @@ extension Span {
   ///            the newly created `Span`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
   @lifetime(immortal)
   public init(
     _unsafeElements buffer: borrowing Slice<UnsafeBufferPointer<Element>>
@@ -144,6 +149,7 @@ extension Span {
   ///            the newly created `Span`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
   @lifetime(immortal)
   public init(
     _unsafeElements buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>
@@ -172,6 +178,7 @@ extension Span where Element: BitwiseCopyable {
   ///            the newly created `Span`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
   @lifetime(immortal)
   public init(
     _unsafeBytes buffer: borrowing UnsafeRawBufferPointer
@@ -206,6 +213,7 @@ extension Span where Element: BitwiseCopyable {
   ///            the newly created `Span`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
   @lifetime(immortal)
   public init(
     _unsafeBytes buffer: borrowing UnsafeMutableRawBufferPointer
@@ -230,6 +238,7 @@ extension Span where Element: BitwiseCopyable {
   ///            the newly created `Span`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
   @lifetime(immortal)
   public init(
     _unsafeStart pointer: borrowing UnsafeRawPointer,
@@ -255,6 +264,7 @@ extension Span where Element: BitwiseCopyable {
   ///            the newly created `Span`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
   @lifetime(immortal)
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeRawBufferPointer>
@@ -278,6 +288,7 @@ extension Span where Element: BitwiseCopyable {
   ///            the newly created `Span`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
   @lifetime(immortal)
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
