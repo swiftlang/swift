@@ -1141,8 +1141,10 @@ void Serializer::writeHeader() {
       }
 
       llvm::VersionTuple compilerVersion = M->getSwiftCompilerVersion();
-      options_block::SwiftCompilerVersionLayout SwiftCompilerVersion(Out);
-      SwiftCompilerVersion.emit(ScratchRecord, compilerVersion.getAsString());
+      if (compilerVersion) {
+        options_block::SwiftCompilerVersionLayout SwiftCompilerVersion(Out);
+        SwiftCompilerVersion.emit(ScratchRecord, compilerVersion.getAsString());
+      }
 
       if (M->isConcurrencyChecked()) {
         options_block::IsConcurrencyCheckedLayout IsConcurrencyChecked(Out);

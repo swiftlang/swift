@@ -304,7 +304,12 @@ bool ArgsToFrontendOptionsConverter::convert(
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
-  } else {
+  // If swiftinterface doesn't have a flag, let's not set the version
+  // to the current compiler version here. This helps us to identify
+  // swiftmodules built from swiftinterface generated before introduction
+  // of `-swift-compiler-version` flag.
+  } else if (Opts.InputMode !=
+             FrontendOptions::ParseInputMode::SwiftModuleInterface) {
     Opts.SwiftCompilerVersion.tryParse(version::getCompilerVersion());
   }
 
