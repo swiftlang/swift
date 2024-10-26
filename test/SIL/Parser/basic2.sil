@@ -454,3 +454,17 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @merge_isolation_region : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: merge_isolation_region %0 : $Klass, %1 : $*MoveOnlyPair
+// CHECK: merge_isolation_region %1 : $*MoveOnlyPair, %0 : $Klass, %0 : $Klass
+// CHECK: } // end sil function 'merge_isolation_region'
+sil [ossa] @merge_isolation_region : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = alloc_stack $MoveOnlyPair
+  merge_isolation_region %0 : $Klass, %1 : $*MoveOnlyPair
+  merge_isolation_region %1 : $*MoveOnlyPair, %0 : $Klass, %0 : $Klass
+  dealloc_stack %1 : $*MoveOnlyPair
+  %9999 = tuple ()
+  return %9999 : $()
+}

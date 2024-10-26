@@ -2426,6 +2426,27 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)TI->getType().getCategory(), ListOfValues);
     break;
   }
+  case SILInstructionKind::MergeIsolationRegionInst: {
+    const auto *mir = cast<MergeIsolationRegionInst>(&SI);
+    SmallVector<uint64_t, 4> ListOfValues;
+    auto getValue = [&](SILValue value) -> uint64_t {
+      uint32_t result = addValueRef(value);
+      // Set the top bit if we are an address. We only transfer raw ast types,
+      // so we lose this bit otherwise. This is safe since all of our IDs are
+      // guaranteed to be 31 bits meaning we can always take the top bit.
+      result |= value->getType().isObject() ? 0 : 0x80000000;
+      return result;
+    };
+
+    for (auto value : mir->getArguments()) {
+      ListOfValues.push_back(getValue(value));
+      ListOfValues.push_back(S.addTypeRef(value->getType().getRawASTType()));
+    }
+    unsigned abbrCode = SILAbbrCodes[SILValuesLayout::Code];
+    SILValuesLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                (unsigned)SI.getKind(), ListOfValues);
+    break;
+  }
   case SILInstructionKind::TupleAddrConstructorInst: {
     // Format: a type followed by a list of values. A value is expressed by
     // 2 IDs: ValueID, ValueResultNumber.
@@ -3231,6 +3252,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILOneTypeValuesLayout>();
   registerSILAbbr<SILOneTypeOwnershipValuesLayout>();
   registerSILAbbr<SILOneTypeValuesCategoriesLayout>();
+  registerSILAbbr<SILValuesLayout>();
   registerSILAbbr<SILTwoOperandsLayout>();
   registerSILAbbr<SILTwoOperandsExtraAttributeLayout>();
   registerSILAbbr<SILTailAddrLayout>();

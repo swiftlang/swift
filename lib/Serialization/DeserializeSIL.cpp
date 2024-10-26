@@ -1271,6 +1271,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     forwardingOwnership = decodeValueOwnership(ownershipField);
     break;
   }
+  case SIL_VALUES: {
+    SILValuesLayout::readRecord(scratch, RawOpCode, ListOfValues);
+    break;
+  }
   case SIL_ONE_TYPE_VALUES_CATEGORIES: {
     // NOTE: This is the same as Values except we smuggle in the category in the
     // top bit.
@@ -2821,6 +2825,36 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto IsInitOfDest = IsInitialization_t(Attr & 0x1);
     ResultInst =
         Builder.createTupleAddrConstructor(Loc, DestAddr, OpList, IsInitOfDest);
+    break;
+  }
+
+  case SILInstructionKind::MergeIsolationRegionInst: {
+    assert(RecordKind == SIL_VALUES);
+
+    // Format: A type followed by a list of values. A value is expressed by 2
+    // IDs: ValueID, TypeID... so we at least need 2 values and thus four
+    // entires.
+    assert(ListOfValues.size() >= 4 && "Should have at least two values.");
+    assert((ListOfValues.size() & 1) == 0 &&
+           "Should always have an even number of values since we store "
+           "valueid, typeid");
+    auto getValue = [&](Type type, uint64_t value) -> SILValue {
+      assert((value & 0xFFFFFFFF00000000) == 0 &&
+             "High bits should never be set");
+      uint32_t count = value & 0x7FFFFFFF;
+      SILValueCategory category = value & 0x80000000 ? SILValueCategory::Address
+                                                     : SILValueCategory::Object;
+      return getLocalValue(Builder.maybeGetFunction(), count,
+                           getSILType(type, category, Fn));
+    };
+
+    SmallVector<SILValue, 4> OpList;
+    for (unsigned i = 0, e = ListOfValues.size(); i != e; i += 2) {
+      auto value = ListOfValues[i];
+      auto type = MF->getType(ListOfValues[i + 1]);
+      OpList.push_back(getValue(type, value));
+    }
+    ResultInst = Builder.createMergeIsolationRegion(Loc, OpList);
     break;
   }
   case SILInstructionKind::ObjectInst: {

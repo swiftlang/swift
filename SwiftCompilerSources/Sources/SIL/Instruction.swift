@@ -1612,3 +1612,6 @@ final public class CheckedCastAddrBranchInst : TermInst {
 
 final public class ThunkInst : Instruction {
 }
+
+final public class MergeIsolationRegionInst : Instruction {
+}

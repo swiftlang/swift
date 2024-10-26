@@ -175,6 +175,7 @@ namespace sil_block {
     SIL_PACK_ELEMENT_SET,
     SIL_TYPE_VALUE,
     SIL_THUNK,
+    SIL_VALUES,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -413,6 +414,17 @@ namespace sil_block {
     BCFixed<1>,                   // options
     BCArray<BCFixed<32>>          // operand id and categories.
   >;
+
+  /// A SILInstruction without a result and N operands.
+  using SILValuesLayout = BCRecordLayout<
+    SIL_VALUES,
+    SILInstOpCodeField, // opcode
+    BCArray<BCFixed<32>> // (value, type).
+  >;
+
+  static_assert(sizeof(DeclID) == sizeof(ValueID) &&
+                sizeof(DeclID) == sizeof(TypeID) &&
+                "SILValuesLayout assumes that DeclID is the same as ValueID and TypeID");
 
   enum ApplyKind : unsigned {
     SIL_APPLY = 0,

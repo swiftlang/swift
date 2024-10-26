@@ -11666,6 +11666,25 @@ public:
   }
 };
 
+class MergeIsolationRegionInst final
+    : public InstructionBaseWithTrailingOperands<
+          SILInstructionKind::MergeIsolationRegionInst,
+          MergeIsolationRegionInst, NonValueInstruction> {
+  friend SILBuilder;
+
+  MergeIsolationRegionInst(SILDebugLocation loc, ArrayRef<SILValue> operands)
+      : InstructionBaseWithTrailingOperands(operands, loc) {}
+
+  static MergeIsolationRegionInst *
+  create(SILDebugLocation loc, ArrayRef<SILValue> operands, SILModule &mod);
+
+public:
+  /// Return the SILValues for all operands of this instruction.
+  OperandValueArrayRef getArguments() const {
+    return OperandValueArrayRef(getAllOperands());
+  }
+};
+
 inline SILType *AllocRefInstBase::getTypeStorage() {
   // If the size of the subclasses are equal, then all of this compiles away.
   if (auto I = dyn_cast<AllocRefInst>(this))
