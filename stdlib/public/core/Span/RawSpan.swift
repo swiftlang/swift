@@ -227,9 +227,9 @@ extension RawSpan {
   @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe // remove when fixing the lifetime annotation
   @_alwaysEmitIntoClient
-  @lifetime(immortal)
+  @lifetime(span)
   public init<Element: BitwiseCopyable>(
-    _unsafeSpan span: borrowing Span<Element>
+    _unsafeSpan span: consuming Span<Element>
   ) {
     self.init(
       _unchecked: span._pointer,
@@ -429,8 +429,8 @@ extension RawSpan {
   @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(immortal)
-  public func _unsafeView<T: BitwiseCopyable>(
+  @lifetime(self)
+  consuming public func _unsafeView<T: BitwiseCopyable>(
     as type: T.Type
   ) -> Span<T> {
     Span(_unsafeBytes: .init(start: _pointer, count: _count))
