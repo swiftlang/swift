@@ -3018,6 +3018,10 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
 }
 
 bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
+  ASTContext &ctx = getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
+    return requiresCorrespondingUnderscoredCoroutineAccessor(
+        AccessorKind::Read2);
   return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
 }
 
@@ -3030,19 +3034,20 @@ bool AbstractStorageDecl::requiresOpaqueRead2Coroutine() const {
 
 bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    RequiresOpaqueModifyCoroutineRequest{const_cast<AbstractStorageDecl *>(this)},
-    false);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      RequiresOpaqueModifyCoroutineRequest{
+          const_cast<AbstractStorageDecl *>(this), /*isUnderscored=*/true},
+      false);
 }
 
 bool AbstractStorageDecl::requiresOpaqueModify2Coroutine() const {
   ASTContext &ctx = getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
-    return false;
-  return evaluateOrDefault(ctx.evaluator,
-                           RequiresOpaqueModifyCoroutineRequest{
-                               const_cast<AbstractStorageDecl *>(this)},
-                           false);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      RequiresOpaqueModifyCoroutineRequest{
+          const_cast<AbstractStorageDecl *>(this), /*isUnderscored=*/false},
+      false);
 }
 
 AccessorDecl *AbstractStorageDecl::getSynthesizedAccessor(AccessorKind kind) const {

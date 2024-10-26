@@ -795,15 +795,29 @@ void RequiresOpaqueAccessorsRequest::cacheResult(bool value) const {
 std::optional<bool>
 RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
-  if (storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed)
-    return static_cast<bool>(storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine);
+  auto isUnderscored = std::get<1>(getStorage());
+  if (isUnderscored) {
+    if (storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed)
+      return static_cast<bool>(
+          storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine);
+  } else {
+    if (storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed)
+      return static_cast<bool>(
+          storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine);
+  }
   return std::nullopt;
 }
 
 void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
   auto *storage = std::get<0>(getStorage());
-  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
-  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
+  auto isUnderscored = std::get<1>(getStorage());
+  if (isUnderscored) {
+    storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
+    storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
+  } else {
+    storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed = 1;
+    storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine = value;
+  }
 }
 
 //----------------------------------------------------------------------------//

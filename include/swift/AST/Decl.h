@@ -5765,6 +5765,8 @@ private:
     unsigned RequiresOpaqueAccessors : 1;
     unsigned RequiresOpaqueModifyCoroutineComputed : 1;
     unsigned RequiresOpaqueModifyCoroutine : 1;
+    unsigned RequiresOpaqueModify2CoroutineComputed : 1;
+    unsigned RequiresOpaqueModify2Coroutine : 1;
   } LazySemanticInfo = { };
 
   /// The implementation info for the accessors.
@@ -6045,6 +6047,11 @@ public:
   /// Does this storage require a 'modify' accessor in its opaque-accessors
   /// set?
   bool requiresOpaqueModify2Coroutine() const;
+
+  /// Given that CoroutineAccessors is enabled, is _read/_modify required for
+  /// ABI stability?
+  bool
+  requiresCorrespondingUnderscoredCoroutineAccessor(AccessorKind kind) const;
 
   /// Does this storage have any explicit observers (willSet or didSet) attached
   /// to it?
