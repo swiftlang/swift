@@ -22,21 +22,21 @@ extension NormalClass: @retroactive NormalProto {
 }
 
 @_spi(X)
-public struct BadStruct {} // expected-note 34 {{type declared here}}
+public struct BadStruct {} // expected-note 34 {{struct declared here}}
 @_spi(X)
-public protocol BadProto {} // expected-note 20 {{type declared here}}
+public protocol BadProto {} // expected-note 20 {{protocol declared here}}
 @_spi(X)
-open class BadClass {} // expected-note 2 {{type declared here}}
+open class BadClass {} // expected-note 2 {{class declared here}}
 
 @_spi(X)
-public struct IntLike: ExpressibleByIntegerLiteral, Equatable { // expected-note {{type declared here}}
+public struct IntLike: ExpressibleByIntegerLiteral, Equatable { // expected-note {{struct declared here}}
   public init(integerLiteral: Int) {}
 }
 
 @_spi(X)
 @propertyWrapper
-public struct BadWrapper { // expected-note {{type declared here}}
-    public var wrappedValue: Int // expected-note {{type declared here}}
+public struct BadWrapper { // expected-note {{struct declared here}}
+    public var wrappedValue: Int // expected-note {{property declared here}}
     public init(wrappedValue: Int) {
         self.wrappedValue = wrappedValue
     }
