@@ -8547,6 +8547,10 @@ public:
   /// associated values, or null if there are no associated values.
   Type getPayloadInterfaceType() const;
 
+  /// Retrieve the parameters of the implicit case constructor for the enum
+  /// element.
+  ArrayRef<AnyFunctionType::Param> getCaseConstructorParams() const;
+
   void setParameterList(ParameterList *params);
   ParameterList *getParameterList() const { return Params; }
 
