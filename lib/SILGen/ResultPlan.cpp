@@ -806,6 +806,12 @@ public:
     std::tie(blockStorage, blockStorageTy, continuationTy) =
         emitBlockStorage(SGF, loc, throws);
 
+    // Add a merge_isolation_region from the continuation result buffer
+    // (resumeBuf) onto the block storage so it is in the same region as the
+    // block storage despite the intervening Sendable continuation wrapping that
+    // disguises this fact from the region isolation checker.
+    SGF.B.createMergeIsolationRegion(loc, {blockStorage, resumeBuf});
+
     // Get the block invocation function for the given completion block type.
     auto completionHandlerIndex = calleeTypeInfo.foreign.async
       ->completionHandlerParamIndex();

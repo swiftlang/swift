@@ -25,3 +25,9 @@ actor MyActor {
     defer { session?.end() }
   }
 }
+
+extension MyAsset {
+  func continuationResultTiedToContinuation(withStringEnum stringEnum: MyStringEnum) async throws -> sending [MyAssetTrack] {
+    try await loadTracks(withStringEnum: stringEnum)
+  }
+}
