@@ -10,10 +10,12 @@ import Foo
 public func testProperties(_ x: FooClassBase) {
   _ = x.fooBaseInstanceFunc0()
   x.fooBaseInstanceFunc1(1.2)
+  _ = FooClassBase.fooBaseClassFunc0()
 }
 
-// CHECK-DAG: fooBaseInstanceFunc0
-// CHECK-DAG: fooBaseInstanceFunc1
+// CHECK-DAG: "instance_method": "fooBaseInstanceFunc0"
+// CHECK-DAG: "instance_method": "fooBaseInstanceFunc1:"
+// CHECK-DAG: "class_method": "fooBaseClassFunc0"
 // CHECK-DAG: "type": "FooClassBase"
 // CHECK-DAG: "declared_at": "SOURCE_DIR/test/IDE/Inputs/mock-sdk/Foo.framework/Headers/Foo.h
 // CHECK-DAG: "referenced_at": "SOURCE_DIR/test/IDE/objc_send_collector.swift"

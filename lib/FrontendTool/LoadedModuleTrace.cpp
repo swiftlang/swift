@@ -829,6 +829,15 @@ class ObjcMethodReferenceCollector: public SourceEntityWalker {
     }
     return true;
   }
+  static StringRef selectMethodKey(const clang::ObjCMethodDecl* clangD) {
+    assert(clangD);
+    if (clangD->isInstanceMethod())
+      return "instance_method";
+    else if (clangD->isClassMethod())
+      return "class_method";
+    else
+      return "method";
+  }
 public:
   void setFileBeforeVisiting(SourceFile *SF) {
     assert(SF && "need to visit actual source files");
@@ -850,7 +859,7 @@ public:
             if (!pName.empty())
               out.attribute("type", pName);
           }
-          out.attribute("method",  clangD->getNameAsString());
+          out.attribute(selectMethodKey(clangD),  clangD->getNameAsString());
           out.attribute("declared_at", Loc.printToString(SM));
           out.attribute("referenced_at", visitingFilePath);
         });
