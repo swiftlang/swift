@@ -666,6 +666,13 @@ ERROR(expr_keypath_mutating_getter,none,
 ERROR(expr_keypath_static_member,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to static member %0",
       (const ValueDecl *, bool))
+ERROR(keypath_static_member_access_from_unsupported_module,none,
+     "%select{key path|dynamic key path member lookup}3 cannot refer "
+     "to static member %1 of type %0 from module %2",
+      (Type, const ValueDecl *, const ModuleDecl *, bool))
+NOTE(keypath_static_member_access_from_unsupported_module_note,none,
+     "rebuild %0 to enable static member use in key paths",
+     (const ModuleDecl *))
 ERROR(expr_keypath_enum_case,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to enum case %0",
       (const ValueDecl *, bool))

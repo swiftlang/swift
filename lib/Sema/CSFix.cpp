@@ -1237,7 +1237,9 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
   }
 
   case RefKind::UnsupportedStaticMember: {
-    return false;
+    UnsupportedStaticMemberRefInKeyPath failure(solution, BaseType, Member,
+                                                getLocator());
+    return failure.diagnose(asNote);
   }
 
   case RefKind::EnumCase: {

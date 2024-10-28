@@ -6352,6 +6352,18 @@ bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
   return true;
 }
 
+bool UnsupportedStaticMemberRefInKeyPath::diagnoseAsError() {
+  auto *member = getMember();
+  auto *module = member->getDeclContext()->getParentModule();
+
+  emitDiagnostic(diag::keypath_static_member_access_from_unsupported_module,
+                 BaseType->getMetatypeInstanceType(), member, module,
+                 getLocator()->isForKeyPathDynamicMemberLookup());
+  emitDiagnostic(
+      diag::keypath_static_member_access_from_unsupported_module_note, module);
+  return true;
+}
+
 bool InvalidEnumCaseRefInKeyPath::diagnoseAsError() {
   emitDiagnostic(diag::expr_keypath_enum_case, getMember(),
                  isForKeyPathDynamicMemberLookup());
