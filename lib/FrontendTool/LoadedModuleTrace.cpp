@@ -838,6 +838,14 @@ class ObjcMethodReferenceCollector: public SourceEntityWalker {
     else
       return "method";
   }
+  static StringRef selectMethodOwnerKey(const clang::NamedDecl* clangD) {
+    assert(clangD);
+    if (isa<clang::ObjCInterfaceDecl>(clangD))
+      return "interface_type";
+    if (isa<clang::ObjCCategoryDecl>(clangD))
+      return "category_type";
+    return "type";
+  }
 public:
   void setFileBeforeVisiting(SourceFile *SF) {
     assert(SF && "need to visit actual source files");
@@ -857,7 +865,7 @@ public:
                                                               ->getParent())) {
             auto pName = parent->getName();
             if (!pName.empty())
-              out.attribute("type", pName);
+              out.attribute(selectMethodOwnerKey(parent), pName);
           }
           out.attribute(selectMethodKey(clangD),  clangD->getNameAsString());
           out.attribute("declared_at", Loc.printToString(SM));
