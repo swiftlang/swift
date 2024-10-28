@@ -6337,22 +6337,15 @@ SourceLoc InvalidMemberRefInKeyPath::getLoc() const {
 }
 
 bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
-  auto *KPE = getAsExpr<KeyPathExpr>(getRawAnchor());
-  auto rootTyRepr = KPE->getExplicitRootType();
-  auto isProtocol = getBaseType()->isExistentialType();
-
-  if (!getConstraintSystem().getASTContext().LangOpts.hasFeature(
-          Feature::KeyPathWithStaticMembers)) {
-    emitDiagnostic(diag::expr_keypath_static_member, getMember(),
-                   isForKeyPathDynamicMemberLookup());
-  } else {
-    if (rootTyRepr && !isProtocol) {
-      emitDiagnostic(diag::could_not_use_type_member_on_instance, getBaseType(),
-                     DeclNameRef(getMember()->getName()))
-          .fixItInsert(rootTyRepr->getEndLoc(), ".Type");
-    } else {
+  auto diagnostic =
       emitDiagnostic(diag::could_not_use_type_member_on_instance, getBaseType(),
                      DeclNameRef(getMember()->getName()));
+
+  // Suggest adding `.Type` to an explicit root if possible.
+  if (auto *keyPath = getAsExpr<KeyPathExpr>(getRawAnchor())) {
+    if (auto *explicitRoot = keyPath->getExplicitRootType()) {
+      if (explicitRoot && !getBaseType()->isExistentialType())
+        diagnostic.fixItInsert(explicitRoot->getEndLoc(), ".Type");
     }
   }
 

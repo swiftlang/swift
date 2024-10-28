@@ -1231,6 +1231,12 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
                                         bool asNote) const {
   switch (Kind) {
   case RefKind::StaticMember: {
+    InvalidStaticMemberRefInKeyPath failure(solution, BaseType, Member,
+                                            getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::UnsupportedStaticMember: {
     return false;
   }
 
@@ -1281,12 +1287,23 @@ AllowInvalidRefInKeyPath *
 AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
                                  ValueDecl *member,
                                  ConstraintLocator *locator) {
+  if (member->isStatic() && !isa<FuncDecl>(member)) {
+    // References to static members are supported only for modules that
+    // are built with 6.1+ compilers, libraries produced by earlier
+    // compilers don't have required symbols.
+    if (auto *module = member->getDeclContext()->getParentModule()) {
+      if (module->isBuiltFromInterface() &&
+          module->getSwiftInterfaceCompilerVersion() <
+              llvm::VersionTuple(6, 1)) {
+        return AllowInvalidRefInKeyPath::create(
+            cs, baseType, RefKind::UnsupportedStaticMember, member, locator);
+      }
+    }
 
-  if (!cs.getASTContext().LangOpts.hasFeature(
-          Feature::KeyPathWithStaticMembers) &&
-      member->isStatic())
-    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::StaticMember,
-                                            member, locator);
+    if (!baseType->getRValueType()->is<AnyMetatypeType>())
+      return AllowInvalidRefInKeyPath::create(
+          cs, baseType, RefKind::StaticMember, member, locator);
+  }
 
   // Referencing (instance or static) methods in key path is
   // not currently allowed.
