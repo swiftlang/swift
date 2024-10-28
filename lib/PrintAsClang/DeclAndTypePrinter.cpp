@@ -2958,7 +2958,9 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   if (outputLang == OutputLanguageMode::Cxx) {
     if (!isExposedToThisModule(M, VD, exposedModules))
       return false;
-    if (!cxx_translation::isExposableToCxx(VD))
+    if (!cxx_translation::isExposableToCxx(
+            VD,
+            [this](const NominalTypeDecl *decl) { return isZeroSized(decl); }))
       return false;
     if (!isEnumExposableToCxx(VD, *this))
       return false;
@@ -2974,6 +2976,16 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
     return false;
 
   return true;
+}
+
+bool DeclAndTypePrinter::isZeroSized(const NominalTypeDecl *decl) {
+  if (decl->isResilient())
+    return false;
+  auto &abiDetails = interopContext.getIrABIDetails();
+  auto sizeAndAlignment = abiDetails.getTypeSizeAlignment(decl);
+  if (sizeAndAlignment)
+    return sizeAndAlignment->size == 0;
+  return false;
 }
 
 bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {
