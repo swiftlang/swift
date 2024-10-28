@@ -78,13 +78,6 @@ class FoundationTests(product.Product):
         ]
         if self.args.verbose_build:
             cmd.append('--verbose')
-
-        # On amazon-linux2 the gold linker (version 1.14) crashes when linking
-        # debug info. Workaround this issue by building without debug info.
-        # rdar://137760869
-        if host_target.startswith('linux'):
-            cmd += ['-Xswiftc', '-gnone']
-
         shell.call(cmd, env={
             'SWIFTCI_USE_LOCAL_DEPS': '1',
             'DISPATCH_INCLUDE_PATH': include_path
