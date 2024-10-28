@@ -38,9 +38,12 @@ This status table describes which of the following standard library features can
 | Collection algorithms (sort, reverse)                      | Yes    |
 | CustomStringConvertible, CustomDebugStringConvertible      | Yes, except those that require reflection (e.g. Array's .description)     |
 | Dictionary (dynamic heap-allocated container)              | Yes    |
+| Floating-point conversion to string                        | No     |
+| Floating-point parsing                                     | No     |
 | FixedWidthInteger + related protocols                      | Yes    |
 | Hashable, Equatable, Comparable protocols                  | Yes    |
 | InputStream, OutputStream                                  | No     |
+| Integer conversion to string                               | Yes    |
 | Integer parsing                                            | No     |
 | KeyPaths                                                   | Partial (only compile-time constant key paths to stored properties supported, only usable in MemoryLayout and UnsafePointer APIs)     |
 | Lazy collections                                           | No     |
@@ -55,7 +58,7 @@ This status table describes which of the following standard library features can
 | SIMD types                                                 | Yes    |
 | StaticString                                               | Yes    |
 | String (dynamic)                                           | Yes    |
-| String Interpolations                                      | Yes    |
+| String interpolations                                      | Partial (only strings, integers, booleans, and custom types that are CustomStringConvertible can be interpolated)    |
 | Unicode                                                    | Yes    |
 | Unsafe\[Mutable\]\[Raw\]\[Buffer\]Pointer                  | Yes    |
 | VarArgs                                                    | No     |
@@ -66,7 +69,7 @@ This status table describes which of the following Swift features can be used in
 
 | **Swift Feature**                                          | **Currently Supported In Embedded Swift?**          |
 |------------------------------------------------------------|-----------------------------------------------------|
-| Synchronization module                                     | Yes    |
+| Synchronization module                                     | Partial (only Atomic types, no Mutex)    |
 | Swift Concurrency                                          | Partial, experimental (basics of actors and tasks work in single-threaded concurrency mode) |
 | C interop                                                  | Yes    | 
 | C++ interop                                                | Yes    |

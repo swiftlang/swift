@@ -80,11 +80,11 @@ sil @loadable_fixed_indirect_to_direct: $@convention(thin) (@in Builtin.FixedArr
 entry(%v : $*Builtin.FixedArray<2, AnyObject>):
     // CHECK: [[V0:%.*]] = getelementptr {{.*}} %0, {{i[0-9]+}} 0
     // CHECK: [[V0_0:%.*]] = getelementptr {{.*}} [[V0]], {{i[0-9]+}} 0, {{i[0-9]+}} 0
-    // CHECK: [[V0_VALUE:%.*]] = load {{.*}} [[V0_0]], align 8
+    // CHECK: [[V0_VALUE:%.*]] = load {{.*}} [[V0_0]], align
 
     // CHECK: [[V1:%.*]] = getelementptr {{.*}} %0, {{i[0-9]+}} 1
     // CHECK: [[V1_0:%.*]] = getelementptr {{.*}} [[V1]], {{i[0-9]+}} 0, {{i[0-9]+}} 0
-    // CHECK: [[V1_VALUE:%.*]] = load {{.*}} [[V1_0]], align 8
+    // CHECK: [[V1_VALUE:%.*]] = load {{.*}} [[V1_0]], align
     %a = load %v : $*Builtin.FixedArray<2, AnyObject>
 
     // CHECK: [[R0:%.*]] = insertvalue {{.*}} undef, ptr [[V0_VALUE]], 0
@@ -205,14 +205,14 @@ entry(%r : $*(Builtin.FixedArray<N, Int>, Builtin.FixedArray<N, Int>), %v : $*Bu
     %a = tuple_element_addr %r : $*(Builtin.FixedArray<N, Int>, Builtin.FixedArray<N, Int>), 0
     // CHECK:   [[SIZE_NEG:%.*]] = icmp slt {{i[0-9]+}} %N, 0
     // CHECK:   [[SIZE:%.*]] = select i1 [[SIZE_NEG]], {{i[0-9]+}} 0, {{i[0-9]+}} %N
-    // CHECK:   [[IS_ZERO:%.*]] = icmp eq i64 [[SIZE]], 0
+    // CHECK:   [[IS_ZERO:%.*]] = icmp eq {{i[0-9]+}} [[SIZE]], 0
     // CHECK:   br i1 [[IS_ZERO]], label %[[LOOP_END:.*]], label %[[LOOP:.*]]
     // CHECK: [[LOOP]]:
     // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ [[SIZE]], %entry ], [ [[SIZE_DEC:%.*]], %[[LOOP]] ]
     // CHECK:   [[DEST:%.*]] = phi ptr [ %0, %entry ], [ [[DEST_INC:%.*]], %[[LOOP]] ]
     // CHECK:   [[SRC:%.*]] = phi ptr [ %1, %entry ], [ [[SRC_INC:%.*]], %[[LOOP]] ]
-    // CHECK:   [[DEST_INC]] = getelementptr inbounds %TSi, ptr [[DEST]], i64 1
-    // CHECK:   [[SRC_INC]] = getelementptr inbounds %TSi, ptr [[SRC]], i64 1
+    // CHECK:   [[DEST_INC]] = getelementptr inbounds %TSi, ptr [[DEST]], {{i[0-9]+}} 1
+    // CHECK:   [[SRC_INC]] = getelementptr inbounds %TSi, ptr [[SRC]], {{i[0-9]+}} 1
     // CHECK:   [[SIZE_DEC]] = sub {{i[0-9]+}} [[COUNT]], 1
     // CHECK:   [[DONE:%.*]] = icmp eq {{i[0-9]+}} [[SIZE_DEC]], 0
     // CHECK:   br i1 [[DONE]], label %[[LOOP_END]], label %[[LOOP]]
@@ -228,14 +228,14 @@ entry(%r : $*(Builtin.FixedArray<N, AnyObject>, Builtin.FixedArray<N, AnyObject>
     %a = tuple_element_addr %r : $*(Builtin.FixedArray<N, AnyObject>, Builtin.FixedArray<N, AnyObject>), 0
     // CHECK:   [[SIZE_NEG:%.*]] = icmp slt {{i[0-9]+}} %N, 0
     // CHECK:   [[SIZE:%.*]] = select i1 [[SIZE_NEG]], {{i[0-9]+}} 0, {{i[0-9]+}} %N
-    // CHECK:   [[IS_ZERO:%.*]] = icmp eq i64 [[SIZE]], 0
+    // CHECK:   [[IS_ZERO:%.*]] = icmp eq {{i[0-9]+}} [[SIZE]], 0
     // CHECK:   br i1 [[IS_ZERO]], label %[[LOOP_END:.*]], label %[[LOOP:.*]]
     // CHECK: [[LOOP]]:
     // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ [[SIZE]], %entry ], [ [[SIZE_DEC:%.*]], %[[LOOP]] ]
     // CHECK:   [[DEST:%.*]] = phi ptr [ %0, %entry ], [ [[DEST_INC:%.*]], %[[LOOP]] ]
     // CHECK:   [[SRC:%.*]] = phi ptr [ %1, %entry ], [ [[SRC_INC:%.*]], %[[LOOP]] ]
-    // CHECK:   [[DEST_INC]] = getelementptr inbounds %AnyObject, ptr [[DEST]], i64 1
-    // CHECK:   [[SRC_INC]] = getelementptr inbounds %AnyObject, ptr [[SRC]], i64 1
+    // CHECK:   [[DEST_INC]] = getelementptr inbounds %AnyObject, ptr [[DEST]], {{i[0-9]+}} 1
+    // CHECK:   [[SRC_INC]] = getelementptr inbounds %AnyObject, ptr [[SRC]], {{i[0-9]+}} 1
     // CHECK:   [[SIZE_DEC]] = sub {{i[0-9]+}} [[COUNT]], 1
     // CHECK:   [[DONE:%.*]] = icmp eq {{i[0-9]+}} [[SIZE_DEC]], 0
     // CHECK:   br i1 [[DONE]], label %[[LOOP_END]], label %[[LOOP]]
@@ -251,14 +251,14 @@ entry(%r : $*(Builtin.FixedArray<N, Any>, Builtin.FixedArray<N, Any>), %v : $*Bu
     %a = tuple_element_addr %r : $*(Builtin.FixedArray<N, Any>, Builtin.FixedArray<N, Any>), 0
     // CHECK:   [[SIZE_NEG:%.*]] = icmp slt {{i[0-9]+}} %N, 0
     // CHECK:   [[SIZE:%.*]] = select i1 [[SIZE_NEG]], {{i[0-9]+}} 0, {{i[0-9]+}} %N
-    // CHECK:   [[IS_ZERO:%.*]] = icmp eq i64 [[SIZE]], 0
+    // CHECK:   [[IS_ZERO:%.*]] = icmp eq {{i[0-9]+}} [[SIZE]], 0
     // CHECK:   br i1 [[IS_ZERO]], label %[[LOOP_END:.*]], label %[[LOOP:.*]]
     // CHECK: [[LOOP]]:
     // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ [[SIZE]], %entry ], [ [[SIZE_DEC:%.*]], %[[LOOP]] ]
     // CHECK:   [[DEST:%.*]] = phi ptr [ %0, %entry ], [ [[DEST_INC:%.*]], %[[LOOP]] ]
     // CHECK:   [[SRC:%.*]] = phi ptr [ %1, %entry ], [ [[SRC_INC:%.*]], %[[LOOP]] ]
-    // CHECK:   [[DEST_INC]] = getelementptr inbounds %Any, ptr [[DEST]], i64 1
-    // CHECK:   [[SRC_INC]] = getelementptr inbounds %Any, ptr [[SRC]], i64 1
+    // CHECK:   [[DEST_INC]] = getelementptr inbounds %Any, ptr [[DEST]], {{i[0-9]+}} 1
+    // CHECK:   [[SRC_INC]] = getelementptr inbounds %Any, ptr [[SRC]], {{i[0-9]+}} 1
     // CHECK:   [[SIZE_DEC]] = sub {{i[0-9]+}} [[COUNT]], 1
     // CHECK:   [[DONE:%.*]] = icmp eq {{i[0-9]+}} [[SIZE_DEC]], 0
     // CHECK:   br i1 [[DONE]], label %[[LOOP_END]], label %[[LOOP]]
@@ -274,7 +274,7 @@ entry(%r : $*(Builtin.FixedArray<N, T>, Builtin.FixedArray<N, T>), %v : $*Builti
     %a = tuple_element_addr %r : $*(Builtin.FixedArray<N, T>, Builtin.FixedArray<N, T>), 0
     // CHECK:   [[SIZE_NEG:%.*]] = icmp slt {{i[0-9]+}} %N, 0
     // CHECK:   [[SIZE:%.*]] = select i1 [[SIZE_NEG]], {{i[0-9]+}} 0, {{i[0-9]+}} %N
-    // CHECK:   [[IS_ZERO:%.*]] = icmp eq i64 [[SIZE]], 0
+    // CHECK:   [[IS_ZERO:%.*]] = icmp eq {{i[0-9]+}} [[SIZE]], 0
     // CHECK:   br i1 [[IS_ZERO]], label %[[LOOP_END:.*]], label %[[LOOP:.*]]
     // CHECK: [[LOOP]]:
     // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ [[SIZE]], %entry ], [ [[SIZE_DEC:%.*]], %[[LOOP]] ]

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/print_synthesized_extensions.swiftmodule -emit-module-doc -emit-module-doc-path %t/print_synthesized_extensions.swiftdoc %s
-// RUN: %target-swift-ide-test -print-module -annotate-print -synthesize-extension -print-interface -no-empty-line-between-members -module-to-print=print_synthesized_extensions -I %t -source-filename=%s > %t.syn.txt
+// RUN: %target-swift-frontend -target %target-swift-5.9-abi-triple -emit-module-path %t/print_synthesized_extensions.swiftmodule -emit-module-doc -emit-module-doc-path %t/print_synthesized_extensions.swiftdoc %s
+// RUN: %target-swift-ide-test -annotate-print -print-module -synthesize-extension -print-interface -no-empty-line-between-members -module-to-print=print_synthesized_extensions -I %t -source-filename=%s -target=%target-swift-5.9-abi-triple > %t.syn.txt
 // RUN: %FileCheck %s -check-prefix=CHECK1 < %t.syn.txt
 // RUN: %FileCheck %s -check-prefix=CHECK2 < %t.syn.txt
 // RUN: %FileCheck %s -check-prefix=CHECK3 < %t.syn.txt
@@ -17,6 +17,7 @@
 // RUN: %FileCheck %s -check-prefix=CHECK14 < %t.syn.txt
 // RUN: %FileCheck %s -check-prefix=CHECK15 < %t.syn.txt
 // RUN: %FileCheck %s -check-prefix=CHECK16 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK17 < %t.syn.txt
 
 public protocol P1 {
   associatedtype T1
@@ -312,8 +313,6 @@ extension S13 : P5 {
 // CHECK11-NEXT:    public func <loc>foo3()</loc></decl>
 // CHECK11-NEXT:  <decl:Func>/// This is picked
 // CHECK11-NEXT:    public func <loc>foo4()</loc></decl>
-// CHECK11-NEXT:  <decl:Func>/// This should not crash
-// CHECK11-NEXT:    public func <loc>foo5()</loc></decl>
 // CHECK11-NEXT: }</synthesized>
 
 // CHECK12:       <decl:Protocol>public protocol <loc>P6</loc> {
@@ -338,8 +337,6 @@ extension S13 : P5 {
 // CHECK14-NEXT:     public func <loc>foo3()</loc></decl>
 // CHECK14-NEXT: <decl:Func>/// This is picked
 // CHECK14-NEXT:     public func <loc>foo4()</loc></decl>
-// CHECK14-NEXT: <decl:Func>/// This should not crash
-// CHECK14-NEXT:     public func <loc>foo5()</loc></decl>
 // CHECK14-NEXT: }</synthesized>
 
 // rdar://76868074: Make sure we print the extensions for C.
@@ -398,3 +395,19 @@ extension F : P8 {}
 // CHECK16-NEXT: }</synthesized>
 
 // CHECK16-NOT: <synthesized>extension <ref:Class>F</ref> where <ref:GenericTypeParam>T</ref> : <ref:module>print_synthesized_extensions</ref>.<ref:Class>E</ref> {
+
+
+// Parameter packs
+public protocol P14 {}
+
+extension P14 {
+  public func foo<each T: Equatable>(_: repeat each T) {}
+}
+
+public struct S14<each T: Equatable> {}
+
+extension S14 : P14 where repeat each T: Hashable {}
+
+// CHECK17:      <synthesized>extension <ref:Struct>S14</ref> {
+// CHECK17-NEXT:   <decl:Func>public func <loc>foo<each <ref:GenericTypeParam>T</ref>>(<decl:Param>_: repeat each <ref:GenericTypeParam>T</ref></decl>)</loc> where Pack{repeat each <ref:GenericTypeParam>T</ref>} : <ref:Protocol>Equatable</ref></decl>
+// CHECK17-NEXT: }</synthesized>

@@ -688,8 +688,8 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   case ChangeKind::RetiredConstraint:
     out << "(RetiredConstraint ";
-    TheConstraint.Constraint->print(out, &cs.getASTContext().SourceMgr,
-                                    indent + 2);
+    Retiree.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                              indent + 2);
     out << ")\n";
     break;
   }

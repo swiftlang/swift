@@ -39,8 +39,8 @@ using namespace swift;
 static EnumElementDecl *
 extractEnumElement(DeclContext *DC, SourceLoc UseLoc,
                    const VarDecl *constant) {
-  ExportContext where = ExportContext::forFunctionBody(DC, UseLoc);
-  diagnoseExplicitUnavailability(constant, UseLoc, where, nullptr);
+  diagnoseDeclAvailability(constant, UseLoc, nullptr,
+                           ExportContext::forFunctionBody(DC, UseLoc));
 
   const FuncDecl *getter = constant->getAccessor(AccessorKind::Get);
   if (!getter)
@@ -942,64 +942,72 @@ void repairTupleOrAssociatedValuePatternIfApplicable(
     Type enumPayloadType,
     const EnumElementDecl *enumCase) {
   auto &DE = Ctx.Diags;
-  bool addDeclNote = false;
-  if (auto *tupleType = dyn_cast<TupleType>(enumPayloadType.getPointer())) {
-    if (tupleType->getNumElements() >= 2
-        && enumElementInnerPat->getKind() == PatternKind::Paren) {
-      auto *semantic = enumElementInnerPat->getSemanticsProvidingPattern();
-      if (auto *tuplePattern = dyn_cast<TuplePattern>(semantic)) {
-        if (tuplePattern->getNumElements() >= 2) {
-          auto diag = DE.diagnose(tuplePattern->getLoc(),
-              diag::converting_tuple_into_several_associated_values,
-              enumCase->getNameStr(), tupleType->getNumElements());
-          auto subPattern =
-            dyn_cast<ParenPattern>(enumElementInnerPat)->getSubPattern();
+  auto addDeclNote = [&]() {
+    DE.diagnose(enumCase->getStartLoc(), diag::decl_declared_here, enumCase);
+  };
+  auto payloadParams = enumCase->getCaseConstructorParams();
 
-          // We might also have code like
-          //
-          // enum Upair { case upair(Int, Int) }
-          // func f(u: Upair) { switch u { case .upair(let (x, y)): () } }
-          //
-          // This needs a more complex rearrangement to fix the code. So only
-          // apply the fix-it if we have a tuple immediately inside.
-          if (subPattern->getKind() == PatternKind::Tuple) {
-            auto leadingParen = SourceRange(enumElementInnerPat->getStartLoc());
-            auto trailingParen = SourceRange(enumElementInnerPat->getEndLoc());
-            diag.fixItRemove(leadingParen)
-                .fixItRemove(trailingParen);
-          }
+  // First check to see whether we need to untuple a pattern.
+  if (payloadParams.size() >= 2) {
+    if (enumElementInnerPat->getKind() != PatternKind::Paren)
+      return;
 
-          addDeclNote = true;
-          enumElementInnerPat = semantic;
-        }
-      } else {
-        DE.diagnose(enumElementInnerPat->getLoc(),
-          diag::found_one_pattern_for_several_associated_values,
-          enumCase->getNameStr(),
-          tupleType->getNumElements());
-        addDeclNote = true;
+    auto *semantic = enumElementInnerPat->getSemanticsProvidingPattern();
+    if (auto *tuplePattern = dyn_cast<TuplePattern>(semantic)) {
+      if (tuplePattern->getNumElements() < 2)
+        return;
+
+      auto diag =
+          DE.diagnose(tuplePattern->getLoc(),
+                      diag::converting_tuple_into_several_associated_values,
+                      enumCase->getNameStr(), payloadParams.size());
+      auto subPattern =
+          dyn_cast<ParenPattern>(enumElementInnerPat)->getSubPattern();
+
+      // We might also have code like
+      //
+      // enum Upair { case upair(Int, Int) }
+      // func f(u: Upair) { switch u { case .upair(let (x, y)): () } }
+      //
+      // This needs a more complex rearrangement to fix the code. So only
+      // apply the fix-it if we have a tuple immediately inside.
+      if (subPattern->getKind() == PatternKind::Tuple) {
+        auto leadingParen = SourceRange(enumElementInnerPat->getStartLoc());
+        auto trailingParen = SourceRange(enumElementInnerPat->getEndLoc());
+        diag.fixItRemove(leadingParen).fixItRemove(trailingParen);
       }
+      diag.flush();
+      addDeclNote();
+      enumElementInnerPat = semantic;
+    } else {
+      DE.diagnose(enumElementInnerPat->getLoc(),
+                  diag::found_one_pattern_for_several_associated_values,
+                  enumCase->getNameStr(), payloadParams.size());
+      addDeclNote();
     }
-  } else if (auto *tupleType = enumPayloadType->getAs<TupleType>()) {
-    if (tupleType->getNumElements() >= 2) {
-      if (auto *tuplePattern = dyn_cast<TuplePattern>(enumElementInnerPat)) {
-        DE.diagnose(enumElementInnerPat->getLoc(),
-                    diag::converting_several_associated_values_into_tuple,
-                    enumCase->getNameStr(),
-                    tupleType->getNumElements())
-          .fixItInsert(enumElementInnerPat->getStartLoc(), "(")
-          .fixItInsertAfter(enumElementInnerPat->getEndLoc(), ")");
-        addDeclNote = true;
-        enumElementInnerPat =
-          new (Ctx) ParenPattern(enumElementInnerPat->getStartLoc(),
-                                 enumElementInnerPat,
-                                 enumElementInnerPat->getEndLoc());
-      }
-    }
+    return;
   }
 
-  if (addDeclNote)
-    DE.diagnose(enumCase->getStartLoc(), diag::decl_declared_here, enumCase);
+  // Then check to see whether we need to tuple a pattern.
+  if (payloadParams.size() == 1 && !payloadParams[0].hasLabel()) {
+    auto *tupleType = enumPayloadType->getAs<TupleType>();
+    if (!tupleType || tupleType->getNumElements() < 2)
+      return;
+
+    auto *tuplePattern = dyn_cast<TuplePattern>(enumElementInnerPat);
+    if (!tuplePattern)
+      return;
+
+    DE.diagnose(enumElementInnerPat->getLoc(),
+                diag::converting_several_associated_values_into_tuple,
+                enumCase->getNameStr(), tupleType->getNumElements())
+        .fixItInsert(enumElementInnerPat->getStartLoc(), "(")
+        .fixItInsertAfter(enumElementInnerPat->getEndLoc(), ")");
+    addDeclNote();
+    enumElementInnerPat = new (Ctx)
+        ParenPattern(enumElementInnerPat->getStartLoc(), enumElementInnerPat,
+                     enumElementInnerPat->getEndLoc());
+  }
 }
 
 NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,

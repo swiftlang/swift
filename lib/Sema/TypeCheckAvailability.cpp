@@ -315,6 +315,19 @@ ExportContext::getExportabilityReason() const {
   return std::nullopt;
 }
 
+std::optional<AvailabilityRange>
+UnmetAvailabilityRequirement::getRequiredNewerAvailabilityRange(
+    ASTContext &ctx) const {
+  switch (kind) {
+  case Kind::AlwaysUnavailable:
+  case Kind::RequiresVersion:
+  case Kind::Obsoleted:
+    return std::nullopt;
+  case Kind::IntroducedInNewerVersion:
+    return AvailabilityInference::availableRange(attr, ctx);
+  }
+}
+
 /// Returns the first availability attribute on the declaration that is active
 /// on the target platform.
 static const AvailableAttr *getActiveAvailableAttribute(const Decl *D,
@@ -345,8 +358,9 @@ static bool computeContainedByDeploymentTarget(TypeRefinementContext *TRC,
 /// Returns true if the reference or any of its parents is an
 /// unconditional unavailable declaration for the same platform.
 static bool isInsideCompatibleUnavailableDeclaration(
-    const Decl *D, const ExportContext &where, const AvailableAttr *attr) {
-  auto referencedPlatform = where.getUnavailablePlatformKind();
+    const Decl *D, AvailabilityContext availabilityContext,
+    const AvailableAttr *attr) {
+  auto referencedPlatform = availabilityContext.getUnavailablePlatformKind();
   if (!referencedPlatform)
     return false;
 
@@ -374,7 +388,7 @@ ExportContext::shouldDiagnoseDeclAsUnavailable(const Decl *D) const {
   if (!attr)
     return nullptr;
 
-  if (isInsideCompatibleUnavailableDeclaration(D, *this, attr))
+  if (isInsideCompatibleUnavailableDeclaration(D, Availability, attr))
     return nullptr;
 
   return attr;
@@ -1496,7 +1510,8 @@ TypeChecker::checkDeclarationAvailability(const Decl *D,
   // Skip computing potential unavailability if the declaration is explicitly
   // unavailable and the context is also unavailable.
   if (const AvailableAttr *Attr = AvailableAttr::isUnavailable(D))
-    if (isInsideCompatibleUnavailableDeclaration(D, Where, Attr))
+    if (isInsideCompatibleUnavailableDeclaration(D, Where.getAvailability(),
+                                                 Attr))
       return std::nullopt;
 
   if (isDeclarationUnavailable(D, Where.getDeclContext(), [&Where] {
@@ -2888,7 +2903,7 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
-bool swift::diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
+static bool diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
                                            const ExportContext &Where,
                                            const Expr *call,
                                            DeclAvailabilityFlags Flags) {
@@ -3062,6 +3077,51 @@ bool diagnoseExplicitUnavailability(
   }
   return true;
 }
+
+std::optional<UnmetAvailabilityRequirement>
+swift::checkDeclarationAvailability(const Decl *decl,
+                                    const DeclContext *declContext,
+                                    AvailabilityContext availabilityContext) {
+  auto &ctx = declContext->getASTContext();
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return std::nullopt;
+
+  // Generic parameters are always available.
+  if (isa<GenericTypeParamDecl>(decl))
+    return std::nullopt;
+
+  if (auto attr = AvailableAttr::isUnavailable(decl)) {
+    if (isInsideCompatibleUnavailableDeclaration(decl, availabilityContext,
+                                                 attr))
+      return std::nullopt;
+
+    switch (attr->getVersionAvailability(ctx)) {
+    case AvailableVersionComparison::Available:
+    case AvailableVersionComparison::PotentiallyUnavailable:
+      llvm_unreachable("Decl should be unavailable");
+
+    case AvailableVersionComparison::Unavailable:
+      if ((attr->isLanguageVersionSpecific() ||
+           attr->isPackageDescriptionVersionSpecific()) &&
+          attr->Introduced.has_value())
+        return UnmetAvailabilityRequirement::forRequiresVersion(attr);
+
+      return UnmetAvailabilityRequirement::forAlwaysUnavailable(attr);
+
+    case AvailableVersionComparison::Obsoleted:
+      return UnmetAvailabilityRequirement::forObsoleted(attr);
+    }
+  }
+
+  // Check whether the declaration is available in a newer platform version.
+  auto rangeAndAttr = AvailabilityInference::availableRangeAndAttr(decl);
+  if (!availabilityContext.getPlatformRange().isContainedIn(rangeAndAttr.first))
+    return UnmetAvailabilityRequirement::forIntroducedInNewerVersion(
+        rangeAndAttr.second);
+
+  return std::nullopt;
+}
+
 
 /// Check if this is a subscript declaration inside String or
 /// Substring that returns String, and if so return true.
@@ -4031,11 +4091,17 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
                                      const Expr *call,
                                      const ExportContext &Where,
                                      DeclAvailabilityFlags Flags) {
-  assert(!Where.isImplicit());
-
   // Generic parameters are always available.
   if (isa<GenericTypeParamDecl>(D))
     return false;
+
+  if (R.isValid()) {
+    if (TypeChecker::diagnoseInlinableDeclRefAccess(R.Start, D, Where))
+      return true;
+
+    if (TypeChecker::diagnoseDeclRefExportability(R.Start, D, Where))
+      return true;
+  }
 
   // Keep track if this is an accessor.
   auto accessor = dyn_cast<AccessorDecl>(D);
@@ -4047,16 +4113,20 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
       return false;
   }
 
-  if (R.isValid()) {
-    if (TypeChecker::diagnoseInlinableDeclRefAccess(R.Start, D, Where))
-      return true;
+  auto *DC = Where.getDeclContext();
+  auto &ctx = DC->getASTContext();
+  auto unmetRequirement =
+      checkDeclarationAvailability(D, DC, Where.getAvailability());
+  auto requiredRange =
+      unmetRequirement
+          ? unmetRequirement->getRequiredNewerAvailabilityRange(ctx)
+          : std::nullopt;
 
-    if (TypeChecker::diagnoseDeclRefExportability(R.Start, D, Where))
+  if (unmetRequirement && !requiredRange) {
+    // FIXME: diagnoseExplicitUnavailability should take an unmet requirement
+    if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
       return true;
   }
-
-  if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
-    return true;
 
   if (diagnoseDeclAsyncAvailability(D, R, call, Where))
     return true;
@@ -4077,25 +4147,21 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
     return false;
 
   // Diagnose (and possibly signal) for potential unavailability
-  auto maybeUnavail = TypeChecker::checkDeclarationAvailability(D, Where);
-  if (!maybeUnavail.has_value())
+  if (!requiredRange)
     return false;
 
-  auto requiredAvailability = maybeUnavail.value();
-  auto *DC = Where.getDeclContext();
-  auto &ctx = DC->getASTContext();
   if (Flags.contains(
           DeclAvailabilityFlag::
               AllowPotentiallyUnavailableAtOrBelowDeploymentTarget) &&
-      requiresDeploymentTargetOrEarlier(requiredAvailability, ctx))
+      requiresDeploymentTargetOrEarlier(*requiredRange, ctx))
     return false;
 
   if (accessor) {
     bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
-    diagnosePotentialAccessorUnavailability(accessor, R, DC,
-                                            requiredAvailability, forInout);
+    diagnosePotentialAccessorUnavailability(accessor, R, DC, *requiredRange,
+                                            forInout);
   } else {
-    if (!diagnosePotentialUnavailability(D, R, DC, requiredAvailability))
+    if (!diagnosePotentialUnavailability(D, R, DC, *requiredRange))
       return false;
   }
 

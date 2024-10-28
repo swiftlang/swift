@@ -191,22 +191,24 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
   struct ExtensionMergeInfo {
     struct Requirement {
-      Type First;
-      Type Second;
-      RequirementKind Kind;
-      CanType CanFirst;
-      CanType CanSecond;
+      swift::Requirement Req;
 
-      bool operator< (const Requirement& Rhs) const {
-        if (Kind != Rhs.Kind)
-          return Kind < Rhs.Kind;
-        else if (CanFirst != Rhs.CanFirst)
-          return CanFirst < Rhs.CanFirst;
-        else
-          return CanSecond < Rhs.CanSecond;
+      bool operator<(const Requirement& Rhs) const {
+        if (auto result = unsigned(Req.getKind()) - unsigned(Rhs.Req.getKind())) {
+          return result < 0;
+        } else if (!Req.getFirstType()->isEqual(Rhs.Req.getFirstType())) {
+          return (Req.getFirstType()->getCanonicalType() <
+                  Rhs.Req.getFirstType()->getCanonicalType());
+        } else if (Req.getKind() != RequirementKind::Layout) {
+          return (Req.getSecondType()->getCanonicalType() <
+                  Rhs.Req.getSecondType()->getCanonicalType());
+        }
+
+        return false;
       }
+
       bool operator== (const Requirement& Rhs) const {
-        return (!(*this < Rhs)) && (!(Rhs < *this));
+        return Req.getCanonical() == Rhs.Req.getCanonical();
       }
     };
 
@@ -214,12 +216,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     unsigned InheritsCount;
     std::set<Requirement> Requirements;
     void addRequirement(swift::Requirement Req) {
-      auto First = Req.getFirstType();
-      auto CanFirst = First->getCanonicalType();
-      auto Second = Req.getSecondType();
-      auto CanSecond = Second->getCanonicalType();
-
-      Requirements.insert({First, Second, Req.getKind(), CanFirst, CanSecond});
+      Requirements.insert({Req});
     }
     bool operator== (const ExtensionMergeInfo& Another) const {
       // Trivially unmergeable.
@@ -333,10 +330,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       ProtocolDecl *BaseProto = OwningExt->getInnermostDeclContext()
         ->getSelfProtocolDecl();
       for (auto Req : Reqs) {
-        // FIXME: Don't skip layout requirements.
-        if (Req.getKind() == RequirementKind::Layout)
-          continue;
-
         // Skip protocol's Self : <Protocol> requirement.
         if (BaseProto &&
             Req.getKind() == RequirementKind::Conformance &&
@@ -357,40 +350,35 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         }
 
         assert(!Req.getFirstType()->hasArchetype());
-        assert(!Req.getSecondType()->hasArchetype());
+        if (Req.getKind() != RequirementKind::Layout)
+          assert(!Req.getSecondType()->hasArchetype());
 
-        auto SubstReq = Req.subst(
-          [&](Type type) -> Type {
-            if (type->isTypeParameter())
-              return Target->mapTypeIntoContext(type);
-
-            return type;
-          },
-          LookUpConformanceInModule());
-
+        auto *env = Target->getGenericEnvironment();
         SmallVector<Requirement, 2> subReqs;
-        switch (SubstReq.checkRequirement(subReqs)) {
-        case CheckRequirementResult::Success:
-          break;
+        subReqs.push_back(
+          Req.subst(
+            QueryInterfaceTypeSubstitutions(env),
+            LookUpConformanceInModule(),
+            SubstFlags::PreservePackExpansionLevel));
 
-        case CheckRequirementResult::ConditionalConformance:
-          // FIXME: Need to handle conditional requirements here!
-          break;
+        while (!subReqs.empty()) {
+          auto req = subReqs.pop_back_val();
+          switch (req.checkRequirement(subReqs)) {
+          case CheckRequirementResult::Success:
+          case CheckRequirementResult::PackRequirement:
+          case CheckRequirementResult::ConditionalConformance:
+            break;
 
-        case CheckRequirementResult::PackRequirement:
-          // FIXME
-          assert(false && "Refactor this");
-          return true;
-
-        case CheckRequirementResult::SubstitutionFailure:
-          return true;
-
-        case CheckRequirementResult::RequirementFailure:
-          if (!SubstReq.canBeSatisfied())
+          case CheckRequirementResult::SubstitutionFailure:
             return true;
 
-          MergeInfo.addRequirement(Req);
-          break;
+          case CheckRequirementResult::RequirementFailure:
+            if (!req.canBeSatisfied())
+              return true;
+
+            MergeInfo.addRequirement(Req);
+            break;
+          }
         }
       }
       return false;
