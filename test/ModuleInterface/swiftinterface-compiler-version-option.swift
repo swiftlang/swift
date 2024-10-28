@@ -18,7 +18,7 @@
 /// Check option in swiftmodule
 // RUN: llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck --check-prefix=CHECK-MODULE-OPTION %s
 // CHECK-MODULE-OPTION: <OPTIONS_BLOCK
-// CHECK-MODULE-OPTION: <SWIFT_COMPILER_VERSION abbrevid={{.*}}/> blob data = '{{.*}}'
+// CHECK-NOT-MODULE-OPTION: <SWIFT_INTERFACE_COMPILER_VERSION abbrevid={{.*}}/> blob data = '{{.*}}'
 // CHECK-MODULE-OPTION: </OPTIONS_BLOCK>
 
 // Drop and rebuilt swiftmodule to make sure that the version is inferred from the interface file.
@@ -28,7 +28,7 @@
 /// Check option in swiftmodule
 // RUN: llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck --check-prefix=CHECK-REBUILT-MODULE-OPTION %s
 // CHECK-REBUILT-MODULE-OPTION: <OPTIONS_BLOCK
-// CHECK-REBUILT-MODULE-OPTION: <SWIFT_COMPILER_VERSION abbrevid={{.*}}/> blob data = '{{.*}}'
+// CHECK-REBUILT-MODULE-OPTION: <SWIFT_INTERFACE_COMPILER_VERSION abbrevid={{.*}}/> blob data = '{{.*}}'
 // CHECK-REBUILT-MODULE-OPTION: </OPTIONS_BLOCK>
 
 public struct S {

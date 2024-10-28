@@ -345,8 +345,9 @@ public:
     return {};
   }
 
-  /// Returns the version of the Swift compiler used to create this module.
-  virtual llvm::VersionTuple getSwiftCompilerVersion() const {
+  /// Returns the version of the Swift compiler used to create generate
+  /// .swiftinterface file if this file is produced from one.
+  virtual llvm::VersionTuple getSwiftInterfaceCompilerVersion() const {
     return {};
   }
 

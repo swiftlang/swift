@@ -111,8 +111,8 @@ public:
   llvm::VersionTuple UserModuleVersion;
 
   /// The Swift compiler version number that would be used to synthesize
-  /// swiftinterface files and subsequently swiftmodules.
-  llvm::VersionTuple SwiftCompilerVersion;
+  /// swiftinterface files and subsequently their swiftmodules.
+  llvm::VersionTuple SwiftInterfaceCompilerVersion;
 
   /// A set of modules allowed to import this module.
   std::set<std::string> AllowableClients;

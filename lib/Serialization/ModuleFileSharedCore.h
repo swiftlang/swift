@@ -104,10 +104,9 @@ class ModuleFileSharedCore {
   StringRef PublicModuleName;
 
   /// The version of the Swift compiler used to produce swiftinterface
-  /// this module is based on or build the module itself. This is
-  /// the most precise version possible - a compiler tag or version
-  /// if this is a development compiler.
-  llvm::VersionTuple SwiftCompilerVersion;
+  /// this module is based on. This is the most precise version possible
+  /// - a compiler tag or version if this is a development compiler.
+  llvm::VersionTuple SwiftInterfaceCompilerVersion;
 
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;

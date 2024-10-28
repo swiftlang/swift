@@ -1490,8 +1490,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setSerializePackageEnabled();
 
     if (auto compilerVersion =
-            Invocation.getFrontendOptions().SwiftCompilerVersion) {
-      MainModule->setSwiftCompilerVersion(compilerVersion);
+            Invocation.getFrontendOptions().SwiftInterfaceCompilerVersion) {
+      MainModule->setSwiftInterfaceCompilerVersion(compilerVersion);
     }
 
     // Register the main module with the AST context.

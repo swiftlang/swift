@@ -254,8 +254,9 @@ class ModuleDecl
 
   mutable Identifier PublicModuleName;
 
-  /// Indicates that version of the Swift compiler this module was built with.
-  mutable llvm::VersionTuple SwiftCompilerVersion;
+  /// Indicates a version of the Swift compiler used to generate 
+  /// .swiftinterface file that this module was produced from (if any).
+  mutable llvm::VersionTuple InterfaceCompilerVersion;
 
 public:
   /// Produces the components of a given module's full name in reverse order.
@@ -521,13 +522,13 @@ public:
     PublicModuleName = name;
   }
 
-  /// The version of the Swift compiler this module was built with.
-  llvm::VersionTuple getSwiftCompilerVersion() const {
-    return SwiftCompilerVersion;
+  /// See \c InterfaceCompilerVersion
+  llvm::VersionTuple getSwiftInterfaceCompilerVersion() const {
+    return InterfaceCompilerVersion;
   }
 
-  void setSwiftCompilerVersion(llvm::VersionTuple version) {
-    SwiftCompilerVersion = version;
+  void setSwiftInterfaceCompilerVersion(llvm::VersionTuple version) {
+    InterfaceCompilerVersion = version;
   }
 
   /// Retrieve the actual module name of an alias used for this module (if any).

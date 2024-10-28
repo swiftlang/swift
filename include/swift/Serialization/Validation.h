@@ -131,7 +131,7 @@ class ExtendedValidationInfo {
   StringRef ExportAsName;
   StringRef PublicModuleName;
   CXXStdlibKind CXXStdlib;
-  llvm::VersionTuple SwiftCompilerVersion;
+  llvm::VersionTuple SwiftInterfaceCompilerVersion;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
@@ -252,14 +252,14 @@ public:
   CXXStdlibKind getCXXStdlibKind() const { return CXXStdlib; }
   void setCXXStdlibKind(CXXStdlibKind kind) { CXXStdlib = kind; }
 
-  llvm::VersionTuple getSwiftCompilerVersion() const {
-    return SwiftCompilerVersion;
+  llvm::VersionTuple getSwiftInterfaceCompilerVersion() const {
+    return SwiftInterfaceCompilerVersion;
   }
-  void setSwiftCompilerVersion(StringRef version) {
+  void setSwiftInterfaceCompilerVersion(StringRef version) {
     llvm::VersionTuple compilerVersion;
     if (compilerVersion.tryParse(version))
       return;
-    SwiftCompilerVersion = compilerVersion;
+    SwiftInterfaceCompilerVersion = compilerVersion;
   }
 };
 

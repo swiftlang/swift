@@ -603,8 +603,8 @@ public:
     return Core->UserModuleVersion;
   }
 
-  llvm::VersionTuple getSwiftCompilerVersion() const {
-    return Core->SwiftCompilerVersion;
+  llvm::VersionTuple getSwiftInterfaceCompilerVersion() const {
+    return Core->SwiftInterfaceCompilerVersion;
   }
 
   ArrayRef<StringRef> getAllowableClientNames() const {
