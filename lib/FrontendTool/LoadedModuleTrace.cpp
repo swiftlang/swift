@@ -816,7 +816,11 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   return false;
 }
 
+const static unsigned OBJC_METHOD_TRACE_FILE_FORMAT_VERSION = 1;
+
 class ObjcMethodReferenceCollector: public SourceEntityWalker {
+  std::string target;
+  std::string targetVariant;
   StringRef visitingFilePath;
   llvm::DenseSet<const clang::ObjCMethodDecl*> results;
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
@@ -847,31 +851,43 @@ class ObjcMethodReferenceCollector: public SourceEntityWalker {
     return "type";
   }
 public:
+  ObjcMethodReferenceCollector(ModuleDecl *MD) {
+    auto &Opts = MD->getASTContext().LangOpts;
+    target = Opts.Target.str();
+    targetVariant = Opts.TargetVariant.has_value() ?
+      Opts.TargetVariant->str() : "";
+  }
   void setFileBeforeVisiting(SourceFile *SF) {
     assert(SF && "need to visit actual source files");
     visitingFilePath = SF->getFilename();
   }
   void serializeAsJson(llvm::raw_ostream &OS) {
     llvm::json::OStream out(OS, /*IndentSize=*/4);
-    out.array([&] {
-      for (const clang::ObjCMethodDecl* clangD: results) {
-        auto &SM = clangD->getASTContext().getSourceManager();
-        clang::SourceLocation Loc = clangD->getLocation();
-        if (!Loc.isValid()) {
-          continue;
-        }
-        out.object([&] {
-          if (auto *parent = dyn_cast_or_null<clang::NamedDecl>(clangD
-                                                              ->getParent())) {
-            auto pName = parent->getName();
-            if (!pName.empty())
-              out.attribute(selectMethodOwnerKey(parent), pName);
+    out.object([&] {
+      out.attribute("format-vesion", OBJC_METHOD_TRACE_FILE_FORMAT_VERSION);
+      out.attribute("target", target);
+      if (!targetVariant.empty())
+        out.attribute("target-variant", targetVariant);
+      out.attributeArray("references", [&] {
+        for (const clang::ObjCMethodDecl* clangD: results) {
+          auto &SM = clangD->getASTContext().getSourceManager();
+          clang::SourceLocation Loc = clangD->getLocation();
+          if (!Loc.isValid()) {
+            continue;
           }
-          out.attribute(selectMethodKey(clangD),  clangD->getNameAsString());
-          out.attribute("declared_at", Loc.printToString(SM));
-          out.attribute("referenced_at", visitingFilePath);
-        });
-      }
+          out.object([&] {
+            if (auto *parent = dyn_cast_or_null<clang::NamedDecl>(clangD
+                                                                  ->getParent())) {
+              auto pName = parent->getName();
+              if (!pName.empty())
+                out.attribute(selectMethodOwnerKey(parent), pName);
+            }
+            out.attribute(selectMethodKey(clangD),  clangD->getNameAsString());
+            out.attribute("declared_at", Loc.printToString(SM));
+            out.attribute("referenced_at", visitingFilePath);
+          });
+        }
+      });
     });
   }
 };
@@ -900,7 +916,7 @@ bool swift::emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
     }
     // Write the contents of the buffer.
     llvm::raw_fd_ostream out(tmpFD, /*shouldClose=*/true);
-    ObjcMethodReferenceCollector collector;
+    ObjcMethodReferenceCollector collector(mainModule);
     for (auto *FU : mainModule->getFiles()) {
       if (auto *SF = dyn_cast<SourceFile>(FU)) {
         collector.setFileBeforeVisiting(SF);
