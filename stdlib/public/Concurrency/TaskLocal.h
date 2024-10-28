@@ -20,6 +20,7 @@
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
 class AsyncTask;
@@ -32,43 +33,62 @@ class TaskGroup;
 
 class TaskLocal {
 public:
-  /// Type of the pointed at `next` task local item.
-  enum class NextLinkType : uintptr_t {
-    /// The storage pointer points at the next TaskLocal::Item in this task.
-    IsNext = 0b00,
-    /// The storage pointer points at a item stored by another AsyncTask.
-    ///
-    /// Note that this may not necessarily be the same as the task's parent
-    /// task -- we may point to a super-parent if we know / that the parent
-    /// does not "contribute" any task local values. This is to speed up
-    /// lookups by skipping empty parent tasks during get(), and explained
-    /// in depth in `createParentLink`.
-    IsParent = 0b01,
-    /// The task local binding was created inside the body of a `withTaskGroup`,
-    /// and therefore must either copy it, or crash when a child task is created
-    /// using 'group.addTask' and it would refer to this task local.
-    ///
-    /// Items of this kind must be copied by a group child task for access
-    /// safety reasons, as otherwise the pop would happen before the child task
-    /// has completed.
-    IsNextCreatedInTaskGroupBody = 0b10,
-  };
-
   class Item {
-  private:
-    /// Mask used for the low status bits in a task local chain item.
-    static const uintptr_t statusMask = 0x03;
+  public:
+    enum class Kind {
+      /// Regular task local binding.
+      Value = 0,
 
-    /// Pointer to one of the following:
-    /// - next task local item as OpaqueValue* if it is task-local allocated
-    /// - next task local item as HeapObject* if it is heap allocated "heavy"
-    /// - the parent task's TaskLocal::Storage
-    ///
-    /// Low bits encode `NextLinkType`, based on which the type of the pointer
-    /// is determined.
-    uintptr_t next;
+      /// Task local binding created inside the body of a `withTaskGroup`,
+      /// and therefore we must either copy it, or crash when a child task is
+      /// created
+      /// using 'group.addTask' and it would refer to this task local.
+      ///
+      /// Items of this kind must be copied by a group child task for access
+      /// safety reasons, as otherwise the pop would happen before the child
+      /// task
+      /// has completed.
+      ValueInTaskGroupBody = 1,
+
+      /// Artificial empty item that indicates end of items owned by the current
+      /// task.
+      /// The `getNext()` points at a item owned by another AsyncTask.
+      ///
+      /// Note that this may not necessarily be the same as the task's parent
+      /// task -- we may point to a super-parent if we know / that the parent
+      /// does not "contribute" any task local values. This is to speed up
+      /// lookups by skipping empty parent tasks during get(), and explained
+      /// in depth in `initializeLinkParent()`.
+      ParentTaskMarker = 2
+    };
+
+  private:
+    llvm::PointerIntPair<Item *, 2, Kind> nextAndKind;
+
+  protected:
+    explicit Item(Item *next, Kind kind) : nextAndKind(next, kind) {}
 
   public:
+    Kind getKind() const { return nextAndKind.getInt(); }
+
+    Item *getNext() const { return nextAndKind.getPointer(); }
+    void setNext(Item *next) { nextAndKind.setPointer(next); }
+
+    bool destroy(AsyncTask *task);
+  };
+
+  class ValueItem : public Item {
+    explicit ValueItem(Item *next, const HeapObject *key,
+                       const Metadata *valueType, bool inTaskGroupBody)
+        : Item(next,
+               inTaskGroupBody ? Kind::ValueInTaskGroupBody : Kind::Value),
+          key(key), valueType(valueType) {
+      assert(key && valueType);
+    }
+
+  public:
+    ~ValueItem() { valueType->vw_destroy(getStoragePtr()); }
+
     /// The type of the key with which this value is associated.
     const HeapObject *key;
     /// The type of the value stored by this item.
@@ -77,91 +97,13 @@ public:
     // Trailing storage for the value itself. The storage will be
     // uninitialized or contain an instance of \c valueType.
 
-    /// Returns true if this item is a 'parent pointer'.
-    ///
-    /// A parent pointer is special kind of `Item` is created when pointing at
-    /// the parent storage, forming a chain of task local items spanning multiple
-    /// tasks.
-    bool isParentPointer() const {
-      return !valueType;
-    }
+    static ValueItem *create(AsyncTask *task, const HeapObject *key,
+                             const Metadata *valueType, bool inTaskGroupBody);
 
-  protected:
-    explicit Item()
-      : next(0),
-        key(nullptr),
-        valueType(nullptr) {}
+    void copyTo(AsyncTask *task);
 
-    explicit Item(const HeapObject *key, const Metadata *valueType)
-      : next(0),
-        key(key),
-        valueType(valueType) {}
-
-  public:
-    /// Item which does not by itself store any value, but only points
-    /// to the nearest task-local-value containing parent's first task item.
-    ///
-    /// This item type is used to link to the appropriate parent task's item,
-    /// when the current task itself does not have any task local values itself.
-    ///
-    /// When a task actually has its own task locals, it should rather point
-    /// to the parent's *first* task-local item in its *last* item, extending
-    /// the Item linked list into the appropriate parent.
-    static Item *createParentLink(AsyncTask *task, AsyncTask *parent);
-
-    static Item *createLink(AsyncTask *task,
-                            const HeapObject *key,
-                            const Metadata *valueType,
-                            bool inTaskGroupBody);
-
-    static Item *createLink(AsyncTask *task,
-                            const HeapObject *key,
-                            const Metadata *valueType);
-
-    static Item *createLinkInTaskGroup(
-        AsyncTask *task,
-        const HeapObject *key,
-        const Metadata *valueType);
-
-    void destroy(AsyncTask *task);
-
-    Item *getNext() {
-      return reinterpret_cast<Item *>(next & ~statusMask);
-    }
-
-    void relinkTaskGroupLocalHeadToSafeNext(Item* nextOverride) {
-      assert(!getNext() &&
-               "Can only relink task local item that was not pointing at anything yet");
-      assert((nextOverride->isNextLinkPointer() ||
-              nextOverride->isParentPointer()) &&
-                 "Currently relinking is only done within a task group to "
-                 "avoid within-taskgroup next pointers; attempted to point at "
-                 "task local declared within task group body though!");
-
-      next = reinterpret_cast<uintptr_t>(nextOverride) |
-             static_cast<uintptr_t>((nextOverride->isNextLinkPointer()
-                                         ? NextLinkType::IsNextCreatedInTaskGroupBody
-                                         : NextLinkType::IsParent));
-    }
-
-    NextLinkType getNextLinkType() const {
-      return static_cast<NextLinkType>(next & statusMask);
-    }
-
-    bool isNextLinkPointer() const {
-      return static_cast<NextLinkType>(next & statusMask) ==
-             NextLinkType::IsNext;
-    }
-
-    bool isNextLinkPointerCreatedInTaskGroupBody() const {
-      return static_cast<NextLinkType>(next & statusMask) ==
-             NextLinkType::IsNextCreatedInTaskGroupBody;
-    }
-
-    /// Item does not contain any actual value, and is only used to point at
-    /// a specific parent item.
-    bool isEmpty() const {
-      return !valueType;
+    bool isInTaskGroupBody() const {
+      return getKind() == Kind::ValueInTaskGroupBody;
     }
 
     /// Retrieve a pointer to the storage of the value.
@@ -170,32 +112,39 @@ public:
         reinterpret_cast<char *>(this) + storageOffset(valueType));
     }
 
-    TaskLocal::Item* copyTo(AsyncTask *task);
-
     /// Compute the offset of the storage from the base of the item.
     static size_t storageOffset(const Metadata *valueType) {
-      size_t offset = sizeof(Item);
-
-      if (valueType) {
-        size_t alignment = valueType->vw_alignment();
-        return (offset + alignment - 1) & ~(alignment - 1);
-      }
-
-      return offset;
+      size_t alignment = valueType->vw_alignment();
+      return (sizeof(ValueItem) + alignment - 1) & ~(alignment - 1);
     }
 
     /// Determine the size of the item given a particular value type.
     static size_t itemSize(const Metadata *valueType) {
       size_t offset = storageOffset(valueType);
-      if (valueType) {
-        offset += valueType->vw_size();
-      }
+      offset += valueType->vw_size();
       return offset;
+    }
+
+    static bool classof(const Item *item) {
+      return item->getKind() == Kind::Value ||
+             item->getKind() == Kind::ValueInTaskGroupBody;
+    }
+  };
+
+  class ParentTaskMarkerItem : public Item {
+    ParentTaskMarkerItem(Item *next) : Item(next, Kind::ParentTaskMarker) {}
+
+  public:
+    static ParentTaskMarkerItem *create(AsyncTask *task);
+
+    static bool classof(const Item *item) {
+      return item->getKind() == Kind::ParentTaskMarker;
     }
   };
 
   class Storage {
-    friend class TaskLocal::Item;
+    friend class TaskLocal::ValueItem;
+
   private:
     /// A stack (single-linked list) of task local values.
     ///
@@ -247,9 +196,6 @@ public:
     /// can be safely disposed of.
     bool popValue(AsyncTask *task);
 
-    /// Peek at the head item and get its type.
-    std::optional<NextLinkType> peekHeadLinkType() const;
-
     /// Copy all task-local bindings to the target task.
     ///
     /// The new bindings allocate their own items and can out-live the current task.
@@ -261,10 +207,6 @@ public:
     /// to observe the `A` value, because it semantically will never observe a
     /// "pop" of the `B` value - it was spawned from a scope where only B was observable.
     void copyTo(AsyncTask *target);
-
-    // FIXME(concurrency): We currently copy from "all" task groups we encounter
-    // however in practice we only
-    void copyToOnlyOnlyFromCurrentGroup(AsyncTask *target);
 
     /// Destroy and deallocate all items stored by this specific task.
     ///

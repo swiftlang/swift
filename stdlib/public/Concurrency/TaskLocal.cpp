@@ -171,106 +171,107 @@ TaskLocal::Storage::getCurrent(AsyncTask *current) {
 
 void TaskLocal::Storage::initializeLinkParent(AsyncTask* task,
                                               AsyncTask* parent) {
+  assert(task && "task must not be null when copying values into it");
   assert(!head && "initial task local storage was already initialized");
   assert(parent && "parent must be provided to link to it");
-  head = TaskLocal::Item::createParentLink(task, parent);
-}
 
-TaskLocal::Item*
-TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
-  size_t amountToAllocate = Item::itemSize(/*valueType*/nullptr);
-  void *allocation = _swift_task_alloc_specific(task, amountToAllocate);
-  Item *item = new(allocation) Item();
+  auto item = parent->_private().Local.head;
 
-  auto parentHead = parent->_private().Local.head;
-  if (parentHead) {
-    if (parentHead->isEmpty()) {
-      switch (parentHead->getNextLinkType()) {
-        case NextLinkType::IsParent:
-          // it has no values, and just points to its parent,
-          // therefore skip also skip pointing to that parent and point
-          // to whichever parent it was pointing to as well, it may be its
-          // immediate parent, or some super-parent.
-          item->next = reinterpret_cast<uintptr_t>(parentHead->getNext()) |
-                       static_cast<uintptr_t>(NextLinkType::IsParent);
-          break;
-        case NextLinkType::IsNext:
-        case NextLinkType::IsNextCreatedInTaskGroupBody:
-          if (parentHead->getNext()) {
-            assert(false && "empty taskValue head in parent task, yet parent's 'head' is `IsNext`, "
-                            "this should not happen, as it implies the parent must have stored some value.");
-          } else {
-            // is terminal pointer
-            item->next = reinterpret_cast<uintptr_t>(parentHead->getNext());
-          }
-          break;
-      }
+  // Don't create parent task marker if there are no values at all.
+  if (!item)
+    return;
+
+  auto tail = TaskLocal::ParentTaskMarkerItem::create(task);
+  head = tail;
+
+  // Set of keys for which we already have copied to the new task.
+  // We only ever need to copy the *first* encounter of any given key,
+  // because it is the most "specific"/"recent" binding and any other binding
+  // of a key does not matter for the target task as it will never be able to
+  // observe it.
+    std::set<const HeapObject *,
+               std::less<const HeapObject *>,
+               swift::cxx_allocator<const HeapObject *>> copied = {};
+
+  // If we are a child task in a task group, it may happen that we are calling
+  // addTask specifically in such shape:
+  //
+  //     $local.withValue(theValue) { addTask {} }
+  //
+  // If this is the case, we MUST copy `theValue` (and any other such directly
+  // wrapping the addTask value bindings), because those values will be popped
+  // when withValue returns - breaking our structured concurrency guarantees
+  // that we rely on for the "link directly to parent's task local Item".
+  //
+  // Values set outside the task group are not subject to this problem, as
+  // their structural lifetime guarantee is upheld by the group scope
+  // out-living any addTask created tasks.
+  //
+  // TODO(concurrency): This can be optimized to copy only from the CURRENT
+  // group, but we need to detect this, e.g. by more flags in the items made
+  // from a group?
+  while (item && item->getKind() == Item::Kind::ValueInTaskGroupBody) {
+    auto valueItem = cast<ValueItem>(item);
+    // we only have to copy an item if it is the most recent binding of a key.
+    // i.e. if we've already seen an item for this key, we can skip it.
+    if (copied.emplace(valueItem->key).second) {
+      valueItem->copyTo(task);
     } else {
-      item->next = reinterpret_cast<uintptr_t>(parentHead) |
-                   static_cast<uintptr_t>(NextLinkType::IsParent);
+      SWIFT_TASK_LOCAL_DEBUG_LOG(
+          valueItem->key,
+          "skip copy, already copied most recent value, value was [%p]",
+          valueItem->getStoragePtr());
     }
-  } else {
-    item->next = reinterpret_cast<uintptr_t>(parentHead);
+
+    item = item->getNext();
   }
 
-  return item;
+  if (item && item->getKind() == Item::Kind::ParentTaskMarker) {
+    // it has no values, and just points to its parent,
+    // therefore skip also skip pointing to that parent and point
+    // to whichever parent it was pointing to as well, it may be its
+    // immediate parent, or some super-parent.
+    item = item->getNext();
+  }
+
+  // The next item is not the "risky one" so we can directly link to it,
+  // as we would have within normal child task relationships. E.g. this is
+  // a parent or next pointer to a "safe" (withValue { withTaskGroup { ... } })
+  // binding, so we re-link our current head to point at this item.
+  tail->setNext(item);
 }
 
-TaskLocal::Item*
-TaskLocal::Item::createLink(AsyncTask *task,
-                            const HeapObject *key,
-                            const Metadata *valueType,
-                            bool inTaskGroupBody) {
-  size_t amountToAllocate = Item::itemSize(valueType);
-  void *allocation = task ? _swift_task_alloc_specific(task, amountToAllocate)
-                          : malloc(amountToAllocate);
-  Item *item = ::new (allocation) Item(key, valueType);
+TaskLocal::ParentTaskMarkerItem *
+TaskLocal::ParentTaskMarkerItem::create(AsyncTask *task) {
+  size_t amountToAllocate = sizeof(ParentTaskMarkerItem);
+  void *allocation = _swift_task_alloc_specific(task, amountToAllocate);
+  return new (allocation) ParentTaskMarkerItem(nullptr);
+}
 
+TaskLocal::ValueItem *TaskLocal::ValueItem::create(AsyncTask *task,
+                                                   const HeapObject *key,
+                                                   const Metadata *valueType,
+                                                   bool inTaskGroupBody) {
   auto next = task ? task->_private().Local.head
                    : FallbackTaskLocalStorage::get()->head;
-  item->next = reinterpret_cast<uintptr_t>(next) |
-               static_cast<uintptr_t>(
-                   inTaskGroupBody ? NextLinkType::IsNextCreatedInTaskGroupBody
-                                   : NextLinkType::IsNext);
 
-  return item;
+  size_t amountToAllocate = ValueItem::itemSize(valueType);
+  void *allocation = task ? _swift_task_alloc_specific(task, amountToAllocate)
+                          : malloc(amountToAllocate);
+  return ::new (allocation) ValueItem(next, key, valueType, inTaskGroupBody);
 }
 
-TaskLocal::Item*
-TaskLocal::Item::createLink(AsyncTask *task,
-                            const HeapObject *key,
-                            const Metadata *valueType) {
-  return createLink(task, key, valueType, /*=inTaskGroupBody=*/false);
-}
-
-
-TaskLocal::Item*
-TaskLocal::Item::createLinkInTaskGroup(AsyncTask *task,
-                                       const HeapObject *key,
-                                       const Metadata *valueType) {
-  return createLink(task, key, valueType, /*=inTaskGroupBody=*/true);
-}
-
-
-TaskLocal::Item*
-TaskLocal::Item::copyTo(AsyncTask *target) {
+void TaskLocal::ValueItem::copyTo(AsyncTask *target) {
   assert(target && "TaskLocal item attempt to copy to null target task!");
 
-  // 'parent' pointers are signified by null valueType.
-  // We must not copy parent pointers, but rather perform a deep copy of all values,
-  // as such, we skip parent pointers here entirely.
-  if (isParentPointer())
-    return nullptr;
-
-  auto item = Item::createLink(target, key, valueType);
+  auto item =
+      ValueItem::create(target, key, valueType, /*inTaskGroupBody=*/false);
   valueType->vw_initializeWithCopy(item->getStoragePtr(), getStoragePtr());
 
   /// A `copyTo` may ONLY be invoked BEFORE the task is actually scheduled,
   /// so right now we can safely copy the value into the task without additional
   /// synchronization.
   target->_private().Local.head = item;
-
-  return item;
 }
 
 // =============================================================================
@@ -358,39 +359,39 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
 // =============================================================================
 // ==== destroy ----------------------------------------------------------------
 
-void TaskLocal::Item::destroy(AsyncTask *task) {
-  // otherwise it was task-local allocated, so we can safely destroy it right away
-  if (valueType) {
-    valueType->vw_destroy(getStoragePtr());
+bool TaskLocal::Item::destroy(AsyncTask *task) {
+  bool stop = false;
+  switch (getKind()) {
+  case Kind::Value:
+  case Kind::ValueInTaskGroupBody:
+    cast<ValueItem>(this)->~ValueItem();
+    break;
+  case Kind::ParentTaskMarker:
+    cast<ParentTaskMarkerItem>(this)->~ParentTaskMarkerItem();
+
+    // we're done here; as we must not proceed into the parent owned values.
+    // we do have to destroy the item pointing at the parent/edge itself though.
+    stop = true;
+    break;
   }
 
   // if task is available, we must have used the task allocator to allocate this item,
   // so we must deallocate it using the same. Otherwise, we must have used malloc.
   if (task) _swift_task_dealloc_specific(task, this);
   else free(this);
+
+  return stop;
 }
 
 void TaskLocal::Storage::destroy(AsyncTask *task) {
   auto item = head;
   head = nullptr;
-  TaskLocal::Item *next;
   while (item) {
-    auto linkType = item->getNextLinkType();
-    switch (linkType) {
-    case TaskLocal::NextLinkType::IsNext: {
-      next = item->getNext();
-      item->destroy(task);
-      item = next;
-      break;
-    }
-    case TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody:
-    case TaskLocal::NextLinkType::IsParent: {
-      // we're done here; as we must not proceed into the parent owned values.
-      // we do have to destroy the item pointing at the parent/edge itself though.
-      item->destroy(task);
+    TaskLocal::Item *next = item->getNext();
+    if (item->destroy(task)) {
       return;
     }
-    }
+    item = next;
   }
 }
 
@@ -417,9 +418,8 @@ void TaskLocal::Storage::pushValue(AsyncTask *task,
   // memory location at this point.
   bool inTaskGroupBody = swift_task_hasTaskGroupStatusRecord();
 
-  TaskLocal::Item* item = Item::createLink(
-      task, key, valueType,
-      inTaskGroupBody);
+  TaskLocal::ValueItem *item =
+      ValueItem::create(task, key, valueType, inTaskGroupBody);
 
   valueType->vw_initializeWithTake(item->getStoragePtr(), value);
   head = item;
@@ -429,7 +429,10 @@ void TaskLocal::Storage::pushValue(AsyncTask *task,
 
 bool TaskLocal::Storage::popValue(AsyncTask *task) {
   assert(head && "attempted to pop value off empty task-local stack");
-  SWIFT_TASK_LOCAL_DEBUG_LOG(head->key, "pop local item:%p, value:%p", head, head->getStoragePtr());
+  auto valueItem = cast<ValueItem>(head);
+  (void)valueItem;
+  SWIFT_TASK_LOCAL_DEBUG_LOG(valueItem->key, "pop local item:%p, value:%p",
+                             head, valueItem->getStoragePtr());
 
   auto old = head;
   head = head->getNext();
@@ -439,22 +442,16 @@ bool TaskLocal::Storage::popValue(AsyncTask *task) {
   return head != nullptr;
 }
 
-std::optional<TaskLocal::NextLinkType>
-TaskLocal::Storage::peekHeadLinkType() const {
-  if (!head)
-    return {};
-
-  return head->getNextLinkType();
-}
-
 OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,
                                           const HeapObject *key) {
   assert(key && "TaskLocal key must not be null.");
 
   auto item = head;
   while (item) {
-    if (item->key == key) {
-      return item->getStoragePtr();
+    if (auto valueItem = dyn_cast<ValueItem>(item)) {
+      if (valueItem->key == key) {
+        return valueItem->getStoragePtr();
+      }
     }
 
     item = item->getNext();
@@ -462,7 +459,6 @@ OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,
 
   return nullptr;
 }
-
 
 void TaskLocal::Storage::copyTo(AsyncTask *target) {
   assert(target && "task must not be null when copying values into it");
@@ -480,62 +476,18 @@ void TaskLocal::Storage::copyTo(AsyncTask *target) {
 
   auto item = head;
   while (item) {
-    // we only have to copy an item if it is the most recent binding of a key.
-    // i.e. if we've already seen an item for this key, we can skip it.
-    if (copied.emplace(item->key).second) {
-      item->copyTo(target);
+    if (auto valueItem = dyn_cast<ValueItem>(item)) {
+      // we only have to copy an item if it is the most recent binding of a key.
+      // i.e. if we've already seen an item for this key, we can skip it.
+      if (copied.emplace(valueItem->key).second) {
+        valueItem->copyTo(target);
+      } else {
+        SWIFT_TASK_LOCAL_DEBUG_LOG(
+            valueItem->key,
+            "skip copy, already copied most recent value, value was [%p]",
+            valueItem->getStoragePtr());
+      }
     }
-
-    item = item->getNext();
-  }
-}
-
-// TODO(concurrency): This can be optimized to copy only from the CURRENT group,
-//  but we need to detect this, e.g. by more flags in the items made from a group?
-void TaskLocal::Storage::copyToOnlyOnlyFromCurrentGroup(AsyncTask *target) {
-  assert(target && "task must not be null when copying values into it");
-  assert(!(target->_private().Local.head) &&
-      "Task must not have any task-local values bound before copying into it");
-
-  // Set of keys for which we already have copied to the new task.
-  // We only ever need to copy the *first* encounter of any given key,
-  // because it is the most "specific"/"recent" binding and any other binding
-  // of a key does not matter for the target task as it will never be able to
-  // observe it.
-  std::set<const HeapObject *,
-           std::less<const HeapObject *>,
-           swift::cxx_allocator<const HeapObject *>> copied = {};
-
-  auto item = head;
-  TaskLocal::Item *copiedHead = nullptr;
-  while (item) {
-    // we only have to copy an item if it is the most recent binding of a key.
-    // i.e. if we've already seen an item for this key, we can skip it.
-    if (copied.emplace(item->key).second) {
-
-      if (!item->isNextLinkPointerCreatedInTaskGroupBody() && copiedHead) {
-        // The next item is not the "risky one" so we can directly link to it,
-        // as we would have within normal child task relationships. E.g. this is
-        // a parent or next pointer to a "safe" (withValue { withTaskGroup { ... } })
-        // binding, so we re-link our current head to point at this item.
-        copiedHead->relinkTaskGroupLocalHeadToSafeNext(item);
-        break;
-      }
-
-      auto copy = item->copyTo(target);
-      if (!copiedHead) {
-        copiedHead = copy;
-      }
-
-      // If we didn't copy an item, e.g. because it was a pointer to parent,
-      // break out of the loop and keep pointing at parent still.
-      if (!copy) {
-        break;
-      }
-    } else {
-      SWIFT_TASK_LOCAL_DEBUG_LOG(item->key, "skip copy, already copied most recent value, value was [%p]", item->getStoragePtr());
-    }
-
     item = item->getNext();
   }
 }
