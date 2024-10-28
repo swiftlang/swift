@@ -142,7 +142,7 @@ if #available(SwiftStdlib 5.1, *) {
       // FIXME: isolated deinit should be clearing task locals
       await TL.$number.withValue(42) {
         await AnotherActor.shared.performTesting {
-          preventAllocationOnStack(ClassNoOp(expectedNumber: 42, group: group))
+          preventAllocationOnStack(ClassNoOp(expectedNumber: 0, group: group))
         }
       }
     }
@@ -168,7 +168,7 @@ if #available(SwiftStdlib 5.1, *) {
       TL.$number.withValue(99) {
         // Despite last release happening not on the actor itself,
         // this is still a fast path due to optimisation for deallocating actors.
-        preventAllocationOnStack(ActorNoOp(expectedNumber: 99, group: group))
+        preventAllocationOnStack(ActorNoOp(expectedNumber: 0, group: group))
       }
     }
     group.wait()
