@@ -2098,15 +2098,15 @@ static void fixAvailability(SourceRange ReferenceRange,
 }
 
 static void diagnosePotentialUnavailability(
-    SourceRange ReferenceRange, Diag<StringRef, llvm::VersionTuple> Diag,
+    SourceRange ReferenceRange,
+    llvm::function_ref<InFlightDiagnostic(StringRef, llvm::VersionTuple)>
+        Diagnose,
     const DeclContext *ReferenceDC, const AvailabilityRange &Availability) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
   {
-    auto Err = Context.Diags.diagnose(
-        ReferenceRange.Start, Diag,
-        Context.getTargetPlatformStringForDiagnostics(),
-        Availability.getRawMinimumVersion());
+    auto Err = Diagnose(Context.getTargetPlatformStringForDiagnostics(),
+                        Availability.getRawMinimumVersion());
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(
@@ -2116,10 +2116,11 @@ static void diagnosePotentialUnavailability(
   fixAvailability(ReferenceRange, ReferenceDC, Availability, Context);
 }
 
-bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
-                                    AvailabilityRange RequiredAvailability,
-                                    Diag<StringRef, llvm::VersionTuple> Diag,
-                                    const DeclContext *ReferenceDC) {
+bool TypeChecker::checkAvailability(
+    SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
+    const DeclContext *ReferenceDC,
+    llvm::function_ref<InFlightDiagnostic(StringRef, llvm::VersionTuple)>
+        Diagnose) {
   ASTContext &ctx = ReferenceDC->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return false;
@@ -2128,12 +2129,25 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
       TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
                                                          ReferenceDC);
   if (!availabilityAtLocation.isContainedIn(RequiredAvailability)) {
-    diagnosePotentialUnavailability(ReferenceRange, Diag, ReferenceDC,
+    diagnosePotentialUnavailability(ReferenceRange, Diagnose, ReferenceDC,
                                     RequiredAvailability);
     return true;
   }
 
   return false;
+}
+
+bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
+                                    AvailabilityRange RequiredAvailability,
+                                    Diag<StringRef, llvm::VersionTuple> Diag,
+                                    const DeclContext *ReferenceDC) {
+  auto &Diags = ReferenceDC->getASTContext().Diags;
+  return TypeChecker::checkAvailability(
+      ReferenceRange, RequiredAvailability, ReferenceDC,
+      [&](StringRef platformName, llvm::VersionTuple version) {
+        return Diags.diagnose(ReferenceRange.Start, Diag, platformName,
+                              version);
+      });
 }
 
 void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
