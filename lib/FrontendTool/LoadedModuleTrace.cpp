@@ -21,6 +21,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/IDE/SourceEntityWalker.h"
 
@@ -816,6 +817,7 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
 }
 
 class ObjcMethodReferenceCollector: public SourceEntityWalker {
+  StringRef visitingFilePath;
   llvm::DenseSet<const clang::ObjCMethodDecl*> results;
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
@@ -828,6 +830,10 @@ class ObjcMethodReferenceCollector: public SourceEntityWalker {
     return true;
   }
 public:
+  void setFileBeforeVisiting(SourceFile *SF) {
+    assert(SF && "need to visit actual source files");
+    visitingFilePath = SF->getFilename();
+  }
   void serializeAsJson(llvm::raw_ostream &OS) {
     llvm::json::OStream out(OS, /*IndentSize=*/4);
     out.array([&] {
@@ -845,7 +851,8 @@ public:
               out.attribute("type", pName);
           }
           out.attribute("method",  clangD->getNameAsString());
-          out.attribute("location", Loc.printToString(SM));
+          out.attribute("declared_at", Loc.printToString(SM));
+          out.attribute("referenced_at", visitingFilePath);
         });
       }
     });
@@ -879,6 +886,7 @@ bool swift::emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
     ObjcMethodReferenceCollector collector;
     for (auto *FU : mainModule->getFiles()) {
       if (auto *SF = dyn_cast<SourceFile>(FU)) {
+        collector.setFileBeforeVisiting(SF);
         collector.walk(*SF);
       }
     }

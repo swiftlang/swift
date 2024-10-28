@@ -15,4 +15,5 @@ public func testProperties(_ x: FooClassBase) {
 // CHECK-DAG: fooBaseInstanceFunc0
 // CHECK-DAG: fooBaseInstanceFunc1
 // CHECK-DAG: "type": "FooClassBase"
-// CHECK-DAG: SOURCE_DIR/test/IDE/Inputs/mock-sdk/Foo.framework/Headers/Foo.h
+// CHECK-DAG: "declared_at": "SOURCE_DIR/test/IDE/Inputs/mock-sdk/Foo.framework/Headers/Foo.h
+// CHECK-DAG: "referenced_at": "SOURCE_DIR/test/IDE/objc_send_collector.swift"
