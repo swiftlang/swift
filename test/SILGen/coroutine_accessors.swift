@@ -17,7 +17,7 @@ public var _i: Int = 0
 
 public var irm: Int {
 // CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivy :
-// CHECK-SAME:      $@yield_once
+// CHECK-SAME:      $@yield_once_2
 // CHECK-SAME:      @convention(method)
 // CHECK-SAME:      (@guaranteed S)
 // CHECK-SAME:      ->
@@ -28,7 +28,7 @@ public var irm: Int {
     yield _i
   }
 // CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivx :
-// CHECK-SAME:      $@yield_once
+// CHECK-SAME:      $@yield_once_2
 // CHECK-SAME:      @convention(method)
 // CHECK-SAME:      (@inout S)
 // CHECK-SAME:      ->
