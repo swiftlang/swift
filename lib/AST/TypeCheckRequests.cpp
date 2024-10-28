@@ -99,6 +99,15 @@ void swift::simple_display(llvm::raw_ostream &out, const TypeLoc source) {
   out << ")";
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           RegexLiteralPatternFeatureKind kind) {
+  out << "regex pattern feature " << kind.getRawValue();
+}
+
+SourceLoc swift::extractNearestSourceLoc(RegexLiteralPatternFeatureKind kind) {
+  return SourceLoc();
+}
+
 //----------------------------------------------------------------------------//
 // Inherited type computation.
 //----------------------------------------------------------------------------//

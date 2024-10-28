@@ -3634,6 +3634,24 @@ public:
       diagnoseDeclRefAvailability(LE->getInitializer(), LE->getSourceRange());
     }
 
+    // Diagnose availability for any features used in a regex literal.
+    if (auto *RE = dyn_cast<RegexLiteralExpr>(E)) {
+      for (auto &feature : RE->getPatternFeatures()) {
+        auto featureKind = feature.getKind();
+        TypeChecker::checkAvailability(
+            RE->getSourceRange(), featureKind.getAvailability(Context),
+            Where.getDeclContext(),
+            [&](StringRef platformName, llvm::VersionTuple version) {
+              auto range = feature.getRange();
+              auto diag = Context.Diags.diagnose(
+                  range.getStart(), diag::regex_feature_unavailable,
+                  featureKind.getDescription(Context), platformName, version);
+              diag.highlightChars(range);
+              return diag;
+            });
+      }
+    }
+
     if (auto *CE = dyn_cast<CollectionExpr>(E)) {
       // Diagnose availability of implicit collection literal initializers.
       diagnoseDeclRefAvailability(CE->getInitializer(), CE->getSourceRange());

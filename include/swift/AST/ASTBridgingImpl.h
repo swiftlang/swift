@@ -16,10 +16,12 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ArgumentList.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/Basic/Assertions.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -377,6 +379,40 @@ swift::IfConfigClauseRangeInfo BridgedIfConfigClauseRangeInfo::unbridged() const
                                         bodyLoc.unbridged(),
                                         endLoc.unbridged(),
                                         clauseKind);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedRegexLiteralPatternFeature
+//===----------------------------------------------------------------------===//
+
+BridgedRegexLiteralPatternFeatureKind::BridgedRegexLiteralPatternFeatureKind(
+    SwiftInt rawValue)
+    : RawValue(rawValue) {
+  ASSERT(rawValue >= 0);
+  ASSERT(rawValue == RawValue);
+}
+
+BridgedRegexLiteralPatternFeatureKind::BridgedRegexLiteralPatternFeatureKind(
+    UnbridgedTy kind)
+    : RawValue(kind.getRawValue()) {}
+
+BridgedRegexLiteralPatternFeatureKind::UnbridgedTy
+BridgedRegexLiteralPatternFeatureKind::unbridged() const {
+  return UnbridgedTy(RawValue);
+}
+
+BridgedRegexLiteralPatternFeature::BridgedRegexLiteralPatternFeature(
+    UnbridgedTy feature)
+    : Range(feature.getRange()), Kind(feature.getKind()) {}
+
+BridgedRegexLiteralPatternFeature::UnbridgedTy
+BridgedRegexLiteralPatternFeature::unbridged() const {
+  return UnbridgedTy(Kind.unbridged(), Range.unbridged());
+}
+
+BridgedRegexLiteralPatternFeatures::UnbridgedTy
+BridgedRegexLiteralPatternFeatures::unbridged() const {
+  return UnbridgedTy(Data, Count);
 }
 
 //===----------------------------------------------------------------------===//
