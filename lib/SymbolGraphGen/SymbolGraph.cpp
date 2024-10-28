@@ -315,9 +315,13 @@ bool SymbolGraph::synthesizedMemberIsBestCandidate(const ValueDecl *VD,
 }
 
 void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
-  if (!Walker.Options.EmitSynthesizedMembers || Walker.Options.SkipProtocolImplementations) {
-    return;
-  }
+  // Even if we don't want to emit synthesized members or protocol
+  // implementations, we still want to emit synthesized members from hidden
+  // underscored protocols. Save this check so we can skip emitting members
+  // later if needed.
+  bool dropSynthesizedMembers = !Walker.Options.EmitSynthesizedMembers ||
+                                Walker.Options.SkipProtocolImplementations;
+
   const auto D = S.getLocalSymbolDecl();
   const NominalTypeDecl *OwningNominal = nullptr;
   if (const auto *ThisNominal = dyn_cast<NominalTypeDecl>(D)) {
@@ -341,59 +345,89 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
       PrintOptions::printModuleInterface(
           OwningNominal->getASTContext().TypeCheckerOpts.PrintFullConvention));
   auto MergeGroupKind = SynthesizedExtensionAnalyzer::MergeGroupKind::All;
-  ExtensionAnalyzer.forEachExtensionMergeGroup(MergeGroupKind,
-      [&](ArrayRef<ExtensionInfo> ExtensionInfos){
-    for (const auto &Info : ExtensionInfos) {
-      if (!Info.IsSynthesized) {
-        continue;
-      }
+  ExtensionAnalyzer.forEachExtensionMergeGroup(
+      MergeGroupKind, [&](ArrayRef<ExtensionInfo> ExtensionInfos) {
+        const auto StdlibModule =
+            OwningNominal->getASTContext().getStdlibModule(
+                /*loadIfAbsent=*/true);
 
-      // We are only interested in synthesized members that come from an
-      // extension that we defined in our module.
-      if (Info.EnablingExt) {
-        const auto *ExtM = Info.EnablingExt->getModuleContext();
-        if (!Walker.isOurModule(ExtM))
-          continue;
-      }
-
-      // If D is not the OwningNominal, it is an ExtensionDecl. In that case
-      // we only want to get members that were enabled by this exact extension.
-      if (D != OwningNominal && Info.EnablingExt != D) {
-        continue;
-      }
-  
-      for (const auto ExtensionMember : Info.Ext->getMembers()) {
-        if (const auto SynthMember = dyn_cast<ValueDecl>(ExtensionMember)) {
-          if (SynthMember->isObjC()) {
+        for (const auto &Info : ExtensionInfos) {
+          if (!Info.IsSynthesized) {
             continue;
           }
 
-          const auto StdlibModule = OwningNominal->getASTContext()
-              .getStdlibModule(/*loadIfAbsent=*/true);
+          // We are only interested in synthesized members that come from an
+          // extension that we defined in our module.
+          if (Info.EnablingExt) {
+            const auto *ExtM = Info.EnablingExt->getModuleContext();
+            if (!Walker.isOurModule(ExtM))
+              continue;
+          }
 
-          // There can be synthesized members on effectively private protocols
-          // or things that conform to them. We don't want to include those.
-          if (isImplicitlyPrivate(SynthMember,
-              /*IgnoreContext =*/
-              SynthMember->getModuleContext() == StdlibModule)) {
+          // If D is not the OwningNominal, it is an ExtensionDecl. In that case
+          // we only want to get members that were enabled by this exact
+          // extension.
+          if (D != OwningNominal && Info.EnablingExt != D) {
             continue;
           }
 
-          if (!synthesizedMemberIsBestCandidate(SynthMember, OwningNominal)) {
+          // Extensions to protocols should generate synthesized members only if
+          // that protocol would otherwise be hidden.
+          if (auto *Nominal = Info.Ext->getExtendedNominal()) {
+            if (dropSynthesizedMembers &&
+                !isImplicitlyPrivate(
+                    Nominal, /*IgnoreContext =*/Nominal->getModuleContext() ==
+                                 StdlibModule))
+              continue;
+          } else if (dropSynthesizedMembers) {
             continue;
           }
 
-          auto ExtendedSG = Walker.getModuleSymbolGraph(OwningNominal);
+          for (const auto ExtensionMember : Info.Ext->getMembers()) {
+            if (const auto SynthMember = dyn_cast<ValueDecl>(ExtensionMember)) {
+              if (SynthMember->isObjC()) {
+                continue;
+              }
 
-          Symbol Source(this, SynthMember, OwningNominal);
+              // There can be synthesized members on effectively private
+              // protocols or things that conform to them. We don't want to
+              // include those.
+              if (isImplicitlyPrivate(SynthMember,
+                                      /*IgnoreContext =*/
+                                      SynthMember->getModuleContext() ==
+                                          StdlibModule)) {
+                continue;
+              }
 
-          ExtendedSG->Nodes.insert(Source);
+              if (!synthesizedMemberIsBestCandidate(SynthMember,
+                                                    OwningNominal)) {
+                continue;
+              }
 
-          ExtendedSG->recordEdge(Source, S, RelationshipKind::MemberOf());
-         }
-      }
-    }
-  });
+              Symbol Source(this, SynthMember, OwningNominal);
+
+              if (auto *InheritedDecl = Source.getInheritedDecl()) {
+                if (auto *ParentDecl =
+                        InheritedDecl->getDeclContext()->getAsDecl()) {
+                  if (dropSynthesizedMembers &&
+                      !isImplicitlyPrivate(
+                          ParentDecl,
+                          /*IgnoreContext =*/ParentDecl->getModuleContext() ==
+                              StdlibModule)) {
+                    continue;
+                  }
+                }
+              }
+
+              auto ExtendedSG = Walker.getModuleSymbolGraph(OwningNominal);
+
+              ExtendedSG->Nodes.insert(Source);
+
+              ExtendedSG->recordEdge(Source, S, RelationshipKind::MemberOf());
+            }
+          }
+        }
+      });
 }
 
 void
@@ -784,6 +818,21 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
   // thing is also private. We could be looking at the `B` of `_A.B`.
   if (const auto *DC = D->getDeclContext()) {
     if (const auto *Parent = DC->getAsDecl()) {
+      // Exception: Children of underscored protocols should be considered
+      // public, even though the protocols themselves aren't. This way,
+      // synthesized copies of those symbols are correctly added to the public
+      // API of public types that conform to underscored protocols.
+      if (isa<ProtocolDecl>(Parent) && Parent->hasUnderscoredNaming()) {
+        return false;
+      }
+      if (const auto *ParentExtension = dyn_cast<ExtensionDecl>(Parent)) {
+        if (const auto *ParentNominal = ParentExtension->getExtendedNominal()) {
+          if (isa<ProtocolDecl>(ParentNominal) &&
+              ParentNominal->hasUnderscoredNaming()) {
+            return false;
+          }
+        }
+      }
       return isImplicitlyPrivate(Parent, IgnoreContext);
     }
   }
