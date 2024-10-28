@@ -10,6 +10,7 @@
 // RUN: %target-swift-frontend -I %t -emit-ir %s -target %target-cpu-apple-macos15.0 -enable-library-evolution | %FileCheck %s -DINT=i%target-ptrsize -check-prefix=CHECK-USAGE -check-prefix=CHECK-USAGE-AFTER
 
 // REQUIRES: OS=macosx
+// UNSUPPORTED: CPU=arm64e
 
 import resilient_protocol
 import non_resilient_protocol
