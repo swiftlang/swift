@@ -18,7 +18,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Bridging/ASTGen.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
@@ -86,6 +85,9 @@ struct LibParseExecutor {
     std::unique_ptr<ASTContext> ctx(ASTContext::get(
         langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts, symbolOpts,
         casOpts, serializationOpts, SM, diagEngine));
+    auto &eval = ctx->evaluator;
+    registerParseRequestFunctions(eval);
+    registerTypeCheckerRequestFunctions(eval);
 
     SourceFile::ParsingOptions parseOpts;
     parseOpts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
@@ -96,13 +98,9 @@ struct LibParseExecutor {
     SourceFile *SF =
         new (*ctx) SourceFile(*M, SourceFileKind::Library, bufferID, parseOpts);
 
-    Parser parser(bufferID, *SF, /*SILParserState=*/nullptr);
-    SmallVector<ASTNode> items;
-    parser.parseTopLevelItems(items);
+    auto items = evaluateOrDefault(eval, ParseSourceFileRequest{SF}, {}).TopLevelItems;
 
     if (opts.contains(ExecuteOptionFlag::Dump)) {
-      registerParseRequestFunctions(ctx->evaluator);
-      registerTypeCheckerRequestFunctions(ctx->evaluator);
       for (auto &item : items) {
         item.dump(llvm::outs());
       }
@@ -120,8 +118,9 @@ struct SwiftParserExecutor {
 #if SWIFT_BUILD_SWIFT_SYNTAX
     // TODO: Implement 'ExecuteOptionFlag::SkipBodies'
     auto sourceFile = swift_ASTGen_parseSourceFile(
-        buffer.getBufferStart(), buffer.getBufferSize(), /*moduleName=*/"",
-        buffer.getBufferIdentifier().data(), /*ASTContext=*/nullptr);
+        buffer.getBuffer(),
+        /*moduleName=*/StringRef(), buffer.getBufferIdentifier(),
+        /*declContextPtr=*/nullptr, BridgedGeneratedSourceFileKindNone);
     swift_ASTGen_destroySourceFile(sourceFile);
 
     if (opts.contains(ExecuteOptionFlag::Dump)) {
@@ -162,8 +161,9 @@ struct ASTGenExecutor {
     std::unique_ptr<ASTContext> ctx(ASTContext::get(
         langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts, symbolOpts,
         casOpts, serializationOpts, SM, diagEngine));
-    registerParseRequestFunctions(ctx->evaluator);
-    registerTypeCheckerRequestFunctions(ctx->evaluator);
+    auto &eval = ctx->evaluator;
+    registerParseRequestFunctions(eval);
+    registerTypeCheckerRequestFunctions(eval);
 
     SourceFile::ParsingOptions parseOpts;
     parseOpts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
@@ -174,9 +174,7 @@ struct ASTGenExecutor {
     SourceFile *SF =
         new (*ctx) SourceFile(*M, SourceFileKind::Library, bufferID, parseOpts);
 
-    Parser P(bufferID, *SF, nullptr);
-    SmallVector<ASTNode> items;
-    P.parseTopLevelItems(items);
+    auto items = evaluateOrDefault(eval, ParseSourceFileRequest{SF}, {}).TopLevelItems;
 
     if (opts.contains(ExecuteOptionFlag::Dump)) {
       for (auto &item : items) {

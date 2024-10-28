@@ -21,6 +21,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 
@@ -127,39 +128,168 @@ ParseAbstractFunctionBodyRequest::evaluate(Evaluator &evaluator,
 }
 
 //----------------------------------------------------------------------------//
+// ExportedSourceFileRequest computation.
+//----------------------------------------------------------------------------//
+
+static BridgedGeneratedSourceFileKind
+getBridgedGeneratedSourceFileKind(const GeneratedSourceInfo *genInfo) {
+  if (!genInfo)
+    return BridgedGeneratedSourceFileKindNone;
+
+  switch (genInfo->kind) {
+
+#define MACRO_ROLE(Name, Description)                                          \
+  case GeneratedSourceInfo::Kind::Name##MacroExpansion:                        \
+    return BridgedGeneratedSourceFileKind##Name##MacroExpansion;
+#include "swift/Basic/MacroRoles.def"
+#undef MACRO_ROLE
+
+  case GeneratedSourceInfo::Kind::ReplacedFunctionBody:
+    return BridgedGeneratedSourceFileKindReplacedFunctionBody;
+  case GeneratedSourceInfo::Kind::PrettyPrinted:
+    return BridgedGeneratedSourceFileKindPrettyPrinted;
+  case GeneratedSourceInfo::Kind::DefaultArgument:
+    return BridgedGeneratedSourceFileKindDefaultArgument;
+  }
+}
+
+void *ExportedSourceFileRequest::evaluate(Evaluator &evaluator,
+                                          const SourceFile *SF) const {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // The SwiftSyntax parser doesn't (yet?) handle SIL.
+  if (SF->Kind == SourceFileKind::SIL)
+    return nullptr;
+
+  auto &ctx = SF->getASTContext();
+
+  const auto *genInfo = SF->getGeneratedSourceFileInfo();
+  DeclContext *dc = const_cast<SourceFile *>(SF);
+  if (genInfo && genInfo->declContext)
+    dc = genInfo->declContext;
+
+  // Parse the source file.
+  auto exportedSourceFile = swift_ASTGen_parseSourceFile(
+      SF->getBuffer(), SF->getParentModule()->getName().str(),
+      SF->getFilename(), dc, getBridgedGeneratedSourceFileKind(genInfo));
+
+  // Round-trip validation if needed.
+  if (SF->getParsingOptions().contains(SourceFile::ParsingFlags::RoundTrip)) {
+    if (swift_ASTGen_roundTripCheck(exportedSourceFile)) {
+      SourceLoc loc = ctx.SourceMgr.getLocForBufferStart(SF->getBufferID());
+      ctx.Diags.diagnose(loc, diag::parser_round_trip_error);
+    }
+  }
+
+  ctx.addCleanup([exportedSourceFile] {
+    swift_ASTGen_destroySourceFile(exportedSourceFile);
+  });
+  return exportedSourceFile;
+#else
+  return nullptr;
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
+}
+
+//----------------------------------------------------------------------------//
 // ParseSourceFileRequest computation.
 //----------------------------------------------------------------------------//
 
-/// A thunk that deletes an allocated PersistentParserState. This is needed for
-/// us to be able to forward declare a unique_ptr to the state in the AST.
-static void deletePersistentParserState(PersistentParserState *state) {
-  delete state;
+namespace {
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+/// Whether we can "parse" the source file via ASTGen.
+bool shouldParseViaASTGen(SourceFile &SF) {
+  auto &ctx = SF.getASTContext();
+  auto &langOpts = ctx.LangOpts;
+
+  if (!langOpts.hasFeature(Feature::ParserASTGen))
+    return false;
+
+  switch (SF.Kind) {
+  case SourceFileKind::SIL:
+    return false;
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+  case SourceFileKind::Interface:
+  case SourceFileKind::MacroExpansion:
+  case SourceFileKind::DefaultArgument:
+    break;
+  }
+
+  // TODO: Migrate SourceKit features to Syntax based.
+  if (SF.shouldCollectTokens())
+    return false;
+
+  // TODO: Implement DebuggerContextChange in ASTGen.
+  if (langOpts.DebuggerSupport)
+    return false;
+
+  // TODO: IDE inspection (code completion) support in ASTGen.
+  if (ctx.SourceMgr.getIDEInspectionTargetBufferID() == SF.getBufferID())
+    return false;
+
+  return true;
 }
 
-SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
-                                                         SourceFile *SF) const {
-  assert(SF);
-  auto &ctx = SF->getASTContext();
-  auto bufferID = SF->getBufferID();
+void appendToVector(BridgedASTNode cNode, void *vecPtr) {
+  auto vec = static_cast<SmallVectorImpl<ASTNode> *>(vecPtr);
+  vec->push_back(cNode.unbridged());
+}
 
-  // If we've been asked to silence warnings, do so now. This is needed for
-  // secondary files, which can be parsed multiple times.
-  auto &diags = ctx.Diags;
-  auto didSuppressWarnings = diags.getSuppressWarnings();
-  auto shouldSuppress = SF->getParsingOptions().contains(
-      SourceFile::ParsingFlags::SuppressWarnings);
-  diags.setSuppressWarnings(didSuppressWarnings || shouldSuppress);
-  SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
+SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
+  Parser legacyParser(SF.getBufferID(), SF, /*SIL=*/nullptr,
+                      /*PersistentState=*/nullptr);
+  legacyParser.IsForASTGen = true;
+
+  ASTContext &Ctx = SF.getASTContext();
+  DiagnosticEngine &Diags = Ctx.Diags;
+  const LangOptions &langOpts = Ctx.LangOpts;
+  const GeneratedSourceInfo *genInfo = SF.getGeneratedSourceFileInfo();
+
+  DeclContext *declContext = &SF;
+  if (genInfo && genInfo->declContext) {
+    declContext = genInfo->declContext;
+  }
+
+  // Parse the file.
+  auto *exportedSourceFile = SF.getExportedSourceFile();
+  assert(exportedSourceFile && "Couldn't parse via SyntaxParser");
+
+  // Emit parser diagnostics.
+  (void)swift_ASTGen_emitParserDiagnostics(
+      Ctx, &Diags, exportedSourceFile, /*emitOnlyErrors=*/false,
+      /*downgradePlaceholderErrorsToWarnings=*/langOpts.Playground ||
+          langOpts.WarnOnEditorPlaceholder);
+
+  // Generate AST nodes.
+  SmallVector<ASTNode, 128> items;
+  swift_ASTGen_buildTopLevelASTNodes(
+      &Diags, exportedSourceFile, declContext, Ctx, legacyParser,
+      static_cast<SmallVectorImpl<ASTNode> *>(&items), appendToVector);
+
+  return SourceFileParsingResult{/*TopLevelItems=*/Ctx.AllocateCopy(items),
+                                 /*CollectedTokens=*/std::nullopt,
+                                 // FIXME: Implement interface hash.
+                                 /*InterfaceHasher=*/std::nullopt};
+}
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
+
+/// A thunk that deletes an allocated PersistentParserState. This is needed for
+/// us to be able to forward declare a unique_ptr to the state in the AST.
+void deletePersistentParserState(PersistentParserState *state) { delete state; }
+
+SourceFileParsingResult parseSourceFile(SourceFile &SF) {
+  auto &ctx = SF.getASTContext();
+  auto bufferID = SF.getBufferID();
 
   // If this buffer is for IDE functionality, hook up the state needed by its
   // second pass.
   PersistentParserState *state = nullptr;
   if (ctx.SourceMgr.getIDEInspectionTargetBufferID() == bufferID) {
     state = new PersistentParserState();
-    SF->setDelayedParserState({state, &deletePersistentParserState});
+    SF.setDelayedParserState({state, &deletePersistentParserState});
   }
 
-  Parser parser(bufferID, *SF, /*SIL*/ nullptr, state);
+  Parser parser(bufferID, SF, /*SIL*/ nullptr, state);
   PrettyStackTraceParser StackTrace(parser);
 
   // If the buffer is generated source information, we might have more
@@ -247,6 +377,30 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
 
   return SourceFileParsingResult{ctx.AllocateCopy(items), tokensRef,
                                  parser.CurrentTokenHash};
+}
+
+} // namespace
+
+SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
+                                                         SourceFile *SF) const {
+  assert(SF);
+  auto &ctx = SF->getASTContext();
+
+  // If we've been asked to silence warnings, do so now. This is needed for
+  // secondary files, which can be parsed multiple times.
+  auto &diags = ctx.Diags;
+  auto didSuppressWarnings = diags.getSuppressWarnings();
+  auto shouldSuppress = SF->getParsingOptions().contains(
+      SourceFile::ParsingFlags::SuppressWarnings);
+  diags.setSuppressWarnings(didSuppressWarnings || shouldSuppress);
+  SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  if (shouldParseViaASTGen(*SF))
+    return parseSourceFileViaASTGen(*SF);
+#endif
+
+  return parseSourceFile(*SF);
 }
 
 evaluator::DependencySource ParseSourceFileRequest::readDependencySource(

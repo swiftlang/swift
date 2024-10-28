@@ -432,6 +432,23 @@ public:
   unsigned getMinor() const { return Minor; }
 };
 
+//===----------------------------------------------------------------------===//
+// MARK: GeneratedSourceInfo
+//===----------------------------------------------------------------------===//
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedGeneratedSourceFileKind {
+#define MACRO_ROLE(Name, Description)                                          \
+  BridgedGeneratedSourceFileKind##Name##MacroExpansion,
+#include "swift/Basic/MacroRoles.def"
+#undef MACRO_ROLE
+
+  BridgedGeneratedSourceFileKindReplacedFunctionBody,
+  BridgedGeneratedSourceFileKindPrettyPrinted,
+  BridgedGeneratedSourceFileKindDefaultArgument,
+
+  BridgedGeneratedSourceFileKindNone,
+};
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #ifndef PURE_BRIDGING_MODE

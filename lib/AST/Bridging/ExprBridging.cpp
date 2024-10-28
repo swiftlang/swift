@@ -383,6 +383,14 @@ BridgedRegexLiteralExpr_createParsed(BridgedASTContext cContext,
                                         cRegexText.unbridged());
 }
 
+BridgedParenExpr BridgedParenExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cLParen,
+                                               BridgedExpr cExpr,
+                                               BridgedSourceLoc cRParen) {
+  ASTContext &context = cContext.unbridged();
+  return new (context)
+      ParenExpr(cLParen.unbridged(), cExpr.unbridged(), cRParen.unbridged());
+}
 BridgedSequenceExpr BridgedSequenceExpr_createParsed(BridgedASTContext cContext,
                                                      BridgedArrayRef exprs) {
   return SequenceExpr::create(cContext.unbridged(), exprs.unbridged<Expr *>());

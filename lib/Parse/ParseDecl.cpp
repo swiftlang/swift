@@ -162,21 +162,6 @@ namespace {
   };
 } // end anonymous namespace
 
-extern "C" void parseTopLevelSwift(const char *buffer,
-                                   void *declContext,
-                                   void *astContext,
-                                   void *outputContext,
-                                   void (*)(void *, void *));
-
-#if SWIFT_BUILD_SWIFT_SYNTAX
-static void appendToVector(void *declPtr, void *vecPtr) {
-  auto vec = static_cast<SmallVectorImpl<ASTNode> *>(vecPtr);
-  auto decl = static_cast<Decl *>(declPtr);
-
-  vec->push_back(decl);
-}
-#endif
-
 /// Main entrypoint for the parser.
 ///
 /// \verbatim
@@ -186,11 +171,6 @@ static void appendToVector(void *declPtr, void *vecPtr) {
 ///     decl-sil-stage [[only in SIL mode]
 /// \endverbatim
 void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
-#if SWIFT_BUILD_SWIFT_SYNTAX
-  std::optional<DiagnosticTransaction> existingParsingTransaction;
-  parseSourceFileViaASTGen(items, existingParsingTransaction);
-#endif
-
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
     consumeTokenWithoutFeedingReceiver();
@@ -239,31 +219,16 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
   }
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (existingParsingTransaction)
-    existingParsingTransaction->abort();
-
   using ParsingFlags = SourceFile::ParsingFlags;
   const auto parsingOpts = SF.getParsingOptions();
 
-  // If we don't need to validate anything, we're done.
-  if (!parsingOpts.contains(ParsingFlags::RoundTrip) &&
-      !parsingOpts.contains(ParsingFlags::ValidateNewParserDiagnostics)) {
-    return;
-  }
-
-  auto *exportedSourceFile = SF.getExportedSourceFile();
-  if (!exportedSourceFile)
-    return;
-
-  // Perform round-trip and/or validation checking.
-  if (parsingOpts.contains(ParsingFlags::RoundTrip) &&
-      swift_ASTGen_roundTripCheck(exportedSourceFile)) {
-    SourceLoc loc = Context.SourceMgr.getLocForBufferStart(SF.getBufferID());
-    diagnose(loc, diag::parser_round_trip_error);
-    return;
-  }
+  // Perform validation checking.
   if (parsingOpts.contains(ParsingFlags::ValidateNewParserDiagnostics) &&
       !Context.Diags.hadAnyError()) {
+    auto *exportedSourceFile = SF.getExportedSourceFile();
+    if (!exportedSourceFile)
+      return;
+
     auto hadSyntaxError = swift_ASTGen_emitParserDiagnostics(
         Context, &Context.Diags, exportedSourceFile,
         /*emitOnlyErrors=*/true,
@@ -278,104 +243,6 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
       SourceLoc loc = Context.SourceMgr.getLocForBufferStart(SF.getBufferID());
       diagnose(loc, diag::parser_new_parser_errors);
     }
-  }
-#endif
-}
-
-void *ExportedSourceFileRequest::evaluate(Evaluator &evaluator,
-                                          const SourceFile *SF) const {
-#if SWIFT_BUILD_SWIFT_SYNTAX
-  // The SwiftSyntax parser doesn't (yet?) handle SIL.
-  if (SF->Kind == SourceFileKind::SIL)
-    return nullptr;
-
-  auto &ctx = SF->getASTContext();
-  auto &SM = ctx.SourceMgr;
-
-  auto bufferID = SF->getBufferID();
-  StringRef contents = SM.extractText(SM.getRangeForBuffer(bufferID));
-
-  // Parse the source file.
-  auto exportedSourceFile = swift_ASTGen_parseSourceFile(
-      contents.begin(), contents.size(),
-      SF->getParentModule()->getName().str().str().c_str(),
-      SF->getFilename().str().c_str(), &ctx);
-
-  ctx.addCleanup([exportedSourceFile] {
-    swift_ASTGen_destroySourceFile(exportedSourceFile);
-  });
-  return exportedSourceFile;
-#else
-  return nullptr;
-#endif
-}
-
-void Parser::parseSourceFileViaASTGen(
-    SmallVectorImpl<ASTNode> &items,
-    std::optional<DiagnosticTransaction> &transaction,
-    bool suppressDiagnostics) {
-#if SWIFT_BUILD_SWIFT_SYNTAX
-  const auto &langOpts = Context.LangOpts;
-
-  // We only need to do parsing if we either have ASTGen enabled, or want the
-  // new parser diagnostics.
-  auto needToParse = [&]() {
-    if (langOpts.hasFeature(Feature::ParserASTGen))
-      return true;
-    if (!suppressDiagnostics &&
-        langOpts.hasFeature(Feature::ParserDiagnostics)) {
-      return true;
-    }
-    return false;
-  }();
-  if (!needToParse)
-    return;
-
-  switch (SF.Kind) {
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-  case SourceFileKind::Interface:
-    break;
-  case SourceFileKind::SIL:
-    // FIXME: Support SIL.
-    return;
-  case SourceFileKind::MacroExpansion:
-  case SourceFileKind::DefaultArgument:
-    // FIXME: Support macro expanded sources.
-    return;
-  }
-
-  auto *exportedSourceFile = SF.getExportedSourceFile();
-  if (!exportedSourceFile)
-    return;
-
-  // If we're supposed to emit diagnostics from the parser, do so now.
-  if (!suppressDiagnostics) {
-    auto hadSyntaxError = swift_ASTGen_emitParserDiagnostics(
-        Context, &Context.Diags, exportedSourceFile, /*emitOnlyErrors=*/false,
-        /*downgradePlaceholderErrorsToWarnings=*/langOpts.Playground ||
-            langOpts.WarnOnEditorPlaceholder);
-    if (hadSyntaxError && Context.Diags.hadAnyError() &&
-        !langOpts.hasFeature(Feature::ParserASTGen)) {
-      // Errors were emitted, and we're still using the C++ parser, so
-      // disable diagnostics from the C++ parser.
-      transaction.emplace(Context.Diags);
-    }
-  }
-
-  // If we want to do ASTGen, do so now.
-  if (langOpts.hasFeature(Feature::ParserASTGen)) {
-    this->IsForASTGen = true;
-    swift_ASTGen_buildTopLevelASTNodes(&Diags, exportedSourceFile,
-                                       CurDeclContext, Context, *this, &items,
-                                       appendToVector);
-
-    // Spin the C++ parser to the end; we won't be using it.
-    DiagnosticTransaction noDiag(Context.Diags);
-    while (!Tok.is(tok::eof)) {
-      consumeToken();
-    }
-    noDiag.abort();
   }
 #endif
 }
@@ -8285,9 +8152,6 @@ void Parser::parseTopLevelAccessors(
 }
 
 void Parser::parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items) {
-  std::optional<DiagnosticTransaction> transaction;
-  parseSourceFileViaASTGen(items, transaction, /*suppressDiagnostics*/true);
-
   if (Tok.is(tok::NUM_TOKENS))
     consumeTokenWithoutFeedingReceiver();
 
@@ -8312,9 +8176,6 @@ void Parser::parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items) {
 }
 
 void Parser::parseExpandedMemberList(SmallVectorImpl<ASTNode> &items) {
-  std::optional<DiagnosticTransaction> transaction;
-  parseSourceFileViaASTGen(items, transaction, /*suppressDiagnostics*/true);
-
   if (Tok.is(tok::NUM_TOKENS))
     consumeTokenWithoutFeedingReceiver();
 
