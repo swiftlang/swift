@@ -3031,7 +3031,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isUnconditionallyDeprecated(),
           theAttr->isNoAsync(),
           theAttr->isPackageDescriptionVersionSpecific(),
-          theAttr->IsSPI,
+          theAttr->isSPI(),
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),

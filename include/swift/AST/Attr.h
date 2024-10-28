@@ -147,6 +147,11 @@ protected:
       Value : 32
     );
 
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 1,
+      /// Whether this attribute was spelled `@_spi_available`.
+      IsSPI : 1
+    );
+
     SWIFT_INLINE_BITFIELD(ClangImporterSynthesizedTypeAttr, DeclAttribute, 1,
       kind : 1
     );
@@ -690,7 +695,9 @@ public:
         INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
         INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
         INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
-        PlatformAgnostic(PlatformAgnostic), Platform(Platform), IsSPI(IsSPI) {}
+        PlatformAgnostic(PlatformAgnostic), Platform(Platform) {
+    Bits.AvailableAttr.IsSPI = IsSPI;
+  }
 
 #undef INIT_VER_TUPLE
 
@@ -735,9 +742,6 @@ public:
   /// The platform of the availability.
   const PlatformKind Platform;
 
-  /// Whether this is available as SPI.
-  const bool IsSPI;
-
   /// Whether this is a language-version-specific entity.
   bool isLanguageVersionSpecific() const;
 
@@ -752,6 +756,9 @@ public:
 
   /// Whether this is a noasync attribute.
   bool isNoAsync() const;
+
+  /// Whether this attribute was spelled `@_spi_available`.
+  bool isSPI() const { return Bits.AvailableAttr.IsSPI; }
 
   /// Returns the platform-agnostic availability.
   PlatformAgnosticAvailabilityKind getPlatformAgnosticAvailability() const {

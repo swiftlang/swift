@@ -6604,7 +6604,7 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
           available->Obsoleted.value_or(noVersion), SourceRange(),
           PlatformAgnosticAvailabilityKind::Unavailable,
           /*implicit=*/true,
-          available->IsSPI);
+          available->isSPI());
       ext->getAttrs().add(attr);
       anyPlatformSpecificAttrs = true;
     }

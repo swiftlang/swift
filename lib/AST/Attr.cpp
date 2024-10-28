@@ -662,7 +662,7 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   if (!AvailAttr)
     return false;
 
-  if (AvailAttr->IsSPI)
+  if (AvailAttr->isSPI())
     return false;
 
   if (!AvailAttr->Introduced.has_value())
@@ -1371,7 +1371,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto Attr = cast<AvailableAttr>(this);
     if (Options.SuppressNoAsyncAvailabilityAttr && Attr->isNoAsync())
       return false;
-    if (Options.printPublicInterface() && Attr->IsSPI) {
+    if (Options.printPublicInterface() && Attr->isSPI()) {
       assert(Attr->hasPlatform());
       assert(Attr->Introduced.has_value());
       Printer.printAttrName("@available");
@@ -1380,7 +1380,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << ", unavailable)";
       break;
     }
-    if (Attr->IsSPI) {
+    if (Attr->isSPI()) {
       std::string atSPI = (llvm::Twine("@") + SPI_AVAILABLE_ATTRNAME).str();
       Printer.printAttrName(atSPI);
     } else {
@@ -2294,7 +2294,7 @@ AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
                                implicit ? SourceRange() : ObsoletedRange,
                                PlatformAgnostic,
                                implicit,
-                               IsSPI);
+                               isSPI());
 }
 
 std::optional<OriginallyDefinedInAttr::ActiveVersion>
