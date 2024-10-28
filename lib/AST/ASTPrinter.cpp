@@ -3597,7 +3597,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
           dyn_cast_or_null<clang::NamespaceDecl>(decl->getClangDecl())) {
     // Enum that correponds to the C++ namespace should only be printed once.
     if (!Printer.shouldPrintRedeclaredClangDecl(
-            namespaceDecl->getOriginalNamespace()))
+            namespaceDecl->getFirstDecl()))
       return;
 
     if (Options.SkipInlineCXXNamespace && namespaceDecl->isInline()) {

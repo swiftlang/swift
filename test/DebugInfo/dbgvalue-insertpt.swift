@@ -4,7 +4,7 @@
 for i in 0 ..< 3 {
   // CHECK: %[[ALLOCA:[0-9]+]] = alloca %TSiSg
   // CHECK: %i.debug = alloca i{{32|64}}
-  // CHECK-NEXT: call void @llvm.dbg.declare(metadata ptr %i.debug,
-  // CHECK-SAME:                           metadata ![[I:[0-9]+]],
+  // CHECK-NEXT: #dbg_declare(ptr %i.debug,
+  // CHECK-SAME:                           ![[I:[0-9]+]],
   // CHECK: ![[I]] = !DILocalVariable(name: "i",
 }

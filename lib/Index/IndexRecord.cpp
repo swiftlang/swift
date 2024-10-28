@@ -35,6 +35,7 @@
 #include "clang/Index/IndexingAction.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTReader.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
 
 using namespace swift;
@@ -480,10 +481,13 @@ static void emitSymbolicInterfaceForClangModule(
     return;
   }
 
+  auto moduleRef = clangModule->getASTFile();
+  if (!moduleRef)
+    return;
+
   // Determine the output name for the symbolic interface file.
   clang::serialization::ModuleFile *ModFile =
-      clangCI.getASTReader()->getModuleManager().lookup(
-          clangModule->getASTFile());
+      clangCI.getASTReader()->getModuleManager().lookup(*moduleRef);
   assert(ModFile && "no module file loaded for module ?");
   SmallString<128> interfaceOutputPath = indexStorePath;
   appendSymbolicInterfaceToIndexStorePath(interfaceOutputPath);
@@ -632,9 +636,12 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
           modulePath = LFU->getSourceFilename();
         }
 
-        auto F = fileMgr.getFile(modulePath);
-        if (!F)
+        auto F = fileMgr.getFileRef(modulePath);
+        if (!F) {
+          // Ignore error and continue.
+          llvm::consumeError(F.takeError());
           break;
+        }
 
         // Use module real name for unit writer in case module aliasing
         // is used. For example, if a file being indexed has `import Foo`
@@ -851,17 +858,18 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
 
   IndexUnitWriter unitWriter(
       fileMgr, indexStorePath, "swift", swiftVersion, filename, moduleName,
-      /*MainFile=*/nullptr, isSystem, /*IsModuleUnit=*/true, isDebugCompilation,
+      /*MainFile=*/{}, isSystem, /*IsModuleUnit=*/true, isDebugCompilation,
       targetTriple, sysrootPath, clangRemapper, getModuleInfoFromOpaqueModule);
 
-  auto FE = fileMgr.getFile(filename);
-  for (auto &pair : records) {
-    std::string &recordFile = pair.first;
-    std::string &groupName = pair.second;
-    if (recordFile.empty())
-      continue;
-    clang::index::writer::OpaqueModule mod = &groupName;
-    unitWriter.addRecordFile(recordFile, *FE, isSystem, mod);
+  if (auto FE = fileMgr.getFileRef(filename)) {
+    for (auto &pair : records) {
+      std::string &recordFile = pair.first;
+      std::string &groupName = pair.second;
+      if (recordFile.empty())
+        continue;
+      clang::index::writer::OpaqueModule mod = &groupName;
+      unitWriter.addRecordFile(recordFile, *FE, isSystem, mod);
+    }
   }
 
   SmallVector<ImportedModule, 8> imports;
@@ -888,21 +896,25 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      bool indexSystemModules, bool skipStdlib,
                      bool includeLocals, bool isDebugCompilation,
                      bool isExplicitModuleBuild, StringRef targetTriple,
-                     ArrayRef<const clang::FileEntry *> fileDependencies,
+                     ArrayRef<clang::FileEntryRef> fileDependencies,
                      const clang::CompilerInstance &clangCI,
                      const PathRemapper &pathRemapper,
                      DiagnosticEngine &diags) {
   auto &fileMgr = clangCI.getFileManager();
   auto *module = primarySourceFile->getParentModule();
   bool isSystem = module->isNonUserModule();
-  auto mainFile = fileMgr.getFile(primarySourceFile->getFilename());
   auto clangRemapper = pathRemapper.asClangPathRemapper();
+
+  auto mainFile = fileMgr.getFileRef(primarySourceFile->getFilename());
+  if (!mainFile)
+    return false;
+
   // FIXME: Get real values for the following.
   StringRef swiftVersion;
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
   IndexUnitWriter unitWriter(
       fileMgr, indexStorePath, "swift", swiftVersion, indexUnitToken,
-      module->getNameStr(), mainFile ? *mainFile : nullptr, isSystem,
+      module->getNameStr(), *mainFile, isSystem,
       /*isModuleUnit=*/false, isDebugCompilation, targetTriple, sysrootPath,
       clangRemapper, getModuleInfoFromOpaqueModule);
 
@@ -918,15 +930,16 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                         primarySourceFile);
 
   // File dependencies.
-  for (auto *F : fileDependencies)
+  for (auto F : fileDependencies)
     unitWriter.addFileDependency(F, /*FIXME:isSystem=*/false, /*Module=*/nullptr);
 
   recordSourceFile(primarySourceFile, indexStorePath, includeLocals, diags,
                    [&](StringRef recordFile, StringRef filename) {
-                     auto file = fileMgr.getFile(filename);
-                     unitWriter.addRecordFile(
-                         recordFile, file ? *file : nullptr,
-                         module->isNonUserModule(), /*Module=*/nullptr);
+                     if (auto file = fileMgr.getFileRef(filename)) {
+                       unitWriter.addRecordFile(
+                           recordFile, *file,
+                           module->isNonUserModule(), /*Module=*/nullptr);
+                     }
                    });
 
   std::string error;
@@ -984,24 +997,11 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
     return true;
   }
 
-  llvm::SetVector<const clang::FileEntry *> fileDependencies;
-  // FIXME: This is not desirable because:
-  // 1. It picks shim header files as file dependencies
-  // 2. Having all the other swift files of the module as file dependencies ends
-  //   up making all of them associated with all the other files as main files.
-  //   It's better to associate each swift file with the unit that recorded it
-  //   as the main one.
-  // Keeping the code in case we want to revisit.
-#if 0
-  auto *module = primarySourceFile->getParentModule();
-  collectFileDependencies(fileDependencies, dependencyTracker, module, fileMgr);
-#endif
-
   return recordSourceFileUnit(primarySourceFile, indexUnitToken,
                               indexStorePath, indexClangModules,
                               indexSystemModules, skipStdlib, includeLocals,
                               isDebugCompilation, isExplicitModuleBuild,
-                              targetTriple, fileDependencies.getArrayRef(),
+                              targetTriple, {},
                               clangCI, pathRemapper, diags);
 }
 
@@ -1028,19 +1028,6 @@ bool index::indexAndRecord(ModuleDecl *module,
     return true;
   }
 
-  // Add the current module's source files to the dependencies.
-  llvm::SetVector<const clang::FileEntry *> fileDependencies;
-  // FIXME: This is not desirable because:
-  // 1. It picks shim header files as file dependencies
-  // 2. Having all the other swift files of the module as file dependencies ends
-  //   up making all of them associated with all the other files as main files.
-  //   It's better to associate each swift file with the unit that recorded it
-  //   as the main one.
-  // Keeping the code in case we want to revisit.
-#if 0
-  collectFileDependencies(fileDependencies, dependencyTracker, module, fileMgr);
-#endif
-
   // Write a unit for each source file.
   unsigned unitIndex = 0;
   for (auto *F : module->getFiles()) {
@@ -1053,7 +1040,7 @@ bool index::indexAndRecord(ModuleDecl *module,
                                indexStorePath, indexClangModules,
                                indexSystemModules, skipStdlib, includeLocals,
                                isDebugCompilation, isExplicitModuleBuild,
-                               targetTriple, fileDependencies.getArrayRef(),
+                               targetTriple, {},
                                clangCI, pathRemapper, diags))
         return true;
       unitIndex += 1;

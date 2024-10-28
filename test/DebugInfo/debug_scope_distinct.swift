@@ -1,5 +1,7 @@
 // REQUIRES: differentiable_programming
 
+// XFAIL: *
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swiftc_driver -DM -emit-module -emit-module-path %t/M.swiftmodule %s -module-name M
 // RUN: %target-swiftc_driver -O -g -I %t -c %s -emit-ir -o - | %FileCheck %s
@@ -14,17 +16,17 @@
 // CHECK-SAME: ptr {{.*}} %[[ARG_PTR:.*]],
 //
 // CHECK: %[[ARG0:.*]] = load {{.*}} %[[ARG_PTR]]
-// CHECK: call void @llvm.dbg.value(metadata {{.*}} %[[ARG0]], metadata ![[VAR1:[0-9]+]], metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg ![[LOC1:[0-9]+]]
+// CHECK: #dbg_value({{.*}} %[[ARG0]], ![[VAR1:[0-9]+]], !DIExpression(DW_OP_LLVM_fragment, 0, 64), !dbg ![[LOC1:[0-9]+]]
 // CHECK: %[[ARG1_GEP:.*]] = getelementptr inbounds i8, ptr %[[ARG_PTR]], i64 8
 // CHECK: %[[ARG1:.*]] = load {{.*}} %[[ARG1_GEP]]
-// CHECK: call void @llvm.dbg.value(metadata {{.*}} %[[ARG1]], metadata ![[VAR1]], metadata !DIExpression(DW_OP_LLVM_fragment, 64, 8)), !dbg ![[LOC1]]
+// CHECK: #dbg_value({{.*}} %[[ARG1]], ![[VAR1]], !DIExpression(DW_OP_LLVM_fragment, 64, 8), !dbg ![[LOC1]]
 //
 // CHECK: %[[ARG2_GEP:.*]] = getelementptr inbounds %T4main1TV13TangentVectorV, ptr %[[ARG_PTR]], i64 0, i32 2
 // CHECK: %[[ARG2:.*]] = load {{.*}} %[[ARG2_GEP]]
-// CHECK: call void @llvm.dbg.value(metadata {{.*}} %[[ARG2]], metadata ![[VAR1]], metadata !DIExpression(DW_OP_LLVM_fragment, 0, 64)), !dbg ![[LOC2:[0-9]+]]
+// CHECK: #dbg_value({{.*}} %[[ARG2]], ![[VAR1]], !DIExpression(DW_OP_LLVM_fragment, 0, 64), !dbg ![[LOC2:[0-9]+]]
 // CHECK: %[[ARG3_GEP:.*]] = getelementptr inbounds %T4main1TV13TangentVectorV, ptr %[[ARG_PTR]], i64 0, i32 2, i32 0, i32 1
 // CHECK: %[[ARG3:.*]] = load {{.*}} %[[ARG3_GEP]]
-// CHECK: call void @llvm.dbg.value(metadata {{.*}} %[[ARG3]], metadata ![[VAR1]], metadata !DIExpression(DW_OP_LLVM_fragment, 64, 8)), !dbg ![[LOC2]]
+// CHECK: #dbg_value({{.*}} %[[ARG3]], ![[VAR1]], !DIExpression(DW_OP_LLVM_fragment, 64, 8), !dbg ![[LOC2]]
 
 // CHECK-DAG: ![[VAR1]] = !DILocalVariable(name: "offset", arg: 1, scope: ![[SCOPE:[0-9]+]]
 

@@ -2,7 +2,7 @@
 
 // CHECK: define{{.*}}@"$s11autoclosure7call_meyys5Int64VF"
 // CHECK-NOT: ret void
-// CHECK: call void @llvm.dbg.declare{{.*}}, !dbg
+// CHECK: #dbg_declare{{.*}}
 // CHECK-NOT: ret void
 // CHECK: _value {{.*}}, !dbg ![[DBG:.*]]
 // CHECK: ret void

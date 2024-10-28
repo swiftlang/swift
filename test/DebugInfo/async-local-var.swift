@@ -17,7 +17,7 @@ public func makeDinner() async throws -> String {
 // CHECK-LABEL: define {{.*}} void @"$s1a10makeDinnerSSyYaKFTQ0_"
 // CHECK-NEXT: entryresume.0:
 // CHECK-NOT: {{ ret }}
-// CHECK: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[LOCAL:[0-9]+]], {{.*}}!DIExpression(DW_OP_LLVM_entry_value, 1, DW_OP_deref, DW_OP_plus_uconst, {{[0-9]+}})
+// CHECK: #dbg_declare({{.*}}%0, ![[LOCAL:[0-9]+]], {{.*}}!DIExpression(DW_OP_LLVM_entry_value, 1, DW_OP_deref, DW_OP_plus_uconst, {{[0-9]+}})
 // CHECK: ![[LOCAL]] = !DILocalVariable(name: "local"
   return local
 }
