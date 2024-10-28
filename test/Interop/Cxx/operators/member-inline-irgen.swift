@@ -5,7 +5,7 @@ import MemberInline
 public func sub(_ lhs: inout LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> LoadableIntWrapper { lhs - rhs }
 
 // CHECK-SYSV: call [[RESA:i32|i64]] [[NAMEA:@_ZN18LoadableIntWrappermiES_]](ptr {{%[0-9]+}}, {{i32|\[1 x i32\]|i64|%struct.LoadableIntWrapper\* byval\(.*\) align 4}} {{%[0-9]+}})
-// CHECK-WIN: call [[RESA:void]] [[NAMEA:@"\?\?GLoadableIntWrapper@@QEAA\?AU0@U0@@Z"]](ptr {{%[0-9]+}}, ptr sret(%struct.LoadableIntWrapper) {{.*}}, i32 {{%[0-9]+}})
+// CHECK-WIN: call [[RESA:void]] [[NAMEA:@"\?\?GLoadableIntWrapper@@QEAA\?AU0@U0@@Z"]](ptr {{%[0-9]+}}, ptr {{.*}} sret(%TSo18LoadableIntWrapperV) {{.*}}, i32 {{%[0-9]+}})
 
 public func call(_ wrapper: inout LoadableIntWrapper, _ arg: Int32) -> Int32 { wrapper(arg) }
 
