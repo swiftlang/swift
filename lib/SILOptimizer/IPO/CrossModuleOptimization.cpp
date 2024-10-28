@@ -203,7 +203,8 @@ public:
     for (Type replType : Subs.getReplacementTypes()) {
       switch (mode) {
         case VisitMode::DetectSerializableInst:
-          CMS.canSerializeType(replType->getCanonicalType());
+          if (!CMS.canSerializeType(replType->getCanonicalType()))
+            isInstSerializable = false;
           break;
         case VisitMode::SerializeInst:
           /// Ensure that all replacement types of \p Subs are usable from serialized
@@ -667,16 +668,17 @@ bool CrossModuleOptimization::canSerializeType(CanType type) {
   if (iter != canTypesChecked.end())
     return iter->getSecond();
 
-  bool success = type.findIf(
+  bool success = !type.findIf(
      [this](Type rawSubType) {
        CanType subType = rawSubType->getCanonicalType();
        if (auto nominal = subType->getNominalOrBoundGenericNominal()) {
-         return canSerializeDecl(nominal);
+         return !canSerializeDecl(nominal);
        }
-       // If reached here, the type is a Builtin type or similar,
-       // e.g. Builtin.Int64, Builtin.Word, Builtin.NativeObject, etc.
-       return true;
-     });
+       // Types that might not have nominal include Builtin types (e.g. Builtin.Int64),
+       // generic parameter types (e.g. T as in Foo<T>), SIL function result types
+       // (e.g. @convention(method) (Int, @thin Hasher.Type) -> Hasher), etc.
+       return false;
+  });
 
   canTypesChecked[type] = success;
   return success;
