@@ -12,6 +12,11 @@
 // RUN: %target-codesign %t/main_crash
 // RUN: %target-run %t/main_crash %t/%target-library-name(PreconcurrencyUnchecked)
 
+// REQUIRES: asserts
+// REQUIRES: executable_test
+// REQUIRES: concurrency
+// REQUIRES: objc_interop
+
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
 // UNSUPPORTED: use_os_stdlib
