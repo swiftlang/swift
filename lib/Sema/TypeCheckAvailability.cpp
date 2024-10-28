@@ -2205,6 +2205,8 @@ diagnosePotentialUnavailability(const ValueDecl *D, SourceRange ReferenceRange,
                                 const AvailabilityRange &Availability,
                                 bool WarnBeforeDeploymentTarget = false) {
   ASTContext &Context = ReferenceDC->getASTContext();
+  if (Context.LangOpts.DisableAvailabilityChecking)
+    return false;
 
   bool IsError;
   {
@@ -3100,8 +3102,6 @@ swift::checkDeclarationAvailability(const Decl *decl,
                                     const DeclContext *declContext,
                                     AvailabilityContext availabilityContext) {
   auto &ctx = declContext->getASTContext();
-  if (ctx.LangOpts.DisableAvailabilityChecking)
-    return std::nullopt;
 
   // Generic parameters are always available.
   if (isa<GenericTypeParamDecl>(decl))
@@ -4150,6 +4150,7 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 
   auto *DC = Where.getDeclContext();
   auto &ctx = DC->getASTContext();
+
   auto unmetRequirement =
       checkDeclarationAvailability(D, DC, Where.getAvailability());
   auto requiredRange =
