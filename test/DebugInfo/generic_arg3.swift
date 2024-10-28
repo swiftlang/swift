@@ -5,7 +5,7 @@ func apply<Type>(_ T : Type, fn: (Type) -> Type) -> Type { return fn(T) }
 public func f<Type>(_ value : Type)
 {
   // CHECK: define {{.*}}$s12generic_arg31fyyxlFxxXEfU_
-  // CHECK: call void @llvm.dbg.declare(metadata ptr %[[ALLOCA:.*]], metadata ![[ARG:.*]], metadata !DIExpression(DW_OP_deref))
+  // CHECK: #dbg_declare(ptr %[[ALLOCA:.*]], ![[ARG:.*]], !DIExpression(DW_OP_deref)
   // CHECK: store ptr %1, ptr %[[ALLOCA]], align
   // No deref here.
   // CHECK-DAG: ![[TY:.*]] = !DICompositeType({{.*}}name: "$sxD", file

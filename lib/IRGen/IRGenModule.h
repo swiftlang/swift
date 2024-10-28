@@ -700,7 +700,7 @@ public:
   bool ShouldUseSwiftError;
 
   llvm::Type *VoidTy;                  /// void (usually {})
-  llvm::Type *PtrTy;                   /// ptr
+  llvm::PointerType *PtrTy;            /// ptr
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
   llvm::IntegerType *Int16Ty;          /// i16
@@ -1206,10 +1206,10 @@ public:
 
   llvm::Constant *getConstantSignedCFunctionPointer(llvm::Constant *fn);
 
-  llvm::Constant *getConstantSignedPointer(llvm::Constant *pointer,
-                                           unsigned key,
-                                           llvm::Constant *addrDiscriminator,
-                                           llvm::Constant *otherDiscriminator);
+  llvm::Constant *
+  getConstantSignedPointer(llvm::Constant *pointer, unsigned key,
+                           llvm::Constant *storageAddress,
+                           llvm::ConstantInt *otherDiscriminator);
   llvm::Constant *getConstantSignedPointer(llvm::Constant *pointer,
                                            const clang::PointerAuthSchema &schema,
                                            const PointerAuthEntity &entity,

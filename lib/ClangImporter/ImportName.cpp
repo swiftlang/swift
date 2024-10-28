@@ -549,7 +549,7 @@ struct AnySwiftNameAttr {
   }
 };
 
-/// Aggregate struct for the common members of clang::SwiftVersionedAttr and
+/// Aggregate struct for the common members of clang::SwiftVersionedAdditionAttr and
 /// clang::SwiftVersionedRemovalAttr.
 ///
 /// For a SwiftVersionedRemovalAttr, the Attr member will be null.
@@ -672,8 +672,8 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
     for (auto *attr : decl->attrs()) {
       VersionedSwiftNameInfo info;
 
-      if (auto *versionedAttr = dyn_cast<clang::SwiftVersionedAttr>(attr)) {
-        auto added = decodeAttr(versionedAttr->getAttrToAdd());
+      if (auto *versionedAttr = dyn_cast<clang::SwiftVersionedAdditionAttr>(attr)) {
+        auto added = decodeAttr(versionedAttr->getAdditionalAttr());
         if (!added)
           continue;
 
@@ -1431,7 +1431,7 @@ bool NameImporter::hasErrorMethodNameCollision(
   unsigned numArgs = selector.getNumArgs();
   assert(numArgs > 0);
 
-  SmallVector<clang::IdentifierInfo *, 4> chunks;
+  SmallVector<const clang::IdentifierInfo *, 4> chunks;
   for (unsigned i = 0, e = selector.getNumArgs(); i != e; ++i) {
     chunks.push_back(selector.getIdentifierInfoForSlot(i));
   }
@@ -2378,7 +2378,7 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
   if (macro->isUsedForHeaderGuard() && macro->getNumTokens() == 1) {
     auto tok = macro->tokens()[0];
     if (tok.is(clang::tok::numeric_constant) && tok.getLength() == 1 &&
-        PP.getSpellingOfSingleCharacterNumericConstant(tok) == '1')
+        PP.getSpellingOfSingleCharacterNumericConstant(tok) == 1)
       return true;
   }
 

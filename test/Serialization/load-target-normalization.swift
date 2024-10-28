@@ -1,10 +1,6 @@
 // RUN: %empty-directory(%t/ForeignModule.swiftmodule)
 // RUN: touch %t/ForeignModule.swiftmodule/garbage-garbage-garbage.swiftmodule
 
-// https://github.com/apple/swift/issues/54797
-// This test crashes on 'next' branch.
-// XFAIL: asserts
-
 // Test format: We try to import ForeignModule with architectures besides
 // garbage-garbage-garbage and check the target triple listed in the error
 // message to make sure it was normalized correctly. This works in lieu of a

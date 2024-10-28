@@ -49,15 +49,15 @@ bb0(%0 : $Int64, %1 : $Int64):
   %18 = tuple_element_addr %4 : $*(x: Int64, y: Int64), 1, loc "sroa.swift":4:12, scope 3
   store %1 to %18 : $*Int64, loc "sroa.swift":4:12, scope 3
 
-  // CHECK-IR: call void @llvm.dbg.value(metadata i64 %0
-  // CHECK-IR-SAME:                      metadata ![[MY_TUP_MD:[0-9]+]]
+  // CHECK-IR: #dbg_value(i64 %0
+  // CHECK-IR-SAME:                      ![[MY_TUP_MD:[0-9]+]]
   // CHECK-IR-SAME:                      !DIExpression(DW_OP_LLVM_fragment, 0, 64)
-  // CHECK-IR: call void @llvm.dbg.value(metadata i64 %1
-  // CHECK-IR-SAME:                      metadata ![[MY_TUP_MD]]
+  // CHECK-IR: #dbg_value(i64 %1
+  // CHECK-IR-SAME:                      ![[MY_TUP_MD]]
   // CHECK-IR-SAME:                      !DIExpression(DW_OP_LLVM_fragment, 64, 64)
 
-  // CHECK-IR: call void @llvm.dbg.value(metadata i64 %0, metadata ![[ARG1_MD:[0-9]+]]
-  // CHECK-IR: call void @llvm.dbg.value(metadata i64 %1, metadata ![[ARG2_MD:[0-9]+]]
+  // CHECK-IR: #dbg_value(i64 %0, ![[ARG1_MD:[0-9]+]]
+  // CHECK-IR: #dbg_value(i64 %1, ![[ARG2_MD:[0-9]+]]
 
   dealloc_stack %4 : $*(x: Int64, y: Int64), loc "sroa.swift":2:7, scope 3
   return %0 : $Int64, loc "sroa.swift":5:3, scope 3

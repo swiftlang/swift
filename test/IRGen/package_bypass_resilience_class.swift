@@ -58,7 +58,7 @@ package class Foo {
   // CHECK-COMMON-DAG: define linkonce_odr hidden swiftcc void @"$s4Core3FooC02myB0AA3PubCSgvpACTk"
 
   // variable initialization expression of Core.Foo.myFoo
-  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc {{i32|i64}} @"$s4Core3FooC02myB0AA3PubCSgvpfi"() #0 {
+  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc{{.*}} {{i32|i64}} @"$s4Core3FooC02myB0AA3PubCSgvpfi"() #0 {
 
   // Core.Foo.myFoo.getter
   // CHECK-RES-DAG: define hidden {{.*}}swiftcc {{i32|i64}} @"$s4Core3FooC02myB0AA3PubCSgvg"(ptr swiftself %0)
@@ -107,7 +107,7 @@ package class Foo {
 
 final package class Bar {
   
-  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc {{i32|i64}} @"$s4Core3BarC02myB0AA3PubCSgvpfi"()
+  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc{{.*}} {{i32|i64}} @"$s4Core3BarC02myB0AA3PubCSgvpfi"()
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc {{i32|i64}} @"$s4Core3BarC02myB0AA3PubCSgvg"(ptr swiftself %0)
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core3BarC02myB0AA3PubCSgvs"({{i32|i64}} %0, ptr swiftself %1)
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc { ptr, ptr } @"$s4Core3BarC02myB0AA3PubCSgvM"

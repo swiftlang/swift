@@ -5,7 +5,7 @@
     {
       'name': 'OUT_DIR', 'type': 'directory',
       'contents': [
-        { 'name': 'module.map', 'type': 'file',
+        { 'name': 'module.modulemap', 'type': 'file',
           'external-contents': 'INPUT_DIR/vfs/a-modulemap'
         },
         { 'name': 'VFSMappedModule.h', 'type': 'file',

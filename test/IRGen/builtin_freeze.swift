@@ -18,10 +18,12 @@ func yuck() -> Int32 {
   // CHECK: poison
 }
 
+// CHECK: define{{.*}} swiftcc{{.*}} i32 @"$s14builtin_freeze3yums5Int32VyF"()
 func yum() -> Int32 {
   fptosiWithFreeze(0x1.0p32)
   // CHECK-NOT: poison
 }
+// CHECK: }
 
 func fptosi(_ x: SIMD2<Float>) -> SIMD2<Int32> {
   let maybePoison = Builtin.fptosi_Vec2xFPIEEE32_Vec2xInt32(x._storage._value)
