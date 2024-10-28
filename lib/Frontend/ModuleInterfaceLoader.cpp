@@ -1785,8 +1785,11 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   GenericArgs.push_back("-disable-objc-attr-requires-foundation-module");
 
   // If we are supposed to use RequireOSSAModules, do so.
-  genericSubInvocation.getSILOptions().EnableOSSAModules =
-      bool(RequireOSSAModules);
+  if (RequireOSSAModules) {
+    genericSubInvocation.getSILOptions().EnableOSSAModules = true;
+    GenericArgs.push_back("-enable-ossa-modules");
+  }
+
   if (LangOpts.DisableAvailabilityChecking) {
     genericSubInvocation.getLangOptions().DisableAvailabilityChecking = true;
     GenericArgs.push_back("-disable-availability-checking");
