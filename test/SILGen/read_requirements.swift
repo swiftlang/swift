@@ -21,6 +21,8 @@
 // - a get accessor
 // - an unsafeAddress accessor
 
+// TODO: CoroutineAccessors: Replace SwiftStdlib 9999 with SwiftStdlib X.Y.
+
 @frozen
 public struct U : ~Copyable {}
 
@@ -30,9 +32,11 @@ public protocol P1 : ~Copyable {
   @_borrowed
   var ubgs: U { get set }
 }
+@available(SwiftStdlib 9999, *)
 public protocol P2 : ~Copyable {
   var urs: U { read set }
 }
+@available(SwiftStdlib 6.0, *)
 public protocol P3 : ~Copyable {
   var ur: U { read }
 }
@@ -83,6 +87,7 @@ public struct ImplAStored : ~Copyable & P1 {
 }
 
 @frozen
+@available(SwiftStdlib 9999, *)
 public struct ImplBStored : ~Copyable & P2 {
   var dummy: ()
   public var urs: U
@@ -130,6 +135,7 @@ public struct ImplBStored : ~Copyable & P2 {
 }
 
 @frozen
+@available(SwiftStdlib 6.0, *)
 public struct ImplCStored : ~Copyable & P3 {
   var dummy: ()
   public var ur: U
@@ -229,6 +235,7 @@ public struct ImplAUnderscoredCoroutineAccessors : ~Copyable & P1 {
 }
 
 @frozen
+@available(SwiftStdlib 9999, *)
 public struct ImplBUnderscoredCoroutineAccessors : ~Copyable & P2 {
   var _i: U
   public var urs: U {
@@ -282,6 +289,7 @@ public struct ImplBUnderscoredCoroutineAccessors : ~Copyable & P2 {
 }
 
 @frozen
+@available(SwiftStdlib 6.0, *)
 public struct ImplCUnderscoredCoroutineAccessors : ~Copyable & P3 {
   var _i: U
   public var ur: U {
@@ -395,6 +403,7 @@ struct ImplACoroutineAccessors : ~Copyable & P1 {
 }
 
 @frozen
+@available(SwiftStdlib 9999, *)
 public struct ImplBCoroutineAccessors : ~Copyable & P2 {
   var _i: U
   public var urs: U {
@@ -480,6 +489,7 @@ public struct ImplBCoroutineAccessors : ~Copyable & P2 {
 }
 
 @frozen
+@available(SwiftStdlib 6.0, *)
 public struct ImplCCoroutineAccessors : ~Copyable & P3 {
   var _i: U
   public var ur: U {
@@ -622,6 +632,7 @@ public struct ImplAGetSet : P1 {
 }
 
 @frozen
+@available(SwiftStdlib 9999, *)
 public struct ImplBGetSet : P2 {
   var _i: U {
     get { return U() }
@@ -682,6 +693,7 @@ public struct ImplBGetSet : P2 {
 }
 
 @frozen
+@available(SwiftStdlib 6.0, *)
 public struct ImplCGetSet : P3 {
   var _i: U {
     get { return U() }
@@ -803,6 +815,7 @@ public struct ImplAUnsafeAddressors : P1 {
 }
 
 @frozen
+@available(SwiftStdlib 9999, *)
 public struct ImplBUnsafeAddressors : P2 {
   var iAddr: UnsafePointer<U>
   var iMutableAddr: UnsafeMutablePointer<U> {
@@ -868,6 +881,7 @@ public struct ImplBUnsafeAddressors : P2 {
 }
 
 @frozen
+@available(SwiftStdlib 6.0, *)
 public struct ImplCUnsafeAddressors : P3 {
   var iAddr: UnsafePointer<U>
   var iMutableAddr: UnsafeMutablePointer<U> {
