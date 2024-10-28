@@ -2764,8 +2764,8 @@ namespace {
       // with complete fields, and we're not in a dependent context(this is
       // equivalent to the logic in CanDeclareSpecialMemberFunction in Clang's
       // SemaLookup.cpp).
-      if (!decl->isBeingDefined() && !decl->isDependentContext() &&
-          areRecordFieldsComplete(decl)) {
+      assert(!decl->isBeingDefined() && "can only import fully defined decls");
+      if (!decl->isDependentContext() && areRecordFieldsComplete(decl)) {
         if (decl->hasInheritedConstructor()) {
           for (auto member : decl->decls()) {
             if (auto usingDecl = dyn_cast<clang::UsingDecl>(member)) {
