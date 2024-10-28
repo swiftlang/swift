@@ -151,7 +151,11 @@ extension DistributedResolvableMacro {
             isGenericStub = false
 
           case .expr:
-            fatalError("Expression type not supported for distributed actor")
+            throw DiagnosticsError(
+              syntax: sameTypeReq.rightType,
+              message: "Expression type not supported for distributed actor",
+              id: .invalidGenericArgument
+            )
           }
 
         default:
@@ -277,6 +281,7 @@ struct DistributedResolvableMacroDiagnostic: DiagnosticMessage {
   enum ID: String {
     case invalidApplication = "invalid type"
     case missingInitializer = "missing initializer"
+    case invalidGenericArgument = "invalid generic argument"
   }
 
   var message: String
