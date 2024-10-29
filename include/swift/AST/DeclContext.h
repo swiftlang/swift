@@ -802,6 +802,10 @@ class IterableDeclContext {
   /// We must restore this when delayed parsing the body.
   unsigned InFreestandingMacroArgument : 1;
 
+  /// Whether delayed parsing detect a possible custom derivative definition
+  /// while skipping the body of this context.
+  unsigned HasDerivativeDeclarations : 1;
+
   template<class A, class B, class C>
   friend struct ::llvm::CastInfo;
 
@@ -817,6 +821,7 @@ public:
     : LastDeclAndKind(nullptr, kind) {
     AddedParsedMembers = 0;
     HasOperatorDeclarations = 0;
+    HasDerivativeDeclarations = 0;
     HasNestedClassDeclarations = 0;
     InFreestandingMacroArgument = 0;
   }
@@ -853,6 +858,15 @@ public:
   void setInFreestandingMacroArgument() {
     assert(hasUnparsedMembers());
     InFreestandingMacroArgument = 1;
+  }
+
+  bool maybeHasDerivativeDeclarations() const {
+    return HasDerivativeDeclarations;
+  }
+
+  void setMaybeHasDerivativeDeclarations() {
+    assert(hasUnparsedMembers());
+    HasDerivativeDeclarations = 1;
   }
 
   /// Retrieve the current set of members in this context.
