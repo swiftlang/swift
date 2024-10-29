@@ -4284,7 +4284,8 @@ public:
   }
 
   /// Whether this closure should implicitly inherit the actor context from
-  /// where it was formed. This only affects @Sendable async closures.
+  /// where it was formed. This only affects @Sendable and sendable async
+  /// closures.
   bool inheritsActorContext() const {
     return Bits.ClosureExpr.InheritActorContext;
   }

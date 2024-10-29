@@ -891,7 +891,7 @@ bool UseAfterTransferDiagnosticInferrer::initForIsolatedPartialApply(
   if (foundCapturedIsolationCrossing.empty())
     return false;
 
-  unsigned opIndex = ApplySite(op->getUser()).getAppliedArgIndex(*op);
+  unsigned opIndex = ApplySite(op->getUser()).getASTAppliedArgIndex(*op);
   bool emittedDiagnostic = false;
   for (auto &p : foundCapturedIsolationCrossing) {
     if (std::get<1>(p) != opIndex)
@@ -1131,7 +1131,7 @@ void UseAfterTransferDiagnosticInferrer::infer() {
 
   auto *i = transferOp->getUser();
   auto pai = ApplySite::isa(i);
-  unsigned captureIndex = pai.getAppliedArgIndex(*transferOp);
+  unsigned captureIndex = pai.getASTAppliedArgIndex(*transferOp);
 
   auto &state = transferringOpToStateMap.get(transferOp);
   auto captureInfo =
@@ -1640,11 +1640,7 @@ private:
     for (auto &paiOp : ApplySite(pai).getArgumentOperands()) {
       if (valueMap.getTrackableValue(paiOp.get()).getRepresentative() ==
           isolatedValue) {
-        // isolated_any causes all partial apply parameters to be shifted by 1
-        // due to the implicit isolated any parameter.
-        unsigned isIsolatedAny = pai->getFunctionType()->getIsolation() ==
-                                 SILFunctionTypeIsolation::Erased;
-        return ApplySite(pai).getAppliedArgIndex(paiOp) - isIsolatedAny;
+        return ApplySite(pai).getASTAppliedArgIndex(paiOp);
       }
     }
 
@@ -1728,7 +1724,10 @@ bool SentNeverSendableDiagnosticInferrer::initForIsolatedPartialApply(
   if (foundCapturedIsolationCrossing.empty())
     return false;
 
-  unsigned opIndex = ApplySite(op->getUser()).getAppliedArgIndex(*op);
+  // We use getASTAppliedArgIndex instead of getAppliedArgIndex to ensure that
+  // we ignore for our indexing purposes any implicit initial parameters like
+  // isolated(any).
+  unsigned opIndex = ApplySite(op->getUser()).getASTAppliedArgIndex(*op);
   for (auto &p : foundCapturedIsolationCrossing) {
     if (std::get<1>(p) == opIndex) {
       auto loc = RegularLocation(std::get<0>(p).getLoc());
@@ -1944,7 +1943,7 @@ bool SentNeverSendableDiagnosticInferrer::run() {
     if (autoClosureExpr->getThunkKind() == AutoClosureExpr::Kind::AsyncLet) {
       auto *i = op->getUser();
       auto pai = ApplySite::isa(i);
-      unsigned captureIndex = pai.getAppliedArgIndex(*op);
+      unsigned captureIndex = pai.getASTAppliedArgIndex(*op);
       auto captureInfo =
           autoClosureExpr->getCaptureInfo().getCaptures()[captureIndex];
       auto loc = RegularLocation(captureInfo.getLoc(), false /*implicit*/);
