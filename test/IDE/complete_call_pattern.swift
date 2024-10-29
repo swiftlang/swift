@@ -59,7 +59,7 @@ struct StaticMethods {
   }
   static func after(_ num: Int) -> (() -> Int) {}
 // AFTER_STATIC_FUNC: Begin completions, 2 items
-// AFTER_STATIC_FUNC-DAG: Keyword[self]/CurrNominal:          .self[#(() -> Int)#];
+// AFTER_STATIC_FUNC-DAG: Keyword[self]/CurrNominal:          .self[#() -> Int#];
 // AFTER_STATIC_FUNC-DAG: Pattern/CurrModule/Flair[ArgLabels]: ()[#Int#];
 // AFTER_STATIC_FUNC: End completions
 }

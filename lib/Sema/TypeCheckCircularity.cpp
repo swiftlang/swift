@@ -491,12 +491,6 @@ void CircularityChecker::addPathElement(Path &path, ValueDecl *member,
     elt.Ty = ref->getReferentType();
   }
 
-  // Strip outer parens from the type.  (This is especially common with
-  // enum elements.)
-  if (auto parens = dyn_cast<ParenType>(elt.Ty.getPointer())) {
-    elt.Ty = parens->getSinglyDesugaredType();
-  }
-
   path.push_back(elt);
 }
 
@@ -606,8 +600,8 @@ void CircularityChecker::diagnoseNonWellFoundedEnum(EnumDecl *E) {
       if (auto tuple = payloadTy->getAs<TupleType>()) {
         if (!containsType(tuple, E->getSelfInterfaceType()))
           return false;
-      } else if (auto paren = dyn_cast<ParenType>(payloadTy.getPointer())) {
-        if (!E->getSelfInterfaceType()->isEqual(paren->getUnderlyingType()))
+      } else {
+        if (!E->getSelfInterfaceType()->isEqual(payloadTy))
           return false;
       }
     }

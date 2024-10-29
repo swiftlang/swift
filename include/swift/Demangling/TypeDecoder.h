@@ -1479,7 +1479,9 @@ protected:
       if (base.isError())
         return base;
 
-      return Builder.createParenType(base.getType());
+      // ParenType has been removed, return the base type for backwards
+      // compatibility.
+      return base.getType();
     }
     case NodeKind::OpaqueType: {
       if (Node->getNumChildren() < 3)

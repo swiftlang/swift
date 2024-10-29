@@ -426,8 +426,6 @@ protected:
     HasCachedType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(ParenType, SugarType);
-
   SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
@@ -687,9 +685,6 @@ public:
 
   /// Returns true if this contextual type is (Escapable && !isNoEscape).
   bool mayEscape() { return !isNoEscape() && isEscapable(); }
-
-  /// Does the type have outer parenthesis?
-  bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
 
   /// Are values of this type essentially just class references,
   /// possibly with some sort of additional information?
@@ -1287,9 +1282,6 @@ public:
   /// removeArgumentLabels -  Retrieve a version of this type with all
   /// argument labels removed.
   Type removeArgumentLabels(unsigned numArgumentLabels);
-
-  /// Retrieve the type without any parentheses around it.
-  Type getWithoutParens();
 
   /// Replace the base type of the result type of the given function
   /// type with a new result type, as per a DynamicSelf or other
@@ -2587,21 +2579,6 @@ public:
   }
 
   uint8_t toRaw() const { return value.toRaw(); }
-};
-
-/// ParenType - A paren type is a type that's been written in parentheses.
-class ParenType : public SugarType {
-  ParenType(Type UnderlyingType, RecursiveTypeProperties properties);
-
-public:
-  static ParenType *get(const ASTContext &C, Type underlying);
-
-  Type getUnderlyingType() const { return getSinglyDesugaredType(); }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Paren;
-  }
 };
 
 /// TupleTypeElt - This represents a single element of a tuple.

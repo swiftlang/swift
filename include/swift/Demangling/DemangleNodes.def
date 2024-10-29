@@ -328,7 +328,7 @@ NODE(AssociatedTypeGenericParamRef)
 NODE(SugaredOptional)
 NODE(SugaredArray)
 NODE(SugaredDictionary)
-NODE(SugaredParen)
+NODE(SugaredParen) // Removed in Swift 6.TBD
 
 // Added in Swift 5.1
 NODE(AccessorFunctionReference)

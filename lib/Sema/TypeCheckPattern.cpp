@@ -805,10 +805,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     if (subType->hasError())
       return ErrorType::get(Context);
 
-    auto type = subType;
-    if (P->getKind() == PatternKind::Paren)
-      type = ParenType::get(Context, type);
-    return type;
+    return subType;
   }
 
   // If we see an explicit type annotation, coerce the sub-pattern to
@@ -1220,8 +1217,9 @@ Pattern *TypeChecker::coercePatternToType(
         !(options & TypeResolutionFlags::FromNonInferredPattern)) {
       diags.diagnose(NP->getLoc(), diag, NP->getDecl()->getName(), type,
                      NP->getDecl()->isLet());
-      diags.diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence)
-          .fixItInsertAfter(var->getNameLoc(), ": " + type->getWithoutParens()->getString());
+      diags
+          .diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence)
+          .fixItInsertAfter(var->getNameLoc(), ": " + type->getString());
     }
 
     return P;

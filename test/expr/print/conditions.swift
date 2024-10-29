@@ -38,7 +38,7 @@ repeat {
 // CHECK: } while b < 10
 
 var p = (17 > 7 ? true : false)
-// CHECK: @_hasInitialValue internal var p: (Bool) = (17 > 7 ? true : false)
+// CHECK: @_hasInitialValue internal var p: Bool = (17 > 7 ? true : false)
 
 var x: Int = 3
 var y: Bool = x is Int

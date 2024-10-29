@@ -1065,13 +1065,12 @@ static StringRef getPrintedName(SDKContext &Ctx, Type Ty,
   if (IsImplicitlyUnwrappedOptional)
     PO.PrintOptionalAsImplicitlyUnwrapped = true;
 
-  Ty->getWithoutParens().print(OS, PO);
+  Ty.print(OS, PO);
   return Ctx.buffer(OS.str());
 }
 
 static StringRef getTypeName(SDKContext &Ctx, Type Ty,
                              bool IsImplicitlyUnwrappedOptional) {
-  Ty = Ty->getWithoutParens();
   if (Ty->isVoid()) {
     return Ctx.buffer("Void");
   }

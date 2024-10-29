@@ -542,7 +542,6 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, VariadicSequenceType*> VariadicSequenceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
-    llvm::DenseMap<Type, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
     llvm::DenseMap<Type, InOutType*> InOutTypes;
@@ -3240,7 +3239,6 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(DictionaryTypes) +
     llvm::capacity_in_bytes(OptionalTypes) +
     llvm::capacity_in_bytes(VariadicSequenceTypes) +
-    llvm::capacity_in_bytes(ParenTypes) +
     llvm::capacity_in_bytes(ReferenceStorageTypes) +
     llvm::capacity_in_bytes(LValueTypes) +
     llvm::capacity_in_bytes(InOutTypes) +
@@ -3279,7 +3277,6 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
     SIZE_AND_BYTES(VariadicSequenceTypes);
     SIZE_AND_BYTES(DictionaryTypes);
     SIZE_AND_BYTES(OptionalTypes);
-    SIZE_AND_BYTES(ParenTypes);
     SIZE_AND_BYTES(ReferenceStorageTypes);
     SIZE_AND_BYTES(LValueTypes);
     SIZE_AND_BYTES(InOutTypes);
@@ -3627,18 +3624,6 @@ BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
        BuiltinVectorType(context, elementType, numElements);
   context.getImpl().BuiltinVectorTypes.InsertNode(vecTy, insertPos);
   return vecTy;
-}
-
-ParenType *ParenType::get(const ASTContext &C, Type underlying) {
-  auto properties = underlying->getRecursiveProperties();
-  auto arena = getArena(properties);
-  ParenType *&Result = C.getImpl().getArena(arena).ParenTypes[underlying];
-  if (Result == nullptr) {
-    Result = new (C, arena) ParenType(underlying, properties);
-    assert((C.hadError() || !underlying->is<InOutType>()) &&
-           "Cannot wrap InOutType");
-  }
-  return Result;
 }
 
 CanTupleType TupleType::getEmpty(const ASTContext &C) {
@@ -4567,7 +4552,7 @@ Type AnyFunctionType::composeTuple(ASTContext &ctx, ArrayRef<Param> params,
     elements.emplace_back(param.getParameterType(), param.getLabel());
   }
   if (elements.size() == 1 && !elements[0].hasName())
-    return ParenType::get(ctx, elements[0].getType());
+    return elements[0].getType();
   return TupleType::get(elements, ctx);
 }
 

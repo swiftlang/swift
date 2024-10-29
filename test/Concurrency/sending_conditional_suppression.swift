@@ -103,9 +103,9 @@ public struct TestInStruct {
   public func testFunctionArg(_ x: () -> sending NonSendableKlass) { fatalError() }
 
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
-  // CHECK-NEXT: public func testFunctionResult() -> (() -> sending test.NonSendableKlass)
+  // CHECK-NEXT: public func testFunctionResult() -> () -> sending test.NonSendableKlass
   // CHECK-NEXT: #else
-  // CHECK-NEXT: public func testFunctionResult() -> (() -> test.NonSendableKlass)
+  // CHECK-NEXT: public func testFunctionResult() -> () -> test.NonSendableKlass
   // CHECK-NEXT: #endif
   public func testFunctionResult() -> (() -> sending NonSendableKlass) { fatalError() }
 
@@ -150,10 +150,10 @@ public struct TestInStruct {
 
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
   // CHECK-NEXT: @usableFromInline
-  // CHECK-NEXT: internal func testUsableFromInlineFunctionResult() -> (() -> sending test.NonSendableKlass)
+  // CHECK-NEXT: internal func testUsableFromInlineFunctionResult() -> () -> sending test.NonSendableKlass
   // CHECK-NEXT: #else
   // CHECK-NEXT: @usableFromInline
-  // CHECK-NEXT: internal func testUsableFromInlineFunctionResult() -> (() -> test.NonSendableKlass)
+  // CHECK-NEXT: internal func testUsableFromInlineFunctionResult() -> () -> test.NonSendableKlass
   // CHECK-NEXT: #endif
   @usableFromInline
   func testUsableFromInlineFunctionResult() -> (() -> sending NonSendableKlass) { fatalError() }
