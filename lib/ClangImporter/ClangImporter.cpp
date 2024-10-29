@@ -7625,18 +7625,22 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
   if (decl->isInStdNamespace() && decl->getIdentifier() &&
       decl->getName() == "_Optional_construct_base")
     return true;
+  // Hack for std::vector::const_iterator from libstdc++, which uses an extra
+  // parameter on its copy constructor, which has a defaulted enable_if value.
+  auto namespaceContext = dyn_cast_or_null<clang::NamespaceDecl>(
+      decl->getEnclosingNamespaceContext());
+  if (namespaceContext && namespaceContext->getIdentifier() &&
+      namespaceContext->getName() == "__gnu_cxx" && decl->getIdentifier() &&
+      decl->getName() == "__normal_iterator")
+    return true;
 
   // If we have no way of copying the type we can't import the class
   // at all because we cannot express the correct semantics as a swift
   // struct.
-  if (llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-        return ctor->isCopyConstructor() &&
-               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
-      }))
-    return false;
-
-  // TODO: this should probably check to make sure we actually have a copy ctor.
-  return true;
+  return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+    return ctor->isCopyConstructor() && !ctor->isDeleted() &&
+           ctor->getAccess() == clang::AccessSpecifier::AS_public;
+  });
 }
 
 static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
