@@ -28,6 +28,10 @@
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
+namespace llvm {
+template<typename T> class ArrayRef;
+}
+
 namespace swift {
 class Argument;
 class ASTContext;
@@ -42,6 +46,8 @@ class Identifier;
 class IfConfigClauseRangeInfo;
 struct LabeledStmtInfo;
 class ProtocolConformanceRef;
+class RegexLiteralPatternFeature;
+class RegexLiteralPatternFeatureKind;
 class Type;
 class CanType;
 class TypeBase;
@@ -1350,6 +1356,68 @@ SWIFT_NAME("BridgedPrefixUnaryExpr.createParsed(_:operator:operand:)")
 BridgedPrefixUnaryExpr
 BridgedPrefixUnaryExpr_createParsed(BridgedASTContext cContext,
                                     BridgedExpr oper, BridgedExpr operand);
+
+class BridgedRegexLiteralPatternFeatureKind final {
+  unsigned RawValue;
+
+public:
+  BRIDGED_INLINE
+  SWIFT_NAME("init(rawValue:)")
+  BridgedRegexLiteralPatternFeatureKind(SwiftInt rawValue);
+
+  using UnbridgedTy = swift::RegexLiteralPatternFeatureKind;
+
+  BRIDGED_INLINE
+  BridgedRegexLiteralPatternFeatureKind(UnbridgedTy kind);
+
+  BRIDGED_INLINE
+  UnbridgedTy unbridged() const;
+};
+
+class BridgedRegexLiteralPatternFeature final {
+  BridgedCharSourceRange Range;
+  BridgedRegexLiteralPatternFeatureKind Kind;
+
+public:
+  SWIFT_NAME("init(kind:at:)")
+  BridgedRegexLiteralPatternFeature(BridgedRegexLiteralPatternFeatureKind kind,
+                                    BridgedCharSourceRange range)
+      : Range(range), Kind(kind) {}
+
+  using UnbridgedTy = swift::RegexLiteralPatternFeature;
+
+  BRIDGED_INLINE
+  BridgedRegexLiteralPatternFeature(UnbridgedTy feature);
+
+  BRIDGED_INLINE
+  UnbridgedTy unbridged() const;
+};
+
+class BridgedRegexLiteralPatternFeatures final {
+  BridgedRegexLiteralPatternFeature *_Nullable Data;
+  SwiftInt Count;
+
+public:
+  BridgedRegexLiteralPatternFeatures() : Data(nullptr), Count(0) {}
+
+  SWIFT_NAME("init(baseAddress:count:)")
+  BridgedRegexLiteralPatternFeatures(
+      BridgedRegexLiteralPatternFeature *_Nullable data, SwiftInt count)
+      : Data(data), Count(count) {}
+
+  using UnbridgedTy = llvm::ArrayRef<BridgedRegexLiteralPatternFeature>;
+
+  BRIDGED_INLINE
+  UnbridgedTy unbridged() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedRegexLiteralPatternFeature *_Nullable getData() const {
+    return Data;
+  }
+  SwiftInt getCount() const {
+    return Count;
+  }
+};
 
 SWIFT_NAME("BridgedRegexLiteralExpr.createParsed(_:loc:regexText:)")
 BridgedRegexLiteralExpr

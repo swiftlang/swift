@@ -18,6 +18,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
 
 using namespace swift;
@@ -174,21 +175,59 @@ RegexLiteralPatternInfoRequest::evaluate(Evaluator &eval,
   auto capturesSize =
       getCaptureStructureSerializationAllocationSize(regexText.size());
   std::vector<uint8_t> capturesBuf(capturesSize);
+
+  BridgedRegexLiteralPatternFeatures bridgedFeatures;
+  SWIFT_DEFER {
+    swift_ASTGen_freeBridgedRegexLiteralPatternFeatures(bridgedFeatures);
+  };
+
   bool hadError = swift_ASTGen_parseRegexLiteral(
       regexText,
       /*versionOut=*/&version,
       /*captureStructureOut=*/capturesBuf.data(),
       /*captureStructureSize=*/capturesBuf.size(),
+      /*patternFeaturesOut=*/&bridgedFeatures,
       /*diagBaseLoc=*/regex->getLoc(), &ctx.Diags);
   if (hadError)
-    return {regexText, Type(), /*version*/ 0};
+    return {regexText, Type(), /*version*/ 0, /*features*/ {}};
+
+  SmallVector<RegexLiteralPatternFeature> features;
+  for (auto &bridgedFeature : bridgedFeatures.unbridged())
+    features.push_back(bridgedFeature.unbridged());
 
   assert(version >= 1);
   auto regexTy = computeRegexLiteralType(regex, capturesBuf);
 
   // FIXME: We need to plumb through the 'regexToEmit' result to the caller.
   // For now, it is the same as the input.
-  return {/*regexToEmit*/ regexText, regexTy, version};
+  return {/*regexToEmit*/ regexText, regexTy, version,
+          ctx.AllocateCopy(features)};
+#else
+  llvm_unreachable("Shouldn't have parsed a RegexLiteralExpr");
+#endif
+}
+
+StringRef RegexLiteralFeatureDescriptionRequest::evaluate(
+    Evaluator &evaluator, RegexLiteralPatternFeatureKind kind,
+    ASTContext *ctx) const {
+#if SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
+  // The resulting string is allocated in the ASTContext, we can return the
+  // StringRef directly.
+  BridgedStringRef str;
+  swift_ASTGen_getDescriptionForRegexPatternFeature(kind, *ctx, &str);
+  return str.unbridged();
+#else
+  llvm_unreachable("Shouldn't have parsed a RegexLiteralExpr");
+#endif
+}
+
+AvailabilityRange RegexLiteralFeatureAvailabilityRequest::evaluate(
+    Evaluator &evaluator, RegexLiteralPatternFeatureKind kind,
+    ASTContext *ctx) const {
+#if SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
+  BridgedSwiftVersion version;
+  swift_ASTGen_getSwiftVersionForRegexPatternFeature(kind, &version);
+  return ctx->getSwiftAvailability(version.getMajor(), version.getMinor());
 #else
   llvm_unreachable("Shouldn't have parsed a RegexLiteralExpr");
 #endif

@@ -225,6 +225,13 @@ InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
   return *this;
 }
 
+InFlightDiagnostic &InFlightDiagnostic::highlightChars(CharSourceRange Range) {
+  assert(IsActive && "Cannot modify an inactive diagnostic");
+  if (Engine && Range.getStart().isValid())
+    Engine->getActiveDiagnostic().addRange(Range);
+  return *this;
+}
+
 /// Add an insertion fix-it to the currently-active diagnostic.  The
 /// text is inserted immediately *after* the token specified.
 ///
