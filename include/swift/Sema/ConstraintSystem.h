@@ -240,9 +240,9 @@ private:
   ASTContext &Context;
   llvm::TimeRecord StartTime;
 
-  /// The number of milliseconds from creation until
+  /// The number of seconds from creation until
   /// this timer is considered expired.
-  unsigned ThresholdInMillis;
+  unsigned ThresholdInSecs;
 
   bool PrintDebugTiming;
   bool PrintWarning;
@@ -251,7 +251,8 @@ public:
   /// This constructor sets a default threshold defined for all expressions
   /// via compiler flag `solver-expression-time-threshold`.
   ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS);
-  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS, unsigned thresholdInMillis);
+  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
+                  unsigned thresholdInSecs);
 
   ~ExpressionTimer();
 
@@ -272,20 +273,18 @@ public:
     return endTime.getProcessTime() - StartTime.getProcessTime();
   }
 
-  /// Return the remaining process time in milliseconds until the
+  /// Return the remaining process time in seconds until the
   /// threshold specified during construction is reached.
-  unsigned getRemainingProcessTimeInMillis() const {
+  unsigned getRemainingProcessTimeInSeconds() const {
     auto elapsed = unsigned(getElapsedProcessTimeInFractionalSeconds());
-    return elapsed >= ThresholdInMillis ? 0 : ThresholdInMillis - elapsed;
+    return elapsed >= ThresholdInSecs ? 0 : ThresholdInSecs - elapsed;
   }
 
   // Disable emission of warnings about expressions that take longer
   // than the warning threshold.
   void disableWarning() { PrintWarning = false; }
 
-  bool isExpired() const {
-    return getRemainingProcessTimeInMillis() == 0;
-  }
+  bool isExpired() const { return getRemainingProcessTimeInSeconds() == 0; }
 };
 
 } // end namespace constraints
