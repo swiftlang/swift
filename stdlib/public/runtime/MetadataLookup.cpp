@@ -2454,6 +2454,13 @@ public:
   TypeLookupErrorOr<BuiltType> createNegativeIntegerType(intptr_t value) {
     return BuiltType(value);
   }
+
+  TypeLookupErrorOr<BuiltType> createBuiltinFixedArrayType(BuiltType size,
+                                                           BuiltType element) {
+    return BuiltType(swift_getFixedArrayTypeMetadata(MetadataState::Abstract,
+                                                     size.getValue(),
+                                                     element.getMetadata()));
+  }
 };
 
 }

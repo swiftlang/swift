@@ -480,3 +480,6 @@ $s2hi1SV1iSivy ---> hi.S.i.read2 : Swift.Int
 $s2hi1SVIetMIy_TC  ---> coroutine continuation prototype for @escaping @convention(thin) @convention(method) @yield_once_2 (@unowned hi.S) -> ()
 $s4mainAAyyycAA1CCFTTI ---> identity thunk of main.main(main.C) -> () -> ()
 $s4mainAAyyycAA1CCFTTH ---> hop to main actor thunk of main.main(main.C) -> () -> ()
+
+$s4main6VectorVy$1_SiG ---> main.Vector<2, Swift.Int>
+$s$n3_SSBV ---> Builtin.FixedArray<-4, Swift.String>

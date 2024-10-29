@@ -715,7 +715,7 @@ Types
   type ::= 'Xe'                              // error or unresolved type
 
 #if SWIFT_RUNTIME_VERSION >= 6.TBD
-  type ::= '$' 'n'? NATURAL_ZERO             // integer type
+  type ::= '$' 'n'? INDEX                    // integer type
 #endif
 
   bound-generic-type ::= type 'y' (type* '_')* type* retroactive-conformance* 'G'   // one type-list per nesting level of type
