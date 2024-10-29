@@ -299,6 +299,13 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_public_module_name))
     Opts.PublicModuleName = A->getValue();
 
+  if (auto A = Args.getLastArg(OPT_swiftinterface_compiler_version)) {
+    if (Opts.SwiftInterfaceCompilerVersion.tryParse(A->getValue())) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
+  }
+
   // This must be called after computing module name, module abi name,
   // and module link name. If computing module aliases is unsuccessful,
   // return early.
