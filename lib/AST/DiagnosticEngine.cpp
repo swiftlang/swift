@@ -1480,7 +1480,8 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   ArrayRef<Diagnostic> childNotes = diagnostic.getChildNotes();
   std::vector<Diagnostic> extendedChildNotes;
 
-  if (auto info = diagnosticInfoForDiagnostic(diagnostic)) {
+  auto info = diagnosticInfoForDiagnostic(diagnostic);
+  if (info) {
     // If the diagnostic location is within a buffer containing generated
     // source code, add child notes showing where the generation occurred.
     // We need to avoid doing this if this is itself a child note, as otherwise
@@ -1528,6 +1529,15 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   // grouping.
   for (auto &childNote : childNotes)
     emitDiagnostic(childNote);
+
+  // If we've been told to exit on the first error, we're done if we have
+  // an error.
+  if (getExitOnFirstError() && info && info->Kind == DiagnosticKind::Error) {
+    for (auto &consumer : Consumers) {
+      consumer->finishProcessing();
+    }
+    exit(EXIT_FAILURE);
+  }
 }
 
 DiagnosticKind DiagnosticEngine::declaredDiagnosticKindFor(const DiagID id) {

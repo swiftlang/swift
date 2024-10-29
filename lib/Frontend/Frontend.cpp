@@ -724,27 +724,21 @@ void CompilerInstance::setUpLLVMArguments() {
 }
 
 void CompilerInstance::setUpDiagnosticOptions() {
-  if (Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
-    Diagnostics.setShowDiagnosticsAfterFatalError();
-  }
-  if (Invocation.getDiagnosticOptions().SuppressWarnings) {
-    Diagnostics.setSuppressWarnings(true);
-  }
-  if (Invocation.getDiagnosticOptions().SuppressRemarks) {
-    Diagnostics.setSuppressRemarks(true);
-  }
-  Diagnostics.setWarningsAsErrorsRules(
-      Invocation.getDiagnosticOptions().WarningsAsErrorsRules);
-  Diagnostics.setPrintDiagnosticNamesMode(
-      Invocation.getDiagnosticOptions().PrintDiagnosticNames);
+  auto &DiagOpts = Invocation.getDiagnosticOptions();
+  Diagnostics.setShowDiagnosticsAfterFatalError(
+      DiagOpts.ShowDiagnosticsAfterFatalError);
+  Diagnostics.setExitOnFirstError(DiagOpts.ExitOnFirstError);
+  Diagnostics.setSuppressWarnings(DiagOpts.SuppressWarnings);
+  Diagnostics.setSuppressRemarks(DiagOpts.SuppressRemarks);
+  Diagnostics.setWarningsAsErrorsRules(DiagOpts.WarningsAsErrorsRules);
+  Diagnostics.setPrintDiagnosticNamesMode(DiagOpts.PrintDiagnosticNames);
   Diagnostics.setDiagnosticDocumentationPath(
-      Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
+      DiagOpts.DiagnosticDocumentationPath);
   Diagnostics.setLanguageVersion(
       Invocation.getLangOptions().EffectiveLanguageVersion);
-  if (!Invocation.getDiagnosticOptions().LocalizationCode.empty()) {
-    Diagnostics.setLocalization(
-        Invocation.getDiagnosticOptions().LocalizationCode,
-        Invocation.getDiagnosticOptions().LocalizationPath);
+  if (!DiagOpts.LocalizationCode.empty()) {
+    Diagnostics.setLocalization(DiagOpts.LocalizationCode,
+                                DiagOpts.LocalizationPath);
   }
 }
 

@@ -2305,6 +2305,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
+  Opts.ExitOnFirstError |= Args.hasArg(OPT_exit_on_first_error);
 
   for (Arg *A : Args.filtered(OPT_verify_additional_file))
     Opts.AdditionalVerifierFiles.push_back(A->getValue());
