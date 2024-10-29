@@ -178,6 +178,8 @@ namespace sil_block {
     SIL_VALUES,
     SIL_DEBUG_SCOPE,
     SIL_DEBUG_SCOPE_REF,
+    SIL_SOURCE_LOC,
+    SIL_SOURCE_LOC_REF
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -308,6 +310,18 @@ namespace sil_block {
     ValueIDField, /// FName.
     TypeIDField,
     SILTypeCategoryField 
+  >;
+
+  using SourceLocLayout = BCRecordLayout<
+    SIL_SOURCE_LOC,
+    ValueIDField,
+    ValueIDField,
+    ValueIDField
+  >;
+
+  using SourceLocRefLayout = BCRecordLayout<
+    SIL_SOURCE_LOC_REF,
+    ValueIDField
   >;
 
   using SILFunctionLayout =

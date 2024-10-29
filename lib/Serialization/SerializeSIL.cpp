@@ -162,6 +162,9 @@ namespace {
     using DebugScopeID = DeclID;
     using DebugScopeIDField = DeclIDField;
 
+    using LocationID = DeclID;
+    using LocationIDField = DeclIDField;
+
     Serializer &S;
 
     llvm::BitstreamWriter &Out;
@@ -226,6 +229,7 @@ namespace {
 
     llvm::DenseMap<PointerUnion<const SILDebugScope *, SILFunction *>, DeclID>
         DebugScopeMap;
+    llvm::DenseMap<const void *, unsigned> SourceLocMap;  
 
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock *, unsigned> BasicBlockMap;
@@ -299,6 +303,7 @@ namespace {
 
     /// Serialize and write SILDebugScope graph in post order.
     void writeDebugScopes(const SILDebugScope *Scope, const SourceManager &SM);
+    void writeSourceLoc(SourceLoc SLoc, const SourceManager &SM);
 
     void writeNoOperandLayout(const SILInstruction *I) {
       unsigned abbrCode = SILAbbrCodes[SILInstNoOperandLayout::Code];
@@ -600,6 +605,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
 
   DebugScopeMap.clear();
+  SourceLocMap.clear();
 
   if (SerializeDebugInfoSIL)
     writeDebugScopes(F.getDebugScope(), F.getModule().getSourceManager());
@@ -689,6 +695,8 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
   SILBasicBlockLayout::emitRecord(Out, ScratchRecord, abbrCode, Args);
 
   const SILDebugScope *Prev = BB.getParent()->getDebugScope();
+  auto PrevSourceLoc =
+      BB.getParent()->getLocation().getSourceLoc().getOpaquePointerValue();
   auto &SM = BB.getParent()->getModule().getSourceManager();
   for (const SILInstruction &SI : BB) {
     if (SerializeDebugInfoSIL) {
@@ -696,6 +704,10 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
         Prev = SI.getDebugScope();
         writeDebugScopes(Prev, SM);
       }
+    }
+    auto SourceLocPtr = SI.getLoc().getSourceLoc().getOpaquePointerValue();
+    if (SourceLocPtr != PrevSourceLoc && SerializeDebugInfoSIL) {
+      writeSourceLoc(SI.getLoc().getSourceLoc(), SM);
     }
 
     writeSILInstruction(SI);
@@ -3074,6 +3086,32 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
     componentValues);
 }
 
+void SILSerializer::writeSourceLoc(SourceLoc SLoc, const SourceManager &SM) {
+  auto OpaquePtr = SLoc.getOpaquePointerValue();
+  if (SourceLocMap.find(OpaquePtr) != SourceLocMap.end()) {
+    SourceLocRefLayout::emitRecord(Out, ScratchRecord,
+                                   SILAbbrCodes[SourceLocRefLayout::Code],
+                                   SourceLocMap[OpaquePtr]);
+    return;
+  }
+
+  ValueID Row = 0;
+  ValueID Column = 0;
+  ValueID FNameID = 0;
+
+  if (!SLoc.isValid())
+    return;
+
+  if (SLoc.isValid()) {
+    std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
+    FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
+  }
+  SourceLocMap.insert({OpaquePtr, SourceLocMap.size() + 1});
+  SourceLocLayout::emitRecord(Out, ScratchRecord,
+                              SILAbbrCodes[SourceLocLayout::Code], Row, Column,
+                              FNameID);
+}
+
 void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
                                      const SourceManager &SM) {
 
@@ -3387,6 +3425,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DifferentiabilityWitnessLayout>();
   registerSILAbbr<SILDebugScopeLayout>();
   registerSILAbbr<SILDebugScopeRefLayout>();
+  registerSILAbbr<SourceLocLayout>();
+  registerSILAbbr<SourceLocRefLayout>();
 
   // Write out VTables first because it may require serializations of
   // non-transparent SILFunctions (body is not needed).

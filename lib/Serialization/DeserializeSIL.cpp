@@ -394,6 +394,24 @@ SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
   return maybeKind;
 }
 
+SILLocation SILDeserializer::readLoc(unsigned kind,
+                                     SmallVectorImpl<uint64_t> &scratch) {
+  if (kind == SIL_SOURCE_LOC_REF) {
+    ValueID LocID;
+    SourceLocRefLayout::readRecord(scratch, LocID);
+    return RegularLocation(ParsedLocs[LocID]);
+  }
+
+  ValueID Row = 0, Col = 0, FNameID = 0;
+  SourceLocLayout::readRecord(scratch, Row, Col, FNameID);
+
+  auto FNameLoc = SILLocation::FilenameAndLocation::alloc(
+      Row, Col, MF->getIdentifierText(FNameID), SILMod);
+
+  ParsedLocs.insert({ParsedLocs.size() + 1, FNameLoc});
+  return RegularLocation(FNameLoc);
+}
+
 llvm::Expected<const SILDebugScope *>
 SILDeserializer::readDebugScopes(SILFunction *F,
                                  SmallVectorImpl<uint64_t> &scratch,
@@ -1095,6 +1113,9 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
         isFirstScope = false;
       }
       Builder.setCurrentDebugScope(Scope);
+    } else if (kind == SIL_SOURCE_LOC || kind == SIL_SOURCE_LOC_REF) {
+      auto Loc = readLoc(kind, scratch);
+      Builder.applyDebugLocOverride(Loc);
     } else {
       // If CurrentBB is empty, just return fn. The code in readSILInstruction
       // assumes that such a situation means that fn is a declaration. Thus it
