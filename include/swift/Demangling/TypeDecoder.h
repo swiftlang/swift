@@ -455,7 +455,8 @@ void decodeRequirement(
     BuilderType &Builder) {
   for (auto &child : *node) {
     if (child->getKind() == Demangle::Node::Kind::DependentGenericParamCount ||
-        child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker)
+        child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker ||
+        child->getKind() == Demangle::Node::Kind::DependentGenericParamValueMarker)
       continue;
 
     if (child->getNumChildren() != 2)
@@ -1527,6 +1528,23 @@ protected:
 
     case NodeKind::NegativeInteger: {
       return Builder.createNegativeIntegerType((intptr_t)Node->getIndex());
+    }
+
+    case NodeKind::BuiltinFixedArray: {
+      if (Node->getNumChildren() < 2)
+        return MAKE_NODE_TYPE_ERROR(Node,
+                                    "fewer children (%zu) than required (2)",
+                                    Node->getNumChildren());
+
+      auto size = decodeMangledType(Node->getChild(0), depth + 1);
+      if (size.isError())
+        return size;
+
+      auto element = decodeMangledType(Node->getChild(1), depth + 1);
+      if (element.isError())
+        return element;
+
+      return Builder.createBuiltinFixedArrayType(size.getType(), element.getType());
     }
 
     // TODO: Handle OpaqueReturnType, when we're in the middle of reconstructing

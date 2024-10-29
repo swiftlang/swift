@@ -4450,11 +4450,11 @@ NodePointer Demangler::demangleIntegerType() {
   switch (peekChar()) {
   case 'n':
     nextChar();
-    integer = createNode(Node::Kind::NegativeInteger, -demangleNatural());
+    integer = createNode(Node::Kind::NegativeInteger, -demangleIndex());
     break;
 
   default:
-    integer = createNode(Node::Kind::Integer, demangleNatural());
+    integer = createNode(Node::Kind::Integer, demangleIndex());
     break;
   }
 

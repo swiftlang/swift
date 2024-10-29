@@ -933,6 +933,12 @@ public:
     return nullptr;
   }
 
+  const TypeRef *createBuiltinFixedArrayType(const TypeRef *size,
+                                             const TypeRef *element) {
+    // FIXME: implement
+    return nullptr;
+  }
+
   // Construct a bound generic type ref along with the parent type info
   // The parent list contains every parent type with at least 1 generic
   // type parameter.
