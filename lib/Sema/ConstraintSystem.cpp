@@ -58,10 +58,10 @@ ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS)
           CS.getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold) {}
 
 ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
-                                 unsigned thresholdInMillis)
+                                 unsigned thresholdInSecs)
     : Anchor(Anchor), Context(CS.getASTContext()),
       StartTime(llvm::TimeRecord::getCurrentTime()),
-      ThresholdInMillis(thresholdInMillis),
+      ThresholdInSecs(thresholdInSecs),
       PrintDebugTiming(CS.getASTContext().TypeCheckerOpts.DebugTimeExpressions),
       PrintWarning(true) {}
 

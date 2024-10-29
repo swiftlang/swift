@@ -938,7 +938,7 @@ public:
       Snapshot.emplace(cs, conjunction);
 
     if (cs.Timer) {
-      auto remainingTime = cs.Timer->getRemainingProcessTimeInMillis();
+      auto remainingTime = cs.Timer->getRemainingProcessTimeInSeconds();
       OuterTimeRemaining.emplace(cs.Timer->getAnchor(), remainingTime);
     }
   }
