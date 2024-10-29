@@ -1065,6 +1065,11 @@ Type ASTBuilder::createNegativeIntegerType(intptr_t value) {
   return IntegerType::get(std::to_string(value), /*isNegative*/ true, Ctx);
 }
 
+Type ASTBuilder::createBuiltinFixedArrayType(Type size, Type element) {
+  return BuiltinFixedArrayType::get(size->getCanonicalType(),
+                                    element->getCanonicalType());
+}
+
 GenericSignature
 ASTBuilder::createGenericSignature(ArrayRef<BuiltType> builtParams,
                                    ArrayRef<BuiltRequirement> requirements) {

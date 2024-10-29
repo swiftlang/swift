@@ -1530,6 +1530,23 @@ protected:
       return Builder.createNegativeIntegerType((intptr_t)Node->getIndex());
     }
 
+    case NodeKind::BuiltinFixedArray: {
+      if (Node->getNumChildren() < 2)
+        return MAKE_NODE_TYPE_ERROR(Node,
+                                    "fewer children (%zu) than required (2)",
+                                    Node->getNumChildren());
+
+      auto size = decodeMangledType(Node->getChild(0), depth + 1);
+      if (size.isError())
+        return size;
+
+      auto element = decodeMangledType(Node->getChild(1), depth + 1);
+      if (element.isError())
+        return element;
+
+      return Builder.createBuiltinFixedArrayType(size.getType(), element.getType());
+    }
+
     // TODO: Handle OpaqueReturnType, when we're in the middle of reconstructing
     // the defining decl
     default:

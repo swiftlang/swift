@@ -250,6 +250,8 @@ public:
 
   Type createNegativeIntegerType(intptr_t value);
 
+  Type createBuiltinFixedArrayType(Type size, Type element);
+
   BuiltGenericSignature
   createGenericSignature(ArrayRef<BuiltType> params,
                          ArrayRef<BuiltRequirement> requirements);
