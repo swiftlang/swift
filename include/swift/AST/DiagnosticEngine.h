@@ -755,6 +755,9 @@ namespace swift {
     /// Add a character-based range to the currently-active diagnostic.
     InFlightDiagnostic &highlightChars(SourceLoc Start, SourceLoc End);
 
+    /// Add a character-based range to the currently-active diagnostic.
+    InFlightDiagnostic &highlightChars(CharSourceRange Range);
+
     static const char *fixItStringFor(const FixItID id);
 
     /// Get the best location where an 'import' fixit might be offered.

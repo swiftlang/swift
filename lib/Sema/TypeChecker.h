@@ -1052,6 +1052,12 @@ checkConformanceAvailability(const RootProtocolConformance *Conf,
                              const ExtensionDecl *Ext,
                              const ExportContext &Where);
 
+bool checkAvailability(
+    SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
+    const DeclContext *ReferenceDC,
+    llvm::function_ref<InFlightDiagnostic(StringRef, llvm::VersionTuple)>
+        Diagnose);
+
 bool checkAvailability(SourceRange ReferenceRange,
                        AvailabilityRange RequiredAvailability,
                        Diag<StringRef, llvm::VersionTuple> Diag,

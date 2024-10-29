@@ -992,6 +992,50 @@ public:
   }
 };
 
+/// The opaque kind of a RegexLiteralExpr feature, which should only be
+/// interpreted by the compiler's regex parsing library.
+class RegexLiteralPatternFeatureKind final {
+  unsigned RawValue;
+
+public:
+  RegexLiteralPatternFeatureKind(unsigned rawValue) : RawValue(rawValue) {}
+
+  unsigned getRawValue() const { return RawValue; }
+
+  AvailabilityRange getAvailability(ASTContext &ctx) const;
+  StringRef getDescription(ASTContext &ctx) const;
+
+  friend llvm::hash_code
+  hash_value(const RegexLiteralPatternFeatureKind &kind) {
+    return llvm::hash_value(kind.getRawValue());
+  }
+
+  friend bool operator==(const RegexLiteralPatternFeatureKind &lhs,
+                         const RegexLiteralPatternFeatureKind &rhs) {
+    return lhs.getRawValue() == rhs.getRawValue();
+  }
+
+  friend bool operator!=(const RegexLiteralPatternFeatureKind &lhs,
+                         const RegexLiteralPatternFeatureKind &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+/// A specific feature used in a RegexLiteralExpr, needed for availability
+/// diagnostics.
+class RegexLiteralPatternFeature final {
+  RegexLiteralPatternFeatureKind Kind;
+  CharSourceRange Range;
+
+public:
+  RegexLiteralPatternFeature(RegexLiteralPatternFeatureKind kind,
+                             CharSourceRange range)
+      : Kind(kind), Range(range) {}
+
+  RegexLiteralPatternFeatureKind getKind() const { return Kind; }
+  CharSourceRange getRange() const { return Range; }
+};
+
 /// A regular expression literal e.g '(a|c)*'.
 class RegexLiteralExpr : public LiteralExpr {
   ASTContext *Ctx;
@@ -1020,6 +1064,9 @@ public:
 
   /// Retrieve the version of the regex string.
   unsigned getVersion() const;
+
+  /// Retrieve any features used in the regex pattern.
+  ArrayRef<RegexLiteralPatternFeature> getPatternFeatures() const;
 
   SourceRange getSourceRange() const { return Loc; }
 

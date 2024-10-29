@@ -5964,6 +5964,10 @@ ERROR(regex_capture_types_failed_to_decode,none,
       "failed to decode capture types for regular expression literal; this may "
       "be a compiler bug", ())
 
+ERROR(regex_feature_unavailable, none,
+      "%0 is only available in %1 %2 or newer",
+      (StringRef, StringRef, llvm::VersionTuple))
+
 ERROR(must_import_regex_builder_module,none,
       "regex builder requires the 'RegexBuilder' module be imported'", ())
 
