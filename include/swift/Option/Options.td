@@ -303,6 +303,11 @@ def package_description_version: Separate<["-"], "package-description-version">,
   HelpText<"The version number to be applied on the input for the PackageDescription availability kind">,
   MetaVarName<"<vers>">;
 
+def swiftinterface_compiler_version : Separate<["-"], "interface-compiler-version">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"The version of the Swift compiler used to generate a .swiftinterface file">,
+  MetaVarName<"<intcvers>">;
+
 def tools_directory : Separate<["-"], "tools-directory">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,

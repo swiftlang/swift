@@ -539,6 +539,8 @@ public:
 
   virtual StringRef getPublicModuleName() const override;
 
+  virtual llvm::VersionTuple getSwiftInterfaceCompilerVersion() const override;
+
   ValueDecl *getMainDecl() const override;
 
   bool hasEntryPoint() const override;
