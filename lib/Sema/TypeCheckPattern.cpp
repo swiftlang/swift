@@ -1608,25 +1608,13 @@ Pattern *TypeChecker::coercePatternToType(
 
       EEP->setSubPattern(sub);
     } else if (payloadType) {
-      // Else if the element pattern has no sub-pattern but the element type has
+      // Else if the element pattern has no sub-pattern but the enum case has
       // associated values, expand it to be semantically equivalent to an
       // element pattern of wildcards.
-      Type elementType = enumTy->getTypeOfMember(elt, payloadType);
       SmallVector<TuplePatternElt, 8> elements;
-      if (auto *TTy = dyn_cast<TupleType>(elementType.getPointer())) {
-        for (auto &elt : TTy->getElements()) {
-          auto *subPattern = AnyPattern::createImplicit(Context);
-          elements.push_back(TuplePatternElt(elt.getName(), SourceLoc(),
-                                             subPattern));
-        }
-      } else {
-        auto parenTy = dyn_cast<ParenType>(elementType.getPointer());
-        assert(parenTy && "Associated value type is neither paren nor tuple?");
-        (void)parenTy;
-        
+      for (auto &param : elt->getCaseConstructorParams()) {
         auto *subPattern = AnyPattern::createImplicit(Context);
-        elements.push_back(TuplePatternElt(Identifier(), SourceLoc(),
-                                           subPattern));
+        elements.emplace_back(param.getLabel(), SourceLoc(), subPattern);
       }
       Pattern *sub = TuplePattern::createSimple(Context, SourceLoc(),
                                                 elements, SourceLoc());
@@ -1634,6 +1622,7 @@ Pattern *TypeChecker::coercePatternToType(
       auto newSubOptions = subOptions;
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
+      Type elementType = enumTy->getTypeOfMember(elt, payloadType);
       sub = coercePatternToType(
           pattern.forSubPattern(sub, /*retainTopLevel=*/false), elementType,
           newSubOptions, tryRewritePattern);
