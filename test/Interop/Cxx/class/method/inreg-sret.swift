@@ -24,5 +24,5 @@ final public class Function {
 // CHECK-x86_64: call void @"?getFirstBlock@BridgedFunction@@QEBA?AUOptionalBridgedBasicBlock@@XZ"(ptr {{.*}}, ptr noalias nocapture sret(%TSo25OptionalBridgedBasicBlockV) {{.*}})
 // CHECK-aarch64: call void @"?getFirstBlock@BridgedFunction@@QEBA?AUOptionalBridgedBasicBlock@@XZ"(ptr {{.*}}, ptr inreg noalias nocapture sret(%TSo25OptionalBridgedBasicBlockV) {{.*}})
 
-// CHECK-x86_64: define {{.*}} void @"?getFirstBlock@BridgedFunction@@QEBA?AUOptionalBridgedBasicBlock@@XZ"(ptr {{.*}} %{{.*}}, ptr noalias sret(%struct.OptionalBridgedBasicBlock) {{.*}} %{{.*}})
-// CHECK-aarch64: define {{.*}} void @"?getFirstBlock@BridgedFunction@@QEBA?AUOptionalBridgedBasicBlock@@XZ"(ptr {{.*}} %{{.*}}, ptr inreg noalias sret(%struct.OptionalBridgedBasicBlock) {{.*}} %{{.*}})
+// CHECK-x86_64: define {{.*}} void @"?getFirstBlock@BridgedFunction@@QEBA?AUOptionalBridgedBasicBlock@@XZ"(ptr {{.*}} %{{.*}}, ptr {{.*}} sret(%struct.OptionalBridgedBasicBlock) {{.*}} %{{.*}})
+// CHECK-aarch64: define {{.*}} void @"?getFirstBlock@BridgedFunction@@QEBA?AUOptionalBridgedBasicBlock@@XZ"(ptr {{.*}} %{{.*}}, ptr inreg {{.*}} sret(%struct.OptionalBridgedBasicBlock) {{.*}} %{{.*}})
