@@ -1685,11 +1685,14 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       appendOperator("$");
 
+      auto value = integer->getValue().getSExtValue();
+
       if (integer->isNegative()) {
-        appendOperator("n");
+        appendOperator("n", Index(-value));
+      } else {
+        appendOperator("", Index(value));
       }
 
-      appendOperator(integer->getDigitsText());
       return;
     }
 

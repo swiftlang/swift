@@ -14,8 +14,8 @@ func genericBA<let N: Int, Element>(_: Builtin.FixedArray<N, Element>) {}
 // CHECK-DAG: !DICompositeType({{.*}}name: "$s4main6VectorVyxq_GD"
 func genericV<let N: Int, Element>(_: Vector<N, Element>) {}
 
-// CHECK-DAG: !DICompositeType({{.*}}name: "Builtin.FixedArray", {{.*}}identifier: "$s$4SiBVD"
+// CHECK-DAG: !DICompositeType({{.*}}name: "Builtin.FixedArray", {{.*}}identifier: "$s$3_SiBVD"
 func concreteBA(_: Builtin.FixedArray<4, Int>) {}
 
-// CHECK-DAG: !DICompositeType({{.*}}name: "$s4main6VectorVy$2SiGD"
+// CHECK-DAG: !DICompositeType({{.*}}name: "$s4main6VectorVy$1_SiGD"
 func concreteV(_: Vector<2, Int>) {}
