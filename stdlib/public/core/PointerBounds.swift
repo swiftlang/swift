@@ -1,5 +1,3 @@
-import Swift
-
 /// Different ways to annotate pointer parameters using the `@PointerBounds` macro.
 /// All indices into parameter lists start at 1. Indices __must__ be integer literals, and strings
 /// __must__ be string literals, because their contents are parsed by the `@PointerBounds` macro.

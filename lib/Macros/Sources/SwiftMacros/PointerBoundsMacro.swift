@@ -97,6 +97,9 @@ func transformType(_ prev: TypeSyntax, _ variant: Variant, _ isSizedBy: Bool) th
     if let optType = prev.as(OptionalTypeSyntax.self) {
         return TypeSyntax(optType.with(\.wrappedType, try transformType(optType.wrappedType, variant, isSizedBy)))
     }
+    if let impOptType = prev.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
+        return try transformType(impOptType.wrappedType, variant, isSizedBy)
+    }
     guard let idType = prev.as(IdentifierTypeSyntax.self) else {
         throw DiagnosticError("expected pointer type, got \(prev) with kind \(prev.kind)", node: prev)
     }
