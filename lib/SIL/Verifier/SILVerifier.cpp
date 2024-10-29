@@ -2120,6 +2120,12 @@ public:
   void checkAbortApplyInst(AbortApplyInst *AI) {
     require(getAsResultOf<BeginApplyInst>(AI->getOperand())->isBeginApplyToken(),
             "operand of abort_apply must be a begin_apply");
+    auto *mvi = getAsResultOf<BeginApplyInst>(AI->getOperand());
+    auto *bai = cast<BeginApplyInst>(mvi->getParent());
+    require(!bai->getSubstCalleeType()->isCalleeAllocatedCoroutine() ||
+                AI->getFunction()->getASTContext().LangOpts.hasFeature(
+                    Feature::CoroutineAccessorsUnwindOnCallerError),
+            "abort_apply of callee-allocated yield-once coroutine!?");
   }
 
   void checkEndApplyInst(EndApplyInst *AI) {
