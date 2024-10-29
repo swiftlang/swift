@@ -914,7 +914,7 @@ bool swift::emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
       return false;
     llvm::SmallString<128> tracePath {loadedModuleTracePath};
     llvm::sys::path::remove_filename(tracePath);
-    llvm::sys::path::append(tracePath, ".SWIFT_OBJC_MESSAGE_TRACE");
+    llvm::sys::path::append(tracePath, ".SWIFT_FINE_DEPENDENCY_TRACE");
     if (!llvm::sys::fs::exists(tracePath)) {
       if (llvm::sys::fs::create_directory(tracePath))
         return false;
