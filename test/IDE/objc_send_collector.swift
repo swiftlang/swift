@@ -18,4 +18,6 @@ public func testProperties(_ x: FooClassBase) {
 // CHECK-DAG: "class_method": "fooBaseClassFunc0"
 // CHECK-DAG: "interface_type": "FooClassBase"
 // CHECK-DAG: "declared_at": "SOURCE_DIR/test/IDE/Inputs/mock-sdk/Foo.framework/Headers/Foo.h
-// CHECK-DAG: "referenced_at": "SOURCE_DIR/test/IDE/objc_send_collector.swift"
+// CHECK-DAG: "referenced_at_file_id": 1
+// CHECK-DAG: "file_id": 1,
+// CHECK-DAG: "file_path": "SOURCE_DIR/test/IDE/objc_send_collector.swift"

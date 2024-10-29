@@ -821,7 +821,8 @@ const static unsigned OBJC_METHOD_TRACE_FILE_FORMAT_VERSION = 1;
 class ObjcMethodReferenceCollector: public SourceEntityWalker {
   std::string target;
   std::string targetVariant;
-  StringRef visitingFilePath;
+  SmallVector<StringRef, 32> FilePaths;
+  unsigned CurrentFileID;
   llvm::DenseSet<const clang::ObjCMethodDecl*> results;
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
@@ -859,7 +860,8 @@ public:
   }
   void setFileBeforeVisiting(SourceFile *SF) {
     assert(SF && "need to visit actual source files");
-    visitingFilePath = SF->getFilename();
+    FilePaths.push_back(SF->getFilename());
+    CurrentFileID = FilePaths.size();
   }
   void serializeAsJson(llvm::raw_ostream &OS) {
     llvm::json::OStream out(OS, /*IndentSize=*/4);
@@ -884,7 +886,15 @@ public:
             }
             out.attribute(selectMethodKey(clangD),  clangD->getNameAsString());
             out.attribute("declared_at", Loc.printToString(SM));
-            out.attribute("referenced_at", visitingFilePath);
+            out.attribute("referenced_at_file_id", CurrentFileID);
+          });
+        }
+      });
+      out.attributeArray("fileMap", [&]{
+        for (unsigned I = 0, N = FilePaths.size(); I != N; I ++) {
+          out.object([&] {
+            out.attribute("file_id", I + 1);
+            out.attribute("file_path", FilePaths[I]);
           });
         }
       });
