@@ -8,3 +8,9 @@ let frtLocalVar1 = global_function_returning_FRT_with_both_attrs_returns_retaine
 
 let frtLocalVar2 = StructWithStaticMethodsReturningFRTWithBothAttributesReturnsRetainedAndReturnsUnretained.StaticMethodReturningFRT()
 // CHECK: error: 'StaticMethodReturningFRT' cannot be annotated with both swift_attr('returns_retained') and swift_attr('returns_unretained') attributes
+
+let frtLocalVar3 = global_function_returning_FRT_WithoutReturnsAnnotations()
+// CHECK: warning: 'global_function_returning_FRT_WithoutReturnsAnnotations' is returning a 'SWIFT_SHARED_REFERENCE' type but is not annotated with either swift_attr('returns_retained') or swift_attr('returns_unretained') attributes
+
+let frtLocalVar4 = StructWithoutReturnsAnnotations.StaticMethodReturningFRT()
+// CHECK: warning: 'StaticMethodReturningFRT' is returning a 'SWIFT_SHARED_REFERENCE' type but is not annotated with either swift_attr('returns_retained') or swift_attr('returns_unretained') attributes
