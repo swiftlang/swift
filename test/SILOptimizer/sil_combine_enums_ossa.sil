@@ -653,3 +653,29 @@ bb0(%0 : $S):
   return %11 : $()
 }
 
+class Klass {}
+
+// CHECK-LABEL: sil [ossa] @test_nontrivial_enum_inject_enum_addr_opt
+// CHECK: [[VAL:%.*]] = enum $Optional<Klass>, #Optional.none!enumelt
+// CHECK: store [[VAL]] to [trivial] %0 : $*Optional<Klass>
+// CHECK: } // end sil function 'test_nontrivial_enum_inject_enum_addr_opt'
+sil [ossa] @test_nontrivial_enum_inject_enum_addr_opt : $@convention(method) (@inout Optional<Klass>) -> @owned Optional<Klass> {
+bb0(%0 : $*Optional<Klass>):
+  %1 = load [take] %0 : $*Optional<Klass>
+  inject_enum_addr %0 : $*Optional<Klass>, #Optional.none!enumelt
+  return %1 : $Optional<Klass>
+}
+
+struct NC : ~Copyable {}
+
+// CHECK-LABEL: sil [ossa] @test_noncopyable_enum_inject_enum_addr_opt
+// CHECK: [[VAL:%.*]] = enum $Optional<NC>, #Optional.none!enumelt
+// CHECK: store [[VAL]] to [init] %0 : $*Optional<NC>
+// CHECK: } // end sil function 'test_noncopyable_enum_inject_enum_addr_opt'
+sil [ossa] @test_noncopyable_enum_inject_enum_addr_opt : $@convention(method) (@inout Optional<NC>) -> @owned Optional<NC> {
+bb0(%0 : $*Optional<NC>):
+  %1 = load [take] %0 : $*Optional<NC>
+  inject_enum_addr %0 : $*Optional<NC>, #Optional.none!enumelt
+  return %1 : $Optional<NC>
+}
+
