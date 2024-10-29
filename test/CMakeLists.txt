@@ -547,6 +547,16 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
       "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
       "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
       "test${VARIANT_SUFFIX}.lit.site.cfg")
+
+  set(VARIANT_SUFFIX "-embedded-riscv32")
+  set(VARIANT_TRIPLE "riscv32-none-none-eabi")
+  set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM TRUE)
+  set(VARIANT_EXTERNAL_EMBEDDED_DEVICE "riscv32-qemu-virt")
+  set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+  swift_configure_lit_site_cfg(
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+      "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
+      "test${VARIANT_SUFFIX}.lit.site.cfg")
 endif()
 
 # Add shortcuts for the default variant.
