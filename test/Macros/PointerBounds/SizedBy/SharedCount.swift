@@ -1,7 +1,7 @@
 // REQUIRES: swift_swift_parser
 // REQUIRES: pointer_bounds
 
-// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions 2>&1 | %FileCheck --match-full-lines %s
 
 @PointerBounds(.sizedBy(pointer: 1, size: "size"), .sizedBy(pointer: 2, size: "size"))
 func myFunc(_ ptr: UnsafeRawPointer, _ ptr2: UnsafeRawPointer, _ size: CInt) {
@@ -17,5 +17,5 @@ func myFunc(_ ptr: UnsafeRawPointer, _ ptr2: UnsafeRawPointer, _ size: CInt) {
 // CHECK-NEXT:     if ptr2.count < _ptr2Count || _ptr2Count < 0 {
 // CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
 // CHECK-NEXT:     }
-// CHECK-NEXT:     myFunc(ptr.baseAddress!, ptr2.baseAddress!, size)
+// CHECK-NEXT:     return myFunc(ptr.baseAddress!, ptr2.baseAddress!, size)
 // CHECK-NEXT: }

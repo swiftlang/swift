@@ -93,6 +93,29 @@ enum UnsafePointerKind {
     case Mutable
 }
 
+func getTypeName(_ type: TypeSyntax) throws -> TokenSyntax {
+    switch type.kind {
+    case .memberType:
+        let memberType = type.as(MemberTypeSyntax.self)!
+        if !memberType.baseType.isSwiftCoreModule {
+            throw DiagnosticError("expected pointer type in Swift core module, got type \(type) with base type \(memberType.baseType)", node: type)
+        }
+        return memberType.name
+    case .identifierType:
+        return type.as(IdentifierTypeSyntax.self)!.name
+    default:
+        throw DiagnosticError("expected pointer type, got \(type) with kind \(type.kind)", node: type)
+    }
+}
+
+func replaceTypeName(_ type: TypeSyntax, _ name: TokenSyntax) -> TypeSyntax {
+    if let memberType = type.as(MemberTypeSyntax.self) {
+        return TypeSyntax(memberType.with(\.name, name))
+    }
+    let idType = type.as(IdentifierTypeSyntax.self)!
+    return TypeSyntax(idType.with(\.name, name))
+}
+
 func transformType(_ prev: TypeSyntax, _ variant: Variant, _ isSizedBy: Bool) throws -> TypeSyntax {
     if let optType = prev.as(OptionalTypeSyntax.self) {
         return TypeSyntax(optType.with(\.wrappedType, try transformType(optType.wrappedType, variant, isSizedBy)))
@@ -100,17 +123,15 @@ func transformType(_ prev: TypeSyntax, _ variant: Variant, _ isSizedBy: Bool) th
     if let impOptType = prev.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
         return try transformType(impOptType.wrappedType, variant, isSizedBy)
     }
-    guard let idType = prev.as(IdentifierTypeSyntax.self) else {
-        throw DiagnosticError("expected pointer type, got \(prev) with kind \(prev.kind)", node: prev)
-    }
-    let text = idType.name.text
+    let name = try getTypeName(prev)
+    let text = name.text
     let kind: UnsafePointerKind = switch text {
     case "UnsafePointer":           .Immutable
     case "UnsafeMutablePointer":    .Mutable
     case "UnsafeRawPointer":        .Immutable
     case "UnsafeMutableRawPointer": .Mutable
     default: throw DiagnosticError("expected Unsafe[Mutable][Raw]Pointer type for type \(prev)" +
-        " - first type token is '\(text)'", node: idType.name)
+        " - first type token is '\(text)'", node: name)
     }
     if isSizedBy {
         let token: TokenSyntax = switch (kind, variant.generateSpan) {
@@ -122,7 +143,7 @@ func transformType(_ prev: TypeSyntax, _ variant: Variant, _ isSizedBy: Bool) th
         return TypeSyntax(IdentifierTypeSyntax(name: token))
     }
     if text == "UnsafeRawPointer" || text == "UnsafeMutableRawPointer" {
-        throw DiagnosticError("raw pointers only supported for SizedBy", node: idType.name)
+        throw DiagnosticError("raw pointers only supported for SizedBy", node: name)
     }
     let token: TokenSyntax = switch (kind, variant.generateSpan) {
     case (.Immutable, true):  "Span"
@@ -130,7 +151,7 @@ func transformType(_ prev: TypeSyntax, _ variant: Variant, _ isSizedBy: Bool) th
     case (.Immutable, false): "UnsafeBufferPointer"
     case (.Mutable,   false): "UnsafeMutableBufferPointer"
     }
-    return TypeSyntax(idType.with(\.name, token))
+    return replaceTypeName(prev, token)
 }
 
 struct Variant {
@@ -209,11 +230,6 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
     }
 }
 
-func hasReturnType(_ signature: FunctionSignatureSyntax) -> Bool {
-    let returnType = signature.returnClause?.type.as(IdentifierTypeSyntax.self)?.name.text ?? "Void"
-    return returnType != "Void"
-}
-
 protocol PointerBoundsThunkBuilder: BoundsCheckedThunkBuilder {
     var name: TokenSyntax { get }
     var nullable: Bool { get }
@@ -274,8 +290,7 @@ struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
     }
 
     func castIntToTargetType(expr: ExprSyntax, type: TypeSyntax) -> ExprSyntax {
-        let idType = type.as(IdentifierTypeSyntax.self)!
-        if idType.name.text == "Int" {
+        if type.isSwiftInt {
             return expr
         }
         return ExprSyntax("\(type)(exactly: \(expr))!")
@@ -290,15 +305,10 @@ struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
         let call = try base.buildFunctionCall(args, variant)
         let ptrRef = unwrapIfNullable(ExprSyntax(DeclReferenceExprSyntax(baseName: name)))
 
-        let returnKw: String = if hasReturnType(signature) {
-            "return "
-        } else {
-            ""
-        }
         let funcName = isSizedBy ? "withUnsafeBytes" : "withUnsafeBufferPointer"
         let unwrappedCall = ExprSyntax("""
         \(ptrRef).\(raw: funcName) { \(unwrappedName) in
-            \(raw: returnKw)\(call)
+            return \(call)
         }
         """)
         return unwrappedCall
@@ -419,7 +429,7 @@ public struct PointerBoundsMacro: PeerMacro {
         guard let intLiteral = expr.as(IntegerLiteralExprSyntax.self) else {
             throw DiagnosticError("expected integer literal, got '\(expr)'", node: expr)
         }
-        guard let res = Int(intLiteral.literal.text) else {
+        guard let res = intLiteral.representedLiteralValue else {
             throw DiagnosticError("expected integer literal, got '\(expr)'", node: expr)
         }
         return res
@@ -429,10 +439,14 @@ public struct PointerBoundsMacro: PeerMacro {
         guard let boolLiteral = expr.as(BooleanLiteralExprSyntax.self) else {
             throw DiagnosticError("expected boolean literal, got '\(expr)'", node: expr)
         }
-        guard let res = Bool(boolLiteral.literal.text) else {
+        switch boolLiteral.literal.tokenKind {
+        case .keyword(.true):
+            return true
+        case .keyword(.false):
+            return false
+        default:
             throw DiagnosticError("expected bool literal, got '\(expr)'", node: expr)
         }
-        return res
     }
 
     static func parseCountedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax, _ signature: FunctionSignatureSyntax) throws -> ParamInfo {
@@ -590,12 +604,8 @@ public struct PointerBoundsMacro: PeerMacro {
                 CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
             }
         }
-        let call = if hasReturnType(funcDecl.signature) {
-            CodeBlockItemSyntax(item: CodeBlockItemSyntax.Item(ReturnStmtSyntax(returnKeyword: .keyword(.return, trailingTrivia: " "),
+        let call = CodeBlockItemSyntax(item: CodeBlockItemSyntax.Item(ReturnStmtSyntax(returnKeyword: .keyword(.return, trailingTrivia: " "),
                 expression: try builder.buildFunctionCall([:], variant))))
-        } else {
-            CodeBlockItemSyntax(item: CodeBlockItemSyntax.Item(try builder.buildFunctionCall([:], variant)))
-        }
         let body = CodeBlockSyntax(statements: CodeBlockItemListSyntax(checks + [call]))
         let newFunc = funcDecl
             .with(\.signature, newSignature)
