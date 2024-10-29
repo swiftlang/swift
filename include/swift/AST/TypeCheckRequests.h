@@ -775,6 +775,27 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Pretty-print the given attribute into a buffer and return a source
+/// location that refers to the attribute in that buffer.
+class PrettyPrintCustomAttrRequest
+    : public SimpleRequest<PrettyPrintCustomAttrRequest,
+                           SourceLoc(const CustomAttr *, const Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  SourceLoc evaluate(Evaluator &eval, const CustomAttr *attr,
+                     const Decl *decl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 // Find the type in the cache or look it up
 class DefaultTypeRequest
     : public SimpleRequest<DefaultTypeRequest,

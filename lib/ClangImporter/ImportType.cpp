@@ -2458,6 +2458,10 @@ ClangImporter::Implementation::importParameterType(
         }
       }
     }
+  } else if (auto CAT = dyn_cast<clang::CountAttributedType>(paramTy)) {
+    // Treat as a normal pointer. importBoundsAttributes() will generate a safe
+    // overload later.
+    paramTy = CAT->desugar();
   } else if (isa<clang::PointerType>(paramTy) &&
              isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
     auto pointeeType = paramTy->getPointeeType();

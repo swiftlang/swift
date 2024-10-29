@@ -3247,9 +3247,8 @@ namespace {
   };
 }
 
-SourceLoc PrettyPrintDeclRequest::evaluate(Evaluator &eval, const Decl *decl) const {
-  // Conjure a buffer name for this declaration.
-  SmallVector<std::string, 4> nameComponents;
+static void collectQualifiedDeclNameComponents(
+    const Decl *decl, SmallVectorImpl<std::string> &nameComponents) {
   DeclContext *dc;
   if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
     nameComponents.push_back(valueDecl->getBaseName().userFacingName().str());
@@ -3296,7 +3295,13 @@ SourceLoc PrettyPrintDeclRequest::evaluate(Evaluator &eval, const Decl *decl) co
 
     dc = dc->getParent();
   }
+}
 
+SourceLoc PrettyPrintDeclRequest::evaluate(Evaluator &eval,
+                                           const Decl *decl) const {
+  // Conjure a buffer name for this declaration.
+  SmallVector<std::string, 4> nameComponents;
+  collectQualifiedDeclNameComponents(decl, nameComponents);
 
   std::string bufferName;
   {
@@ -3390,4 +3395,63 @@ SourceLoc PrettyPrintDeclRequest::evaluate(Evaluator &eval, const Decl *decl) co
   sourceFile->setImports({ });
 
   return memBufferStartLoc.getAdvancedLoc(targetDeclOffsetInBuffer);
+}
+
+//----------------------------------------------------------------------------//
+// PrettyPrintCustomAttrRequest
+//----------------------------------------------------------------------------//
+
+SourceLoc PrettyPrintCustomAttrRequest::evaluate(Evaluator &eval,
+                                                 const CustomAttr *attr,
+                                                 const Decl *decl) const {
+  // Conjure a buffer name for this declaration.
+  SmallVector<std::string, 4> nameComponents;
+  nameComponents.push_back(attr->getAttrName().str());
+  collectQualifiedDeclNameComponents(decl, nameComponents);
+
+  std::string bufferName;
+  {
+    llvm::raw_string_ostream out(bufferName);
+    for (auto iter = nameComponents.rbegin(); iter != nameComponents.rend();
+         ++iter) {
+      out << *iter;
+
+      if (iter + 1 != nameComponents.rend())
+        out << ".";
+    }
+  }
+
+  // Render the buffer contents.
+  ASTContext &ctx = decl->getASTContext();
+  llvm::SmallString<128> bufferContents;
+  {
+    llvm::raw_svector_ostream out(bufferContents);
+    StreamPrinter P(out);
+
+    // Print this macro attribute.
+    auto options = PrintOptions::printForDiagnostics(
+        getBufferAccessLevel(decl), ctx.TypeCheckerOpts.PrintFullConvention);
+    attr->print(P, options, decl);
+  }
+
+  // Build a buffer with the pretty-printed macro attribute.
+  SourceManager &sourceMgr = ctx.SourceMgr;
+  auto bufferID = sourceMgr.addMemBufferCopy(bufferContents, bufferName);
+  auto memBufferStartLoc = sourceMgr.getLocForBufferStart(bufferID);
+
+  // Note that this is a pretty-printed buffer.
+  sourceMgr.setGeneratedSourceInfo(
+      bufferID,
+      GeneratedSourceInfo{
+          GeneratedSourceInfo::PrettyPrinted, CharSourceRange(),
+          CharSourceRange(memBufferStartLoc, bufferContents.size()),
+          ASTNode(const_cast<Decl *>(decl)).getOpaqueValue(), nullptr});
+
+  // Add a source file for the buffer.
+  auto moduleDecl = decl->getDeclContext()->getParentModule();
+  auto sourceFile =
+      new (ctx) SourceFile(*moduleDecl, SourceFileKind::Library, bufferID);
+  sourceFile->setImports({});
+
+  return memBufferStartLoc;
 }

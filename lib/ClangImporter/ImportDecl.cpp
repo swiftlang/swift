@@ -124,6 +124,7 @@ createFuncOrAccessor(ClangImporter::Implementation &impl, SourceLoc funcLoc,
                                     genericParams, dc, clangNode);
   }
   impl.importSwiftAttrAttributes(decl);
+  impl.importBoundsAttributes(decl);
   return decl;
 }
 
@@ -8610,6 +8611,107 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
             /*unsafe=*/false, /*implicit=*/true));
       }
     }
+  }
+}
+
+namespace {
+class PointerParamInfo {
+public:
+  virtual void print(clang::ASTContext &ctx, llvm::raw_ostream &out) const = 0;
+  virtual ~PointerParamInfo() {}
+};
+
+class CountedByParam : public PointerParamInfo {
+public:
+  size_t pointerIndex;
+  clang::Expr *countExpr;
+  bool isSizedBy;
+  CountedByParam(size_t idx, clang::Expr *E, bool sizedBy)
+      : pointerIndex(idx), countExpr(E), isSizedBy(sizedBy) {}
+
+  virtual void print(clang::ASTContext &ctx,
+                     llvm::raw_ostream &out) const override {
+    out << ".";
+    if (isSizedBy)
+      out << "sizedBy";
+    else
+      out << "countedBy";
+    out << "(pointer: " << pointerIndex << ", ";
+    if (isSizedBy)
+      out << "size";
+    else
+      out << "count";
+    out << ": \"";
+    countExpr->printPretty(
+        out, {}, {ctx.getLangOpts()}); // TODO: map clang::Expr to Swift Expr
+    out << "\")";
+  }
+  virtual ~CountedByParam() {}
+};
+} // namespace
+
+void ClangImporter::Implementation::importBoundsAttributes(
+    FuncDecl *MappedDecl) {
+  auto ClangDecl =
+      dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
+  if (!ClangDecl)
+    return;
+
+  SmallVector<PointerParamInfo *, 4> BoundsInfo;
+  size_t parameterIndex = 1;
+  for (auto param : ClangDecl->parameters()) {
+    if (auto CAT = param->getType()->getAs<clang::CountAttributedType>()) {
+      BoundsInfo.push_back(new CountedByParam(
+          parameterIndex, CAT->getCountExpr(), CAT->isCountInBytes()));
+    }
+    parameterIndex++;
+  }
+  if (BoundsInfo.empty())
+    return;
+
+  llvm::SmallString<128> MacroString;
+  {
+    llvm::raw_svector_ostream out(MacroString);
+
+    out << "@PointerBounds(";
+    for (size_t i = 0; i < BoundsInfo.size(); i++) {
+      BoundsInfo[i]->print(getClangASTContext(), out);
+      if (i + 1 < BoundsInfo.size()) {
+        out << ", ";
+      }
+    }
+    out << ")";
+  }
+
+  // Dig out a buffer with the attribute text.
+  unsigned bufferID = getClangSwiftAttrSourceBuffer(MacroString);
+
+  // Dig out a source file we can use for parsing.
+  auto &sourceFile = getClangSwiftAttrSourceFile(
+      *MappedDecl->getDeclContext()->getParentModule(), bufferID);
+
+  // Spin up a parser.
+  swift::Parser parser(bufferID, sourceFile, &SwiftContext.Diags, nullptr,
+                       nullptr);
+  // Prime the lexer.
+  parser.consumeTokenWithoutFeedingReceiver();
+
+  bool hadError = false;
+  assert(parser.Tok.is(tok::at_sign));
+  SourceLoc atEndLoc = parser.Tok.getRange().getEnd();
+  SourceLoc atLoc = parser.consumeToken(tok::at_sign);
+  DeclContext *DC = MappedDecl->getParent();
+  auto initContext = PatternBindingInitializer::create(DC);
+  hadError = parser
+                 .parseDeclAttribute(MappedDecl->getAttrs(), atLoc, atEndLoc,
+                                     initContext,
+                                     /*isFromClangAttribute=*/true)
+                 .isError();
+  if (hadError) {
+    HeaderLoc attrLoc(ClangDecl->getLocation());
+    diagnose(attrLoc, diag::clang_pointer_bounds_unhandled,
+             MappedDecl->getName(), MacroString);
+    return;
   }
 }
 

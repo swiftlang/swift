@@ -81,6 +81,8 @@ SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PrettyPrintDeclRequest,
               SourceLoc(const Decl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PrettyPrintCustomAttrRequest,
+              SourceLoc(const CustomAttr *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DifferentiableAttributeTypeCheckRequest,
               IndexSubset *(DifferentiableAttr *),
               SeparatelyCached, NoLocationInfo)

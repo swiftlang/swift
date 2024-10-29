@@ -87,6 +87,11 @@ NOTE(unresolvable_clang_decl_is_a_framework_bug,none,
 WARNING(clang_swift_attr_unhandled,none,
         "ignoring unknown Swift attribute or modifier '%0'", (StringRef))
 
+WARNING(clang_pointer_bounds_unhandled, none,
+        "ignoring unknown pointer bound attributes on '%0' because the "
+        "generated macro could not be parsed: '%1'",
+        (DeclName, StringRef))
+
 WARNING(clang_error_code_must_be_sendable,none,
         "cannot make error code type '%0' non-sendable because Swift errors "
         "are always sendable", (StringRef))
