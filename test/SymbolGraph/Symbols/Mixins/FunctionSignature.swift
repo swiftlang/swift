@@ -4,6 +4,7 @@
 // RUN: %FileCheck %s --input-file %t/FunctionSignature.symbols.json --check-prefix=FUNC
 // RUN: %FileCheck %s --input-file %t/FunctionSignature.symbols.json --check-prefix=INIT
 // RUN: %FileCheck %s --input-file %t/FunctionSignature.symbols.json --check-prefix=SUBSCRIPT
+// RUN: %FileCheck %s --input-file %t/FunctionSignature.symbols.json --check-prefix=FUNC2
 
 public struct MyStruct {
   public init(_ noext: Int, ext int: Int) {}
@@ -101,5 +102,37 @@ public struct MyStruct {
 // FUNC: "kind": "typeIdentifier"
 // FUNC-NEXT: "spelling": "String"
 // FUNC-NEXT: "preciseIdentifier": "s:SS"
+    
+  public func bar(_: Int, ext _: Int) -> Void {}
+      
+// FUNC2-LABEL: "precise": "s:17FunctionSignature8MyStructV3bar_3extySi_SitF",
+// FUNC2: "name": "_"
+// FUNC2-NOT: "internalName": "_"
+// FUNC2-NEXT: declarationFragments
+
+// FUNC2: "kind": "identifier"
+// FUNC2-NEXT: "spelling": "_"
+// FUNC2: "kind": "text"
+// FUNC2-NEXT: "spelling": ": "
+// FUNC2: "kind": "typeIdentifier"
+// FUNC2-NEXT: "spelling": "Int"
+// FUNC2-NEXT: "preciseIdentifier": "s:Si"
+
+// FUNC2: "name": "ext"
+// FUNC2-NEXT: "internalName": "_"
+// FUNC2-NEXT: declarationFragments
+
+// FUNC2: "kind": "identifier"
+// FUNC2-NEXT: "spelling": "_"
+// FUNC2: "kind": "text"
+// FUNC2-NEXT: "spelling": ": "
+// FUNC2: "kind": "typeIdentifier"
+// FUNC2-NEXT: "spelling": "Int"
+// FUNC2-NEXT: "preciseIdentifier": "s:Si"
+
+// FUNC2: returns
+// FUNC2: "kind": "typeIdentifier"
+// FUNC2-NEXT: "spelling": "Void"
+// FUNC2-NEXT: "preciseIdentifier": "s:s4Voida"
     
 }
