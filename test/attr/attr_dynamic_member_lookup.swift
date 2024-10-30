@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithStaticMembers
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: asserts
 

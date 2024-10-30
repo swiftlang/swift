@@ -2,13 +2,13 @@
 // RUN: split-file %s %t/src
 
 /// Build LibA
-// RUN: %host-build-swift %t/src/LibA.swift -swift-version 5 -enable-experimental-feature KeyPathWithStaticMembers -emit-module -emit-library -enable-library-evolution -module-name LibA -o %t/%target-library-name(LibA) -emit-module-interface-path %t/LibA.swiftinterface
+// RUN: %host-build-swift %t/src/LibA.swift -swift-version 5 -emit-module -emit-library -enable-library-evolution -module-name LibA -o %t/%target-library-name(LibA) -emit-module-interface-path %t/LibA.swiftinterface
 
 // Build LibB
-// RUN: %target-build-swift %t/src/LibB.swift -I %t -L %t -l LibA -swift-version 5 -enable-experimental-feature KeyPathWithStaticMembers -emit-module -emit-library -module-name LibB -o %t/%target-library-name(LibB)
+// RUN: %target-build-swift %t/src/LibB.swift -I %t -L %t -l LibA -swift-version 5 -emit-module -emit-library -module-name LibB -o %t/%target-library-name(LibB)
 
 // Build LibC
-// RUN: %target-build-swift %t/src/LibC.swift -I %t -L %t -l LibA -swift-version 5 -enable-experimental-feature KeyPathWithStaticMembers -emit-module -emit-library -module-name LibC -o %t/%target-library-name(LibC)
+// RUN: %target-build-swift %t/src/LibC.swift -I %t -L %t -l LibA -swift-version 5 -emit-module -emit-library -module-name LibC -o %t/%target-library-name(LibC)
 
 // Build & run main.swift
 // RUN: %target-build-swift -I %t -L %t -l LibA -l LibB -l LibC %t/src/main.swift -o %t/a.out
