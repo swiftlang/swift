@@ -4373,7 +4373,8 @@ void IRGenFunction::emitCoroutineOrAsyncExit(bool isUnwind) {
 static void emitReturnInst(IRGenSILFunction &IGF,
                            SILType resultTy,
                            Explosion &result,
-                           CanSILFunctionType fnType) {
+                           CanSILFunctionType fnType,
+                           bool mayPeepholeLoad) {
   SILFunctionConventions conv(IGF.CurSILFn->getLoweredFunctionType(),
                               IGF.getSILModule());
 
@@ -4448,8 +4449,35 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     assert(swiftCCReturn ||
            funcLang == SILFunctionLanguage::C && "Need to handle all cases");
     IGF.emitScalarReturn(resultTy, funcResultType, result, swiftCCReturn,
-                         false);
+                         false, mayPeepholeLoad);
   }
+}
+
+static bool canPeepholeLoadToReturn(IRGenModule &IGM, swift::ReturnInst *r) {
+  auto *load = dyn_cast<LoadInst>(r->getOperand());
+  if (!load)
+    return false;
+
+  // Later code can't deal with projections.
+  if (!isa<AllocStackInst>(load->getOperand()))
+    return false;
+
+  if (load->getParent() != r->getParent())
+    return false;
+
+  for (auto it = ++load->getIterator(), e = r->getIterator(); it != e; ++it) {
+    if (it->mayHaveSideEffects()) {
+      if (auto *dealloc = dyn_cast<DeallocStackInst>(&*it)) {
+        auto &ti = IGM.getTypeInfo(
+          dealloc->getOperand()->getType().getObjectType());
+        if (!ti.isLoadable())
+          return false;
+        continue;
+      }
+      return false;
+    }
+  }
+  return true;
 }
 
 void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
@@ -4466,8 +4494,11 @@ void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
     result = std::move(temp);
   }
 
+  bool mayPeepholeLoad = canPeepholeLoadToReturn(IGM, i);
+
   emitReturnInst(*this, i->getOperand()->getType(), result,
-                 i->getFunction()->getLoweredFunctionType());
+                 i->getFunction()->getLoweredFunctionType(),
+                 mayPeepholeLoad);
 }
 
 void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
@@ -5524,6 +5555,81 @@ void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
   }
   setLoweredExplosion(i, lowered);
 }
+static Address isSafeForMemCpyPeephole(const TypeInfo &TI, SILArgument *arg,
+                                       Explosion &argSrc, AllocStackInst *dst,
+                                       Address storeDst,
+                                       StoreInst *store,
+                                       llvm::Instruction * &insertPt) {
+  if (!arg || !dst)
+    return Address();
+
+  // Store of function argument.
+  if (store->getParent() != store->getFunction()->getEntryBlock())
+    return Address();
+
+  auto explosionSize = TI.getSchema().size();
+  if (argSrc.size() < 1 || explosionSize < 4)
+    return Address();
+
+  auto *load = dyn_cast<llvm::LoadInst>(*argSrc.begin());
+  if (!load)
+    return Address();
+
+  auto *gep = dyn_cast<llvm::GetElementPtrInst>(load->getPointerOperand());
+  if (!gep)
+    return Address();
+
+  auto *alloca = dyn_cast<llvm::AllocaInst>(getUnderlyingObject(gep));
+  if (!alloca)
+    return Address();
+
+  // Check all the other loads.
+  for (size_t i = 1, e = explosionSize; i != e; ++i) {
+    auto *load = dyn_cast<llvm::LoadInst>(*(argSrc.begin() + i));
+    if (!load)
+      return Address();
+    auto *alloca2 = dyn_cast<llvm::AllocaInst>(
+        getUnderlyingObject(load->getPointerOperand()));
+    if (!alloca2 || alloca2 != alloca)
+      return Address();
+  }
+
+  auto *dstAlloca = dyn_cast<llvm::AllocaInst>(storeDst.getAddress());
+  if (!dstAlloca)
+    return Address();
+
+  // Move the lifetime.begin above the load instruction (where we eventually
+  // will insert the memcpy.
+  llvm::Instruction *lifetimeBegin = nullptr;
+  for (const auto &use : dstAlloca->uses()) {
+    auto *begin = dyn_cast<llvm::LifetimeIntrinsic>(use.getUser());
+    if (!begin)
+      continue;
+    if (begin->getParent() != alloca->getParent())
+      continue;
+    if (begin->getIntrinsicID() != llvm::Intrinsic::lifetime_start)
+      continue;
+
+    if (lifetimeBegin) {
+      // Seen a second lifetime.begin in the entry block.
+      lifetimeBegin = nullptr;
+      break;
+    }
+    lifetimeBegin = begin;
+  }
+
+  if (!lifetimeBegin) {
+    return Address();
+  }
+
+  lifetimeBegin->moveBefore(load);
+
+  // Set insertPt to the first load such that we are within the lifetime of the
+  // alloca marked by the lifetime intrinsic.
+  insertPt = load;
+
+  return TI.getAddressForPointer(alloca);
+}
 
 static Address canForwardIndirectResultAlloca(const TypeInfo &TI,
                                               StoreInst *store,
@@ -5576,7 +5682,6 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   SILType objType = i->getSrc()->getType().getObjectType();
   const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
 
-
   llvm::Instruction *insertPt = nullptr;
   auto forwardAddr = canForwardIndirectResultAlloca(typeInfo, i, source,
                                                     insertPt);
@@ -5585,8 +5690,29 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
     // Set the insert point to the first load instruction. We need to be with
     // the lifetime of the alloca.
     IRBuilder::SavedInsertionPointRAII insertRAII(this->Builder, insertPt);
+    ArtificialLocation Loc(getDebugScope(), IGM.DebugInfo.get(), Builder);
     addrTI.initializeWithTake(*this, dest, forwardAddr, i->getDest()->getType(),
                               false, /*zeroizeIfSensitive=*/ true);
+    (void)source.claimAll();
+    return;
+  }
+
+  // See if we can forward a load from an alloca we have created for the purpose
+  // of argument coercion.
+  auto argSrc = dyn_cast<SILArgument>(i->getSrc());
+  auto stackDst = dyn_cast<AllocStackInst>(i->getDest());
+  const auto &addrTI = getTypeInfo(i->getDest()->getType());
+  insertPt = nullptr;
+
+  auto srcAddr = isSafeForMemCpyPeephole(addrTI, argSrc, source, stackDst, dest,
+                                         i, insertPt);
+  if (srcAddr.isValid() &&
+      (i->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial ||
+       i->getOwnershipQualifier() == StoreOwnershipQualifier::Unqualified)) {
+    IRBuilder::SavedInsertionPointRAII insertRAII(this->Builder, insertPt);
+    ArtificialLocation Loc(getDebugScope(), IGM.DebugInfo.get(), Builder);
+    addrTI.initializeWithTake(*this, dest, srcAddr, i->getDest()->getType(),
+                              false, /*zeroizeIfSensitive*/true);
     (void)source.claimAll();
     return;
   }

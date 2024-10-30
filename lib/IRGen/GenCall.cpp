@@ -5346,7 +5346,8 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
                                                 IRGenFunction &IGF,
                                                 Explosion &fromNonNative,
                                                 SILType type,
-                                                bool isOutlined) const {
+                                                bool isOutlined,
+                                                bool mayPeepholeLoad) const {
   if (fromNonNative.empty()) {
     assert(empty() && "Empty explosion must match the native convention");
     return Explosion();
@@ -5424,6 +5425,82 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
   llvm::StructType *largerCoercion = coercionSize >= overlappedCoercionSize
                                          ? coercionTy
                                          : overlappedCoercionTy;
+
+  if (mayPeepholeLoad) {
+    auto succeeded = [&]() -> bool {
+      if (!overlappedCoercionTy->isEmptyTy())
+        return false;
+      auto load = dyn_cast<llvm::LoadInst>(*fromNonNative.begin());
+      if (!load)
+        return false;
+      auto *gep = dyn_cast<llvm::GetElementPtrInst>(load->getPointerOperand());
+      if (!gep)
+        return false;
+      auto *alloca = dyn_cast<llvm::AllocaInst>(getUnderlyingObject(gep));
+      if (!alloca)
+        return false;
+      auto numExplosions = fromNonNative.size();
+      if (numExplosions < 2)
+        return false;
+      for (unsigned i = 0, e = numExplosions; i < e; ++i) {
+        auto *otherLoad = dyn_cast<llvm::LoadInst>(*(fromNonNative.begin() + i));
+        if (!otherLoad)
+          return false;
+        auto otherAlloca = dyn_cast<llvm::AllocaInst>(
+          getUnderlyingObject(otherLoad->getPointerOperand()));
+        if (!otherAlloca || otherAlloca != alloca)
+          return false;
+        load = otherLoad;
+      }
+      auto allocaSize =
+        DataLayout.getTypeSizeInBits(alloca->getAllocatedType());
+
+      Address origAlloca(alloca, alloca->getAllocatedType(),
+                         Alignment(alloca->getAlign().value()));
+
+      IRBuilder Builder(*IGM.LLVMContext, false);
+      Builder.SetInsertPoint(load);
+
+      if (allocaSize < coercionSize) {
+        auto coerced = IGF.createAlloca(coercionTy, Alignment(alloca->getAlign().value()) , "tmp.coerce");
+        // Copy the defined bytes.
+        Builder.CreateMemCpy(coerced, origAlloca, Size(allocaSize/8));
+        origAlloca = coerced;
+      }
+
+      adjustAllocaAlignment(DataLayout, origAlloca, coercionTy);
+
+
+      unsigned expandedMapIdx = 0;
+      SmallVector<llvm::Value *, 8> expandedElts(expandedTys.size(), nullptr);
+      auto structAddr = Builder.CreateElementBitCast(origAlloca, coercionTy);
+      for (auto eltIndex : indices(coercionTy->elements())) {
+        auto layout = DataLayout.getStructLayout(coercionTy);
+        auto eltTy = coercionTy->getElementType(eltIndex);
+        // Skip padding fields.
+        if (eltTy->isArrayTy())
+          continue;
+        Address eltAddr = Builder.CreateStructGEP(structAddr, eltIndex, layout);
+        llvm::Value *elt = Builder.CreateLoad(eltAddr);
+        auto index = expandedTyIndicesMap[expandedMapIdx];
+        assert(expandedElts[index] == nullptr);
+        expandedElts[index] = elt;
+        ++expandedMapIdx;
+      }
+
+      // Add the values to the explosion.
+      for (auto *val : expandedElts)
+        nativeExplosion.add(val);
+      assert(expandedTys.size() == nativeExplosion.size());
+
+      return true;
+    }();
+
+    if (succeeded) {
+      (void)fromNonNative.claimAll();
+      return nativeExplosion;
+    }
+  }
 
   // Allocate a temporary for the coercion.
   Address temporary;
@@ -5514,7 +5591,8 @@ Explosion IRGenFunction::coerceValueTo(SILType fromTy, Explosion &from,
 
 void IRGenFunction::emitScalarReturn(SILType returnResultType,
                                      SILType funcResultType, Explosion &result,
-                                     bool isSwiftCCReturn, bool isOutlined) {
+                                     bool isSwiftCCReturn, bool isOutlined,
+                                     bool mayPeepholeLoad) {
   if (result.empty()) {
     assert(IGM.getTypeInfo(returnResultType)
                .nativeReturnValueSchema(IGM)
@@ -5533,7 +5611,8 @@ void IRGenFunction::emitScalarReturn(SILType returnResultType,
     assert(!nativeSchema.requiresIndirect());
 
     Explosion native = nativeSchema.mapIntoNative(IGM, *this, result,
-                                                  funcResultType, isOutlined);
+                                                  funcResultType, isOutlined,
+                                                  mayPeepholeLoad);
     if (native.size() == 1) {
       Builder.CreateRet(native.claimNext());
       return;
