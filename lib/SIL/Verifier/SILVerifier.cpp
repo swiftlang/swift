@@ -1069,6 +1069,24 @@ public:
             what + " must be Optional<Builtin.Executor>");
   }
 
+  /// Require the operand to be an object of some type that conforms to
+  /// Actor or DistributedActor.
+  void requireAnyActorType(SILValue value, bool allowOptional,
+                           bool allowExecutor, const Twine &what) {
+    auto type = value->getType();
+    require(type.isObject(), what + " must be an object type");
+
+    auto actorType = type.getASTType();
+    if (allowOptional) {
+      if (auto objectType = actorType.getOptionalObjectType())
+        actorType = objectType;
+    }
+    if (allowExecutor && isa<BuiltinExecutorType>(actorType))
+      return;
+    require(actorType->isAnyActorType(),
+            what + " must be some kind of actor type");
+  }
+
   /// Assert that two types are equal.
   void requireSameType(Type type1, Type type2, const Twine &complaint) {
     _require(type1->isEqual(type2), complaint,
@@ -5806,10 +5824,21 @@ public:
     if (HI->getModule().getStage() == SILStage::Lowered) {
       requireOptionalExecutorType(executor,
                                   "hop_to_executor operand in lowered SIL");
+    } else {
+      requireAnyActorType(executor,
+                          /*allow optional*/ true,
+                          /*allow executor*/ true,
+                          "hop_to_executor operand");
     }
   }
 
   void checkExtractExecutorInst(ExtractExecutorInst *EEI) {
+    requireObjectType(BuiltinExecutorType, EEI,
+                      "extract_executor result");
+    requireAnyActorType(EEI->getExpectedExecutor(),
+                        /*allow optional*/ false,
+                        /*allow executor*/ false,
+                        "extract_executor operand");
     if (EEI->getModule().getStage() == SILStage::Lowered) {
       require(false,
               "extract_executor instruction should have been lowered away");
