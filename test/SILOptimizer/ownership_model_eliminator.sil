@@ -20,6 +20,10 @@ struct PairOfInt {
   var rhs : Builtin.Int32
 }
 
+struct ContainsTuple {
+  var tuple : (Builtin.Int32, Builtin.Int32)
+}
+
 // CHECK-LABEL: sil @load : $@convention(thin) (@in Builtin.NativeObject, @in Builtin.Int32) -> () {
 // CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : $*Builtin.Int32):
 // CHECK: [[LOAD2:%[0-9]+]] = load [[ARG1]] : $*Builtin.NativeObject
@@ -453,6 +457,24 @@ die:
 
 exit:
   dealloc_box %b : ${ var C }
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @destructure_tuple_peephole : $@convention(thin) (ContainsTuple) -> () {
+// CHECK: bb0([[ARG:%.*]] : $ContainsTuple):
+// CHECK:  [[S:%.*]] = alloc_stack $(Builtin.Int32, Builtin.Int32)
+// CHECK:  [[T:%.*]] = struct_extract [[ARG]] : $ContainsTuple, #ContainsTuple.tuple
+// CHECK:  store [[T]] to [[S]] : $*(Builtin.Int32, Builtin.Int32)
+// CHECK: } // end sil function 'destructure_tuple_peephole'
+sil [ossa] @destructure_tuple_peephole : $@convention(thin) (ContainsTuple) -> () {
+entry(%arg : $ContainsTuple):
+  %stk = alloc_stack $(Builtin.Int32, Builtin.Int32)
+  %tpl = struct_extract %arg : $ContainsTuple, #ContainsTuple.tuple
+  (%1, %2) = destructure_tuple %tpl : $(Builtin.Int32, Builtin.Int32)
+  %3 = tuple (%1 : $Builtin.Int32, %2 : $Builtin.Int32)
+  store %3 to [trivial] %stk : $*(Builtin.Int32, Builtin.Int32)
+  dealloc_stack %stk : $*(Builtin.Int32, Builtin.Int32)
   %retval = tuple ()
   return %retval : $()
 }
