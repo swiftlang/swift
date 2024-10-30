@@ -49,17 +49,7 @@ struct AvailabilityContext::PlatformInfo {
   /// availability is more restrictive. Returns true if any field was updated.
   bool constrainWith(const Decl *decl);
 
-  bool constrainRange(const AvailabilityRange &other) {
-    if (!other.isContainedIn(Range))
-      return false;
-
-    Range = other;
-    return true;
-  }
-
   bool constrainUnavailability(std::optional<PlatformKind> unavailablePlatform);
-
-  bool constrainDeprecated(bool deprecated);
 
   /// Returns true if `other` is as available or is more available.
   bool isContainedIn(const PlatformInfo &other) const;
