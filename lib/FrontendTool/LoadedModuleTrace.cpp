@@ -21,6 +21,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/IDE/SourceEntityWalker.h"
 
@@ -815,7 +816,13 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   return false;
 }
 
+const static unsigned OBJC_METHOD_TRACE_FILE_FORMAT_VERSION = 1;
+
 class ObjcMethodReferenceCollector: public SourceEntityWalker {
+  std::string target;
+  std::string targetVariant;
+  SmallVector<StringRef, 32> FilePaths;
+  unsigned CurrentFileID;
   llvm::DenseSet<const clang::ObjCMethodDecl*> results;
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
@@ -827,27 +834,70 @@ class ObjcMethodReferenceCollector: public SourceEntityWalker {
     }
     return true;
   }
+  static StringRef selectMethodKey(const clang::ObjCMethodDecl* clangD) {
+    assert(clangD);
+    if (clangD->isInstanceMethod())
+      return "instance_method";
+    else if (clangD->isClassMethod())
+      return "class_method";
+    else
+      return "method";
+  }
+  static StringRef selectMethodOwnerKey(const clang::NamedDecl* clangD) {
+    assert(clangD);
+    if (isa<clang::ObjCInterfaceDecl>(clangD))
+      return "interface_type";
+    if (isa<clang::ObjCCategoryDecl>(clangD))
+      return "category_type";
+    return "type";
+  }
 public:
+  ObjcMethodReferenceCollector(ModuleDecl *MD) {
+    auto &Opts = MD->getASTContext().LangOpts;
+    target = Opts.Target.str();
+    targetVariant = Opts.TargetVariant.has_value() ?
+      Opts.TargetVariant->str() : "";
+  }
+  void setFileBeforeVisiting(SourceFile *SF) {
+    assert(SF && "need to visit actual source files");
+    FilePaths.push_back(SF->getFilename());
+    CurrentFileID = FilePaths.size();
+  }
   void serializeAsJson(llvm::raw_ostream &OS) {
     llvm::json::OStream out(OS, /*IndentSize=*/4);
-    out.array([&] {
-      for (const clang::ObjCMethodDecl* clangD: results) {
-        auto &SM = clangD->getASTContext().getSourceManager();
-        clang::SourceLocation Loc = clangD->getLocation();
-        if (!Loc.isValid()) {
-          continue;
-        }
-        out.object([&] {
-          if (auto *parent = dyn_cast_or_null<clang::NamedDecl>(clangD
-                                                              ->getParent())) {
-            auto pName = parent->getName();
-            if (!pName.empty())
-              out.attribute("type", pName);
+    out.object([&] {
+      out.attribute("format-vesion", OBJC_METHOD_TRACE_FILE_FORMAT_VERSION);
+      out.attribute("target", target);
+      if (!targetVariant.empty())
+        out.attribute("target-variant", targetVariant);
+      out.attributeArray("references", [&] {
+        for (const clang::ObjCMethodDecl* clangD: results) {
+          auto &SM = clangD->getASTContext().getSourceManager();
+          clang::SourceLocation Loc = clangD->getLocation();
+          if (!Loc.isValid()) {
+            continue;
           }
-          out.attribute("method",  clangD->getNameAsString());
-          out.attribute("location", Loc.printToString(SM));
-        });
-      }
+          out.object([&] {
+            if (auto *parent = dyn_cast_or_null<clang::NamedDecl>(clangD
+                                                                  ->getParent())) {
+              auto pName = parent->getName();
+              if (!pName.empty())
+                out.attribute(selectMethodOwnerKey(parent), pName);
+            }
+            out.attribute(selectMethodKey(clangD),  clangD->getNameAsString());
+            out.attribute("declared_at", Loc.printToString(SM));
+            out.attribute("referenced_at_file_id", CurrentFileID);
+          });
+        }
+      });
+      out.attributeArray("fileMap", [&]{
+        for (unsigned I = 0, N = FilePaths.size(); I != N; I ++) {
+          out.object([&] {
+            out.attribute("file_id", I + 1);
+            out.attribute("file_path", FilePaths[I]);
+          });
+        }
+      });
     });
   }
 };
@@ -864,7 +914,7 @@ bool swift::emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
       return false;
     llvm::SmallString<128> tracePath {loadedModuleTracePath};
     llvm::sys::path::remove_filename(tracePath);
-    llvm::sys::path::append(tracePath, ".SWIFT_OBJC_MESSAGE_TRACE");
+    llvm::sys::path::append(tracePath, ".SWIFT_FINE_DEPENDENCY_TRACE");
     if (!llvm::sys::fs::exists(tracePath)) {
       if (llvm::sys::fs::create_directory(tracePath))
         return false;
@@ -876,9 +926,10 @@ bool swift::emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
     }
     // Write the contents of the buffer.
     llvm::raw_fd_ostream out(tmpFD, /*shouldClose=*/true);
-    ObjcMethodReferenceCollector collector;
+    ObjcMethodReferenceCollector collector(mainModule);
     for (auto *FU : mainModule->getFiles()) {
       if (auto *SF = dyn_cast<SourceFile>(FU)) {
+        collector.setFileBeforeVisiting(SF);
         collector.walk(*SF);
       }
     }
