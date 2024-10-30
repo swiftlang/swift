@@ -1294,6 +1294,13 @@ def disable_lifetime_dependence_diagnostics :
   Flag<["-"], "disable-lifetime-dependence-diagnostics">,
   HelpText<"Disable lifetime dependence diagnostics for Nonescapable types.">;
 
+def enable_aggressive_reg2mem :
+  Flag<["-"], "enable-aggressive-reg2mem">,
+  HelpText<"Enable a more aggresive reg2mem heuristic">;
+def disable_aggressive_reg2mem :
+  Flag<["-"], "disable-aggresive-reg2mem">,
+  HelpText<"Disable a more aggresive reg2mem heuristic">;
+
 def enable_collocate_metadata_functions :
   Flag<["-"], "enable-collocate-metadata-functions">,
   HelpText<"Enable collocate metadata functions">;
