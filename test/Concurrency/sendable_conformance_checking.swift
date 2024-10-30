@@ -204,3 +204,16 @@ public struct TestSendableWitnesses2 : NoSendableReqs {
   var prop = globalFn // Ok (no warnings)
   static let staticProp = globalFn // Ok (no warnings)
 }
+
+// @preconcurrency attributes to make it akin to an imported Obj-C API
+@preconcurrency @MainActor public protocol EscapingSendableProtocol {
+  // expected-complete-and-tns-note @+1 {{protocol requires function 'f(handler:)' with type '(@escaping @MainActor @Sendable (Int) -> Void) -> ()'}}
+  @preconcurrency func f(handler: @escaping @MainActor @Sendable (Int) -> Void)
+}
+
+// expected-complete-and-tns-error @+2 {{type 'TestEscapingOnly' does not conform to protocol 'EscapingSendableProtocol'}}
+// expected-complete-and-tns-note @+1 {{add stubs for conformance}}
+class TestEscapingOnly: EscapingSendableProtocol {
+    // expected-complete-and-tns-note @+1 {{candidate has non-matching type '(@escaping (Int) -> Void) -> ()'}}
+    func f(handler: @escaping (Int) -> Void) {}
+}
