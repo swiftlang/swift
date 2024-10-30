@@ -2350,7 +2350,8 @@ static void swift_task_deinitOnExecutorImpl(void *object,
   // when running on the main thread without any executor.
   if (swift_task_isCurrentExecutorWithFlags(
           newExecutor, swift_task_is_current_executor_flag::None)) {
-    return work(object); // 'return' forces tail call
+    TaskLocal::StopLookupScope scope;
+    return work(object);
   }
 
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
@@ -2384,7 +2385,10 @@ static void swift_task_deinitOnExecutorImpl(void *object,
       trackingInfo.enterAndShadow(newExecutor, taskExecutor);
 
       // Run the work.
-      work(object);
+      {
+        TaskLocal::StopLookupScope scope;
+        work(object);
+      }
 
       // `work` is a synchronous function, it cannot call swift_task_switch()
       // If it calls any synchronous API that may change executor inside
