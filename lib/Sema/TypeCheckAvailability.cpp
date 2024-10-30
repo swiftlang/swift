@@ -364,19 +364,20 @@ static bool isInsideCompatibleUnavailableDeclaration(
   if (!referencedPlatform)
     return false;
 
-  if (!attr->isUnconditionallyUnavailable()) {
+  if (!attr->isUnconditionallyUnavailable())
     return false;
-  }
 
-  // Unless in embedded Swift mode, refuse calling unavailable functions from
-  // unavailable code, but allow the use of types.
+  // Refuse calling universally unavailable functions from unavailable code,
+  // but allow the use of types.
   PlatformKind platform = attr->Platform;
-  if (!D->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-    if (platform == PlatformKind::none && !isa<TypeDecl>(D) &&
-        !isa<ExtensionDecl>(D)) {
-      return false;
-    }
-  }
+  if (platform == PlatformKind::none && !attr->isForEmbedded() &&
+      !isa<TypeDecl>(D) && !isa<ExtensionDecl>(D))
+    return false;
+
+  // @_unavailableInEmbedded declarations may be used in contexts that are
+  // also @_unavailableInEmbedded.
+  if (attr->isForEmbedded())
+    return availabilityContext.isUnavailableInEmbedded();
 
   return (*referencedPlatform == platform ||
           inheritsAvailabilityFromPlatform(platform, *referencedPlatform));

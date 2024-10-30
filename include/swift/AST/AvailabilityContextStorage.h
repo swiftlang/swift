@@ -36,6 +36,9 @@ struct AvailabilityContext::PlatformInfo {
   /// platform.
   unsigned IsUnavailable : 1;
 
+  /// Whether or not the context is `@_unavailableInEmbedded`.
+  unsigned IsUnavailableInEmbedded : 1;
+
   /// Whether or not the context is considered deprecated on the current
   /// platform.
   unsigned IsDeprecated : 1;
@@ -57,6 +60,7 @@ struct AvailabilityContext::PlatformInfo {
   void Profile(llvm::FoldingSetNodeID &ID) const {
     Range.getRawVersionRange().Profile(ID);
     ID.AddBoolean(IsUnavailable);
+    ID.AddBoolean(IsUnavailableInEmbedded);
     ID.AddInteger(static_cast<uint8_t>(UnavailablePlatform));
     ID.AddBoolean(IsDeprecated);
   }

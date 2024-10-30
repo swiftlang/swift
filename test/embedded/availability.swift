@@ -12,11 +12,11 @@ public struct UniverallyUnavailable {}
 
 @_unavailableInEmbedded
 public func unavailable_in_embedded() { }
-// expected-note@-1 {{'unavailable_in_embedded()' has been explicitly marked unavailable here}}
+// expected-note@-1 2 {{'unavailable_in_embedded()' has been explicitly marked unavailable here}}
 
 @available(*, unavailable, message: "always unavailable")
 public func universally_unavailable() { }
-// expected-note@-1 {{'universally_unavailable()' has been explicitly marked unavailable here}}
+// expected-note@-1 3 {{'universally_unavailable()' has been explicitly marked unavailable here}}
 
 @_unavailableInEmbedded
 public func unused() { } // no error
@@ -50,7 +50,7 @@ public func also_unavailable_in_embedded(
   _ uu: UniverallyUnavailable // FIXME: should be an error
 ) {
   unavailable_in_embedded() // OK
-  universally_unavailable() // FIXME: should be an error
+  universally_unavailable() // expected-error {{'universally_unavailable()' is unavailable: always unavailable}}
   has_unavailable_in_embedded_overload(.init()) // FIXME: should be ambiguous
   has_universally_unavailable_overload(.init()) // not ambiguous, selects available overload
 }
@@ -60,8 +60,8 @@ public func also_universally_unavailable(
   _ uie: UnavailableInEmbedded, // OK
   _ uu: UniverallyUnavailable // OK
 ) {
-  unavailable_in_embedded() // FIXME: should be an error
-  universally_unavailable() // FIXME: should be an error
+  unavailable_in_embedded() // expected-error {{'unavailable_in_embedded()' is unavailable: unavailable in embedded Swift}}
+  universally_unavailable() // expected-error {{'universally_unavailable()' is unavailable: always unavailable}}
   has_unavailable_in_embedded_overload(.init()) // not ambiguous, selects available overload
   has_universally_unavailable_overload(.init()) // not ambiguous, selects available overload
 }

@@ -44,18 +44,18 @@ private:
 
   AvailabilityContext(const Storage *info) : Info(info) { assert(info); };
 
-public:
-  /// Retrieves the default `AvailabilityContext`, which is maximally available.
-  /// The platform availability range will be set to the deployment target (or
-  /// minimum inlining target when applicable).
-  static AvailabilityContext getDefault(ASTContext &ctx);
-
   /// Retrieves a uniqued `AvailabilityContext` with the given platform
   /// availability parameters.
   static AvailabilityContext
   get(const AvailabilityRange &platformAvailability,
       std::optional<PlatformKind> unavailablePlatform, bool deprecated,
       ASTContext &ctx);
+
+public:
+  /// Retrieves the default `AvailabilityContext`, which is maximally available.
+  /// The platform availability range will be set to the deployment target (or
+  /// minimum inlining target when applicable).
+  static AvailabilityContext getDefault(ASTContext &ctx);
 
   /// Returns the range of platform versions which may execute code in the
   /// availability context, starting at its introduction version.
@@ -73,6 +73,9 @@ public:
 
   /// Returns true if this context is deprecated on the current platform.
   bool isDeprecated() const;
+
+  /// Returns true if this context is `@_unavailableInEmbedded`.
+  bool isUnavailableInEmbedded() const;
 
   /// Constrain with another `AvailabilityContext`.
   void constrainWithContext(const AvailabilityContext &other, ASTContext &ctx);
