@@ -2275,7 +2275,7 @@ synthesizeRead2CoroutineBody(AccessorDecl *read, ASTContext &ctx) {
   return synthesizeCoroutineAccessorBody(read, ctx);
 }
 
-/// Synthesize the body of a modify coroutine.
+/// Synthesize the body of a _modify coroutine.
 static std::pair<BraceStmt *, bool>
 synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
 #ifndef NDEBUG
