@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-target %module-target-future -enable-experimental-feature ValueGenerics -enable-experimental-feature BuiltinModule -Xfrontend -disable-experimental-parser-round-trip) | %FileCheck %s
+// RUN: %target-swift-frontend -target %module-target-future -enable-experimental-feature ValueGenerics -enable-experimental-feature BuiltinModule -disable-experimental-parser-round-trip -emit-module %s -o %t/Vector.swiftmodule
 
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib

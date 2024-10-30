@@ -6134,6 +6134,7 @@ void Serializer::writeAllDeclsAndTypes() {
   BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 9);
   using namespace decls_block;
   registerDeclTypeAbbr<BuiltinAliasTypeLayout>();
+  registerDeclTypeAbbr<BuiltinFixedArrayTypeLayout>();
   registerDeclTypeAbbr<TypeAliasTypeLayout>();
   registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
   registerDeclTypeAbbr<AssociatedTypeDeclLayout>();
