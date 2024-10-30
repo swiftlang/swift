@@ -2000,10 +2000,8 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
     SourceManager SM;
     unsigned BufferID = SM.addNewSourceBuffer(std::move(FileBuf));
 
-    ParserUnit Parser(
-        SM, SourceFileKind::Main, BufferID, Invocation.getLangOptions(),
-        Invocation.getTypeCheckerOptions(), Invocation.getSILOptions(),
-        Invocation.getModuleName());
+    ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
+                      Invocation.getLangOptions(), Invocation.getModuleName());
 
     registerTypeCheckerRequestFunctions(Parser.getParser().Context.evaluator);
     registerClangImporterRequestFunctions(Parser.getParser().Context.evaluator);
@@ -2229,9 +2227,7 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   unsigned BufferID = SM.addNewSourceBuffer(std::move(FileBuf));
 
   ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
-                    Invocation.getLangOptions(),
-                    Invocation.getTypeCheckerOptions(),
-                    Invocation.getSILOptions(), Invocation.getModuleName());
+                    Invocation.getLangOptions(), Invocation.getModuleName());
 
   registerTypeCheckerRequestFunctions(
       Parser.getParser().Context.evaluator);
@@ -2512,15 +2508,17 @@ static int doSemanticAnnotation(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doInputCompletenessTest(StringRef SourceFilename) {
+static int doInputCompletenessTest(const CompilerInvocation &InitInvok,
+                                   StringRef SourceFilename) {
   std::unique_ptr<llvm::MemoryBuffer> FileBuf;
   if (setBufferForFile(SourceFilename, FileBuf))
     return 1;
 
   llvm::raw_ostream &OS = llvm::outs();
   OS << SourceFilename << ": ";
-  if (isSourceInputComplete(std::move(FileBuf),
-                            SourceFileKind::Main).IsComplete) {
+  if (isSourceInputComplete(std::move(FileBuf), SourceFileKind::Main,
+                            InitInvok.getLangOptions())
+          .IsComplete) {
     OS << "IS_COMPLETE\n";
   } else {
     OS << "IS_INCOMPLETE\n";
@@ -4748,7 +4746,7 @@ int main(int argc, char *argv[]) {
     break;
 
   case ActionType::TestInputCompleteness:
-    ExitCode = doInputCompletenessTest(options::SourceFilename);
+    ExitCode = doInputCompletenessTest(InitInvok, options::SourceFilename);
     break;
 
   case ActionType::PrintASTNotTypeChecked:
