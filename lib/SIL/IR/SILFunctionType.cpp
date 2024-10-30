@@ -2202,7 +2202,7 @@ static void destructureYieldsForCoroutine(TypeConverter &TC,
     return;
 
   // 'modify' yields an inout of the target type.
-  if (isYieldingDefaultMutatingAccessor(accessor->getAccessorKind())) {
+  if (isYieldingMutableAccessor(accessor->getAccessorKind())) {
     auto loweredValueTy =
         TC.getLoweredType(origType, canValueType, expansion);
     yields.push_back(SILYieldInfo(loweredValueTy.getASTType(),
@@ -2210,7 +2210,7 @@ static void destructureYieldsForCoroutine(TypeConverter &TC,
   } else {
     // 'read' yields a borrowed value of the target type, destructuring
     // tuples as necessary.
-    assert(isYieldingDefaultNonmutatingAccessor(accessor->getAccessorKind()));
+    assert(isYieldingImmutableAccessor(accessor->getAccessorKind()));
     destructureYieldsForReadAccessor(TC, expansion, origType, canValueType,
                                      yields);
   }

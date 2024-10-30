@@ -1201,7 +1201,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
         // Check for availability of wrappedValue.
         if (accessor->getAccessorKind() == AccessorKind::Get ||
-            isYieldingDefaultNonmutatingAccessor(accessor->getAccessorKind())) {
+            isYieldingImmutableAccessor(accessor->getAccessorKind())) {
           diagnoseDeclAvailability(
               wrappedValue,
               var->getAttachedPropertyWrappers()[i]->getRangeWithAt(), nullptr,
@@ -2209,7 +2209,7 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
 
   // If this is a variable with an attached property wrapper, then
   // the accessors need to yield the wrappedValue or projectedValue.
-  if (isYieldingDefaultNonmutatingAccessor(accessor->getAccessorKind()) ||
+  if (isYieldingImmutableAccessor(accessor->getAccessorKind()) ||
       storageReadWriteImpl == ReadWriteImplKind::Modify) {
     if (auto var = dyn_cast<VarDecl>(storage)) {
       if (var->hasAttachedPropertyWrapper()) {
@@ -2226,8 +2226,7 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
   SourceLoc loc = storage->getLoc();
   SmallVector<ASTNode, 1> body;
 
-  bool isModify =
-      isYieldingDefaultMutatingAccessor(accessor->getAccessorKind());
+  bool isModify = isYieldingMutableAccessor(accessor->getAccessorKind());
 
   // Special-case for a modify coroutine of a simple stored property with
   // observers. We can yield a borrowed copy of the underlying storage
@@ -2543,7 +2542,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   SourceLoc loc = storage->getLoc();
 
   bool isMutating = storage->isGetterMutating();
-  if (isYieldingDefaultMutatingAccessor(kind))
+  if (isYieldingMutableAccessor(kind))
     isMutating |= storage->isSetterMutating();
 
   auto dc = storage->getDeclContext();
@@ -2580,7 +2579,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   if (FuncDecl *getter = storage->getParsedAccessor(AccessorKind::Get)) {
     asAvailableAs.push_back(getter);
   }
-  if (isYieldingDefaultMutatingAccessor(kind)) {
+  if (isYieldingMutableAccessor(kind)) {
     if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set)) {
       asAvailableAs.push_back(setter);
     }
@@ -2593,7 +2592,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   AvailabilityInference::applyInferredAvailableAttrs(accessor, asAvailableAs);
 
   // A modify coroutine should have the same SPI visibility as the setter.
-  if (isYieldingDefaultMutatingAccessor(kind)) {
+  if (isYieldingMutableAccessor(kind)) {
     if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set))
       applyInferredSPIAccessControlAttr(accessor, setter, ctx);
   }
