@@ -865,8 +865,11 @@ struct AsyncTask::PrivateStorage {
 
 // It will be aligned to 2 words on all platforms. On arm64_32, we have an
 // additional requirement where it is aligned to 4 words.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
 static_assert(((offsetof(AsyncTask, Private) + offsetof(AsyncTask::PrivateStorage, StatusStorage)) % ACTIVE_TASK_STATUS_SIZE == 0),
    "StatusStorage is not aligned in the AsyncTask");
+#pragma clang diagnostic pop
 static_assert(sizeof(AsyncTask::PrivateStorage) <= sizeof(AsyncTask::OpaquePrivateStorage),
               "Task-private storage doesn't fit in reserved space");
 
