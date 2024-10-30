@@ -1085,7 +1085,8 @@ private:
       D = cast<VarDecl>(D)->getCanonicalVarDecl();
     }
 
-    if (D->isImplicit() && !shouldIndexImplicitDecl(D, IsRef))
+    if (!D->isSynthesized() && D->isImplicit() &&
+        !shouldIndexImplicitDecl(D, IsRef))
       return false;
 
     // Do not handle non-public imported decls.

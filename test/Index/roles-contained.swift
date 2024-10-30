@@ -319,7 +319,11 @@ struct SomeStruct {
     // CHECK-NEXT: RelCont | static-property/Swift | staticProperty | {{.*}}
 
     lazy var lazyProperty: Int = { 1 }()
-    // CHECK: [[@LINE-1]]:28 | struct/Swift | Int | {{.*}} | Ref,RelCont | rel: 1
+    // CHECK: [[@LINE-1]]:14 | instance-method/acc-get/Swift | getter:lazyProperty | s:14swift_ide_test10SomeStructV12lazyPropertySivg | Def,Impl,RelChild,RelAcc | rel: 1
+    // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | lazyProperty | s:14swift_ide_test10SomeStructV12lazyPropertySivp
+    // CHECK: [[@LINE-3]]:14 | instance-method/acc-set/Swift | setter:lazyProperty | s:14swift_ide_test10SomeStructV12lazyPropertySivs | Def,Impl,RelChild,RelAcc | rel: 1
+    // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | lazyProperty | s:14swift_ide_test10SomeStructV12lazyPropertySivp
+    // CHECK: [[@LINE-5]]:28 | struct/Swift | Int | {{.*}} | Ref,RelCont | rel: 1
     // CHECK-NEXT: RelCont | instance-property/Swift | lazyProperty | {{.*}}
 
     @Wrapped
