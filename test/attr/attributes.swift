@@ -68,7 +68,7 @@ protocol ProtoWithTransparent {
 class TestTranspClass : ProtoWithTransparent {
   @_transparent  // expected-error{{'@_transparent' attribute is not supported on declarations within classes}} {{3-17=}}
   init () {}
-  @_transparent // expected-error{{'@_transparent' attribute cannot be applied to this declaration}} {{3-17=}}
+  @_transparent // expected-error{{'@_transparent' attribute is not supported on declarations within classes}} {{3-17=}}
   deinit {}
   @_transparent // expected-error{{'@_transparent' attribute is not supported on declarations within classes}} {{3-17=}}
   class func transStatic() {}

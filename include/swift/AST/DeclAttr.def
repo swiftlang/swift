@@ -102,7 +102,7 @@ DECL_ATTR(_semantics, Semantics,
   OnAbstractFunction | OnSubscript | OnNominalType | OnVar | AllowMultipleAttributes | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   21)
 SIMPLE_DECL_ATTR(_transparent, Transparent,
-  OnFunc | OnAccessor | OnConstructor | OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor | OnConstructor | OnVar | OnDestructor | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   26)
 SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
   OnClass | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
