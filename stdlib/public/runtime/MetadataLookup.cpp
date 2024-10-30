@@ -164,7 +164,7 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
       break;
         
     default:
-      if (auto typeContext = dyn_cast<TypeContextDescriptor>(descriptor)) {
+      if (isa<TypeContextDescriptor>(descriptor)) {
         nodeKind = Node::Kind::TypeSymbolicReference;
         isType = true;
         break;

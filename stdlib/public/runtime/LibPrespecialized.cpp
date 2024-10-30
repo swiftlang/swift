@@ -686,7 +686,7 @@ void _swift_validatePrespecializedMetadata() {
 
     auto result = swift_getTypeByMangledName(MetadataState::Complete,
                                              mangledName, nullptr, {}, {});
-    if (auto *error = result.getError()) {
+    if (result.getError()) {
       fprintf(stderr,
               "Prespecializations library validation: unable to build metadata "
               "for mangled name '%s'\n",
