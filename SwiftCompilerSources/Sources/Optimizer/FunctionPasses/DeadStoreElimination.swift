@@ -75,7 +75,7 @@ let deadStoreElimination = FunctionPass(name: "dead-store-elimination") {
 }
 
 private func tryEliminate(store: StoreInst, complexityBudget: inout Int, _ context: FunctionPassContext) {
-  if !store.hasValidOwnershipForDeadStoreElimination {
+  if !store.hasValidOwnershipForDeadStoreElimination || !store.source.type.shouldExpand(context) {
     return
   }
 

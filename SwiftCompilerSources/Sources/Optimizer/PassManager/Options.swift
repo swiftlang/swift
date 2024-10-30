@@ -20,6 +20,10 @@ struct Options {
     _bridged.enableStackProtection()
   }
 
+  var useAggressiveReg2MemForCodeSize : Bool {
+    _bridged.useAggressiveReg2MemForCodeSize()
+  }
+
   var enableMoveInoutStackProtection: Bool {
     _bridged.enableMoveInoutStackProtection()
   }
