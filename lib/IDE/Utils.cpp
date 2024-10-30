@@ -96,10 +96,10 @@ static const char *skipStringInCode(const char *p, const char *End) {
 
 SourceCompleteResult
 ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
-                           SourceFileKind SFKind) {
+                           SourceFileKind SFKind, const LangOptions &LangOpts) {
   SourceManager SM;
   auto BufferID = SM.addNewSourceBuffer(std::move(MemBuf));
-  ParserUnit Parse(SM, SFKind, BufferID);
+  ParserUnit Parse(SM, SFKind, BufferID, LangOpts, "input");
   Parse.parse();
   SourceCompleteResult SCR;
   SCR.IsComplete = !Parse.getParser().isInputIncomplete();
@@ -177,10 +177,11 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
   return SCR;
 }
 
-SourceCompleteResult
-ide::isSourceInputComplete(StringRef Text,SourceFileKind SFKind) {
+SourceCompleteResult ide::isSourceInputComplete(StringRef Text,
+                                                SourceFileKind SFKind,
+                                                const LangOptions &LangOpts) {
   return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text),
-                                    SFKind);
+                                    SFKind, LangOpts);
 }
 
 template <typename FnTy>
