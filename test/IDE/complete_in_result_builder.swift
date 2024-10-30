@@ -379,3 +379,34 @@ func testOverloadedCallArgs() {
   }
 
 }
+
+// https://github.com/swiftlang/swift/issues/77283
+func testInForLoop(_ x: [Int]) {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ components: T...) -> T {
+      components.first!
+    }
+    static func buildArray<T>(_ components: [T]) -> T {
+      components.first!
+    }
+  }
+  struct S {
+    init() {}
+    func baz() -> Int { 0 }
+  }
+  struct R {
+    init<T>(@Builder _ x: () -> T) {}
+  }
+  _ = R {
+    for _ in x {
+      S().#^IN_FOR_LOOP^#
+      // IN_FOR_LOOP: Decl[InstanceMethod]/CurrNominal:   baz()[#Int#]; name=baz()
+    }
+  }
+  _ = R {
+    for _ in S().#^IN_FOR_LOOP_SEQ^# {
+      // IN_FOR_LOOP_SEQ: Decl[InstanceMethod]/CurrNominal:   baz()[#Int#]; name=baz()
+    }
+  }
+}
