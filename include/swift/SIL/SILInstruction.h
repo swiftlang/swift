@@ -31,6 +31,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
@@ -4148,6 +4149,24 @@ public:
   void dropReferencedPattern();
   
   ~KeyPathInst();
+};
+
+struct SILInstructionContext {
+  using Storage = TaggedUnion<SILModule *, SILFunction *>;
+  Storage storage;
+
+  static SILInstructionContext forModule(SILModule &M) { return {Storage(&M)}; }
+
+  static SILInstructionContext forFunction(SILFunction &F) {
+    return {Storage(&F)};
+  }
+
+  static SILInstructionContext forFunctionInModule(SILFunction *F,
+                                                   SILModule &M);
+
+  SILFunction *getFunction();
+
+  SILModule &getModule();
 };
 
 /// Represents an invocation of builtin functionality provided by the code
