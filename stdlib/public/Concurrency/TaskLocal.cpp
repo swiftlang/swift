@@ -181,7 +181,7 @@ void TaskLocal::Storage::initializeLinkParent(AsyncTask* task,
   if (!item)
     return;
 
-  auto tail = TaskLocal::ParentTaskMarkerItem::create(task);
+  auto tail = TaskLocal::MarkerItem::createParentTaskMarker(task);
   head = tail;
 
   // Set of keys for which we already have copied to the new task.
@@ -234,6 +234,12 @@ void TaskLocal::Storage::initializeLinkParent(AsyncTask* task,
     item = item->getNext();
   }
 
+  if (item && item->getKind() == Item::Kind::StopLookupMarker) {
+    // Stop marker also could have been created inside task group body
+    // But we don't need to copy it. Instead we can break the chain.
+    item = nullptr;
+  }
+
   // The next item is not the "risky one" so we can directly link to it,
   // as we would have within normal child task relationships. E.g. this is
   // a parent or next pointer to a "safe" (withValue { withTaskGroup { ... } })
@@ -241,11 +247,11 @@ void TaskLocal::Storage::initializeLinkParent(AsyncTask* task,
   tail->setNext(item);
 }
 
-TaskLocal::ParentTaskMarkerItem *
-TaskLocal::ParentTaskMarkerItem::create(AsyncTask *task) {
-  size_t amountToAllocate = sizeof(ParentTaskMarkerItem);
+TaskLocal::MarkerItem *TaskLocal::MarkerItem::create(AsyncTask *task,
+                                                     Item *next, Kind kind) {
+  size_t amountToAllocate = sizeof(MarkerItem);
   void *allocation = _swift_task_alloc_specific(task, amountToAllocate);
-  return new (allocation) ParentTaskMarkerItem(nullptr);
+  return new (allocation) MarkerItem(next, kind);
 }
 
 TaskLocal::ValueItem *TaskLocal::ValueItem::create(AsyncTask *task,
@@ -367,11 +373,12 @@ bool TaskLocal::Item::destroy(AsyncTask *task) {
     cast<ValueItem>(this)->~ValueItem();
     break;
   case Kind::ParentTaskMarker:
-    cast<ParentTaskMarkerItem>(this)->~ParentTaskMarkerItem();
-
     // we're done here; as we must not proceed into the parent owned values.
     // we do have to destroy the item pointing at the parent/edge itself though.
     stop = true;
+    LLVM_FALLTHROUGH;
+  case Kind::StopLookupMarker:
+    cast<MarkerItem>(this)->~MarkerItem();
     break;
   }
 
@@ -442,6 +449,21 @@ bool TaskLocal::Storage::popValue(AsyncTask *task) {
   return head != nullptr;
 }
 
+void TaskLocal::Storage::pushStopLookup(AsyncTask *task) {
+  head = MarkerItem::createStopLookupMarker(task, head);
+  SWIFT_TASK_LOCAL_DEBUG_LOG(nullptr, "push stop node item:%p", head);
+}
+
+void TaskLocal::Storage::popStopLookup(AsyncTask *task) {
+  assert(head && "attempted to pop stop node off empty task-local stack");
+  assert(head->getKind() == Item::Kind::StopLookupMarker &&
+         "attempted to pop wrong node type");
+  auto old = head;
+  SWIFT_TASK_LOCAL_DEBUG_LOG(nullptr, "pop stop node item:%p", old);
+  head = head->getNext();
+  old->destroy(task);
+}
+
 OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,
                                           const HeapObject *key) {
   assert(key && "TaskLocal key must not be null.");
@@ -452,6 +474,8 @@ OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,
       if (valueItem->key == key) {
         return valueItem->getStoragePtr();
       }
+    } else if (item->getKind() == Item::Kind::StopLookupMarker) {
+      break;
     }
 
     item = item->getNext();
@@ -487,8 +511,28 @@ void TaskLocal::Storage::copyTo(AsyncTask *target) {
             "skip copy, already copied most recent value, value was [%p]",
             valueItem->getStoragePtr());
       }
+    } else if (item->getKind() == Item::Kind::StopLookupMarker) {
+      break;
     }
     item = item->getNext();
+  }
+}
+
+TaskLocal::StopLookupScope::StopLookupScope() {
+  task = swift_task_getCurrent();
+  storage = Storage::getCurrent(task);
+  if (storage && storage->isEmpty()) {
+    storage = nullptr;
+  }
+
+  if (storage) {
+    storage->pushStopLookup(task);
+  }
+}
+
+TaskLocal::StopLookupScope::~StopLookupScope() {
+  if (storage) {
+    storage->popStopLookup(task);
   }
 }
 
