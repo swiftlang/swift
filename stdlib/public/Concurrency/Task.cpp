@@ -347,7 +347,7 @@ void AsyncTask::setTaskId() {
 uint64_t AsyncTask::getTaskId() {
   // Reconstitute a full 64-bit task ID from the 32-bit job ID and the upper
   // 32 bits held in _private().
-  return (uint64_t)Id << _private().Id;
+  return ((uint64_t)_private().Id << 32) | (uint64_t)Id;
 }
 
 SWIFT_CC(swift)
