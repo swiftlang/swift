@@ -3854,6 +3854,18 @@ namespace {
       if (decl->getTemplatedKind() == clang::FunctionDecl::TK_FunctionTemplate)
         return;
 
+      SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+      LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, 0,
+                                              /*isImmortal*/ true);
+      if (const auto *funDecl = dyn_cast<FuncDecl>(result))
+        if (hasUnsafeAPIAttr(decl) && !funDecl->getResultInterfaceType()->isEscapable()) {
+          Impl.SwiftContext.evaluator.cacheOutput(
+              LifetimeDependenceInfoRequest{result},
+              Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
+          lifetimeDependencies.push_back(immortalLifetime);
+          return;
+        }
+
       auto retType = decl->getReturnType();
       auto warnForEscapableReturnType = [&] {
         if (isEscapableAnnotatedType(retType.getTypePtr())) {
@@ -3866,8 +3878,8 @@ namespace {
       };
 
       auto swiftParams = result->getParameters();
-      bool hasSelf = result->hasImplicitSelfDecl() && !isa<ConstructorDecl>(result);
-      SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+      bool hasSelf =
+          result->hasImplicitSelfDecl() && !isa<ConstructorDecl>(result);
       SmallBitVector inheritLifetimeParamIndicesForReturn(swiftParams->size() +
                                                           hasSelf);
       SmallBitVector scopedLifetimeParamIndicesForReturn(swiftParams->size() +
@@ -3907,8 +3919,7 @@ namespace {
         // Assume default constructed view types have no dependencies.
         if (ctordecl->isDefaultConstructor() &&
             importer::hasNonEscapableAttr(ctordecl->getParent()))
-          lifetimeDependencies.push_back(
-              LifetimeDependenceInfo(nullptr, nullptr, 0, /*isImmortal*/ true));
+          lifetimeDependencies.push_back(immortalLifetime);
       }
       if (lifetimeDependencies.empty()) {
         if (isNonEscapableAnnotatedType(retType.getTypePtr())) {
