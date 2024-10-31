@@ -208,6 +208,16 @@ func functionWithWhile() {
   }
 }
 
+// CHECK-NEXT: {{^}}  (decl version=51 decl=functionWithDefer()
+// CHECK-NEXT: {{^}}    (condition_following_availability version=52
+// CHECK-NEXT: {{^}}    (if_then version=52
+@available(OSX 51, *)
+func functionWithDefer() {
+  defer {
+    if #available(OSX 52, *) {}
+  }
+}
+
 // CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeClass
 // CHECK-NEXT: {{^}}    (decl version=51 decl=extension.SomeClass
 // CHECK-NEXT: {{^}}      (decl_implicit version=51 decl=someStaticPropertyWithClosureInit
