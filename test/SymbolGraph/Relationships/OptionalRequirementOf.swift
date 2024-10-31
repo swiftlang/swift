@@ -8,12 +8,12 @@
 // RUN: %target-swift-symbolgraph-extract -module-name OptionalRequirementOf -F %t/frameworks -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/OptionalRequirementOf.symbols.json
 
-// CHECK-NOT: "kind": "requirementOf"
-
 // ObjCProto.objcReq -> ObjCProto
+// CHECK-NOT: "kind": "requirementOf",{{[[:space:]]*}}"source": "c:@M@OptionalRequirementOf@objc(pl)SwiftProto(im)swiftReq",{{[[:space:]]*}}"target": "c:@M@OptionalRequirementOf@objc(pl)SwiftProto"
 // CHECK-DAG: "kind": "optionalRequirementOf",{{[[:space:]]*}}"source": "c:@M@OptionalRequirementOf@objc(pl)SwiftProto(im)swiftReq",{{[[:space:]]*}}"target": "c:@M@OptionalRequirementOf@objc(pl)SwiftProto"
 
 // SwiftProto.swiftReq -> SwiftProto
+// CHECK-NOT: "kind": "requirementOf",{{[[:space:]]*}}"source": "c:objc(pl)ObjCProto(im)objcReq",{{[[:space:]]*}}"target": "c:objc(pl)ObjCProto"
 // CHECK-DAG: "kind": "optionalRequirementOf",{{[[:space:]]*}}"source": "c:objc(pl)ObjCProto(im)objcReq",{{[[:space:]]*}}"target": "c:objc(pl)ObjCProto"
 
 //--- reqs.swift
