@@ -251,12 +251,6 @@ class USRBasedType {
       : USR(USR), Supertypes(Supertypes),
         CustomAttributeKinds(CustomAttributeKinds) {}
 
-  /// Implementation of \c typeRelation. \p VisistedTypes keeps track which
-  /// types have already been visited.
-  CodeCompletionResultTypeRelation
-  typeRelationImpl(const USRBasedType *ResultType, const USRBasedType *VoidType,
-                   SmallPtrSetImpl<const USRBasedType *> &VisitedTypes) const;
-
 public:
   /// A null \c USRBasedType that's represented by an empty USR and has no
   /// supertypes.

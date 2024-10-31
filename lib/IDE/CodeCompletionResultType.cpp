@@ -122,38 +122,6 @@ const USRBasedType *USRBasedTypeArena::getVoidType() const { return VoidType; }
 
 // MARK: - USRBasedType
 
-TypeRelation USRBasedType::typeRelationImpl(
-    const USRBasedType *ResultType, const USRBasedType *VoidType,
-    SmallPtrSetImpl<const USRBasedType *> &VisitedTypes) const {
-
-  // `this` is the contextual type.
-  if (this == VoidType) {
-    // We don't report Void <-> Void matches because that would boost
-    // methods returning Void in e.g.
-    // func foo() { #^COMPLETE^# }
-    // because #^COMPLETE^# is implicitly returned. But that's not very
-    // helpful.
-    return TypeRelation::Unknown;
-  }
-  if (ResultType == this) {
-    return TypeRelation::Convertible;
-  }
-  for (const USRBasedType *Supertype : ResultType->getSupertypes()) {
-    if (!VisitedTypes.insert(Supertype).second) {
-      // Already visited this type.
-      continue;
-    }
-    if (this->typeRelation(Supertype, VoidType) >= TypeRelation::Convertible) {
-      return TypeRelation::Convertible;
-    }
-  }
-  // TypeRelation computation based on USRs is an under-approximation because we
-  // don't take into account generic conversions or retroactive conformance of
-  // library types. Hence, we can't know for sure that ResultType is not
-  // convertible to `this` type and thus can't return Unrelated or Invalid here.
-  return TypeRelation::Unknown;
-}
-
 const USRBasedType *USRBasedType::null(USRBasedTypeArena &Arena) {
   return USRBasedType::fromUSR(/*USR=*/"", /*Supertypes=*/{}, {}, Arena);
 }
@@ -337,8 +305,37 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
 
 TypeRelation USRBasedType::typeRelation(const USRBasedType *ResultType,
                                         const USRBasedType *VoidType) const {
-  SmallPtrSet<const USRBasedType *, 4> VisitedTypes;
-  return this->typeRelationImpl(ResultType, VoidType, VisitedTypes);
+  // `this` is the contextual type.
+  if (this == VoidType) {
+    // We don't report Void <-> Void matches because that would boost
+    // methods returning Void in e.g.
+    // func foo() { #^COMPLETE^# }
+    // because #^COMPLETE^# is implicitly returned. But that's not very
+    // helpful.
+    return TypeRelation::Unknown;
+  }
+
+  SmallPtrSet<const USRBasedType *, 16> VisitedTypes;
+  SmallVector<const USRBasedType *, 16> Worklist;
+  Worklist.push_back(ResultType);
+  while (!Worklist.empty()) {
+    auto *CurrentType = Worklist.pop_back_val();
+    if (CurrentType == this)
+      return TypeRelation::Convertible;
+
+    for (const USRBasedType *Supertype : CurrentType->getSupertypes()) {
+      if (!VisitedTypes.insert(Supertype).second) {
+        // Already visited this type.
+        continue;
+      }
+      Worklist.push_back(Supertype);
+    }
+  }
+  // TypeRelation computation based on USRs is an under-approximation because we
+  // don't take into account generic conversions or retroactive conformance of
+  // library types. Hence, we can't know for sure that ResultType is not
+  // convertible to `this` type and thus can't return Unrelated or Invalid here.
+  return TypeRelation::Unknown;
 }
 
 // MARK: - USRBasedTypeContext
