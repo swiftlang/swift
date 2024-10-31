@@ -69,3 +69,22 @@ do {
     test(&outputs[name]!) // Ok
   }
 }
+
+do {
+  func test<O>(_ initialValue: O, _ action: (inout O) -> Void) -> O {
+  }
+
+  func compute(_: UnsafeMutablePointer<UInt8>!) {
+  }
+
+  let result1 = test(0) { // `0` should be inferred as `UInt8`
+    compute(&$0)
+  }
+
+  let result2 = test([0]) { // `0` should be inferred as `UInt8`
+      compute(&$0)
+  }
+
+  let _: UInt8 = result1 // Ok
+  let _: [UInt8] = result2 // Ok
+}

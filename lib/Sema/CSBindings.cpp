@@ -1518,11 +1518,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       if (auto pointeeTy = second->lookThroughAllOptionalTypes()
                                ->getAnyPointerElementType()) {
         if (!pointeeTy->isTypeVariableOrMember()) {
-          // The binding is as a fallback in this case because $T could
-          // also be Array<X> or C-style pointer.
-          if (constraint->getKind() >= ConstraintKind::ArgumentConversion)
-            DelayedBy.push_back(constraint);
-
           return PotentialBinding(pointeeTy, AllowedBindingKind::Exact,
                                   constraint);
         }
