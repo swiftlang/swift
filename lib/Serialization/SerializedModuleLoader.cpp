@@ -1190,8 +1190,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                        moduleBufferID);
     break;
   case serialization::Status::NotInOSSA:
-    // Diagnose only when explicit build modules is enabled
-    if (Ctx.SerializationOpts.ExplicitModuleBuild) {
+    if (Ctx.SerializationOpts.ExplicitModuleBuild ||
+        !Ctx.SILOpts.EnableRecompilationToOSSAModule) {
       Ctx.Diags.diagnose(diagLoc,
                          diag::serialization_non_ossa_module_incompatible,
                          ModuleName);
