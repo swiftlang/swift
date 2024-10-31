@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend  -I %t/lib/swift -typecheck %s -module-name main -swift-version 5 -F %S/Inputs/mock-sdk -emit-loaded-module-trace-path %t/.MODULE_TRACE
+// RUN: %target-swift-frontend  -I %t/lib/swift -typecheck %s %S/Inputs/objc_send_collector_2.swift -module-name main -swift-version 5 -F %S/Inputs/mock-sdk -emit-loaded-module-trace-path %t/.MODULE_TRACE
 // RUN: cat %t/.SWIFT_FINE_DEPENDENCY_TRACE/* | %FileCheck %s
 
 // REQUIRES: objc_interop
@@ -21,5 +21,7 @@ public func testProperties(_ x: FooClassBase, _ y: FooProtocolBase) {
 // CHECK-DAG: "protocol_type": "FooProtocolBase"
 // CHECK-DAG: "declared_at": "SOURCE_DIR/test/IDE/Inputs/mock-sdk/Foo.framework/Headers/Foo.h
 // CHECK-DAG: "referenced_at_file_id": 1
+// CHECK-DAG: "referenced_at_file_id": 2
 // CHECK-DAG: "file_id": 1,
-// CHECK-DAG: "file_path": "SOURCE_DIR/test/IDE/objc_send_collector.swift"
+// CHECK-DAG: "file_path": "SOURCE_DIR/test/IDE/objc_send_collector_1.swift"
+// CHECK-DAG: "file_path": "SOURCE_DIR/test/IDE/Inputs/objc_send_collector_2.swift"
