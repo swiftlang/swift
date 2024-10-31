@@ -8177,6 +8177,9 @@ public:
 
 llvm::Expected<const clang::Type *>
 ModuleFile::getClangType(ClangTypeID TID) {
+  if (!getContext().LangOpts.UseClangFunctionTypes)
+    return nullptr;
+
   if (TID == 0)
     return nullptr;
 
