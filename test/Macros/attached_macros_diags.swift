@@ -17,9 +17,7 @@
 // expected-note@-1{{'m3(message:)' declared here}}
 
 @attached(peer) macro m4(_ param1: Int, label2 param2: String) = #externalMacro(module: "MacroDefinition", type: "EmptyPeerMacro")
-// expected-note@-1{{'m4(_:label2:)' declared here}}
-// expected-note@-2{{'m4(_:label2:)' declared here}}
-// expected-note@-3{{'m4(_:label2:)' declared here}}
+// expected-note@-1 3 {{'m4(_:label2:)' declared here}}
 
 @attached(peer) macro m5(label1: Int, label2: String) = #externalMacro(module: "MacroDefinition", type: "EmptyPeerMacro")
 // expected-note@-1{{'m5(label1:label2:)' declared here}}
