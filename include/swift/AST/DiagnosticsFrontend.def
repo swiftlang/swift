@@ -585,5 +585,8 @@ ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",
       (StringRef))
 
+ERROR(zlib_not_supported,none,
+      "this compiler was not built with zlib compression support enabled", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

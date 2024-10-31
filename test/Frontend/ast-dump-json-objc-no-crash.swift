@@ -9,17 +9,19 @@
 
 import Foundation
 
-@objc public class NotRenamed: NSObject {}
+@objc public class NotRenamed: NSObject {
+    @objc public var property: Int = 0
+}
 
 @objc(PFXRenamed) @objcMembers public class Renamed: NSObject {
     @objc(f1) public func f1() {}
     @objc(f2WithInteger:) public func f2(_ x: Int) {}
     @objc(f3withInteger:error:) public func f3(_ x: Int) throws {}
 
-    @objc(strobjc) public var str: NSString = ""
+    @objc(objcnested) public var nested: NotRenamed = .init()
 }
 
 func f() {
     _ = #selector(Renamed.f1)
-    _ = #keyPath(Renamed.str.length)
+    _ = #keyPath(Renamed.nested.property)
 }

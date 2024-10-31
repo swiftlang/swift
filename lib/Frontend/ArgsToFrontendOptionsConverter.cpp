@@ -29,6 +29,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/Compression.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
@@ -207,6 +208,10 @@ bool ArgsToFrontendOptionsConverter::convert(
             .Case("json", FrontendOptions::ASTFormat::JSON)
             .Case("json-zlib", FrontendOptions::ASTFormat::JSONZlib)
             .Default(FrontendOptions::ASTFormat::Default);
+    if (Opts.DumpASTFormat == FrontendOptions::ASTFormat::JSONZlib && !llvm::compression::zlib::isAvailable()) {
+      Diags.diagnose(SourceLoc(), diag::zlib_not_supported);
+      return true;
+    }
   }
 
   std::optional<FrontendInputsAndOutputs> inputsAndOutputs =
