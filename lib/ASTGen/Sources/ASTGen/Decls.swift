@@ -48,8 +48,8 @@ extension ASTGenVisitor {
       return self.generate(initializerDecl: node).asDecl
     case .macroDecl:
       break
-    case .macroExpansionDecl:
-      break
+    case .macroExpansionDecl(let node):
+      return self.generate(macroExpansionDecl: node).asDecl
     case .missingDecl:
       break
     case .operatorDecl(let node):
@@ -615,6 +615,29 @@ extension ASTGenVisitor {
         decl.setParsedBody(self.generate(codeBlock: body))
       }
     }
+
+    return decl
+  }
+}
+
+// MARK: - MacroExpansionDecl
+
+extension ASTGenVisitor {
+  func generate(macroExpansionDecl node: MacroExpansionDeclSyntax) -> BridgedMacroExpansionDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: true)
+    let info = self.generate(freestandingMacroExpansion: node)
+
+    let decl = BridgedMacroExpansionDecl.createParsed(
+      self.declContext,
+      poundLoc: info.poundLoc,
+      macroNameRef: info.macroNameRef,
+      macroNameLoc: info.macroNameLoc,
+      leftAngleLoc: info.leftAngleLoc,
+      genericArgs: info.genericArgs,
+      rightAngleLoc: info.rightAngleLoc,
+      args: info.arguments
+    )
+    decl.asDecl.setAttrs(attrs.attributes)
 
     return decl
   }

@@ -330,6 +330,20 @@ void Parser::parseSourceFileViaASTGen(
   if (!needToParse)
     return;
 
+  switch (SF.Kind) {
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+  case SourceFileKind::Interface:
+    break;
+  case SourceFileKind::SIL:
+    // FIXME: Support SIL.
+    return;
+  case SourceFileKind::MacroExpansion:
+  case SourceFileKind::DefaultArgument:
+    // FIXME: Support macro expanded sources.
+    return;
+  }
+
   auto *exportedSourceFile = SF.getExportedSourceFile();
   if (!exportedSourceFile)
     return;
