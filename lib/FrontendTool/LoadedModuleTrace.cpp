@@ -849,6 +849,8 @@ class ObjcMethodReferenceCollector: public SourceEntityWalker {
       return "interface_type";
     if (isa<clang::ObjCCategoryDecl>(clangD))
       return "category_type";
+    if (isa<clang::ObjCProtocolDecl>(clangD))
+      return "protocol_type";
     return "type";
   }
 public:
