@@ -82,6 +82,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/Compression.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
@@ -471,6 +472,16 @@ static bool dumpAST(CompilerInstance &Instance) {
       break;
     case FrontendOptions::ASTFormat::JSON:
       SF->dumpJSON(Instance.getASTContext(), out);
+      break;
+    case FrontendOptions::ASTFormat::JSONZlib:
+      std::string jsonText;
+      llvm::raw_string_ostream jsonTextStream(jsonText);
+      SF->dumpJSON(Instance.getASTContext(), jsonTextStream);
+
+      SmallVector<uint8_t, 0> compressed;
+      llvm::compression::zlib::compress(llvm::arrayRefFromStringRef(jsonText),
+                                        compressed);
+      out << llvm::toStringRef(compressed);
       break;
     }
   };

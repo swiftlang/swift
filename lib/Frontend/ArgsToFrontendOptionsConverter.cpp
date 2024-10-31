@@ -205,6 +205,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.DumpASTFormat =
         llvm::StringSwitch<FrontendOptions::ASTFormat>(A->getValue())
             .Case("json", FrontendOptions::ASTFormat::JSON)
+            .Case("json-zlib", FrontendOptions::ASTFormat::JSONZlib)
             .Default(FrontendOptions::ASTFormat::Default);
   }
 
