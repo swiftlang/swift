@@ -80,6 +80,8 @@ FEATURE(ClearSensitive,                                 FUTURE)
 FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
 FEATURE(ValueGenericType,                               FUTURE)
 FEATURE(InitRawStructMetadata2,                         FUTURE)
+// TODO: CoroutineAccessors: Change to correct version number.
+FEATURE(CoroutineAccessors,                             FUTURE)
 
 #undef FEATURE
 #undef FUTURE

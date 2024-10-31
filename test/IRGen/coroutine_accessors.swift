@@ -1,6 +1,7 @@
 // RUN: %target-swift-emit-irgen                             \
 // RUN:     %s                                               \
 // RUN:     -enable-experimental-feature CoroutineAccessors  \
+// RUN:     -enable-library-evolution                        \
 // RUN: | %IRGenFileCheck %s --check-prefix=CHECK-OLD
 
 // For now, a crash is expected when attempting to use the callee-allocated ABI: 
@@ -13,6 +14,7 @@
 
 // REQUIRES: asserts
 
+@frozen
 public struct S {
 public var o: any AnyObject
 public var _i: Int = 0
