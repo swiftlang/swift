@@ -23,12 +23,14 @@
 #include "ImportName.h"
 #include "SwiftLookupTable.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -1714,6 +1716,20 @@ public:
     D->setAccess(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccess(access);
+
+    if constexpr (std::is_base_of_v<NominalTypeDecl, DeclTy>) {
+      // Estimate brace locations.
+      auto begin = ClangN.getAsDecl()->getBeginLoc();
+      auto end = ClangN.getAsDecl()->getEndLoc();
+      SourceRange range;
+      if (begin.isValid() && end.isValid() && D->getNameLoc().isValid())
+        range = SourceRange(importSourceLoc(begin), importSourceLoc(end));
+      else {
+        range = SourceRange(D->getNameLoc(), D->getNameLoc());
+      }
+      assert(range.isValid() == D->getNameLoc().isValid());
+      D->setBraces(range);
+    }
 
     // SwiftAttrs on ParamDecls are interpreted by applyParamAttributes().
     if (!isa<ParamDecl>(D))
