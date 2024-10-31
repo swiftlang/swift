@@ -2711,6 +2711,17 @@ public:
         CaseCounts, DefaultCount, forwardingOwnershipKind));
   }
 
+  /// A convenience function to decompose a scalar optional value with a
+  /// switch_enum.  Returns the object value, which will only be valid
+  /// in `someBB`.  Don't forget to switch insertion blocks after
+  /// calling this.
+  SILPhiArgument *createSwitchOptional(
+      SILLocation loc, SILValue operand,
+      SILBasicBlock *someBB, SILBasicBlock *noneBB,
+      ValueOwnershipKind forwardingOwnershipKind,
+      ProfileCounter someCount = ProfileCounter(),
+      ProfileCounter noneCount = ProfileCounter());
+
   SwitchEnumAddrInst *createSwitchEnumAddr(
       SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
