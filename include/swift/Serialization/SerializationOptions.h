@@ -25,13 +25,12 @@
 namespace swift {
 
   class SerializationOptions {
-    SerializationOptions(const SerializationOptions &) = delete;
-    void operator=(const SerializationOptions &) = delete;
-
   public:
     SerializationOptions() = default;
     SerializationOptions(SerializationOptions &&) = default;
     SerializationOptions &operator=(SerializationOptions &&) = default;
+    SerializationOptions(const SerializationOptions &) = default;
+    SerializationOptions &operator=(const SerializationOptions &) = default;
     ~SerializationOptions() = default;
 
     StringRef OutputPath;

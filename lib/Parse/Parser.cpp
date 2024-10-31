@@ -1126,6 +1126,7 @@ struct ParserUnit::Implementation {
   ClangImporterOptions clangImporterOpts;
   symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
   CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   DiagnosticEngine Diags;
   ASTContext &Ctx;
   SourceFile *SF;
@@ -1136,8 +1137,8 @@ struct ParserUnit::Implementation {
                  const SILOptions &silOpts, StringRef ModuleName)
       : LangOpts(Opts), TypeCheckerOpts(TyOpts), SILOpts(silOpts), Diags(SM),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
-                             clangImporterOpts, symbolGraphOpts, CASOpts, SM,
-                             Diags)) {
+                             clangImporterOpts, symbolGraphOpts, CASOpts,
+                             SerializationOpts, SM, Diags)) {
     registerParseRequestFunctions(Ctx.evaluator);
 
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);

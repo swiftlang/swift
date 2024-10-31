@@ -180,6 +180,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
                       workerCompilerInvocation->getClangImporterOptions(),
                       workerCompilerInvocation->getSymbolGraphOptions(),
                       workerCompilerInvocation->getCASOptions(),
+                      workerCompilerInvocation->getSerializationOptions(),
                       ScanASTContext.SourceMgr, Diagnostics));
   auto loader = std::make_unique<PluginLoader>(
       *workerASTContext, /*DepTracker=*/nullptr,

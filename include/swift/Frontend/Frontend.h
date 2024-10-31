@@ -104,6 +104,7 @@ class CompilerInvocation {
   TBDGenOptions TBDGenOpts;
   ModuleInterfaceOptions ModuleInterfaceOpts;
   CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   llvm::MemoryBuffer *IDEInspectionTargetBuffer = nullptr;
 
   /// The offset that IDEInspection wants to further examine in offset of bytes
@@ -326,6 +327,11 @@ public:
 
   IRGenOptions &getIRGenOptions() { return IRGenOpts; }
   const IRGenOptions &getIRGenOptions() const { return IRGenOpts; }
+
+  SerializationOptions &getSerializationOptions() { return SerializationOpts; }
+  const SerializationOptions &getSerializationOptions() const {
+    return SerializationOpts;
+  }
 
   void setParseStdlib() {
     FrontendOpts.ParseStdlib = true;

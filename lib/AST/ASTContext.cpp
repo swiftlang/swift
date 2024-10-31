@@ -757,7 +757,8 @@ ASTContext *ASTContext::get(
     SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
-    SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    SerializationOptions &serializationOpts, SourceManager &SourceMgr,
+    DiagnosticEngine &Diags,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
@@ -771,8 +772,8 @@ ASTContext *ASTContext::get(
   new (impl) Implementation();
   return new (mem)
       ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
-                 ClangImporterOpts, SymbolGraphOpts, casOpts, SourceMgr, Diags,
-                 std::move(OutputBackend));
+                 ClangImporterOpts, SymbolGraphOpts, casOpts, serializationOpts,
+                 SourceMgr, Diags, std::move(OutputBackend));
 }
 
 ASTContext::ASTContext(
@@ -780,17 +781,19 @@ ASTContext::ASTContext(
     SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
-    SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    SerializationOptions &SerializationOpts, SourceManager &SourceMgr,
+    DiagnosticEngine &Diags,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend)
     : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
-      SymbolGraphOpts(SymbolGraphOpts), CASOpts(casOpts), SourceMgr(SourceMgr),
-      Diags(Diags), OutputBackend(std::move(OutBackend)),
-      evaluator(Diags, langOpts), TheBuiltinModule(createBuiltinModule(*this)),
+      SymbolGraphOpts(SymbolGraphOpts), CASOpts(casOpts),
+      SerializationOpts(SerializationOpts), SourceMgr(SourceMgr), Diags(Diags),
+      OutputBackend(std::move(OutBackend)), evaluator(Diags, langOpts),
+      TheBuiltinModule(createBuiltinModule(*this)),
       StdlibModuleName(getIdentifier(STDLIB_NAME)),
       SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
       blockListConfig(SourceMgr),
-      TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(
+      TheErrorType(new(*this, AllocationArena::Permanent) ErrorType(
           *this, Type(), RecursiveTypeProperties::HasError)),
       TheUnresolvedType(new(*this, AllocationArena::Permanent)
                             UnresolvedType(*this)),
@@ -801,17 +804,17 @@ ASTContext::ASTContext(
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
 #include "swift/AST/TypeNodes.def"
-      TheIEEE32Type(new (*this, AllocationArena::Permanent)
+      TheIEEE32Type(new(*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE32, *this)),
-      TheIEEE64Type(new (*this, AllocationArena::Permanent)
+      TheIEEE64Type(new(*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE64, *this)),
-      TheIEEE16Type(new (*this, AllocationArena::Permanent)
+      TheIEEE16Type(new(*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE16, *this)),
-      TheIEEE80Type(new (*this, AllocationArena::Permanent)
+      TheIEEE80Type(new(*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE80, *this)),
-      TheIEEE128Type(new (*this, AllocationArena::Permanent)
+      TheIEEE128Type(new(*this, AllocationArena::Permanent)
                          BuiltinFloatType(BuiltinFloatType::IEEE128, *this)),
-      ThePPC128Type(new (*this, AllocationArena::Permanent)
+      ThePPC128Type(new(*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::PPC128, *this)) {
 
   // Initialize all of the known identifiers.

@@ -188,11 +188,12 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   LangOpts.Target = Invocation.getTargetTriple();
   LangOpts.EnableObjCInterop = Invocation.enableObjCInterop();
   ASTContext &ASTCtx = *ASTContext::get(
       LangOpts, TypeCheckOpts, SILOpts, SearchPathOpts, ClangImporterOpts,
-      SymbolGraphOpts, CASOpts, SrcMgr, Instance.getDiags(),
+      SymbolGraphOpts, CASOpts, SerializationOpts, SrcMgr, Instance.getDiags(),
       llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>());
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
