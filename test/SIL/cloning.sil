@@ -289,3 +289,20 @@ entry:
   %res = apply %callee() : $@convention(thin) () -> ()
   return %res : $()
 }
+
+sil [transparent] [ossa] @getSize : $@convention(thin) <Type> (@thick Type.Type) -> Builtin.Word {
+bb0(%ty : $@thick Type.Type):
+  %size = builtin "sizeof"<Type>() : $Builtin.Word
+  return %size : $Builtin.Word
+}
+
+// CHECK-LABEL: sil [ossa] @callee_builtin_type_dep_operand : {{.*}} {
+// CHECK:         open_existential_metatype
+// CHECK-LABEL: } // end sil function 'callee_builtin_type_dep_operand'
+sil [ossa] @callee_builtin_type_dep_operand : $@convention(thin) (@thick any Any.Type) -> Builtin.Word {
+bb0(%0 : $@thick any Any.Type):
+  %ty = open_existential_metatype %0 : $@thick any Any.Type to $@thick (@opened("00000000-0000-0000-0000-000000000000", Any) Self).Type
+  %getSize = function_ref @getSize : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
+  %retval = apply %getSize<@opened("00000000-0000-0000-0000-000000000000", Any) Self>(%ty) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
+  return %retval : $Builtin.Word
+}
