@@ -320,7 +320,7 @@ public:
 
   /// Block expanding and register promotion more aggressively throughout the
   /// optimizer.
-  bool UseAggressiveReg2MemForCodeSize = false;
+  bool UseAggressiveReg2MemForCodeSize = true;
 
   SILOptions() {}
 
