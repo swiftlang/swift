@@ -94,19 +94,19 @@ extern "C" void _swift_job_run_c(SwiftJob *job, SwiftExecutorRef executor)
 
 extern "C" SwiftTime swift_time_now(SwiftClockId clock)
 {
-  SwiftTime result;
-  swift_get_time(&result.seconds,
-                 (int64_t *)&result.nanoseconds,
+  long long llsecs, llnsecs;
+  swift_get_time(&llsecs,
+                 &llnsecs,
                  (swift_clock_id)clock);
-  return result;
+  return { (int64_t)llsecs, (uint64_t)llnsecs };
 }
 
 extern "C" SwiftDuration swift_time_getResolution(SwiftClockId clock)
 {
-  SwiftDuration result;
-  swift_get_clock_res(&result.seconds, (int64_t *)&result.nanoseconds,
+  long long llsecs, llnsecs;
+  swift_get_clock_res(&llsecs, &llnsecs,
                       (swift_clock_id)clock);
-  return result;
+  return { (int64_t)llsecs, (uint64_t)llnsecs };
 }
 
 bool swift::swift_executor_isComplexEquality(SerialExecutorRef ref) {
