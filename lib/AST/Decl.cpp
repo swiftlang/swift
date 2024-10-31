@@ -5545,8 +5545,12 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
   if (const auto specifierLoc = getSpecifierLoc())
     startLoc = specifierLoc;
 
-  if (!getInherited().empty())
-    endLoc = getInherited().getEndLoc();
+  if (!getInherited().empty()) {
+    if (getInherited().getEndLoc().isValid())
+      endLoc = getInherited().getEndLoc();
+    else
+      assert(startLoc.isInvalid() || this->hasClangNode());
+  }
 
   return {startLoc, endLoc};
 }
