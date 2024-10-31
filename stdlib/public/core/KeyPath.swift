@@ -84,7 +84,7 @@ public class AnyKeyPath: _AppendKeyPath {
       _kvcKeyPathStringPtr = nil
     }
 #else
-#error("Unsupported platform")
+    // Don't assign anything.
 #endif
   }
 
@@ -111,7 +111,8 @@ public class AnyKeyPath: _AppendKeyPath {
     }
     return nil
 #else
-#error("Unsupported platform")
+    // Otherwise, we assigned nothing so return nothing.
+    return nil
 #endif
   }
 
