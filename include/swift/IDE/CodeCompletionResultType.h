@@ -207,6 +207,10 @@ private:
   /// allocated.
   const USRBasedTypeArena &Arena;
 
+  /// A cached set of type relations for this given type context.
+  mutable llvm::DenseMap<const USRBasedType *, CodeCompletionResultTypeRelation>
+      CachedTypeRelations;
+
   SmallVector<ContextualType, 4> ContextualTypes;
 
   /// See \c ExpectedTypeContext::ExpectedAttributeKinds.

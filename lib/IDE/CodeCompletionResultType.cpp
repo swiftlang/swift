@@ -88,27 +88,37 @@ USRBasedTypeContext::USRBasedTypeContext(const ExpectedTypeContext *TypeContext,
 
 TypeRelation
 USRBasedTypeContext::typeRelation(const USRBasedType *ResultType) const {
-  if (ExpectedCustomAttributeKinds) {
-    return ResultType->getCustomAttributeKinds() & ExpectedCustomAttributeKinds
-               ? TypeRelation::Convertible
-               : TypeRelation::Unrelated;
-  }
-  const USRBasedType *VoidType = Arena.getVoidType();
-  if (ResultType == VoidType) {
-    // Void is not convertible to anything and we don't report Void <-> Void
-    // identical matches (see USRBasedType::typeRelation). So we don't have to
-    // check anything if the result returns Void.
-    return TypeRelation::Unknown;
-  }
-
-  TypeRelation Res = TypeRelation::Unknown;
-  for (auto &ContextualType : ContextualTypes) {
-    Res = std::max(Res, ContextualType.typeRelation(ResultType, VoidType));
-    if (Res == TypeRelation::MAX_VALUE) {
-      return Res; // We can't improve further
+  auto compute = [&]() -> TypeRelation {
+    if (ExpectedCustomAttributeKinds) {
+      return ResultType->getCustomAttributeKinds() &
+                     ExpectedCustomAttributeKinds
+                 ? TypeRelation::Convertible
+                 : TypeRelation::Unrelated;
     }
-  }
-  return Res;
+    const USRBasedType *VoidType = Arena.getVoidType();
+    if (ResultType == VoidType) {
+      // Void is not convertible to anything and we don't report Void <-> Void
+      // identical matches (see USRBasedType::typeRelation). So we don't have to
+      // check anything if the result returns Void.
+      return TypeRelation::Unknown;
+    }
+
+    TypeRelation Res = TypeRelation::Unknown;
+    for (auto &ContextualType : ContextualTypes) {
+      Res = std::max(Res, ContextualType.typeRelation(ResultType, VoidType));
+      if (Res == TypeRelation::MAX_VALUE) {
+        return Res; // We can't improve further
+      }
+    }
+    return Res;
+  };
+  auto iter = CachedTypeRelations.find(ResultType);
+  if (iter != CachedTypeRelations.end())
+    return iter->second;
+
+  auto relation = compute();
+  CachedTypeRelations.insert({ResultType, relation});
+  return relation;
 }
 
 // MARK: - USRBasedTypeArena
