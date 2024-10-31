@@ -182,20 +182,21 @@ public:
     Immediate, ///< Immediate mode
     REPL,      ///< REPL mode
 
-    EmitAssembly, ///< Emit assembly
-    EmitIRGen,    ///< Emit LLVM IR before LLVM optimizations
-    EmitIR,       ///< Emit LLVM IR after LLVM optimizations
-    EmitBC,       ///< Emit LLVM BC
-    EmitObject,   ///< Emit object file
+    EmitAssembly,   ///< Emit assembly
+    EmitLoweredSIL, ///< Emit lowered SIL before IRGen runs
+    EmitIRGen,      ///< Emit LLVM IR before LLVM optimizations
+    EmitIR,         ///< Emit LLVM IR after LLVM optimizations
+    EmitBC,         ///< Emit LLVM BC
+    EmitObject,     ///< Emit object file
 
     DumpTypeInfo, ///< Dump IRGen type info
 
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
 
-    ScanDependencies,        ///< Scan dependencies of Swift source files
-    PrintVersion,       ///< Print version information.
-    PrintFeature,       ///< Print supported feature of this compiler
+    ScanDependencies, ///< Scan dependencies of Swift source files
+    PrintVersion,     ///< Print version information.
+    PrintFeature,     ///< Print supported feature of this compiler
   };
 
   /// Indicates the action the user requested that the frontend perform.
