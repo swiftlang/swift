@@ -979,6 +979,10 @@ function Build-CMakeProject {
         $UseBuiltCompilers.Contains("C") -Or $UseBuiltCompilers.Contains("CXX") -Or
         $UsePinnedCompilers.Contains("C") -Or $UsePinnedCompilers.Contains("CXX")) {
       if ($DebugInfo -and $Platform -eq "Windows") {
+        $DebugFlag = if ($EnableCaching) { "/Z7" } else { "/Zi" }
+        Append-FlagsDefine $Defines CMAKE_C_FLAGS_RELEASE $DebugFlag
+        Append-FlagsDefine $Defines CMAKE_CXX_FLAGS_RELEASE $DebugFlag
+        # The following settings only handle Debug and RelWithDebInfo modes
         Append-FlagsDefine $Defines CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded
         Append-FlagsDefine $Defines CMAKE_POLICY_CMP0141 NEW
         # Add additional linker flags for generating the debug info.
