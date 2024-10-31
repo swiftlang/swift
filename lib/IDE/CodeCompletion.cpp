@@ -960,7 +960,9 @@ addClosureSignatureKeywordsIfApplicable(CodeCompletionResultSink &Sink,
   if (closure->getInLoc().isValid())
     return;
 
-  addKeyword(Sink, "in", CodeCompletionKeywordKind::kw_in);
+  addKeyword(Sink, "in", CodeCompletionKeywordKind::kw_in,
+             /*TypeAnnotation=*/"",
+             CodeCompletionFlairBit::CommonKeywordAtCurrentPosition);
 }
 
 void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
