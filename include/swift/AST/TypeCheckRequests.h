@@ -1937,10 +1937,10 @@ public:
   void cacheResult(bool value) const;
 };
 
-class RequiresOpaqueModifyCoroutineRequest :
-    public SimpleRequest<RequiresOpaqueModifyCoroutineRequest,
-                         bool(AbstractStorageDecl *),
-                         RequestFlags::SeparatelyCached> {
+class RequiresOpaqueModifyCoroutineRequest
+    : public SimpleRequest<RequiresOpaqueModifyCoroutineRequest,
+                           bool(AbstractStorageDecl *, bool isUnderscored),
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1948,8 +1948,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool
-  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl,
+                bool isUnderscored) const;
 
 public:
   // Separate caching.

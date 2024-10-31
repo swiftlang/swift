@@ -2849,8 +2849,13 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
                                        /*dispatch*/ false);
   case ReadWriteImplKind::StoredWithDidSet:
   case ReadWriteImplKind::InheritedWithDidSet:
-    if (storage->requiresOpaqueModifyCoroutine() &&
+    if (storage->requiresOpaqueModify2Coroutine() &&
         storage->getParsedAccessor(AccessorKind::DidSet)->isSimpleDidSet()) {
+      return AccessStrategy::getAccessor(AccessorKind::Modify2,
+                                         /*dispatch*/ false);
+    } else if (storage->requiresOpaqueModifyCoroutine() &&
+               storage->getParsedAccessor(AccessorKind::DidSet)
+                   ->isSimpleDidSet()) {
       return AccessStrategy::getAccessor(AccessorKind::Modify,
                                          /*dispatch*/ false);
     } else {
@@ -2868,6 +2873,8 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
 
 static AccessStrategy
 getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) {
+  if (storage->requiresOpaqueRead2Coroutine())
+    return AccessStrategy::getAccessor(AccessorKind::Read2, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
   return AccessStrategy::getAccessor(AccessorKind::Get, dispatch);
@@ -2883,6 +2890,8 @@ getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) 
 static AccessStrategy
 getOpaqueReadWriteAccessStrategy(const AbstractStorageDecl *storage,
                                  bool dispatch) {
+  if (storage->requiresOpaqueModify2Coroutine())
+    return AccessStrategy::getAccessor(AccessorKind::Modify2, dispatch);
   if (storage->requiresOpaqueModifyCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
   return AccessStrategy::getMaterializeToTemporary(
@@ -2990,11 +2999,13 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
   case AccessorKind::Set:
     return requiresOpaqueSetter();
   case AccessorKind::Read:
-  case AccessorKind::Read2:
     return requiresOpaqueReadCoroutine();
+  case AccessorKind::Read2:
+    return requiresOpaqueRead2Coroutine();
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
     return requiresOpaqueModifyCoroutine();
+  case AccessorKind::Modify2:
+    return requiresOpaqueModify2Coroutine();
 
   // Other accessors are never part of the opaque-accessors set.
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
@@ -3006,11 +3017,37 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
   llvm_unreachable("bad accessor kind");
 }
 
+bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
+  ASTContext &ctx = getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
+    return requiresCorrespondingUnderscoredCoroutineAccessor(
+        AccessorKind::Read2);
+  return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+}
+
+bool AbstractStorageDecl::requiresOpaqueRead2Coroutine() const {
+  ASTContext &ctx = getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
+    return false;
+  return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+}
+
 bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    RequiresOpaqueModifyCoroutineRequest{const_cast<AbstractStorageDecl *>(this)},
-    false);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      RequiresOpaqueModifyCoroutineRequest{
+          const_cast<AbstractStorageDecl *>(this), /*isUnderscored=*/true},
+      false);
+}
+
+bool AbstractStorageDecl::requiresOpaqueModify2Coroutine() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      RequiresOpaqueModifyCoroutineRequest{
+          const_cast<AbstractStorageDecl *>(this), /*isUnderscored=*/false},
+      false);
 }
 
 AccessorDecl *AbstractStorageDecl::getSynthesizedAccessor(AccessorKind kind) const {
@@ -3109,6 +3146,9 @@ void AbstractStorageDecl::visitExpectedOpaqueAccessors(
   if (requiresOpaqueReadCoroutine())
     visit(AccessorKind::Read);
 
+  if (requiresOpaqueRead2Coroutine())
+    visit(AccessorKind::Read2);
+
   // All mutable storage should have a setter.
   if (requiresOpaqueSetter())
     visit(AccessorKind::Set);
@@ -3116,6 +3156,9 @@ void AbstractStorageDecl::visitExpectedOpaqueAccessors(
   // Include the modify coroutine if it's required.
   if (requiresOpaqueModifyCoroutine())
     visit(AccessorKind::Modify);
+
+  if (requiresOpaqueModify2Coroutine())
+    visit(AccessorKind::Modify2);
 }
 
 void AbstractStorageDecl::visitOpaqueAccessors(

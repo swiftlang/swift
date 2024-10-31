@@ -2289,6 +2289,20 @@ synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
   return synthesizeCoroutineAccessorBody(modify, ctx);
 }
 
+/// Synthesize the body of a modify coroutine.
+static std::pair<BraceStmt *, bool>
+synthesizeModify2CoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
+#ifndef NDEBUG
+  auto storage = modify->getStorage();
+  auto impl = storage->getReadWriteImpl();
+  auto hasWrapper = isa<VarDecl>(storage) &&
+                    cast<VarDecl>(storage)->hasAttachedPropertyWrapper();
+  assert((hasWrapper || impl != ReadWriteImplKind::Modify2) &&
+         impl != ReadWriteImplKind::Immutable);
+#endif
+  return synthesizeCoroutineAccessorBody(modify, ctx);
+}
+
 static std::pair<BraceStmt *, bool>
 synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   auto *accessor = cast<AccessorDecl>(fn);
@@ -2312,8 +2326,10 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
     return synthesizeRead2CoroutineBody(accessor, ctx);
 
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
     return synthesizeModifyCoroutineBody(accessor, ctx);
+
+  case AccessorKind::Modify2:
+    return synthesizeModify2CoroutineBody(accessor, ctx);
 
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
@@ -2694,9 +2710,67 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-bool
-RequiresOpaqueModifyCoroutineRequest::evaluate(Evaluator &evaluator,
-                                               AbstractStorageDecl *storage) const {
+/// When the CoroutineAccessors feature is available, the coroutine accessor
+/// _could_ be required.  That non-underscored accessor would be preferred to
+/// its underscored counterpart accessor.
+///
+/// The underscored accessor could, however, still be required for ABI
+/// stability.
+bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
+    AccessorKind kind) const {
+  auto &ctx = getASTContext();
+  assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
+  assert(kind == AccessorKind::Modify2 || kind == AccessorKind::Read2);
+
+  // Non-stable modules have no ABI to keep stable.
+  if (getModuleContext()->getResilienceStrategy() !=
+      ResilienceStrategy::Resilient)
+    return false;
+
+  // Non-exported storage has no ABI to keep stable.
+  if (!isExported(this))
+    return false;
+
+  // The the non-underscored accessor is not present, the underscored accessor
+  // won't be either.
+  // TODO: CoroutineAccessors: What if only the underscored is written out?
+  auto *accessor = getOpaqueAccessor(kind);
+  if (!accessor)
+    return false;
+
+  // Availability checks are only relevant on targets which support versioned
+  // availability.  Otherwise, since we're building with library evolution,
+  // conservatively assume that the binary must keep ABI compatibility with its
+  // prior versions, and emit the underscored variant.
+  if (!ctx.supportsVersionedAvailability())
+    return true;
+
+  auto modifyAvailability = TypeChecker::availabilityAtLocation({}, accessor);
+  auto featureAvailability = ctx.getCoroutineAccessorsRuntimeAvailability();
+  // If accessor was introduced only after the feature was, there's no old ABI
+  // to maintain.
+  if (modifyAvailability.getPlatformRange().isContainedIn(featureAvailability))
+    return false;
+
+  // The underscored accessor is required for ABI stability.
+  return true;
+}
+
+bool RequiresOpaqueModifyCoroutineRequest::evaluate(
+    Evaluator &evaluator, AbstractStorageDecl *storage,
+    bool isUnderscored) const {
+  auto &ctx = storage->getASTContext();
+  bool hasModifyFeature = ctx.LangOpts.hasFeature(Feature::CoroutineAccessors);
+
+  // No `modify` accessor without the feature.
+  if (!hasModifyFeature && !isUnderscored)
+    return false;
+
+  if (hasModifyFeature && isUnderscored) {
+    return storage->requiresCorrespondingUnderscoredCoroutineAccessor(
+        AccessorKind::Modify2);
+  }
+
   // Only for mutable storage.
   if (!storage->supportsMutation())
     return false;
