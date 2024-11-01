@@ -369,7 +369,7 @@ private func flaggingPass(
       let sllResult = sllResults[i + sllOffset]
 
       // Check if lookup was stopped earlier. If so, flag this result with lookupStopped.
-      if wasLookupStopped {
+      if wasLookupStopped && !(astResult?.isTheEndOfLookup ?? false) {
         sllResult.flags.insert(.lookupStopped)
       }
 
