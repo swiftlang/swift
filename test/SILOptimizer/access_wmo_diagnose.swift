@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithStaticMembers -parse-as-library -emit-sil -enforce-exclusivity=checked -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -parse-as-library -emit-sil -enforce-exclusivity=checked -primary-file %s -o /dev/null -verify
 
 // REQUIRES: asserts
 

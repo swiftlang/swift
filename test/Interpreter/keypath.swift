@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-feature -Xfrontend KeyPathWithStaticMembers) | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: executable_test
