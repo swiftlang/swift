@@ -211,6 +211,7 @@ public struct TestSendableWitnesses2 : NoSendableReqs {
   @preconcurrency func f(handler: @escaping @MainActor @Sendable (Int) -> Void)
 }
 
+// TODO: The following error should actually be a warning.
 // expected-complete-and-tns-error @+2 {{type 'TestEscapingOnly' does not conform to protocol 'EscapingSendableProtocol'}}
 // expected-complete-and-tns-note @+1 {{add stubs for conformance}}
 class TestEscapingOnly: EscapingSendableProtocol {
