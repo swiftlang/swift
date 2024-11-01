@@ -43,6 +43,17 @@ do {
 do {
   struct S {
     let n: Int
+
+    func test(v: String) -> Int { }
+    func test(v: String, flag: Bool = false) -> Int? { }
+
+
+    func verify(v: String) -> Int? {
+      guard let _ = test(v: v) else { // Ok
+        return nil
+      }
+      return 0
+    }
   }
 
   func f(_: String, _ p: Bool = false) -> S? {
