@@ -140,6 +140,7 @@ struct OwnershipModelEliminatorVisitor
   bool visitApplyInst(ApplyInst *ai);
 
   void splitDestroy(DestroyValueInst *destroy);
+  bool peepholeTupleConstructorUser(DestructureTupleInst *dti);
   bool visitDestroyValueInst(DestroyValueInst *dvi);
   bool visitDeallocBoxInst(DeallocBoxInst *dbi) {
     if (!dbi->isDeadEnd())
@@ -712,8 +713,50 @@ bool OwnershipModelEliminatorVisitor::visitDestructureStructInst(
   return true;
 }
 
+bool OwnershipModelEliminatorVisitor::peepholeTupleConstructorUser(DestructureTupleInst *dti) {
+  auto destructureResults = dti->getResults();
+  TupleInst *ti = nullptr;
+  for (unsigned index : indices(destructureResults)) {
+    SILValue result = destructureResults[index];
+    // We must have a single use of the destructure value.
+    auto *use = result->getSingleUse();
+    if (!use) {
+      ti = nullptr;
+      break;
+    }
+    // The user must be a single tuple constructor.
+    auto *tupleUsr = dyn_cast<TupleInst>(use->getUser());
+    if (!tupleUsr || (ti && ti != tupleUsr)) {
+      ti = nullptr;
+      break;
+    }
+    // Indices of destructure and tuple must match.
+    if (use->getOperandNumber() != index) {
+      ti = nullptr;
+      break;
+    }
+    ti = tupleUsr;
+  }
+  if (!ti)
+    return false;
+
+  if (ti->getType() != dti->getOperand()->getType())
+    return false;
+
+  ti->replaceAllUsesWith(dti->getOperand());
+  eraseInstruction(ti);
+  eraseInstruction(dti);
+  return true;
+}
+
 bool OwnershipModelEliminatorVisitor::visitDestructureTupleInst(
     DestructureTupleInst *dti) {
+
+  // (tuple (destructure)) -> (id)
+  if (peepholeTupleConstructorUser(dti)) {
+    return true;
+  }
+
   splitDestructure(dti, dti->getOperand());
   return true;
 }

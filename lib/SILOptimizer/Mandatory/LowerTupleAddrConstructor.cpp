@@ -22,6 +22,54 @@ using namespace swift;
 
 namespace {
 
+static bool peepholeTupleDestructorOperand(TupleAddrConstructorInst *ctor) {
+
+  // (%7, ...) = destructure_tuple %6 : $(A, ...)
+  // tuple_addr_constructor [assign] %9 : $*(A, ...) with (%7 : $A, ...)
+  //   =>
+  // store [assign] %6 to %9
+
+  auto numTupleElts = ctor->getNumElements();
+  if (ctor->getNumElements() == 0)
+    return false;
+
+  auto multiVal = dyn_cast<MultipleValueInstructionResult>(ctor->getElement(0));
+  if (!multiVal) {
+    return false;
+  }
+  auto destructure = dyn_cast<DestructureTupleInst>(multiVal->getParent());
+  if (!destructure) {
+    return false;
+  }
+
+  if (destructure->getNumResults() != numTupleElts) {
+    return false;
+  }
+
+  for (unsigned i = 0; i < numTupleElts; ++i) {
+    if (destructure->getResult(i) != ctor->getElement(i)) {
+      return false;
+    }
+    if (!destructure->getResult(i)->getSingleUse()) {
+      return false;
+    }
+  }
+  if (ctor->getDest()->getType().getObjectType() !=
+      destructure->getOperand()->getType())
+    return false;
+
+  // Okay now we can peephole this to an assign.
+  SILBuilderWithScope b(ctor);
+  b.emitStoreValueOperation(ctor->getLoc(),
+                            destructure->getOperand(), ctor->getDest(),
+                            bool(ctor->isInitializationOfDest()) ?
+                              StoreOwnershipQualifier::Init
+                            : StoreOwnershipQualifier::Assign);
+  ctor->eraseFromParent();
+  destructure->eraseFromParent();
+  return true;
+}
+
 class LowerTupleAddrConstructorTransform : public SILFunctionTransform {
   void run() override {
     SILFunction *function = getFunction();
@@ -35,6 +83,14 @@ class LowerTupleAddrConstructorTransform : public SILFunctionTransform {
 
         if (!inst)
           continue;
+
+        // (tuple_addr_constructor [assign/init] %addr,
+        //                         (destructure_tuple %tuple))
+        // ->
+        // (store [assign/init] %tuple to %addr)
+        if (peepholeTupleDestructorOperand(inst)) {
+          continue;
+        }
 
         SILBuilderWithScope builder(inst);
 

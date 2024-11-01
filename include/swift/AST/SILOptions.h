@@ -318,6 +318,10 @@ public:
   /// for the debugger?
   bool ShouldFunctionsBePreservedToDebugger = true;
 
+  /// Block expanding and register promotion more aggressively throughout the
+  /// optimizer.
+  bool UseAggressiveReg2MemForCodeSize = false;
+
   SILOptions() {}
 
   /// Return a hash code of any components from these options that should

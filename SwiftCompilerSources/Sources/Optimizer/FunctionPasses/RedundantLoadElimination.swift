@@ -97,6 +97,9 @@ private func eliminateRedundantLoads(in function: Function, ignoreArrays: Bool, 
         {
           continue
         }
+        if !load.type.shouldExpand(context) {
+           continue
+        }
         tryEliminate(load: load, complexityBudget: &complexityBudget, context)
       }
     }

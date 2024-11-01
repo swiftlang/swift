@@ -3154,6 +3154,12 @@ static AllocationInst *getOptimizableAllocation(SILInstruction *i) {
   if (getMemoryType(alloc).isMoveOnly())
     return nullptr;
 
+  // Don't promote large types.
+  auto &mod = alloc->getFunction()->getModule();
+  if (mod.getOptions().UseAggressiveReg2MemForCodeSize &&
+      !shouldExpand(mod, alloc->getType().getObjectType()))
+    return nullptr;
+
   // Otherwise we are good to go. Lets try to optimize this memory!
   return alloc;
 }
