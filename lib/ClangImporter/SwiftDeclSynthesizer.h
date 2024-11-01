@@ -287,6 +287,13 @@ public:
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
                          clang::CXXMethodDecl *clangOperator);
 
+  clang::CXXMethodDecl *synthesizeCXXForwardingMethod(
+   const clang::CXXRecordDecl *derivedClass,
+    const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
+    bool forwardingMethodKindVirtual,
+    bool referenceReturnTypeBehaviorKeepReference,
+    bool forceConstQualifier);
+
   FuncDecl *makeInstanceToStaticOperatorCallMethod(
       const clang::CXXMethodDecl *clangMethodDecl);
 
