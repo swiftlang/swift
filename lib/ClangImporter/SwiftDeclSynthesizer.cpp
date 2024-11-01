@@ -18,6 +18,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/ClangImporter/CXXMethodBridging.h"
+#include "clang/Sema/DelayedDiagnostic.h"
 
 using namespace swift;
 using namespace importer;
