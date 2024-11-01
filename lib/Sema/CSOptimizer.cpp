@@ -181,6 +181,15 @@ static OverloadedDeclRefExpr *isOverloadedDeclRef(Constraint *disjunction) {
   return nullptr;
 }
 
+static unsigned numOverloadChoicesMatchingOnArity(OverloadedDeclRefExpr *ODRE,
+                                                  ArgumentList *arguments) {
+  return llvm::count_if(ODRE->getDecls(), [&arguments](auto *choice) {
+    if (auto *paramList = getParameterList(choice))
+      return arguments->size() == paramList->size();
+    return false;
+  });
+}
+
 /// This maintains an "old hack" behavior where overloads  of some
 /// `OverloadedDeclRef` calls were favored purely based on number of
 /// argument and (non-defaulted) parameters matching.
@@ -191,11 +200,7 @@ static void findFavoredChoicesBasedOnArity(
   if (!ODRE)
     return;
 
-  if (llvm::count_if(ODRE->getDecls(), [&argumentList](auto *choice) {
-        if (auto *paramList = getParameterList(choice))
-          return argumentList->size() == paramList->size();
-        return false;
-      }) > 1)
+  if (numOverloadChoicesMatchingOnArity(ODRE, argumentList) > 1)
     return;
 
   auto isVariadicGenericOverload = [&](ValueDecl *choice) {
@@ -631,7 +636,16 @@ static Constraint *determineBestChoicesInContext(
     double bestScore = 0.0;
     SmallVector<std::pair<Constraint *, double>, 2> favoredChoices;
 
-    bool isOverloadedDeclRefDisjunction = isOverloadedDeclRef(disjunction);
+    // Preserves old behavior where, for unary calls, the solver
+    // would not consider choices that didn't match on the number
+    // of parameters (regardless of defaults) and only exact
+    // matches were favored.
+    bool preserveFavoringOfUnlabeledUnaryArgument = false;
+    if (argumentList->isUnlabeledUnary()) {
+      auto ODRE = isOverloadedDeclRef(disjunction);
+      preserveFavoringOfUnlabeledUnaryArgument =
+          !ODRE || numOverloadChoicesMatchingOnArity(ODRE, argumentList) < 2;
+    }
 
     forEachDisjunctionChoice(
         cs, disjunction,
@@ -654,11 +668,8 @@ static Constraint *determineBestChoicesInContext(
           // matches to filter out non-default literal bindings which otherwise
           // could cause "over-favoring".
           bool favorExactMatchesOnly = onlyLiteralCandidates;
-          // Preserves old behavior where for unary calls to members
-          // the solver would not consider choices that didn't match on
-          // the number of parameters (regardless of defaults) and only
-          // exact matches were favored.
-          if (!isOverloadedDeclRefDisjunction && argumentList->size() == 1) {
+
+          if (preserveFavoringOfUnlabeledUnaryArgument) {
             // Old behavior completely disregarded the fact that some of
             // the parameters could be defaulted.
             if (overloadType->getNumParams() != 1)
