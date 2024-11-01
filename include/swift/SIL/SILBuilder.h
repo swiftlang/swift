@@ -2579,6 +2579,12 @@ public:
                     getSILDebugLocation(loc), fnValue, resultType));
   }
 
+  MergeIsolationRegionInst *
+  createMergeIsolationRegion(SILLocation loc, ArrayRef<SILValue> args) {
+    return insert(MergeIsolationRegionInst::create(getSILDebugLocation(loc),
+                                                   args, getModule()));
+  }
+
   //===--------------------------------------------------------------------===//
   // Terminator SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//

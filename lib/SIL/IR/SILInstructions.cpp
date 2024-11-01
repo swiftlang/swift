@@ -3552,3 +3552,11 @@ TypeValueInst *TypeValueInst::create(SILFunction &F, SILDebugLocation loc,
   return ::new (buffer)
       TypeValueInst(loc, typeDependentOperands, valueType, paramType);
 }
+
+MergeIsolationRegionInst *
+MergeIsolationRegionInst::create(SILDebugLocation loc, ArrayRef<SILValue> args,
+                                 SILModule &mod) {
+  auto size = totalSizeToAlloc<swift::Operand>(args.size());
+  auto buffer = mod.allocateInst(size, alignof(MergeIsolationRegionInst));
+  return ::new (buffer) MergeIsolationRegionInst(loc, args);
+}

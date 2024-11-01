@@ -151,6 +151,11 @@ struct OwnershipModelEliminatorVisitor
     eraseInstruction(dbi);
     return true;
   }
+  bool visitMergeIsolationRegionInst(MergeIsolationRegionInst *mir) {
+    eraseInstruction(mir);
+    return true;
+  }
+
   bool visitLoadBorrowInst(LoadBorrowInst *lbi);
   bool visitMoveValueInst(MoveValueInst *mvi) {
     eraseInstructionAndRAUW(mvi, mvi->getOperand());

@@ -2232,6 +2232,25 @@ public:
                              requireOperands);
   }
 
+  void translateSILMerge(MutableArrayRef<Operand> array,
+                         bool requireOperands = true) {
+    if (array.size() < 2)
+      return;
+
+    auto trackableDest = tryToTrackValue(array.front().get());
+    if (!trackableDest)
+      return;
+    for (Operand &op : array.drop_front()) {
+      if (auto trackableSrc = tryToTrackValue(op.get())) {
+        if (requireOperands) {
+          builder.addRequire(trackableSrc->getRepresentative().getValue());
+          builder.addRequire(trackableDest->getRepresentative().getValue());
+        }
+        builder.addMerge(trackableDest->getRepresentative().getValue(), &op);
+      }
+    }
+  }
+
   void translateSILAssignmentToTransferringParameter(TrackableValue destRoot,
                                                      Operand *destOperand,
                                                      TrackableValue srcRoot,
@@ -3173,6 +3192,13 @@ PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   assert(isStaticallyLookThroughInst(mdi) && "Out of sync");
   translateSILLookThrough(mdi->getResults(), mdi->getValue());
   translateSILRequire(mdi->getBase());
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics PartitionOpTranslator::visitMergeIsolationRegionInst(
+    MergeIsolationRegionInst *mir) {
+  // But we want to require and merge the base into the result.
+  translateSILMerge(mir->getAllOperands(), true /*require operands*/);
   return TranslationSemantics::Special;
 }
 

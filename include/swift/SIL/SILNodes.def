@@ -894,6 +894,9 @@ NON_VALUE_INST(CondFailInst, cond_fail,
 NON_VALUE_INST(MarkUnresolvedMoveAddrInst, mark_unresolved_move_addr,
                SILInstruction, None, DoesNotRelease)
 
+NON_VALUE_INST(MergeIsolationRegionInst, merge_isolation_region,
+               SILInstruction, None, DoesNotRelease)
+
 NON_VALUE_INST(IncrementProfilerCounterInst, increment_profiler_counter,
                SILInstruction, MayReadWrite, DoesNotRelease)
 

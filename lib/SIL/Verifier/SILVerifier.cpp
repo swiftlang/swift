@@ -2187,6 +2187,11 @@ public:
     }
   }
 
+  void checkMergeIsolationRegionInst(MergeIsolationRegionInst *mir) {
+    require(mir->getNumOperands() >= 2, "Must have at least two parameters");
+    require(F.hasOwnership(), "Only valid when OSSA is enabled");
+  }
+
   void checkMarkDependencInst(MarkDependenceInst *MDI) {
     require(isa<SILUndef>(MDI->getValue()) || MDI->getValue() != MDI->getBase(),
             "mark_dependence operands must be distinct");
