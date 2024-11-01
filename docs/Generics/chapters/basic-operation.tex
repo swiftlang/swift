@@ -4,34 +4,34 @@
 
 \chapter{Basic Operation}\label{rqm basic operation}
 
-\lettrine{T}{he final part} of this book is devoted to the implementation of \index{generic signature query}generic signature queries (\SecRef{genericsigqueries}) and \index{minimal requirement}requirement minimization (\SecRef{minimal requirements}). More precisely, we're looking at the \emph{decision procedure} for the \index{derived requirement}derived requirements formalism. We achieve this by translating the requirements of each generic signature and protocol into \emph{rewrite rules}, and then analyzing the relationships between these rewrite rules.
+\lettrine{T}{he final part} of this book is devoted to the implementation of \index{generic signature query}generic signature queries (\SecRef{genericsigqueries}) and \index{minimal requirement}requirement minimization (\SecRef{minimal requirements}). More precisely, we're looking at the \emph{decision procedure} for the \index{derived requirement!decision procedure}derived requirements formalism. We achieve this by translating the requirements of each generic signature and protocol into \emph{rewrite rules}, and then analyzing the relationships between these rewrite rules.
 
-We use the proper noun \IndexDefinition{requirement machine}``the Requirement Machine'' to mean the compiler component responsible for this reasoning, while \index{requirement machine}\emph{a} requirement machine---a common noun---is an \emph{instance} of a data structure storing a list of rewrite rules that describe a generic signature or protocol.
+We use the proper noun \IndexDefinition{requirement machine}``the Requirement Machine'' to mean the compiler component responsible for this reasoning, while \index{requirement machine}\emph{a} requirement machine---a common noun---is an \emph{instance} of a data structure containing those rewrite rules that describe a specific generic signature or protocol.
 
 In this chapter, we give a high-level overview of how requirement machines operate, without saying anything about what goes on inside. Understanding their inner workings will take two more chapters. \ChapRef{monoids} introduces the theory of finitely-presented monoids and string rewriting, and \ChapRef{symbols terms rules} details the translation of requirements into rewrite rules.
 
 \smallskip
 
-Let's go. There are two entry points into the Requirement Machine:
+Let's go. There are two principal entry points into the Requirement Machine:
 \begin{itemize}
 \item To answer a \index{generic signature query}\textbf{generic signature query}, we construct a requirement machine from the requirements of the given generic signature; we call this a \emph{query machine}. We then consult the machine's \emph{property map}: a description of all conformance, superclass, layout and concrete type requirements imposed on each type parameter.
 
 \item To \textbf{build a new generic signature}, we construct a requirement machine from a list of user-written requirements; we call this a \emph{minimization machine}. We compute the minimal requirements as a side-effect of the construction process.
 \end{itemize}
-We have two more kinds of requirement machine for reasoning about protocols:
+In addition, there are two more we call upon when reasoning about protocols:
 \begin{itemize}
 \item To answer questions about \textbf{a protocol's requirement signature}, we construct a requirement machine from the protocol's requirement signature; we call this a \emph{protocol machine}.
 \item To \textbf{build a new requirement signature} for a protocol written in source, we construct a requirement machine from the list of user-written requirements; we call this a \emph{protocol minimization machine}. We compute the minimal associated requirements as a side-effect of the construction process.
 \end{itemize}
 
-An important fact about requirement machines is that the list of rewrite rules is divided into \IndexDefinition{local rules}\emph{local rules}, corresponding to the initial requirements the machine was built from, and \emph{imported rules}, which as we see shortly, describe associated requirements of protocols referenced by the local rules. We now look at each of the four requirement machine kinds in detail.
+We divide list of rewrite rules in a requirement machine into \IndexDefinition{local rule}\emph{local rules}, corresponding to the initial requirements the machine was built from, and \emph{imported rules}, which as we see shortly, describe associated requirements of protocols referenced by the local rules. We now look at each of the four requirement machine kinds in detail.
 
 \paragraph{Query machines.}
-We maintain a table of \IndexDefinition{query machine}\emph{query machine} instances inside a singleton object, called the \IndexDefinition{rewrite context}\emph{rewrite context}. We can use \index{canonical generic signature}\emph{canonical} generic signatures as keys, because the translation of requirements into rewrite rules ignores \index{sugared type!in requirement machine}type sugar. We build a query machine from a \index{generic signature!query machine}generic signature like so:
+We maintain a table of \IndexDefinition{query machine}\emph{query machine} instances inside a singleton object, called the \IndexDefinition{rewrite context}\emph{rewrite context}. We can use \index{canonical generic signature}\emph{canonical} generic signatures as keys, because the translation of requirements into rewrite rules ignores \index{sugared type!in requirement machine}type sugar. Once built, a query machine remains live for the duration of the compilation session. We build a query machine from a \index{generic signature!query machine}generic signature like so:
 \begin{enumerate}
 \item We translate the generic signature's explicit requirements into rewrite rules using \AlgRef{build rule} of \SecRef{building rules} to get the list of local rules for our query machine.
 
-\item We lazily construct a \emph{protocol machine} for each \index{protocol declaration}protocol appearing on the right-hand side of a \index{conformance requirement}conformance requirement in our signature.
+\item We lazily construct a \emph{protocol machine} for each \index{protocol declaration}protocol appearing on the right-hand side of a \index{conformance requirement!protocol dependency}conformance requirement in our signature.
 
 \item We use \AlgRef{importing rules} to collect local rules from each of these protocol machines as well as all protocol machines they transitively reference, to get the list of imported rules for our query machine.
 
@@ -39,9 +39,9 @@ We maintain a table of \IndexDefinition{query machine}\emph{query machine} insta
 
 \item We build the property map data structure (\ChapRef{propertymap}). 
 
-\item If property map construction added new local rules, we return to Step~3 and repeat the process until no more local rules are added.
+\item If property map construction added new local rules, we return to Step~4 and repeat completion and property map construction again.
 \end{enumerate}
-Once built, a query machine remains live for the duration of the compilation session. 
+Here is the flowchart:
 
 \begin{center}
 \begin{tikzpicture}[node distance=0.70cm]
@@ -68,15 +68,15 @@ Once built, a query machine remains live for the duration of the compilation ses
 \end{center}
 
 \paragraph{Minimization machines.}
-To compute the list of \index{minimal requirement}minimal requirements for a new generic signature, we build a \IndexDefinition{minimization machine}\emph{minimization machine}. This is the final step in \FigRef{inferred generic signature request figure} and \FigRef{abstract generic signature request figure} of \ChapRef{building generic signatures}. The flow is similar to building a query machine, except now the inputs are user-written requirements after \index{desugared requirement!in requirement machine}desugaring (\SecRef{requirement desugaring}). The other main differences are:
+To compute the list of \index{minimal requirement}minimal requirements for a new generic signature, we build a \IndexDefinition{minimization machine}\emph{minimization machine}. This is the final step in \FigRef{inferred generic signature request figure} and \FigRef{abstract generic signature request figure} of \ChapRef{building generic signatures}. Minimization machines have a temporary lifetime owned by the \index{inferred generic signature request}\Request{inferred generic signature request} or \index{abstract generic signature request}\Request{abstract generic signature request}. The flow is similar to building a query machine, except now the inputs are user-written requirements after \index{desugared requirement!in requirement machine}desugaring (\SecRef{requirement desugaring}). The other main differences are:
 \begin{enumerate}
-\item Completion must do additional work if the input requirements contain \index{unbound type parameter}unbound type parameters, as they do when they come from the \index{structural resolution stage}structural resolution stage.
+\item Completion must do additional work if the input requirements contain \index{unbound dependent member type!in requirements}unbound dependent member types, as they do when they come from the \index{structural resolution stage}structural resolution stage.
 \item Completion also records \emph{rewrite loops}, which describe relations between rewrite rules---in particular, this describes which rules are redundant because they are a consequence of existing rules.
 \item When constructing the property map, we note any \index{conflicting requirement}conflicting requirements, to be diagnosed if this generic signature has a source location.
 \item After completion and property map construction, we process the rewrite loops to find a minimal subset of local rules which imply the rest. This is the topic of \ChapRef{rqm minimization}.
 \item Finally, we translate the minimal rules into requirements to get the list of minimal requirements that we output. This is explained in \SecRef{requirement builder}.
 \end{enumerate}
-Minimization machines have a temporary lifetime that is scoped to the \index{inferred generic signature request}\Request{inferred generic signature request} or \index{abstract generic signature request}\Request{abstract generic signature request}.
+Here is the flowchart:
 
 \begin{center}
 \begin{tikzpicture}[node distance=0.70cm]
@@ -137,7 +137,7 @@ For this optimization to work, the requirements as the user wrote them must gene
 
 \item As we will see in \SecRef{word problem}, completion may fail if the user-written requirements are too complex to reason about. In this case the minimization machine outputs an empty list of minimal requirements.
 
-\item If a conformance requirement is made redundant by a same-type requirement that fixes a type parameter to a concrete type (such as $\TP$ and $\SameReq{T}{X}$ where \texttt{X} is a concrete type conforming to \tP), we drop the conformance requirement, but this changes the theory; we will talk about this in \ChapRef{concrete conformances}.
+\item If a conformance requirement is made redundant by a same-type requirement that fixes a type parameter to a concrete type (such as $\TP$ and $\SameReq{T}{X}$ where \tX\ is a concrete type conforming to \tP), we drop the conformance requirement, but this changes the theory; we will talk about this in \ChapRef{concrete conformances}.
 \end{enumerate}
 
 If any of these conditions hold, we record this fact while building the minimization machine. This prevents the minimization machine from being installed into the rewrite context, forcing us to discard it instead. The \IndexFlag{disable-requirement-machine-reuse}\texttt{-disable-requirement-machine-reuse} frontend flag is intended for debugging. It disables this optimization entirely, forcing us to discard all minimization machines immediately without attempting to install them.
@@ -148,7 +148,7 @@ A \IndexDefinition{protocol machine}\emph{protocol machine} collects the \index{
 Protocol machines have a global lifetime and are owned by the \index{rewrite context}rewrite context. The procedure for building a protocol machine is similar to building a query machine:
 \begin{enumerate}
 \item We translate the associated requirements of each protocol into rewrite rules, using \AlgRef{build rule protocol} of \SecRef{building rules}. These become the protocol machine's local rules.
-\item We lazily construct a protocol machine for each protocol that appears on the right-hand side of an \index{associated conformance requirement}associated conformance requirement.
+\item We lazily construct a protocol machine for each protocol that appears on the right-hand side of an \index{associated conformance requirement!protocol dependency}associated conformance requirement.
 \item We use \AlgRef{importing rules} to collect local rules from each of these protocol machines as well as all protocol machines they transitively reference, to get our imported rules. Thus, protocol machines recursively import rules from other protocol machines.
 \item Completion and property map construction proceed as in the query machine case.
 \end{enumerate}
@@ -162,23 +162,8 @@ To actually build the requirement signature of a protocol written in source, we 
 
 In the absence of error conditions, we install the protocol minimization machine in the rewrite context, so that it becomes a long-lived protocol machine for the same protocol component. In fact, we only ever directly construct a protocol machine for a protocol written in source if we failed to install the protocol minimization machine. Otherwise, protocol machines are usually only built when the user's program references a protocol from a \index{serialized module}serialized module, such as the standard library.
 
-\paragraph{Circularity.}
-There is a potential source of \index{circular reference}circularity in the construction of a query machine. If we encounter a type parameter subject to both a conformance and a concrete same-type requirement, say $\ConfReq{T}{P}$ and $\SameReq{T}{X}$ where \texttt{X} is a concrete type conforming to~\tP, we may look up one or more \index{type witness}type witnesses in this \index{conformance}conformance. This might perform type substitution, and recursively invoke a generic signature query. If we issue a query against the same generic signature whose query machine we are constructing now, we report a fatal error and give up.
-
-\paragraph{Summary.}
-The four machine kinds correspond to the four combinations of ``domain'' (\index{generic signature}generic signature or requirement signature) and ``purpose'' (querying an existing entity, or building a new entity of that kind):
-\begin{center}
-\begin{tabular}{cc}
-\toprule
-\textbf{Query machine}&\textbf{Minimization machine}\\
-\textbf{Protocol machine}&\textbf{Protocol minimization machine}\\
-\bottomrule
-\end{tabular}
-\end{center}
-Notice that a protocol machine is the protocol version of a query machine, and a protocol minimization machine is the protocol version of a minimization machine. Machines in the first column are owned by the rewrite context; those in the second have a temporary lifetime, but can be installed in the rewrite context so they become an instance of the first.
-
 \begin{example}
-We saw these three declarations at the start of \ChapRef{genericsig}:
+We talked about these declarations from the start of \ChapRef{genericsig} most recently in \ExRef{same name rule example}:
 \begin{Verbatim}
 func sameElt<S1: Sequence, S2: Sequence>(_ s1: S1, _ s2: S2)
     where S1.Element == S2.Element {...}
@@ -221,12 +206,27 @@ We will see more Requirement Machine debugging flags in \SecRef{rqm debugging fl
 If \tP\ is any protocol, a query machine for the protocol generic signature \verb|<Self where Self: P>| is particularly easy to build; we take the protocol machine for \tP\ and all protocols \tP\ depends on, collect all of their local rules, and then add a single local rule for $\ConfReq{Self}{P}$.
 \end{example}
 
+\paragraph{Circularity.}
+If we encounter a type parameter subject to both a conformance and a concrete same-type requirement, say $\ConfReq{T}{P}$ and $\SameReq{T}{X}$ where \tX\ is a concrete type conforming to~\tP, we may look up one or more \index{type witness}type witnesses in this \index{conformance}conformance. Type witness projection calls into type substitution, which can perform generic signature queries. If we recursively call into the same query machine we are constructing now, we cannot answer the query, so we report a fatal error and give up.
+
+\paragraph{Summary.}
+The four machine kinds correspond to the four combinations of ``domain'' (\index{generic signature!requirement machine}generic signature or \index{requirement signature!requirement machine}requirement signature) and ``purpose'' (querying an existing entity, or building a new entity of that kind):
+\begin{center}
+\begin{tabular}{cc}
+\toprule
+\index{query machine!summary}\textbf{Query machine}&\index{minimization machine!summary}\textbf{Minimization machine}\\
+\index{protocol machine!summary}\textbf{Protocol machine}&\index{protocol minimization machine!summary}\textbf{Protocol minimization machine}\\
+\bottomrule
+\end{tabular}
+\end{center}
+Notice that a protocol machine is the protocol version of a query machine, and a protocol minimization machine is the protocol version of a minimization machine. Machines in the first column are owned by the rewrite context; those in the second have a temporary lifetime, but can transition to the corresponding kind in the first column if  installed in the rewrite context.
+
 \paragraph{History.}
 To continue the historical sketch of \SecRef{archetype builder}: the Requirement Machine shipped in \IndexSwift{5.6}Swift~5.6, where it was used for generic signature queries only. Requirement minimization was re-implemented in \IndexSwift{5.7}Swift~5.7, with the old logic available behind a flag. The \Index{GenericSignatureBuilder@\texttt{GenericSignatureBuilder}}\texttt{GenericSignatureBuilder} was then fully removed in \IndexSwift{5.8}Swift~5.8.
 
 \section{Protocol Components}\label{protocol component}
 
-We now take a closer look at how generic signatures and protocols depend on other protocols, and fully explain how protocol machines work. We begin by revisiting the \index{protocol dependency graph}protocol dependency graph, from \DefRef{protocol dependency graph def} of \SecRef{recursive conformances}. Recall that the \index{vertex}vertices are protocol declarations, and the \index{edge}edges are \index{associated conformance requirement}associated conformance requirements. That is, if $\AssocConfReq{Self.U}{P}{Q}$ is some associated conformance requirement, we define:
+We now take a closer look at how generic signatures and protocols depend on other protocols, and fully explain how protocol machines work. We begin by revisiting the \index{protocol dependency graph}protocol dependency graph, from \DefRef{protocol dependency graph def} of \SecRef{recursive conformances}. Recall that the \index{vertex}vertices are protocol declarations, and the \index{edge}edges are \index{associated conformance requirement!protocol dependency}associated conformance requirements. That is, if $\AssocConfReq{Self.U}{P}{Q}$ is some associated conformance requirement, we define:
 \begin{align*}
 \Src(\AssocConfReq{Self.U}{Q}{P})&:=\tP,\\
 \Dst(\AssocConfReq{Self.U}{Q}{P})&:=\tQ.
@@ -261,12 +261,12 @@ $(\Rightarrow)$ Suppose there is a path from \tP\ to \tQ\ in the protocol depend
 
 \begin{wrapfigure}[12]{r}{3.6cm}
 \begin{tikzpicture}[x=1cm, y=1.3cm]
-\node (Top) [protocol, outer sep=0.05cm] at (1, -0) {\protosym{Top}};
-\node (Foo) [protocol, outer sep=0.05cm] at (0, -1) {\protosym{Foo}};
-\node (Bar) [protocol, outer sep=0.05cm] at (2, -1) {\protosym{Bar}};
-\node (Baz) [protocol, outer sep=0.05cm] at (0, -2) {\protosym{Baz}};
-\node (Fiz) [protocol, outer sep=0.05cm] at (2, -2) {\protosym{Fiz}};
-\node (Bot) [protocol, outer sep=0.05cm] at (1, -3) {\protosym{Bot}};
+\node (Top) [protocol, outer sep=0.05cm] at (1, -0) {\texttt{Top}};
+\node (Foo) [protocol, outer sep=0.05cm] at (0, -1) {\texttt{Foo}};
+\node (Bar) [protocol, outer sep=0.05cm] at (2, -1) {\texttt{Bar}};
+\node (Baz) [protocol, outer sep=0.05cm] at (0, -2) {\texttt{Baz}};
+\node (Fiz) [protocol, outer sep=0.05cm] at (2, -2) {\texttt{Fiz}};
+\node (Bot) [protocol, outer sep=0.05cm] at (1, -3) {\texttt{Bot}};
 
 \path [->] (Top) edge [bend right] (Foo)
            (Top) edge [bend left] (Bar)
@@ -277,7 +277,7 @@ $(\Rightarrow)$ Suppose there is a path from \tP\ to \tQ\ in the protocol depend
            (Baz) edge [bend right] (Bot)
            (Fiz) edge [bend left] (Bot);
   \begin{scope}[on background layer]
-    \node[dashed, draw=darkgray, fit=(Foo) (Bar), inner sep=0.4em] {};
+    \node[dashed, draw=darkgray, fit=(Foo) (Bar), inner sep=0.8em] {};
   \end{scope}
 \end{tikzpicture}
 \end{wrapfigure}
@@ -328,13 +328,13 @@ Suppose $(V, E)$ is any \index{directed graph}directed graph, and $\prec$ is the
 
 The \index{equivalence class}equivalence classes of $\equiv$ are called the \emph{strongly connected components} of $(V, E)$. We can define a graph where each \emph{vertex} is a strongly connected component of the original graph; two components are joined by an edge if and only if some vertex in the first component is joined by a path with another vertex in the second component in the original graph. (This is \index{well-defined}well-defined, because if $x_1\equiv x_2$ and $y_1\equiv y_2$, then $x_1\prec y_1$ if and only if $x_2\prec y_2$.) The graph of strongly connected components is a \index{DAG|see {directed acyclic graph}}\IndexDefinition{directed acyclic graph}\emph{directed acyclic graph} (or DAG); that is, it does not have any non-empty paths with the same source and destination. Furthermore, if the original graph was already acyclic, then each vertex will be in a strongly connected component by itself.
 
-\begin{wrapfigure}{l}{3.5cm}
+\begin{wrapfigure}{l}{3.3cm}
 \begin{tikzpicture}[x=1cm, y=1.3cm]
-\node (Top) [protocol, outer sep=0.05cm] at (1, -0) {\protosym{Top}};
-\node (FooBar) [protocol, outer sep=0.05cm] at (1, -1) {\protosym{Foo}, \protosym{Bar}};
-\node (Baz) [protocol, outer sep=0.05cm] at (0, -2) {\protosym{Baz}};
-\node (Fiz) [protocol, outer sep=0.05cm] at (2, -2) {\protosym{Fiz}};
-\node (Bot) [protocol, outer sep=0.05cm] at (1, -3) {\protosym{Bot}};
+\node (Top) [protocol, outer sep=0.05cm] at (1, -0) {$\{\texttt{Top}\}$};
+\node (FooBar) [protocol, outer sep=0.05cm] at (1, -1) {$\{\texttt{Foo},\, \texttt{Bar}\}$};
+\node (Baz) [protocol, outer sep=0.05cm] at (0, -2) {$\{\texttt{Baz}\}$};
+\node (Fiz) [protocol, outer sep=0.05cm] at (2, -2) {$\{\texttt{Fiz}\}$};
+\node (Bot) [protocol, outer sep=0.05cm] at (1, -3) {$\{\texttt{Bot}\}$};
 
 \path [->] (Top) edge (FooBar)
            (FooBar) edge [bend right] (Baz)
@@ -344,7 +344,7 @@ The \index{equivalence class}equivalence classes of $\equiv$ are called the \emp
 \end{tikzpicture}
 \end{wrapfigure}
 
-Let's define the \IndexDefinition{protocol component graph}\emph{protocol component graph} as the graph of strongly connected components of the protocol dependency graph. The protocol component graph of \ListingRef{protocol component listing} is shown on the left. This looks almost the same as the original protocol dependency graph, except that we've collapsed \texttt{Foo} and \texttt{Bar} down to a single vertex. While the protocol component graph is always \index{directed acyclic graph}acyclic, it is not a \index{tree}tree or a \index{forest}forest in the general case; as we see in our example, we have two distinct paths with source \texttt{Top} and destination~\texttt{Bot}, so components can share ``children.'' To ensure we do not import duplicate rules, we must visit every downstream protocol machine once, and take only the \emph{local} rules from each.
+Let's define the \IndexDefinition{protocol component graph}\emph{protocol component graph} to be the graph of strongly connected components of the protocol dependency graph. The protocol component graph of \ListingRef{protocol component listing} is shown on the left. This looks almost the same as the original protocol dependency graph, except that we've collapsed \texttt{Foo} and \texttt{Bar} down to a single vertex. While the protocol component graph is always acyclic, it is not a \index{tree}tree or a \index{forest}forest in the general case; as we see in our example, we have two distinct paths with source \texttt{Top} and destination~\texttt{Bot}, so components can share ``children.'' To ensure we do not import duplicate rules, we must visit every downstream protocol machine once, and take only the \emph{local} rules from each.
 
 A \IndexTwoFlag{debug-requirement-machine}{protocol-dependencies}debugging flag prints out each strongly connected component as it is formed. Let's try with our example:
 \begin{Verbatim}[fontsize=\footnotesize,numbers=none]
@@ -379,7 +379,7 @@ Recall that if $v\in V$ is a vertex, then $w\in V$ is a \index{successor}\emph{s
 
 Tarjan's algorithm requires us to specify the input graph in the form of a callback mapping a given vertex to its list of successors. This allows the graph to be explored incrementally. In our case, the successors of a protocol are obtained by evaluating the \IndexDefinition{protocol dependencies request}\Request{protocol dependencies request}, which is implemented as follows:
 \begin{itemize}
-\item If the protocol is declared inside the main module, we evaluate the \index{structural requirements request}\Request{structural requirements request} and collect the protocols appearing on the right-hand side of the protocol's \index{associated conformance requirement}associated conformance requirements written in source.
+\item If the protocol is declared inside the main module, we evaluate the \index{structural requirements request}\Request{structural requirements request} and collect the protocols appearing on the right-hand side of the protocol's \index{associated conformance requirement!protocol dependency}associated conformance requirements written in source.
 
 \item If the protocol is part of a \index{serialized module}serialized module, we evaluate the \index{requirement signature request}\Request{requirement signature request} and collect the protocols appearing on the right-hand side of the protocol's associated requirements.
 \end{itemize}
@@ -411,7 +411,7 @@ Tarjan's algorithm requires us to specify the input graph in the form of a callb
 
 We number vertices in the order they are visited, by assigning the current value of a counter to each visited vertex $v$, prior to visiting the successors of $v$. We denote the value assigned to a vertex $v$ by $\Number{v}$. Our traversal can determine if a vertex has been previously visited by checking if $\Number{v}$ is set.
 
-We return to the protocol dependency graph from \ListingRef{protocol component listing}. A depth-first search originating from \texttt{Top} produces the numbering of vertices shown on the right, where the first vertex is assigned the value 1. Here, the entire graph was ultimately reachable from 1; more generally, we get a numbering of the subgraph reachable from the initial vertex.
+We return to the protocol dependency graph from \ListingRef{protocol component listing}. A depth-first search originating from \texttt{Top} produces the numbering of vertices shown on the right, where the first vertex is assigned the value 1. Here, the entire graph was ultimately reachable from 1; more generally, we get a numbering of the \index{subgraph}subgraph reachable from the initial vertex.
 
 When we visit a vertex $v$, we look at each edge $e\in E$ with $\Src(e)=v$. Suppose that $\Dst(e)$ is some other vertex~$w$; we consider the state of $\Number{w}$, and classify the edge $e$ as a tree edge, ignored edge, frond, or cross-link.
 
@@ -468,7 +468,7 @@ The taxonomy of edges in our running example is illustrated on the left. The tre
 \path [->>] (a) edge (b);
 \end{tikzpicture}).
 
-The correctness of the algorithm hinges on the following property of depth-first search: any two strongly connected vertices have a common ancestor in the spanning tree, so each strongly connected component is a \index{subtree}\emph{subtree} of the spanning tree. We define \emph{root} of a strongly connected component as the root of this subtree. To identify the root of each strongly connected component, we associate another integer with each vertex~$v$, denoted by $\Lowlink{v}$. This value is defined such that if $\Lowlink{v}=\Number{v}$, then $v$ is the root of a strongly connected component. In our example, $\Lowlink{v}=\Number{v}$ for all $v$ with the exception of ``$3$''; we have $\Lowlink{3}=\Number{2}$, since ``$2$'' and ``$3$'' are in the same strongly connected component having ``$2$'' as the root.
+The correctness of the algorithm hinges on the following property of depth-first search: any two strongly connected vertices have a common ancestor in the spanning tree, so each strongly connected component induces a \index{subtree}\emph{subtree} of the spanning tree. We define the \emph{root} of a strongly connected component as the root of this subtree. To find the root of a strongly connected component, we associate another integer with each vertex~$v$, denoted by $\Lowlink{v}$. This value is defined such that if $\Lowlink{v}=\Number{v}$, then $v$ is the root of a strongly connected component. In our example, $\Lowlink{v}=\Number{v}$ for all $v$ with the exception of ``$3$''; we have $\Lowlink{3}=\Number{2}$, since ``$2$'' and ``$3$'' are in the same strongly connected component having ``$2$'' as the root.
 
 We repeatedly update $\Lowlink{v}$ while visiting the successors of $v$, and check if $\Lowlink{v}=\Number{v}$ afterwards. If so, we've discovered a new strongly connected component! We maintain a pushdown \index{stack}stack in such a way that at this point, the strongly connected component consists of some number of vertices from the top of the stack.
 
@@ -516,7 +516,7 @@ A generic signature $G$ has a \IndexDefinition{protocol dependency}\emph{protoco
 
 This new form of $\prec$ is not a binary relation in the sense of \DefRef{def relation}, because the operands are in different sets. However, it is still transitive in the sense that $G\prec\tP$ and $\tP\prec\tQ$ together imply $G\prec\tQ$. Note that the two definitions of $\prec$ are related via the \index{protocol generic signature}protocol generic signature: $\GP\prec\tQ$ if and only if $\tP\prec\tQ$.
 
-Now, consider the protocols appearing on the right-hand side of the \index{explicit requirement}\emph{explicit} \index{conformance requirement}conformance requirements of our generic signature $G$; call these the \emph{successors} of $G$, by analogy with the successors of a protocol in the protocol dependency graph. If we consider all protocols reachable via paths originating from the successors of~$G$, we arrive at the complete set of protocol dependencies of~$G$.
+Now, consider the protocols appearing on the right-hand side of the \index{explicit requirement}\emph{explicit} \index{conformance requirement!protocol dependency}conformance requirements of our generic signature $G$; call these the \emph{successors} of $G$, by analogy with the successors of a protocol in the protocol dependency graph. If we consider all protocols reachable via paths originating from the successors of~$G$, we arrive at the complete set of protocol dependencies of~$G$.
 
 We end this section with the algorithm to collect imported rules for a new requirement machine. We find all protocols reachable from some initial set, compute their strongly connected components, lazily construct a protocol machine for each component, and finally, \index{imported rule}collect the local rules from each requirement machine.
 \begin{algorithm}[Import rules from protocol components]\label{importing rules}
@@ -597,7 +597,7 @@ The global singleton for a single frontend instance. See also \SecRef{compilatio
 
 \IndexSource{rewrite context}
 \apiref{rewriting::RewriteContext}{class}
-A singleton object to manage construction of requirement machines, building of the protocol component graph, and unique allocation of symbols and terms.
+A singleton object to manage construction of requirement machines, building of the protocol component graph, and unique allocation of symbols and terms. See also \SecRef{symbols terms rules sourceref}.
 \begin{itemize}
 \item \texttt{getRequirementMachine(CanGenericSignature)} returns a \IndexSource{query machine}query machine for the given generic signature, creating one first if necessary.
 \item \texttt{getRequirementMachine(ProtocolDecl *)} returns a \IndexSource{protocol machine} for the protocol component which contains the given protocol, creating one first if necessary.
@@ -618,11 +618,10 @@ takes a \IndexSource{minimization machine}minimization machine and associates it
 takes a \IndexSource{protocol minimization machine}protocol minimization machine and associates it with the given protocol's component.
 \end{itemize}
 
-\index{generic signature}
 \apiref{GenericSignatureImpl}{class}
 See also \SecRef{genericsigsourceref}.
 \begin{itemize}
-\item \texttt{getRequirementMachine()} returns the query machine for this generic signature, by asking the rewrite context to produce one and then caching the result in an instance variable of the \texttt{GenericSignatureImpl} instance itself.
+\item \texttt{getRequirementMachine()} returns the query machine for this \IndexSource{generic signature!requirement machine}generic signature, by asking the rewrite context to produce one and then caching the result in an instance variable of the \texttt{GenericSignatureImpl} instance itself.
 
 This method is used by the implementation of \IndexSource{generic signature query}generic signature queries; apart from that, there should be no reason to reach inside the requirement machine instance from elsewhere in the compiler.
 \end{itemize}
@@ -639,14 +638,22 @@ See also \SecRef{declarationssourceref}.
 
 \IndexSource{requirement machine}
 \apiref{rewriting::RequirementMachine}{class}
-Represents a list of generic requirements in a manner amenable to automated reasoning.
+A list of rewrite rules and a property map. See also \SecRef{symbols terms rules sourceref} and \SecRef{property map sourceref}. Entry points for initializing a requirement machine, called by the rewrite context and various requests:
 \begin{itemize}
 \item \texttt{initWithGenericSignature()} initializes a new \IndexSource{query machine}query machine from the requirements of an existing generic signature.
 \item \texttt{initWithWrittenRequirements()} initializes a new \IndexSource{minimization machine}minimization machine from user-written requirements when building a new generic signature.
-\item \texttt{initWithProtocolSignatureRequirements()} initializes a new protocol machine from existing \IndexSource{requirement signature}requirement signatures of each protocol in a protocol component.
-\item \texttt{initWithProtocolWrittenRequirements()} initializes a new \IndexSource{protocol minimization machine}protocol minimization machine for computing new requirement signatures for each protocol in a protocol component.
-\item \texttt{verify()} checks various invariants, called after construction.
-\item \texttt{dump()} dumps the requirement machine's \index{rewrite rule}rewrite rules and \index{property map}property map.
+\item \texttt{initWithProtocolSignatureRequirements()} initializes a new \IndexSource{protocol machine}protocol machine from the \IndexSource{requirement signature}requirement signature of each protocol of a protocol component.
+\item \texttt{initWithProtocolWrittenRequirements()} initializes a new \IndexSource{protocol minimization machine}protocol minimization machine from the user-written requirements in each protocol of a protocol component.
+\end{itemize}
+Taking a requirement machine apart:
+\begin{itemize}
+\item \texttt{getRewriteSystem()} returns the \texttt{RewriteSystem} (\SecRef{symbols terms rules sourceref}).
+\item \texttt{getPropertyMap()} returns the \texttt{PropertyMap} (\SecRef{property map sourceref}).
+\end{itemize}
+Miscellaneous:
+\begin{itemize}
+\item \texttt{verify()} checks various invariants. We call this after constructing this requirement machine.
+\item \texttt{dump()} dumps the \texttt{RewriteSystem} and \texttt{PropertyMap}.
 \end{itemize}
 
 \subsection*{Requests}

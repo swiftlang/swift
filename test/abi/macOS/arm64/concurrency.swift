@@ -371,3 +371,4 @@ Added: _$ss15SuspendingClockV7InstantV3nowADvpZMV
 Added: _$ss9TaskLocalC18_enclosingInstance7wrapped7storagexs5NeverO_s24ReferenceWritableKeyPathCyAGxGAIyAgByxGGtcipZMV
 
 Added: _swift_taskGroup_initializeWithOptions
+Added: _swift_task_isCurrentExecutorWithFlags

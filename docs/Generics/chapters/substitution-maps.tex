@@ -6,7 +6,7 @@
 
 \lettrine{S}{ubstitution maps arise} when the type checker needs to reason about a reference to a generic declaration, specialized with list of generic arguments. Abstractly, a \IndexDefinition{substitution map}substitution map defines a \IndexDefinition{replacement type}replacement type corresponding to each type parameter of a generic signature; applying a substitution map to the interface type of a generic declaration recursively replaces the type parameters therein, producing the type of the specialized reference.
 
-The generic signature of a substitution map is called the \IndexDefinition{input generic signature}\emph{input generic signature}. A substitution map stores its input generic signature, and the generic signature's list of generic parameters and \index{conformance}conformance requirements determine the substitution map's shape:
+The \index{generic signature!type substitution}generic signature of a substitution map is called the \IndexDefinition{input generic signature}\emph{input generic signature}. A substitution map stores its input generic signature, and the generic signature's list of generic parameters and \index{conformance}conformance requirements determine the substitution map's shape:
 \begin{quote}
 \texttt{<\ttbox{A}, \ttbox{B} where \ttbox{B:\ Sequence}, B.[Sequence]Element == Int>}
 \end{quote}
@@ -31,14 +31,14 @@ $\ConfReq{B}{Sequence}$&$\mapsto$&$\ConfReq{Array<Int>}{Sequence}$\\[\medskipamo
 \end{tabular}
 \end{quote}
 Or more concisely,\index{$\mapsto$}\index{$\mapsto$!z@\igobble|seealso{substitution map}}
-\[
-\SubstMapLongC{
-\SubstType{A}{String}\\
-\SubstType{B}{Array<Int>}
-}{
-\SubstConf{B}{Array<Int>}{Sequence}
+\begin{align*}
+\SubstMapC{
+&\SubstType{A}{String},\\
+&\SubstType{B}{Array<Int>}
+}{\\
+&\SubstConf{B}{Array<Int>}{Sequence}
 }
-\]
+\end{align*}
 
 \begin{listing}\captionabove{Substitution maps in type checking}\label{substmaptypecheck}
 \begin{Verbatim}
@@ -63,18 +63,18 @@ value.nonGenericMethod()
 
 \begin{example}
 We often use the Greek letter $\Sigma$, in various forms, to denote substitution maps. For example, $\Sigma$, $\Sigma_1$, $\Sigma_2$, $\Sigma^\prime$, etc. For now we'll just work with the single substitution map defined above, so let's denote it by $\Sigma$:
-\[
-\Sigma := \SubstMapLongC{
-\SubstType{A}{String}\\
-\SubstType{B}{Array<Int>}
-}{
-\SubstConf{B}{Array<Int>}{Sequence}
+\begin{align*}
+\Sigma := \SubstMapC{
+&\SubstType{A}{String},\\
+&\SubstType{B}{Array<Int>}
+}{\\
+&\SubstConf{B}{Array<Int>}{Sequence}
 }
-\]
+\end{align*}
 Our substitution map appears while type checking the program shown in \ListingRef{substmaptypecheck}. Here, all three of \texttt{genericFunction()}, \texttt{GenericType} and \texttt{nonGenericMethod()} have the same generic signature, \texttt{<A, B where B:~Sequence, B.Element == Int>}. When type checking a generic function call, the expression type checker infers the generic arguments from the types of the argument expressions. When referencing a generic type, the generic arguments can be written explicitly. In fact, all three declarations are also referenced with the same substitution map. (In the case of a generic type, this substitution map is called the \emph{context substitution map}, as you will see in \SecRef{contextsubstmap}.)
 \end{example}
 
-\paragraph{Type substitution.} Substitution maps operate on interface types. Recall that an \index{interface type}interface type is a type \emph{containing} valid type parameters for some generic signature, which may itself not be a type parameter; for example, one possible interface type is \texttt{Array<T>}, if \texttt{T} is a generic parameter type. Let's introduce the formal notation \IndexSetDefinition{type}{\TypeObj{G}}$\TypeObj{G}$ to mean the set of interface types for a generic signature $G$. Then, if $\texttt{T}\in\TypeObj{G}$ and $\Sigma$ is a substitution map with input generic signature $G$, we can \emph{apply} $\Sigma$ to \texttt{T} to get a new type. This operation is called \IndexDefinition{type substitution}\emph{type substitution}. The interface type here is called the \IndexDefinition{original type}\emph{original type}, and the result of the substitution is the \IndexDefinition{substituted type}\emph{substituted type}. We will think of applying a substitution map to an interface type as an binary operation: \[\texttt{T}\otimes\Sigma\]
+\paragraph{Type substitution.} Substitution maps operate on interface types. Recall that an \index{interface type!type substitution}interface type is a type \emph{containing} valid type parameters for some generic signature, which may itself not be a type parameter; for example, one possible interface type is \texttt{Array<T>}, if \texttt{T} is a generic parameter type. Let's introduce the formal notation \IndexSetDefinition{type}{\TypeObj{G}}$\TypeObj{G}$ to mean the set of interface types for a generic signature $G$. Then, if $\texttt{T}\in\TypeObj{G}$ and $\Sigma$ is a substitution map with input generic signature $G$, we can \emph{apply} $\Sigma$ to \texttt{T} to get a new type. This operation is called \IndexDefinition{type substitution}\emph{type substitution}. The interface type here is called the \IndexDefinition{original type}\emph{original type}, and the result of the substitution is the \IndexDefinition{substituted type}\emph{substituted type}. We will think of applying a substitution map to an interface type as an binary operation: \[\texttt{T}\otimes\Sigma\]
 The \index{$\otimes$}\index{$\otimes$!z@\igobble|seealso{type substitution}}\index{binary operation}$\otimes$ binary operation is a \emph{right action} of substitution maps on types. (We could have instead defined a left action, but later we will see the right action formulation is more natural for expressing certain identities. Indeed, we'll develop this notation further throughout this book.)
 
 Type substitution recursively replaces any type parameters appearing in the original type with new types derived from the substitution map, while preserving the ``concrete structure'' of the original type. Thus the behavior of type substitution is ultimately defined by how substitution maps act the two kinds of type parameters: generic parameters and dependent member types:
@@ -164,64 +164,55 @@ The output generic signature is not stored in the substitution map; it is implic
 Recall our notation $\TypeObj{G}$ for the set of interface types of $G$. We also use the notation \IndexSetDefinition{sub}{\SubMapObj{G}{H}}$\SubMapObj{G}{H}$ for the set of substitution maps with input generic signature $G$ and output generic signature $H$. We make use of this notation to formalize our principle. If $\texttt{T}\in\TypeObj{G}$ and $\Sigma\in\SubMapObj{G}{H}$, then $\texttt{T}\otimes\Sigma\in\TypeObj{H}$, and thus the $\otimes$ binary operation is a function between the following sets:
 \[\TypeObj{G}\otimes\SubMapObj{G}{H}\longrightarrow\TypeObj{H}\]
 
-\paragraph{Canonical substitution maps.}
-\IndexDefinition{canonical substitution map}%
-\index{canonical type}%
-\index{canonical conformance}%
-\IndexDefinition{substitution map equality}%
-Substitution maps are immutable and uniqued, just like types and generic signatures. A substitution map is canonical if all replacement types are canonical types and all conformances are canonical conformances. A substitution map is canonicalized by constructing a new substitution map from the original substitution map's canonicalized replacement types and conformances.
-
-As with types, canonicalization gives substitution maps two levels of equality; two substitution maps are equal pointers if their replacement types and conformances are equal pointers. Two substitution maps are canonically equal if their canonical substitution maps are equal pointers; or equivalently, if their replacement types and conformances are canonically equal.
-
-Applying a canonical substitution map to a canonical original type is not guaranteed to produce a canonical substituted type. However, there are two important invariants that do hold:
+\begin{algorithm}[Substitute interface type]\label{type subst algo}
+Takes an interface type \tX\ and a substitution map $\Sigma$ as input. The type parameters contained in \tX\ must be valid for the input generic signature of $\Sigma$. Outputs $\tX\otimes\Sigma$.
 \begin{enumerate}
-\item Given two canonically equal original types, applying the same substitution map to both will produce two canonically equal substituted types.
-\item Given an original type and two canonically equal substitution maps, applying the two substitution maps to this type will also produce two canonically equal substituted types.
+\item If \tX\ is a generic parameter type \ttgp{d}{i}, find the replacement type for \ttgp{d}{i} in~$\Sigma$ and return it.
+\item If \tX\ is a dependent member type \texttt{T.[P]A}, apply \AlgRef{dependent member type substitution} to \texttt{T.[P]A}~and~$\Sigma$, and return the result.
+\item If \tX\ does not recursively contain any type parameters, return \tX.
+\item Otherwise, recursively apply this algorithm to each child of \tX, and return the new type formed from the substituted children.
 \end{enumerate}
+\end{algorithm}
 
 \section{Generic Arguments}\label{contextsubstmap}
 
-\IndexDefinition{context substitution map}
-\index{declared interface type}
-\IndexDefinition{specialized type}
-\index{parent type}
-A nominal type is \emph{specialized} if the type itself or one of its parent types is a generic nominal type. That is, \texttt{Array<Int>} and \texttt{Array<Int>.Iterator} are both specialized types, but \texttt{Int} and \texttt{String.UTF8View} are not. Equivalently, a nominal type is specialized if its nominal type declaration is a generic context---that is, if the type declaration itself has a generic parameter list, or an outer declaration context has one.
+A nominal type is \IndexDefinition{specialized type}\emph{specialized} if the type itself or one of its \index{parent type!specialized type}parent types is a generic nominal type. That is, \texttt{Array<Int>} and \texttt{Array<Int>.Iterator} are both specialized types, but \texttt{Int} and \texttt{String.UTF8View} are not. Equivalently, a nominal type is specialized if its nominal type declaration is a generic context---that is, if the type declaration itself has a generic parameter list, or an outer declaration context has one.
 
-Every specialized type determines a unique substitution map for the generic signature of its declaration, called the \emph{context substitution map}. The context substitution map replaces the generic parameters of the type declaration with the corresponding generic arguments of the specialized type.
+Every specialized type determines a unique substitution map for the generic signature of its declaration, called the \IndexDefinition{context substitution map}\emph{context substitution map}. The context substitution map replaces the generic parameters of the type declaration with the corresponding generic arguments of the specialized type.
 
-Let's say that $d$ is a nominal type declaration with generic signature $G$. The declared interface type of $d$, which we will denote by $\texttt{T}_d$, is an element of $\TypeObj{G}$. Suppose that \texttt{T} is some specialized type of $d$ whose generic arguments are interface types for a generic signature $H$, so that $\texttt{T}\in\TypeObj{H}$. The context substitution map of \texttt{T} is a substitution map $\Sigma\in\SubMapObj{G}{H}$, such that applying it to the declared interface type of $d$ gives us back \texttt{T}. That is,
+Let's say that $d$ is a \index{nominal type declaration!generic arguments}nominal type declaration with generic signature $G$. The \index{declared interface type!nominal type declaration}declared interface type of $d$, which we will denote by $\tXd$, is an element of $\TypeObj{G}$. Suppose that \tX\ is some specialized type of $d$ whose generic arguments are interface types for a generic signature $H$, so that $\tX\in\TypeObj{H}$. The context substitution map of \tX\ is a substitution map $\Sigma\in\SubMapObj{G}{H}$, such that applying it to the declared interface type of $d$ gives us back \texttt{T}. That is,
 \[
-\texttt{T}=\texttt{T}_d\otimes\Sigma.
+\tX = \tXd\otimes\Sigma
 \]
 To demonstrate the above identity, consider the generic signature of the \texttt{Dictionary} type declaration in the standard library:
 \begin{quote}
 \texttt{<Key, Value where Key:\ Hashable>}
 \end{quote}
 One possible specialized type for \texttt{Dictionary} is the type \texttt{Dictionary<Int, String>}; this type is related to the declared interface type of \texttt{Dictionary} by this substitution map:
-\begin{multline*}
+\begin{align*}
 \texttt{Dictionary<\ttgp{0}{0}, \ttgp{0}{1}>}\otimes
-\SubstMapLongC{
-\SubstType{\ttgp{0}{0}}{Int}\\
-\SubstType{\ttgp{0}{1}}{String}
-}{
-\SubstConf{\ttgp{0}{0}}{Int}{Hashable}
+\SubstMapC{
+&\SubstType{\ttgp{0}{0}}{Int},\\
+&\SubstType{\ttgp{0}{1}}{String}
+}{\\
+&\SubstConf{\ttgp{0}{0}}{Int}{Hashable}
 }\\
-= \texttt{Dictionary<Int, String>}
-\end{multline*}
+{} = \texttt{Dictionary<Int, String>}
+\end{align*}
 \paragraph{The identity substitution map.}
-What is the context substitution map of a type declaration's declared interface type? By definition, if $\Sigma$ is the context substitution map of $\texttt{T}_d$, then $\texttt{T}_d\otimes\Sigma=\texttt{T}_d$; it leaves the declared interface type unchanged. That is, this substitution map maps every generic parameter of the type declaration's generic signature to itself. If we look at the \texttt{Dictionary} type again, we can write down this substitution map:
-\begin{multline*}
+What is the context substitution map of a type declaration's declared interface type? By definition, if $\Sigma$ is the context substitution map of $\tXd$, then $\tXd\otimes\Sigma=\tXd$; it leaves the declared interface type unchanged. That is, this substitution map maps every generic parameter of the type declaration's generic signature to itself. If we look at the \texttt{Dictionary} type again, we can write down this substitution map:
+\begin{align*}
 \texttt{Dictionary<\ttgp{0}{0}, \ttgp{0}{1}>}\otimes
-\SubstMapLongC{
-\SubstType{\ttgp{0}{0}}{\ttgp{0}{0}}\\
-\SubstType{\ttgp{0}{1}}{\ttgp{0}{1}}
-}{
-\SubstConf{\ttgp{0}{0}}{\ttgp{0}{0}}{Hashable}
+\SubstMapC{
+&\SubstType{\ttgp{0}{0}}{\ttgp{0}{0}},\\
+&\SubstType{\ttgp{0}{1}}{\ttgp{0}{1}}
+}{\\
+&\SubstConf{\ttgp{0}{0}}{\ttgp{0}{0}}{Hashable}
 }\\
-= \texttt{Dictionary<\ttgp{0}{0}, \ttgp{0}{1}>}
-\end{multline*}
-This is called the \IndexDefinition{identity substitution map}\emph{identity substitution map} for this generic signature; every generic signature has one. We denote the identity substitution map of a generic signature $G$ by \index{$1_G$}\index{$1_G$!z@\igobble|seealso{identity substitution map}}$1_G$. Then, $1_g\in\SubMapObj{G}{G}$, and if $\texttt{T}\in\TypeObj{G}$, we have
-\[\texttt{T} \otimes 1_G = \texttt{T}.\]
+{} = \texttt{Dictionary<\ttgp{0}{0}, \ttgp{0}{1}>}
+\end{align*}
+This is called the \IndexDefinition{identity substitution map}\emph{identity substitution map} for this generic signature; every generic signature has one. We denote the identity substitution map of a generic signature $G$ by \index{$1_G$}\index{$1_G$!z@\igobble|seealso{identity substitution map}}$1_G$. Then, $1_G\in\SubMapObj{G}{G}$, and if $\texttt{T}\in\TypeObj{G}$, we have
+\[\tX \otimes 1_G = \tX\]
 Applying the identity substitution map to any interface type leaves it unchanged, with three caveats:
 \begin{enumerate}
 \item The interface type must only contain type parameters which are valid in the input generic signature $G$ of this identity substitution map $1_G$.
@@ -235,40 +226,36 @@ The \index{empty generic signature}empty generic signature only has a single uni
 The empty substitution map $\SubstMap{}$ is almost never the same as the identity substitution map $1_G$. In fact, they only coincide if $G$ is the empty generic signature. Applying the empty substitution map to an interface type containing type parameters is a substitution failure and returns an error type.
 \[\texttt{\ttgp{0}{0}.[Sequence]Element} \otimes \SubstMap{} = \texttt{<<error type>>}\]
 
-\section{Composing Substitution Maps}\label{submapcomposition}
+\section{Composing Substitution Maps}\label{submapcomposition}\label{classinheritance}
 
-Suppose that we have three generic signatures, $F$, $G$ and $H$, and a pair of substitution maps: $\Sigma_1\in\SubMapObj{F}{G}$, and $\Sigma_2\in\SubMapObj{G}{H}$. If we start with an interface type $\texttt{T}\in\TypeObj{F}$, then $\texttt{T}\otimes\Sigma_1\in\TypeObj{G}$. If we then apply $\Sigma_2$ to $\texttt{T}\otimes\Sigma_1$, we get an interface type in $\TypeObj{H}$:
-\[(\texttt{T}\otimes\Sigma_1)\otimes\Sigma_2\]
-The \IndexDefinition{substitution map composition}\emph{composition} of the substitution maps $\Sigma_1$ and $\Sigma_2$, denoted by \index{$\otimes$}$\Sigma_1\otimes\Sigma_2$, is the unique substitution map which satisfies the following equation for all $\texttt{T}\in\TypeObj{F}$:
-\[\texttt{T}\otimes(\Sigma_1\otimes\Sigma_2)=(\texttt{T}\otimes\Sigma_1)\otimes\Sigma_2\]
-That is, applying the composition of two substitution maps is the same as applying the first substitution map followed by the second. Since $(\texttt{T}\otimes\Sigma_1)\otimes\Sigma_2\in\TypeObj{H}$, we see that $\Sigma_1\otimes\Sigma_2\in\SubMapObj{F}{H}$; the \index{input generic signature}input generic signature of the composition is the input generic signature of the first substitution map, and the output generic signature of the composition is the \index{output generic signature}output generic signature of the second. Substitution map composition can thus be understood as a function between sets:
-\[\SubMapObj{F}{G}\otimes\SubMapObj{G}{H}\longrightarrow\SubMapObj{F}{H}\]
+\iffalse
 
-To understand how the composition $\Sigma_1\otimes\Sigma_2$ is actually constructed from $\Sigma_1$ and $\Sigma_2$ in the implementation, we decompose $\Sigma_1$ by applying it to each \index{generic parameter type}generic parameter and \index{conformance requirement}conformance requirement of the generic signature $F$:
-\[\Sigma_1 := \SubstMapLongC{
-\SubstType{\ttgp{0}{0}}{$\ttgp{0}{0}\otimes\Sigma_1$}\\
-\ldots
-}{
-\ConfReq{\ttgp{0}{0}}{P}\mapsto\ConfReq{\ttgp{0}{0}}{P}\otimes\Sigma_1\\
-\ldots
-}\]
+\SecRef{abstract conformances} talks about composition with root conformances
+
+\fi
+
+Suppose that we have three generic signatures, $G$, $H$ and $I$, and a pair of substitution maps: $\Sigma_1\in\SubMapObj{G}{H}$, and $\Sigma_2\in\SubMapObj{H}{I}$. If we start with an interface type $\tX\in\TypeObj{G}$, then $\tX\otimes\Sigma_1\in\TypeObj{H}$. If we then apply $\Sigma_2$ to $\tX\otimes\Sigma_1$, we get an interface type in $\TypeObj{I}$:
+\[(\tX\otimes\Sigma_1)\otimes\Sigma_2\]
+The \IndexDefinition{substitution map composition}\emph{composition} of the substitution maps $\Sigma_1$ and $\Sigma_2$, denoted by \index{$\otimes$}$\Sigma_1\otimes\Sigma_2$, is the unique substitution map which satisfies the following equation for all $\tX\in\TypeObj{F}$:
+\[\tX\otimes(\Sigma_1\otimes\Sigma_2):=(\tX\otimes\Sigma_1)\otimes\Sigma_2\]
+That is, applying the composition of two substitution maps is the same as applying the first substitution map followed by the second. Since $(\tX\otimes\Sigma_1)\otimes\Sigma_2\in\TypeObj{I}$, we see that $\Sigma_1\otimes\Sigma_2\in\SubMapObj{G}{I}$; the \index{input generic signature}input generic signature of the composition is the input generic signature of the first substitution map, and the output generic signature of the composition is the \index{output generic signature}output generic signature of the second. Substitution map composition can thus be understood as a function between sets:
+\[\SubMapObj{G}{H}\otimes\SubMapObj{H}{I}\longrightarrow\SubMapObj{G}{I}\]
+
+To understand how the composition $\Sigma_1\otimes\Sigma_2$ is actually constructed from $\Sigma_1$ and $\Sigma_2$ in the implementation, we decompose $\Sigma_1$ by applying it to each \index{generic parameter type!type substitution}generic parameter of generic signature $F$:
+\[\Sigma_1 := \SubstMap{\SubstType{\ttgp{0}{0}}{$\ttgp{0}{0}\otimes\Sigma_1$},\,\ldots}\]
 This looks like a circular definition, but what it really says is that the behavior of $\Sigma_1$ is completely determined by these primitive elements of its input generic signature. Now, we define $\Sigma_1\otimes\Sigma_2$ by applying $\Sigma_2$ to each element of $\Sigma_1$:
 \[
-\Sigma_1\otimes\Sigma_2 := \SubstMapLongC{
-\SubstType{\ttgp{0}{0}}{$\bigl((\ttgp{0}{0}\otimes\Sigma_1)\otimes\Sigma_2\bigr)$}\\
-\ldots
-}{
-\ConfReq{\ttgp{0}{0}}{P}\mapsto\bigl((\ConfReq{\ttgp{0}{0}}{P}\otimes\Sigma_1)\otimes\Sigma_2\bigr)\\
+\Sigma_1\otimes\Sigma_2 := \SubstMap{
+\SubstType{\ttgp{0}{0}}{$\bigl((\ttgp{0}{0}\otimes\Sigma_1)\otimes\Sigma_2\bigr)$},\,
 \ldots
 }
 \]
-Under this definition, if we take a generic parameter \ttgp{d}{i} or conformance requirement $\ConfReq{\ttgp{d}{i}}{P}$ of $F$, we see that $\Sigma_1\otimes\Sigma_2$ satisfies the necessary identity on these primitive elements of $F$:
-\begin{gather*}
-\ttgp{d}{i}\otimes(\Sigma_1\otimes\Sigma_2)=(\ttgp{d}{i}\otimes\Sigma_1)\otimes\Sigma_2\\
-\ConfReq{\ttgp{d}{i}}{P}\otimes(\Sigma_1\otimes\Sigma_2)=(\ConfReq{\ttgp{d}{i}}{P}\otimes\Sigma_1)\otimes\Sigma_2
-\end{gather*}
-Since the behavior of $\Sigma_1\otimes\Sigma_2$ is completely determined by these primitive elements of its input generic signature, this is actually true for any interface type $\texttt{T}\in\TypeObj{F}$:
-\[\texttt{T}\otimes(\Sigma_1\otimes\Sigma_2)=(\texttt{T}\otimes\Sigma_1)\otimes\Sigma_2\]
+Under this definition, if we take a generic parameter \ttgp{d}{i} of $G$, we see that $\Sigma_1\otimes\Sigma_2$ satisfies the necessary identity:
+\[
+\ttgp{d}{i}\otimes(\Sigma_1\otimes\Sigma_2)=(\ttgp{d}{i}\otimes\Sigma_1)\otimes\Sigma_2
+\]
+Since the behavior of $\Sigma_1\otimes\Sigma_2$ is completely determined by its replacement types, this is actually true for any interface type $\tX\in\TypeObj{G}$:
+\[\tX\otimes(\Sigma_1\otimes\Sigma_2)=(\tX\otimes\Sigma_1)\otimes\Sigma_2\]
 
 \newcommand{\FirstMapInExample}{\SubstMap{
 \SubstType{T}{Array<A>},\,\SubstType{U}{A}
@@ -326,37 +313,39 @@ Now, the substituted type of \texttt{outer.inner.value} can be derived from the 
 \end{enumerate}
 The final substituted type, \texttt{(Array<Int>) -> Int}, is the same in both cases.
 \end{example}
-If $\Sigma\in\SubMapObj{F}{G}$, then the identity substitution maps $1_F$ and $1_G$ have a natural behavior under substitution map composition:
-\[1_F\otimes\Sigma = \Sigma\qquad\Sigma\otimes 1_G = \Sigma\]
-The second identity carries the same caveat as the identity $\texttt{T}\otimes 1_G=\texttt{T}$ for types; it is only true if the replacement types of $\Sigma$ are interface types. If they are contextual types, the archetypes will be replaced with equivalent type parameters, as we will explain in \SecRef{archetypesubst}.
+If $\Sigma\in\SubMapObj{G}{H}$, then the identity substitution maps $1_G$ and $1_H$ have a natural behavior under substitution map composition:
+\[1_G\otimes\Sigma = \Sigma\otimes 1_H = \Sigma\]
+The second identity carries the same caveat as the identity $\tX\otimes 1_G=\tX$ does for types; it is only true if the replacement types of $\Sigma$ are interface types. If the replacement types are contextual types, they will map to interface types, as we will explain in \SecRef{archetypesubst}.
 \begin{example}
-Recall the generic signatures $F$ and $G$, and the substitution map $\Sigma_1 := \FirstMapInExample\in\SubMapObj{F}{G}$ from \ExRef{composesubstmapexample}. We can write down the identity substitution maps $1_F$ and $1_G$:
+Recall the generic signatures $G$ and $H$, and the substitution map $\Sigma_1 := \FirstMapInExample\in\SubMapObj{G}{H}$ from \ExRef{composesubstmapexample}. We can write down the identity substitution maps $1_G$ and $1_H$:
 \begin{gather*}
-1_F := \SubstMap{\SubstType{T}{T},\,\SubstType{U}{U}}\\
-1_G := \SubstMap{\SubstType{A}{A}}
+1_G := \SubstMap{\SubstType{T}{T},\,\SubstType{U}{U}}\\
+1_H := \SubstMap{\SubstType{A}{A}}
 \end{gather*}
 Now, one can verify that both of these hold:
 \begin{gather*}
 \SubstMap{\SubstType{T}{T},\,\SubstType{U}{U}}\otimes\FirstMapInExample=\FirstMapInExample\\
 \FirstMapInExample\otimes\SubstMap{\SubstType{A}{A}}=\FirstMapInExample
 \end{gather*}
-Thus $1_F\otimes\Sigma_1 = \Sigma_1\otimes 1_G=\Sigma_1$. Note that the left and right identity substitution maps are different in this case, because the input and output generic signatures of $\Sigma_1$ are different.
+Thus $1_G\otimes\Sigma_1 = \Sigma_1\otimes 1_H=\Sigma_1$. Note that the left and right identity substitution maps are different in this case, because the input and output generic signatures of $\Sigma_1$ are different.
 \end{example}
 \index{associative operation}
 One final rule here is that substitution map composition is \emph{associative}. This means that both possible ways of composing three substitution maps will output the same result:
 \[
 (\Sigma_1\otimes\Sigma_2)\otimes\Sigma_3=\Sigma_1\otimes(\Sigma_2\otimes\Sigma_3)
 \]
-Putting everything together, if \texttt{T} is some type, all of the following are equivalent when defined (and by our compatibility conditions, if one is defined, all are):
+Putting everything together, if \tX is some type, all of the following are equivalent when defined (and by our compatibility conditions, if one is defined, all are):
 \begin{gather*}
-((\texttt{T}\otimes\Sigma_1)\otimes\Sigma_2)\otimes\Sigma_3\\
-(\texttt{T}\otimes\Sigma_1)\otimes(\Sigma_2\otimes\Sigma_3)\\
-(\texttt{T}\otimes(\Sigma_1\otimes\Sigma_2))\otimes\Sigma_3\\
-\texttt{T}\otimes((\Sigma_1\otimes\Sigma_2)\otimes\Sigma_3)\\
-\texttt{T}\otimes(\Sigma_1\otimes(\Sigma_2\otimes\Sigma_3))
+((\tX\otimes\Sigma_1)\otimes\Sigma_2)\otimes\Sigma_3\\
+(\tX\otimes\Sigma_1)\otimes(\Sigma_2\otimes\Sigma_3)\\
+(\tX\otimes(\Sigma_1\otimes\Sigma_2))\otimes\Sigma_3\\
+\tX\otimes((\Sigma_1\otimes\Sigma_2)\otimes\Sigma_3)\\
+\tX\otimes(\Sigma_1\otimes(\Sigma_2\otimes\Sigma_3))
 \end{gather*}
 Thus, our type substitution algebra allows us to omit grouping parentheses without introducing ambiguity:
-\[\texttt{T}\otimes\Sigma_1\otimes\Sigma_2\otimes\Sigma_3\]
+\[\tX\otimes\Sigma_1\otimes\Sigma_2\otimes\Sigma_3\]
+
+A \IndexDefinition{commutative diagram}\emph{commutative diagram} is one where following the chain of operations along two paths with the same start and end always produces the same result.
 
 \paragraph{Categorically speaking.}
 A \IndexDefinition{category}\emph{category} is a collection of \IndexDefinition{object}\emph{objects} and \IndexDefinition{morphism}\emph{morphisms}. (Very often the morphisms are \index{function}functions of some sort, but they might also be completely abstract.) Each morphism is associated with a pair of objects, the \emph{source} and \emph{destination}. The collection of morphisms with source $A$ and destination $B$ is denoted $\mathrm{Hom}(A,B)$. The morphisms of a category must obey certain properties:
@@ -381,23 +370,11 @@ Category theory often comes up in programming when working with data structures 
 
 Now that we've seen how to get substitution maps from types, and how to compose existing substitution maps, it's time to talk about building substitution maps from scratch using the two variants of the \textbf{get substitution map} operation.
 
-\newcommand{\InvalidSubjectTypeSubMap}{\SubstMapLongC{
-\SubstType{T}{Array<Int>}
-}{
-\SubstConf{T}{Array<Int>}{Sequence}\\
-\SubstConf{T.[Sequence]Element}{String}{Comparable}
-}}
 \IndexDefinition{get substitution map}
-\index{conformance requirement}
-\index{protocol substitution map}
 \index{serialized module}
 \index{conforming type}
-The first variant constructs a substitution map directly from its three constituent parts: a generic signature, an array of replacement types, and an array of conformances. The arrays must have the correct length---equal to the number of generic parameters and conformance requirements, respectively. Conformances satisfy an additional validity condition where they must match the conformance requirements of the generic signature:
-\begin{enumerate}
-\item The conforming type of a conformance must be canonically equal to the result of applying the substitution map to the subject type of the corresponding conformance requirement.
-\item The protocol of a conformance must be the same as the protocol on the right hand side of the corresponding conformance requirement.
-\end{enumerate}
-This variant of \textbf{get substitution map} is used when constructing a substitution map from a deserialized representation, because a serialized substitution map is guaranteed to satisfy the above invariants. It is also used when building a protocol substitution map, because the shape is sufficiently simple---just a single replacement type and a single conformance.
+The first variant constructs a substitution map directly from its three constituent parts: a generic signature, an array of replacement types, and an array of conformances. The arrays must have the correct length---equal to the number of generic parameters and \index{conformance requirement!type substitution}conformance requirements, respectively.
+This variant of \textbf{get substitution map} is used when constructing a substitution map from a deserialized representation, because a serialized substitution map is guaranteed to satisfy the above invariants.
 
 \IndexDefinition{replacement type callback}
 \index{type variable type}
@@ -429,39 +406,80 @@ For the conformance lookup callback,
 \end{enumerate}
 \IndexDefinition{conformance lookup callback}
 \index{abstract conformance}
-\index{global conformance lookup}
+\index{global conformance lookup!substitution map}
 \index{local conformance lookup}
 \IndexDefinition{global conformance lookup callback}
 \IndexDefinition{local conformance lookup callback}
 \IndexDefinition{make abstract conformance callback}
 
-\index{context substitution map}
-Specialized types only store their generic arguments, not conformances, so the context substitution map of a specialized type is constructed by first populating a \texttt{DenseMap} with the generic arguments of the specialized type and all of its parent types, and then invoking the \textbf{get substitution map} operation with the \textbf{query type map} and \textbf{global conformance lookup} callbacks.
+Specialized types only store their generic arguments, not conformances, so the \index{context substitution map!construction}context substitution map of a specialized type is constructed by first populating a \texttt{DenseMap} with the generic arguments of the specialized type and all of its parent types, and then invoking the \textbf{get substitution map} operation with the \textbf{query type map} and \textbf{global conformance lookup} callbacks.
 
 \index{identity substitution map}
 The identity substitution map of a generic signature is constructed from a replacement type callback which just returns the input generic parameter together with the \textbf{make abstract conformance} callback.
 
-\begin{example}
-A substitution map which does \emph{not} satisfy the invariants specified above, and thus cannot be constructed. First, the generic signature:
+\iffalse
+
+When a subclass inherits from a superclass, there is a subtype relationship between the subclass and superclass. If neither class is generic, the relationship is straightforward. Here, we have a pair of classes \texttt{C} and \texttt{D}; \texttt{D} inherits from \texttt{C}, so instances of \texttt{D} are also instances of \texttt{C}:
+\begin{Verbatim}
+class C {}
+class D {}
+
+let instanceOfD: D = D()
+let instanceOfC: C = instanceOfD  // okay
+\end{Verbatim}
+With generic classes, the situation is more subtle. The subclass \emph{declaration} states a superclass \emph{type}. The superclass type appears in the inheritance clause of the subclass, and can reference the subclass's generic parameters:
+\begin{Verbatim}
+class Base<T, U> {}
+class Derived<A>: Base<String, A> {}
+\end{Verbatim}
+Now, the declaration \texttt{Derived} has the generic superclass type \texttt{Base<String, A>}. We expect that \texttt{Derived<A>} is a subtype of \texttt{Base<String, A>}, and \texttt{Derived<Int>} is a subtype of \texttt{Base<String, Int>}, but that \texttt{Derived<Int>} and \texttt{Base<String, String>} are unrelated types.
+
+To get a complete picture of the subtype relationship, we need to define the concept of the superclass type \emph{of a type}, and not just the superclass type of a declaration.
+
+First of all, what is the superclass type of the declared interface type of a class? The superclass type of the class declaration is an interface type for the class declaration's generic signature, so we say that the superclass type of the declared interface type is just the superclass type of the declaration. In our example, this tells us that \texttt{Derived<A>} is a subtype of \texttt{Base<String, A>} and an unrelated type to \texttt{Base<Int, A>}.
+
+What about the superclass type of an arbitrary specialization of the class? Here, we rely on the property that a specialized type is the result of applying its context substitution map to the declared interface type. If we instead apply the context substitution map to the superclass type of the class declaration, we get the superclass type of our specialized type. This can be shown with a commutative diagram:
 \begin{quote}
-\texttt{<T where T:\ Sequence, T.[Sequence]Element:\ Comparable>}:
+\begin{tikzcd}[column sep=3cm,row sep=1cm]
+\mathboxed{declared interface type} \arrow[d, "\text{superclass type}"{left}] \arrow[r, "\text{substitution}"] &\mathboxed{specialized type} \arrow[d, "\text{superclass type}"] \\
+\mathboxed{superclass type of declaration} \arrow[r, "\text{substitution}"]&\mathboxed{superclass type of type}
+\end{tikzcd}
 \end{quote}
-And the substitution map:
-\[
-\Sigma := \InvalidSubjectTypeSubMap
+
+Now that we can compute the superclass type of a type, we can walk up the inheritance hierarchy by iterating the process, to get the superclass type of a superclass type, and so on.
+
+\begin{algorithm}[Iterated superclass type]\label{superclassfordecl} As input, takes a class type \texttt{T} and a superclass declaration \texttt{D}. Returns the superclass type of \texttt{T} for \texttt{D}.
+\begin{enumerate}
+\item Let \texttt{C} be the class declaration referenced by \texttt{T}. If $\texttt{C}=\texttt{D}$, return \texttt{T}.
+\item If \texttt{C} does not have a superclass type, fail with an invariant violation; \texttt{D} is not actually a superclass of \texttt{T}.
+\item Otherwise, apply the context substitution map of \texttt{T} to the superclass type of \texttt{C}. Assign this new type to \texttt{T}, and go back to Step~1.
+\end{enumerate}
+\end{algorithm}
+
+\begin{example}\label{genericsuperclassexample}
+\ListingRef{generic superclass example listing} shows a class hierarchy demonstrating these behaviors:
+\begin{enumerate}
+\item The superclass type of \texttt{Derived} is \texttt{Middle<Int, String>}.
+\item The superclass type of \texttt{Middle} is \texttt{Base<(T, T)>}.
+\end{enumerate}
+The superclass type of the type \texttt{Middle<Int, String>} is the superclass type of \texttt{Middle} with the context substitution map of \texttt{Middle<Int, String>} applied:
+\[\texttt{Base<(T, T)>}\otimes
+\SubstMap{
+\SubstType{T}{Int}\\
+\SubstType{U}{String}
+} = \texttt{Base<(Int, Int)>}
 \]
-The generic signature has two conformance requirements:
-\begin{gather*}
-\ConfReq{T}{Sequence}\\
-\ConfReq{T.[Sequence]Element}{Comparable}
-\end{gather*}
-Applying the substitution map to the subject type of each requirement produces the expected conforming types:
-\begin{gather*}
-\texttt{T} \otimes \Sigma = \texttt{Array<Int>}\\
-\texttt{T.[Sequence]Element} \otimes \Sigma = \texttt{Int}
-\end{gather*}
-The substitution map violates the invariant, because the conforming type of the second conformance is \texttt{String}, and not \texttt{Int} as was expected.
+This means the superclass type of \texttt{Derived} with respect to \texttt{Base} is \texttt{Base<(Int, Int)>}.
+
+What is the type \texttt{Derived.C}? The type alias \texttt{C} is declared in \texttt{Base}. The superclass type of \texttt{Derived} with respect to \texttt{Base} is \texttt{Base<(Int, Int)>}. We can apply the context substitution map of this superclass type to the declared interface type of \texttt{C}:
+\[\texttt{() -> T}\otimes
+\SubstMap{
+\SubstType{T}{(Int, Int)}
+} = \texttt{() -> (Int, Int)}
+\]
 \end{example}
+
+\fi
 
 \section{Nested Nominal Types}\label{nested nominal types}
 
@@ -473,11 +491,7 @@ Nominal type declarations can appear \index{nested type declaration}inside other
 \end{enumerate}
 We're going to explore the implementation limitations behind these restrictions, and possible future directions for lifting them. (The rest of the book talks about what the compiler does, but this section is about what the compiler \emph{doesn't} do.)
 
-\index{local declaration context}
-\index{local type declaration}
-\index{generic context}
-\index{context substitution map}
-\paragraph{Types in generic local contexts.} This restriction is a consequence of a shortcoming in the representation of a nominal type. Recall from \ChapRef{types} that nominal types and generic nominal types store a parent type, and generic nominal types additionally store a list of generic arguments, corresponding to the generic parameter list of the nominal type declaration. This essentially means there is no place to store the generic arguments from outer local contexts, such as functions.
+\paragraph{Types in generic local contexts.} \index{local declaration context}\index{local type declaration}This restriction is a consequence of a shortcoming in the representation of a nominal type. Recall from \ChapRef{types} that nominal types and generic nominal types store a parent type, and generic nominal types additionally store a list of generic arguments, corresponding to the generic parameter list of the nominal type declaration. This essentially means there is no place to store the generic arguments from outer \index{generic context}local contexts, such as functions.
 
 \begin{listing}\captionabove{A nominal type declaration in a generic local context}\label{nominal type in generic local context}
 \begin{Verbatim}
@@ -500,7 +514,7 @@ func g() {
 \end{Verbatim}
 \end{listing}
 
-\ListingRef{nominal type in generic local context} shows a nominal type nested inside of a generic function. The generic signature of \texttt{Nested} contains the generic parameter \texttt{T} from the outer generic function \texttt{algorithm()}. However, under our rules, the declared interface type of \texttt{Nested} is a singleton nominal type, because \texttt{Nested} does not have its own generic parameter list, and its parent context is not a nominal type declaration. This means there is no way to recover a context substitution map for this type because the generic argument for \texttt{T} is not actually stored anywhere.
+\ListingRef{nominal type in generic local context} shows a nominal type nested inside of a generic function. The generic signature of \texttt{Nested} contains the generic parameter \texttt{T} from the outer generic function \texttt{algorithm()}. However, under our rules, the declared interface type of \texttt{Nested} is a singleton nominal type, because \texttt{Nested} does not have its own generic parameter list, and its parent context is not a nominal type declaration. This means there is no way to recover a \index{context substitution map!of local type}context substitution map for this type because the generic argument for \texttt{T} is not actually stored anywhere.
 
 In the source language, there is no way to specialize \texttt{Nested}; the reference to \texttt{T} inside \texttt{f()} is always understood to be the generic parameter \texttt{T} of the outer function. However, inside the compiler, different generic specializations can still arise. If the two calls to \texttt{f()} from inside \texttt{g()} are specialized and inlined by the SIL optimizer for example, the two temporary instances of \texttt{Nested} must have different in-memory layouts, because in one call \texttt{T} is \texttt{Int}, and in the other \texttt{T} is \texttt{String}.
 
@@ -562,6 +576,8 @@ func generic<T>(_: T) {
 \end{enumerate}
 The first case was originally prohibited, but is now permitted as of \IndexSwift{5.a@5.10}Swift~5.10 \cite{se0404}; the non-generic declaration context acts as a namespace to which the protocol declaration is scoped, but apart from the interaction with name lookup this has no other semantic consequences. The second case is more subtle. If we were to allow a ``generic protocol'' to be parameterized by its outer generic parameters in addition to just the protocol \IndexSelf\tSelf\ type, we would get what \index{Haskell}Haskell calls a \index{multi-parameter type class}``multi-parameter type class.'' Multi-parameter type classes introduce some complications, for example undecidable type inference~\cite{mptc}.
 
+\section{Reabstraction Thunks}
+
 \section{Source Code Reference}\label{substmapsourcecoderef}
 
 Key source files:
@@ -584,12 +600,11 @@ See also \SecRef{typesourceref}.
 \item \texttt{subst()} applies a substitution map to this type and returns the substituted type.
 \end{itemize}
 
-\index{declaration context}
 \IndexSource{context substitution map}
 \apiref{TypeBase}{class}
 See also \SecRef{typesourceref} and \SecRef{genericsigsourceref}.
 \begin{itemize}
-\item \texttt{getContextSubstitutionMap()} returns this type's context substitution map with respect to the given \texttt{DeclContext}.
+\item \texttt{getContextSubstitutionMap()} returns this type's context substitution map.
 \end{itemize}
 
 \IndexSource{substitution map}
@@ -597,7 +612,22 @@ See also \SecRef{typesourceref} and \SecRef{genericsigsourceref}.
 \IndexSource{empty substitution map}
 \IndexSource{substitution map composition}
 \apiref{SubstitutionMap}{class}
-Represents an immutable, uniqued substitution map.
+Represents an immutable, uniqued substitution map. See also \SecRef{conformancesourceref}.
+
+\paragraph{Canonical substitution maps.}
+\IndexDefinition{canonical substitution map}%
+\index{canonical type}%
+\index{canonical conformance}%
+\IndexDefinition{substitution map equality}%
+Substitution maps are immutable and uniqued, just like types and generic signatures. A substitution map is canonical if all replacement types are canonical types and all conformances are canonical conformances. A substitution map is canonicalized by constructing a new substitution map from the original substitution map's canonicalized replacement types and conformances.
+
+As with types, canonicalization gives substitution maps two levels of equality; two substitution maps are equal pointers if their replacement types and conformances are equal pointers. Two substitution maps are canonically equal if their canonical substitution maps are equal pointers; or equivalently, if their replacement types and conformances are canonically equal.
+
+Applying a canonical substitution map to a canonical original type is not guaranteed to produce a canonical substituted type. However, there are two important invariants that do hold:
+\begin{enumerate}
+\item Given two canonically equal original types, applying the same substitution map to both will produce two canonically equal substituted types.
+\item Given an original type and two canonically equal substitution maps, applying the two substitution maps to this type will also produce two canonically equal substituted types.
+\end{enumerate}
 
 As with \texttt{Type} and \texttt{GenericSignature}, this class stores a single pointer, so substitution maps are cheap to pass around as values. The default constructor \texttt{SubstitutionMap()} constructs an empty substitution map. The implicit \texttt{bool} conversion tests for a non-empty substitution map.
 
@@ -644,12 +674,6 @@ Two overloads of the \texttt{get()} static method are defined for constructing s
 \medskip
 \noindent
 \texttt{get(GenericSignature, TypeSubstitutionFn, LookupConformanceFn)} builds a new substitution map by invoking a pair of callbacks to produce each replacement type and conformance.
-
-\IndexSource{protocol substitution map}
-A static method for constructing protocol substitution maps:
-\begin{itemize}
-\item \texttt{getProtocolSubstitutions()} builds a new substitution map from a conforming type and a conformance of this type to a protocol.
-\end{itemize}
 
 \IndexSource{replacement type callback}
 \apiref{TypeSubstitutionFn}{type alias}
@@ -719,13 +743,11 @@ Constructed without arguments:
 MakeAbstractConformanceForGenericType()
 \end{Verbatim}
 
-\index{generic signature}
-\IndexSource{identity substitution map}
 \apiref{GenericSignature}{class}
 See also \SecRef{genericsigsourceref}.
 
 \begin{itemize}
-\item \texttt{getIdentitySubstitutionMap()} returns the substitution map that replaces each generic parameter with itself.
+\item \texttt{getIdentitySubstitutionMap()} returns the \IndexSource{identity substitution map}substitution map that replaces each \IndexSource{generic signature!type substitution}generic parameter with itself.
 \end{itemize}
 
 \end{document}

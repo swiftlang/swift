@@ -148,14 +148,14 @@ namespace {
       uint32_t dataLength = (sizeof(uint32_t) + 1) * data.size();
       assert(dataLength == static_cast<uint16_t>(dataLength));
 
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
       return { keyLength, dataLength };
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       switch (key.getKind()) {
       case DeclBaseName::Kind::Normal:
         writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Normal));
@@ -176,7 +176,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       for (auto entry : data) {
         writer.write<uint8_t>(entry.first);
         writer.write<uint32_t>(entry.second);
@@ -232,7 +232,7 @@ namespace {
           dataLength += nameData;
       }
       assert(dataLength == static_cast<uint16_t>(dataLength));
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
       return { keyLength, dataLength };
@@ -245,7 +245,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       for (auto entry : data) {
         StringRef dataToWrite;
         writer.write<uint32_t>(entry.second);
@@ -275,7 +275,7 @@ namespace {
       uint32_t keyLength = key.size();
       assert(keyLength == static_cast<uint16_t>(keyLength));
       uint32_t dataLength = sizeof(uint32_t);
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
       // No need to write the data length; it's constant.
       return { keyLength, dataLength };
@@ -288,7 +288,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint32_t>(data);
     }
   };
@@ -317,7 +317,7 @@ namespace {
       assert(keyLength == static_cast<uint16_t>(keyLength));
       uint32_t dataLength = (sizeof(uint32_t) * 2) * data.size();
       assert(dataLength == static_cast<uint16_t>(dataLength));
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
       return { keyLength, dataLength };
@@ -331,7 +331,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       for (auto entry : data) {
         writer.write<uint32_t>(entry.first);
         writer.write<uint32_t>(entry.second);
@@ -372,14 +372,14 @@ namespace {
       }
       assert(keyLength == static_cast<uint16_t>(keyLength));
       uint32_t dataLength = sizeof(uint32_t);
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
       // No need to write dataLength, it's constant.
       return { keyLength, dataLength };
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       switch (key.getKind()) {
       case DeclBaseName::Kind::Normal:
         writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Normal));
@@ -400,7 +400,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(bitOffsetFitsIn32Bits(), "BitOffset too large");
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint32_t>(static_cast<uint32_t>(data));
     }
   };
@@ -425,7 +425,7 @@ namespace {
       // with the same DeclBaseName. Seems highly unlikely.
       assert((data.size() < (1 << 14)) && "Too many members");
       uint32_t dataLength = sizeof(uint32_t) * data.size(); // value DeclIDs
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       // No need to write the key length; it's constant.
       writer.write<uint16_t>(dataLength);
       return { sizeof(uint32_t), dataLength };
@@ -434,14 +434,14 @@ namespace {
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
       assert(len == sizeof(uint32_t));
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint32_t>(key);
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       for (auto entry : data) {
         writer.write<uint32_t>(entry);
       }
@@ -465,7 +465,7 @@ namespace {
 
     std::pair<unsigned, unsigned>
     EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       // No need to write the key or value length; they're both constant.
       const unsigned valueLen = Fingerprint::DIGEST_LENGTH;
       return {sizeof(uint32_t), valueLen};
@@ -474,7 +474,7 @@ namespace {
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
       assert(len == sizeof(uint32_t));
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint32_t>(key);
     }
 
@@ -482,7 +482,7 @@ namespace {
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
       assert(len == Fingerprint::DIGEST_LENGTH);
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       out << data;
     }
   };
@@ -864,6 +864,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
   BLOCK_RECORD(options_block, CXX_STDLIB_KIND);
   BLOCK_RECORD(options_block, PUBLIC_MODULE_NAME);
+  BLOCK_RECORD(options_block, SWIFT_INTERFACE_COMPILER_VERSION);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -1137,6 +1138,13 @@ void Serializer::writeHeader() {
       if (publicModuleName != M->getName()) {
         options_block::PublicModuleNameLayout PublicModuleName(Out);
         PublicModuleName.emit(ScratchRecord, publicModuleName.str());
+      }
+
+      llvm::VersionTuple compilerVersion =
+          M->getSwiftInterfaceCompilerVersion();
+      if (compilerVersion) {
+        options_block::SwiftInterfaceCompilerVersionLayout Version(Out);
+        Version.emit(ScratchRecord, compilerVersion.getAsString());
       }
 
       if (M->isConcurrencyChecked()) {
@@ -3023,7 +3031,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isUnconditionallyDeprecated(),
           theAttr->isNoAsync(),
           theAttr->isPackageDescriptionVersionSpecific(),
-          theAttr->IsSPI,
+          theAttr->isSPI(),
+          theAttr->isForEmbedded(),
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
@@ -5437,6 +5446,15 @@ public:
   void visitBuiltinType(BuiltinType *ty) {
     visitBuiltinTypeImpl(ty);
   }
+  
+  void visitBuiltinFixedArrayType(BuiltinFixedArrayType *ty) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[BuiltinFixedArrayTypeLayout::Code];
+    BuiltinFixedArrayTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addTypeRef(ty->getSize()),
+        S.addTypeRef(ty->getElementType()));
+  }
 
   void visitSILTokenType(SILTokenType *ty) {
     // This is serialized like a BuiltinType, even though it isn't one.
@@ -5697,7 +5715,10 @@ public:
     using namespace decls_block;
 
     auto resultType = S.addTypeRef(fnTy->getResult());
-    auto clangType = S.addClangTypeRef(fnTy->getClangTypeInfo().getType());
+    auto clangType =
+      S.getASTContext().LangOpts.UseClangFunctionTypes
+      ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
+      : ClangTypeID(0);
 
     auto isolation = encodeIsolation(fnTy->getIsolation());
 
@@ -6071,6 +6092,18 @@ public:
     writeBool(swiftAttr->isPackExpansion());
     writeUInt64(S.addUniquedStringRef(swiftAttr->getAttribute()));
   }
+
+  // CountAttributedType is a clang type representing a pointer with
+  // a "counted_by" type attribute and DynamicRangePointerType is
+  // representing a "__ended_by" type attribute.
+  // TypeCoupledDeclRefInfo is used to hold information of a declaration
+  // referenced from an expression argument of "__counted_by(expr)" or
+  // "__ended_by(expr)".
+  // Nothing to be done for now as we currently don't import
+  // these types into Swift.
+  void writeTypeCoupledDeclRefInfo(clang::TypeCoupledDeclRefInfo info) {
+    llvm_unreachable("TypeCoupledDeclRefInfo shouldn't be reached from swift");
+  }
 };
 
 }
@@ -6105,6 +6138,7 @@ void Serializer::writeAllDeclsAndTypes() {
   BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 9);
   using namespace decls_block;
   registerDeclTypeAbbr<BuiltinAliasTypeLayout>();
+  registerDeclTypeAbbr<BuiltinFixedArrayTypeLayout>();
   registerDeclTypeAbbr<TypeAliasTypeLayout>();
   registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
   registerDeclTypeAbbr<AssociatedTypeDeclLayout>();
@@ -6309,7 +6343,7 @@ static void writeDeclTable(const index_block::DeclListLayout &DeclList,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -6335,7 +6369,7 @@ writeExtensionTable(const index_block::ExtensionTableLayout &ExtensionTable,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = generator.Emit(blobStream, info);
   }
 
@@ -6351,7 +6385,7 @@ static void writeLocalDeclTable(const index_block::DeclListLayout &DeclList,
   {
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -6371,7 +6405,7 @@ writeNestedTypeDeclsTable(const index_block::NestedTypeDeclsLayout &declList,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -6396,7 +6430,7 @@ writeDeclMemberNamesTable(const index_block::DeclMemberNamesLayout &declNames,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -6416,7 +6450,7 @@ writeDeclMembersTable(const decl_member_tables_block::DeclMembersLayout &mems,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -6437,7 +6471,7 @@ writeDeclFingerprintsTable(const index_block::DeclFingerprintsLayout &fpl,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -6473,7 +6507,7 @@ namespace {
         dataLength += std::get<0>(entry).size();
       }
 
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
@@ -6490,7 +6524,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       for (const auto &entry : data) {
         writer.write<uint32_t>(std::get<0>(entry).size());
         writer.write<uint8_t>(std::get<1>(entry));
@@ -6523,7 +6557,7 @@ static void writeObjCMethodTable(const index_block::ObjCMethodTableLayout &out,
     }
 
     // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -6556,7 +6590,7 @@ namespace {
       for (auto entry : data)
         dataLength += entry.first.size();
       assert(dataLength == static_cast<uint16_t>(dataLength));
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
       return { keyLength, dataLength };
@@ -6569,7 +6603,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       for (auto &entry : data) {
         // Write `GenericSignatureID`.
         writer.write<uint32_t>(entry.second);
@@ -6594,7 +6628,7 @@ static void writeDerivativeFunctionConfigs(
     for (auto &entry : derivativeConfigs)
       generator.insert(entry.first.get(), entry.second);
     // Make sure that no bucket is at offset 0.
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = generator.Emit(blobStream);
   }
   SmallVector<uint64_t, 8> scratch;

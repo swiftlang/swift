@@ -1800,14 +1800,12 @@ OverrideRequiresKeyword swift::overrideRequiresKeyword(ValueDecl *overridden) {
 /// makes it a safe override, given the availability of the base declaration.
 static bool isAvailabilitySafeForOverride(ValueDecl *override,
                                           ValueDecl *base) {
-  ASTContext &ctx = override->getASTContext();
-
   // API availability ranges are contravariant: make sure the version range
   // of an overridden declaration is fully contained in the range of the
   // overriding declaration.
   AvailabilityRange overrideInfo =
-      AvailabilityInference::availableRange(override, ctx);
-  AvailabilityRange baseInfo = AvailabilityInference::availableRange(base, ctx);
+      AvailabilityInference::availableRange(override);
+  AvailabilityRange baseInfo = AvailabilityInference::availableRange(base);
 
   if (baseInfo.isContainedIn(overrideInfo))
     return true;
@@ -1815,7 +1813,7 @@ static bool isAvailabilitySafeForOverride(ValueDecl *override,
   // Allow overrides that are not as available as the base decl as long as the
   // override is as available as its context.
   auto overrideTypeAvailability = AvailabilityInference::availableRange(
-      override->getDeclContext()->getSelfNominalTypeDecl(), ctx);
+      override->getDeclContext()->getSelfNominalTypeDecl());
 
   return overrideTypeAvailability.isContainedIn(overrideInfo);
 }

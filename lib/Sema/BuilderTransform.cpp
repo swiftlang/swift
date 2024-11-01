@@ -693,18 +693,20 @@ protected:
       return failTransform(forEachStmt);
 
     SmallVector<ASTNode, 4> doBody;
+    SourceLoc startLoc = forEachStmt->getStartLoc();
     SourceLoc endLoc = forEachStmt->getEndLoc();
 
     // Build a variable that is going to hold array of results produced
-    // by each iteration of the loop.
+    // by each iteration of the loop. Note we need to give it the start loc of
+    // the for loop to ensure the implicit 'do' has a correct source range.
     //
     // Not that it's not going to be initialized here, that would happen
     // only when a solution is found.
     VarDecl *arrayVar = buildPlaceholderVar(
-        forEachStmt->getEndLoc(), doBody,
+        startLoc, doBody,
         ArraySliceType::get(PlaceholderType::get(ctx, forEachVar.get())),
-        ArrayExpr::create(ctx, /*LBrace=*/endLoc, /*Elements=*/{},
-                          /*Commas=*/{}, /*RBrace=*/endLoc));
+        ArrayExpr::create(ctx, /*LBrace=*/startLoc, /*Elements=*/{},
+                          /*Commas=*/{}, /*RBrace=*/startLoc));
 
     NullablePtr<Expr> bodyVarRef;
     std::optional<UnsupportedElt> unsupported;

@@ -1059,7 +1059,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getNoOpVoidFunction(IGM));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getDestroyStrongFunction(IGM));
-    } else if (layoutStringsEnabled(IGM)) {
+    } else if (layoutStringsEnabled(IGM) &&
+               concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1083,7 +1084,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       }
     }
 
-    if (layoutStringsEnabled(IGM)) {
+    if (layoutStringsEnabled(IGM) &&
+        concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics
                     ? boundGenericCharacteristics->concreteType
                     : concreteType;
@@ -1106,7 +1108,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::InitializeWithTake:
     if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
-    } else if (layoutStringsEnabled(IGM)) {
+    } else if (layoutStringsEnabled(IGM) &&
+               concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1126,7 +1129,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getAssignWithCopyStrongFunction(IGM));
-    } else if (layoutStringsEnabled(IGM)) {
+    } else if (layoutStringsEnabled(IGM) &&
+               concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1146,7 +1150,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getAssignWithTakeStrongFunction(IGM));
-    } else if (layoutStringsEnabled(IGM)) {
+    } else if (layoutStringsEnabled(IGM) &&
+               concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1166,7 +1171,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getInitWithCopyStrongFunction(IGM));
-    } else if (layoutStringsEnabled(IGM)) {
+    } else if (layoutStringsEnabled(IGM) &&
+               concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1233,7 +1239,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::GetEnumTag: {
     assert(concreteType.getEnumOrBoundGenericEnum());
 
-    if (layoutStringsEnabled(IGM)) {
+    if (layoutStringsEnabled(IGM) &&
+        concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics
                     ? boundGenericCharacteristics->concreteType
                     : concreteType;
@@ -1255,7 +1262,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   }
   case ValueWitness::DestructiveInjectEnumTag: {
     assert(concreteType.getEnumOrBoundGenericEnum());
-    if (layoutStringsEnabled(IGM)) {
+    if (layoutStringsEnabled(IGM) &&
+        concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics
                     ? boundGenericCharacteristics->concreteType
                     : concreteType;

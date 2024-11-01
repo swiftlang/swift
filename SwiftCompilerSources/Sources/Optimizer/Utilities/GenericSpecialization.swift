@@ -86,6 +86,7 @@ private struct VTableSpecializer {
       let methodSubs = classContextSubs.getMethodSubstitutions(for: entry.implementation)
 
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
+            context.loadFunction(function: entry.implementation, loadCalleesRecursively: true),
             let specializedMethod = context.specialize(function: entry.implementation, for: methodSubs) else
       {
         context.diagnosticEngine.diagnose(entry.methodDecl.location.sourceLoc, .non_final_generic_class_function)
@@ -125,6 +126,7 @@ func specializeWitnessTable(forConformance conformance: Conformance,
       let methodSubs = conformance.specializedSubstitutions.getMethodSubstitutions(for: origMethod)
 
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
+            context.loadFunction(function: origMethod, loadCalleesRecursively: true),
             let specializedMethod = context.specialize(function: origMethod, for: methodSubs) else
       {
         context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_witness_method, requirement)

@@ -952,7 +952,10 @@ public:
 
       // Emit an unavailable stub for a Swift type.
       if (auto *nmtd = dyn_cast<NominalTypeDecl>(vd)) {
-        auto representation = cxx_translation::getDeclRepresentation(vd);
+        auto representation = cxx_translation::getDeclRepresentation(
+            vd, [this](const NominalTypeDecl *decl) {
+              return printer.isZeroSized(decl);
+            });
         if (nmtd->isGeneric()) {
           auto genericSignature =
               nmtd->getGenericSignature().getCanonicalSignature();

@@ -100,6 +100,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   assert(Importer && "No clang module loader!");
   auto &ClangContext = Importer->getClangASTContext();
 
+  auto &CGTI = Importer->getTargetInfo();
   auto &CGO = Importer->getCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
@@ -154,7 +155,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
                                                 ModuleName, &VFS, HSI, PPO, CGO,
                                                 LLVMContext);
-  ClangCodeGen->Initialize(ClangContext);
+  ClangCodeGen->Initialize(ClangContext, CGTI);
   return ClangCodeGen;
 }
 
@@ -243,7 +244,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
   Int32PtrTy = Int32Ty->getPointerTo();
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
-  Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
+  Int8PtrTy = PtrTy;
   Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
   SizeTy = DataLayout.getIntPtrType(getLLVMContext(), /*addrspace*/ 0);
 
@@ -1002,6 +1003,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability ValueGenericTypeAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getValueGenericTypeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -1474,6 +1483,12 @@ void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
 void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
   llvm::AttrBuilder b(getLLVMContext());
   setHasNoFramePointer(b);
+  F->addFnAttrs(b);
+}
+
+void IRGenModule::setMustHaveFramePointer(llvm::Function *F) {
+  llvm::AttrBuilder b(getLLVMContext());
+  b.addAttribute("frame-pointer", "all");
   F->addFnAttrs(b);
 }
 

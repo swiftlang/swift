@@ -1072,3 +1072,18 @@ do {
     // expected-error@-1 {{referencing instance method 'compute()' on 'Dictionary' requires the types 'any P' and 'Any' be equivalent}}
   }
 }
+
+// https://github.com/swiftlang/swift/issues/77003
+do {
+  func f<T, U>(_: T.Type, _ fn: (T) -> U?, _: (U) -> ()) {}
+
+  struct Task<E> {
+    init(_: () -> ()) where E == Never {}
+    init(_: () throws -> ()) where E == Error {}
+  }
+
+  func test(x: Int?.Type) {
+      // Note that it's important that Task stays unused, using `_ = ` changes constraint generation behavior.
+      f(x, { $0 }, { _ in Task {} }) // expected-warning {{result of 'Task<E>' initializer is unused}}
+  }
+}

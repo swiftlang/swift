@@ -207,7 +207,7 @@ BridgedOwnedString BridgedFunction::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   getFunction()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstitutionMap contextSubs) const {
@@ -231,7 +231,7 @@ BridgedOwnedString BridgedBasicBlock::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   unbridged()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
@@ -243,7 +243,7 @@ BridgedOwnedString BridgedValue::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   getSILValue()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedValue::Kind BridgedValue::getKind() const {
@@ -310,7 +310,7 @@ static_assert((int)BridgedLinkage::HiddenExternal == (int)swift::SILLinkage::Hid
 void BridgedOperand::changeOwnership(BridgedValue::Ownership from, BridgedValue::Ownership to) const {
   swift::ForwardingOperand forwardingOp(op);
   assert(forwardingOp);
-  forwardingOp.replaceOwnershipKind(BridgedValue::castToOwnership(from), BridgedValue::castToOwnership(to));
+  forwardingOp.replaceOwnershipKind(BridgedValue::unbridge(from), BridgedValue::unbridge(to));
 }
 
 //===----------------------------------------------------------------------===//
@@ -322,7 +322,7 @@ BridgedOwnedString BridgedGlobalVar::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   getGlobal()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 bool BridgedGlobalVar::canBeInitializedStatically() const {
@@ -350,7 +350,7 @@ BridgedOwnedString BridgedDeclRef::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
   unbridged().print(os);
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
@@ -369,7 +369,7 @@ BridgedOwnedString BridgedVTable::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   vTable->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedOwnedString BridgedVTableEntry::getDebugDescription() const {
@@ -377,7 +377,7 @@ BridgedOwnedString BridgedVTableEntry::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   unbridged().print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
@@ -398,7 +398,7 @@ BridgedOwnedString BridgedWitnessTableEntry::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   unbridged().print(os, /*verbose=*/ false, PrintOptions::printSIL());
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedOwnedString BridgedWitnessTable::getDebugDescription() const {
@@ -406,7 +406,7 @@ BridgedOwnedString BridgedWitnessTable::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   table->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedOwnedString BridgedDefaultWitnessTable::getDebugDescription() const {
@@ -414,7 +414,7 @@ BridgedOwnedString BridgedDefaultWitnessTable::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   table->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
@@ -439,7 +439,7 @@ BridgedOwnedString BridgedLocation::getDebugDescription() const {
     }
   }
 #endif
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
@@ -457,7 +457,7 @@ BridgedOwnedString BridgedInstruction::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   unbridged()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 bool BridgedInstruction::mayAccessPointer() const {

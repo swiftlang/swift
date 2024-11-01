@@ -55,7 +55,7 @@ function(_add_target_variant_c_compile_link_flags)
   if("${CFLAGS_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
     # Check if there's a specific OS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "OSX")
-      if(DEFINED maccatalyst_build_flavor)
+      if(DEFINED maccatalyst_build_flavor AND DEFINED CFLAGS_DEPLOYMENT_VERSION_MACCATALYST)
         set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST})
       else()
         set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_OSX})

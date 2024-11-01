@@ -240,9 +240,9 @@ private:
   ASTContext &Context;
   llvm::TimeRecord StartTime;
 
-  /// The number of milliseconds from creation until
+  /// The number of seconds from creation until
   /// this timer is considered expired.
-  unsigned ThresholdInMillis;
+  unsigned ThresholdInSecs;
 
   bool PrintDebugTiming;
   bool PrintWarning;
@@ -251,7 +251,8 @@ public:
   /// This constructor sets a default threshold defined for all expressions
   /// via compiler flag `solver-expression-time-threshold`.
   ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS);
-  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS, unsigned thresholdInMillis);
+  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
+                  unsigned thresholdInSecs);
 
   ~ExpressionTimer();
 
@@ -272,20 +273,18 @@ public:
     return endTime.getProcessTime() - StartTime.getProcessTime();
   }
 
-  /// Return the remaining process time in milliseconds until the
+  /// Return the remaining process time in seconds until the
   /// threshold specified during construction is reached.
-  unsigned getRemainingProcessTimeInMillis() const {
+  unsigned getRemainingProcessTimeInSeconds() const {
     auto elapsed = unsigned(getElapsedProcessTimeInFractionalSeconds());
-    return elapsed >= ThresholdInMillis ? 0 : ThresholdInMillis - elapsed;
+    return elapsed >= ThresholdInSecs ? 0 : ThresholdInSecs - elapsed;
   }
 
   // Disable emission of warnings about expressions that take longer
   // than the warning threshold.
   void disableWarning() { PrintWarning = false; }
 
-  bool isExpired() const {
-    return getRemainingProcessTimeInMillis() == 0;
-  }
+  bool isExpired() const { return getRemainingProcessTimeInSeconds() == 0; }
 };
 
 } // end namespace constraints
@@ -2075,14 +2074,6 @@ struct ClosureIsolatedByPreconcurrency {
   bool operator()(const ClosureExpr *expr) const;
 };
 
-/// Determine whether the given expression is part of the left-hand side
-/// of an assignment expression.
-struct IsInLeftHandSideOfAssignment {
-  ConstraintSystem &cs;
-
-  bool operator()(Expr *expr) const;
-};
-
 /// Describes the type produced when referencing a declaration.
 struct DeclReferenceType {
   /// The "opened" type, which is the type of the declaration where any
@@ -2537,13 +2528,6 @@ private:
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
-
-    /// Mark given constraint as retired along current solver path.
-    ///
-    /// \param constraint The constraint to retire temporarily.
-    void retireConstraint(Constraint *constraint) {
-      Trail.recordChange(SolverTrail::Change::RetiredConstraint(constraint));
-    }
 
     /// Add new "generated" constraint along the current solver path.
     ///
@@ -3924,7 +3908,10 @@ public:
   /// Remove an inactive constraint from the current constraint graph.
   void removeInactiveConstraint(Constraint *constraint) {
     CG.removeConstraint(constraint);
-    InactiveConstraints.erase(constraint);
+
+    auto where = InactiveConstraints.erase(constraint);
+    if (solverState)
+      recordChange(SolverTrail::Change::RetiredConstraint(where, constraint));
 
     if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
       auto &log = llvm::errs();
@@ -3934,9 +3921,6 @@ public:
                         solverState->getCurrentIndent() + 4);
       log << ")\n";
     }
-
-    if (solverState)
-      solverState->retireConstraint(constraint);
   }
 
   /// Transfer given constraint from to active list
@@ -4381,39 +4365,6 @@ public:
                                   bool wantInterfaceType = false,
                                   bool adjustForPreconcurrency = true);
 
-  /// Return the type-of-reference of the given value.
-  ///
-  /// \param baseType if non-null, return the type of a member reference to
-  ///   this value when the base has the given type
-  ///
-  /// \param UseDC The context of the access.  Some variables have different
-  ///   types depending on where they are used.
-  ///
-  /// \param locator The locator anchored at this value reference, when
-  /// it is a member reference.
-  ///
-  /// \param wantInterfaceType Whether we want the interface type, if available.
-  ///
-  /// \param getType Optional callback to extract a type for given declaration.
-  static Type
-  getUnopenedTypeOfReference(
-      VarDecl *value, Type baseType, DeclContext *UseDC,
-      llvm::function_ref<Type(VarDecl *)> getType,
-      ConstraintLocator *locator,
-      bool wantInterfaceType = false,
-      bool adjustForPreconcurrency = true,
-      llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
-        [](const AbstractClosureExpr *) {
-          return Type();
-        },
-      llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency =
-        [](const ClosureExpr *closure) {
-          return closure->isIsolatedByPreconcurrency();
-        },
-      llvm::function_ref<bool(Expr *)> isAssignTarget = [](Expr *) {
-        return false;
-      });
-
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
   Type getMemberReferenceTypeFromOpenedType(
@@ -4649,7 +4600,7 @@ public:
   /// \param getFix Optional callback to determine a fix for a given
   /// choice (first argument is a position of current choice,
   /// second - the choice in question).
-  void generateConstraints(
+  void generateOverloadConstraints(
       SmallVectorImpl<Constraint *> &constraints, Type type,
       ArrayRef<OverloadChoice> choices, DeclContext *useDC,
       ConstraintLocator *locator,
@@ -4768,10 +4719,10 @@ public:
   /// Subroutine of \c matchTypes(), which matches up a value to an
   /// existential type.
   ///
-  /// \param kind Either ConstraintKind::SelfObjectOfProtocol or
-  /// ConstraintKind::ConformsTo. Usually this uses SelfObjectOfProtocol,
-  /// but when matching the instance type of a metatype with the instance type
-  /// of an existential metatype, since we want an actual conformance check.
+  /// \param kind Either ConstraintKind::Subtype or ConstraintKind::ConformsTo.
+  /// Usually this uses Subtype, but when matching the instance type of a
+  /// metatype with the instance type of an existential metatype, since we
+  /// want an actual conformance check.
   TypeMatchResult matchExistentialTypes(Type type1, Type type2,
                                         ConstraintKind kind,
                                         TypeMatchOptions flags,
@@ -4978,7 +4929,7 @@ private:
   ///
   /// \param type The type being tested.
   /// \param protocol The protocol to which the type should conform.
-  /// \param kind Either ConstraintKind::SelfObjectOfProtocol or
+  /// \param kind Either ConstraintKind::Subtype or
   /// ConstraintKind::ConformsTo.
   /// \param locator Locator describing where this constraint occurred.
   SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,

@@ -6000,7 +6000,8 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   return normalBB->createPhiArgument(resultType, OwnershipKind::Owned);
 }
 
-std::pair<MultipleValueInstructionResult *, CleanupHandle>
+std::tuple<MultipleValueInstructionResult *, CleanupHandle, SILValue,
+           CleanupHandle>
 SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
                                           SILType substFnType,
                                           SubstitutionMap subs,
@@ -6021,19 +6022,29 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
 
   auto *token = beginApply->getTokenResult();
 
+  CleanupHandle deallocCleanup;
+  auto *allocation = beginApply->getCalleeAllocationResult();
+  if (allocation) {
+    deallocCleanup = enterDeallocStackCleanup(allocation);
+  }
+
   Cleanups.pushCleanup<EndCoroutineApply>(token);
   auto abortCleanup = Cleanups.getTopCleanup();
 
-  return { token, abortCleanup };
+  return {token, abortCleanup, allocation, deallocCleanup};
 }
 
-void SILGenFunction::emitEndApplyWithRethrow(SILLocation loc,
-                                        MultipleValueInstructionResult *token) {
+void SILGenFunction::emitEndApplyWithRethrow(
+    SILLocation loc, MultipleValueInstructionResult *token,
+    SILValue allocation) {
   // TODO: adjust this to handle results of TryBeginApplyInst.
   assert(token->isBeginApplyToken());
 
   B.createEndApply(loc, token,
                    SILType::getEmptyTupleType(getASTContext()));
+  if (allocation) {
+    B.createDeallocStack(loc, allocation);
+  }
 }
 
 void SILGenFunction::emitYield(SILLocation loc,

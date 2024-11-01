@@ -3473,6 +3473,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_fragile_resilient_protocol_witnesses,
                  OPT_disable_fragile_resilient_protocol_witnesses,
                  Opts.UseFragileResilientProtocolWitnesses);
+  Opts.UseProfilingMarkerThunks =
+    Args.hasFlag(OPT_enable_profiling_marker_thunks,
+                 OPT_disable_profiling_marker_thunks,
+                 Opts.UseProfilingMarkerThunks);
   Opts.EmitYieldOnce2AsYieldOnce =
       !LangOpts.hasFeature(Feature::CoroutineAccessorsAllocateInCallee);
   Opts.EnableHotColdSplit =
@@ -3652,6 +3656,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
+  ParseAssertionArgs(ParsedArgs);
+
   if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
                         ConfigurationFileBuffers)) {
     return true;
@@ -3667,8 +3673,6 @@ bool CompilerInvocation::parseArgs(
   if (ParseCASArgs(CASOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
   }
-
-  ParseAssertionArgs(ParsedArgs);
 
   if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
@@ -3734,6 +3738,7 @@ bool CompilerInvocation::parseArgs(
     SILOpts.SkipFunctionBodies = FunctionBodySkipping::None;
     SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
     SILOpts.EmbeddedSwift = true;
+    SILOpts.UseAggressiveReg2MemForCodeSize = true;
     // OSSA modules are required for deinit de-virtualization.
     SILOpts.EnableOSSAModules = true;
     // -g is promoted to -gdwarf-types in embedded Swift
@@ -3746,6 +3751,11 @@ bool CompilerInvocation::parseArgs(
       return true;
     }
   }
+
+  SILOpts.UseAggressiveReg2MemForCodeSize =
+    ParsedArgs.hasFlag(OPT_enable_aggressive_reg2mem,
+                       OPT_disable_aggressive_reg2mem,
+                       SILOpts.UseAggressiveReg2MemForCodeSize);
 
   // With Swift 6, enable @_spiOnly by default. This also enables proper error
   // reporting of ioi references from spi decls.

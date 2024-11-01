@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Onone -disable-availability-checking -emit-ir -primary-file %s -enable-pack-metadata-stack-promotion=false -enable-pack-metadata-stack-promotion=true -Xllvm -sil-print-after=pack-metadata-marker-inserter 2>&1 | %FileCheck %s --check-prefixes CHECK-SIL
-// RUN: %target-swift-frontend -Onone -disable-availability-checking -emit-ir -primary-file %s -enable-pack-metadata-stack-promotion=false -enable-pack-metadata-stack-promotion=true | %IRGenFileCheck %s --check-prefixes CHECK-LLVM
+// RUN: %target-swift-frontend -Onone -target %target-swift-5.9-abi-triple -emit-ir -primary-file %s -enable-pack-metadata-stack-promotion=false -enable-pack-metadata-stack-promotion=true -Xllvm -sil-print-after=pack-metadata-marker-inserter 2>&1 | %FileCheck %s --check-prefixes CHECK-SIL
+// RUN: %target-swift-frontend -Onone -target %target-swift-5.9-abi-triple -emit-ir -primary-file %s -enable-pack-metadata-stack-promotion=false -enable-pack-metadata-stack-promotion=true | %IRGenFileCheck %s --check-prefixes CHECK-LLVM
 
 public struct G<each T> {
   var pack: (repeat each T)

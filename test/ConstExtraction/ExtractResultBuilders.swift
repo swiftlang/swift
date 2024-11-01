@@ -127,6 +127,12 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:     "conformances": [
 // CHECK-NEXT:       "ExtractResultBuilders.FooProvider"
 // CHECK-NEXT:     ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractResultBuilders.FooProvider"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractResultBuilders"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:     "associatedTypeAliases": [],
 // CHECK-NEXT:     "properties": [
 // CHECK-NEXT:       {
@@ -238,6 +244,12 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:     "conformances": [
 // CHECK-NEXT:       "ExtractResultBuilders.FooProvider"
 // CHECK-NEXT:     ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractResultBuilders.FooProvider"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractResultBuilders"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:     "associatedTypeAliases": [],
 // CHECK-NEXT:     "properties": [
 // CHECK-NEXT:       {

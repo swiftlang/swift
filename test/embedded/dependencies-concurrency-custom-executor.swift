@@ -11,14 +11,11 @@
 // RUN: test -z "`comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt`"
 
 // DEP: ___assert_rtn
-// DEP: ___error
 // DEP: ___stack_chk_fail
 // DEP: ___stack_chk_guard
-// DEP: ___stderrp
 // DEP: _abort
 // DEP: _clock_gettime
 // DEP: _exit
-// DEP: _fprintf
 // DEP: _free
 // DEP: _malloc
 // DEP: _memmove
@@ -27,11 +24,10 @@
 // DEP: _nanosleep
 // DEP: _posix_memalign
 // DEP: _putchar
+// DEP: _puts
 // DEP: _strlen
-// DEP: _vfprintf
 // DEP: _vprintf
 // DEP: _vsnprintf
-// DEP: _write
 
 // RUN: %target-run %t/a.out | %FileCheck %s
 

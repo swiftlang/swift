@@ -208,6 +208,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
     // e.g. it has resilient fields.
     if (typeSizeAlign && typeSizeAlign->size == 0) {
       // FIXME: How to represent 0 sized structs?
+      declAndTypePrinter.getCxxDeclEmissionScope()
+          .additionalUnrepresentableDeclarations.push_back(typeDecl);
       return;
     }
   }

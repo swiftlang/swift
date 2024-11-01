@@ -1164,6 +1164,16 @@ func _taskCreateNullaryContinuationJob(priority: Int, continuation: Builtin.RawU
 @_silgen_name("swift_task_isCurrentExecutor")
 func _taskIsCurrentExecutor(_ executor: Builtin.Executor) -> Bool
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
+
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_task_isCurrentExecutorWithFlags")
+@usableFromInline
+internal func _taskIsCurrentExecutor(
+  executor: Builtin.Executor, flags: UInt64) -> Bool
+
+#endif
+
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
 @_silgen_name("swift_task_reportUnexpectedExecutor")
@@ -1257,5 +1267,49 @@ internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owne
 #endif
 }
 #endif
+
+#endif
+
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
+
+@available(SwiftStdlib 9999, *)
+@_alwaysEmitIntoClient
+@usableFromInline
+internal func _taskIsOnMainActor() -> Bool {
+  // 0 for check mode means do not assert.
+  return _taskIsCurrentExecutor(executor: _getMainExecutor(),
+                                flags: 0)
+}
+
+/// SPI that is used by the compiler to implement the hop to main actor if
+/// needed thunk. This thunk is used when passing preconcurrency code a main
+/// actor isolated callback. If when invoked, we are dynamically on the main
+/// actor, we just invoke the function without creating a task. Otherwise, we
+/// create a Task and run operation within it.
+///
+/// NOTE: For this to be safe, we need our function to not have any return value
+/// and that includes an error return value. So we cannot accept throwing
+/// functions here.
+@_alwaysEmitIntoClient
+@available(SwiftStdlib 9999, *)
+public func _taskRunOnMainActor(operation: @escaping @MainActor () -> ()) {
+  typealias YesActor = @MainActor () -> ()
+  typealias NoActor = () -> ()
+
+  // First check if we are on the main actor. If so, just call the synchronous
+  // function directly.
+  if _taskIsOnMainActor() {
+    return withoutActuallyEscaping(operation) {
+      (_ fn: @escaping YesActor) -> () in
+      let rawFn = unsafeBitCast(fn, to: NoActor.self)
+      return rawFn()
+    }
+  }
+
+  // Otherwise, create a new task on the main actor and run operation there.
+  Task { @MainActor in
+    operation()
+  }
+}
 
 #endif

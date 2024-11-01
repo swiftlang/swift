@@ -330,6 +330,20 @@ void Parser::parseSourceFileViaASTGen(
   if (!needToParse)
     return;
 
+  switch (SF.Kind) {
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+  case SourceFileKind::Interface:
+    break;
+  case SourceFileKind::SIL:
+    // FIXME: Support SIL.
+    return;
+  case SourceFileKind::MacroExpansion:
+  case SourceFileKind::DefaultArgument:
+    // FIXME: Support macro expanded sources.
+    return;
+  }
+
   auto *exportedSourceFile = SF.getExportedSourceFile();
   if (!exportedSourceFile)
     return;
@@ -2135,7 +2149,7 @@ AvailabilityMacroMap &Parser::parseAllAvailabilityMacroArguments() {
   for (unsigned bufferID: bufferIDs) {
     // Create temporary parser.
     swift::ParserUnit PU(SM, SourceFileKind::Main, bufferID, LangOpts,
-                         TypeCheckerOptions(), SILOptions(), "unknown");
+                         "unknown");
 
     ForwardingDiagnosticConsumer PDC(Context.Diags);
     PU.getDiagnosticEngine().addConsumer(PDC);
@@ -4501,18 +4515,16 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
   // Rewrite @_unavailableInEmbedded into @available(*, unavailable) when in
   // embedded Swift mode, or into nothing when in regular mode.
-  if (!DK && Tok.getText() == "_unavailableInEmbedded") {
+  if (!DK && Tok.getText() == UNAVAILABLE_IN_EMBEDDED_ATTRNAME) {
     SourceLoc attrLoc = consumeToken();
     if (Context.LangOpts.hasFeature(Feature::Embedded)) {
       StringRef Message = "unavailable in embedded Swift", Renamed;
-      auto attr = new (Context) AvailableAttr(AtLoc, SourceRange(AtLoc, attrLoc),
-                  PlatformKind::none,
-                  Message, Renamed, /*RenameDecl=*/nullptr,
-                  llvm::VersionTuple(), SourceRange(),
-                  llvm::VersionTuple(), SourceRange(),
-                  llvm::VersionTuple(), SourceRange(),
-                  PlatformAgnosticAvailabilityKind::Unavailable,
-                  /*Implicit=*/false, /*IsSPI=*/false);
+      auto attr = new (Context) AvailableAttr(
+          AtLoc, SourceRange(AtLoc, attrLoc), PlatformKind::none, Message,
+          Renamed, /*RenameDecl=*/nullptr, llvm::VersionTuple(), SourceRange(),
+          llvm::VersionTuple(), SourceRange(), llvm::VersionTuple(),
+          SourceRange(), PlatformAgnosticAvailabilityKind::Unavailable,
+          /*Implicit=*/false, /*IsSPI=*/false, /*IsForEmbedded=*/true);
       Attributes.add(attr);
     }
     return makeParserSuccess();
@@ -7031,8 +7043,8 @@ bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
   llvm::SaveAndRestore<std::optional<StableHasher>> T(CurrentTokenHash,
                                                       std::nullopt);
 
-  bool HasOperatorDeclarations;
-  bool HasNestedClassDeclarations;
+  bool HasOperatorDeclarations = false;
+  bool HasNestedClassDeclarations = false;
 
   if (canDelayMemberDeclParsing(HasOperatorDeclarations,
                                 HasNestedClassDeclarations)) {
@@ -7040,6 +7052,8 @@ bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
       IDC->setMaybeHasOperatorDeclarations();
     if (HasNestedClassDeclarations)
       IDC->setMaybeHasNestedClassDeclarations();
+    if (InFreestandingMacroArgument)
+      IDC->setInFreestandingMacroArgument();
 
     if (delayParsingDeclList(LBLoc, RBLoc, IDC))
       return true;
@@ -7806,6 +7820,7 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
+  case AccessorKind::Read2:
     return true;
 
   case AccessorKind::Address:
@@ -7813,7 +7828,6 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Read:
-  case AccessorKind::Read2:
   case AccessorKind::Modify:
   case AccessorKind::Modify2:
     return false;
@@ -8144,7 +8158,10 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
 
       // parsingLimitedSyntax mode cannot have a body.
       if (parsingLimitedSyntax) {
-        diagnose(Tok, diag::expected_getset_in_protocol);
+        auto diag = Context.LangOpts.hasFeature(Feature::CoroutineAccessors)
+                        ? diag::expected_getreadset_in_protocol
+                        : diag::expected_getset_in_protocol;
+        diagnose(Tok, diag);
         Status |= makeParserError();
         break;
       }
@@ -8178,7 +8195,10 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     // avoid having to deal with them everywhere.
     if (parsingLimitedSyntax && !isAllowedWhenParsingLimitedSyntax(
                                     Kind, SF.Kind == SourceFileKind::SIL)) {
-      diagnose(Loc, diag::expected_getset_in_protocol);
+      auto diag = Context.LangOpts.hasFeature(Feature::CoroutineAccessors)
+                      ? diag::expected_getreadset_in_protocol
+                      : diag::expected_getset_in_protocol;
+      diagnose(Loc, diag);
       continue;
     }
 

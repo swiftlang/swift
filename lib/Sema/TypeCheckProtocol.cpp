@@ -4263,13 +4263,17 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           diagnoseSendabilityErrorBasedOn(conformance->getProtocol(), sendFrom,
                                           [&](DiagnosticBehavior limit) {
             auto &diags = DC->getASTContext().Diags;
-            diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
-                           diag::witness_not_as_sendable,
-                           witness, conformance->getProtocol())
+            auto preconcurrencyBehaviorLimit =
+                sendFrom.preconcurrencyBehavior(nominal);
+            diags
+                .diagnose(getLocForDiagnosingWitness(conformance, witness),
+                          diag::witness_not_as_sendable, witness,
+                          conformance->getProtocol())
                 .limitBehaviorUntilSwiftVersion(limit, 6)
-                .limitBehaviorIf(sendFrom.preconcurrencyBehavior(nominal));
+                .limitBehaviorIf(preconcurrencyBehaviorLimit);
             diags.diagnose(requirement, diag::less_sendable_reqt_here);
-            return false;
+            return preconcurrencyBehaviorLimit &&
+                   (*preconcurrencyBehaviorLimit == DiagnosticBehavior::Ignore);
           });
         });
       }
@@ -6041,7 +6045,7 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   // a new-enough OS.
   if (auto sourceFile = classDecl->getParentSourceFile()) {
     AvailabilityRange safeRangeUnderApprox{
-        AvailabilityInference::availableRange(classDecl, ctx)};
+        AvailabilityInference::availableRange(classDecl)};
     AvailabilityRange runningOSOverApprox =
         AvailabilityRange::forDeploymentTarget(ctx);
 

@@ -1974,6 +1974,26 @@ UncheckedTakeEnumDataAddrInst::isDestructive(EnumDecl *forEnum, SILModule &M) {
   return false;
 }
 
+SILInstructionContext SILInstructionContext::forFunctionInModule(SILFunction *F,
+                                                                 SILModule &M) {
+  if (F) {
+    assert(&F->getModule() == &M);
+    return forFunction(*F);
+  }
+  return forModule(M);
+}
+
+SILFunction *SILInstructionContext::getFunction() {
+  return *storage.dyn_cast<SILFunction *>();
+}
+
+SILModule &SILInstructionContext::getModule() {
+  if (auto *m = storage.dyn_cast<SILModule *>()) {
+    return **m;
+  }
+  return storage.get<SILFunction *>()->getModule();
+}
+
 #ifndef NDEBUG
 
 //---

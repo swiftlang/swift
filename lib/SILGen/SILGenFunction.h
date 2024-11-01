@@ -2185,12 +2185,14 @@ public:
                                 SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
 
-  std::pair<MultipleValueInstructionResult *, CleanupHandle>
+  std::tuple<MultipleValueInstructionResult *, CleanupHandle, SILValue,
+             CleanupHandle>
   emitBeginApplyWithRethrow(SILLocation loc, SILValue fn, SILType substFnType,
                             SubstitutionMap subs, ArrayRef<SILValue> args,
                             SmallVectorImpl<SILValue> &yields);
   void emitEndApplyWithRethrow(SILLocation loc,
-                               MultipleValueInstructionResult *token);
+                               MultipleValueInstructionResult *token,
+                               SILValue allocation);
 
   ManagedValue emitExtractFunctionIsolation(SILLocation loc,
                                         ArgumentSource &&fnValue);

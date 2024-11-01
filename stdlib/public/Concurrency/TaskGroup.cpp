@@ -610,11 +610,13 @@ struct TaskGroupStatus {
     }
 #endif
 
-#if defined(_WIN32)
+#if defined(_WIN32) && !SWIFT_CONCURRENCY_EMBEDDED
     #define STDERR_FILENO 2
    _write(STDERR_FILENO, message, strlen(message));
-#elif defined(STDERR_FILENO)
+#elif defined(STDERR_FILENO) && !SWIFT_CONCURRENCY_EMBEDDED
     write(STDERR_FILENO, message, strlen(message));
+#else
+    puts(message);
 #endif
 #if defined(SWIFT_STDLIB_HAS_ASL)
 #pragma clang diagnostic push

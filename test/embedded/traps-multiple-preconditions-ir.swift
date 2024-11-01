@@ -22,13 +22,13 @@ public func test(i: Int) {
 
 // "Non-production builds" - We expect 4 separate _assertionFailure() calls with different values
 // CHECK-MESSAGE: define {{.*}}void @"$s4main4test1iySi_tF"(i64 %0) {{.*}}{
-// CHECK-MESSAGE:   call {{.*}}@"$ss17_assertionFailure
+// CHECK-MESSAGE:   call {{.*}}@"${{(ss17_assertionFailure__|ss31_embeddedReportFatalErrorInFile)}}
 // CHECK-MESSAGE:   unreachable
-// CHECK-MESSAGE:   call {{.*}}@"$ss17_assertionFailure
+// CHECK-MESSAGE:   call {{.*}}@"${{(ss17_assertionFailure__|ss31_embeddedReportFatalErrorInFile)}}
 // CHECK-MESSAGE:   unreachable
-// CHECK-MESSAGE:   call {{.*}}@"$ss17_assertionFailure
+// CHECK-MESSAGE:   call {{.*}}@"${{(ss17_assertionFailure__|ss31_embeddedReportFatalErrorInFile)}}
 // CHECK-MESSAGE:   unreachable
-// CHECK-MESSAGE:   call {{.*}}@"$ss17_assertionFailure
+// CHECK-MESSAGE:   call {{.*}}@"${{(ss17_assertionFailure__|ss31_embeddedReportFatalErrorInFile)}}
 // CHECK-MESSAGE:   unreachable
 // CHECK-MESSAGE: }
 

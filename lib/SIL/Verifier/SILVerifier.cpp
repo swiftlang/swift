@@ -1069,6 +1069,24 @@ public:
             what + " must be Optional<Builtin.Executor>");
   }
 
+  /// Require the operand to be an object of some type that conforms to
+  /// Actor or DistributedActor.
+  void requireAnyActorType(SILValue value, bool allowOptional,
+                           bool allowExecutor, const Twine &what) {
+    auto type = value->getType();
+    require(type.isObject(), what + " must be an object type");
+
+    auto actorType = type.getASTType();
+    if (allowOptional) {
+      if (auto objectType = actorType.getOptionalObjectType())
+        actorType = objectType;
+    }
+    if (allowExecutor && isa<BuiltinExecutorType>(actorType))
+      return;
+    require(actorType->isAnyActorType(),
+            what + " must be some kind of actor type");
+  }
+
   /// Assert that two types are equal.
   void requireSameType(Type type1, Type type2, const Twine &complaint) {
     _require(type1->isEqual(type2), complaint,
@@ -2120,6 +2138,12 @@ public:
   void checkAbortApplyInst(AbortApplyInst *AI) {
     require(getAsResultOf<BeginApplyInst>(AI->getOperand())->isBeginApplyToken(),
             "operand of abort_apply must be a begin_apply");
+    auto *mvi = getAsResultOf<BeginApplyInst>(AI->getOperand());
+    auto *bai = cast<BeginApplyInst>(mvi->getParent());
+    require(!bai->getSubstCalleeType()->isCalleeAllocatedCoroutine() ||
+                AI->getFunction()->getASTContext().LangOpts.hasFeature(
+                    Feature::CoroutineAccessorsUnwindOnCallerError),
+            "abort_apply of callee-allocated yield-once coroutine!?");
   }
 
   void checkEndApplyInst(EndApplyInst *AI) {
@@ -5225,6 +5249,27 @@ public:
     require(resTI == ti->getThunkKind().getDerivedFunctionType(
                          ti->getFunction(), objTI, ti->getSubstitutionMap()),
             "resTI is not the thunk kind assigned derived function type");
+
+    auto originalCalleeFuncType =
+        ti->getOperand()->getType().castTo<SILFunctionType>();
+
+    switch (ti->getThunkKind()) {
+    case ThunkInst::Kind::Invalid:
+      break;
+    case ThunkInst::Kind::Identity:
+      break;
+    case ThunkInst::Kind::HopToMainActorIfNeeded:
+      require(originalCalleeFuncType->getParameters().empty(),
+              "Hop To Main Actor If Needed cannot have any parameters");
+      require(originalCalleeFuncType->getResults().empty(),
+              "Hop To Main Actor If Needed cannot have any results");
+      // We require that hop_to_main_actor inputs do not an error since we
+      // have to have no results.
+      require(!originalCalleeFuncType->hasErrorResult(),
+              "HopToMainActorIfNeeded thunks cannot have input without an "
+              "error result");
+      break;
+    }
   }
 
   void checkConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *ICI) {
@@ -5779,10 +5824,21 @@ public:
     if (HI->getModule().getStage() == SILStage::Lowered) {
       requireOptionalExecutorType(executor,
                                   "hop_to_executor operand in lowered SIL");
+    } else {
+      requireAnyActorType(executor,
+                          /*allow optional*/ true,
+                          /*allow executor*/ true,
+                          "hop_to_executor operand");
     }
   }
 
   void checkExtractExecutorInst(ExtractExecutorInst *EEI) {
+    requireObjectType(BuiltinExecutorType, EEI,
+                      "extract_executor result");
+    requireAnyActorType(EEI->getExpectedExecutor(),
+                        /*allow optional*/ false,
+                        /*allow executor*/ false,
+                        "extract_executor operand");
     if (EEI->getModule().getStage() == SILStage::Lowered) {
       require(false,
               "extract_executor instruction should have been lowered away");
@@ -7328,6 +7384,10 @@ static bool verificationEnabled(const SILModule &M) {
 
   // Otherwise, if verify all is set, we always verify.
   if (M.getOptions().VerifyAll)
+    return true;
+
+  // If we have asserts enabled, always verify...
+  if (CONDITIONAL_ASSERT_enabled())
     return true;
 
 #ifndef NDEBUG

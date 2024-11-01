@@ -152,6 +152,7 @@ extension OptionSetMacro: MemberMacro {
   >(
     of attribute: AttributeSyntax,
     providingMembersOf decl: Decl,
+    conformingTo protocols: [TypeSyntax],
     in context: Context
   ) throws -> [DeclSyntax] {
     // Decode the expansion arguments.

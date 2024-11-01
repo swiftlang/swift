@@ -1001,6 +1001,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
         Instance.getMainModule(), Instance.getDependencyTracker(), opts);
 
     dumpAPIIfNeeded(Instance);
+    swift::emitObjCMessageSendTraceIfNeeded(Instance.getMainModule(), opts);
   }
 
   // Contains the hadError checks internally, we still want to output the
@@ -1076,6 +1077,7 @@ static void printSingleFrontendOpt(llvm::opt::OptTable &table, options::ID id,
       table.getOption(id).hasFlag(options::AutolinkExtractOption) ||
       table.getOption(id).hasFlag(options::ModuleWrapOption) ||
       table.getOption(id).hasFlag(options::SwiftSymbolGraphExtractOption) ||
+      table.getOption(id).hasFlag(options::SwiftSynthesizeInterfaceOption) ||
       table.getOption(id).hasFlag(options::SwiftAPIDigesterOption)) {
     auto name = StringRef(table.getOptionName(id));
     if (!name.empty()) {
@@ -1105,9 +1107,9 @@ static bool printSwiftFeature(CompilerInstance &instance) {
     out << "}\n";
   };
   out << "  \"SupportedArguments\": [\n";
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELPTEXT, METAVAR, VALUES)                                      \
-  printSingleFrontendOpt(*table, swift::options::OPT_##ID, out);
+#define OPTION(...)                                                            \
+  printSingleFrontendOpt(*table,                                               \
+                         swift::options::LLVM_MAKE_OPT_ID(__VA_ARGS__), out);
 #include "swift/Option/Options.inc"
 #undef OPTION
   out << "    \"LastOption\"\n";
@@ -1277,6 +1279,7 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::EmitSILGen:
   case FrontendOptions::ActionType::EmitSIBGen:
   case FrontendOptions::ActionType::EmitSIL:
+  case FrontendOptions::ActionType::EmitLoweredSIL:
   case FrontendOptions::ActionType::EmitSIB:
   case FrontendOptions::ActionType::EmitModuleOnly:
   case FrontendOptions::ActionType::MergeModules:
@@ -1745,6 +1748,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return !opts.AllowModuleWithCompilerErrors;
 
   runSILLoweringPasses(*SM);
+
+  // If we are asked to emit lowered SIL, dump it now and return.
+  if (Action == FrontendOptions::ActionType::EmitLoweredSIL)
+    return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
 
   // Cancellation check after SILLowering.
   if (Instance.isCancellationRequested())

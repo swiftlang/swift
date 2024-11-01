@@ -291,6 +291,13 @@ public:
     llvm::dbgs() << '\n';
   }
 
+  /// Prints out the message for a diagnostic that states that the value is
+  /// exposed to a specific code.
+  ///
+  /// We do this programatically since task-isolated code needs a very different
+  /// form of diagnostic than other cases.
+  void printForCodeDiagnostic(llvm::raw_ostream &os) const;
+
   void printForDiagnostics(llvm::raw_ostream &os) const;
 
   SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
@@ -523,6 +530,10 @@ public:
 
   SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
     innerInfo.dumpForDiagnostics();
+  }
+
+  void printForCodeDiagnostic(llvm::raw_ostream &os) const {
+    innerInfo.printForCodeDiagnostic(os);
   }
 
   void printForOneLineLogging(llvm::raw_ostream &os) const {

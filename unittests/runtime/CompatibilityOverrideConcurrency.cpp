@@ -330,6 +330,11 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startOnMainActorImpl) {
   swift_task_startOnMainActor(nullptr);
 }
 
+TEST_F(CompatibilityOverrideConcurrencyTest,
+       test_swift_task_isCurrentExecutorWithFlags) {
+  swift_task_isCurrentExecutorWithFlags(swift_task_getMainExecutor(), 0);
+}
+
 #if RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_asyncMainDrainQueue) {
 

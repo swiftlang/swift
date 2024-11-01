@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/SILThunkKind.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Compiler.h"
@@ -30,6 +31,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
@@ -58,7 +60,7 @@ namespace ilist_detail {
 ///
 /// We need a custom base class to not clear the prev/next pointers when
 /// removing an instruction from the list.
-class SILInstructionListBase : public ilist_base<false> {
+class SILInstructionListBase : public ilist_base<false, void> {
 public:
   /// Remove an instruction from the list.
   ///
@@ -94,8 +96,10 @@ template <> struct compute_node_options<::swift::SILInstruction> {
 
     static const bool enable_sentinel_tracking = false;
     static const bool is_sentinel_tracking_explicit = false;
+    static const bool has_iterator_bits = false;
     typedef void tag;
-    typedef ilist_node_base<enable_sentinel_tracking> node_base_type;
+    typedef void parent_ty;
+    typedef ilist_node_base<enable_sentinel_tracking, void> node_base_type;
     typedef SILInstructionListBase list_base_type;
   };
 };
@@ -4147,6 +4151,24 @@ public:
   ~KeyPathInst();
 };
 
+struct SILInstructionContext {
+  using Storage = TaggedUnion<SILModule *, SILFunction *>;
+  Storage storage;
+
+  static SILInstructionContext forModule(SILModule &M) { return {Storage(&M)}; }
+
+  static SILInstructionContext forFunction(SILFunction &F) {
+    return {Storage(&F)};
+  }
+
+  static SILInstructionContext forFunctionInModule(SILFunction *F,
+                                                   SILModule &M);
+
+  SILFunction *getFunction();
+
+  SILModule &getModule();
+};
+
 /// Represents an invocation of builtin functionality provided by the code
 /// generator.
 class BuiltinInst final
@@ -4161,13 +4183,16 @@ class BuiltinInst final
   /// The substitutions.
   SubstitutionMap Substitutions;
 
+  unsigned numNormalOperands;
+
   BuiltinInst(SILDebugLocation DebugLoc, Identifier Name, SILType ReturnType,
-              SubstitutionMap Substitutions, ArrayRef<SILValue> Args);
+              SubstitutionMap Substitutions, ArrayRef<SILValue> Args,
+              unsigned numNormalOperands);
 
   static BuiltinInst *create(SILDebugLocation DebugLoc, Identifier Name,
-                             SILType ReturnType,
-                             SubstitutionMap Substitutions,
-                             ArrayRef<SILValue> Args, SILModule &M);
+                             SILType ReturnType, SubstitutionMap Substitutions,
+                             ArrayRef<SILValue> Args,
+                             SILInstructionContext context);
 
 public:
   /// Return the name of the builtin operation.
@@ -4213,13 +4238,19 @@ public:
 
   /// The arguments to the builtin.
   OperandValueArrayRef getArguments() const {
-    return OperandValueArrayRef(getAllOperands());
+    return OperandValueArrayRef(getArgumentOperands());
   }
   ArrayRef<Operand> getArgumentOperands() const {
-    return getAllOperands();
+    return getAllOperands().slice(0, numNormalOperands);
   }
   MutableArrayRef<Operand> getArgumentOperands() {
-    return getAllOperands();
+    return getAllOperands().slice(0, numNormalOperands);
+  }
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return getAllOperands().drop_front(numNormalOperands);
+  }
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return getAllOperands().drop_front(numNormalOperands);
   }
 };
 
@@ -5887,41 +5918,7 @@ class ThunkInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::ThunkInst, ThunkInst, SingleValueInstruction> {
 public:
-  struct Kind {
-    enum InnerTy {
-      Invalid = 0,
-
-      /// A thunk that just calls the passed in function. Used for testing
-      /// purposes of the underlying thunking machinery.
-      Identity = 1,
-
-      MaxValue = Identity,
-    };
-
-    InnerTy innerTy;
-
-    Kind() : innerTy(InnerTy::Invalid) {}
-    Kind(InnerTy innerTy) : innerTy(innerTy) {}
-    Kind(unsigned inputInnerTy) : innerTy(InnerTy(inputInnerTy)) {
-      assert(inputInnerTy <= MaxValue && "Invalid value");
-    }
-
-    operator InnerTy() const { return innerTy; }
-
-    /// Given the current enum state returned the derived output function from
-    /// \p inputFunction.
-    CanSILFunctionType getDerivedFunctionType(SILFunction *fn,
-                                              CanSILFunctionType inputFunction,
-                                              SubstitutionMap subMap) const;
-
-    SILType getDerivedFunctionType(SILFunction *fn, SILType inputFunctionType,
-                                   SubstitutionMap subMap) const {
-      auto fType = inputFunctionType.castTo<SILFunctionType>();
-      return SILType::getPrimitiveType(
-          getDerivedFunctionType(fn, fType, subMap),
-          inputFunctionType.getCategory());
-    }
-  };
+  using Kind = SILThunkKind;
 
   /// The type of thunk we are supposed to produce.
   Kind kind;
@@ -8580,6 +8577,7 @@ class StrongRetainInst
   StrongRetainInst(SILDebugLocation DebugLoc, SILValue Operand,
                    Atomicity atomicity)
       : UnaryInstructionBase(DebugLoc, Operand) {
+    assert(!Operand->getType().getAs<BuiltinFixedArrayType>());
     setAtomicity(atomicity);
   }
 };

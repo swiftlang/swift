@@ -518,12 +518,6 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(CopyableToMoveOnlyWrapperAddrInst,
                     copyable_to_moveonlywrapper_addr, SingleValueInstruction,
                     None, DoesNotRelease)
-  // A move_addr is a Raw SIL only instruction that is equivalent to a copy_addr
-  // [init]. It is lowered during the diagnostic passes to a copy_addr [init] if
-  // the move checker found uses that prevented us from converting this to a
-  // move or if we do not find such uses, a copy_addr [init] [take].
-  NON_VALUE_INST(MarkUnresolvedMoveAddrInst, mark_unresolved_move_addr,
-                 SILInstruction, None, DoesNotRelease)
 
   // IsUnique does not actually write to memory but should be modeled
   // as such. Its operand is a pointer to an object reference. The
@@ -892,6 +886,13 @@ NON_VALUE_INST(PackElementSetInst, pack_element_set,
 // FIXME: Special MemBehavior for runtime failure?
 NON_VALUE_INST(CondFailInst, cond_fail,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
+
+// A move_addr is a Raw SIL only instruction that is equivalent to a copy_addr
+// [init]. It is lowered during the diagnostic passes to a copy_addr [init] if
+// the move checker found uses that prevented us from converting this to a
+// move or if we do not find such uses, a copy_addr [init] [take].
+NON_VALUE_INST(MarkUnresolvedMoveAddrInst, mark_unresolved_move_addr,
+               SILInstruction, None, DoesNotRelease)
 
 NON_VALUE_INST(IncrementProfilerCounterInst, increment_profiler_counter,
                SILInstruction, MayReadWrite, DoesNotRelease)

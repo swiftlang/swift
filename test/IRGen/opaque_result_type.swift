@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/opaque_result_type.swift
-// RUN: %target-swift-frontend -enable-experimental-named-opaque-types -enable-implicit-dynamic -disable-availability-checking -emit-ir %t/opaque_result_type.swift | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NODEBUG %t/opaque_result_type.swift
+// RUN: %target-swift-frontend -enable-experimental-named-opaque-types -enable-implicit-dynamic -target %target-swift-5.1-abi-triple -emit-ir %t/opaque_result_type.swift | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NODEBUG %t/opaque_result_type.swift
 
 // rdar://76863553
 // UNSUPPORTED: OS=watchos && CPU=x86_64

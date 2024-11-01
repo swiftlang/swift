@@ -27,6 +27,7 @@ add_swift_host_library(swiftAST STATIC
   Attr.cpp
   AutoDiff.cpp
   Availability.cpp
+  AvailabilityContext.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
   CaptureInfo.cpp

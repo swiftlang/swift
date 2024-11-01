@@ -681,6 +681,25 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
     createEndBorrow(loc, value);
 }
 
+SILPhiArgument *SILBuilder::createSwitchOptional(
+                                SILLocation loc, SILValue operand,
+                                SILBasicBlock *someBB, SILBasicBlock *noneBB,
+                                ValueOwnershipKind forwardingOwnershipKind,
+                                ProfileCounter someCount,
+                                ProfileCounter noneCount) {
+  ProfileCounter counts[] = {someCount, noneCount};
+  std::optional<ArrayRef<ProfileCounter>> countsArg = std::nullopt;
+  if (someCount || noneCount) countsArg = counts;
+
+  auto &ctx = getASTContext();
+  auto sei = createSwitchEnum(loc, operand, /*default*/ nullptr,
+                              {{ctx.getOptionalSomeDecl(), someBB},
+                               {ctx.getOptionalNoneDecl(), noneBB}},
+                              countsArg, /*default*/ProfileCounter(),
+                              forwardingOwnershipKind);
+  return sei->createResult(someBB, operand->getType().unwrapOptionalType());
+}
+
 /// Attempt to propagate ownership from \p operand to the returned forwarding
 /// ownership where the forwarded value has type \p targetType. If this fails,
 /// return Owned forwarding ownership instead.

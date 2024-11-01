@@ -1027,48 +1027,25 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     if ((group && group->isCancelled()) || swift_task_isCancelled(parent))
       swift_task_cancel(task);
 
-    // Initialize task locals storage
-    bool taskLocalStorageInitialized = false;
-
     // Inside a task group, we may have to perform some defensive copying,
     // check if doing so is necessary, and initialize storage using partial
     // defensive copies if necessary.
     if (group) {
       assert(parent && "a task created in a group must be a child task");
-      // We are a child task in a task group; and it may happen that we are calling
-      // addTask specifically in such shape:
-      //
-      //     $local.withValue(theValue) { addTask {} }
-      //
-      // If this is the case, we MUST copy `theValue` (and any other such directly
-      // wrapping the addTask value bindings), because those values will be popped
-      // when withValue returns - breaking our structured concurrency guarantees
-      // that we rely on for the "link directly to parent's task local Item".
-      //
-      // Values set outside the task group are not subject to this problem, as
-      // their structural lifetime guarantee is upheld by the group scope
-      // out-living any addTask created tasks.
-      auto ParentLocal = parent->_private().Local;
-      // If we were going to copy ALL values anyway, we don't need to
-      // perform this defensive partial copying. In practice, we currently
-      // do not have child tasks which force copying, but we could.
-      assert(!taskCreateFlags.copyTaskLocals() &&
-             "Currently we don't have child tasks which force copying task "
-             "locals; unexpected attempt to combine the two!");
-
-      if (auto taskLocalHeadLinkType = ParentLocal.peekHeadLinkType()) {
-        if (taskLocalHeadLinkType ==
-            swift::TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody) {
-          ParentLocal.copyToOnlyOnlyFromCurrentGroup(task);
-          taskLocalStorageInitialized = true;
-        }
-      }
     }
 
-    if (!taskLocalStorageInitialized) {
-      // just initialize the storage normally
-      task->_private().Local.initializeLinkParent(task, parent);
-    }
+    // Initialize task locals with a link to the parent task.
+    //
+    // Inside a task group, we may have to perform some defensive copying,
+    // and initialize storage using partial defensive copies if necessary.
+    //
+    // If we were going to copy ALL values anyway, we don't need to
+    // perform this defensive partial copying. In practice, we currently
+    // do not have child tasks which force copying, but we could.
+    assert(!taskCreateFlags.copyTaskLocals() &&
+           "Currently we don't have child tasks which force copying task "
+           "locals; unexpected attempt to combine the two!");
+    task->_private().Local.initializeLinkParent(task, parent);
   }
 
   // Configure the initial context.

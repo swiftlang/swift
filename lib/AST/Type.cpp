@@ -258,6 +258,8 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
+  case TypeKind::BuiltinUnboundGeneric:
+  case TypeKind::BuiltinFixedArray:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -305,7 +307,6 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   containsObjCProtocol = protoDecl->isObjC();
   containsSwiftProtocol = (!protoDecl->isObjC() &&
                            !protoDecl->isMarkerProtocol());
-  containsParameterized = false;
   representsAnyObject = false;
 
   protocols.push_back(protoDecl);
@@ -316,7 +317,6 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
   hasExplicitAnyObject = type->hasExplicitAnyObject();
   containsObjCProtocol = false;
   containsSwiftProtocol = false;
-  containsParameterized = false;
 
   auto members = type.getMembers();
   if (!members.empty() &&
@@ -331,9 +331,9 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
     if (auto protocolType = dyn_cast<ProtocolType>(member)) {
       protoDecl = protocolType->getDecl();
     } else {
-      auto parameterized = cast<ParameterizedProtocolType>(member);
-      protoDecl = parameterized->getProtocol();
-      containsParameterized = true;
+      auto *parameterizedType = member->castTo<ParameterizedProtocolType>();
+      protoDecl = parameterizedType->getProtocol();
+      parameterized.push_back(parameterizedType);
     }
     if (protoDecl->isObjC())
       containsObjCProtocol = true;
@@ -366,8 +366,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
 
 ExistentialLayout::ExistentialLayout(CanParameterizedProtocolType type)
     : ExistentialLayout(type.getBaseType()) {
-  sameTypeRequirements = type->getArgs();
-  containsParameterized = true;
+  parameterized.push_back(type);
 }
 
 ExistentialLayout TypeBase::getExistentialLayout() {
@@ -4333,6 +4332,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
+  case TypeKind::BuiltinUnboundGeneric:
+  case TypeKind::BuiltinFixedArray:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -4909,4 +4910,25 @@ TypeBase::getConcurrencyDiagnosticBehaviorLimit(DeclContext *declCtx) const {
   }
 
   return {};
+}
+
+GenericTypeParamKind
+TypeBase::getMatchingParamKind() {
+  if (auto gtpt = dyn_cast<GenericTypeParamType>(this)) {
+    return gtpt->getParamKind();
+  }
+  
+  if (auto arch = dyn_cast<ArchetypeType>(this)) {
+    return arch->mapTypeOutOfContext()->getMatchingParamKind();
+  }
+  
+  if (isa<IntegerType>(this)) {
+    return GenericTypeParamKind::Value;
+  }
+  
+  if (isa<PackType>(this)) {
+    return GenericTypeParamKind::Pack;
+  }
+  
+  return GenericTypeParamKind::Type;
 }

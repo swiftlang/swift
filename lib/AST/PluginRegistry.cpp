@@ -352,8 +352,8 @@ llvm::Error LoadedExecutablePlugin::sendMessage(llvm::StringRef message) {
   size_t size = message.size();
 
   // Write header (message size).
-  uint64_t header = llvm::support::endian::byte_swap(
-      uint64_t(size), llvm::support::endianness::little);
+  uint64_t header = llvm::support::endian::byte_swap(uint64_t(size),
+                                                     llvm::endianness::little);
   writtenSize = Process->write(&header, sizeof(header));
   if (writtenSize != sizeof(header)) {
     setStale();
@@ -385,8 +385,8 @@ llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() {
                                    "failed to read plugin message header");
   }
 
-  size_t size = llvm::support::endian::read<uint64_t>(
-      &header, llvm::support::endianness::little);
+  size_t size =
+      llvm::support::endian::read<uint64_t>(&header, llvm::endianness::little);
 
   // Read message.
   std::string message;

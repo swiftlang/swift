@@ -28,6 +28,67 @@ public struct ClassMetadata {
   var ivarDestroyer: UnsafeRawPointer?
 }
 
+/*
+  Embedded Swift Refcounting Scheme
+  =================================
+
+  The scheme for storing and maintaining a refcount on heap objects is very simple in Embedded Swift, and is much
+  simpler than regular Swift's. This is mainly due to the fact that we currently only maintain the regular ("strong")
+  refcount and we don't allow weak references, unowned references and we don't track refcount during deinit of the
+  object.
+
+  The refcount is always stored directly inline in the heap object, in the `refcount` field (see HeapObject struct
+  below). This field has the following structure (on 32-bit, and similar on other bitwidths):
+
+  ┌──────────────┬──────────────────────────────────────────────┐
+  │     b31      │                  b30:b0                      │
+  ├──────────────┼──────────────────────────────────────────────┤
+  │ doNotFreeBit │          actual number of references         │
+  └──────────────┴──────────────────────────────────────────────┘
+
+  If the highest bit (doNotFreeBit) is set, the behavior of dropping the last reference (release operation where
+  refcount ends up being 0) is altered to avoid calling free() on the object (deinit is still run). This is crutial for
+  class instances that are promoted by the compiler from being heap-allocated to instead be located on the stack
+  (see swift_initStackObject).
+
+  To retrieve the actual number of references from the `refcount` field, refcountMask needs to be applied, which masks
+  off the doNotFreeBit.
+
+  The actual number of references has one possible value that has a special meaning, immortalRefCount (all bits set,
+  i.e. 0x7fff_ffff on 32-bit systems). When used, retain and release operations do nothing, references are not counted,
+  and the object can never be deinit'd / free'd. This is used for class instances that are promoted by the compiler to
+  be allocated statically in global memory (see swift_initStaticObject). Note that there are two different scenarios for
+  this currently:
+
+  - In most cases, a class instance that is promoted to a global, is still dynamically initialized with a runtime call
+    to swift_initStaticObject. This function will set the refcount field to immortalRefCount | doNotFreeBit.
+  - As a special case to allow arrays be fully statically initialized without runtime overhead, instances of
+    _ContiguousArrayStorage can be promoted to __StaticArrayStorage with the HeapObject header emitted directly by the
+    compiler and refcount field directly set to immortalRefCount | doNotFreeBit (see irgen::emitConstantObject).
+
+  Tne immortalRefCount is additionally also used as a placeholder value for objects (heap-allocated or stack-allocated)
+  when they're currently inside their deinit(). This is done to prevent further retains and releases inside deinit from
+  triggering deinitialization again, without the need to reserve another bit for this purpose. Retains and releases in
+  deinit() are allowed, as long as they are balanced at the end, i.e. the object is not escaped (user's responsibility)
+  and not over-released (this can only be caused by unsafe code).
+
+  The following table summarizes the meaning of the possible combinations of doNotFreeBit and have immortal refcount
+  value:
+
+  ┌───────────╥──────────╥─────────────────────────────────────────────────┐
+  │ doNotFree ║ immortal ║                                                 │
+  ╞═══════════╬══════════╬═════════════════════════════════════════════════╡
+  │ 0         ║ no       ║ regular class instance                          │
+  ├───────────╫──────────╫─────────────────────────────────────────────────┤
+  │ 0         ║ yes      ║ regular class instance during deinit()          │
+  ├───────────╫──────────╫─────────────────────────────────────────────────┤
+  │ 1         ║ no       ║ stack-allocated                                 │
+  ├───────────╫──────────╫─────────────────────────────────────────────────┤
+  │ 1         ║ yes      ║ global-allocated, no need to track references,  │
+  │           ║          ║ or stack-allocated instance during deinit()     │
+  └───────────╨──────────╨─────────────────────────────────────────────────┘
+*/
+
 public struct HeapObject {
   // There is no way to express the custom ptrauth signature on the metadata
   // field, so let's use UnsafeRawPointer and a helper function in C instead
@@ -38,19 +99,20 @@ public struct HeapObject {
   // to think about supporting (or banning) weak and/or unowned references.
   var refcount: Int
 
+  // Note: The immortalRefCount value is also hard-coded in IRGen in `irgen::emitConstantObject`.
 #if _pointerBitWidth(_64)
-  static let doNotFreeBit = Int(bitPattern: 0x8000_0000_0000_0000)
-  static let refcountMask = Int(bitPattern: 0x7fff_ffff_ffff_ffff)
+  static let doNotFreeBit     = Int(bitPattern: 0x8000_0000_0000_0000)
+  static let refcountMask     = Int(bitPattern: 0x7fff_ffff_ffff_ffff)
+  static let immortalRefCount = Int(bitPattern: 0x7fff_ffff_ffff_ffff) // Make sure we don't have doNotFreeBit set
 #elseif _pointerBitWidth(_32)
-  static let doNotFreeBit = Int(bitPattern: 0x8000_0000)
-  static let refcountMask = Int(bitPattern: 0x7fff_ffff)
+  static let doNotFreeBit     = Int(bitPattern: 0x8000_0000)
+  static let refcountMask     = Int(bitPattern: 0x7fff_ffff)
+  static let immortalRefCount = Int(bitPattern: 0x7fff_ffff) // Make sure we don't have doNotFreeBit set
 #elseif _pointerBitWidth(_16)
-  static let doNotFreeBit = Int(bitPattern: 0x8000)
-  static let refcountMask = Int(bitPattern: 0x7fff)
+  static let doNotFreeBit     = Int(bitPattern: 0x8000)
+  static let refcountMask     = Int(bitPattern: 0x7fff)
+  static let immortalRefCount = Int(bitPattern: 0x7fff) // Make sure we don't have doNotFreeBit set
 #endif
-
-  // Note: The immortalRefCount value of -1 is also hard-coded in IRGen in `irgen::emitConstantObject`.
-  static let immortalRefCount = -1
 
 #if _pointerBitWidth(_64)
   static let immortalObjectPointerBit = UInt(0x8000_0000_0000_0000)
@@ -158,7 +220,7 @@ public func swift_initStaticObject(metadata: Builtin.RawPointer, object: Builtin
 
 func swift_initStaticObject(metadata: UnsafeMutablePointer<ClassMetadata>, object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<HeapObject> {
   _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
-  object.pointee.refcount = HeapObject.immortalRefCount
+  object.pointee.refcount = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
   return object
 }
 
@@ -251,7 +313,7 @@ public func swift_retain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.Raw
 
 func swift_retain_n_(object: UnsafeMutablePointer<HeapObject>, n: UInt32) -> UnsafeMutablePointer<HeapObject> {
   let refcount = refcountPointer(for: object)
-  if loadRelaxed(refcount) == HeapObject.immortalRefCount {
+  if loadRelaxed(refcount) & HeapObject.refcountMask == HeapObject.immortalRefCount {
     return object
   }
 
@@ -294,7 +356,8 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
   }
 
   let refcount = refcountPointer(for: object)
-  if loadRelaxed(refcount) == HeapObject.immortalRefCount {
+  let loadedRefcount = loadRelaxed(refcount)
+  if loadedRefcount & HeapObject.refcountMask == HeapObject.immortalRefCount {
     return
   }
 
@@ -309,7 +372,8 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
     // There can only be one thread with a reference at this point (because
     // we're releasing the last existing reference), so a relaxed store is
     // enough.
-    storeRelaxed(refcount, newValue: HeapObject.immortalRefCount)
+    let doNotFree = (loadedRefcount & HeapObject.doNotFreeBit) != 0
+    storeRelaxed(refcount, newValue: HeapObject.immortalRefCount | (doNotFree ? HeapObject.doNotFreeBit : 0))
 
     _swift_embedded_invoke_heap_object_destroy(object)
   } else if resultingRefcount < 0 {

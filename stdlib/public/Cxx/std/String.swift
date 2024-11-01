@@ -291,3 +291,61 @@ extension String {
     withExtendedLifetime(cxxU32String) {}
   }
 }
+
+// MARK: Initializing Swift String from a C++ string_view
+
+extension String {
+  /// Creates a String having the same content as the given C++ string view.
+  ///
+  /// If `cxxStringView` contains ill-formed UTF-8 code unit sequences, this
+  /// initializer replaces them with the Unicode replacement character
+  /// (`"\u{FFFD}"`).
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ string
+  ///   view.
+  public init(_ cxxStringView: std.string_view) {
+    let buffer = UnsafeBufferPointer<CChar>(
+      start: cxxStringView.__dataUnsafe(),
+      count: cxxStringView.size())
+    self = buffer.withMemoryRebound(to: UInt8.self) {
+      String(decoding: $0, as: UTF8.self)
+    }
+    withExtendedLifetime(cxxStringView) {}
+  }
+
+  /// Creates a String having the same content as the given C++ UTF-16 string
+  /// view.
+  ///
+  /// If `cxxU16StringView` contains ill-formed UTF-16 code unit sequences, this
+  /// initializer replaces them with the Unicode replacement character
+  /// (`"\u{FFFD}"`).
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ UTF-16
+  ///   string view.
+  public init(_ cxxU16StringView: std.u16string_view) {
+    let buffer = UnsafeBufferPointer<UInt16>(
+      start: cxxU16StringView.__dataUnsafe(),
+      count: cxxU16StringView.size())
+    self = String(decoding: buffer, as: UTF16.self)
+    withExtendedLifetime(cxxU16StringView) {}
+  }
+
+  /// Creates a String having the same content as the given C++ UTF-32 string
+  /// view.
+  ///
+  /// If `cxxU32StringView` contains ill-formed UTF-32 code unit sequences, this
+  /// initializer replaces them with the Unicode replacement character
+  /// (`"\u{FFFD}"`).
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ UTF-32
+  ///   string view.
+  public init(_ cxxU32StringView: std.u32string_view) {
+    let buffer = UnsafeBufferPointer<Unicode.Scalar>(
+      start: cxxU32StringView.__dataUnsafe(),
+      count: cxxU32StringView.size())
+    self = buffer.withMemoryRebound(to: UInt32.self) {
+      String(decoding: $0, as: UTF32.self)
+    }
+    withExtendedLifetime(cxxU32StringView) {}
+  }
+}

@@ -20,6 +20,8 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/Sema/Constraint.h"
+#include "llvm/ADT/ilist.h"
 #include <vector>
 
 namespace llvm {
@@ -103,7 +105,6 @@ public:
         Type DstType;
       } Restriction;
 
-
       struct {
         GenericTypeParamType *GP;
         Type ReqTy;
@@ -118,6 +119,14 @@ public:
         const KeyPathExpr *Expr;
         Type OldType;
       } KeyPath;
+
+      struct {
+        /// It's former position in the inactive constraints list.
+        llvm::ilist<Constraint>::iterator Where;
+
+        /// The constraint.
+        Constraint *Constraint;
+      } Retiree;
 
       ConstraintFix *TheFix;
       ConstraintLocator *TheLocator;
@@ -212,6 +221,10 @@ public:
 
     /// Create a change that recorded a key path expression.
     static Change RecordedKeyPath(KeyPathExpr *expr);
+
+    /// Create a change that removed a constraint from the inactive constraint list.
+    static Change RetiredConstraint(llvm::ilist<Constraint>::iterator where,
+                                    Constraint *constraint);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -disable-availability-checking -verify %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -target %target-swift-5.1-abi-triple -verify %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 

@@ -249,8 +249,6 @@ static void handleEnd(const Metadata *metadata,
 static void errorDestroy(const Metadata *metadata, LayoutStringReader1 &reader,
                          uintptr_t &addrOffset, uint8_t *addr) {
   uintptr_t object = *(uintptr_t *)(addr + addrOffset);
-  if (object & _swift_abi_ObjCReservedBitsMask)
-    return;
   object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset += sizeof(SwiftError*);
   swift_errorRelease((SwiftError *)object);
@@ -911,8 +909,6 @@ static void errorRetain(const Metadata *metadata, LayoutStringReader1 &reader,
                         uintptr_t &addrOffset, uint8_t *dest, uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
   uintptr_t object = *(uintptr_t *)(src + _addrOffset);
-  if (object & _swift_abi_ObjCReservedBitsMask)
-    return;
   memcpy(dest + addrOffset, &object, sizeof(SwiftError*));
   object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset = _addrOffset + sizeof(SwiftError *);
@@ -1306,15 +1302,10 @@ static void errorAssignWithCopy(const Metadata *metadata,
   memcpy(dest + _addrOffset, &srcObject, sizeof(SwiftError *));
   addrOffset = _addrOffset + sizeof(SwiftError *);
 
-  if (!(destObject & _swift_abi_ObjCReservedBitsMask)) {
-    destObject &= ~_swift_abi_SwiftSpareBitsMask;
-    swift_errorRelease((SwiftError *)destObject);
-  }
-
-  if (!(srcObject & _swift_abi_ObjCReservedBitsMask)) {
-    srcObject &= ~_swift_abi_SwiftSpareBitsMask;
-    swift_errorRetain((SwiftError *)srcObject);
-  }
+  destObject &= ~_swift_abi_SwiftSpareBitsMask;
+  srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+  swift_errorRelease((SwiftError *)destObject);
+  swift_errorRetain((SwiftError *)srcObject);
 }
 
 static void nativeStrongAssignWithCopy(const Metadata *metadata,

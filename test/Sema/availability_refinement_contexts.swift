@@ -208,6 +208,16 @@ func functionWithWhile() {
   }
 }
 
+// CHECK-NEXT: {{^}}  (decl version=51 decl=functionWithDefer()
+// CHECK-NEXT: {{^}}    (condition_following_availability version=52
+// CHECK-NEXT: {{^}}    (if_then version=52
+@available(OSX 51, *)
+func functionWithDefer() {
+  defer {
+    if #available(OSX 52, *) {}
+  }
+}
+
 // CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeClass
 // CHECK-NEXT: {{^}}    (decl version=51 decl=extension.SomeClass
 // CHECK-NEXT: {{^}}      (decl_implicit version=51 decl=someStaticPropertyWithClosureInit
@@ -297,6 +307,71 @@ var someComputedGlobalVar: Int {
 
   @available(OSX 52, *)
   set { }
+}
+
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=interpolated
+// CHECK-NEXT: {{^}}    (decl_implicit version=50 decl=string
+
+func testStringInterpolation() {
+  let interpolated = """
+    \([""].map {
+      let string = $0
+      return string
+    })
+    """
+}
+
+// CHECK-NEXT: {{^}}  (decl version=50 unavailable=macOS decl=unavailableOnMacOS()
+// CHECK-NEXT: {{^}}    (decl_implicit version=50 unavailable=macOS decl=x
+
+@available(macOS, unavailable)
+func unavailableOnMacOS() {
+  let x = 1
+}
+
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeEnum
+// CHECK-NEXT: {{^}}    (decl version=51 decl=extension.SomeEnum
+// CHECK-NEXT: {{^}}      (decl_implicit version=51 decl=unavailableOnMacOS
+// CHECK-NEXT: {{^}}        (decl version=51 unavailable=macOS decl=unavailableOnMacOS
+@available(OSX 51, *)
+extension SomeEnum {
+  @available(macOS, unavailable)
+  var unavailableOnMacOS: Int { 1 }
+}
+
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeEnum
+// CHECK-NEXT: {{^}}    (decl version=50 unavailable=macOS decl=extension.SomeEnum
+// CHECK-NEXT: {{^}}      (decl_implicit version=50 unavailable=macOS decl=availableMacOS_52
+// CHECK-NEXT: {{^}}        (decl version=52 unavailable=macOS decl=availableMacOS_52
+// CHECK-NEXT: {{^}}      (decl version=50 unavailable=* decl=neverAvailable()
+
+@available(macOS, unavailable)
+extension SomeEnum {
+  @available(OSX 52, *)
+  var availableMacOS_52: Int { 1 }
+
+  @available(macOSApplicationExtension, unavailable)
+  func unavailableInAppExtensions() {}
+
+  @available(*, unavailable)
+  func neverAvailable() {}
+}
+
+// CHECK-NEXT: {{^}}  (decl version=50 unavailable=* decl=NeverAvailable
+// CHECK-NEXT: {{^}}    (decl version=50 unavailable=* decl=unavailableOnMacOS()
+
+@available(*, unavailable)
+struct NeverAvailable {
+  @available(macOS, unavailable)
+  func unavailableOnMacOS() {}
+}
+
+// CHECK-NEXT: {{^}}  (decl version=50 deprecated decl=deprecatedOnMacOS()
+// CHECK-NEXT: {{^}}    (decl_implicit version=50 deprecated decl=x
+
+@available(macOS, deprecated)
+func deprecatedOnMacOS() {
+  let x = 1
 }
 
 // CHECK-NEXT: {{^}}  (decl version=51 decl=FinalDecl

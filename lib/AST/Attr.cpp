@@ -662,7 +662,7 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   if (!AvailAttr)
     return false;
 
-  if (AvailAttr->IsSPI)
+  if (AvailAttr->isSPI())
     return false;
 
   if (!AvailAttr->Introduced.has_value())
@@ -1371,7 +1371,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto Attr = cast<AvailableAttr>(this);
     if (Options.SuppressNoAsyncAvailabilityAttr && Attr->isNoAsync())
       return false;
-    if (Options.printPublicInterface() && Attr->IsSPI) {
+    if (Options.printPublicInterface() && Attr->isSPI()) {
       assert(Attr->hasPlatform());
       assert(Attr->Introduced.has_value());
       Printer.printAttrName("@available");
@@ -1380,7 +1380,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << ", unavailable)";
       break;
     }
-    if (Attr->IsSPI) {
+    if (Attr->isForEmbedded()) {
+      std::string atUnavailableInEmbedded =
+          (llvm::Twine("@") + UNAVAILABLE_IN_EMBEDDED_ATTRNAME).str();
+      Printer.printAttrName(atUnavailableInEmbedded);
+      break;
+    }
+
+    if (Attr->isSPI()) {
       std::string atSPI = (llvm::Twine("@") + SPI_AVAILABLE_ATTRNAME).str();
       Printer.printAttrName(atSPI);
     } else {
@@ -2243,6 +2250,34 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
                            ErrorType::get(ctx));
 }
 
+#define INIT_VER_TUPLE(X) X(X.empty() ? std::optional<llvm::VersionTuple>() : X)
+
+AvailableAttr::AvailableAttr(
+    SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
+    StringRef Message, StringRef Rename, ValueDecl *RenameDecl,
+    const llvm::VersionTuple &Introduced, SourceRange IntroducedRange,
+    const llvm::VersionTuple &Deprecated, SourceRange DeprecatedRange,
+    const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
+    PlatformAgnosticAvailabilityKind PlatformAgnostic, bool Implicit,
+    bool IsSPI, bool IsForEmbedded)
+    : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
+      Message(Message), Rename(Rename), RenameDecl(RenameDecl),
+      INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
+      INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
+      INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
+      PlatformAgnostic(PlatformAgnostic), Platform(Platform) {
+  Bits.AvailableAttr.IsSPI = IsSPI;
+
+  if (IsForEmbedded) {
+    // FIXME: The IsForEmbedded bit should be removed when library availability
+    // conditions are implemented (rdar://138802876)
+    Bits.AvailableAttr.IsForEmbedded = true;
+    assert(Platform == PlatformKind::none);
+  }
+}
+
+#undef INIT_VER_TUPLE
+
 AvailableAttr *
 AvailableAttr::createPlatformAgnostic(ASTContext &C,
                                    StringRef Message,
@@ -2294,7 +2329,8 @@ AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
                                implicit ? SourceRange() : ObsoletedRange,
                                PlatformAgnostic,
                                implicit,
-                               IsSPI);
+                               isSPI(),
+                               isForEmbedded());
 }
 
 std::optional<OriginallyDefinedInAttr::ActiveVersion>

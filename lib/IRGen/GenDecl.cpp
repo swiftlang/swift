@@ -3113,7 +3113,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     // Index of swiftasync context | ((index of swiftself) << 8).
     arguments.push_back(IGM.getInt32(paramAttributeFlags));
     arguments.push_back(currentResumeFn);
-    auto resumeProjFn = IGF.getOrCreateResumePrjFn(true /*forProlog*/);
+    auto resumeProjFn = IGF.getOrCreateResumePrjFn();
     arguments.push_back(
         Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
     auto dispatchFn = IGF.createAsyncDispatchFn(
@@ -6277,4 +6277,63 @@ void IRGenModule::setColocateMetadataSection(llvm::Function *f) {
   case llvm::Triple::COFF:
     break;
   }
+}
+
+llvm::Function *IRGenModule::getOrCreateProfilingThunk(
+  llvm::Function *f,
+  StringRef prefix) {
+
+  llvm::SmallString<32> name;
+  {
+    llvm::raw_svector_ostream os(name);
+    os << prefix;
+    os << f->getName();
+  }
+
+  auto thunk = cast<llvm::Function>(
+    getOrCreateHelperFunction(name, f->getReturnType(),
+                              f->getFunctionType()->params(),
+    [&](IRGenFunction &IGF) {
+      Explosion args = IGF.collectParameters();
+      auto res = IGF.Builder.CreateCall(f->getFunctionType(), f, args.getAll());
+      res->setAttributes(f->getAttributes());
+      (void)args.claimAll();
+      if (res->getType()->isVoidTy()) {
+        IGF.Builder.CreateRetVoid();
+      } else {
+        IGF.Builder.CreateRet(res);
+      }
+    }, /*isNoInline*/ true));
+
+  thunk->setAttributes(f->getAttributes());
+  thunk->setCallingConv(f->getCallingConv());
+  thunk->setDLLStorageClass(f->getDLLStorageClass());
+  if (f->getComdat())
+    thunk->setComdat(f->getParent()->getOrInsertComdat(thunk->getName()));
+  setMustHaveFramePointer(thunk);
+  thunk->addFnAttr(llvm::Attribute::NoInline);
+
+  return cast<llvm::Function>(thunk);
+}
+
+llvm::Function*
+IRGenModule::getAddrOfWitnessTableProfilingThunk(
+  llvm::Function *witness,
+  const NormalProtocolConformance &conformance) {
+
+  assert(
+    conformance.getDeclContext()->getSelfNominalTypeDecl()->isGenericContext());
+
+  return getOrCreateProfilingThunk(witness,
+                            "__swift_prof_thunk__generic_witness__");
+}
+
+llvm::Function *
+IRGenModule::getAddrOfVTableProfilingThunk(
+  llvm::Function *vTableFun, ClassDecl *classDecl) {
+
+  assert(classDecl->getSelfNominalTypeDecl()->isGenericContext());
+
+  return getOrCreateProfilingThunk(vTableFun,
+                            "__swift_prof_thunk__generic_vtable__");
 }

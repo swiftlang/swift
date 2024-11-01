@@ -2772,6 +2772,28 @@ unsigned RegexLiteralExpr::getVersion() const {
       .Version;
 }
 
+ArrayRef<RegexLiteralPatternFeature>
+RegexLiteralExpr::getPatternFeatures() const {
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, RegexLiteralPatternInfoRequest{this}, {})
+      .Features;
+}
+
+StringRef
+RegexLiteralPatternFeatureKind::getDescription(ASTContext &ctx) const {
+  auto &eval = ctx.evaluator;
+  return evaluateOrDefault(
+      eval, RegexLiteralFeatureDescriptionRequest{*this, &ctx}, {});
+}
+
+AvailabilityRange
+RegexLiteralPatternFeatureKind::getAvailability(ASTContext &ctx) const {
+  auto &eval = ctx.evaluator;
+  return evaluateOrDefault(eval,
+                           RegexLiteralFeatureAvailabilityRequest{*this, &ctx},
+                           AvailabilityRange::alwaysAvailable());
+}
+
 TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
                            ArrayRef<Expr *> elements, SingleValueStmtExpr *SVE)
     : Expr(ExprKind::TypeJoin, /*implicit=*/true, Type()), Var(nullptr),

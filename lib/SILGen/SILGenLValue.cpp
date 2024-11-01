@@ -4566,10 +4566,19 @@ LValue SILGenLValue::visitABISafeConversionExpr(ABISafeConversionExpr *e,
                                     LValueOptions options) {
   LValue lval = visitRec(e->getSubExpr(), accessKind, options);
   auto typeData = getValueTypeData(SGF, accessKind, e);
+  auto subExprType = e->getSubExpr()->getType()->getRValueType();
+  auto loweredSubExprType = SGF.getLoweredType(subExprType);
+  
+  // Ensure the lvalue is re-abstracted to the substituted type, since that's
+  // the type with which we have ABI compatibility.
+  if (lval.getTypeOfRValue().getASTType() != loweredSubExprType.getASTType()) {
+    // Logical components always re-abstract back to the substituted
+    // type.
+    ASSERT(lval.isLastComponentPhysical());
+    lval.addOrigToSubstComponent(loweredSubExprType);
+  }
 
-  auto OrigType = e->getSubExpr()->getType();
-
-  lval.add<UncheckedConversionComponent>(typeData, OrigType);
+  lval.add<UncheckedConversionComponent>(typeData, subExprType);
 
   return lval;
 }

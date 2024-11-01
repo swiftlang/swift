@@ -8,6 +8,7 @@ add_swift_host_library(swiftIRGen STATIC
   ExtraInhabitants.cpp
   Fulfillment.cpp
   GenArchetype.cpp
+  GenArray.cpp
   GenBuiltin.cpp
   GenCall.cpp
   GenCast.cpp

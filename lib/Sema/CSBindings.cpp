@@ -1215,8 +1215,12 @@ bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
     // as a binding because `$T0` could be inferred to
     // `(key: String, value: Int)` and binding `$T1` to `Array<(String, Int)>`
     // eagerly would be incorrect.
-    if (existing->Kind != binding.Kind)
-      continue;
+    if (existing->Kind != binding.Kind) {
+      // Array, Set and Dictionary allow conversions, everything else
+      // requires their generic arguments to match exactly.
+      if (existingType->isKnownStdlibCollectionType())
+        continue;
+    }
 
     // If new type has a type variable it shouldn't
     // be considered  viable.
@@ -1869,8 +1873,7 @@ void PotentialBindings::infer(Constraint *constraint) {
     DelayedBy.push_back(constraint);
     break;
 
-  case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol: {
+  case ConstraintKind::ConformsTo: {
     auto protocolTy = constraint->getSecondType();
     if (protocolTy->is<ProtocolType>())
       Protocols.push_back(constraint);
@@ -1981,7 +1984,6 @@ void PotentialBindings::retract(Constraint *constraint) {
 
   switch (constraint->getKind()) {
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
     Protocols.erase(llvm::remove_if(Protocols, isMatchingConstraint),
                     Protocols.end());
     break;

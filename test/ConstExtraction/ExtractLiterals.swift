@@ -104,6 +104,12 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractLiterals.MyProto"
 // CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractLiterals.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractLiterals"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
@@ -138,6 +144,12 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:    "line": 14,
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractLiterals.MyProto"
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractLiterals.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractLiterals"
+// CHECK-NEXT:      }
 // CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
@@ -185,6 +197,12 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractLiterals.MyProto"
 // CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractLiterals.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractLiterals"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
@@ -229,6 +247,12 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:    "line": 26,
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractLiterals.MyProto"
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractLiterals.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractLiterals"
+// CHECK-NEXT:      }
 // CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
@@ -275,6 +299,12 @@ public struct PropertyWrappers : MyProto {
 // CHECK-NEXT:    "line": 37,
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractLiterals.MyProto"
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractLiterals.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractLiterals"
+// CHECK-NEXT:      }
 // CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [

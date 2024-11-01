@@ -1175,6 +1175,19 @@ func testMultiPayloadError() {
     // CHECK-NEXT: SimpleClass deinitialized!
     testDestroy(ptr)
 
+    // initWithCopy
+    do {
+        let x = MultiPayloadError.error3(0, MyError(x: SimpleClass(x: 23)))
+        testInit(ptr, to: x)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
     ptr.deallocate()
 }
 
@@ -1194,6 +1207,7 @@ func testMultiPayloadErrorKeepsTagIntact() {
     switch ptr.pointee {
         case .error1: print("Get error1!")
         case .error2: print("Got error2!")
+        case .error3: print("Got error3!")
         case .empty: print("Got empty!")
     }
 

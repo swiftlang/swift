@@ -1240,12 +1240,12 @@ struct PartitionOpBuilder {
         PartitionOp::Require(lookupValueID(value), currentInst));
   }
 
-  void addRequireInOutSendingAtFunctionExit(SILValue value) {
+  void addInOutSendingAtFunctionExit(SILValue value) {
     assert(valueHasID(value, /*dumpIfHasNoID=*/true) &&
            "required value should already have been encountered");
     currentInstPartitionOps.emplace_back(
-        PartitionOp::RequireInOutSendingAtFunctionExit(lookupValueID(value),
-                                                       currentInst));
+        PartitionOp::InOutSendingAtFunctionExit(lookupValueID(value),
+                                                currentInst));
   }
 
   void addUnknownPatternError(SILValue value) {
@@ -2402,7 +2402,7 @@ public:
 
   /// Adds requires for all sending inout parameters to make sure that they are
   /// properly updated before the end of the function.
-  void addRequiresForInOutParameters(TermInst *inst) {
+  void addEndOfFunctionChecksForInOutSendingParameters(TermInst *inst) {
     assert(inst->isFunctionExiting() && "Must be function exiting term inst?!");
     for (auto *arg : inst->getFunction()->getArguments()) {
       auto *fArg = cast<SILFunctionArgument>(arg);
@@ -2410,7 +2410,7 @@ public:
           fArg->getKnownParameterInfo().hasOption(SILParameterInfo::Sending)) {
         if (auto ns = tryToTrackValue(arg)) {
           auto rep = ns->getRepresentative().getValue();
-          builder.addRequireInOutSendingAtFunctionExit(rep);
+          builder.addInOutSendingAtFunctionExit(rep);
         }
       }
     }
@@ -2838,7 +2838,7 @@ CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 #define FUNCTION_EXITING_TERMINATOR_CONSTANT(INST, Kind)                       \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
     assert(inst->isFunctionExiting() && "Must be function exiting?!");         \
-    addRequiresForInOutParameters(inst);                                       \
+    addEndOfFunctionChecksForInOutSendingParameters(inst);                     \
     return TranslationSemantics::Kind;                                         \
   }
 
@@ -3090,7 +3090,7 @@ PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
 }
 
 TranslationSemantics PartitionOpTranslator::visitReturnInst(ReturnInst *ri) {
-  addRequiresForInOutParameters(ri);
+  addEndOfFunctionChecksForInOutSendingParameters(ri);
   if (ri->getFunction()->getLoweredFunctionType()->hasSendingResult()) {
     return TranslationSemantics::TransferringNoResult;
   }

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

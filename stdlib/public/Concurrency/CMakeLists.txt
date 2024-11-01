@@ -256,6 +256,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
 
+    # lib/swift/embedded/_Concurrency.swiftmodule
+    # lib/swift/embedded/<triple>/libswift_Concurrency.a
     add_swift_target_library_single(
       embedded-concurrency-${mod}
       swift_Concurrency
@@ -264,7 +266,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
       ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
-      CooperativeGlobalExecutor.cpp
 
       SWIFT_COMPILE_FLAGS
         ${extra_swift_compile_flags} -enable-experimental-feature Embedded
@@ -291,8 +292,37 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
     set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
-
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
+
+    # lib/swift/embedded/<triple>/libswift_ConcurrencyDefaultExecutor.a
+    add_swift_target_library_single(
+      embedded-concurrency-default-executor-${mod}
+      swift_ConcurrencyDefaultExecutor
+      STATIC
+      IS_FRAGILE
+
+      CooperativeGlobalExecutor.cpp
+
+      C_COMPILE_FLAGS ${extra_c_compile_flags}
+      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
+      SDK "embedded"
+      ARCHITECTURE "${mod}"
+      DEPENDS embedded-stdlib-${mod}
+      INSTALL_IN_COMPONENT stdlib
+      )
+    swift_install_in_component(
+      TARGETS embedded-concurrency-default-executor-${mod}
+      DESTINATION "lib/swift/embedded/${mod}"
+      COMPONENT "stdlib"
+      )
+    swift_install_in_component(
+      FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswift_ConcurrencyDefaultExecutor.a"
+      DESTINATION "lib/swift/embedded/${mod}/"
+      COMPONENT "stdlib"
+      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+      )
+    set_property(TARGET embedded-concurrency-default-executor-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+    add_dependencies(embedded-concurrency embedded-concurrency-default-executor-${mod})
   endforeach()
 
   # Copy the ExecutorImpl.h header into the local include directory

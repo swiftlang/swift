@@ -4063,6 +4063,21 @@ namespace {
       printRec(T->getElementType());
       printFoot();
     }
+    
+    void visitBuiltinUnboundGenericType(BuiltinUnboundGenericType *T,
+                                        StringRef label) {
+      printCommon("builtin_unbound_generic_type", label);
+      printField(T->getBuiltinTypeNameString(), "name");
+      printFoot();
+    }
+    
+    void visitBuiltinFixedArrayType(BuiltinFixedArrayType *T,
+                                    StringRef label) {
+      printCommon("builtin_fixed_array_type", label);
+      printRec(T->getSize());
+      printRec(T->getElementType());
+      printFoot();
+    }
 
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
       printCommon("type_alias_type", label);

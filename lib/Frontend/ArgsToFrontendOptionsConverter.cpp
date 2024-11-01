@@ -299,6 +299,13 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_public_module_name))
     Opts.PublicModuleName = A->getValue();
 
+  if (auto A = Args.getLastArg(OPT_swiftinterface_compiler_version)) {
+    if (Opts.SwiftInterfaceCompilerVersion.tryParse(A->getValue())) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
+  }
+
   // This must be called after computing module name, module abi name,
   // and module link name. If computing module aliases is unsuccessful,
   // return early.
@@ -406,7 +413,8 @@ void ArgsToFrontendOptionsConverter::computePrintStatsOptions() {
   using namespace options;
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
   Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
-#if defined(NDEBUG) && !defined(LLVM_ENABLE_STATS)
+  Opts.PrintZeroStats |= Args.hasArg(OPT_print_zero_stats);
+#if defined(NDEBUG) && !LLVM_ENABLE_STATS
   if (Opts.PrintStats || Opts.PrintClangStats)
     Diags.diagnose(SourceLoc(), diag::stats_disabled);
 #endif
@@ -539,6 +547,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitSIL;
   if (Opt.matches(OPT_emit_silgen))
     return FrontendOptions::ActionType::EmitSILGen;
+  if (Opt.matches(OPT_emit_lowered_sil))
+    return FrontendOptions::ActionType::EmitLoweredSIL;
   if (Opt.matches(OPT_emit_sib))
     return FrontendOptions::ActionType::EmitSIB;
   if (Opt.matches(OPT_emit_sibgen))

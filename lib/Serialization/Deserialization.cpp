@@ -3749,10 +3749,9 @@ public:
       lifetimeDependencies.push_back(*info);
     }
 
-    if (!lifetimeDependencies.empty()) {
-      ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{ctor},
-                                ctx.AllocateCopy(lifetimeDependencies));
-    }
+    ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{ctor},
+                              lifetimeDependencies.empty()? std::nullopt :
+                                  ctx.AllocateCopy(lifetimeDependencies));
 
     if (auto errorConvention = MF.maybeReadForeignErrorConvention())
       ctor->setForeignErrorConvention(*errorConvention);
@@ -4338,10 +4337,9 @@ public:
       lifetimeDependencies.push_back(*info);
     }
 
-    if (!lifetimeDependencies.empty()) {
-      ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{fn},
-                                ctx.AllocateCopy(lifetimeDependencies));
-    }
+    ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{fn},
+                              lifetimeDependencies.empty() ? std::nullopt
+                                  : ctx.AllocateCopy(lifetimeDependencies));
 
     if (auto errorConvention = MF.maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
@@ -5604,6 +5602,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   bool isNoAsync;
   bool isPackageDescriptionVersionSpecific;
   bool isSPI;
+  bool isForEmbedded;
   DEF_VER_TUPLE_PIECES(Introduced);
   DEF_VER_TUPLE_PIECES(Deprecated);
   DEF_VER_TUPLE_PIECES(Obsoleted);
@@ -5613,7 +5612,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   // Decode the record, pulling the version tuple information.
   serialization::decls_block::AvailableDeclAttrLayout::readRecord(
       scratch, isImplicit, isUnavailable, isDeprecated, isNoAsync,
-      isPackageDescriptionVersionSpecific, isSPI,
+      isPackageDescriptionVersionSpecific, isSPI, isForEmbedded,
       LIST_VER_TUPLE_PIECES(Introduced), LIST_VER_TUPLE_PIECES(Deprecated),
       LIST_VER_TUPLE_PIECES(Obsoleted), rawPlatform, renameDeclID, messageSize,
       renameSize);
@@ -5657,7 +5656,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   auto attr = new (ctx) AvailableAttr(
       SourceLoc(), SourceRange(), platform, message, rename, renameDecl,
       Introduced, SourceRange(), Deprecated, SourceRange(), Obsoleted,
-      SourceRange(), platformAgnostic, isImplicit, isSPI);
+      SourceRange(), platformAgnostic, isImplicit, isSPI, isForEmbedded);
   return attr;
 }
 
@@ -6826,6 +6825,32 @@ DESERIALIZE_TYPE(BUILTIN_ALIAS_TYPE)(
 
   return alias->getDeclaredInterfaceType();
 }
+
+Expected<Type>
+DESERIALIZE_TYPE(BUILTIN_FIXED_ARRAY_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData)
+{
+  TypeID sizeID;
+  TypeID elementTypeID;
+  decls_block::BuiltinFixedArrayTypeLayout::readRecord(scratch, sizeID,
+                                                       elementTypeID);
+                                                       
+  
+  auto sizeOrError = MF.getTypeChecked(sizeID);
+  if (!sizeOrError) {
+    return sizeOrError.takeError();
+  }
+  auto size = sizeOrError.get()->getCanonicalType();
+  
+  auto elementTypeOrError = MF.getTypeChecked(elementTypeID);
+  if (!elementTypeOrError) {
+    return elementTypeOrError.takeError();
+  }
+  auto elementType = elementTypeOrError.get()->getCanonicalType();
+  
+  return BuiltinFixedArrayType::get(size, elementType);
+}
+
 
 Expected<Type> DESERIALIZE_TYPE(NAME_ALIAS_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
@@ -8134,12 +8159,27 @@ public:
 
     return attr;
   }
+
+  // CountAttributedType is a clang type representing a pointer with
+  // a "counted_by" type attribute and DynamicRangePointerType is
+  // representing a "__ended_by" type attribute.
+  // TypeCoupledDeclRefInfo is used to hold information of a declaration
+  // referenced from an expression argument of "__counted_by(expr)" or
+  // "__ended_by(expr)".
+  // Nothing to be done for now as we currently don't import
+  // these types into Swift.
+  clang::TypeCoupledDeclRefInfo readTypeCoupledDeclRefInfo() {
+    llvm_unreachable("TypeCoupledDeclRefInfo shouldn't be reached from swift");
+  }
 };
 
 } // end anonymous namespace
 
 llvm::Expected<const clang::Type *>
 ModuleFile::getClangType(ClangTypeID TID) {
+  if (!getContext().LangOpts.UseClangFunctionTypes)
+    return nullptr;
+
   if (TID == 0)
     return nullptr;
 

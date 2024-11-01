@@ -3597,7 +3597,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
           dyn_cast_or_null<clang::NamespaceDecl>(decl->getClangDecl())) {
     // Enum that correponds to the C++ namespace should only be printed once.
     if (!Printer.shouldPrintRedeclaredClangDecl(
-            namespaceDecl->getOriginalNamespace()))
+            namespaceDecl->getFirstDecl()))
       return;
 
     if (Options.SkipInlineCXXNamespace && namespaceDecl->isInline()) {
@@ -6073,6 +6073,8 @@ public:
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinVectorType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinIntegerType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinFloatType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnboundGenericType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinFixedArrayType)
 #undef ASTPRINTER_PRINT_BUILTINTYPE
 
   void visitSILTokenType(SILTokenType *T) {

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -strict-concurrency=complete -disable-availability-checking -parse-as-library -emit-sil -o /dev/null -verify -verify-additional-prefix tns- %s -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend  -strict-concurrency=complete -target %target-swift-5.1-abi-triple -parse-as-library -emit-sil -o /dev/null -verify -verify-additional-prefix tns- %s -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

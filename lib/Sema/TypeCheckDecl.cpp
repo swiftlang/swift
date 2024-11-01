@@ -1696,8 +1696,8 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   // range with both the conforming type's available range and the protocol
   // declaration's available range.
   AvailabilityRange witnessInfo =
-      AvailabilityInference::availableRange(witness, Context);
-  requirementInfo = AvailabilityInference::availableRange(requirement, Context);
+      AvailabilityInference::availableRange(witness);
+  requirementInfo = AvailabilityInference::availableRange(requirement);
 
   AvailabilityRange infoForConformingDecl =
       overApproximateAvailabilityAtLocation(dc->getAsDecl()->getLoc(), dc);

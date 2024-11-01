@@ -410,6 +410,7 @@ deriveEquatable_eq(
       /*Throws=*/false, /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, boolTy, parentDC);
   eqDecl->setUserAccessible(false);
+  eqDecl->setSynthesized();
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
   if (generatedIdentifier != C.Id_EqualsOperator) {
@@ -546,6 +547,7 @@ deriveHashable_hashInto(
       /*Async=*/false,
       /*Throws=*/false, /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, returnType, parentDC);
+  hashDecl->setSynthesized();
   hashDecl->setBodySynthesizer(bodySynthesizer);
   hashDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext=*/true);

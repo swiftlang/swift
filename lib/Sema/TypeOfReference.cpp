@@ -411,18 +411,57 @@ FunctionType *ConstraintSystem::openFunctionType(
   return funcType->castTo<FunctionType>();
 }
 
+static bool isInLeftHandSideOfAssignment(ConstraintSystem &cs, Expr *expr) {
+  // Walk up the parent tree.
+  auto parent = cs.getParentExpr(expr);
+  if (!parent)
+    return false;
 
+  // If the parent is an assignment expression, check whether we are
+  // the left-hand side.
+  if (auto assignParent = dyn_cast<AssignExpr>(parent)) {
+    return expr == assignParent->getDest();
+  }
+
+  // Always look up through these parent kinds.
+  if (isa<TupleExpr>(parent) || isa<IdentityExpr>(parent) ||
+      isa<AnyTryExpr>(parent) || isa<BindOptionalExpr>(parent)) {
+    return isInLeftHandSideOfAssignment(cs, parent);
+  }
+
+  // If the parent is a lookup expression, only follow from the base.
+  if (auto lookupParent = dyn_cast<LookupExpr>(parent)) {
+    if (lookupParent->getBase() == expr)
+      return isInLeftHandSideOfAssignment(cs, parent);
+
+    // The expression wasn't in the base, so this isn't part of the
+    // left-hand side.
+    return false;
+  }
+
+  // If the parent is an unresolved member reference a.b, only follow
+  // from the base.
+  if (auto dotParent = dyn_cast<UnresolvedDotExpr>(parent)) {
+    if (dotParent->getBase() == expr)
+      return isInLeftHandSideOfAssignment(cs, parent);
+
+    // The expression wasn't in the base, so this isn't part of the
+    // left-hand side.
+    return false;
+  }
+
+  return false;
+}
 
 /// Does a var or subscript produce an l-value?
 ///
 /// \param baseType - the type of the base on which this object
 ///   is being accessed; must be null if and only if this is not
 ///   a type member
-static bool
-doesStorageProduceLValue(
+static bool doesStorageProduceLValue(
     AbstractStorageDecl *storage, Type baseType,
     DeclContext *useDC,
-    llvm::function_ref<bool(Expr *)> isAssignTarget,
+    ConstraintSystem &cs,
     ConstraintLocator *locator) {
   const DeclRefExpr *base = nullptr;
   if (locator) {
@@ -456,7 +495,7 @@ doesStorageProduceLValue(
 
       // If the anchor isn't known to be the target of an assignment,
       // treat as immutable.
-      if (!isAssignTarget(anchor))
+      if (!isInLeftHandSideOfAssignment(cs, anchor))
         return false;
 
       break;
@@ -503,43 +542,31 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     ConstraintLocator *locator, bool wantInterfaceType,
     bool adjustForPreconcurrency) {
-  return ConstraintSystem::getUnopenedTypeOfReference(
-      value, baseType, UseDC,
-      [&](VarDecl *var) -> Type {
-        if (Type type = getTypeIfAvailable(var))
-          return type;
+  Type requestedType;
+  if (Type type = getTypeIfAvailable(value)) {
+    requestedType = type;
+  } else if (!value->hasInterfaceType()) {
+    requestedType = ErrorType::get(getASTContext());
+  } else {
+    requestedType = (wantInterfaceType
+                     ? value->getInterfaceType()
+                     : value->getTypeInContext());
+  }
 
-        if (!var->hasInterfaceType()) {
-          return ErrorType::get(getASTContext());
-        }
-
-        return wantInterfaceType ? var->getInterfaceType() : var->getTypeInContext();
-      },
-      locator, wantInterfaceType, adjustForPreconcurrency,
-      GetClosureType{*this},
-      ClosureIsolatedByPreconcurrency{*this},
-      IsInLeftHandSideOfAssignment{*this});
-}
-
-Type ConstraintSystem::getUnopenedTypeOfReference(
-    VarDecl *value, Type baseType, DeclContext *UseDC,
-    llvm::function_ref<Type(VarDecl *)> getType,
-    ConstraintLocator *locator,
-    bool wantInterfaceType, bool adjustForPreconcurrency,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType,
-    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency,
-    llvm::function_ref<bool(Expr *)> isAssignTarget) {
-  Type requestedType =
-      getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
+  requestedType =
+      requestedType->getWithoutSpecifierType()->getReferenceStorageReferent();
 
   // Strip pack expansion types off of pack references.
   if (auto *expansion = requestedType->getAs<PackExpansionType>())
     requestedType = expansion->getPatternType();
 
   // Adjust the type for concurrency if requested.
-  if (adjustForPreconcurrency)
+  if (adjustForPreconcurrency) {
     requestedType = adjustVarTypeForConcurrency(
-        requestedType, value, UseDC, getClosureType, isolatedByPreconcurrency);
+        requestedType, value, UseDC,
+        GetClosureType{*this},
+        ClosureIsolatedByPreconcurrency{*this});
+  }
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -553,8 +580,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
-  if (doesStorageProduceLValue(value, baseType, UseDC, isAssignTarget,
-                               locator) &&
+  if (doesStorageProduceLValue(value, baseType, UseDC, *this, locator) &&
       !requestedType->hasError()) {
     return LValueType::get(requestedType);
   }
@@ -1402,48 +1428,6 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
   return type;
 }
 
-bool IsInLeftHandSideOfAssignment::operator()(Expr *expr) const {
-  // Walk up the parent tree.
-  auto parent = cs.getParentExpr(expr);
-  if (!parent)
-    return false;
-
-  // If the parent is an assignment expression, check whether we are
-  // the left-hand side.
-  if (auto assignParent = dyn_cast<AssignExpr>(parent)) {
-    return expr == assignParent->getDest();
-  }
-
-  // Always look up through these parent kinds.
-  if (isa<TupleExpr>(parent) || isa<IdentityExpr>(parent) ||
-      isa<AnyTryExpr>(parent) || isa<BindOptionalExpr>(parent)) {
-    return (*this)(parent);
-  }
-
-  // If the parent is a lookup expression, only follow from the base.
-  if (auto lookupParent = dyn_cast<LookupExpr>(parent)) {
-    if (lookupParent->getBase() == expr)
-      return (*this)(parent);
-
-    // The expression wasn't in the base, so this isn't part of the
-    // left-hand side.
-    return false;
-  }
-
-  // If the parent is an unresolved member reference a.b, only follow
-  // from the base.
-  if (auto dotParent = dyn_cast<UnresolvedDotExpr>(parent)) {
-    if (dotParent->getBase() == expr)
-      return (*this)(parent);
-
-    // The expression wasn't in the base, so this isn't part of the
-    // left-hand side.
-    return false;
-  }
-
-  return false;
-}
-
 DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicLookup,
     FunctionRefKind functionRefKind, ConstraintLocator *locator,
@@ -1546,9 +1530,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
       auto elementTy = subscript->getElementInterfaceType();
 
-      if (doesStorageProduceLValue(
-              subscript, baseTy, useDC,
-              IsInLeftHandSideOfAssignment{*this}, locator))
+      if (doesStorageProduceLValue(subscript, baseTy, useDC, *this, locator))
         elementTy = LValueType::get(elementTy);
 
       auto indices = subscript->getInterfaceType()
@@ -1802,9 +1784,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       auto elementTy = subscript->getElementInterfaceType();
 
       if (doesStorageProduceLValue(subscript, overload.getBaseType(),
-                                   useDC,
-                                   IsInLeftHandSideOfAssignment{*this},
-                                   locator))
+                                   useDC, *this, locator))
         elementTy = LValueType::get(elementTy);
       else if (elementTy->hasDynamicSelfType()) {
         elementTy = withDynamicSelfResultReplaced(elementTy,
@@ -1829,8 +1809,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       type = var->getValueInterfaceType();
       if (doesStorageProduceLValue(
-              var, overload.getBaseType(), useDC,
-              IsInLeftHandSideOfAssignment{*this}, locator)) {
+              var, overload.getBaseType(), useDC, *this, locator)) {
         type = LValueType::get(type);
       } else if (type->hasDynamicSelfType()) {
         type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/0);

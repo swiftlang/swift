@@ -29,7 +29,7 @@
 
 using namespace swift;
 
-static bool canInlineBeginApply(BeginApplyInst *BA) {
+bool SILInliner::canInlineBeginApply(BeginApplyInst *BA) {
   // Don't inline if we have multiple resumption sites (i.e. end_apply or
   // abort_apply instructions).  The current implementation clones a single
   // copy of the end_apply and abort_apply paths, so it can't handle values

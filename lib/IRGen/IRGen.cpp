@@ -338,7 +338,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     options.Atomic = bool(Opts.Sanitizers & SanitizerKind::Thread);
     PB.registerPipelineStartEPCallback(
         [options](ModulePassManager &MPM, OptimizationLevel level) {
-          MPM.addPass(InstrProfiling(options, false));
+           MPM.addPass(InstrProfilingLoweringPass(options, false));
         });
   }
   if (Opts.shouldOptimize()) {
@@ -670,8 +670,8 @@ bool swift::compileAndWriteLLVM(
     legacy::PassManager EmitPasses;
     CodeGenFileType FileType;
     FileType =
-        (opts.OutputKind == IRGenOutputKind::NativeAssembly ? CGFT_AssemblyFile
-                                                            : CGFT_ObjectFile);
+        (opts.OutputKind == IRGenOutputKind::NativeAssembly ? CodeGenFileType::AssemblyFile
+                                                            : CodeGenFileType::ObjectFile);
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         targetMachine->getTargetIRAnalysis()));
 
@@ -874,9 +874,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
 
 std::unique_ptr<llvm::TargetMachine>
 swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
-  CodeGenOpt::Level OptLevel = Opts.shouldOptimize()
-                                   ? CodeGenOpt::Default // -Os
-                                   : CodeGenOpt::None;
+  CodeGenOptLevel OptLevel = Opts.shouldOptimize()
+                                   ? CodeGenOptLevel::Default // -Os
+                                   : CodeGenOptLevel::None;
 
   // Set up TargetOptions and create the target features string.
   TargetOptions TargetOpts;

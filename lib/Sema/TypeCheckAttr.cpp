@@ -50,6 +50,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include <optional>
 
 using namespace swift;
 
@@ -2104,7 +2105,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     return;
 
   // FIXME: This seems like it could be diagnosed during parsing instead.
-  while (attr->IsSPI) {
+  while (attr->isSPI()) {
     if (attr->hasPlatform() && attr->Introduced.has_value())
       break;
     diagnoseAndRemoveAttr(attr, diag::spi_available_malformed);
@@ -2321,7 +2322,7 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
     }
 
     // Verify that the declaration is exposable.
-    auto repr = cxx_translation::getDeclRepresentation(VD);
+    auto repr = cxx_translation::getDeclRepresentation(VD, std::nullopt);
     if (repr.isUnsupported())
       diagnose(attr->getLocation(),
                cxx_translation::diagnoseRepresenationError(*repr.error, VD));
@@ -4672,7 +4673,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> Attrs) {
   if (!D->getDeclContext()->getInnermostDeclarationDeclContext()) {
     // If all available are spi available, we should use @_spi instead.
     if (std::all_of(Attrs.begin(), Attrs.end(), [](AvailableAttr *AV) {
-      return AV->IsSPI;
+      return AV->isSPI();
     })) {
       diagnose(D->getLoc(), diag::spi_preferred_over_spi_available);
     }
@@ -5459,7 +5460,8 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
   if (!baseType && lookupContext->isTypeContext())
     baseType = lookupContext->getSelfTypeInContext();
   if (baseType) {
-    results = TypeChecker::lookupMember(lookupContext, baseType, funcName);
+    if (!baseType->hasError())
+      results = TypeChecker::lookupMember(lookupContext, baseType, funcName);
   } else {
     results = TypeChecker::lookupUnqualified(
         lookupContext, funcName, funcNameLoc.getBaseNameLoc(), lookupOptions);

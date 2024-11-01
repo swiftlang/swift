@@ -137,6 +137,17 @@ struct TemplateInstantiationNamePrinter
             Visit(type->getElementType().getTypePtr()) + ">")
         .str();
   }
+
+  std::string VisitArrayType(const clang::ArrayType *type) {
+    return (Twine("[") + Visit(type->getElementType().getTypePtr()) + "]")
+        .str();
+  }
+
+  std::string VisitConstantArrayType(const clang::ConstantArrayType *type) {
+    return (Twine("Vector<") + Visit(type->getElementType().getTypePtr()) +
+            ", " + std::to_string(type->getSExtSize()) + ">")
+        .str();
+  }
 };
 
 std::string swift::importer::printClassTemplateSpecializationName(
