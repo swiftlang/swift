@@ -323,17 +323,16 @@ extension ExtendMe {
     osx_extension() // expected-error {{'osx_extension()' is unavailable in application extensions for macOS}}
   }
 
-  // FIXME: Reenable
-//  @available(OSX, unavailable)
-//  func osx_app_extension_extension_osx_method(
-//    _: NeverAvailable,
-//    _: OSXUnavailable,
-//    _: OSXAppExtensionsUnavailable
-//  ) {
-//    never()
-//    osx()
-//    osx_extension()
-//  }
+  @available(OSX, unavailable)
+  func osx_app_extension_extension_osx_method(
+    _: NeverAvailable,
+    _: OSXUnavailable,
+    _: OSXAppExtensionsUnavailable
+  ) {
+    never() // expected-error {{'never()' is unavailable}}
+    osx()
+    osx_extension()
+  }
 
   @available(OSXApplicationExtension, unavailable)
   func osx_app_extension_extension_osx_app_extension_method(
