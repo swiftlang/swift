@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -enable-experimental-feature KeyPathWithStaticMembers -parse-as-library %s -verify
+// RUN: %target-swift-frontend -typecheck -parse-as-library %s -verify
 
 // REQUIRES: asserts
 
