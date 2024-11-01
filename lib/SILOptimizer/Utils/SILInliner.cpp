@@ -877,6 +877,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BorrowedFromInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::PreviousDynamicFunctionRefInst:
   case SILInstructionKind::DynamicFunctionRefInst:
   case SILInstructionKind::FunctionRefInst:

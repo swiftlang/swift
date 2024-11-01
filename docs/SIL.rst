@@ -4126,6 +4126,91 @@ pipeline.
 
 The operand is a guaranteed operand, i.e. not consumed.
 
+merge_isolation_region
+``````````````````````
+
+::
+
+  sil-instruction :: 'merge_isolation_region' (sil-operand ',')+ sil-operand
+
+  %2 = merge_isolation_region %first : $*T, %second : $U
+  %2 = merge_isolation_region %first : $*T, %second : $U, %third : $H
+
+Instruction that is only valid in Ownership SSA.
+
+This instruction informs region isolation that all of the operands should be
+considered to be artificially apart of the same region. It is intended to be
+used to express region dependency when due to unsafe codegen we have to traffic
+a non-Sendable value through computations with Sendable values (causing us to
+not track the non-Sendable value) but have to later express that a non-Sendable
+result of using the Sendable value needs to be in the same region as the
+original non-Sendable value. As an example of where this comes up, consider the
+following code::
+
+  // objc code
+  @interface CallbackData : NSObject
+  @end
+  
+  @interface Klass : NSObject
+  
+  - (void)loadDataWithCompletionHandler:(void (^)(CallbackData * _Nullable, NSError * _Nullable))completionHandler;
+  
+  @end
+
+  // swift code
+  extension Klass {
+    func loadCallbackData() async throws -> sending CallbackData {
+      try await loadData()
+    }
+  }
+
+This lowers to::
+
+  %5 = alloc_stack $CallbackData                  // users: %26, %25, %31, %16, %7
+  %6 = objc_method %0 : $Klass, #Klass.loadData!foreign : (Klass) -> () async throws -> CallbackData, $@convention(objc_method) (Optional<@convention(block) (Optional<CallbackData>, Optional<NSError>) -> ()>, Klass) -> () // user: %20
+  %7 = get_async_continuation_addr [throws] CallbackData, %5 : $*CallbackData // users: %23, %8
+  %8 = struct $UnsafeContinuation<CallbackData, any Error> (%7 : $Builtin.RawUnsafeContinuation) // user: %14
+  %9 = alloc_stack $@block_storage Any            // users: %22, %16, %10
+  %10 = project_block_storage %9 : $*@block_storage Any // user: %11
+  %11 = init_existential_addr %10 : $*Any, $CheckedContinuation<CallbackData, any Error> // user: %15
+  // function_ref _createCheckedThrowingContinuation<A>(_:)
+  %12 = function_ref @$ss34_createCheckedThrowingContinuationyScCyxs5Error_pGSccyxsAB_pGnlF : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, any Error>) -> @out CheckedContinuation<τ_0_0, any Error> // user: %14
+  %13 = alloc_stack $CheckedContinuation<CallbackData, any Error> // users: %21, %15, %14
+  %14 = apply %12<CallbackData>(%13, %8) : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, any Error>) -> @out CheckedContinuation<τ_0_0, any Error>
+  copy_addr [take] %13 to [init] %11 : $*CheckedContinuation<CallbackData, any Error> // id: %15
+  merge_isolation_region %9 : $*@block_storage Any, %5 : $*CallbackData // id: %16
+  // function_ref @objc completion handler block implementation for @escaping @callee_unowned @convention(block) (@unowned CallbackData?, @unowned NSError?) -> () with result type CallbackData
+  %17 = function_ref @$sSo12CallbackDataCSgSo7NSErrorCSgIeyByy_ABTz_ : $@convention(c) (@inout_aliasable @block_storage Any, Optional<CallbackData>, Optional<NSError>) -> () // user: %18
+  %18 = init_block_storage_header %9 : $*@block_storage Any, invoke %17 : $@convention(c) (@inout_aliasable @block_storage Any, Optional<CallbackData>, Optional<NSError>) -> (), type $@convention(block) (Optional<CallbackData>, Optional<NSError>) -> () // user: %19
+  %19 = enum $Optional<@convention(block) (Optional<CallbackData>, Optional<NSError>) -> ()>, #Optional.some!enumelt, %18 : $@convention(block) (Optional<CallbackData>, Optional<NSError>) -> () // user: %20
+  %20 = apply %6(%19, %0) : $@convention(objc_method) (Optional<@convention(block) (Optional<CallbackData>, Optional<NSError>) -> ()>, Klass) -> ()
+
+Notice how without the `merge_isolation_region`_ instruction (%16) there is no
+non-Sendable def-use chain from %5, the indirect return value of the block, to
+the actual non-Sendable block storage %9. This can result in region isolation
+not propagating restrictions on usage from %9 onto %5 risking the creation of
+races.
+
+Applying the previous discussion to this specific example, self (%0) is
+non-Sendable and is bound to the current task. If we did not have the
+`merge_isolation_region`_ instruction here, we would not tie the return value %5
+to %0 via %9. This would cause %5 to be treated as a disconnected value and thus
+be a valid sending return value potentially allowing for %5 in the caller of the
+function to be sent to another isolation domain and introduce a race.
+
+.. note::
+   This is effectively the same purpose that `mark_dependence`_ plays for memory
+   dependence (expressing memory dependence that the compiler cannot infer)
+   except in the world of region isolation. We purposely use a different
+   instruction since `mark_dependence`_ is often times used to create a
+   temporary dependence in between two values via the return value of
+   `mark_dependence`_. If `mark_dependence`_ had the semantics of acting like a
+   region merge we would in contrast have from that point on a region dependence
+   in between the base and value of the `mark_dependence`_ causing the
+   `mark_dependence`_ to have a less "local" effect since all paths through that
+   program point would have to maintain that region dependence until the end of
+   the function.
+
 dealloc_stack
 `````````````
 ::
@@ -9048,7 +9133,6 @@ underlying T from an @moveOnly T.
 NOTE: From the perspective of the address checker, a trivial `load`_ with a
 `moveonlywrapper_to_copyable_addr`_ operand is considered to be a use of a
 noncopyable type.
-
 
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~
