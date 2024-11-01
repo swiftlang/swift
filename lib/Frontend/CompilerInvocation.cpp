@@ -1015,13 +1015,16 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableExperimentalStringProcessing = true;
   }
 
-  auto enableUpcomingFeature = [&Opts, &Diags](Feature feature) -> bool {
+  auto enableUpcomingFeature = [&Opts, &Diags](Feature feature,
+                                               bool downgradeDiag) -> bool {
     // Check if this feature was introduced already in this language version.
     if (auto firstVersion = getFeatureLanguageVersion(feature)) {
       if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
-        Diags.diagnose(SourceLoc(), diag::error_upcoming_feature_on_by_default,
-                       getFeatureName(feature), *firstVersion);
-        return true;
+        Diags
+            .diagnose(SourceLoc(), diag::error_upcoming_feature_on_by_default,
+                      getFeatureName(feature), *firstVersion)
+            .limitBehaviorIf(downgradeDiag, DiagnosticBehavior::Warning);
+        return !downgradeDiag;
       }
     }
 
@@ -1062,7 +1065,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // -enable-experimental-feature flag too since the feature may have
     // graduated from being experimental.
     if (auto feature = getUpcomingFeature(value)) {
-      if (enableUpcomingFeature(*feature))
+      if (enableUpcomingFeature(*feature, /*downgradeDiag=*/true))
         HadError = true;
     }
 
@@ -1087,7 +1090,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (!feature)
       continue;
 
-    if (enableUpcomingFeature(*feature))
+    if (enableUpcomingFeature(*feature, /*downgradeDiag=*/false))
       HadError = true;
   }
 
