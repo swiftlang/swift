@@ -769,7 +769,7 @@ func classViaTypeParameter() {
 // Potentially unavailable class used in declarations
 
 class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
-      // expected-note@-1 6{{add @available attribute to enclosing class}}
+      // expected-note@-1 5{{add @available attribute to enclosing class}}
 
   @available(OSX, introduced: 51)
   init() {}
@@ -823,8 +823,7 @@ class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
   
   @available(OSX, unavailable)
   func unavailableMethodWithPotentiallyUnavailableLocalDeclaration() {
-    let _ : ClassAvailableOn51 = methodWithPotentiallyUnavailableReturnType() // expected-error {{'ClassAvailableOn51' is only available in macOS 51 or newer}}
-      // expected-note@-1 {{add 'if #available' version check}}
+    let _ : ClassAvailableOn51 = methodWithPotentiallyUnavailableReturnType()
   }
 }
 

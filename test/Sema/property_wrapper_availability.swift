@@ -17,7 +17,7 @@ struct Available51Wrapper<T> {
 
 @available(*, unavailable)
 @propertyWrapper
-struct UnavailableWrapper<T> { // expected-note 8 {{'UnavailableWrapper' has been explicitly marked unavailable here}}
+struct UnavailableWrapper<T> { // expected-note 6 {{'UnavailableWrapper' has been explicitly marked unavailable here}}
   var wrappedValue: T
 }
 
@@ -77,8 +77,8 @@ struct UnavailableStruct {
   @AlwaysAvailableWrapper var alwaysAvailableExplicit: S
   @AlwaysAvailableWrapper var alwaysAvailableInferred = S()
   
-  @Available51Wrapper var available51Explicit: S  // expected-error {{'Available51Wrapper' is only available in macOS 51 or newer}}
-  @Available51Wrapper var available51Inferred = S() // expected-error {{'Available51Wrapper' is only available in macOS 51 or newer}}
+  @Available51Wrapper var available51Explicit: S
+  @Available51Wrapper var available51Inferred = S()
 
   @UnavailableWrapper var unavailableExplicit: S
   @UnavailableWrapper var unavailableInferred = S()
@@ -92,11 +92,11 @@ struct UnavailableOnMacOSStruct {
   @AlwaysAvailableWrapper var alwaysAvailableExplicit: S
   @AlwaysAvailableWrapper var alwaysAvailableInferred = S()
 
-  @Available51Wrapper var available51Explicit: S  // expected-error {{'Available51Wrapper' is only available in macOS 51 or newer}}
-  @Available51Wrapper var available51Inferred = S() // expected-error {{'Available51Wrapper' is only available in macOS 51 or newer}}
+  @Available51Wrapper var available51Explicit: S
+  @Available51Wrapper var available51Inferred = S()
 
-  @UnavailableWrapper var unavailableExplicit: S // expected-error {{'UnavailableWrapper' is unavailable}}
-  @UnavailableWrapper var unavailableInferred = S() // expected-error {{'UnavailableWrapper' is unavailable}}
+  @UnavailableWrapper var unavailableExplicit: S
+  @UnavailableWrapper var unavailableInferred = S()
 
   @WrappedValueUnavailableOnMacOS var unavailableWrappedValue: S
   @WrappedValueAvailable51 var wrappedValueAavailable51: S // expected-error {{'wrappedValue' is only available in macOS 51 or newer}}

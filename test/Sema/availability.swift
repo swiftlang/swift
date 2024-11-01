@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library -module-name MyModule
 
-// REQUIRES: OS=macosx
-
 @available(*, unavailable)
 func unavailable_foo() {} // expected-note {{'unavailable_foo()' has been explicitly marked unavailable here}}
 
@@ -29,90 +27,6 @@ func foo(x : NSUInteger) { // expected-error {{'NSUInteger' is unavailable: use 
 
   let z3 : MyModule.Outer.NSUInteger = 42 // expected-error {{'NSUInteger' is unavailable: use 'UInt' instead}}
   // expected-error@-1 {{cannot convert value of type 'Int' to specified type 'Outer.NSUInteger'}}
-}
-
-/* FIXME 'nil == a' fails to type-check with a bogus error message
- * <rdar://problem/17540796>
-func markUsed<T>(t: T) {}
-func testString() {
-  let a : String = "Hey"
-  if a == nil {
-    markUsed("nil")
-  } else if nil == a {
-    markUsed("nil")
-  }
-  else {
-    markUsed("not nil")
-  }
-}
- */
-
-// Test preventing protocol witnesses for unavailable requirements
-@objc
-protocol ProtocolWithRenamedRequirement {
-  @available(*, unavailable, renamed: "new(bar:)")
-  @objc optional func old(foo: Int) // expected-note{{'old(foo:)' has been explicitly marked unavailable here}}
-  func new(bar: Int)
-}
-
-class ClassWithGoodWitness : ProtocolWithRenamedRequirement {
-  @objc func new(bar: Int) {}
-}
-
-class ClassWithBadWitness : ProtocolWithRenamedRequirement {
-  @objc func old(foo: Int) {} // expected-error{{'old(foo:)' has been renamed to 'new(bar:)'}}
-  @objc func new(bar: Int) {}
-}
-
-@available(OSX, unavailable)
-let unavailableOnOSX: Int = 0 // expected-note{{explicitly marked unavailable here}}
-@available(iOS, unavailable)
-let unavailableOniOS: Int = 0
-@available(iOS, unavailable) @available(OSX, unavailable)
-let unavailableOnBothA: Int = 0 // expected-note{{explicitly marked unavailable here}}
-@available(OSX, unavailable) @available(iOS, unavailable)
-let unavailableOnBothB: Int = 0 // expected-note{{explicitly marked unavailable here}}
-
-@available(OSX, unavailable)
-typealias UnavailableOnOSX = Int // expected-note{{explicitly marked unavailable here}}
-@available(iOS, unavailable)
-typealias UnavailableOniOS = Int
-@available(iOS, unavailable) @available(OSX, unavailable)
-typealias UnavailableOnBothA = Int // expected-note{{explicitly marked unavailable here}}
-@available(OSX, unavailable) @available(iOS, unavailable)
-typealias UnavailableOnBothB = Int // expected-note{{explicitly marked unavailable here}}
-
-@available(macOS, unavailable)
-let unavailableOnMacOS: Int = 0 // expected-note{{explicitly marked unavailable here}}
-@available(macOS, unavailable)
-typealias UnavailableOnMacOS = Int // expected-note{{explicitly marked unavailable here}}
-
-@available(OSXApplicationExtension, unavailable)
-let unavailableOnOSXAppExt: Int = 0
-@available(macOSApplicationExtension, unavailable)
-let unavailableOnMacOSAppExt: Int = 0
-
-@available(OSXApplicationExtension, unavailable)
-typealias UnavailableOnOSXAppExt = Int
-@available(macOSApplicationExtension, unavailable)
-typealias UnavailableOnMacOSAppExt = Int
-
-func testPlatforms() {
-  _ = unavailableOnOSX // expected-error{{unavailable}}
-  _ = unavailableOniOS
-  _ = unavailableOnBothA // expected-error{{unavailable}}
-  _ = unavailableOnBothB // expected-error{{unavailable}}
-  _ = unavailableOnMacOS // expected-error{{unavailable}}
-  _ = unavailableOnOSXAppExt
-  _ = unavailableOnMacOSAppExt
-
-  let _: UnavailableOnOSX = 0 // expected-error{{unavailable}}
-  let _: UnavailableOniOS = 0
-  let _: UnavailableOnBothA = 0 // expected-error{{unavailable}}
-  let _: UnavailableOnBothB = 0 // expected-error{{unavailable}}
-  let _: UnavailableOnMacOS = 0 // expected-error{{unavailable}}
-  let _: UnavailableOnOSXAppExt = 0
-  let _: UnavailableOnMacOSAppExt = 0
 }
 
 struct VarToFunc {

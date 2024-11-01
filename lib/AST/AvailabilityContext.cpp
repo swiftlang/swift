@@ -91,8 +91,8 @@ bool AvailabilityContext::PlatformInfo::isContainedIn(
   if (IsUnavailable && other.IsUnavailable) {
     if (UnavailablePlatform != other.UnavailablePlatform &&
         UnavailablePlatform != PlatformKind::none &&
-        !inheritsAvailabilityFromPlatform(UnavailablePlatform,
-                                          other.UnavailablePlatform))
+        inheritsAvailabilityFromPlatform(UnavailablePlatform,
+                                         other.UnavailablePlatform))
       return false;
   }
 
