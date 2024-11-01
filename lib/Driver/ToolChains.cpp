@@ -708,6 +708,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-silgen";
   case file_types::TY_SIL:
     return "-emit-sil";
+  case file_types::TY_LoweredSIL:
+    return "-emit-lowered-sil";
   case file_types::TY_RawSIB:
     return "-emit-sibgen";
   case file_types::TY_SIB:
@@ -1008,6 +1010,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_RawSIL:
     case file_types::TY_RawSIB:
     case file_types::TY_SIL:
+    case file_types::TY_LoweredSIL:
     case file_types::TY_SIB:
     case file_types::TY_PCH:
     case file_types::TY_ClangModuleFile:

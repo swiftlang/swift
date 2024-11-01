@@ -1279,6 +1279,7 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::EmitSILGen:
   case FrontendOptions::ActionType::EmitSIBGen:
   case FrontendOptions::ActionType::EmitSIL:
+  case FrontendOptions::ActionType::EmitLoweredSIL:
   case FrontendOptions::ActionType::EmitSIB:
   case FrontendOptions::ActionType::EmitModuleOnly:
   case FrontendOptions::ActionType::MergeModules:
@@ -1747,6 +1748,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return !opts.AllowModuleWithCompilerErrors;
 
   runSILLoweringPasses(*SM);
+
+  // If we are asked to emit lowered SIL, dump it now and return.
+  if (Action == FrontendOptions::ActionType::EmitLoweredSIL)
+    return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
 
   // Cancellation check after SILLowering.
   if (Instance.isCancellationRequested())
