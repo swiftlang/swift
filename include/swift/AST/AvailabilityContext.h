@@ -66,6 +66,11 @@ public:
   /// returns `nullopt`.
   std::optional<PlatformKind> getUnavailablePlatformKind() const;
 
+  /// Returns true if this context is unavailable.
+  bool isUnavailable() const {
+    return getUnavailablePlatformKind().has_value();
+  }
+
   /// Returns true if this context is deprecated on the current platform.
   bool isDeprecated() const;
 

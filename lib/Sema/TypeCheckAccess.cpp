@@ -2033,7 +2033,7 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     
     // If the decl which references this type is unavailable on the current
     // platform, don't diagnose the availability of the type.
-    if (AvailableAttr::isUnavailable(context))
+    if (Where.getAvailability().isUnavailable())
       return;
 
     diagnoseTypeAvailability(typeRepr, type, context->getLoc(),
