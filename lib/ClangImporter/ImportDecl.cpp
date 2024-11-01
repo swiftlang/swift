@@ -25,6 +25,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -2669,7 +2670,7 @@ namespace {
           Impl.diagnoseTopLevelValue(
               DeclName(Impl.SwiftContext.getIdentifier(releaseOperation.name)));
         }
-      }else if (releaseOperation.kind ==
+      } else if (releaseOperation.kind ==
                  CustomRefCountingOperationResult::tooManyFound) {
         HeaderLoc loc(decl->getLocation());
         Impl.diagnose(loc,
@@ -3338,13 +3339,11 @@ namespace {
         return property->getParsedAccessor(AccessorKind::Set);
       }
 
-      // If a C++ decl is annotated with both swift_attr("returns_retained") and
-      // swift_attr("returns_unretained") then emit an error in the swift
-      // compiler. Note: this error is not emitted in the clang compiler because
-      // these attributes are used only for swift interop.
+      // Emit diagnostics for incorrect usage of "returns_unretained" and
+      // "returns_unretained" attributes
+      bool returnsRetainedAttrIsPresent = false;
+      bool returnsUnretainedAttrIsPresent = false;
       if (decl->hasAttrs()) {
-        bool returnsRetainedAttrIsPresent = false;
-        bool returnsUnretainedAttrIsPresent = false;
         for (const auto *attr : decl->getAttrs()) {
           if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
             if (swiftAttr->getAttribute() == "returns_unretained") {
@@ -3354,11 +3353,25 @@ namespace {
             }
           }
         }
+      }
 
+      HeaderLoc loc(decl->getLocation());
+      if (isForeignReferenceTypeWithoutImmortalAttrs(decl->getReturnType())) {
         if (returnsRetainedAttrIsPresent && returnsUnretainedAttrIsPresent) {
-          HeaderLoc loc(decl->getLocation());
           Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
                         decl);
+        } else if (!returnsRetainedAttrIsPresent &&
+                   !returnsUnretainedAttrIsPresent) {
+          Impl.diagnose(loc, diag::no_returns_retained_returns_unretained,
+                        decl);
+        }
+      } else {
+        if (returnsRetainedAttrIsPresent || returnsUnretainedAttrIsPresent) {
+          Impl.diagnose(
+              loc,
+              diag::
+                  returns_retained_or_returns_unretained_for_non_cxx_frt_values,
+              decl);
         }
       }
 
