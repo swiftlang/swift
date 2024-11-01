@@ -550,10 +550,6 @@ private:
   }
 
   bool shouldSkipDecl(Decl *D) const {
-    // Implicit decls don't have source locations so they cannot have a TRC.
-    if (D->isImplicit())
-      return true;
-
     // Only visit a node that has a corresponding concrete syntax node if we are
     // already walking that concrete syntax node.
     auto *concreteDecl = concreteSyntaxDeclForAvailableAttribute(D);
@@ -567,6 +563,12 @@ private:
 
   PreWalkAction walkToDeclPre(Decl *D) override {
     PrettyStackTraceDecl trace(stackTraceAction(), D);
+
+    // Implicit decls don't have source locations so they cannot have a TRC.
+    // However, some implicit nodes contain non-implicit nodes (e.g. defer
+    // blocks) so continue rather than skipping the node entirely.
+    if (D->isImplicit())
+      return Action::Continue();
 
     if (shouldSkipDecl(D))
       return Action::SkipNode();
