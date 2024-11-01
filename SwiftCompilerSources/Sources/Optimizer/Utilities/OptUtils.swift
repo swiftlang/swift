@@ -809,3 +809,12 @@ extension CheckedCastAddrBranchInst {
     }
   }
 }
+
+extension Type {
+  func shouldExpand(_ context: some Context) -> Bool {
+    if !context.options.useAggressiveReg2MemForCodeSize {
+      return true
+    }
+    return context._bridged.shouldExpand(self.bridged)
+  }
+}
