@@ -353,8 +353,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger
   ///   closed range; otherwise, `false`.
   ///
   /// - Complexity: O(1)
-  @backDeployed(before: SwiftStdlib 6.1)
-  @inlinable
+  @_alwaysEmitIntoClient
   public func contains(_ other: Range<Bound>) -> Bool {
     if other.isEmpty { return true }
     let otherInclusiveUpper = other.upperBound.advanced(by: -1)
@@ -380,8 +379,7 @@ extension ClosedRange {
   ///   otherwise, `false`.
   ///
   /// - Complexity: O(1)
-  @backDeployed(before: SwiftStdlib 6.1)
-  @inlinable
+  @_alwaysEmitIntoClient
   public func contains(_ other: ClosedRange<Bound>) -> Bool {
     lowerBound <= other.lowerBound && upperBound >= other.upperBound
   }
