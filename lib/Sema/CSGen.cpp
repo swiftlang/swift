@@ -697,8 +697,8 @@ namespace {
     auto *lhs = args->getExpr(0);
     auto *rhs = args->getExpr(1);
 
-    auto firstArgTy = CS.getType(lhs)->getWithoutParens();
-    auto secondArgTy = CS.getType(rhs)->getWithoutParens();
+    auto firstArgTy = CS.getType(lhs);
+    auto secondArgTy = CS.getType(rhs);
 
     auto isOptionalWithMatchingObjectType = [](Type optional,
                                                Type object) -> bool {
@@ -980,8 +980,7 @@ namespace {
     }
 
     /// If the provided type is a tuple, decomposes it into a matching set of
-    /// function params. Otherwise produces a single parameter of the type,
-    /// stripping a ParenType if needed.
+    /// function params. Otherwise produces a single parameter of the type.
     void decomposeTuple(Type ty,
                         SmallVectorImpl<AnyFunctionType::Param> &result) {
       switch (ty->getKind()) {
@@ -989,11 +988,6 @@ namespace {
         auto tupleTy = cast<TupleType>(ty.getPointer());
         for (auto &elt : tupleTy->getElements())
           result.emplace_back(elt.getType(), elt.getName());
-        return;
-      }
-      case TypeKind::Paren: {
-        auto pty = cast<ParenType>(ty.getPointer());
-        result.emplace_back(pty->getUnderlyingType(), Identifier());
         return;
       }
       default:
@@ -2063,7 +2057,7 @@ namespace {
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
-      return ParenType::get(CS.getASTContext(), CS.getType(expr->getSubExpr()));
+      return CS.getType(expr->getSubExpr());
     }
 
     Type visitTupleExpr(TupleExpr *expr) {
@@ -2607,7 +2601,7 @@ namespace {
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             bindPatternVarsOneWay);
 
-        return setType(ParenType::get(CS.getASTContext(), underlyingType));
+        return setType(underlyingType);
       }
       case PatternKind::Binding: {
         auto *subPattern = cast<BindingPattern>(pattern)->getSubPattern();

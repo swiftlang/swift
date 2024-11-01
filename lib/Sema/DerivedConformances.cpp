@@ -909,8 +909,7 @@ Pattern *DerivedConformance::enumElementPayloadSubpattern(
   // Otherwise, a one-argument unlabeled payload. Return a paren pattern whose
   // underlying type is the same as the payload. For example:
   // case a(Int) => (let a0)
-  auto underlyingType = payloadType->getWithoutParens();
-  auto payloadVar = indexedVarDecl(varPrefix, 0, underlyingType, varContext);
+  auto payloadVar = indexedVarDecl(varPrefix, 0, payloadType, varContext);
   boundVars.push_back(payloadVar);
 
   auto namedPattern = new (C) NamedPattern(payloadVar);
