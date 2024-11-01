@@ -843,7 +843,7 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
   return type.transformRec([&](TypeBase *type) -> std::optional<Type> {
     if (auto *tupleType = dyn_cast<TupleType>(type)) {
       if (tupleType->getNumElements() == 1)
-        return ParenType::get(ctx, tupleType->getElementType(0));
+        return tupleType->getElementType(0);
 
       SmallVector<TupleTypeElt, 8> elts;
       for (auto elt : tupleType->getElements()) {

@@ -5649,7 +5649,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   if (options.contains(TypeResolutionFlags::SILType)) {
     if (repr->isParenType())
-      return ParenType::get(ctx, elements[0].getType());
+      return elements[0].getType();
   } else {
     // Single-element labeled tuples are not permitted outside of declarations
     // or SIL, either.
@@ -5665,7 +5665,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
     if (elements.size() == 1 && !elements[0].hasName() &&
         !elements[0].getType()->is<PackExpansionType>())
-      return ParenType::get(ctx, elements[0].getType());
+      return elements[0].getType();
   }
   
   if (moveOnlyElementIndex.has_value()) {
@@ -5937,14 +5937,17 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
                                                TypeResolutionOptions options) {
   auto subOptions = options.withoutContext(true)
       .withContext(TypeResolverContext::Inverted);
-  auto ty = resolveType(repr->getConstraint(), subOptions);
+  auto *constraintRepr = repr->getConstraint();
+  auto ty = resolveType(constraintRepr, subOptions);
   if (ty->hasError())
     return ErrorType::get(getASTContext());
 
   // If the inverted type is an existential metatype, unwrap the existential
   // metatype so we can look at the instance type. We'll re-wrap at the end.
-  ExistentialMetatypeType *existentialTy =
-      dyn_cast<ExistentialMetatypeType>(ty.get().getPointer());
+  // Note we don't look through parens.
+  ExistentialMetatypeType *existentialTy = nullptr;
+  if (!constraintRepr->isParenType())
+    existentialTy = dyn_cast<ExistentialMetatypeType>(ty.get().getPointer());
   if (existentialTy) {
     ty = existentialTy->getInstanceType();
   }
