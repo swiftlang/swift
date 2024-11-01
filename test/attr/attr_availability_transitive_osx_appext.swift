@@ -135,15 +135,12 @@ struct AlwaysAvailabileContainer {
 struct NeverAvailableContainer { // expected-note {{'NeverAvailableContainer' has been explicitly marked unavailable here}}
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
   let osx_var: OSXUnavailable = osx() // expected-error {{'osx()' is unavailable}}
-  // expected-error@-1 {{'OSXUnavailable' is unavailable in macOS}}
   let osx_extension_var: OSXAppExtensionsUnavailable = osx_extension() // expected-error {{'osx_extension()' is unavailable in application extensions for macOS}}
-  // expected-error@-1 {{'OSXAppExtensionsUnavailable' is unavailable in application extensions for macOS}}
 }
 
 @available(OSX, unavailable)
 struct OSXUnavailableContainer { // expected-note {{'OSXUnavailableContainer' has been explicitly marked unavailable here}}
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
-  // expected-error@-1 {{'NeverAvailable' is unavailable}}
   let osx_var: OSXUnavailable = osx()
   let osx_extension_var: OSXAppExtensionsUnavailable = osx_extension()
 }
@@ -151,9 +148,7 @@ struct OSXUnavailableContainer { // expected-note {{'OSXUnavailableContainer' ha
 @available(OSXApplicationExtension, unavailable)
 struct OSXAppExtensionsUnavailableContainer { // expected-note {{'OSXAppExtensionsUnavailableContainer' has been explicitly marked unavailable here}}
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
-  // expected-error@-1 {{'NeverAvailable' is unavailable}}
   let osx_var: OSXUnavailable = osx() // expected-error {{'osx()' is unavailable}}
-  // expected-error@-1 {{'OSXUnavailable' is unavailable in macOS}}
   let osx_extension_var: OSXAppExtensionsUnavailable = osx_extension()
 }
 
