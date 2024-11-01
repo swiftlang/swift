@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -target %target-swift-5.1-abi-triple %s -o /dev/null -import-objc-header %S/Inputs/transfernonsendable_crashers_objc.h -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -target %target-swift-5.1-abi-triple %s -o /dev/null -import-objc-header %S/Inputs/transfernonsendable_objc.h -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: objc_interop
 // REQUIRES: asserts
@@ -11,12 +11,12 @@ extension MyNotificationCenter {
 
 public func handleFile(at location: URL) throws {
 //  createDownloadDirectoryIfRequired()
-  let movedFileLocation = try moveTheme(from: location)
+  let movedFileLocation = try moveFile(from: location)
   let unzippedFileLocation = try unzipFile(at: movedFileLocation)
   MyNotificationCenter.value!.post()
 }
 
-private func moveTheme(from location: URL) throws -> URL { fatalError() }
+private func moveFile(from location: URL) throws -> URL { fatalError() }
 private func unzipFile(at location: URL) throws -> URL { fatalError() }
 
 actor MyActor {
