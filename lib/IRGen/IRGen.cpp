@@ -212,7 +212,22 @@ static void populatePGOOptions(std::optional<PGOOptions> &Out,
       /*Action=*/ PGOOptions::SampleUse,
       /*CSPGOAction=*/ PGOOptions::NoCSAction,
       /*ColdType=*/ PGOOptions::ColdFuncOpt::Default,
-      /*DebugInfoForProfiling=*/ false
+      /*DebugInfoForProfiling=*/ Opts.DebugInfoForProfiling
+    );
+    return;
+  }
+
+  if (Opts.DebugInfoForProfiling) {
+    Out = PGOOptions(
+        /*ProfileFile=*/ "",
+        /*CSProfileGenFile=*/ "",
+        /*ProfileRemappingFile=*/ "",
+        /*MemoryProfile=*/ "",
+        /*FS=*/ nullptr,
+        /*Action=*/ PGOOptions::NoAction,
+        /*CSPGOAction=*/ PGOOptions::NoCSAction,
+        /*ColdType=*/ PGOOptions::ColdFuncOpt::Default,
+        /*DebugInfoForProfiling=*/ true
     );
     return;
   }

@@ -1477,6 +1477,10 @@ def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts">;
 
+def debug_info_for_profiling : Flag<["-"], "debug-info-for-profiling">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit extra debug info (DWARF discriminators) to make sampling-based profiling more accurate">;
+
 def profile_use : CommaJoined<["-"], "profile-use=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
   MetaVarName<"<profdata>">,
