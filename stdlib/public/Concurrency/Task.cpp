@@ -215,7 +215,6 @@ InitialTaskExecutorOwnedPreferenceTaskOptionRecord::getExecutorRefFromUnownedTas
     return executorRef;
 }
 
-
 void NullaryContinuationJob::process(Job *_job) {
   auto *job = cast<NullaryContinuationJob>(_job);
 
@@ -393,7 +392,9 @@ static void jobInvoke(void *obj, void *unused, uint32_t flags) {
 // Magic constant to identify Swift Job vtables to Dispatch.
 static const unsigned long dispatchSwiftObjectType = 1;
 
-FullMetadata<DispatchClassMetadata> swift::jobHeapMetadata = {
+#if !SWIFT_CONCURRENCY_EMBEDDED
+
+static FullMetadata<DispatchClassMetadata> jobHeapMetadata = {
   {
     {
       /*type layout*/ nullptr,
@@ -432,10 +433,46 @@ static FullMetadata<DispatchClassMetadata> taskHeapMetadata = {
   }
 };
 
+
 const void *const swift::_swift_concurrency_debug_jobMetadata =
     static_cast<Metadata *>(&jobHeapMetadata);
 const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
     static_cast<Metadata *>(&taskHeapMetadata);
+
+const HeapMetadata *swift::jobHeapMetadataPtr =
+    static_cast<HeapMetadata *>(&jobHeapMetadata);
+const HeapMetadata *swift::taskHeapMetadataPtr =
+    static_cast<HeapMetadata *>(&taskHeapMetadata);
+
+#else // SWIFT_CONCURRENCY_EMBEDDED
+
+// This matches the embedded class metadata layout in IRGen and in
+// EmbeddedRuntime.swift.
+typedef struct EmbeddedClassMetadata {
+  void *superclass;
+  HeapObjectDestroyer *__ptrauth_swift_heap_object_destructor destroy;
+  void *ivar_destroyer;
+} EmbeddedHeapObject;
+
+static EmbeddedClassMetadata jobHeapMetadata = {
+  0, &destroyJob, 0,
+};
+
+static EmbeddedClassMetadata taskHeapMetadata = {
+  0, &destroyTask, 0,
+};
+
+const void *const swift::_swift_concurrency_debug_jobMetadata =
+    (Metadata *)(&jobHeapMetadata);
+const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
+    (Metadata *)(&taskHeapMetadata);
+
+const HeapMetadata *swift::jobHeapMetadataPtr =
+    (HeapMetadata *)(&jobHeapMetadata);
+const HeapMetadata *swift::taskHeapMetadataPtr =
+    (HeapMetadata *)(&taskHeapMetadata);
+
+#endif
 
 static void completeTaskImpl(AsyncTask *task,
                              AsyncContext *context,
@@ -959,14 +996,12 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   if (asyncLet) {
     // Initialize the refcount bits to "immortal", so that
     // ARC operations don't have any effect on the task.
-    task = new(allocation) AsyncTask(&taskHeapMetadata,
-                             InlineRefCounts::Immortal, jobFlags,
-                             function, initialContext,
-                             captureCurrentVoucher);
+    task = new (allocation)
+        AsyncTask(taskHeapMetadataPtr, InlineRefCounts::Immortal, jobFlags,
+                  function, initialContext, captureCurrentVoucher);
   } else {
-    task = new(allocation) AsyncTask(&taskHeapMetadata, jobFlags,
-                                    function, initialContext,
-                                    captureCurrentVoucher);
+    task = new (allocation) AsyncTask(taskHeapMetadataPtr, jobFlags, function,
+                                      initialContext, captureCurrentVoucher);
   }
 
   // Initialize the child fragment if applicable.
