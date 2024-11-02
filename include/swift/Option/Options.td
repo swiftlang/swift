@@ -1479,6 +1479,10 @@ def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts">;
 
+def debug_info_for_profiling : Flag<["-"], "debug-info-for-profiling">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit extra debug info (DWARF discriminators) to make sampling-based profiling more accurate">;
+
 def profile_use : CommaJoined<["-"], "profile-use=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
   MetaVarName<"<profdata>">,
@@ -1487,6 +1491,11 @@ def profile_use : CommaJoined<["-"], "profile-use=">,
 def profile_coverage_mapping : Flag<["-"], "profile-coverage-mapping">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate coverage data for use with profiled execution counts">;
+
+def profile_sample_use : CommaJoined<["-"], "profile-sample-use=">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
+  MetaVarName<"<profile data>">,
+  HelpText<"Supply sampling-based profiling data from llvm-profdata to enable profile-guided optimization">;
 
 def embed_bitcode : Flag<["-"], "embed-bitcode">,
   Flags<[FrontendOption, NoInteractiveOption]>,

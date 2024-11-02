@@ -500,6 +500,13 @@ public:
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
 
+  /// Path to the data file to be used for sampling-based PGO,
+  /// or the empty string.
+  std::string UseSampleProfile = "";
+
+  /// Controls whether DWARF discriminators are added to the IR.
+  unsigned DebugInfoForProfiling : 1;
+
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
 
@@ -584,7 +591,8 @@ public:
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
         EmitAsyncFramePushPopMetadata(false), EmitYieldOnce2AsYieldOnce(true),
-        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false), CmdArgs(),
+        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
+        DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
