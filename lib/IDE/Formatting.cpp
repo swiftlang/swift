@@ -14,11 +14,11 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/IDE/SourceEntityWalker.h"
-#include "swift/Parse/Parser.h"
-#include "swift/Frontend/Frontend.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Indenting.h"
+#include "swift/IDE/SourceEntityWalker.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;
