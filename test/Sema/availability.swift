@@ -3,8 +3,12 @@
 @available(*, unavailable)
 func unavailable_foo() {} // expected-note {{'unavailable_foo()' has been explicitly marked unavailable here}}
 
+@_unavailableInEmbedded // no-op without -enable-experimental-feature Embedded
+public func unavailable_in_embedded() { }
+
 func test() {
   unavailable_foo() // expected-error {{'unavailable_foo()' is unavailable}}
+  unavailable_in_embedded() // ok
 }
 
 @available(*,unavailable,message: "use 'Int' instead")
