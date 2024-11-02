@@ -23,6 +23,7 @@
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/IDE/SourceEntityWalker.h"
 
 #include "clang/AST/DeclObjC.h"
@@ -819,18 +820,19 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
 const static unsigned OBJC_METHOD_TRACE_FILE_FORMAT_VERSION = 1;
 
 class ObjcMethodReferenceCollector: public SourceEntityWalker {
+  std::string compilerVer;
   std::string target;
   std::string targetVariant;
   SmallVector<StringRef, 32> FilePaths;
   unsigned CurrentFileID;
-  llvm::DenseSet<const clang::ObjCMethodDecl*> results;
+  llvm::DenseMap<const clang::ObjCMethodDecl*, unsigned> results;
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                           Type T, ReferenceMetaData Data) override {
     if (!Range.isValid())
       return true;
     if (auto *clangD = dyn_cast_or_null<clang::ObjCMethodDecl>(D->getClangDecl())) {
-      results.insert(clangD);
+      results[clangD] = CurrentFileID;
     }
     return true;
   }
@@ -855,6 +857,8 @@ class ObjcMethodReferenceCollector: public SourceEntityWalker {
   }
 public:
   ObjcMethodReferenceCollector(ModuleDecl *MD) {
+    compilerVer =
+      getSwiftInterfaceCompilerVersionForCurrentCompiler(MD->getASTContext());
     auto &Opts = MD->getASTContext().LangOpts;
     target = Opts.Target.str();
     targetVariant = Opts.TargetVariant.has_value() ?
@@ -868,12 +872,14 @@ public:
   void serializeAsJson(llvm::raw_ostream &OS) {
     llvm::json::OStream out(OS, /*IndentSize=*/4);
     out.object([&] {
+      out.attribute("swift-compiler-version", compilerVer);
       out.attribute("format-vesion", OBJC_METHOD_TRACE_FILE_FORMAT_VERSION);
       out.attribute("target", target);
       if (!targetVariant.empty())
         out.attribute("target-variant", targetVariant);
       out.attributeArray("references", [&] {
-        for (const clang::ObjCMethodDecl* clangD: results) {
+        for (auto pair: results) {
+          auto *clangD = pair.first;
           auto &SM = clangD->getASTContext().getSourceManager();
           clang::SourceLocation Loc = clangD->getLocation();
           if (!Loc.isValid()) {
@@ -881,14 +887,14 @@ public:
           }
           out.object([&] {
             if (auto *parent = dyn_cast_or_null<clang::NamedDecl>(clangD
-                                                                  ->getParent())) {
+                                                               ->getParent())) {
               auto pName = parent->getName();
               if (!pName.empty())
                 out.attribute(selectMethodOwnerKey(parent), pName);
             }
             out.attribute(selectMethodKey(clangD),  clangD->getNameAsString());
             out.attribute("declared_at", Loc.printToString(SM));
-            out.attribute("referenced_at_file_id", CurrentFileID);
+            out.attribute("referenced_at_file_id", pair.second);
           });
         }
       });
