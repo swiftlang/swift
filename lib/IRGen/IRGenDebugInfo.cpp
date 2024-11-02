@@ -839,6 +839,7 @@ private:
                               TheCU->getProducer(), true, StringRef(), 0,
                               RemappedASTFile, llvm::DICompileUnit::FullDebug,
                               Signature);
+        // NOTE: not setting DebugInfoForProfiling here
         DIB.finalize();
       }
     }
@@ -2519,7 +2520,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly,
       /* DWOId */ 0, /* SplitDebugInlining */ true,
-      /* DebugInfoForProfiling */ false,
+      /* DebugInfoForProfiling */ Opts.DebugInfoForProfiling,
       llvm::DICompileUnit::DebugNameTableKind::Default,
       /* RangesBaseAddress */ false, DebugPrefixMap.remapPath(Sysroot), SDK);
 
