@@ -4393,6 +4393,10 @@ public:
     Sending = 0x2,
 
     /// Set if the given parameter is isolated.
+    ///
+    /// This means that the value provides the functions isolation. This implies
+    /// that the parameter must be an Optional actor or something that conforms
+    /// to AnyActor.
     Isolated = 0x4,
   };
 
