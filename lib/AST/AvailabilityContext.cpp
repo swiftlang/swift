@@ -18,14 +18,34 @@
 
 using namespace swift;
 
+// Defined as a macro because you can't take the reference of a bitfield.
+#define CONSTRAIN_BOOL(_old, _new)                                             \
+  [&]() {                                                                      \
+    if (_old || !_new)                                                         \
+      return false;                                                            \
+    _old = true;                                                               \
+    return true;                                                               \
+  }()
+
+static bool constrainRange(AvailabilityRange &existing,
+                           const AvailabilityRange &other) {
+  if (!other.isContainedIn(existing))
+    return false;
+
+  existing = other;
+  return true;
+}
+
 bool AvailabilityContext::PlatformInfo::constrainWith(
     const PlatformInfo &other) {
   bool isConstrained = false;
-  isConstrained |= constrainRange(other.Range);
+  isConstrained |= constrainRange(Range, other.Range);
   if (other.IsUnavailable) {
     isConstrained |= constrainUnavailability(other.UnavailablePlatform);
+    isConstrained |=
+        CONSTRAIN_BOOL(IsUnavailableInEmbedded, other.IsUnavailableInEmbedded);
   }
-  isConstrained |= constrainDeprecated(other.IsDeprecated);
+  isConstrained |= CONSTRAIN_BOOL(IsDeprecated, other.IsDeprecated);
 
   return isConstrained;
 }
@@ -35,13 +55,16 @@ bool AvailabilityContext::PlatformInfo::constrainWith(const Decl *decl) {
   auto &ctx = decl->getASTContext();
 
   if (auto range = AvailabilityInference::annotatedAvailableRange(decl))
-    isConstrained |= constrainRange(*range);
+    isConstrained |= constrainRange(Range, *range);
 
-  if (auto *attr = decl->getAttrs().getUnavailable(ctx))
+  if (auto *attr = decl->getAttrs().getUnavailable(ctx)) {
     isConstrained |= constrainUnavailability(attr->Platform);
+    isConstrained |=
+        CONSTRAIN_BOOL(IsUnavailableInEmbedded, attr->isForEmbedded());
+  }
 
-  if (!IsDeprecated)
-    isConstrained |= constrainDeprecated(decl->getAttrs().isDeprecated(ctx));
+  isConstrained |=
+      CONSTRAIN_BOOL(IsDeprecated, decl->getAttrs().isDeprecated(ctx));
 
   return isConstrained;
 }
@@ -72,14 +95,6 @@ bool AvailabilityContext::PlatformInfo::constrainUnavailability(
   return true;
 }
 
-bool AvailabilityContext::PlatformInfo::constrainDeprecated(bool deprecated) {
-  if (IsDeprecated || !deprecated)
-    return false;
-
-  IsDeprecated = true;
-  return true;
-}
-
 bool AvailabilityContext::PlatformInfo::isContainedIn(
     const PlatformInfo &other) const {
   if (!Range.isContainedIn(other.Range))
@@ -93,6 +108,9 @@ bool AvailabilityContext::PlatformInfo::isContainedIn(
         UnavailablePlatform != PlatformKind::none &&
         inheritsAvailabilityFromPlatform(UnavailablePlatform,
                                          other.UnavailablePlatform))
+      return false;
+
+    if (IsUnavailableInEmbedded && !other.IsUnavailableInEmbedded)
       return false;
   }
 
@@ -110,6 +128,7 @@ AvailabilityContext AvailabilityContext::getDefault(ASTContext &ctx) {
   PlatformInfo platformInfo{AvailabilityRange::forInliningTarget(ctx),
                             PlatformKind::none,
                             /*IsUnavailable*/ false,
+                            /*IsUnavailableInEmbedded*/ false,
                             /*IsDeprecated*/ false};
   return AvailabilityContext(Storage::get(platformInfo, ctx));
 }
@@ -122,7 +141,8 @@ AvailabilityContext::get(const AvailabilityRange &platformAvailability,
                             unavailablePlatform.has_value()
                                 ? *unavailablePlatform
                                 : PlatformKind::none,
-                            unavailablePlatform.has_value(), deprecated};
+                            unavailablePlatform.has_value(),
+                            /*IsUnavailableInEmbedded*/ false, deprecated};
   return AvailabilityContext(Storage::get(platformInfo, ctx));
 }
 
@@ -135,6 +155,10 @@ AvailabilityContext::getUnavailablePlatformKind() const {
   if (Info->Platform.IsUnavailable)
     return Info->Platform.UnavailablePlatform;
   return std::nullopt;
+}
+
+bool AvailabilityContext::isUnavailableInEmbedded() const {
+  return Info->Platform.IsUnavailableInEmbedded;
 }
 
 bool AvailabilityContext::isDeprecated() const {
@@ -156,7 +180,7 @@ void AvailabilityContext::constrainWithDecl(const Decl *decl) {
 void AvailabilityContext::constrainWithPlatformRange(
     const AvailabilityRange &platformRange, ASTContext &ctx) {
   PlatformInfo platformAvailability{Info->Platform};
-  if (!platformAvailability.constrainRange(platformRange))
+  if (!constrainRange(platformAvailability.Range, platformRange))
     return;
 
   Info = Storage::get(platformAvailability, ctx);
@@ -167,7 +191,7 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
   PlatformInfo platformAvailability{Info->Platform};
   bool isConstrained = false;
   isConstrained |= platformAvailability.constrainWith(decl);
-  isConstrained |= platformAvailability.constrainRange(platformRange);
+  isConstrained |= constrainRange(platformAvailability.Range, platformRange);
 
   if (!isConstrained)
     return;
