@@ -25,3 +25,4 @@ public func testProperties(_ x: FooClassBase, _ y: FooProtocolBase) {
 // CHECK-DAG: "file_id": 1,
 // CHECK-DAG: "file_path": "SOURCE_DIR/test/IDE/objc_send_collector_1.swift"
 // CHECK-DAG: "file_path": "SOURCE_DIR/test/IDE/Inputs/objc_send_collector_2.swift"
+// CHECK-DAG: "swift-compiler-version":

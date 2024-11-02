@@ -23,6 +23,7 @@
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/IDE/SourceEntityWalker.h"
 
 #include "clang/AST/DeclObjC.h"
@@ -819,6 +820,7 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
 const static unsigned OBJC_METHOD_TRACE_FILE_FORMAT_VERSION = 1;
 
 class ObjcMethodReferenceCollector: public SourceEntityWalker {
+  std::string compilerVer;
   std::string target;
   std::string targetVariant;
   SmallVector<StringRef, 32> FilePaths;
@@ -855,6 +857,8 @@ class ObjcMethodReferenceCollector: public SourceEntityWalker {
   }
 public:
   ObjcMethodReferenceCollector(ModuleDecl *MD) {
+    compilerVer =
+      getSwiftInterfaceCompilerVersionForCurrentCompiler(MD->getASTContext());
     auto &Opts = MD->getASTContext().LangOpts;
     target = Opts.Target.str();
     targetVariant = Opts.TargetVariant.has_value() ?
@@ -868,6 +872,7 @@ public:
   void serializeAsJson(llvm::raw_ostream &OS) {
     llvm::json::OStream out(OS, /*IndentSize=*/4);
     out.object([&] {
+      out.attribute("swift-compiler-version", compilerVer);
       out.attribute("format-vesion", OBJC_METHOD_TRACE_FILE_FORMAT_VERSION);
       out.attribute("target", target);
       if (!targetVariant.empty())
