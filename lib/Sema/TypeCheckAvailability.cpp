@@ -3099,9 +3099,9 @@ bool diagnoseExplicitUnavailability(
 }
 
 std::optional<UnmetAvailabilityRequirement>
-swift::checkDeclarationAvailability(const Decl *decl,
-                                    const DeclContext *declContext,
-                                    AvailabilityContext availabilityContext) {
+swift::getUnmetDeclAvailabilityRequirement(
+    const Decl *decl, const DeclContext *declContext,
+    AvailabilityContext availabilityContext) {
   auto &ctx = declContext->getASTContext();
 
   // Generic parameters are always available.
@@ -3139,7 +3139,6 @@ swift::checkDeclarationAvailability(const Decl *decl,
 
   return std::nullopt;
 }
-
 
 /// Check if this is a subscript declaration inside String or
 /// Substring that returns String, and if so return true.
@@ -4153,7 +4152,7 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   auto &ctx = DC->getASTContext();
 
   auto unmetRequirement =
-      checkDeclarationAvailability(D, DC, Where.getAvailability());
+      getUnmetDeclAvailabilityRequirement(D, DC, Where.getAvailability());
   auto requiredRange =
       unmetRequirement
           ? unmetRequirement->getRequiredNewerAvailabilityRange(ctx)

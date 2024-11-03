@@ -316,8 +316,9 @@ void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 /// returns a result that describes the unmet availability requirements.
 /// Returns `std::nullopt` if the declaration is available.
 std::optional<UnmetAvailabilityRequirement>
-checkDeclarationAvailability(const Decl *decl, const DeclContext *declContext,
-                             AvailabilityContext availabilityContext);
+getUnmetDeclAvailabilityRequirement(const Decl *decl,
+                                    const DeclContext *declContext,
+                                    AvailabilityContext availabilityContext);
 
 /// Diagnose uses of the runtime support of the given type, such as
 /// type metadata and dynamic casting.

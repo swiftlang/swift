@@ -41,10 +41,10 @@ extractEnumElement(DeclContext *DC, SourceLoc UseLoc,
                    const VarDecl *constant) {
   auto &ctx = DC->getASTContext();
   auto availabilityContext = TypeChecker::availabilityAtLocation(UseLoc, DC);
-  if (auto unmetRequirement =
-          checkDeclarationAvailability(constant, DC, availabilityContext)) {
+  if (auto requirement = getUnmetDeclAvailabilityRequirement(
+          constant, DC, availabilityContext)) {
     // Only diagnose explicit unavailability.
-    if (!unmetRequirement->getRequiredNewerAvailabilityRange(ctx))
+    if (!requirement->getRequiredNewerAvailabilityRange(ctx))
       diagnoseDeclAvailability(constant, UseLoc, nullptr,
                                ExportContext::forFunctionBody(DC, UseLoc));
   }
