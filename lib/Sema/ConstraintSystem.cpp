@@ -4682,9 +4682,7 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
       loc = getLoc(anchor);
   }
 
-  auto availabilityContext = TypeChecker::availabilityAtLocation(loc, DC);
-  return getUnmetDeclAvailabilityRequirement(D, DC, availabilityContext)
-      .has_value();
+  return getUnmetDeclAvailabilityRequirement(D, DC, loc).has_value();
 }
 
 bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conformance,

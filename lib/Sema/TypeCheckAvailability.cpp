@@ -3127,6 +3127,15 @@ swift::getUnmetDeclAvailabilityRequirement(
   return std::nullopt;
 }
 
+std::optional<UnmetAvailabilityRequirement>
+swift::getUnmetDeclAvailabilityRequirement(const Decl *decl,
+                                           const DeclContext *referenceDC,
+                                           SourceLoc referenceLoc) {
+  return getUnmetDeclAvailabilityRequirement(
+      decl, referenceDC,
+      TypeChecker::availabilityAtLocation(referenceLoc, referenceDC));
+}
+
 /// Check if this is a subscript declaration inside String or
 /// Substring that returns String, and if so return true.
 bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {

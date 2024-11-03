@@ -252,6 +252,13 @@ getUnmetDeclAvailabilityRequirement(const Decl *decl,
                                     const DeclContext *declContext,
                                     AvailabilityContext availabilityContext);
 
+/// Checks whether a declaration should be considered unavailable when referred
+/// to at the given source location in the given decl context and, if so,
+/// returns a result that describes the unmet availability requirements.
+/// Returns `std::nullopt` if the declaration is available.
+std::optional<UnmetAvailabilityRequirement> getUnmetDeclAvailabilityRequirement(
+    const Decl *decl, const DeclContext *referenceDC, SourceLoc referenceLoc);
+
 /// Diagnose uses of the runtime support of the given type, such as
 /// type metadata and dynamic casting.
 ///
