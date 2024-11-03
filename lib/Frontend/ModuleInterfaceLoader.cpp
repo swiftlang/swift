@@ -2040,6 +2040,12 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     GenericArgs.push_back(blocklist);
   }
 
+  // Inherit APINotes processing method
+  if (clangImporterOpts.LoadVersionIndependentAPINotes) {
+    GenericArgs.push_back("-version-independent-apinotes");
+    genericSubInvocation.getClangImporterOptions().LoadVersionIndependentAPINotes = true;
+  }
+
   // For now, we only inherit the C++ interoperability mode in
   // Explicit Module Builds.
   if (langOpts.EnableCXXInterop &&
