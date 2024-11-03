@@ -21,11 +21,10 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
 using namespace swift;

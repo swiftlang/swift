@@ -30,7 +30,6 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
-#include "swift/Parse/Parser.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
