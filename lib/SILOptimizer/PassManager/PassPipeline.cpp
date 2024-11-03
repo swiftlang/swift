@@ -134,7 +134,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Passes that depend on region analysis information
   //
 
-  P.addTransferNonSendable();
+  P.addSendNonSendable();
 
   // Now that we have completed running passes that use region analysis, clear
   // region analysis and emit diagnostics for unnecessary preconcurrency
