@@ -1478,7 +1478,7 @@ AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
   return availabilityAtLocation(loc, DC, MostRefined).getPlatformRange();
 }
 
-bool TypeChecker::isDeclarationUnavailable(
+static bool isDeclarationUnavailable(
     const Decl *D, const DeclContext *referenceDC,
     llvm::function_ref<AvailabilityRange()> getAvailabilityRange) {
   ASTContext &Context = referenceDC->getASTContext();
