@@ -1495,9 +1495,8 @@ static bool isDeclarationUnavailable(
   return !runningOSOverApprox.isContainedIn(safeRangeUnderApprox);
 }
 
-std::optional<AvailabilityRange>
-TypeChecker::checkDeclarationAvailability(const Decl *D,
-                                          const ExportContext &Where) {
+static std::optional<AvailabilityRange>
+checkDeclarationAvailability(const Decl *D, const ExportContext &Where) {
   // Skip computing potential unavailability if the declaration is explicitly
   // unavailable and the context is also unavailable.
   if (const AvailableAttr *Attr = AvailableAttr::isUnavailable(D))

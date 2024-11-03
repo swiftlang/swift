@@ -33,3 +33,4 @@ public func conditionalAvailableSetterContext() {
     }
 }
 
+// FIXME: Check additional unavailability conditions
