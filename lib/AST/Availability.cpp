@@ -77,6 +77,17 @@ UnmetAvailabilityRequirement::getRequiredNewerAvailabilityRange(
   }
 }
 
+bool UnmetAvailabilityRequirement::isConditionallySatisfiable() const {
+  switch (kind) {
+  case Kind::AlwaysUnavailable:
+  case Kind::RequiresVersion:
+  case Kind::Obsoleted:
+    return false;
+  case Kind::IntroducedInNewerVersion:
+    return true;
+  }
+}
+
 namespace {
 
 /// The inferred availability required to access a group of declarations

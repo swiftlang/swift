@@ -4140,12 +4140,8 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 
   auto unmetRequirement =
       getUnmetDeclAvailabilityRequirement(D, DC, Where.getAvailability());
-  auto requiredRange =
-      unmetRequirement
-          ? unmetRequirement->getRequiredNewerAvailabilityRange(ctx)
-          : std::nullopt;
 
-  if (unmetRequirement && !requiredRange) {
+  if (unmetRequirement && !unmetRequirement->isConditionallySatisfiable()) {
     // FIXME: diagnoseExplicitUnavailability should take an unmet requirement
     if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
       return true;
@@ -4168,6 +4164,11 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
         && isa<ProtocolDecl>(D))
     return false;
+
+  if (!unmetRequirement)
+    return false;
+
+  auto requiredRange = unmetRequirement->getRequiredNewerAvailabilityRange(ctx);
 
   // Diagnose (and possibly signal) for potential unavailability
   if (!requiredRange)

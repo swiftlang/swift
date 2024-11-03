@@ -401,6 +401,10 @@ public:
   /// `std::nullopt` otherwise.
   std::optional<AvailabilityRange>
   getRequiredNewerAvailabilityRange(ASTContext &ctx) const;
+
+  /// Returns true if this unmet requirement can be satisfied by introducing an
+  /// `if #available(...)` condition in source.
+  bool isConditionallySatisfiable() const;
 };
 
 class AvailabilityInference {

@@ -39,12 +39,11 @@ using namespace swift;
 static EnumElementDecl *
 extractEnumElement(DeclContext *DC, SourceLoc UseLoc,
                    const VarDecl *constant) {
-  auto &ctx = DC->getASTContext();
   auto availabilityContext = TypeChecker::availabilityAtLocation(UseLoc, DC);
   if (auto requirement = getUnmetDeclAvailabilityRequirement(
           constant, DC, availabilityContext)) {
     // Only diagnose explicit unavailability.
-    if (!requirement->getRequiredNewerAvailabilityRange(ctx))
+    if (!requirement->isConditionallySatisfiable())
       diagnoseDeclAvailability(constant, UseLoc, nullptr,
                                ExportContext::forFunctionBody(DC, UseLoc));
   }
