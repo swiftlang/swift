@@ -1,6 +1,8 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -O -sil-verify-all -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
 
+// REQUIRES: swift_feature_MoveOnlyClasses
+
 //////////////////
 // Declarations //
 //////////////////

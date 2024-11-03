@@ -11,8 +11,10 @@
 // RUN:     -enable-experimental-feature CoroutineAccessorsUnwindOnCallerError \
 // RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-UNWIND,CHECK-%target-abi-stability
 
+// REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: swift_feature_CoroutineAccessorsUnwindOnCallerError
+
 // For CoroutineAccessorsUnwindOnCallerError
-// REQUIRES: asserts
 
 // A read requirement may be satisfied by
 // - a stored property

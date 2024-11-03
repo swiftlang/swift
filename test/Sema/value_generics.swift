@@ -1,5 +1,8 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ValueGenerics -enable-experimental-feature NonescapableTypes -disable-availability-checking -disable-experimental-parser-round-trip
 
+// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_ValueGenerics
+
 protocol P {}
 
 func invalid<let N>() {} // expected-error {{value generic 'N' must have an explicit value type declared}}

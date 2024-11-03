@@ -1,5 +1,5 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ParserDiagnostics
 
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserDiagnostics
 

@@ -5,7 +5,8 @@
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
+// REQUIRES: swift_feature_SendableCompletionHandlers
 
 // overload resolution should pick sync version in a sync context
 func syncContext() {

@@ -3,6 +3,8 @@
 // RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny -verify-additional-prefix explicit-any- -verify-additional-prefix default-swift-mode-
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ExistentialAny -verify-additional-prefix explicit-any- -verify-additional-prefix default-swift-mode-
 
+// REQUIRES: swift_feature_ExistentialAny
+
 
 protocol HasSelfRequirements {
   func foo(_ x: Self)

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-feature IsolatedDeinit -emit-ir %s | %FileCheck %s
 
+// REQUIRES: swift_feature_IsolatedDeinit
+
 public class Foo {
   @MainActor
   deinit {}

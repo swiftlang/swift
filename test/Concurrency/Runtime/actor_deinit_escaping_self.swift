@@ -4,6 +4,7 @@
 // REQUIRES: libdispatch
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+// REQUIRES: swift_feature_IsolatedDeinit
 // UNSUPPORTED: back_deployment_runtime
 
 import _Concurrency

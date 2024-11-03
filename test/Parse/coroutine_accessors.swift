@@ -6,7 +6,7 @@
 // RUN:     -verify-additional-prefix disabled- \
 // RUN:     -debug-diagnostic-names
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_CoroutineAccessors
 
 var _i: Int = 0
 

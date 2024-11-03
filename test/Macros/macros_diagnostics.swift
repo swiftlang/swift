@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser, asserts
+// REQUIRES: swift_feature_CodeItemMacros
 
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature CodeItemMacros -module-name MacrosTest
 

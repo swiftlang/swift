@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -target %target-swift-5.1-abi-triple %s -o /dev/null -import-objc-header %S/Inputs/transfernonsendable_objc.h -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: objc_interop
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 import Foundation
 

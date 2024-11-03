@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -transfer-non-sendable -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %s -verify
 
+// REQUIRES: swift_feature_RegionBasedIsolation
+
 // PLEASE READ THIS!
 //
 // In this file, we test out how the checker handles dataflow in a CFG. We want

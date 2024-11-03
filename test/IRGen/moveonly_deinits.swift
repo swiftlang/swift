@@ -6,11 +6,11 @@
 // this test is in test/SILGen/moveonly_deinits. We have a separate test so that
 // we can test on other platforms the other behavior.
 
-// REQUIRES: asserts
 // REQUIRES: CODEGENERATOR=X86
 
 // rdar://107495541 Test needs to be updated for 32bit.
 // REQUIRES: PTRSIZE=64
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 //////////////////////
 // Misc Declaration //

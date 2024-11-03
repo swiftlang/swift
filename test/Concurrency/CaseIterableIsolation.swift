@@ -3,6 +3,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 import StdlibUnittest
 

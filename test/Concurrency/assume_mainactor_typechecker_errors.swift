@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -swift-version 6 -emit-sil -enable-experimental-feature UnspecifiedMeansMainActorIsolated %s -verify
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_UnspecifiedMeansMainActorIsolated
 
 // READ THIS! This test is meant to check the specific isolation when
 // UnspecifiedMeansMainActorIsolated is enabled in combination with validating

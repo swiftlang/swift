@@ -6,6 +6,8 @@
 // RUN: %FileCheck %s < %t/test.silgen
 // RUN: %swift-demangle < %t/test.silgen | %FileCheck %s --check-prefix=DEMANGLED
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 struct Basic<T: ~Copyable> {
     // DEMANGLED: (extension in test):test.Basic< where A: ~Swift.Copyable>.cali2() -> ()
     // CHECK: $s4test5BasicVAARi_zrlE5cali2yyF

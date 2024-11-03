@@ -7,6 +7,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+// REQUIRES: swift_feature_IsolatedDeinit
 // UNSUPPORTED: back_deployment_runtime
 
 import Swift
@@ -87,14 +88,14 @@ class Probe {
   var probeExpectedExecutor: UnownedSerialExecutor
   let probeExpectedNumber: Int
   let probeGroup: DispatchGroup
-  
+
   init(expectedNumber: Int, group: DispatchGroup) {
     self.probeExpectedExecutor = AnotherActor.shared.unownedExecutor
     self.probeExpectedNumber = expectedNumber
     self.probeGroup = group
     group.enter()
   }
-  
+
   deinit {
     expectTrue(isCurrentExecutor(probeExpectedExecutor))
     expectEqual(probeExpectedNumber, TL.number)
@@ -148,7 +149,7 @@ if #available(SwiftStdlib 5.1, *) {
     }
     group.wait()
   }
-  
+
   tests.test("class sync slow path") {
     let group = DispatchGroup()
     group.enter(1)

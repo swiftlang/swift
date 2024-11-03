@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -strict-concurrency=complete -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 
 /*
  This file tests the experimental TransferNonSendable feature. This feature causes the passing

@@ -6,7 +6,8 @@
 // RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature IsolatedDefaultValues -enable-upcoming-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_IsolatedDefaultValues
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 // This tests errors emitted in definite initialization; this test file cannot
 // have any type checker errors. Type checker errors for IsolatedDefaultValues

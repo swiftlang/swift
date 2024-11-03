@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-sil -verify -o /dev/null %s -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 // Check that the inserted hop-to-executor instructions don't cause a false
 // "unreachable code" warning.
