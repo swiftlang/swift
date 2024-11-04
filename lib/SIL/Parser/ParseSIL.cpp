@@ -130,7 +130,7 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
     return SILModule::createEmptyModule(desc.context, desc.conv, desc.opts);
   }
 
-  //mark functions as zombies before calling SILVerifier as functions referred
+  // Mark functions as zombies before calling SILVerifier as functions referred
   //to by debug scopes only can fail verifier checks
   parserState.markZombies();
 
