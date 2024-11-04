@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature Embedded
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 @_unavailableInEmbedded
 public struct UnavailableInEmbedded {}
@@ -21,8 +22,8 @@ public func universally_unavailable() { }
 @_unavailableInEmbedded
 public func unused() { } // no error
 
-public struct S1 {}
-public struct S2 {}
+public struct S1 {} // expected-note {{found this candidate}}
+public struct S2 {} // expected-note {{found this candidate}}
 
 @_unavailableInEmbedded
 public func has_unavailable_in_embedded_overload(_ s1: S1) { }
@@ -47,11 +48,11 @@ public func available(
 @_unavailableInEmbedded
 public func also_unavailable_in_embedded(
   _ uie: UnavailableInEmbedded, // OK
-  _ uu: UniverallyUnavailable // FIXME: should be an error
+  _ uu: UniverallyUnavailable // OK
 ) {
   unavailable_in_embedded() // OK
   universally_unavailable() // expected-error {{'universally_unavailable()' is unavailable: always unavailable}}
-  has_unavailable_in_embedded_overload(.init()) // FIXME: should be ambiguous
+  has_unavailable_in_embedded_overload(.init()) // expected-error {{ambiguous use of 'init()'}}
   has_universally_unavailable_overload(.init()) // not ambiguous, selects available overload
 }
 

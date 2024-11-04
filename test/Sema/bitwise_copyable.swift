@@ -5,6 +5,9 @@
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names
 
+// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_Sensitive
+
 //==============================================================================
 //===========================DEPENDENCY-FREE TESTS=(BEGIN)===================={{
 //==============================================================================

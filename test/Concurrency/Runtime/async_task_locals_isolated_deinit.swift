@@ -7,6 +7,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+// REQUIRES: swift_feature_IsolatedDeinit
 // UNSUPPORTED: back_deployment_runtime
 
 import Swift
@@ -87,14 +88,14 @@ class Probe {
   var probeExpectedExecutor: UnownedSerialExecutor
   let probeExpectedNumber: Int
   let probeGroup: DispatchGroup
-  
+
   init(expectedNumber: Int, group: DispatchGroup) {
     self.probeExpectedExecutor = AnotherActor.shared.unownedExecutor
     self.probeExpectedNumber = expectedNumber
     self.probeGroup = group
     group.enter()
   }
-  
+
   deinit {
     expectTrue(isCurrentExecutor(probeExpectedExecutor))
     expectEqual(probeExpectedNumber, TL.number)
@@ -126,14 +127,6 @@ class ClassNoOp: Probe {
 
 let tests = TestSuite("Isolated Deinit")
 
-// Dummy global variable to suppress stack propagation
-// TODO: Remove it after disabling allocation on stack for classes with isolated deinit
-var x: AnyObject? = nil
-func preventAllocationOnStack(_ object: AnyObject) {
-  x = object
-  x = nil
-}
-
 if #available(SwiftStdlib 5.1, *) {
   tests.test("class sync fast path") {
     let group = DispatchGroup()
@@ -142,19 +135,19 @@ if #available(SwiftStdlib 5.1, *) {
       // FIXME: isolated deinit should be clearing task locals
       await TL.$number.withValue(42) {
         await AnotherActor.shared.performTesting {
-          preventAllocationOnStack(ClassNoOp(expectedNumber: 0, group: group))
+          _ = ClassNoOp(expectedNumber: 0, group: group)
         }
       }
     }
     group.wait()
   }
-  
+
   tests.test("class sync slow path") {
     let group = DispatchGroup()
     group.enter(1)
     Task {
       TL.$number.withValue(99) {
-        preventAllocationOnStack(ClassNoOp(expectedNumber: 0, group: group))
+        _ = ClassNoOp(expectedNumber: 0, group: group)
       }
     }
     group.wait()
@@ -168,7 +161,7 @@ if #available(SwiftStdlib 5.1, *) {
       TL.$number.withValue(99) {
         // Despite last release happening not on the actor itself,
         // this is still a fast path due to optimisation for deallocating actors.
-        preventAllocationOnStack(ActorNoOp(expectedNumber: 0, group: group))
+        _ = ActorNoOp(expectedNumber: 0, group: group)
       }
     }
     group.wait()
@@ -180,7 +173,7 @@ if #available(SwiftStdlib 5.1, *) {
     Task {
       TL.$number.withValue(99) {
         // Using ProxyActor breaks optimization
-        preventAllocationOnStack(ProxyActor(expectedNumber: 0, group: group))
+        _ = ProxyActor(expectedNumber: 0, group: group)
       }
     }
     group.wait()
@@ -190,8 +183,8 @@ if #available(SwiftStdlib 5.1, *) {
     let group = DispatchGroup()
     group.enter(2)
     Task {
-      preventAllocationOnStack(ActorNoOp(expectedNumber: 0, group: group))
-      preventAllocationOnStack(ClassNoOp(expectedNumber: 0, group: group))
+      _ = ActorNoOp(expectedNumber: 0, group: group)
+      _ = ClassNoOp(expectedNumber: 0, group: group)
     }
     group.wait()
   }

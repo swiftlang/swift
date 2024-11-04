@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -target %module-target-future -enable-experimental-feature ValueGenerics -enable-experimental-feature BuiltinModule -disable-experimental-parser-round-trip -emit-module %s -o %t/Vector.swiftmodule
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_BuiltinModule
+// REQUIRES: swift_feature_ValueGenerics
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 

@@ -1,6 +1,7 @@
 // Please keep this file in alphabetical order!
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_CImplementation
 
 // Temporarily disable on arm64e (rdar://127675057)
 // UNSUPPORTED: CPU=arm64e

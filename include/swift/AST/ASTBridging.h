@@ -313,6 +313,8 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj NominalType_getValueTypeDestructor() const;
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
+  BRIDGED_INLINE bool Destructor_isIsolated() const;
 };
 
 struct BridgedASTNode {

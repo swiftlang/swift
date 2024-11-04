@@ -7,8 +7,8 @@
 // RUN:   -o /dev/null 2>&1 | %FileCheck %s
 // FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer

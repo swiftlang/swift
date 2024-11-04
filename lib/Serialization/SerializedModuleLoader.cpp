@@ -1191,7 +1191,12 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                        moduleBufferID);
     break;
   case serialization::Status::NotInOSSA:
-    // soft reject, silently ignore.
+    if (Ctx.SerializationOpts.ExplicitModuleBuild ||
+        !Ctx.SILOpts.EnableRecompilationToOSSAModule) {
+      Ctx.Diags.diagnose(diagLoc,
+                         diag::serialization_non_ossa_module_incompatible,
+                         ModuleName);
+    }
     break;
   case serialization::Status::RevisionIncompatible:
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_incompatible_revision,

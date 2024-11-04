@@ -1,5 +1,8 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -I %S/Inputs
 
+// REQUIRES: swift_feature_AllowUnsafeAttribute
+// REQUIRES: swift_feature_WarnUnsafe
+
 import unsafe_decls
 
 func testUnsafe(_ ut: UnsafeType) { // expected-warning{{reference to unsafe struct 'UnsafeType'}}

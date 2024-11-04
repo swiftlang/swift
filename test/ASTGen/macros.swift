@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser, asserts
+// REQUIRES: swift_feature_ParserASTGen
 
 // RUN: %empty-directory(%t)
 

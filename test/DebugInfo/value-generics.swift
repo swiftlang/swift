@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -enable-builtin-module -enable-experimental-feature ValueGenerics -disable-experimental-parser-round-trip -disable-availability-checking -o - | %FileCheck %s
 
+// REQUIRES: swift_feature_ValueGenerics
+
 import Builtin
 
 struct Vector<let N: Int, Element: ~Copyable>: ~Copyable {

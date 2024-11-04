@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -disable-experimental-parser-round-trip -disable-availability-checking -enable-experimental-feature ValueGenerics -enable-experimental-feature BuiltinModule -typecheck -verify %s
 
+// REQUIRES: swift_feature_BuiltinModule
+// REQUIRES: swift_feature_ValueGenerics
+
 import Builtin
 
 func a<let N: Int, T>(x: Builtin.FixedArray<N, T>) -> Builtin.FixedArray<N, T> {

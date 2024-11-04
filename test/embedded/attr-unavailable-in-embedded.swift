@@ -5,6 +5,7 @@
 // RUN: %target-swift-frontend -typecheck -verify -I %t %t/Main.swift -parse-stdlib -enable-experimental-feature Embedded
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN MyModule.swift
 

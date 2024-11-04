@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes 
-// REQUIRES: asserts
+
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct E {}
 

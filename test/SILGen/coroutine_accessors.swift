@@ -11,7 +11,8 @@
 // RUN:     -enable-experimental-feature CoroutineAccessorsUnwindOnCallerError \
 // RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-UNWIND
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: swift_feature_CoroutineAccessorsUnwindOnCallerError
 
 @frozen
 public struct S {

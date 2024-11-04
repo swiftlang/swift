@@ -11,6 +11,7 @@ add_swift_host_library(swiftParse STATIC
   Lexer.cpp
   ParseBridging.cpp
   ParseDecl.cpp
+  ParseDeclName.cpp
   ParseExpr.cpp
   ParseGeneric.cpp
   ParseIfConfig.cpp

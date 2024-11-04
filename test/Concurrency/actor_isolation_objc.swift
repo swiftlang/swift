@@ -5,7 +5,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 import Foundation
 

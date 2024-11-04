@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_KeyPathWithStaticMembers
 
 var global = 42
 

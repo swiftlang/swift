@@ -1,6 +1,8 @@
 // RUN: %target-sil-opt %s \
 // RUN:   -enable-experimental-feature NonescapableTypes | %FileCheck %s
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 sil_stage canonical
 
 import Builtin

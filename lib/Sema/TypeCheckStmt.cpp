@@ -41,7 +41,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TopCollection.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"

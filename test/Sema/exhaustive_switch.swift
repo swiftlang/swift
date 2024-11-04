@@ -4,6 +4,8 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics -I %t
 // RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution -enable-upcoming-feature NonfrozenEnumExhaustivity -I %t
 
+// REQUIRES: swift_feature_NonfrozenEnumExhaustivity
+
 import exhaustive_switch_testable_helper
 
 func foo(a: Int?, b: Int?) -> Int {

@@ -6,7 +6,7 @@
 // hoptomainactorifneeded_interpreter.
 
 // REQUIRES: objc_interop
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GenerateForceToMainActorThunks
 
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency

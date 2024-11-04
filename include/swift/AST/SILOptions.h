@@ -188,6 +188,10 @@ public:
   /// If this is disabled we do not serialize in OSSA form when optimizing.
   bool EnableOSSAModules = false;
 
+  /// Allow recompilation of a non-OSSA module to an OSSA module when imported
+  /// from another OSSA module.
+  bool EnableRecompilationToOSSAModule = false;
+
   /// If set to true, compile with the SIL Opaque Values enabled.
   bool EnableSILOpaqueValues = false;
 

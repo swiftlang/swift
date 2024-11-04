@@ -4,6 +4,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_IsolatedDeinit
 
 import Foundation
 

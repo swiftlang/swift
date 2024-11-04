@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature NoImplicitCopy %s | %FileCheck %s
 
+// REQUIRES: swift_feature_NoImplicitCopy
+
 final class Klass {
   var k: Klass? = nil
 }

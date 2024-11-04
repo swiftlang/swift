@@ -37,6 +37,8 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_CImplementation
+// REQUIRES: swift_feature_ObjCImplementationWithResilientStorage
 
 @main struct Main {
   static func main() {

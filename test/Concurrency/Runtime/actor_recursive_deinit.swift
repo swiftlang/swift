@@ -4,6 +4,7 @@
 // REQUIRES: concurrency
 
 // REQUIRES: concurrency_runtime
+// REQUIRES: swift_feature_IsolatedDeinit
 // UNSUPPORTED: back_deployment_runtime
 
 // Compiler crashes because builtin "ifdef_SWIFT_STDLIB_PRINT_DISABLED"() gets lowered as "i32 0",

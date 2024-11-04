@@ -22,6 +22,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -37,7 +38,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
+#include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -313,19 +314,6 @@ ExportContext::getExportabilityReason() const {
   if (Exported)
     return ExportabilityReason(Reason);
   return std::nullopt;
-}
-
-std::optional<AvailabilityRange>
-UnmetAvailabilityRequirement::getRequiredNewerAvailabilityRange(
-    ASTContext &ctx) const {
-  switch (kind) {
-  case Kind::AlwaysUnavailable:
-  case Kind::RequiresVersion:
-  case Kind::Obsoleted:
-    return std::nullopt;
-  case Kind::IntroducedInNewerVersion:
-    return AvailabilityInference::availableRange(attr, ctx);
-  }
 }
 
 /// Returns the first availability attribute on the declaration that is active
@@ -1477,62 +1465,6 @@ AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
   return availabilityAtLocation(loc, DC, MostRefined).getPlatformRange();
 }
 
-bool TypeChecker::isDeclarationUnavailable(
-    const Decl *D, const DeclContext *referenceDC,
-    llvm::function_ref<AvailabilityRange()> getAvailabilityRange) {
-  ASTContext &Context = referenceDC->getASTContext();
-  if (Context.LangOpts.DisableAvailabilityChecking) {
-    return false;
-  }
-
-  if (!referenceDC->getParentSourceFile()) {
-    // We only check availability if this reference is in a source file; we do
-    // not check in other kinds of FileUnits.
-    return false;
-  }
-
-  AvailabilityRange safeRangeUnderApprox{
-      AvailabilityInference::availableRange(D)};
-
-  if (safeRangeUnderApprox.isAlwaysAvailable())
-    return false;
-
-  AvailabilityRange runningOSOverApprox = getAvailabilityRange();
-
-  // The reference is safe if an over-approximation of the running OS
-  // versions is fully contained within an under-approximation
-  // of the versions on which the declaration is available. If this
-  // containment cannot be guaranteed, we say the reference is
-  // not available.
-  return !runningOSOverApprox.isContainedIn(safeRangeUnderApprox);
-}
-
-std::optional<AvailabilityRange>
-TypeChecker::checkDeclarationAvailability(const Decl *D,
-                                          const ExportContext &Where) {
-  // Skip computing potential unavailability if the declaration is explicitly
-  // unavailable and the context is also unavailable.
-  if (const AvailableAttr *Attr = AvailableAttr::isUnavailable(D))
-    if (isInsideCompatibleUnavailableDeclaration(D, Where.getAvailability(),
-                                                 Attr))
-      return std::nullopt;
-
-  if (isDeclarationUnavailable(D, Where.getDeclContext(), [&Where] {
-        return Where.getAvailabilityRange();
-      })) {
-    return AvailabilityInference::availableRange(D);
-  }
-
-  return std::nullopt;
-}
-
-std::optional<AvailabilityRange>
-TypeChecker::checkConformanceAvailability(const RootProtocolConformance *conf,
-                                          const ExtensionDecl *ext,
-                                          const ExportContext &where) {
-  return checkDeclarationAvailability(ext, where);
-}
-
 /// A class that walks the AST to find the innermost (i.e., deepest) node that
 /// contains a target SourceRange and matches a particular criterion.
 /// This class finds the innermost nodes of interest by walking
@@ -2205,6 +2137,8 @@ diagnosePotentialUnavailability(const ValueDecl *D, SourceRange ReferenceRange,
                                 const AvailabilityRange &Availability,
                                 bool WarnBeforeDeploymentTarget = false) {
   ASTContext &Context = ReferenceDC->getASTContext();
+  if (Context.LangOpts.DisableAvailabilityChecking)
+    return false;
 
   bool IsError;
   {
@@ -2272,12 +2206,14 @@ behaviorLimitForExplicitUnavailability(
 
 /// Emits a diagnostic for a protocol conformance that is potentially
 /// unavailable at the given source location.
-static void
+static bool
 diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
                                 const ExtensionDecl *ext, SourceLoc loc,
                                 const DeclContext *dc,
                                 const AvailabilityRange &availability) {
   ASTContext &ctx = dc->getASTContext();
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return false;
 
   {
     auto type = rootConf->getType();
@@ -2293,10 +2229,11 @@ diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(loc, dc, availability, ctx,
                                                      err))
-      return;
+      return true;
   }
 
   fixAvailability(loc, dc, availability, ctx);
+  return true;
 }
 
 /// Returns the availability attribute indicating deprecation of the
@@ -3096,12 +3033,10 @@ bool diagnoseExplicitUnavailability(
 }
 
 std::optional<UnmetAvailabilityRequirement>
-swift::checkDeclarationAvailability(const Decl *decl,
-                                    const DeclContext *declContext,
-                                    AvailabilityContext availabilityContext) {
+swift::getUnmetDeclAvailabilityRequirement(
+    const Decl *decl, const DeclContext *declContext,
+    AvailabilityContext availabilityContext) {
   auto &ctx = declContext->getASTContext();
-  if (ctx.LangOpts.DisableAvailabilityChecking)
-    return std::nullopt;
 
   // Generic parameters are always available.
   if (isa<GenericTypeParamDecl>(decl))
@@ -3139,6 +3074,14 @@ swift::checkDeclarationAvailability(const Decl *decl,
   return std::nullopt;
 }
 
+std::optional<UnmetAvailabilityRequirement>
+swift::getUnmetDeclAvailabilityRequirement(const Decl *decl,
+                                           const DeclContext *referenceDC,
+                                           SourceLoc referenceLoc) {
+  return getUnmetDeclAvailabilityRequirement(
+      decl, referenceDC,
+      TypeChecker::availabilityAtLocation(referenceLoc, referenceDC));
+}
 
 /// Check if this is a subscript declaration inside String or
 /// Substring that returns String, and if so return true.
@@ -4150,14 +4093,11 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 
   auto *DC = Where.getDeclContext();
   auto &ctx = DC->getASTContext();
-  auto unmetRequirement =
-      checkDeclarationAvailability(D, DC, Where.getAvailability());
-  auto requiredRange =
-      unmetRequirement
-          ? unmetRequirement->getRequiredNewerAvailabilityRange(ctx)
-          : std::nullopt;
 
-  if (unmetRequirement && !requiredRange) {
+  auto unmetRequirement =
+      getUnmetDeclAvailabilityRequirement(D, DC, Where.getAvailability());
+
+  if (unmetRequirement && !unmetRequirement->isConditionallySatisfiable()) {
     // FIXME: diagnoseExplicitUnavailability should take an unmet requirement
     if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
       return true;
@@ -4180,6 +4120,11 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
         && isa<ProtocolDecl>(D))
     return false;
+
+  if (!unmetRequirement)
+    return false;
+
+  auto requiredRange = unmetRequirement->getRequiredNewerAvailabilityRange(ctx);
 
   // Diagnose (and possibly signal) for potential unavailability
   if (!requiredRange)
@@ -4628,6 +4573,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   // Diagnose "missing" conformances where we needed a conformance but
   // didn't have one.
   auto *DC = where.getDeclContext();
+  auto &ctx = DC->getASTContext();
   if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
     if (builtinConformance->isMissing()) {
       diagnoseMissingConformance(loc, builtinConformance->getType(),
@@ -4641,7 +4587,6 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
     Type selfTy = rootConf->getProtocol()->getSelfInterfaceType();
     if (!depTy->isEqual(selfTy)) {
-      auto &ctx = DC->getASTContext();
       ctx.Diags.diagnose(
           loc,
           diag::assoc_conformance_from_implementation_only_module,
@@ -4656,20 +4601,26 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       return true;
     }
 
-    if (diagnoseExplicitUnavailability(loc, rootConf, ext, where,
-                                       warnIfConformanceUnavailablePreSwift6)) {
-      maybeEmitAssociatedTypeNote();
-      return true;
-    }
+    auto unmetRequirement = getUnmetDeclAvailabilityRequirement(
+        ext, where.getDeclContext(), where.getAvailability());
+    if (unmetRequirement) {
+      // FIXME: diagnoseExplicitUnavailability() should take unmet requirement
+      if (diagnoseExplicitUnavailability(
+              loc, rootConf, ext, where,
+              warnIfConformanceUnavailablePreSwift6)) {
+        maybeEmitAssociatedTypeNote();
+        return true;
+      }
 
-    // Diagnose (and possibly signal) for potential unavailability
-    auto maybeUnavail = TypeChecker::checkConformanceAvailability(
-        rootConf, ext, where);
-    if (maybeUnavail.has_value()) {
-      diagnosePotentialUnavailability(rootConf, ext, loc, DC,
-                                      maybeUnavail.value());
-      maybeEmitAssociatedTypeNote();
-      return true;
+      // Diagnose (and possibly signal) for potential unavailability
+      if (auto requiredRange =
+              unmetRequirement->getRequiredNewerAvailabilityRange(ctx)) {
+        if (diagnosePotentialUnavailability(rootConf, ext, loc, DC,
+                                            *requiredRange)) {
+          maybeEmitAssociatedTypeNote();
+          return true;
+        }
+      }
     }
 
     // Diagnose for deprecation

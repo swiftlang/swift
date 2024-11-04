@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes
-// REQUIRES: asserts
+
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct NC: ~Copyable {
   var ne: NE {

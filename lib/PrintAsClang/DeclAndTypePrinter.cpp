@@ -40,7 +40,6 @@
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 
 #include "SwiftToClangInteropContext.h"
 #include "clang/AST/ASTContext.h"
