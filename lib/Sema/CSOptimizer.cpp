@@ -244,7 +244,7 @@ static void findFavoredChoicesBasedOnArity(
 
 /// Given a set of disjunctions, attempt to determine
 /// favored choices in the current context.
-static Constraint *determineBestChoicesInContext(
+static void determineBestChoicesInContext(
     ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions,
     llvm::DenseMap<Constraint *,
                    std::pair<double, llvm::TinyPtrVector<Constraint *>>>
@@ -267,14 +267,14 @@ static Constraint *determineBestChoicesInContext(
 
     auto argumentList = cs.getArgumentList(applicableFn.get()->getLocator());
     if (!argumentList)
-      return nullptr;
+      return;
 
     for (const auto &argument : *argumentList) {
       if (auto *expr = argument.getExpr()) {
         // Directly `<#...#>` or has one inside.
         if (isa<CodeCompletionExpr>(expr) ||
             cs.containsIDEInspectionTarget(expr))
-          return nullptr;
+          return;
       }
     }
 
@@ -924,7 +924,7 @@ static Constraint *determineBestChoicesInContext(
   }
 
   if (bestOverallScore == 0)
-    return nullptr;
+    return;
 
   for (auto &entry : disjunctionScores) {
     TinyPtrVector<Constraint *> favoredChoices;
@@ -932,19 +932,6 @@ static Constraint *determineBestChoicesInContext(
       favoredChoices.push_back(choice);
     favorings[entry.first] = std::make_pair(entry.second, favoredChoices);
   }
-
-  Constraint *bestDisjunction = nullptr;
-  for (auto *disjunction : disjunctions) {
-    if (disjunctionScores[disjunction] != bestOverallScore)
-      continue;
-
-    if (!bestDisjunction)
-      bestDisjunction = disjunction;
-    else // Multiple disjunctions with the same score.
-      return nullptr;
-  }
-
-  return bestDisjunction;
 }
 
 // Attempt to find a disjunction of bind constraints where all options
@@ -1019,9 +1006,7 @@ ConstraintSystem::selectDisjunction() {
   llvm::DenseMap<Constraint *,
                  std::pair</*bestScore=*/double, llvm::TinyPtrVector<Constraint *>>>
       favorings;
-  if (auto *bestDisjunction =
-          determineBestChoicesInContext(*this, disjunctions, favorings))
-    return std::make_pair(bestDisjunction, favorings[bestDisjunction].second);
+  determineBestChoicesInContext(*this, disjunctions, favorings);
 
   // Pick the disjunction with the smallest number of favored, then active
   // choices.
@@ -1034,16 +1019,23 @@ ConstraintSystem::selectDisjunction() {
         auto &[firstScore, firstFavoredChoices] = favorings[first];
         auto &[secondScore, secondFavoredChoices] = favorings[second];
 
+        bool isFirstSupported = isSupportedDisjunction(first);
+        bool isSecondSupported = isSupportedDisjunction(second);
+
         // Rank based on scores only if both disjunctions are supported.
-        if (isSupportedDisjunction(first) && isSupportedDisjunction(second)) {
+        if (isFirstSupported && isSecondSupported) {
           // If both disjunctions have the same score they should be ranked
           // based on number of favored/active choices.
           if (firstScore != secondScore)
             return firstScore > secondScore;
         }
 
-        unsigned numFirstFavored = firstFavoredChoices.size();
-        unsigned numSecondFavored = secondFavoredChoices.size();
+        unsigned numFirstFavored = isFirstSupported
+                                       ? firstFavoredChoices.size()
+                                       : first->countFavoredNestedConstraints();
+        unsigned numSecondFavored =
+            isSecondSupported ? secondFavoredChoices.size()
+                              : second->countFavoredNestedConstraints();
 
         if (numFirstFavored == numSecondFavored) {
           if (firstActive != secondActive)
