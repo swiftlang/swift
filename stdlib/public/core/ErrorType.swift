@@ -278,7 +278,7 @@ extension Error {
   }
 
   public var _domain: String {
-    return String(reflecting: type(of: self))
+    return _typeName(type(of: self), qualified: true)
   }
 
   public var _userInfo: AnyObject? {
