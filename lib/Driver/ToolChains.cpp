@@ -204,6 +204,12 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-disable-objc-interop");
   }
 
+  if (const Arg *arg = inputArgs.getLastArg(
+        options::OPT_experimental_serialize_debug_info)) {
+    arguments.push_back(
+        inputArgs.MakeArgString(Twine("-experimental-serialize-debug-info")));
+  }
+
   if (inputArgs.hasArg(options::OPT_experimental_hermetic_seal_at_link)) {
     arguments.push_back("-enable-llvm-vfe");
     arguments.push_back("-enable-llvm-wme");
