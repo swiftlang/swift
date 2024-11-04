@@ -386,6 +386,28 @@ void DynamicallyReplacedDeclRequest::cacheResult(ValueDecl *result) const {
 }
 
 //----------------------------------------------------------------------------//
+// OpaqueResultTypeRequest caching.
+//----------------------------------------------------------------------------//
+
+std::optional<OpaqueTypeDecl *>
+OpaqueResultTypeRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.noOpaqueResultType)
+    return std::optional(nullptr);
+
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void OpaqueResultTypeRequest::cacheResult(OpaqueTypeDecl *result) const {
+  auto *decl = std::get<0>(getStorage());
+  if (!result) {
+    decl->LazySemanticInfo.noOpaqueResultType = 1;
+    return;
+  }
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
 // ApplyAccessNoteRequest computation.
 //----------------------------------------------------------------------------//
 

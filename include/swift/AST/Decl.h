@@ -2758,6 +2758,10 @@ private:
     /// output a null pointer.
     unsigned noDynamicallyReplacedDecl : 1;
 
+    /// Whether the OpaqueResultTypeRequest request was evaluated and produced
+    /// a null pointer.
+    unsigned noOpaqueResultType : 1;
+
     /// Whether the "isFinal" bit has been computed yet.
     unsigned isFinalComputed : 1;
 
@@ -2785,7 +2789,7 @@ private:
   friend class InterfaceTypeRequest;
   friend class CheckRedeclarationRequest;
   friend class ActorIsolationRequest;
-  friend class DynamicallyReplacedDeclRequest;
+  friend class OpaqueResultTypeRequest;
   friend class ApplyAccessNoteRequest;
 
   friend class Decl;
