@@ -286,9 +286,14 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       continue;
     }
 
+    auto &mod = User->getFunction()->getModule();
+    bool shouldScalarizeTuple =
+      !mod.getOptions().UseAggressiveReg2MemForCodeSize ||
+      shouldExpand(mod, PointeeType);
+
     // Loads are a use of the value.
     if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
-      if (PointeeType.is<TupleType>())
+      if (PointeeType.is<TupleType>() && shouldScalarizeTuple)
         UsesToScalarize.push_back(User);
       else
         Uses.emplace_back(User, PMOUseKind::Load);
@@ -300,7 +305,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       if (UI->getOperandNumber() == StoreInst::Dest) {
         if (auto tupleType = PointeeType.getAs<TupleType>()) {
           if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType) &&
-              !tupleType->containsPackExpansionType()) {
+              !tupleType->containsPackExpansionType() &&
+              shouldScalarizeTuple) {
             UsesToScalarize.push_back(User);
             continue;
           }
@@ -337,7 +343,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       // have an access that crosses elements.
       if (auto tupleType = PointeeType.getAs<TupleType>()) {
         if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType) &&
-            !tupleType->containsPackExpansionType()) {
+            !tupleType->containsPackExpansionType() &&
+            shouldScalarizeTuple) {
           UsesToScalarize.push_back(CAI);
           continue;
         }
