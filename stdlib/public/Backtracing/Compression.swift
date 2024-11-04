@@ -50,6 +50,9 @@ enum CompressedImageSourceError: Error {
   case outputOverrun
 }
 
+let zlib_stream_init = swift.runtime.zlib_stream_init
+let lzma_stream_init = swift.runtime.lzma_stream_init
+
 // .. CompressedStream .........................................................
 
 protocol CompressedStream {

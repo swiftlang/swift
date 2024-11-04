@@ -29,11 +29,7 @@ internal import Musl
 
 #if os(macOS)
 internal import BacktracingImpl.OS.Darwin
-#elseif os(Linux)
-internal import BacktracingImpl.OS.Linux
 #endif
-
-internal import BacktracingImpl.Runtime
 
 @_spi(MemoryReaders) public protocol MemoryReader {
   typealias Address = UInt64

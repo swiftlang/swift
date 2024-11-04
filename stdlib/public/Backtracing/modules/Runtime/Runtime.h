@@ -22,6 +22,11 @@
 
 #include "swift/Runtime/CrashInfo.h"
 
+#ifdef __cplusplus
+namespace swift {
+namespace runtime {
+#endif
+
 // Can't import swift/Runtime/Debug.h because it assumes C++
 void swift_reportWarning(uint32_t flags, const char *message);
 
@@ -33,5 +38,10 @@ char *_swift_backtrace_demangle(const char *rawName,
                                 size_t rawNameLength,
                                 char *outputBuffer,
                                 size_t *outputBufferSize);
+
+#ifdef __cplusplus
+} // namespace runtime
+} // namespace swift
+#endif
 
 #endif // SWIFT_BACKTRACING_RUNTIME_H

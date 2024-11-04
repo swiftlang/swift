@@ -36,9 +36,11 @@ set(BACKTRACING_SOURCES
   Image.swift
   ImageSource.swift
   MemoryImageSource.swift
+  Libc.swift
   MemoryReader.swift
   ProcMapsScanner.swift
   Registers.swift
+  Runtime.swift
   SymbolicatedBacktrace.swift
   Utils.swift
   Win32Extras.cpp
@@ -47,6 +49,7 @@ set(BACKTRACING_SOURCES
 )
 
 set(BACKTRACING_COMPILE_FLAGS
+  "-cxx-interoperability-mode=default"
   "-Xfrontend;-experimental-spi-only-imports"
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
   "-Xcc;-I${CMAKE_BINARY_DIR}/include"

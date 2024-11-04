@@ -19,14 +19,26 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 internal import Darwin
+#elseif os(Windows)
+internal import ucrt
+#elseif canImport(Glibc)
+internal import Glibc
+#elseif canImport(Musl)
+internal import Musl
+#endif
+
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 internal import BacktracingImpl.OS.Darwin
-#elseif os(Linux)
-internal import BacktracingImpl.OS.Linux
 #endif
 
 internal import BacktracingImpl.FixedLayout
+
+typealias x86_64_gprs = swift.runtime.backtrace.x86_64_gprs
+typealias i386_gprs = swift.runtime.backtrace.i386_gprs
+typealias arm64_gprs = swift.runtime.backtrace.arm64_gprs
+typealias arm_gprs = swift.runtime.backtrace.arm_gprs
 
 @_spi(Contexts) public enum ContextError: Error {
   case unableToFormTLSAddress

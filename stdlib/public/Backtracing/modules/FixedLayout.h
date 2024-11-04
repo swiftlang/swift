@@ -20,7 +20,8 @@
 
 #ifdef __cplusplus
 namespace swift {
-extern "C" {
+namespace runtime {
+namespace backtrace {
 #endif
 
 #include <stdint.h>
@@ -52,8 +53,9 @@ struct arm_gprs {
   uint32_t valid;
 };
 
-#ifdef __cpluspus
-} // extern "C"
+#ifdef __cplusplus
+} // namespace backtrace
+} // namespace runtime
 } // namespace swift
 #endif
 
