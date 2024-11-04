@@ -281,6 +281,21 @@ BridgedIntegerLiteralExpr_createParsed(BridgedASTContext cContext,
       IntegerLiteralExpr(cStr.unbridged(), cTokenLoc.unbridged());
 }
 
+BridgedKeyPathDotExpr
+BridgedKeyPathDotExpr_createParsed(BridgedASTContext cContext,
+                                   BridgedSourceLoc cLoc) {
+  return new (cContext.unbridged()) KeyPathDotExpr(cLoc.unbridged());
+}
+
+BridgedKeyPathExpr BridgedKeyPathExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cBackslashLoc,
+    BridgedNullableExpr cParsedRoot, BridgedNullableExpr cParsedPath,
+    bool hasLeadingDot) {
+  return KeyPathExpr::createParsed(
+      cContext.unbridged(), cBackslashLoc.unbridged(), cParsedRoot.unbridged(),
+      cParsedPath.unbridged(), hasLeadingDot);
+}
+
 BridgedSuperRefExpr
 BridgedSuperRefExpr_createParsed(BridgedASTContext cContext,
                                  BridgedSourceLoc cSuperLoc) {
