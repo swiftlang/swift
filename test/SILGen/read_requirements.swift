@@ -1532,3 +1532,24 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-NEXT:    method #P3.ur!read2
 // CHECK-SAME:      : @$s17read_requirements21ImplCUnsafeAddressorsVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_default_witness_table P1 {
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_default_witness_table P2 {
+// CHECK-unstable: no_default
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    no_default
+// CHECK-unstable: no_default
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_default_witness_table P3 {
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:  }
