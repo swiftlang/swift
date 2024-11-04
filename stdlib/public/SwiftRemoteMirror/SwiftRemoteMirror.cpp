@@ -1073,3 +1073,20 @@ swift_reflection_nextJob(SwiftReflectionContextRef ContextRef,
     return Context->nextJob(JobPtr);
   });
 }
+
+const char *swift_reflection_pointerIsUnrealizedObjCClass(
+    SwiftReflectionContextRef ContextRef,
+    swift_reflection_ptr_t CandidateClassPtr,
+    bool (*IsKnownRealizedClass)(void *Context, swift_reflection_ptr_t Ptr),
+    void *IsKnownRealizedClassContext, int *OutIsUnrealizedObjCClass) {
+  return ContextRef->withContext<const char *>([&](auto *Context) {
+    auto IsKnownClassAdaptor = [&](auto Ptr) {
+      return IsKnownRealizedClass(IsKnownRealizedClassContext, Ptr);
+    };
+    auto [Error, IsUnrealizedClass] =
+        Context->isUnrealizedObjCClass(CandidateClassPtr, IsKnownClassAdaptor);
+
+    *OutIsUnrealizedObjCClass = IsUnrealizedClass ? 1 : 0;
+    return returnableCString(ContextRef, Error);
+  });
+}
