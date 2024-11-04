@@ -64,6 +64,30 @@ AvailabilityRange AvailabilityRange::forRuntimeTarget(const ASTContext &Ctx) {
   return AvailabilityRange(VersionRange::allGTE(Ctx.LangOpts.RuntimeVersion));
 }
 
+std::optional<AvailabilityRange>
+UnmetAvailabilityRequirement::getRequiredNewerAvailabilityRange(
+    ASTContext &ctx) const {
+  switch (kind) {
+  case Kind::AlwaysUnavailable:
+  case Kind::RequiresVersion:
+  case Kind::Obsoleted:
+    return std::nullopt;
+  case Kind::IntroducedInNewerVersion:
+    return AvailabilityInference::availableRange(attr, ctx);
+  }
+}
+
+bool UnmetAvailabilityRequirement::isConditionallySatisfiable() const {
+  switch (kind) {
+  case Kind::AlwaysUnavailable:
+  case Kind::RequiresVersion:
+  case Kind::Obsoleted:
+    return false;
+  case Kind::IntroducedInNewerVersion:
+    return true;
+  }
+}
+
 namespace {
 
 /// The inferred availability required to access a group of declarations

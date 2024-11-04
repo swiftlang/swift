@@ -2475,10 +2475,9 @@ private:
       if (!nominal)
         return false;
 
-      ExportContext where =
-          ExportContext::forFunctionBody(context.getAsDeclContext(), loc);
-      if (auto reason =
-              TypeChecker::checkDeclarationAvailability(nominal, where)) {
+      auto unmetRequirement = getUnmetDeclAvailabilityRequirement(
+          nominal, context.getAsDeclContext(), loc);
+      if (unmetRequirement && unmetRequirement->isConditionallySatisfiable()) {
         auto &ctx = getASTContext();
         ctx.Diags.diagnose(loc,
                            diag::result_builder_missing_limited_availability,

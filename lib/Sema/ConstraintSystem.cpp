@@ -4682,8 +4682,7 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
       loc = getLoc(anchor);
   }
 
-  auto availabilityContext = TypeChecker::availabilityAtLocation(loc, DC);
-  return checkDeclarationAvailability(D, DC, availabilityContext).has_value();
+  return getUnmetDeclAvailabilityRequirement(D, DC, loc).has_value();
 }
 
 bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conformance,
@@ -4898,12 +4897,12 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-    ExportContext where = ExportContext::forFunctionBody(DC, referenceLoc);
-    auto maybeUnavail =
-        TypeChecker::checkDeclarationAvailability(setter, where);
-    if (maybeUnavail.has_value()) {
+    // FIXME: Fully unavailable setters should cause the key path to be
+    // readonly too.
+    auto unmetRequirement =
+        getUnmetDeclAvailabilityRequirement(setter, DC, referenceLoc);
+    if (unmetRequirement && unmetRequirement->isConditionallySatisfiable())
       return true;
-    }
   }
 
   return false;

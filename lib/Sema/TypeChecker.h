@@ -1032,26 +1032,6 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 /// is allowed.
 std::optional<Diagnostic> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
 
-/// Same as \c checkDeclarationAvailability but doesn't give a reason for
-/// unavailability.
-bool isDeclarationUnavailable(
-    const Decl *D, const DeclContext *referenceDC,
-    llvm::function_ref<AvailabilityRange()> getAvailabilityRange);
-
-/// Checks whether a declaration should be considered unavailable when
-/// referred to at the given location and, if so, returns the unmet required
-/// version range. Returns None is the declaration is definitely available.
-std::optional<AvailabilityRange>
-checkDeclarationAvailability(const Decl *D, const ExportContext &Where);
-
-/// Checks whether a conformance should be considered unavailable when
-/// referred to at the given location and, if so, returns the unmet required
-/// version range. Returns None is the declaration is definitely available.
-std::optional<AvailabilityRange>
-checkConformanceAvailability(const RootProtocolConformance *Conf,
-                             const ExtensionDecl *Ext,
-                             const ExportContext &Where);
-
 bool checkAvailability(
     SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
     const DeclContext *ReferenceDC,

@@ -36,15 +36,12 @@ using namespace swift;
 ///
 /// This requires the getter's body to have a certain syntactic form. It should
 /// be kept in sync with importEnumCaseAlias in the ClangImporter library.
-static EnumElementDecl *
-extractEnumElement(DeclContext *DC, SourceLoc UseLoc,
-                   const VarDecl *constant) {
-  auto &ctx = DC->getASTContext();
-  auto availabilityContext = TypeChecker::availabilityAtLocation(UseLoc, DC);
-  if (auto unmetRequirement =
-          checkDeclarationAvailability(constant, DC, availabilityContext)) {
+static EnumElementDecl *extractEnumElement(DeclContext *DC, SourceLoc UseLoc,
+                                           const VarDecl *constant) {
+  if (auto requirement =
+          getUnmetDeclAvailabilityRequirement(constant, DC, UseLoc)) {
     // Only diagnose explicit unavailability.
-    if (!unmetRequirement->getRequiredNewerAvailabilityRange(ctx))
+    if (!requirement->isConditionallySatisfiable())
       diagnoseDeclAvailability(constant, UseLoc, nullptr,
                                ExportContext::forFunctionBody(DC, UseLoc));
   }
