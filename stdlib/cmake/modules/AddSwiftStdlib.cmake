@@ -1836,6 +1836,9 @@ endfunction()
 # INSTALL_WITH_SHARED
 #   Install a static library target alongside shared libraries
 #
+# IMPORTS_NON_OSSA
+#   Imports a non-ossa module
+#
 # MACCATALYST_BUILD_FLAVOR
 #   Possible values are 'ios-like', 'macos-like', 'zippered', 'unzippered-twin'
 #   Presence of a build flavor requires SWIFT_MODULE_DEPENDS_MACCATALYST to be
@@ -1895,7 +1898,8 @@ function(add_swift_target_library name)
         SHARED
         STATIC
         NO_LINK_NAME
-        INSTALL_WITH_SHARED)
+        INSTALL_WITH_SHARED
+        IMPORTS_NON_OSSA)
   set(SWIFTLIB_single_parameter_options
         DEPLOYMENT_VERSION_IOS
         DEPLOYMENT_VERSION_OSX
@@ -2057,8 +2061,11 @@ function(add_swift_target_library name)
   # behavior for their requirements.
   if (SWIFTLIB_IS_STDLIB)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-lexical-lifetimes=false")
+  endif()
+
+  if (NOT DEFINED IMPORTS_NON_OSSA)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
   endif()
 
   if(NOT DEFINED SWIFTLIB_INSTALL_BINARY_SWIFTMODULE)

@@ -1226,6 +1226,9 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
             "when optimizing ownership will be lowered before serializing SIL">;
 }
 
+def enable_recompilation_to_ossa_module : Flag<["-"], "enable-recompilation-to-ossa-module">,
+  HelpText<"Allow recompilation of a non-OSSA module to an OSSA module when imported from another OSSA module">;
+
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
 

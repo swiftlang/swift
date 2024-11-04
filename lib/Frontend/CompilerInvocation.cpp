@@ -2700,6 +2700,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
+  Opts.EnableRecompilationToOSSAModule |=
+      Args.hasArg(OPT_enable_recompilation_to_ossa_module);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
   Opts.EnableSILOpaqueValues = Args.hasFlag(
       OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values, false);

@@ -80,11 +80,12 @@ TEST(ClangImporterTest, emitPCHInMemory) {
   swift::SearchPathOptions searchPathOpts;
   swift::symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
   swift::CASOptions casOpts;
+  swift::SerializationOptions serializationOpts;
   swift::SourceManager sourceMgr;
   swift::DiagnosticEngine diags(sourceMgr);
-  std::unique_ptr<ASTContext> context(
-      ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts, options,
-                      symbolGraphOpts, casOpts, sourceMgr, diags));
+  std::unique_ptr<ASTContext> context(ASTContext::get(
+      langOpts, typecheckOpts, silOpts, searchPathOpts, options,
+      symbolGraphOpts, casOpts, serializationOpts, sourceMgr, diags));
   auto importer = ClangImporter::create(*context);
 
   std::string PCH = createFilename(cache, "bridging.h.pch");
@@ -197,14 +198,15 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
   swift::DiagnosticEngine diags(sourceMgr);
   ClangImporterOptions options;
   CASOptions casOpts;
+  SerializationOptions serializationOpts;
   options.clangPath = "/usr/bin/clang";
   options.ExtraArgs.push_back(
       (llvm::Twine("--gcc-toolchain=") + "/opt/rh/devtoolset-9/root/usr")
           .str());
   options.ExtraArgs.push_back("--gcc-toolchain");
-  std::unique_ptr<ASTContext> context(
-      ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts, options,
-                      symbolGraphOpts, casOpts, sourceMgr, diags));
+  std::unique_ptr<ASTContext> context(ASTContext::get(
+      langOpts, typecheckOpts, silOpts, searchPathOpts, options,
+      symbolGraphOpts, casOpts, serializationOpts, sourceMgr, diags));
 
   {
     LibStdCxxInjectionVFS vfs;

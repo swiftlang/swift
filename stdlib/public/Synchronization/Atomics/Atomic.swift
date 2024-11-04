@@ -42,11 +42,10 @@ public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
     _address.initialize(to: Value.encodeAtomicRepresentation(initialValue))
   }
 
-  // Deinit's can't be marked @_transparent. Do these things need all of these
-  // attributes..?
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
+  @_transparent
   deinit {
     let oldValue = Value.decodeAtomicRepresentation(_address.pointee)
     _ = consume oldValue
