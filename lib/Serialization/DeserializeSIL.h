@@ -146,10 +146,10 @@ namespace swift {
     SILDifferentiabilityWitness *
     getSILDifferentiabilityWitnessForReference(StringRef mangledKey);
 
-    const SILDebugScope *readDebugScopes(SILFunction *F,
-                                         SmallVectorImpl<uint64_t> &scratch,
-                                         SILBuilder &Builder, unsigned kind);
-    unsigned readNextRecord(SmallVectorImpl<uint64_t> &scratch);
+    llvm::Expected<const SILDebugScope *>
+    readDebugScopes(SILFunction *F, SmallVectorImpl<uint64_t> &scratch,
+                    SILBuilder &Builder, unsigned kind);
+    llvm::Expected<unsigned> readNextRecord(SmallVectorImpl<uint64_t> &scratch);
     llvm::DenseMap<unsigned, const SILDebugScope *> ParsedScopes;
 
     SILFunction *getFuncForReference(StringRef Name, SILType Ty, TypeExpansionContext context);

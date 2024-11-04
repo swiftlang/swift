@@ -63,6 +63,7 @@ public:
   bool parseSILProperty(Parser &P) override;
   bool parseSILScope(Parser &P) override;
 
+  /// Mark potential zombie functions as zombies.
   void markZombies();
 };
 

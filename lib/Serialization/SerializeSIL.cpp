@@ -265,7 +265,7 @@ namespace {
     }
 
     bool ShouldSerializeAll;
-    bool SerializeDebugInfo;
+    bool SerializeDebugInfoSIL;
 
     void addMandatorySILFunction(const SILFunction *F,
                                  bool emitDeclarationsForOnoneSupport);
@@ -296,6 +296,8 @@ namespace {
 
     void writeSILBlock(const SILModule *SILMod);
     void writeIndexTables();
+
+    /// Serialize and write SILDebugScope graph in post order.
     void writeDebugScopes(const SILDebugScope *Scope, const SourceManager &SM);
 
     void writeNoOperandLayout(const SILInstruction *I) {
@@ -341,7 +343,7 @@ namespace {
     SILSerializer(Serializer &S, llvm::BitstreamWriter &Out, bool serializeAll,
                   bool serializeDebugInfo)
         : S(S), Out(Out), ShouldSerializeAll(serializeAll),
-          SerializeDebugInfo(serializeDebugInfo) {}
+          SerializeDebugInfoSIL(serializeDebugInfo) {}
 
     void writeSILModule(const SILModule *SILMod);
   };
@@ -599,7 +601,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   DebugScopeMap.clear();
 
-  if (SerializeDebugInfo)
+  if (SerializeDebugInfoSIL)
     writeDebugScopes(F.getDebugScope(), F.getModule().getSourceManager());
   // Assign a unique ID to each basic block of the SILFunction.
   unsigned BasicID = 0;
@@ -689,7 +691,7 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
   const SILDebugScope *Prev = BB.getParent()->getDebugScope();
   auto &SM = BB.getParent()->getModule().getSourceManager();
   for (const SILInstruction &SI : BB) {
-    if (SerializeDebugInfo) {
+    if (SerializeDebugInfoSIL) {
       if (SI.getDebugScope() != Prev) {
         Prev = SI.getDebugScope();
         writeDebugScopes(Prev, SM);
@@ -3072,12 +3074,11 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
     componentValues);
 }
 
-// Serialize and write SILDebugScope graph in post order
 void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
                                      const SourceManager &SM) {
 
   if (DebugScopeMap.find(Scope) != DebugScopeMap.end()) {
-    // We won't be in a recursive call here
+    // We won't be in a recursive call here.
     SILDebugScopeRefLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILDebugScopeRefLayout::Code],
         DebugScopeMap[Scope]);
@@ -3090,27 +3091,29 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
   unsigned isFuncParent = 0;
 
   assert(!Scope->Parent.isNull());
-  if (Scope->Parent) {
-    if (Scope->Parent.is<const SILDebugScope *>()) {
-      auto Parent = Scope->Parent.get<const SILDebugScope *>();
-      if (DebugScopeMap.find(Parent) == DebugScopeMap.end()) {
-        writeDebugScopes(Parent, SM);
-      }
-      ParentID = DebugScopeMap[Parent];
-    } else {
-      const SILFunction *ParentFn = Scope->Parent.get<SILFunction *>();
-      assert(ParentFn);
-      isFuncParent = true;
-      FuncsToEmitDebug.insert(ParentFn);
-      ParentID = S.addUniquedStringRef(ParentFn->getName());
-    }
+
+  if (!Scope->Parent)
+    return;
+
+  // A debug scope's parent can either be a function or a debug scope.
+  // Handle both cases appropriately.
+  if (Scope->Parent.is<const SILDebugScope *>()) {
+    auto Parent = Scope->Parent.get<const SILDebugScope *>();
+    if (DebugScopeMap.find(Parent) == DebugScopeMap.end())
+      writeDebugScopes(Parent, SM);
+    ParentID = DebugScopeMap[Parent];
+  } else {
+    const SILFunction *ParentFn = Scope->Parent.get<SILFunction *>();
+    assert(ParentFn);
+    isFuncParent = true;
+    FuncsToEmitDebug.insert(ParentFn);
+    ParentID = S.addUniquedStringRef(ParentFn->getName());
   }
 
   assert(ParentID != 0);
   if (auto Inlined = Scope->InlinedCallSite) {
-    if (DebugScopeMap.find(Inlined) == DebugScopeMap.end()) {
+    if (DebugScopeMap.find(Inlined) == DebugScopeMap.end())
       writeDebugScopes(Inlined, SM);
-    }
     InlinedID = DebugScopeMap[Inlined];
   }
 
@@ -3130,7 +3133,6 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
     Column = FNameLoc->column;
     FNameID = S.addUniquedStringRef(FNameLoc->filename);
   }
-
 
   DebugScopeMap.insert({Scope, DebugScopeMap.size() + 1});
 

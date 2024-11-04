@@ -89,7 +89,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
   Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
   Opts.IndexIncludeLocals |= Args.hasArg(OPT_index_include_locals);
-  Opts.SerializeDebugInfo |= Args.hasArg(OPT_experimental_serialize_debug_info);
+  Opts.SerializeDebugInfoSIL |=
+      Args.hasArg(OPT_experimental_serialize_debug_info);
 
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);

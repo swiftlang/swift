@@ -301,11 +301,11 @@ namespace sil_block {
   using SILDebugScopeLayout = BCRecordLayout<
     SIL_DEBUG_SCOPE,
     BCFixed<1>,
-    ValueIDField, // Parent
-    ValueIDField, // InlinedCallSite
-    ValueIDField, // SourceLoc Row
-    ValueIDField, // Column
-    ValueIDField,  // FName
+    ValueIDField, /// Parent.
+    ValueIDField, /// InlinedCallSite.
+    ValueIDField, /// SourceLoc Row.
+    ValueIDField, /// Column.
+    ValueIDField, /// FName.
     TypeIDField,
     SILTypeCategoryField 
   >;

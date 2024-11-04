@@ -379,26 +379,22 @@ SILType SILDeserializer::getSILType(Type Ty, SILValueCategory Category,
       .getCategoryType(Category);
 }
 
-unsigned SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
+llvm::Expected<unsigned>
+SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
   scratch.clear();
-  unsigned kind = 0;
   llvm::Expected<llvm::BitstreamEntry> maybeEntry =
       SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry)
-    MF->fatal(maybeEntry.takeError());
+    return maybeEntry.takeError();
   llvm::BitstreamEntry entry = maybeEntry.get();
 
   // EndBlock means the end of this SILFunction.
   assert(entry.Kind != llvm::BitstreamEntry::EndBlock);
   llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch);
-  if (!maybeKind)
-    MF->fatal(maybeKind.takeError());
-  kind = maybeKind.get();
-
-  return kind;
+  return maybeKind;
 }
 
-const SILDebugScope *
+llvm::Expected<const SILDebugScope *>
 SILDeserializer::readDebugScopes(SILFunction *F,
                                  SmallVectorImpl<uint64_t> &scratch,
                                  SILBuilder &Builder, unsigned kind) {
@@ -436,12 +432,14 @@ SILDeserializer::readDebugScopes(SILFunction *F,
       Parent = getFuncForReference(MF->getIdentifierText(ParentID), true);
       assert(Parent);
     } else {
-      assert(ParsedScopes.find(ParentID) != ParsedScopes.end());
+      if (ParsedScopes.find(ParentID) == ParsedScopes.end())
+        return llvm::createStringError("Parent debug scope not found\n");
       Parent = ParsedScopes[ParentID];
     }
 
     if (InlinedID) {
-      assert(ParsedScopes.find(InlinedID) != ParsedScopes.end());
+      if (ParsedScopes.find(InlinedID) == ParsedScopes.end())
+        return llvm::createStringError("Inlined at debug scope not found\n");
       InlinedCallSite = ParsedScopes[InlinedID];
     }
 
@@ -456,8 +454,12 @@ SILDeserializer::readDebugScopes(SILFunction *F,
     ParsedScopes.insert({ParsedScopes.size() + 1, Scope});
 
     //  Fetch the next record.
-    kind = readNextRecord(scratch);
+    auto maybeKind = readNextRecord(scratch);
 
+    if (!maybeKind)
+      return maybeKind.takeError();
+
+    kind = maybeKind.get();
     // restore the offset after last sil debug scope
     if (kind == SIL_DEBUG_SCOPE)
       restoreOffset.reset();
@@ -994,10 +996,9 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   }
 
   GenericEnvironment *genericEnv = nullptr;
-  //generic signatures are stored for declarations as well in a debug context
-  if (!declarationOnly || onlyReferencedByDebugInfo) {
+  // Generic signatures are stored for declarations as well in a debug context.
+  if (!declarationOnly || onlyReferencedByDebugInfo)
     genericEnv = MF->getGenericSignature(genericSigID).getGenericEnvironment();
-  }
 
   // If the next entry is the end of the block, then this function has
   // no contents.
@@ -1046,6 +1047,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   BasicBlockID = 0;
   BlocksByID.clear();
   UndefinedBlocks.clear();
+  ParsedScopes.clear();
 
   // The first two IDs are reserved for SILUndef.
   LastValueID = 1;
@@ -1057,7 +1059,6 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESS_TABLE record also means the end
   // of this SILFunction.
   bool isFirstScope = true;
-  ParsedScopes.clear();
   Builder.setCurrentDebugScope(fn->getDebugScope());
   while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
          kind != SIL_MOVEONLY_DEINIT && kind != SIL_WITNESS_TABLE &&
@@ -1066,7 +1067,11 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       // Handle a SILBasicBlock record.
       CurrentBB = readSILBasicBlock(fn, CurrentBB, scratch);
     else if (kind == SIL_DEBUG_SCOPE || kind == SIL_DEBUG_SCOPE_REF) {
-      auto Scope = readDebugScopes(fn, scratch, Builder, kind);
+      auto maybeScope = readDebugScopes(fn, scratch, Builder, kind);
+      if (!maybeScope)
+        return maybeScope.takeError();
+
+      auto Scope = maybeScope.get();
       if (isFirstScope) {
         fn->setDebugScope(Scope);
         isFirstScope = false;
