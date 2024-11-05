@@ -34,16 +34,17 @@ struct ClangBuildArgsProvider {
     // Gather the candidates for each file to get build arguments for. We may
     // have multiple outputs, in which case, pick the first one that exists.
     var commandsToAdd: [RelativePath:
-                          (output: AbsolutePath, args: [Command.Argument])] = [:]
+                          (output: AbsolutePath?, args: [Command.Argument])] = [:]
     for command in parsed {
       guard command.command.executable.knownCommand == .clang,
             let relFilePath = command.file.removingPrefix(repoPath)
       else {
         continue
       }
-      let output = command.directory.appending(command.output)
+      let output = command.output.map { command.directory.appending($0) }
       if let existing = commandsToAdd[relFilePath],
-         existing.output.exists || !output.exists {
+         let existingOutput = existing.output,
+          output == nil || existingOutput.exists || !output!.exists {
         continue
       }
       commandsToAdd[relFilePath] = (output, command.command.args)
