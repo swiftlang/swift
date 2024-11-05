@@ -37,11 +37,11 @@ void swift_ASTGen_renderQueuedDiagnostics(
 
 // FIXME: Hack because we cannot easily get to the already-parsed source
 // file from here. Fix this egregious oversight!
-void *_Nullable swift_ASTGen_parseSourceFile(const char *_Nonnull buffer,
-                                             size_t bufferLength,
-                                             const char *_Nonnull moduleName,
-                                             const char *_Nonnull filename,
-                                             void *_Nullable ctx);
+void *_Nullable swift_ASTGen_parseSourceFile(BridgedStringRef buffer,
+                                             BridgedStringRef moduleName,
+                                             BridgedStringRef filename,
+                                             void *_Nullable declContextPtr,
+                                             BridgedGeneratedSourceFileKind);
 void swift_ASTGen_destroySourceFile(void *_Nonnull sourceFile);
 
 /// Check whether the given source file round-trips correctly. Returns 0 if
@@ -60,7 +60,7 @@ void swift_ASTGen_buildTopLevelASTNodes(
     BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
     BridgedDeclContext declContext, BridgedASTContext astContext,
     BridgedLegacyParser legacyParser, void *_Nonnull outputContext,
-    void (*_Nonnull)(void *_Nonnull, void *_Nonnull));
+    void (*_Nonnull)(BridgedASTNode, void *_Nonnull));
 
 void swift_ASTGen_freeBridgedString(BridgedStringRef);
 

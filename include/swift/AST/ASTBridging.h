@@ -504,7 +504,19 @@ void BridgedDiagnostic_finish(BridgedDiagnostic cDiag);
 //===----------------------------------------------------------------------===//
 
 SWIFT_NAME("getter:BridgedDeclContext.isLocalContext(self:)")
-bool BridgedDeclContext_isLocalContext(BridgedDeclContext cDeclContext);
+BRIDGED_INLINE bool
+BridgedDeclContext_isLocalContext(BridgedDeclContext cDeclContext);
+
+SWIFT_NAME("getter:BridgedDeclContext.isTypeContext(self:)")
+BRIDGED_INLINE bool BridgedDeclContext_isTypeContext(BridgedDeclContext dc);
+
+SWIFT_NAME("getter:BridgedDeclContext.isModuleScopeContext(self:)")
+BRIDGED_INLINE bool
+BridgedDeclContext_isModuleScopeContext(BridgedDeclContext dc);
+
+SWIFT_NAME("getter:BridgedDeclContext.astContext(self:)")
+BRIDGED_INLINE BridgedASTContext
+BridgedDeclContext_getASTContext(BridgedDeclContext dc);
 
 SWIFT_NAME("BridgedPatternBindingInitializer.create(declContext:)")
 BridgedPatternBindingInitializer
@@ -1364,6 +1376,12 @@ BridgedPackExpansionExpr
 BridgedPackExpansionExpr_createParsed(BridgedASTContext cContext,
                                       BridgedSourceLoc cRepeatLoc,
                                       BridgedExpr cPatternExpr);
+
+SWIFT_NAME("BridgedParenExpr.createParsed(_:leftParenLoc:expr:rightParenLoc:)")
+BridgedParenExpr BridgedParenExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cLParen,
+                                               BridgedExpr cExpr,
+                                               BridgedSourceLoc cRParen);
 
 SWIFT_NAME("BridgedPostfixUnaryExpr.createParsed(_:operator:operand:)")
 BridgedPostfixUnaryExpr

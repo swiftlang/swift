@@ -117,7 +117,7 @@ extension ASTGenVisitor {
     decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
+      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members).lazy.bridgedArray(in: self))
     }
 
     return decl
@@ -144,7 +144,7 @@ extension ASTGenVisitor {
     decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
+      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members).lazy.bridgedArray(in: self))
     }
 
     return decl
@@ -172,7 +172,7 @@ extension ASTGenVisitor {
     decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
+      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members).lazy.bridgedArray(in: self))
     }
 
     return decl
@@ -200,7 +200,7 @@ extension ASTGenVisitor {
     decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
+      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members).lazy.bridgedArray(in: self))
     }
 
     return decl
@@ -230,7 +230,7 @@ extension ASTGenVisitor {
     decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
+      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members).lazy.bridgedArray(in: self))
     }
 
     return decl
@@ -275,7 +275,7 @@ extension ASTGenVisitor {
     decl.asDecl.setAttrs(attrs.attributes)
 
     self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members))
+      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members).lazy.bridgedArray(in: self))
     }
 
     return decl
@@ -848,7 +848,7 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   @inline(__always)
-  func generate(memberBlockItemList node: MemberBlockItemListSyntax) -> BridgedArrayRef {
+  func generate(memberBlockItemList node: MemberBlockItemListSyntax) -> [BridgedDecl] {
     var allBridged: [BridgedDecl] = []
     visitIfConfigElements(node, of: MemberBlockItemSyntax.self) { element in
       if let ifConfigDecl = element.decl.as(IfConfigDeclSyntax.self) {
@@ -861,7 +861,7 @@ extension ASTGenVisitor {
       allBridged.append(self.generate(decl: member.decl))
     }
 
-    return allBridged.lazy.bridgedArray(in: self)
+    return allBridged
   }
 
   @inline(__always)

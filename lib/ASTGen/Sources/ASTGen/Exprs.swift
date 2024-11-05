@@ -172,7 +172,7 @@ extension ASTGenVisitor {
     case .tryExpr(let node):
       return self.generate(tryExpr: node)
     case .tupleExpr(let node):
-      return self.generate(tupleExpr: node).asExpr
+      return self.generate(tupleExpr: node)
     case .typeExpr(let node):
       return self.generate(typeExpr: node).asExpr
     case .unresolvedAsExpr:
@@ -890,7 +890,19 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(tupleExpr node: TupleExprSyntax) -> BridgedTupleExpr {
+  func generate(tupleExpr node: TupleExprSyntax) -> BridgedExpr {
+    if node.elements.count == 1,
+       let first = node.elements.first,
+       first.label == nil,
+       !first.expression.is(PackExpansionExprSyntax.self) {
+      return BridgedParenExpr.createParsed(
+        self.ctx,
+        leftParenLoc: self.generateSourceLoc(node.leftParen),
+        expr: self.generate(expr: node.elements.first!.expression),
+        rightParenLoc: self.generateSourceLoc(node.rightParen)
+      ).asExpr
+    }
+
     let expressions = node.elements.lazy.map {
       self.generate(expr: $0.expression)
     }
@@ -912,7 +924,7 @@ extension ASTGenVisitor {
       labels: labels.bridgedArray(in: self),
       labelLocs: labelLocations.bridgedArray(in: self),
       rightParenLoc: self.generateSourceLoc(node.rightParen)
-    )
+    ).asExpr
   }
 
   func generate(typeExpr node: TypeExprSyntax) -> BridgedTypeExpr {
