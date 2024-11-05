@@ -2201,7 +2201,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     bool isIndirectError = fnConv.hasIndirectSILErrorResults();
 
     if (isTypedError && !isIndirectError) {
-      auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(errorType));
+      auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(inContextErrorType));
       IGF.setCallerTypedErrorResultSlot(Address(
           emission->getCallerTypedErrorResultArgument(),
           errorTI.getStorageType(),
