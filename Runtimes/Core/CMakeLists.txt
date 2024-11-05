@@ -55,23 +55,22 @@ include(EmitSwiftInterface)
 include(PlatformInfo)
 include(gyb)
 
-option(SwiftCore_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries" OFF)
+defaulted_option(SwiftCore_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries")
 
-option(SwiftCore_ENABLE_CRASH_REPORTER_CLIENT "Enable Apple CrashReporter integration" OFF)
-option(SwiftCore_ENABLE_OBJC_INTEROP "Enable runtime ObjC interop" OFF)
-option(SwiftCore_ENABLE_TYPE_PRINTING "Enable printing type names" OFF)
-option(SwiftCore_ENABLE_VECTOR_TYPES "Enable vector support" OFF)
+defaulted_option(SwiftCore_ENABLE_CRASH_REPORTER_CLIENT "Enable Apple CrashReporter integration")
+defaulted_option(SwiftCore_ENABLE_OBJC_INTEROP "Enable runtime ObjC interop")
+defaulted_option(SwiftCore_ENABLE_TYPE_PRINTING "Enable printing type names")
+defaulted_option(SwiftCore_ENABLE_VECTOR_TYPES "Enable vector support")
+defaulted_option(SwiftCore_ENABLE_REFLECTION "Enable runtime support for mirrors and reflection support")
+defaulted_option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argument support")
 
-option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" ${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS_default})
-option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" ${SwiftCore_ENABLE_RIUNTIME_LEAK_CHECKER_default})
-option(SwiftCore_ENABLE_REFLECTION "" OFF)
+defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support")
+set(SwiftCore_BACKTRACER_PATH ${SwiftCore_BACKTRACER_PATH_default} CACHE STRING "Set a fixed path to the Swift backtracer")
 
-option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argument support" OFF)
+option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" OFF)
+option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)
 
-option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support" OFF)
-set(SwiftCore_BACKTRACER_PATH "" CACHE STRING "Set a fixed path to the Swift backtracer")
-
-set(SwiftCore_OBJECT_FORMAT ${SwiftCore_OBJECT_FORMAT} CACHE STRING "Object format")
+set(SwiftCore_OBJECT_FORMAT "${SwiftCore_OBJECT_FORMAT_default}" CACHE STRING "Object format")
 
 add_compile_definitions(
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_OBJC_INTEROP=$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>

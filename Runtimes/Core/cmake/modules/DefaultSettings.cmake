@@ -4,15 +4,25 @@
 # way that will work. The config files under `cmake/configs` are build
 # configurations that are actually shipping.
 
-set(SwiftCore_ENABLE_CRASH_REPORTER_CLIENT_default OFF)
-set(SwiftCore_ENABLE_OBJC_INTEROP_default OFF)
+set(SwiftCore_ENABLE_BACKTRACING_default OFF) # TODO: enable this by default
+set(SwiftCore_ENABLE_COMMANDLINE_SUPPORT_default OFF) # TODO: enable this by default
+
 set(SwiftCore_ENABLE_TYPE_PRINTING_default ON)
-set(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS_default OFF)
-set(SwiftCore_ENABLE_BACKTRACING_default OFF)
+
 set(SwiftCore_BACKTRACER_PATH_default "")
 
+macro(defaulted_option variable helptext)
+  if(NOT DEFINED ${variable}_default)
+    set(${variable}_default OFF)
+  endif()
+  option(${variable} ${helptext} ${${variable}_default})
+endmacro()
+
 if(APPLE)
+  set(SwiftCore_ENABLE_LIBRARY_EVOLUTION_default ON)
   set(SwiftCore_ENABLE_CRASH_REPORTER_CLIENT_default ON)
+  set(SwiftCore_ENABLE_OBJC_INTEROP_default ON)
+  set(SwiftCore_ENABLE_REFLECTION_default ON)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "WASM")
   set(SwiftCore_OBJECT_FORMAT_default "elf")
 elseif(LINUX)
