@@ -1260,12 +1260,8 @@ static bool walkExplicitReturnStmts(const BraceStmt *BS,
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      if (S->isImplicit()) {
-        return Action::SkipNode(S);
-      }
-
       auto *returnStmt = dyn_cast<ReturnStmt>(S);
-      if (!returnStmt) {
+      if (!returnStmt || returnStmt->isImplicit()) {
         return Action::Continue(S);
       }
 
