@@ -9,11 +9,11 @@ import def_source_loc
 
 let _ = foo(x: 100)
 
-//CHECK: {{.*integer_literal.*}} loc "SOURCE_DIR/test/Serialization/Inputs/def_source_loc.swift":3:13
-//CHECK: {{.*struct_extract.*}} loc "SOURCE_DIR/test/Serialization/Inputs/def_source_loc.swift":3:11
-//CHECK: {{.*builtin "cmp_ult_Int64".*}} loc "SOURCE_DIR/test/Serialization/Inputs/def_source_loc.swift":3:11
-//CHECK: {{.*cond_br.*}} loc "SOURCE_DIR/test/Serialization/Inputs/def_source_loc.swift":3:11
-//CHECK: {{.*integer_literal.*}} 1, loc "SOURCE_DIR/test/Serialization/Inputs/def_source_loc.swift":7:12
-//CHECK: {{.*struct \$UInt64.*}} loc "SOURCE_DIR/test/Serialization/Inputs/def_source_loc.swift":7:12
-//CHECK: {{.*br.*}} loc "SOURCE_DIR/test/Serialization/Inputs/def_source_loc.swift":7:5
-//CHECK: {{.*return.*}} loc "SOURCE_DIR/test/Serialization/Inputs/def_source_loc.swift":8:2
+//CHECK: {{.*integer_literal.*}} loc "{{.*}}def_source_loc.swift":3:13
+//CHECK: {{.*struct_extract.*}} loc "{{.*}}def_source_loc.swift":3:11
+//CHECK: {{.*builtin "cmp_ult_Int64".*}} loc "{{.*}}def_source_loc.swift":3:11
+//CHECK: {{.*cond_br.*}} loc "{{.*}}def_source_loc.swift":3:11
+//CHECK: {{.*integer_literal.*}} 1, loc "{{.*}}def_source_loc.swift":7:12
+//CHECK: {{.*struct \$UInt64.*}} loc "{{.*}}def_source_loc.swift":7:12
+//CHECK: {{.*br.*}} loc "{{.*}}def_source_loc.swift":7:5
+//CHECK: {{.*return.*}} loc "{{.*}}def_source_loc.swift":8:2
