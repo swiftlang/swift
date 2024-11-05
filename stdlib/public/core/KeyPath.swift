@@ -3725,6 +3725,16 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
                             leafMetadataRef: MetadataReference,
                             kvcCompatibilityString: UnsafeRawPointer?) {
     self.genericEnvironment = genericEnvironment
+
+    let leaf = _resolveKeyPathMetadataReference(
+              leafMetadataRef,
+              genericEnvironment: genericEnvironment,
+              arguments: patternArgs
+    )
+
+    let size = _openExistential(leaf, do: _getTypeSize(_:))
+
+    maxSize = Swift.max(maxSize, size)
   }
 
   mutating func visitStoredComponent(kind: KeyPathStructOrClass,
