@@ -4,8 +4,6 @@
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_InferSendableFromCaptures
-// REQUIRES: swift_feature_IsolatedDefaultValues
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 @globalActor
 actor SomeGlobalActor {

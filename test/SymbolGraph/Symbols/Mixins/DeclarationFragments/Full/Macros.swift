@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift_feature_Macros
 
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/stringify_macro.swift -g -no-toolchain-stdlib-rpath -swift-version 5

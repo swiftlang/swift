@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// REQUIRES: swift_feature_KeyPathWithStaticMembers
-
 var global = 42
 
 @dynamicMemberLookup

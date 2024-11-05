@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_KeyPathWithStaticMembers
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
