@@ -659,7 +659,7 @@ extension ASTGenVisitor {
     if let generics = node.genericArgumentClause {
       leftAngleLoc = self.generateSourceLoc(generics.leftAngle)
       genericArgs = generics.arguments.map {
-        self.generate(type: $0.argument)
+        self.generate(genericArgument: $0.argument)
       }
       rightAngleLoc = self.generateSourceLoc(generics.rightAngle)
     } else {
