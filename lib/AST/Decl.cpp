@@ -4344,30 +4344,6 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
-bool ValueDecl::isInterfacePackageEffectivelyPublic() const {
-  // A package decl with @usableFromInline (or other inlinable
-  // attributes) is essentially public, and can be printed in
-  // public (or private) interface file without package-name;
-  // it can be referenced by another module (without package-name)
-  // importing such interface module.
-  auto isCandidate = getFormalAccess() == AccessLevel::Package &&
-                     isUsableFromInline() &&
-                     getModuleContext()->getPackageName().empty();
-  if (!isCandidate)
-    return false;
-
-  // Treat the decl as public (1) if it's contained in an interface
-  // file, e.g. when running -typecheck-module-from-interface or
-  // -compile-module-from-interface.
-  isCandidate = false;
-  if (auto srcFile = getDeclContext()->getParentSourceFile()) {
-    isCandidate = srcFile->Kind == SourceFileKind::Interface;
-  }
-  // Or (2) if the decl being referenced in a client file is defined
-  // in an interface module.
-  return isCandidate || getModuleContext()->isBuiltFromInterface();
-}
-
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
   if (isPrivateSystemDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
@@ -4459,9 +4435,6 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
   // access level of the current declaration to be as open as possible.
   if (useDC && VD->getASTContext().isAccessControlDisabled())
     return getMaximallyOpenAccessFor(VD);
-
-  if (VD->isInterfacePackageEffectivelyPublic())
-    return AccessLevel::Public;
 
   if (treatUsableFromInlineAsPublic &&
       access < AccessLevel::Public &&
@@ -4645,11 +4618,9 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Package: {
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
-      if (VD->isInterfacePackageEffectivelyPublic())
-        return AccessScope::getPublic();
-
-      // If reached here, should be treated as internal.
-      return AccessScope(resultDC->getParentModule());
+      // Instead of reporting and failing early, return the scope of resultDC to
+      // allow continuation (should still non-zero exit later if in script mode)
+      return AccessScope(resultDC);
     } else {
       return AccessScope(pkg);
     }
@@ -4780,9 +4751,6 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return false;
 
   if (VD->getASTContext().isAccessControlDisabled())
-    return true;
-
-  if (VD->isInterfacePackageEffectivelyPublic())
     return true;
 
   auto access = getAccessLevel();
