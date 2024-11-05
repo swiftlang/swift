@@ -4853,24 +4853,6 @@ void ConstraintSystem::removeFixedRequirement(GenericTypeParamType *GP,
   ASSERT(erased);
 }
 
-// Replace any error types encountered with placeholders.
-Type ConstraintSystem::getVarType(const VarDecl *var) {
-  auto type = var->getTypeInContext();
-
-  // If this declaration is used as part of a code completion
-  // expression, solver needs to glance over the fact that
-  // it might be invalid to avoid failing constraint generation
-  // and produce completion results.
-  if (!isForCodeCompletion())
-    return type;
-
-  return type.transformRec([&](Type type) -> std::optional<Type> {
-    if (!type->is<ErrorType>())
-      return std::nullopt;
-    return Type(PlaceholderType::get(Context, const_cast<VarDecl *>(var)));
-  });
-}
-
 bool ConstraintSystem::isReadOnlyKeyPathComponent(
     const AbstractStorageDecl *storage, SourceLoc referenceLoc) {
   // See whether key paths can store to this component. (Key paths don't

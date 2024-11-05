@@ -34,6 +34,15 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT-DAG: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT-DAG: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
 
+// FOO_ENUM_DOT_INVALID-DAG: Keyword[self]/CurrNominal: self[#FooEnum.Type#]; name=self
+// FOO_ENUM_DOT_INVALID-DAG: Keyword/CurrNominal: Type[#FooEnum.Type#]; name=Type
+// FOO_ENUM_DOT_INVALID-DAG: Decl[EnumElement]/CurrNominal: Foo1[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-DAG: Decl[EnumElement]/CurrNominal: Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-DAG: Decl[StaticVar]/CurrNominal: alias1[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): FooEnum#})[#(into: inout Hasher) -> Void#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-DAG: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-DAG: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
+
 // FOO_ENUM_DOT_CONTEXT-DAG: Keyword[self]/CurrNominal: self[#FooEnum.Type#]; name=self
 // FOO_ENUM_DOT_CONTEXT-DAG: Keyword/CurrNominal: Type[#FooEnum.Type#]; name=Type
 // FOO_ENUM_DOT_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: Foo1[#FooEnum#]{{; name=.+$}}
@@ -256,7 +265,7 @@ func testSwitchWithQualification1(e: FooEnum) {
 
 func testSwitchExprError1() {
   switch unknown_var {
-  case FooEnum.#^ENUM_SW_EXPR_ERROR_1?check=FOO_ENUM_DOT^#
+  case FooEnum.#^ENUM_SW_EXPR_ERROR_1?check=FOO_ENUM_DOT_INVALID^#
   }
 }
 

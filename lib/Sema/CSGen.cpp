@@ -1530,7 +1530,7 @@ namespace {
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
         if (!knownType)
-          knownType = CS.getVarType(VD);
+          knownType = VD->getTypeInContext();
 
         if (knownType) {
           // An out-of-scope type variable(s) could appear the type of
@@ -2420,7 +2420,7 @@ namespace {
 
           Type externalType;
           if (param->getTypeRepr()) {
-            auto declaredTy = CS.getVarType(param);
+            auto declaredTy = param->getTypeInContext();
 
             // If closure parameter couldn't be resolved, let's record
             // a fix to make sure that type resolution diagnosed the
@@ -4899,7 +4899,7 @@ bool ConstraintSystem::generateConstraints(
 
   case SyntacticElementTarget::Kind::uninitializedVar: {
     if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
-      auto propertyType = getVarType(wrappedVar);
+      auto propertyType = wrappedVar->getTypeInContext();
       if (propertyType->hasError())
         return true;
 
