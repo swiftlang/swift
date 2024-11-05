@@ -1,0 +1,134 @@
+//===--- PathProtocol.swift -----------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import System
+
+public protocol PathProtocol: Hashable, CustomStringConvertible {
+  var storage: FilePath { get }
+  var asAnyPath: AnyPath { get }
+  init(_ storage: FilePath)
+}
+
+public extension PathProtocol {
+  typealias Component = FilePath.Component
+
+  var parentDir: Self? {
+    // Remove the last component and check to see if it's empty.
+    var result = storage
+    guard result.removeLastComponent(), !result.isEmpty else { return nil }
+    return Self(result)
+  }
+
+  var fileName: String {
+    storage.lastComponent?.string ?? ""
+  }
+
+  func appending(_ relPath: RelativePath) -> Self {
+    Self(storage.pushing(relPath.storage))
+  }
+
+  func appending(_ str: String) -> Self {
+    Self(storage.appending(str))
+  }
+
+  func commonAncestor(with other: Self) -> Self {
+    precondition(storage.root == other.storage.root)
+    var result = [Component]()
+    for (comp, otherComp) in zip(components, other.components) {
+      guard comp == otherComp else { break }
+      result.append(comp)
+    }
+    return Self(FilePath(root: storage.root, result))
+  }
+
+  /// Attempt to remove `other` as a prefix of `self`, or `nil` if `other` is
+  /// not a prefix of `self`.
+  func removingPrefix(_ other: Self) -> RelativePath? {
+    var result = storage
+    guard result.removePrefix(other.storage) else { return nil }
+    return RelativePath(result)
+  }
+
+  func hasExtension(_ ext: FileExtension) -> Bool {
+    storage.extension == ext.rawValue
+  }
+  func hasExtension(_ exts: FileExtension...) -> Bool {
+    // Note that querying `.extension` involves re-parsing, so only do it
+    // once here.
+    let ext = storage.extension
+    return exts.contains(where: { ext == $0.rawValue })
+  }
+
+  func hasPrefix(_ other: Self) -> Bool {
+    rawPath.hasPrefix(other.rawPath)
+  }
+
+  var components: FilePath.ComponentView {
+    storage.components
+  }
+
+  var description: String { storage.string }
+
+  init(stringLiteral value: String) {
+    self.init(value)
+  }
+
+  init(_ rawPath: String) {
+    self.init(FilePath(rawPath))
+  }
+
+  var rawPath: String {
+    storage.string
+  }
+
+  func escaped(addQuotesIfNeeded: Bool) -> String {
+    rawPath.escaped(addQuotesIfNeeded: addQuotesIfNeeded)
+  }
+
+  var escaped: String {
+    rawPath.escaped
+  }
+}
+
+extension PathProtocol {
+  /// Whether this is a .swift.gyb file.
+  var isSwiftGyb: Bool {
+    hasExtension(.gyb) && rawPath.dropLast(4).hasExtension(.swift)
+  }
+
+  var isHeaderLike: Bool {
+    if hasExtension(.h, .def, .td, .modulemap) {
+      return true
+    }
+    // Consider all gyb files to be header-like, except .swift.gyb, which
+    // will be handled separately when creating Swift targets.
+    if hasExtension(.gyb) && !isSwiftGyb {
+      return true
+    }
+    return false
+  }
+
+  var isCSourceLike: Bool {
+    hasExtension(.c, .cpp)
+  }
+
+  var isDocLike: Bool {
+    hasExtension(.md, .rst) || fileName.starts(with: "README")
+  }
+}
+
+extension Collection where Element: PathProtocol {
+  var commonAncestor: Element? {
+    guard let first = self.first else { return nil }
+    return dropFirst().reduce(first, { $0.commonAncestor(with: $1) })
+  }
+}
