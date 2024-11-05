@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "transfer-non-sendable"
+#define DEBUG_TYPE "send-non-sendable"
 
 #include "swift/SILOptimizer/Analysis/RegionAnalysis.h"
 
@@ -600,15 +600,15 @@ static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
   return *kind == BuiltinValueKind::StartAsyncLetWithLocalBuffer;
 }
 
-/// Returns true if this is a function argument that is able to be transferred
-/// in the body of our function.
-static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
-  // Indirect out parameters cannot be an input transferring parameter.
+/// Returns true if this is a function argument that is able to be sent in the
+/// body of our function.
+static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
+  // Indirect out parameters can never be sent.
   if (arg->isIndirectResult() || arg->isIndirectErrorResult())
     return false;
 
   // If we have a function argument that is closure captured by a Sendable
-  // closure, allow for the argument to be transferred.
+  // closure, allow for the argument to be sent.
   //
   // DISCUSSION: The reason that we do this is that in the case of us
   // having an actual Sendable closure there are two cases we can see:
@@ -621,18 +621,18 @@ static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
   // us not being in swift 6 mode lets not emit extra errors.
   //
   // 2. If we have an async-let based Sendable closure, we want to allow
-  // for the argument to be transferred in the async let's statement and
+  // for the argument to be sent in the async let's statement and
   // not emit an error.
   //
   // TODO: Once the async let refactoring change this will no longer be needed
-  // since closure captures will have transferring parameters and be
+  // since closure captures will have sending parameters and be
   // non-Sendable.
   if (arg->isClosureCapture() &&
       arg->getFunction()->getLoweredFunctionType()->isSendable())
     return true;
 
-  // Otherwise, we only allow for the argument to be transferred if it is
-  // explicitly marked as a strong transferring parameter.
+  // Otherwise, we only allow for the argument to be sent if it is explicitly
+  // marked as a 'sending' parameter.
   return arg->isSending();
 }
 
@@ -653,7 +653,7 @@ bool TrackableValue::isSendingParameter() const {
   if (asi->getParent() != asi->getFunction()->getEntryBlock())
     return false;
 
-  // See if we are initialized from a transferring parameter and are the only
+  // See if we are initialized from a 'sending' parameter and are the only
   // use of the parameter.
   OperandWorklist worklist(asi->getFunction());
   worklist.pushResultOperandsIfNotVisited(asi);
@@ -668,9 +668,8 @@ bool TrackableValue::isSendingParameter() const {
     }
 
     if (auto *si = dyn_cast<StoreInst>(user)) {
-      // Check if our store inst is from a function argument that is
-      // transferring and for which the store is the only use of the function
-      // argument.
+      // Check if our store inst is from a 'sending' function argument and for
+      // which the store is the only use of the function argument.
       auto *fArg = dyn_cast<SILFunctionArgument>(si->getSrc());
       if (!fArg || !fArg->isSending())
         return false;
@@ -678,8 +677,8 @@ bool TrackableValue::isSendingParameter() const {
     }
 
     if (auto *copyAddr = dyn_cast<CopyAddrInst>(user)) {
-      // Check if our copy_addr is from a function argument that is transferring
-      // and for which the copy_addr is the only use of the function argument.
+      // Check if our copy_addr is from a 'sending' function argument and for
+      // which the copy_addr is the only use of the function argument.
       auto *fArg = dyn_cast<SILFunctionArgument>(copyAddr->getSrc());
       if (!fArg || !fArg->isSending())
         return false;
@@ -700,8 +699,8 @@ namespace {
 /// We need to be able to know if instructions that extract sendable fields from
 /// non-sendable addresses are reachable from a partial_apply that captures the
 /// non-sendable value or its underlying object by reference. In such a case, we
-/// need to require the value to not be transferred when the extraction happens
-/// since we could race on extracting the value.
+/// need to require the value to not be sent when the extraction happens since
+/// we could race on extracting the value.
 ///
 /// The reason why we use a dataflow to do this is that:
 ///
@@ -1189,21 +1188,20 @@ struct PartitionOpBuilder {
                             lookupValueID(srcOperand->get()), srcOperand));
   }
 
-  void addTransfer(SILValue representative, Operand *op) {
+  void addSend(SILValue representative, Operand *op) {
     assert(valueHasID(representative) &&
-           "transferred value should already have been encountered");
+           "sent value should already have been encountered");
 
     currentInstPartitionOps.emplace_back(
-        PartitionOp::Transfer(lookupValueID(representative), op));
+        PartitionOp::Send(lookupValueID(representative), op));
   }
 
-  void addUndoTransfer(SILValue representative,
-                       SILInstruction *untransferringInst) {
+  void addUndoSend(SILValue representative, SILInstruction *unsendingInst) {
     assert(valueHasID(representative) &&
-           "transferred value should already have been encountered");
+           "value should already have been encountered");
 
-    currentInstPartitionOps.emplace_back(PartitionOp::UndoTransfer(
-        lookupValueID(representative), untransferringInst));
+    currentInstPartitionOps.emplace_back(
+        PartitionOp::UndoSend(lookupValueID(representative), unsendingInst));
   }
 
   void addMerge(SILValue destValue, Operand *srcOperand) {
@@ -1323,8 +1321,8 @@ enum class TranslationSemantics {
   ///    their behavior depending on some state on the instruction itself.
   Special,
 
-  /// An instruction that is a full apply site. Can cause transfering or
-  /// untransferring of regions.
+  /// An instruction that is a full apply site. Can cause sending or
+  /// unsending of regions.
   Apply,
 
   /// A terminator instruction that acts like a phi in terms of its region.
@@ -1344,9 +1342,9 @@ enum class TranslationSemantics {
   /// should be caught in testing when we assert.
   AssertingIfNonSendable,
 
-  /// Instructions that always unconditionally transfer all of their
-  /// non-Sendable parameters and that do not have any results.
-  TransferringNoResult,
+  /// Instructions that always unconditionally send all of their non-Sendable
+  /// parameters and that do not have any results.
+  SendingNoResult,
 };
 
 } // namespace
@@ -1389,8 +1387,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   case TranslationSemantics::AssertingIfNonSendable:
     os << "asserting_if_nonsendable";
     return os;
-  case TranslationSemantics::TransferringNoResult:
-    os << "transferring_no_result";
+  case TranslationSemantics::SendingNoResult:
+    os << "sending_no_result";
     return os;
   }
 
@@ -1521,20 +1519,20 @@ public:
     for (SILArgument *arg : functionArguments) {
       // This will decide what the isolation region is.
       if (auto state = tryToTrackValue(arg)) {
-        // If we can transfer our parameter, just add it to
+        // If we can send our parameter, just add it to
         // nonSendableSeparateIndices.
         //
         // NOTE: We do not support today the ability to have multiple parameters
-        // transfer together as part of the same region.
-        if (isTransferrableFunctionArgument(cast<SILFunctionArgument>(arg))) {
+        // send together as part of the same region.
+        if (canFunctionArgumentBeSent(cast<SILFunctionArgument>(arg))) {
           REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    %%" << state->getID()
-                                                << " (transferring): " << *arg);
+                                                << " (sending): " << *arg);
           nonSendableSeparateIndices.push_back(state->getID());
           continue;
         }
 
         // Otherwise, it is one of our merged parameters. Add it to the never
-        // transfer list and to the region join list.
+        // send list and to the region join list.
         REGIONBASEDISOLATION_LOG(
             llvm::dbgs() << "    %%" << state->getID() << ": ";
             state->print(llvm::dbgs()); llvm::dbgs() << *arg);
@@ -1774,7 +1772,7 @@ public:
     }
   }
 
-  /// Transfer the parameters of our partial_apply.
+  /// Send the parameters of our partial_apply.
   ///
   /// Handling async let has three-four parts:
   ///
@@ -1783,11 +1781,11 @@ public:
   /// builtin "async let start"(%reabstraction | %partial_apply)
   /// call %asyncLetGet()
   ///
-  /// We transfer the captured parameters of %partial_apply at the async let
-  /// start and then untransfer them at async let get.
+  /// We send the captured parameters of %partial_apply at the async let
+  /// start and then unsend them at async let get.
   void translateAsyncLetStart(BuiltinInst *bi) {
     // Just track the result of the builtin inst as an assign fresh. We do this
-    // so we properly track the partial_apply get. We already transferred the
+    // so we properly track the partial_apply get. We already sent the
     // parameters.
     builder.addAssignFresh(bi);
   }
@@ -1827,7 +1825,7 @@ public:
 
         // Then see if /any/ of our uses are passed to over a isolation boundary
         // that is actor isolated... if we find one continue so we do not undo
-        // the transfer for that element.
+        // the send for that element.
         if (llvm::any_of(
                 typeInfo.applyUses,
                 [](const std::pair<Type, std::optional<ApplyIsolationCrossing>>
@@ -1840,8 +1838,8 @@ public:
                 }))
           continue;
 
-        builder.addUndoTransfer(trackedArgValue->getRepresentative().getValue(),
-                                ai);
+        builder.addUndoSend(trackedArgValue->getRepresentative().getValue(),
+                            ai);
       }
     }
   }
@@ -1849,21 +1847,20 @@ public:
   void translateSILPartialApplyAsyncLetBegin(PartialApplyInst *pai) {
     REGIONBASEDISOLATION_LOG(llvm::dbgs()
                              << "Translating Async Let Begin Partial Apply!\n");
-    // Grab our partial apply and transfer all of its non-sendable
+    // Grab our partial apply and send all of its non-sendable
     // parameters. We do not merge the parameters since each individual capture
     // of the async let at the program level is viewed as still being in
     // separate regions. Otherwise, we would need to error on the following
     // code:
     //
     // let x = NonSendable(), x2 = NonSendable()
-    // async let y = transferToActor(x) + transferToNonIsolated(x2)
+    // async let y = sendToActor(x) + sendToNonIsolated(x2)
     // _ = await y
     // useValue(x2)
     for (auto &op : ApplySite(pai).getArgumentOperands()) {
       if (auto trackedArgValue = tryToTrackValue(op.get())) {
         builder.addRequire(trackedArgValue->getRepresentative().getValue());
-        builder.addTransfer(trackedArgValue->getRepresentative().getValue(),
-                            &op);
+        builder.addSend(trackedArgValue->getRepresentative().getValue(), &op);
       }
     }
 
@@ -1873,7 +1870,7 @@ public:
 
   /// Handles the semantics for SIL applies that cross isolation.
   ///
-  /// Semantically this causes all arguments of the applysite to be transferred.
+  /// Semantically this causes all arguments of the applysite to be sent.
   void translateIsolatedPartialApply(PartialApplyInst *pai,
                                      SILIsolationInfo actorIsolation) {
     ApplySite applySite(pai);
@@ -1884,16 +1881,16 @@ public:
     for (auto &op : applySite.getArgumentOperands()) {
       // See if we tracked it.
       if (auto value = tryToTrackValue(op.get())) {
-        // If we are tracking it, transfer it and if it is actor derived, mark
+        // If we are tracking it, sent it and if it is actor derived, mark
         // our partial apply as actor derived.
         builder.addRequire(value->getRepresentative().getValue());
-        builder.addTransfer(value->getRepresentative().getValue(), &op);
+        builder.addSend(value->getRepresentative().getValue(), &op);
       }
     }
 
-    // Now that we have transferred everything into the partial_apply, perform
+    // Now that we have sent everything into the partial_apply, perform
     // an assign fresh for the partial_apply if it is non-Sendable. If we use
-    // any of the transferred values later, we will error, so it is safe to just
+    // any of the sent values later, we will error, so it is safe to just
     // create a new value.
     if (pai->getFunctionType()->isSendable())
       return;
@@ -1925,7 +1922,7 @@ public:
     // handle it especially.
     //
     // NOTE: If it is an async_let, then the closure itself will be Sendable. We
-    // treat passing in a value into the async Sendable closure as transferring
+    // treat passing in a value into the async Sendable closure as sending
     // it into the closure.
     if (isAsyncLetBeginPartialApply(pai)) {
       return translateSILPartialApplyAsyncLetBegin(pai);
@@ -1951,8 +1948,8 @@ public:
   void translateCreateAsyncTask(BuiltinInst *bi) {
     if (auto value = tryToTrackValue(bi->getOperand(1))) {
       builder.addRequire(value->getRepresentative().getValue());
-      builder.addTransfer(value->getRepresentative().getValue(),
-                          &bi->getAllOperands()[1]);
+      builder.addSend(value->getRepresentative().getValue(),
+                      &bi->getAllOperands()[1]);
     }
   }
 
@@ -1974,13 +1971,13 @@ public:
   }
 
   void translateNonIsolationCrossingSILApply(FullApplySite fas) {
-    // For non-self parameters, gather all of the transferring parameters and
-    // gather our non-transferring parameters.
-    SmallVector<Operand *, 8> nonTransferringParameters;
+    // For non-self parameters, gather all of the sending parameters and
+    // gather our non-sending parameters.
+    SmallVector<Operand *, 8> nonSendingParameters;
     SmallVector<Operand *, 8> sendingIndirectResults;
     if (fas.getNumArguments()) {
       // NOTE: We want to process indirect parameters as if they are
-      // parameters... so we process them in nonTransferringParameters.
+      // parameters... so we process them in nonSendingParameters.
       for (auto &op : fas.getOperandsWithoutSelf()) {
         // If op is the callee operand, skip it.
         if (fas.isCalleeOperand(op))
@@ -1994,16 +1991,16 @@ public:
 
           if (auto value = tryToTrackValue(op.get())) {
             builder.addRequire(value->getRepresentative().getValue());
-            builder.addTransfer(value->getRepresentative().getValue(), &op);
+            builder.addSend(value->getRepresentative().getValue(), &op);
             continue;
           }
         } else {
-          nonTransferringParameters.push_back(&op);
+          nonSendingParameters.push_back(&op);
         }
       }
     }
 
-    // If our self parameter was transferring, transfer it. Otherwise, just
+    // If our self parameter was sending, send it. Otherwise, just
     // stick it in the non self operand values array and run multiassign on
     // it.
     if (fas.hasSelfArgument()) {
@@ -2012,11 +2009,10 @@ public:
               .hasOption(SILParameterInfo::Sending)) {
         if (auto value = tryToTrackValue(selfOperand.get())) {
           builder.addRequire(value->getRepresentative().getValue());
-          builder.addTransfer(value->getRepresentative().getValue(),
-                              &selfOperand);
+          builder.addSend(value->getRepresentative().getValue(), &selfOperand);
         }
       } else {
-        nonTransferringParameters.push_back(&selfOperand);
+        nonSendingParameters.push_back(&selfOperand);
       }
     }
 
@@ -2026,7 +2022,7 @@ public:
     // region as our operands/results, we still need to require that it is live
     // at the point of application. Otherwise, we will not emit errors if the
     // closure before this function application is already in the same region as
-    // a transferred value. In such a case, the function application must error.
+    // a sent value. In such a case, the function application must error.
     if (auto value = tryToTrackValue(fas.getCallee())) {
       builder.addRequire(value->getRepresentative().getValue());
     }
@@ -2037,16 +2033,16 @@ public:
     auto type = fas.getSubstCalleeSILType().castTo<SILFunctionType>();
     auto isolationInfo = SILIsolationInfo::get(*fas);
 
-    // If our result is not transferring, just do the normal multi-assign.
+    // If our result is not a 'sending' result, just do the normal multi-assign.
     if (!type->hasSendingResult()) {
-      return translateSILMultiAssign(applyResults, nonTransferringParameters,
+      return translateSILMultiAssign(applyResults, nonSendingParameters,
                                      isolationInfo);
     }
 
-    // If our result is transferring, then pass in empty as our results, no
-    // override isolation, then perform assign fresh.
+    // If our result is a 'sending' result, then pass in empty as our results,
+    // no override isolation, then perform assign fresh.
     ArrayRef<SILValue> empty;
-    translateSILMultiAssign(empty, nonTransferringParameters, {});
+    translateSILMultiAssign(empty, nonSendingParameters, {});
 
     // Sending direct results.
     for (SILValue result : applyResults) {
@@ -2080,7 +2076,7 @@ public:
     }
 
     // If this apply does not cross isolation domains, it has normal
-    // non-transferring multi-assignment semantics
+    // non-sending multi-assignment semantics
     if (!getApplyIsolationCrossing(*fas))
       return translateNonIsolationCrossingSILApply(fas);
 
@@ -2098,9 +2094,9 @@ public:
 
   /// Handles the semantics for SIL applies that cross isolation.
   ///
-  /// Semantically this causes all arguments of the applysite to be transferred.
+  /// Semantically this causes all arguments of the applysite to be sent.
   void translateIsolationCrossingSILApply(FullApplySite applySite) {
-    // Require all operands first before we emit transferring.
+    // Require all operands first before we emit a send.
     for (auto op : applySite.getArguments())
       if (auto value = tryToTrackValue(op))
         builder.addRequire(value->getRepresentative().getValue());
@@ -2108,14 +2104,14 @@ public:
     auto handleSILOperands = [&](MutableArrayRef<Operand> operands) {
       for (auto &op : operands) {
         if (auto value = tryToTrackValue(op.get())) {
-          builder.addTransfer(value->getRepresentative().getValue(), &op);
+          builder.addSend(value->getRepresentative().getValue(), &op);
         }
       }
     };
 
     auto handleSILSelf = [&](Operand *self) {
       if (auto value = tryToTrackValue(self->get())) {
-        builder.addTransfer(value->getRepresentative().getValue(), self);
+        builder.addSend(value->getRepresentative().getValue(), self);
       }
     };
 
@@ -2251,22 +2247,22 @@ public:
     }
   }
 
-  void translateSILAssignmentToTransferringParameter(TrackableValue destRoot,
-                                                     Operand *destOperand,
-                                                     TrackableValue srcRoot,
-                                                     Operand *srcOperand) {
+  void translateSILAssignmentToSendingParameter(TrackableValue destRoot,
+                                                Operand *destOperand,
+                                                TrackableValue srcRoot,
+                                                Operand *srcOperand) {
     assert(isa<AllocStackInst>(destRoot.getRepresentative().getValue()) &&
            "Destination should always be an alloc_stack");
 
-    // Transfer src. This ensures that we cannot use src again locally in this
-    // function... which makes sense since its value is now in the transferring
+    // Send src. This ensures that we cannot use src again locally in this
+    // function... which makes sense since its value is now in the 'sending'
     // parameter.
     builder.addRequire(srcRoot.getRepresentative().getValue());
-    builder.addTransfer(srcRoot.getRepresentative().getValue(), srcOperand);
+    builder.addSend(srcRoot.getRepresentative().getValue(), srcOperand);
 
     // Then check if we are assigning into an aggregate projection. In such a
     // case, we want to ensure that we keep tracking the elements already in the
-    // region of transferring. This is more conservative than we need to be
+    // region of sending. This is more conservative than we need to be
     // (since we could forget anything reachable from the aggregate
     // field)... but being more conservative is ok.
     if (isProjectedFromAggregate(destOperand->get()))
@@ -2380,13 +2376,13 @@ public:
     }
   }
 
-  /// Instructions that transfer all of their non-Sendable parameters
+  /// Instructions that send all of their non-Sendable parameters
   /// unconditionally and that do not have a result.
-  void translateSILTransferringNoResult(MutableArrayRef<Operand> values) {
+  void translateSILSendingNoResult(MutableArrayRef<Operand> values) {
     for (auto &op : values) {
       if (auto ns = tryToTrackValue(op.get())) {
         builder.addRequire(ns->getRepresentative().getValue());
-        builder.addTransfer(ns->getRepresentative().getValue(), &op);
+        builder.addSend(ns->getRepresentative().getValue(), &op);
       }
     }
   }
@@ -2497,8 +2493,7 @@ public:
 
     case TranslationSemantics::Asserting:
       llvm::errs() << "BannedInst: " << *inst;
-      llvm::report_fatal_error(
-          "transfer-non-sendable: Found banned instruction?!");
+      llvm::report_fatal_error("send-non-sendable: Found banned instruction?!");
       return;
 
     case TranslationSemantics::AssertingIfNonSendable:
@@ -2510,11 +2505,11 @@ public:
         return;
       llvm::errs() << "BadInst: " << *inst;
       llvm::report_fatal_error(
-          "transfer-non-sendable: Found instruction that is not allowed to "
+          "send-non-sendable: Found instruction that is not allowed to "
           "have non-Sendable parameters with such parameters?!");
       return;
-    case TranslationSemantics::TransferringNoResult:
-      return translateSILTransferringNoResult(inst->getAllOperands());
+    case TranslationSemantics::SendingNoResult:
+      return translateSILSendingNoResult(inst->getAllOperands());
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
@@ -2843,7 +2838,7 @@ CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 // Function exiting terminators.
 //
 // We handle these especially since we want to make sure that inout parameters
-// that are transferred are forced to be reinitialized.
+// that are sent are forced to be reinitialized.
 //
 // There is an assert in TermInst::isFunctionExiting that makes sure we do this
 // correctly.
@@ -3111,7 +3106,7 @@ PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
 TranslationSemantics PartitionOpTranslator::visitReturnInst(ReturnInst *ri) {
   addEndOfFunctionChecksForInOutSendingParameters(ri);
   if (ri->getFunction()->getLoweredFunctionType()->hasSendingResult()) {
-    return TranslationSemantics::TransferringNoResult;
+    return TranslationSemantics::SendingNoResult;
   }
   return TranslationSemantics::Require;
 }
@@ -3329,13 +3324,12 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
 
 BlockPartitionState::BlockPartitionState(
     SILBasicBlock *basicBlock, PartitionOpTranslator &translator,
-    TransferringOperandSetFactory &ptrSetFactory,
+    SendingOperandSetFactory &ptrSetFactory,
     IsolationHistory::Factory &isolationHistoryFactory,
-    TransferringOperandToStateMap &transferringOpToStateMap)
+    SendingOperandToStateMap &sendingOpToStateMap)
     : entryPartition(isolationHistoryFactory.get()),
       exitPartition(isolationHistoryFactory.get()), basicBlock(basicBlock),
-      ptrSetFactory(ptrSetFactory),
-      transferringOpToStateMap(transferringOpToStateMap) {
+      ptrSetFactory(ptrSetFactory), sendingOpToStateMap(sendingOpToStateMap) {
   translator.translateSILBasicBlock(basicBlock, blockPartitionOps);
 }
 
@@ -3348,11 +3342,11 @@ bool BlockPartitionState::recomputeExitFromEntry(
     PartitionOpTranslator &translator;
 
     ComputeEvaluator(Partition &workingPartition,
-                     TransferringOperandSetFactory &ptrSetFactory,
+                     SendingOperandSetFactory &ptrSetFactory,
                      PartitionOpTranslator &translator,
-                     TransferringOperandToStateMap &transferringOpToStateMap)
+                     SendingOperandToStateMap &sendingOpToStateMap)
         : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory,
-                                       transferringOpToStateMap),
+                                       sendingOpToStateMap),
           translator(translator) {}
 
     SILIsolationInfo getIsolationRegionInfo(Element elt) const {
@@ -3385,7 +3379,7 @@ bool BlockPartitionState::recomputeExitFromEntry(
     }
   };
   ComputeEvaluator eval(workingPartition, ptrSetFactory, translator,
-                        transferringOpToStateMap);
+                        sendingOpToStateMap);
   for (const auto &partitionOp : blockPartitionOps) {
     // By calling apply without providing any error handling callbacks, errors
     // will be surpressed.  will be suppressed
@@ -3454,7 +3448,7 @@ static bool canComputeRegionsForFunction(SILFunction *fn) {
     return false;
   }
 
-  // The sendable protocol should /always/ be available if TransferNonSendable
+  // The sendable protocol should /always/ be available if SendNonSendable
   // is enabled. If not, there is a major bug in the compiler and we should
   // fail loudly.
   if (!fn->getASTContext().getProtocol(KnownProtocolKind::Sendable))
@@ -3467,7 +3461,7 @@ RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
     SILFunction *fn, PostOrderFunctionInfo *pofi)
     : allocator(), fn(fn), valueMap(fn), translator(), ptrSetFactory(allocator),
       isolationHistoryFactory(allocator),
-      transferringOpToStateMap(isolationHistoryFactory), blockStates(),
+      sendingOperandToStateMap(isolationHistoryFactory), blockStates(),
       pofi(pofi), solved(false), supportedFunction(true) {
   // Before we do anything, make sure that we support processing this function.
   //
@@ -3482,7 +3476,7 @@ RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
   blockStates.emplace(fn, [this](SILBasicBlock *block) -> BlockPartitionState {
     return BlockPartitionState(block, *translator, ptrSetFactory,
                                isolationHistoryFactory,
-                               transferringOpToStateMap);
+                               sendingOperandToStateMap);
   });
   // Mark all blocks as needing to be updated.
   for (auto &block : *fn) {

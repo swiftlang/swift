@@ -36,7 +36,7 @@ static inline bool shouldAbortOnUnknownPatternMatchError() {
   return AbortOnUnknownPatternMatchError;
 }
 
-using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
+using SendingOperandSetFactory = Partition::SendingOperandSetFactory;
 using Element = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
 
@@ -74,15 +74,15 @@ class BlockPartitionState {
   /// block.
   std::vector<PartitionOp> blockPartitionOps = {};
 
-  TransferringOperandSetFactory &ptrSetFactory;
+  SendingOperandSetFactory &ptrSetFactory;
 
-  TransferringOperandToStateMap &transferringOpToStateMap;
+  SendingOperandToStateMap &sendingOpToStateMap;
 
   BlockPartitionState(SILBasicBlock *basicBlock,
                       PartitionOpTranslator &translator,
-                      TransferringOperandSetFactory &ptrSetFactory,
+                      SendingOperandSetFactory &ptrSetFactory,
                       IsolationHistory::Factory &isolationHistoryFactory,
-                      TransferringOperandToStateMap &transferringOpToStateMap);
+                      SendingOperandToStateMap &sendingOpToStateMap);
 
 public:
   bool getLiveness() const { return isLive; }
@@ -359,8 +359,7 @@ private:
 class RegionAnalysisFunctionInfo {
   using BlockPartitionState = regionanalysisimpl::BlockPartitionState;
   using PartitionOpTranslator = regionanalysisimpl::PartitionOpTranslator;
-  using TransferringOperandSetFactory =
-      regionanalysisimpl::TransferringOperandSetFactory;
+  using SendingOperandSetFactory = regionanalysisimpl::SendingOperandSetFactory;
   using BasicBlockData = BasicBlockData<BlockPartitionState>;
 
   llvm::BumpPtrAllocator allocator;
@@ -373,11 +372,11 @@ class RegionAnalysisFunctionInfo {
   // allocator when we allocate everything.
   PartitionOpTranslator *translator;
 
-  TransferringOperandSetFactory ptrSetFactory;
+  SendingOperandSetFactory ptrSetFactory;
 
   IsolationHistory::Factory isolationHistoryFactory;
 
-  TransferringOperandToStateMap transferringOpToStateMap;
+  SendingOperandToStateMap sendingOperandToStateMap;
 
   // We make this optional to prevent an issue that we have seen on windows when
   // capturing a field in a closure that is used to initialize a different
@@ -464,7 +463,7 @@ public:
   reverse_range getReverseRange() { return {rbegin(), rend()}; }
   const_reverse_range getReverseRange() const { return {rbegin(), rend()}; }
 
-  TransferringOperandSetFactory &getOperandSetFactory() {
+  SendingOperandSetFactory &getOperandSetFactory() {
     assert(supportedFunction && "Unsupported Function?!");
     return ptrSetFactory;
   }
@@ -479,9 +478,9 @@ public:
     return isolationHistoryFactory;
   }
 
-  TransferringOperandToStateMap &getTransferringOpToStateMap() {
+  SendingOperandToStateMap &getSendingOperandToStateMap() {
     assert(supportedFunction && "Unsupported Function?!");
-    return transferringOpToStateMap;
+    return sendingOperandToStateMap;
   }
 
   bool isClosureCaptured(SILValue value, Operand *op);

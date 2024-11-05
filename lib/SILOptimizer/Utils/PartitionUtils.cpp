@@ -42,17 +42,17 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
   case PartitionOpKind::AssignFresh:
     os << "assign_fresh %%" << opArgs[0];
     break;
-  case PartitionOpKind::Transfer: {
+  case PartitionOpKind::Send: {
     constexpr static char extraSpaceLiteral[10] = "    ";
-    os << "transfer ";
+    os << "send ";
     if (extraSpace)
       os << extraSpaceLiteral;
     os << "%%" << opArgs[0];
     break;
   }
-  case PartitionOpKind::UndoTransfer: {
+  case PartitionOpKind::UndoSend: {
     constexpr static char extraSpaceLiteral[10] = "    ";
-    os << "undo_transfer ";
+    os << "undo_send ";
     if (extraSpace)
       os << extraSpaceLiteral;
     os << "%%" << opArgs[0];
@@ -145,14 +145,13 @@ Partition Partition::separateRegions(SILLocation loc, ArrayRef<Element> indices,
   return p;
 }
 
-void Partition::markTransferred(Element val,
-                                TransferringOperandSet *transferredOperandSet) {
+void Partition::markSent(Element val, SendingOperandSet *sendingOperandSet) {
   // First see if our val is tracked. If it is not tracked, insert it and mark
-  // its new region as transferred.
+  // its new region as sent.
   if (!isTrackingElement(val)) {
     elementToRegionMap.insert_or_assign(val, freshLabel);
     pushNewElementRegion(val);
-    regionToTransferredOpMap.insert({freshLabel, transferredOperandSet});
+    regionToSendingOpMap.insert({freshLabel, sendingOperandSet});
     freshLabel = Region(freshLabel + 1);
     canonical = false;
     return;
@@ -161,18 +160,17 @@ void Partition::markTransferred(Element val,
   // Otherwise, we already have this value in the map. Try to insert it.
   auto iter1 = elementToRegionMap.find(val);
   assert(iter1 != elementToRegionMap.end());
-  auto iter2 =
-      regionToTransferredOpMap.insert({iter1->second, transferredOperandSet});
+  auto iter2 = regionToSendingOpMap.insert({iter1->second, sendingOperandSet});
 
   // If we did insert, just return. We were not tracking any state.
   if (iter2.second)
     return;
 
   // Otherwise, we need to merge the sets.
-  iter2.first->second = iter2.first->second->merge(transferredOperandSet);
+  iter2.first->second = iter2.first->second->merge(sendingOperandSet);
 }
 
-bool Partition::undoTransfer(Element val) {
+bool Partition::undoSend(Element val) {
   // First see if our val is tracked. If it is not tracked, insert it.
   if (!isTrackingElement(val)) {
     elementToRegionMap.insert_or_assign(val, freshLabel);
@@ -183,14 +181,14 @@ bool Partition::undoTransfer(Element val) {
   }
 
   // Otherwise, we already have this value in the map. Remove it from the
-  // transferred map.
+  // "sending operand" map.
   auto iter1 = elementToRegionMap.find(val);
   assert(iter1 != elementToRegionMap.end());
-  return regionToTransferredOpMap.erase(iter1->second);
+  return regionToSendingOpMap.erase(iter1->second);
 }
 
 void Partition::trackNewElement(Element newElt, bool updateHistory) {
-  SWIFT_DEFER { validateRegionToTransferredOpMapRegions(); };
+  SWIFT_DEFER { validateRegionToSendingOpMapRegions(); };
 
   // First try to emplace newElt with fresh_label.
   auto iter = elementToRegionMap.try_emplace(newElt, freshLabel);
@@ -214,10 +212,10 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
   // 1. We of course need to update iter to point at fresh_label.
   //
   // 2. We need to see if this value was the last element in its current
-  // region. If so, then we need to remove the region from the transferred op
+  // region. If so, then we need to remove the region from the sending op
   // map.
   //
-  // This is important to ensure that every region in the transferredOpMap is
+  // This is important to ensure that every region in the sendingOpMap is
   // also in elementToRegionMap.
   auto oldRegion = iter.first->second;
   iter.first->second = freshLabel;
@@ -234,7 +232,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
     if (updateHistory)
       pushRemoveElementFromRegion(*matchingElt, newElt);
   } else {
-    regionToTransferredOpMap.erase(oldRegion);
+    regionToSendingOpMap.erase(oldRegion);
     if (updateHistory)
       pushRemoveLastElementFromRegion(newElt);
   }
@@ -254,7 +252,7 @@ void Partition::assignElement(Element oldElt, Element newElt,
   if (oldElt == newElt)
     return;
 
-  SWIFT_DEFER { validateRegionToTransferredOpMapRegions(); };
+  SWIFT_DEFER { validateRegionToSendingOpMapRegions(); };
 
   // First try to emplace oldElt with the newRegion.
   auto newRegion = elementToRegionMap.at(newElt);
@@ -283,7 +281,7 @@ void Partition::assignElement(Element oldElt, Element newElt,
 
   // Otherwise, we need to actually assign. In such a case, we need to see if
   // oldElt was the last element in oldRegion. If so, we need to erase the
-  // oldRegion from regionToTransferredOpMap.
+  // oldRegion from regionToSendingOpMap.
   iter.first->second = newRegion;
 
   auto getValueFromOtherRegion = [&]() -> std::optional<Element> {
@@ -298,7 +296,7 @@ void Partition::assignElement(Element oldElt, Element newElt,
     if (updateHistory)
       pushRemoveElementFromRegion(*otherElt, oldElt);
   } else {
-    regionToTransferredOpMap.erase(oldRegion);
+    regionToSendingOpMap.erase(oldRegion);
     if (updateHistory)
       pushRemoveLastElementFromRegion(oldElt);
   }
@@ -343,18 +341,18 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
         // representative element of its region in sndReduced. We need to
         // ensure that in result, that representative and our current
         // value are in the same region. If they are the same value, we can
-        // just reuse sndEltNumber's region in result for the transferring
+        // just reuse sndEltNumber's region in result for the sending
         // check.
         if (sndEltNumber != Element(sndRegionNumber)) {
           // NOTE: History is updated by Partition::merge(...).
           resultRegion = result.merge(sndEltNumber, Element(sndRegionNumber));
         }
 
-        // Then if sndRegionNumber is transferred in sndReduced, make sure
-        // mergedRegion is transferred in result.
-        auto sndIter = snd.regionToTransferredOpMap.find(sndRegionNumber);
-        if (sndIter != snd.regionToTransferredOpMap.end()) {
-          auto resultIter = result.regionToTransferredOpMap.insert(
+        // Then if sndRegionNumber is sent in sndReduced, make sure mergedRegion
+        // is sent in result.
+        auto sndIter = snd.regionToSendingOpMap.find(sndRegionNumber);
+        if (sndIter != snd.regionToSendingOpMap.end()) {
+          auto resultIter = result.regionToSendingOpMap.insert(
               {resultRegion, sndIter->second});
           if (!resultIter.second) {
             resultIter.first->second =
@@ -377,7 +375,7 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
     // be
     // <= our representative.
     //
-    // In this case, we do not need to propagate transfer into resultRegion
+    // In this case, we do not need to propagate 'send' into resultRegion
     // since we would have handled that already when we visited our earlier
     // representative element number.
     {
@@ -401,9 +399,9 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
     assert(sndEltNumber == Element(sndRegionNumber));
     result.elementToRegionMap.insert({sndEltNumber, sndRegionNumber});
     result.pushNewElementRegion(sndEltNumber);
-    auto sndIter = snd.regionToTransferredOpMap.find(sndRegionNumber);
-    if (sndIter != snd.regionToTransferredOpMap.end()) {
-      auto fstIter = result.regionToTransferredOpMap.insert(
+    auto sndIter = snd.regionToSendingOpMap.find(sndRegionNumber);
+    if (sndIter != snd.regionToSendingOpMap.end()) {
+      auto fstIter = result.regionToSendingOpMap.insert(
           {sndRegionNumber, sndIter->second});
       if (!fstIter.second)
         fstIter.first->second = fstIter.first->second->merge(sndIter->second);
@@ -423,12 +421,12 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
 bool Partition::popHistory(
     SmallVectorImpl<IsolationHistory> &foundJoinedHistories) {
   // We only allow for history rewinding if we are not tracking any
-  // transferring operands. This is because the history rewinding does not
-  // care about transferring. One can either construct a new Partition from
-  // the current Partition using Partition::removingTransferringInfo or clear
-  // the transferring information using Partition::clearTransferringInfo().
-  assert(regionToTransferredOpMap.empty() &&
-         "Can only rewind history if not tracking any transferring operands");
+  // sending operands. This is because the history rewinding does not
+  // care about sending. One can either construct a new Partition from
+  // the current Partition using Partition::removeSendingOperandSet or clear
+  // the sending information using Partition::clearSendingOperandState().
+  assert(regionToSendingOpMap.empty() &&
+         "Can only rewind history if not tracking any sending operands");
 
   if (!history.getHead())
     return false;
@@ -453,9 +451,9 @@ void Partition::print(llvm::raw_ostream &os) const {
 
   os << "[";
   for (auto [regionNo, elementNumbers] : multimap.getRange()) {
-    auto iter = regionToTransferredOpMap.find(regionNo);
-    bool isTransferred = iter != regionToTransferredOpMap.end();
-    if (isTransferred) {
+    auto iter = regionToSendingOpMap.find(regionNo);
+    bool wasSent = iter != regionToSendingOpMap.end();
+    if (wasSent) {
       os << '{';
     } else {
       os << '(';
@@ -465,7 +463,7 @@ void Partition::print(llvm::raw_ostream &os) const {
     for (Element i : elementNumbers) {
       os << (j++ ? " " : "") << i;
     }
-    if (isTransferred) {
+    if (wasSent) {
       os << '}';
     } else {
       os << ')';
@@ -483,11 +481,11 @@ void Partition::printVerbose(llvm::raw_ostream &os) const {
   multimap.setFrozen();
 
   for (auto [regionNo, elementNumbers] : multimap.getRange()) {
-    auto iter = regionToTransferredOpMap.find(regionNo);
-    bool isTransferred = iter != regionToTransferredOpMap.end();
+    auto iter = regionToSendingOpMap.find(regionNo);
+    bool wasSent = iter != regionToSendingOpMap.end();
 
     os << "Region: " << regionNo << ". ";
-    if (isTransferred) {
+    if (wasSent) {
       os << '{';
     } else {
       os << '(';
@@ -497,14 +495,14 @@ void Partition::printVerbose(llvm::raw_ostream &os) const {
     for (Element i : elementNumbers) {
       os << (j++ ? " " : "") << i;
     }
-    if (isTransferred) {
+    if (wasSent) {
       os << '}';
     } else {
       os << ')';
     }
     os << "\n";
-    os << "TransferInsts:\n";
-    if (isTransferred) {
+    os << "SentInsts:\n";
+    if (wasSent) {
       for (auto op : iter->second->data()) {
         os << "    ";
         op->print(os);
@@ -590,8 +588,8 @@ bool Partition::is_canonical_correct() const {
       return fail(eltNo, 3);
   }
 
-  // Before we do anything, validate region to transferred op map.
-  validateRegionToTransferredOpMapRegions();
+  // Before we do anything, validate region to region to sending op map.
+  validateRegionToSendingOpMapRegions();
 
   return true;
 #endif
@@ -622,11 +620,11 @@ Region Partition::merge(Element fst, Element snd, bool updateHistory) {
   // Rename snd and snd's entire region to fst's region.
   SmallVector<Element, 32> mergedElements;
   horizontalUpdate(snd, fstRegion, mergedElements);
-  auto iter = regionToTransferredOpMap.find(sndRegion);
-  if (iter != regionToTransferredOpMap.end()) {
+  auto iter = regionToSendingOpMap.find(sndRegion);
+  if (iter != regionToSendingOpMap.end()) {
     auto operand = iter->second;
-    regionToTransferredOpMap.erase(iter);
-    regionToTransferredOpMap.insert({fstRegion, operand});
+    regionToSendingOpMap.erase(iter);
+    regionToSendingOpMap.insert({fstRegion, operand});
   }
 
   assert(is_canonical_correct());
@@ -643,7 +641,7 @@ void Partition::canonicalize() {
     return;
   canonical = true;
 
-  validateRegionToTransferredOpMapRegions();
+  validateRegionToSendingOpMapRegions();
   std::map<Region, Region> oldRegionToRelabeledMap;
 
   // We rely on in-order traversal of labels to ensure that we always take the
@@ -665,17 +663,16 @@ void Partition::canonicalize() {
     freshLabel = Region(eltNo + 1);
   }
 
-  // Then relabel our regionToTransferredInst map if we need to by swapping
-  // out the old map and updating.
+  // Then relabel our regionToSendingOpMap map if we need to by swapping out the
+  // old map and updating.
   //
   // TODO: If we just used an array for this, we could just rewrite and
   // re-sort and not have to deal with potential allocations.
-  decltype(regionToTransferredOpMap) oldMap =
-      std::move(regionToTransferredOpMap);
+  decltype(regionToSendingOpMap) oldMap = std::move(regionToSendingOpMap);
   for (auto &[oldReg, op] : oldMap) {
     auto iter = oldRegionToRelabeledMap.find(oldReg);
     assert(iter != oldRegionToRelabeledMap.end());
-    regionToTransferredOpMap[iter->second] = op;
+    regionToSendingOpMap[iter->second] = op;
   }
 
   assert(is_canonical_correct());
@@ -719,7 +716,7 @@ bool Partition::popHistoryOnce(
     auto iter = elementToRegionMap.find(head->getFirstArgAsElement());
     assert(iter != elementToRegionMap.end());
     Region oldRegion = iter->second;
-    regionToTransferredOpMap.erase(oldRegion);
+    regionToSendingOpMap.erase(oldRegion);
     elementToRegionMap.erase(iter);
     assert(llvm::none_of(elementToRegionMap,
                          [&](std::pair<Element, Region> pair) {

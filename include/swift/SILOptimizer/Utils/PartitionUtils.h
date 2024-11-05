@@ -31,7 +31,7 @@
 #include <algorithm>
 #include <variant>
 
-#define DEBUG_TYPE "transfer-non-sendable"
+#define DEBUG_TYPE "send-non-sendable"
 
 namespace swift {
 
@@ -87,7 +87,7 @@ struct DenseMapInfo<swift::PartitionPrimitives::Region> {
 namespace swift {
 
 class Partition;
-class TransferringOperandToStateMap;
+class SendingOperandToStateMap;
 
 /// The representative value of the equivalence class that makes up a tracked
 /// value.
@@ -145,12 +145,12 @@ private:
 /// A persistent data structure that is used to "rewind" partition history so
 /// that we can discover when values become part of the same region.
 ///
-/// NOTE: This does not track whether or not values are transferred. This is
+/// NOTE: This does not track whether or not values are sent. This is
 /// because from the perspective of determining when two values become part of
 /// the same region, that information is not important. To unroll history, a
-/// Partition must have no transfers to use this. NOTE: There is a method that
+/// Partition must have no sends to use this. NOTE: There is a method that
 /// takes a Partition and produces a new Partition that does not have any
-/// transfers.
+/// sends.
 class IsolationHistory {
 public:
   class Factory;
@@ -162,7 +162,7 @@ private:
 
   // TODO: This shouldn't need to be a friend.
   friend class Partition;
-  friend TransferringOperandToStateMap;
+  friend SendingOperandToStateMap;
 
   /// First node in the immutable linked list.
   Node *head = nullptr;
@@ -380,8 +380,8 @@ public:
   IsolationHistory get() { return IsolationHistory(this); }
 };
 
-struct TransferringOperandState {
-  /// The dynamic isolation info of the region of value when we transferred.
+struct SendingOperandState {
+  /// The dynamic isolation info of the region of value when we sent.
   ///
   /// This will contain the isolated value if we found one.
   SILDynamicMergedIsolationInfo isolationInfo;
@@ -389,28 +389,27 @@ struct TransferringOperandState {
   /// The dynamic isolation history at this point.
   IsolationHistory isolationHistory;
 
-  /// Set to true if the element associated with the operand's vlaue is closure
+  /// Set to true if the element associated with the operand's value is closure
   /// captured by the user. In such a case, if our element is a sendable var of
   /// a non-Sendable type, we cannot access it since we could race against an
   /// assignment to the var in a closure.
   bool isClosureCaptured;
 
-  TransferringOperandState(IsolationHistory history)
+  SendingOperandState(IsolationHistory history)
       : isolationInfo(), isolationHistory(history), isClosureCaptured(false) {}
 };
 
-class TransferringOperandToStateMap {
-  llvm::SmallDenseMap<Operand *, TransferringOperandState> internalMap;
+class SendingOperandToStateMap {
+  llvm::SmallDenseMap<Operand *, SendingOperandState> internalMap;
   IsolationHistory::Factory &isolationHistoryFactory;
 
 public:
-  TransferringOperandToStateMap(
-      IsolationHistory::Factory &isolationHistoryFactory)
+  SendingOperandToStateMap(IsolationHistory::Factory &isolationHistoryFactory)
       : isolationHistoryFactory(isolationHistoryFactory) {}
-  TransferringOperandState &get(Operand *op) const {
-    auto *self = const_cast<TransferringOperandToStateMap *>(this);
+  SendingOperandState &get(Operand *op) const {
+    auto *self = const_cast<SendingOperandToStateMap *>(this);
     auto history = IsolationHistory(&isolationHistoryFactory);
-    return self->internalMap.try_emplace(op, TransferringOperandState(history))
+    return self->internalMap.try_emplace(op, SendingOperandState(history))
         .first->getSecond();
   }
 };
@@ -423,24 +422,24 @@ namespace swift {
 /// SILInstructions can be translated to
 enum class PartitionOpKind : uint8_t {
   /// Assign one value to the region of another, takes two args, second arg
-  /// must already be tracked with a non-transferred region
+  /// must already be tracked with a non-sent region
   Assign,
 
   /// Assign one value to a fresh region, takes one arg.
   AssignFresh,
 
   /// Merge the regions of two values, takes two args, both must be from
-  /// non-transferred regions.
+  /// non-sent regions.
   Merge,
 
-  /// Transfer the region of a value if not already transferred, takes one arg.
-  Transfer,
+  /// Send the region of a value if not already sent, takes one arg.
+  Send,
 
-  /// Due to an async let or something like that a value that was transferred is
-  /// no longer transferred.
-  UndoTransfer,
+  /// Due to an async let or something like that a value that was sent is
+  /// no longer sent.
+  UndoSend,
 
-  /// Require the region of a value to be non-transferred, takes one arg.
+  /// Require the region of a value to be non-sent, takes one arg.
   Require,
 
   /// Emit an error saying that the given instruction was not understood for
@@ -453,10 +452,10 @@ enum class PartitionOpKind : uint8_t {
   /// This is used if we need to reject the program and do not want to assert.
   UnknownPatternError,
 
-  /// Require that a 'inout sending' parameter's region is not transferred and
+  /// Require that a 'inout sending' parameter's region is not sent and
   /// disconnected at a specific function exiting term inst.
   ///
-  /// This ensures that if users transfer away an inout sending parameter, the
+  /// This ensures that if users send away an inout sending parameter, the
   /// parameter is reinitialized with a disconnected value.
   ///
   /// Takes one parameter, the inout parameter that we need to check.
@@ -464,7 +463,7 @@ enum class PartitionOpKind : uint8_t {
 };
 
 /// PartitionOp represents a primitive operation that can be performed on
-/// Partitions. This is part of the TransferNonSendable SIL pass workflow:
+/// Partitions. This is part of the SendNonSendable SIL pass workflow:
 /// first SILBasicBlocks are compiled to vectors of PartitionOps, then a fixed
 /// point partition is found over the CFG.
 class PartitionOp {
@@ -482,20 +481,20 @@ private:
   PartitionOp(PartitionOpKind opKind, Element arg1,
               SILInstruction *sourceInst = nullptr)
       : opKind(opKind), opArgs({arg1}), source(sourceInst) {
-    assert(((opKind != PartitionOpKind::Transfer &&
-             opKind != PartitionOpKind::UndoTransfer) ||
+    assert(((opKind != PartitionOpKind::Send &&
+             opKind != PartitionOpKind::UndoSend) ||
             sourceInst) &&
-           "Transfer needs a sourceInst");
+           "Send needs a sourceInst");
   }
 
   template <typename T>
   PartitionOp(PartitionOpKind opKind, T collectionOfIndices,
               SILInstruction *sourceInst = nullptr)
       : opKind(opKind), opArgs(), source(sourceInst) {
-    assert(((opKind != PartitionOpKind::Transfer &&
-             opKind != PartitionOpKind::UndoTransfer) ||
+    assert(((opKind != PartitionOpKind::Send &&
+             opKind != PartitionOpKind::UndoSend) ||
             sourceInst) &&
-           "Transfer needs a sourceInst");
+           "Send needs a sourceInst");
     for (Element elt : collectionOfIndices) {
       opArgs.push_back(elt);
     }
@@ -503,19 +502,19 @@ private:
 
   PartitionOp(PartitionOpKind opKind, Element arg1, Operand *sourceOperand)
       : opKind(opKind), opArgs({arg1}), source(sourceOperand) {
-    assert(((opKind != PartitionOpKind::Transfer &&
-             opKind != PartitionOpKind::UndoTransfer) ||
+    assert(((opKind != PartitionOpKind::Send &&
+             opKind != PartitionOpKind::UndoSend) ||
             bool(sourceOperand)) &&
-           "Transfer needs a sourceInst");
+           "Send needs a sourceInst");
   }
 
   PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2,
               SILInstruction *sourceInst = nullptr)
       : opKind(opKind), opArgs({arg1, arg2}), source(sourceInst) {
-    assert(((opKind != PartitionOpKind::Transfer &&
-             opKind != PartitionOpKind::UndoTransfer) ||
+    assert(((opKind != PartitionOpKind::Send &&
+             opKind != PartitionOpKind::UndoSend) ||
             sourceInst) &&
-           "Transfer needs a sourceInst");
+           "Send needs a sourceInst");
   }
 
   PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2,
@@ -543,13 +542,12 @@ public:
     return PartitionOp(PartitionOpKind::AssignFresh, collection, sourceInst);
   }
 
-  static PartitionOp Transfer(Element tgt, Operand *transferringOp) {
-    return PartitionOp(PartitionOpKind::Transfer, tgt, transferringOp);
+  static PartitionOp Send(Element tgt, Operand *sendingOp) {
+    return PartitionOp(PartitionOpKind::Send, tgt, sendingOp);
   }
 
-  static PartitionOp UndoTransfer(Element tgt,
-                                  SILInstruction *untransferringInst) {
-    return PartitionOp(PartitionOpKind::UndoTransfer, tgt, untransferringInst);
+  static PartitionOp UndoSend(Element tgt, SILInstruction *unsendingInst) {
+    return PartitionOp(PartitionOpKind::UndoSend, tgt, unsendingInst);
   }
 
   static PartitionOp Merge(Element destElement, Element srcElement,
@@ -617,12 +615,12 @@ public:
 
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
-  using TransferringOperandSet = ImmutablePointerSet<Operand *>;
-  using TransferringOperandSetFactory = ImmutablePointerSetFactory<Operand *>;
+  using SendingOperandSet = ImmutablePointerSet<Operand *>;
+  using SendingOperandSetFactory = ImmutablePointerSetFactory<Operand *>;
   using IsolationHistoryNode = IsolationHistory::Node;
 
 private:
-  /// A map from a region number to a instruction that consumes it.
+  /// A map from a region number to a instruction that sends it.
   ///
   /// All we care is that we ever track a single SILInstruction for a region
   /// since we are fine with emitting a single error per value and letting the
@@ -630,8 +628,7 @@ private:
   /// multi map here. The implication of this is that when we are performing
   /// dataflow we use a union operation to combine CFG elements and just take
   /// the first instruction that we see.
-  llvm::SmallMapVector<Region, TransferringOperandSet *, 2>
-      regionToTransferredOpMap;
+  llvm::SmallMapVector<Region, SendingOperandSet *, 2> regionToSendingOpMap;
 
   /// Label each index with a non-negative (unsigned) label if it is associated
   /// with a valid region.
@@ -678,13 +675,12 @@ public:
     snd.canonicalize();
 
     return fst.elementToRegionMap == snd.elementToRegionMap &&
-           fst.regionToTransferredOpMap.size() ==
-               snd.regionToTransferredOpMap.size() &&
+           fst.regionToSendingOpMap.size() == snd.regionToSendingOpMap.size() &&
            llvm::all_of(
-               fst.regionToTransferredOpMap,
-               [&snd](const std::pair<Region, TransferringOperandSet *> &p) {
-                 auto sndIter = snd.regionToTransferredOpMap.find(p.first);
-                 return sndIter != snd.regionToTransferredOpMap.end() &&
+               fst.regionToSendingOpMap,
+               [&snd](const std::pair<Region, SendingOperandSet *> &p) {
+                 auto sndIter = snd.regionToSendingOpMap.find(p.first);
+                 return sndIter != snd.regionToSendingOpMap.end() &&
                         sndIter->second == p.second;
                });
   }
@@ -693,13 +689,12 @@ public:
     return elementToRegionMap.count(val);
   }
 
-  /// Mark val as transferred.
-  void markTransferred(Element val,
-                       TransferringOperandSet *transferredOperandSet);
+  /// Mark val as having been sent.
+  void markSent(Element val, SendingOperandSet *sendingOperandSet);
 
-  /// If val was marked as transferred, unmark it as transfer. Returns true if
-  /// we found that \p val was transferred. We return false otherwise.
-  bool undoTransfer(Element val);
+  /// If val was marked as sent, unmark it as sent. Returns true if we found
+  /// that \p val was sent. We return false otherwise.
+  bool undoSend(Element val);
 
   /// If \p newElt is not being tracked, create a new region for \p newElt. If
   /// \p newElt is already being tracked, remove it from its old region as well.
@@ -722,11 +717,11 @@ public:
   iterator end() { return elementToRegionMap.end(); }
   llvm::iterator_range<iterator> range() { return {begin(), end()}; }
 
-  void clearTransferState() { regionToTransferredOpMap.clear(); }
+  void clearSendingOperandState() { regionToSendingOpMap.clear(); }
 
-  Partition removingTransferState() const {
+  Partition removingSendingOperandState() const {
     Partition p = *this;
-    p.clearTransferState();
+    p.clearSendingOperandState();
     return p;
   }
 
@@ -737,12 +732,12 @@ public:
   /// afterwards if the current linear history does not find what one is looking
   /// for.
   ///
-  /// NOTE: This can only be used if one has cleared transfer state using
-  /// Partition::clearTransferState or constructed a new Partiton using
-  /// Partition::withoutTransferState(). This is because history rewinding
-  /// doesn't use transfer information so just to be careful around potential
-  /// invariants being broken, we just require the elimination of the transfer
-  /// information.
+  /// NOTE: This can only be used if one has cleared the sent state using
+  /// Partition::clearSendingOperandState or constructed a new Partiton using
+  /// Partition::removingSendingOperandState(). This is because history
+  /// rewinding doesn't use send information so just to be careful around
+  /// potential invariants being broken, we just require the elimination of the
+  /// send information.
   ///
   /// \returns true if there is more history that can be popped.
   bool popHistory(SmallVectorImpl<IsolationHistory> &foundJoinedHistories);
@@ -779,19 +774,19 @@ public:
   /// Runs in quadratic time.
   static Partition join(const Partition &fst, Partition &snd);
 
-  /// Return a vector of the transferred values in this partition.
-  std::vector<Element> getTransferredVals() const {
+  /// Return a vector of the sent values in this partition.
+  std::vector<Element> getSentValues() const {
     // For effeciency, this could return an iterator not a vector.
-    std::vector<Element> transferredVals;
+    std::vector<Element> sentVals;
     for (auto [i, _] : elementToRegionMap)
-      if (isTransferred(i))
-        transferredVals.push_back(i);
-    return transferredVals;
+      if (isSent(i))
+        sentVals.push_back(i);
+    return sentVals;
   }
 
-  /// Return a vector of the non-transferred regions in this partition, each
+  /// Return a vector of the non-sent regions in this partition, each
   /// represented as a vector of values.
-  std::vector<std::vector<Element>> getNonTransferredRegions() const {
+  std::vector<std::vector<Element>> getNonSentRegions() const {
     // For effeciency, this could return an iterator not a vector.
     std::map<Region, std::vector<Element>> buckets;
 
@@ -832,38 +827,38 @@ public:
     return history.pushHistorySequenceBoundary(loc);
   }
 
-  bool isTransferred(Element val) const {
+  bool isSent(Element val) const {
     auto iter = elementToRegionMap.find(val);
     if (iter == elementToRegionMap.end())
       return false;
-    return regionToTransferredOpMap.count(iter->second);
+    return regionToSendingOpMap.count(iter->second);
   }
 
-  /// Return the instruction that transferred \p val's region or nullptr
+  /// Return the instruction that sent \p val's region or nullptr
   /// otherwise.
-  TransferringOperandSet *getTransferred(Element val) const {
+  SendingOperandSet *getSentOperandSet(Element val) const {
     auto iter = elementToRegionMap.find(val);
     if (iter == elementToRegionMap.end())
       return nullptr;
-    auto iter2 = regionToTransferredOpMap.find(iter->second);
-    if (iter2 == regionToTransferredOpMap.end())
+    auto iter2 = regionToSendingOpMap.find(iter->second);
+    if (iter2 == regionToSendingOpMap.end())
       return nullptr;
     auto *set = iter2->second;
     assert(!set->empty());
     return set;
   }
 
-  /// Validate that all regions in the regionToTransferredOpMap exist in the
+  /// Validate that all regions in the regionToSentOpMap exist in the
   /// elementToRegionMap.
   ///
   /// Asserts when NDEBUG is set. Does nothing otherwise.
-  void validateRegionToTransferredOpMapRegions() const {
+  void validateRegionToSendingOpMapRegions() const {
 #ifndef NDEBUG
     llvm::SmallSet<Region, 8> regions;
     for (auto [eltNo, regionNo] : elementToRegionMap) {
       regions.insert(regionNo);
     }
-    for (auto [regionNo, opSet] : regionToTransferredOpMap) {
+    for (auto [regionNo, opSet] : regionToSendingOpMap) {
       assert(regions.contains(regionNo) && "Region doesn't exist?!");
     }
 #endif
@@ -930,7 +925,7 @@ private:
     history.pushMergeElementRegions(elementToMergeInto, otherRegions);
   }
 
-  /// Remove a single element without touching the region to transferring inst
+  /// Remove a single element without touching the region to sending inst
   /// multimap. Assumes that the element is never the last element in a region.
   ///
   /// Just a helper routine.
@@ -1095,23 +1090,21 @@ private:
 public:
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
-  using TransferringOperandSetFactory =
-      Partition::TransferringOperandSetFactory;
+  using SendingOperandSetFactory = Partition::SendingOperandSetFactory;
 
 #define PARTITION_OP_ERROR(NAME)                                               \
   using NAME##Error = PartitionOpError::NAME##Error;
 #include "PartitionOpError.def"
 
 protected:
-  TransferringOperandSetFactory &ptrSetFactory;
-  TransferringOperandToStateMap &operandToStateMap;
+  SendingOperandSetFactory &ptrSetFactory;
+  SendingOperandToStateMap &operandToStateMap;
 
   Partition &p;
 
 public:
-  PartitionOpEvaluator(Partition &p,
-                       TransferringOperandSetFactory &ptrSetFactory,
-                       TransferringOperandToStateMap &operandToStateMap)
+  PartitionOpEvaluator(Partition &p, SendingOperandSetFactory &ptrSetFactory,
+                       SendingOperandToStateMap &operandToStateMap)
       : ptrSetFactory(ptrSetFactory), operandToStateMap(operandToStateMap),
         p(p) {}
 
@@ -1275,65 +1268,63 @@ public:
       }
       return;
     }
-    case PartitionOpKind::Transfer: {
-      // NOTE: We purposely do not check here if a transferred value is already
-      // transferred. Callers are expected to put a require for that
-      // purpose. This ensures that if we pass the same argument multiple times
-      // to the same transferring function as weakly transferred arguments, we
-      // do not get an error.
+    case PartitionOpKind::Send: {
+      // NOTE: We purposely do not check here if the value has already been
+      // sent. Callers are expected to put a require for that purpose. This
+      // ensures that if we pass the same argument multiple times to the same
+      // sending function as weakly sent arguments, we do not get an
+      // error.
       assert(op.getOpArgs().size() == 1 &&
-             "Transfer PartitionOp should be passed 1 argument");
+             "Send PartitionOp should be passed 1 argument");
       assert(p.isTrackingElement(op.getOpArgs()[0]) &&
-             "Transfer PartitionOp's argument should already be tracked");
+             "Send PartitionOp's argument should already be tracked");
 
       // Before we do any further work, see if we have a nonisolated(unsafe)
-      // element. In such a case, this is also not a real transfer point.
-      Element transferredElement = op.getOpArgs()[0];
-      if (getIsolationRegionInfo(transferredElement).isUnsafeNonIsolated()) {
+      // element. In such a case, this is also not a real send point.
+      Element sentElement = op.getOpArgs()[0];
+      if (getIsolationRegionInfo(sentElement).isUnsafeNonIsolated()) {
         return;
       }
 
       // Otherwise, we need to merge our isolation region info with the
       // isolation region info of everything else in our region. This is the
       // dynamic isolation region info found by the dataflow.
-      Region transferredRegion = p.getRegion(transferredElement);
+      Region sentRegion = p.getRegion(sentElement);
       bool isClosureCapturedElt = false;
-      SILDynamicMergedIsolationInfo transferredRegionIsolation;
-      auto pairOpt =
-          getIsolationRegionInfo(transferredRegion, op.getSourceOp());
+      SILDynamicMergedIsolationInfo sentRegionIsolation;
+      auto pairOpt = getIsolationRegionInfo(sentRegion, op.getSourceOp());
       if (!pairOpt) {
         return handleError(UnknownCodePatternError(op));
       }
-      std::tie(transferredRegionIsolation, isClosureCapturedElt) = *pairOpt;
+      std::tie(sentRegionIsolation, isClosureCapturedElt) = *pairOpt;
 
-      // If we merged anything, we need to handle a transfer non-transferrable
-      // unless our value has the same isolation info as our callee.
+      // If we merged anything, we need to handle an attempt to send a
+      // never-sent value unless our value has the same isolation info as our
+      // callee.
       auto calleeIsolationInfo = getIsolationInfo(op);
       if (!(calleeIsolationInfo &&
-            transferredRegionIsolation.hasSameIsolation(calleeIsolationInfo)) &&
-          !transferredRegionIsolation.isDisconnected()) {
-        return handleTransferNonTransferrableHelper(op, op.getOpArgs()[0],
-                                                    transferredRegionIsolation);
+            sentRegionIsolation.hasSameIsolation(calleeIsolationInfo)) &&
+          !sentRegionIsolation.isDisconnected()) {
+        return handleSendNeverSentHelper(op, op.getOpArgs()[0],
+                                         sentRegionIsolation);
       }
 
       // Next see if we are disconnected and have the same isolation. In such a
-      // case, if we are not marked explicitly as sending, we do not transfer
+      // case, if we are not marked explicitly as sending, we do not send
       // since the disconnected value is allowed to be resued after we
       // return. If we are passed as a sending parameter, we cannot do this.
       if (auto *sourceInst = Impl::getSourceInst(op)) {
         if (auto fas = FullApplySite::isa(sourceInst);
             (!fas || !fas.isSending(*op.getSourceOp())) &&
-            transferredRegionIsolation.isDisconnected() &&
-            calleeIsolationInfo &&
-            transferredRegionIsolation.hasSameIsolation(calleeIsolationInfo))
+            sentRegionIsolation.isDisconnected() && calleeIsolationInfo &&
+            sentRegionIsolation.hasSameIsolation(calleeIsolationInfo))
           return;
       }
 
-      // Mark op.getOpArgs()[0] as transferred.
-      TransferringOperandState &state = operandToStateMap.get(op.getSourceOp());
+      // Mark op.getOpArgs()[0] as sent.
+      SendingOperandState &state = operandToStateMap.get(op.getSourceOp());
       state.isClosureCaptured |= isClosureCapturedElt;
-      if (auto newInfo =
-              state.isolationInfo.merge(transferredRegionIsolation)) {
+      if (auto newInfo = state.isolationInfo.merge(sentRegionIsolation)) {
         state.isolationInfo = *newInfo;
       } else {
         handleError(UnknownCodePatternError(op));
@@ -1341,17 +1332,17 @@ public:
       assert(state.isolationInfo && "Cannot have unknown");
       state.isolationHistory.pushCFGHistoryJoin(p.getIsolationHistory());
       auto *ptrSet = ptrSetFactory.get(op.getSourceOp());
-      p.markTransferred(op.getOpArgs()[0], ptrSet);
+      p.markSent(op.getOpArgs()[0], ptrSet);
       return;
     }
-    case PartitionOpKind::UndoTransfer: {
+    case PartitionOpKind::UndoSend: {
       assert(op.getOpArgs().size() == 1 &&
-             "UndoTransfer PartitionOp should be passed 1 argument");
+             "UndoSend PartitionOp should be passed 1 argument");
       assert(p.isTrackingElement(op.getOpArgs()[0]) &&
-             "UndoTransfer PartitionOp's argument should already be tracked");
+             "UndoSend PartitionOp's argument should already be tracked");
 
-      // Mark op.getOpArgs()[0] as not transferred.
-      p.undoTransfer(op.getOpArgs()[0]);
+      // Mark op.getOpArgs()[0] as not sent.
+      p.undoSend(op.getOpArgs()[0]);
       return;
     }
     case PartitionOpKind::Merge: {
@@ -1392,10 +1383,9 @@ public:
              "Require PartitionOp should be passed 1 argument");
       assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              "Require PartitionOp's argument should already be tracked");
-      if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
-        for (auto transferredOperand : transferredOperandSet->data()) {
-          handleLocalUseAfterTransferHelper(op, op.getOpArgs()[0],
-                                            transferredOperand);
+      if (auto *sentOperandSet = p.getSentOperandSet(op.getOpArgs()[0])) {
+        for (auto sentOperand : sentOperandSet->data()) {
+          handleLocalUseAfterSendHelper(op, op.getOpArgs()[0], sentOperand);
         }
       }
       return;
@@ -1406,17 +1396,17 @@ public:
              "Require PartitionOp's argument should already be tracked");
 
       // First check if the region of our 'inout sending' element has been
-      // transferred. In that case, we emit a special use after free error.
-      if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
-        for (auto transferredOperand : transferredOperandSet->data()) {
+      // sent. In that case, we emit a special use after free error.
+      if (auto *sentOperandSet = p.getSentOperandSet(op.getOpArgs()[0])) {
+        for (auto sentOperand : sentOperandSet->data()) {
           handleError(InOutSendingNotInitializedAtExitError(
-              op, op.getOpArgs()[0], transferredOperand));
+              op, op.getOpArgs()[0], sentOperand));
         }
         return;
       }
 
-      // If we were not transferred, check if our region is actor isolated. If
-      // so, error since we need a disconnected value in the inout parameter.
+      // If we were not sent, check if our region is actor isolated. If so,
+      // error since we need a disconnected value in the inout parameter.
       Region inoutSendingRegion = p.getRegion(op.getOpArgs()[0]);
       auto dynamicRegionIsolation = getIsolationRegionInfo(inoutSendingRegion);
 
@@ -1481,13 +1471,12 @@ private:
         equivalenceClassRep->getFunction());
   }
 
-  // Private helper that squelches the error if our transfer instruction and our
-  // use have the same isolation.
-  void handleLocalUseAfterTransferHelper(const PartitionOp &op, Element elt,
-                                         Operand *transferringOp) {
+  // Private helper that squelches the error if our send instruction and our use
+  // have the same isolation.
+  void handleLocalUseAfterSendHelper(const PartitionOp &op, Element elt,
+                                     Operand *sentOp) {
     if (shouldTryToSquelchErrors()) {
-      if (SILValue equivalenceClassRep =
-              getRepresentative(transferringOp->get())) {
+      if (SILValue equivalenceClassRep = getRepresentative(sentOp->get())) {
 
         // If we have a temporary that is initialized with an unsafe nonisolated
         // value... squelch the error like if we were that value.
@@ -1512,23 +1501,23 @@ private:
 
       // If our instruction does not have any isolation info associated with it,
       // it must be nonisolated. See if our function has a matching isolation to
-      // our transferring operand. If so, we can squelch this.
+      // our sent operand. If so, we can squelch this.
       if (auto functionIsolation =
-              transferringOp->getUser()->getFunction()->getActorIsolation()) {
+              sentOp->getUser()->getFunction()->getActorIsolation()) {
         if (functionIsolation->isActorIsolated() &&
-            SILIsolationInfo::get(transferringOp->getUser())
+            SILIsolationInfo::get(sentOp->getUser())
                 .hasSameIsolation(*functionIsolation))
           return;
       }
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleError(LocalUseAfterSendError(op, elt, transferringOp));
+    return handleError(LocalUseAfterSendError(op, elt, sentOp));
   }
 
-  // Private helper that squelches the error if our transfer instruction and our
+  // Private helper that squelches the error if our send instruction and our
   // use have the same isolation.
-  void handleTransferNonTransferrableHelper(
+  void handleSendNeverSentHelper(
       const PartitionOp &op, Element elt,
       SILDynamicMergedIsolationInfo dynamicMergedIsolationInfo) {
     if (shouldTryToSquelchErrors()) {
@@ -1569,13 +1558,12 @@ template <typename Subclass>
 struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
-  using TransferringOperandSetFactory =
-      Partition::TransferringOperandSetFactory;
+  using SendingOperandSetFactory = Partition::SendingOperandSetFactory;
   using Super = PartitionOpEvaluator<Subclass>;
 
   PartitionOpEvaluatorBaseImpl(Partition &workingPartition,
-                               TransferringOperandSetFactory &ptrSetFactory,
-                               TransferringOperandToStateMap &operandToStateMap)
+                               SendingOperandSetFactory &ptrSetFactory,
+                               SendingOperandToStateMap &operandToStateMap)
       : Super(workingPartition, ptrSetFactory, operandToStateMap) {}
 
   /// Should we emit extra verbose logging statements when evaluating
@@ -1583,8 +1571,8 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   bool shouldEmitVerboseLogging() const { return true; }
 
   /// This is used to determine if an element is actor derived. If we determine
-  /// that a region containing such an element is transferred, we emit an error
-  /// since actor regions cannot be transferred.
+  /// that a region containing such an element is sent, we emit an error since
+  /// actor regions cannot be sent.
   bool isActorDerived(Element elt) const { return false; }
 
   /// This is used to determine if an element is in the same region as a task
@@ -1646,8 +1634,8 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
 struct PartitionOpEvaluatorBasic final
     : PartitionOpEvaluatorBaseImpl<PartitionOpEvaluatorBasic> {
   PartitionOpEvaluatorBasic(Partition &workingPartition,
-                            TransferringOperandSetFactory &ptrSetFactory,
-                            TransferringOperandToStateMap &operandToStateMap)
+                            SendingOperandSetFactory &ptrSetFactory,
+                            SendingOperandToStateMap &operandToStateMap)
       : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory,
                                      operandToStateMap) {}
 };

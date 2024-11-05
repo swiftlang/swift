@@ -29,9 +29,8 @@
 ///
 /// 2. The element in the PartitionOp that was asked to be alive.
 ///
-/// 3. The operand of the instruction that originally transferred the
-/// region. Can be used to get the immediate value transferred or the
-/// transferring instruction.
+/// 3. The operand of the instruction that originally sent the region. Can be
+/// used to get the immediate value sent or the sending instruction.
 PARTITION_OP_ERROR(LocalUseAfterSend)
 
 /// This is called if we detect a never sendable element that was actually sent.

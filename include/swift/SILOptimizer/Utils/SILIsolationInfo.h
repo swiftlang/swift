@@ -143,14 +143,14 @@ public:
   /// This forms a lattice of semantics. The lattice progresses from left ->
   /// right below:
   ///
-  /// Unknown -> Disconnected -> TransferringParameter -> Task -> Actor.
+  /// Unknown -> Disconnected -> Task -> Actor.
   ///
   enum Kind : uint8_t {
     /// Unknown means no information. We error when merging on it.
     Unknown,
 
-    /// An entity with disconnected isolation can be freely transferred into
-    /// another isolation domain. These are associated with "use after transfer"
+    /// An entity with disconnected isolation can be freely sent into another
+    /// isolation domain. These are associated with "use after send"
     /// diagnostics.
     Disconnected,
 
