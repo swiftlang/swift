@@ -70,7 +70,7 @@ public:
     Bridge = 0x08,
     Block = 0x09,
     ObjC = 0x0a,
-    Custom = 0x0b,
+    NativeSwiftObjC = 0x0b,
 
     // reserved
     // Metatype = 0x0c,
@@ -1294,7 +1294,12 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Block, size);
     break;
   case ScalarKind::ObjCReference:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC, size);
+    if (typeInfo.hasFixedSpareBits()) {
+      B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeSwiftObjC,
+                    size);
+    } else {
+      B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC, size);
+    }
     break;
   case ScalarKind::ThickFunc:
     B.addSkip(IGM.getPointerSize().getValue());

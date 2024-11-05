@@ -92,3 +92,44 @@ func testMultiPayloadObjCExistentialWrapper() {
 }
 
 testMultiPayloadObjCExistentialWrapper()
+
+@objc
+class SwiftObjC: NSObject {
+    deinit {
+        print("SwiftObjC deinitialized!")
+    }
+}
+
+enum MultiPayloadNativeSwiftObjC {
+    case x(SwiftObjC)
+    case y(SwiftObjC)
+    case z(SwiftObjC)
+}
+
+func testMultiPayloadNativeSwiftObjC() {
+    let ptr = allocateInternalGenericPtr(of: MultiPayloadNativeSwiftObjC.self)
+
+    do {
+        let x = MultiPayloadNativeSwiftObjC.y(SwiftObjC())
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = MultiPayloadNativeSwiftObjC.z(SwiftObjC())
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SwiftObjC deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SwiftObjC deinitialized!
+    testGenericDestroy(ptr, of: MultiPayloadNativeSwiftObjC.self)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadNativeSwiftObjC()
