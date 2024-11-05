@@ -3352,6 +3352,19 @@ namespace {
         }
       }
 
+      bool retunrsRetainedUnretainedDiagnosticsNeeded = false;
+      if (!isa<clang::CXXDeductionGuideDecl>(decl)) {
+        if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
+          if (isNormalCxxMemberMethod(methodDecl)) {
+            // normal c++ member method
+            retunrsRetainedUnretainedDiagnosticsNeeded = true;
+          }
+        } else {
+          // global or top-level function
+          retunrsRetainedUnretainedDiagnosticsNeeded = true;
+        }
+      }
+
       HeaderLoc loc(decl->getLocation());
       if (isForeignReferenceTypeWithoutImmortalAttrs(decl->getReturnType())) {
         if (returnsRetainedAttrIsPresent && returnsUnretainedAttrIsPresent) {
@@ -3359,8 +3372,18 @@ namespace {
                         decl);
         } else if (!returnsRetainedAttrIsPresent &&
                    !returnsUnretainedAttrIsPresent) {
-          Impl.diagnose(loc, diag::no_returns_retained_returns_unretained,
-                        decl);
+          if (retunrsRetainedUnretainedDiagnosticsNeeded) {
+            if (Impl.isCxxInteropCompatVersionAtLeast(
+                    version::getUpcomingCxxInteropCompatVersion())) {
+              // TODO: change into error here
+              Impl.diagnose(loc,
+                            diag::no_returns_retained_returns_unretained_error,
+                            decl);
+            } else {
+              Impl.diagnose(
+                  loc, diag::no_returns_retained_returns_unretained_warn, decl);
+            }
+          }
         }
       } else {
         if (returnsRetainedAttrIsPresent || returnsUnretainedAttrIsPresent) {
@@ -3374,6 +3397,29 @@ namespace {
 
       return importFunctionDecl(decl, importedName, correctSwiftName,
                                 std::nullopt);
+    }
+
+    bool isNormalCxxMemberMethod(const clang::CXXMethodDecl *method) {
+      // Check if the method is a constructor or destructor
+      if (llvm::dyn_cast<clang::CXXConstructorDecl>(method) ||
+          llvm::dyn_cast<clang::CXXDestructorDecl>(method)) {
+        return false;
+      }
+
+      // Exclude compiler-generated, special, and trivial functions
+      return !method->isOverloadedOperator() && // Not an operator overload
+             !method->getDescribedFunctionTemplate() && // Not a template
+                                                        // definition
+             !method
+                  ->isTemplateInstantiation() && // Not a template instantiation
+             !method->isFunctionTemplateSpecialization() && // Not a template
+                                                            // specialization
+             !method->isDefaulted() &&           // Not explicitly defaulted
+             !method->isDeleted() &&             // Not deleted
+             !method->getParent()->isLambda() && // Not part of a lambda
+             !method->isLambdaStaticInvoker() && // Not a lambda invoker
+             !method->isVirtual() &&             // Not virtual
+             method->isUserProvided();           // Has user-provided body
     }
 
     /// Handles special functions such as subscripts and dereference operators.
