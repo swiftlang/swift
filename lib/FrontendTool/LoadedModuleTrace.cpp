@@ -922,8 +922,16 @@ static std::optional<int> createObjCMessageTraceFile(const InputFile &input,
   }
   for (auto *FU : MD->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(FU)) {
-      if (SF->getFilename().ends_with(".swift")) {
+      switch (SF->Kind) {
+      case swift::SourceFileKind::Library:
+      case swift::SourceFileKind::Main:
+      case swift::SourceFileKind::MacroExpansion:
+      case swift::SourceFileKind::DefaultArgument:
         filesToWalk.push_back(SF);
+        LLVM_FALLTHROUGH;
+      case swift::SourceFileKind::SIL:
+      case swift::SourceFileKind::Interface:
+        continue;
       }
     }
   }
