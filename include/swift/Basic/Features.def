@@ -219,7 +219,6 @@ UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
 UPCOMING_FEATURE(DynamicActorIsolation, 423, 6)
 UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, 6)
 UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
-UPCOMING_FEATURE(GlobalActorInferenceCutoff, 0449, 6)
 
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
