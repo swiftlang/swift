@@ -804,6 +804,12 @@ NodePointer Demangler::demangleType(StringRef MangledName,
 bool Demangler::parseAndPushNodes() {
   const auto textSize = Text.size();
   while (Pos < textSize) {
+    // Programs may look up a type by NUL-terminated name with an excessive
+    // length. Keep them working by returning success if we encounter a NUL in
+    // the middle of the string where an operator is expected.
+    if (peekChar() == '\0')
+      return true;
+
     NodePointer Node = demangleOperator();
     if (!Node)
       return false;
