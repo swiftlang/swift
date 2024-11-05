@@ -3032,8 +3032,8 @@ bool diagnoseExplicitUnavailability(
   return true;
 }
 
-std::optional<UnmetAvailabilityRequirement>
-swift::getUnmetDeclAvailabilityRequirement(
+std::optional<AvailabilityConstraint>
+swift::getUnsatisfiedAvailabilityConstraint(
     const Decl *decl, const DeclContext *declContext,
     AvailabilityContext availabilityContext) {
   auto &ctx = declContext->getASTContext();
@@ -3056,29 +3056,29 @@ swift::getUnmetDeclAvailabilityRequirement(
       if ((attr->isLanguageVersionSpecific() ||
            attr->isPackageDescriptionVersionSpecific()) &&
           attr->Introduced.has_value())
-        return UnmetAvailabilityRequirement::forRequiresVersion(attr);
+        return AvailabilityConstraint::forRequiresVersion(attr);
 
-      return UnmetAvailabilityRequirement::forAlwaysUnavailable(attr);
+      return AvailabilityConstraint::forAlwaysUnavailable(attr);
 
     case AvailableVersionComparison::Obsoleted:
-      return UnmetAvailabilityRequirement::forObsoleted(attr);
+      return AvailabilityConstraint::forObsoleted(attr);
     }
   }
 
   // Check whether the declaration is available in a newer platform version.
   auto rangeAndAttr = AvailabilityInference::availableRangeAndAttr(decl);
   if (!availabilityContext.getPlatformRange().isContainedIn(rangeAndAttr.first))
-    return UnmetAvailabilityRequirement::forIntroducedInNewerVersion(
+    return AvailabilityConstraint::forIntroducedInNewerVersion(
         rangeAndAttr.second);
 
   return std::nullopt;
 }
 
-std::optional<UnmetAvailabilityRequirement>
-swift::getUnmetDeclAvailabilityRequirement(const Decl *decl,
-                                           const DeclContext *referenceDC,
-                                           SourceLoc referenceLoc) {
-  return getUnmetDeclAvailabilityRequirement(
+std::optional<AvailabilityConstraint>
+swift::getUnsatisfiedAvailabilityConstraint(const Decl *decl,
+                                            const DeclContext *referenceDC,
+                                            SourceLoc referenceLoc) {
+  return getUnsatisfiedAvailabilityConstraint(
       decl, referenceDC,
       TypeChecker::availabilityAtLocation(referenceLoc, referenceDC));
 }
@@ -4094,10 +4094,10 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   auto *DC = Where.getDeclContext();
   auto &ctx = DC->getASTContext();
 
-  auto unmetRequirement =
-      getUnmetDeclAvailabilityRequirement(D, DC, Where.getAvailability());
+  auto constraint =
+      getUnsatisfiedAvailabilityConstraint(D, DC, Where.getAvailability());
 
-  if (unmetRequirement && !unmetRequirement->isConditionallySatisfiable()) {
+  if (constraint && !constraint->isConditionallySatisfiable()) {
     // FIXME: diagnoseExplicitUnavailability should take an unmet requirement
     if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
       return true;
@@ -4121,10 +4121,10 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
         && isa<ProtocolDecl>(D))
     return false;
 
-  if (!unmetRequirement)
+  if (!constraint)
     return false;
 
-  auto requiredRange = unmetRequirement->getRequiredNewerAvailabilityRange(ctx);
+  auto requiredRange = constraint->getRequiredNewerAvailabilityRange(ctx);
 
   // Diagnose (and possibly signal) for potential unavailability
   if (!requiredRange)
@@ -4601,9 +4601,9 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       return true;
     }
 
-    auto unmetRequirement = getUnmetDeclAvailabilityRequirement(
+    auto constraint = getUnsatisfiedAvailabilityConstraint(
         ext, where.getDeclContext(), where.getAvailability());
-    if (unmetRequirement) {
+    if (constraint) {
       // FIXME: diagnoseExplicitUnavailability() should take unmet requirement
       if (diagnoseExplicitUnavailability(
               loc, rootConf, ext, where,
@@ -4614,7 +4614,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
       // Diagnose (and possibly signal) for potential unavailability
       if (auto requiredRange =
-              unmetRequirement->getRequiredNewerAvailabilityRange(ctx)) {
+              constraint->getRequiredNewerAvailabilityRange(ctx)) {
         if (diagnosePotentialUnavailability(rootConf, ext, loc, DC,
                                             *requiredRange)) {
           maybeEmitAssociatedTypeNote();

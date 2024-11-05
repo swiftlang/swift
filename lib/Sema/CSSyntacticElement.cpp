@@ -2475,9 +2475,9 @@ private:
       if (!nominal)
         return false;
 
-      auto unmetRequirement = getUnmetDeclAvailabilityRequirement(
+      auto constraint = getUnsatisfiedAvailabilityConstraint(
           nominal, context.getAsDeclContext(), loc);
-      if (unmetRequirement && unmetRequirement->isConditionallySatisfiable()) {
+      if (constraint && constraint->isConditionallySatisfiable()) {
         auto &ctx = getASTContext();
         ctx.Diags.diagnose(loc,
                            diag::result_builder_missing_limited_availability,
