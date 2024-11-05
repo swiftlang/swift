@@ -3391,6 +3391,8 @@ public:
   void checkRetainValueInst(RetainValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
+    require(!I->getOperand()->getType().isMoveOnly(),
+            "retain value operand type must be copyable");
     require(!F.hasOwnership(),
             "retain_value is only in functions with unqualified ownership");
   }
