@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -transfer-non-sendable -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %s -verify -o /dev/null
+// RUN: %target-sil-opt -send-non-sendable -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %s -verify -o /dev/null
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_RegionBasedIsolation
