@@ -8618,7 +8618,7 @@ namespace {
 class PointerParamInfo {
 public:
   virtual void print(clang::ASTContext &ctx, llvm::raw_ostream &out) const = 0;
-  virtual ~PointerParamInfo() {}
+  virtual ~PointerParamInfo() = default;
 };
 
 class CountedByParam : public PointerParamInfo {
