@@ -42,7 +42,9 @@ OpaqueTypeDecl *
 OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
                                   ValueDecl *originatingDecl) const {
   auto *repr = originatingDecl->getOpaqueResultTypeRepr();
-  assert(repr && "Declaration does not have an opaque result type");
+  if (!repr)
+    return nullptr;
+
   auto *dc = originatingDecl->getInnermostDeclContext();
   auto &ctx = dc->getASTContext();
 

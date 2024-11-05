@@ -2295,21 +2295,22 @@ public:
 
 /// Builds an opaque result type for a declaration.
 class OpaqueResultTypeRequest
-    : public SimpleRequest<OpaqueResultTypeRequest,
-                           OpaqueTypeDecl *(ValueDecl *),
-                           RequestFlags::Cached> {
+    : public SimpleRequest<
+          OpaqueResultTypeRequest, OpaqueTypeDecl *(ValueDecl *),
+          RequestFlags::SeparatelyCached | RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  OpaqueTypeDecl *
-  evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+  OpaqueTypeDecl *evaluate(Evaluator &evaluator, ValueDecl *VD) const;
 
 public:
-  // Caching.
+  // Split caching.
   bool isCached() const { return true; }
+  std::optional<OpaqueTypeDecl *> getCachedResult() const;
+  void cacheResult(OpaqueTypeDecl *result) const;
 };
 
 /// Determines if a function declaration is 'static'.

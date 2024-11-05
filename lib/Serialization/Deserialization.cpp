@@ -3936,14 +3936,17 @@ public:
     if (var->hasStorage())
       AddAttribute(new (ctx) HasStorageAttr(/*isImplicit:*/true));
 
-    if (opaqueReturnTypeID) {
-      auto opaqueReturnType = MF.getDeclChecked(opaqueReturnTypeID);
-      if (!opaqueReturnType)
-        return opaqueReturnType.takeError();
+    {
+      OpaqueTypeDecl *opaqueDecl = nullptr;
+      if (opaqueReturnTypeID) {
+        auto opaqueReturnType = MF.getDeclChecked(opaqueReturnTypeID);
+        if (!opaqueReturnType)
+          return opaqueReturnType.takeError();
 
-      ctx.evaluator.cacheOutput(
-          OpaqueResultTypeRequest{var},
-          cast<OpaqueTypeDecl>(opaqueReturnType.get()));
+        opaqueDecl = cast<OpaqueTypeDecl>(opaqueReturnType.get());
+      }
+      ctx.evaluator.cacheOutput(OpaqueResultTypeRequest{var},
+                                std::move(opaqueDecl));
     }
 
     // If this is a lazy property, record its backing storage.
@@ -4357,14 +4360,17 @@ public:
     fn->setIsObjC(isObjC);
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
 
-    if (opaqueReturnTypeID) {
-      auto declOrError = MF.getDeclChecked(opaqueReturnTypeID);
-      if (!declOrError)
-        return declOrError.takeError();
+    {
+      OpaqueTypeDecl *opaqueDecl = nullptr;
+      if (opaqueReturnTypeID) {
+        auto declOrError = MF.getDeclChecked(opaqueReturnTypeID);
+        if (!declOrError)
+          return declOrError.takeError();
 
-      ctx.evaluator.cacheOutput(
-          OpaqueResultTypeRequest{fn},
-          cast<OpaqueTypeDecl>(declOrError.get()));
+        opaqueDecl = cast<OpaqueTypeDecl>(declOrError.get());
+      }
+      ctx.evaluator.cacheOutput(OpaqueResultTypeRequest{fn},
+                                std::move(opaqueDecl));
     }
 
     if (!isAccessor)
@@ -5204,16 +5210,19 @@ public:
     subscript->setOverriddenDecl(cast_or_null<SubscriptDecl>(overridden.get()));
     if (subscript->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
-    
-    if (opaqueReturnTypeID) {
-      Decl *opaqueReturnType;
-      UNWRAP(MF.getDeclChecked(opaqueReturnTypeID), opaqueReturnType);
 
-      ctx.evaluator.cacheOutput(
-          OpaqueResultTypeRequest{subscript},
-          cast<OpaqueTypeDecl>(opaqueReturnType));
+    {
+      OpaqueTypeDecl *opaqueDecl = nullptr;
+      if (opaqueReturnTypeID) {
+        Decl *opaqueReturnType;
+        UNWRAP(MF.getDeclChecked(opaqueReturnTypeID), opaqueReturnType);
+
+        opaqueDecl = cast<OpaqueTypeDecl>(opaqueReturnType);
+      }
+      ctx.evaluator.cacheOutput(OpaqueResultTypeRequest{subscript},
+                                std::move(opaqueDecl));
     }
-    
+
     return subscript;
   }
 

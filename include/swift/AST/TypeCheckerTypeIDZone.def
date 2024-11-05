@@ -262,7 +262,7 @@ SWIFT_REQUEST(TypeChecker, OpaqueReadOwnershipRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, OpaqueResultTypeRequest,
               OpaqueTypeDecl *(ValueDecl *),
-              Cached, NoLocationInfo)
+              SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, OperatorPrecedenceGroupRequest,
               PrecedenceGroupDecl *(PrecedenceGroupDecl *),
               Cached, NoLocationInfo)

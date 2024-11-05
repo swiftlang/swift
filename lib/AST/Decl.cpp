@@ -3887,21 +3887,6 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
-  if (getOpaqueResultTypeRepr() == nullptr) {
-    if (!isa<VarDecl>(this) &&
-        !isa<FuncDecl>(this) &&
-        !isa<SubscriptDecl>(this))
-      return nullptr;
-    auto file = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
-    // Don't look up when the decl is from source, otherwise a cycle will happen.
-    if (file->getKind() == FileUnitKind::SerializedAST) {
-      Mangle::ASTMangler mangler;
-      auto name = mangler.mangleOpaqueTypeDecl(this);
-      return file->lookupOpaqueResultType(name);
-    }
-    return nullptr;
-  }
-
   return evaluateOrDefault(getASTContext().evaluator,
     OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)},
     nullptr);
