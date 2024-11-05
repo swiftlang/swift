@@ -129,6 +129,7 @@ public:
   /// Include local definitions/references in the index data.
   bool IndexIncludeLocals = false;
 
+  bool SerializeDebugInfoSIL = false;
   /// If building a module from interface, ignore compiler flags
   /// specified in the swiftinterface.
   bool ExplicitInterfaceBuild = false;

@@ -958,6 +958,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_OPEN_PACK_ELEMENT);
   BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_GET);
   BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_SET);
+  BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE);
+  BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE_REF);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -7026,7 +7028,7 @@ void Serializer::writeToStream(
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
     S.writeHeader();
     S.writeInputBlock();
-    S.writeSIL(SILMod, options.SerializeAllSIL);
+    S.writeSIL(SILMod, options.SerializeAllSIL, options.SerializeDebugInfoSIL);
     S.writeAST(DC);
 
     if (S.hadError)
