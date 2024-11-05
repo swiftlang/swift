@@ -64,9 +64,11 @@ public struct Container2 {
 
 // CHECK: sil @$s1t10LargeThingVACycfC : $@convention(method) (@thin LargeThing.Type) -> @out LargeThing {
 // CHECK: bb0(%0 : $*LargeThing, %1 : $@thin LargeThing.Type):
-// CHECK:  [[T0:%.*]] =  alloc_stack $LargeThing
-// CHECK:  [[T2:%.*]] = struct_element_addr [[T0]] : $*LargeThing, #LargeThing.s0
+// CHECK:  [[T0:%.*]] = alloc_stack $LargeThing
+// CHECK:  [[T1:%.*]] = alloc_stack [var_decl] $LargeThing
+// CHECK:  [[T2:%.*]] = struct_element_addr [[T1]] : $*LargeThing, #LargeThing.s0
 // CHECK:  store {{.*}} to [[T2]] : $*String
+// CHECK:  copy_addr [take] [[T1]] to [init] [[T0]] : $*LargeThing
 // CHECK:  copy_addr [take] [[T0]] to [init] %0 : $*LargeThing
 // CHECK: } // end sil function '$s1t10LargeThingVACycfC'
 
