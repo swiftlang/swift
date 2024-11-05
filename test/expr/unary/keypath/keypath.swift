@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -typecheck -parse-as-library %s -verify
 
-// REQUIRES: swift_feature_KeyPathWithStaticMembers
-
 struct Sub: Hashable {
   static func ==(_: Sub, _: Sub) -> Bool { return true }
   func hash(into hasher: inout Hasher) {}
