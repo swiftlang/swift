@@ -302,7 +302,7 @@ public func k(_ arg: FrozenPublicEnum) -> Int {
 // package-name; requires @unknown default.
 import Utils
 
-package func n(_ arg: FrozenUfiPkgEnum) -> Int {
+package func n(_ arg: FrozenUfiPkgEnum) -> Int { // expected-error {{cannot find type 'FrozenUfiPkgEnum' in scope}}
   switch arg { // no-warning
   case .one:
     return 1
@@ -311,8 +311,8 @@ package func n(_ arg: FrozenUfiPkgEnum) -> Int {
   }
 }
 
-package func g(_ arg: UfiPkgEnum) -> Int {
-  switch arg { // expected-error {{switch covers known cases, but 'UfiPkgEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
+package func g(_ arg: UfiPkgEnum) -> Int { // expected-error {{cannot find type 'UfiPkgEnum' in scope}}
+  switch arg {
   case .one:
     return 1
   case .two(let val):
@@ -321,8 +321,8 @@ package func g(_ arg: UfiPkgEnum) -> Int {
 }
 
 @inlinable
-package func gi(_ arg: UfiPkgEnum) -> Int {
-  switch arg { // expected-error {{switch covers known cases, but 'UfiPkgEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
+package func gi(_ arg: UfiPkgEnum) -> Int { // expected-error {{cannot find type 'UfiPkgEnum' in scope}}
+  switch arg {
   case .one:
     return 1
   case .two(let val):
