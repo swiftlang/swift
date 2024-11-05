@@ -6,19 +6,35 @@
 //
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
+
+// Build PlaygroundSupport module
 // RUN: %target-build-swift -whole-module-optimization -module-name PlaygroundSupport -emit-module-path %t/PlaygroundSupport.swiftmodule -parse-as-library -c -o %t/PlaygroundSupport.o %S/Inputs/SilentPCMacroRuntime.swift %S/Inputs/PlaygroundsRuntime.swift
-//
-// RUN: %target-build-swift -Xfrontend -playground -Xfrontend -playground-high-performance -o %t/main -I=%t %t/PlaygroundSupport.o %t/main.swift
-// RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
-//
-// RUN: %target-build-swift -Xfrontend -pc-macro -Xfrontend -playground -Xfrontend -playground-high-performance -o %t/main2 -I=%t %t/PlaygroundSupport.o %t/main.swift
-// RUN: %target-codesign %t/main2
-// RUN: %target-run %t/main2 | %FileCheck %s
-//
-// RUN: %target-build-swift -Xfrontend -playground -Xfrontend -playground-option -Xfrontend NoScopeEvents -Xfrontend -playground-option -Xfrontend NoFunctionParameters -o %t/main3 -I=%t %t/PlaygroundSupport.o %t/main.swift
-// RUN: %target-codesign %t/main3
-// RUN: %target-run %t/main3 | %FileCheck %s
+
+// -playground -playground-high-performance
+// RUN: %target-build-swift -swift-version 5 -Xfrontend -playground -Xfrontend -playground-high-performance -o %t/main5a -I=%t %t/PlaygroundSupport.o %t/main.swift
+// RUN: %target-build-swift -swift-version 6 -Xfrontend -playground -Xfrontend -playground-high-performance -o %t/main6a -I=%t %t/PlaygroundSupport.o %t/main.swift
+
+// -pc-macro -playground  -playground-high-performance
+// RUN: %target-build-swift -swift-version 5 -Xfrontend -pc-macro -Xfrontend -playground -Xfrontend -playground-high-performance -o %t/main5b -I=%t %t/PlaygroundSupport.o %t/main.swift
+// RUN: %target-build-swift -swift-version 6 -Xfrontend -pc-macro -Xfrontend -playground -Xfrontend -playground-high-performance -o %t/main6b -I=%t %t/PlaygroundSupport.o %t/main.swift
+
+// -playground -playground-option NoScopeEvents -playground-option NoFunctionParameters
+// RUN: %target-build-swift -swift-version 5 -Xfrontend -playground -Xfrontend -playground-option -Xfrontend NoScopeEvents -Xfrontend -playground-option -Xfrontend NoFunctionParameters -o %t/main5c -I=%t %t/PlaygroundSupport.o %t/main.swift
+// RUN: %target-build-swift -swift-version 6 -Xfrontend -playground -Xfrontend -playground-option -Xfrontend NoScopeEvents -Xfrontend -playground-option -Xfrontend NoFunctionParameters -o %t/main6c -I=%t %t/PlaygroundSupport.o %t/main.swift
+
+// RUN: %target-codesign %t/main5a
+// RUN: %target-codesign %t/main5b
+// RUN: %target-codesign %t/main5c
+// RUN: %target-codesign %t/main6a
+// RUN: %target-codesign %t/main6b
+// RUN: %target-codesign %t/main6c
+
+// RUN: %target-run %t/main5a | %FileCheck %s
+// RUN: %target-run %t/main5b | %FileCheck %s
+// RUN: %target-run %t/main5c | %FileCheck %s
+// RUN: %target-run %t/main6a | %FileCheck %s
+// RUN: %target-run %t/main6b | %FileCheck %s
+// RUN: %target-run %t/main6c | %FileCheck %s
 
 import PlaygroundSupport
 
