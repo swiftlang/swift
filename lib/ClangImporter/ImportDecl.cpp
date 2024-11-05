@@ -3336,8 +3336,16 @@ namespace {
         return property->getParsedAccessor(AccessorKind::Set);
       }
 
-      // Emit diagnostics for incorrect usage of "returns_unretained" and
-      // "returns_unretained" attributes
+      emitdiagnosticsForReturnsRetainedUnretainedAttrs(decl);
+
+      return importFunctionDecl(decl, importedName, correctSwiftName,
+                                std::nullopt);
+    }
+
+    /// Emit diagnostics for incorrect usage of SWIFT_RETURNS_RETAINED and
+    /// SWIFT_RETURNS_UNRETAINED
+    void emitdiagnosticsForReturnsRetainedUnretainedAttrs(
+        const clang::FunctionDecl *decl) {
       bool returnsRetainedAttrIsPresent = false;
       bool returnsUnretainedAttrIsPresent = false;
       if (decl->hasAttrs()) {
@@ -3359,8 +3367,7 @@ namespace {
                         decl);
         } else if (!returnsRetainedAttrIsPresent &&
                    !returnsUnretainedAttrIsPresent) {
-          Impl.diagnose(loc, diag::no_returns_retained_returns_unretained,
-                        decl);
+          diagnoseUnannotatedCxxApisReturningFRT(decl);
         }
       } else {
         if (returnsRetainedAttrIsPresent || returnsUnretainedAttrIsPresent) {
@@ -3371,9 +3378,44 @@ namespace {
               decl);
         }
       }
+    }
 
-      return importFunctionDecl(decl, importedName, correctSwiftName,
-                                std::nullopt);
+    /// Emit warnings for unannotated C++ APIs returning FRTs
+    void
+    diagnoseUnannotatedCxxApisReturningFRT(const clang::FunctionDecl *decl) {
+      bool returnsRetainedUnretainedDiagnosticsNeeded = false;
+      if (!isa<clang::CXXDeductionGuideDecl>(decl)) {
+        if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
+          if (canBeRefCountConventionAnnotated(methodDecl)) {
+            // normal c++ member method
+            returnsRetainedUnretainedDiagnosticsNeeded = true;
+          }
+        } else {
+          // global or top-level function
+          returnsRetainedUnretainedDiagnosticsNeeded = true;
+        }
+      }
+
+      if (returnsRetainedUnretainedDiagnosticsNeeded) {
+        HeaderLoc loc(decl->getLocation());
+        Impl.diagnose(loc, diag::no_returns_retained_returns_unretained, decl);
+      }
+    }
+
+    /// Helper routine to exclude things that can't be annotated currently
+    bool canBeRefCountConventionAnnotated(const clang::CXXMethodDecl *method) {
+      if (isa<clang::CXXConstructorDecl>(method) ||
+          isa<clang::CXXDestructorDecl>(method))
+        return false;
+
+      return !method->isOverloadedOperator() &&
+             !method->getDescribedFunctionTemplate() &&
+             !method->isTemplateInstantiation() &&
+             !method->isFunctionTemplateSpecialization() &&
+             !method->isDefaulted() && !method->isDeleted() &&
+             !method->getParent()->isLambda() &&
+             !method->isLambdaStaticInvoker() && !method->isVirtual() &&
+             method->isUserProvided();
     }
 
     /// Handles special functions such as subscripts and dereference operators.
