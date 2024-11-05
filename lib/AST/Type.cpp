@@ -3735,10 +3735,18 @@ void ParameterizedProtocolType::getRequirements(
   for (unsigned i : indices(argTypes)) {
     auto argType = argTypes[i];
     auto *assocType = assocTypes[i];
-    // Do a general type substitution here because the associated type might be
-    // from an inherited protocol, in which case we will evaluate a non-trivial
-    // conformance path.
-    auto subjectType = assocType->getDeclaredInterfaceType().subst(subMap);
+
+    Type subjectType;
+    if (baseType->isTypeParameter()) {
+      // Fast path.
+      subjectType = DependentMemberType::get(baseType, assocType);
+    } else {
+      // Do a general type substitution here because the associated type might be
+      // from an inherited protocol, in which case we will evaluate a non-trivial
+      // conformance path.
+      subjectType = assocType->getDeclaredInterfaceType().subst(subMap);
+    }
+
     reqs.emplace_back(RequirementKind::SameType, subjectType, argType);
   }
 }
