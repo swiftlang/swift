@@ -1039,6 +1039,10 @@ namespace swift {
     /// invocations directly from clang cc1 args.
     bool ClangImporterDirectCC1Scan = false;
 
+    /// Whether requires user of the binary module with bridging header to chain
+    /// its bridging header.
+    bool BridgingHeaderChaining = false;
+
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.
     llvm::hash_code getPCHHashComponents() const {
