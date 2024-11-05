@@ -17,6 +17,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -65,7 +66,7 @@ AvailabilityRange AvailabilityRange::forRuntimeTarget(const ASTContext &Ctx) {
 }
 
 std::optional<AvailabilityRange>
-UnmetAvailabilityRequirement::getRequiredNewerAvailabilityRange(
+AvailabilityConstraint::getRequiredNewerAvailabilityRange(
     ASTContext &ctx) const {
   switch (kind) {
   case Kind::AlwaysUnavailable:
@@ -77,7 +78,7 @@ UnmetAvailabilityRequirement::getRequiredNewerAvailabilityRange(
   }
 }
 
-bool UnmetAvailabilityRequirement::isConditionallySatisfiable() const {
+bool AvailabilityConstraint::isConditionallySatisfiable() const {
   switch (kind) {
   case Kind::AlwaysUnavailable:
   case Kind::RequiresVersion:

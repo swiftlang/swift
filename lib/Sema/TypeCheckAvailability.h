@@ -14,6 +14,7 @@
 #define SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
@@ -245,18 +246,18 @@ void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 
 /// Checks whether a declaration should be considered unavailable when referred
 /// to in the given declaration context and availability context and, if so,
-/// returns a result that describes the unmet availability requirements.
+/// returns a result that describes the unsatisfied constraint.
 /// Returns `std::nullopt` if the declaration is available.
-std::optional<UnmetAvailabilityRequirement>
-getUnmetDeclAvailabilityRequirement(const Decl *decl,
-                                    const DeclContext *declContext,
-                                    AvailabilityContext availabilityContext);
+std::optional<AvailabilityConstraint>
+getUnsatisfiedAvailabilityConstraint(const Decl *decl,
+                                     const DeclContext *declContext,
+                                     AvailabilityContext availabilityContext);
 
 /// Checks whether a declaration should be considered unavailable when referred
 /// to at the given source location in the given decl context and, if so,
-/// returns a result that describes the unmet availability requirements.
+/// returns a result that describes the unsatisfied constraint.
 /// Returns `std::nullopt` if the declaration is available.
-std::optional<UnmetAvailabilityRequirement> getUnmetDeclAvailabilityRequirement(
+std::optional<AvailabilityConstraint> getUnsatisfiedAvailabilityConstraint(
     const Decl *decl, const DeclContext *referenceDC, SourceLoc referenceLoc);
 
 /// Diagnose uses of the runtime support of the given type, such as

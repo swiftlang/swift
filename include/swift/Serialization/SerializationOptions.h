@@ -151,6 +151,7 @@ public:
 
   bool AutolinkForceLoad = false;
   bool SerializeAllSIL = false;
+  bool SerializeDebugInfoSIL = false;
   bool SerializeOptionsForDebugging = false;
   bool IsSIB = false;
   bool DisableCrossModuleIncrementalInfo = false;

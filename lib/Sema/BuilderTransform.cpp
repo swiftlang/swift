@@ -1318,7 +1318,7 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
 
   auto isUnavailable = [&](Decl *D) -> bool {
     auto loc = extractNearestSourceLoc(dc);
-    return getUnmetDeclAvailabilityRequirement(D, dc, loc).has_value();
+    return getUnsatisfiedAvailabilityConstraint(D, dc, loc).has_value();
   };
 
   bool foundMatch = false;

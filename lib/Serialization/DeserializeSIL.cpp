@@ -379,6 +379,97 @@ SILType SILDeserializer::getSILType(Type Ty, SILValueCategory Category,
       .getCategoryType(Category);
 }
 
+llvm::Expected<unsigned>
+SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
+  scratch.clear();
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    return maybeEntry.takeError();
+  llvm::BitstreamEntry entry = maybeEntry.get();
+
+  // EndBlock means the end of this SILFunction.
+  assert(entry.Kind != llvm::BitstreamEntry::EndBlock);
+  llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch);
+  return maybeKind;
+}
+
+llvm::Expected<const SILDebugScope *>
+SILDeserializer::readDebugScopes(SILFunction *F,
+                                 SmallVectorImpl<uint64_t> &scratch,
+                                 SILBuilder &Builder, unsigned kind) {
+
+  if (kind == SIL_DEBUG_SCOPE_REF) {
+    ValueID ScopeID;
+    SILDebugScopeRefLayout::readRecord(scratch, ScopeID);
+    assert(ParsedScopes.find(ScopeID) != ParsedScopes.end());
+    return ParsedScopes[ScopeID];
+  }
+
+  BCOffsetRAII restoreOffset(SILCursor);
+  const SILDebugScope *Scope = nullptr;
+  do {
+    ValueID ParentID = 0, InlinedID = 0, Row = 0, Column = 0, FName = 0;
+    TypeID FuncType = 0;
+    unsigned FuncCategory = 0;
+    unsigned isFuncParent = false;
+
+    SILDebugScopeLayout::readRecord(scratch, isFuncParent, ParentID, InlinedID,
+                                    Row, Column, FName, FuncType, FuncCategory);
+    assert(ParentID);
+
+    PointerUnion<const SILDebugScope *, SILFunction *> Parent = nullptr;
+    const SILDebugScope *InlinedCallSite = nullptr;
+
+    std::optional<SILLocation> Loc;
+    if (!Row && !Column && !FName)
+      Loc = SILLocation::invalid();
+    else
+      Loc = RegularLocation(SILLocation::FilenameAndLocation::alloc(
+          Row, Column, MF->getIdentifierText(FName), SILMod));
+
+    if (isFuncParent) {
+      Parent = getFuncForReference(MF->getIdentifierText(ParentID), true);
+      assert(Parent);
+    } else {
+      if (ParsedScopes.find(ParentID) == ParsedScopes.end())
+        return llvm::createStringError("Parent debug scope not found\n");
+      Parent = ParsedScopes[ParentID];
+    }
+
+    if (InlinedID) {
+      if (ParsedScopes.find(InlinedID) == ParsedScopes.end())
+        return llvm::createStringError("Inlined at debug scope not found\n");
+      InlinedCallSite = ParsedScopes[InlinedID];
+    }
+
+    if (isFuncParent)
+      Scope = new (SILMod) SILDebugScope(
+          Loc.value(), Parent.get<SILFunction *>(), nullptr, InlinedCallSite);
+    else
+      Scope = new (SILMod)
+          SILDebugScope(Loc.value(), nullptr,
+                        Parent.get<const SILDebugScope *>(), InlinedCallSite);
+
+    ParsedScopes.insert({ParsedScopes.size() + 1, Scope});
+
+    //  Fetch the next record.
+    auto maybeKind = readNextRecord(scratch);
+
+    if (!maybeKind)
+      return maybeKind.takeError();
+
+    kind = maybeKind.get();
+    // restore the offset after last sil debug scope
+    if (kind == SIL_DEBUG_SCOPE)
+      restoreOffset.reset();
+
+  } while (kind == SIL_DEBUG_SCOPE);
+
+  assert(Scope);
+  return Scope;
+}
+
 /// Helper function to find a SILDifferentiabilityWitness, given its mangled
 /// key.
 SILDifferentiabilityWitness *
@@ -457,7 +548,8 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name,
 }
 
 /// Helper function to find a SILFunction, given its name and type.
-SILFunction *SILDeserializer::getFuncForReference(StringRef name) {
+SILFunction *SILDeserializer::getFuncForReference(StringRef name,
+                                                  bool forDebugScope) {
   // Check to see if we have a function by this name already.
   SILFunction *fn = SILMod.lookUpFunction(name);
   if (fn)
@@ -465,11 +557,13 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name) {
 
   // Otherwise, look for a function with this name in the module.
   auto iter = FuncTable->find(name);
+
   if (iter == FuncTable->end())
     return nullptr;
 
-  auto maybeFn = readSILFunctionChecked(*iter, nullptr, name,
-                                        /*declarationOnly*/ true);
+  auto maybeFn =
+      readSILFunctionChecked(*iter, nullptr, name,
+                             /*declarationOnly*/ true, true, forDebugScope);
   if (!maybeFn) {
     // Ignore the failure and just pretend the function doesn't exist
     llvm::consumeError(maybeFn.takeError());
@@ -509,13 +603,14 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   return deserialized.get();
 }
 
-llvm::Expected<SILFunction *>
-SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
-                                        StringRef name, bool declarationOnly,
-                                        bool errorIfEmptyBody) {
+llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
+    DeclID FID, SILFunction *existingFn, StringRef name, bool declarationOnly,
+    bool errorIfEmptyBody, bool forDebugScope) {
   // We can't deserialize function bodies after IRGen lowering passes have
   // happened since other definitions in the module will no longer be in
   // canonical SIL form.
+  assert(!forDebugScope || declarationOnly); // debug scopes must always be read
+                                             // declaration only
   switch (SILMod.getStage()) {
   case SILStage::Raw:
   case SILStage::Canonical:
@@ -532,10 +627,33 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   PrettyStackTraceStringAction trace("deserializing SIL function", name);
 
-  auto &cacheEntry = Funcs[FID-1];
+  auto &cacheEntry = Funcs[FID - 1];
+
   if (cacheEntry.isFullyDeserialized() ||
-      (cacheEntry.isDeserialized() && declarationOnly))
-    return cacheEntry.get();
+      (cacheEntry.isDeserialized() && declarationOnly)) {
+    auto fn = cacheEntry.get();
+
+    // Functions onlyReferencedByDebugInfo (A) are a subset of functions
+    // referred to by debug scopes forDebugScope=true (B)
+
+    // I) Functions in A U B only ever get deserialized as zombies
+
+    // II) For rest of functions (B - A), there are two orders of
+    // deserialization:
+    //  i) Deserialized for debugging -> deserialized by linker/optimizer:
+    //    a) Deserialize as zombie. When referenced by linker/optimizer,
+    //    createDeclaration would resurrect function as normal
+    //  ii) Deserialized by linker/optimizer -> deserialized for debugging ->
+    //  no zombie created
+
+    if (fn->isZombie() && !forDebugScope) {
+      if (cacheEntry.isFullyDeserialized())
+        return nullptr;
+      // else function resurrected below by createDeclaration
+    } else {
+      return fn;
+    }
+  }
 
   BCOffsetRAII restoreOffset(SILCursor);
   if (llvm::Error Err = SILCursor.JumpToBit(cacheEntry.getOffset()))
@@ -570,7 +688,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
-      isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes;
+      isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
+      onlyReferencedByDebugInfo;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
@@ -578,9 +697,10 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
-      isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes, funcTyID,
-      replacedFunctionID, usedAdHocWitnessFunctionID, genericSigID,
-      clangNodeOwnerID, parentModuleID, SemanticsIDs);
+      isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
+      onlyReferencedByDebugInfo, funcTyID, replacedFunctionID,
+      usedAdHocWitnessFunctionID, genericSigID, clangNodeOwnerID,
+      parentModuleID, SemanticsIDs);
 
   if (funcTyID == 0)
     return MF->diagnoseFatal("SILFunction typeID is 0");
@@ -634,6 +754,10 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     usedAdHocWitnessFunction = getFuncForReference(usedAdHocWitnessFunctionStr);
   }
 
+  // don't want to load and return zombie if not for debugging
+  if (onlyReferencedByDebugInfo && !forDebugScope)
+    return nullptr;
+
   auto linkageOpt = fromStableSILLinkage(rawLinkage);
   if (!linkageOpt) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
@@ -652,7 +776,12 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // If we weren't handed a function, check for an existing
   // declaration in the output module.
   if (!existingFn) existingFn = SILMod.lookUpFunction(name);
+  assert(!existingFn || !existingFn->isZombie());
   auto fn = existingFn;
+
+  // if is debug and we have declaration, we don't care about deserialization
+  if (fn && forDebugScope)
+    return fn;
 
   // TODO: use the correct SILLocation from module.
   SILLocation loc = RegularLocation::getAutoGeneratedLocation();
@@ -667,6 +796,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   // If we have an existing function, verify that the types match up.
   if (fn) {
+    assert(!forDebugScope);
+
     if (fn->getLoweredType() != ty) {
       auto error = llvm::make_error<SILFunctionTypeMismatch>(
                      name,
@@ -721,7 +852,10 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   } else {
     // Otherwise, create a new function.
     fn = builder.createDeclaration(name, ty, loc);
-    fn->setLinkage(linkage);
+
+    // TODO: for functions deserialized for debug scopes, set linkage to private
+    // as public symbols make into the final binary even when zombies?
+    fn->setLinkage(forDebugScope ? SILLinkage::Private : linkage);
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
     fn->setSerializedKind(SerializedKind_t(serializedKind));
     fn->setThunk(IsThunk_t(isThunk));
@@ -758,7 +892,10 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     for (auto ID : SemanticsIDs) {
       fn->addSemanticsAttr(MF->getIdentifierText(ID));
     }
-    if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
+    if (forDebugScope)
+      SILMod.eraseFunction(fn);
+    if (Callback && !forDebugScope)
+      Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
 
   // First before we do /anything/ validate that our function is truly empty.
@@ -877,7 +1014,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   }
 
   GenericEnvironment *genericEnv = nullptr;
-  if (!declarationOnly)
+  // Generic signatures are stored for declarations as well in a debug context.
+  if (!declarationOnly || onlyReferencedByDebugInfo)
     genericEnv = MF->getGenericSignature(genericSigID).getGenericEnvironment();
 
   // If the next entry is the end of the block, then this function has
@@ -887,12 +1025,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     return maybeEntry.takeError();
   entry = maybeEntry.get();
   bool isEmptyFunction = (entry.Kind == llvm::BitstreamEntry::EndBlock);
-  assert((!isEmptyFunction || !genericEnv) &&
+  assert((!isEmptyFunction || !genericEnv || onlyReferencedByDebugInfo) &&
          "generic environment without body?!");
 
   // Remember this in our cache in case it's a recursive function.
   // Increase the reference count to keep it alive.
-  bool isFullyDeserialized = (isEmptyFunction || !declarationOnly);
+  bool isFullyDeserialized =
+      (isEmptyFunction || !declarationOnly || onlyReferencedByDebugInfo);
   if (cacheEntry.isDeserialized()) {
     assert(fn == cacheEntry.get() && "changing SIL function during deserialization!");
   } else {
@@ -902,6 +1041,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   // Stop here if we have nothing else to do.
   if (isEmptyFunction || declarationOnly) {
+    if (genericEnv)
+      fn->setGenericEnvironment(genericEnv);
     return fn;
   }
 
@@ -924,6 +1065,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   BasicBlockID = 0;
   BlocksByID.clear();
   UndefinedBlocks.clear();
+  ParsedScopes.clear();
 
   // The first two IDs are reserved for SILUndef.
   LastValueID = 1;
@@ -934,13 +1076,26 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // Another SIL_FUNCTION record means the end of this SILFunction.
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESS_TABLE record also means the end
   // of this SILFunction.
+  bool isFirstScope = true;
+  Builder.setCurrentDebugScope(fn->getDebugScope());
   while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
          kind != SIL_MOVEONLY_DEINIT && kind != SIL_WITNESS_TABLE &&
          kind != SIL_DIFFERENTIABILITY_WITNESS) {
     if (kind == SIL_BASIC_BLOCK)
       // Handle a SILBasicBlock record.
       CurrentBB = readSILBasicBlock(fn, CurrentBB, scratch);
-    else {
+    else if (kind == SIL_DEBUG_SCOPE || kind == SIL_DEBUG_SCOPE_REF) {
+      auto maybeScope = readDebugScopes(fn, scratch, Builder, kind);
+      if (!maybeScope)
+        return maybeScope.takeError();
+
+      auto Scope = maybeScope.get();
+      if (isFirstScope) {
+        fn->setDebugScope(Scope);
+        isFirstScope = false;
+      }
+      Builder.setCurrentDebugScope(Scope);
+    } else {
       // If CurrentBB is empty, just return fn. The code in readSILInstruction
       // assumes that such a situation means that fn is a declaration. Thus it
       // is using return false to mean two different things, error a failure
@@ -1198,8 +1353,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                          SILBuilder &Builder,
                                          unsigned RecordKind,
                                          SmallVectorImpl<uint64_t> &scratch) {
-  if (Fn)
-    Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            Attr = 0, Attr2 = 0, Attr3 = 0, Attr4 = 0, SubID = 0;
   ValueID ValID, ValID2, ValID3;
@@ -3551,10 +3704,11 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc,
     return nullptr;
   }
 
-  if (maybeFunc.get()) {
+  if (auto fn = maybeFunc.get()) {
     LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
                maybeFunc.get()->dump());
     assert(InFunc->getName() == maybeFunc.get()->getName());
+    assert(!fn->isZombie());
   }
 
   return maybeFunc.get();
@@ -3621,7 +3775,8 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numSpecAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
-      isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes;
+      isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
+      onlyReferencedByDebugInfo;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
@@ -3629,15 +3784,19 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       optimizationMode, perfConstr, subclassScope, hasCReferences, effect,
       numSpecAttrs, hasQualifiedOwnership, isWeakImported,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
-      isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes, funcTyID,
-      replacedFunctionID, usedAdHocWitnessFunctionID, genericSigID,
-      clangOwnerID, parentModuleID, SemanticsIDs);
+      isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
+      onlyReferencedByDebugInfo, funcTyID, replacedFunctionID,
+      usedAdHocWitnessFunctionID, genericSigID, clangOwnerID, parentModuleID,
+      SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
                             << " for SIL function " << Name << "\n");
     return false;
   }
+
+  if (onlyReferencedByDebugInfo)
+    return false;
 
   // Bail if it is not a required linkage.
   if (Linkage && linkage.value() != *Linkage)
@@ -3664,9 +3823,10 @@ SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
     return nullptr;
   }
 
-  if (maybeFunc.get()) {
+  if (auto fn = maybeFunc.get()) {
     LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
                maybeFunc.get()->dump());
+    assert(!fn->isZombie());
   }
   return maybeFunc.get();
 }

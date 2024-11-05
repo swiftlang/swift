@@ -4682,7 +4682,7 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
       loc = getLoc(anchor);
   }
 
-  return getUnmetDeclAvailabilityRequirement(D, DC, loc).has_value();
+  return getUnsatisfiedAvailabilityConstraint(D, DC, loc).has_value();
 }
 
 bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conformance,
@@ -4881,9 +4881,9 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
     // FIXME: Fully unavailable setters should cause the key path to be
     // readonly too.
-    auto unmetRequirement =
-        getUnmetDeclAvailabilityRequirement(setter, DC, referenceLoc);
-    if (unmetRequirement && unmetRequirement->isConditionallySatisfiable())
+    auto constraint =
+        getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc);
+    if (constraint && constraint->isConditionallySatisfiable())
       return true;
   }
 
