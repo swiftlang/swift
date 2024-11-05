@@ -144,9 +144,13 @@ func downloadToolchainAndRunTest(
 
     let swiftcPath = "\(toolchainDir)/usr/bin/swiftc"
     let swiftFrontendPath = "\(toolchainDir)/usr/bin/swift-frontend"
+    // Just for now just support macosx.
+    let platform = "macosx"
+    let swiftLibraryPath = "\(toolchainDir)/usr/lib/swift/\(platform)"
     log(shell("\(swiftcPath) --version").stdout)
     let exitCode = shell(
-      "\(script)", environment: ["SWIFTC": swiftcPath, "SWIFT_FRONTEND": swiftFrontendPath],
+      "\(script)", environment: ["SWIFTC": swiftcPath, "SWIFT_FRONTEND": swiftFrontendPath,
+        "SWIFT_LIBRARY_PATH": swiftLibraryPath],
       mustSucceed: false,
       verbose: verbose,
       extraArgs: extraArgs

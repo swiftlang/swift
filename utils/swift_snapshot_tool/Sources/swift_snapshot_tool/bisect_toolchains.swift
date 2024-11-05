@@ -6,7 +6,7 @@ struct BisectToolchains: AsyncParsableCommand {
     commandName: "bisect",
     discussion: """
       Bisects on exit status of attached script. Passes in name of swift as the
-      environment variabless SWIFTC and SWIFT_FRONTEND
+      environment variables \(environmentVariables).
       """)
 
   @Flag var platform: Platform = .osx
@@ -22,8 +22,9 @@ struct BisectToolchains: AsyncParsableCommand {
 
   @Option(
     help: """
-      The script that should be run. The environment variable
-      SWIFT_EXEC is used by the script to know where swift-frontend is
+      The script that should be run. It runs a specific swift compilation and
+      optionally program using the passed in environment variables
+      \(environmentVariables)
       """)
   var script: String
 

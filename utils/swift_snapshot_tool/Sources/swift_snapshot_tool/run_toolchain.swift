@@ -6,9 +6,9 @@ struct RunToolchains: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "run",
     discussion: """
-      Run a toolchain like bisect would. Passes in name of swift as the
-      environment variabless SWIFTC and SWIFT_FRONTEND
-      """)
+    Run a toolchain like bisect would. Passed the environment variables:
+    \(environmentVariables)
+    """)
 
   @Flag var platform: Platform = .osx
 
