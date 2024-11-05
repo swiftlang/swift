@@ -3033,7 +3033,7 @@ bool diagnoseExplicitUnavailability(
 }
 
 std::optional<AvailabilityConstraint>
-swift::getUnmetDeclAvailabilityRequirement(
+swift::getUnsatisfiedAvailabilityConstraint(
     const Decl *decl, const DeclContext *declContext,
     AvailabilityContext availabilityContext) {
   auto &ctx = declContext->getASTContext();
@@ -3075,10 +3075,10 @@ swift::getUnmetDeclAvailabilityRequirement(
 }
 
 std::optional<AvailabilityConstraint>
-swift::getUnmetDeclAvailabilityRequirement(const Decl *decl,
-                                           const DeclContext *referenceDC,
-                                           SourceLoc referenceLoc) {
-  return getUnmetDeclAvailabilityRequirement(
+swift::getUnsatisfiedAvailabilityConstraint(const Decl *decl,
+                                            const DeclContext *referenceDC,
+                                            SourceLoc referenceLoc) {
+  return getUnsatisfiedAvailabilityConstraint(
       decl, referenceDC,
       TypeChecker::availabilityAtLocation(referenceLoc, referenceDC));
 }
@@ -4094,10 +4094,10 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   auto *DC = Where.getDeclContext();
   auto &ctx = DC->getASTContext();
 
-  auto unmetRequirement =
-      getUnmetDeclAvailabilityRequirement(D, DC, Where.getAvailability());
+  auto constraint =
+      getUnsatisfiedAvailabilityConstraint(D, DC, Where.getAvailability());
 
-  if (unmetRequirement && !unmetRequirement->isConditionallySatisfiable()) {
+  if (constraint && !constraint->isConditionallySatisfiable()) {
     // FIXME: diagnoseExplicitUnavailability should take an unmet requirement
     if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
       return true;
@@ -4121,10 +4121,10 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
         && isa<ProtocolDecl>(D))
     return false;
 
-  if (!unmetRequirement)
+  if (!constraint)
     return false;
 
-  auto requiredRange = unmetRequirement->getRequiredNewerAvailabilityRange(ctx);
+  auto requiredRange = constraint->getRequiredNewerAvailabilityRange(ctx);
 
   // Diagnose (and possibly signal) for potential unavailability
   if (!requiredRange)
@@ -4601,9 +4601,9 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       return true;
     }
 
-    auto unmetRequirement = getUnmetDeclAvailabilityRequirement(
+    auto constraint = getUnsatisfiedAvailabilityConstraint(
         ext, where.getDeclContext(), where.getAvailability());
-    if (unmetRequirement) {
+    if (constraint) {
       // FIXME: diagnoseExplicitUnavailability() should take unmet requirement
       if (diagnoseExplicitUnavailability(
               loc, rootConf, ext, where,
@@ -4614,7 +4614,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
       // Diagnose (and possibly signal) for potential unavailability
       if (auto requiredRange =
-              unmetRequirement->getRequiredNewerAvailabilityRange(ctx)) {
+              constraint->getRequiredNewerAvailabilityRange(ctx)) {
         if (diagnosePotentialUnavailability(rootConf, ext, loc, DC,
                                             *requiredRange)) {
           maybeEmitAssociatedTypeNote();

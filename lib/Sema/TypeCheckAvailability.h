@@ -246,18 +246,18 @@ void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 
 /// Checks whether a declaration should be considered unavailable when referred
 /// to in the given declaration context and availability context and, if so,
-/// returns a result that describes the unmet availability requirements.
+/// returns a result that describes the unsatisfied constraint.
 /// Returns `std::nullopt` if the declaration is available.
 std::optional<AvailabilityConstraint>
-getUnmetDeclAvailabilityRequirement(const Decl *decl,
-                                    const DeclContext *declContext,
-                                    AvailabilityContext availabilityContext);
+getUnsatisfiedAvailabilityConstraint(const Decl *decl,
+                                     const DeclContext *declContext,
+                                     AvailabilityContext availabilityContext);
 
 /// Checks whether a declaration should be considered unavailable when referred
 /// to at the given source location in the given decl context and, if so,
-/// returns a result that describes the unmet availability requirements.
+/// returns a result that describes the unsatisfied constraint.
 /// Returns `std::nullopt` if the declaration is available.
-std::optional<AvailabilityConstraint> getUnmetDeclAvailabilityRequirement(
+std::optional<AvailabilityConstraint> getUnsatisfiedAvailabilityConstraint(
     const Decl *decl, const DeclContext *referenceDC, SourceLoc referenceLoc);
 
 /// Diagnose uses of the runtime support of the given type, such as
