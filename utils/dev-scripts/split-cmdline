@@ -88,7 +88,10 @@ def main():
                 #     swiftc --help;                \
                 #     xcrun swift-frontend --help;  \
                 #     clang --help;                 \
-                #   ) | rg -o -r '$3 $2' -- ' ((-[\w-]+),)? (-[\w-]+) <' | sed 's/ *$//' | tr ' ' '\n' | sort | uniq | sed -E 's/(.*)/"\1",/'
+                #   ) | rg -o -r '$3 $2' -- ' ((-[\w-]+),)? (-[\w-]+) <' \
+                #     | sed 's/ *$//' | tr ' ' '\n' \
+                #     | sort | uniq \
+                #     | sed -E 's/(.*)/"\1",/'
                 "--analyzer-output",
                 "--build-system",
                 "--cache-path",
