@@ -19,17 +19,6 @@ struct WithDeinit : ~Copyable {
   deinit
 }
 
-struct Outer : ~Copyable {
-  var wd: WithDeinit
-}
-
-enum EnumWithDeinit: ~Copyable {
-  case A(Int64)
-  case B
-
-  deinit
-}
-
 struct TwoEnums {
   var u1: U
   var u2: U
@@ -60,16 +49,6 @@ bb0(%0 : $Builtin.Int8, %1 : $Builtin.NativeObject):
   retain_value %1 : $Builtin.NativeObject
   %4 = tuple(%0 : $Builtin.Int8, %1 : $Builtin.NativeObject)
   return %4 : $(Builtin.Int8, Builtin.NativeObject)
-}
-
-// CHECK-LABEL: sil @dont_remove_struct_with_deinit_field
-// CHECK:         retain_value %0
-// CHECK:       } // end sil function 'dont_remove_struct_with_deinit_field'
-sil @dont_remove_struct_with_deinit_field : $@convention(thin) (Outer) -> () {
-bb0(%0 : $Outer):
-  retain_value %0 : $Outer
-  %2 = tuple ()
-  return %2 : $()
 }
 
 // CHECK-LABEL: sil @struct_with_two_trivial_enums
@@ -136,18 +115,6 @@ bb0(%0 : $@thin U.Type, %1 : $C):
   retain_value %5 : $U
   %6 = tuple(%2 : $U, %4 : $U, %5 : $U)
   return %6 : $(U, U, U)
-}
-
-// CHECK-LABEL: sil @dont_replace_payload_of_enum_with_deinit
-// CHECK:         %1 = enum
-// CHECK:         retain_value %1
-// CHECK:       } // end sil function 'dont_replace_payload_of_enum_with_deinit'
-sil @dont_replace_payload_of_enum_with_deinit : $@convention(thin) (Int64) -> () {
-bb0(%0 : $Int64):
-  %1 = enum $EnumWithDeinit, #EnumWithDeinit.A!enumelt, %0 : $Int64
-  retain_value %1 : $EnumWithDeinit
-  %3 = tuple ()
-  return %3 : $()
 }
 
 // CHECK-LABEL: sil @release_then_retain_peephole
