@@ -3032,7 +3032,7 @@ bool diagnoseExplicitUnavailability(
   return true;
 }
 
-std::optional<UnmetAvailabilityRequirement>
+std::optional<AvailabilityConstraint>
 swift::getUnmetDeclAvailabilityRequirement(
     const Decl *decl, const DeclContext *declContext,
     AvailabilityContext availabilityContext) {
@@ -3056,25 +3056,25 @@ swift::getUnmetDeclAvailabilityRequirement(
       if ((attr->isLanguageVersionSpecific() ||
            attr->isPackageDescriptionVersionSpecific()) &&
           attr->Introduced.has_value())
-        return UnmetAvailabilityRequirement::forRequiresVersion(attr);
+        return AvailabilityConstraint::forRequiresVersion(attr);
 
-      return UnmetAvailabilityRequirement::forAlwaysUnavailable(attr);
+      return AvailabilityConstraint::forAlwaysUnavailable(attr);
 
     case AvailableVersionComparison::Obsoleted:
-      return UnmetAvailabilityRequirement::forObsoleted(attr);
+      return AvailabilityConstraint::forObsoleted(attr);
     }
   }
 
   // Check whether the declaration is available in a newer platform version.
   auto rangeAndAttr = AvailabilityInference::availableRangeAndAttr(decl);
   if (!availabilityContext.getPlatformRange().isContainedIn(rangeAndAttr.first))
-    return UnmetAvailabilityRequirement::forIntroducedInNewerVersion(
+    return AvailabilityConstraint::forIntroducedInNewerVersion(
         rangeAndAttr.second);
 
   return std::nullopt;
 }
 
-std::optional<UnmetAvailabilityRequirement>
+std::optional<AvailabilityConstraint>
 swift::getUnmetDeclAvailabilityRequirement(const Decl *decl,
                                            const DeclContext *referenceDC,
                                            SourceLoc referenceLoc) {
