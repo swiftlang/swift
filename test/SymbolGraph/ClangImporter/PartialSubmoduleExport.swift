@@ -3,7 +3,10 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-symbolgraph-extract -sdk %clang-importer-sdk -module-name PartialSubmoduleExport -I %t/PartialSubmoduleExport -output-dir %t -pretty-print -v
+
 // RUN: %FileCheck %s --input-file %t/PartialSubmoduleExport.symbols.json
+// check the missing symbols separately to account for arbitrary ordering
+// RUN: %FileCheck %s --input-file %t/PartialSubmoduleExport.symbols.json --check-prefix MISSING
 
 // REQUIRES: objc_interop
 
@@ -67,6 +70,8 @@ static int groupATwo = 2;
 #include "GroupBOne.h"
 #include "GroupBTwo.h"
 
+// Because GroupB was not exported by itself, this symbol should be missing
+// MISSING-NOT: "precise": "c:GroupB.h@groupBVar"
 static int groupBVar = 0;
 
 //--- PartialSubmoduleExport/GroupB/GroupBOne.h
@@ -76,5 +81,5 @@ static int groupBOne = 1;
 //--- PartialSubmoduleExport/GroupB/GroupBTwo.h
 // Because GroupBTwo is not exported in the top-level module map,
 // this shouldn't be in the symbol graph
-// CHECK-NOT: "precise": "c:GroupBTwo.h@groupBTwo"
+// MISSING-NOT: "precise": "c:GroupBTwo.h@groupBTwo"
 static int groupBTwo = 2;
