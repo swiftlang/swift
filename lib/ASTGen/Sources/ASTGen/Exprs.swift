@@ -46,17 +46,13 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
       .discardAssignmentExpr, .declReferenceExpr, .dictionaryExpr, .doExpr,
       .editorPlaceholderExpr, .floatLiteralExpr, .forceUnwrapExpr, .functionCallExpr,
       .genericSpecializationExpr, .ifExpr, .infixOperatorExpr, .inOutExpr,
-      .integerLiteralExpr, .isExpr, .macroExpansionExpr, .memberAccessExpr, .nilLiteralExpr,
+      .integerLiteralExpr, .isExpr, .keyPathExpr, .macroExpansionExpr, .memberAccessExpr, .nilLiteralExpr,
       .optionalChainingExpr, .packElementExpr, .packExpansionExpr, .patternExpr, .postfixIfConfigExpr,
       .postfixOperatorExpr, .prefixOperatorExpr, .regexLiteralExpr, .sequenceExpr,
       .simpleStringLiteralExpr, .subscriptCallExpr, .stringLiteralExpr, .superExpr,
       .switchExpr, .tryExpr, .tupleExpr, .typeExpr, .unresolvedAsExpr, .unresolvedIsExpr,
       .unresolvedTernaryExpr, .ternaryExpr:
       break
-
-    // Known unimplemented kinds.
-    case .keyPathExpr:
-      return false
 
     // Unknown expr kinds.
     case _ where current.is(ExprSyntax.self):
@@ -129,8 +125,8 @@ extension ASTGenVisitor {
       return self.generate(integerLiteralExpr: node).asExpr
     case .isExpr:
       preconditionFailure("IsExprSyntax only appear after operator folding")
-    case .keyPathExpr:
-      break
+    case .keyPathExpr(let node):
+      return self.generate(keyPathExpr: node)
     case .macroExpansionExpr(let node):
       return self.generate(macroExpansionExpr: node).asExpr
     case .memberAccessExpr(let node):
@@ -406,14 +402,10 @@ extension ASTGenVisitor {
   func generate(functionCallExpr node: FunctionCallExprSyntax, postfixIfConfigBaseExpr: BridgedExpr? = nil) -> BridgedCallExpr {
     if !node.arguments.isEmpty || node.trailingClosure == nil {
       if node.leftParen == nil {
-        self.diagnose(
-          Diagnostic(node: node, message: MissingChildTokenError(parent: node, kindOfTokenMissing: .leftParen))
-        )
+        self.diagnose(.missingChildToken(parent: node, kindOfTokenMissing: .leftParen))
       }
       if node.rightParen == nil {
-        self.diagnose(
-          Diagnostic(node: node, message: MissingChildTokenError(parent: node, kindOfTokenMissing: .rightParen))
-        )
+        self.diagnose(.missingChildToken(parent: node, kindOfTokenMissing: .rightParen))
       }
     }
 
@@ -533,6 +525,118 @@ extension ASTGenVisitor {
       declContext: declContext,
       mustBeExpr: true
     )
+  }
+
+  func generate(keyPathComponent node: KeyPathComponentSyntax, baseExpr: BridgedExpr) -> BridgedExpr {
+    switch node.component {
+    case .property(let prop):
+      let dotLoc = self.generateSourceLoc(node.period)
+      if prop.declName.baseName.presence == .missing {
+        return BridgedErrorExpr.create(
+          self.ctx,
+          loc: BridgedSourceRange(start: dotLoc, end: dotLoc)
+        ).asExpr
+      } else if prop.declName.baseName.keywordKind == .`self` {
+        // TODO: Diagnose if there's arguments
+        assert(prop.declName.argumentNames == nil)
+
+        return BridgedDotSelfExpr.createParsed(
+          self.ctx,
+          subExpr: baseExpr,
+          dotLoc: dotLoc,
+          selfLoc: self.generateSourceLoc(prop.declName)
+        ).asExpr
+      } else {
+        let declNameRef = self.generateDeclNameRef(declReferenceExpr: prop.declName)
+        return BridgedUnresolvedDotExpr.createParsed(
+          self.ctx,
+          base: baseExpr,
+          dotLoc: dotLoc,
+          name: declNameRef.name,
+          nameLoc: declNameRef.loc
+        ).asExpr
+      }
+
+    case .optional(let comp):
+      if comp.questionOrExclamationMark.rawText == "!" {
+        return BridgedForceValueExpr.createParsed(
+          self.ctx,
+          subExpr: baseExpr,
+          exclaimLoc: self.generateSourceLoc(comp.questionOrExclamationMark)
+        ).asExpr
+      } else {
+        return BridgedBindOptionalExpr.createParsed(
+          self.ctx,
+          subExpr: baseExpr,
+          questionLoc: self.generateSourceLoc(comp.questionOrExclamationMark)
+        ).asExpr
+      }
+
+    case .subscript(let comp):
+      return BridgedSubscriptExpr.createParsed(
+        self.ctx,
+        baseExpr: baseExpr,
+        args: self.generateArgumentList(
+          leftParen: comp.leftSquare,
+          labeledExprList: comp.arguments,
+          rightParen: comp.rightSquare,
+          trailingClosure: nil,
+          additionalTrailingClosures: nil
+        )
+      ).asExpr
+    }
+  }
+
+  func generate(keyPathExpr node: KeyPathExprSyntax) -> BridgedExpr {
+    guard !node.components.isEmpty else {
+      // FIXME: Diagnostics KeyPath expression without any component.
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
+    }
+
+    var rootExpr: BridgedExpr?
+    if let parsedType = node.root, !parsedType.is(MissingTypeSyntax.self) {
+      let rootType = self.generate(type: parsedType)
+      rootExpr = BridgedTypeExpr.createParsed(self.ctx, type: rootType).asExpr
+    } else {
+      rootExpr = nil
+    }
+
+    var inRoot = rootExpr != nil
+    var pathExpr: BridgedExpr? = nil
+
+    for component in node.components {
+      if inRoot {
+        switch component.component {
+        case // "root" expression is separated by '.?' or '.[idx]'
+          .optional(_) where component.period != nil,
+          .subscript(_) where component.period != nil:
+          inRoot = false
+        default:
+          rootExpr = self.generate(keyPathComponent: component, baseExpr: rootExpr!)
+          continue
+        }
+      }
+
+      if pathExpr == nil {
+        // 'KeyPathDotExpr' is a dummy base expression.
+        pathExpr = BridgedKeyPathDotExpr.createParsed(
+          self.ctx,
+          // Use 'component' instead of 'component.period' because period can
+          // be nil (e.g. '\?'), but 'loc' must be a valid location.
+          loc: self.generateSourceLoc(component)
+        ).asExpr
+      }
+
+      pathExpr = self.generate(keyPathComponent: component, baseExpr: pathExpr!)
+    }
+
+    return BridgedKeyPathExpr.createParsed(
+      self.ctx,
+      backslashLoc: self.generateSourceLoc(node.backslash),
+      parsedRoot: rootExpr.asNullable,
+      parsedPath: pathExpr.asNullable,
+      hasLeadingDot: rootExpr == nil
+    ).asExpr
   }
 
   struct FreestandingMacroExpansionInfo {

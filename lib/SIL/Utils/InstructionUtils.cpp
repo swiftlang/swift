@@ -27,8 +27,13 @@
 #include "swift/SIL/SILVisitor.h"
 
 #include "clang/AST/DeclObjC.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
+
+static llvm::cl::opt<bool> EnableExpandAll("enable-expand-all",
+                                           llvm::cl::init(false));
+
 
 SILValue swift::lookThroughOwnershipInsts(SILValue v) {
   while (true) {
@@ -1411,4 +1416,30 @@ swift::lookUpFunctionInWitnessTable(WitnessMethodInst *wmi,
   SILModule &mod = wmi->getModule();
   return mod.lookUpFunctionInWitnessTable(wmi->getConformance(), wmi->getMember(),
                                           wmi->isSpecialized(), linkingMode);
+}
+
+// True if a type can be expanded without a significant increase to code size.
+//
+// False if expanding a type is invalid. For example, expanding a
+// struct-with-deinit drops the deinit.
+bool swift::shouldExpand(SILModule &module, SILType ty) {
+  // FIXME: Expansion
+  auto expansion = TypeExpansionContext::minimal();
+
+  if (module.Types.getTypeLowering(ty, expansion).isAddressOnly()) {
+    return false;
+  }
+  // A move-only-with-deinit type cannot be SROA.
+  //
+  // TODO: we could loosen this requirement if all paths lead to a drop_deinit.
+  if (auto *nominalTy = ty.getNominalOrBoundGenericNominal()) {
+    if (nominalTy->getValueTypeDestructor())
+      return false;
+  }
+  if (EnableExpandAll) {
+    return true;
+  }
+
+  unsigned numFields = module.Types.countNumberOfFields(ty, expansion);
+  return (numFields <= 6);
 }

@@ -164,7 +164,7 @@ struct ProjectOptions: ParsableArguments {
     name: .customLong("stdlib-swift"), inversion: .prefixedNo,
     help: """
       Generate targets for Swift files in the standard library. This requires
-      using Xcode with with a main development snapshot (and as such is disabled
+      using Xcode with a main development snapshot (and as such is disabled
       by default).
       """
   )

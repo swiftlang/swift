@@ -524,6 +524,7 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   Opts.PrintMissingImports =
     !Args.hasArg(OPT_disable_print_missing_imports_in_module_interface);
   Opts.ABIComments = Args.hasArg(OPT_abi_comments_in_module_interface);
+  Opts.DisablePackageNameForNonPackageInterface |= Args.hasArg(OPT_disable_print_package_name_for_non_package_interface);
 
   if (const Arg *A = Args.getLastArg(OPT_library_level)) {
     StringRef contents = A->getValue();
@@ -555,8 +556,8 @@ static bool ShouldIncludeModuleInterfaceArg(const Arg *A) {
 
 static bool IsPackageInterfaceFlag(const Arg *A, ArgList &Args) {
   return A->getOption().matches(options::OPT_package_name) &&
-         !Args.hasArg(
-             options::OPT_print_package_name_in_non_package_interface);
+         Args.hasArg(
+             options::OPT_disable_print_package_name_for_non_package_interface);
 }
 
 static bool IsPrivateInterfaceFlag(const Arg *A, ArgList &Args) {

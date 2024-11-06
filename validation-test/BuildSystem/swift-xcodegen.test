@@ -8,8 +8,6 @@
 # REQUIRES: standalone_build
 # REQUIRES: target-same-as-host
 
-# REQUIRES: issue_77407
-
 # First copy swift-xcodegen to the temporary location
 # so we don't touch the user's build, and make sure
 # we're doing a clean build.

@@ -340,7 +340,7 @@ extension ASTGenVisitor {
     case .`init`:
       return .`init`
     default:
-      self.diagnose(Diagnostic(node: specifier, message: UnknownAccessorSpecifierError(specifier)))
+      self.diagnose(.unknownAccessorSpecifier(specifier))
       return nil
     }
   }
@@ -349,7 +349,13 @@ extension ASTGenVisitor {
     accessorDecl node: AccessorDeclSyntax,
     for storage: BridgedAbstractStorageDecl
   ) -> BridgedAccessorDecl? {
-    // TODO: Attributes and modifier.
+    // FIXME: Attributes.
+    var attrs = BridgedDeclAttributes()
+    if
+      let modifier = node.modifier,
+      let attr = self.generate(declModifier: modifier) {
+      attrs.add(attr)
+    }
 
     guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier) else {
       // TODO: We could potentially recover if this is the first accessor by treating
@@ -368,6 +374,7 @@ extension ASTGenVisitor {
       throwsSpecifierLoc: self.generateSourceLoc(node.effectSpecifiers?.throwsClause),
       thrownType: self.generate(type: node.effectSpecifiers?.thrownError)
     )
+    accessor.asDecl.setAttrs(attrs)
     if let body = node.body {
       self.withDeclContext(accessor.asDeclContext) {
         accessor.setParsedBody(self.generate(codeBlock: body))
@@ -448,7 +455,7 @@ extension ASTGenVisitor {
         let storage = primaryVar.asAbstractStorageDecl
         storage.setAccessors(generate(accessorBlock: accessors, for: storage))
       } else {
-        self.diagnose(Diagnostic(node: binding.pattern, message: NonTrivialPatternForAccessorError()))
+        self.diagnose(.nonTrivialPatternForAccessor(binding.pattern))
       }
     }
     return BridgedPatternBindingEntry(
@@ -667,9 +674,7 @@ extension ASTGenVisitor {
       fixity = value
     } else {
       fixity = .infix
-      self.diagnose(
-        Diagnostic(node: node.fixitySpecifier, message: UnexpectedTokenKindError(token: node.fixitySpecifier))
-      )
+      self.diagnose(.unexpectedTokenKind(token: node.fixitySpecifier))
     }
 
     return .createParsed(
@@ -712,9 +717,7 @@ extension ASTGenVisitor {
     }
 
     func diagnoseDuplicateSyntax(_ duplicate: some SyntaxProtocol, original: some SyntaxProtocol) {
-      self.diagnose(
-        Diagnostic(node: duplicate, message: DuplicateSyntaxError(duplicate: duplicate, original: original))
-      )
+      self.diagnose(.duplicateSyntax(duplicate: duplicate, original: original))
     }
 
     let body = node.groupAttributes.reduce(into: PrecedenceGroupBody()) { body, element in
@@ -735,7 +738,7 @@ extension ASTGenVisitor {
             body.lowerThanRelation = relation
           }
         default:
-          return self.diagnose(Diagnostic(node: keyword, message: UnexpectedTokenKindError(token: keyword)))
+          return self.diagnose(.unexpectedTokenKind(token: keyword))
         }
       case .precedenceGroupAssignment(let assignment):
         if let current = body.assignment {
@@ -757,7 +760,7 @@ extension ASTGenVisitor {
       if let value = BridgedAssociativity(from: token.keywordKind) {
         associativityValue = value
       } else {
-        self.diagnose(Diagnostic(node: token, message: UnexpectedTokenKindError(token: token)))
+        self.diagnose(.unexpectedTokenKind(token: token))
         associativityValue = .none
       }
     } else {
@@ -769,7 +772,7 @@ extension ASTGenVisitor {
       if token.keywordKind == .true {
         assignmentValue = true
       } else {
-        self.diagnose(Diagnostic(node: token, message: UnexpectedTokenKindError(token: token)))
+        self.diagnose(.unexpectedTokenKind(token: token))
         assignmentValue = false
       }
     } else {
@@ -824,7 +827,7 @@ extension ASTGenVisitor {
       if let value = BridgedImportKind(from: specifier.keywordKind) {
         importKind = value
       } else {
-        self.diagnose(Diagnostic(node: specifier, message: UnexpectedTokenKindError(token: specifier)))
+        self.diagnose(.unexpectedTokenKind(token: specifier))
         importKind = .module
       }
     } else {

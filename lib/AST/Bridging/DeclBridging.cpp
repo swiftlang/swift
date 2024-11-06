@@ -346,6 +346,8 @@ static void setParsedMembers(IterableDeclContext *IDC,
     }
   }
 
+  IDC->setMaybeHasOperatorDeclarations();
+  IDC->setMaybeHasNestedClassDeclarations();
   ctx.evaluator.cacheOutput(
       ParseMembersRequest{IDC},
       FingerprintAndMembers{std::nullopt, ctx.AllocateCopy(members)});
