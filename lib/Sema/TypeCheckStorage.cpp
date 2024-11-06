@@ -2630,6 +2630,10 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
                                     AccessorKind kind) const {
   auto &ctx = storage->getASTContext();
 
+  if (auto *accessor = storage->getAccessor(kind)) {
+    return accessor;
+  }
+
   switch (kind) {
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:

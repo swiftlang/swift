@@ -3050,10 +3050,8 @@ bool AbstractStorageDecl::requiresOpaqueModify2Coroutine() const {
       false);
 }
 
-AccessorDecl *AbstractStorageDecl::getSynthesizedAccessor(AccessorKind kind) const {
-  if (auto *accessor = getAccessor(kind))
-    return accessor;
-
+AccessorDecl *
+AbstractStorageDecl::getSynthesizedAccessor(AccessorKind kind) const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
     SynthesizeAccessorRequest{const_cast<AbstractStorageDecl *>(this), kind},
@@ -7112,7 +7110,10 @@ void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
 void
 AbstractStorageDecl::setSynthesizedAccessor(AccessorKind kind,
                                             AccessorDecl *accessor) {
-  assert(!getAccessor(kind) && "accessor already exists");
+  if (auto *current = getAccessor(kind)) {
+    assert(current == accessor && "different accessor of this kind exists");
+    return;
+  }
   assert(accessor->getAccessorKind() == kind);
 
   auto accessors = Accessors.getPointer();
