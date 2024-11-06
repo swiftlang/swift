@@ -125,16 +125,14 @@ func replaceTypeName(_ type: TypeSyntax, _ name: TokenSyntax) -> TypeSyntax {
   return TypeSyntax(idType.with(\.name, name))
 }
 
-func getPointerMutability(text: String) -> Mutability {
+func getPointerMutability(text: String) -> Mutability? {
   switch text {
   case "UnsafePointer": return .Immutable
   case "UnsafeMutablePointer": return .Mutable
   case "UnsafeRawPointer": return .Immutable
   case "UnsafeMutableRawPointer": return .Mutable
   default:
-    throw DiagnosticError(
-      "expected Unsafe[Mutable][Raw]Pointer type for type \(prev)"
-        + " - first type token is '\(text)'", node: name)
+    return nil
   }
 }
 
@@ -166,8 +164,11 @@ func transformType(_ prev: TypeSyntax, _ variant: Variant, _ isSizedBy: Bool) th
     throw DiagnosticError("raw pointers only supported for SizedBy", node: name)
   }
 
-  let kind: Mutability =
-    getPointerMutability(text: text)
+  guard let kind: Mutability = getPointerMutability(text: text) else {
+    throw DiagnosticError(
+      "expected Unsafe[Mutable][Raw]Pointer type for type \(prev)"
+        + " - first type token is '\(text)'", node: name)
+  }
   let token = getSafePointerName(mut: kind, generateSpan: variant.generateSpan, isRaw: isSizedBy)
   if isSizedBy {
     return TypeSyntax(IdentifierTypeSyntax(name: token))
@@ -543,7 +544,7 @@ public struct PointerBoundsMacro: PeerMacro {
     let endParamIndexArg = try getArgumentByName(argumentList, "end")
     let endParamIndex: Int = try getIntLiteralValue(endParamIndexArg)
     let nonescapingExprArg = getOptionalArgumentByName(argumentList, "nonescaping")
-    let nonescaping = nonescapingExprArg != nil && try getBoolLiteralValue(nonescapingExprArg!)
+    let nonescaping = try nonescapingExprArg != nil && getBoolLiteralValue(nonescapingExprArg!)
     return EndedBy(
       pointerIndex: startParamIndex, endIndex: endParamIndex, nonescaping: nonescaping,
       original: ExprSyntax(enumConstructorExpr))
@@ -615,10 +616,9 @@ public struct PointerBoundsMacro: PeerMacro {
       let i = pointerArg.pointerIndex
       if i < 1 || i > paramCount {
         let noteMessage =
-          paramCount > 0 ?
-            "function \(funcDecl.name) has parameter indices 1..\(paramCount)"
-          :
-            "function \(funcDecl.name) has no parameters"
+          paramCount > 0
+          ? "function \(funcDecl.name) has parameter indices 1..\(paramCount)"
+          : "function \(funcDecl.name) has no parameters"
         throw DiagnosticError(
           "pointer index out of bounds", node: pointerArg.original,
           notes: [
@@ -670,12 +670,11 @@ public struct PointerBoundsMacro: PeerMacro {
         })
       let newSignature = try builder.buildFunctionSignature([:], variant)
       let checks =
-        variant.skipTrivialCount ?
-          [] as [CodeBlockItemSyntax]
-        :
-          try builder.buildBoundsChecks(variant).map { e in
-            CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
-          }
+        variant.skipTrivialCount
+        ? [] as [CodeBlockItemSyntax]
+        : try builder.buildBoundsChecks(variant).map { e in
+          CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
+        }
       let call = CodeBlockItemSyntax(
         item: CodeBlockItemSyntax.Item(
           ReturnStmtSyntax(
