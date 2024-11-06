@@ -316,21 +316,21 @@ public struct ImplAUnderscoredCoroutineAccessors : ~Copyable & P1 {
 // CHECK:         [[VALUE_BORROW:%[^,]+]] = begin_borrow [[VALUE_COPY]]
 // CHECK:         yield [[VALUE_BORROW]]
 // CHECK-SAME:        resume [[SUCCESS:bb[0-9]+]]
-// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]          
-// CHECK:       [[SUCCESS]]:                                              
+// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]
+// CHECK:       [[SUCCESS]]:
 // CHECK:         end_borrow [[VALUE_BORROW]]
 // CHECK:         destroy_value [[VALUE_COPY]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_borrow [[SELF_BORROW]]
 // CHECK:         destroy_value [[SELF_COPY]]
 // CHECK:         return
-// CHECK:       [[FAILURE]]:                                              
+// CHECK:       [[FAILURE]]:
 // CHECK:         end_borrow [[VALUE_BORROW]]
 // CHECK:         destroy_value [[VALUE_COPY]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_borrow [[SELF_BORROW]]
 // CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         unwind                                          
+// CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements34ImplAUnderscoredCoroutineAccessorsV4ubgsAA1UVvy'
 // CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvrTW : {{.*}} {
 // CHECK:       bb0(
@@ -422,21 +422,21 @@ public struct ImplBUnderscoredCoroutineAccessors : ~Copyable & P2 {
 // CHECK:         [[VALUE_BORROW:%[^,]+]] = begin_borrow [[VALUE_COPY]]
 // CHECK:         yield [[VALUE_BORROW]]
 // CHECK-SAME:        resume [[SUCCESS:bb[0-9]+]]
-// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]          
-// CHECK:       [[SUCCESS]]:                                              
+// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]
+// CHECK:       [[SUCCESS]]:
 // CHECK:         end_borrow [[VALUE_BORROW]]
 // CHECK:         destroy_value [[VALUE_COPY]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_borrow [[SELF_BORROW]]
 // CHECK:         destroy_value [[SELF_COPY]]
 // CHECK:         return
-// CHECK:       [[FAILURE]]:                                              
+// CHECK:       [[FAILURE]]:
 // CHECK:         end_borrow [[VALUE_BORROW]]
 // CHECK:         destroy_value [[VALUE_COPY]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_borrow [[SELF_BORROW]]
 // CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         unwind                                          
+// CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements34ImplBUnderscoredCoroutineAccessorsV3ursAA1UVvy'
 // CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvyTW : {{.*}} {
 // CHECK:       bb0(
@@ -506,21 +506,21 @@ public struct ImplCUnderscoredCoroutineAccessors : ~Copyable & P3 {
 // CHECK:         [[VALUE_BORROW:%[^,]+]] = begin_borrow [[VALUE_COPY]]
 // CHECK:         yield [[VALUE_BORROW]]
 // CHECK-SAME:        resume [[SUCCESS:bb[0-9]+]]
-// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]          
-// CHECK:       [[SUCCESS]]:                                              
+// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]
+// CHECK:       [[SUCCESS]]:
 // CHECK:         end_borrow [[VALUE_BORROW]]
 // CHECK:         destroy_value [[VALUE_COPY]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_borrow [[SELF_BORROW]]
 // CHECK:         destroy_value [[SELF_COPY]]
 // CHECK:         return
-// CHECK:       [[FAILURE]]:                                              
+// CHECK:       [[FAILURE]]:
 // CHECK:         end_borrow [[VALUE_BORROW]]
 // CHECK:         destroy_value [[VALUE_COPY]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_borrow [[SELF_BORROW]]
 // CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         unwind                                          
+// CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements34ImplCUnderscoredCoroutineAccessorsV2urAA1UVvy'
 // CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsVAA2P3A2aDP2urAA1UVvrTW : {{.*}} {
 // CHECK:       bb0(
@@ -1289,7 +1289,7 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-SAME:      [[SELF:%[^:]+]] :
 // CHECK-SAME:  ):
 // CHECK:         [[UNSAFE_POINTER:%[^,]+]] = struct_extract [[SELF]]
-// CHECK:             #ImplCUnsafeAddressors.iAddr 
+// CHECK:             #ImplCUnsafeAddressors.iAddr
 // CHECK:         return [[UNSAFE_POINTER]]
 // CHECK-LABEL: } // end sil function '$s17read_requirements21ImplCUnsafeAddressorsV2urAA1UVvlu'
 // CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements21ImplCUnsafeAddressorsV2urAA1UVvr : {{.*}} {
