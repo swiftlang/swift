@@ -46,6 +46,11 @@ struct UnknownEscapabilityAggregate {
     Unannotated unann;
 };
 
+struct MyContainer {
+    int begin() const { return 0; }
+    int end() const { return -1; }
+};
+
 //--- test.swift
 
 import Test
@@ -61,7 +66,8 @@ func useUnsafeParam2(x: UnsafeReference) { // expected-warning{{reference to uns
 func useUnsafeParam3(x: UnknownEscapabilityAggregate) { // expected-warning{{reference to unsafe struct 'UnknownEscapabilityAggregate'}}
 }
 
-func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate) {
+func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer) {
+    let _ = c.__beginUnsafe() // expected-warning{{call to unsafe instance method '__beginUnsafe'}}
 }
 
 func useCfType(x: CFArray) {
