@@ -238,10 +238,8 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
 
   auto *DC = D->getInnermostDeclContext();
   auto fragileKind = DC->getFragileFunctionKind();
-  auto availabilityContext =
-      (Ctx.LangOpts.DisableAvailabilityChecking
-           ? AvailabilityContext::getDefault(Ctx)
-           : TypeChecker::availabilityAtLocation(D->getLoc(), DC));
+  auto loc = D->getLoc();
+  auto availabilityContext = TypeChecker::availabilityAtLocation(loc, DC);
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   computeExportContextBits(Ctx, D, &spi, &implicit);
@@ -259,10 +257,7 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   auto &Ctx = DC->getASTContext();
 
   auto fragileKind = DC->getFragileFunctionKind();
-  auto availabilityContext =
-      (Ctx.LangOpts.DisableAvailabilityChecking
-           ? AvailabilityContext::getDefault(Ctx)
-           : TypeChecker::availabilityAtLocation(loc, DC));
+  auto availabilityContext = TypeChecker::availabilityAtLocation(loc, DC);
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   forEachOuterDecl(
@@ -1075,6 +1070,8 @@ private:
   std::pair<std::optional<AvailabilityRange>,
             std::optional<AvailabilityRange>>
   buildStmtConditionRefinementContext(StmtCondition Cond) {
+    if (Context.LangOpts.DisableAvailabilityChecking)
+      return {};
 
     // Any refinement contexts introduced in the statement condition
     // will end at the end of the last condition element.
@@ -1346,8 +1343,18 @@ private:
 } // end anonymous namespace
 
 void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
+  switch (SF.Kind) {
+  case SourceFileKind::SIL:
+    // SIL doesn't support availability queries.
+    return;
+  case SourceFileKind::MacroExpansion:
+  case SourceFileKind::DefaultArgument:
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+  case SourceFileKind::Interface:
+    break;
+  }
   ASTContext &Context = SF.getASTContext();
-  assert(!Context.LangOpts.DisableAvailabilityChecking);
 
   // If there's already a root node, then we're done.
   if (SF.getTypeRefinementContext())
@@ -1376,9 +1383,6 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
 
 TypeRefinementContext *
 TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
-  if (SF->getASTContext().LangOpts.DisableAvailabilityChecking)
-    return nullptr;
-
   TypeRefinementContext *TRC = SF->getTypeRefinementContext();
   if (!TRC) {
     buildTypeRefinementContextHierarchy(*SF);
