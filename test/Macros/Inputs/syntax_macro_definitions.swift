@@ -2704,3 +2704,30 @@ public struct AddGetterMacro: AccessorMacro {
     return ["get { 0 }"]
   }
 }
+
+public struct HangingMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let variableDecl = declaration.as(VariableDeclSyntax.self) else {
+      return []
+    }
+
+    guard let binding: PatternBindingSyntax = variableDecl.bindings.first else {
+      return []
+    }
+
+    guard let typeAnnotation = binding.typeAnnotation else {
+      return []
+    }
+
+    let mockProperty = try VariableDeclSyntax("var BadThing: \(typeAnnotation.type)") {
+    }
+
+    return [
+      DeclSyntax(mockProperty)
+    ]
+  }
+}
