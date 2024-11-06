@@ -76,13 +76,10 @@ endif()
 #       file rather than pushing them through macro flags.
 target_compile_definitions(swiftRuntime
   PRIVATE
+    -DswiftCore_EXPORTS
     -DSWIFT_RUNTIME
     -DSWIFT_TARGET_LIBRARY_NAME=swiftRuntime
-    -DswiftCore_EXPORTS
-    -DSWIFT_LIBRARY_EVOLUTION=$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>
-    -DSWIFT_ENABLE_BACKTRACING=$<BOOL:${SwiftCore_ENABLE_BACKTRACING}>
-    $<$<BOOL:${SwiftCore_ENABLE_CRASH_REPORTER_CLIENT}>:-DSWIFT_HAVE_CRASHREPORTERCLIENT>
-    $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
+    $<$<BOOL:${SwiftCore_ENABLE_BACKTRACING}>:-DSWIFT_ENABLE_BACKTRACING>
     $<$<BOOL:${SwiftCore_BACKTRACER_PATH}>:-DSWIFT_RUNTIME_FIXED_BACKTRACER_PATH="${SwiftCore_BACKTRACER_PATH}">)
 
 target_include_directories(swiftRuntime PRIVATE
@@ -127,8 +124,6 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
   install(TARGETS swiftrt DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift")
 elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
   add_library(swiftrt OBJECT SwiftRT-COFF.cpp)
-  target_compile_definitions(swiftrt PRIVATE
-    -DSWIFT_ENABLE_BACKTRACING=$<BOOL:${SwiftCore_ENABLE_BACKTRACING}>)
   target_link_libraries(swiftrt PRIVATE swiftShims)
   install(TARGETS swiftrt DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift")
 elseif(NOT "${SwiftCore_OBJECT_FORMAT}" STREQUAL "x")

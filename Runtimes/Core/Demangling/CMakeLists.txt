@@ -10,9 +10,9 @@ add_library(swiftDemangling OBJECT
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/Errors.cpp")
 target_compile_definitions(swiftDemangling PRIVATE swiftCore_EXPORTS
-  -DSWIFT_SUPPORT_OLD_MANGLING=$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>
+  $<$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>:-DSWIFT_SUPPORT_OLD_MANGLING>
   $<$<BOOL:${SwiftCore_ENABLE_TYPE_PRINTING}>:-DSWIFT_STDLIB_HAS_TYPE_PRINTING>
-  -DSWIFT_HAVE_CRASHREPORTERCLIENT=$<BOOL:${SwiftCore_ENABLE_CRASH_REPORTER_CLIENT}>)
+  $<$<BOOL:${SwiftCore_ENABLE_CRASH_REPORTER_CLIENT}>:-DSWIFT_HAVE_CRASHREPORTERCLIENT>)
 
 target_include_directories(swiftDemangling
   PRIVATE
