@@ -2462,6 +2462,9 @@ ClangImporter::Implementation::importParameterType(
     // Treat as a normal pointer. importBoundsAttributes() will generate a safe
     // overload later.
     paramTy = CAT->desugar();
+    if (auto FuncD =
+            dyn_cast<clang::FunctionDecl>(param->getParentFunctionOrMethod()))
+      funcsWithPointerBounds.insert(FuncD);
   } else if (isa<clang::PointerType>(paramTy) &&
              isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
     auto pointeeType = paramTy->getPointeeType();

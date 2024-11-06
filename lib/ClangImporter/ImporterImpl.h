@@ -544,6 +544,8 @@ private:
   /// These are re-used when parsing the Swift attributes on import.
   llvm::StringMap<llvm::TinyPtrVector<SourceFile *>> ClangSwiftAttrSourceFiles;
 
+  llvm::SmallPtrSet<const clang::FunctionDecl *, 16> funcsWithPointerBounds;
+
 public:
   /// The Swift lookup table for the bridging header.
   std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
