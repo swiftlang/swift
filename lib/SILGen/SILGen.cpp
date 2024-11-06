@@ -1928,12 +1928,11 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
   if (decl->isResilient(M.getSwiftModule(), expansion))
     return false;
 
-  auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
-                                          decl->supportsMutation()
-                                            ? AccessKind::ReadWrite
-                                            : AccessKind::Read,
-                                          M.getSwiftModule(),
-                                          expansion);
+  auto strategy = decl->getAccessStrategy(
+      AccessSemantics::Ordinary,
+      decl->supportsMutation() ? AccessKind::ReadWrite : AccessKind::Read,
+      M.getSwiftModule(), expansion,
+      /*useOldABI=*/false);
   switch (strategy.getKind()) {
   case AccessStrategy::Storage: {
     // Keypaths rely on accessors to handle the special behavior of weak,

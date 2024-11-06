@@ -1466,7 +1466,7 @@ static bool contextMayExpandOperator(
 SmallVector<ValueDecl *, 4>
 swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
-  assert(req->isProtocolRequirement());
+  assert(req->isProtocolRequirement() || isa<AccessorDecl>(req));
 
   SmallVector<ValueDecl *, 4> witnesses;
 
@@ -6829,9 +6829,32 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
 
     ResolveWitnessResult result = checker.resolveWitnessViaLookup(requirement);
 
-    if (result == ResolveWitnessResult::Missing &&
-        requirement->isSPI() &&
-        !proto->isSPI()) {
+    if (result != ResolveWitnessResult::Missing)
+      continue;
+
+    if (auto *asd = dyn_cast<AbstractStorageDecl>(requirement)) {
+      bool hasDefaults = false;
+      asd->visitExpectedOpaqueAccessors([&](auto kind) {
+        auto *accessor = asd->getOpaqueAccessor(kind);
+        if (accessor->hasBody()) {
+          hasDefaults = true;
+        }
+      });
+      if (hasDefaults) {
+        auto asdTy = asd->getInterfaceType();
+        GenericSignature reqSig = proto->getGenericSignature();
+        if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(asd)) {
+          if (subscriptDecl->isGeneric())
+            reqSig = subscriptDecl->getGenericSignature();
+        }
+        RequirementEnvironment reqEnv(proto, reqSig, proto, nullptr, nullptr);
+        auto match =
+            RequirementMatch(asd, MatchKind::ExactMatch, asdTy, reqEnv);
+        checker.recordWitness(asd, match);
+      }
+    }
+
+    if (requirement->isSPI() && !proto->isSPI()) {
       // SPI requirements need a default value, unless the protocol is SPI too.
       requirement->diagnose(diag::spi_attribute_on_protocol_requirement,
                             requirement);

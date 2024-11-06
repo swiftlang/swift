@@ -382,12 +382,12 @@ public:
     // capture of the storage address - not a capture of the getter/setter.
     if (auto var = dyn_cast<VarDecl>(D)) {
       if (var->getAccessStrategy(DRE->getAccessSemantics(),
-                                 var->supportsMutation()
-                                   ? AccessKind::ReadWrite
-                                   : AccessKind::Read,
+                                 var->supportsMutation() ? AccessKind::ReadWrite
+                                                         : AccessKind::Read,
                                  CurDC->getParentModule(),
-                                 CurDC->getResilienceExpansion())
-          .getKind() == AccessStrategy::Storage)
+                                 CurDC->getResilienceExpansion(),
+                                 /*useOldABI=*/false)
+              .getKind() == AccessStrategy::Storage)
         Flags |= CapturedValue::IsDirect;
     }
 
