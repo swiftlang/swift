@@ -1423,7 +1423,8 @@ private:
     auto sfi = swiftProperties.begin(), sfe = swiftProperties.end();
     // When collecting fields from the base subobjects, we do not have corresponding swift
     // stored properties.
-    if (decl != ClangDecl)
+    bool isBaseSubobject = decl != ClangDecl;
+    if (isBaseSubobject)
       sfi = swiftProperties.end();
 
     while (cfi != cfe) {
@@ -1475,10 +1476,14 @@ private:
 
     assert(sfi == sfe && "more Swift fields than there were Clang fields?");
 
-    Size objectTotalStride = Size(layout.getSize().getQuantity());
-    // We never take advantage of tail padding, because that would prevent
-    // us from passing the address of the object off to C, which is a pretty
-    // likely scenario for imported C types.
+    auto objectSize = isBaseSubobject ? layout.getDataSize() : layout.getSize();
+    Size objectTotalStride = Size(objectSize.getQuantity());
+    // Unless this is a base subobject of a C++ type, we do not take advantage
+    // of tail padding, because that would prevent us from passing the address
+    // of the object off to C, which is a pretty likely scenario for imported C
+    // types.
+    // In C++, fields of a derived class might get placed into tail padding of a
+    // base class, in which case we should not add extra padding here.
     assert(NextOffset <= SubobjectAdjustment + objectTotalStride);
     assert(SpareBits.size() <= SubobjectAdjustment.getValueInBits() +
                                    objectTotalStride.getValueInBits());
