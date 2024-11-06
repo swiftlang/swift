@@ -261,6 +261,7 @@
 
 # utils
 /utils/*windows*                                              @compnerd
+/utils/generate-xcode                                         @hamishknight
 /utils/gyb_sourcekit_support/                                 @ahoppen @bnbarham @hamishknight @rintaro
 /utils/sourcekit_fuzzer/                                      @ahoppen @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/earlyswiftsyntax.py       @ahoppen @bnbarham @hamishknight @rintaro
@@ -268,6 +269,7 @@
 /utils/swift_build_support/products/sourcekitlsp.py           @ahoppen @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/swiftformat.py            @ahoppen @allevato @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/swiftsyntax.py            @ahoppen @bnbarham @hamishknight @rintaro
+/utils/swift-xcodegen/                                        @hamishknight
 /utils/update-checkout*                                       @shahmishal
 /utils/update_checkout/                                       @shahmishal
 /utils/vim/                                                   @compnerd
