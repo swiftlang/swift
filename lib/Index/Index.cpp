@@ -678,6 +678,35 @@ private:
     return true;
   }
 
+  /// Indexes refs to initializers of collections when initialized from a short
+  /// hand version of the collection's type.
+  ///
+  /// For example, emits refs for `[Int](repeating:count:)`.
+  void handleCollectionShortHandTypeInitRefs(Expr *E) {
+    auto *ctorRef = dyn_cast<ConstructorRefCallExpr>(E);
+    if (!ctorRef)
+      return;
+    auto TE = dyn_cast<TypeExpr>(ctorRef->getBase());
+    if (!TE || TE->isImplicit())
+      return;
+    auto TR = TE->getTypeRepr();
+    if (TR && !isa<ArrayTypeRepr>(TR) && !isa<DictionaryTypeRepr>(TR))
+      return;
+    auto DRE = dyn_cast<DeclRefExpr>(ctorRef->getFn());
+    if (!DRE)
+      return;
+
+    auto decl = DRE->getDecl();
+    if (!shouldIndex(decl, /*IsRef=*/true))
+      return;
+    IndexSymbol Info;
+    if (initIndexSymbol(decl, ctorRef->getSourceRange().Start, /*IsRef=*/true,
+                        Info))
+      return;
+    if (startEntity(decl, Info, /*IsRef=*/true))
+      finishCurrentEntity();
+  }
+
   void handleMemberwiseInitRefs(Expr *E) {
     if (!isa<ApplyExpr>(E))
       return;
@@ -744,6 +773,7 @@ private:
     ExprStack.push_back(E);
     Containers.activateContainersFor(E);
     handleMemberwiseInitRefs(E);
+    handleCollectionShortHandTypeInitRefs(E);
     return true;
   }
 
