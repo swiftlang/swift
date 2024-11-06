@@ -3997,6 +3997,10 @@ namespace {
       auto results = namelookup::lookupMacros(CurDC, DeclNameRef(moduleName),
                                               DeclNameRef(macroName), roles);
       for (const auto &result : results) {
+        // Ignore invalid results. This matches the OverloadedDeclRefExpr
+        // logic.
+        if (result->isInvalid())
+          continue;
         OverloadChoice choice = OverloadChoice(Type(), result, functionRefKind);
         choices.push_back(choice);
       }
