@@ -8320,8 +8320,8 @@ void Parser::parseExpandedMemberList(SmallVectorImpl<ASTNode> &items) {
 
   bool previousHadSemi = true;
 
-  SourceLoc startingLoc = Tok.getLoc();
   while (!Tok.is(tok::eof)) {
+    SourceLoc startingLoc = Tok.getLoc();
     parseDeclItem(previousHadSemi, [&](Decl *d) { items.push_back(d); });
 
     if (Tok.getLoc() == startingLoc)
