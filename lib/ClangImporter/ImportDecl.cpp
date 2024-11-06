@@ -8226,18 +8226,27 @@ bool swift::importer::isMutabilityAttr(const clang::SwiftAttrAttr *swiftAttr) {
          swiftAttr->getAttribute() == "nonmutating";
 }
 
-static bool importAsUnsafe(ASTContext &context, const clang::RecordDecl *decl,
+static bool importAsUnsafe(ASTContext &context, const clang::NamedDecl *decl,
                            const Decl *MappedDecl) {
   if (!context.LangOpts.hasFeature(Feature::SafeInterop) ||
-      !context.LangOpts.hasFeature(Feature::AllowUnsafeAttribute) || !decl)
+      !context.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
     return false;
+
+  if (isa<clang::CXXMethodDecl>(decl) &&
+      !evaluateOrDefault(context.evaluator, IsSafeUseOfCxxDecl({decl, context}),
+                         {}))
+    return true;
 
   if (isa<ClassDecl>(MappedDecl))
     return false;
 
-  return evaluateOrDefault(
-             context.evaluator, ClangTypeEscapability({decl->getTypeForDecl()}),
-             CxxEscapability::Unknown) == CxxEscapability::Unknown;
+  if (const auto *record = dyn_cast<clang::RecordDecl>(decl))
+    return evaluateOrDefault(context.evaluator,
+                             ClangTypeEscapability({record->getTypeForDecl()}),
+                             CxxEscapability::Unknown) ==
+           CxxEscapability::Unknown;
+
+  return false;
 }
 
 void
@@ -8419,9 +8428,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       }
     }
 
-    if (seenUnsafe ||
-        importAsUnsafe(SwiftContext, dyn_cast<clang::RecordDecl>(ClangDecl),
-                       MappedDecl)) {
+    if (seenUnsafe || importAsUnsafe(SwiftContext, ClangDecl, MappedDecl)) {
       auto attr = new (SwiftContext) UnsafeAttr(/*implicit=*/!seenUnsafe);
       MappedDecl->getAttrs().add(attr);
     }
