@@ -21,7 +21,7 @@ endif()
 if(NOT SwiftCore_SWIFTC_CLANGIMPORTER_RESOURCE_DIR)
   # TODO: We need to separate the concept of compiler resources and the stdlib.
   #       Compiler-resources in the compiler-resource directory are specific to
-  #       a given compiler. The headers in `lib/clang/include` and
+  #       a given compiler. The headers in `lib/clang/<version>/include` and
   #       `lib/swift/clang/include` correspond with that specific copy clang and
   #       should not be mixed. This won't cause modularization issues because
   #       the one copy of clang should never be looking in the other's resource

@@ -1,8 +1,7 @@
 # This file is designed to setup reasonable defaults for the various settings so
 # that configuring a build for a given platform is likely to build
 # out-of-the-box without customization. This does not mean that it is the only
-# way that will work. The config files under `cmake/configs` are build
-# configurations that are actually shipping.
+# way that will work, or that it represents a shipping configuration.
 
 set(SwiftCore_ENABLE_BACKTRACING_default OFF) # TODO: enable this by default
 set(SwiftCore_ENABLE_COMMANDLINE_SUPPORT_default OFF) # TODO: enable this by default
