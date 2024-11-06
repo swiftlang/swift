@@ -402,14 +402,10 @@ extension ASTGenVisitor {
   func generate(functionCallExpr node: FunctionCallExprSyntax, postfixIfConfigBaseExpr: BridgedExpr? = nil) -> BridgedCallExpr {
     if !node.arguments.isEmpty || node.trailingClosure == nil {
       if node.leftParen == nil {
-        self.diagnose(
-          Diagnostic(node: node, message: MissingChildTokenError(parent: node, kindOfTokenMissing: .leftParen))
-        )
+        self.diagnose(.missingChildToken(parent: node, kindOfTokenMissing: .leftParen))
       }
       if node.rightParen == nil {
-        self.diagnose(
-          Diagnostic(node: node, message: MissingChildTokenError(parent: node, kindOfTokenMissing: .rightParen))
-        )
+        self.diagnose(.missingChildToken(parent: node, kindOfTokenMissing: .rightParen))
       }
     }
 

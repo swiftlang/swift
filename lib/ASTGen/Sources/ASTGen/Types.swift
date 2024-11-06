@@ -367,7 +367,7 @@ extension ASTGenVisitor {
             specifierLoc: self.generateSourceLoc(specifier)
           ).asTypeRepr
       } else {
-        self.diagnose(Diagnostic(node: specifier, message: UnexpectedTokenKindError(token: specifier)))
+        self.diagnose(.unexpectedTokenKind(token: specifier))
       }
     }
 

@@ -13,65 +13,90 @@
 import SwiftDiagnostics
 import SwiftSyntax
 
-protocol ASTGenError: DiagnosticMessage {}
-
-extension ASTGenError {
-  var diagnosticID: MessageID {
-    MessageID(domain: "ASTGen", id: "\(Self.self)")
+extension ASTGenVisitor {
+  /// Emits the given ASTGen diagnostic via the C++ diagnostic engine.
+  func diagnose(_ message: ASTGenDiagnostic, highlights: [Syntax]? = nil, notes: [Note] = [], fixIts: [FixIt] = []) {
+    self.diagnose(Diagnostic(
+      node: message.node,
+      message: message,
+      highlights: highlights,
+      notes: notes,
+      fixIts: fixIts
+    ))
   }
 
-  var severity: DiagnosticSeverity { .error }
+  /// Emits the given diagnostic via the C++ diagnostic engine.
+  func diagnose(_ diagnostic: Diagnostic) {
+    emitDiagnostic(
+      diagnosticEngine: self.diagnosticEngine,
+      sourceFileBuffer: self.base,
+      diagnostic: diagnostic,
+      diagnosticSeverity: diagnostic.diagMessage.severity
+    )
+  }
+
+  /// Emits the given diagnostics via the C++ diagnostic engine.
+  func diagnoseAll(_ diagnostics: [Diagnostic]) {
+    diagnostics.forEach(diagnose)
+  }
 }
 
-/// An error emitted when a token is of an unexpected kind.
-struct UnexpectedTokenKindError: ASTGenError {
-  let token: TokenSyntax
-  private let parent: Syntax
+struct ASTGenDiagnostic: DiagnosticMessage {
+  var node: Syntax
+  var message: String
+  var severity: DiagnosticSeverity
+  var messageID: String
 
-  init(token: TokenSyntax) {
+  var diagnosticID: MessageID {
+    MessageID(domain: "ASTGen", id: messageID)
+  }
+
+  init(node: some SyntaxProtocol, message: String, severity: DiagnosticSeverity = .error, messageID: String) {
+    self.node = Syntax(node)
+    self.message = message
+    self.severity = severity
+    self.messageID = messageID
+  }
+
+  fileprivate init(node: some SyntaxProtocol, message: String, severity: DiagnosticSeverity = .error, function: String = #function) {
+    // Extract messageID from the function name.
+    let messageID = String(function.prefix(while: { $0 != "(" }))
+    self.init(node: node, message: message, severity: severity, messageID: messageID)
+  }
+}
+
+extension ASTGenDiagnostic {
+  /// An error emitted when a token is of an unexpected kind.
+  static func unexpectedTokenKind(token: TokenSyntax) -> Self {
     guard let parent = token.parent else {
       preconditionFailure("Expected a child (not a root) token")
     }
 
-    self.token = token
-    self.parent = parent
-  }
-
-  var message: String {
-    return """
+    return Self(
+      node: token,
+      message: """
       unexpected token kind for token:
-        \(self.token.debugDescription)
+        \(token.debugDescription)
       in parent:
-        \(self.parent.debugDescription(indentString: "  "))
+        \(parent.debugDescription(indentString: "  "))
       """
-  }
-}
-
-/// An error emitted when an optional child token is unexpectedly nil.
-struct MissingChildTokenError: ASTGenError {
-  let parent: Syntax
-  let kindOfTokenMissing: TokenKind
-
-  init(parent: some SyntaxProtocol, kindOfTokenMissing: TokenKind) {
-    self.parent = Syntax(parent)
-    self.kindOfTokenMissing = kindOfTokenMissing
+    )
   }
 
-  var message: String {
-    """
-    missing child token of kind '\(self.kindOfTokenMissing)' in:
-      \(parent.debugDescription(indentString: "  "))
-    """
+  /// An error emitted when an optional child token is unexpectedly nil.
+  static func missingChildToken(parent: some SyntaxProtocol, kindOfTokenMissing: TokenKind) -> Self {
+    Self(
+      node: parent,
+      message: """
+      missing child token of kind '\(kindOfTokenMissing)' in:
+        \(parent.debugDescription(indentString: "  "))
+      """
+    )
   }
-}
 
-/// An error emitted when a syntax collection entry is encountered that is considered a duplicate of a previous entry
-/// per the language grammar.
-struct DuplicateSyntaxError: ASTGenError {
-  let duplicate: Syntax
-  let original: Syntax
-
-  init(duplicate: some SyntaxProtocol, original: some SyntaxProtocol) {
+  /// An error emitted when a syntax collection entry is encountered that is
+  /// considered a duplicate of a previous entry per the language grammar.
+  static func duplicateSyntax(duplicate: some SyntaxProtocol, original: some SyntaxProtocol) -> Self {
     precondition(duplicate.kind == original.kind, "Expected duplicate and original to be of same kind")
 
     guard let duplicateParent = duplicate.parent, let originalParent = original.parent,
@@ -80,42 +105,28 @@ struct DuplicateSyntaxError: ASTGenError {
       preconditionFailure("Expected a shared syntax collection parent")
     }
 
-    self.duplicate = Syntax(duplicate)
-    self.original = Syntax(original)
+    return Self(
+      node: duplicate,
+      message: """
+      unexpected duplicate syntax in list:
+        \(duplicate.debugDescription(indentString: "  "))
+      previous syntax:
+        \(original.debugDescription(indentString: "  "))
+      """
+    )
   }
 
-  var message: String {
-    """
-    unexpected duplicate syntax in list:
-      \(duplicate.debugDescription(indentString: "  "))
-    previous syntax:
-      \(original.debugDescription(indentString: "  "))
-    """
-  }
-}
-
-struct NonTrivialPatternForAccessorError: ASTGenError {
-  var message: String {
-    "getter/setter can only be defined for a single variable"
-  }
-}
-
-struct UnknownAccessorSpecifierError: ASTGenError {
-  var specifier: TokenSyntax
-  init(_ specifier: TokenSyntax) {
-    self.specifier = specifier
+  static func nonTrivialPatternForAccessor(_ pattern: some SyntaxProtocol) -> Self {
+    Self(
+      node: pattern,
+      message: "getter/setter can only be defined for a single variable"
+    )
   }
 
-  var message: String {
-    "unknown accessor specifier '\(specifier.text)'"
+  static func unknownAccessorSpecifier(_ specifier: TokenSyntax) -> Self {
+    Self(
+      node: specifier,
+      message: "unknown accessor specifier '\(specifier.text)'"
+    )
   }
-}
-
-struct RegexParserError: ASTGenError {
-  var message: String
-  init(_ message: String) {
-    self.message = message
-  }
-
-  var severity: DiagnosticSeverity { .error }
 }

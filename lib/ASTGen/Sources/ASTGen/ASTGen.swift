@@ -69,7 +69,7 @@ class Boxed<Value> {
 }
 
 struct ASTGenVisitor {
-  fileprivate let diagnosticEngine: BridgedDiagnosticEngine
+  let diagnosticEngine: BridgedDiagnosticEngine
 
   let base: UnsafeBufferPointer<UInt8>
 
@@ -277,24 +277,6 @@ extension ASTGenVisitor {
       self.declContext = oldDeclContext
     }
     return body()
-  }
-}
-
-extension ASTGenVisitor {
-  /// Emits the given diagnostic via the C++ diagnostic engine.
-  @inline(__always)
-  func diagnose(_ diagnostic: Diagnostic) {
-    emitDiagnostic(
-      diagnosticEngine: self.diagnosticEngine,
-      sourceFileBuffer: self.base,
-      diagnostic: diagnostic,
-      diagnosticSeverity: diagnostic.diagMessage.severity
-    )
-  }
-
-  /// Emits the given diagnostics via the C++ diagnostic engine.
-  func diagnoseAll(_ diagnostics: [Diagnostic]) {
-    diagnostics.forEach(diagnose)
   }
 }
 
