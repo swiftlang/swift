@@ -39,7 +39,6 @@
 // RUN:   -module-name Utils -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -enable-library-evolution -swift-version 6 \
-// RUN:   -disable-print-package-name-for-non-package-interface \
 // RUN:   -emit-module -emit-module-interface-path %t/Utils.swiftinterface \
 // RUN:   -emit-module -emit-package-module-interface-path %t/Utils.package.swiftinterface
 
@@ -297,12 +296,12 @@ public func k(_ arg: FrozenPublicEnum) -> Int {
 
 //--- ClientInPkgLoadPublicInterface.swift
 
-// Utils is built from public interface containing
-// package decls with @usableFromInline, but without
-// package-name; requires @unknown default.
+// Utils is built from public interface. Accessing
+// resilient enums from Utils should not require
+// @unknown default.
 import Utils
 
-package func n(_ arg: FrozenUfiPkgEnum) -> Int { // expected-error {{cannot find type 'FrozenUfiPkgEnum' in scope}}
+package func n(_ arg: FrozenUfiPkgEnum) -> Int {
   switch arg { // no-warning
   case .one:
     return 1
@@ -311,17 +310,19 @@ package func n(_ arg: FrozenUfiPkgEnum) -> Int { // expected-error {{cannot find
   }
 }
 
-package func g(_ arg: UfiPkgEnum) -> Int { // expected-error {{cannot find type 'UfiPkgEnum' in scope}}
+package func g(_ arg: UfiPkgEnum) -> Int {
   switch arg {
   case .one:
     return 1
   case .two(let val):
     return 2 + val
+  @unknown default:
+    return 3
   }
 }
 
 @inlinable
-package func gi(_ arg: UfiPkgEnum) -> Int { // expected-error {{cannot find type 'UfiPkgEnum' in scope}}
+package func gi(_ arg: UfiPkgEnum) -> Int {
   switch arg {
   case .one:
     return 1
@@ -331,17 +332,19 @@ package func gi(_ arg: UfiPkgEnum) -> Int { // expected-error {{cannot find type
 }
 
 public func h(_ arg: PublicEnum) -> Int {
-  switch arg { // expected-error {{switch covers known cases, but 'PublicEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
+  switch arg { // no-warning
   case .one:
     return 1
   case .two(let val):
     return 2 + val
+  @unknown default:
+    return 3
   }
 }
 
 @inlinable
 public func hi(_ arg: PublicEnum) -> Int {
-  switch arg { // expected-error {{switch covers known cases, but 'PublicEnum' may have additional unknown values}} {{none}} expected-note {{handle unknown values using "@unknown default"}}
+  switch arg { // no-warning
   case .one:
     return 1
   case .two(let val):
