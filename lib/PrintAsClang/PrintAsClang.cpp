@@ -361,7 +361,7 @@ static void collectClangModuleHeaderIncludes(
     for (clang::Module::HeaderKind headerKind :
          {clang::Module::HK_Normal, clang::Module::HK_Textual}) {
       for (const clang::Module::Header &header :
-           clangModule->Headers[headerKind]) {
+           clangModule->getHeaders(headerKind)) {
         addHeader(header.Entry.getFileEntry().tryGetRealPathName(),
                   header.PathRelativeToRootModuleDirectory);
       }
