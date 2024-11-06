@@ -26,7 +26,7 @@
 // CHECK: instance-property/subscript/Swift | subscript(_:) | s:{{.*}} | <no-cgname> | Def,RelChild -
 // CHECK: instance-method/acc-get/Swift | getter:subscript(_:) | s:{{.*}} | <no-cgname> | Def,RelChild,RelAcc -
 // CHECK: protocol/Swift | P1 | s:{{.*}} | <no-cgname> | Def -
-// CHECK: type-alias/associated-type/Swift | AT | s:{{.*}} | <no-cgname> | Def,Ref,RelChild -
+// CHECK: type-alias/associated-type/Swift | AT | s:{{.*}} | <no-cgname> | Def,Ref,RelChild,RelCont -
 // CHECK: type-alias/Swift | TA | s:{{.*}} | <no-cgname> | Def,RelChild -
 // CHECK: class/Swift | C1 | s:{{.*}} | <no-cgname> | Def,Ref,RelBase,RelCont -
 // CHECK: instance-method/Swift | method() | s:{{.*}} | <no-cgname> | Def,Ref,Call,Dyn,RelChild,RelRec,RelCall,RelCont -
@@ -111,9 +111,10 @@ protocol P1 {
 // CHECK: [[@LINE+2]]:18 | type-alias/associated-type/Swift | s:{{.*}} | Def,RelChild | rel: 1
 // CHECK-NEXT: RelChild | [[P1_USR]]
   associatedtype AT
-// CHECK: [[@LINE+3]]:13 | type-alias/Swift | s:{{.*}} | Def,RelChild | rel: 1
+// CHECK: [[@LINE+4]]:13 | type-alias/Swift | [[TA_USR:s:.*]] | Def,RelChild | rel: 1
 // CHECK-NEXT: RelChild | [[P1_USR]]
-// CHECK: [[@LINE+1]]:18 | type-alias/associated-type/Swift | s:{{.*}} | Ref | rel: 0
+// CHECK: [[@LINE+2]]:18 | type-alias/associated-type/Swift | s:{{.*}} | Ref,RelCont | rel: 1
+// CHECK-NEXT: RelCont | [[TA_USR]]
   typealias TA = AT
 }
 

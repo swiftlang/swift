@@ -207,6 +207,9 @@ public:
       Entry.ActiveKey = D;
       Entry.Containers[D] = D;
       Stack.push_back(std::move(Entry));
+    } else if (auto TAD = dyn_cast<TypeAliasDecl>(D)) {
+      StackEntry Entry = identifyContainers(TAD);
+      Stack.push_back(std::move(Entry));
     }
   }
 
@@ -419,6 +422,29 @@ private:
     }
 
     return true;
+  }
+
+  StackEntry identifyContainers(const TypeAliasDecl *D) const {
+    StackEntry Entry;
+    Entry.TrackedDecl = D;
+    Entry.ActiveKey = D;
+    if (auto TR = D->getUnderlyingTypeRepr()) {
+      associateTypeRepr(TR, D, Entry);
+    }
+    return Entry;
+  }
+
+  void associateTypeRepr(const TypeRepr *TR, const TypeAliasDecl *D,
+                         StackEntry &Entry) const {
+    if (auto composition = dyn_cast<CompositionTypeRepr>(TR)) {
+      for (auto Type : composition->getTypes()) {
+        associateTypeRepr(Type, D, Entry);
+      }
+    } else if (auto declRef = dyn_cast<DeclRefTypeRepr>(TR)) {
+      if (auto decl = declRef->getBoundDecl()) {
+        Entry.Containers[TR] = D;
+      }
+    }
   }
 };
 
