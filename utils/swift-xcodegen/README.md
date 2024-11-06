@@ -74,7 +74,7 @@ PROJECT CONFIGURATION:
                           Generate a target for C/C++ files in the standard library (default: --stdlib)
   --stdlib-swift/--no-stdlib-swift
                           Generate targets for Swift files in the standard library. This requires
-                          using Xcode with with a main development snapshot (and as such is disabled
+                          using Xcode with a main development snapshot (and as such is disabled
                           by default). (default: --no-stdlib-swift)
   --test-folders/--no-test-folders
                           Add folder references for test files (default: --test-folders)
