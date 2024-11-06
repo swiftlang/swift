@@ -3,8 +3,8 @@
 #       and linking empty objects.
 #       https://github.com/swiftlang/swift/issues/77435
 add_library(swiftThreading OBJECT
-  "${PROJECT_SOURCE_DIR}/../../lib/Threading/C11.cpp"
-  "${PROJECT_SOURCE_DIR}/../../lib/Threading/Linux.cpp"
-  "${PROJECT_SOURCE_DIR}/../../lib/Threading/Pthreads.cpp"
-  "${PROJECT_SOURCE_DIR}/../../lib/Threading/Win32.cpp")
+  "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Threading/C11.cpp"
+  "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Threading/Linux.cpp"
+  "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Threading/Pthreads.cpp"
+  "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Threading/Win32.cpp")
 target_link_libraries(swiftThreading PRIVATE swiftShims)

@@ -45,7 +45,7 @@ target_include_directories(swiftStdlibStubs PRIVATE
   #   swift/Runtime/Debug.h
   # ...
   #
-  "${PROJECT_SOURCE_DIR}/../../include")
+  "${SwiftCore_SWIFTC_SOURCE_DIR}/include")
 
 if(APPLE)
   set_property(SOURCE SwiftNativeNSXXXBaseARC.m

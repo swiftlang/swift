@@ -23,7 +23,7 @@ function(gyb_expand source output)
   endforeach()
   list(REMOVE_DUPLICATES gyb_expand_deps)
 
-  set(utils_dir "${PROJECT_SOURCE_DIR}/../../utils/")
+  set(utils_dir "${SwiftCore_SWIFTC_SOURCE_DIR}/utils/")
   set(gyb_tool "${utils_dir}/gyb")
 
   # All the tidbits to track for changes
