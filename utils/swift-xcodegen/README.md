@@ -101,8 +101,3 @@ MISC:
 OPTIONS:
   -h, --help              Show help information.
 ```
-
-## TODO
-
-- [ ] Add support for mixed Swift + Clang targets
-- [ ] More tests
