@@ -349,7 +349,13 @@ extension ASTGenVisitor {
     accessorDecl node: AccessorDeclSyntax,
     for storage: BridgedAbstractStorageDecl
   ) -> BridgedAccessorDecl? {
-    // TODO: Attributes and modifier.
+    // FIXME: Attributes.
+    var attrs = BridgedDeclAttributes()
+    if
+      let modifier = node.modifier,
+      let attr = self.generate(declModifier: modifier) {
+      attrs.add(attr)
+    }
 
     guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier) else {
       // TODO: We could potentially recover if this is the first accessor by treating
@@ -368,6 +374,7 @@ extension ASTGenVisitor {
       throwsSpecifierLoc: self.generateSourceLoc(node.effectSpecifiers?.throwsClause),
       thrownType: self.generate(type: node.effectSpecifiers?.thrownError)
     )
+    accessor.asDecl.setAttrs(attrs)
     if let body = node.body {
       self.withDeclContext(accessor.asDeclContext) {
         accessor.setParsedBody(self.generate(codeBlock: body))

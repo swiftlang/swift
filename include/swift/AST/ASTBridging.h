@@ -1347,6 +1347,18 @@ BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
                                          BridgedSourceLoc cIsLoc,
                                          BridgedTypeRepr cType);
 
+SWIFT_NAME("BridgedKeyPathDotExpr.createParsed(_:loc:)")
+BridgedKeyPathDotExpr
+BridgedKeyPathDotExpr_createParsed(BridgedASTContext cContext,
+                                   BridgedSourceLoc cLoc);
+
+SWIFT_NAME("BridgedKeyPathExpr.createParsed(_:backslashLoc:parsedRoot:"
+           "parsedPath:hasLeadingDot:)")
+BridgedKeyPathExpr BridgedKeyPathExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cBackslashLoc,
+    BridgedNullableExpr cParsedRoot, BridgedNullableExpr cParsedPath,
+    bool hasLeadingDot);
+
 SWIFT_NAME("BridgedMacroExpansionExpr.createParsed(_:poundLoc:macroNameRef:"
            "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")
 BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
