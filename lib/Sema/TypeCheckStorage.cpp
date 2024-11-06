@@ -928,7 +928,8 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
   return ParameterList::create(context, elements);
 }
 
-static bool doesAccessorHaveBody(AccessorDecl *accessor) {
+bool AccessorDecl::doesAccessorHaveBody() const {
+  auto *accessor = this;
   // Protocol requirements don't have bodies.
   //
   // FIXME: Revisit this if we ever get 'real' default implementations.
@@ -2349,7 +2350,7 @@ static void finishImplicitAccessor(AccessorDecl *accessor,
   if (ctx.Stats)
     ++ctx.Stats->getFrontendCounters().NumAccessorsSynthesized;
 
-  if (doesAccessorHaveBody(accessor))
+  if (accessor->doesAccessorHaveBody())
     accessor->setBodySynthesizer(&synthesizeAccessorBody);
 }
 
@@ -2828,7 +2829,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   if (!accessor->isImplicit())
     return false;
 
-  if (!doesAccessorHaveBody(accessor))
+  if (!accessor->doesAccessorHaveBody())
     return false;
 
   auto *DC = accessor->getDeclContext();

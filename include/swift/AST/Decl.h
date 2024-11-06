@@ -8441,6 +8441,10 @@ public:
   /// accessed by it.
   ArrayRef<VarDecl *> getAccessedProperties() const;
 
+  /// Whether this accessor should have a body.  Note that this will be true
+  /// even when it does not have one _yet_.
+  bool doesAccessorHaveBody() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Accessor;
   }
