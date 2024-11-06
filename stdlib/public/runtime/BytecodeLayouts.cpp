@@ -97,6 +97,16 @@ static uint64_t readTagBytes(const uint8_t *addr, uint8_t byteCount) {
   }
 }
 
+// This check is used to determine whether or not ObjC references can
+// be tagged pointers. If they can't, they have the same spare bits
+// as swift references, and we have to mask them out before passing the
+// reference to ref counting operations.
+static constexpr bool platformSupportsTaggedPointers() {
+  // Platforms that don't reserve bits for ObjC, don't support tagged
+  // pointers.
+  return _swift_abi_ObjCReservedBitsMask != 0;
+}
+
 #if defined(__APPLE__) && defined(__arm64__)
 
 #define CONTINUE_WITH_COPY(METADATA, READER, ADDR_OFFSET, DEST, SRC)           \
@@ -282,9 +292,12 @@ static void weakDestroy(const Metadata *metadata, LayoutStringReader1 &reader,
 static void unknownDestroy(const Metadata *metadata,
                            LayoutStringReader1 &reader, uintptr_t &addrOffset,
                            uint8_t *addr) {
-  void *object = *(void**)(addr + addrOffset);
+  uintptr_t object = *(uintptr_t *)(addr + addrOffset);
   addrOffset += sizeof(void*);
-  swift_unknownObjectRelease(object);
+  if (!platformSupportsTaggedPointers()) {
+    object &= ~_swift_abi_SwiftSpareBitsMask;
+  }
+  swift_unknownObjectRelease((void *)object);
 }
 
 static void unknownUnownedDestroy(const Metadata *metadata,
@@ -770,9 +783,10 @@ multiPayloadEnumGeneric(const Metadata *metadata, LayoutStringReader1 &reader,
 static void blockDestroy(const Metadata *metadata, LayoutStringReader1 &reader,
                          uintptr_t &addrOffset, uint8_t *addr) {
 #if SWIFT_OBJC_INTEROP
-  void* object = (void *)(addr + addrOffset);
+  uintptr_t object = *(uintptr_t *)(addr + addrOffset);
+  object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset += sizeof(void*);
-  _Block_release(object);
+  _Block_release((void *)object);
 #else
   swift_unreachable("Blocks are not available on this platform");
 #endif
@@ -784,10 +798,11 @@ static void objcStrongDestroy(const Metadata *metadata,
 #if SWIFT_OBJC_INTEROP
   uintptr_t object = *(uintptr_t *)(addr + addrOffset);
   addrOffset += sizeof(objc_object*);
-  if (object & _swift_abi_ObjCReservedBitsMask)
-    return;
 
-  object &= ~_swift_abi_SwiftSpareBitsMask;
+  if (!platformSupportsTaggedPointers()) {
+    object &= ~_swift_abi_SwiftSpareBitsMask;
+  }
+
   objc_release((objc_object *)object);
 #else
   swift_unreachable("ObjC interop is not available on this platform");
@@ -953,10 +968,13 @@ static void weakCopyInit(const Metadata *metadata, LayoutStringReader1 &reader,
 static void unknownRetain(const Metadata *metadata, LayoutStringReader1 &reader,
                           uintptr_t &addrOffset, uint8_t *dest, uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  void *object = *(void **)(src + _addrOffset);
+  uintptr_t object = *(uintptr_t *)(src + _addrOffset);
   memcpy(dest + _addrOffset, &object, sizeof(void*));
   addrOffset = _addrOffset + sizeof(void *);
-  swift_unknownObjectRetain(object);
+  if (!platformSupportsTaggedPointers()) {
+    object &= ~_swift_abi_SwiftSpareBitsMask;
+  }
+  swift_unknownObjectRetain((void *)object);
 }
 
 static void unknownUnownedCopyInit(const Metadata *metadata,
@@ -994,9 +1012,11 @@ static void blockCopy(const Metadata *metadata, LayoutStringReader1 &reader,
                       uintptr_t &addrOffset, uint8_t *dest, uint8_t *src) {
 #if SWIFT_OBJC_INTEROP
   uintptr_t _addrOffset = addrOffset;
-  auto *copy = _Block_copy(*(void**)(src + _addrOffset));
-  memcpy(dest + _addrOffset, &copy, sizeof(void*));
+  uintptr_t object = *(uintptr_t *)(src + _addrOffset);
+  memcpy(dest + _addrOffset, &object, sizeof(void *));
   addrOffset = _addrOffset + sizeof(void*);
+  object &= ~_swift_abi_SwiftSpareBitsMask;
+  _Block_copy((void *)object);
 #else
   swift_unreachable("Blocks are not available on this platform");
 #endif
@@ -1010,9 +1030,11 @@ static void objcStrongRetain(const Metadata *metadata,
   uintptr_t object = *(uintptr_t *)(src + _addrOffset);
   memcpy(dest + _addrOffset, &object, sizeof(objc_object *));
   addrOffset = _addrOffset + sizeof(objc_object *);
-  if (object & _swift_abi_ObjCReservedBitsMask)
-    return;
-  object &= ~_swift_abi_SwiftSpareBitsMask;
+
+  if (!platformSupportsTaggedPointers()) {
+    object &= ~_swift_abi_SwiftSpareBitsMask;
+  }
+
   objc_retain((objc_object *)object);
 #else
   swift_unreachable("ObjC interop is not available on this platform");
@@ -1354,12 +1376,16 @@ static void unknownAssignWithCopy(const Metadata *metadata,
                                   uintptr_t &addrOffset, uint8_t *dest,
                                   uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  void *destObject = *(void **)(dest + _addrOffset);
-  void *srcObject = *(void **)(src + _addrOffset);
+  uintptr_t destObject = *(uintptr_t *)(dest + _addrOffset);
+  uintptr_t srcObject = *(uintptr_t *)(src + _addrOffset);
   memcpy(dest + _addrOffset, &srcObject, sizeof(void *));
   addrOffset = _addrOffset + sizeof(void *);
-  swift_unknownObjectRelease(destObject);
-  swift_unknownObjectRetain(srcObject);
+  if (!platformSupportsTaggedPointers()) {
+    destObject &= ~_swift_abi_SwiftSpareBitsMask;
+    srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+  }
+  swift_unknownObjectRelease((void *)destObject);
+  swift_unknownObjectRetain((void *)srcObject);
 }
 
 static void bridgeAssignWithCopy(const Metadata *metadata,
@@ -1417,10 +1443,14 @@ static void blockAssignWithCopy(const Metadata *metadata,
                              uint8_t *src) {
 #if SWIFT_OBJC_INTEROP
   uintptr_t _addrOffset = addrOffset;
-  _Block_release(*(void **)(dest + _addrOffset));
-  auto *copy = _Block_copy(*(void **)(src + _addrOffset));
-  memcpy(dest + _addrOffset, &copy, sizeof(void*));
+  uintptr_t destObject = *(uintptr_t *)(dest + _addrOffset);
+  uintptr_t srcObject = *(uintptr_t *)(src + _addrOffset);
+  memcpy(dest + _addrOffset, &srcObject, sizeof(void *));
   addrOffset = _addrOffset + sizeof(void*);
+  destObject &= ~_swift_abi_SwiftSpareBitsMask;
+  srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+  _Block_release((void *)destObject);
+  _Block_copy((void *)srcObject);
 #else
   swift_unreachable("Blocks are not available on this platform");
 #endif
@@ -1438,15 +1468,13 @@ static void objcStrongAssignWithCopy(const Metadata *metadata,
   memcpy(dest + _addrOffset, &srcObject, sizeof(objc_object*));
   addrOffset = _addrOffset + sizeof(objc_object*);
 
-  if (!(destObject & _swift_abi_ObjCReservedBitsMask)) {
+  if (!platformSupportsTaggedPointers()) {
     destObject &= ~_swift_abi_SwiftSpareBitsMask;
-    objc_release((objc_object *)destObject);
+    srcObject &= ~_swift_abi_SwiftSpareBitsMask;
   }
 
-  if (!(srcObject & _swift_abi_ObjCReservedBitsMask)) {
-    srcObject &= ~_swift_abi_SwiftSpareBitsMask;
-    objc_retain((objc_object *)srcObject);
-  }
+  objc_release((objc_object *)destObject);
+  objc_retain((objc_object *)srcObject);
 #else
   swift_unreachable("ObjC interop is not available on this platform");
 #endif

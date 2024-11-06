@@ -90,3 +90,101 @@ func testMultiPayloadObjCExistentialWrapper() {
 }
 
 testMultiPayloadObjCExistentialWrapper()
+
+@objc
+class SwiftObjC: NSObject {
+    deinit {
+        print("SwiftObjC deinitialized!")
+    }
+}
+
+enum MultiPayloadNativeSwiftObjC {
+    case x(SwiftObjC)
+    case y(SwiftObjC)
+    case z(SwiftObjC)
+}
+
+func testMultiPayloadNativeSwiftObjC() {
+    let ptr = allocateInternalGenericPtr(of: MultiPayloadNativeSwiftObjC.self)
+
+    do {
+        let x = MultiPayloadNativeSwiftObjC.y(SwiftObjC())
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = MultiPayloadNativeSwiftObjC.z(SwiftObjC())
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SwiftObjC deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SwiftObjC deinitialized!
+    testGenericDestroy(ptr, of: MultiPayloadNativeSwiftObjC.self)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadNativeSwiftObjC()
+
+public enum MultiPayloadBlock {
+#if _pointerBitWidth(_32)
+    public typealias PaddingPayload = (Int16, Int8, Bool)
+#else
+    public typealias PaddingPayload = (Int32, Int16, Int8, Bool)
+#endif
+
+    case x(PaddingPayload)
+    case y(@convention(block) () -> Void)
+}
+
+func testMultiPayloadBlock() {
+    let ptr = UnsafeMutablePointer<MultiPayloadBlock>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let instance = SimpleClass(x: 0)
+        let x = MultiPayloadBlock.y({ print(instance) })
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let instance = SimpleClass(x: 1)
+        let y = MultiPayloadBlock.y({ print(instance) })
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        let instance = SimpleClass(x: 2)
+        var z = MultiPayloadBlock.y({ print(instance) })
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadBlock()
