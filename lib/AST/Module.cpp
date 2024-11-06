@@ -1073,6 +1073,10 @@ void SourceFile::lookupClassMembers(ImportPath::Access accessPath,
   cache.lookupClassMembers(accessPath, consumer);
 }
 
+const GeneratedSourceInfo *SourceFile::getGeneratedSourceFileInfo() const {
+  return getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
+}
+
 ASTNode SourceFile::getMacroExpansion() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
@@ -1084,9 +1088,7 @@ SourceRange SourceFile::getMacroInsertionRange() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return SourceRange();
 
-  auto generatedInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  auto origRange = generatedInfo.originalSourceRange;
+  auto origRange = getGeneratedSourceFileInfo()->originalSourceRange;
   return {origRange.getStart(), origRange.getEnd()};
 }
 
@@ -1094,18 +1096,14 @@ CustomAttr *SourceFile::getAttachedMacroAttribute() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  return genInfo.attachedMacroCustomAttr;
+  return getGeneratedSourceFileInfo()->attachedMacroCustomAttr;
 }
 
 std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return std::nullopt;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  switch (genInfo.kind) {
+  switch (getGeneratedSourceFileInfo()->kind) {
 #define MACRO_ROLE(Name, Description)               \
   case GeneratedSourceInfo::Name##MacroExpansion: \
     return MacroRole::Name;
@@ -1123,9 +1121,7 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
       Kind != SourceFileKind::DefaultArgument)
     return nullptr;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  auto sourceLoc = genInfo.originalSourceRange.getStart();
+  auto sourceLoc = getGeneratedSourceFileInfo()->originalSourceRange.getStart();
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
 
@@ -1134,9 +1130,7 @@ ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
       Kind != SourceFileKind::DefaultArgument)
     return nullptr;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  return ASTNode::getFromOpaqueValue(genInfo.astNode);
+  return ASTNode::getFromOpaqueValue(getGeneratedSourceFileInfo()->astNode);
 }
 
 void ModuleDecl::lookupClassMember(ImportPath::Access accessPath,
@@ -3571,6 +3565,11 @@ bool SourceFile::walk(ASTWalker &walker) {
 StringRef SourceFile::getFilename() const {
   SourceManager &SM = getASTContext().SourceMgr;
   return SM.getIdentifierForBuffer(BufferID);
+}
+
+StringRef SourceFile::getBuffer() const {
+  SourceManager &SM = getASTContext().SourceMgr;
+  return SM.getEntireTextForBuffer(BufferID);
 }
 
 ASTScope &SourceFile::getScope() {

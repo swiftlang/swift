@@ -31,7 +31,7 @@ public struct ExportedSourceFile {
   public let fileName: String
 
   /// The syntax tree for the complete source file.
-  public let syntax: SourceFileSyntax
+  public let syntax: Syntax
 
   /// A source location converter to convert `AbsolutePosition`s in `syntax` to line/column locations.
   ///
@@ -96,31 +96,67 @@ extension Parser.SwiftVersion {
 /// ExportedSourceFile instance.
 @_cdecl("swift_ASTGen_parseSourceFile")
 public func parseSourceFile(
-  buffer: UnsafePointer<UInt8>,
-  bufferLength: Int,
-  moduleName: UnsafePointer<UInt8>,
-  filename: UnsafePointer<UInt8>,
-  ctxPtr: UnsafeMutableRawPointer?
+  buffer: BridgedStringRef,
+  moduleName: BridgedStringRef,
+  filename: BridgedStringRef,
+  declContextPtr: UnsafeMutableRawPointer?,
+  kind: BridgedGeneratedSourceFileKind
 ) -> UnsafeRawPointer {
-  let buffer = UnsafeBufferPointer(start: buffer, count: bufferLength)
+  let buffer = UnsafeBufferPointer(start: buffer.data, count: buffer.count)
+  let dc = declContextPtr.map { BridgedDeclContext(raw: $0) }
+  let ctx = dc?.astContext
 
-  let ctx = ctxPtr.map { BridgedASTContext(raw: $0) }
-  let sourceFile = Parser.parse(
-    source: buffer,
+  var parser = Parser(
+    buffer,
     swiftVersion: Parser.SwiftVersion(from: ctx),
-    experimentalFeatures: .init(from: ctx)
+    experimentalFeatures: Parser.ExperimentalFeatures(from: ctx)
   )
 
+  let parsed: Syntax
+  switch kind {
+  case .none, // Top level source file.
+      .expressionMacroExpansion,
+      .conformanceMacroExpansion,
+      .extensionMacroExpansion,
+      .preambleMacroExpansion,
+      .replacedFunctionBody,
+      .prettyPrinted,
+      .defaultArgument:
+    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+
+  case .declarationMacroExpansion,
+      .codeItemMacroExpansion,
+      .peerMacroExpansion:
+    if let dc, dc.isTypeContext {
+      parsed = Syntax(MemberBlockItemListSyntax.parse(from: &parser))
+    } else {
+      parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+    }
+
+  case .memberMacroExpansion:
+    parsed = Syntax(MemberBlockItemListSyntax.parse(from: &parser))
+
+  case .accessorMacroExpansion:
+    // FIXME: Implement specialized parsing.
+    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+  case .memberAttributeMacroExpansion:
+    // FIXME: Implement specialized parsing.
+    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+  case .bodyMacroExpansion:
+    // FIXME: Implement specialized parsing.
+    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+  }
+
   let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)
-  let moduleName = String(cString: moduleName)
-  let fileName = String(cString: filename)
+  let moduleName = String(bridged: moduleName)
+  let fileName = String(bridged: filename)
   exportedPtr.initialize(
     to: .init(
       buffer: buffer,
       moduleName: moduleName,
       fileName: fileName,
-      syntax: sourceFile,
-      sourceLocationConverter: SourceLocationConverter(fileName: fileName, tree: sourceFile)
+      syntax: parsed,
+      sourceLocationConverter: SourceLocationConverter(fileName: fileName, tree: parsed)
     )
   )
 

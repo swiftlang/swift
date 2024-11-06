@@ -595,6 +595,8 @@ public:
     return BufferID;
   }
 
+  const GeneratedSourceInfo *getGeneratedSourceFileInfo() const;
+
   /// For source files created to hold the source code created by expanding
   /// a macro, this is the AST node that describes the macro expansion.
   ///
@@ -640,6 +642,9 @@ public:
   /// If this buffer corresponds to a file on disk, returns the path.
   /// Otherwise, return an empty string.
   StringRef getFilename() const;
+
+  /// Retrieve the source text buffer.
+  StringRef getBuffer() const;
 
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();

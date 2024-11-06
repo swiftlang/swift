@@ -101,52 +101,59 @@ struct ASTGenVisitor {
     self.legacyParse = legacyParser
   }
 
-  func generate(sourceFile node: SourceFileSyntax) -> [BridgedDecl] {
-    var out = [BridgedDecl]()
+  func generate(sourceFile node: SourceFileSyntax) -> [ASTNode] {
+    var out = [ASTNode]()
+    let isTopLevel = self.declContext.isModuleScopeContext
 
     visitIfConfigElements(
       node.statements,
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { element in
-      let loc = self.generateSourceLoc(element)
+      let astNode = generate(codeBlockItem: element)
+      if !isTopLevel {
+        out.append(astNode)
+        return
+      }
 
-      func endLoc() -> BridgedSourceLoc {
+      func getRange() -> (start: BridgedSourceLoc, end: BridgedSourceLoc) {
+        let loc = self.generateSourceLoc(element)
         if let endTok = element.lastToken(viewMode: .sourceAccurate) {
           switch endTok.parent?.kind {
           case .stringLiteralExpr, .regexLiteralExpr:
             // string/regex literal are single token in AST.
-            return self.generateSourceLoc(endTok.parent)
+            return (loc, self.generateSourceLoc(endTok.parent))
           default:
-            return self.generateSourceLoc(endTok)
+            return (loc, self.generateSourceLoc(endTok))
           }
         } else {
-          return loc
+          return (loc, loc)
         }
       }
 
-      let swiftASTNodes = generate(codeBlockItem: element)
-      switch swiftASTNodes {
+      switch astNode {
       case .decl(let d):
-        out.append(d)
+        out.append(.decl(d))
       case .stmt(let s):
+        let range = getRange()
         let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
           self.ctx,
           declContext: self.declContext,
-          startLoc: loc,
+          startLoc: range.start,
           stmt: s,
-          endLoc: endLoc()
+          endLoc: range.end
         )
-        out.append(topLevelDecl.asDecl)
+        out.append(.decl(topLevelDecl.asDecl))
       case .expr(let e):
+        let range = getRange()
         let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
           self.ctx,
           declContext: self.declContext,
-          startLoc: loc,
+          startLoc: range.start,
           expr: e,
-          endLoc: endLoc()
+          endLoc: range.end
         )
-        out.append(topLevelDecl.asDecl)
+        out.append(.decl(topLevelDecl.asDecl))
       }
     }
 
@@ -442,7 +449,7 @@ public func buildTopLevelASTNodes(
   ctx: BridgedASTContext,
   legacyParser: BridgedLegacyParser,
   outputContext: UnsafeMutableRawPointer,
-  callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
+  callback: @convention(c) (BridgedASTNode, UnsafeMutableRawPointer) -> Void
 ) {
   let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
   let visitor = ASTGenVisitor(
@@ -454,8 +461,18 @@ public func buildTopLevelASTNodes(
     legacyParser: legacyParser
   )
 
-  visitor.generate(sourceFile: sourceFile.pointee.syntax)
-    .forEach { callback($0.raw, outputContext) }
+  switch sourceFile.pointee.syntax.as(SyntaxEnum.self) {
+  case .sourceFile(let node):
+    for elem in visitor.generate(sourceFile: node) {
+      callback(elem.bridged, outputContext)
+    }
+  case .memberBlockItemList(let node):
+    for elem in visitor.generate(memberBlockItemList: node) {
+      callback(ASTNode.decl(elem).bridged, outputContext)
+    }
+  default:
+    fatalError("invalid syntax for a source file")
+  }
 
   // Diagnose any errors from evaluating #ifs.
   visitor.diagnoseAll(visitor.configuredRegions.diagnostics)
