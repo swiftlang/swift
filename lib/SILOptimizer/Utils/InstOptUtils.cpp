@@ -49,9 +49,6 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> EnableExpandAll("enable-expand-all",
-                                           llvm::cl::init(false));
-
 static llvm::cl::opt<bool> KeepWillThrowCall(
     "keep-will-throw-call", llvm::cl::init(false),
     llvm::cl::desc(
@@ -1267,32 +1264,6 @@ bool swift::simplifyUsers(SingleValueInstruction *inst) {
   }
 
   return changed;
-}
-
-// True if a type can be expanded without a significant increase to code size.
-//
-// False if expanding a type is invalid. For example, expanding a
-// struct-with-deinit drops the deinit.
-bool swift::shouldExpand(SILModule &module, SILType ty) {
-  // FIXME: Expansion
-  auto expansion = TypeExpansionContext::minimal();
-
-  if (module.Types.getTypeLowering(ty, expansion).isAddressOnly()) {
-    return false;
-  }
-  // A move-only-with-deinit type cannot be SROA.
-  //
-  // TODO: we could loosen this requirement if all paths lead to a drop_deinit.
-  if (auto *nominalTy = ty.getNominalOrBoundGenericNominal()) {
-    if (nominalTy->getValueTypeDestructor())
-      return false;
-  }
-  if (EnableExpandAll) {
-    return true;
-  }
-
-  unsigned numFields = module.Types.countNumberOfFields(ty, expansion);
-  return (numFields <= 6);
 }
 
 /// Some support functions for the global-opt and let-properties-opts

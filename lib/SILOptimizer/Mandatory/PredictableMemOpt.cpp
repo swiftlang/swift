@@ -38,6 +38,9 @@
 
 using namespace swift;
 
+static llvm::cl::opt<bool> EnableAggressiveExpansionBlocking(
+  "enable-aggressive-expansion-blocking", llvm::cl::init(false));
+
 STATISTIC(NumLoadPromoted, "Number of loads promoted");
 STATISTIC(NumLoadTakePromoted, "Number of load takes promoted");
 STATISTIC(NumDestroyAddrPromoted, "Number of destroy_addrs promoted");
@@ -3156,7 +3159,8 @@ static AllocationInst *getOptimizableAllocation(SILInstruction *i) {
 
   // Don't promote large types.
   auto &mod = alloc->getFunction()->getModule();
-  if (mod.getOptions().UseAggressiveReg2MemForCodeSize &&
+  if (EnableAggressiveExpansionBlocking &&
+      mod.getOptions().UseAggressiveReg2MemForCodeSize &&
       !shouldExpand(mod, alloc->getType().getObjectType()))
     return nullptr;
 

@@ -3495,6 +3495,7 @@ public:
       UseAggressiveHeuristic(UseAggressiveHeuristic) {}
 
    void visit(SILInstruction *i);
+   void visit(SILArgument *arg);
 
    bool isLargeLoadableType(SILType ty);
    bool isPotentiallyCArray(SILType ty);
@@ -3539,6 +3540,27 @@ private:
 };
 }
 
+void LargeLoadableHeuristic::visit(SILArgument *arg) {
+  auto objType = arg->getType().getObjectType();
+  if (numRegisters(objType) < NumRegistersLargeType)
+    return;
+
+  auto &entry = largeTypeProperties[objType];
+  for (auto *use : arg->getUses()) {
+    auto *usr = use->getUser();
+    switch (usr->getKind()) {
+    case SILInstructionKind::TupleExtractInst:
+    case SILInstructionKind::StructExtractInst: {
+      auto projectionTy = cast<SingleValueInstruction>(usr)->getType();
+      if (numRegisters(projectionTy) >= NumRegistersLargeType)
+        entry.addProjection();
+      break;
+    }
+    default:
+      continue;
+    }
+  }
+}
 void LargeLoadableHeuristic::visit(SILInstruction *i) {
   if (!UseAggressiveHeuristic)
     return;
@@ -4611,6 +4633,9 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
                                      UseAggressiveHeuristic);
     Peepholes opts(pm, silMod, irgenModule);
     for (SILBasicBlock &BB : currF) {
+      for (auto *arg : BB.getArguments()) {
+        heuristic.visit(arg);
+      }
       for (SILInstruction &I : BB) {
         heuristic.visit(&I);
         if (opts.ignore(&I))
