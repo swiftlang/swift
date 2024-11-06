@@ -95,7 +95,7 @@ struct DiagnosticError: Error {
   }
 }
 
-enum UnsafePointerKind {
+enum Mutability {
   case Immutable
   case Mutable
 }
@@ -125,6 +125,33 @@ func replaceTypeName(_ type: TypeSyntax, _ name: TokenSyntax) -> TypeSyntax {
   return TypeSyntax(idType.with(\.name, name))
 }
 
+func getPointerMutability(text: String) -> Mutability {
+  switch text {
+  case "UnsafePointer": return .Immutable
+  case "UnsafeMutablePointer": return .Mutable
+  case "UnsafeRawPointer": return .Immutable
+  case "UnsafeMutableRawPointer": return .Mutable
+  default:
+    throw DiagnosticError(
+      "expected Unsafe[Mutable][Raw]Pointer type for type \(prev)"
+        + " - first type token is '\(text)'", node: name)
+  }
+}
+
+func getSafePointerName(mut: Mutability, generateSpan: Bool, isRaw: Bool) -> TokenSyntax {
+  switch (mut, generateSpan, isRaw) {
+  case (.Immutable, true, true): return "RawSpan"
+  case (.Mutable, true, true): return "MutableRawSpan"
+  case (.Immutable, false, true): return "UnsafeRawBufferPointer"
+  case (.Mutable, false, true): return "UnsafeMutableRawBufferPointer"
+
+  case (.Immutable, true, false): return "Span"
+  case (.Mutable, true, false): return "MutableSpan"
+  case (.Immutable, false, false): return "UnsafeBufferPointer"
+  case (.Mutable, false, false): return "UnsafeMutableBufferPointer"
+  }
+}
+
 func transformType(_ prev: TypeSyntax, _ variant: Variant, _ isSizedBy: Bool) throws -> TypeSyntax {
   if let optType = prev.as(OptionalTypeSyntax.self) {
     return TypeSyntax(
@@ -135,37 +162,16 @@ func transformType(_ prev: TypeSyntax, _ variant: Variant, _ isSizedBy: Bool) th
   }
   let name = try getTypeName(prev)
   let text = name.text
-  let kind: UnsafePointerKind =
-    switch text {
-    case "UnsafePointer": .Immutable
-    case "UnsafeMutablePointer": .Mutable
-    case "UnsafeRawPointer": .Immutable
-    case "UnsafeMutableRawPointer": .Mutable
-    default:
-      throw DiagnosticError(
-        "expected Unsafe[Mutable][Raw]Pointer type for type \(prev)"
-          + " - first type token is '\(text)'", node: name)
-    }
-  if isSizedBy {
-    let token: TokenSyntax =
-      switch (kind, variant.generateSpan) {
-      case (.Immutable, true): "RawSpan"
-      case (.Mutable, true): "MutableRawSpan"
-      case (.Immutable, false): "UnsafeRawBufferPointer"
-      case (.Mutable, false): "UnsafeMutableRawBufferPointer"
-      }
-    return TypeSyntax(IdentifierTypeSyntax(name: token))
-  }
-  if text == "UnsafeRawPointer" || text == "UnsafeMutableRawPointer" {
+  if !isSizedBy && (text == "UnsafeRawPointer" || text == "UnsafeMutableRawPointer") {
     throw DiagnosticError("raw pointers only supported for SizedBy", node: name)
   }
-  let token: TokenSyntax =
-    switch (kind, variant.generateSpan) {
-    case (.Immutable, true): "Span"
-    case (.Mutable, true): "MutableSpan"
-    case (.Immutable, false): "UnsafeBufferPointer"
-    case (.Mutable, false): "UnsafeMutableBufferPointer"
-    }
+
+  let kind: Mutability =
+    getPointerMutability(text: text)
+  let token = getSafePointerName(mut: kind, generateSpan: variant.generateSpan, isRaw: isSizedBy)
+  if isSizedBy {
+    return TypeSyntax(IdentifierTypeSyntax(name: token))
+  }
   return replaceTypeName(prev, token)
 }
 
@@ -183,13 +189,11 @@ protocol BoundsCheckedThunkBuilder {
 
 func getParam(_ signature: FunctionSignatureSyntax, _ paramIndex: Int) -> FunctionParameterSyntax {
   let params = signature.parameterClause.parameters
-  let index =
-    if paramIndex > 0 {
-      params.index(params.startIndex, offsetBy: paramIndex)
-    } else {
-      params.startIndex
-    }
-  return params[index]
+  if paramIndex > 0 {
+    return params[params.index(params.startIndex, offsetBy: paramIndex)]
+  } else {
+    return params[params.startIndex]
+  }
 }
 func getParam(_ funcDecl: FunctionDeclSyntax, _ paramIndex: Int) -> FunctionParameterSyntax {
   return getParam(funcDecl.signature, paramIndex)
@@ -342,19 +346,17 @@ struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
 
   func getCount(_ variant: Variant) -> ExprSyntax {
     let countName = isSizedBy && variant.generateSpan ? "byteCount" : "count"
-    return if nullable {
-      ExprSyntax("\(name)?.\(raw: countName) ?? 0")
-    } else {
-      ExprSyntax("\(name).\(raw: countName)")
+    if nullable {
+      return ExprSyntax("\(name)?.\(raw: countName) ?? 0")
     }
+    return ExprSyntax("\(name).\(raw: countName)")
   }
 
   func getPointerArg() -> ExprSyntax {
-    return if nullable {
-      ExprSyntax("\(name)?.baseAddress")
-    } else {
-      ExprSyntax("\(name).baseAddress!")
+    if nullable {
+      return ExprSyntax("\(name)?.baseAddress")
     }
+    return ExprSyntax("\(name).baseAddress!")
   }
 
   func buildFunctionCall(_ argOverrides: [Int: ExprSyntax], _ variant: Variant) throws -> ExprSyntax
@@ -541,12 +543,7 @@ public struct PointerBoundsMacro: PeerMacro {
     let endParamIndexArg = try getArgumentByName(argumentList, "end")
     let endParamIndex: Int = try getIntLiteralValue(endParamIndexArg)
     let nonescapingExprArg = getOptionalArgumentByName(argumentList, "nonescaping")
-    let nonescaping =
-      if nonescapingExprArg != nil {
-        try getBoolLiteralValue(nonescapingExprArg!)
-      } else {
-        false
-      }
+    let nonescaping = nonescapingExprArg != nil && try getBoolLiteralValue(nonescapingExprArg!)
     return EndedBy(
       pointerIndex: startParamIndex, endIndex: endParamIndex, nonescaping: nonescaping,
       original: ExprSyntax(enumConstructorExpr))
@@ -618,11 +615,10 @@ public struct PointerBoundsMacro: PeerMacro {
       let i = pointerArg.pointerIndex
       if i < 1 || i > paramCount {
         let noteMessage =
-          if paramCount > 0 {
+          paramCount > 0 ?
             "function \(funcDecl.name) has parameter indices 1..\(paramCount)"
-          } else {
+          :
             "function \(funcDecl.name) has no parameters"
-          }
         throw DiagnosticError(
           "pointer index out of bounds", node: pointerArg.original,
           notes: [
@@ -674,13 +670,12 @@ public struct PointerBoundsMacro: PeerMacro {
         })
       let newSignature = try builder.buildFunctionSignature([:], variant)
       let checks =
-        if variant.skipTrivialCount {
+        variant.skipTrivialCount ?
           [] as [CodeBlockItemSyntax]
-        } else {
+        :
           try builder.buildBoundsChecks(variant).map { e in
             CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
           }
-        }
       let call = CodeBlockItemSyntax(
         item: CodeBlockItemSyntax.Item(
           ReturnStmtSyntax(
