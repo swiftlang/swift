@@ -321,7 +321,7 @@ endif()
 
 if(WIN32)
   target_link_libraries(swiftCore PRIVATE shell32 DbgHelp Synchronization)
-elseif(NOT APPLE AND NOT LINUX AND UNIX)
+elseif(NOT APPLE AND NOT LINUX AND NOT ANDROID AND UNIX)
   find_library(EXECINFO_LIBRARY execinfo)
   target_link_libraries(swiftCore PRIVATE "${EXECINFO_LIBRARY}")
 endif()
