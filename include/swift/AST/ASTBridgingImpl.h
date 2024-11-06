@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
+#include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SourceFile.h"
@@ -51,6 +52,9 @@ swift::DeclBaseName BridgedDeclBaseName::unbridged() const {
 //===----------------------------------------------------------------------===//
 // MARK: BridgedDeclNameRef
 //===----------------------------------------------------------------------===//
+
+BridgedDeclNameRef::BridgedDeclNameRef()
+    : BridgedDeclNameRef(swift::DeclNameRef()) {}
 
 BridgedDeclNameRef::BridgedDeclNameRef(swift::DeclNameRef name)
   : opaque(name.getOpaqueValue()) {}
@@ -378,6 +382,47 @@ BridgedSubstitutionMap BridgedConformance::getSpecializedSubstitutions() const {
 
 BridgedConformance BridgedConformanceArray::getAt(SwiftInt index) const {
   return pcArray.unbridged<swift::ProtocolConformanceRef>()[index];
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Macros
+//===----------------------------------------------------------------------===//
+
+swift::MacroRole unbridge(BridgedMacroRole cRole) {
+  switch (cRole) {
+#define MACRO_ROLE(Name, Description)                                          \
+  case BridgedMacroRole##Name:                                                 \
+    return swift::MacroRole::Name;
+#include "swift/Basic/MacroRoles.def"
+  case BridgedMacroRoleNone:
+    break;
+  }
+  llvm_unreachable("invalid macro role");
+}
+
+swift::MacroIntroducedDeclNameKind
+unbridge(BridgedMacroIntroducedDeclNameKind kind) {
+  switch (kind) {
+#define CASE(ID)                                                               \
+  case BridgedMacroIntroducedDeclNameKind##ID:                                 \
+    return swift::MacroIntroducedDeclNameKind::ID;
+    CASE(Named)
+    CASE(Overloaded)
+    CASE(Prefixed)
+    CASE(Suffixed)
+    CASE(Arbitrary)
+#undef CASE
+  }
+}
+
+bool BridgedMacroRole_isAttached(BridgedMacroRole role) {
+  return isAttachedMacro(unbridge(role));
+}
+
+swift::MacroIntroducedDeclName
+BridgedMacroIntroducedDeclName::unbridged() const {
+  return swift::MacroIntroducedDeclName(unbridge(kind),
+                                        name.unbridged().getFullName());
 }
 
 //===----------------------------------------------------------------------===//

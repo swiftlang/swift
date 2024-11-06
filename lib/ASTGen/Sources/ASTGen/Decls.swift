@@ -31,7 +31,7 @@ extension ASTGenVisitor {
     case .deinitializerDecl(let node):
       return self.generate(deinitializerDecl: node).asDecl
     case .editorPlaceholderDecl:
-      break
+      fatalError("EditorPlaceholderDeclSyntax should not be used")
     case .enumCaseDecl(let node):
       return self.generate(enumCaseDecl: node).asDecl
     case .enumDecl(let node):
@@ -46,8 +46,8 @@ extension ASTGenVisitor {
       return self.generate(importDecl: node).asDecl
     case .initializerDecl(let node):
       return self.generate(initializerDecl: node).asDecl
-    case .macroDecl:
-      break
+    case .macroDecl(let node):
+      return self.generate(macroDecl: node)?.asDecl
     case .macroExpansionDecl(let node):
       return self.generate(macroExpansionDecl: node).asDecl
     case .missingDecl:
@@ -654,6 +654,29 @@ extension ASTGenVisitor {
     }
 
     return decl
+  }
+}
+
+extension ASTGenVisitor {
+  func generate(macroDecl node: MacroDeclSyntax) -> BridgedMacroDecl? {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
+    guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
+      return nil
+    }
+    let decl = BridgedMacroDecl.createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      macroKeywordLoc: self.generateSourceLoc(node.macroKeyword),
+      name: name,
+      nameLoc: nameLoc,
+      genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
+      paramList: self.generate(functionParameterClause: node.signature.parameterClause, forSubscript: false),
+      arrowLoc: self.generateSourceLoc(node.signature.returnClause?.arrow),
+      resultType: self.generate(type: node.signature.returnClause?.type),
+      definition: self.generate(expr: node.definition?.value)
+    )
+    decl.asDecl.setAttrs(attrs.attributes);
+    return decl;
   }
 }
 

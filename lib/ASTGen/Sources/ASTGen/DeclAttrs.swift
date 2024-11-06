@@ -135,7 +135,7 @@ extension ASTGenVisitor {
       case .mainType:
         return self.generateMainTypeAttr(attribute: node)?.asDeclAttribute
       case .macroRole:
-        fatalError("unimplemented")
+        return self.generateMacroRoleAttr(attribute: node, attrName: attrName)?.asDeclAttribute
       case .noExistentials:
         fatalError("unimplemented")
       case .noObjCBridging:
@@ -671,6 +671,267 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName)
+    )
+  }
+
+  func generateMacroIntroducedDeclNameKind(declReferenceExpr node: DeclReferenceExprSyntax) -> BridgedMacroIntroducedDeclNameKind? {
+    if node.argumentNames != nil {
+      // TODO: Diagnose
+    }
+    guard node.argumentNames == nil else {
+      return nil
+    }
+    switch node.baseName.rawText {
+    case "arbitrary":
+      return .arbitrary
+    case "named":
+      return .named
+    case "overloaded":
+      return .overloaded
+    case "prefixed":
+      return .prefixed
+    case "suffixed":
+      return .suffixed
+    default:
+      return nil
+    }
+  }
+
+  func generateMacroIntroducedDeclName(expr node: ExprSyntax) -> BridgedMacroIntroducedDeclName? {
+    let kind: BridgedMacroIntroducedDeclNameKind?
+    let arguments: LabeledExprListSyntax?
+    if let kindExpr = node.as(DeclReferenceExprSyntax.self) {
+      kind = self.generateMacroIntroducedDeclNameKind(declReferenceExpr: kindExpr)
+      arguments = nil
+    } else if let callExpr =  node.as(FunctionCallExprSyntax.self) {
+      if let kindExpr = callExpr.calledExpression.as(DeclReferenceExprSyntax.self) {
+        kind = self.generateMacroIntroducedDeclNameKind(declReferenceExpr: kindExpr)
+      } else {
+        kind = nil
+      }
+      arguments = callExpr.arguments
+    } else {
+      kind = nil
+      arguments = nil
+    }
+    guard let kind else {
+      // TODO: Diagnose.
+      return nil
+    }
+
+    let name: BridgedDeclNameRef
+    switch kind {
+    case .named, .prefixed, .suffixed:
+      guard let arguments else {
+        // TODO: Diagnose
+        return nil
+      }
+      guard var arg = arguments.first?.expression else {
+        // TODO: Diagnose.
+        return nil
+      }
+      if let call = arg.as(FunctionCallExprSyntax.self), call.arguments.isEmpty {
+        // E.g. 'named(foo())', use the callee to generate the name.
+        arg = call.calledExpression
+      }
+      guard let arg = arg.as(DeclReferenceExprSyntax.self) else {
+        // TODO: Diagnose.
+        return nil
+      }
+      name = self.generateDeclNameRef(declReferenceExpr: arg).name
+      if arguments.count >= 2 {
+        // TODO: Diagnose.
+      }
+
+    case .overloaded, .arbitrary:
+      if arguments != nil {
+        // TODO: Diagnose
+      }
+      name = BridgedDeclNameRef()
+    }
+
+    return BridgedMacroIntroducedDeclName(kind: kind, name: name)
+  }
+
+  struct GeneratedGenericArguments {
+    var arguments: BridgedArrayRef = .init()
+    var range: BridgedSourceRange = .init()
+  }
+
+  /// Generate 'TypeRepr' from a expression, because 'conformances' arguments in
+  /// macro role attributes are parsed as normal expressions.
+  func generateMacroIntroducedConformance(
+    expr: ExprSyntax,
+    genericArgs: GeneratedGenericArguments = GeneratedGenericArguments()
+  ) -> BridgedTypeRepr? {
+    switch expr.as(ExprSyntaxEnum.self) {
+    case .typeExpr(let node):
+      return self.generate(type: node.type)
+
+    case .declReferenceExpr(let node):
+      guard node.argumentNames == nil else {
+        // 'Foo.bar(_:baz:)'
+        break
+      }
+      let name = self.generateIdentifierAndSourceLoc(node.baseName)
+      return BridgedUnqualifiedIdentTypeRepr .createParsed(
+        self.ctx,
+        name: name.identifier,
+        nameLoc: name.sourceLoc,
+        genericArgs: genericArgs.arguments,
+        leftAngleLoc: genericArgs.range.start,
+        rightAngleLoc: genericArgs.range.end
+      ).asTypeRepr
+
+    case .memberAccessExpr(let node):
+      guard let parsedBase = node.base else {
+        // Implicit member expressions. E.g. '.Foo'
+        break
+      }
+      guard let base = self.generateMacroIntroducedConformance(expr: parsedBase) else {
+        // Unsupported base expr. E.g. 'foo().bar'
+        return nil
+      }
+      guard node.declName.argumentNames == nil else {
+        // Function name. E.g. 'Foo.bar(_:baz:)'
+        break
+      }
+      let name = self.generateIdentifierAndSourceLoc(node.declName.baseName)
+      return BridgedDeclRefTypeRepr.createParsed(
+        self.ctx,
+        base: base,
+        name: name.identifier,
+        nameLoc: name.sourceLoc,
+        genericArguments: genericArgs.arguments,
+        angleRange: genericArgs.range
+      ).asTypeRepr
+
+    case .genericSpecializationExpr(let node):
+      guard node.expression.is(MemberAccessExprSyntax.self) || node.expression.is(DeclReferenceExprSyntax.self) else {
+        break
+      }
+      let args = node.genericArgumentClause.arguments.lazy.map {
+        self.generate(genericArgument: $0.argument)
+      }
+      return self.generateMacroIntroducedConformance(
+        expr: node.expression,
+        genericArgs: GeneratedGenericArguments(
+          arguments: args.bridgedArray(in: self),
+          range: self.generateSourceRange(node.genericArgumentClause)
+        )
+      )
+
+    case .sequenceExpr:
+      // TODO: Support protocol composition.
+      break
+
+    default:
+      break
+    }
+
+    // TODO: Diagnose invalid expression for a conformance.
+    return nil
+  }
+
+  func generateMacroRoleAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedMacroRoleAttr? {
+    // '@freestanding' or '@attached'.
+    assert(attrName == "freestanding" || attrName == "attached")
+    let syntax: BridgedMacroSyntax =
+      attrName == "freestanding" ? .freestanding : .attached;
+    let isAttached = syntax == .attached
+
+    // Start consuming arguments.
+    guard
+      var args = node.arguments?.as(LabeledExprListSyntax.self)?[...]
+    else {
+      // TODO: Diagnose.
+      return nil
+    }
+
+    // Macro role.
+    let role = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+      BridgedMacroRole(from: $0.rawText.bridged)
+    }
+    guard let role = role else {
+      return nil
+    }
+    guard role != .none else {
+      // TODO: Diagnose.
+      return nil
+    }
+    if role.isAttached != isAttached {
+      // TODO: Diagnose.
+      return nil
+    }
+
+    var names: [BridgedMacroIntroducedDeclName] = []
+    var conformances: [BridgedTypeExpr] = []
+
+    enum ArgState {
+      case inNames
+      case inConformances
+      case inInvalid
+    }
+    // Assume we're in 'names:' arguments.
+    var argState: ArgState = .inNames
+    // Seen at 'names:' argument label.
+    var seenNames = false
+    // Seen at 'conformances:' argument label.
+    var seenConformances = false
+
+    LOOP: while let arg = args.popFirst() {
+      // Argument state.
+      if let label = arg.label {
+        switch label.tokenKind {
+        case .identifier("names"):
+          argState = .inNames
+          if seenNames {
+            // TODO: Diagnose duplicated 'names:'.
+          }
+          seenNames = true
+        case .identifier("conformances"):
+          argState = .inConformances
+          if seenConformances {
+            // TODO: Diagnose duplicated 'conformances:'.
+          }
+          seenConformances = true
+        default:
+          // Invalid label.
+          // TODO: Diagnose `no argument with label '\(label)'`.
+          argState = .inInvalid
+        }
+      } else if argState == .inNames && !seenNames {
+        // E.g. `@attached(member, named(foo))` this is missing 'names:'
+        // TODO: Diagnose to insert 'names:'
+        seenNames = true
+      }
+
+      // Argument values.
+      switch argState {
+      case .inNames:
+        if let name = self.generateMacroIntroducedDeclName(expr: arg.expression) {
+          names.append(name)
+        }
+      case .inConformances:
+        if let conformance = self.generateMacroIntroducedConformance(expr: arg.expression) {
+          conformances.append(BridgedTypeExpr.createParsed(self.ctx, type: conformance))
+        }
+      case .inInvalid:
+        // Ignore the value.
+        break
+      }
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateSourceRange(node),
+      syntax: syntax,
+      lParenLoc: self.generateSourceLoc(node.leftParen),
+      role: role,
+      names: names.lazy.bridgedArray(in: self),
+      conformances: conformances.lazy.bridgedArray(in: self),
+      rParenLoc: self.generateSourceLoc(node.rightParen)
     )
   }
 
