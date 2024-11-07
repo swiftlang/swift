@@ -8,6 +8,7 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// REQUIRES: swift_feature_IsolatedDeinit
 
 import Swift
 import _Concurrency
