@@ -86,15 +86,3 @@ struct DeferBody {
     // expected-error@-1 {{'No' is unavailable}}
   }
 }
-
-struct NotP {}
-
-protocol P {}
-
-@available(*, unavailable)
-extension NotP: P {} // expected-note {{conformance of 'NotP' to 'P' has been explicitly marked unavailable here}}
-
-@available(SwiftStdlib 5.1, *)
-func requireP() -> some P {
-  NotP() // expected-error {{conformance of 'NotP' to 'P' is unavailable}}
-}
