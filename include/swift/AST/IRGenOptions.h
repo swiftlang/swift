@@ -590,7 +590,7 @@ public:
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
-        EmitAsyncFramePushPopMetadata(false), EmitYieldOnce2AsYieldOnce(true),
+        EmitAsyncFramePushPopMetadata(true), EmitYieldOnce2AsYieldOnce(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
