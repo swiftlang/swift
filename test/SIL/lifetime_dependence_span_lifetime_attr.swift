@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip | %FileCheck %s
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
+// RUN:   -enable-experimental-feature NonescapableTypes | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_NonescapableTypes

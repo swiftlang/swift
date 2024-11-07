@@ -3,9 +3,7 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
+// RUN:   -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_NonescapableTypes
