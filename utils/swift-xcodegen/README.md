@@ -11,13 +11,15 @@ This script is primarily focussed on providing a good editor experience for work
 
 ## Running
 
-Run as:
+You can run using either `utils/generate-xcode` or the `swift-xcodegen` script in this directory; the former is just a convenience for the latter. The basic invocation is:
 
-```
-./swift-xcodegen <path to Ninja build directory>
+```sh
+./swift-xcodegen <build dir>
 ```
 
-An Xcode project will be created in the grandparent directory (i.e `build/../Swift.xcodeproj`). Projects for LLVM, LLDB, and Clang may also be created by passing `--llvm`, `--lldb`, and `--clang` respectively. Workspaces of useful combinations will also be created (e.g Swift+LLVM, Clang+LLVM).
+where `<build dir>` is the path to the build directory e.g `build/Ninja-RelWithDebInfoAssert`. This will by default create a `Swift.xcodeproj` in the parent directory (next to the `build` directory). Projects for LLVM, LLDB, and Clang may also be created by passing `--llvm`, `--lldb`, and `--clang` respectively. Workspaces of useful combinations will also be created (e.g Swift+LLVM, Clang+LLVM).
+
+For the full set of options, see the [Command usage](#command-usage) below.
 
 An `ALL` meta-target is created that depends on all the targets in the given project or workspace. A scheme for this target is automatically generated too (and automatic scheme generation is disabled). You can manually add individual schemes for targets you're interested in. Note however that Clang targets do not currently have dependency information.
 
