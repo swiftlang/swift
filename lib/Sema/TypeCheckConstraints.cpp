@@ -386,19 +386,21 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 // instead of each individual syntactic element types.
 std::optional<SyntacticElementTarget>
 TypeChecker::typeCheckExpression(SyntacticElementTarget &target,
-                                 TypeCheckExprOptions options) {
+                                 TypeCheckExprOptions options,
+                                 DiagnosticTransaction *diagnosticTransaction) {
   DeclContext *dc = target.getDeclContext();
   auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr",
                                   target.getAsExpr());
   PrettyStackTraceExpr stackTrace(Context, "type-checking", target.getAsExpr());
 
-  return typeCheckTarget(target, options);
+  return typeCheckTarget(target, options, diagnosticTransaction);
 }
 
 std::optional<SyntacticElementTarget>
 TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
-                             TypeCheckExprOptions options) {
+                             TypeCheckExprOptions options,
+                             DiagnosticTransaction *diagnosticTransaction) {
   auto errorResult = [&]() -> std::optional<SyntacticElementTarget> {
     // Fill in ErrorTypes for the target if we can.
     if (!options.contains(TypeCheckExprFlags::AvoidInvalidatingAST))
@@ -435,7 +437,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   if (options.contains(TypeCheckExprFlags::DisableMacroExpansions))
     csOptions |= ConstraintSystemFlags::DisableMacroExpansions;
 
-  ConstraintSystem cs(dc, csOptions);
+  ConstraintSystem cs(dc, csOptions, diagnosticTransaction);
 
   if (auto *expr = target.getAsExpr()) {
     // Tell the constraint system what the contextual type is.  This informs
@@ -523,7 +525,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     // First, let's try to type-check default expression using
     // archetypes, which guarantees that it would work for any
     // substitution of the generic parameter (if they are involved).
-    if (auto result = typeCheckExpression(defaultExprTarget, options)) {
+    if (auto result = typeCheckExpression(
+            defaultExprTarget, options, &diagnostics)) {
       defaultValue = result->getAsExpr();
       return defaultValue->getType();
     }

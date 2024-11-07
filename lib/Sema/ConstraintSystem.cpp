@@ -117,8 +117,10 @@ ExpressionTimer::~ExpressionTimer() {
 }
 
 ConstraintSystem::ConstraintSystem(DeclContext *dc,
-                                   ConstraintSystemOptions options)
+                                   ConstraintSystemOptions options,
+                                   DiagnosticTransaction *diagnosticTransaction)
   : Context(dc->getASTContext()), DC(dc), Options(options),
+    diagnosticTransaction(diagnosticTransaction),
     Arena(dc->getASTContext(), Allocator),
     CG(*new ConstraintGraph(*this))
 {
@@ -4710,7 +4712,8 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
   // diagnostics already emitted or waiting to be emitted. Because they are
   // a better indication of the problem.
   ASTContext &ctx = getASTContext();
-  if (ctx.hadError())
+  if (ctx.hadError() ||
+      (diagnosticTransaction && diagnosticTransaction->hasErrors()))
     return;
 
   ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
