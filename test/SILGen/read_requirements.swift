@@ -14,8 +14,6 @@
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_CoroutineAccessorsUnwindOnCallerError
 
-// For CoroutineAccessorsUnwindOnCallerError
-
 // A read requirement may be satisfied by
 // - a stored property
 // - a _read accessor
