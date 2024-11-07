@@ -1011,8 +1011,12 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
            conventions.getNumDirectSILResults() == 0 &&
            conventions.getNumIndirectSILResults() == 0 &&
            "unexpected Array.append(_:) signature");
-    // Get the element to be appended which is passed indirectly (@in).
-    SymbolicValue element = getConstAddrAndLoadResult(apply->getOperand(1));
+    // Get the element to be appended which is usually passed indirectly (@in),
+    // or directly (in Embedded Swift where Array.append can be specialized).
+    SymbolicValue element = getConstantValue(apply->getOperand(1));
+    if (element.getKind() == SymbolicValue::Address) {
+      element = getConstAddrAndLoadResult(apply->getOperand(1));
+    }
     if (!element.isConstant())
       return element;
 
