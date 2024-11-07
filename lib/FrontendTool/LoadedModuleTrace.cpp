@@ -27,6 +27,7 @@
 #include "swift/IDE/SourceEntityWalker.h"
 
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/ObjCMethodReferenceInfo.h"
 #include "clang/Basic/Module.h"
 
 #include "llvm/ADT/SmallPtrSet.h"
@@ -817,13 +818,7 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   return false;
 }
 
-const static unsigned OBJC_METHOD_TRACE_FILE_FORMAT_VERSION = 1;
-
 class ObjcMethodReferenceCollector: public SourceEntityWalker {
-  std::string compilerVer;
-  std::string target;
-  std::string targetVariant;
-  SmallVector<StringRef, 32> FilePaths;
   unsigned CurrentFileID;
   llvm::DenseMap<const clang::ObjCMethodDecl*, unsigned> results;
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
@@ -831,82 +826,30 @@ class ObjcMethodReferenceCollector: public SourceEntityWalker {
                           Type T, ReferenceMetaData Data) override {
     if (!Range.isValid())
       return true;
-    if (auto *clangD = dyn_cast_or_null<clang::ObjCMethodDecl>(D->getClangDecl())) {
-      results[clangD] = CurrentFileID;
-    }
+    if (auto *clangD = dyn_cast_or_null<clang::ObjCMethodDecl>(D->getClangDecl()))
+      Info.References[CurrentFileID].push_back(clangD);
     return true;
   }
-  static StringRef selectMethodKey(const clang::ObjCMethodDecl* clangD) {
-    assert(clangD);
-    if (clangD->isInstanceMethod())
-      return "instance_method";
-    else if (clangD->isClassMethod())
-      return "class_method";
-    else
-      return "method";
-  }
-  static StringRef selectMethodOwnerKey(const clang::NamedDecl* clangD) {
-    assert(clangD);
-    if (isa<clang::ObjCInterfaceDecl>(clangD))
-      return "interface_type";
-    if (isa<clang::ObjCCategoryDecl>(clangD))
-      return "category_type";
-    if (isa<clang::ObjCProtocolDecl>(clangD))
-      return "protocol_type";
-    return "type";
-  }
+
+  clang::ObjCMethodReferenceInfo Info;
+
 public:
   ObjcMethodReferenceCollector(ModuleDecl *MD) {
-    compilerVer =
+    Info.ToolName = "swift-compiler-version";
+    Info.ToolVersion =
       getSwiftInterfaceCompilerVersionForCurrentCompiler(MD->getASTContext());
     auto &Opts = MD->getASTContext().LangOpts;
-    target = Opts.Target.str();
-    targetVariant = Opts.TargetVariant.has_value() ?
+    Info.Target = Opts.Target.str();
+    Info.TargetVariant = Opts.TargetVariant.has_value() ?
       Opts.TargetVariant->str() : "";
   }
   void setFileBeforeVisiting(SourceFile *SF) {
     assert(SF && "need to visit actual source files");
-    FilePaths.push_back(SF->getFilename());
-    CurrentFileID = FilePaths.size();
+    Info.FilePaths.push_back(SF->getFilename().str());
+    CurrentFileID = Info.FilePaths.size();
   }
   void serializeAsJson(llvm::raw_ostream &OS) {
-    llvm::json::OStream out(OS, /*IndentSize=*/4);
-    out.object([&] {
-      out.attribute("swift-compiler-version", compilerVer);
-      out.attribute("format-vesion", OBJC_METHOD_TRACE_FILE_FORMAT_VERSION);
-      out.attribute("target", target);
-      if (!targetVariant.empty())
-        out.attribute("target-variant", targetVariant);
-      out.attributeArray("references", [&] {
-        for (auto pair: results) {
-          auto *clangD = pair.first;
-          auto &SM = clangD->getASTContext().getSourceManager();
-          clang::SourceLocation Loc = clangD->getLocation();
-          if (!Loc.isValid()) {
-            continue;
-          }
-          out.object([&] {
-            if (auto *parent = dyn_cast_or_null<clang::NamedDecl>(clangD
-                                                               ->getParent())) {
-              auto pName = parent->getName();
-              if (!pName.empty())
-                out.attribute(selectMethodOwnerKey(parent), pName);
-            }
-            out.attribute(selectMethodKey(clangD),  clangD->getNameAsString());
-            out.attribute("declared_at", Loc.printToString(SM));
-            out.attribute("referenced_at_file_id", pair.second);
-          });
-        }
-      });
-      out.attributeArray("fileMap", [&]{
-        for (unsigned I = 0, N = FilePaths.size(); I != N; I ++) {
-          out.object([&] {
-            out.attribute("file_id", I + 1);
-            out.attribute("file_path", FilePaths[I]);
-          });
-        }
-      });
-    });
+    clang::serializeObjCMethodReferencesAsJson(Info, OS);
   }
 };
 
