@@ -4020,8 +4020,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
       Builder.emitBlock(typedErrorLoadBB);
 
       auto &errorTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(errorType));
-      auto silResultTy =
-          substConv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+      auto silResultTy = CurSILFn->mapTypeIntoContext(
+          substConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
       auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silResultTy));
 
       auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
@@ -4498,8 +4498,8 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     SILType errorType;
     if (fnType->hasErrorResult() && conv.isTypedError() &&
         !conv.hasIndirectSILResults() && !conv.hasIndirectSILErrorResults()) {
-      errorType =
-          conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
+      errorType = IGF.CurSILFn->mapTypeIntoContext(
+          conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
     }
     IGF.emitScalarReturn(resultTy, funcResultType, result, swiftCCReturn, false,
                          mayPeepholeLoad, errorType);
@@ -4566,12 +4566,12 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
       llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
       flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
       Explosion errorResult = getLoweredExplosion(i->getOperand());
-      auto silErrorTy =
-          conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
+      auto silErrorTy = CurSILFn->mapTypeIntoContext(
+          conv.getSILErrorType(IGM.getMaximalTypeExpansionContext()));
       auto &errorTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silErrorTy));
 
-      auto silResultTy =
-          conv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+      auto silResultTy = CurSILFn->mapTypeIntoContext(
+          conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
 
       if (silErrorTy.getASTType()->isNever()) {
         emitTrap("Never can't be initialized", true);
@@ -4621,12 +4621,12 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
         conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
 
     if (conv.isTypedError()) {
-      auto silErrorTy =
-          conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
+      auto silErrorTy = CurSILFn->mapTypeIntoContext(
+          conv.getSILErrorType(IGM.getMaximalTypeExpansionContext()));
       auto &errorTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silErrorTy));
 
-      auto silResultTy =
-          conv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+      auto silResultTy = CurSILFn->mapTypeIntoContext(
+          conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
       auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silResultTy));
       auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
       auto &errorSchema = errorTI.nativeReturnValueSchema(IGM);
