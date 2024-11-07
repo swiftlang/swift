@@ -634,7 +634,7 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(
-    uncheckedBounds bounds: some RangeExpression<Int>
+    unchecked bounds: some RangeExpression<Int>
   ) -> Self {
     _extracting(unchecked: bounds.relative(to: indices))
   }
