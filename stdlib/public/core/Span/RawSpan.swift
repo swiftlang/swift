@@ -82,13 +82,12 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
-  /// The memory in `buffer` must be owned by the instance `owner`,
-  /// meaning that as long as `owner` is alive the memory will remain valid.
+  /// The memory in `buffer` must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `RawSpan`.
+  /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  ///   - owner: a binding whose lifetime must exceed that of
-  ///            the newly created `RawSpan`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
@@ -101,6 +100,14 @@ extension RawSpan {
     )
   }
 
+  /// Unsafely create a `RawSpan` over initialized memory.
+  ///
+  /// The memory in `buffer` must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `RawSpan`.
+  /// Failure to maintain this invariant results in undefined behaviour.
+  ///
+  /// - Parameters:
+  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
@@ -113,13 +120,12 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
-  /// The memory in `buffer` must be owned by the instance `owner`,
-  /// meaning that as long as `owner` is alive the memory will remain valid.
+  /// The memory in `buffer` must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `RawSpan`.
+  /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeMutableRawBufferPointer` to initialized memory.
-  ///   - owner: a binding whose lifetime must exceed that of
-  ///            the newly created `RawSpan`.
+  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
@@ -142,15 +148,14 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
-  /// The memory over `count` bytes starting at
-  /// `pointer` must be owned by the instance `owner`,
-  /// meaning that as long as `owner` is alive the memory will remain valid.
+  /// The region of memory representing `byteCount` bytes starting at `pointer`
+  /// must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `RawSpan`.
+  /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized byte.
   ///   - byteCount: the number of initialized bytes in the span.
-  ///   - owner: a binding whose lifetime must exceed that of
-  ///            the newly created `RawSpan`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
@@ -165,13 +170,12 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
-  /// The memory in `buffer` must be owned by the instance `owner`,
-  /// meaning that as long as `owner` is alive the memory will remain valid.
+  /// The memory in `buffer` must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `RawSpan`.
+  /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  ///   - owner: a binding whose lifetime must exceed that of
-  ///            the newly created `RawSpan`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
@@ -184,11 +188,12 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
-  /// The memory in `buffer` must be valid and initialized
-  /// for at least as long as the returned `RawSpan` exists.
+  /// The memory in `buffer` must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `RawSpan`.
+  /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: a raw buffer to initialized memory.
+  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
@@ -203,13 +208,12 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
-  /// The memory in `buffer` must be owned by the instance `owner`,
-  /// meaning that as long as `owner` is alive the memory will remain valid.
+  /// The memory in `buffer` must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `RawSpan`.
+  /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeMutableRawBufferPointer` to initialized memory.
-  ///   - owner: a binding whose lifetime must exceed that of
-  ///            the newly created `RawSpan`.
+  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
@@ -222,11 +226,12 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
-  /// The memory in `buffer` must be valid and initialized
-  /// for at least as long as the returned `RawSpan` exists.
+  /// The memory in `buffer` must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `RawSpan`.
+  /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: a raw buffer to initialized memory.
+  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
@@ -241,15 +246,14 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
-  /// The memory over `count` bytes starting at
-  /// `pointer` must be owned by the instance `owner`,
-  /// meaning that as long as `owner` is alive the memory will remain valid.
+  /// The region of memory representing `byteCount` bytes starting at `pointer`
+  /// must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `RawSpan`.
+  /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized byte.
   ///   - byteCount: the number of initialized bytes in the span.
-  ///   - owner: a binding whose lifetime must exceed that of
-  ///            the newly created `RawSpan`.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   //FIXME: should be @lifetime(borrow <argname>) rdar://138672380
