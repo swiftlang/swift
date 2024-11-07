@@ -1948,8 +1948,9 @@ private:
 
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Documentation.
-      auto *getter = VD->getOpaqueAccessor(AccessorKind::Get);
-      printAbstractFunctionAsMethod(getter, /*isStatic=*/VD->isStatic());
+      // TODO: support read/modify accessors.
+      if (auto *getter = VD->getOpaqueAccessor(AccessorKind::Get))
+        printAbstractFunctionAsMethod(getter, /*isStatic=*/VD->isStatic());
       if (auto *setter = VD->getOpaqueAccessor(AccessorKind::Set))
         printAbstractFunctionAsMethod(setter, /*isStatic=*/VD->isStatic());
       return;
