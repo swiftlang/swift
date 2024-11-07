@@ -199,6 +199,14 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   if (!typeCheckedType)
     return MacroDefinition::forInvalid();
 
+  // If the expanded macro was one of the the magic literal expressions
+  // (like #file), there's nothing to expand.
+  if (auto magicLiteral =
+          dyn_cast<MagicIdentifierLiteralExpr>(definition)) {
+    StringRef expansionText = externalMacroName.unbridged();
+    return MacroDefinition::forExpanded(ctx, expansionText, { }, { });
+  }
+
   // Dig out the macro that was expanded.
   auto expansion = cast<MacroExpansionExpr>(definition);
   auto expandedMacro =
@@ -1105,9 +1113,10 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
       return nullptr;
 
     case BuiltinMacroKind::IsolationMacro:
-      // Create a buffer full of scratch space; this will be populated
-      // much later.
-      std::string scratchSpace(128, ' ');
+      // Create a buffer with "nil" plus a bunch of scratch space. This
+      // will be populated much later.
+      std::string scratchSpace = "nil";
+      scratchSpace.append(125, ' ');
       evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
           scratchSpace,
           adjustMacroExpansionBufferName(*discriminator));

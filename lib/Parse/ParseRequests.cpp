@@ -310,10 +310,27 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
       break;
 
     case GeneratedSourceInfo::ExpressionMacroExpansion:
+    case GeneratedSourceInfo::DefaultArgument: {
+      // Prime the lexer.
+      if (parser.Tok.is(tok::NUM_TOKENS))
+        parser.consumeTokenWithoutFeedingReceiver();
+
+      ParserResult<Expr> resultExpr = parser.parseExpr(diag::expected_expr);
+      if (auto expr = resultExpr.getPtrOrNull())
+        items.push_back(expr);
+
+      if (!parser.Tok.is(tok::eof)) {
+        parser.diagnose(parser.Tok, diag::extra_tokens_after_expression);
+        while (!parser.Tok.is(tok::eof))
+          parser.consumeToken();
+      }
+
+      break;
+    }
+
     case GeneratedSourceInfo::PreambleMacroExpansion:
     case GeneratedSourceInfo::ReplacedFunctionBody:
-    case GeneratedSourceInfo::PrettyPrinted:
-    case GeneratedSourceInfo::DefaultArgument: {
+    case GeneratedSourceInfo::PrettyPrinted:{
       parser.parseTopLevelItems(items);
       break;
     }
