@@ -2411,16 +2411,9 @@ public:
         } else
           inFlight.fixItInsert(ID->getStartLoc(), "internal ");
 
-#ifndef NDEBUG
-        static bool enableTreatAsError = true;
-#else
-        static bool enableTreatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
-#endif
-
         bool isImportOfUnderlying = importer->getName() == target->getName();
         auto *SF = ID->getDeclContext()->getParentSourceFile();
-        bool treatAsError = enableTreatAsError &&
-                            !isImportOfUnderlying &&
+        bool treatAsError = !isImportOfUnderlying &&
                             SF->Kind != SourceFileKind::Interface;
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
