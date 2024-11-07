@@ -291,3 +291,12 @@ struct ValueStruct<let N: Int> {}
 func genericTest1<T>(_: T) {}
 func genericTest2<each T>(_: repeat each T) {}
 func genericTest4<let T: Int>(_: ValueStruct<T>) {}
+
+func concreteValueTest1(_: ValueStruct<123>) {}
+func concreteValueTest2(_: ValueStruct<-123>) {}
+
+extension ValueStruct where N == 123 {}
+extension ValueStruct where 123 == N {}
+extension ValueStruct where N == -123 {}
+extension ValueStruct where -123 == N {}
+

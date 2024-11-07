@@ -1938,6 +1938,12 @@ BridgedVarargTypeRepr_createParsed(BridgedASTContext cContext,
                                    BridgedTypeRepr base,
                                    BridgedSourceLoc cEllipsisLoc);
 
+SWIFT_NAME(
+    "BridgedIntegerTypeRepr.createParsed(_:string:loc:minusLoc:)")
+BridgedIntegerTypeRepr BridgedIntegerTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedStringRef cString, BridgedSourceLoc cLoc,
+    BridgedSourceLoc cMinusLoc);
+
 SWIFT_NAME("BridgedTypeRepr.dump(self:)")
 void BridgedTypeRepr_dump(BridgedTypeRepr type);
 

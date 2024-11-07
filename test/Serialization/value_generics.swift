@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -emit-module -enable-experimental-feature ValueGenerics -enable-experimental-feature RawLayout -disable-availability-checking -disable-experimental-parser-round-trip -parse-as-library -o %t
-// FIXME: Remove -disable-experimental-parser-round-trip after https://github.com/swiftlang/swift-syntax/pull/2859 is merged
+// RUN: %target-swift-frontend %s -emit-module -enable-experimental-feature ValueGenerics -enable-experimental-feature RawLayout -disable-availability-checking -parse-as-library -o %t
 // RUN: %target-sil-opt -enable-sil-verify-all %t/value_generics.swiftmodule -o - | %FileCheck %s
 
 // REQUIRES: swift_feature_RawLayout
