@@ -97,6 +97,12 @@ private func eliminateRedundantLoads(in function: Function, ignoreArrays: Bool, 
         {
           continue
         }
+        // Check if the type can be expanded without a significant increase to
+        // code size.
+        // We block redundant load elimination because it might increase
+        // register pressure for large values. Furthermore, this pass also
+        // splits values into its projections (e.g
+        // shrinkMemoryLifetimeAndSplit).
         if !load.type.shouldExpand(context) {
            continue
         }

@@ -811,6 +811,19 @@ extension CheckedCastAddrBranchInst {
 }
 
 extension Type {
+  /// True if a type can be expanded without a significant increase to code
+  /// size.
+  /// Expanding a type can mean expressing it as a SSA value (which ultimately
+  /// is represented as multiple SSA values in LLVM IR) instead of indirectly
+  /// via memory operations (copy_addr), or exploding an SSA value into its
+  /// constituent projections.
+  /// Once a value is represented as its projections we don't "reconstitute" the
+  /// aggregate value anymore leading to register pressure and code size bloat.
+  /// Therefore, we try to keep "larger" values indirect and not exploated
+  /// throughout the pipeline.
+  ///
+  /// False if expanding a type is invalid. For example, expanding a
+  /// struct-with-deinit drops the deinit.
   func shouldExpand(_ context: some Context) -> Bool {
     if !context.options.useAggressiveReg2MemForCodeSize {
       return true
