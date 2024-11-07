@@ -1498,7 +1498,7 @@ ConstraintSystem::solveImpl(SyntacticElementTarget &target,
     Timer.emplace(expr, *this);
 
   if (generateConstraints(target, allowFreeTypeVariables))
-    return SolutionResult::forError();;
+    return SolutionResult::forError();
 
   // Try to solve the constraint system using computed suggestions.
   SmallVector<Solution, 4> solutions;
