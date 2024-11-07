@@ -667,6 +667,12 @@ public enum ErrorWrapper {
     case y(Error)
 }
 
+public enum MultiPayloadAnyObject {
+    case x(AnyObject)
+    case y(AnyObject)
+    case z(AnyObject)
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}
