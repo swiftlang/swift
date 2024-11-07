@@ -37,4 +37,15 @@ TemplatingTestSuite.test("DerivedOutOfOrder") {
     expectEqual(789, d.leafField)
 }
 
+var FrtInheritanceTestSuite = TestSuite("Foreign references in C++ inheritance")
+
+FrtInheritanceTestSuite.test("ParentChild") {
+  var x = returnValueType()
+  var y = returnRefType()
+  var z = returnDerivedFromRefType()
+  expectTrue(!(type(of: x) is AnyObject.Type), "Expected x to be a value type, but it’s a reference type")
+  expectTrue(type(of: y) is AnyObject.Type, "Expected y to be a reference type, but it’s a value type")
+  expectTrue(type(of: z) is AnyObject.Type, "Expected z to be a reference type, but it’s a value type")
+}
+
 runAllTests()
