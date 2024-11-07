@@ -162,3 +162,14 @@ do {
     }
   }
 }
+
+
+
+@preconcurrency
+func withSendableClosure(_: @Sendable () -> Void) {}
+
+func conversionDowngrade() {
+  let ns: () -> Void = {}
+  withSendableClosure(ns)
+  // expected-warning@-1 {{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+}
