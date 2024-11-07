@@ -607,11 +607,13 @@ Type typeCheckExpression(Expr *&expr, DeclContext *dc,
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckExpression(constraints::SyntacticElementTarget &target,
-                    TypeCheckExprOptions options = TypeCheckExprOptions());
+                    TypeCheckExprOptions options = TypeCheckExprOptions(),
+                    DiagnosticTransaction *diagnosticTransaction);
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckTarget(constraints::SyntacticElementTarget &target,
-                TypeCheckExprOptions options = TypeCheckExprOptions());
+                TypeCheckExprOptions options = TypeCheckExprOptions(),
+                DiagnosticTransaction *diagnosticTransaction);
 
 /// Remove any solutions from the provided vector that require more fixes than
 /// the best score or don't contain a type for the code completion token.

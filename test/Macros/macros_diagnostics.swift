@@ -226,3 +226,11 @@ macro multipleFreestandingRoles<T>(_: T) -> Void = #externalMacro(module: "A", t
 @attached(peer)
 macro Foo() = #externalMacro(module: "ThisMacroModuleDoesNotExist", type: "ThisMacroTypeDoesNotExist")
 // expected-warning@-1{{external macro implementation type}}
+
+
+@available(SwiftStdlib 5.1, *)
+func someGlobalNext(
+  isolation actor: isolated (any Actor)? = #isolated // expected-error{{no macro named 'isolated'}}
+) async throws {
+  fatalError()
+}
