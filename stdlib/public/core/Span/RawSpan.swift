@@ -10,23 +10,57 @@
 //
 //===----------------------------------------------------------------------===//
 
-// A RawSpan represents a span of initialized memory
-// of unspecified type.
+/// `RawSpan` represents a contiguous region of memory
+/// which contains initialized bytes.
+///
+/// A `RawSpan` instance is a non-owning, non-escaping view into memory.
+/// When a `RawSpan` is created, it inherits the lifetime of the container
+/// owning the contiguous memory, ensuring temporal safety and avoiding
+/// use-after-free errors. Operations on `RawSpan` are bounds-checked,
+/// ensuring spcial safety and avoiding buffer overflow errors.
 @_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 @frozen
 public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
-  @usableFromInline internal let _pointer: UnsafeRawPointer?
+
+  /// The starting address of this `RawSpan`.
+  ///
+  /// `_pointer` can be `nil` if and only if `_count` equals 0.
+  /// Otherwise, `_pointer` must point to memory that will remain
+  /// valid and not mutated as long as this `Span` exists.
+  /// The memory at `_pointer` must consist of `_count` initialized bytes.
+  @usableFromInline
+  internal let _pointer: UnsafeRawPointer?
 
   @_alwaysEmitIntoClient
   internal func _start() -> UnsafeRawPointer {
     _pointer._unsafelyUnwrappedUnchecked
   }
 
-  @usableFromInline internal let _count: Int
+  /// The number of bytes in this `RawSpan`.
+  ///
+  /// If `_count` equals 0, then `_pointer` may be either `nil` or valid.
+  /// Any `_count` greater than 0 indicates a valid non-nil `_pointer`.
+  /// Any `_count` less than 0 is invalid and is undefined behaviour.
+  @usableFromInline
+  internal let _count: Int
 
+  /// Unsafely create a `RawSpan` over initialized memory.
+  ///
+  /// `pointer` must point to a region of `byteCount` initialized bytes,
+  /// or may be `nil` if `count` is 0.
+  ///
+  /// The region of `byteCount` bytes of memory starting at `pointer`
+  /// must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `Span`.
+  /// Failure to maintain this invariant results in undefined behaviour.
+  ///
+  /// - Parameters:
+  ///   - pointer: a pointer to the first initialized byte.
+  ///   - byteCount: the number of initialized bytes in the span.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @inline(__always)
   //FIXME: should be @lifetime(borrow pointer) rdar://138672380
   @lifetime(immortal)
   internal init(
@@ -298,11 +332,12 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(self)
   public func _extracting(_ bounds: Range<Int>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "byte offset range out of bounds"
+      "Byte offset range out of bounds"
     )
     return _extracting(unchecked: bounds)
   }
@@ -325,6 +360,7 @@ extension RawSpan {
   @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
   @_alwaysEmitIntoClient
+  @lifetime(self)
   public func _extracting(unchecked bounds: Range<Int>) -> Self {
     RawSpan(
       _unchecked: _pointer?.advanced(by: bounds.lowerBound),
@@ -347,6 +383,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(self)
   public func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
     _extracting(bounds.relative(to: byteOffsets))
   }
@@ -369,6 +406,7 @@ extension RawSpan {
   @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
   @_alwaysEmitIntoClient
+  @lifetime(self)
   public func _extracting(
     unchecked bounds: some RangeExpression<Int>
   ) -> Self {
@@ -386,6 +424,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(self)
   public func _extracting(_: UnboundedRange) -> Self {
     self
   }
@@ -479,7 +518,7 @@ extension RawSpan {
     _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
       MemoryLayout<T>.size <= (_count &- offset),
-      "byte offset range out of bounds"
+      "Byte offset range out of bounds"
     )
     return unsafeLoad(fromUncheckedByteOffset: offset, as: T.self)
   }
@@ -536,7 +575,7 @@ extension RawSpan {
     _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
       MemoryLayout<T>.size <= (_count &- offset),
-      "byte offset range out of bounds"
+      "Byte offset range out of bounds"
     )
     return unsafeLoadUnaligned(fromUncheckedByteOffset: offset, as: T.self)
   }
@@ -589,16 +628,16 @@ extension RawSpan {
   /// Returns: A range of offsets within `self`
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
-  public func byteOffsets(of span: borrowing Self) -> Range<Int>? {
-    if span._count > _count { return nil }
-    guard let spanStart = span._pointer, _count > 0 else {
-      return _pointer == span._pointer ? Range(_uncheckedBounds: (0, 0)) : nil
+  public func byteOffsets(of other: borrowing Self) -> Range<Int>? {
+    if other._count > _count { return nil }
+    guard let spanStart = other._pointer, _count > 0 else {
+      return _pointer == other._pointer ? Range(_uncheckedBounds: (0, 0)) : nil
     }
     let start = _start()
-    let spanEnd = spanStart + span._count
+    let spanEnd = spanStart + other._count
     if spanStart < start || (start + _count) < spanEnd { return nil }
     let lower = start.distance(to: spanStart)
-    return Range(_uncheckedBounds: (lower, lower &+ span._count))
+    return Range(_uncheckedBounds: (lower, lower &+ other._count))
   }
 }
 
@@ -624,8 +663,9 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(self)
   public func _extracting(first maxLength: Int) -> Self {
-    _precondition(maxLength >= 0, "Can't have a prefix of negative length.")
+    _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, byteCount)
     return Self(_unchecked: _pointer, byteCount: newCount)
   }
@@ -646,8 +686,9 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(self)
   public func _extracting(droppingLast k: Int) -> Self {
-    _precondition(k >= 0, "Can't drop a negative number of elements.")
+    _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, byteCount)
     return Self(_unchecked: _pointer, byteCount: byteCount &- droppedCount)
   }
@@ -669,8 +710,9 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(self)
   public func _extracting(last maxLength: Int) -> Self {
-    _precondition(maxLength >= 0, "Can't have a suffix of negative length.")
+    _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, byteCount)
     let newStart = _pointer?.advanced(by: byteCount &- newCount)
     return Self(_unchecked: newStart, byteCount: newCount)
@@ -692,8 +734,9 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
+  @lifetime(self)
   public func _extracting(droppingFirst k: Int) -> Self {
-    _precondition(k >= 0, "Can't drop a negative number of elements.")
+    _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, byteCount)
     let newStart = _pointer?.advanced(by: droppedCount)
     return Self(_unchecked: newStart, byteCount: byteCount &- droppedCount)
