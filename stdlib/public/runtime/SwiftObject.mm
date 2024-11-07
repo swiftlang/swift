@@ -1380,11 +1380,19 @@ id swift_dynamicCastObjCProtocolConditional(id object,
   return object;
 }
 
+#if OBJC_SUPPORTSLAZYREALIZATION_DEFINED
+static bool checkObjCSupportsLazyRealization() {
+  if (!SWIFT_RUNTIME_WEAK_CHECK(_objc_supportsLazyRealization))
+    return false;
+  return SWIFT_RUNTIME_WEAK_USE(_objc_supportsLazyRealization());
+}
+#endif
+
 // Check whether the current ObjC runtime supports lazy realization. If it does,
 // then we can avoid forcing realization of classes before we use them.
 static bool objcSupportsLazyRealization() {
 #if OBJC_SUPPORTSLAZYREALIZATION_DEFINED
-  return SWIFT_LAZY_CONSTANT(_objc_supportsLazyRealization());
+  return SWIFT_LAZY_CONSTANT(checkObjCSupportsLazyRealization());
 #else
   return false;
 #endif
