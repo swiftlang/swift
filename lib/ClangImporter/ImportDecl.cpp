@@ -157,8 +157,7 @@ bool ClangImporter::Implementation::recordHasReferenceSemantics(
     return false;
 
   auto semanticsKind =
-      evaluateOrDefault(ctx.evaluator,
-                        CxxRecordSemantics({decl, ctx}), {});
+      evaluateOrDefault(ctx.evaluator, CxxRecordSemantics({decl, *this}), {});
   return semanticsKind == CxxRecordSemanticsKind::Reference;
 }
 
@@ -2011,14 +2010,12 @@ namespace {
     }
 
     bool recordHasReferenceSemantics(const clang::RecordDecl *decl) {
-      return ClangImporter::Implementation::recordHasReferenceSemantics(
-          decl, Impl.SwiftContext);
+      return Impl.recordHasReferenceSemantics(decl, Impl.SwiftContext);
     }
 
     bool recordHasMoveOnlySemantics(const clang::RecordDecl *decl) {
       auto semanticsKind = evaluateOrDefault(
-          Impl.SwiftContext.evaluator,
-          CxxRecordSemantics({decl, Impl.SwiftContext}), {});
+          Impl.SwiftContext.evaluator, CxxRecordSemantics({decl, Impl}), {});
       return semanticsKind == CxxRecordSemanticsKind::MoveOnly;
     }
 
@@ -2839,9 +2836,8 @@ namespace {
 
       // It is import that we bail on an unimportable record *before* we import
       // any of its members or cache the decl.
-      auto semanticsKind =
-          evaluateOrDefault(Impl.SwiftContext.evaluator,
-                            CxxRecordSemantics({decl, Impl.SwiftContext}), {});
+      auto semanticsKind = evaluateOrDefault(
+          Impl.SwiftContext.evaluator, CxxRecordSemantics({decl, Impl}), {});
       if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation &&
           // Let un-specialized class templates through. We'll sort out their
           // members once they're instranciated.
@@ -3186,9 +3182,9 @@ namespace {
       // when it comes to getter/setter generation.
       if (auto parent = dyn_cast<clang::CXXRecordDecl>(
               decl->getAnonField()->getParent())) {
-        auto semanticsKind = evaluateOrDefault(
-            Impl.SwiftContext.evaluator,
-            CxxRecordSemantics({parent, Impl.SwiftContext}), {});
+        auto semanticsKind =
+            evaluateOrDefault(Impl.SwiftContext.evaluator,
+                              CxxRecordSemantics({parent, Impl}), {});
         if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation)
           return nullptr;
       }

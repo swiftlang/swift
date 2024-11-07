@@ -277,6 +277,11 @@ WARNING(
     "swift_attr('returns_unretained') attributes",
     (const clang::NamedDecl *))
 
+WARNING(cant_infer_frt_in_cxx_inheritance, none,
+        "unable to infer 'SWIFT_SHARED_REFERENCE' for %0, although one of its "
+        "C++ inheritance parents is marked as 'SWIFT_SHARED_REFERENCE'",
+        (const clang::NamedDecl *))
+
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
 NOTE(record_field_not_imported, none, "field %0 unavailable (cannot import)", (const clang::NamedDecl*))
 NOTE(invoked_func_not_imported, none, "function %0 unavailable (cannot import)", (const clang::NamedDecl*))

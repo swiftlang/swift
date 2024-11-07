@@ -1385,10 +1385,10 @@ ClangImporter::create(ASTContext &ctx,
   // Install a Clang module file extension to build Swift name lookup tables.
   importer->Impl.Invocation->getFrontendOpts().ModuleFileExtensions.push_back(
       std::make_shared<SwiftNameLookupExtension>(
-          importer->Impl.BridgingHeaderLookupTable,
-          importer->Impl.LookupTables, importer->Impl.SwiftContext,
+          importer->Impl.BridgingHeaderLookupTable, importer->Impl.LookupTables,
+          importer->Impl.SwiftContext,
           importer->Impl.getBufferImporterForDiagnostics(),
-          importer->Impl.platformAvailability));
+          importer->Impl.platformAvailability, importer->Impl));
 
   // Create a compiler instance.
   {
@@ -1536,7 +1536,7 @@ ClangImporter::create(ASTContext &ctx,
 
   importer->Impl.nameImporter.reset(new NameImporter(
       importer->Impl.SwiftContext, importer->Impl.platformAvailability,
-      importer->Impl.getClangSema()));
+      importer->Impl.getClangSema(), importer->Impl));
 
   // FIXME: These decls are not being parsed correctly since (a) some of the
   // callbacks are still being added, and (b) the logic to parse them has
@@ -7515,6 +7515,78 @@ bool importer::isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType 
          !hasImmortalAtts(pointeeType->getDecl());
 }
 
+// Returns the given declaration along with all its parent declarations that are
+// reference types.
+llvm::SmallVector<const clang::RecordDecl *, 4>
+getRefParentDecls(const clang::RecordDecl *decl) {
+  assert(decl && "decl is null inside getRefParentDecls");
+
+  llvm::SmallVector<const clang::RecordDecl *, 4> matchingDecls;
+
+  if (hasImportAsRefAttr(decl)) {
+    matchingDecls.push_back(decl);
+  }
+
+  if (const auto *cxxRecordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
+    if (!cxxRecordDecl->hasDefinition())
+      return matchingDecls;
+    cxxRecordDecl->forallBases([&](const clang::CXXRecordDecl *baseDecl) {
+      if (hasImportAsRefAttr(baseDecl))
+        matchingDecls.push_back(baseDecl);
+      return true;
+    });
+  }
+
+  return matchingDecls;
+}
+
+const clang::RecordDecl *getRefParentOrDiag(
+    const clang::RecordDecl *decl,
+    std::optional<std::reference_wrapper<ClangImporter::Implementation>>
+        importerImpl) {
+  auto refParentDecls = getRefParentDecls(decl);
+  if (refParentDecls.empty())
+    return nullptr;
+
+  llvm::StringRef uniqueRetainAttr, uniqueReleaseAttr;
+
+  for (const auto *refParentDecl : refParentDecls) {
+    assert(refParentDecl && "refParentDecl is null inside getRefParentOrDiag");
+    for (const auto *attr : refParentDecl->getAttrs()) {
+      if (const auto swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
+        const auto &attribute = swiftAttr->getAttribute();
+        if (attribute.starts_with("retain:")) {
+          if (uniqueRetainAttr.empty()) {
+            uniqueRetainAttr = attribute;
+          } else if (uniqueRetainAttr != attribute) {
+            uniqueRetainAttr = "";
+            break;
+          }
+        } else if (attribute.starts_with("release:")) {
+          if (uniqueReleaseAttr.empty()) {
+            uniqueReleaseAttr = attribute;
+          } else if (uniqueReleaseAttr != attribute) {
+            uniqueReleaseAttr = "";
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Ensure exactly one retain and one release attribute
+  if (uniqueRetainAttr.empty() || uniqueReleaseAttr.empty()) {
+    if (importerImpl.has_value()) {
+      HeaderLoc loc(decl->getLocation());
+      importerImpl.value().get().diagnose(
+          loc, diag::cant_infer_frt_in_cxx_inheritance, decl);
+    }
+    return nullptr;
+  }
+
+  return refParentDecls.front();
+}
+
 // Is this a pointer to a foreign reference type.
 static bool isForeignReferenceType(const clang::QualType type) {
   if (!type->isPointerType())
@@ -7787,8 +7859,9 @@ CxxRecordSemanticsKind
 CxxRecordSemantics::evaluate(Evaluator &evaluator,
                              CxxRecordSemanticsDescriptor desc) const {
   const auto *decl = desc.decl;
-
-  if (hasImportAsRefAttr(decl)) {
+  ClangImporter::Implementation &importerImpl = desc.importerImpl;
+  if (hasImportAsRefAttr(decl) ||
+      getRefParentOrDiag(decl, std::make_optional(std::ref(importerImpl)))) {
     return CxxRecordSemanticsKind::Reference;
   }
 
@@ -7802,15 +7875,16 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
 
   if (!hasDestroyTypeOperations(cxxDecl) ||
       (!hasCopyTypeOperations(cxxDecl) && !hasMoveTypeOperations(cxxDecl))) {
+    HeaderLoc loc(decl->getLocation());
     if (hasUnsafeAPIAttr(cxxDecl))
-      desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
-                              "import_unsafe", decl->getNameAsString());
+      importerImpl.diagnose(loc, diag::api_pattern_attr_ignored,
+                            "import_unsafe", decl->getNameAsString());
     if (hasOwnedValueAttr(cxxDecl))
-      desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
-                              "import_owned", decl->getNameAsString());
+      importerImpl.diagnose(loc, diag::api_pattern_attr_ignored, "import_owned",
+                            decl->getNameAsString());
     if (hasIteratorAPIAttr(cxxDecl))
-      desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
-                              "import_iterator", decl->getNameAsString());
+      importerImpl.diagnose(loc, diag::api_pattern_attr_ignored,
+                            "import_iterator", decl->getNameAsString());
 
     return CxxRecordSemanticsKind::MissingLifetimeOperation;
   }
@@ -7853,7 +7927,8 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
 
   SmallVector<ValueDecl *, 1> results;
   auto *essaAttr = cxxDecl->getAttr<clang::ExternalSourceSymbolAttr>();
-  auto *mod = desc.ctx.getModuleByName(essaAttr->getDefinedIn());
+  auto *mod =
+      desc.importerImpl.SwiftContext.getModuleByName(essaAttr->getDefinedIn());
   if (!mod) {
     // TODO: warn about missing 'import'.
     return nullptr;
@@ -7861,8 +7936,8 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
   // FIXME: Support renamed declarations.
   auto swiftName = cxxDecl->getName();
   // FIXME: handle nested Swift types once they're supported.
-  mod->lookupValue(desc.ctx.getIdentifier(swiftName), NLKind::UnqualifiedLookup,
-                   results);
+  mod->lookupValue(desc.importerImpl.SwiftContext.getIdentifier(swiftName),
+                   NLKind::UnqualifiedLookup, results);
   if (results.size() == 1) {
     if (dyn_cast<ClassDecl>(results[0]))
       return results[0];
@@ -8016,6 +8091,13 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
                                  : "release:";
 
   auto decl = cast<clang::RecordDecl>(swiftDecl->getClangDecl());
+
+  if (!hasImportAsRefAttr(decl)) {
+    if (auto parentRefDecl = getRefParentOrDiag(decl, std::nullopt)) {
+      decl = parentRefDecl;
+    }
+  }
+
   if (!decl->hasAttrs())
     return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
 

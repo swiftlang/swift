@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/conforms-to-imported.swift -module-name ImportedModule -emit-module -emit-module-path %t/ImportedModule.swiftmodule
 
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %t -I %S/Inputs -module-name SwiftTest -enable-experimental-cxx-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %t -I %S/Inputs -module-name SwiftTest -cxx-interoperability-mode=default
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %t -I %S/Inputs -module-name SwiftTest -cxx-interoperability-mode=swift-5.9
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %t -I %S/Inputs -module-name SwiftTest -cxx-interoperability-mode=swift-6
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %t -I %S/Inputs -module-name SwiftTest -cxx-interoperability-mode=upcoming-swift
@@ -35,13 +35,17 @@ func callee(_ _: Playable) {
 func caller(_ x: Playable) {
     callee(x)
 }
+@available(macOS 13.3, *)
 func caller(_ x: DerivedFromHasPlay) { callee(x) }
+@available(macOS 13.3, *)
 func caller(_ x: DerivedFromDerivedFromHasPlay) { callee(x) }
 
+@available(macOS 13.3, *)
 func caller(_ x: HasTestAndPlay) {
     callee(x as Testable)
     callee(x as Playable)
 }
+@available(macOS 13.3, *)
 func caller(_ x: DerivedFromHasTestAndPlay) {
     callee(x as Testable)
     callee(x as Playable)
