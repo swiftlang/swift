@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -verify -emit-sil -module-name main -disable-availability-checking -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift | %FileCheck %s
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -verify -emit-sil -module-name main -target %target-swift-5.7-abi-triple -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: distributed

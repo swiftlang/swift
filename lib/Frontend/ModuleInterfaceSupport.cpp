@@ -124,13 +124,14 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
         !Opts.PackageFlags.IgnorableFlags.empty())
       ignorableFlags.push_back(Opts.PackageFlags.IgnorableFlags);
 
-    if (!ignorableFlags.empty()) {
-      out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": ";
-      llvm::interleave(
-          ignorableFlags, [&out](StringRef str) { out << str; },
-          [&out] { out << " "; });
-      out << "\n";
-    }
+    out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": ";
+
+    llvm::interleave(
+        ignorableFlags, [&out](StringRef str) { out << str; },
+        [&out] { out << " "; });
+
+    out << " -interface-compiler-version " << version::getCompilerVersion();
+    out << "\n";
   }
 }
 

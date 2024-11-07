@@ -95,6 +95,7 @@ private func registerSwiftPasses() {
   registerPass(lifetimeDependenceDiagnosticsPass, { lifetimeDependenceDiagnosticsPass.run($0) })
   registerPass(lifetimeDependenceInsertionPass, { lifetimeDependenceInsertionPass.run($0) })
   registerPass(lifetimeDependenceScopeFixupPass, { lifetimeDependenceScopeFixupPass.run($0) })
+  registerPass(loadCopyToBorrowOptimization, { loadCopyToBorrowOptimization.run($0) })
   registerPass(generalClosureSpecialization, { generalClosureSpecialization.run($0) })
   registerPass(autodiffClosureSpecialization, { autodiffClosureSpecialization.run($0) })
 
@@ -111,6 +112,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(DestructureStructInst.self, { run(DestructureStructInst.self, $0) })
   registerForSILCombine(DestructureTupleInst.self, { run(DestructureTupleInst.self, $0) })
   registerForSILCombine(TypeValueInst.self, { run(TypeValueInst.self, $0) })
+  registerForSILCombine(ClassifyBridgeObjectInst.self, { run(ClassifyBridgeObjectInst.self, $0) })
 
   // Test passes
   registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })

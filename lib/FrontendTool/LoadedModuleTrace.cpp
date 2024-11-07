@@ -17,15 +17,21 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginRegistry.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/IDE/SourceEntityWalker.h"
 
+#include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/FileUtilities.h"
@@ -808,5 +814,174 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                         loadedModuleTracePath, toString(std::move(err)));
     return true;
   }
+  return false;
+}
+
+const static unsigned OBJC_METHOD_TRACE_FILE_FORMAT_VERSION = 1;
+
+class ObjcMethodReferenceCollector: public SourceEntityWalker {
+  std::string compilerVer;
+  std::string target;
+  std::string targetVariant;
+  SmallVector<StringRef, 32> FilePaths;
+  unsigned CurrentFileID;
+  llvm::DenseMap<const clang::ObjCMethodDecl*, unsigned> results;
+  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
+                          Type T, ReferenceMetaData Data) override {
+    if (!Range.isValid())
+      return true;
+    if (auto *clangD = dyn_cast_or_null<clang::ObjCMethodDecl>(D->getClangDecl())) {
+      results[clangD] = CurrentFileID;
+    }
+    return true;
+  }
+  static StringRef selectMethodKey(const clang::ObjCMethodDecl* clangD) {
+    assert(clangD);
+    if (clangD->isInstanceMethod())
+      return "instance_method";
+    else if (clangD->isClassMethod())
+      return "class_method";
+    else
+      return "method";
+  }
+  static StringRef selectMethodOwnerKey(const clang::NamedDecl* clangD) {
+    assert(clangD);
+    if (isa<clang::ObjCInterfaceDecl>(clangD))
+      return "interface_type";
+    if (isa<clang::ObjCCategoryDecl>(clangD))
+      return "category_type";
+    if (isa<clang::ObjCProtocolDecl>(clangD))
+      return "protocol_type";
+    return "type";
+  }
+public:
+  ObjcMethodReferenceCollector(ModuleDecl *MD) {
+    compilerVer =
+      getSwiftInterfaceCompilerVersionForCurrentCompiler(MD->getASTContext());
+    auto &Opts = MD->getASTContext().LangOpts;
+    target = Opts.Target.str();
+    targetVariant = Opts.TargetVariant.has_value() ?
+      Opts.TargetVariant->str() : "";
+  }
+  void setFileBeforeVisiting(SourceFile *SF) {
+    assert(SF && "need to visit actual source files");
+    FilePaths.push_back(SF->getFilename());
+    CurrentFileID = FilePaths.size();
+  }
+  void serializeAsJson(llvm::raw_ostream &OS) {
+    llvm::json::OStream out(OS, /*IndentSize=*/4);
+    out.object([&] {
+      out.attribute("swift-compiler-version", compilerVer);
+      out.attribute("format-vesion", OBJC_METHOD_TRACE_FILE_FORMAT_VERSION);
+      out.attribute("target", target);
+      if (!targetVariant.empty())
+        out.attribute("target-variant", targetVariant);
+      out.attributeArray("references", [&] {
+        for (auto pair: results) {
+          auto *clangD = pair.first;
+          auto &SM = clangD->getASTContext().getSourceManager();
+          clang::SourceLocation Loc = clangD->getLocation();
+          if (!Loc.isValid()) {
+            continue;
+          }
+          out.object([&] {
+            if (auto *parent = dyn_cast_or_null<clang::NamedDecl>(clangD
+                                                               ->getParent())) {
+              auto pName = parent->getName();
+              if (!pName.empty())
+                out.attribute(selectMethodOwnerKey(parent), pName);
+            }
+            out.attribute(selectMethodKey(clangD),  clangD->getNameAsString());
+            out.attribute("declared_at", Loc.printToString(SM));
+            out.attribute("referenced_at_file_id", pair.second);
+          });
+        }
+      });
+      out.attributeArray("fileMap", [&]{
+        for (unsigned I = 0, N = FilePaths.size(); I != N; I ++) {
+          out.object([&] {
+            out.attribute("file_id", I + 1);
+            out.attribute("file_path", FilePaths[I]);
+          });
+        }
+      });
+    });
+  }
+};
+
+static std::optional<int> createObjCMessageTraceFile(const InputFile &input,
+                                                     ModuleDecl *MD,
+                                        std::vector<SourceFile*> &filesToWalk) {
+  if (input.getLoadedModuleTracePath().empty()) {
+    // we basically rely on the passing down of module trace file path
+    // as an indicator that this job needs to emit an ObjC message trace file.
+    // FIXME: add a separate swift-frontend flag for ObjC message trace path
+    // specifically.
+    return {};
+  }
+  for (auto *FU : MD->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(FU)) {
+      switch (SF->Kind) {
+      case swift::SourceFileKind::Library:
+      case swift::SourceFileKind::Main:
+      case swift::SourceFileKind::MacroExpansion:
+      case swift::SourceFileKind::DefaultArgument:
+        filesToWalk.push_back(SF);
+        LLVM_FALLTHROUGH;
+      case swift::SourceFileKind::SIL:
+      case swift::SourceFileKind::Interface:
+        continue;
+      }
+    }
+  }
+  // No source files to walk, abort.
+  if (filesToWalk.empty()) {
+    return {};
+  }
+  llvm::SmallString<128> tracePath;
+  if (const char *P = ::getenv("SWIFT_COMPILER_OBJC_MESSAGE_TRACE_DIRECTORY")) {
+    StringRef DirPath = P;
+    llvm::sys::path::append(tracePath, DirPath);
+  } else {
+    llvm::sys::path::append(tracePath, input.getLoadedModuleTracePath());
+    llvm::sys::path::remove_filename(tracePath);
+    llvm::sys::path::append(tracePath, ".SWIFT_FINE_DEPENDENCY_TRACE");
+  }
+  if (!llvm::sys::fs::exists(tracePath)) {
+    if (llvm::sys::fs::create_directory(tracePath))
+      return {};
+  }
+  SmallString<32> fileName(MD->getNameStr());
+  fileName.append("-%%%%-%%%%-%%%%.json");
+  llvm::sys::path::append(tracePath, fileName);
+  int tmpFD;
+  if (llvm::sys::fs::createUniqueFile(tracePath.str(), tmpFD, tracePath)) {
+    return {};
+  }
+  return tmpFD;
+}
+
+bool swift::emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
+                                             const FrontendOptions &opts) {
+  ASTContext &ctxt = mainModule->getASTContext();
+  assert(!ctxt.hadError() &&
+         "We should've already exited earlier if there was an error.");
+
+  opts.InputsAndOutputs.forEachInput([&](const InputFile &input) {
+    std::vector<SourceFile*> filesToWalk;
+    auto tmpFD = createObjCMessageTraceFile(input, mainModule, filesToWalk);
+    if (!tmpFD)
+      return false;
+    // Write the contents of the buffer.
+    llvm::raw_fd_ostream out(*tmpFD, /*shouldClose=*/true);
+    ObjcMethodReferenceCollector collector(mainModule);
+    for (auto *SF : filesToWalk) {
+      collector.setFileBeforeVisiting(SF);
+      collector.walk(*SF);
+    }
+    collector.serializeAsJson(out);
+    return true;
+  });
   return false;
 }

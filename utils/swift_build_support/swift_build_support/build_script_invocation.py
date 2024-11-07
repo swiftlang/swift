@@ -891,20 +891,20 @@ class BuildScriptInvocation(object):
             build_dir=build_dir)
         if product.should_clean(host_target):
             log_message = "Cleaning %s" % product_name
-            print("--- {} ---".format(log_message))
+            print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.clean(host_target)
         if product.should_build(host_target):
             log_message = "Building %s" % product_name
-            print("--- {} ---".format(log_message))
+            print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.build(host_target)
         if product.should_test(host_target):
             log_message = "Running tests for %s" % product_name
-            print("--- {} ---".format(log_message))
+            print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.test(host_target)
-            print("--- Finished tests for %s ---" % product_name)
+            print("--- Finished tests for %s ---" % product_name, flush=True)
         # Install the product if it should be installed specifically, or
         # if it should be built and `install_all` is set to True.
         # The exception is select before_build_script_impl products
@@ -914,6 +914,6 @@ class BuildScriptInvocation(object):
            (self.install_all and product.should_build(host_target) and
            not product.is_ignore_install_all_product()):
             log_message = "Installing %s" % product_name
-            print("--- {} ---".format(log_message))
+            print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.install(host_target)

@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx13.0 -enable-experimental-feature RawLayout -emit-ir %s | %FileCheck %s
 
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_RawLayout
 
 // Test that when targeting older OSes 
 

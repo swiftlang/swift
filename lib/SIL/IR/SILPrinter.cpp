@@ -1658,7 +1658,13 @@ public:
     *this << ") : ";
     *this << BI->getType();
   }
-  
+
+  void visitMergeIsolationRegionInst(MergeIsolationRegionInst *mir) {
+    llvm::interleave(
+        mir->getArguments(), [&](SILValue v) { *this << getIDAndType(v); },
+        [&] { *this << ", "; });
+  }
+
   void visitAllocGlobalInst(AllocGlobalInst *AGI) {
     if (AGI->getReferencedGlobal()) {
       AGI->getReferencedGlobal()->printName(PrintState.OS);
@@ -2057,6 +2063,9 @@ public:
       break;
     case ThunkInst::Kind::Identity:
       *this << "[identity] ";
+      break;
+    case ThunkInst::Kind::HopToMainActorIfNeeded:
+      *this << "[hop_to_mainactor_if_needed] ";
       break;
     }
     *this << Ctx.getID(ti->getOperand());

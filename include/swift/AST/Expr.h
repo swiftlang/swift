@@ -71,6 +71,7 @@ namespace swift {
   class KeyPathExpr;
   class CaptureListExpr;
   class ThenStmt;
+  class ReturnStmt;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -991,41 +992,81 @@ public:
   }
 };
 
-/// A regular expression literal e.g '(a|c)*'.
-class RegexLiteralExpr : public LiteralExpr {
-  SourceLoc Loc;
-  StringRef RegexText;
-  unsigned Version;
-  ArrayRef<uint8_t> SerializedCaptureStructure;
-
-  RegexLiteralExpr(SourceLoc loc, StringRef regexText, unsigned version,
-                   ArrayRef<uint8_t> serializedCaps,
-                   bool isImplicit)
-      : LiteralExpr(ExprKind::RegexLiteral, isImplicit), Loc(loc),
-        RegexText(regexText), Version(version),
-        SerializedCaptureStructure(serializedCaps) {}
+/// The opaque kind of a RegexLiteralExpr feature, which should only be
+/// interpreted by the compiler's regex parsing library.
+class RegexLiteralPatternFeatureKind final {
+  unsigned RawValue;
 
 public:
-  static RegexLiteralExpr *createParsed(
-      ASTContext &ctx, SourceLoc loc, StringRef regexText, unsigned version,
-      ArrayRef<uint8_t> serializedCaptureStructure);
+  RegexLiteralPatternFeatureKind(unsigned rawValue) : RawValue(rawValue) {}
 
-  typedef uint16_t CaptureStructureSerializationVersion;
+  unsigned getRawValue() const { return RawValue; }
 
-  static unsigned getCaptureStructureSerializationAllocationSize(
-      unsigned regexLength) {
-    return sizeof(CaptureStructureSerializationVersion) + regexLength + 1;
+  AvailabilityRange getAvailability(ASTContext &ctx) const;
+  StringRef getDescription(ASTContext &ctx) const;
+
+  friend llvm::hash_code
+  hash_value(const RegexLiteralPatternFeatureKind &kind) {
+    return llvm::hash_value(kind.getRawValue());
   }
 
-  /// Retrieve the raw regex text.
-  StringRef getRegexText() const { return RegexText; }
+  friend bool operator==(const RegexLiteralPatternFeatureKind &lhs,
+                         const RegexLiteralPatternFeatureKind &rhs) {
+    return lhs.getRawValue() == rhs.getRawValue();
+  }
+
+  friend bool operator!=(const RegexLiteralPatternFeatureKind &lhs,
+                         const RegexLiteralPatternFeatureKind &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+/// A specific feature used in a RegexLiteralExpr, needed for availability
+/// diagnostics.
+class RegexLiteralPatternFeature final {
+  RegexLiteralPatternFeatureKind Kind;
+  CharSourceRange Range;
+
+public:
+  RegexLiteralPatternFeature(RegexLiteralPatternFeatureKind kind,
+                             CharSourceRange range)
+      : Kind(kind), Range(range) {}
+
+  RegexLiteralPatternFeatureKind getKind() const { return Kind; }
+  CharSourceRange getRange() const { return Range; }
+};
+
+/// A regular expression literal e.g '(a|c)*'.
+class RegexLiteralExpr : public LiteralExpr {
+  ASTContext *Ctx;
+  SourceLoc Loc;
+  StringRef ParsedRegexText;
+
+  RegexLiteralExpr(ASTContext *ctx, SourceLoc loc, StringRef parsedRegexText,
+                   bool isImplicit)
+      : LiteralExpr(ExprKind::RegexLiteral, isImplicit), Ctx(ctx), Loc(loc),
+        ParsedRegexText(parsedRegexText) {}
+
+public:
+  static RegexLiteralExpr *createParsed(ASTContext &ctx, SourceLoc loc,
+                                        StringRef regexText);
+
+  ASTContext &getASTContext() const { return *Ctx; }
+
+  /// Retrieve the raw parsed regex text.
+  StringRef getParsedRegexText() const { return ParsedRegexText; }
+
+  /// Retrieve the regex pattern to emit.
+  StringRef getRegexToEmit() const;
+
+  /// Retrieve the computed type for the regex.
+  Type getRegexType() const;
 
   /// Retrieve the version of the regex string.
-  unsigned getVersion() const { return Version; }
+  unsigned getVersion() const;
 
-  ArrayRef<uint8_t> getSerializedCaptureStructure() {
-    return SerializedCaptureStructure;
-  }
+  /// Retrieve any features used in the regex pattern.
+  ArrayRef<RegexLiteralPatternFeature> getPatternFeatures() const;
 
   SourceRange getSourceRange() const { return Loc; }
 
@@ -4051,6 +4092,18 @@ public:
   /// returns nullptr if the closure doesn't have a body
   BraceStmt *getBody() const;
 
+  /// Returns a boolean value indicating whether the body, if any, contains
+  /// an explicit `return` statement.
+  ///
+  /// \returns `true` if the body contains an explicit `return` statement,
+  /// `false` otherwise.
+  bool bodyHasExplicitReturnStmt() const;
+
+  /// Finds occurrences of explicit `return` statements within the body, if any.
+  ///
+  /// \param results An out container to which the results are added.
+  void getExplicitReturnStmts(SmallVectorImpl<ReturnStmt *> &results) const;
+
   ActorIsolation getActorIsolation() const {
     return actorIsolation;
   }
@@ -4231,7 +4284,8 @@ public:
   }
 
   /// Whether this closure should implicitly inherit the actor context from
-  /// where it was formed. This only affects @Sendable async closures.
+  /// where it was formed. This only affects @Sendable and sendable async
+  /// closures.
   bool inheritsActorContext() const {
     return Bits.ClosureExpr.InheritActorContext;
   }
@@ -6545,9 +6599,8 @@ void simple_display(llvm::raw_ostream &out, const ClosureExpr *CE);
 void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
 void simple_display(llvm::raw_ostream &out, const Expr *expr);
 
-SourceLoc extractNearestSourceLoc(const DefaultArgumentExpr *expr);
-SourceLoc extractNearestSourceLoc(const MacroExpansionExpr *expr);
 SourceLoc extractNearestSourceLoc(const ClosureExpr *expr);
+SourceLoc extractNearestSourceLoc(const Expr *expr);
 
 } // end namespace swift
 

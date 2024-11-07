@@ -4,9 +4,13 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
-protocol ClassBound: AnyObject {
+public protocol Base: AnyObject {
     func foo()
+}
+
+protocol ClassBound: Base {
     func bar()
 }
 

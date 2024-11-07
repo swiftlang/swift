@@ -2,13 +2,15 @@
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -disable-experimental-parser-round-trip
+// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
 // Future tests for LifetimeDependenceDiagnostics.
 // REQUIRES: disabled
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer

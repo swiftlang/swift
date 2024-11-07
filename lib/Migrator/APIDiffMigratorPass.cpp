@@ -10,26 +10,27 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/USRGeneration.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/IDE/APIDigesterData.h"
 #include "swift/IDE/Utils.h"
-#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Migrator/ASTMigratorPass.h"
 #include "swift/Migrator/EditorAdapter.h"
 #include "swift/Migrator/FixitApplyDiagnosticConsumer.h"
 #include "swift/Migrator/Migrator.h"
 #include "swift/Migrator/RewriteBufferEditsReceiver.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Edit/EditedSource.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/Support/FileSystem.h"
-#include "swift/IDE/APIDigesterData.h"
-#include "swift/Basic/Defer.h"
 
 using namespace swift;
 using namespace swift::migrator;

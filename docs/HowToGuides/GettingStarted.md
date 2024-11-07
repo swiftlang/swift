@@ -26,7 +26,6 @@ toolchain as a one-off, there are a couple of differences:
   - [Setting up your fork](#setting-up-your-fork)
   - [Using Ninja with Xcode](#using-ninja-with-xcode)
     - [Regenerating the Xcode project](#regenerating-the-xcode-project)
-    - [Troubleshooting editing issues in Xcode](#troubleshooting-editing-issues-in-xcode)
   - [Other IDEs setup](#other-ides-setup)
   - [Editing](#editing)
   - [Incremental builds with Ninja](#incremental-builds-with-ninja)
@@ -367,55 +366,21 @@ following steps assume that you have already [built the toolchain with Ninja](#t
   [debug variant](#debugging-issues) of the component you intend to debug.
 
 * <p id="generate-xcode">
-  Generate the Xcode project with
+  Generate the Xcode project with:
 
   ```sh
-  utils/build-script --swift-darwin-supported-archs "$(uname -m)" --xcode --clean
+  utils/generate-xcode <build dir>
   ```
 
-  This can take a few minutes due to metaprogrammed sources that depend on LLVM
-  tools that are built from source.
-  </p>
-* Create an empty Xcode workspace and open it.
-* Add `build/Xcode-*/swift-macosx-*/Swift.xcodeproj` to the workspace by
-  selecting the Project navigator and choosing
-  *File > Add Files to "\<workspace name>"*.
+  where `<build dir>` is the path to the build directory e.g
+  `../build/Ninja-RelWithDebInfoAssert`. This will create a `Swift.xcodeproj`
+  in the parent directory (next to the `build` directory).
 
-  > **Important**\
-  > If upon addition Xcode prompts to autocreate schemes, select *Manually
-    Manage Schemes*.
-
-  This Xcode project includes the sources for almost everything in the
-  repository, including the compiler, standard library and runtime.
-  If you intend to work on a compiler subcomponent that is written in Swift and
-  has a `Package.swift` file, e.g. `lib/ASTGen`, first choose
-  *Product > Scheme > Manage Schemes* and select the *Autocreate schemes*
-  checkbox, then add the package directory to the workspace the same way you
-  added the Xcode project.
-  Xcode will automatically create schemes for the package manifest.
-* Create an Xcode project using the _External Build System_ template, and add
-  it to the workspace.
-* Create a target in the new Xcode project, using the _External Build System_
-  template.
-* In the _Info_ pane of the target settings, set
-  * _Build Tool_ to the absolute path of the `ninja` executable (the output of
-    `which ninja` on the command line)
-  * _Arguments_ to a Ninja target (e.g. `bin/swift-frontend` is the compiler)
-  * _Directory_ to the absolute path of the `build/Ninja-*/swift-macosx-*`
-    directory
-* Create a scheme in the workspace, making sure to select the target you just
-  created. Be *extra* careful not to choose a target from the generated Xcode
-  project you added to the workspace.
-* Spot-check your target in the settings for the _Build_ scheme action.
-* If the target is executable, adjust the settings for the _Run_ scheme action:
-  * In the _Info_ pane, select the _Executable_ produced by the Ninja target
-    from `build/Ninja-*/swift-macosx-*/bin` (e.g. `swift-frontend`).
-  * In the _Arguments_ pane, add command line arguments that you want to pass to
-    the executable on launch (e.g. `path/to/file.swift -typecheck` for
-    `bin/swift-frontend`).
-  * Optionally set a custom working directory in the _Options_ pane.
-* Follow the previous steps to create more targets and schemes per your line
-  of work.
+  `generate-xcode` directly invokes `swift-xcodegen`, which is a tool designed
+  specifically to generate Xcode projects for the Swift repo (as well as a
+  couple of adjacent repos such as LLVM and Clang). It supports a number of
+  different options, you can run `utils/generate-xcode --help` to see them. For
+  more information, see [the documentation for `swift-xcodegen`](/utils/swift-xcodegen/README.md).
 
 #### Regenerating the Xcode project
 
@@ -425,15 +390,6 @@ system, such as file/directory additions/deletions/renames. Over the course of
 multiple `update-checkout` rounds, the resulting divergence is likely to begin
 affecting your editing experience. To fix this, regenerate the project by
 running the invocation from the <a href="#generate-xcode">first step</a>.
-
-#### Troubleshooting editing issues in Xcode
-
-* If a syntax highlighting or code action issue does not resolve itself after
-  regenerating the Xcode project, select a scheme that covers the affected area
-  and try *Product > Analyze*.
-* Xcode has been seen to sometimes get stuck on indexing after switching back
-  and forth between distant branches. To sort things out, close the workspace
-  and delete the _Index_ directory from its derived data.
 
 ### Other IDEs setup
 
@@ -658,12 +614,11 @@ printed to stderr. It will likely look something like:
   on. If you are new to LLDB, check out the [official LLDB documentation][] and
   [nesono's LLDB cheat sheet][].
 - Using LLDB within Xcode:
-  Select the current scheme 'swift-frontend' → Edit Scheme → Run phase →
-  Arguments tab. Under "Arguments Passed on Launch", copy-paste the `<args>`
-  and make sure that "Expand Variables Based On" is set to swift-frontend.
-  Close the scheme editor. If you now run the compiler
-  (<kbd>⌘</kbd>+<kbd>R</kbd> or Product → Run), you will be able to use the
-  Xcode debugger.
+  Select the current scheme 'swift-frontend' → Edit Scheme → Run → Arguments
+  tab. Under "Arguments Passed on Launch", copy-paste the `<args>` and make sure
+  that "Expand Variables Based On" is set to swift-frontend. Close the scheme
+  editor. If you now run the compiler (<kbd>⌘</kbd>+<kbd>R</kbd> or 
+  Product → Run), you will be able to use the Xcode debugger.
 
   Xcode also has the ability to attach to and debug Swift processes launched
   elsewhere. Under Debug → Attach to Process by PID or name..., you can enter

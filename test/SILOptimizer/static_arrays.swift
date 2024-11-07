@@ -267,12 +267,12 @@ func takeUnsafePointer(ptr : UnsafePointer<SwiftClass>, len: Int) {
 // This should be a single basic block, and the array should end up being stack
 // allocated.
 //
-// CHECK-LABEL: sil [noinline] @{{.*passArrayOfClasses.*}} : $@convention(thin) (@guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass) -> () {
+// CHECK-LABEL: sil [noinline] @$s4test18passArrayOfClasses1a1b1cyAA10SwiftClassC_A2GtF : $@convention(thin) (@guaranteed SwiftClass, @guaranteed SwiftClass, @guaranteed SwiftClass) -> () {
 // CHECK:       bb0(%0 : $SwiftClass, %1 : $SwiftClass, %2 : $SwiftClass):
-// CHECK-NOT:   bb1(
-// CHECK:         alloc_ref{{(_dynamic)?}} {{.*}}[tail_elems $SwiftClass *
-// CHECK-NOT:   bb1(
-// CHECK:       } // end sil function '{{.*passArrayOfClasses.*}}'
+// CHECK-NOT:   bb1
+// CHECK:         alloc_ref{{.*}}[stack] [tail_elems $SwiftClass *
+// CHECK-NOT:   bb1
+// CHECK:       } // end sil function '$s4test18passArrayOfClasses1a1b1cyAA10SwiftClassC_A2GtF'
 @inline(never)
 public func passArrayOfClasses(a: SwiftClass, b: SwiftClass, c: SwiftClass) {
   let arr = [a, b, c]

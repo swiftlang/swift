@@ -1283,6 +1283,10 @@ bool SILInstruction::isAllocatingStack() const {
       && !PA->getFunction()->hasOwnership();
   }
 
+  if (auto *BAI = dyn_cast<BeginApplyInst>(this)) {
+    return BAI->isCalleeAllocated();
+  }
+
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     if (BI->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
         BI->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc) {
@@ -1291,6 +1295,17 @@ bool SILInstruction::isAllocatingStack() const {
   }
 
   return false;
+}
+
+SILValue SILInstruction::getStackAllocation() const {
+  if (!isAllocatingStack()) {
+    return {};
+  }
+
+  if (auto *bai = dyn_cast<BeginApplyInst>(this)) {
+    return bai->getCalleeAllocationResult();
+  }
+  return cast<SingleValueInstruction>(this);
 }
 
 bool SILInstruction::isDeallocatingStack() const {
@@ -1957,6 +1972,26 @@ UncheckedTakeEnumDataAddrInst::isDestructive(EnumDecl *forEnum, SILModule &M) {
   }
   
   return false;
+}
+
+SILInstructionContext SILInstructionContext::forFunctionInModule(SILFunction *F,
+                                                                 SILModule &M) {
+  if (F) {
+    assert(&F->getModule() == &M);
+    return forFunction(*F);
+  }
+  return forModule(M);
+}
+
+SILFunction *SILInstructionContext::getFunction() {
+  return *storage.dyn_cast<SILFunction *>();
+}
+
+SILModule &SILInstructionContext::getModule() {
+  if (auto *m = storage.dyn_cast<SILModule *>()) {
+    return **m;
+  }
+  return storage.get<SILFunction *>()->getModule();
 }
 
 #ifndef NDEBUG

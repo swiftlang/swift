@@ -13,9 +13,10 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ParserASTGen
+// REQUIRES: swift_feature_SwiftParser
+// REQUIRES: swift_feature_ValueGenerics
 
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
 // rdar://116686158
 // UNSUPPORTED: asan
 

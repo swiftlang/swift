@@ -14,6 +14,7 @@ swift_compiler_sources(Optimizer
   SimplifyBranch.swift
   SimplifyBuiltin.swift
   SimplifyCheckedCast.swift
+  SimplifyClassifyBridgeObject.swift
   SimplifyCondBranch.swift
   SimplifyCondFail.swift
   SimplifyConvertEscapeToNoEscape.swift

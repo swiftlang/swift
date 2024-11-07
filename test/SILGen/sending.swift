@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name sending -disable-availability-checking -strict-concurrency=complete %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name sending -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s | %FileCheck %s
 
 class NonSendable {}
 

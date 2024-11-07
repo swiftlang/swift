@@ -9,6 +9,8 @@
 // RUN: %target-run %t/main %t/%target-library-name(layout_string_witnesses_types) | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_LayoutStringValueWitnesses
+// REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation
 
 // Requires runtime functions added in Swift 5.9.
 // UNSUPPORTED: use_os_stdlib
@@ -1208,6 +1210,34 @@ func testWeakRefOptionalNative() {
 }
 
 testWeakRefOptionalNative()
+
+func testGenericResilientWithUnmanagedAndWeak() {
+    let ptr = allocateInternalGenericPtr(of: GenericResilientWithUnmanagedAndWeak<TestClass>.self)
+
+    do {
+        let x = GenericResilientWithUnmanagedAndWeak<TestClass>(x: TestClass())
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = GenericResilientWithUnmanagedAndWeak<TestClass>(x: TestClass())
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: GenericResilientWithUnmanagedAndWeak<TestClass>.self)
+
+    ptr.deallocate()
+}
+
+testGenericResilientWithUnmanagedAndWeak()
 
 #if os(macOS)
 

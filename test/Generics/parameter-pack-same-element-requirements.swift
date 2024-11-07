@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -enable-experimental-feature SameElementRequirements -disable-availability-checking 2>&1 | %FileCheck %s -dump-input=fail
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SameElementRequirements
 
 protocol P {
   associatedtype A

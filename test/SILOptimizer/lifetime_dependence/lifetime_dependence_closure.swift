@@ -3,10 +3,12 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -disable-experimental-parser-round-trip
+// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct NCInt: ~Copyable {
   var value: Int
@@ -17,9 +19,9 @@ struct NCInt: ~Copyable {
 struct NEInt : ~Escapable {
   let value: Int
 
-  init(borrowed: borrowing NCInt) -> dependsOn(borrowed) Self {
+  @lifetime(borrow borrowed)
+  init(borrowed: borrowing NCInt) {
     self.value = borrowed.value
-    return self
   }
 }
 

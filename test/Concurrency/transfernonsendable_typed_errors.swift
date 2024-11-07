@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -disable-availability-checking
+// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -target %target-swift-5.1-abi-triple
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

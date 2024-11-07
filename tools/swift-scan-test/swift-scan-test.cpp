@@ -284,7 +284,7 @@ int main(int argc, char *argv[]) {
   auto Args = createArgs(SwiftCommands, Saver, Action);
 
   std::atomic<int> Ret = 0;
-  llvm::ThreadPool Pool(llvm::hardware_concurrency(Threads));
+  llvm::StdThreadPool Pool(llvm::hardware_concurrency(Threads));
   for (unsigned i = 0; i < Threads; ++i) {
     Pool.async([&]() {
       switch (Action) {

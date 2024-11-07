@@ -120,6 +120,8 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Swift protocol witness table associated conformance witness table
   /// access functions.
+  /// In Embedded Swift used for associated conformance witness table
+  /// pointers.
   PointerAuthSchema ProtocolAssociatedTypeWitnessTableAccessFunctions;
 
   /// Swift class v-table functions.
@@ -162,6 +164,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Resumption functions from yield-once coroutines.
   PointerAuthSchema YieldOnceResumeFunctions;
+
+  /// Resumption functions from yield-once-2 coroutines.
+  PointerAuthSchema YieldOnce2ResumeFunctions;
 
   /// Resumption functions from yield-many coroutines.
   PointerAuthSchema YieldManyResumeFunctions;
@@ -480,15 +485,27 @@ public:
 
   unsigned EmitAsyncFramePushPopMetadata : 1;
 
+  // Whether to use the yield_once ABI when emitting yield_once_2 coroutines.
+  unsigned EmitYieldOnce2AsYieldOnce : 1;
+
   // Whether to force emission of a frame for all async functions
   // (LLVM's 'frame-pointer=all').
   unsigned AsyncFramePointerAll : 1;
+
+  unsigned UseProfilingMarkerThunks : 1;
 
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
+
+  /// Path to the data file to be used for sampling-based PGO,
+  /// or the empty string.
+  std::string UseSampleProfile = "";
+
+  /// Controls whether DWARF discriminators are added to the IR.
+  unsigned DebugInfoForProfiling : 1;
 
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
@@ -572,10 +589,11 @@ public:
         EmitGenericRODatas(true), NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
-        UseFragileResilientProtocolWitnesses(false),
-        EnableHotColdSplit(false), EmitAsyncFramePushPopMetadata(false),
-        AsyncFramePointerAll(false),
-        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
+        EmitAsyncFramePushPopMetadata(false), EmitYieldOnce2AsYieldOnce(true),
+        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
+        DebugInfoForProfiling(false), CmdArgs(),
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
         CASObjMode(llvm::CASBackendMode::Native) {

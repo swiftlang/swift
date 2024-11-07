@@ -1,6 +1,11 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature ValueGenerics -Xfrontend  -disable-availability-checking -Xfrontend -disable-experimental-parser-round-trip) | %FileCheck %s
+// FIXME: Remove -disable-experimental-parser-round-trip after https://github.com/swiftlang/swift-syntax/pull/2859 is merged
+
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ValueGenerics
 
 struct A<let N: Int, let M: Int> {}
 

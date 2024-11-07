@@ -26,6 +26,36 @@
 using namespace swift;
 using namespace swift::constraints;
 
+void ConstraintSystem::setTargetFor(SyntacticElementTargetKey key,
+                                    SyntacticElementTarget target) {
+  bool inserted = targets.insert({key, target}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedTarget(key));
+}
+
+void ConstraintSystem::removeTargetFor(SyntacticElementTargetKey key) {
+  bool erased = targets.erase(key);
+  ASSERT(erased);
+}
+
+std::optional<SyntacticElementTarget>
+ConstraintSystem::getTargetFor(SyntacticElementTargetKey key) const {
+  auto known = targets.find(key);
+  if (known == targets.end())
+    return std::nullopt;
+  return known->second;
+}
+
+std::optional<SyntacticElementTarget>
+Solution::getTargetFor(SyntacticElementTargetKey key) const {
+  auto known = targets.find(key);
+  if (known == targets.end())
+    return std::nullopt;
+  return known->second;
+}
+
 namespace {
 
 // Produce an implicit empty tuple expression.
@@ -2445,10 +2475,9 @@ private:
       if (!nominal)
         return false;
 
-      ExportContext where =
-          ExportContext::forFunctionBody(context.getAsDeclContext(), loc);
-      if (auto reason =
-              TypeChecker::checkDeclarationAvailability(nominal, where)) {
+      auto constraint = getUnsatisfiedAvailabilityConstraint(
+          nominal, context.getAsDeclContext(), loc);
+      if (constraint && constraint->isConditionallySatisfiable()) {
         auto &ctx = getASTContext();
         ctx.Diags.diagnose(loc,
                            diag::result_builder_missing_limited_availability,
@@ -2551,7 +2580,7 @@ bool ConstraintSystem::applySolution(AnyFunctionRef fn,
         param->setIsolated(true);
     }
 
-    if (llvm::is_contained(solution.preconcurrencyClosures, closure))
+    if (solution.preconcurrencyClosures.count(closure))
       closure->setIsolatedByPreconcurrency();
 
     // Coerce the result type, if it was written explicitly.

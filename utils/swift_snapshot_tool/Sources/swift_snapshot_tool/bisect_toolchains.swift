@@ -119,7 +119,8 @@ struct BisectToolchains: AsyncParsableCommand {
         success = !success
       }
       if !success {
-        log("[INFO] Oldest snapshot fails?! We assume that the oldest snapshot is known good!")
+        log("[INFO] Oldest assumed good snapshot fails! Did you forget to pass --invert?")
+        fatalError()
       } else {
         log("[INFO] Oldest snapshot passes test. Snapshot: \(tags[startIndex])")
       }
@@ -135,7 +136,8 @@ struct BisectToolchains: AsyncParsableCommand {
         success = !success
       }
       if !success {
-        log("[INFO] Newest snapshot succeceds?! We assume that the newest snapshot is known bad!")
+        log("[INFO] Newest assumed bad snapshot succeeds! Did you forget to pass --invert?")
+        fatalError()
       } else {
         log("[INFO] Newest snapshot passes test. Snapshot: \(tags[endIndex])")
       }

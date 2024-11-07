@@ -14,9 +14,9 @@ Let $G$ be a \index{generic signature!summary}generic signature. We generate the
 \midrule
 \tT, \tU, and \tV&\index{type parameter!summary}type parameters\\
 \texttt{Self.U} and \texttt{Self.V}&type parameters rooted in the \Index{protocol Self type@protocol \tSelf\ type!summary}protocol \tSelf\ type\\
-\texttt{X}&a concrete type\\
-\texttt{C}&a concrete \index{class type!summary}class type\\
-$\Xprime$ and $\Cprime$&obtained from \texttt{X} and \texttt{C} by replacing \tSelf\ with \tT\\
+\tX&a concrete type\\
+\tC&a concrete \index{class type!summary}class type\\
+$\Xprime$ and $\Cprime$&obtained from \tX\ and \tC\ by replacing \tSelf\ with \tT\\
 \tP\ and \tQ&protocols\\
 \nA&the name of an \index{associated type declaration!summary}associated type of \tP\\
 \texttt{[P]A}&an associated type declaration of \tP\\
@@ -30,7 +30,7 @@ $\AssocConfReq{Self.U}{Q}{P}$&an \index{associated requirement!summary}associate
 \bottomrule
 \end{tabular}
 \end{center}
-See \index{derived requirement!summary}\index{valid type parameter!summary}\SecRef{derived req} and \SecRef{type params} for details.
+See \index{derived requirement!summary}\index{valid type parameter!summary}\SecRef{derived req}, \SecRef{valid type params}, and \SecRef{bound type params} for details.
 
 \index{elementary derivation step!summary}\paragraph{Elementary statements.}
 For \IndexStepTwo{Generic}{summary}each generic parameter \ttgp{d}{i} of~$G$:

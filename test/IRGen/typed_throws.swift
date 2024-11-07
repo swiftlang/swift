@@ -91,3 +91,8 @@ func testit() throws (S) {
 public struct TypeH {
   public var method: (Int) throws(MyBigError) -> String
 }
+
+// Used to crash with null GenericSignature -- https://github.com/swiftlang/swift/issues/77297
+struct LoadableGeneric<E>: Error {}
+
+func throwsLoadableGeneric<E>(_: E) throws(LoadableGeneric<E>) {}

@@ -2,6 +2,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 public func foo<T>(n: T) {
     bar(n: 42)

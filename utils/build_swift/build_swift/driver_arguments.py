@@ -1494,7 +1494,7 @@ def create_argument_parser():
            help='Enable Volatile module.')
 
     option('--enable-experimental-parser-validation', toggle_true,
-           default=False,
+           default=True,
            help='Enable experimental Swift Parser validation by default.')
 
     # -------------------------------------------------------------------------

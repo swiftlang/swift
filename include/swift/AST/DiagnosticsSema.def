@@ -666,6 +666,13 @@ ERROR(expr_keypath_mutating_getter,none,
 ERROR(expr_keypath_static_member,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to static member %0",
       (const ValueDecl *, bool))
+ERROR(keypath_static_member_access_from_unsupported_module,none,
+     "%select{key path|dynamic key path member lookup}3 cannot refer "
+     "to static member %1 of type %0 from module %2",
+      (Type, const ValueDecl *, const ModuleDecl *, bool))
+NOTE(keypath_static_member_access_from_unsupported_module_note,none,
+     "rebuild %0 to enable static member use in key paths",
+     (const ModuleDecl *))
 ERROR(expr_keypath_enum_case,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to enum case %0",
       (const ValueDecl *, bool))
@@ -901,6 +908,9 @@ ERROR(serialization_target_too_new_repl,none,
       "deployment target of %0 %3: %4",
       (StringRef, llvm::VersionTuple, Identifier, llvm::VersionTuple,
        StringRef))
+ERROR(serialization_non_ossa_module_incompatible, Fatal,
+      "cannot import non-OSSA module into an OSSA module",
+      (Identifier))
 
 ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
@@ -2086,6 +2096,8 @@ ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
       "Swift %kind0 cannot be represented in C++", (ValueDecl *))
+ERROR(expose_zero_size_to_cxx,none,
+      "%0 is a zero sized value type, it cannot be exposed to C++ yet", (ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -4641,6 +4653,8 @@ ERROR(cannot_explicitly_specialize_function,none,
       "cannot explicitly specialize %kind0", (ValueDecl *))
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
+ERROR(invalid_generic_builtin_type,none,
+      "invalid generic arguments to builtin type %0", (Type))
 ERROR(not_a_generic_macro,none,
       "cannot specialize a non-generic external macro %0", (const ValueDecl *))
 ERROR(protocol_declares_unknown_primary_assoc_type,none,
@@ -5945,9 +5959,6 @@ ERROR(isolated_deinit_no_isolation,none,
 ERROR(isolated_deinit_on_value_type,none,
       "only classes and actors can have isolated deinit",
       ())
-ERROR(isolated_deinit_experimental,none,
-      "'isolated' deinit requires frontend flag -enable-experimental-feature IsolatedDeinit "
-      "to enable the usage of this language feature", ())
 
 //------------------------------------------------------------------------------
 // MARK: String Processing
@@ -5959,6 +5970,10 @@ ERROR(string_processing_lib_missing,none,
 ERROR(regex_capture_types_failed_to_decode,none,
       "failed to decode capture types for regular expression literal; this may "
       "be a compiler bug", ())
+
+ERROR(regex_feature_unavailable, none,
+      "%0 is only available in %1 %2 or newer",
+      (StringRef, StringRef, llvm::VersionTuple))
 
 ERROR(must_import_regex_builder_module,none,
       "regex builder requires the 'RegexBuilder' module be imported'", ())
@@ -7948,9 +7963,9 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_invalid_param_name, none,
-      "invalid parameter name specified %0", (Identifier))
+      "invalid parameter name specified '%0'", (StringRef))
 ERROR(lifetime_dependence_invalid_param_index, none,
-      "invalid parameter index specified %0", (unsigned))
+      "invalid parameter index specified '%0'", (unsigned))
 ERROR(lifetime_dependence_invalid_self_in_static, none,
       "invalid lifetime dependence specifier on non-existent self", ())
 ERROR(lifetime_dependence_invalid_self_in_init, none,
@@ -7992,7 +8007,7 @@ ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
        "Escapable",
        ())
 ERROR(lifetime_dependence_immortal_conflict_name, none,
-      "conflict between the parameter name and immortal keyword", ())
+      "conflict between the parameter name and 'immortal' contextual keyword", ())
 ERROR(lifetime_dependence_function_type, none,
       "lifetime dependencies on function types are not supported",
       ())
@@ -8005,6 +8020,8 @@ ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
 ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
       "invalid use of borrow dependence with consuming ownership",
       ())
+ERROR(lifetime_dependence_duplicate_target, none,
+      "invalid duplicate target lifetime dependencies on function", ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Sending

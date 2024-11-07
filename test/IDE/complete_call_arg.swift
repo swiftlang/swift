@@ -789,7 +789,7 @@ func testClosurePlaceholderContainsInternalParameterNamesIfPresentInSignature() 
   func sortWithParensAroundClosureType(callback: ((_ left: Int, _ right: Int) -> Bool)) {}
   sortWithParensAroundClosureType(#^CLOSURE_PARAM_WITH_PARENS^#)
 // CLOSURE_PARAM_WITH_PARENS: Begin completions, 1 item
-// CLOSURE_PARAM_WITH_PARENS-DAG: Decl[FreeFunction]/Local/Flair[ArgLabels]:           ['(']{#callback: ((Int, Int) -> Bool)##(_ left: Int, _ right: Int) -> Bool#}[')'][#Void#];
+// CLOSURE_PARAM_WITH_PARENS-DAG: Decl[FreeFunction]/Local/Flair[ArgLabels]:           ['(']{#callback: (Int, Int) -> Bool##(_ left: Int, _ right: Int) -> Bool#}[')'][#Void#];
 
   func sortWithOptionalClosureType(callback: ((_ left: Int, _ right: Int) -> Bool)?) {}
   sortWithOptionalClosureType(#^OPTIONAL_CLOSURE_PARAM^#)
@@ -1119,7 +1119,7 @@ func testLValueBaseTyOfSubscript() {
   var cache: [String: Codable] = [:]
   if let cached = cache[#^LVALUEBASETY^#
 
-  // LVALUEBASETY-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem: ['[']{#(position): Dictionary<String, any Codable>.Index#}[']'][#Dictionary<String, any Codable>.Element#];
+  // LVALUEBASETY-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem: ['[']{#(position): Dictionary<String, any Codable>.Index#}[']'][#(key: String, value: any Codable)#];
   // LVALUEBASETY-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/IsSystem: ['[']{#(key): String#}[']'][#@lvalue (any Codable)?#];
 }
 

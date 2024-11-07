@@ -1168,6 +1168,15 @@ SILCloner<ImplClass>::visitBuiltinInst(BuiltinInst *Inst) {
                 getOpSubstitutionMap(Inst->getSubstitutions()), Args));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitMergeIsolationRegionInst(
+    MergeIsolationRegionInst *Inst) {
+  auto Args = getOpValueArray<8>(Inst->getOperandValues());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createMergeIsolationRegion(
+                                    getOpLocation(Inst->getLoc()), Args));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
@@ -2682,7 +2691,7 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
   recordClonedInstruction(Inst,
                           getBuilder().createWitnessMethod(
                               getOpLocation(Inst->getLoc()), newLookupType,
-                              conformance, Inst->getMember(), Inst->getType()));
+                              conformance, Inst->getMember(), getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>

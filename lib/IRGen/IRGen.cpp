@@ -200,11 +200,45 @@ static void align(llvm::Module *Module) {
     }
 }
 
+static void populatePGOOptions(std::optional<PGOOptions> &Out,
+                               const IRGenOptions &Opts) {
+  if (!Opts.UseSampleProfile.empty()) {
+    Out = PGOOptions(
+      /*ProfileFile=*/ Opts.UseSampleProfile,
+      /*CSProfileGenFile=*/ "",
+      /*ProfileRemappingFile=*/ "",
+      /*MemoryProfile=*/ "",
+      /*FS=*/ llvm::vfs::getRealFileSystem(), // TODO: is this fine?
+      /*Action=*/ PGOOptions::SampleUse,
+      /*CSPGOAction=*/ PGOOptions::NoCSAction,
+      /*ColdType=*/ PGOOptions::ColdFuncOpt::Default,
+      /*DebugInfoForProfiling=*/ Opts.DebugInfoForProfiling
+    );
+    return;
+  }
+
+  if (Opts.DebugInfoForProfiling) {
+    Out = PGOOptions(
+        /*ProfileFile=*/ "",
+        /*CSProfileGenFile=*/ "",
+        /*ProfileRemappingFile=*/ "",
+        /*MemoryProfile=*/ "",
+        /*FS=*/ nullptr,
+        /*Action=*/ PGOOptions::NoAction,
+        /*CSPGOAction=*/ PGOOptions::NoCSAction,
+        /*ColdType=*/ PGOOptions::ColdFuncOpt::Default,
+        /*DebugInfoForProfiling=*/ true
+    );
+    return;
+  }
+}
+
 void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                      llvm::Module *Module,
                                      llvm::TargetMachine *TargetMachine,
                                      llvm::raw_pwrite_stream *out) {
   std::optional<PGOOptions> PGOOpt;
+  populatePGOOptions(PGOOpt, Opts);
 
   PipelineTuningOptions PTO;
 
@@ -338,7 +372,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     options.Atomic = bool(Opts.Sanitizers & SanitizerKind::Thread);
     PB.registerPipelineStartEPCallback(
         [options](ModulePassManager &MPM, OptimizationLevel level) {
-          MPM.addPass(InstrProfiling(options, false));
+           MPM.addPass(InstrProfilingLoweringPass(options, false));
         });
   }
   if (Opts.shouldOptimize()) {
@@ -670,8 +704,8 @@ bool swift::compileAndWriteLLVM(
     legacy::PassManager EmitPasses;
     CodeGenFileType FileType;
     FileType =
-        (opts.OutputKind == IRGenOutputKind::NativeAssembly ? CGFT_AssemblyFile
-                                                            : CGFT_ObjectFile);
+        (opts.OutputKind == IRGenOutputKind::NativeAssembly ? CodeGenFileType::AssemblyFile
+                                                            : CodeGenFileType::ObjectFile);
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         targetMachine->getTargetIRAnalysis()));
 
@@ -797,6 +831,8 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
   opts.YieldOnceResumeFunctions =
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
+  opts.YieldOnce2ResumeFunctions =
+      PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Type);
 
   opts.ResilientClassStubInitCallbacks =
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Constant,
@@ -872,9 +908,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
 
 std::unique_ptr<llvm::TargetMachine>
 swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
-  CodeGenOpt::Level OptLevel = Opts.shouldOptimize()
-                                   ? CodeGenOpt::Default // -Os
-                                   : CodeGenOpt::None;
+  CodeGenOptLevel OptLevel = Opts.shouldOptimize()
+                                   ? CodeGenOptLevel::Default // -Os
+                                   : CodeGenOptLevel::None;
 
   // Set up TargetOptions and create the target features string.
   TargetOptions TargetOpts;

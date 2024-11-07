@@ -84,7 +84,7 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   // recordChange() to assert if there's an active undo. It is not valid to
   // create new nodes during an undo.
   if (CS.solverState)
-    CS.recordChange(SolverTrail::Change::addedTypeVariable(typeVar));
+    CS.recordChange(SolverTrail::Change::AddedTypeVariable(typeVar));
 
   // If this type variable is not the representative of its equivalence class,
   // add it to its representative's set of equivalences.
@@ -399,8 +399,8 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   auto referencedTypeVars = constraint->getTypeVariables();
   for (auto typeVar : referencedTypeVars) {
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
-      CS.recordChange(SolverTrail::Change::addedConstraint(typeVar, constraint));
+    if (CS.solverState)
+      CS.recordChange(SolverTrail::Change::AddedConstraint(typeVar, constraint));
 
     addConstraint(typeVar, constraint);
 
@@ -419,8 +419,8 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   // track it as such.
   if (referencedTypeVars.empty()) {
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
-      CS.recordChange(SolverTrail::Change::addedConstraint(nullptr, constraint));
+    if (CS.solverState)
+      CS.recordChange(SolverTrail::Change::AddedConstraint(nullptr, constraint));
 
     addConstraint(nullptr, constraint);
   }
@@ -454,8 +454,8 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
     }
 
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
-      CS.recordChange(SolverTrail::Change::removedConstraint(typeVar, constraint));
+    if (CS.solverState)
+      CS.recordChange(SolverTrail::Change::RemovedConstraint(typeVar, constraint));
 
     removeConstraint(typeVar, constraint);
   }
@@ -463,8 +463,8 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
   // If this is an orphaned constraint, remove it from the list.
   if (referencedTypeVars.empty()) {
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
-      CS.recordChange(SolverTrail::Change::removedConstraint(nullptr, constraint));
+    if (CS.solverState)
+      CS.recordChange(SolverTrail::Change::RemovedConstraint(nullptr, constraint));
 
     removeConstraint(nullptr, constraint);
   }
@@ -503,7 +503,7 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
   // Record the change, if there are active scopes.
   if (CS.isRecordingChanges()) {
     CS.recordChange(
-      SolverTrail::Change::extendedEquivalenceClass(
+      SolverTrail::Change::ExtendedEquivalenceClass(
                         typeVarRep,
                         repNode.getEquivalenceClass().size()));
   }
@@ -533,7 +533,7 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
 
     // Record the change, if there are active scopes.
     if (CS.isRecordingChanges())
-      CS.recordChange(SolverTrail::Change::relatedTypeVariables(typeVar, otherTypeVar));
+      CS.recordChange(SolverTrail::Change::RelatedTypeVariables(typeVar, otherTypeVar));
   }
 }
 
@@ -722,6 +722,10 @@ namespace {
     mutable llvm::SmallDenseMap<TypeVariableType *, TypeVariableType *>
         representatives;
 
+    // Figure out which components have unbound type variables and/or
+    // constraints. These are the only components we want to report.
+    llvm::SmallDenseSet<TypeVariableType *> validComponents;
+
     /// The complete set of constraints that were visited while computing
     /// connected components.
     llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
@@ -764,29 +768,20 @@ namespace {
 
     /// Retrieve the set of components.
     SmallVector<Component, 1> getComponents() const {
-      // Figure out which components have unbound type variables and/or
-      // constraints. These are the only components we want to report.
-      llvm::SmallDenseSet<TypeVariableType *> validComponents;
-      auto &cs = cg.getConstraintSystem();
-      for (auto typeVar : typeVars) {
-        // If this type variable has a fixed type, skip it.
-        if (cs.getFixedType(typeVar))
-          continue;
+      // The final return value.
+      SmallVector<Component, 1> flatComponents;
 
-        auto rep = findRepresentative(typeVar);
-        validComponents.insert(rep);
-      }
 
-      for (auto &constraint : cs.getConstraints()) {
-        for (auto typeVar : constraint.getTypeVariables()) {
-          auto rep = findRepresentative(typeVar);
-          validComponents.insert(rep);
-        }
-      }
+      // We don't actually need to partition the graph into components if
+      // there are fewer than 2.
+      if (validComponents.size() < 2 && cg.getOrphanedConstraints().empty())
+        return flatComponents;
 
-      // Capture the type variables of each component.
+      // Mapping from representatives to components.
       llvm::SmallDenseMap<TypeVariableType *, Component> components;
       SmallVector<TypeVariableType *, 4> representativeTypeVars;
+
+      // Capture the type variables of each component.
       for (auto typeVar : typeVars) {
         // Find the representative. If we aren't creating a type variable
         // for this component, skip it.
@@ -794,17 +789,13 @@ namespace {
         if (validComponents.count(rep) == 0)
           continue;
 
-        // If this type variable is the representative, add it to the list of
-        // representatives.
-        if (rep == typeVar) {
+        auto pair = components.insert({rep, Component(components.size())});
+        if (pair.second)
           representativeTypeVars.push_back(rep);
-        }
 
         // Record this type variable in the set of type variables for its
         // component.
-        auto &component = components.insert(
-            {rep, Component(components.size())}).first->second;
-        component.typeVars.push_back(typeVar);
+        pair.first->second.typeVars.push_back(typeVar);
       }
 
       // Retrieve the component for the given representative type variable.
@@ -813,6 +804,8 @@ namespace {
         assert(component != components.end());
         return component->second;
       };
+
+      auto &cs = cg.getConstraintSystem();
 
       // Assign each constraint to its appropriate component.
       // Note: we use the inactive constraints so that we maintain the
@@ -848,8 +841,7 @@ namespace {
                   });
         
         representativeTypeVars =
-            computeOneWayComponentOrdering(representativeTypeVars,
-                                           validComponents);
+            computeOneWayComponentOrdering(representativeTypeVars);
 
         // Fill in one-way dependency information for all of the components.
         for (auto typeVar : representativeTypeVars) {
@@ -869,7 +861,6 @@ namespace {
       }
 
       // Flatten the set of components.
-      SmallVector<Component, 1> flatComponents;
       flatComponents.reserve(
           representativeTypeVars.size() + cg.getOrphanedConstraints().size());
       for (auto rep: representativeTypeVars) {
@@ -934,10 +925,13 @@ namespace {
 
       // Reparent the type variable with the higher ID. The actual choice doesn't
       // matter, but this makes debugging easier.
-      if (rep1->getID() < rep2->getID())
+      if (rep1->getID() < rep2->getID()) {
+        validComponents.erase(rep2);
         representatives[rep2] = rep1;
-      else
+      } else {
+        validComponents.erase(rep1);
         representatives[rep1] = rep2;
+      }
       return true;
     }
 
@@ -947,6 +941,8 @@ namespace {
     /// \returns the set of one-way constraints that were skipped.
     TinyPtrVector<Constraint *> connectedComponents() {
       TinyPtrVector<Constraint *> oneWayConstraints;
+
+      auto &cs = cg.getConstraintSystem();
 
       // Perform a depth-first search from each type variable to identify
       // what component it is in.
@@ -966,6 +962,10 @@ namespace {
               assert((inserted.second || inserted.first->second == typeVar) &&
                      "Wrong component?");
 
+              if (inserted.second)
+                if (!cs.getFixedType(found))
+                  validComponents.insert(typeVar);
+
               return inserted.second;
             },
             [&](Constraint *constraint) {
@@ -978,6 +978,17 @@ namespace {
               return true;
             },
             visitedConstraints);
+      }
+
+      for (auto &constraint : cs.getConstraints()) {
+        if (constraint.getKind() == ConstraintKind::Disjunction ||
+            constraint.getKind() == ConstraintKind::Conjunction) {
+          for (auto typeVar : constraint.getTypeVariables()) {
+            auto rep = findRepresentative(typeVar);
+            if (validComponents.insert(rep).second)
+              ASSERT(cs.getFixedType(typeVar));
+          }
+        }
       }
 
       return oneWayConstraints;
@@ -1196,8 +1207,7 @@ namespace {
     /// solved after the components for type variables on the right-hand
     /// side of that constraint.
     SmallVector<TypeVariableType *, 4> computeOneWayComponentOrdering(
-        ArrayRef<TypeVariableType *> representativeTypeVars,
-        llvm::SmallDenseSet<TypeVariableType *> &validComponents) const {
+        ArrayRef<TypeVariableType *> representativeTypeVars) const {
       SmallVector<TypeVariableType *, 4> orderedReps;
       orderedReps.reserve(representativeTypeVars.size());
       SmallPtrSet<TypeVariableType *, 4> visited;
@@ -1282,7 +1292,7 @@ bool ConstraintGraph::contractEdges() {
         continue;
 
       // This closure is not currently in scope.
-      if (!CS.TypeVariables.count(paramTy))
+      if (!CS.isActiveTypeVariable(paramTy))
         break;
 
       // Nothing to contract here since outside parameter

@@ -3,6 +3,9 @@
 // Make sure everything compiles without error when unsafe code is allowed.
 // RUN: %target-swift-frontend -typecheck -enable-experimental-feature AllowUnsafeAttribute -warnings-as-errors %s
 
+// REQUIRES: swift_feature_AllowUnsafeAttribute
+// REQUIRES: swift_feature_WarnUnsafe
+
 func test(
   x: OpaquePointer, // expected-warning{{reference to unsafe struct 'OpaquePointer'}}
   other: UnsafeMutablePointer<Int> // expected-warning{{reference to unsafe generic struct 'UnsafeMutablePointer'}}

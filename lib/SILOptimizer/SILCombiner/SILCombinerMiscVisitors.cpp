@@ -1132,6 +1132,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
                           IEAI->getOperand()->getType().getObjectType());
     auto storeQual = !func->hasOwnership()
                          ? StoreOwnershipQualifier::Unqualified
+                     : IEAI->getOperand()->getType().isMoveOnly()
+                         ? StoreOwnershipQualifier::Init
                          : StoreOwnershipQualifier::Trivial;
     Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand(), storeQual);
     return eraseInstFromFunction(*IEAI);
@@ -2001,24 +2003,6 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
     // a literal is replace by the string_literal itself.
     replaceInstUsesWith(*mdi, mdi->getValue());
     return eraseInstFromFunction(*mdi);
-  }
-
-  return nullptr;
-}
-
-SILInstruction *
-SILCombiner::visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *cboi) {
-  auto *urc = dyn_cast<UncheckedRefCastInst>(cboi->getOperand());
-  if (!urc)
-    return nullptr;
-
-  auto type = urc->getOperand()->getType().getASTType();
-  if (ClassDecl *cd = type->getClassOrBoundGenericClass()) {
-    if (!cd->isObjC()) {
-      auto int1Ty = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
-      SILValue zero = Builder.createIntegerLiteral(cboi->getLoc(), int1Ty, 0);
-      return Builder.createTuple(cboi->getLoc(), {zero, zero});
-    }
   }
 
   return nullptr;

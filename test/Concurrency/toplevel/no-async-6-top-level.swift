@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -disable-availability-checking -swift-version 6 %s -verify
+// RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple -swift-version 6 %s -verify
 
 // Even though enable-experimental-async-top-level is enabled, there are no
 // 'await's made from the top-level, thus the top-level is not an asynchronous

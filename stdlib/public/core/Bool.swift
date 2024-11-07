@@ -170,7 +170,6 @@ extension Bool: _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral
   }
 }
 
-@_unavailableInEmbedded
 extension Bool: CustomStringConvertible {
   /// A textual representation of the Boolean value.
   @inlinable

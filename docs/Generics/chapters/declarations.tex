@@ -8,7 +8,7 @@
 
 We begin with two major divisions in the declaration taxonomy:
 \begin{enumerate}
-\item A \IndexDefinition{value declaration}\emph{value declaration} is a one that can be referenced by name from an \index{expression}expression; this includes variables, functions, and such. Every value declaration has an \IndexDefinition{interface type}\emph{interface type}, which is the type assigned to an expression that names this declaration.
+\item A \IndexDefinition{value declaration}\emph{value declaration} is a one that can be referenced by name from an \index{expression}expression; this includes variables, functions, and such. Every value declaration has an \IndexDefinition{interface type!value declaration}\emph{interface type}, which is the type assigned to an expression that names this declaration.
 \item A \IndexDefinition{type declaration}\emph{type declaration} is one that can be referenced by name from within a \index{type representation}type representation. This includes structs, type aliases, and so on. A type declaration declares a type, called the \IndexDefinition{declared interface type}\emph{declared interface type} of the type declaration.
 \end{enumerate}
 Not all declarations are value declarations. An \index{extension declaration}extension declaration adds members to an existing nominal type declaration, as we'll see in \ChapRef{extensions}, but an extension does not itself have a name. A \IndexDefinition{top-level code declaration}\emph{top-level code declaration} holds the statements and expressions written at the top level of a source file, and again, it does not have a name, semantically.
@@ -37,13 +37,13 @@ The interface type of a type declaration always wraps its declared interface typ
 \paragraph{Nominal type declarations.}
 \IndexDefinition{nominal type declaration}Introduced with the \texttt{struct}, \IndexDefinition{enum declaration}\texttt{enum} and \IndexDefinition{class declaration}\texttt{class} keywords; \IndexSwift{5.5}Swift~5.5 also added \texttt{actor}, which to us is just a class~\cite{se0306}. Nominal type declarations are declaration contexts, and the declarations they contain are called their \IndexDefinition{member declaration}\emph{member declarations}. If a member declaration is a function, we call it a \IndexDefinition{method declaration}\emph{method}, a member variable is a \IndexDefinition{property declaration}\emph{property}, and a \IndexDefinition{member type declaration}\emph{member type declaration} is exactly that.
 
-Structs and classes can contain a special kind of property declaration called a \IndexDefinition{stored property declaration}\emph{stored property declaration}. Struct values directly store their stored properties, while a class value is a reference to a heap allocated \index{boxing}box. Enum values store exactly one element among several; enum declarations instead contain \IndexDefinition{enum element declaration}\emph{enum element declarations}, introduced with \texttt{case}.
+Structs and classes can contain a special kind of property declaration called a \IndexDefinition{stored property declaration}\emph{stored property declaration}. Struct values directly store their stored properties, while a class value is a reference to a heap allocated \index{boxing}box. Enum values store exactly one element among several; enum declarations instead contain \IndexDefinition{enum element declaration}\emph{enum element declarations}, introduced with the \texttt{case} keyword.
 
 The members of a nominal type declaration are visible to name lookup (\SecRef{name lookup}), both in the nominal type declaration's scope (unqualified lookup) and outside (qualified lookup). \ListingRef{unqualified lookup listing} shows three features we will cover in detail later:
 \begin{itemize}
 \item Nominal type declarations can conform to protocols (\ChapRef{conformances}).
 \item Extensions add members to existing nominal type declarations (\ChapRef{extensions}).
-\item A class can inherit from a \index{superclass type}superclass type, and members of the superclass are also visible from the subclass (\ChapRef{classinheritance}).
+\item A class can inherit from a \index{superclass type}superclass type, and members of the superclass are also visible from the subclass (\SecRef{classinheritance}).
 \end{itemize}
 
 \begin{listing}\captionabove{Some behaviors of name lookup}\label{unqualified lookup listing}
@@ -64,17 +64,17 @@ struct Square: Shape {
 
 The body of \texttt{caller()} can reference \texttt{callee1()}, \texttt{callee2()} or \texttt{callee3()} with a single identifier. To resolve the identifier, unqualified lookup must search through these declaration contexts, starting in the top-left corner:
 \begin{center}
-\begin{tikzpicture}[node distance=1cm]
+\begin{tikzpicture}[x=4.5cm,y=1.5cm]
 
-\node (caller) [class] {\texttt{\vphantom{p}func caller()}};
+\node (caller) [class,anchor=mid] at (0,2) {\texttt{\vphantom{p}func caller()}};
 
-\node (Circle) [class, right=of caller] {\texttt{\vphantom{p}class Circle}};
-\node (Square) [class, right=of Circle] {\texttt{struct Square}};
+\node (Circle) [class,anchor=mid] at (1,2) {\texttt{\vphantom{p}class Circle}};
+\node (Square) [class,anchor=mid] at (2,2) {\texttt{struct Square}};
 
-\node (Form) [class, below=of Circle] {\texttt{\vphantom{p}class Form}};
-\node (Shape) [class, below=of Square] {\texttt{protocol Shape}};
+\node (Form) [class,anchor=mid] at (1,1) {\texttt{\vphantom{p}class Form}};
+\node (Shape) [class,anchor=mid] at (2,1) {\texttt{protocol Shape}};
 
-\node (extShape) [class, below=of Shape] {\texttt{extension Shape}};
+\node (extShape) [class,anchor=mid] at (2,0) {\texttt{extension Shape}};
 
 \path [arrow] (caller) edge [above] node {\footnotesize{parent}} (Circle);
 \path [arrow] (Circle) edge [above] node {\footnotesize{parent}} (Square);
@@ -145,13 +145,13 @@ Each comma-separated element in this list is a \IndexDefinition{generic paramete
 
 Any declaration kind that can have a generic parameter list is also a \index{declaration context}declaration context in our taxonomy, because it contains other declarations; namely, its generic parameter declarations. We say that a declaration context is a \IndexDefinition{generic context}\emph{generic context} if at least one parent context has a generic parameter list.
 
-The name of a generic parameter declaration plays no role after \index{unqualified lookup}unqualified lookup. Instead, to each generic parameter declaration, we assign a pair of integers (or more accurately, \index{natural number}natural numbers; they're non-negative), the \IndexDefinition{depth}\emph{depth} and the \IndexDefinition{index}\emph{index}:
+The name of a generic parameter declaration plays no role after \index{unqualified lookup}unqualified lookup. Instead, to each generic parameter declaration, we assign a pair of integers (or more accurately, natural numbers; they're non-negative), the \IndexDefinition{depth}\emph{depth} and the \IndexDefinition{index}\emph{index}:
 \begin{itemize}
 \item The depth selects a generic parameter list; the generic parameters declared by the outermost generic parameter list are at depth zero, and we increment the depth by one for each nested generic parameter list.
 \item The index selects a generic parameter within a generic parameter list; we number sibling generic parameter declarations consecutively starting from zero.
 \end{itemize}
 
-Let's write some nested generic declarations inside the \texttt{Outer} struct above. In the following, \texttt{two()} is generic over \texttt{T}~and~\texttt{U}, while \texttt{four()} is generic over~\texttt{T}, \texttt{V}, \texttt{W}~and~\texttt{X}:
+Let's write some nested generic declarations inside the \texttt{Outer} struct above. In the following, \texttt{two()} is generic over \tT~and~\tU, while \texttt{four()} is generic over~\tT, \texttt{V}, \texttt{W}~and~\texttt{X}:
 \begin{Verbatim}
 struct Outer<T> {
   func two<U>(u: U) -> T {...}
@@ -162,13 +162,13 @@ struct Outer<T> {
 }
 \end{Verbatim}
 
-When type resolution resolves the type representation ``\texttt{T}'' in the return type of \texttt{two()}, it outputs a generic parameter type that prints as ``\texttt{T}'', if it appears in a diagnostic for example. This is a \index{sugared type}sugared type. Every generic parameter type also has a canonical form which only records the depth and index; we denote a canonical generic parameter type by ``\ttgp{d}{i}'', where \texttt{d} is the depth and \texttt{i} is the index. Two generic parameter types are canonically equal if they have the same depth and index. This is sound, because the depth and index unambiguously identify a generic parameter within its lexical scope.
+When type resolution resolves the type representation ``\tT'' in the return type of \texttt{two()}, it outputs a generic parameter type that prints as ``\tT'', if it appears in a diagnostic for example. This is a \index{sugared type}sugared type. Every generic parameter type also has a canonical form which only records the depth and index; we denote a canonical generic parameter type by ``\ttgp{d}{i}'', where \texttt{d} is the depth and \texttt{i} is the index. Two generic parameter types are canonically equal if they have the same depth and index. This is sound, because the depth and index unambiguously identify a generic parameter within its lexical scope.
 
 Let's enumerate all generic parameters visible within \texttt{two()},
 \begin{center}
 \begin{tabular}{rll}
 \toprule
-\textbf{Name:}&\texttt{T}&\texttt{U}\\
+\textbf{Name:}&\tT&\tU\\
 \midrule
 \textbf{Depth:}&0&1\\
 \textbf{Index:}&0&0\\
@@ -180,7 +180,7 @@ and \texttt{four()},
 \begin{center}
 \begin{tabular}{rllll}
 \toprule
-\textbf{Name:}&\texttt{T}&\texttt{V}&\texttt{W}&\texttt{X}\\
+\textbf{Name:}&\tT&\texttt{V}&\texttt{W}&\texttt{X}\\
 \midrule
 \textbf{Depth:}&0&1&1&2\\
 \textbf{Index:}&0&0&1&0\\
@@ -188,7 +188,7 @@ and \texttt{four()},
 \bottomrule
 \end{tabular}
 \end{center}
-The generic parameter~\texttt{U} of \texttt{two()} has the same \index{declared interface type!generic parameter}declared interface type, \ttgp{1}{0}, as the generic parameter~\texttt{V} of \texttt{four()}. This is not a problem because the source ranges of their parent declarations, \texttt{two()} and \texttt{Both}, do not intersect.
+The generic parameter~\tU\ of \texttt{two()} has the same \index{declared interface type!generic parameter declaration}declared interface type, \ttgp{1}{0}, as the generic parameter~\tV\ of \texttt{four()}. This is not a problem because the source ranges of their parent declarations, \texttt{two()} and \texttt{Both}, do not intersect.
 
 The numbering by depth can be seen in the \index{declared interface type!nested nominal type}declared interface type of a nested generic nominal type declaration. For example, the declared interface type of \texttt{Outer.Both} is the generic nominal type \texttt{Outer<\ttgp{0}{0}>.Both<\ttgp{1}{0}, \ttgp{1}{1}>}.
 
@@ -209,19 +209,19 @@ In \ChapRef{genericsig}, we define the generic signature, which records all visi
 The requirements of a generic declaration constrain the generic argument types that can be provided by the caller. This endows the generic declaration's type parameters with new capabilities, so they abstract over the concrete types that satisfy those requirements. We use the following encoding for requirements in the theory and implementation.
 
 \begin{definition}\label{requirement def}
-A \IndexDefinition{requirement}\emph{requirement} is a triple consisting of a \emph{requirement kind}, a \IndexDefinition{subject type!of requirement}subject type~\texttt{T} (usually a \index{type parameter}type parameter), and one final piece of information that depends on the requirement kind:
+A \IndexDefinition{requirement}\emph{requirement} is a triple consisting of a \emph{requirement kind}, a \IndexDefinition{subject type!of requirement}subject type~\tT\ (usually a \index{type parameter}type parameter), and one final piece of information that depends on the requirement kind:
 \begin{itemize}
-\item A \IndexDefinition{conformance requirement}\textbf{conformance requirement} $\TP$ states that the replacement type for~\texttt{T} must conform to~\texttt{P}, which must be a protocol, protocol composition, or parameterized protocol type.
-\item A \IndexDefinition{superclass requirement}\textbf{superclass requirement} $\TC$ states that the replacement type for~\texttt{T} must be a subclass of some \index{class type}class type~\texttt{C}.
-\item A \IndexDefinition{layout requirement}\textbf{layout requirement} $\TAnyObject$ states that the replacement type for~\texttt{T} must be represented as a single reference-counted pointer at runtime.
-\item A \IndexDefinition{same-type requirement}\textbf{same-type requirement} $\TU$ states that the replacement types for \texttt{T}~and~\texttt{U} must be \index{canonical type equality}canonically equal.
+\item A \IndexDefinition{conformance requirement}\textbf{conformance requirement} $\TP$ states that the replacement type for~\tT\ must conform to~\texttt{P}, which must be a protocol, protocol composition, or parameterized protocol type.
+\item A \IndexDefinition{superclass requirement}\textbf{superclass requirement} $\TC$ states that the replacement type for~\tT\ must be a subclass of some \index{class type}class type~\tC.
+\item A \IndexDefinition{layout requirement}\textbf{layout requirement} $\TAnyObject$ states that the replacement type for~\tT\ must be represented as a single reference-counted pointer at runtime.
+\item A \IndexDefinition{same-type requirement}\textbf{same-type requirement} $\TU$ states that the replacement types for \tT~and~\tU\ must be \index{canonical type equality}canonically equal.
 \end{itemize}
 \end{definition}
 
-When looking at concrete instances of requirements in a self-contained snippet of code, there is no ambiguity in using the same notation for the first three kinds, because the type referenced by the right-hand side determines the requirement kind. When talking about requirements in the abstract, we will explicitly state that~\texttt{P} is some protocol, or~\texttt{C} is some class, before talking about $\TP$ or $\TC$.
+When looking at concrete instances of requirements in a self-contained snippet of code, there is no ambiguity in using the same notation for the first three kinds, because the type referenced by the right-hand side determines the requirement kind. When talking about requirements in the abstract, we will explicitly state that~\texttt{P} is some protocol, or~\tC\ is some class, before talking about $\TP$ or $\TC$.
 
 \paragraph{Constraint types.}
-Before we introduce the trailing \texttt{where} clause syntax for stating requirements in a fully general way, let's look at the shorthand of stating a \IndexDefinition{constraint type}\emph{constraint type} in the \IndexDefinition{inheritance clause!generic parameter}inheritance clause of a \index{generic parameter declaration}generic parameter declaration:
+Before we introduce the trailing \texttt{where} clause syntax for stating requirements in a fully general way, let's look at the shorthand of stating a \IndexDefinition{constraint type}\emph{constraint type} in the \IndexDefinition{inheritance clause!generic parameter declaration}inheritance clause of a \index{generic parameter declaration}generic parameter declaration:
 \begin{Verbatim}
 func allEqual<E: Equatable>(_ elements: [E]) {...}
 \end{Verbatim}
@@ -233,10 +233,10 @@ The generic parameter declaration~\texttt{E} declares the generic parameter type
 \item A \index{class type!constraint type}class type, like \texttt{NSObject}.
 \item The \Index{AnyObject@\texttt{AnyObject}}\texttt{AnyObject} \index{layout constraint}\emph{layout constraint}, which restricts the possible concrete types to those represented as a single reference-counted pointer.
 \end{enumerate}
-In the first three cases, the stated requirement becomes a conformance requirement. Otherwise, it is a superclass or layout requirement. In all cases, the subject type of the requirement is the \index{declared interface type!generic parameter}declared interface type of the generic parameter.
+In the first three cases, the stated requirement becomes a conformance requirement. Otherwise, it is a superclass or layout requirement. In all cases, the subject type of the requirement is the \index{declared interface type!generic parameter declaration}declared interface type of the generic parameter.
 
 \begin{example}
-Notice how the generic parameter \texttt{B} of \texttt{open()} states the constraint type \texttt{Box<C>}, and this refers to the second generic parameter, \texttt{C}:
+Notice how the generic parameter \texttt{B} of \texttt{open()} states the constraint type \texttt{Box<C>}, and this refers to the second generic parameter, \tC:
 \begin{Verbatim}
 func open<B: Box<C>, C>(box: B) -> C {
   return box.contents!
@@ -256,7 +256,7 @@ let vegetable: Vegetable = open(box: FarmBox())
 \end{example}
 
 \paragraph{Opaque parameters.}
-Recall from \SecRef{generic params} that an opaque parameter declares a parameter value, a generic parameter type, and a \index{constraint type!opaque parameter}constraint type. The constraint type defines a conformance, superclass or layout requirement on the \index{opaque parameter}generic parameter type. Both of the following declarations state the requirement $\ConfReq{\rU}{Sequence<\rT>}$:
+An opaque parameter declaration is written with a \index{constraint type!opaque parameter}constraint type after the \texttt{some} keyword (\SecRef{generic params}). This specifies a conformance, superclass or layout requirement on the \index{opaque parameter}generic parameter type introduced by the opaque parameter declaration. For example, the following two declarations are equivalent:
 \begin{Verbatim}
 func pickElement<E>(_ elts: some Sequence<E>) -> E {...}
 func pickElement<E, S: Sequence<E>>(_ elts: S) -> E {...}
@@ -271,7 +271,7 @@ We will see later that constraint types also appear in various other positions, 
 
 \paragraph{Trailing where clauses.} Requirements can also be stated in a \IndexDefinition{where clause@\texttt{where} clause}\index{trailing where clause@trailing \texttt{where} clause|see{\texttt{where} clause}}\texttt{where} clause attached to the generic declaration. This allows generality that cannot be expressed using the inheritance clause of a generic parameter alone.
 
-A \texttt{where} clause entry defines a requirement whose subject type is written explicitly, so that \index{dependent member type}dependent member types can be be subject to requirements; here, we state two requirements, $\ConfReq{\rT}{Sequence}$ and $\ConfReq{\rT.Element}{Comparable}$:
+A \texttt{where} clause entry defines a requirement whose subject type is written explicitly, so that \index{dependent member type!in requirements}dependent member types can be be subject to requirements; here, we state two requirements, $\ConfReq{\rT}{Sequence}$ and $\ConfReq{\rT.Element}{Comparable}$:
 \begin{Verbatim}
 func isSorted<S>(_: S) where S: Sequence, S.Element: Comparable {...}
 \end{Verbatim}
@@ -282,7 +282,7 @@ func merge<S1: Sequence, S2: Sequence>(_: S1, _: S2) -> [S1.Element]
     where S1: Comparable, S1.Element == S2.Element {...}
 \end{Verbatim}
 
-Note that there is no way to refer to an opaque parameter type within the function's \Index{where clause@\texttt{where} clause}\texttt{where} clause, but every declaration using opaque parameters can always be rewritten into an equivalent one using named generic parameters, so no generality is lost.
+Note that there is no way to refer to an opaque parameter type within the function's \Index{where clause@\texttt{where} clause!opaque parameter}\texttt{where} clause, but every declaration using opaque parameters can always be rewritten into an equivalent one using named generic parameters, so no generality is lost.
 
 We saw in \ChapRef{types} that when the parser reads a type annotation in the source, it constructs a \index{type representation}type representation, a lower-level syntactic object which must be \index{type resolution}resolved to obtain a \index{type}type. Similarly, requirements have a syntactic form, called a \IndexDefinition{requirement representation}\emph{requirement representation}. The parser constructs requirement representations while reading a \texttt{where} clause. The relationship between the syntactic and semantic entities is shown in this diagram:
 \begin{center}
@@ -305,13 +305,13 @@ We saw in \ChapRef{types} that when the parser reads a type annotation in the so
 \end{center}
 There are only two kinds of requirement representations, because the ``\texttt{:}'' form cannot distinguish conformance, superclass and layout requirements until we resolve the type representation on the right-hand side:
 \begin{enumerate}
-\item A \IndexDefinition{constraint requirement representation}\textbf{constraint requirement representation} ``\texttt{T:\ C}'', where \texttt{T} and \texttt{C} are type representations.
-\item A \IndexDefinition{same-type requirement representation}\textbf{same-type requirement representation} ``\texttt{T == U}'', where \texttt{T} and \texttt{U} are type representations.
+\item A \IndexDefinition{constraint requirement representation}\textbf{constraint requirement representation} ``\texttt{T:\ C}'', where \tT\ and \tC\ are type representations.
+\item A \IndexDefinition{same-type requirement representation}\textbf{same-type requirement representation} ``\texttt{T == U}'', where \tT\ and \tU\ are type representations.
 \end{enumerate}
 
-Recall that a conformance requirement has a protocol type, protocol composition type, or parameterized protocol type on the right-hand side (\SecRef{fundamental types}). In the case of a protocol composition, we decompose the requirement into simpler requirements, one for each member of the composition. For example, if \texttt{MyClass} is a class, the requirement $\ConfReq{\rT}{Sequence~\&~MyClass}$ decomposes as $\ConfReq{\rT}{Sequence}$ and $\ConfReq{\rT}{MyClass}$, the latter being a superclass requirement. The empty protocol composition, written \Index{Any@\texttt{Any}}\texttt{Any}, is a trivial case; stating a conformance requirement to \texttt{Any} does nothing in a \texttt{where} clause, but it is allowed. Parameterized protocol types also decompose, as we'll see in~\SecRef{protocols}.
+Recall that a conformance requirement has a protocol type, protocol composition type, or parameterized protocol type on the right-hand side (\SecRef{fundamental types}). In the case of a protocol composition, we decompose the requirement into simpler requirements, one for each member of the composition. For example, if \texttt{MyClass} is a class, the requirement $\ConfReq{\rT}{Sequence~\&~MyClass}$ splits up as $\ConfReq{\rT}{Sequence}$ and $\ConfReq{\rT}{MyClass}$, the latter being a superclass requirement. The empty protocol composition, written \Index{Any@\texttt{Any}}\texttt{Any}, is a trivial case; stating a conformance requirement to \texttt{Any} does nothing in a \texttt{where} clause, but it is allowed. Parameterized protocol types also decompose, as we'll see in~\SecRef{protocols}.
 
-The next chapter will introduce the derived requirements formalism. We will assume that only conformance requirements to protocol types remain, and similarly, that the subject types of requirements are type parameters, and not arbitrary types. \SecRef{requirement desugaring} will show how we eliminate these unnecessary forms of generality.
+In the next section, we will introduce a formal system for derived requirements, where we will assume that only conformance requirements to protocol types remain, and that the subject type of a requirement is always a type parameter, and not an arbitrary type. \SecRef{requirement desugaring} will show how we eliminate these unnecessary forms of generality.
 
 \paragraph{Contextually-generic declarations.} A generic declaration nested inside of another generic declaration can state a \texttt{where} clause, without introducing new generic parameters of its own. This is called a \IndexDefinition{contextually-generic declaration}\emph{contextually-generic declaration}:
 \begin{Verbatim}
@@ -336,26 +336,26 @@ In \ChapRef{genericsig}, we will see that the generic signature of a declaration
 
 \paragraph{History.} The syntax described in this section has evolved over time:
 \begin{itemize}
-\item The \texttt{where} clause used to be written within the ``\texttt{<}'' and ``\texttt{>}'', but was moved to the current \Index{where clause@\texttt{where} clause}``trailing'' position in \IndexSwift{3.0}Swift 3 \cite{se0081}.
+\item The \texttt{where} clause used to be written within the ``\texttt{<}'' and ``\texttt{>}'', but was moved to the current \Index{where clause@\texttt{where} clause!history}``trailing'' position in \IndexSwift{3.0}Swift 3 \cite{se0081}.
 \item Generic type aliases were introduced in \IndexSwift{3.0}Swift 3 \cite{se0048}.
-\item Protocol compositions involving class types were introduced in \IndexSwift{4.0}Swift 4 \cite{se0156}.
-\item Generic subscripts were introduced in \IndexSwift{4.0}Swift 4 \cite{se0148}.
-\item Implementation limitations prevented the \texttt{where} clause from stating requirements that constrain outer generic parameters until Swift 3, and contextually-generic declarations were not allowed until \IndexSwift{5.3}Swift 5.3 \cite{se0261}.
-\item Opaque parameter declarations were introduced in \IndexSwift{5.7}Swift 5.7 \cite{se0341}.
+\item \index{protocol composition type!history}Protocol compositions involving class types were introduced in \IndexSwift{4.0}Swift 4 \cite{se0156}.
+\item Generic \index{subscript declaration!history}subscripts were introduced in \IndexSwift{4.0}Swift 4 \cite{se0148}.
+\item Implementation limitations prevented the \texttt{where} clause from stating requirements that constrain outer generic parameters until Swift 3, and \index{contextually-generic declaration!history}contextually-generic declarations were not allowed until \IndexSwift{5.3}Swift 5.3 \cite{se0261}.
+\item \index{opaque parameter!history}Opaque parameter declarations were introduced in \IndexSwift{5.7}Swift 5.7 \cite{se0341}.
 \end{itemize}
 
 \section{Protocols}\label{protocols}
 
-The \texttt{protocol} keyword introduces a \IndexDefinition{protocol declaration}\emph{protocol declaration}, which is a special kind of nominal type declaration. The members of a protocol, with the exception of type aliases, are requirements that must be witnessed by corresponding members in each \index{conforming type}conforming type. In particular, the property, subscript and method declarations inside a protocol don't have bodies, but are otherwise represented in a similar way to the concrete case. A protocol declaration's declared interface type is a \index{protocol type}protocol type.
+The \texttt{protocol} keyword introduces a \IndexDefinition{protocol declaration}\emph{protocol declaration}, which is a special kind of nominal type declaration. The members of a protocol, with the exception of type aliases, are requirements that must be witnessed by corresponding members in a \index{conforming type}conforming type. The protocol's properties, subscripts, and methods are called  \IndexDefinition{value requirement}\emph{value requirements}. They don't have bodies, but are otherwise like member declarations of a concrete nominal type. The declared interface type of a protocol declaration is a \index{protocol type}protocol type.
 
 Every protocol has an implicit generic parameter list with a single generic parameter named \IndexDefinition{protocol Self type@protocol \tSelf\ type}\tSelf, which abstracts over the conforming type. The declared interface type of \tSelf\ is always~\rT; protocols cannot be nested in other generic contexts (\SecRef{nested nominal types}), nor can they declare any other generic parameters.
 
-The \texttt{associatedtype} keyword introduces an \IndexDefinition{associated type declaration}\emph{associated type declaration}, which can only appear inside of a protocol. The declared interface type is a \index{dependent member type}dependent member type (\SecRef{fundamental types}). Specifically, the declared interface type of an associated type~\texttt{A} in a protocol~\texttt{P} is the \index{bound dependent member type}bound dependent member type denoted \texttt{Self.[P]A}, formed from the base type of~\tSelf\ together with~\texttt{A}. A nominal type conforming to this protocol must declare a type witness for each associated type (\SecRef{type witnesses}). 
+The \texttt{associatedtype} keyword introduces an \IndexDefinition{associated type declaration}\emph{associated type declaration}, which can only appear inside of a protocol. The declared interface type is a \index{dependent member type!associated type declaration}dependent member type (\SecRef{fundamental types}). Specifically, the \index{declared interface type!associated type declaration}declared interface type of an associated type~\texttt{A} in a protocol~\texttt{P} is the \index{bound dependent member type!associated type declaration}bound dependent member type denoted \texttt{Self.[P]A}, formed from the base type of~\tSelf\ together with~\texttt{A}. A nominal type conforming to this protocol must declare a type witness for each associated type (\SecRef{type witnesses}). 
 
 Protocols can also state \IndexDefinition{associated requirement}\emph{associated requirements} on their \tSelf\ type and its dependent member types. The conforming type and its type witnesses must satisfy the protocol's associated requirements. We will review all the ways of stating associated requirements now.
 
 \paragraph{Protocol inheritance clauses.}
-A protocol can have an \index{inheritance clause!protocol}inheritance clause with a list of one or more comma-separated \index{constraint type!protocol inheritance clause}constraint types. Each inheritance clause entry states an associated requirement with a subject type of \tSelf. These are additional requirements the conforming type itself must satisfy in order to conform.
+A protocol can have an \index{inheritance clause!protocol declaration}inheritance clause with a list of one or more comma-separated \index{constraint type!protocol inheritance clause}constraint types. Each inheritance clause entry states an associated requirement with a subject type of \tSelf. These are additional requirements the conforming type itself must satisfy in order to conform.
 
 An associated conformance requirement with a subject type of \tSelf\ establishes a \index{protocol inheritance|see{inherited protocol}}\IndexDefinition{inherited protocol}\emph{protocol inheritance} relationship. The protocol stating the requirement is the \emph{derived protocol}, and the protocol on the right-hand side is the \emph{base protocol}. The derived protocol is said to \emph{inherit} from (or sometimes, \emph{refine}) the base protocol. A \index{qualified lookup!protocol inheritance}qualified lookup will search through all base protocols, when the lookup begins at a derived protocol or one of its concrete conforming types.
 
@@ -376,7 +376,7 @@ class Animal {}
 protocol Duck: Animal {}
 class MockDuck: Plant, Duck {}  // error: not a subclass of Animal
 \end{Verbatim}
-A protocol is \IndexDefinition{class-constrained protocol}\emph{class-constrained} if the $\ConfReq{Self}{AnyObject}$ associated requirement is either explicitly stated, or a consequence of some other associated requirement. We'll say more about the semantics of protocol inheritance clauses and name lookup in \SecRef{requirement sig}, \SecRef{identtyperepr}, and \ChapRef{building generic signatures}.
+A protocol is \IndexDefinition{class-constrained protocol}\emph{class-constrained} if the $\ConfReq{Self}{AnyObject}$ \index{associated layout requirement}associated layout requirement is either explicitly stated, or a consequence of some other associated requirement. We'll say more about the semantics of protocol inheritance clauses and name lookup in \SecRef{requirement sig}, \SecRef{identtyperepr}, and \ChapRef{building generic signatures}.
 
 \paragraph{Primary associated types.}
 A protocol can declare a list of \IndexDefinition{primary associated type}\emph{primary associated types} with a syntax resembling that of a generic parameter list:
@@ -398,12 +398,12 @@ func sumOfSquares<I>(_: I) -> Int
 More details appear in \SecRef{requirement desugaring}. Parameterized protocol types and primary associated types were added to the language in \IndexSwift{5.7}Swift~5.7~\cite{se0346}. 
 
 \paragraph{Associated requirements.}
-An associated type declaration can have an \index{inheritance clause!associated type}inheritance clause, consisting of one or more comma-separated constraint types. Each entry defines a requirement on the declared interface type of the associated type declaration, so we get $\ConfReq{Self.Data}{Codable}$ and $\ConfReq{Self.Data}{Hashable}$ below:
+An associated type declaration can have an \IndexDefinition{inheritance clause!associated type declaration}inheritance clause, consisting of one or more comma-separated constraint types. Each entry defines a requirement on the declared interface type of the associated type declaration, so we get $\ConfReq{Self.Data}{Codable}$ and $\ConfReq{Self.Data}{Hashable}$ below:
 \begin{Verbatim}
 associatedtype Data: Codable, Hashable
 \end{Verbatim}
 
-An associated type declaration can also have a trailing \Index{where clause@\texttt{where} clause}\texttt{where} clause, which allows associated requirements to be stated in full generality. The standard library \texttt{Sequence} protocol showcases both primary associated types, and associated requirements:
+An associated type declaration can also have a trailing \Index{where clause@\texttt{where} clause!associated type declaration}\texttt{where} clause, which allows associated requirements to be stated in full generality. The standard library \texttt{Sequence} protocol showcases both primary associated types, and associated requirements:
 \begin{Verbatim}
 protocol Sequence<Element> {
   associatedtype Iterator: IteratorProtocol
@@ -416,7 +416,7 @@ The associated conformance requirement on \texttt{Self.Iterator} could have been
 \begin{Verbatim}
 associatedtype Iterator where Iterator: IteratorProtocol
 \end{Verbatim}
-A \texttt{where} clause can also be attached to the protocol itself; there is no semantic difference between that and attaching it to an associated type declaration:
+A \Index{where clause@\texttt{where} clause!protocol declaration}\texttt{where} clause can also be attached to the protocol itself; there is no semantic difference between that and attaching it to an associated type declaration:
 \begin{Verbatim}
 protocol Sequence where Iterator: IteratorProtocol,
                         Element == Iterator.Element {...}
@@ -436,13 +436,13 @@ Let's summarize all the ways of stating associated requirements in a protocol~\t
 \begin{itemize}
 \item The protocol can state an inheritance clause. Each entry defines a conformance, superclass or layout requirement with a subject type of \tSelf.
 \item An associated type declaration \texttt{A} can state an inheritance clause. Each entry defines a conformance, superclass or layout requirement with a subject type of \texttt{Self.[P]A}.
-\item Arbitrary associated requirements can be stated in \Index{where clause@\texttt{where} clause}trailing \texttt{where} clauses, attached to the protocol or any of its associated types, in any combination.
+\item Arbitrary associated requirements can be stated in \Index{where clause@\texttt{where} clause!protocol declaration}trailing \texttt{where} clauses, attached to the protocol or any of its associated types, in any combination.
 \end{itemize}
 
 A protocol's associated requirements are collected in its requirement signature, which we will see is dual to a generic signature in some sense (\SecRef{requirement sig}). How concrete types satisfy the requirement signature will be discussed in \ChapRef{conformances}.
 
 \paragraph{Self requirements.}
-The \Index{where clause@\texttt{where} clause}\texttt{where} clause of a protocol method or subscript requirement cannot constrain \tSelf\ or its associated types. For example, the following protocol is rejected, because there would be no way to implement the \texttt{minElement()} requirement in a concrete conforming type whose \texttt{Element} type is \emph{not} \texttt{Comparable}:
+The \Index{where clause@\texttt{where} clause!protocol declaration}\texttt{where} clause of a protocol method or subscript requirement cannot constrain \tSelf\ or its associated types. For example, the following protocol is rejected, because there would be no way to implement the \texttt{minElement()} requirement in a concrete conforming type whose \texttt{Element} type is \emph{not} \texttt{Comparable}:
 \begin{Verbatim}
 protocol SetProtocol {
   associatedtype Element  // we want `where Element: Comparable' here
@@ -1086,7 +1086,7 @@ A generic parameter declaration.
 \item \texttt{getDeclaredInterfaceType()} returns the \IndexSource{sugared type}sugared generic parameter type for this declaration, which prints as the generic parameter's name.
 \item \texttt{isOpaque()} answers if this generic parameter is associated with an \IndexSource{opaque parameter}opaque parameter.
 \item \texttt{getOpaqueTypeRepr()} returns the associated \texttt{OpaqueReturnTypeRepr} if this is an opaque parameter, otherwise \texttt{nullptr}.
-\item \texttt{getInherited()} returns the generic parameter declaration's \IndexSource{inheritance clause}inheritance clause.
+\item \texttt{getInherited()} returns the generic parameter declaration's \IndexSource{inheritance clause!generic parameter declaration}inheritance clause.
 \end{itemize}
 
 Inheritance clauses are not preserved in serialized generic parameter declarations. Requirements stated on generic parameter declarations are part of the corresponding generic context's generic signature, so except when actually building the generic signature, most code uses \texttt{GenericContext::getGenericSignature()} instead (\SecRef{genericsigsourceref}).
@@ -1140,28 +1140,26 @@ Request which can be evaluated to resolve a single requirement representation in
 \apiref{ProtocolDecl}{class}
 A protocol declaration.
 \begin{itemize}
-\item \texttt{getTrailingWhereClause()} returns the protocol \texttt{where} clause, or \texttt{nullptr}.
-\item \texttt{getAssociatedTypes()} returns an array of all associated type declarations in the protocol.
-\item \texttt{getPrimaryAssociatedTypes()} returns an array of all primary associated type declarations in the protocol.
-\item \texttt{getInherited()} returns the parsed inheritance clause.
+\item \texttt{getTrailingWhereClause()} returns this protocol \IndexSource{where clause@\texttt{where} clause!protocol declaration}\texttt{where} clause, or \texttt{nullptr}.
+\item \texttt{getAssociatedTypes()} returns an array of all associated type declarations in this protocol.
+\item \texttt{getPrimaryAssociatedTypes()} returns an array of all primary associated type declarations in this protocol.
+\item \texttt{getInherited()} returns this protocol's \IndexSource{inheritance clause!protocol declaration}inheritance clause.
 \end{itemize}
 
 Trailing \texttt{where} clauses and inheritance clauses are not preserved in serialized protocol declarations. Except when actually building the requirement signature, most code uses \texttt{ProtocolDecl::getRequirementSignature()} instead (\SecRef{genericsigsourceref}).
 
-\IndexSource{inherited protocol}
 The last four utility methods operate on the requirement signature, so are safe to use on deserialized protocols:
 \begin{itemize}
-\item \texttt{getInheritedProtocols()} returns an array of all protocols directly inherited by this protocol, computed from the inheritance clause.
+\item \texttt{getInheritedProtocols()} returns an array of all protocols directly \IndexSource{inherited protocol}inherited by this protocol, computed from the inheritance clause.
 \item \texttt{inheritsFrom()} determines if this protocol inherits from the given protocol, possibly transitively.
 \item \texttt{getSuperclassDecl()} returns the protocol's superclass declaration.
 \end{itemize}
 
-\index{associated type declaration}
 \apiref{AssociatedTypeDecl}{class}
-An associated type declaration.
+An \IndexSource{associated type declaration}associated type declaration.
 \begin{itemize}
-\item \texttt{getTrailingWhereClause()} returns the associated type's trailing \texttt{where} clause, or \texttt{nullptr}.
-\item \texttt{getInherited()} returns the associated type's inheritance clause.
+\item \texttt{getTrailingWhereClause()} returns this associated type's trailing \IndexSource{where clause@\texttt{where} clause!associated type declaration}\texttt{where} clause, or \texttt{nullptr}.
+\item \texttt{getInherited()} returns this associated type's \IndexSource{inheritance clause!associated type declaration}inheritance clause.
 \end{itemize}
 
 Trailing \texttt{where} clauses and inheritance clauses are not preserved in serialized associated type declarations. Requirements on associated types are part of a protocol's requirement signature, so except when actually building the requirement signature, most code uses \texttt{ProtocolDecl::getRequirementSignature()} instead (\SecRef{genericsigsourceref}).

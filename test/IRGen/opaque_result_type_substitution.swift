@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-type-layout -enable-library-evolution -disable-availability-checking -emit-ir -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-type-layout -enable-library-evolution -target %target-swift-5.1-abi-triple -emit-ir -primary-file %s | %FileCheck %s
 
 public protocol E {}
 

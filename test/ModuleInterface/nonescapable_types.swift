@@ -3,6 +3,8 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name Test
 // RUN: %FileCheck %s < %t.swiftinterface
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 // CHECK: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK: public protocol P : ~Escapable {
 // CHECK:   associatedtype A
@@ -79,10 +81,12 @@ public func derive<T : ~Escapable>(_ y: Y<T>) -> Y<T> {
 }
 
 // CHECK: #if compiler(>=5.3) && $NonescapableTypes
-// CHECK: public func derive<T>(_ x: Test.X<T>) -> dependsOn(x) Test.X<T> where T : ~Escapable
+// CHECK: @lifetime(x)
+// CHECK: public func derive<T>(_ x: Test.X<T>) -> Test.X<T> where T : ~Escapable
 // CHECK: #else
 // CHECK: public func derive<T>(_ x: Test.X<T>) -> Test.X<T>
 // CHECK: #endif
-public func derive<T : ~Escapable>(_ x: X<T>) -> dependsOn(x) X<T> {
+@lifetime(x)
+public func derive<T : ~Escapable>(_ x: X<T>) -> X<T> {
   x
 }

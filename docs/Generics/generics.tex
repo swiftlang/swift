@@ -100,15 +100,15 @@
 \tikzstyle{stage}=[rounded corners, draw=darkgray, thick, fill=lightgray, text centered, outer sep=0.2em]
 \tikzstyle{data}=[draw=darkgray, thick, fill=light-gray, text centered, outer sep=0.2em]
 \tikzstyle{arrow}=[->,>=stealth]
-\tikzstyle{genericenv}=[inner sep=12pt, rounded corners, draw=gray, very thick]
-\tikzstyle{genericenvlabel}=[fill=white, draw=gray, very thick, rounded corners]
+\tikzstyle{genericenv}=[inner sep=12pt, rounded corners, draw=black, very thick]
+\tikzstyle{genericenvlabel}=[fill=white, draw=black, very thick, rounded corners]
 \tikzstyle{genericenvmatrix}=[matrix, row sep=3pt, column sep=5pt]
 \tikzstyle{genericenvpart}=[rounded corners, fill=light-gray]
 \tikzstyle{abstractvertex}=[circle, fill=gray, outer sep=0.1em]
 \tikzstyle{abstractvertex2}=[circle, fill=lightgray, outer sep=0.1em]
 \tikzstyle{SourceFile}=[draw=black,thick,fill=lightgray, outer sep=0.2em]
 \tikzstyle{decl}=[draw=black,thick, outer sep=0.2em]
-\tikzstyle{type}=[rounded corners,draw=black,thick,fill=lighter-gray, outer sep=0.2em]
+\tikzstyle{type}=[rounded corners,draw=black,thick,fill=lighter-gray,outer sep=0.2em]
 \tikzstyle{OtherEntity}=[draw=black,thick,fill=lighter-gray, outer sep=0.2em]
 
 % \DeclareMathOperator, \boxed, etc
@@ -142,8 +142,11 @@
 % Text flowing around figures
 \usepackage{wrapfig}
 
-% Set up hyperref link colors
+% Set up hyperref link colors.
 \hypersetup{linkcolor=[rgb]{0,0.2,0.6},citecolor=[rgb]{0.5,0,0.5},urlcolor=[rgb]{0,0.4,0.2}}
+
+% For printing in black and white:
+%\hypersetup{linkcolor=[rgb]{0,0,0},citecolor=[rgb]{0,0,0},urlcolor=[rgb]{0,0,0}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Environments
@@ -182,6 +185,15 @@
 
 % Derived requirements
 \newenvironment{derivation}{\begin{gather*}}{\end{gather*}}
+
+% Generic environments in Archetypes
+
+\newenvironment{tightcenter}{%
+\setlength\topsep{2pt}%
+\setlength\parskip{0pt}\begin{center}%
+}{%
+\end{center}%
+}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Macros
@@ -229,9 +241,49 @@
 % Request evalator requests
 \newcommand{\Request}[1]{\textbf{#1}}
 
-% Derived requirements and type substitution notation
+% Generic parameters
+\newcommand{\ttgp}[2]{\texttt{$\uptau$\char`_#1\char`_#2}}
+\newcommand{\rT}{\ttgp{0}{0}}
+\newcommand{\rU}{\ttgp{0}{1}}
+\newcommand{\rV}{\ttgp{0}{2}}
+
+% Identifiers
+\newcommand{\tT}{\texttt{T}}
+\newcommand{\tU}{\texttt{U}}
+\newcommand{\tV}{\texttt{V}}
+\newcommand{\tP}{\texttt{P}}
+\newcommand{\tQ}{\texttt{Q}}
+\newcommand{\tR}{\texttt{R}}
+\newcommand{\tX}{\texttt{X}}
+\newcommand{\tY}{\texttt{Y}}
+\newcommand{\tC}{\texttt{C}}
+\newcommand{\tSelf}{\texttt{Self}}
+\newcommand{\tCollection}{\texttt{Collection}}
+\newcommand{\tSequence}{\texttt{Sequence}}
+\newcommand{\tIterator}{\texttt{IteratorProtocol}}
+\newcommand{\tInt}{\texttt{Int}}
+
+\newcommand{\nA}{\texttt{A}}
+\newcommand{\nB}{\texttt{B}}
+\newcommand{\nC}{\texttt{C}}
+\newcommand{\nElement}{\texttt{Element}}
+\newcommand{\nIterator}{\texttt{Iterator}}
+
+% Declared interface type
+\newcommand{\tXd}{\texttt{X}_d}
+
+% Protocol generic signature
+\newcommand{\GP}{G_\tP}
+
+%%%
+% Derived requirements
+%%%
+
 \newcommand{\SameReq}[2]{[\texttt{#1 == #2}]}
 \newcommand{\ConfReq}[2]{[\texttt{#1:~#2}]}
+
+\newcommand{\AssocSameReq}[3]{\SameReq{#1}{#2}_{\texttt{#3}}}
+\newcommand{\AssocConfReq}[3]{\ConfReq{#1}{#2}_{\texttt{#3}}}
 
 \newcommand{\TP}{\ConfReq{T}{P}}
 \newcommand{\TC}{\ConfReq{T}{C}}
@@ -239,11 +291,11 @@
 \newcommand{\TU}{\SameReq{T}{U}}
 \newcommand{\TX}{\SameReq{T}{X}}
 
-\newcommand{\AssocSameReq}[3]{\SameReq{#1}{#2}_{\texttt{#3}}}
-\newcommand{\AssocConfReq}[3]{\ConfReq{#1}{#2}_{\texttt{#3}}}
+\newcommand{\Tprime}{\texttt{T}^\prime}
+\newcommand{\Xprime}{\texttt{X}^\prime}
+\newcommand{\Cprime}{\texttt{C}^\prime}
 
-\newcommand{\GP}{G_\tP}
-
+% Derivation step definitions for induction proofs and Appendix B
 \newcommand{\GenericStepDef}{\ttgp{d}{i}\tag{\textsc{Generic}}}
 
 \newcommand{\ConfStepDef}{\TP\tag{\textsc{Conf}}}
@@ -274,6 +326,7 @@
 \newcommand{\SameNameStepDef}{\SameReq{T.A}{U.A}\tag{\textsc{SameName} $\ConfReq{U}{P}$ $\TU$}}
 \newcommand{\SameDeclStepDef}{\SameReq{T.[P]A}{U.[P]A}\tag{\textsc{SameDecl} $\ConfReq{U}{P}$ $\TU$}}
 
+% Derivation steps in concrete derivations
 \newcommand{\AnyStep}[2]{{#2}.\ #1\tag{$\ldots$}}
 
 \newcommand{\GenericStep}[2]{{#2}.\ \texttt{#1}\tag{\textsc{Generic}}}
@@ -301,9 +354,24 @@
 \newcommand{\SameNameStep}[5]{{#5}.\ \SameReq{#3}{#4}\tag{\textsc{SameName} {#1} {#2}}}
 \newcommand{\SameDeclStep}[5]{{#5}.\ \SameReq{#3}{#4}\tag{\textsc{SameDecl} {#1} {#2}}}
 
-\newcommand{\Tprime}{\texttt{T}^\prime}
-\newcommand{\Xprime}{\texttt{X}^\prime}
-\newcommand{\Cprime}{\texttt{C}^\prime}
+%%%
+% Generic signature queries
+%%%
+
+\newcommand{\Query}[2]{\texttt{#1}(#2)}
+\newcommand{\QueryDef}[5]{
+\item \textbf{Query:} \IndexQueryDef{#1}$\texttt{#1}(#2)$
+
+\textbf{Input:} #3
+
+\textbf{Output:} #4
+
+#5
+}
+
+%%%
+% Type substitution algebra
+%%%
 
 \newcommand{\SubstMap}[1]{\{#1\}}
 \newcommand{\SubstMapC}[2]{\{#1;\,#2\}}
@@ -311,15 +379,34 @@
 \newcommand{\SubstType}[2]{\texttt{#1} \mapsto \texttt{#2}}
 \newcommand{\SubstConf}[3]{\ConfReq{#1}{#3} \mapsto \ConfReq{#2}{#3}}
 
-\newcommand{\SubstMapLong}[1]{\left\{\begin{array}{l}#1\end{array}\right\}}
-\newcommand{\SubstMapLongC}[2]{\left\{\begin{array}{l}#1;\\[\medskipamount] #2\end{array}\right\}}
+\newcommand{\SubMapInt}{\SubstMap{\SubstType{\rT}{Int}}}
 
-\newcommand{\ProtoObj}{\textsc{Proto}}
+% Protocols
+\newcommand{\Proto}[1]{\langle\texttt{#1}]}
+\newcommand{\PP}{\Proto{P}}
+\newcommand{\PQ}{\Proto{Q}}
 
-\newcommand{\AssocType}[1]{\pi(\texttt{#1})}
-\newcommand{\AssocConf}[2]{\pi(\texttt{#1:~#2})}
+% Conformances
+\newcommand{\XP}{\ConfReq{X}{P}}
+\newcommand{\NormalConf}{\ConfReq{$\tXd$}{P}}
+\newcommand{\ArraySequence}{\ConfReq{Array<\rT>}{Sequence}}
+\newcommand{\ArrayCollection}{\ConfReq{Array<\rT>}{Collection}}
+\newcommand{\ArrayIntSequence}{\ConfReq{Array<Int>}{Sequence}}
+\newcommand{\ArrayIntCollection}{\ConfReq{Array<Int>}{Collection}}
+
+\newcommand{\AssocType}[2]{\langle\texttt{#1}|\texttt{#2}}
+\newcommand{\AssocConf}[2]{\langle\texttt{#1:~#2}]}
+
+\newcommand{\PSequence}{\Proto{Sequence}}
+\newcommand{\PIterator}{\Proto{IteratorProtocol}}
+\newcommand{\AElement}{\AssocType{Sequence}{Element}}
+\newcommand{\AIElement}{\AssocType{IteratorProtocol}{Element}}
+\newcommand{\AIterator}{\AssocType{Sequence}{Iterator}}
+\newcommand{\APA}{\AssocType{P}{A}}
+\newcommand{\SelfUQ}{\AssocConf{Self.U}{Q}}
 
 \newcommand{\SigObj}{\textsc{Sig}}
+\newcommand{\ProtoObj}{\textsc{Proto}}
 \newcommand{\TypeObj}[1]{\textsc{Type}({#1})}
 \newcommand{\SubMapObj}[2]{\textsc{Sub}({#1, #2})}
 \newcommand{\ReqObj}[1]{\textsc{Req}({#1})}
@@ -328,32 +415,31 @@
 \newcommand{\AssocTypeObj}[1]{\textsc{AssocType}_{\texttt{#1}}}
 \newcommand{\AssocConfObj}[1]{\textsc{AssocConf}_{\texttt{#1}}}
 
-\newcommand{\ttgp}[2]{\texttt{$\uptau$\char`_#1\char`_#2}}
-\newcommand{\rT}{\ttgp{0}{0}}
-\newcommand{\rU}{\ttgp{0}{1}}
-\newcommand{\rV}{\ttgp{0}{2}}
+% Archetypes print [[like this]]. Must be in math mode
+\newcommand{\archetype}[1]{[\![\texttt{#1}]\!]}
 
-\newcommand{\tT}{\texttt{T}}
-\newcommand{\tU}{\texttt{U}}
-\newcommand{\tV}{\texttt{V}}
-\newcommand{\tP}{\texttt{P}}
-\newcommand{\tQ}{\texttt{Q}}
-\newcommand{\tR}{\texttt{R}}
-\newcommand{\tCollection}{\texttt{Collection}}
-\newcommand{\tSequence}{\texttt{Sequence}}
+% Generic environment operations
+\newcommand{\MapIn}{\mathsf{in}_G}
+\newcommand{\MapOut}{\mathsf{out}_G}
 
-\newcommand{\tSelf}{\texttt{Self}}
+%%%
+% Monoids, etc
+%%%
 
-% Monoids etc
 \newcommand{\Pres}[2]{\langle #1\,|\,#2\rangle}
 \newcommand{\AR}{\Pres{A}{R}}
 \newcommand{\PhiInv}{\varphi^{-1}}
-\newcommand{\BaseCase}{\smallskip\par\emph{Base case.}\ }
-\newcommand{\InductiveStep}{\smallskip\par\emph{Inductive step.}\ }
 \newcommand{\NN}{\mathbb{N}}
 
 \newcommand{\WL}{\triangleleft}
 \newcommand{\WR}{\triangleright}
+
+% Requirement Machine
+\newcommand{\protosym}[1]{[\texttt{#1}]}
+\newcommand{\assocsym}[2]{[\texttt{#1}|\texttt{#2}]}
+\newcommand{\layoutsym}[1]{[\mathsf{layout}\colon\texttt{#1}]}
+\newcommand{\supersym}[1]{[\mathsf{superclass}\colon #1]}
+\newcommand{\concretesym}[1]{[\mathsf{concrete}\colon #1]}
 
 \newcommand{\Term}{\mathsf{term}}
 \newcommand{\Rule}{\mathsf{rule}}
@@ -362,12 +448,6 @@
 \newcommand{\RuleP}[1]{\mathsf{rule}_{\texttt{#1}}}
 
 \newcommand{\Type}{\mathsf{type}}
-
-\newcommand{\nA}{\texttt{A}}
-\newcommand{\nB}{\texttt{B}}
-\newcommand{\nC}{\texttt{C}}
-\newcommand{\nElement}{\texttt{Element}}
-\newcommand{\nIterator}{\texttt{Iterator}}
 
 \newcommand{\pP}{\protosym{P}}
 \newcommand{\pQ}{\protosym{Q}}
@@ -383,37 +463,31 @@
 \newcommand{\pSequence}{\protosym{Sequence}}
 \newcommand{\pCollection}{\protosym{Collection}}
 \newcommand{\pIterator}{\protosym{IteratorProtocol}}
+\newcommand{\pEquatable}{\protosym{Equatable}}
+\newcommand{\pComparable}{\protosym{Comparable}}
 
 \newcommand{\ConfRule}[2]{#1 \cdot #2 \sim #1}
 \newcommand{\SameRule}[2]{#1 \sim #2}
+\newcommand{\AssocRule}[2]{\protosym{#1}\cdot\texttt{#2} \sim \assocsym{#1}{#2}}
+
+\newcommand{\CRule}[1]{$\diamond\, #1$}
+
+%%%
+% Math helpers
+%%%
+\newcommand{\BaseCase}{\smallskip\par\emph{Base case.}\ }
+\newcommand{\InductiveStep}{\smallskip\par\emph{Inductive step.}\ }
 
 \newcommand{\Tight}{\hspace{-0.08em}}
 
-% Used in `Generic Signature Queries' section
-\newcommand{\Query}[2]{\texttt{#1}(#2)}
+\newcommand{\EquivClass}[1]{[\![#1]\!]}
 
-\newcommand{\QueryDef}[5]{
-\item \textbf{Query:} \IndexQueryDef{#1}$\texttt{#1}(#2)$
+\DeclareMathOperator{\Src}{src}
+\DeclareMathOperator{\Dst}{dst}
 
-\textbf{Input:} #3
-
-\textbf{Output:} #4
-
-#5
-}
 % Old substitution algebra notation
 \newcommand{\mathboxed}[1]{\boxed{\mbox{\vphantom{pI\texttt{pI}}#1}}}
 \newcommand{\ttbox}[1]{\boxed{\mbox{\vphantom{pI\texttt{pI}}\texttt{#1}}}}
-
-% Archetypes print [[like this]]. Must be in math mode
-\newcommand{\archetype}[1]{[\![\texttt{#1}]\!]}
-
-% Generic environment operations
-\newcommand{\MapIn}{\mathsf{in}_G}
-\newcommand{\MapOut}{\mathsf{out}_G}
-
-% Equivalence class notation for math
-\newcommand{\EquivClass}[1]{[\![#1]\!]}
 
 % GitHub links in 'Source Code Reference' sections
 \newcommand{\SourceFile}[1]{\href{https://github.com/swiftlang/swift/tree/main/#1}{\texttt{#1}}}
@@ -421,30 +495,6 @@
 % Note: \apiref{foo}{bar} must be followed by a newline, because of a quirk with \noindent
 \def\apiref#1#2
 {\bigskip\hrule\nobreak\vskip 3pt\noindent\texttt{\vphantom{p}#1}\hfill\textsl{#2}\par\nobreak\vskip 3pt\hrule\vskip 3pt\noindent}
-
-% Requirement Machine symbols
-\newcommand{\proto}[1]{\texttt{#1}}
-\newcommand{\protosym}[1]{[\texttt{#1}]}
-\newcommand{\assocsym}[2]{[\texttt{#1}|\texttt{#2}]}
-\newcommand{\layoutsym}[1]{[\mathsf{layout}\colon\texttt{#1}]}
-\newcommand{\supersym}[1]{[\mathsf{superclass}\colon #1]}
-\newcommand{\concretesym}[1]{[\mathsf{concrete}\colon #1]}
-
-\DeclareMathOperator{\Src}{src}
-\DeclareMathOperator{\Dst}{dst}
-
-%%%%
-% Remove these
-%%%%
-\usepackage{bm}
-\newcommand{\namesym}[1]{\mathrm{#1}}
-\newcommand{\genericparam}[1]{\bm{\mathsf{#1}}}
-\newcommand{\gensig}[2]{\langle #1\;\textit{where}\;#2\rangle}
-\newcommand{\genericsym}[2]{\bm{\uptau}_{#1,#2}}
-\DeclareMathOperator{\gpdepth}{depth}
-\DeclareMathOperator{\gpindex}{index}
-\DeclareMathOperator{\domain}{domain}
-%%%%%
 
 % Type parameter and conformance path graph
 \tikzstyle{root} = [rounded corners, fill=lightgray, outer sep=0.1em]
@@ -488,6 +538,8 @@
 % Index
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\indexsetup{othercode=\footnotesize}
+
 % We have a main index and one for command line flags.
 
 % generics.ist configures letter headings in the index.
@@ -527,7 +579,7 @@
 \newcommand{\IndexQuerySource}[1]{\IndexSource{#1()@$\texttt{#1}()$}}
 \newcommand{\IndexQuery}[1]{\Index{#1()@$\texttt{#1}()$}}
 
-\newcommand{\IndexSelf}{\Index{protocol Self type@protocol \texttt{Self} type}}
+\newcommand{\IndexSelf}{\Index{protocol Self type@protocol \tSelf\ type}}
 
 % Normally a seealso index entry elides the page number, but sometimes we want index entries that look like this:
 %
@@ -560,12 +612,6 @@
 % Let's Go!
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Add a PDF bookmark for the Preface
-\cleardoublepage
-\pdfbookmark{Preface}{preface}
-
-\subfile{chapters/preface}
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Table of Contents
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -583,6 +629,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % The Good Stuff
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subfile{chapters/preface}
 
 \part{Syntax}\label{part syntax}
 
@@ -604,9 +652,9 @@
 
 \subfile{chapters/archetypes}
 
-\part{Specialties}\label{part specialties}
-
 \subfile{chapters/type-resolution}
+
+\part{Specialties}\label{part specialties}
 
 \subfile{chapters/extensions}
 
@@ -614,13 +662,9 @@
 
 \subfile{chapters/conformance-paths}
 
-\part[]{Supplements}\label{part supplements}
-
 \subfile{chapters/opaque-return-types}
 
 \subfile{chapters/existential-types}
-
-\subfile{chapters/class-inheritance}
 
 \part{The Requirement Machine}\label{part rqm}
 
@@ -636,7 +680,7 @@
 
 \subfile{chapters/concrete-conformances}
 
-\subfile{chapters/rewrite-system-minimization}
+\subfile{chapters/rule-minimization}
 
 % Move subsequent PDF bookmarks to the top level since the Appendix, Bibliography and Index are not logically contained in Part V
 \bookmarksetup{startatroot}

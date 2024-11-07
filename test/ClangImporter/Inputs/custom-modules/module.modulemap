@@ -113,8 +113,8 @@ module ImportAsMember {
   }
 }
 
-// FIXME: This probably ought to be in a module_private.map, but that causes
-// hundreds of clang warnings.
+// FIXME: This probably ought to be in a module.private.modulemap, but that
+// causes hundreds of clang warnings.
 module ImportAsMember_Private {
   export *
 

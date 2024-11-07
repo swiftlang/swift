@@ -693,18 +693,20 @@ protected:
       return failTransform(forEachStmt);
 
     SmallVector<ASTNode, 4> doBody;
+    SourceLoc startLoc = forEachStmt->getStartLoc();
     SourceLoc endLoc = forEachStmt->getEndLoc();
 
     // Build a variable that is going to hold array of results produced
-    // by each iteration of the loop.
+    // by each iteration of the loop. Note we need to give it the start loc of
+    // the for loop to ensure the implicit 'do' has a correct source range.
     //
     // Not that it's not going to be initialized here, that would happen
     // only when a solution is found.
     VarDecl *arrayVar = buildPlaceholderVar(
-        forEachStmt->getEndLoc(), doBody,
+        startLoc, doBody,
         ArraySliceType::get(PlaceholderType::get(ctx, forEachVar.get())),
-        ArrayExpr::create(ctx, /*LBrace=*/endLoc, /*Elements=*/{},
-                          /*Commas=*/{}, /*RBrace=*/endLoc));
+        ArrayExpr::create(ctx, /*LBrace=*/startLoc, /*Elements=*/{},
+                          /*Commas=*/{}, /*RBrace=*/startLoc));
 
     NullablePtr<Expr> bodyVarRef;
     std::optional<UnsupportedElt> unsupported;
@@ -918,13 +920,13 @@ std::optional<BraceStmt *>
 TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // First look for any return statements, and bail if we have any.
   auto &ctx = func->getASTContext();
-  if (evaluateOrDefault(ctx.evaluator, BraceHasReturnRequest{func->getBody()},
-                        false)) {
+
+  SmallVector<ReturnStmt *> returnStmts;
+  func->getExplicitReturnStmts(returnStmts);
+
+  if (!returnStmts.empty()) {
     // One or more explicit 'return' statements were encountered, which
     // disables the result builder transform. Warn when we do this.
-    auto returnStmts = findReturnStatements(func);
-    assert(!returnStmts.empty());
-
     ctx.Diags.diagnose(
         returnStmts.front()->getReturnLoc(),
         diag::result_builder_disabled_by_return_warn, builderType);
@@ -1082,7 +1084,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   }
 
   // FIXME: Shouldn't need to do this.
-  cs.applySolution(solutions.front());
+  cs.replaySolution(solutions.front());
 
   // Apply the solution to the function body.
   if (auto result = cs.applySolution(solutions.front(), target)) {
@@ -1126,8 +1128,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   // not apply the result builder transform if it contained an explicit return.
   // To maintain source compatibility, we still need to check for HasReturnStmt.
   // https://github.com/apple/swift/issues/64332.
-  if (evaluateOrDefault(getASTContext().evaluator,
-                        BraceHasReturnRequest{fn.getBody()}, false)) {
+  if (fn.bodyHasExplicitReturnStmt()) {
     // Diagnostic mode means that solver couldn't reach any viable
     // solution, so let's diagnose presence of a `return` statement
     // in the closure body.
@@ -1211,15 +1212,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   transformInfo.transformedBody = transformedBody->second;
 
   // Record the transformation.
-  assert(
-      std::find_if(
-          resultBuilderTransformed.begin(), resultBuilderTransformed.end(),
-          [&](const std::pair<AnyFunctionRef, AppliedBuilderTransform> &elt) {
-            return elt.first == fn;
-          }) == resultBuilderTransformed.end() &&
-      "already transformed this body along this path!?!");
-  resultBuilderTransformed.insert(
-      std::make_pair(fn, std::move(transformInfo)));
+  recordResultBuilderTransform(fn, std::move(transformInfo));
 
   if (generateConstraints(fn, transformInfo.transformedBody))
     return getTypeMatchFailure(locator);
@@ -1227,49 +1220,96 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   return getTypeMatchSuccess();
 }
 
-namespace {
-class ReturnStmtFinder : public ASTWalker {
-  std::vector<ReturnStmt *> ReturnStmts;
+void ConstraintSystem::recordResultBuilderTransform(AnyFunctionRef fn,
+                                          AppliedBuilderTransform transformInfo) {
+  bool inserted = resultBuilderTransformed.insert(
+      std::make_pair(fn, std::move(transformInfo))).second;
+  ASSERT(inserted);
 
-public:
-  static std::vector<ReturnStmt *> find(const BraceStmt *BS) {
-    ReturnStmtFinder finder;
-    const_cast<BraceStmt *>(BS)->walk(finder);
-    return std::move(finder.ReturnStmts);
-  }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Arguments;
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    return Action::SkipNode(E);
-  }
-
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    // If we see a return statement, note it..
-    auto *returnStmt = dyn_cast<ReturnStmt>(S);
-    if (!returnStmt || returnStmt->isImplicit())
-      return Action::Continue(S);
-
-    ReturnStmts.push_back(returnStmt);
-    return Action::SkipNode(S);
-  }
-
-  /// Ignore patterns.
-  PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
-    return Action::SkipNode(pat);
-  }
-};
-} // end anonymous namespace
-
-bool BraceHasReturnRequest::evaluate(Evaluator &evaluator,
-                                     const BraceStmt *BS) const {
-  return !ReturnStmtFinder::find(BS).empty();
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedResultBuilderTransform(fn));
 }
 
-std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
-  return ReturnStmtFinder::find(fn.getBody());
+/// Undo the above change.
+void ConstraintSystem::removeResultBuilderTransform(AnyFunctionRef fn) {
+  bool erased = resultBuilderTransformed.erase(fn);
+  ASSERT(erased);
+}
+
+/// Walks the given brace statement and calls the given function reference on
+/// every occurrence of an explicit `return` statement.
+///
+/// \param callback A function reference that takes a `return` statement and
+/// returns a boolean value indicating whether to abort the walk.
+///
+/// \returns `true` if the walk was aborted, `false` otherwise.
+static bool walkExplicitReturnStmts(const BraceStmt *BS,
+                                    function_ref<bool(ReturnStmt *)> callback) {
+  class Walker : public ASTWalker {
+    function_ref<bool(ReturnStmt *)> callback;
+
+  public:
+    Walker(decltype(Walker::callback) callback) : callback(callback) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      return Action::SkipNode(E);
+    }
+
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      auto *returnStmt = dyn_cast<ReturnStmt>(S);
+      if (!returnStmt || returnStmt->isImplicit()) {
+        return Action::Continue(S);
+      }
+
+      if (callback(returnStmt)) {
+        return Action::Stop();
+      }
+
+      // Skip children & post walk and continue.
+      return Action::SkipNode(S);
+    }
+
+    /// Ignore patterns.
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
+      return Action::SkipNode(pat);
+    }
+  };
+
+  Walker walker(callback);
+
+  return const_cast<BraceStmt *>(BS)->walk(walker) == nullptr;
+}
+
+bool BraceHasExplicitReturnStmtRequest::evaluate(Evaluator &evaluator,
+                                                 const BraceStmt *BS) const {
+  return walkExplicitReturnStmts(BS, [](ReturnStmt *) { return true; });
+}
+
+bool AnyFunctionRef::bodyHasExplicitReturnStmt() const {
+  auto *body = getBody();
+  if (!body) {
+    return false;
+  }
+
+  auto &ctx = getAsDeclContext()->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           BraceHasExplicitReturnStmtRequest{body}, false);
+}
+
+void AnyFunctionRef::getExplicitReturnStmts(
+    SmallVectorImpl<ReturnStmt *> &results) const {
+  if (!bodyHasExplicitReturnStmt()) {
+    return;
+  }
+
+  walkExplicitReturnStmts(getBody(), [&results](ReturnStmt *RS) {
+    results.push_back(RS);
+    return false;
+  });
 }
 
 ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
@@ -1277,12 +1317,8 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
     ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
 
   auto isUnavailable = [&](Decl *D) -> bool {
-    if (AvailableAttr::isUnavailable(D))
-      return true;
-
     auto loc = extractNearestSourceLoc(dc);
-    auto context = ExportContext::forFunctionBody(dc, loc);
-    return TypeChecker::checkDeclarationAvailability(D, context).has_value();
+    return getUnsatisfiedAvailabilityConstraint(D, dc, loc).has_value();
   };
 
   bool foundMatch = false;

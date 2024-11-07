@@ -2026,9 +2026,11 @@ public:
 
 class AllowInvalidRefInKeyPath final : public ConstraintFix {
   enum RefKind {
+    // Allow invalid references to static members i.e. on instance of a type.
+    StaticMember,
     // Allow a reference to a static member as a key path component if it is
     // declared in a module with built with Swift 6.0 compiler version or older.
-    StaticMember,
+    UnsupportedStaticMember,
     // Allow a reference to a declaration with mutating getter as
     // a key path component.
     MutatingGetter,
@@ -2054,7 +2056,10 @@ public:
   std::string getName() const override {
     switch (Kind) {
     case RefKind::StaticMember:
-      return "allow reference to a static member as a key path component";
+      return "allow reference to a static member on invalid base in key path "
+             "context";
+    case RefKind::UnsupportedStaticMember:
+      return "allow unsupported static member reference";
     case RefKind::MutatingGetter:
       return "allow reference to a member with mutating getter as a key "
              "path component";

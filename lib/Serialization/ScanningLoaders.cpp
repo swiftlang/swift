@@ -314,7 +314,7 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenClangModules,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-    InterfaceSubContextDelegate &delegate, llvm::TreePathPrefixMapper *mapper,
+    InterfaceSubContextDelegate &delegate, llvm::PrefixMapper *mapper,
     bool isTestableDependencyLookup) {
   ImportPath::Module::Builder builder(moduleName);
   auto modulePath = builder.get();

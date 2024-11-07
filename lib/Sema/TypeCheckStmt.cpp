@@ -41,7 +41,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TopCollection.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
@@ -1726,23 +1725,6 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
     // 'nil'.
     auto *nilExpr = dyn_cast<NilLiteralExpr>(E->getSemanticsProvidingExpr());
     if (!nilExpr) {
-      if (ctor->hasLifetimeDependentReturn()) {
-        bool isSelf = false;
-        if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
-          isSelf = UDRE->getName().isSimpleName(ctx.Id_self);
-          // Result the result expression so that rest of the compilation
-          // pipeline handles initializers with lifetime dependence specifiers
-          // in the same way as other initializers.
-          RS->setResult(nullptr);
-        }
-        if (!isSelf) {
-          ctx.Diags.diagnose(
-              RS->getStartLoc(),
-              diag::lifetime_dependence_ctor_non_self_or_nil_return);
-          RS->setResult(nullptr);
-        }
-        return RS;
-      }
       ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_init_non_nil)
           .highlight(E->getSourceRange());
       RS->setResult(nullptr);
@@ -2139,20 +2121,6 @@ void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC,
   // any issue for now. But it should be populated nonetheless.
   stmtChecker.LeaveBraceStmtBodyUnchecked = LeaveBodyUnchecked;
   stmtChecker.typeCheckASTNode(node);
-}
-
-static Type getResultBuilderType(FuncDecl *FD) {
-  Type builderType = FD->getResultBuilderType();
-
-  // For getters, fall back on looking on the attribute on the storage.
-  if (!builderType) {
-    auto accessor = dyn_cast<AccessorDecl>(FD);
-    if (accessor && accessor->getAccessorKind() == AccessorKind::Get) {
-      builderType = accessor->getStorage()->getResultBuilderType();
-    }
-  }
-
-  return builderType;
 }
 
 /// Attempts to build an implicit call within the provided constructor
@@ -2634,7 +2602,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
 
   // Function builder function doesn't support partial type checking.
   if (auto *func = dyn_cast<FuncDecl>(DC)) {
-    if (Type builderType = getResultBuilderType(func)) {
+    if (Type builderType = func->getResultBuilderType()) {
       if (func->getBody()) {
         auto optBody =
             TypeChecker::applyResultBuilderBodyTransform(func, builderType);
@@ -2711,7 +2679,7 @@ static void addImplicitReturnIfNeeded(BraceStmt *body, DeclContext *dc) {
 
   if (auto *fd = dyn_cast<FuncDecl>(dc)) {
     // Don't apply if we have a result builder, or a Void return type.
-    if (getResultBuilderType(fd) || fd->getResultInterfaceType()->isVoid())
+    if (fd->getResultBuilderType() || fd->getResultInterfaceType()->isVoid())
       return;
   }
 
@@ -2911,7 +2879,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   // produce a type-checked body.
   bool alreadyTypeChecked = false;
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
-    if (Type builderType = getResultBuilderType(func)) {
+    if (Type builderType = func->getResultBuilderType()) {
       if (auto optBody =
               TypeChecker::applyResultBuilderBodyTransform(
                 func, builderType)) {

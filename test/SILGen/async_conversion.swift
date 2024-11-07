@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking | %FileCheck --implicit-check-not hop_to_executor %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -target %target-swift-5.1-abi-triple | %FileCheck --implicit-check-not hop_to_executor %s
 // REQUIRES: concurrency
 
 func f(_: Int, _: String) -> String? { nil }

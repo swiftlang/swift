@@ -47,7 +47,6 @@ private:
   explicit SerializedSILLoader(
       ASTContext &ctx, SILModule *SILMod,
       DeserializationNotificationHandlerSet *callbacks);
-
 public:
   /// Create a new loader.
   ///

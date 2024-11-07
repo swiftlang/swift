@@ -3,10 +3,12 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -disable-experimental-parser-round-trip
+// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct Span<T>: ~Escapable {
   private var base: UnsafePointer<T>
@@ -18,7 +20,8 @@ struct Span<T>: ~Escapable {
     self.count = count
   }
 
-  init<S>(base: UnsafePointer<T>, count: Int, generic: borrowing S) -> dependsOn(generic) Self {
+  @lifetime(borrow generic)
+  init<S>(base: UnsafePointer<T>, count: Int, generic: borrowing S) {
     self.base = base
     self.count = count
   }

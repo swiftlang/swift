@@ -19,6 +19,7 @@
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -541,7 +542,6 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, VariadicSequenceType*> VariadicSequenceTypes;
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
-    llvm::DenseMap<Type, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
     llvm::DenseMap<Type, InOutType*> InOutTypes;
@@ -593,6 +593,9 @@ struct ASTContext::Implementation {
     /// The set of substitution maps (uniqued by their storage).
     llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
 
+    /// The set of unique AvailabilityContexts (uniqued by their storage).
+    llvm::FoldingSet<AvailabilityContext::Storage> AvailabilityContexts;
+
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
         conformance.~SpecializedProtocolConformance();
@@ -628,7 +631,9 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::FoldingSet<IntegerType> IntegerTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
+  llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
+  llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
@@ -751,7 +756,8 @@ ASTContext *ASTContext::get(
     SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
-    SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    SerializationOptions &serializationOpts, SourceManager &SourceMgr,
+    DiagnosticEngine &Diags,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
@@ -765,8 +771,8 @@ ASTContext *ASTContext::get(
   new (impl) Implementation();
   return new (mem)
       ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
-                 ClangImporterOpts, SymbolGraphOpts, casOpts, SourceMgr, Diags,
-                 std::move(OutputBackend));
+                 ClangImporterOpts, SymbolGraphOpts, casOpts, serializationOpts,
+                 SourceMgr, Diags, std::move(OutputBackend));
 }
 
 ASTContext::ASTContext(
@@ -774,17 +780,19 @@ ASTContext::ASTContext(
     SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
-    SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    SerializationOptions &SerializationOpts, SourceManager &SourceMgr,
+    DiagnosticEngine &Diags,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend)
     : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
-      SymbolGraphOpts(SymbolGraphOpts), CASOpts(casOpts), SourceMgr(SourceMgr),
-      Diags(Diags), OutputBackend(std::move(OutBackend)),
-      evaluator(Diags, langOpts), TheBuiltinModule(createBuiltinModule(*this)),
+      SymbolGraphOpts(SymbolGraphOpts), CASOpts(casOpts),
+      SerializationOpts(SerializationOpts), SourceMgr(SourceMgr), Diags(Diags),
+      OutputBackend(std::move(OutBackend)), evaluator(Diags, langOpts),
+      TheBuiltinModule(createBuiltinModule(*this)),
       StdlibModuleName(getIdentifier(STDLIB_NAME)),
       SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
       blockListConfig(SourceMgr),
-      TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(
+      TheErrorType(new(*this, AllocationArena::Permanent) ErrorType(
           *this, Type(), RecursiveTypeProperties::HasError)),
       TheUnresolvedType(new(*this, AllocationArena::Permanent)
                             UnresolvedType(*this)),
@@ -795,17 +803,17 @@ ASTContext::ASTContext(
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
 #include "swift/AST/TypeNodes.def"
-      TheIEEE32Type(new (*this, AllocationArena::Permanent)
+      TheIEEE32Type(new(*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE32, *this)),
-      TheIEEE64Type(new (*this, AllocationArena::Permanent)
+      TheIEEE64Type(new(*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE64, *this)),
-      TheIEEE16Type(new (*this, AllocationArena::Permanent)
+      TheIEEE16Type(new(*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE16, *this)),
-      TheIEEE80Type(new (*this, AllocationArena::Permanent)
+      TheIEEE80Type(new(*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE80, *this)),
-      TheIEEE128Type(new (*this, AllocationArena::Permanent)
+      TheIEEE128Type(new(*this, AllocationArena::Permanent)
                          BuiltinFloatType(BuiltinFloatType::IEEE128, *this)),
-      ThePPC128Type(new (*this, AllocationArena::Permanent)
+      ThePPC128Type(new(*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::PPC128, *this)) {
 
   // Initialize all of the known identifiers.
@@ -1444,6 +1452,8 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::UnsafeCxxMutableInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
   case KnownProtocolKind::UnsafeCxxMutableRandomAccessIterator:
+  case KnownProtocolKind::UnsafeCxxContiguousIterator:
+  case KnownProtocolKind::UnsafeCxxMutableContiguousIterator:
     M = getLoadedModule(Id_Cxx);
     break;
   case KnownProtocolKind::Copyable:
@@ -3232,7 +3242,6 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(DictionaryTypes) +
     llvm::capacity_in_bytes(OptionalTypes) +
     llvm::capacity_in_bytes(VariadicSequenceTypes) +
-    llvm::capacity_in_bytes(ParenTypes) +
     llvm::capacity_in_bytes(ReferenceStorageTypes) +
     llvm::capacity_in_bytes(LValueTypes) +
     llvm::capacity_in_bytes(InOutTypes) +
@@ -3271,7 +3280,6 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
     SIZE_AND_BYTES(VariadicSequenceTypes);
     SIZE_AND_BYTES(DictionaryTypes);
     SIZE_AND_BYTES(OptionalTypes);
-    SIZE_AND_BYTES(ParenTypes);
     SIZE_AND_BYTES(ReferenceStorageTypes);
     SIZE_AND_BYTES(LValueTypes);
     SIZE_AND_BYTES(InOutTypes);
@@ -3299,6 +3307,7 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
     SIZE_AND_BYTES(BuiltinConformances);
     SIZE(PackConformances);
     SIZE(SubstitutionMaps);
+    SIZE(AvailabilityContexts);
 
 #undef SIZE
 #undef SIZE_AND_BYTES
@@ -3569,6 +3578,38 @@ BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
   return Result;
 }
 
+BuiltinUnboundGenericType *
+BuiltinUnboundGenericType::get(TypeKind genericTypeKind,
+                               const ASTContext &C) {
+  BuiltinUnboundGenericType *&Result
+    = C.getImpl().BuiltinUnboundGenericTypes[unsigned(genericTypeKind)];
+  
+  if (Result == nullptr) {
+    Result = new (C, AllocationArena::Permanent)
+      BuiltinUnboundGenericType(C, genericTypeKind);
+  }
+  return Result;
+}
+
+BuiltinFixedArrayType *BuiltinFixedArrayType::get(CanType Size,
+                                                  CanType ElementType) {
+  llvm::FoldingSetNodeID id;
+  BuiltinFixedArrayType::Profile(id, Size, ElementType);
+  auto &context = Size->getASTContext();
+
+  void *insertPos;
+  if (BuiltinFixedArrayType *vecType
+        = context.getImpl().BuiltinFixedArrayTypes
+                 .FindNodeOrInsertPos(id, insertPos))
+    return vecType;
+
+  BuiltinFixedArrayType *faTy
+    = new (context, AllocationArena::Permanent)
+        BuiltinFixedArrayType(Size, ElementType);
+  context.getImpl().BuiltinFixedArrayTypes.InsertNode(faTy, insertPos);
+  return faTy;
+}
+
 BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
                                           Type elementType,
                                           unsigned numElements) {
@@ -3586,18 +3627,6 @@ BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
        BuiltinVectorType(context, elementType, numElements);
   context.getImpl().BuiltinVectorTypes.InsertNode(vecTy, insertPos);
   return vecTy;
-}
-
-ParenType *ParenType::get(const ASTContext &C, Type underlying) {
-  auto properties = underlying->getRecursiveProperties();
-  auto arena = getArena(properties);
-  ParenType *&Result = C.getImpl().getArena(arena).ParenTypes[underlying];
-  if (Result == nullptr) {
-    Result = new (C, arena) ParenType(underlying, properties);
-    assert((C.hadError() || !underlying->is<InOutType>()) &&
-           "Cannot wrap InOutType");
-  }
-  return Result;
 }
 
 CanTupleType TupleType::getEmpty(const ASTContext &C) {
@@ -4526,7 +4555,7 @@ Type AnyFunctionType::composeTuple(ASTContext &ctx, ArrayRef<Param> params,
     elements.emplace_back(param.getParameterType(), param.getLabel());
   }
   if (elements.size() == 1 && !elements[0].hasName())
-    return ParenType::get(ctx, elements[0].getType());
+    return elements[0].getType();
   return TupleType::get(elements, ctx);
 }
 
@@ -5573,6 +5602,27 @@ SubstitutionMap::Storage *SubstitutionMap::Storage::get(
   auto result = new (mem) Storage(genericSig, replacementTypes, conformances);
   substitutionMaps.InsertNode(result, insertPos);
   return result;
+}
+
+const AvailabilityContext::Storage *
+AvailabilityContext::Storage::get(const PlatformInfo &platformInfo,
+                                  ASTContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  platformInfo.Profile(id);
+
+  auto &foldingSet =
+      ctx.getImpl().getArena(AllocationArena::Permanent).AvailabilityContexts;
+  void *insertPos;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  void *mem = ctx.Allocate(sizeof(AvailabilityContext::Storage),
+                           alignof(AvailabilityContext::Storage));
+  auto *newNode = ::new (mem) AvailabilityContext::Storage(platformInfo);
+  foldingSet.InsertNode(newNode, insertPos);
+
+  return newNode;
 }
 
 void GenericSignatureImpl::Profile(llvm::FoldingSetNodeID &ID,

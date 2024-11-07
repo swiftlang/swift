@@ -10,6 +10,8 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_LayoutStringValueWitnesses
+// REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation
 
 // Requires runtime functions added in Swift 5.9.
 // UNSUPPORTED: use_os_stdlib
@@ -48,3 +50,86 @@ func testNestedResilientObjc() {
 }
 
 testNestedResilientObjc()
+
+protocol P {}
+
+extension ObjCPrintOnDealloc: P {}
+
+enum MultiPayloadObjCExistential {
+    case x(AnyObject)
+    case y(P & ObjCPrintOnDealloc)
+}
+
+struct MultiPayloadObjCExistentialWrapper {
+    let x: MultiPayloadObjCExistential
+    let y: Int = 0
+}
+
+func testMultiPayloadObjCExistentialWrapper() {
+    let ptr = allocateInternalGenericPtr(of: MultiPayloadObjCExistentialWrapper.self)
+
+    do {
+        let x = MultiPayloadObjCExistentialWrapper(x: .y(ObjCPrintOnDealloc()))
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = MultiPayloadObjCExistentialWrapper(x: .y(ObjCPrintOnDealloc()))
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
+    testGenericDestroy(ptr, of: MultiPayloadObjCExistentialWrapper.self)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadObjCExistentialWrapper()
+
+@objc
+class SwiftObjC: NSObject {
+    deinit {
+        print("SwiftObjC deinitialized!")
+    }
+}
+
+enum MultiPayloadNativeSwiftObjC {
+    case x(SwiftObjC)
+    case y(SwiftObjC)
+    case z(SwiftObjC)
+}
+
+func testMultiPayloadNativeSwiftObjC() {
+    let ptr = allocateInternalGenericPtr(of: MultiPayloadNativeSwiftObjC.self)
+
+    do {
+        let x = MultiPayloadNativeSwiftObjC.y(SwiftObjC())
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = MultiPayloadNativeSwiftObjC.z(SwiftObjC())
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SwiftObjC deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SwiftObjC deinitialized!
+    testGenericDestroy(ptr, of: MultiPayloadNativeSwiftObjC.self)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadNativeSwiftObjC()

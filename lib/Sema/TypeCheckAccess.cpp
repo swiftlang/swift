@@ -15,19 +15,20 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckAccess.h"
-#include "TypeChecker.h"
-#include "TypeCheckAvailability.h"
 #include "TypeAccessScopeChecker.h"
+#include "TypeCheckAvailability.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Import.h"
-#include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 
 using namespace swift;
@@ -1883,6 +1884,11 @@ bool isFragileClangNode(const ClangNode &node) {
     return isFragileClangType(pd->getType());
   if (auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl))
     return isFragileClangType(typedefDecl->getUnderlyingType());
+  if (auto *rd = dyn_cast<clang::RecordDecl>(decl)) {
+    if (!isa<clang::CXXRecordDecl>(rd))
+      return false;
+    return !rd->getDeclContext()->isExternCContext();
+  }
   return true;
 }
 
@@ -1997,7 +2003,9 @@ swift::getDisallowedOriginKind(const Decl *decl,
       where.getDeclContext()->getAsDecl() &&
       where.getDeclContext()->getAsDecl()->getModuleContext()->isResilient() &&
       decl->hasClangNode() && !decl->getModuleContext()->isSwiftShimsModule() &&
-      isFragileClangNode(decl->getClangNode()))
+      isFragileClangNode(decl->getClangNode()) &&
+      !SF->getASTContext().LangOpts.hasFeature(
+          Feature::AssumeResilientCxxTypes))
     return DisallowedOriginKind::FragileCxxAPI;
 
   // Report non-public import last as it can be ignored by the caller.
@@ -2025,7 +2033,7 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     
     // If the decl which references this type is unavailable on the current
     // platform, don't diagnose the availability of the type.
-    if (AvailableAttr::isUnavailable(context))
+    if (Where.getAvailability().isUnavailable())
       return;
 
     diagnoseTypeAvailability(typeRepr, type, context->getLoc(),

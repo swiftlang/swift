@@ -1073,6 +1073,10 @@ void SourceFile::lookupClassMembers(ImportPath::Access accessPath,
   cache.lookupClassMembers(accessPath, consumer);
 }
 
+const GeneratedSourceInfo *SourceFile::getGeneratedSourceFileInfo() const {
+  return getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
+}
+
 ASTNode SourceFile::getMacroExpansion() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
@@ -1084,9 +1088,7 @@ SourceRange SourceFile::getMacroInsertionRange() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return SourceRange();
 
-  auto generatedInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  auto origRange = generatedInfo.originalSourceRange;
+  auto origRange = getGeneratedSourceFileInfo()->originalSourceRange;
   return {origRange.getStart(), origRange.getEnd()};
 }
 
@@ -1094,18 +1096,14 @@ CustomAttr *SourceFile::getAttachedMacroAttribute() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  return genInfo.attachedMacroCustomAttr;
+  return getGeneratedSourceFileInfo()->attachedMacroCustomAttr;
 }
 
 std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return std::nullopt;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  switch (genInfo.kind) {
+  switch (getGeneratedSourceFileInfo()->kind) {
 #define MACRO_ROLE(Name, Description)               \
   case GeneratedSourceInfo::Name##MacroExpansion: \
     return MacroRole::Name;
@@ -1123,9 +1121,7 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
       Kind != SourceFileKind::DefaultArgument)
     return nullptr;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  auto sourceLoc = genInfo.originalSourceRange.getStart();
+  auto sourceLoc = getGeneratedSourceFileInfo()->originalSourceRange.getStart();
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
 
@@ -1134,9 +1130,7 @@ ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
       Kind != SourceFileKind::DefaultArgument)
     return nullptr;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  return ASTNode::getFromOpaqueValue(genInfo.astNode);
+  return ASTNode::getFromOpaqueValue(getGeneratedSourceFileInfo()->astNode);
 }
 
 void ModuleDecl::lookupClassMember(ImportPath::Access accessPath,
@@ -3573,6 +3567,11 @@ StringRef SourceFile::getFilename() const {
   return SM.getIdentifierForBuffer(BufferID);
 }
 
+StringRef SourceFile::getBuffer() const {
+  SourceManager &SM = getASTContext().SourceMgr;
+  return SM.getEntireTextForBuffer(BufferID);
+}
+
 ASTScope &SourceFile::getScope() {
   if (!Scope)
     Scope = new (getASTContext()) ASTScope(this);
@@ -4004,8 +4003,27 @@ bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) con
   auto sdkOrPlatform = searchPathOpts.getSDKPlatformPath(FS).value_or(sdkPath);
 
   StringRef runtimePath = searchPathOpts.RuntimeResourcePath;
-  return (!runtimePath.empty() && pathStartsWith(runtimePath, modulePath)) ||
-      (!sdkOrPlatform.empty() && pathStartsWith(sdkOrPlatform, modulePath));
+  if (!runtimePath.empty() && pathStartsWith(runtimePath, modulePath)) {
+    return true;
+  }
+  if (!sdkOrPlatform.empty() && pathStartsWith(sdkOrPlatform, modulePath)) {
+    return true;
+  }
+
+  // `getSDKPlatformPath` returns a real path but the module might have path
+  // inside a symlink pointing to that real path. To catch this case, also check
+  // whether the module's real path is inside the SDK's real path.
+  llvm::SmallString<128> moduleRealPath;
+  if (FS->getRealPath(modulePath, moduleRealPath)) {
+    modulePath = moduleRealPath;
+  }
+  if (!runtimePath.empty() && pathStartsWith(runtimePath, moduleRealPath)) {
+    return true;
+  }
+  if (!sdkOrPlatform.empty() && pathStartsWith(sdkOrPlatform, moduleRealPath)) {
+    return true;
+  }
+  return false;
 }
 
 version::Version ModuleDecl::getLanguageVersionBuiltWith() const {

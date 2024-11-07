@@ -28,7 +28,7 @@ let swiftSourceDirectory = #filePath
 let swiftSetttings: [SwiftSetting] = [
   .interoperabilityMode(.Cxx),
   .unsafeFlags([
-    "-Xcc", "-DCOMPILED_WITH_SWIFT",
+    "-Xcc", "-DCOMPILED_WITH_SWIFT", "-Xcc", "-DPURE_BRIDGING_MODE",
     "-Xcc", "-UIBOutlet", "-Xcc", "-UIBAction", "-Xcc", "-UIBInspectable",
     "-Xcc", "-I\(swiftSourceDirectory)/include",
     "-Xcc", "-I\(swiftSourceDirectory)/../llvm-project/llvm/include",
@@ -68,7 +68,7 @@ let package = Package(
       swiftSettings: swiftSetttings
     ),
     .target(
-      name: "swiftMacros",
+      name: "swiftMacroEvaluation",
       dependencies: [
         "swiftASTGen",
         .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
@@ -78,7 +78,7 @@ let package = Package(
         .product(name: "SwiftOperators", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacroExpansion", package: "swift-syntax"),
       ],
-      path: "Sources/Macros",
+      path: "Sources/MacroEvaluation",
       swiftSettings: swiftSetttings
     ),
     .target(

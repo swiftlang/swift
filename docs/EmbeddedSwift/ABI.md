@@ -20,13 +20,30 @@ The compiler respects the ABIs and calling conventions of C and C++ when interop
 
 ## Metadata ABI of Embedded Swift
 
-Embedded Swift eliminates almost all metadata compared to full Swift. However, class metadata is still used, because those serve as vtables for dynamic dispatch of methods to implement runtime polymorphism. The layout of Embedded Swift's class metadata is *different* from full Swift:
+Embedded Swift eliminates almost all metadata compared to full Swift. However, class and existential metadata are still used, because those serve as vtables and witness tables for dynamic dispatch of methods to implement runtime polymorphism with classes and existentials.
+
+### Class Metadata ABI
+
+The layout of Embedded Swift's class metadata is *different* from full Swift:
 
 - The **super pointer** pointing to the class metadata record for the superclass is stored at **offset 0**. If the class is a root class, it is null.
 - The **destructor pointer** is stored at **offset 1**. This function is invoked by Swift's deallocator when the class instance is destroyed.
 - The **ivar destroyer** is stored at **offset 2**. This function is invoked to destroy instance members when creation of the object is cancelled (e.g. in a failable initializer).
 - Lastly, the **vtable** is stored at **offset 3**: For each Swift class in the class's inheritance hierarchy, in order starting
   from the root class and working down to the most derived class, the function pointers to the implementation of every method of the class in declaration order in stored.
+
+### Witness Tables ABI
+
+The layout of Embedded Swift's witness tables is *different* from full Swift:
+
+- The first word is always a null pointer (TODO: it can be eliminated)
+- The following words are witness table entries which can be one of the following:
+  - A method witness: a pointer to the witness function.
+  - An associated conformance witness: a pointer to the witness table of the associated conformance
+
+Note that witness tables in Embedded Swift do not contain associated type entries.
+
+Witness functions are always specialized for concrete types. This also means that parameters and return values are passed directly (if possible).
 
 ## Heap object layout in Embedded Swift
 

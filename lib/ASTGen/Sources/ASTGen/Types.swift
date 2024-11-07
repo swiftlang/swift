@@ -356,7 +356,8 @@ extension ASTGenVisitor {
     var type = generate(type: node.baseType)
 
     // Handle specifiers.
-    if let specifier = node.specifier {
+    if case .simpleTypeSpecifier(let simpleSpecifier) = node.specifiers.first {
+      let specifier = simpleSpecifier.specifier
       if let kind = BridgedAttributedTypeSpecifier(from: specifier.keywordKind) {
         type =
           BridgedSpecifierTypeRepr.createParsed(
@@ -366,7 +367,7 @@ extension ASTGenVisitor {
             specifierLoc: self.generateSourceLoc(specifier)
           ).asTypeRepr
       } else {
-        self.diagnose(Diagnostic(node: specifier, message: UnexpectedTokenKindError(token: specifier)))
+        self.diagnose(.unexpectedTokenKind(token: specifier))
       }
     }
 

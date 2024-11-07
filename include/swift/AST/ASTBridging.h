@@ -22,24 +22,36 @@
 #include "swift/Basic/BasicBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE
-#include "swift/AST/ArgumentList.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/DiagnosticConsumer.h"
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/IfConfigClauseRangeInfo.h"
-#include "swift/AST/Stmt.h"
 #endif
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
+namespace llvm {
+template<typename T> class ArrayRef;
+}
+
 namespace swift {
+class Argument;
 class ASTContext;
+struct ASTNode;
+class DeclAttributes;
+class DeclBaseName;
+class DeclNameLoc;
+class DeclNameRef;
 class DiagnosticArgument;
 class DiagnosticEngine;
+class Identifier;
+class IfConfigClauseRangeInfo;
+struct LabeledStmtInfo;
+class ProtocolConformanceRef;
+class RegexLiteralPatternFeature;
+class RegexLiteralPatternFeatureKind;
 class Type;
 class CanType;
 class TypeBase;
+class StmtConditionElement;
 class SubstitutionMap;
 }
 
@@ -62,14 +74,9 @@ public:
   SWIFT_NAME("init(raw:)")
   BridgedIdentifier(const void *_Nullable raw) : Raw(raw) {}
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedIdentifier(swift::Identifier ident)
-      : Raw(ident.getAsOpaquePointer()) {}
+  BRIDGED_INLINE BridgedIdentifier(swift::Identifier ident);
 
-  swift::Identifier unbridged() const {
-    return swift::Identifier::getFromOpaquePointer(Raw);
-  }
-#endif
+  BRIDGED_INLINE swift::Identifier unbridged() const;
 };
 
 SWIFT_NAME("getter:BridgedIdentifier.raw(self:)")
@@ -89,17 +96,9 @@ class BridgedDeclBaseName {
   BridgedIdentifier Ident;
 
 public:
-  // Ensure that this struct value type will be indirectly returned on
-  // Windows ARM64
-  BridgedDeclBaseName() : Ident() {}
+  BRIDGED_INLINE BridgedDeclBaseName(swift::DeclBaseName baseName);
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedDeclBaseName(swift::DeclBaseName baseName) : Ident(baseName.Ident) {}
-
-  swift::DeclBaseName unbridged() const {
-    return swift::DeclBaseName(Ident.unbridged());
-  }
-#endif
+  BRIDGED_INLINE swift::DeclBaseName unbridged() const;
 };
 
 SWIFT_NAME("BridgedDeclBaseName.createConstructor()")
@@ -119,17 +118,9 @@ class BridgedDeclNameRef {
   void *_Nonnull opaque;
 
 public:
-  // Ensure that this struct value type will be indirectly returned on
-  // Windows ARM64
-  BridgedDeclNameRef() : opaque() {}
+  BRIDGED_INLINE BridgedDeclNameRef(swift::DeclNameRef name);
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedDeclNameRef(swift::DeclNameRef name) : opaque(name.getOpaqueValue()) {}
-
-  swift::DeclNameRef unbridged() const {
-    return swift::DeclNameRef::getFromOpaqueValue(opaque);
-  }
-#endif
+  BRIDGED_INLINE swift::DeclNameRef unbridged() const;
 };
 
 SWIFT_NAME("BridgedDeclNameRef.createParsed(_:baseName:argumentLabels:)")
@@ -149,15 +140,9 @@ class BridgedDeclNameLoc {
 public:
   BridgedDeclNameLoc() : LocationInfo(nullptr), NumArgumentLabels(0) {}
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedDeclNameLoc(swift::DeclNameLoc loc)
-      : LocationInfo(loc.LocationInfo),
-        NumArgumentLabels(loc.NumArgumentLabels) {}
+  BRIDGED_INLINE BridgedDeclNameLoc(swift::DeclNameLoc loc);
 
-  swift::DeclNameLoc unbridged() const {
-    return swift::DeclNameLoc(LocationInfo, NumArgumentLabels);
-  }
-#endif
+  BRIDGED_INLINE swift::DeclNameLoc unbridged() const;
 };
 
 SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:baseNameLoc:lParenLoc:"
@@ -179,17 +164,11 @@ class BridgedASTContext {
   swift::ASTContext * _Nonnull Ctx;
 
 public:
-  // Ensure that this struct value type will be indirectly returned on
-  // Windows ARM64
-  BridgedASTContext() : Ctx() {}
-
-#ifdef USED_IN_CPP_SOURCE
   SWIFT_UNAVAILABLE("Use init(raw:) instead")
-  BridgedASTContext(swift::ASTContext &ctx) : Ctx(&ctx) {}
+  BRIDGED_INLINE BridgedASTContext(swift::ASTContext &ctx);
 
   SWIFT_UNAVAILABLE("Use '.raw' instead")
-  swift::ASTContext &unbridged() const { return *Ctx; }
-#endif
+  BRIDGED_INLINE swift::ASTContext &unbridged() const;
 };
 
 SWIFT_NAME("getter:BridgedASTContext.raw(self:)")
@@ -199,6 +178,17 @@ void * _Nonnull BridgedASTContext_raw(BridgedASTContext bridged);
 SWIFT_NAME("BridgedASTContext.init(raw:)")
 BRIDGED_INLINE
 BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr);
+
+SWIFT_NAME("BridgedASTContext.allocate(self:size:alignment:)")
+BRIDGED_INLINE
+void *_Nullable BridgedASTContext_allocate(BridgedASTContext bridged,
+                                           size_t size, size_t alignment);
+
+SWIFT_NAME("BridgedASTContext.allocateCopy(self:string:)")
+BRIDGED_INLINE
+BridgedStringRef
+BridgedASTContext_allocateCopyString(BridgedASTContext cContext,
+                                     BridgedStringRef cStr);
 
 SWIFT_NAME("BridgedASTContext.getIdentifier(self:_:)")
 BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
@@ -317,11 +307,14 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Type_getName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Value_getUserFacingName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc Value_getNameLoc() const;
+  BRIDGED_INLINE bool Value_isObjC() const;
   BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj NominalType_getValueTypeDestructor() const;
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
+  BRIDGED_INLINE bool Destructor_isIsolated() const;
 };
 
 struct BridgedASTNode {
@@ -331,18 +324,7 @@ struct BridgedASTNode {
   SWIFT_NAME("kind")
   ASTNodeKind Kind;
 
-#ifdef USED_IN_CPP_SOURCE
-  swift::ASTNode unbridged() const {
-    switch (Kind) {
-    case ASTNodeKindExpr:
-      return swift::ASTNode(static_cast<swift::Expr *>(Raw));
-    case ASTNodeKindStmt:
-      return swift::ASTNode(static_cast<swift::Stmt *>(Raw));
-    case ASTNodeKindDecl:
-      return swift::ASTNode(static_cast<swift::Decl *>(Raw));
-    }
-  }
-#endif
+  BRIDGED_INLINE swift::ASTNode unbridged() const;
 };
 
 // Forward declare the underlying AST node type for each wrapper.
@@ -441,39 +423,16 @@ class BridgedDiagnosticArgument {
   int64_t storage[3];
 
 public:
-  // Ensure that this struct value type will be indirectly returned on
-  // Windows ARM64
-  BridgedDiagnosticArgument() {}
-
-#ifdef USED_IN_CPP_SOURCE
-  BridgedDiagnosticArgument(const swift::DiagnosticArgument &arg) {
-    *reinterpret_cast<swift::DiagnosticArgument *>(&storage) = arg;
-  }
-  const swift::DiagnosticArgument &unbridged() const {
-    return *reinterpret_cast<const swift::DiagnosticArgument *>(&storage);
-  }
-#endif
+  BRIDGED_INLINE BridgedDiagnosticArgument(const swift::DiagnosticArgument &arg);
+  BRIDGED_INLINE const swift::DiagnosticArgument &unbridged() const;
 
   BridgedDiagnosticArgument(SwiftInt i);
   BridgedDiagnosticArgument(BridgedStringRef s);
 };
 
 class BridgedDiagnosticFixIt {
-  int64_t storage[7];
-
 public:
-  // Ensure that this struct value type will be indirectly returned on
-  // Windows ARM64
-  BridgedDiagnosticFixIt() {}
-
-#ifdef USED_IN_CPP_SOURCE
-  BridgedDiagnosticFixIt(const swift::DiagnosticInfo::FixIt &fixit){
-    *reinterpret_cast<swift::DiagnosticInfo::FixIt *>(&storage) = fixit;
-  }
-  const swift::DiagnosticInfo::FixIt &unbridged() const {
-    return *reinterpret_cast<const swift::DiagnosticInfo::FixIt *>(&storage);
-  }
-#endif
+  int64_t storage[7];
 
   BridgedDiagnosticFixIt(BridgedSourceLoc start, uint32_t length, BridgedStringRef text);
 };
@@ -545,7 +504,19 @@ void BridgedDiagnostic_finish(BridgedDiagnostic cDiag);
 //===----------------------------------------------------------------------===//
 
 SWIFT_NAME("getter:BridgedDeclContext.isLocalContext(self:)")
-bool BridgedDeclContext_isLocalContext(BridgedDeclContext cDeclContext);
+BRIDGED_INLINE bool
+BridgedDeclContext_isLocalContext(BridgedDeclContext cDeclContext);
+
+SWIFT_NAME("getter:BridgedDeclContext.isTypeContext(self:)")
+BRIDGED_INLINE bool BridgedDeclContext_isTypeContext(BridgedDeclContext dc);
+
+SWIFT_NAME("getter:BridgedDeclContext.isModuleScopeContext(self:)")
+BRIDGED_INLINE bool
+BridgedDeclContext_isModuleScopeContext(BridgedDeclContext dc);
+
+SWIFT_NAME("getter:BridgedDeclContext.astContext(self:)")
+BRIDGED_INLINE BridgedASTContext
+BridgedDeclContext_getASTContext(BridgedDeclContext dc);
 
 SWIFT_NAME("BridgedPatternBindingInitializer.create(declContext:)")
 BridgedPatternBindingInitializer
@@ -573,16 +544,9 @@ struct BridgedDeclAttributes {
 
   BridgedDeclAttributes() : chain(nullptr){};
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedDeclAttributes(swift::DeclAttributes attrs)
-      : chain(attrs.getRawAttributeChain()) {}
+  BRIDGED_INLINE BridgedDeclAttributes(swift::DeclAttributes attrs);
 
-  swift::DeclAttributes unbridged() const {
-    swift::DeclAttributes attrs;
-    attrs.setRawAttributeChain(chain.unbridged());
-    return attrs;
-  }
-#endif
+  BRIDGED_INLINE swift::DeclAttributes unbridged() const;
 };
 
 SWIFT_NAME("BridgedDeclAttributes.add(self:_:)")
@@ -1016,6 +980,14 @@ BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
     BridgedNullableTypeRepr opaqueDefaultType,
     BridgedNullableTrailingWhereClause genericWhereClause);
 
+SWIFT_NAME("BridgedMacroExpansionDecl.createParsed(_:poundLoc:macroNameRef:"
+           "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")
+BridgedMacroExpansionDecl BridgedMacroExpansionDecl_createParsed(
+    BridgedDeclContext cDeclContext, BridgedSourceLoc cPoundLoc,
+    BridgedDeclNameRef cMacroNameRef, BridgedDeclNameLoc cMacroNameLoc,
+    BridgedSourceLoc cLeftAngleLoc, BridgedArrayRef cGenericArgs,
+    BridgedSourceLoc cRightAngleLoc, BridgedNullableArgumentList cArgList);
+
 SWIFT_NAME(
     "BridgedExtensionDecl.createParsed(_:declContext:extensionKeywordLoc:"
     "extendedType:inheritedTypes:genericWhereClause:braceRange:)")
@@ -1197,12 +1169,7 @@ struct BridgedCallArgument {
   BridgedIdentifier label;
   BridgedExpr argExpr;
 
-#ifdef USED_IN_CPP_SOURCE
-  swift::Argument unbridged() const {
-    return swift::Argument(labelLoc.unbridged(), label.unbridged(),
-                           argExpr.unbridged());
-  }
-#endif
+  BRIDGED_INLINE swift::Argument unbridged() const;
 };
 
 SWIFT_NAME("BridgedArgumentList.createImplicitUnlabeled(_:exprs:)")
@@ -1241,6 +1208,12 @@ SWIFT_NAME("BridgedAwaitExpr.createParsed(_:awaitLoc:subExpr:)")
 BridgedAwaitExpr BridgedAwaitExpr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cAwaitLoc,
                                                BridgedExpr cSubExpr);
+
+SWIFT_NAME("BridgedBindOptionalExpr.createParsed(_:subExpr:questionLoc:)")
+BridgedBindOptionalExpr
+BridgedBindOptionalExpr_createParsed(BridgedASTContext cContext,
+                                     BridgedExpr cSubExpr,
+                                     BridgedSourceLoc cQuestionLoc);
 
 SWIFT_NAME("BridgedBooleanLiteralExpr.createParsed(_:value:loc:)")
 BridgedBooleanLiteralExpr
@@ -1309,17 +1282,52 @@ BridgedDotSelfExpr BridgedDotSelfExpr_createParsed(BridgedASTContext cContext,
                                                    BridgedSourceLoc cDotLoc,
                                                    BridgedSourceLoc cSelfLoc);
 
+SWIFT_NAME("BridgedEditorPlaceholderExpr.createParsed(_:placeholder:loc:"
+           "placeholderType:expansionType:)")
+BridgedEditorPlaceholderExpr BridgedEditorPlaceholderExpr_createParsed(
+    BridgedASTContext cContext, BridgedIdentifier cPlaceholderId,
+    BridgedSourceLoc cLoc, BridgedNullableTypeRepr cPlaceholderTyR,
+    BridgedNullableTypeRepr cExpansionTyR);
+
+SWIFT_NAME("BridgedErrorExpr.create(_:loc:)")
+BridgedErrorExpr BridgedErrorExpr_create(BridgedASTContext cContext,
+                                         BridgedSourceRange cRange);
+
+SWIFT_NAME("BridgedFloatLiteralExpr.createParsed(_:value:loc:)")
+BridgedFloatLiteralExpr
+BridgedFloatLiteralExpr_createParsed(BridgedASTContext cContext,
+                                     BridgedStringRef cStr,
+                                     BridgedSourceLoc cTokenLoc);
+
 SWIFT_NAME("BridgedForceTryExpr.createParsed(_:tryLoc:subExpr:exclaimLoc:)")
 BridgedForceTryExpr
 BridgedForceTryExpr_createParsed(BridgedASTContext cContext,
                                  BridgedSourceLoc cTryLoc, BridgedExpr cSubExpr,
                                  BridgedSourceLoc cExclaimLoc);
 
+SWIFT_NAME("BridgedForceValueExpr.createParsed(_:subExpr:exclaimLoc:)")
+BridgedForceValueExpr
+BridgedForceValueExpr_createParsed(BridgedASTContext cContext,
+                                   BridgedExpr cSubExpr,
+                                   BridgedSourceLoc cExclaimLoc);
+
 SWIFT_NAME(
     "BridgedForcedCheckedCastExpr.createParsed(_:asLoc:exclaimLoc:type:)")
 BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAsLoc,
     BridgedSourceLoc cExclaimLoc, BridgedTypeRepr cType);
+
+SWIFT_NAME("BridgedUnresolvedSpecializeExpr.createParsed(_:subExpr:lAngleLoc:"
+           "arguments:rAngleLoc:)")
+BridgedUnresolvedSpecializeExpr BridgedUnresolvedSpecializeExpr_createParsed(
+    BridgedASTContext cContext, BridgedExpr cSubExpr,
+    BridgedSourceLoc cLAngleLoc, BridgedArrayRef cArguments,
+    BridgedSourceLoc cRAngleLoc);
+
+SWIFT_NAME("BridgedInOutExpr.createParsed(_:loc:subExpr:)")
+BridgedInOutExpr BridgedInOutExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cLoc,
+                                               BridgedExpr cSubExpr);
 
 SWIFT_NAME("BridgedIntegerLiteralExpr.createParsed(_:value:loc:)")
 BridgedIntegerLiteralExpr
@@ -1338,6 +1346,26 @@ SWIFT_NAME("BridgedIsExpr.createParsed(_:isLoc:type:)")
 BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
                                          BridgedSourceLoc cIsLoc,
                                          BridgedTypeRepr cType);
+
+SWIFT_NAME("BridgedKeyPathDotExpr.createParsed(_:loc:)")
+BridgedKeyPathDotExpr
+BridgedKeyPathDotExpr_createParsed(BridgedASTContext cContext,
+                                   BridgedSourceLoc cLoc);
+
+SWIFT_NAME("BridgedKeyPathExpr.createParsed(_:backslashLoc:parsedRoot:"
+           "parsedPath:hasLeadingDot:)")
+BridgedKeyPathExpr BridgedKeyPathExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cBackslashLoc,
+    BridgedNullableExpr cParsedRoot, BridgedNullableExpr cParsedPath,
+    bool hasLeadingDot);
+
+SWIFT_NAME("BridgedMacroExpansionExpr.createParsed(_:poundLoc:macroNameRef:"
+           "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")
+BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
+    BridgedDeclContext cDeclContext, BridgedSourceLoc cPoundLoc,
+    BridgedDeclNameRef cMacroNameRef, BridgedDeclNameLoc cMacroNameLoc,
+    BridgedSourceLoc cLeftAngleLoc, BridgedArrayRef cGenericArgs,
+    BridgedSourceLoc cRightAngleLoc, BridgedNullableArgumentList cArgList);
 
 SWIFT_NAME("BridgedNilLiteralExpr.createParsed(_:nilKeywordLoc:)")
 BridgedNilLiteralExpr
@@ -1361,6 +1389,12 @@ BridgedPackExpansionExpr_createParsed(BridgedASTContext cContext,
                                       BridgedSourceLoc cRepeatLoc,
                                       BridgedExpr cPatternExpr);
 
+SWIFT_NAME("BridgedParenExpr.createParsed(_:leftParenLoc:expr:rightParenLoc:)")
+BridgedParenExpr BridgedParenExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cLParen,
+                                               BridgedExpr cExpr,
+                                               BridgedSourceLoc cRParen);
+
 SWIFT_NAME("BridgedPostfixUnaryExpr.createParsed(_:operator:operand:)")
 BridgedPostfixUnaryExpr
 BridgedPostfixUnaryExpr_createParsed(BridgedASTContext cContext,
@@ -1370,6 +1404,74 @@ SWIFT_NAME("BridgedPrefixUnaryExpr.createParsed(_:operator:operand:)")
 BridgedPrefixUnaryExpr
 BridgedPrefixUnaryExpr_createParsed(BridgedASTContext cContext,
                                     BridgedExpr oper, BridgedExpr operand);
+
+class BridgedRegexLiteralPatternFeatureKind final {
+  unsigned RawValue;
+
+public:
+  BRIDGED_INLINE
+  SWIFT_NAME("init(rawValue:)")
+  BridgedRegexLiteralPatternFeatureKind(SwiftInt rawValue);
+
+  using UnbridgedTy = swift::RegexLiteralPatternFeatureKind;
+
+  BRIDGED_INLINE
+  BridgedRegexLiteralPatternFeatureKind(UnbridgedTy kind);
+
+  BRIDGED_INLINE
+  UnbridgedTy unbridged() const;
+};
+
+class BridgedRegexLiteralPatternFeature final {
+  BridgedCharSourceRange Range;
+  BridgedRegexLiteralPatternFeatureKind Kind;
+
+public:
+  SWIFT_NAME("init(kind:at:)")
+  BridgedRegexLiteralPatternFeature(BridgedRegexLiteralPatternFeatureKind kind,
+                                    BridgedCharSourceRange range)
+      : Range(range), Kind(kind) {}
+
+  using UnbridgedTy = swift::RegexLiteralPatternFeature;
+
+  BRIDGED_INLINE
+  BridgedRegexLiteralPatternFeature(UnbridgedTy feature);
+
+  BRIDGED_INLINE
+  UnbridgedTy unbridged() const;
+};
+
+class BridgedRegexLiteralPatternFeatures final {
+  BridgedRegexLiteralPatternFeature *_Nullable Data;
+  SwiftInt Count;
+
+public:
+  BridgedRegexLiteralPatternFeatures() : Data(nullptr), Count(0) {}
+
+  SWIFT_NAME("init(baseAddress:count:)")
+  BridgedRegexLiteralPatternFeatures(
+      BridgedRegexLiteralPatternFeature *_Nullable data, SwiftInt count)
+      : Data(data), Count(count) {}
+
+  using UnbridgedTy = llvm::ArrayRef<BridgedRegexLiteralPatternFeature>;
+
+  BRIDGED_INLINE
+  UnbridgedTy unbridged() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedRegexLiteralPatternFeature *_Nullable getData() const {
+    return Data;
+  }
+  SwiftInt getCount() const {
+    return Count;
+  }
+};
+
+SWIFT_NAME("BridgedRegexLiteralExpr.createParsed(_:loc:regexText:)")
+BridgedRegexLiteralExpr
+BridgedRegexLiteralExpr_createParsed(BridgedASTContext cContext,
+                                     BridgedSourceLoc cLoc,
+                                     BridgedStringRef cRegexText);
 
 SWIFT_NAME("BridgedSequenceExpr.createParsed(_:exprs:)")
 BridgedSequenceExpr BridgedSequenceExpr_createParsed(BridgedASTContext cContext,
@@ -1386,6 +1488,17 @@ BridgedStringLiteralExpr
 BridgedStringLiteralExpr_createParsed(BridgedASTContext cContext,
                                       BridgedStringRef cStr,
                                       BridgedSourceLoc cTokenLoc);
+
+SWIFT_NAME("BridgedSuperRefExpr.createParsed(_:superLoc:)")
+BridgedSuperRefExpr
+BridgedSuperRefExpr_createParsed(BridgedASTContext cContext,
+                                 BridgedSourceLoc cSuperLoc);
+
+SWIFT_NAME("BridgedSubscriptExpr.createParsed(_:baseExpr:args:)")
+BridgedSubscriptExpr
+BridgedSubscriptExpr_createParsed(BridgedASTContext cContext,
+                                  BridgedExpr cBaseExpr,
+                                  BridgedArgumentList cArgs);
 
 SWIFT_NAME("BridgedTapExpr.create(_:body:)")
 BridgedTapExpr BridgedTapExpr_create(BridgedASTContext cContext,
@@ -1458,29 +1571,16 @@ struct BridgedLabeledStmtInfo {
   SWIFT_NAME("loc")
   BridgedSourceLoc Loc;
 
-#ifdef USED_IN_CPP_SOURCE
-  swift::LabeledStmtInfo unbridged() const {
-    return {Name.unbridged(), Loc.unbridged()};
-  }
-#endif
+  BRIDGED_INLINE swift::LabeledStmtInfo unbridged() const;
 };
 
 class BridgedStmtConditionElement {
   void *_Nonnull Raw;
 
 public:
-  // Ensure that this struct value type will be indirectly returned on
-  // Windows ARM64
-  BridgedStmtConditionElement() {}
+  BRIDGED_INLINE BridgedStmtConditionElement(swift::StmtConditionElement elem);
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedStmtConditionElement(swift::StmtConditionElement elem)
-      : Raw(elem.getOpaqueValue()) {}
-
-  swift::StmtConditionElement unbridged() const {
-    return swift::StmtConditionElement::fromOpaqueValue(Raw);
-  }
-#endif
+  BRIDGED_INLINE swift::StmtConditionElement unbridged() const;
 };
 
 SWIFT_NAME("BridgedStmtConditionElement.createBoolean(expr:)")
@@ -2014,6 +2114,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isEscapable() const;
   BRIDGED_INLINE bool isNoEscape() const;
   BRIDGED_INLINE bool isInteger() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
 };
 
 class BridgedCanType {
@@ -2028,35 +2129,22 @@ public:
 struct BridgedConformance {
   void * _Nullable opaqueValue;
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedConformance(swift::ProtocolConformanceRef conformance)
-      : opaqueValue(conformance.getOpaqueValue()) {}
-
-  swift::ProtocolConformanceRef unbridged() const {
-    return swift::ProtocolConformanceRef::getFromOpaqueValue(opaqueValue);
-  }
-#endif
+  BRIDGED_INLINE BridgedConformance(swift::ProtocolConformanceRef conformance);
+  BRIDGED_INLINE swift::ProtocolConformanceRef unbridged() const;
 
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool isConcrete() const;
   BRIDGED_INLINE bool isValid() const;
   BRIDGED_INLINE bool isSpecializedConformance() const;
+  BRIDGED_INLINE bool isInheritedConformance() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getGenericConformance() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getInheritedConformance() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getSpecializedSubstitutions() const;
 };
 
 struct BridgedConformanceArray {
   BridgedArrayRef pcArray;
-
-#ifdef USED_IN_CPP_SOURCE
-  BridgedConformanceArray(llvm::ArrayRef<swift::ProtocolConformanceRef> conformances)
-      : pcArray(conformances) {}
-
-  llvm::ArrayRef<swift::ProtocolConformanceRef> unbridged() const {
-    return pcArray.unbridged<swift::ProtocolConformanceRef>();
-  }
-#endif
 
   SwiftInt getCount() const { return SwiftInt(pcArray.Length); }
 
@@ -2070,6 +2158,7 @@ struct BridgedSubstitutionMap {
   BRIDGED_INLINE BridgedSubstitutionMap(swift::SubstitutionMap map);
   BRIDGED_INLINE swift::SubstitutionMap unbridged() const;
   BRIDGED_INLINE BridgedSubstitutionMap();
+  BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool isEmpty() const;
   BRIDGED_INLINE bool hasAnySubstitutableParams() const;
   BRIDGED_INLINE SwiftInt getNumConformances() const;
@@ -2094,29 +2183,7 @@ struct BridgedIfConfigClauseRangeInfo {
   BridgedSourceLoc endLoc;
   BridgedIfConfigClauseKind kind;
 
-#ifdef USED_IN_CPP_SOURCE
-  swift::IfConfigClauseRangeInfo unbridged() const {
-    swift::IfConfigClauseRangeInfo::ClauseKind clauseKind;
-    switch (kind) {
-    case IfConfigActive:
-      clauseKind = swift::IfConfigClauseRangeInfo::ActiveClause;
-      break;
-
-    case IfConfigInactive:
-      clauseKind = swift::IfConfigClauseRangeInfo::InactiveClause;
-      break;
-
-    case IfConfigEnd:
-      clauseKind = swift::IfConfigClauseRangeInfo::EndDirective;
-      break;
-    }
-
-    return swift::IfConfigClauseRangeInfo(directiveLoc.unbridged(),
-                                          bodyLoc.unbridged(),
-                                          endLoc.unbridged(),
-                                          clauseKind);
-  }
-#endif
+  BRIDGED_INLINE swift::IfConfigClauseRangeInfo unbridged() const;
 };
 
 //===----------------------------------------------------------------------===//

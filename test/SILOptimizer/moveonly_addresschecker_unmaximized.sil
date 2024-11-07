@@ -7,6 +7,8 @@
 // RUN:     -move-only-address-checker-disable-lifetime-extension=true \
 // RUN: | %FileCheck %s
 
+// REQUIRES: swift_feature_MoveOnlyClasses
+
 import Builtin
 import Swift
 

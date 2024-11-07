@@ -12,6 +12,8 @@
 
 import ASTBridging
 import BasicBridging
+import SwiftDiagnostics
+import SwiftSyntax
 
 #if canImport(_CompilerRegexParser)
 @_spi(CompilerInterface) import _CompilerRegexParser
@@ -96,6 +98,7 @@ public func _RegexLiteralParsingFn(
   _ versionOut: UnsafeMutablePointer<UInt>,
   _ captureStructureOut: UnsafeMutableRawPointer,
   _ captureStructureSize: UInt,
+  _ patternFeaturesOut: UnsafeMutablePointer<BridgedRegexLiteralPatternFeatures>,
   _ bridgedDiagnosticBaseLoc: BridgedSourceLoc,
   _ bridgedDiagnosticEngine: BridgedDiagnosticEngine
 ) -> Bool {
@@ -111,6 +114,8 @@ public func _RegexLiteralParsingFn(
       str,
       captureBufferOut: captureBuffer
     )
+    // TODO: -> [Feature(opaque kind, (String.Index, length))]
+    patternFeaturesOut.pointee = .init(baseAddress: nil, count: 0)
     versionOut.pointee = UInt(version)
     return false
   } catch let error as CompilerParseError {
@@ -132,6 +137,36 @@ public func _RegexLiteralParsingFn(
   } catch {
     fatalError("Expected CompilerParseError")
   }
+}
+
+@_cdecl("swift_ASTGen_freeBridgedRegexLiteralPatternFeatures")
+func freeBridgedRegexLiteralPatternFeatures(
+  _ features: BridgedRegexLiteralPatternFeatures
+) {
+  let buffer = UnsafeMutableBufferPointer(
+    start: features.getData(), count: features.getCount()
+  )
+  buffer.deinitialize()
+  buffer.deallocate()
+}
+
+@_cdecl("swift_ASTGen_getSwiftVersionForRegexPatternFeature")
+func getSwiftVersionForRegexPatternFeature(
+  _ featureKind: BridgedRegexLiteralPatternFeatureKind,
+  _ versionOut: UnsafeMutablePointer<BridgedSwiftVersion>
+) {
+  // TODO: FeatureKind(opaque kind) -> Version(major, minor)
+  fatalError("Unimplemented")
+}
+
+@_cdecl("swift_ASTGen_getDescriptionForRegexPatternFeature")
+func getDescriptionForRegexPatternFeature(
+  _ featureKind: BridgedRegexLiteralPatternFeatureKind,
+  _ context: BridgedASTContext,
+  _ descriptionOut: UnsafeMutablePointer<BridgedStringRef>
+) {
+  // TODO: FeatureKind(opaque kind) -> String
+  fatalError("Unimplemented")
 }
 
 #else  // canImport(_CompilerRegexParser)

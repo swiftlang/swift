@@ -253,6 +253,16 @@ if(NOT "${COVERAGE_DB}" STREQUAL "")
       COMMENT "Touching covering tests")
 endif()
 
+if(SWIFT_COMPILER_IS_MSVC_LIKE)
+  set(C_PREPROCESSOR_COMMAND
+    "${CMAKE_C_COMPILER}" "/P" "/EP" "/I" "${SWIFT_MAIN_INCLUDE_DIR}" "/TC"
+    "/Fi<<<OUTPUT_FILE>>>")
+else()
+  set(C_PREPROCESSOR_COMMAND
+    "${CMAKE_C_COMPILER}" "-E" "-P" "-I${SWIFT_MAIN_INCLUDE_DIR}" "-x" "c" "-o"
+    "<<<OUTPUT_FILE>>>")
+endif()
+
 foreach(SDK ${SWIFT_SDKS})
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
     # macCatalyst needs to run two sets of tests: one with the normal macosx target triple
@@ -286,6 +296,9 @@ foreach(SDK ${SWIFT_SDKS})
         set(SWIFT_HAVE_LIBXML2 FALSE)
       endif()
 
+      set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
+      set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
+
       swift_configure_lit_site_cfg(
           "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
           "${test_bin_dir}/lit.site.cfg"
@@ -300,6 +313,38 @@ foreach(SDK ${SWIFT_SDKS})
           "${CMAKE_CURRENT_SOURCE_DIR}/../validation-test/lit.site.cfg.in"
           "${validation_test_bin_dir}/lit.site.cfg"
           "validation-test${VARIANT_SUFFIX}.lit.site.cfg")
+
+      set(test_lit_swift_features_cmd ${C_PREPROCESSOR_COMMAND})
+      list(
+        TRANSFORM test_lit_swift_features_cmd
+        REPLACE "<<<OUTPUT_FILE>>>" "${test_bin_dir}/lit.swift-features.cfg")
+      add_custom_command(
+        OUTPUT "${test_bin_dir}/lit.swift-features.cfg"
+        COMMAND
+          ${test_lit_swift_features_cmd}
+          "${CMAKE_CURRENT_SOURCE_DIR}/lit.swift-features.cfg.inc"
+        DEPENDS
+          "lit.swift-features.cfg.inc"
+          "${SWIFT_MAIN_INCLUDE_DIR}/swift/Basic/Features.def"
+      )
+
+      set(validation_test_lit_swift_features_cmd ${C_PREPROCESSOR_COMMAND})
+      list(
+        TRANSFORM validation_test_lit_swift_features_cmd
+        REPLACE "<<<OUTPUT_FILE>>>" "${validation_test_bin_dir}/lit.swift-features.cfg")
+      add_custom_command(
+        OUTPUT "${validation_test_bin_dir}/lit.swift-features.cfg"
+        COMMAND
+          ${validation_test_lit_swift_features_cmd}
+          "${CMAKE_CURRENT_SOURCE_DIR}/lit.swift-features.cfg.inc"
+        DEPENDS
+          "lit.swift-features.cfg.inc"
+          "${SWIFT_MAIN_INCLUDE_DIR}/swift/Basic/Features.def"
+      )
+      add_custom_target(lit_swift_features_cfg_${VARIANT_SUFFIX}
+        DEPENDS
+          "${test_bin_dir}/lit.swift-features.cfg"
+          "${validation_test_bin_dir}/lit.swift-features.cfg")
 
       set(test_dependencies)
       get_test_dependencies("${SDK}" test_dependencies)
@@ -337,6 +382,9 @@ foreach(SDK ${SWIFT_SDKS})
         "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
       set(validation_test_dependencies)
+
+      list(APPEND test_dependencies lit_swift_features_cfg_${VARIANT_SUFFIX})
+      list(APPEND validation_test_dependencies lit_swift_features_cfg_${VARIANT_SUFFIX})
 
       set(command_upload_stdlib)
       set(command_upload_swift_reflection_test)
@@ -523,6 +571,38 @@ foreach(SDK ${SWIFT_SDKS})
     endforeach()
   endforeach()
 endforeach()
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
+  set(VARIANT_SUFFIX "-embedded-armv7")
+  set(VARIANT_TRIPLE "armv7em-none-none-eabi")
+  set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM TRUE)
+  set(VARIANT_EXTERNAL_EMBEDDED_DEVICE "arm-qemu-stm32f4")
+  set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+  swift_configure_lit_site_cfg(
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+      "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
+      "test${VARIANT_SUFFIX}.lit.site.cfg")
+
+  set(VARIANT_SUFFIX "-embedded-avr")
+  set(VARIANT_TRIPLE "avr-none-none-elf")
+  set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM TRUE)
+  set(VARIANT_EXTERNAL_EMBEDDED_DEVICE "avr-qemu-atmega2560")
+  set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+  swift_configure_lit_site_cfg(
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+      "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
+      "test${VARIANT_SUFFIX}.lit.site.cfg")
+
+  set(VARIANT_SUFFIX "-embedded-riscv32")
+  set(VARIANT_TRIPLE "riscv32-none-none-eabi")
+  set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM TRUE)
+  set(VARIANT_EXTERNAL_EMBEDDED_DEVICE "riscv32-qemu-virt")
+  set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+  swift_configure_lit_site_cfg(
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+      "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
+      "test${VARIANT_SUFFIX}.lit.site.cfg")
+endif()
 
 # Add shortcuts for the default variant.
 foreach(test_mode ${TEST_MODES})

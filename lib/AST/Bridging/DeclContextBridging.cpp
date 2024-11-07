@@ -20,10 +20,6 @@ using namespace swift;
 // MARK: DeclContexts
 //===----------------------------------------------------------------------===//
 
-bool BridgedDeclContext_isLocalContext(BridgedDeclContext cDeclContext) {
-  return cDeclContext.unbridged()->isLocalContext();
-}
-
 BridgedPatternBindingInitializer
 BridgedPatternBindingInitializer_create(BridgedDeclContext cDeclContext) {
   return PatternBindingInitializer::create(cDeclContext.unbridged());

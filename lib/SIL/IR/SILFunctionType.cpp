@@ -2307,8 +2307,11 @@ static CanSILFunctionType getSILFunctionType(
   
   if (auto accessor = getAsCoroutineAccessor(constant)) {
     auto origAccessor = cast<AccessorDecl>(origConstant->getDecl());
-    coroutineKind = SILCoroutineKind::YieldOnce;
-    
+    coroutineKind =
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind())
+            ? SILCoroutineKind::YieldOnce2
+            : SILCoroutineKind::YieldOnce;
+
     // Coroutine accessors are always native, so fetch the native
     // abstraction pattern.
     auto origStorage = origAccessor->getStorage();

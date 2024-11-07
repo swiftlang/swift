@@ -29,7 +29,7 @@
 
 using namespace swift;
 
-static bool canInlineBeginApply(BeginApplyInst *BA) {
+bool SILInliner::canInlineBeginApply(BeginApplyInst *BA) {
   // Don't inline if we have multiple resumption sites (i.e. end_apply or
   // abort_apply instructions).  The current implementation clones a single
   // copy of the end_apply and abort_apply paths, so it can't handle values
@@ -264,6 +264,13 @@ public:
       AbortApply->eraseFromParent();
     for (auto *EndBorrow : EndBorrows)
       EndBorrow->eraseFromParent();
+
+    if (auto allocation = BeginApply->getCalleeAllocationResult()) {
+      for (auto *user : allocation->getUsers()) {
+        auto *dsi = cast<DeallocStackInst>(user);
+        dsi->eraseFromParent();
+      }
+    }
 
     assert(!BeginApply->hasUsesOfAnyResult());
   }
@@ -870,6 +877,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BorrowedFromInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::PreviousDynamicFunctionRefInst:
   case SILInstructionKind::DynamicFunctionRefInst:
   case SILInstructionKind::FunctionRefInst:

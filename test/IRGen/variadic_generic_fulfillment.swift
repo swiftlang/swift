@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -disable-availability-checking | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir %s -target %target-swift-5.9-abi-triple | %FileCheck %s -DINT=i%target-ptrsize
 
 public struct G<T> {}
 

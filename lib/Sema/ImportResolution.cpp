@@ -28,7 +28,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/DocumentationCategory.h"
 #include "clang/Basic/Module.h"
@@ -36,9 +35,9 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/TargetParser/Host.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/TargetParser/Host.h"
 #include <algorithm>
 #include <system_error>
 using namespace swift;

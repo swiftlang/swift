@@ -44,6 +44,10 @@
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
 
+// RUN: %FileCheck %s --check-prefix=PLUGIN_SEARCH --check-prefix=RESOLVED --input-file=%t/MyApp.cmd
+// PLUGIN_SEARCH-NOT: -external-plugin-path
+// RESOLVED-COUNT-2: -load-resolved-plugin
+
 // RUN: %target-swift-frontend -diagnostic-style=swift \
 // RUN:   -emit-module -o %t/Test.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \

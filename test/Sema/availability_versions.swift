@@ -28,7 +28,22 @@ let ignored3: Int = globalFuncAvailableOn52() // expected-error {{'globalFuncAva
 
 // Functions without annotations should reflect the minimum deployment target.
 func functionWithoutAvailability() {
-      // expected-note@-1 2{{add @available attribute to enclosing global function}}
+      // expected-note@-1 5{{add @available attribute to enclosing global function}}
+
+  defer {
+    let _: Int = globalFuncAvailableOn10_9()
+    let _: Int = globalFuncAvailableOn51() // expected-error {{'globalFuncAvailableOn51()' is only available in macOS 51 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    let _: Int = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+
+    if #available(OSX 51, *) {
+      let _: Int = globalFuncAvailableOn10_9()
+      let _: Int = globalFuncAvailableOn51()
+      let _: Int = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+      // expected-note@-1 {{add 'if #available' version check}}
+    }
+  }
 
   let _: Int = globalFuncAvailableOn10_9()
 
@@ -754,7 +769,7 @@ func classViaTypeParameter() {
 // Potentially unavailable class used in declarations
 
 class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
-      // expected-note@-1 6{{add @available attribute to enclosing class}}
+      // expected-note@-1 5{{add @available attribute to enclosing class}}
 
   @available(OSX, introduced: 51)
   init() {}
@@ -808,8 +823,7 @@ class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
   
   @available(OSX, unavailable)
   func unavailableMethodWithPotentiallyUnavailableLocalDeclaration() {
-    let _ : ClassAvailableOn51 = methodWithPotentiallyUnavailableReturnType() // expected-error {{'ClassAvailableOn51' is only available in macOS 51 or newer}}
-      // expected-note@-1 {{add 'if #available' version check}}
+    let _ : ClassAvailableOn51 = methodWithPotentiallyUnavailableReturnType()
   }
 }
 

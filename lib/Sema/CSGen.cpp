@@ -16,7 +16,6 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckMacros.h"
-#include "TypeCheckRegex.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -698,8 +697,8 @@ namespace {
     auto *lhs = args->getExpr(0);
     auto *rhs = args->getExpr(1);
 
-    auto firstArgTy = CS.getType(lhs)->getWithoutParens();
-    auto secondArgTy = CS.getType(rhs)->getWithoutParens();
+    auto firstArgTy = CS.getType(lhs);
+    auto secondArgTy = CS.getType(rhs);
 
     auto isOptionalWithMatchingObjectType = [](Type optional,
                                                Type object) -> bool {
@@ -981,8 +980,7 @@ namespace {
     }
 
     /// If the provided type is a tuple, decomposes it into a matching set of
-    /// function params. Otherwise produces a single parameter of the type,
-    /// stripping a ParenType if needed.
+    /// function params. Otherwise produces a single parameter of the type.
     void decomposeTuple(Type ty,
                         SmallVectorImpl<AnyFunctionType::Param> &result) {
       switch (ty->getKind()) {
@@ -990,11 +988,6 @@ namespace {
         auto tupleTy = cast<TupleType>(ty.getPointer());
         for (auto &elt : tupleTy->getElements())
           result.emplace_back(elt.getType(), elt.getName());
-        return;
-      }
-      case TypeKind::Paren: {
-        auto pty = cast<ParenType>(ty.getPointer());
-        result.emplace_back(pty->getUnderlyingType(), Identifier());
         return;
       }
       default:
@@ -1242,12 +1235,18 @@ namespace {
       CS.setType(expr, expansionType);
     }
 
-    virtual Type visitErrorExpr(ErrorExpr *E) {
+    /// Records a fix for an invalid AST node, and returns a potential hole
+    /// type variable for it.
+    Type recordInvalidNode(ASTNode node) {
       CS.recordFix(
-          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(E)));
+          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(node)));
 
-      return CS.createTypeVariable(CS.getConstraintLocator(E),
+      return CS.createTypeVariable(CS.getConstraintLocator(node),
                                    TVO_CanBindToHole);
+    }
+
+    virtual Type visitErrorExpr(ErrorExpr *E) {
+      return recordInvalidNode(E);
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
@@ -1498,30 +1497,12 @@ namespace {
     }
 
     Type visitRegexLiteralExpr(RegexLiteralExpr *E) {
-      auto &ctx = CS.getASTContext();
-      auto *regexDecl = ctx.getRegexDecl();
-      if (!regexDecl) {
-        ctx.Diags.diagnose(E->getLoc(),
-                           diag::string_processing_lib_missing,
-                           ctx.Id_Regex.str());
-        return Type();
-      }
-      SmallVector<TupleTypeElt, 4> matchElements;
-      if (decodeRegexCaptureTypes(ctx,
-                                  E->getSerializedCaptureStructure(),
-                                  /*atomType*/ ctx.getSubstringType(),
-                                  matchElements)) {
-        ctx.Diags.diagnose(E->getLoc(),
-                           diag::regex_capture_types_failed_to_decode);
-        return Type();
-      }
-      assert(!matchElements.empty() && "Should have decoded at least an atom");
-      if (matchElements.size() == 1)
-        return BoundGenericStructType::get(
-            regexDecl, Type(), matchElements.front().getType());
-      // Form a tuple.
-      auto matchType = TupleType::get(matchElements, ctx);
-      return BoundGenericStructType::get(regexDecl, Type(), {matchType});
+      // Retrieve the computed Regex type from the compiler regex library.
+      auto ty = E->getRegexType();
+      if (!ty)
+        return recordInvalidNode(E);
+
+      return ty;
     }
 
     PackExpansionExpr *getParentPackExpansionExpr(Expr *E) const {
@@ -1549,7 +1530,7 @@ namespace {
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
         if (!knownType)
-          knownType = CS.getVarType(VD);
+          knownType = VD->getTypeInContext();
 
         if (knownType) {
           // An out-of-scope type variable(s) could appear the type of
@@ -2076,7 +2057,7 @@ namespace {
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
-      return ParenType::get(CS.getASTContext(), CS.getType(expr->getSubExpr()));
+      return CS.getType(expr->getSubExpr());
     }
 
     Type visitTupleExpr(TupleExpr *expr) {
@@ -2439,7 +2420,7 @@ namespace {
 
           Type externalType;
           if (param->getTypeRepr()) {
-            auto declaredTy = CS.getVarType(param);
+            auto declaredTy = param->getTypeInContext();
 
             // If closure parameter couldn't be resolved, let's record
             // a fix to make sure that type resolution diagnosed the
@@ -2620,7 +2601,7 @@ namespace {
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             bindPatternVarsOneWay);
 
-        return setType(ParenType::get(CS.getASTContext(), underlyingType));
+        return setType(underlyingType);
       }
       case PatternKind::Binding: {
         auto *subPattern = cast<BindingPattern>(pattern)->getSubPattern();
@@ -4016,6 +3997,10 @@ namespace {
       auto results = namelookup::lookupMacros(CurDC, DeclNameRef(moduleName),
                                               DeclNameRef(macroName), roles);
       for (const auto &result : results) {
+        // Ignore invalid results. This matches the OverloadedDeclRefExpr
+        // logic.
+        if (result->isInvalid())
+          continue;
         OverloadChoice choice = OverloadChoice(Type(), result, functionRefKind);
         choices.push_back(choice);
       }
@@ -4918,7 +4903,7 @@ bool ConstraintSystem::generateConstraints(
 
   case SyntacticElementTarget::Kind::uninitializedVar: {
     if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
-      auto propertyType = getVarType(wrappedVar);
+      auto propertyType = wrappedVar->getTypeInContext();
       if (propertyType->hasError())
         return true;
 
@@ -4995,7 +4980,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
   }
 
   Type boolTy = boolDecl->getDeclaredInterfaceType();
-  for (const auto &condElement : condition) {
+  for (auto &condElement : condition) {
     switch (condElement.getKind()) {
     case StmtConditionElement::CK_Availability:
       // Nothing to do here.
@@ -5046,6 +5031,22 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
   return false;
 }
 
+void ConstraintSystem::applyPropertyWrapper(
+    Expr *anchor, AppliedPropertyWrapper applied) {
+  appliedPropertyWrappers[anchor].push_back(applied);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::AppliedPropertyWrapper(anchor));
+}
+
+void ConstraintSystem::removePropertyWrapper(Expr *anchor) {
+  auto found = appliedPropertyWrappers.find(anchor);
+  ASSERT(found != appliedPropertyWrappers.end());
+  auto &wrappers = found->second;
+  ASSERT(!wrappers.empty());
+  wrappers.pop_back();
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::applyPropertyWrapperToParameter(
     Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
@@ -5079,13 +5080,13 @@ ConstraintSystem::applyPropertyWrapperToParameter(
       setType(param->getPropertyWrapperProjectionVar(), projectionType);
     }
 
-    appliedPropertyWrappers[anchor].push_back({ wrapperType, PropertyWrapperInitKind::ProjectedValue });
+    applyPropertyWrapper(anchor, { wrapperType, PropertyWrapperInitKind::ProjectedValue });
   } else if (param->hasExternalPropertyWrapper()) {
     Type wrappedValueType = computeWrappedValueType(param, wrapperType);
     addConstraint(matchKind, paramType, wrappedValueType, locator);
     setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType);
 
-    appliedPropertyWrappers[anchor].push_back({ wrapperType, PropertyWrapperInitKind::WrappedValue });
+    applyPropertyWrapper(anchor, { wrapperType, PropertyWrapperInitKind::WrappedValue });
   } else {
     return getTypeMatchFailure(locator);
   }

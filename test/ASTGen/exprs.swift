@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only > %t/cpp-parser.ast.raw
+// RUN: %target-swift-frontend %s -dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
+// RUN: %target-swift-frontend %s -dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only > %t/cpp-parser.ast.raw
 
 // Filter out any addresses in the dump, since they can differ.
 // RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
@@ -9,13 +9,13 @@
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ParserASTGen
+// REQUIRES: swift_feature_SwiftParser
 
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
 // rdar://116686158
 // UNSUPPORTED: asan
 
@@ -67,6 +67,8 @@ struct TestStruct {
     _ = self.method(arg:_:).self
     _ = Ty.`Self` ==  Ty.`self`
   }
+
+  var optSelf: Self? { self }
 }
 
 func testSequence(arg1: Int, arg2: () -> Int, arg3: Any) {
@@ -104,6 +106,12 @@ func testTrailingClsure() {
   acceptClosures(x: {}, y: { 12 }) {}
 }
 
+func testInOut() {
+  func acceptInOut(arg: inout Int) { arg += 1 }
+  var value = 42
+  acceptInOut(arg: &value)
+}
+
 func testStringLiteral(arg: Int) {
   _ = "test"
   _ = "foo\(arg)bar"
@@ -128,4 +136,56 @@ func testStringLiteral(arg: Int) {
     )
     baz
     """
+}
+
+func testNumberLiteral() {
+  _ = 12
+  _ = 1_2
+  _ = 0xab
+  _ = 0xab_p2
+  _ = 12.42
+  _ = 0b0000_1100_1000
+  _ = 1_
+  _ = 1_000
+  _ = 0b1111_0000_
+  _ = 0b1111_0000
+  _  = 0o127_777_
+  _ = 0o127_777
+  _ = 0x12FF_FFFF
+  _ = 0x12FF_FFFF_
+  _ = 1.0e42
+  _ = 0x1.0p0
+  _ = 0x1.fffffep+2
+  _ = 1_000.200_001e1_000
+  _ =  0x1_0000.0FFF_ABCDp10_001
+}
+
+class BaseCls {
+  init(base: Int) {}
+}
+class DerivedCls: BaseCls {
+  init(testSuperRef arg: Int) { super.init(base: arg) }
+}
+
+struct HasSubscript {
+  subscript(label label: Int, args: Int) -> Int { return 1 }
+}
+func testSubscript(intArry: [Int], val: HasSubscript) {
+  _ = intArry[12]
+  _ = val[label: 42, 14]
+}
+
+struct Generic<T: Comparable> {}
+func testSpecializeExpr() {
+  _ = Generic<Int>.self
+  _ = Generic<Int>()
+}
+
+func testOptionalChain(value: TestStruct) {
+  let _: TestStruct? = value.optSelf?.optSelf!
+  let _: TestStruct = value.optSelf!
+  let _: TestStruct = value.optSelf.self!
+
+  var value: Int? = 1
+  value? += 1
 }

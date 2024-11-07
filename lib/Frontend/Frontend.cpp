@@ -200,6 +200,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
   serializationOpts.UserModuleVersion = opts.UserModuleVersion;
   serializationOpts.AllowableClients = opts.AllowableClients;
+  serializationOpts.SerializeDebugInfoSIL = opts.SerializeDebugInfoSIL;
 
   serializationOpts.PublicDependentLibraries =
       getIRGenOptions().PublicLinkLibraries;
@@ -302,7 +303,8 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
       Invocation.getSILOptions(), Invocation.getSearchPathOptions(),
       Invocation.getClangImporterOptions(), Invocation.getSymbolGraphOptions(),
-      Invocation.getCASOptions(), SourceMgr, Diagnostics, OutputBackend));
+      Invocation.getCASOptions(), Invocation.getSerializationOptions(),
+      SourceMgr, Diagnostics, OutputBackend));
   if (!Invocation.getFrontendOptions().ModuleAliasMap.empty())
     Context->setModuleAliases(Invocation.getFrontendOptions().ModuleAliasMap);
 
@@ -384,7 +386,8 @@ void CompilerInstance::setupStatsReporter() {
       Invoke.getFrontendOptions().FineGrainedTimers,
       Invoke.getFrontendOptions().TraceStats,
       Invoke.getFrontendOptions().ProfileEvents,
-      Invoke.getFrontendOptions().ProfileEntities);
+      Invoke.getFrontendOptions().ProfileEntities,
+      Invoke.getFrontendOptions().PrintZeroStats);
   // Hand the stats reporter down to the ASTContext so the rest of the compiler
   // can use it.
   getASTContext().setStatsReporter(Reporter.get());
@@ -562,7 +565,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     return true;
   }
 
-  setupStatsReporter();
+  if (hasASTContext()) {
+    setupStatsReporter();
+  }
 
   if (setupDiagnosticVerifierIfNeeded()) {
     Error = "Setting up diagnostics verifier failed";
@@ -623,10 +628,12 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
   }
 
   if (Invocation.getCASOptions().requireCASFS()) {
-    if (!CASOpts.CASFSRootIDs.empty() || !CASOpts.ClangIncludeTrees.empty()) {
+    if (!CASOpts.CASFSRootIDs.empty() || !CASOpts.ClangIncludeTrees.empty() ||
+        !CASOpts.ClangIncludeTreeFileList.empty()) {
       // Set up CASFS as BaseFS.
       auto FS = createCASFileSystem(*CAS, CASOpts.CASFSRootIDs,
-                                    CASOpts.ClangIncludeTrees);
+                                    CASOpts.ClangIncludeTrees,
+                                    CASOpts.ClangIncludeTreeFileList);
       if (!FS) {
         Diagnostics.diagnose(SourceLoc(), diag::error_cas,
                              toString(FS.takeError()));
@@ -816,8 +823,11 @@ bool CompilerInstance::setUpModuleLoaders() {
   }
 
   // Configure ModuleInterfaceChecker for the ASTContext.
+  auto CacheFromInvocation = getInvocation().getClangModuleCachePath();
   auto const &Clang = clangImporter->getClangInstance();
-  std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
+  std::string ModuleCachePath = CacheFromInvocation.empty()
+                                    ? getModuleCachePathFromClang(Clang)
+                                    : CacheFromInvocation.str();
   auto &FEOpts = Invocation.getFrontendOptions();
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   Context->addModuleInterfaceChecker(
@@ -1482,6 +1492,11 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setAllowNonResilientAccess();
     if (Invocation.getSILOptions().EnableSerializePackage)
       MainModule->setSerializePackageEnabled();
+
+    if (auto compilerVersion =
+            Invocation.getFrontendOptions().SwiftInterfaceCompilerVersion) {
+      MainModule->setSwiftInterfaceCompilerVersion(compilerVersion);
+    }
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);

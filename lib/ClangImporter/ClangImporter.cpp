@@ -42,13 +42,12 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseVersion.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
@@ -682,6 +681,11 @@ void importer::getNormalInvocationArguments(
   // is supported.
   if (LangOpts.hasFeature(Feature::SendingArgsAndResults))
     invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_SENDING=1");
+
+  // Indicate that the compiler will respect macros applied to imported
+  // declarations via '__attribute__((swift_attr("@...")))'.
+  if (LangOpts.hasFeature(Feature::MacrosOnImports))
+    invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_MACROS=1");
 
   if (searchPathOpts.getSDKPath().empty()) {
     invocationArgStrs.push_back("-Xclang");
@@ -1500,6 +1504,10 @@ ClangImporter::create(ASTContext &ctx,
   if (importerOpts.Mode == ClangImporterOptions::Modes::PrecompiledModule)
     return importer;
 
+  instance.initializeDelayedInputFileFromCAS();
+  if (instance.getFrontendOpts().Inputs.empty())
+    return nullptr; // no inputs available.
+
   bool canBegin = action->BeginSourceFile(instance,
                                           instance.getFrontendOpts().Inputs[0]);
   if (!canBegin)
@@ -1553,18 +1561,18 @@ ClangImporter::create(ASTContext &ctx,
   importer->Impl.objectAtIndexedSubscript
     = clangContext.Selectors.getUnarySelector(
         &clangContext.Idents.get("objectAtIndexedSubscript"));
-  clang::IdentifierInfo *setObjectAtIndexedSubscriptIdents[2] = {
-    &clangContext.Idents.get("setObject"),
-    &clangContext.Idents.get("atIndexedSubscript")
+  const clang::IdentifierInfo *setObjectAtIndexedSubscriptIdents[2] = {
+      &clangContext.Idents.get("setObject"),
+      &clangContext.Idents.get("atIndexedSubscript"),
   };
   importer->Impl.setObjectAtIndexedSubscript
     = clangContext.Selectors.getSelector(2, setObjectAtIndexedSubscriptIdents);
   importer->Impl.objectForKeyedSubscript
     = clangContext.Selectors.getUnarySelector(
         &clangContext.Idents.get("objectForKeyedSubscript"));
-  clang::IdentifierInfo *setObjectForKeyedSubscriptIdents[2] = {
-    &clangContext.Idents.get("setObject"),
-    &clangContext.Idents.get("forKeyedSubscript")
+  const clang::IdentifierInfo *setObjectForKeyedSubscriptIdents[2] = {
+      &clangContext.Idents.get("setObject"),
+      &clangContext.Idents.get("forKeyedSubscript"),
   };
   importer->Impl.setObjectForKeyedSubscript
     = clangContext.Selectors.getSelector(2, setObjectForKeyedSubscriptIdents);
@@ -2277,9 +2285,9 @@ ClangImporter::Implementation::lookupModule(StringRef moduleName) {
   if (moduleFile == PrebuiltModules.end())
     return nullptr;
 
-  if (!Instance->loadModuleFile(moduleFile->second))
+  clang::serialization::ModuleFile *Loaded = nullptr;
+  if (!Instance->loadModuleFile(moduleFile->second, Loaded))
     return nullptr; // error loading, return not found.
-  // Lookup again.
   return loadFromMM();
 }
 
@@ -2445,13 +2453,15 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   // instead, manually register all `.h` inputs of Clang module dependnecies.
   if (SwiftDependencyTracker &&
       !Instance->getInvocation().getLangOpts().ImplicitModules) {
-    auto *moduleFile = Instance->getASTReader()->getModuleManager().lookup(
-        clangModule->getASTFile());
-    Instance->getASTReader()->visitInputFileInfos(
-        *moduleFile, /*IncludeSystem=*/true,
-        [&](const clang::serialization::InputFileInfo &IFI, bool isSystem) {
-          SwiftDependencyTracker->addDependency(IFI.Filename, isSystem);
-        });
+    if (auto moduleRef = clangModule->getASTFile()) {
+      auto *moduleFile = Instance->getASTReader()->getModuleManager().lookup(
+          *moduleRef);
+      Instance->getASTReader()->visitInputFileInfos(
+          *moduleFile, /*IncludeSystem=*/true,
+          [&](const clang::serialization::InputFileInfo &IFI, bool isSystem) {
+            SwiftDependencyTracker->addDependency(IFI.Filename, isSystem);
+          });
+    }
   }
 
   if (clangModule->isSubModule()) {
@@ -2849,14 +2859,12 @@ ClangImporter::Implementation::exportSourceLoc(SourceLoc loc) {
 
 SourceLoc
 ClangImporter::Implementation::importSourceLoc(clang::SourceLocation loc) {
-  // FIXME: Implement!
-  return SourceLoc();
+  return BuffersForDiagnostics.resolveSourceLocation(Instance->getSourceManager(), loc);
 }
 
 SourceRange
-ClangImporter::Implementation::importSourceRange(clang::SourceRange loc) {
-  // FIXME: Implement!
-  return SourceRange();
+ClangImporter::Implementation::importSourceRange(clang::SourceRange range) {
+  return SourceRange(importSourceLoc(range.getBegin()), importSourceLoc(range.getEnd()));
 }
 
 #pragma mark Importing names
@@ -2926,7 +2934,7 @@ ClangImporter::Implementation::exportSelector(DeclName name,
 
   clang::ASTContext &ctx = getClangASTContext();
 
-  SmallVector<clang::IdentifierInfo *, 8> pieces;
+  SmallVector<const clang::IdentifierInfo *, 8> pieces;
   pieces.push_back(exportName(name.getBaseIdentifier()).getAsIdentifierInfo());
 
   auto argNames = name.getArgumentNames();
@@ -2945,7 +2953,7 @@ ClangImporter::Implementation::exportSelector(DeclName name,
 
 clang::Selector
 ClangImporter::Implementation::exportSelector(ObjCSelector selector) {
-  SmallVector<clang::IdentifierInfo *, 4> pieces;
+  SmallVector<const clang::IdentifierInfo *, 4> pieces;
   for (auto piece : selector.getSelectorPieces())
     pieces.push_back(exportName(piece).getAsIdentifierInfo());
   return getClangASTContext().Selectors.getSelector(selector.getNumArgs(),
@@ -2961,7 +2969,7 @@ isPotentiallyConflictingSetter(const clang::ObjCProtocolDecl *proto,
   if (sel.getNumArgs() != 1)
     return false;
 
-  clang::IdentifierInfo *setterID = sel.getIdentifierInfoForSlot(0);
+  const clang::IdentifierInfo *setterID = sel.getIdentifierInfoForSlot(0);
   if (!setterID || !setterID->getName().starts_with("set"))
     return false;
 
@@ -3995,11 +4003,12 @@ void ClangModuleUnit::lookupObjCMethods(
   // Collect all of the Objective-C methods with this selector.
   SmallVector<clang::ObjCMethodDecl *, 8> objcMethods;
   auto &clangSema = owner.getClangSema();
-  clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
+  auto &clangObjc = clangSema.ObjC();
+  clangObjc.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
                                                /*InstanceFirst=*/true,
                                                /*CheckTheOther=*/false);
-  clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
+  clangObjc.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
                                                /*InstanceFirst=*/false,
                                                /*CheckTheOther=*/false);
@@ -4060,14 +4069,13 @@ StringRef ClangModuleUnit::getFilename() const {
     else
       return SinglePCH;
   }
-  if (const clang::FileEntry *F = clangModule->getASTFile())
-    if (!F->getName().empty())
-      return F->getName();
+  if (auto F = clangModule->getASTFile())
+    return F->getName();
   return StringRef();
 }
 
 StringRef ClangModuleUnit::getLoadedFilename() const {
-  if (const clang::FileEntry *F = clangModule->getASTFile())
+  if (auto F = clangModule->getASTFile())
     return F->getName();
   return StringRef();
 }
@@ -4716,6 +4724,17 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
         anyMatching = true;
       }
     }
+
+    // Visit auxiliary declarations to check for name matches.
+    decl->visitAuxiliaryDecls([&](Decl *aux) {
+      if (auto auxValue = dyn_cast<ValueDecl>(aux)) {
+        if (auxValue->getName().matchesRef(name) &&
+            auxValue->getDeclContext()->isModuleScopeContext()) {
+          consumer.foundDecl(auxValue, DeclVisibilityKind::VisibleAtTopLevel);
+          anyMatching = true;
+        }
+      }
+    });
 
     // If we have a declaration and nothing matched so far, try the names used
     // in other versions of Swift.
@@ -5441,9 +5460,9 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
 
   // Returns the expression that accesses the base field from derived type.
   auto createFieldAccess = [&]() -> clang::Expr * {
-    auto *thisExpr = new (clangCtx)
-        clang::CXXThisExpr(clang::SourceLocation(), newMethod->getThisType(),
-                           /*IsImplicit=*/false);
+    auto *thisExpr = clang::CXXThisExpr::Create(
+        clangCtx, clang::SourceLocation(), newMethod->getThisType(),
+        /*IsImplicit=*/false);
     clang::QualType baseClassPtr = clangCtx.getRecordType(baseClass);
     baseClassPtr.addConst();
     baseClassPtr = clangCtx.getPointerType(baseClassPtr);
@@ -5959,9 +5978,10 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   if (auto typeAlias = dyn_cast<TypeAliasDecl>(decl)) {
     auto rawMemory = allocateMemoryForDecl<TypeAliasDecl>(
         typeAlias->getASTContext(), sizeof(TypeAliasDecl), false);
-    auto out = new (rawMemory) TypeAliasDecl(
-        typeAlias->getLoc(), typeAlias->getEqualLoc(), typeAlias->getName(),
-        typeAlias->getNameLoc(), typeAlias->getGenericParams(), newContext);
+    auto out = new (rawMemory)
+        TypeAliasDecl(typeAlias->getStartLoc(), typeAlias->getEqualLoc(),
+                      typeAlias->getName(), typeAlias->getNameLoc(),
+                      typeAlias->getGenericParams(), newContext);
     out->setUnderlyingType(typeAlias->getUnderlyingType());
     out->copyFormalAccessFrom(typeAlias);
     return out;
@@ -7424,6 +7444,31 @@ static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
          });
 }
 
+// TODO: Move all these utility functions in a new file ClangImporterUtils.h
+// rdar://138803759
+static bool hasImmortalAtts(const clang::RecordDecl *decl) {
+  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+             return swiftAttr->getAttribute() == "retain:immortal" ||
+                    swiftAttr->getAttribute() == "release:immortal";
+           return false;
+         });
+}
+
+// Is this a pointer to a foreign reference type.
+bool importer::isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType type) {
+  if (!type->isPointerType())
+    return false;
+
+  auto pointeeType =
+      dyn_cast<clang::RecordType>(type->getPointeeType().getCanonicalType());
+  if (pointeeType == nullptr)
+    return false;
+
+  return hasImportAsRefAttr(pointeeType->getDecl()) &&
+         !hasImmortalAtts(pointeeType->getDecl());
+}
+
 // Is this a pointer to a foreign reference type.
 static bool isForeignReferenceType(const clang::QualType type) {
   if (!type->isPointerType())
@@ -7603,18 +7648,22 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
   if (decl->isInStdNamespace() && decl->getIdentifier() &&
       decl->getName() == "_Optional_construct_base")
     return true;
+  // Hack for std::vector::const_iterator from libstdc++, which uses an extra
+  // parameter on its copy constructor, which has a defaulted enable_if value.
+  auto namespaceContext = dyn_cast_or_null<clang::NamespaceDecl>(
+      decl->getEnclosingNamespaceContext());
+  if (namespaceContext && namespaceContext->getIdentifier() &&
+      namespaceContext->getName() == "__gnu_cxx" && decl->getIdentifier() &&
+      decl->getName() == "__normal_iterator")
+    return true;
 
   // If we have no way of copying the type we can't import the class
   // at all because we cannot express the correct semantics as a swift
   // struct.
-  if (llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-        return ctor->isCopyConstructor() &&
-               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
-      }))
-    return false;
-
-  // TODO: this should probably check to make sure we actually have a copy ctor.
-  return true;
+  return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+    return ctor->isCopyConstructor() && !ctor->isDeleted() &&
+           ctor->getAccess() == clang::AccessSpecifier::AS_public;
+  });
 }
 
 static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
@@ -8029,7 +8078,7 @@ bool importer::requiresCPlusPlus(const clang::Module *module) {
   }
 
   return llvm::any_of(module->Requirements, [](clang::Module::Requirement req) {
-    return req.first == "cplusplus";
+    return req.FeatureName == "cplusplus";
   });
 }
 

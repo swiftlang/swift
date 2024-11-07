@@ -34,6 +34,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -51,8 +52,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
-#include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -1696,8 +1695,8 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   // range with both the conforming type's available range and the protocol
   // declaration's available range.
   AvailabilityRange witnessInfo =
-      AvailabilityInference::availableRange(witness, Context);
-  requirementInfo = AvailabilityInference::availableRange(requirement, Context);
+      AvailabilityInference::availableRange(witness);
+  requirementInfo = AvailabilityInference::availableRange(requirement);
 
   AvailabilityRange infoForConformingDecl =
       overApproximateAvailabilityAtLocation(dc->getAsDecl()->getLoc(), dc);
@@ -3350,6 +3349,7 @@ SourceLoc PrettyPrintDeclRequest::evaluate(Evaluator &eval, const Decl *decl) co
         getBufferAccessLevel(decl),
         ctx.TypeCheckerOpts.PrintFullConvention);
     decl->print(printer, options);
+
     // Close all of the enclosing types.
     for (const auto & enclosingType: enclosingTypes) {
       (void)enclosingType;
@@ -3380,6 +3380,12 @@ SourceLoc PrettyPrintDeclRequest::evaluate(Evaluator &eval, const Decl *decl) co
         nullptr
       }
   );
+
+  // Add a source file for the buffer.
+  auto moduleDecl = decl->getDeclContext()->getParentModule();
+  auto sourceFile = new (ctx) SourceFile(
+      *moduleDecl, SourceFileKind::Library, bufferID);
+  sourceFile->setImports({ });
 
   return memBufferStartLoc.getAdvancedLoc(targetDeclOffsetInBuffer);
 }

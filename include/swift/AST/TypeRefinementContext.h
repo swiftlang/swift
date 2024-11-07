@@ -18,13 +18,14 @@
 #ifndef SWIFT_TYPEREFINEMENTCONTEXT_H
 #define SWIFT_TYPEREFINEMENTCONTEXT_H
 
-#include "swift/AST/Identifier.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Stmt.h" // for PoundAvailableInfo
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -171,12 +172,7 @@ private:
 
   /// A canonical availability info for this context, computed top-down from the
   /// root context.
-  AvailabilityRange AvailabilityInfo;
-
-  /// If this context was annotated with an availability attribute, this property captures that.
-  /// It differs from the above `AvailabilityInfo` by being independent of the deployment target,
-  /// and is used for providing availability attribute redundancy warning diagnostics.
-  AvailabilityRange ExplicitAvailabilityInfo;
+  const AvailabilityContext AvailabilityInfo;
 
   std::vector<TypeRefinementContext *> Children;
 
@@ -185,37 +181,37 @@ private:
     unsigned needsExpansion : 1;
   } LazyInfo = {};
 
+  void verify(const TypeRefinementContext *parent, ASTContext &ctx) const;
+
   TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
                         TypeRefinementContext *Parent, SourceRange SrcRange,
-                        const AvailabilityRange &Info,
-                        const AvailabilityRange &ExplicitInfo);
+                        const AvailabilityContext Info);
 
 public:
-  
   /// Create the root refinement context for the given SourceFile.
   static TypeRefinementContext *
-  createForSourceFile(SourceFile *SF, const AvailabilityRange &Info);
+  createForSourceFile(SourceFile *SF, const AvailabilityContext Info);
 
   /// Create a refinement context for the given declaration.
-  static TypeRefinementContext *
-  createForDecl(ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
-                const AvailabilityRange &Info,
-                const AvailabilityRange &ExplicitInfo, SourceRange SrcRange);
+  static TypeRefinementContext *createForDecl(ASTContext &Ctx, Decl *D,
+                                              TypeRefinementContext *Parent,
+                                              const AvailabilityContext Info,
+                                              SourceRange SrcRange);
 
   /// Create a refinement context for the given declaration.
   static TypeRefinementContext *
   createForDeclImplicit(ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
-                        const AvailabilityRange &Info, SourceRange SrcRange);
+                        const AvailabilityContext Info, SourceRange SrcRange);
 
   /// Create a refinement context for the Then branch of the given IfStmt.
   static TypeRefinementContext *
   createForIfStmtThen(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
-                      const AvailabilityRange &Info);
+                      const AvailabilityContext Info);
 
   /// Create a refinement context for the Else branch of the given IfStmt.
   static TypeRefinementContext *
   createForIfStmtElse(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
-                      const AvailabilityRange &Info);
+                      const AvailabilityContext Info);
 
   /// Create a refinement context for the true-branch control flow to
   /// further StmtConditionElements following a #available() query in
@@ -224,24 +220,24 @@ public:
   createForConditionFollowingQuery(ASTContext &Ctx, PoundAvailableInfo *PAI,
                                    const StmtConditionElement &LastElement,
                                    TypeRefinementContext *Parent,
-                                   const AvailabilityRange &Info);
+                                   const AvailabilityContext Info);
 
   /// Create a refinement context for the fallthrough of a GuardStmt.
   static TypeRefinementContext *createForGuardStmtFallthrough(
       ASTContext &Ctx, GuardStmt *RS, BraceStmt *ContainingBraceStmt,
-      TypeRefinementContext *Parent, const AvailabilityRange &Info);
+      TypeRefinementContext *Parent, const AvailabilityContext Info);
 
   /// Create a refinement context for the else branch of a GuardStmt.
   static TypeRefinementContext *
   createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
                          TypeRefinementContext *Parent,
-                         const AvailabilityRange &Info);
+                         const AvailabilityContext Info);
 
   /// Create a refinement context for the body of a WhileStmt.
   static TypeRefinementContext *
   createForWhileStmtBody(ASTContext &Ctx, WhileStmt *WS,
                          TypeRefinementContext *Parent,
-                         const AvailabilityRange &Info);
+                         const AvailabilityContext Info);
 
   Decl *getDeclOrNull() const {
     auto IntroReason = getReason();
@@ -274,28 +270,28 @@ public:
       PlatformKind Platform,
       const llvm::VersionTuple &Version) const;
 
+  /// Returns the availability version range that was explicitly written in
+  /// source, if applicable. Otherwise, returns null.
+  std::optional<const AvailabilityRange> getExplicitAvailabilityRange() const;
+
   /// Returns the source range on which this context refines types.
   SourceRange getSourceRange() const { return SrcRange; }
 
-  /// Returns the information on what can be assumed present at run time when
-  /// running code contained in this context.
-  const AvailabilityRange &getAvailabilityInfo() const {
+  /// Returns the availability context of code contained in this context.
+  const AvailabilityContext getAvailabilityContext() const {
     return AvailabilityInfo;
   }
 
-  /// Returns the information on what availability was specified by the programmer
-  /// on this context (if any).
-  const AvailabilityRange &getExplicitAvailabilityInfo() const {
-    return ExplicitAvailabilityInfo;
+  /// Returns the platform version range that can be assumed present at run
+  /// time when running code contained in this context.
+  const AvailabilityRange getPlatformAvailabilityRange() const {
+    return AvailabilityInfo.getPlatformRange();
   }
 
   /// Adds a child refinement context.
-  void addChild(TypeRefinementContext *Child) {
-    assert(Child->getSourceRange().isValid());
-    Children.push_back(Child);
-  }
+  void addChild(TypeRefinementContext *Child, ASTContext &Ctx);
 
-  /// Returns the inner-most TypeRefinementContext descendant of this context
+  /// Returns the innermost TypeRefinementContext descendant of this context
   /// for the given source location.
   TypeRefinementContext *findMostRefinedSubContext(SourceLoc Loc,
                                                    ASTContext &Ctx);
@@ -305,6 +301,10 @@ public:
   void setNeedsExpansion(bool needsExpansion) {
     LazyInfo.needsExpansion = needsExpansion;
   }
+
+  /// Recursively check the tree for integrity. If any errors are found, emits
+  /// diagnostics to stderr and aborts.
+  void verify(ASTContext &ctx);
 
   SWIFT_DEBUG_DUMPER(dump(SourceManager &SrcMgr));
   void dump(raw_ostream &OS, SourceManager &SrcMgr) const;

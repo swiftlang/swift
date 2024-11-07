@@ -30,7 +30,6 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
-#include "swift/Parse/Parser.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -87,11 +86,16 @@ SILParserState::~SILParserState() {
   }
 
   // Turn any debug-info-only function declarations into zombies.
-  for (auto *Fn : PotentialZombieFns)
-    if (Fn->isExternalDeclaration()) {
+  markZombies();
+}
+
+void SILParserState::markZombies() {
+  for (auto *Fn : PotentialZombieFns) {
+    if (Fn->isExternalDeclaration() && !Fn->isZombie()) {
       Fn->setInlined();
       M.eraseFunction(Fn);
     }
+  }
 }
 
 std::unique_ptr<SILModule>
@@ -125,6 +129,11 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
            "Failed to parse SIL but did not emit any errors!");
     return SILModule::createEmptyModule(desc.context, desc.conv, desc.opts);
   }
+
+  // Mark functions as zombies before calling SILVerifier as functions referred
+  //to by debug scopes only can fail verifier checks
+  parserState.markZombies();
+
   // If SIL parsing succeeded, verify the generated SIL.
   if (!parser.Diags.hadAnyError() && !DisableInputVerify) {
     silMod->verify(/*SingleFunction=*/true, !ParseIncompleteOSSA);
@@ -3030,6 +3039,21 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createBuiltin(InstLoc, Id, ResultTy, subMap, Args);
     break;
   }
+  case SILInstructionKind::MergeIsolationRegionInst: {
+    SmallVector<SILValue, 4> Args;
+    do {
+      SILValue Val;
+      if (parseTypedValueRef(Val, B))
+        return true;
+      Args.push_back(Val);
+    } while (P.consumeIf(tok::comma));
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal = B.createMergeIsolationRegion(InstLoc, Args);
+    break;
+  }
   case SILInstructionKind::OpenExistentialAddrInst:
     if (parseOpenExistAddrKind() || parseTypedValueRef(Val, B) ||
         parseVerbatim("to") || parseSILType(Ty) ||
@@ -4046,6 +4070,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     auto kind = llvm::StringSwitch<ThunkInst::Kind>(attrName)
                     .Case("identity", ThunkInst::Kind::Identity)
+                    .Case("hop_to_mainactor_if_needed",
+                          ThunkInst::Kind::HopToMainActorIfNeeded)
                     .Default(ThunkInst::Kind::Invalid);
     if (!kind) {
       P.diagnose(OpcodeLoc, diag::sil_thunkinst_failed_to_parse_kind, attrName);
@@ -6883,7 +6909,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       return true;
     }
   } else if (Opcode == SILInstructionKind::BeginApplyInst) {
-    if (FTI->getCoroutineKind() != SILCoroutineKind::YieldOnce) {
+    if (FTI->getCoroutineKind() != SILCoroutineKind::YieldOnce &&
+        FTI->getCoroutineKind() != SILCoroutineKind::YieldOnce2) {
       P.diagnose(TypeLoc, diag::expected_sil_type_kind,
                  "to be a yield_once coroutine");
       return true;

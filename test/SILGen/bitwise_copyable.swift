@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend                                  \
 // RUN:     %s                                                  \
 // RUN:     -emit-silgen                                        \
-// RUN:     -disable-availability-checking                      \
+// RUN:     -target %target-swift-5.1-abi-triple                      \
 // RUN:     -enable-experimental-feature Sensitive              \
 // RUN:     -enable-builtin-module
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_Sensitive
 
 // Force verification of TypeLowering's isTrivial.
 

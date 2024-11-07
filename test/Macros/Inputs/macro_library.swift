@@ -53,3 +53,6 @@ public struct declareVarValuePeerShadowed {
 
 @attached(peer, names: named(value))
 public macro declareVarValuePeerShadowed() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
+
+@attached(peer, names: overloaded)
+public macro AddAsync() = #externalMacro(module: "MacroDefinition", type: "AddAsyncMacro")

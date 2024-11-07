@@ -20,6 +20,7 @@
 #include "IRGen.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "ReferenceTypeInfo.h"
 #include "SwitchBuilder.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -69,7 +70,7 @@ public:
     Bridge = 0x08,
     Block = 0x09,
     ObjC = 0x0a,
-    Custom = 0x0b,
+    NativeSwiftObjC = 0x0b,
 
     // reserved
     // Metatype = 0x0c,
@@ -1293,7 +1294,12 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Block, size);
     break;
   case ScalarKind::ObjCReference:
-    B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC, size);
+    if (typeInfo.hasFixedSpareBits()) {
+      B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeSwiftObjC,
+                    size);
+    } else {
+      B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC, size);
+    }
     break;
   case ScalarKind::ThickFunc:
     B.addSkip(IGM.getPointerSize().getValue());
@@ -2408,7 +2414,8 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
     if (isMultiPayloadEnum() &&
         buildMultiPayloadRefCountString(IGM, B, genericSig)) {
       return true;
-    } else if (buildSinglePayloadRefCountString(IGM, B, genericSig)) {
+    } else if (!isMultiPayloadEnum() &&
+               buildSinglePayloadRefCountString(IGM, B, genericSig)) {
       return true;
     }
 
@@ -3829,6 +3836,13 @@ TypeInfoBasedTypeLayoutEntry::layoutString(IRGenModule &IGM,
 bool TypeInfoBasedTypeLayoutEntry::refCountString(
     IRGenModule &IGM, LayoutStringBuilder &B,
     GenericSignature genericSig) const {
+  if (auto *refTI = dyn_cast<ReferenceTypeInfo>(&typeInfo)) {
+    if (refTI->getReferenceCountingType() == ReferenceCounting::ObjC) {
+      B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC,
+                    typeInfo.getFixedSize().getValue());
+      return true;
+    }
+  }
   return false;
 }
 

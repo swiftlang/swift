@@ -17,6 +17,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -28,6 +29,26 @@
 #include <map>
 
 using namespace swift;
+
+void VersionRange::Profile(llvm::FoldingSetNodeID &id) const {
+  id.AddBoolean(hasLowerEndpoint());
+  if (!hasLowerEndpoint()) {
+    id.AddBoolean(isAll());
+    return;
+  }
+
+  auto profileVersionComponent = [&id](std::optional<unsigned> component) {
+    id.AddBoolean(component.has_value());
+    if (component)
+      id.AddInteger(*component);
+  };
+
+  auto lowerEndpoint = getLowerEndpoint();
+  id.AddInteger(lowerEndpoint.getMajor());
+  profileVersionComponent(lowerEndpoint.getMinor());
+  profileVersionComponent(lowerEndpoint.getSubminor());
+  profileVersionComponent(lowerEndpoint.getBuild());
+}
 
 AvailabilityRange
 AvailabilityRange::forDeploymentTarget(const ASTContext &Ctx) {
@@ -42,6 +63,30 @@ AvailabilityRange AvailabilityRange::forInliningTarget(const ASTContext &Ctx) {
 
 AvailabilityRange AvailabilityRange::forRuntimeTarget(const ASTContext &Ctx) {
   return AvailabilityRange(VersionRange::allGTE(Ctx.LangOpts.RuntimeVersion));
+}
+
+std::optional<AvailabilityRange>
+AvailabilityConstraint::getRequiredNewerAvailabilityRange(
+    ASTContext &ctx) const {
+  switch (kind) {
+  case Kind::AlwaysUnavailable:
+  case Kind::RequiresVersion:
+  case Kind::Obsoleted:
+    return std::nullopt;
+  case Kind::IntroducedInNewerVersion:
+    return AvailabilityInference::availableRange(attr, ctx);
+  }
+}
+
+bool AvailabilityConstraint::isConditionallySatisfiable() const {
+  switch (kind) {
+  case Kind::AlwaysUnavailable:
+  case Kind::RequiresVersion:
+  case Kind::Obsoleted:
+    return false;
+  case Kind::IntroducedInNewerVersion:
+    return true;
+  }
 }
 
 namespace {
@@ -94,7 +139,7 @@ static void mergeWithInferredAvailability(const AvailableAttr *Attr,
 
   // The merge of two introduction versions is the maximum of the two versions.
   if (mergeIntoInferredVersion(Attr->Introduced, Inferred.Introduced, std::max)) {
-    Inferred.IsSPI = Attr->IsSPI;
+    Inferred.IsSPI = Attr->isSPI();
   }
 
   // The merge of deprecated and obsoleted versions takes the minimum.
@@ -135,8 +180,8 @@ static AvailableAttr *createAvailableAttr(PlatformKind Platform,
 }
 
 void AvailabilityInference::applyInferredAvailableAttrs(
-    Decl *ToDecl, ArrayRef<const Decl *> InferredFromDecls,
-    ASTContext &Context) {
+    Decl *ToDecl, ArrayRef<const Decl *> InferredFromDecls) {
+  auto &Context = ToDecl->getASTContext();
 
   // Let the new AvailabilityAttr inherit the message and rename.
   // The first encountered message / rename will win; this matches the 
@@ -370,8 +415,8 @@ bool AvailabilityInference::updateBeforePlatformForFallback(
 }
 
 const AvailableAttr *
-AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D,
-                                                      ASTContext &Ctx) {
+AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D) {
+  ASTContext &Ctx = D->getASTContext();
   const AvailableAttr *bestAvailAttr = nullptr;
 
   D = abstractSyntaxDeclForAvailableAttribute(D);
@@ -395,8 +440,7 @@ AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D,
 std::optional<AvailableAttrDeclPair>
 SemanticAvailableRangeAttrRequest::evaluate(Evaluator &evaluator,
                                             const Decl *decl) const {
-  if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(
-          decl, decl->getASTContext()))
+  if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(decl))
     return std::make_pair(attr, decl);
 
   if (auto *parent =
@@ -414,16 +458,16 @@ Decl::getSemanticAvailableRangeAttr() const {
 }
 
 std::optional<AvailabilityRange>
-AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
-  auto bestAvailAttr = attrForAnnotatedAvailableRange(D, Ctx);
+AvailabilityInference::annotatedAvailableRange(const Decl *D) {
+  auto bestAvailAttr = attrForAnnotatedAvailableRange(D);
   if (!bestAvailAttr)
     return std::nullopt;
 
-  return availableRange(bestAvailAttr, Ctx);
+  return availableRange(bestAvailAttr, D->getASTContext());
 }
 
 bool Decl::isAvailableAsSPI() const {
-  return AvailabilityInference::isAvailableAsSPI(this, getASTContext());
+  return AvailabilityInference::isAvailableAsSPI(this);
 }
 
 std::optional<AvailableAttrDeclPair>
@@ -540,9 +584,8 @@ AvailabilityRange AvailabilityInference::annotatedAvailableRangeForAttr(
   return AvailabilityRange::alwaysAvailable();
 }
 
-static const AvailableAttr *attrForAvailableRange(const Decl *D,
-                                                  ASTContext &Ctx) {
-  if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(D, Ctx))
+static const AvailableAttr *attrForAvailableRange(const Decl *D) {
+  if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(D))
     return attr;
 
   // Unlike other declarations, extensions can be used without referring to them
@@ -555,26 +598,30 @@ static const AvailableAttr *attrForAvailableRange(const Decl *D,
 
   DeclContext *DC = D->getDeclContext();
   if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-    if (auto attr =
-            AvailabilityInference::attrForAnnotatedAvailableRange(ED, Ctx))
+    if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(ED))
       return attr;
   }
 
   return nullptr;
 }
 
-AvailabilityRange AvailabilityInference::availableRange(const Decl *D,
-                                                        ASTContext &Ctx) {
-  if (auto attr = attrForAvailableRange(D, Ctx))
-    return availableRange(attr, Ctx);
+std::pair<AvailabilityRange, const AvailableAttr *>
+AvailabilityInference::availableRangeAndAttr(const Decl *D) {
+  if (auto attr = attrForAvailableRange(D)) {
+    return {availableRange(attr, D->getASTContext()), attr};
+  }
 
   // Treat unannotated declarations as always available.
-  return AvailabilityRange::alwaysAvailable();
+  return {AvailabilityRange::alwaysAvailable(), nullptr};
 }
 
-bool AvailabilityInference::isAvailableAsSPI(const Decl *D, ASTContext &Ctx) {
-  if (auto attr = attrForAvailableRange(D, Ctx))
-    return attr->IsSPI;
+AvailabilityRange AvailabilityInference::availableRange(const Decl *D) {
+  return availableRangeAndAttr(D).first;
+}
+
+bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
+  if (auto attr = attrForAvailableRange(D))
+    return attr->isSPI();
 
   return false;
 }
@@ -598,15 +645,12 @@ namespace {
 /// Infers the availability required to access a type.
 class AvailabilityInferenceTypeWalker : public TypeWalker {
 public:
-  ASTContext &AC;
   AvailabilityRange AvailabilityInfo = AvailabilityRange::alwaysAvailable();
-
-  AvailabilityInferenceTypeWalker(ASTContext &AC) : AC(AC) {}
 
   Action walkToTypePre(Type ty) override {
     if (auto *nominalDecl = ty->getAnyNominal()) {
       AvailabilityInfo.intersectWith(
-          AvailabilityInference::availableRange(nominalDecl, AC));
+          AvailabilityInference::availableRange(nominalDecl));
     }
 
     return Action::Continue;
@@ -615,7 +659,7 @@ public:
 } // end anonymous namespace
 
 AvailabilityRange AvailabilityInference::inferForType(Type t) {
-  AvailabilityInferenceTypeWalker walker(t->getASTContext());
+  AvailabilityInferenceTypeWalker walker;
   t.walk(walker);
   return walker.AvailabilityInfo;
 }

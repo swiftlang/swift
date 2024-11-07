@@ -1011,6 +1011,7 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
     return getLocFromSource();
   switch(File->getKind()) {
   case FileUnitKind::Source:
+  case FileUnitKind::ClangModule:
     return getLocFromSource();
   case FileUnitKind::SerializedAST: {
     if (!SerializedOK)
@@ -1019,7 +1020,6 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   }
   case FileUnitKind::Builtin:
   case FileUnitKind::Synthesized:
-  case FileUnitKind::ClangModule:
   case FileUnitKind::DWARFModule:
     return SourceLoc();
   }
@@ -1254,8 +1254,7 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
   if (auto backDeployVersion = getBackDeployedBeforeOSVersion(ctx))
     return AvailabilityRange{VersionRange::allGTE(*backDeployVersion)};
 
-  auto containingContext =
-      AvailabilityInference::annotatedAvailableRange(this, getASTContext());
+  auto containingContext = AvailabilityInference::annotatedAvailableRange(this);
   if (containingContext.has_value()) {
     // If this entity comes from the concurrency module, adjust its
     // availability for linkage purposes up to Swift 5.5, so that we use
@@ -2344,11 +2343,35 @@ PatternBindingDecl::getInitializerIsolation(unsigned i) const {
   return var->getInitializerIsolation();
 }
 
+Expr *PatternBindingDecl::getContextualizedInit(unsigned i) const {
+  auto *mutableThis = const_cast<PatternBindingDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      PatternBindingCheckedAndContextualizedInitRequest{mutableThis, i},
+      nullptr);
+}
+
 Expr *PatternBindingDecl::getCheckedAndContextualizedInit(unsigned i) const {
-  return evaluateOrDefault(getASTContext().evaluator,
-                           PatternBindingCheckedAndContextualizedInitRequest{
-                               const_cast<PatternBindingDecl *>(this), i},
-                           nullptr);
+  auto *expr = getContextualizedInit(i);
+
+  if (auto *initContext = getInitContext(i)) {
+    // Property wrapper isolation is checked separately while
+    // synthesizing the backing property wrapper initializer.
+    auto *var = getSingleVar();
+    if (!(var && var->hasAttachedPropertyWrapper())) {
+      (void)getInitializerIsolation(i);
+    }
+
+    // Effects checking for 'async' needs actor isolation to be
+    // computed. Always run effects checking after the actor
+    // isolation checker.
+    evaluateOrDefault(
+        getASTContext().evaluator,
+        CheckInitEffectsRequest{initContext, expr},
+        {});
+  }
+
+  return expr;
 }
 
 Expr *PatternBindingDecl::getCheckedAndContextualizedExecutableInit(
@@ -2826,8 +2849,13 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
                                        /*dispatch*/ false);
   case ReadWriteImplKind::StoredWithDidSet:
   case ReadWriteImplKind::InheritedWithDidSet:
-    if (storage->requiresOpaqueModifyCoroutine() &&
+    if (storage->requiresOpaqueModify2Coroutine() &&
         storage->getParsedAccessor(AccessorKind::DidSet)->isSimpleDidSet()) {
+      return AccessStrategy::getAccessor(AccessorKind::Modify2,
+                                         /*dispatch*/ false);
+    } else if (storage->requiresOpaqueModifyCoroutine() &&
+               storage->getParsedAccessor(AccessorKind::DidSet)
+                   ->isSimpleDidSet()) {
       return AccessStrategy::getAccessor(AccessorKind::Modify,
                                          /*dispatch*/ false);
     } else {
@@ -2845,6 +2873,8 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
 
 static AccessStrategy
 getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) {
+  if (storage->requiresOpaqueRead2Coroutine())
+    return AccessStrategy::getAccessor(AccessorKind::Read2, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
   return AccessStrategy::getAccessor(AccessorKind::Get, dispatch);
@@ -2860,6 +2890,8 @@ getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) 
 static AccessStrategy
 getOpaqueReadWriteAccessStrategy(const AbstractStorageDecl *storage,
                                  bool dispatch) {
+  if (storage->requiresOpaqueModify2Coroutine())
+    return AccessStrategy::getAccessor(AccessorKind::Modify2, dispatch);
   if (storage->requiresOpaqueModifyCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
   return AccessStrategy::getMaterializeToTemporary(
@@ -2967,11 +2999,13 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
   case AccessorKind::Set:
     return requiresOpaqueSetter();
   case AccessorKind::Read:
-  case AccessorKind::Read2:
     return requiresOpaqueReadCoroutine();
+  case AccessorKind::Read2:
+    return requiresOpaqueRead2Coroutine();
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
     return requiresOpaqueModifyCoroutine();
+  case AccessorKind::Modify2:
+    return requiresOpaqueModify2Coroutine();
 
   // Other accessors are never part of the opaque-accessors set.
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
@@ -2983,11 +3017,37 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
   llvm_unreachable("bad accessor kind");
 }
 
+bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
+  ASTContext &ctx = getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
+    return requiresCorrespondingUnderscoredCoroutineAccessor(
+        AccessorKind::Read2);
+  return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+}
+
+bool AbstractStorageDecl::requiresOpaqueRead2Coroutine() const {
+  ASTContext &ctx = getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
+    return false;
+  return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+}
+
 bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    RequiresOpaqueModifyCoroutineRequest{const_cast<AbstractStorageDecl *>(this)},
-    false);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      RequiresOpaqueModifyCoroutineRequest{
+          const_cast<AbstractStorageDecl *>(this), /*isUnderscored=*/true},
+      false);
+}
+
+bool AbstractStorageDecl::requiresOpaqueModify2Coroutine() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      RequiresOpaqueModifyCoroutineRequest{
+          const_cast<AbstractStorageDecl *>(this), /*isUnderscored=*/false},
+      false);
 }
 
 AccessorDecl *AbstractStorageDecl::getSynthesizedAccessor(AccessorKind kind) const {
@@ -3086,6 +3146,9 @@ void AbstractStorageDecl::visitExpectedOpaqueAccessors(
   if (requiresOpaqueReadCoroutine())
     visit(AccessorKind::Read);
 
+  if (requiresOpaqueRead2Coroutine())
+    visit(AccessorKind::Read2);
+
   // All mutable storage should have a setter.
   if (requiresOpaqueSetter())
     visit(AccessorKind::Set);
@@ -3093,6 +3156,9 @@ void AbstractStorageDecl::visitExpectedOpaqueAccessors(
   // Include the modify coroutine if it's required.
   if (requiresOpaqueModifyCoroutine())
     visit(AccessorKind::Modify);
+
+  if (requiresOpaqueModify2Coroutine())
+    visit(AccessorKind::Modify2);
 }
 
 void AbstractStorageDecl::visitOpaqueAccessors(
@@ -3821,21 +3887,6 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
-  if (getOpaqueResultTypeRepr() == nullptr) {
-    if (!isa<VarDecl>(this) &&
-        !isa<FuncDecl>(this) &&
-        !isa<SubscriptDecl>(this))
-      return nullptr;
-    auto file = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
-    // Don't look up when the decl is from source, otherwise a cycle will happen.
-    if (file->getKind() == FileUnitKind::SerializedAST) {
-      Mangle::ASTMangler mangler;
-      auto name = mangler.mangleOpaqueTypeDecl(this);
-      return file->lookupOpaqueResultType(name);
-    }
-    return nullptr;
-  }
-
   return evaluateOrDefault(getASTContext().evaluator,
     OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)},
     nullptr);
@@ -4293,30 +4344,6 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
-bool ValueDecl::isInterfacePackageEffectivelyPublic() const {
-  // A package decl with @usableFromInline (or other inlinable
-  // attributes) is essentially public, and can be printed in
-  // public (or private) interface file without package-name;
-  // it can be referenced by another module (without package-name)
-  // importing such interface module.
-  auto isCandidate = getFormalAccess() == AccessLevel::Package &&
-                     isUsableFromInline() &&
-                     getModuleContext()->getPackageName().empty();
-  if (!isCandidate)
-    return false;
-
-  // Treat the decl as public (1) if it's contained in an interface
-  // file, e.g. when running -typecheck-module-from-interface or
-  // -compile-module-from-interface.
-  isCandidate = false;
-  if (auto srcFile = getDeclContext()->getParentSourceFile()) {
-    isCandidate = srcFile->Kind == SourceFileKind::Interface;
-  }
-  // Or (2) if the decl being referenced in a client file is defined
-  // in an interface module.
-  return isCandidate || getModuleContext()->isBuiltFromInterface();
-}
-
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
   if (isPrivateSystemDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
@@ -4408,9 +4435,6 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
   // access level of the current declaration to be as open as possible.
   if (useDC && VD->getASTContext().isAccessControlDisabled())
     return getMaximallyOpenAccessFor(VD);
-
-  if (VD->isInterfacePackageEffectivelyPublic())
-    return AccessLevel::Public;
 
   if (treatUsableFromInlineAsPublic &&
       access < AccessLevel::Public &&
@@ -4594,11 +4618,9 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Package: {
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
-      if (VD->isInterfacePackageEffectivelyPublic())
-        return AccessScope::getPublic();
-
-      // If reached here, should be treated as internal.
-      return AccessScope(resultDC->getParentModule());
+      // Instead of reporting and failing early, return the scope of resultDC to
+      // allow continuation (should still non-zero exit later if in script mode)
+      return AccessScope(resultDC);
     } else {
       return AccessScope(pkg);
     }
@@ -4729,9 +4751,6 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return false;
 
   if (VD->getASTContext().isAccessControlDisabled())
-    return true;
-
-  if (VD->isInterfacePackageEffectivelyPublic())
     return true;
 
   auto access = getAccessLevel();
@@ -5479,8 +5498,12 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
   if (const auto specifierLoc = getSpecifierLoc())
     startLoc = specifierLoc;
 
-  if (!getInherited().empty())
-    endLoc = getInherited().getEndLoc();
+  if (!getInherited().empty()) {
+    if (getInherited().getEndLoc().isValid())
+      endLoc = getInherited().getEndLoc();
+    else
+      assert(startLoc.isInvalid() || this->hasClangNode());
+  }
 
   return {startLoc, endLoc};
 }
@@ -9356,6 +9379,17 @@ bool AbstractFunctionDecl::hasBody() const {
   }
 }
 
+bool AbstractFunctionDecl::bodyHasExplicitReturnStmt() const {
+  return AnyFunctionRef(const_cast<AbstractFunctionDecl *>(this))
+      .bodyHasExplicitReturnStmt();
+}
+
+void AbstractFunctionDecl::getExplicitReturnStmts(
+    SmallVectorImpl<ReturnStmt *> &results) const {
+  AnyFunctionRef(const_cast<AbstractFunctionDecl *>(this))
+      .getExplicitReturnStmts(results);
+}
+
 /// Expand all preamble macros attached to the given function declaration.
 static std::vector<ASTNode> expandPreamble(AbstractFunctionDecl *func) {
   std::vector<ASTNode> preamble;
@@ -10611,10 +10645,6 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   return params->get(0)->getInterfaceType()->isVoid();
 }
 
-bool ConstructorDecl::hasLifetimeDependentReturn() const {
-  return isa_and_nonnull<LifetimeDependentTypeRepr>(getResultTypeRepr());
-}
-
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
                          DeclBaseName::createDestructor(), DestructorLoc,
@@ -10703,22 +10733,32 @@ SourceRange EnumElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 
-Type EnumElementDecl::getPayloadInterfaceType() const {
+ArrayRef<AnyFunctionType::Param>
+EnumElementDecl::getCaseConstructorParams() const {
   if (!hasAssociatedValues())
-    return nullptr;
+    return {};
 
   auto interfaceType = getInterfaceType();
-  if (interfaceType->is<ErrorType>()) {
-    return interfaceType;
-  }
+  if (interfaceType->is<ErrorType>())
+    return {};
 
   auto funcTy = interfaceType->castTo<AnyFunctionType>();
-  funcTy = funcTy->getResult()->castTo<FunctionType>();
+  return funcTy->getResult()->castTo<FunctionType>()->getParams();
+}
+
+Type EnumElementDecl::getPayloadInterfaceType() const {
+  if (!hasAssociatedValues())
+    return Type();
+
+  auto interfaceType = getInterfaceType();
+  if (interfaceType->is<ErrorType>())
+    return interfaceType;
 
   // The payload type of an enum is an imploded tuple of the internal arguments
   // of the case constructor. As such, compose a tuple type with the parameter
   // flags dropped.
-  return AnyFunctionType::composeTuple(getASTContext(), funcTy->getParams(),
+  return AnyFunctionType::composeTuple(getASTContext(),
+                                       getCaseConstructorParams(),
                                        ParameterFlagHandling::IgnoreNonEmpty);
 }
 
@@ -11434,183 +11474,6 @@ void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
     simple_display(out, func);
   else
     out << "closure";
-}
-
-ActorIsolation::ActorIsolation(Kind kind, NominalTypeDecl *actor,
-                               unsigned parameterIndex)
-    : actorInstance(actor), kind(kind), isolatedByPreconcurrency(false),
-      silParsed(false), parameterIndex(parameterIndex) {}
-
-ActorIsolation::ActorIsolation(Kind kind, VarDecl *actor,
-                               unsigned parameterIndex)
-    : actorInstance(actor), kind(kind), isolatedByPreconcurrency(false),
-      silParsed(false), parameterIndex(parameterIndex) {}
-
-ActorIsolation::ActorIsolation(Kind kind, Expr *actor,
-                               unsigned parameterIndex)
-    : actorInstance(actor), kind(kind), isolatedByPreconcurrency(false),
-      silParsed(false), parameterIndex(parameterIndex) {}
-
-ActorIsolation::ActorIsolation(Kind kind, Type globalActor)
-    : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
-      silParsed(false), parameterIndex(0) {}
-
-ActorIsolation
-ActorIsolation::forActorInstanceParameter(Expr *actor,
-                                          unsigned parameterIndex) {
-  auto &ctx = actor->getType()->getASTContext();
-
-  // An isolated value of `nil` is statically nonisolated.
-  // FIXME: Also allow 'Optional.none'
-  if (dyn_cast<NilLiteralExpr>(actor))
-    return ActorIsolation::forNonisolated(/*unsafe*/false);
-
-  // An isolated value of `<global actor type>.shared` is statically
-  // global actor isolated.
-  if (auto *memberRef = dyn_cast<MemberRefExpr>(actor)) {
-    // Check that the member declaration witnesses the `shared`
-    // requirement of the `GlobalActor` protocol.
-    auto declRef = memberRef->getDecl();
-    auto baseType =
-        memberRef->getBase()->getType()->getMetatypeInstanceType();
-    if (auto globalActor = ctx.getProtocol(KnownProtocolKind::GlobalActor)) {
-      auto conformance = checkConformance(baseType, globalActor);
-      if (conformance &&
-          conformance.getWitnessByName(baseType, ctx.Id_shared) == declRef) {
-        return ActorIsolation::forGlobalActor(baseType);
-      }
-    }
-  }
-
-  return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
-}
-
-ActorIsolation
-ActorIsolation::forActorInstanceSelf(ValueDecl *decl) {
-  if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl))
-    return ActorIsolation(ActorInstance, fn->getImplicitSelfDecl(), 0);
-
-  if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
-    if (auto *fn = storage->getAccessor(AccessorKind::Get)) {
-      return ActorIsolation(ActorInstance, fn->getImplicitSelfDecl(), 0);
-    }
-  }
-
-  auto *dc = decl->getDeclContext();
-  return ActorIsolation(ActorInstance, dc->getSelfNominalTypeDecl(), 0);
-}
-
-ActorIsolation ActorIsolation::forActorInstanceSelf(NominalTypeDecl *selfDecl) {
-  return ActorIsolation(ActorInstance, selfDecl, 0);
-}
-
-NominalTypeDecl *ActorIsolation::getActor() const {
-  assert(getKind() == ActorInstance || getKind() == GlobalActor);
-
-  if (silParsed)
-    return nullptr;
-
-  if (getKind() == GlobalActor) {
-    return getGlobalActor()->getAnyNominal();
-  }
-
-  Type actorType;
-
-  if (auto *instance = actorInstance.dyn_cast<VarDecl *>()) {
-    actorType = instance->getTypeInContext();
-  } else if (auto *expr = actorInstance.dyn_cast<Expr *>()) {
-    actorType = expr->getType();
-  }
-
-  if (actorType) {
-    if (auto wrapped = actorType->getOptionalObjectType()) {
-      actorType = wrapped;
-    }
-    return actorType
-        ->getReferenceStorageReferent()->getAnyActor();
-  }
-
-  return actorInstance.get<NominalTypeDecl *>();
-}
-
-VarDecl *ActorIsolation::getActorInstance() const {
-  assert(getKind() == ActorInstance);
-
-  if (silParsed)
-    return nullptr;
-
-  return actorInstance.dyn_cast<VarDecl *>();
-}
-
-Expr *ActorIsolation::getActorInstanceExpr() const {
-  assert(getKind() == ActorInstance);
-
-  if (silParsed)
-    return nullptr;
-
-  return actorInstance.dyn_cast<Expr *>();
-}
-
-bool ActorIsolation::isMainActor() const {
-  if (silParsed)
-    return false;
-
-  if (isGlobalActor()) {
-    if (auto *nominal = getGlobalActor()->getAnyNominal())
-      return nominal->isMainActor();
-  }
-
-  return false;
-}
-
-bool ActorIsolation::isDistributedActor() const {
-  if (silParsed)
-    return false;
-
-  if (getKind() != ActorInstance)
-    return false;
-
-  return getActor()->isDistributedActor();
-}
-
-bool ActorIsolation::isEqual(const ActorIsolation &lhs,
-                             const ActorIsolation &rhs) {
-  if (lhs.getKind() != rhs.getKind())
-    return false;
-
-  switch (lhs.getKind()) {
-  case Nonisolated:
-  case NonisolatedUnsafe:
-  case Unspecified:
-    return true;
-
-  case Erased:
-    // Different functions with erased isolation have the same *kind* of
-    // isolation, but we must generally assume that they're not isolated
-    // the *same way*, which is what this function is apparently supposed
-    // to answer.
-    return false;
-
-  case ActorInstance: {
-    auto *lhsActor = lhs.getActorInstance();
-    auto *rhsActor = rhs.getActorInstance();
-    if (lhsActor && rhsActor) {
-      // FIXME: This won't work for arbitrary isolated parameter captures.
-      if ((lhsActor->isSelfParameter() && rhsActor->isSelfParamCapture()) ||
-          (lhsActor->isSelfParamCapture() && rhsActor->isSelfParameter())) {
-        return true;
-      }
-    }
-
-    // The parameter index doesn't matter; only the actor instance
-    // values must be equal.
-    return (lhs.getActor() == rhs.getActor() &&
-            lhs.actorInstance == rhs.actorInstance);
-  }
-
-  case GlobalActor:
-    return areTypesEqual(lhs.globalActor, rhs.globalActor);
-  }
 }
 
 BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)

@@ -39,7 +39,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/DeclObjC.h"
@@ -5291,7 +5290,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       SmallString<16> coercionString;
       coercionString += " as ";
-      coercionString += destType->getWithoutParens()->getString();
+      coercionString += destType->getString();
 
       Ctx.Diags.diagnose(E->getLoc(), diag::silence_optional_to_any,
                          destType, coercionString.substr(1))
@@ -6377,9 +6376,6 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
       type = newType;
       continue;
     }
-
-    // Look through parentheses.
-    type = type->getWithoutParens();
 
     // Look through optionals.
     if (auto optObjectTy = type->getOptionalObjectType()) {

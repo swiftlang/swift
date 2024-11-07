@@ -2147,7 +2147,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
-  case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::ValueWitness:
@@ -2509,7 +2508,6 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
-  case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::ValueWitness:
@@ -3154,7 +3152,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
-  case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::ValueWitness:
@@ -3880,19 +3877,6 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     return getTypeMatchFailure(locator);
   }
 
-  // ConformsTo constraints are generated when opening a generic
-  // signature with a RequirementKind::Conformance requirement, so
-  // we must handle pack types on the left by splitting up into
-  // smaller constraints.
-  if (auto *packType = type1->getAs<PackType>()) {
-    for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
-      addConstraint(kind, packType->getElementType(i), type2,
-                    locator.withPathElement(LocatorPathElt::PackElement(i)));
-    }
-
-    return getTypeMatchSuccess();
-  }
-
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   // Handle existential metatypes.
@@ -3994,8 +3978,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   }
 
   if (layout.explicitSuperclass) {
-    auto subKind = std::min(ConstraintKind::Subtype, kind);
-    auto result = matchTypes(type1, layout.explicitSuperclass, subKind,
+    auto result = matchTypes(type1, layout.explicitSuperclass,
+                             ConstraintKind::Subtype,
                              subflags, locator);
     if (result.isFailure())
       return result;
@@ -4095,65 +4079,74 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     }
   }
 
-  auto constraintType1 = type1;
-  if (auto existential = constraintType1->getAs<ExistentialType>())
-    constraintType1 = existential->getConstraintType();
+  // Finally, check parameterized protocol requirements.
+  if (!layout.getParameterizedProtocols().empty()) {
+    SmallVector<std::pair<AssociatedTypeDecl *, Type>, 4> fromReqs;
 
-  auto constraintType2 = type2;
-  if (auto existential = constraintType2->getAs<ExistentialType>())
-    constraintType2 = existential->getConstraintType();
+    if (type1->isExistentialType()) {
+      auto fromLayout = type1->getExistentialLayout();
+      for (auto *parameterizedType : fromLayout.getParameterizedProtocols()) {
+        auto *protoDecl = parameterizedType->getProtocol();
+        auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
+        auto argTypes = parameterizedType->getArgs();
 
-  auto ppt1 = constraintType1->getAs<ParameterizedProtocolType>();
-  auto ppt2 = constraintType2->getAs<ParameterizedProtocolType>();
-
-  // With two parameterized protocols, we've already made sure conformance
-  // constraints are satisfied. Try to match the arguments!
-  if (ppt1 && ppt2) {
-    ArrayRef<Type> longerArgs = ppt1->getArgs();
-    ArrayRef<Type> shorterArgs = ppt2->getArgs();
-    // The more constrained of the two types had better be the first type -
-    // otherwise we're forgetting requirements.
-    if (longerArgs.size() < shorterArgs.size()) {
-      return getTypeMatchFailure(locator);
+        for (unsigned i : indices(argTypes)) {
+          auto argType = argTypes[i];
+          auto *assocType = assocTypes[i]->getAssociatedTypeAnchor();
+          fromReqs.push_back(std::make_pair(assocType, argType));
+        }
+      }
     }
 
-    // Line up the arguments of the parameterized protocol.
-    // FIXME: Extend the locator path to point to the argument
-    // inducing the requirement.
-    for (const auto &pair : llvm::zip_first(shorterArgs, longerArgs)) {
-      auto result = matchTypes(std::get<0>(pair), std::get<1>(pair),
-                               ConstraintKind::Bind,
-                               subflags, locator);
-      if (result.isFailure())
-        return result;
-    }
-  } else if (ppt1 && type2->isExistentialType()) {
-    // P<T, U, V, ...> converts to (P & Q & ...) trivially...
-    return getTypeMatchSuccess();
-  } else if (ppt2 && type1->isExistentialType()) {
-    // But (P & Q & ...) does not convert to P<T, U, V, ...>
-    return getTypeMatchFailure(locator);
-  } else if (ppt1 || ppt2) {
-    auto parameterized = constraintType1;
-    auto base = constraintType2;
-    if (ppt2)
-      std::swap(parameterized, base);
+    for (auto *parameterizedType : layout.getParameterizedProtocols()) {
+      // With two parameterized protocols, we've already made sure conformance
+      // constraints are satisfied. Try to match the arguments!
+      if (type1->isExistentialType()) {
+        auto *protoDecl = parameterizedType->getProtocol();
+        auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
+        auto argTypes = parameterizedType->getArgs();
 
-    // One of the two is parameterized, and the other is a concrete type.
-    // Substitute the base into the requirements of the parameterized type and
-    // discharge the requirements of the parameterized protocol.
-    // FIXME: Extend the locator path to point to the argument
-    // inducing the requirement.
-    SmallVector<Requirement, 2> reqs;
-    parameterized->castTo<ParameterizedProtocolType>()
-                 ->getRequirements(base, reqs);
-    for (const auto &req : reqs) {
-      assert(req.getKind() == RequirementKind::SameType);
-      auto result = matchTypes(req.getFirstType(), req.getSecondType(),
-                               ConstraintKind::Bind,
-                               subflags, locator);
-      if (result.isFailure())
-        return result;
+        for (unsigned i : indices(argTypes)) {
+          auto argType = argTypes[i];
+          auto *assocType = assocTypes[i]->getAssociatedTypeAnchor();
+          bool found = false;
+          for (auto fromReq : fromReqs) {
+            if (fromReq.first == assocType) {
+              // FIXME: Extend the locator path to point to the argument
+              // inducing the requirement.
+              auto result = matchTypes(fromReq.second, argType,
+                                       ConstraintKind::Bind,
+                                       subflags, locator);
+              if (result.isFailure())
+                return result;
+
+              found = true;
+              break;
+            }
+          }
+
+          if (!found)
+            return getTypeMatchFailure(locator);
+        }
+      } else {
+        // The source type is a concrete type.
+        //
+        // Substitute the source into the requirements of the parameterized type
+        // and discharge the requirements of the parameterized protocol.
+        //
+        // FIXME: Extend the locator path to point to the argument
+        // inducing the requirement.
+        SmallVector<Requirement, 2> reqs;
+        parameterizedType->getRequirements(type1, reqs);
+        for (const auto &req : reqs) {
+          assert(req.getKind() == RequirementKind::SameType);
+          auto result = matchTypes(req.getFirstType(), req.getSecondType(),
+                                   ConstraintKind::Bind,
+                                   subflags, locator);
+          if (result.isFailure())
+            return result;
+        }
+      }
     }
   }
 
@@ -6970,7 +6963,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::OptionalObject:
-    case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueMember:
     case ConstraintKind::ValueWitness:
@@ -8318,6 +8310,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  ConstraintKind kind,
                                  ConstraintLocatorBuilder locator,
                                  TypeMatchOptions flags) {
+
   if (auto proto = protocol->getAs<ProtocolType>()) {
     return simplifyConformsToConstraint(type, proto->getDecl(), kind,
                                         locator, flags);
@@ -8326,7 +8319,39 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // Dig out the fixed type to which this type refers.
   type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
 
+  // ConformsTo constraints are generated when opening a generic
+  // signature with a RequirementKind::Conformance requirement, so
+  // we must handle pack types on the left by splitting up into
+  // smaller constraints.
+  if (auto *packType = type->getAs<PackType>()) {
+    for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
+      auto eltType = packType->getElementType(i);
+      if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
+        auto patternLoc =
+            locator.withPathElement(ConstraintLocator::PackExpansionPattern);
+        addConstraint(ConstraintKind::ConformsTo,
+                      packExpansionType->getPatternType(), protocol,
+                      patternLoc);
+      } else {
+        addConstraint(ConstraintKind::ConformsTo, eltType, protocol,
+                      locator.withPathElement(LocatorPathElt::PackElement(i)));
+      }
+    }
+
+    return SolutionKind::Solved;
+  }
+
   return matchExistentialTypes(type, protocol, kind, flags, locator);
+}
+
+void ConstraintSystem::recordSynthesizedConformance(
+                                           ConstraintLocator *locator,
+                                           ProtocolConformanceRef conformance) {
+  bool inserted = SynthesizedConformances.insert({locator, conformance}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedSynthesizedConformance(locator));
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
@@ -8448,7 +8473,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // conform -- they only need to contain the protocol, so check that
   // separately.
   switch (kind) {
-  case ConstraintKind::SelfObjectOfProtocol: {
+  case ConstraintKind::Subtype: {
     auto conformance = TypeChecker::containsProtocol(
         type, protocol, /*allowMissing=*/true);
     if (conformance) {
@@ -8487,7 +8512,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           ProtocolConformanceRef synthesized(protocol);
           auto witnessLoc = getConstraintLocator(
               locator.getAnchor(), LocatorPathElt::Witness(witness));
-          SynthesizedConformances.insert({witnessLoc, synthesized});
+          // FIXME: Why are we recording the same locator more than once here?
+          if (SynthesizedConformances.count(witnessLoc) == 0)
+            recordSynthesizedConformance(witnessLoc, synthesized);
           return recordConformance(synthesized);
         };
 
@@ -10376,9 +10403,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     baseExpr = UDE->getBase();
     baseType = getType(baseExpr);
     if (baseType->is<MetatypeType>()) {
-      auto instanceType = baseType->getAs<MetatypeType>()
-                              ->getInstanceType()
-                              ->getWithoutParens();
+      auto instanceType = baseType->getAs<MetatypeType>()->getInstanceType();
       if (!cs.isTypeReference(baseExpr) && instanceType->isExistentialType()) {
         return AllowInvalidInitRef::onProtocolMetatype(
             cs, baseType, init, /*isStaticallyDerived=*/true,
@@ -10396,7 +10421,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
       // If this is an initializer call without explicit mention
       // of `.init` on metatype value.
       if (auto *AMT = baseType->getAs<AnyMetatypeType>()) {
-        auto instanceType = AMT->getInstanceType()->getWithoutParens();
+        auto instanceType = AMT->getInstanceType();
         if (!cs.isTypeReference(baseExpr)) {
           if (baseType->is<MetatypeType>() &&
               instanceType->isAnyExistentialType()) {
@@ -10822,7 +10847,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       }
     }
 
-    generateConstraints(
+    generateOverloadConstraints(
         candidates, memberTy, result.ViableCandidates, useDC, locator,
         result.getFavoredIndex(), /*requiresFix=*/false,
         [&](unsigned, const OverloadChoice &choice) {
@@ -10849,7 +10874,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           allFromConditionalConformances(*this, baseTy,
                                          result.ViableCandidates);
 
-      generateConstraints(
+      generateOverloadConstraints(
           candidates, memberTy, outerAlternatives, useDC, locator, std::nullopt,
           /*requiresFix=*/!treatAsViable,
           [&](unsigned, const OverloadChoice &) {
@@ -10863,7 +10888,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   if (!result.UnviableCandidates.empty()) {
     // Generate constraints for unavailable choices if they have a fix,
     // and disable them by default, they'd get picked up in the "salvage" mode.
-    generateConstraints(
+    generateOverloadConstraints(
         candidates, memberTy, result.UnviableCandidates, useDC, locator,
         /*favoredChoice=*/std::nullopt, /*requiresFix=*/true,
         [&](unsigned idx, const OverloadChoice &choice) {
@@ -11513,6 +11538,36 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
   return builderType;
 }
 
+void ConstraintSystem::recordIsolatedParam(ParamDecl *param) {
+  bool inserted = isolatedParams.insert(param).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedIsolatedParam(param));
+}
+
+void ConstraintSystem::removeIsolatedParam(ParamDecl *param) {
+  bool erased = isolatedParams.erase(param);
+  ASSERT(erased);
+}
+
+void ConstraintSystem::recordPreconcurrencyClosure(
+    const ClosureExpr *closure) {
+  bool inserted = preconcurrencyClosures.insert(closure).second;
+  ASSERT(inserted);
+
+  if (solverState) {
+    recordChange(SolverTrail::Change::RecordedPreconcurrencyClosure(
+      const_cast<ClosureExpr *>(closure)));
+  }
+}
+
+void ConstraintSystem::removePreconcurrencyClosure(
+    const ClosureExpr *closure) {
+  bool erased = preconcurrencyClosures.erase(closure);
+  ASSERT(erased);
+}
+
 bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                                       Type contextualType,
                                       ConstraintLocatorBuilder locator) {
@@ -11522,7 +11577,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   // Note if this closure is isolated by preconcurrency.
   if (hasPreconcurrencyCallee(locator))
-    preconcurrencyClosures.insert(closure);
+    recordPreconcurrencyClosure(closure);
 
   // Let's look through all optionals associated with contextual
   // type to make it possible to infer parameter/result type of
@@ -11658,7 +11713,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
         // Note when a parameter is inferred to be isolated.
         if (contextualParam->isIsolated() && !flags.isIsolated() && paramDecl)
-          isolatedParams.insert(paramDecl);
+          recordIsolatedParam(paramDecl);
 
         // Carry-over the ownership specifier from the contextual parameter.
         auto paramOwnership =
@@ -12869,7 +12924,11 @@ createImplicitRootForCallAsFunction(ConstraintSystem &cs, Type refType,
     // Record a type of the new reference in the constraint system.
     cs.setType(implicitRef, refType);
     // Record new `.callAsFunction` in the constraint system.
-    cs.recordCallAsFunction(implicitRef, arguments, calleeLocator);
+    cs.recordImplicitCallAsFunctionRoot(calleeLocator, implicitRef);
+
+    auto *implicitRefLocator = cs.getConstraintLocator(
+        implicitRef, ConstraintLocator::ApplyArgument);
+    cs.associateArgumentList(implicitRefLocator, arguments);
   }
 
   return implicitRef;
@@ -14052,6 +14111,17 @@ void ConstraintSystem::addRestrictedConstraint(
                                      TMF_GenerateConstraints, locator);
 }
 
+void ConstraintSystem::recordImplicitValueConversion(
+                             ConstraintLocator *locator,
+                             ConversionRestrictionKind restriction) {
+  bool inserted = ImplicitValueConversions.insert(
+        {getConstraintLocator(locator), restriction}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedImplicitValueConversion(locator));
+}
+
 /// Given that we have a conversion constraint between two types, and
 /// that the given constraint-reduction rule applies between them at
 /// the top level, apply it and generate any necessary recursive
@@ -14201,7 +14271,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::Existential:
     addContextualScore();
     return matchExistentialTypes(type1, type2,
-                                 ConstraintKind::SelfObjectOfProtocol,
+                                 ConstraintKind::Subtype,
                                  subflags, locator);
 
   // for $< in { <, <c, <oc }:
@@ -14624,7 +14694,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
           getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
           /*firstTrailingClosureIndex=*/std::nullopt,
           AllocationArena::ConstraintSolver);
-      ArgumentLists.insert({argumentsLoc, argList});
+      recordArgumentList(argumentsLoc, argList);
     }
 
     auto *memberTypeLoc = getConstraintLocator(
@@ -14927,25 +14997,37 @@ void ConstraintSystem::recordMatchCallArgumentResult(
     ConstraintLocator *locator, MatchCallArgumentResult result) {
   assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
   bool inserted = argumentMatchingChoices.insert({locator, result}).second;
-  if (inserted) {
-    if (isRecordingChanges())
-      recordChange(SolverTrail::Change::recordedMatchCallArgumentResult(locator));
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedMatchCallArgumentResult(locator));
+}
+
+void ConstraintSystem::recordImplicitCallAsFunctionRoot(
+    ConstraintLocator *locator, UnresolvedDotExpr *root) {
+  bool inserted = ImplicitCallAsFunctionRoots.insert({locator, root}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedImplicitCallAsFunctionRoot(locator));
+}
+
+void ConstraintSystem::recordKeyPath(const KeyPathExpr *keypath,
+                                     TypeVariableType *root,
+                                     TypeVariableType *value, DeclContext *dc) {
+  bool inserted = KeyPaths.insert(
+    std::make_pair(keypath, std::make_tuple(root, value, dc))).second;
+  ASSERT(inserted);
+
+  if (solverState) {
+    recordChange(SolverTrail::Change::RecordedKeyPath(
+      const_cast<KeyPathExpr *>(keypath)));
   }
 }
 
-void ConstraintSystem::recordCallAsFunction(UnresolvedDotExpr *root,
-                                            ArgumentList *arguments,
-                                            ConstraintLocator *locator) {
-  ImplicitCallAsFunctionRoots.insert({locator, root});
-
-  associateArgumentList(
-      getConstraintLocator(root, ConstraintLocator::ApplyArgument), arguments);
-}
-
-void ConstraintSystem::recordKeyPath(KeyPathExpr *keypath,
-                                     TypeVariableType *root,
-                                     TypeVariableType *value, DeclContext *dc) {
-  KeyPaths.insert(std::make_pair(keypath, std::make_tuple(root, value, dc)));
+void ConstraintSystem::removeKeyPath(const KeyPathExpr *keypath) {
+  bool erased = KeyPaths.erase(keypath);
+  ASSERT(erased);
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
@@ -14963,9 +15045,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     SmallVector<Type, 4> unwraps2;
     type2->lookThroughAllOptionalTypes(unwraps2);
 
-    auto impact = unwraps1.size() != unwraps2.size()
-                      ? unwraps1.size() - unwraps2.size()
-                      : 1;
+    unsigned impact = 1;
+    if (unwraps1.size() > unwraps2.size())
+      impact = unwraps1.size() - unwraps2.size();
+    else if (unwraps2.size() > unwraps1.size())
+      impact = unwraps2.size() - unwraps1.size();
+
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -15453,7 +15538,6 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
 
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(first, second, kind, locator,
                                         subflags);
 
@@ -15984,7 +16068,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
         constraint.getKind(), constraint.getLocator(), std::nullopt);

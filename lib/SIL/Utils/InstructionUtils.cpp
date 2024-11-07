@@ -14,6 +14,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/NullablePtr.h"
@@ -26,8 +27,13 @@
 #include "swift/SIL/SILVisitor.h"
 
 #include "clang/AST/DeclObjC.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
+
+static llvm::cl::opt<bool> EnableExpandAll("enable-expand-all",
+                                           llvm::cl::init(false));
+
 
 SILValue swift::lookThroughOwnershipInsts(SILValue v) {
   while (true) {
@@ -516,6 +522,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
@@ -671,7 +678,20 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
            RuntimeEffect::MetaData | RuntimeEffect::Existential;
 
   case SILInstructionKind::InitExistentialRefInst:
-    impactType = inst->getOperand(0)->getType();
+    impactType = cast<InitExistentialRefInst>(inst)->getType();
+    // Make sure to get a diagnostic error in embedded swift for class existentials
+    // where not all protocols of a composition are class bound. For example:
+    //   let existential: any ClassBound & NotClassBound = MyClass()
+    // In future we might support this case and then we can remove this check.
+    for (auto protoRef : cast<InitExistentialRefInst>(inst)->getConformances()) {
+      if (protoRef.isConcrete()) {
+        ProtocolConformance *conf = protoRef.getConcrete();
+        if (isa<NormalProtocolConformance>(conf) &&
+            !conf->getProtocol()->requiresClass()) {
+          return RuntimeEffect::MetaData | RuntimeEffect::Existential;
+        }
+      }
+    }
     return RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
 
   case SILInstructionKind::InitExistentialMetatypeInst:
@@ -1388,4 +1408,38 @@ bool swift::visitExplodedTupleValue(
   }
 
   return true;
+}
+
+std::pair<SILFunction *, SILWitnessTable *>
+swift::lookUpFunctionInWitnessTable(WitnessMethodInst *wmi,
+                                    SILModule::LinkingMode linkingMode) {
+  SILModule &mod = wmi->getModule();
+  return mod.lookUpFunctionInWitnessTable(wmi->getConformance(), wmi->getMember(),
+                                          wmi->isSpecialized(), linkingMode);
+}
+
+// True if a type can be expanded without a significant increase to code size.
+//
+// False if expanding a type is invalid. For example, expanding a
+// struct-with-deinit drops the deinit.
+bool swift::shouldExpand(SILModule &module, SILType ty) {
+  // FIXME: Expansion
+  auto expansion = TypeExpansionContext::minimal();
+
+  if (module.Types.getTypeLowering(ty, expansion).isAddressOnly()) {
+    return false;
+  }
+  // A move-only-with-deinit type cannot be SROA.
+  //
+  // TODO: we could loosen this requirement if all paths lead to a drop_deinit.
+  if (auto *nominalTy = ty.getNominalOrBoundGenericNominal()) {
+    if (nominalTy->getValueTypeDestructor())
+      return false;
+  }
+  if (EnableExpandAll) {
+    return true;
+  }
+
+  unsigned numFields = module.Types.countNumberOfFields(ty, expansion);
+  return (numFields <= 6);
 }

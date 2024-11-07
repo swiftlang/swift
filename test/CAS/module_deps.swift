@@ -27,7 +27,7 @@
 
 /// check cas-fs content
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json E casFSRootID > %t/E_fs.casid
-// RUN: llvm-cas --cas %t/cas --ls-tree-recursive @%t/E_fs.casid | %FileCheck %s -check-prefix FS_ROOT_E
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/E_fs.casid | %FileCheck %s -check-prefix FS_ROOT_E
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:F casFSRootID > %t/F_fs.casid
 // RUN: llvm-cas --cas %t/cas --ls-tree-recursive @%t/F_fs.casid | %FileCheck %s -check-prefix FS_ROOT_F
 
@@ -98,16 +98,38 @@ import SubE
 // CHECK-DAG:     "swift": "A"
 // CHECK-DAG:     "swift": "F"
 
-/// --------Swift module A
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
+/// --------Clang module C
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}C-{{.*}}.pcm",
+
+// CHECK: "sourceFiles": [
+// CHECK-DAG: module.modulemap
+// CHECK-DAG: C.h
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
-// CHECK-DAG:   "clang": "A"
-// CHECK-DAG:   "swift": "Swift"
-// CHECK-NEXT: },
-// CHECK: "details":
-// CHECK: "moduleCacheKey":
+// CHECK-NEXT: "clang": "B"
+
+// CHECK: "moduleMapPath"
+// CHECK-SAME: module.modulemap
+
+// CHECK: "contextHash"
+// CHECK-SAME: "{{.*}}"
+
+/// --------Clang module B
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}B-{{.*}}.pcm",
+// CHECK: "contextHash": "[[B_CONTEXT:.*]]",
+// CHECK: "-o"
+// CHECK-NEXT: B-{{.*}}[[B_CONTEXT]].pcm
+
+// Check make-style dependencies
+// CHECK-MAKE-DEPS: module_deps.swift
+// CHECK-MAKE-DEPS-SAME: A.swiftinterface
+// CHECK-MAKE-DEPS-SAME: G.swiftinterface
+// CHECK-MAKE-DEPS-SAME: B.h
+// CHECK-MAKE-DEPS-SAME: F.h
+// CHECK-MAKE-DEPS-SAME: Bridging.h
+// CHECK-MAKE-DEPS-SAME: BridgingOther.h
+// CHECK-MAKE-DEPS-SAME: module.modulemap
 
 /// --------Swift module F
 // CHECK:      "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
@@ -120,6 +142,18 @@ import SubE
 // CHECK-DAG:     "swift": "SwiftOnoneSupport"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],
+// CHECK: "details":
+// CHECK: "moduleCacheKey":
+
+/// --------Swift module A
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
+
+// CHECK: directDependencies
+// CHECK-NEXT: {
+// CHECK-DAG:   "clang": "A"
+// CHECK-DAG:   "swift": "Swift"
+// CHECK-DAG:   "swift": "SwiftOnoneSupport"
+// CHECK-NEXT: }
 // CHECK: "details":
 // CHECK: "moduleCacheKey":
 
@@ -162,39 +196,6 @@ import SubE
 
 // CHECK: "moduleInterfacePath"
 // CHECK-SAME: E.swiftinterface
-
-/// --------Clang module C
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}C-{{.*}}.pcm",
-
-// CHECK: "sourceFiles": [
-// CHECK-DAG: module.modulemap
-// CHECK-DAG: C.h
-
-// CHECK: directDependencies
-// CHECK-NEXT: {
-// CHECK-NEXT: "clang": "B"
-
-// CHECK: "moduleMapPath"
-// CHECK-SAME: module.modulemap
-
-// CHECK: "contextHash"
-// CHECK-SAME: "{{.*}}"
-
-/// --------Clang module B
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}B-{{.*}}.pcm",
-// CHECK: "contextHash": "[[B_CONTEXT:.*]]",
-// CHECK: "-o"
-// CHECK-NEXT: B-{{.*}}[[B_CONTEXT]].pcm
-
-// Check make-style dependencies
-// CHECK-MAKE-DEPS: module_deps.swift
-// CHECK-MAKE-DEPS-SAME: A.swiftinterface
-// CHECK-MAKE-DEPS-SAME: G.swiftinterface
-// CHECK-MAKE-DEPS-SAME: B.h
-// CHECK-MAKE-DEPS-SAME: F.h
-// CHECK-MAKE-DEPS-SAME: Bridging.h
-// CHECK-MAKE-DEPS-SAME: BridgingOther.h
-// CHECK-MAKE-DEPS-SAME: module.modulemap
 
 /// --------Swift module Swift
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 5 -disable-availability-checking -emit-sil -verify %s
+// RUN: %target-swift-frontend -swift-version 5 -target %target-swift-5.1-abi-triple -emit-sil -verify %s
 
 // check the initializer kinds for protocols and their extensions
 

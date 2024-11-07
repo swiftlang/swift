@@ -54,6 +54,7 @@
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/DiagnosticHelper.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Frontend/MakeStyleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/IRGen/TBDGen.h"
@@ -107,15 +108,13 @@ static std::string displayName(StringRef MainExecutablePath) {
   return Name;
 }
 
-static void emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
-                                         DependencyTracker *depTracker,
-                                         const FrontendOptions &opts,
-                                         llvm::vfs::OutputBackend &backend) {
-  opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
-      [&](const InputFile &f) -> bool {
-        return swift::emitMakeDependenciesIfNeeded(diags, depTracker, opts, f,
-                                                   backend);
-      });
+static void emitMakeDependenciesIfNeeded(CompilerInstance &instance) {
+  instance.getInvocation()
+      .getFrontendOptions()
+      .InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+          [&](const InputFile &f) -> bool {
+            return swift::emitMakeDependenciesIfNeeded(instance, f);
+          });
 }
 
 static void
@@ -1002,6 +1001,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
         Instance.getMainModule(), Instance.getDependencyTracker(), opts);
 
     dumpAPIIfNeeded(Instance);
+    swift::emitObjCMessageSendTraceIfNeeded(Instance.getMainModule(), opts);
   }
 
   // Contains the hadError checks internally, we still want to output the
@@ -1056,9 +1056,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   emitSwiftdepsForAllPrimaryInputsIfNeeded(Instance);
 
   // Emit Make-style dependencies.
-  emitMakeDependenciesIfNeeded(Instance.getDiags(),
-                               Instance.getDependencyTracker(), opts,
-                               Instance.getOutputBackend());
+  emitMakeDependenciesIfNeeded(Instance);
 
   // Emit extracted constant values for every file in the batch
   emitConstValuesForAllPrimaryInputsIfNeeded(Instance);
@@ -1079,6 +1077,7 @@ static void printSingleFrontendOpt(llvm::opt::OptTable &table, options::ID id,
       table.getOption(id).hasFlag(options::AutolinkExtractOption) ||
       table.getOption(id).hasFlag(options::ModuleWrapOption) ||
       table.getOption(id).hasFlag(options::SwiftSymbolGraphExtractOption) ||
+      table.getOption(id).hasFlag(options::SwiftSynthesizeInterfaceOption) ||
       table.getOption(id).hasFlag(options::SwiftAPIDigesterOption)) {
     auto name = StringRef(table.getOptionName(id));
     if (!name.empty()) {
@@ -1108,9 +1107,9 @@ static bool printSwiftFeature(CompilerInstance &instance) {
     out << "}\n";
   };
   out << "  \"SupportedArguments\": [\n";
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELPTEXT, METAVAR, VALUES)                                      \
-  printSingleFrontendOpt(*table, swift::options::OPT_##ID, out);
+#define OPTION(...)                                                            \
+  printSingleFrontendOpt(*table,                                               \
+                         swift::options::LLVM_MAKE_OPT_ID(__VA_ARGS__), out);
 #include "swift/Option/Options.inc"
 #undef OPTION
   out << "    \"LastOption\"\n";
@@ -1280,6 +1279,7 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::EmitSILGen:
   case FrontendOptions::ActionType::EmitSIBGen:
   case FrontendOptions::ActionType::EmitSIL:
+  case FrontendOptions::ActionType::EmitLoweredSIL:
   case FrontendOptions::ActionType::EmitSIB:
   case FrontendOptions::ActionType::EmitModuleOnly:
   case FrontendOptions::ActionType::MergeModules:
@@ -1322,7 +1322,7 @@ static bool tryReplayCompilerResults(CompilerInstance &Instance) {
   bool replayed = replayCachedCompilerOutputs(
       Instance.getObjectStore(), Instance.getActionCache(),
       *Instance.getCompilerBaseKey(), Instance.getDiags(),
-      Instance.getInvocation().getFrontendOptions().InputsAndOutputs, *CDP,
+      Instance.getInvocation().getFrontendOptions(), *CDP,
       Instance.getInvocation().getCASOptions().EnableCachingRemarks,
       Instance.getInvocation().getIRGenOptions().UseCASBackend);
 
@@ -1749,6 +1749,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   runSILLoweringPasses(*SM);
 
+  // If we are asked to emit lowered SIL, dump it now and return.
+  if (Action == FrontendOptions::ActionType::EmitLoweredSIL)
+    return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
+
   // Cancellation check after SILLowering.
   if (Instance.isCancellationRequested())
     return true;
@@ -1988,7 +1992,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // hundreds or thousands of lines. Skip dumping this output in that case.
   if (!Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule()) {
     for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
-             &configurationFileStackTraces[0],
+             configurationFileStackTraces.get(),
              [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
                 std::optional<PrettyStackTraceFileContents> &trace) {
                trace.emplace(*buffer);

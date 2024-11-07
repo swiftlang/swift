@@ -23,6 +23,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
@@ -39,8 +40,9 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Bridging/ASTGen.h"
-#include "swift/Bridging/Macros.h"
+#include "swift/Bridging/MacroEvaluation.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
@@ -196,6 +198,14 @@ MacroDefinition MacroDefinitionRequest::evaluate(
       TypeCheckExprFlags::DisableMacroExpansions);
   if (!typeCheckedType)
     return MacroDefinition::forInvalid();
+
+  // If the expanded macro was one of the the magic literal expressions
+  // (like #file), there's nothing to expand.
+  if (auto magicLiteral =
+          dyn_cast<MagicIdentifierLiteralExpr>(definition)) {
+    StringRef expansionText = externalMacroName.unbridged();
+    return MacroDefinition::forExpanded(ctx, expansionText, { }, { });
+  }
 
   // Dig out the macro that was expanded.
   auto expansion = cast<MacroExpansionExpr>(definition);
@@ -1021,7 +1031,10 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
   auto macroSourceFile = new (ctx) SourceFile(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
-  macroSourceFile->setImports(dc->getParentSourceFile()->getImports());
+  if (auto parentSourceFile = dc->getParentSourceFile())
+    macroSourceFile->setImports(parentSourceFile->getImports());
+  else if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+    macroSourceFile->setImports({});
   return macroSourceFile;
 }
 
@@ -1100,9 +1113,10 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
       return nullptr;
 
     case BuiltinMacroKind::IsolationMacro:
-      // Create a buffer full of scratch space; this will be populated
-      // much later.
-      std::string scratchSpace(128, ' ');
+      // Create a buffer with "nil" plus a bunch of scratch space. This
+      // will be populated much later.
+      std::string scratchSpace = "nil";
+      scratchSpace.append(125, ' ');
       evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
           scratchSpace,
           adjustMacroExpansionBufferName(*discriminator));
@@ -1346,8 +1360,18 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   if (!attrSourceFile)
     return nullptr;
 
-  auto declSourceFile =
-      moduleDecl->getSourceFileContainingLocation(attachedTo->getStartLoc());
+  // If the declaration comes from a Clang module,
+  // pretty-print the declaration and use that location.
+  SourceLoc attachedToLoc = attachedTo->getLoc();
+  bool isPrettyPrintedDecl = false;
+  if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
+    isPrettyPrintedDecl = true;
+    attachedToLoc = evaluateOrDefault(
+        ctx.evaluator, PrettyPrintDeclRequest{attachedTo}, SourceLoc());
+  }
+
+  SourceFile *declSourceFile =
+      moduleDecl->getSourceFileContainingLocation(attachedToLoc);
   if (!declSourceFile)
     return nullptr;
 
@@ -1486,13 +1510,18 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     if (auto var = dyn_cast<VarDecl>(attachedTo))
       searchDecl = var->getParentPatternBinding();
 
+    auto startLoc = searchDecl->getStartLoc();
+    if (isPrettyPrintedDecl) {
+      startLoc = attachedToLoc;
+    }
+
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
     swift_Macros_expandAttachedMacro(
         &ctx.Diags, externalDef.get(), discriminator->c_str(),
         extendedType.c_str(), conformanceList.c_str(), getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
-        astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
+        astGenDeclSourceFile, startLoc.getOpaquePointerValue(),
         astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceOut);
     if (!evaluatedSourceOut.unbridged().data())
       return nullptr;

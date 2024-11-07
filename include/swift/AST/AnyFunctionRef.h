@@ -153,6 +153,18 @@ public:
     llvm_unreachable("autoclosures don't have statement bodies");
   }
 
+  /// Returns a boolean value indicating whether the body, if any, contains
+  /// an explicit `return` statement.
+  ///
+  /// \returns `true` if the body contains an explicit `return` statement,
+  /// `false` otherwise.
+  bool bodyHasExplicitReturnStmt() const;
+
+  /// Finds occurrences of explicit `return` statements within the body, if any.
+  ///
+  /// \param results An out container to which the results are added.
+  void getExplicitReturnStmts(SmallVectorImpl<ReturnStmt *> &results) const;
+
   DeclContext *getAsDeclContext() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD;

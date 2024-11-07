@@ -3794,12 +3794,25 @@ void TypeChecker::checkFunctionEffects(AbstractFunctionDecl *fn) {
       superInit->walk(checker);
 }
 
-void TypeChecker::checkInitializerEffects(Initializer *initCtx,
-                                                Expr *init) {
+evaluator::SideEffect
+CheckInitEffectsRequest::evaluate(Evaluator &evaluator,
+                                  Initializer *initCtx,
+                                  Expr *init) const {
   auto &ctx = initCtx->getASTContext();
   CheckEffectsCoverage checker(ctx, Context::forInitializer(initCtx));
   init->walk(checker);
   init->walk(LocalFunctionEffectsChecker());
+
+  return {};
+}
+
+
+void TypeChecker::checkInitializerEffects(Initializer *initCtx,
+                                          Expr *init) {
+  evaluateOrDefault(
+      initCtx->getASTContext().evaluator,
+      CheckInitEffectsRequest{initCtx, init},
+      {});
 }
 
 void TypeChecker::checkCallerSideDefaultArgumentEffects(DeclContext *initCtx,

@@ -5,6 +5,7 @@
 // RUN: %FileCheck --input-file %t.ir %s
 // RUN: %FileCheck --input-file %t.ir --check-prefix NEGATIVE %s
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_CImplementation
 
 // CHECK-DAG: @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE9beforeInts5Int32VvpWvd" = hidden global i64 8, align 8
 // CHECK-DAG: @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE6mirrors6MirrorVSgvpWvd" = hidden global i64 0, align 8

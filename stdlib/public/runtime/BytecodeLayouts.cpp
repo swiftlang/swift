@@ -127,15 +127,15 @@ static uint64_t readTagBytes(const uint8_t *addr, uint8_t byteCount) {
       uint64_t TAG = 0;                                                        \
       uintptr_t OFFSET = 0;                                                    \
                                                                                \
-      _Pragma("clang diagnostic push")                                         \
-          _Pragma("clang diagnostic ignored \"-Wgnu-label-as-value\"")         \
-              const void *dispatchTable[] = {                                  \
-                  &&done,       &&Error,   &&NativeStrong,   &&NativeUnowned,  \
-                  &&NativeWeak, &&Unknown, &&UnknownUnowned, &&UnknownWeak,    \
-                  &&Bridge,     &&Block,   &&ObjC,           &&Custom,         \
-                  &&Metatype,   &&Generic, &&Existential,    &&Resilient,      \
-                  &&Default,    &&Default, &&Default,        &&Default,        \
-                  &&Default,    &&Default, &&Default,                          \
+      _Pragma("clang diagnostic push") _Pragma(                                \
+          "clang diagnostic ignored \"-Wgnu-label-as-value\"")                 \
+          const void *dispatchTable[] = {                                      \
+              &&done,       &&Error,   &&NativeStrong,   &&NativeUnowned,      \
+              &&NativeWeak, &&Unknown, &&UnknownUnowned, &&UnknownWeak,        \
+              &&Bridge,     &&Block,   &&ObjC,           &&NativeSwiftObjC,    \
+              &&Metatype,   &&Generic, &&Existential,    &&Resilient,          \
+              &&Default,    &&Default, &&Default,        &&Default,            \
+              &&Default,    &&Default, &&Default,                              \
       };                                                                       \
                                                                                \
       [[clang::nomerge]] {                                                     \
@@ -194,8 +194,9 @@ static uint64_t readTagBytes(const uint8_t *addr, uint8_t byteCount) {
         CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
       }                                                                        \
       [[clang::nomerge]] {                                                     \
-      Custom:                                                                  \
-        swift_unreachable("");                                                 \
+      NativeSwiftObjC:                                                         \
+        FN_TABLE[11](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);              \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
       }                                                                        \
       [[clang::nomerge]] {                                                     \
       Metatype:                                                                \
@@ -249,8 +250,6 @@ static void handleEnd(const Metadata *metadata,
 static void errorDestroy(const Metadata *metadata, LayoutStringReader1 &reader,
                          uintptr_t &addrOffset, uint8_t *addr) {
   uintptr_t object = *(uintptr_t *)(addr + addrOffset);
-  if (object & _swift_abi_ObjCReservedBitsMask)
-    return;
   object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset += sizeof(SwiftError*);
   swift_errorRelease((SwiftError *)object);
@@ -784,9 +783,18 @@ static void objcStrongDestroy(const Metadata *metadata,
 #if SWIFT_OBJC_INTEROP
   uintptr_t object = *(uintptr_t *)(addr + addrOffset);
   addrOffset += sizeof(objc_object*);
-  if (object & _swift_abi_ObjCReservedBitsMask)
-    return;
+  objc_release((objc_object *)object);
+#else
+  swift_unreachable("ObjC interop is not available on this platform");
+#endif
+}
 
+static void nativeSwiftObjcStrongDestroy(const Metadata *metadata,
+                                         LayoutStringReader1 &reader,
+                                         uintptr_t &addrOffset, uint8_t *addr) {
+#if SWIFT_OBJC_INTEROP
+  uintptr_t object = *(uintptr_t *)(addr + addrOffset);
+  addrOffset += sizeof(objc_object *);
   object &= ~_swift_abi_SwiftSpareBitsMask;
   objc_release((objc_object *)object);
 #else
@@ -840,7 +848,7 @@ constexpr DestrFn destroyTable[] = {
     &bridgeDestroy,
     &blockDestroy,
     &objcStrongDestroy,
-    nullptr, // Custom
+    &nativeSwiftObjcStrongDestroy,
     &metatypeDestroy,
     nullptr, // Generic
     &existentialDestroy,
@@ -911,8 +919,6 @@ static void errorRetain(const Metadata *metadata, LayoutStringReader1 &reader,
                         uintptr_t &addrOffset, uint8_t *dest, uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
   uintptr_t object = *(uintptr_t *)(src + _addrOffset);
-  if (object & _swift_abi_ObjCReservedBitsMask)
-    return;
   memcpy(dest + addrOffset, &object, sizeof(SwiftError*));
   object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset = _addrOffset + sizeof(SwiftError *);
@@ -1010,8 +1016,21 @@ static void objcStrongRetain(const Metadata *metadata,
   uintptr_t object = *(uintptr_t *)(src + _addrOffset);
   memcpy(dest + _addrOffset, &object, sizeof(objc_object *));
   addrOffset = _addrOffset + sizeof(objc_object *);
-  if (object & _swift_abi_ObjCReservedBitsMask)
-    return;
+  objc_retain((objc_object *)object);
+#else
+  swift_unreachable("ObjC interop is not available on this platform");
+#endif
+}
+
+static void nativeSwiftObjcStrongRetain(const Metadata *metadata,
+                                        LayoutStringReader1 &reader,
+                                        uintptr_t &addrOffset, uint8_t *dest,
+                                        uint8_t *src) {
+#if SWIFT_OBJC_INTEROP
+  uintptr_t _addrOffset = addrOffset;
+  uintptr_t object = *(uintptr_t *)(src + _addrOffset);
+  memcpy(dest + _addrOffset, &object, sizeof(objc_object *));
+  addrOffset = _addrOffset + sizeof(objc_object *);
   object &= ~_swift_abi_SwiftSpareBitsMask;
   objc_retain((objc_object *)object);
 #else
@@ -1073,7 +1092,7 @@ constexpr InitFn initWithCopyTable[] = {
     &bridgeRetain,
     &blockCopy,
     &objcStrongRetain,
-    nullptr, // Custom
+    &nativeSwiftObjcStrongRetain,
     &metatypeInitWithCopy,
     nullptr, // Generic
     &existentialInitWithCopy,
@@ -1306,15 +1325,10 @@ static void errorAssignWithCopy(const Metadata *metadata,
   memcpy(dest + _addrOffset, &srcObject, sizeof(SwiftError *));
   addrOffset = _addrOffset + sizeof(SwiftError *);
 
-  if (!(destObject & _swift_abi_ObjCReservedBitsMask)) {
-    destObject &= ~_swift_abi_SwiftSpareBitsMask;
-    swift_errorRelease((SwiftError *)destObject);
-  }
-
-  if (!(srcObject & _swift_abi_ObjCReservedBitsMask)) {
-    srcObject &= ~_swift_abi_SwiftSpareBitsMask;
-    swift_errorRetain((SwiftError *)srcObject);
-  }
+  destObject &= ~_swift_abi_SwiftSpareBitsMask;
+  srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+  swift_errorRelease((SwiftError *)destObject);
+  swift_errorRetain((SwiftError *)srcObject);
 }
 
 static void nativeStrongAssignWithCopy(const Metadata *metadata,
@@ -1438,15 +1452,29 @@ static void objcStrongAssignWithCopy(const Metadata *metadata,
   memcpy(dest + _addrOffset, &srcObject, sizeof(objc_object*));
   addrOffset = _addrOffset + sizeof(objc_object*);
 
-  if (!(destObject & _swift_abi_ObjCReservedBitsMask)) {
-    destObject &= ~_swift_abi_SwiftSpareBitsMask;
-    objc_release((objc_object *)destObject);
-  }
+  objc_release((objc_object *)destObject);
+  objc_retain((objc_object *)srcObject);
+#else
+  swift_unreachable("ObjC interop is not available on this platform");
+#endif
+}
 
-  if (!(srcObject & _swift_abi_ObjCReservedBitsMask)) {
-    srcObject &= ~_swift_abi_SwiftSpareBitsMask;
-    objc_retain((objc_object *)srcObject);
-  }
+static void nativeSwiftObjcStrongAssignWithCopy(const Metadata *metadata,
+                                                LayoutStringReader1 &reader,
+                                                uintptr_t &addrOffset,
+                                                uint8_t *dest, uint8_t *src) {
+#if SWIFT_OBJC_INTEROP
+  uintptr_t _addrOffset = addrOffset;
+  uintptr_t destObject = *(uintptr_t *)(dest + _addrOffset);
+  uintptr_t srcObject = *(uintptr_t *)(src + _addrOffset);
+  memcpy(dest + _addrOffset, &srcObject, sizeof(objc_object *));
+  addrOffset = _addrOffset + sizeof(objc_object *);
+
+  destObject &= ~_swift_abi_SwiftSpareBitsMask;
+  objc_release((objc_object *)destObject);
+
+  srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+  objc_retain((objc_object *)srcObject);
 #else
   swift_unreachable("ObjC interop is not available on this platform");
 #endif
@@ -1882,7 +1910,7 @@ constexpr InitFn assignWithCopyTable[] = {
     &bridgeAssignWithCopy,
     &blockAssignWithCopy,
     &objcStrongAssignWithCopy,
-    nullptr, // Custom
+    &nativeSwiftObjcStrongAssignWithCopy,
     &metatypeAssignWithCopy,
     nullptr, // Generic
     &existentialAssignWithCopy,

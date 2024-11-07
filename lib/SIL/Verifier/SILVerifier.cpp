@@ -12,8 +12,6 @@
 
 #define DEBUG_TYPE "sil-verifier"
 
-#include "VerifierPrivate.h"
-
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -63,7 +61,6 @@
 #include <memory>
 
 using namespace swift;
-using namespace swift::silverifier;
 
 using Lowering::AbstractionPattern;
 
@@ -934,8 +931,6 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   /// TODO: LifetimeCompletion: shared_ptr -> unique_ptr
   std::shared_ptr<DeadEndBlocks> deadEndBlocks;
 
-  LoadBorrowImmutabilityAnalysis loadBorrowImmutabilityAnalysis;
-
   /// A cache of the isOperandInValueUse check. When we process an operand, we
   /// fix this for each of its uses.
   llvm::DenseSet<std::pair<SILValue, const Operand *>> isOperandInValueUsesCache;
@@ -1074,6 +1069,24 @@ public:
             what + " must be Optional<Builtin.Executor>");
   }
 
+  /// Require the operand to be an object of some type that conforms to
+  /// Actor or DistributedActor.
+  void requireAnyActorType(SILValue value, bool allowOptional,
+                           bool allowExecutor, const Twine &what) {
+    auto type = value->getType();
+    require(type.isObject(), what + " must be an object type");
+
+    auto actorType = type.getASTType();
+    if (allowOptional) {
+      if (auto objectType = actorType.getOptionalObjectType())
+        actorType = objectType;
+    }
+    if (allowExecutor && isa<BuiltinExecutorType>(actorType))
+      return;
+    require(actorType->isAnyActorType(),
+            what + " must be some kind of actor type");
+  }
+
   /// Assert that two types are equal.
   void requireSameType(Type type1, Type type2, const Twine &complaint) {
     _require(type1->isEqual(type2), complaint,
@@ -1185,8 +1198,7 @@ public:
         SingleFunction(SingleFunction),
         checkLinearLifetime(checkLinearLifetime),
         Dominance(nullptr),
-        InstNumbers(numInstsInFunction(F)),
-        loadBorrowImmutabilityAnalysis(DEBlocks.get(), &F) {
+        InstNumbers(numInstsInFunction(F)) {
     if (F.isExternalDeclaration())
       return;
 
@@ -1688,8 +1700,11 @@ public:
   }
 
   static bool isLegalSILTokenProducer(SILValue value) {
-    if (auto *baResult = isaResultOf<BeginApplyInst>(value))
-      return baResult->isBeginApplyToken();
+    if (auto *baResult = isaResultOf<BeginApplyInst>(value)) {
+      auto *bai = cast<BeginApplyInst>(baResult->getParent());
+      return value == bai->getTokenResult() ||
+             value == bai->getCalleeAllocationResult();
+    }
 
     if (isa<OpenPackElementInst>(value))
       return true;
@@ -2110,8 +2125,12 @@ public:
               "begin_apply instruction cannot call function with error result");
     }
 
-    require(calleeConv.funcTy->getCoroutineKind() == SILCoroutineKind::YieldOnce,
-            "must call yield_once coroutine with begin_apply");
+    auto coroKind = calleeConv.funcTy->getCoroutineKind();
+
+    require(coroKind == SILCoroutineKind::YieldOnce ||
+                coroKind == SILCoroutineKind::YieldOnce2,
+            "first operand of begin_apply must be a yield_once or yield_once_2 "
+            "coroutine");
     require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
             "cannot call an async function from a non async function");
   }
@@ -2119,6 +2138,12 @@ public:
   void checkAbortApplyInst(AbortApplyInst *AI) {
     require(getAsResultOf<BeginApplyInst>(AI->getOperand())->isBeginApplyToken(),
             "operand of abort_apply must be a begin_apply");
+    auto *mvi = getAsResultOf<BeginApplyInst>(AI->getOperand());
+    auto *bai = cast<BeginApplyInst>(mvi->getParent());
+    require(!bai->getSubstCalleeType()->isCalleeAllocatedCoroutine() ||
+                AI->getFunction()->getASTContext().LangOpts.hasFeature(
+                    Feature::CoroutineAccessorsUnwindOnCallerError),
+            "abort_apply of callee-allocated yield-once coroutine!?");
   }
 
   void checkEndApplyInst(EndApplyInst *AI) {
@@ -2160,6 +2185,11 @@ public:
               "llvm.invariant.end parameter #2 must be an integer literal");
       break;
     }
+  }
+
+  void checkMergeIsolationRegionInst(MergeIsolationRegionInst *mir) {
+    require(mir->getNumOperands() >= 2, "Must have at least two parameters");
+    require(F.hasOwnership(), "Only valid when OSSA is enabled");
   }
 
   void checkMarkDependencInst(MarkDependenceInst *MDI) {
@@ -2659,13 +2689,6 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
-    if (LBI->isUnchecked()) {
-      require(LBI->getModule().getStage() == SILStage::Raw,
-              "load_borrow can only be [unchecked] in raw SIL");
-    } else {
-      require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
-              "Found load borrow that is invalidated by a local write?!");
-    }
   }
 
   void checkBeginBorrowInst(BeginBorrowInst *bbi) {
@@ -3368,6 +3391,8 @@ public:
   void checkRetainValueInst(RetainValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
+    require(!I->getOperand()->getType().isMoveOnly(),
+            "retain value operand type must be copyable");
     require(!F.hasOwnership(),
             "retain_value is only in functions with unqualified ownership");
   }
@@ -3768,12 +3793,23 @@ public:
   }
 
   void checkDeallocStackInst(DeallocStackInst *DI) {
+    auto isTokenFromCalleeAllocatedBeginApply = [](SILValue value) -> bool {
+      auto *inst = value->getDefiningInstruction();
+      if (!inst)
+        return false;
+      auto *bai = dyn_cast<BeginApplyInst>(inst);
+      if (!bai)
+        return false;
+      return value == bai->getCalleeAllocationResult();
+    };
     require(isa<SILUndef>(DI->getOperand()) ||
                 isa<AllocStackInst>(DI->getOperand()) ||
                 isa<AllocVectorInst>(DI->getOperand()) ||
                 (isa<PartialApplyInst>(DI->getOperand()) &&
-                 cast<PartialApplyInst>(DI->getOperand())->isOnStack()),
-            "Operand of dealloc_stack must be an alloc_stack, alloc_vector or partial_apply "
+                 cast<PartialApplyInst>(DI->getOperand())->isOnStack()) ||
+                (isTokenFromCalleeAllocatedBeginApply(DI->getOperand())),
+            "Operand of dealloc_stack must be an alloc_stack, alloc_vector or "
+            "partial_apply "
             "[stack]");
   }
   void checkDeallocPackInst(DeallocPackInst *DI) {
@@ -4114,29 +4150,31 @@ public:
               == F.getModule().Types.getProtocolWitnessRepresentation(protocol),
             "result of witness_method must have correct representation for protocol");
 
-    require(methodType->isPolymorphic(),
-            "result of witness_method must be polymorphic");
+    if (methodType->isPolymorphic()) {
+      require(methodType->isPolymorphic(),
+              "result of witness_method must be polymorphic");
 
-    auto genericSig = methodType->getInvocationGenericSignature();
+      auto genericSig = methodType->getInvocationGenericSignature();
 
-    auto selfGenericParam = genericSig.getGenericParams()[0];
-    require(selfGenericParam->getDepth() == 0
-            && selfGenericParam->getIndex() == 0,
-            "method should be polymorphic on Self parameter at depth 0 index 0");
-    std::optional<Requirement> selfRequirement;
-    for (auto req : genericSig.getRequirements()) {
-      if (req.getKind() != RequirementKind::SameType) {
-        selfRequirement = req;
-        break;
+      auto selfGenericParam = genericSig.getGenericParams()[0];
+      require(selfGenericParam->getDepth() == 0
+              && selfGenericParam->getIndex() == 0,
+              "method should be polymorphic on Self parameter at depth 0 index 0");
+      std::optional<Requirement> selfRequirement;
+      for (auto req : genericSig.getRequirements()) {
+        if (req.getKind() != RequirementKind::SameType) {
+          selfRequirement = req;
+          break;
+        }
       }
-    }
 
-    require(selfRequirement &&
-            selfRequirement->getKind() == RequirementKind::Conformance,
-            "first non-same-typerequirement should be conformance requirement");
-    const auto protos = genericSig->getRequiredProtocols(selfGenericParam);
-    require(std::find(protos.begin(), protos.end(), protocol) != protos.end(),
-            "requirement Self parameter must conform to called protocol");
+      require(selfRequirement &&
+              selfRequirement->getKind() == RequirementKind::Conformance,
+              "first non-same-typerequirement should be conformance requirement");
+      const auto protos = genericSig->getRequiredProtocols(selfGenericParam);
+      require(std::find(protos.begin(), protos.end(), protocol) != protos.end(),
+              "requirement Self parameter must conform to called protocol");
+    }
 
     auto lookupType = AMI->getLookupType();
     if (getLocalArchetypeOf(lookupType) || lookupType->hasDynamicSelfType()) {
@@ -5218,6 +5256,27 @@ public:
     require(resTI == ti->getThunkKind().getDerivedFunctionType(
                          ti->getFunction(), objTI, ti->getSubstitutionMap()),
             "resTI is not the thunk kind assigned derived function type");
+
+    auto originalCalleeFuncType =
+        ti->getOperand()->getType().castTo<SILFunctionType>();
+
+    switch (ti->getThunkKind()) {
+    case ThunkInst::Kind::Invalid:
+      break;
+    case ThunkInst::Kind::Identity:
+      break;
+    case ThunkInst::Kind::HopToMainActorIfNeeded:
+      require(originalCalleeFuncType->getParameters().empty(),
+              "Hop To Main Actor If Needed cannot have any parameters");
+      require(originalCalleeFuncType->getResults().empty(),
+              "Hop To Main Actor If Needed cannot have any results");
+      // We require that hop_to_main_actor inputs do not an error since we
+      // have to have no results.
+      require(!originalCalleeFuncType->hasErrorResult(),
+              "HopToMainActorIfNeeded thunks cannot have input without an "
+              "error result");
+      break;
+    }
   }
 
   void checkConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *ICI) {
@@ -5772,10 +5831,21 @@ public:
     if (HI->getModule().getStage() == SILStage::Lowered) {
       requireOptionalExecutorType(executor,
                                   "hop_to_executor operand in lowered SIL");
+    } else {
+      requireAnyActorType(executor,
+                          /*allow optional*/ true,
+                          /*allow executor*/ true,
+                          "hop_to_executor operand");
     }
   }
 
   void checkExtractExecutorInst(ExtractExecutorInst *EEI) {
+    requireObjectType(BuiltinExecutorType, EEI,
+                      "extract_executor result");
+    requireAnyActorType(EEI->getExpectedExecutor(),
+                        /*allow optional*/ false,
+                        /*allow executor*/ false,
+                        "extract_executor operand");
     if (EEI->getModule().getStage() == SILStage::Lowered) {
       require(false,
               "extract_executor instruction should have been lowered away");
@@ -6762,7 +6832,7 @@ public:
     };
 
     struct BBState {
-      std::vector<SingleValueInstruction*> Stack;
+      std::vector<SILValue> Stack;
 
       /// Contents: BeginAccessInst*, BeginApplyInst*.
       std::set<SILInstruction*> ActiveOps;
@@ -6812,9 +6882,15 @@ public:
         }
           
         if (i.isAllocatingStack()) {
-          state.Stack.push_back(cast<SingleValueInstruction>(&i));
-
-        } else if (i.isDeallocatingStack()) {
+          if (auto *BAI = dyn_cast<BeginApplyInst>(&i)) {
+            state.Stack.push_back(BAI->getCalleeAllocationResult());
+          } else {
+            state.Stack.push_back(cast<SingleValueInstruction>(&i));
+          }
+          // Not "else if": begin_apply both allocates stack and begins an
+          // operation.
+        }
+        if (i.isDeallocatingStack()) {
           SILValue op = i.getOperand(0);
           while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
             op = mvi->getOperand();
@@ -7315,6 +7391,10 @@ static bool verificationEnabled(const SILModule &M) {
 
   // Otherwise, if verify all is set, we always verify.
   if (M.getOptions().VerifyAll)
+    return true;
+
+  // If we have asserts enabled, always verify...
+  if (CONDITIONAL_ASSERT_enabled())
     return true;
 
 #ifndef NDEBUG

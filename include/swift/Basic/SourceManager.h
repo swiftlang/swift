@@ -55,6 +55,7 @@ public:
   enum Kind {
 #define MACRO_ROLE(Name, Description) Name##MacroExpansion,
 #include "swift/Basic/MacroRoles.def"
+#undef MACRO_ROLE
 
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,
@@ -65,6 +66,23 @@ public:
     /// The expansion of default argument at caller side
     DefaultArgument,
   } kind;
+
+  static StringRef kindToString(GeneratedSourceInfo::Kind kind) {
+    switch (kind) {
+#define MACRO_ROLE(Name, Description)                                          \
+  case Name##MacroExpansion:                                                   \
+    return #Name "MacroExpansion";
+#include "swift/Basic/MacroRoles.def"
+#undef MACRO_ROLE
+    case ReplacedFunctionBody:
+      return "ReplacedFunctionBody";
+    case PrettyPrinted:
+      return "PrettyPrinted";
+    case DefaultArgument:
+      return "DefaultArgument";
+    }
+    llvm_unreachable("Invalid kind");
+  }
 
   /// The source range in the enclosing buffer where this source was generated.
   ///

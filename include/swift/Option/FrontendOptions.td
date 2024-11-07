@@ -270,7 +270,7 @@ def dependency_scan_cache_remarks : Flag<["-"], "Rdependency-scan-cache">,
 
 def parallel_scan : Flag<["-"], "parallel-scan">,
    HelpText<"Perform dependency scanning in-parallel.">;
-def no_parallel_scan : Flag<["-"], "-no-parallel-scan">,
+def no_parallel_scan : Flag<["-"], "no-parallel-scan">,
    HelpText<"Perform dependency scanning in a single-threaded fashion.">;
 
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
@@ -1226,6 +1226,9 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
             "when optimizing ownership will be lowered before serializing SIL">;
 }
 
+def enable_recompilation_to_ossa_module : Flag<["-"], "enable-recompilation-to-ossa-module">,
+  HelpText<"Allow recompilation of a non-OSSA module to an OSSA module when imported from another OSSA module">;
+
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
 
@@ -1294,6 +1297,13 @@ def disable_lifetime_dependence_diagnostics :
   Flag<["-"], "disable-lifetime-dependence-diagnostics">,
   HelpText<"Disable lifetime dependence diagnostics for Nonescapable types.">;
 
+def enable_aggressive_reg2mem :
+  Flag<["-"], "enable-aggressive-reg2mem">,
+  HelpText<"Enable a more aggressive reg2mem heuristic">;
+def disable_aggressive_reg2mem :
+  Flag<["-"], "disable-aggressive-reg2mem">,
+  HelpText<"Disable a more aggressive reg2mem heuristic">;
+
 def enable_collocate_metadata_functions :
   Flag<["-"], "enable-collocate-metadata-functions">,
   HelpText<"Enable collocate metadata functions">;
@@ -1349,6 +1359,13 @@ def disable_new_llvm_pass_manager :
   Flag<["-"], "disable-new-llvm-pass-manager">,
   HelpText<"Disable the new llvm pass manager">;
 
+def enable_profiling_marker_thunks :
+  Flag<["-"], "enable-profiling-marker-thunks">,
+  HelpText<"Enable profiling marker thunks">;
+def disable_profiling_marker_thunks :
+  Flag<["-"], "disable-profiling-marker-thunks">,
+  HelpText<"Disable profiling marker thunks">;
+
 def enable_objective_c_protocol_symbolic_references :
   Flag<["-"], "enable-objective-c-protocol-symbolic-references">,
   HelpText<"Enable objective-c protocol symbolic references">;
@@ -1386,7 +1403,8 @@ def cas_fs: Separate<["-"], "cas-fs">,
 
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
-
+def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
+  HelpText<"Clang Include Tree FileList CASID">, MetaVarName<"<cas-id>">;
 
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,

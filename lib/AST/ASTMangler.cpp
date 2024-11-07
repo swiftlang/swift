@@ -636,6 +636,16 @@ std::string ASTMangler::mangleSILDifferentiabilityWitness(StringRef originalName
   return finalize();
 }
 
+std::string ASTMangler::mangleSILThunkKind(StringRef originalName,
+                                           SILThunkKind thunkKind) {
+  beginManglingWithoutPrefix();
+  appendOperator(originalName);
+  // Prefix for thunk inst based thunks
+  auto code = (char)thunkKind.getMangledKind();
+  appendOperator("TT", StringRef(&code, 1));
+  return finalize();
+}
+
 std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
     AutoDiffGeneratedDeclarationKind declKind, StringRef origFnName,
     unsigned bbId, AutoDiffLinearMapKind linearMapKind,
@@ -1281,6 +1291,15 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendOperator("Bb");
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
+    case TypeKind::BuiltinUnboundGeneric:
+      llvm_unreachable("not a real type");
+    case TypeKind::BuiltinFixedArray: {
+      auto bfa = cast<BuiltinFixedArrayType>(tybase);
+      appendType(bfa->getSize(), sig, forDecl);
+      appendType(bfa->getElementType(), sig, forDecl);
+      return appendOperator("BV");
+    }
+    
     case TypeKind::SILToken:
       return appendOperator("Bt");
     case TypeKind::BuiltinVector:
@@ -1376,12 +1395,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       Buffer << (packTy->isElementAddress() ? 'i' : 'd');
       return;
     }
-
-    case TypeKind::Paren:
-      assert(DWARFMangling && "sugared types are only legal for the debugger");
-      appendType(cast<ParenType>(tybase)->getUnderlyingType(), sig, forDecl);
-      appendOperator("XSp");
-      return;
 
     case TypeKind::ArraySlice:
       assert(DWARFMangling && "sugared types are only legal for the debugger");
@@ -1666,11 +1679,14 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       appendOperator("$");
 
+      auto value = integer->getValue().getSExtValue();
+
       if (integer->isNegative()) {
-        appendOperator("n");
+        appendOperator("n", Index(-value));
+      } else {
+        appendOperator("", Index(value));
       }
 
-      appendOperator(integer->getDigitsText());
       return;
     }
 
@@ -2148,6 +2164,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     break;
   case SILCoroutineKind::YieldOnce:
     OpArgs.push_back('A');
+    break;
+  case SILCoroutineKind::YieldOnce2:
+    OpArgs.push_back('I');
     break;
   case SILCoroutineKind::YieldMany:
     OpArgs.push_back('G');
@@ -3053,7 +3072,7 @@ void ASTMangler::appendClangType(FnType *fn, llvm::raw_svector_ostream &out) {
       fn->getASTContext().getClangModuleLoader()->getClangASTContext();
   std::unique_ptr<clang::ItaniumMangleContext> mangler{
       clang::ItaniumMangleContext::create(clangCtx, clangCtx.getDiagnostics())};
-  mangler->mangleTypeName(clang::QualType(clangType, 0), scratchOS);
+  mangler->mangleCanonicalTypeName(clang::QualType(clangType, 0), scratchOS);
   out << scratchOS.str().size() << scratchOS.str();
 }
 
@@ -3607,10 +3626,17 @@ void ASTMangler::appendGenericSignatureParts(
   ArrayRef<Requirement> requirements = parts.requirements;
   ArrayRef<InverseRequirement> inverseRequirements = parts.inverses;
 
-  // Mangle which generic parameters are pack parameters.
+  // Mangle the kind for each generic parameter.
   for (auto param : params) {
+    // Regular type parameters have no marker.
+
     if (param->isParameterPack())
       appendOpWithGenericParamIndex("Rv", param);
+
+    if (param->isValue()) {
+      appendType(param->getValueType(), sig);
+      appendOpWithGenericParamIndex("RV", param);
+    }
   }
 
   // Mangle the requirements.

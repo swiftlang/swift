@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -disable-availability-checking -enable-experimental-async-top-level %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -target %target-swift-5.1-abi-triple -enable-experimental-async-top-level %s | %FileCheck %s
 
 // a
 // CHECK-LABEL: sil_global hidden @$s24toplevel_globalactorvars1aSivp : $Int

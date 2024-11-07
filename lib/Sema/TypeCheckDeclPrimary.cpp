@@ -36,6 +36,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -56,9 +57,8 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Bridging/Macros.h"
+#include "swift/Bridging/MacroEvaluation.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
@@ -2885,15 +2885,6 @@ public:
         // Trigger a request that will complete typechecking for the
         // initializer.
         (void) PBD->getCheckedAndContextualizedInit(i);
-
-        if (auto *var = PBD->getSingleVar()) {
-          if (var->hasAttachedPropertyWrapper())
-            return;
-        }
-
-        if (!PBD->getDeclContext()->isLocalContext()) {
-          (void) PBD->getInitializerIsolation(i);
-        }
       }
     }
 
@@ -3094,8 +3085,8 @@ public:
     auto module = AT->getDeclContext()->getParentModule();
     if (!defaultType &&
         module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
-        AvailabilityInference::availableRange(proto, Ctx)
-          .isSupersetOf(AvailabilityInference::availableRange(AT, Ctx))) {
+        AvailabilityInference::availableRange(proto).isSupersetOf(
+            AvailabilityInference::availableRange(AT))) {
       AT->diagnose(
           diag::resilient_associated_type_less_available_requires_default, AT);
     }

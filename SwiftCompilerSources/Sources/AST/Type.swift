@@ -37,6 +37,10 @@ public struct Type: CustomStringConvertible, NoReflectionChildren {
   public var isEscapable: Bool { bridged.isEscapable() }
   public var isNoEscape: Bool { bridged.isNoEscape() }
   public var isInteger: Bool { bridged.isInteger() }
+
+  public func subst(with substitutionMap: SubstitutionMap) -> Type {
+    return Type(bridged: bridged.subst(substitutionMap.bridged))
+  }
 }
 
 /// A Type that is statically known to be canonical.
@@ -55,4 +59,8 @@ public struct CanonicalType: CustomStringConvertible, NoReflectionChildren {
   public var isEscapable: Bool { type.isEscapable }
   public var isNoEscape: Bool { type.isNoEscape }
   public var isInteger: Bool { type.isInteger }
+
+  public func subst(with substitutionMap: SubstitutionMap) -> CanonicalType {
+    return type.subst(with: substitutionMap).canonical
+  }
 }

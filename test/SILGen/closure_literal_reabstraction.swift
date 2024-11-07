@@ -162,14 +162,14 @@ func reabstractClassCompInitializerRefs<T>(
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]<T>([[MV1]])
 // CHECK:         [[CLOSURE_C:%.*]] = convert_function [[CLOSURE]]
 // CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_C]]
-// CHECK:         apply {{.*}}<Int, any (AbstractGenericButt<T> & Buttable)>([[CLOSURE_NE]])
+// CHECK:         apply {{.*}}<Int, any AbstractGenericButt<T> & Buttable>([[CLOSURE_NE]])
     gen(f: butt.init(c:))
 // CHECK:         [[MV2:%.*]] = move_value [var_decl] %0
 // CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u0_
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]<T>([[MV2]])
 // CHECK:         [[CLOSURE_C:%.*]] = convert_function [[CLOSURE]]
 // CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_C]]
-// CHECK:         apply {{.*}}<Int, any (AbstractGenericButt<T> & Buttable)>([[CLOSURE_NE]])
+// CHECK:         apply {{.*}}<Int, any AbstractGenericButt<T> & Buttable>([[CLOSURE_NE]])
     gen(f: butt.init(p:))
 }
 
@@ -182,14 +182,14 @@ func reabstractClassCompStaticMemberRefs<T>(
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]<T>([[MV1]])
 // CHECK:         [[CLOSURE_C:%.*]] = convert_function [[CLOSURE]]
 // CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_C]]
-// CHECK:         apply {{.*}}<Int, any (AbstractGenericButt<T> & Buttable)>([[CLOSURE_NE]])
+// CHECK:         apply {{.*}}<Int, any AbstractGenericButt<T> & Buttable>([[CLOSURE_NE]])
     gen(f: butt.create(c:))
 // CHECK:         [[MV2:%.*]] = move_value [var_decl] %0
 // CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u0_
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN]]<T>([[MV2]])
 // CHECK:         [[CLOSURE_C:%.*]] = convert_function [[CLOSURE]]
 // CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_C]]
-// CHECK:         apply {{.*}}<Int, any (AbstractGenericButt<T> & Buttable)>([[CLOSURE_NE]])
+// CHECK:         apply {{.*}}<Int, any AbstractGenericButt<T> & Buttable>([[CLOSURE_NE]])
     gen(f: butt.create(p:))
 }
 

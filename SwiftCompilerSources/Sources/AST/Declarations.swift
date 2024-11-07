@@ -30,6 +30,7 @@ public class Decl: CustomStringConvertible, Hashable {
 public class ValueDecl: Decl {
   final public var nameLoc: SourceLoc? { SourceLoc(bridged: bridged.Value_getNameLoc()) }
   final public var userFacingName: StringRef { StringRef(bridged: bridged.Value_getUserFacingName()) }
+  final public var isObjC: Bool { bridged.Value_isObjC() }
 }
 
 public class TypeDecl: ValueDecl {
@@ -56,6 +57,10 @@ final public class StructDecl: NominalTypeDecl {
 
 final public class ClassDecl: NominalTypeDecl {
   public var superClass: Type? { Type(bridgedOrNil: bridged.Class_getSuperclass()) }
+
+  final public var destructor: DestructorDecl {
+    bridged.Class_getDestructor().getAs(DestructorDecl.self)
+  }
 }
 
 final public class ProtocolDecl: NominalTypeDecl {}
@@ -84,7 +89,9 @@ public class AbstractFunctionDecl: ValueDecl {}
 
 final public class ConstructorDecl: AbstractFunctionDecl {}
 
-final public class DestructorDecl: AbstractFunctionDecl {}
+final public class DestructorDecl: AbstractFunctionDecl {
+  final public var isIsolated: Bool { bridged.Destructor_isIsolated() }
+}
 
 public class FuncDecl: AbstractFunctionDecl {}
 

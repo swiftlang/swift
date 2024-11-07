@@ -18,7 +18,7 @@ Specific instances of monoids can be quite complicated and abstract, but our fir
 \end{definition}
 
 \begin{example}
-The set of \index{natural numbers}natural numbers $\NN$ satisfies the monoid axioms if we take addition as our operation and zero as the identity element:
+The set of \index{natural numbers!addition}natural numbers $\NN$ satisfies the monoid axioms if we take addition as our operation and zero as the identity element:
 \begin{itemize}
 \item The sum of two natural numbers is again a natural number.
 \item Addition is associative: for all $x$, $y$, $z\in\NN$, $(x+y)+z=x+(y+z)$.
@@ -181,7 +181,7 @@ The free monoid over an \index{empty set}empty set $\varnothing^*$ is $\{\vareps
 
 \section{Finitely-Presented Monoids}\label{finitely presented monoids}
 
-Every element of a free monoid has a \emph{unique} expression as a product of generators. Finitely-presented monoids are more general, because multiple distinct combinations can name the same element. To model this phenomenon, we start from a finite set of \IndexDefinition{rewrite rule}\emph{rewrite rules}, which then generate an equivalence relation on terms. We first turned to equivalence relations in \SecRef{type params}, to understand the same-type requirements of a generic signature; the below construction is similar.
+Every element of a free monoid has a \emph{unique} expression as a product of generators. Finitely-presented monoids are more general, because multiple distinct combinations can name the same element. To model this phenomenon, we start from a finite set of \index{rule|see{rewrite rule}}\IndexDefinition{rewrite rule}\emph{rewrite rules}, which then generate an equivalence relation on terms. We first turned to equivalence relations in \SecRef{valid type params}, to understand the same-type requirements of a generic signature; the below construction is similar.
 
 A \IndexDefinition{monoid presentation}\emph{monoid presentation} is a list of generators and rewrite rules:
 \[\Pres{ \underbrace{a_1,\,\ldots,\, a_m}_{\text{generators}} }{ \underbrace{u_1 \sim v_1,\,\ldots,\, u_n \sim v_n}_{\text{rewrite rules}}} \]
@@ -190,7 +190,7 @@ Also, if $A := \{a_1,\ldots, a_m\}$ and $R := \{(u_1,v_1),\,\ldots,\,(u_n,v_n)\}
 
 We will describe the intuitive model behind the \index{term equivalence relation}term equivalence relation first, and then give a rigorous definition in the next section. Syntactically, a rewrite rule $(u,v)\in R$ is a pair of terms. Semantically, a rewrite rule tells us that if we find $u$ anywhere within a term, we can replace this subterm with $v$, and obtain another equivalent term. Term equivalence is symmetric, so we can also replace $v$ with $u$, too. Finally, it is transitive, so we can iterate these rewrite steps any number of times to prove an equivalence.
 
-A monoid presentation $\AR$ then defines a \IndexDefinition{finitely-presented monoid}\emph{finitely-presented monoid}. The \index{set!of finitely-presented monoid}elements of a finitely-presented monoid are the equivalence classes of $\sim_R$, the \index{binary operation!of finitely-presented monoid}binary operation is concatenation of terms, and the \index{identity element!of finitely-presented monoid}identity element is the equivalence class of $\varepsilon$. 
+A monoid presentation $\AR$ then defines a \IndexDefinition{finitely-presented monoid}\emph{finitely-presented monoid}. The \index{set!of finitely-presented monoid}elements of a finitely-presented monoid are the \index{equivalence class!of terms}equivalence classes of $\sim_R$, the \index{binary operation!of finitely-presented monoid}binary operation is concatenation of terms, and the \index{identity element!of finitely-presented monoid}identity element is the equivalence class of $\varepsilon$. 
 
 \begin{example}
 Finitely-presented monoids generalize the free monoids, because every free monoid (with a finite generating set) is also finitely presented if we start from an empty set of rewrite rules. In this case $x\sim y$ if and only if $x=y$.
@@ -220,7 +220,7 @@ Therefore, the rule partitions the terms of $\{a^*\}$ into four infinite equival
 \{a^3,\, a^7,\, a^{11},\, \ldots,\, a^{4k+3},\, \ldots\}
 \end{gather*}
 
-In the \index{Cayley graph!of finitely-presented monoid}Cayley graph of a finitely-presented monoid, the \index{vertex!of Cayley graph}vertices are equivalence classes of terms. The \index{edge!of Cayley graph}edge set is now defined on these equivalence classes, so for each equivalence class $\EquivClass{t}$ and generator $g\in A$, we have an edge with source~$\EquivClass{t}$ and destination~$\EquivClass{tg}$. We will see later this does not depend on our choice of labels. With $\mathbb{Z}_4$ we can label each vertex with the shortest term in each equivalence class. The Cayley graph for $\mathbb{Z}_4$ is the same as the graph we associated with the \texttt{Z4} protocol from \ExRef{protocol z4 graph}:
+In the \index{Cayley graph!of finitely-presented monoid}Cayley graph of a finitely-presented monoid, the \index{vertex!of Cayley graph}vertices are \index{equivalence class!of terms}equivalence classes of terms. The \index{edge!of Cayley graph}edge set is now defined on these equivalence classes, so for each equivalence class $\EquivClass{t}$ and generator $g\in A$, we have an edge with source~$\EquivClass{t}$ and destination~$\EquivClass{tg}$. We will see later this does not depend on our choice of labels. With $\mathbb{Z}_4$ we can label each vertex with the shortest term in each equivalence class. The Cayley graph for $\mathbb{Z}_4$ is the same as the graph we associated with the \texttt{Z4} protocol from \ExRef{protocol z4 graph}:
 
 \begin{center}
 \begin{tikzpicture}
@@ -387,7 +387,7 @@ The \index{Cayley graph}Cayley graph of a monoid presentation helped us understa
 \begin{enumerate}
 \item A \IndexDefinition{rewrite step}rewrite step is an \index{ordered tuple}ordered tuple of terms, written \index{$\Rightarrow$}\index{$\Rightarrow$!z@\igobble|seealso{rewrite path, rewrite step}}$x(u\Rightarrow v)y$, where $x$, $y\in A^*$, and one of $(u,v)$ or $(v,u)\in R$.
 \item If $(u,v)\in R$, we say that $x(u\Rightarrow v)y$ is a \IndexDefinition{positive rewrite step}\emph{positive} rewrite step. If $(v,u)\in R$, then $x(u\Rightarrow v)y$ is a \IndexDefinition{negative rewrite step}\emph{negative} rewrite step.
-\item The terms $x$ and $y$ are called the left and right \emph{whiskers}, respectively. If $x$ or $y$ is identically~$\varepsilon$, we omit them in the notation.
+\item The terms $x$ and $y$ are called the \IndexDefinition{left whisker}left and \IndexDefinition{right whisker}right \emph{whiskers}, respectively. If $x$ or $y$ is identically~$\varepsilon$, we omit them in the notation.
 \item For rewrite steps to serve as edges in our graph, we define the \emph{source} and \emph{destination} of a rewrite step $s:= x(u\Rightarrow v)y$ as the following terms of~$A^*$:
 \begin{gather*}
 \Src(s) := xuy\\
@@ -595,7 +595,7 @@ z\WL (z^\prime \WL p)=(z\cdot z^\prime) \WL p\\
 \end{gather*}
 The left and right whiskering actions are compatible with each other:
 \[(z\WL p)\WR z^\prime = z\WL(p\WR z^\prime)\]
-Finally, the distributive law generalizes to rewrite path composition:
+Finally, the distributive law generalizes from rewrite steps to rewrite paths:
 \begin{gather*}
 z\WL (p_1 \circ p_2) = (z\WL p_1) \circ (z\WL p_2)\\
 (p_1 \circ p_2)\WR z = (p_1\WR z) \circ (p_2\WR z)
@@ -603,7 +603,7 @@ z\WL (p_1 \circ p_2) = (z\WL p_1) \circ (z\WL p_2)\\
 \end{definition}
 
 \begin{proposition}
-Let $\AR$ be a monoid presentation. Let $P$ be the set of paths in the rewrite graph of $\AR$. The following axioms characterize~$P$:
+Let $\AR$ be a monoid presentation. Let $P$ be the set of rewrite paths of $\AR$. The following axioms characterize~$P$:
 \begin{enumerate}
 \item (Base case) For each $(u,v)\in R$, there is a rewrite path $(u\Rightarrow v)\in P$.
 \item (Closure under inversion) If $p\in P$, then $p^{-1}\in P$.
@@ -621,7 +621,7 @@ Recall that $x\sim_R y$ means our rewrite graph has a path from $x$~to~$y$.
 Let $\AR$ be a monoid presentation. Then $\sim_R$ is an equivalence relation on $A^*$.
 \end{proposition}
 \begin{proof}
-We check each axiom in turn.
+Let $P$ be the set of rewrite paths of $\AR$. We check each axiom in turn.
 \begin{enumerate}
 \item \index{reflexive relation}(Reflexivity) For each $x\in A^*$, there is an \index{empty rewrite path}empty rewrite path $1_x\in P$. Since $\Src(1_x)=\Dst(1_x)=x$, it follows that $x\sim x$.
 \item \index{symmetric relation}(Symmetry) Assume $x\sim y$. Then there is a $p\in P$ such that $x=\Src(p)$ and $y=\Dst(p)$. Since $P$ is closed under taking inverses, $p^{-1}\in P$. But $y=\Src(p^{-1})$ and $x=\Dst(p^{-1})$, so we have $y\sim x$.
@@ -641,13 +641,13 @@ Let $M$ be a monoid. A relation $R\subseteq M\times M$ is \IndexDefinition{trans
 \end{definition}
 A translation-invariant equivalence relation is known as a \IndexDefinition{monoid congruence}\emph{monoid congruence}.
 \begin{example}
-Consider the monoid $(\NN,+,0)$. The standard \index{linear order}linear order $<$ on \index{natural numbers}$\NN$ is translation-invariant (but not an equivalence relation). For instance $5<7$ also implies that $5+2<7+2$. (Hence we're using ``translation'' in the geometric sense.)
+Consider the monoid $(\NN,+,0)$. The standard \index{linear order}linear order $<$ on \index{natural numbers!linear order}$\NN$ is translation-invariant (but not an equivalence relation). For instance $5<7$ also implies that $5+2<7+2$. (Hence we're using ``translation'' in the geometric sense.)
 \end{example}
 \begin{theorem}
 Let $\AR$ be a monoid presentation. Then the term equivalence relation~$\sim_R$ is a monoid congruence.
 \end{theorem}
 \begin{proof}
-We've seen that $\sim$ is an equivalence relation, so it remains to establish translation invariance. Suppose that we're given $x$, $y$, $z\in A^*$ where $x\sim y$. We must show that $zx\sim zy$ and $xz\sim yz$. To show that $zx\sim zy$, take $p\in P$ such that $x=\Src(p)$ and $y=\Dst(p)$. Since $P$ is closed under whiskering, we have $z\WL p\in P$, so $zx\sim zy$:
+We've seen that $\sim$ is an equivalence relation, so it remains to establish translation invariance. Let $P$ be the set of rewrite paths of $\AR$. Suppose that $x$, $y$, $z\in A^*$, and also that $x\sim y$, so we have $p\in P$ such that $x=\Src(p)$ and $y=\Dst(p)$. We must show $zx\sim zy$ and $xz\sim yz$. For the first claim, we notice that $z\WL p\in P$, so $zx\sim zy$:
 \begin{gather*}
 \Src(z\WL p)=z\cdot \Src(p)=zx\\
 \Dst(z\WL p)=z\cdot \Dst(p)=zy
@@ -658,8 +658,7 @@ To show that $xz \sim yz$, consider $p\WR z$ instead.
 Thus, \emph{the set of equivalence classes} of $\sim_R$ has the structure of a monoid:
 
 \begin{theorem}
-\index{equivalence class}%
-Let $\AR$ be a monoid presentation. Term concatenation is \index{well-defined}well-defined on the equivalence classes of $\sim_R$; that is, if we pick two representative terms and concatenate them together, the equivalence class of the result does not depend on the choice of representatives.
+Let $\AR$ be a monoid presentation. Term concatenation is \index{well-defined}well-defined on the \index{equivalence class!monoid operation}equivalence classes of $\sim_R$; that is, if we pick two representative terms and concatenate them together, the equivalence class of the result does not depend on the choice of representatives.
 \end{theorem}
 \begin{proof}
 Suppose we're given $x$, $x^\prime$, $y$, $y^\prime\in A^*$ such that $x\sim x^\prime$ and $y\sim y^\prime$. We must show that $xy\sim x^\prime y^\prime$. By assumption, there exist a pair of rewrite paths $p_x$, $p_y$ such that:
@@ -739,7 +738,7 @@ A stack language program is a sequence of tokens, where each token is either a \
 \item A word, which is analogous to a function in other languages, pops some number of input values from the stack, processes those values, and then pushes zero or more results back on the stack.
 \end{enumerate}
 
-To each token, we assign a \emph{stack effect}, which is a pair of natural numbers $(m,n)$ that encodes the number of inputs~$m$ and the number of outputs~$n$ that result from evaluating this token on the stack. It turns out if we represent a stack effect as an element $b^m a^n$ in the bicyclic monoid, then composition of stack effects is the same as the monoid operation.
+To each token, we assign a \emph{stack effect}, which is a pair of natural numbers $(m,n)$ that encodes the number of inputs~$m$ and the number of outputs~$n$ that result from evaluating this token on the stack. It turns out if we encode each stack effect as an element $b^m a^n$ in the bicyclic monoid, then the monoid operation gives us a composition operation on stack effects.
 
 Consider a stack language whose literals are integers and whose words are as below.
 \begin{center}
@@ -763,9 +762,9 @@ We can use this language to evaluate simple postfix arithmetic expressions:
 5 dup * 3 neg + .
 \end{verbatim}
 \end{quote}
-The above program has no overall effect on the stack; it will execute correctly when run on an empty stack, but if there were values on the stack, they remain unchanged. On the other hand, we can also have a program like ``\verb|dup * .|'' which expects at least one input value to be present, otherwise the evaluation of ``\texttt{dup}'' will attempt to pop the top of an empty stack. We can also write a program like ``\verb|5 7 + 1|'' which expects no inputs, but leaves values behind.
+The above program has no overall effect on the stack; it will execute correctly when run on an empty stack, but if there were values on the stack, they remain unchanged. On the other hand, we can also have a program like ``\verb|dup * .|'' which expects at least one input value to be present, otherwise the evaluation of ``\texttt{dup}'' will attempt to pop the top of an empty stack. Finally, we can write a program like ``\verb|5 7 + 1|'' which expects no inputs, but leaves values behind.
 
-We can formalize this as follows. Given a stack language program, we map each token to its stack effect, which is known, and then compose them together. This gives us the stack effect of the overall program, as an element of the bicyclic monoid. The following closed form expression for the monoid operation can be used:
+We can determine the stack effect of each of these programs without evaluating them, as follows. We map each token to its stack effect using the above table, and then compose them together. The following closed form expression for the monoid operation is helpful here:
 \[
 b^i a^j \cdot b^k a^l = \begin{cases}
 b^{i-j+k} a^l &\text{if $j<k$}\\
@@ -773,15 +772,15 @@ b^i a^{j-k+l} &\text{if $j\geq k$}
 \end{cases}
 \]
 
-We can calculate that the stack effect of ``\verb|5 dup * 3 neg + .|'' is $\varepsilon$, confirming that this program has no effect on the stack:
+For example, we can calculate that the stack effect of ``\verb|5 dup * 3 neg + .|'' as follows, confirming that this program has no effect on the stack:
 \[a\cdot ba^2 \cdot b^2a \cdot a \cdot ba \cdot b^2a \cdot b = \varepsilon\]
 
-The stack effect of the \emph{concatenation} of two programs is the composition of their stack effects. For this reason, stack-based languages are also known as \IndexDefinition{concatenative language}\emph{concatenative languages}. Examples of stack-based languages include \index{Forth}Forth~\cite{forth}, \index{Joy}Joy~\cite{joy}, and \index{Factor}Factor~\cite{factor}. The Factor compiler implements a static stack effect checker based on this idea.
+Because the monoid operation is associative, it follows that the stack effect of the \emph{concatenation} of two programs is equal to the composition of their stack effects. For this reason, stack-based languages are also known as \IndexDefinition{concatenative language}\emph{concatenative languages}. Examples of stack-based languages include \index{Forth}Forth~\cite{forth}, \index{Joy}Joy~\cite{joy}, and \index{Factor}Factor~\cite{factor}. The Factor compiler implements a static stack effect checker based on the idea we just described.
 \end{example}
 
 \section{A Swift Connection}\label{monoidsasprotocols}
 
-In this section, we will show that finitely-presented monoids map to Swift protocols in a very natural way. We make use of the \index{derived requirement}derived requirements formalism we defined in \SecRef{derived req}, and some further results from \SecRef{generic signature validity}. By now, it should be apparent that there are some similarities between the two theories, even if the concepts do not completely overlap:
+In this section, we will show that finitely-presented monoids map to Swift protocols in a very natural way. We make use of the \index{derived requirement!encoding monoid}derived requirements formalism we defined in \SecRef{derived req}, and some further results from \SecRef{generic signature validity}. By now, it should be apparent that there are some similarities between the two theories, even if the concepts do not completely overlap:
 \begin{center}
 \begin{tabular}{ll}
 \toprule
@@ -805,11 +804,6 @@ protocol M {
   associatedtype B: M
 }
 \end{Verbatim}
-The requirement signature of \texttt{M} declares two \index{associated conformance requirement!free monoid}associated conformance requirements:
-\begin{gather*}
-\AssocConfReq{Self.A}{M}{M}\\
-\AssocConfReq{Self.B}{M}{M}
-\end{gather*}
 We define a function $\varphi$ that sends each element of $\{a,b\}^*$ to a type parameter of $\GM$ by recursively constructing a \index{dependent member type!free monoid}dependent member type for each ``$a$'' and ``$b$'', until we finally get to the empty term, which becomes the \Index{protocol Self type@protocol \tSelf\ type!free monoid}protocol \tSelf\ type:
 \begin{gather*}
 \varphi(\varepsilon):=\tSelf\\
@@ -823,7 +817,12 @@ For example, the four distinct terms of length 2 map to the following type param
 \varphi(ba)=\texttt{Self.B.A}\\
 \varphi(bb)=\texttt{Self.B.B}
 \end{gather*}
-Every type parameter output by $\varphi$ is a valid type parameter of $\GM$, and every such type parameter also conforms to~\texttt{M}:
+The requirement signature of \texttt{M} also declares two \index{associated conformance requirement!free monoid}associated conformance requirements:
+\begin{gather*}
+\AssocConfReq{Self.A}{M}{M}\\
+\AssocConfReq{Self.B}{M}{M}
+\end{gather*}
+As a consequence of these requirements, every type parameter output by $\varphi$ is a valid type parameter of $\GM$, and every such type parameter also conforms to~\texttt{M}:
 \begin{proposition}\label{monoid type lemma} If $t\in \{a,b\}^*$ and $\texttt{T}:=\varphi(t)$, then $\GM\vdash\texttt{T}$ and $\GM\vdash\ConfReq{T}{M}$.
 \end{proposition}
 \begin{proof}
@@ -886,7 +885,7 @@ Finally, there is an inverse $\PhiInv$ mapping the type parameters of $\GM$ to e
 We've shown that the type parameters of $\GM$ have a monoid structure isomorphic to~$\{a,b\}^*$. Furthermore, nothing in our construction relied on there being exactly two generators; we can add or remove associated type declarations in \texttt{M} as needed. For example, if we apply this construction to the free monoid with one generator, we get protocol \texttt{N} from \ExRef{protocol n graph}. This monoid is isomorphic to $(\NN,+,0)$, which justifies the name \texttt{N}.
 
 \paragraph{Finitely-presented monoids.}
-We extend our encoding from a free monoid~$A^*$ to a \index{finitely-presented monoid}finitely-presented monoid~$\AR$. We start with a protocol~\texttt{M} that encodes $A^*$, then for each $(u,v)\in R$, we apply $\varphi$ to $u$ and $v$ to obtain an \index{associated same-type requirement!finitely-presented monoid}associated same-type requirement $\AssocSameReq{$\varphi(u)$}{$\varphi(v)$}{M}$. Finally, we attach a \Index{where clause@\texttt{where} clause}trailing \texttt{where} clause to \texttt{M} where we state these requirements. Let's try the \index{bicyclic monoid}bicyclic monoid $\Bicyclic$ from \ExRef{bicyclic}:
+We extend our encoding from a free monoid~$A^*$ to a \index{finitely-presented monoid}finitely-presented monoid~$\AR$. We start with a protocol~\texttt{M} that encodes $A^*$, then for each $(u,v)\in R$, we apply $\varphi$ to $u$ and $v$ to obtain an \index{associated same-type requirement!finitely-presented monoid}associated same-type requirement $\AssocSameReq{$\varphi(u)$}{$\varphi(v)$}{M}$. Finally, we attach a \Index{where clause@\texttt{where} clause!protocol declaration}trailing \texttt{where} clause to \texttt{M} where we state these requirements. Let's try the \index{bicyclic monoid}bicyclic monoid $\Bicyclic$ from \ExRef{bicyclic}:
 \begin{Verbatim}
 protocol M {
   associatedtype A: M
@@ -897,7 +896,7 @@ protocol M {
 \newcommand{\SameReqPhi}[2]{\SameReq{$\varphi(#1)$}{$\varphi(#2)$}}
 \newcommand{\ConfReqPhi}[1]{\ConfReq{$\varphi(#1)$}{M}}
 
-The same-type requirements of \texttt{M} give the protocol generic signature $\GM$ a non-trivial \index{equivalence class}equivalence class structure under the \index{reduced type equality!finitely-presented monoid}reduced type equality relation. 
+The same-type requirements of \texttt{M} give the protocol generic signature $\GM$ a non-trivial \index{equivalence class!of type parameters}equivalence class structure under the \index{reduced type equality!finitely-presented monoid}reduced type equality relation. 
 
 \begin{example}
 Recalling \ExRef{bicyclic 2}, we saw that $baaba\sim babaa$ in the bicyclic monoid, with $ba\BRule a \circ b\BRuleInv aa$ being one possible rewrite path from $baaba$ to $babaa$. Let \texttt{M} be the protocol that encodes this monoid. We can construct a derivation of $\GM\vdash\SameReq{Self.B.A.A.B.A}{Self.B.A.B.A.A}$ by translating each rewrite step:
@@ -945,7 +944,7 @@ Finally, we compose the two rewriting steps with \IndexStep{Trans}\textsc{Trans}
 \end{gather*}
 \end{example}
 
-We now prove that for any monoid presentation $\AR$, the corresponding generic signature $\GM$ has the same equivalence class structure as~$\sim$:
+We now prove that for any monoid presentation $\AR$, the corresponding generic signature $\GM$ has the same equivalence class structure as~$\sim_R$:
 \begin{enumerate}
 \item If $x\sim y$, then $\varphi(x)$~and~$\varphi(y)$ are equivalent type parameters in $\GM$.
 \item If $\varphi(x)$ and $\varphi(y)$ are equivalent type parameters in $\GM$, then $x\sim y$.
@@ -989,7 +988,7 @@ Thus, every rewrite path $p$ maps to a derived same-type requirement in $\GM$.
 \end{proof}
 
 \begin{theorem}\label{derivation to path}
-Let $\AR$ be a monoid presentation, and let \texttt{M} be the protocol that encodes $\AR$. Then $\GM\vdash\SameReqPhi{x}{y}$ implies that $x\sim y$ for all $x$, $y\in A^*$.
+Let $\AR$ be a monoid presentation, and let \texttt{M} be the protocol that encodes $\AR$. Then $\GM\vdash\SameReqPhi{x}{y}$ implies that $x\sim_R y$ for all $x$, $y\in A^*$.
 \end{theorem}
 \begin{proof}
 We are given a derivation of $\SameReqPhi{x}{y}$, and we must show that $x\sim y$ by constructing a rewrite path $p$ with source $x$ and destination $y$. We proceed by structural \index{induction}induction on derived requirements.
@@ -1079,7 +1078,7 @@ A call to \texttt{sameType()} requires that both arguments are \index{metatype t
 \end{gather*}
 The first statement is true, because $baaba\sim babaa$, as we've seen. However, the second statement is actually false, and in fact $baa\not\sim bbb$. The compiler accepts the first call, and diagnoses an error on the second call to \texttt{sameType()}, as we would expect.
 
-We can write similar programs to solve word problems in every other finitely-presented monoid we previously introduced, and the Swift compiler will accept them all. We now ask, does this always work, or are there some protocol declarations constructed this way that we cannot accept?
+We can write a similar program to encode every other finitely-presented monoid we've seen so far, and the Swift compiler will happily accept them, and correctly decide if arbitrary terms are equivalent to each other. We now ask, does this always work, or are there some protocol declarations constructed this way that we cannot accept?
 
 This is the well-known \IndexDefinition{word problem}\emph{word problem}:
 \begin{itemize}
@@ -1182,7 +1181,7 @@ Our example does not exhibit undecidability, because the word problem in~$D_{12}
 
 \paragraph{The big picture.} We've shown that every finitely-presented monoid can be encoded as a specific kind of Swift protocol, almost as if Swift's protocols are a generalization of the finitely-presented monoids! This doesn't immediately help us implement Swift generics, though. However, \ChapRef{symbols terms rules} shows that by taking a suitable alphabet and set of rewrite rules, we can go in the other direction and encode any Swift generic signature as a finitely-presented monoid. While the undecidability of the word problem prevents us from accepting \emph{all} generic signatures, the next section will describe a large class of finitely-presented monoids where the word problem is easy to solve. All reasonable generic signatures fit in with our model.
 
-\paragraph{Closing remarks.} In \SecRef{tag systems}, we showed that the \index{type substitution}type substitution algebra can encode arbitrary computation, using only recursive conformance requirements~\cite{se0157}. On the other hand, the encoding of a finitely-presented monoid as a protocol needs both recursive conformance requirements and protocol \texttt{where} clauses~\cite{se0142}.
+\paragraph{Closing remarks.} In \SecRef{tag systems}, we showed that the \index{type substitution}type substitution algebra can encode arbitrary computation with recursive conformance requirements~\cite{se0157}. Now we see that using recursive conformance requirements and protocol \texttt{where} clauses~\cite{se0142}, we can encode an undecidable problem in the derived requirements formalism as well.
 
 Tseitin's monoid is not a special monoid, so it cannot encode its own word problem. D.~J.~Collins~\cite{universalsemigroup} later discovered a ``more'' universal word problem interpreter having only a few more rules; this can encode word problems in $\Ts$ or even itself:
 \begin{align*}
@@ -1219,19 +1218,19 @@ Let $\AR$ be a monoid presentation.
 \begin{enumerate}
 \item The \IndexDefinition{reduction relation}\emph{reduction relation} on $A^*$ generated by $R$, denoted \index{$\rightarrow$}\index{$\rightarrow$!z@\igobble|seealso{reduction relation}}$s\rightarrow_R t$ or $s\rightarrow t$ when $R$ is clear from context, relates each pair of terms $s$ and $t$ such that there exists a positive rewrite path with source~$s$ and destination~$t$.
 
-\item A term $s$ is \index{irreducible term|see{reduced term}}\emph{irreducible} or \IndexDefinition{reduced term}\emph{reduced} if $s\rightarrow t$ implies $s=t$ for all $t\in A^*$.
+\item A term $s$ is \index{irreducible term|see{reduced term}}\emph{irreducible} or \IndexDefinition{reduced term}\emph{reduced} if $s\rightarrow t$ implies that $s=t$.
 
-\item A term $s$ \emph{reduces} to $t$ if $s\rightarrow t$, and $t$ is irreducible. We also say $t$ is a \IndexDefinition{normal form}\emph{normal form} of $s$, denoted by $\tilde{s} = t$.
+\item If $s\rightarrow t$ and $t$ is irreducible, we say $t$ is a \IndexDefinition{normal form}\emph{normal form} of $s$, denoted by $\tilde{s} = t$.
 \end{enumerate}
 \end{definition}
 
-We can describe an algorithm that attempts to find normal forms.
+We can describe an \IndexDefinition{normal form algorithm}algorithm that attempts to find normal forms.
 
 \begin{algorithm}[Normal form algorithm]\label{term reduction algo}
 As input, takes a term $t\in A^*$ and a list of rewrite rules $R:=\{(u_1,v_1),\ldots\,(u_n,v_n)\}$. As output, returns some normal form of~$t$, which we denote~$\tilde{t}$; and a \index{positive rewrite path}positive rewrite path $p$, such that $\Src(p)=t$ and $\Dst(p)=\tilde{t}$.
 \begin{enumerate}
 \item Initialize the return value $p$ with the empty rewrite path $1_t$.
-\item If $t=xuy$ for some $x$, $y\in A^*$ and $(u,v)\in R$, append the rewrite step $x(u\Rightarrow v)y$ at the end of~$p$, replace $t$ with $xvy$, and go back to Step~1.
+\item If $t=xuy$ for some $x$, $y\in A^*$ and $(u,v)\in R$: set $t\leftarrow xvy$, set $p\leftarrow p \circ x(u\Rightarrow v)y$, and go back to Step~1.
 \item Otherwise, return $t$ and $p$.
 \end{enumerate}
 \end{algorithm}
@@ -1274,7 +1273,7 @@ Let $\AR$ be a monoid presentation. A rewrite rule $(u,v)\in R$ is \IndexDefinit
 If we can orient the rewrite rules of our monoid presentation using a reduction order, then the normal form algorithm will always find \emph{some} normal form in a finite number of steps. This solves the first of our two problems:
 
 \begin{theorem}
-Let $\AR$ be a monoid presentation. If the rewrite rules of~$R$ are oriented with respect to a reduction order~$<$, then every equivalence class of $\sim$ contains \emph{at least} one reduced term. We also say that the reduction relation $\rightarrow$ is \IndexDefinition{terminating reduction relation}\index{Noetherian reduction relation@see{terminating reduction relation}}\emph{terminating} or \emph{Noetherian} in this case.
+Let $\AR$ be a monoid presentation. If the rewrite rules of~$R$ are oriented with respect to a reduction order~$<$, then every equivalence class of $\sim$ contains \emph{at least} one reduced term. We also say that the reduction relation $\rightarrow$ is \IndexDefinition{terminating reduction relation}\index{Noetherian reduction relation|see{terminating reduction relation}}\emph{terminating} or \emph{Noetherian} in this case.
 \end{theorem}
 \begin{proof}
 Assume we have a non-terminating execution of \AlgRef{term reduction algo}, starting with some term~$t$. This means we have an infinite sequence of terms, each one reducing to the next by a positive rewrite step:
@@ -1285,7 +1284,7 @@ Now, let $s=x(u\Rightarrow v)y$ be a \index{positive rewrite step}positive rewri
 However, this contradicts the assumption that $<$ is well-founded. Thus, no such infinite sequence of terms exists, and the normal form algorithm must terminate.
 \end{proof}
 
-If we equip our alphabet of symbols~$A$ with a well-founded partial order, we can always define a reduction order on $A^*$, called the \IndexDefinition{shortlex order}\emph{shortlex order}:
+If we equip our alphabet of symbols~$A$ with a well-founded partial order, we can always get a reduction order on $A^*$, called the \IndexDefinition{shortlex order}\emph{shortlex order}:
 \begin{enumerate}
 \item Terms of shorter length precede terms of longer length.
 \item Otherwise, if two terms have the same length, we compare the symbols pairwise using the order on~$A$.
@@ -1304,19 +1303,20 @@ Takes two terms $x$, $y\in A^*$ as input, and returns one of ``$<$'', ``$>$'', `
 \item (Next) Increment $i$ and go back to Step~4.
 \end{enumerate}
 \end{algorithm}
-The shortlex order will return ``$\bot$'' if and only if two equal-length terms $x$~and~$y$ have an incomparable pair of symbols at the same position, under the partial order on~$A$. In particular, if we have a linear order on~$A$, the shortlex order is always a linear order on~$A^*$. We omit two simple proofs here. It can also be shown that the shortlex order is well-founded using the same argument as in \PropRef{well founded type order}. Finally, one can show that the shortlex order is translation-invariant by \index{induction}induction on term length.
+The shortlex order will return ``$\bot$'' if and only if two equal-length terms $x$~and~$y$ have an \index{incomparable elements}incomparable pair of symbols at the same position, under the partial order on~$A$. In particular, if the order on~$A$ is linear, the induced shortlex order is always a linear order on~$A^*$. We also omit two simple proofs. It can also be shown that the shortlex order is well-founded using the same argument as in \PropRef{well founded type order}. Finally, one can show that the shortlex order is translation-invariant by \index{induction}induction on term length.
 
 \begin{example}
 The shortlex order is \emph{not} the same as the \index{lexicographic order}lexicographic ``dictionary'' order on strings. For example, $b<ab$ under the shortlex order, but $ab<b$ under the lexicographic order. The lexicographic order is \emph{not} well-founded, thus it is unsuitable for use as a reduction order:
 \[b>ab>aab>aaab>aaaab>\cdots\]
 \end{example}
 
-To summarize, we can always guarantee termination by introducing a reduction order. At this point, we pause to observe that we can now apply the normal form algorithm to solve the word problem in our prior examples:
+At this point, we pause to observe that in all of our examples so far except the undecidable $\mathfrak{C}_1$, the normal form algorithm solves the word problem once we establish termination:
 \begin{enumerate}
 \item The \index{modular arithmetic}monoid $\Pres{a}{a^4\sim\varepsilon}$ from \ExRef{monoid z4 example} has a single length-reducing rewrite rule. The normal form algorithm will output one of $\{\varepsilon,a,a^2,a^3\}$.
 \item The \index{bicyclic monoid}bicyclic monoid $\Bicyclic$ from \ExRef{bicyclic} has a single length-reducing rewrite rule. The normal form algorithm will find the unique term of the form $b^m a^n$ in each equivalence class.
 \item The \index{free commutative monoid}free commutative monoid $\Pres{a,b}{ba\sim ab}$ from \ExRef{commutative free monoid example} can be equipped with the shortlex order where $a<b$ to establish termination. The normal form algorithm will find in each equivalence class a unique term of the form $a^m b^n$.
 \end{enumerate}
+The three examples above all enjoy unique normal forms, something that is not true of an arbitrary monoid presentation.
 
 \paragraph{Uniqueness.}
 We now describe monoid presentations with unique normal forms:
@@ -1365,7 +1365,7 @@ In our new presentation, the non-determinism disappears; the normal form algorit
 We give a name to this kind of monoid presentation where the normal form algorithm always terminates and outputs a unique reduced term from each equivalence class.
 
 \begin{definition}
-A \IndexDefinition{convergent rewriting system}\emph{convergent rewriting system} is a monoid presentation $\AR$ where the reduction relation $\rightarrow_R$ is terminating and confluent.
+A \IndexDefinition{convergent rewriting system}\emph{convergent rewriting system} is a monoid presentation $\AR$ whose reduction relation $\rightarrow_R$ is Noetherian and confluent.
 \end{definition}
 
 A monoid presented by a convergent rewriting system has a decidable word problem:
@@ -1387,7 +1387,7 @@ Reduced type parameter&Reduced term\\
 \end{center}
 In fact, the type parameter order of \AlgRef{type parameter order} is basically a specific instance of the shortlex order, except we described it with a recursive algorithm, whereas \AlgRef{shortlex} is iterative.
 
-\paragraph{Completion.} The process of repairing confluence violations by adding rules is called \IndexDefinition{completion}\emph{completion}. If completion succeeds, we get a convergent rewriting system. \ChapRef{completion} will explain the Knuth-Bendix algorithm that is used for this purpose. This algorithm allows the Swift compiler to accept a protocol \texttt{M} that encodes the original presentation of \ExRef{non confluent example}, and then prove the equivalence $\GM\vdash\SameReq{Self.A.C}{Self.A}$.
+\paragraph{Completion.} The process of repairing confluence violations by adding rules is called \IndexDefinition{completion}\emph{completion}. If completion succeeds, we get a convergent rewriting system. \ChapRef{completion} will explain the Knuth-Bendix algorithm that is used for this purpose. For example, the Swift compiler accepts a protocol \texttt{M} encoding the monoid presentation from \ExRef{non confluent example}; completion allows us to establish that $\GM\vdash\SameReq{Self.A.C}{Self.A}$.
 
 Completion is only a \emph{semi-decision procedure} that may fail to terminate; in practice, we impose an iteration limit. This cannot be improved upon, because ultimately, it is \index{undecidable problem}undecidable if a monoid can be presented by a convergent rewriting system \cite{ODUNLAING1983339}. A monoid with an undecidable word problem cannot have such a presentation, so completion must fail in that case. Is the converse true? That is, if a finitely-presented monoid is known to have a decidable word problem, will completion always terminate in a finite number of steps and output a convergent rewriting system? The answer is also no:
 \begin{enumerate}

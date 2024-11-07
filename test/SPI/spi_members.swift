@@ -9,7 +9,7 @@ public struct Wrapper<T> {
 
 @_spi(Foo)
 public class Bar {
-  // expected-note@-1 16{{type declared here}}
+  // expected-note@-1 16{{class declared here}}
 
   public init() {}
 }

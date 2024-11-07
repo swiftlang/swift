@@ -3,17 +3,20 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -disable-experimental-parser-round-trip
+// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence should be expressed by a builtin that is
 // hidden within the function body.
 @_unsafeNonescapableResult
+@lifetime(source)
 func unsafeLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
   dependent: consuming T, dependsOn source: borrowing U)
-  -> dependsOn(source) T {
+  -> T {
   dependent
 }
 
@@ -21,12 +24,14 @@ struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
-  init(_ p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
   }
 
-  init(independent p: UnsafeRawPointer, _ i: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(independent p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
   }
@@ -35,7 +40,8 @@ struct BV : ~Escapable {
   public var isEmpty: Bool { i == 0 }
 
   // Test consuming `self`
-  consuming func derive() -> dependsOn(self) BV {
+  @lifetime(self)
+  consuming func derive() -> BV {
     // Technically, this "new" view does not depend on the 'view' argument.
     // This unsafely creates a new view with no dependence.
     let bv = BV(independent: self.p, self.i)
@@ -47,7 +53,8 @@ struct BV : ~Escapable {
 struct NE {
   var bv: BV
 
-  init(_ bv: BV) -> dependsOn(bv) Self {
+  @lifetime(bv)
+  init(_ bv: BV) {
     self.bv = bv
   }
 }

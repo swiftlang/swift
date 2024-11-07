@@ -21,8 +21,11 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <tuple>
+
+#define DEBUG_TYPE "PotentialBindings"
 
 using namespace swift;
 using namespace constraints;
@@ -1212,8 +1215,12 @@ bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
     // as a binding because `$T0` could be inferred to
     // `(key: String, value: Int)` and binding `$T1` to `Array<(String, Int)>`
     // eagerly would be incorrect.
-    if (existing->Kind != binding.Kind)
-      continue;
+    if (existing->Kind != binding.Kind) {
+      // Array, Set and Dictionary allow conversions, everything else
+      // requires their generic arguments to match exactly.
+      if (existingType->isKnownStdlibCollectionType())
+        continue;
+    }
 
     // If new type has a type variable it shouldn't
     // be considered  viable.
@@ -1269,7 +1276,8 @@ static bool hasConversions(Type type) {
   }
 
   return !(type->is<StructType>() || type->is<EnumType>() ||
-           type->is<BuiltinType>() || type->is<ArchetypeType>());
+           type->is<BuiltinType>() || type->is<ArchetypeType>() ||
+           type->isVoid());
 }
 
 bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
@@ -1510,11 +1518,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       if (auto pointeeTy = second->lookThroughAllOptionalTypes()
                                ->getAnyPointerElementType()) {
         if (!pointeeTy->isTypeVariableOrMember()) {
-          // The binding is as a fallback in this case because $T could
-          // also be Array<X> or C-style pointer.
-          if (constraint->getKind() >= ConstraintKind::ArgumentConversion)
-            DelayedBy.push_back(constraint);
-
           return PotentialBinding(pointeeTy, AllowedBindingKind::Exact,
                                   constraint);
         }
@@ -1774,7 +1777,7 @@ void PotentialBindings::infer(Constraint *constraint) {
 
   // Record the change, if there are active scopes.
   if (CS.isRecordingChanges())
-    CS.recordChange(SolverTrail::Change::inferredBindings(TypeVar, constraint));
+    CS.recordChange(SolverTrail::Change::InferredBindings(TypeVar, constraint));
 
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
@@ -1865,8 +1868,7 @@ void PotentialBindings::infer(Constraint *constraint) {
     DelayedBy.push_back(constraint);
     break;
 
-  case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol: {
+  case ConstraintKind::ConformsTo: {
     auto protocolTy = constraint->getSecondType();
     if (protocolTy->is<ProtocolType>())
       Protocols.push_back(constraint);
@@ -1949,7 +1951,14 @@ void PotentialBindings::retract(Constraint *constraint) {
 
   // Record the change, if there are active scopes.
   if (CS.isRecordingChanges())
-    CS.recordChange(SolverTrail::Change::retractedBindings(TypeVar, constraint));
+    CS.recordChange(SolverTrail::Change::RetractedBindings(TypeVar, constraint));
+
+  LLVM_DEBUG(
+    llvm::dbgs() << Constraints.size() << " " << Bindings.size() << " "
+                 << Protocols.size() << " " << Literals.size() << " "
+                 << AdjacentVars.size() << " " << DelayedBy.size() << " "
+                 << SubtypeOf.size() << " " << SupertypeOf.size() << " "
+                 << EquivalentTo.size() << "\n");
 
   Bindings.erase(
       llvm::remove_if(Bindings,
@@ -1970,7 +1979,6 @@ void PotentialBindings::retract(Constraint *constraint) {
 
   switch (constraint->getKind()) {
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
     Protocols.erase(llvm::remove_if(Protocols, isMatchingConstraint),
                     Protocols.end());
     break;

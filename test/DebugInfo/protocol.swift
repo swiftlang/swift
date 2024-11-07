@@ -23,7 +23,7 @@ class Point : PointUtils {
 public func main() -> Int64 {
     var pt = Point(_x: 2.5, _y: 4.25)
 // CHECK: [[LOC2D:%[a-zA-Z0-9]+]] = alloca %T8protocol10PointUtilsP, align {{(4|8)}}
-// CHECK: call void @llvm.dbg.declare(metadata {{.*}} [[LOC2D]], metadata ![[LOC:.*]], metadata !DIExpression())
+// CHECK: #dbg_declare({{.*}} [[LOC2D]], ![[LOC:.*]], !DIExpression()
     var loc2d : PointUtils = pt
     var distance = loc2d.distanceFromOrigin()
 

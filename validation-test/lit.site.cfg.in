@@ -14,6 +14,7 @@ import sys
 import platform
 
 config.cmake = "@CMAKE_COMMAND@"
+config.cmake_binary_dir = "@CMAKE_BINARY_DIR@"
 config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
 config.llvm_obj_root = "@LLVM_BINARY_DIR@"
 config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
@@ -145,4 +146,5 @@ config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
 
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
+lit_config.load_config(config, os.path.join(config.test_exec_root, "lit.swift-features.cfg"))
 lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/validation-test/lit.cfg")

@@ -3157,12 +3157,10 @@ std::optional<std::string> PrintAST::mangledNameToPrint(const Decl *D) {
     return mangler.mangleConstructorEntity(init, /*isAllocating=*/true);
   }
 
-  // For global and static variables, mangle the entity directly.
+  // For variables, mangle the entity directly.
   if (auto var = dyn_cast<VarDecl>(D)) {
-    if (!var->isInstanceMember()) {
-      ASTMangler mangler;
-      return mangler.mangleEntity(var);
-    }
+    ASTMangler mangler;
+    return mangler.mangleEntity(var);
   }
 
   // For subscripts, mangle the entity directly.
@@ -3599,7 +3597,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
           dyn_cast_or_null<clang::NamespaceDecl>(decl->getClangDecl())) {
     // Enum that correponds to the C++ namespace should only be printed once.
     if (!Printer.shouldPrintRedeclaredClangDecl(
-            namespaceDecl->getOriginalNamespace()))
+            namespaceDecl->getFirstDecl()))
       return;
 
     if (Options.SkipInlineCXXNamespace && namespaceDecl->isInline()) {
@@ -4246,16 +4244,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
-      {
-        if (!Options.SuppressNonEscapableTypes) {
-          if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
-                  decl->getResultTypeRepr())) {
-            for (auto &dep : typeRepr->getLifetimeDependencies()) {
-              Printer << " " << dep.getDependsOnString() << " ";
-            }
-          }
-        }
-      }
 
       if (!Options.SuppressSendingArgsAndResults) {
         if (decl->hasSendingResult()) {
@@ -4499,18 +4487,6 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
       printGenericDeclGenericParams(decl);
       printFunctionParameters(decl);
-      if (!Options.SuppressNonEscapableTypes) {
-        if (decl->hasLifetimeDependentReturn()) {
-          Printer << " -> ";
-          auto *typeRepr =
-              cast<LifetimeDependentTypeRepr>(decl->getResultTypeRepr());
-          for (auto &dep : typeRepr->getLifetimeDependencies()) {
-            Printer << dep.getDependsOnString() << " ";
-          }
-          // TODO: Handle failable initializers with lifetime dependent returns
-          Printer << "Self";
-        }
-      }
     });
 
   printDeclGenericRequirements(decl);
@@ -4770,7 +4746,7 @@ void PrintAST::visitBooleanLiteralExpr(BooleanLiteralExpr *expr) {
 }
 
 void PrintAST::visitRegexLiteralExpr(RegexLiteralExpr *expr) {
-  Printer << expr->getRegexText();
+  Printer << expr->getParsedRegexText();
 }
 
 void PrintAST::visitErrorExpr(ErrorExpr *expr) {
@@ -6097,6 +6073,8 @@ public:
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinVectorType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinIntegerType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinFloatType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnboundGenericType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinFixedArrayType)
 #undef ASTPRINTER_PRINT_BUILTINTYPE
 
   void visitSILTokenType(SILTokenType *T) {
@@ -6122,12 +6100,6 @@ public:
       else
         printGenericArgs(T->getExpandedGenericArgs());
     }
-  }
-
-  void visitParenType(ParenType *T) {
-    Printer << "(";
-    visit(T->getUnderlyingType()->getInOutObjectType());
-    Printer << ")";
   }
 
   void visitPackType(PackType *T) {
@@ -6207,7 +6179,7 @@ public:
         Printer << ": ";
       } else if (e == 1 && !EltType->is<PackExpansionType>()) {
         // Unlabeled one-element tuples always print the empty label to
-        // distinguish them from the older syntax for ParenType.
+        // distinguish them from the older syntax for parens.
         Printer << "_: ";
       }
       visit(EltType);
@@ -6769,6 +6741,9 @@ public:
       return;
     case SILCoroutineKind::YieldOnce:
       Printer << "@yield_once ";
+      return;
+    case SILCoroutineKind::YieldOnce2:
+      Printer << "@yield_once_2 ";
       return;
     case SILCoroutineKind::YieldMany:
       Printer << "@yield_many ";

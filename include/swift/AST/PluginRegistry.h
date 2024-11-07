@@ -87,7 +87,7 @@ public:
 
   /// Remove "on reconnect" callback.
   void removeOnReconnect(std::function<void(void)> *fn) {
-    llvm::erase_value(onReconnect, fn);
+    llvm::erase(onReconnect, fn);
   }
 
   ArrayRef<std::function<void(void)> *> getOnReconnectCallbacks() {
@@ -97,9 +97,6 @@ public:
 
 /// Represents a in-process plugin server.
 class InProcessPlugins : public CompilerPlugin {
-  /// PluginServer shared library handle.
-  void *server;
-
   /// Entry point in the in-process plugin server. It receives the request
   /// string and populate the response string. The return value indicates there
   /// was an error. If true the returned string contains the error message.
@@ -113,10 +110,9 @@ class InProcessPlugins : public CompilerPlugin {
   /// Temporary storage for the response data from 'handleMessageFn'.
   std::string receivedResponse;
 
-  InProcessPlugins(llvm::StringRef serverPath, void *server,
+  InProcessPlugins(llvm::StringRef serverPath,
                    HandleMessageFunction handleMessageFn)
-      : CompilerPlugin(serverPath), server(server),
-        handleMessageFn(handleMessageFn) {}
+      : CompilerPlugin(serverPath), handleMessageFn(handleMessageFn) {}
 
 public:
   /// Create an instance by loading the in-process plugin server at 'serverPath'
@@ -151,7 +147,6 @@ class LoadedExecutablePlugin : public CompilerPlugin {
     const llvm::sys::ProcessInfo process;
     const int input;
     const int output;
-    bool isStale = false;
 
     PluginProcess(llvm::sys::ProcessInfo process, int input, int output)
         : process(process), input(input), output(output) {}
@@ -172,7 +167,7 @@ class LoadedExecutablePlugin : public CompilerPlugin {
 
   /// Mark the current process "stale" (not usable anymore for some reason,
   /// probably crashed).
-  void setStale() { Process->isStale = true; }
+  void setStale() { Process.reset(); }
 
 public:
   LoadedExecutablePlugin(llvm::StringRef ExecutablePath,
@@ -189,7 +184,7 @@ public:
   }
 
   /// Indicates that the current process is usable.
-  bool isAlive() const { return Process != nullptr && !Process->isStale; }
+  bool isAlive() const { return Process != nullptr; }
 
   // Launch the plugin if it's not already running, or it's stale. Return an
   // error if it's fails to execute it.

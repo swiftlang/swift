@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -swift-version 6 -disable-availability-checking -emit-sil -o /dev/null %s -parse-as-library -enable-experimental-feature SendingArgsAndResults -verify -import-objc-header %S/Inputs/sending.h
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendingArgsAndResults
 
 ////////////////////////
 // MARK: Declarations //

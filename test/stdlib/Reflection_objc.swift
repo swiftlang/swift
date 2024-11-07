@@ -5,8 +5,7 @@
 // and it is needed for conformances on macOS < 15.
 // RUN: %target-build-swift -parse-stdlib %s -module-name Reflection -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/a.out -lswiftCoreGraphics
 // RUN: %target-codesign %t/a.out
-// RUN: %{python} %S/../Inputs/timeout.py 360 %target-run %t/a.out %S/Inputs/shuffle.jpg | %FileCheck %s
-// FIXME: timeout wrapper is necessary because the ASan test runs for hours
+// RUN: %target-run %t/a.out %S/Inputs/shuffle.jpg | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop

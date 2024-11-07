@@ -2,6 +2,9 @@
 // RUN: -enable-experimental-feature NonescapableTypes \
 // RUN: -enable-experimental-feature SuppressedAssociatedTypes
 
+// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
+
 // expected-note@+1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
 struct AttemptImplicitConditionalConformance<T: ~Copyable>: ~Copyable {
   var t: T // expected-error {{stored property 't' of 'Copyable'-conforming generic struct 'AttemptImplicitConditionalConformance' has non-Copyable type 'T'}}

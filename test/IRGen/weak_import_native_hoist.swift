@@ -69,7 +69,8 @@ public func test_not_hoist_weakly_linked4() {
 // CHECK:  br i1 [[IS_STRONG]], label %[[BB0:[0-9]+]], label %[[BB1:[0-9]+]]
 //
 // CHECK:  [[BB1]]:
-// CHECK:  br i1 icmp eq ({{.*}} ptrtoint (ptr @"$s31weak_import_native_hoist_helper1EO0A0yA2CmFWC" to {{.*}}), {{.*}} 0), label %[[BB2:[0-9]+]], label %[[BB3:[0-9]+]]
+// CHECK:  [[V0:%.*]] = icmp eq {{.*}} ptrtoint (ptr @"$s31weak_import_native_hoist_helper1EO0A0yA2CmFWC" to {{.*}}), 0
+// CHECK:  br i1 [[V0]], label %[[BB2:[0-9]+]], label %[[BB3:[0-9]+]]
 //
 // CHECK:  [[BB3]]:
 // CHECK:  [[WEAK_CASE:%.*]] = load i32, ptr @"$s31weak_import_native_hoist_helper1EO0A0yA2CmFWC"

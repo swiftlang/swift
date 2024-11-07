@@ -77,10 +77,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return doIt(ty->getPackType());
   }
 
-  bool visitParenType(ParenType *ty) {
-    return doIt(ty->getUnderlyingType());
-  }
-
   bool visitTupleType(TupleType *ty) {
     for (auto elementTy : ty->getElementTypes())
       if (doIt(elementTy))
@@ -294,6 +290,16 @@ class Traversal : public TypeVisitor<Traversal, bool>
     for (Type type : ty->getSubstitutions().getReplacementTypes()) {
       if (type && doIt(type))
         return true;
+    }
+    return false;
+  }
+  
+  bool visitBuiltinFixedArrayType(BuiltinFixedArrayType *ty) {
+    if (ty->getSize() && doIt(ty->getSize()))  {
+      return true;
+    }
+    if (ty->getElementType() && doIt(ty->getElementType())) {
+      return true;
     }
     return false;
   }

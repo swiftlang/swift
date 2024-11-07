@@ -326,7 +326,7 @@ public:
     llvm::copy(block->getPredecessorBlocks(), std::back_inserter(*predBlocks));
   }
 
-  static SILValue GetUndefVal(SILBasicBlock *block, SILSSAUpdater *ssaUpdater) {
+  static SILValue GetPoisonVal(SILBasicBlock *block, SILSSAUpdater *ssaUpdater) {
     return SILUndef::get(block->getParent(), ssaUpdater->type);
   }
 

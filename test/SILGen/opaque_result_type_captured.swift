@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking -verify %s
+// RUN: %target-swift-emit-silgen -target %target-swift-5.1-abi-triple -verify %s
 // rdar://83378116
 
 public protocol P {}

@@ -3,16 +3,19 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -disable-experimental-parser-round-trip
+// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct MutableSpan : ~Escapable, ~Copyable {
   let base: UnsafeMutableRawPointer
   let count: Int
 
-  init(_ p: UnsafeMutableRawPointer, _ c: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(_ p: UnsafeMutableRawPointer, _ c: Int) {
     self.base = p
     self.count = c
   }
@@ -33,7 +36,8 @@ struct MutableSpan : ~Escapable, ~Copyable {
     var base: UnsafeMutableRawPointer
     var count: Int
 
-    init(base: UnsafeMutableRawPointer, count: Int) -> dependsOn(base) Self {
+    @lifetime(borrow base)
+    init(base: UnsafeMutableRawPointer, count: Int) {
       self.base = base
       self.count = count
     }
@@ -64,7 +68,8 @@ struct NC : ~Copyable {
   let c: Int
 
   // Requires a mutable borrow.
-  mutating func getMutableSpan() -> dependsOn(self) MutableSpan {
+  @lifetime(borrow self)
+  mutating func getMutableSpan() -> MutableSpan {
     MutableSpan(p, c)
   }
 }

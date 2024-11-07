@@ -221,7 +221,7 @@ private:
   bool finishDependency(bool isClangModule) override { return true; }
 
   Action startSourceEntity(const IndexSymbol &symbol) override {
-    if (symbol.decl != declToRename) {
+    if (symbol.decl != declToRename && symbol.originalDecl != declToRename) {
       return IndexDataConsumer::Continue;
     }
     auto loc = indexSymbolToRenameLoc(symbol);

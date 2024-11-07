@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature SuppressedAssociatedTypes
 
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
+
 protocol U {}
 
 enum Maybe<Thing: ~Copyable> : ~Copyable {}

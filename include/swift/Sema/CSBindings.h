@@ -94,7 +94,7 @@ protected:
 public:
   PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
       : PotentialBinding(
-            type->getWithoutParens(), kind,
+            type, kind,
             PointerUnion<Constraint *, ConstraintLocator *>(source)) {}
 
   bool isDefaultableBinding() const {
