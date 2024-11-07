@@ -462,7 +462,7 @@ extension Span where Element: ~Copyable {
     //FIXME: change to unsafeRawAddress when ready
     unsafeAddress {
       _precondition(indices.contains(position), "Index out of bounds")
-      return unsafeAddressOfElement(unchecked: position)
+      return _unsafeAddressOfElement(unchecked: position)
     }
   }
 
@@ -481,14 +481,14 @@ extension Span where Element: ~Copyable {
   public subscript(unchecked position: Index) -> Element {
     //FIXME: change to unsafeRawAddress when ready
     unsafeAddress {
-      unsafeAddressOfElement(unchecked: position)
+      _unsafeAddressOfElement(unchecked: position)
     }
   }
 
   @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
   @_alwaysEmitIntoClient
-  internal func unsafeAddressOfElement(
+  internal func _unsafeAddressOfElement(
     unchecked position: Index
   ) -> UnsafePointer<Element> {
     let elementOffset = position &* MemoryLayout<Element>.stride
