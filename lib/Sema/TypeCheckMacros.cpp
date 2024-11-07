@@ -1360,12 +1360,11 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   if (!attrSourceFile)
     return nullptr;
 
-  // If the declaration has no source location and comes from a Clang module,
+  // If the declaration comes from a Clang module,
   // pretty-print the declaration and use that location.
   SourceLoc attachedToLoc = attachedTo->getLoc();
   bool isPrettyPrintedDecl = false;
-  if (attachedToLoc.isInvalid() &&
-      isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
+  if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
     isPrettyPrintedDecl = true;
     attachedToLoc = evaluateOrDefault(
         ctx.evaluator, PrettyPrintDeclRequest{attachedTo}, SourceLoc());
