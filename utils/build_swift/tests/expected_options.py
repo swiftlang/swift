@@ -185,6 +185,7 @@ EXPECTED_DEFAULTS = {
     'enable_experimental_string_processing': True,
     'enable_experimental_observation': True,
     'enable_experimental_parser_validation': True,
+    'enable_experimental_pointer_bounds': False,
     'swift_enable_backtracing': True,
     'enable_synchronization': True,
     'enable_volatile': True,
