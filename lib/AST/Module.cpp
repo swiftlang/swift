@@ -1503,9 +1503,8 @@ collectExportedImports(const ModuleDecl *topLevelModule,
                                  ModuleDecl::ImportFilterKind::Exported);
         for (const auto &im : exportedImports) {
           // Skip collecting the underlying clang module as we already have the relevant import.
-          if (module->isClangOverlayOf(im.importedModule))
-            continue;
-          importCollector.collect(im);
+          if (!module->isClangOverlayOf(im.importedModule))
+            importCollector.collect(im);
           if (!visited.contains(im.importedModule)) {
             visited.insert(im.importedModule);
             stack.push_back(im.importedModule);
