@@ -15,6 +15,8 @@ message(STATUS "Source dir: ${StdlibSources}")
 function(copy_library_sources name from_prefix to_prefix)
   message(STATUS "${name}[${StdlibSources}/${from_prefix}/${name}] -> ${to_prefix}/${name} ")
 
+  set(full_to_prefix "${CMAKE_CURRENT_LIST_DIR}/${to_prefix}")
+
   file(GLOB_RECURSE filenames
     FOLLOW_SYMLINKS
     LIST_DIRECTORIES FALSE
@@ -28,20 +30,23 @@ function(copy_library_sources name from_prefix to_prefix)
     "${StdlibSources}/${from_prefix}/${name}/*.def"
     "${StdlibSources}/${from_prefix}/${name}/*.gyb"
     "${StdlibSources}/${from_prefix}/${name}/*.apinotes"
-    "${StdlibSources}/${from_prefix}/${name}/*.yaml")
+    "${StdlibSources}/${from_prefix}/${name}/*.yaml"
+    "${StdlibSources}/${from_prefix}/${name}/*.inc"
+    "${StdlibSources}/${from_prefix}/${name}/*.modulemap"
+    "${StdlibSources}/${from_prefix}/${name}/*.json")
 
   foreach(file ${filenames})
     # Get and create the directory
     get_filename_component(dirname ${file} DIRECTORY)
-    file(MAKE_DIRECTORY "${to_prefix}/${dirname}")
+    file(MAKE_DIRECTORY "${full_to_prefix}/${dirname}")
     file(COPY_FILE
       "${StdlibSources}/${from_prefix}/${file}"         # From
-      "${CMAKE_CURRENT_LIST_DIR}/${to_prefix}/${file}"  # To
+      "${full_to_prefix}/${file}"                       # To
       RESULT _output
       ONLY_IF_DIFFERENT)
     if(_output)
       message(SEND_ERROR
-        "Copy ${from_prefix}/${file} -> ${to_prefix}/${file} Failed: ${_output}")
+        "Copy ${from_prefix}/${file} -> ${full_to_prefix}/${file} Failed: ${_output}")
     endif()
   endforeach()
 endfunction()
@@ -51,8 +56,16 @@ endfunction()
 # Copy shared core headers
 copy_library_sources(include "" "Core")
 
+# Copy magic linker symbols
+copy_library_sources("linker-support" "" "Core")
+
 set(CoreLibs
-  LLVMSupport)
+  LLVMSupport
+  SwiftShims
+  runtime
+  CompatibilityOverride
+  stubs
+  core)
 
   # Add these as we get them building
   # core

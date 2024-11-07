@@ -1579,3 +1579,48 @@ if(XCODE)
   add_custom_target(Miscellaneous
       SOURCES ${SWIFT_TOPLEVEL_HEADERS})
 endif()
+
+# New standard library build
+option(SWIFT_ENABLE_NEW_RUNTIME_BUILD "Build Swift runtimes with new build system" OFF)
+if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
+
+  add_custom_target(PopulateRuntimeSourceDir
+    COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Resync.cmake"
+    COMMENT "Copying sources into new runtime build")
+
+  foreach(sdk ${SWIFT_SDKS})
+    foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+      # Provide a mechanism to skip building one of these runtimes
+      if(SWIFT_SKIP_${sdk}_${arch}_RUNTIME)
+        message(STATUS "Skipping: ${arch}-${sdk} runtime build")
+        continue()
+      endif()
+      set(stdlib_target "swift-stdlib-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+      if(${SWIFT_SDK_${sdk}_${arch}_CACHE})
+        set(stdlib_cache_file_flag -C ${SWIFT_SDK_${sdk}_${arch}_CACHE})
+      endif()
+      ExternalProject_Add("${stdlib_target}-core"
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Core"
+        # TODO: Add this once we're ready to start swapping out the libraries
+        #       for testing
+        # INSTALL_DIR "${CMAKE_BINARY_DIR}/"
+
+        DEPENDS PopulateRuntimeSourceDir
+        CMAKE_ARGS
+          -DCMAKE_INSTALL_LIBDIR:FILEPATH=lib/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}
+          # Compiler will see mismatched swift modules and fail initial checks
+          -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
+          -DBUILD_SHARED_LIBS:BOOLEAN=YES # TODO: Make this configurable
+          ${stdlib_cache_file_flag}
+          -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+          -DCMAKE_INSTALL_PREFIX:FILEPATH=<INSTALL_DIR>
+          -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
+          -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
+          -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+          -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS})
+      if(NOT ${CMAKE_CROSSCOMPILING})
+        add_dependencies("${stdlib_target}" swift-frontend)
+      endif()
+    endforeach()
+  endforeach()
+endif()
