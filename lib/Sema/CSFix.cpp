@@ -294,10 +294,16 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
 
   // For a @preconcurrency callee outside of a strict concurrency
   // context, ignore.
-  if (cs.hasPreconcurrencyCallee(locator) &&
-      !contextRequiresStrictConcurrencyChecking(
-          cs.DC, GetClosureType{cs}, ClosureIsolatedByPreconcurrency{cs}))
+  if (cs.hasPreconcurrencyCallee(locator)) {
+    // Preconcurrency failures are always downgraded to warnings, even in
+    // Swift 6 mode.
+    if (contextRequiresStrictConcurrencyChecking(
+            cs.DC, GetClosureType{cs}, ClosureIsolatedByPreconcurrency{cs})) {
+      return FixBehavior::DowngradeToWarning;
+    }
+
     return FixBehavior::Suppress;
+  }
 
   // Otherwise, warn until Swift 6.
   if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6))
