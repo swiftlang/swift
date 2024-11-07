@@ -320,14 +320,14 @@ extension Span where Element: BitwiseCopyable {
   /// Create a `Span` over the bytes represented by a `RawSpan`
   ///
   /// - Parameters:
-  ///   - rawSpan: An existing `RawSpan`, which will define both this
-  ///             `Span`'s lifetime and the memory it represents.
+  ///   - bytes: An existing `RawSpan`, which will define both this
+  ///            `Span`'s lifetime and the memory it represents.
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
-  @lifetime(rawSpan)
-  public init(_bytes rawSpan: consuming RawSpan) {
+  @lifetime(bytes)
+  public init(_bytes bytes: consuming RawSpan) {
     self.init(
-      _unsafeBytes: .init(start: rawSpan._pointer, count: rawSpan.byteCount)
+      _unsafeBytes: .init(start: bytes._pointer, count: bytes.byteCount)
     )
   }
 }
@@ -712,7 +712,7 @@ extension Span where Element: BitwiseCopyable {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    try RawSpan(_unsafeSpan: self).withUnsafeBytes(body)
+    try RawSpan(_elements: self).withUnsafeBytes(body)
   }
 }
 

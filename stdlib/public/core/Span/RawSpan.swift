@@ -274,12 +274,9 @@ extension RawSpan {
   ///   - span: An existing `Span<T>`, which will define both this
   ///           `RawSpan`'s lifetime and the memory it represents.
   @_disallowFeatureSuppression(NonescapableTypes)
-  @unsafe // remove when fixing the lifetime annotation
   @_alwaysEmitIntoClient
   @lifetime(span)
-  public init<Element: BitwiseCopyable>(
-    _unsafeSpan span: consuming Span<Element>
-  ) {
+  public init<Element: BitwiseCopyable>(_elements span: consuming Span<Element>) {
     self.init(
       _unchecked: span._pointer,
       byteCount: span.count &* MemoryLayout<Element>.stride
