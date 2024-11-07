@@ -3519,7 +3519,7 @@ private:
              "Expected only two categories: address and object");
       assert(!canType->hasTypeParameter());
 
-      auto &entry = largeTypeProperties[ty];
+      auto entry = largeTypeProperties[ty];
       auto cached = entry.getNumRegisters();
       if (cached)
         return cached;
@@ -3532,6 +3532,7 @@ private:
       auto explosionSchema = TI.getSchema();
       auto res = std::max(nativeSchemaOrigParam.size(), explosionSchema.size());
       entry.setNumRegisters(res);
+      largeTypeProperties[ty] = entry;
       return entry.getNumRegisters();
     }
 
@@ -3545,15 +3546,18 @@ void LargeLoadableHeuristic::visit(SILArgument *arg) {
   if (numRegisters(objType) < NumRegistersLargeType)
     return;
 
-  auto &entry = largeTypeProperties[objType];
+  auto entry = largeTypeProperties[objType];
   for (auto *use : arg->getUses()) {
     auto *usr = use->getUser();
     switch (usr->getKind()) {
     case SILInstructionKind::TupleExtractInst:
     case SILInstructionKind::StructExtractInst: {
       auto projectionTy = cast<SingleValueInstruction>(usr)->getType();
-      if (numRegisters(projectionTy) >= NumRegistersLargeType)
+      if (numRegisters(projectionTy) >= NumRegistersLargeType) {
         entry.addProjection();
+
+        largeTypeProperties[objType] = entry;
+      }
       break;
     }
     default:
@@ -3575,8 +3579,9 @@ void LargeLoadableHeuristic::visit(SILInstruction *i) {
       auto resTy = bitcast->getType();
       if (numRegisters(resTy) > NumRegistersLargeType) {
         // Force the source type to be indirect.
-        auto &entry = largeTypeProperties[opdTy];
+        auto entry = largeTypeProperties[opdTy];
         entry.setNumRegisters(65535);
+        largeTypeProperties[opdTy] = entry;
         return;
       }
     }
@@ -3589,7 +3594,7 @@ void LargeLoadableHeuristic::visit(SILInstruction *i) {
     if (registerCount < NumRegistersLargeType)
       continue;
 
-    auto &entry = largeTypeProperties[objType];
+    auto entry = largeTypeProperties[objType];
 
     switch (i->getKind()) {
     case SILInstructionKind::TupleExtractInst:
@@ -3639,6 +3644,8 @@ void LargeLoadableHeuristic::visit(SILInstruction *i) {
       entry.addUse();
       break;
     }
+
+    largeTypeProperties[objType] = entry;
   }
 }
 
