@@ -1202,6 +1202,31 @@ extension Array: RangeReplaceableCollection {
     _appendElementAssumeUniqueAndCapacity(oldCount, newElement: newElement)
     _endMutation()
   }
+  
+  @inlinable
+  @_semantics("array.append_contentsOf")
+  @_effects(notEscaping self.value**)
+  public mutating func append(contentsOf newElements: __owned some Collection<Element>) {
+    let newElementsCount = newElements.count
+    // This check prevents a data race writing to _swiftEmptyArrayStorage
+    if newElementsCount == 0 {
+      return
+    }
+    defer {
+      _endMutation()
+    }
+    _reserveCapacityImpl(minimumCapacity: self.count + newElementsCount,
+                         growForAppend: true)
+
+    let oldCount = _buffer.mutableCount
+    let startNewElements = _buffer.mutableFirstElementAddress + oldCount
+    let buf = UnsafeMutableBufferPointer(
+                start: startNewElements,
+                count: _buffer.mutableCapacity - oldCount)
+
+    _ = buf.initialize(fromContentsOf: newElements)
+    _buffer.mutableCount = _buffer.mutableCount + newElementsCount
+  }
 
   /// Adds the elements of a sequence to the end of the array.
   ///
@@ -1227,6 +1252,14 @@ extension Array: RangeReplaceableCollection {
 
     defer {
       _endMutation()
+    }
+      
+    let wasContiguous = newElements.withContiguousStorageIfAvailable {
+      append(contentsOf: $0)
+      return true
+    }
+    if wasContiguous != nil {
+      return
     }
 
     let newElementsCount = newElements.underestimatedCount
