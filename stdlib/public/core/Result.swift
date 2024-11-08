@@ -21,8 +21,12 @@ public enum Result<Success: ~Copyable & ~Escapable, Failure: Error> {
   case failure(Failure)
 }
 
+// FIXME: The ~Escapable clause must be explicit for this to be readable.
+// FIXME: Alas, that's currently an error. (rdar://130781168)
 extension Result: Copyable where Success: Copyable /*& ~Escapable*/ {}
 
+// FIXME: The ~Copyable clause must be explicit for this to be readable.
+// FIXME: Alas, that's currently an error. (rdar://130781168)
 extension Result: Escapable where Success: Escapable /*& ~Copyable*/ {}
 
 extension Result: Sendable where Success: Sendable & ~Copyable & ~Escapable {}
