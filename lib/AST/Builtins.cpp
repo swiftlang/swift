@@ -3385,11 +3385,12 @@ bool BuiltinType::isBitwiseCopyable() const {
     return false;
     
   case BuiltinTypeKind::BuiltinFixedArray: {
-    // Bitwise-copyability depends on the element type.
+    // FixedArray<N, X> : BitwiseCopyable whenever X : BitwiseCopyable
     auto bfa = cast<BuiltinFixedArrayType>(this);
     auto &C = bfa->getASTContext();
-    return (bool)lookupConformance(bfa->getElementType(),
-                           C.getProtocol(KnownProtocolKind::BitwiseCopyable));
+    return (bool)checkConformance(
+        bfa->getElementType(),
+        C.getProtocol(KnownProtocolKind::BitwiseCopyable));
   }
   }
 }
