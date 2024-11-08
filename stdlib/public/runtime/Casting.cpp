@@ -1289,9 +1289,8 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
       swift_unknownObjectRetain(result);
     return result;
   }
-  
   // Dig through existential types.
-  if (auto srcExistentialTy = dyn_cast<ExistentialTypeMetadata>(srcType)) {
+  else if (auto srcExistentialTy = dyn_cast<ExistentialTypeMetadata>(srcType)) {
     OpaqueValue *srcInnerValue;
     const Metadata *srcInnerType;
     bool isOutOfLine;
@@ -1320,10 +1319,9 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
     }
     return result;
   }
-  
-  // Handle metatypes.
-  if (isa<ExistentialMetatypeMetadata>(srcType)
-      || isa<MetatypeMetadata>(srcType)) {
+  // Handle metatypes and existential metatypes
+  else if (isa<ExistentialMetatypeMetadata>(srcType)
+	   || isa<MetatypeMetadata>(srcType)) {
     const Metadata *srcMetatypeValue;
     memcpy(&srcMetatypeValue, src, sizeof(srcMetatypeValue));
     
@@ -1342,8 +1340,9 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
         return objc_retain(protocolObj);
       }
     }
+  }
   // Handle bridgeable types.
-  } else if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
+  else if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
     // Bridge the source value to an object.
     auto srcBridgedObject =
       srcBridgeWitness->bridgeToObjectiveC(src, srcType, srcBridgeWitness);
@@ -1353,12 +1352,23 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
       srcType->vw_destroy(src);
 
     return (id)srcBridgedObject;
+  }
   // Handle Errors.
-  } else if (auto srcErrorWitness = findErrorWitness(srcType)) {
+  else if (auto srcErrorWitness = findErrorWitness(srcType)) {
     // Bridge the source value to an NSError.
     auto flags = consume ? DynamicCastFlags::TakeOnSuccess
                          : DynamicCastFlags::Default;
     return dynamicCastValueToNSError(src, srcType, srcErrorWitness, flags);
+  }
+  // Handle functions:  "Block" types can be bridged literally
+  else if (auto fn = dyn_cast<FunctionTypeMetadata>(srcType)) {
+    if (fn->getConvention() == FunctionMetadataConvention::Block) {
+      id result;
+      memcpy(&result, src, sizeof(id));
+      if (!consume)
+	swift_unknownObjectRetain(result);
+      return result;
+    }
   }
 
   // Fall back to boxing.
