@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library -emit-silgen -verify %s
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library -emit-silgen -DSILGEN %s | %FileCheck %s
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library -emit-silgen -DSILGEN %s | %FileCheck -check-prefix=CHECK-SYMB %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library -enable-experimental-feature IsolatedDeinit -emit-silgen -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library -enable-experimental-feature IsolatedDeinit -emit-silgen -DSILGEN %s | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library -enable-experimental-feature IsolatedDeinit -emit-silgen -DSILGEN %s | %FileCheck -check-prefix=CHECK-SYMB %s
 
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_IsolatedDeinit
 
 // Fixtures
 

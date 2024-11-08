@@ -1,9 +1,10 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -target %target-swift-5.1-abi-triple -parse-as-library -emit-silgen -verify %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -target %target-swift-5.1-abi-triple -parse-as-library -emit-silgen -DSILGEN %s | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -target %target-swift-5.1-abi-triple -parse-as-library -emit-silgen -DSILGEN %s | %FileCheck -check-prefix=CHECK-SYMB %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-feature IsolatedDeinit -disable-implicit-string-processing-module-import -target %target-swift-5.1-abi-triple -parse-as-library -emit-silgen -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-feature IsolatedDeinit -disable-implicit-string-processing-module-import -target %target-swift-5.1-abi-triple -parse-as-library -emit-silgen -DSILGEN %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-feature IsolatedDeinit -disable-implicit-string-processing-module-import -target %target-swift-5.1-abi-triple -parse-as-library -emit-silgen -DSILGEN %s | %FileCheck -check-prefix=CHECK-SYMB %s
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_IsolatedDeinit
 
 import Foundation
 

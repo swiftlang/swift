@@ -5959,6 +5959,9 @@ ERROR(isolated_deinit_no_isolation,none,
 ERROR(isolated_deinit_on_value_type,none,
       "only classes and actors can have isolated deinit",
       ())
+ERROR(isolated_deinit_experimental,none,
+      "'isolated' deinit requires frontend flag -enable-experimental-feature IsolatedDeinit "
+      "to enable the usage of this language feature", ())
 
 //------------------------------------------------------------------------------
 // MARK: String Processing
