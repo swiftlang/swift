@@ -630,19 +630,6 @@ protected:
   transformCase(CaseStmt *caseStmt) {
     auto *body = caseStmt->getBody();
 
-    // Explicitly disallow `case` statements with empty bodies
-    // since that helps to diagnose other issues with switch
-    // statements by excluding invalid cases.
-    if (auto *BS = dyn_cast<BraceStmt>(body)) {
-      if (BS->getNumElements() == 0) {
-        // HACK: still allow empty bodies if typechecking for code
-        // completion. Code completion ignores diagnostics
-        // and won't get any types if we fail.
-        if (!ctx.SourceMgr.hasIDEInspectionTargetBuffer())
-          return std::nullopt;
-      }
-    }
-
     NullablePtr<Expr> caseVarRef;
     std::optional<UnsupportedElt> unsupported;
     SmallVector<ASTNode, 4> newBody;
