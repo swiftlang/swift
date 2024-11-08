@@ -1233,9 +1233,10 @@ bool swift::diagnoseNonSendableTypesInReference(
 }
 
 void swift::diagnoseMissingSendableConformance(
-    SourceLoc loc, Type type, const DeclContext *fromDC) {
+    SourceLoc loc, Type type, const DeclContext *fromDC, bool preconcurrency) {
+  SendableCheckContext sendableContext(fromDC, preconcurrency);
   diagnoseNonSendableTypes(
-      type, fromDC, /*inDerivedConformance*/Type(),
+      type, sendableContext, /*inDerivedConformance*/Type(),
       loc, diag::non_sendable_type);
 }
 

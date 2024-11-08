@@ -228,7 +228,8 @@ diagnoseConformanceAvailability(SourceLoc loc,
                                 const ExportContext &context,
                                 Type depTy=Type(),
                                 Type replacementTy=Type(),
-                                bool warnIfConformanceUnavailablePreSwift6 = false);
+                                bool warnIfConformanceUnavailablePreSwift6 = false,
+                                bool preconcurrency = false);
 
 bool diagnoseSubstitutionMapAvailability(
     SourceLoc loc,
@@ -237,7 +238,8 @@ bool diagnoseSubstitutionMapAvailability(
     Type depTy = Type(),
     Type replacementTy = Type(),
     bool warnIfConformanceUnavailablePreSwift6 = false,
-    bool suppressParameterizationCheckForOptional = false);
+    bool suppressParameterizationCheckForOptional = false,
+    bool preconcurrency = false);
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
