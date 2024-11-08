@@ -5620,16 +5620,20 @@ namespace {
             .fixItInsert(coercion->getStartLoc(), "consume ");
       }
 
-      // Type-check any local decls encountered.
-      for (auto *D : LocalDeclsToTypeCheck)
-        TypeChecker::typeCheckDecl(D);
+      // If we're doing code completion, avoid doing any further type-checking,
+      // that should instead be handled by TypeCheckASTNodeAtLocRequest.
+      if (!ctx.CompletionCallback) {
+        // Type-check any local decls encountered.
+        for (auto *D : LocalDeclsToTypeCheck)
+          TypeChecker::typeCheckDecl(D);
 
-      // Expand any macros encountered.
-      // FIXME: Expansion should be lazy.
-      auto &eval = cs.getASTContext().evaluator;
-      for (auto *E : MacrosToExpand) {
-        (void)evaluateOrDefault(eval, ExpandMacroExpansionExprRequest{E},
-                                std::nullopt);
+        // Expand any macros encountered.
+        // FIXME: Expansion should be lazy.
+        auto &eval = cs.getASTContext().evaluator;
+        for (auto *E : MacrosToExpand) {
+          (void)evaluateOrDefault(eval, ExpandMacroExpansionExprRequest{E},
+                                  std::nullopt);
+        }
       }
     }
 
