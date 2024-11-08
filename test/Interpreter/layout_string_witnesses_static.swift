@@ -1363,6 +1363,49 @@ func testMultiPayloadOneExtraTagValue() {
 
 testMultiPayloadOneExtraTagValue()
 
+func testMultiPayloadAnyObject() {
+    let ptr = UnsafeMutablePointer<MultiPayloadAnyObject>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let x = MultiPayloadAnyObject.y(SimpleClass(x: 0))
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let y = MultiPayloadAnyObject.z(SimpleClass(x: 1))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = MultiPayloadAnyObject.z(SimpleClass(x: 2))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadAnyObject()
+
 #if os(macOS)
 func testObjc() {
     let ptr = UnsafeMutablePointer<ObjcWrapper>.allocate(capacity: 1)

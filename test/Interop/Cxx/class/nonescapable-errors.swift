@@ -50,6 +50,7 @@ public func noAnnotations() -> View {
     // CHECK-NOT: nonescapable.h:19
     f2(nil, nil)
     // CHECK: nonescapable.h:23:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated
+    // CHECKL nonescapable.h:23:6: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
     g(nil)
     return View()
 }

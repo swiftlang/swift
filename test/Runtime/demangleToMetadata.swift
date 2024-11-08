@@ -568,9 +568,7 @@ if #available(SwiftStdlib 6.0, *) {
 
 if #available(SwiftStdlib 6.1, *) {
   DemangleToMetadataTests.test("NUL-terminated name, excessive length value") {
-    let t = _getTypeByMangledNameInContext("4main1SV", 256,
-                                           genericContext: nil,
-                                           genericArguments: nil)
+    let t = _typeByName("4main1SV\0random stuff here")
     expectNotNil(t)
     if let t {
       expectEqual(type(of: S()), t)

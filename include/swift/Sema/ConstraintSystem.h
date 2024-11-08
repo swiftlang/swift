@@ -77,11 +77,13 @@ std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckExpression(constraints::SyntacticElementTarget &target,
-                    OptionSet<TypeCheckExprFlags> options);
+                    OptionSet<TypeCheckExprFlags> options,
+                    DiagnosticTransaction *diagnosticTransaction = nullptr);
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckTarget(constraints::SyntacticElementTarget &target,
-                OptionSet<TypeCheckExprFlags> options);
+                OptionSet<TypeCheckExprFlags> options,
+                DiagnosticTransaction *diagnosticTransaction = nullptr);
 
 Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool, bool);
 
@@ -2111,6 +2113,7 @@ class ConstraintSystem {
 public:
   DeclContext *DC;
   ConstraintSystemOptions Options;
+  DiagnosticTransaction *diagnosticTransaction;
   std::optional<ExpressionTimer> Timer;
 
   friend class Solution;
@@ -2782,7 +2785,8 @@ public:
   };
 
   ConstraintSystem(DeclContext *dc,
-                   ConstraintSystemOptions options);
+                   ConstraintSystemOptions options,
+                   DiagnosticTransaction *diagnosticTransaction = nullptr);
   ~ConstraintSystem();
 
   /// Retrieve the constraint graph associated with this constraint system.
@@ -2823,11 +2827,13 @@ private:
 
   friend std::optional<SyntacticElementTarget>
   swift::TypeChecker::typeCheckExpression(
-      SyntacticElementTarget &target, OptionSet<TypeCheckExprFlags> options);
+      SyntacticElementTarget &target, OptionSet<TypeCheckExprFlags> options, DiagnosticTransaction *diagnosticTransaction);
 
   friend std::optional<SyntacticElementTarget>
-  swift::TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
-                                      OptionSet<TypeCheckExprFlags> options);
+  swift::TypeChecker::typeCheckTarget(
+      SyntacticElementTarget &target,
+      OptionSet<TypeCheckExprFlags> options,
+      DiagnosticTransaction *diagnosticTransaction);
 
   friend Type swift::TypeChecker::typeCheckParameterDefault(Expr *&,
                                                             DeclContext *, Type,

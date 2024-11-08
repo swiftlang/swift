@@ -175,12 +175,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     tildeLoc = consumeToken();
   }
 
-  // Eat any '-' preceding integer literals.
-  SourceLoc minusLoc;
-  if (Tok.isMinus() && peekToken().is(tok::integer_literal)) {
-    minusLoc = consumeToken();
-  }
-
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::identifier:
@@ -237,12 +231,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     }
     return makeParserCodeCompletionResult<TypeRepr>(
         ErrorTypeRepr::create(Context, consumeToken(tok::code_complete)));
-  case tok::integer_literal: {
-    auto text = copyAndStripUnderscores(Tok.getText());
-    auto loc = consumeToken(tok::integer_literal);
-    ty = makeParserResult(new (Context) IntegerTypeRepr(text, loc, minusLoc));
-    break;
-  }
   case tok::l_square: {
     ty = parseTypeCollection();
     break;
@@ -739,7 +727,8 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
   // variadic generic types.
   if (!startsWithGreater(Tok)) {
     while (true) {
-      ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
+      // Note: This can be a value type, e.g. 'Vector<3, Int>'.
+      ParserResult<TypeRepr> Ty = parseTypeOrValue(diag::expected_type);
       if (Ty.isNull() || Ty.hasCodeCompletion()) {
         // Skip until we hit the '>'.
         RAngleLoc = skipUntilGreaterInTypeList();
@@ -1479,6 +1468,31 @@ Parser::parseTypeImplicitlyUnwrappedOptional(ParserResult<TypeRepr> base) {
   auto TyR =
       new (Context) ImplicitlyUnwrappedOptionalTypeRepr(base.get(), exclamationLoc);
   return makeParserResult(ParserStatus(base), TyR);
+}
+
+ParserResult<TypeRepr> Parser::parseTypeOrValue() {
+  return parseTypeOrValue(diag::expected_type);
+}
+
+ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
+                                                ParseTypeReason reason,
+                                                bool fromASTGen) {
+  // Eat any '-' preceding integer literals.
+  SourceLoc minusLoc;
+  if (Tok.isMinus() && peekToken().is(tok::integer_literal)) {
+    minusLoc = consumeToken();
+  }
+
+  // Attempt to parse values first. Right now the only value that can be parsed
+  // as a type are integers.
+  if (Tok.is(tok::integer_literal)) {
+    auto text = copyAndStripUnderscores(Tok.getText());
+    auto loc = consumeToken(tok::integer_literal);
+    return makeParserResult(new (Context) IntegerTypeRepr(text, loc, minusLoc));
+  }
+
+  // Otherwise, attempt to parse a regular type.
+  return parseType(MessageID, reason, fromASTGen);
 }
 
 //===----------------------------------------------------------------------===//

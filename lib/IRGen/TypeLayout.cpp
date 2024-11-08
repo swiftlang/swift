@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeLayout.h"
+#include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "EnumPayload.h"
 #include "FixedTypeInfo.h"
@@ -1293,14 +1294,17 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
   case ScalarKind::BlockReference:
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Block, size);
     break;
-  case ScalarKind::ObjCReference:
-    if (typeInfo.hasFixedSpareBits()) {
+  case ScalarKind::ObjCReference: {
+    auto *classTI = dyn_cast<ClassTypeInfo>(&typeInfo);
+    assert(classTI);
+    if (!classTI->getClass()->hasClangNode()) {
       B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeSwiftObjC,
                     size);
     } else {
       B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC, size);
     }
     break;
+  }
   case ScalarKind::ThickFunc:
     B.addSkip(IGM.getPointerSize().getValue());
     B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong,
