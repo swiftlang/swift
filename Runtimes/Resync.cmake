@@ -65,6 +65,7 @@ set(CoreLibs
   runtime
   CompatibilityOverride
   stubs
+  CommandLineSupport
   core)
 
   # Add these as we get them building

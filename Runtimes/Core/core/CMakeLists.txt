@@ -241,9 +241,9 @@ add_library(swiftCore
 
 set_target_properties(swiftCore PROPERTIES Swift_MODULE_NAME Swift)
 
-if(SwiftCore_ENABLE_COMMANDLINE)
-  # TODO: Pull in the CommandLine C++ files too
+if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
   target_sources(swiftCore PRIVATE CommandLine.swift)
+  target_link_libraries(swiftCore PRIVATE swiftCommandLineSupport)
 endif()
 
 if(SwiftCore_ENABLE_VECTOR_TYPES)
