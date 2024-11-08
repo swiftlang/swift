@@ -3524,6 +3524,7 @@ class ExprAvailabilityWalker : public ASTWalker {
   ASTContext &Context;
   MemberAccessContext AccessContext = MemberAccessContext::Default;
   SmallVector<const Expr *, 16> ExprStack;
+  SmallVector<bool, 4> PreconcurrencyCalleeStack;
   const ExportContext &Where;
 
 public:
@@ -3546,6 +3547,15 @@ public:
     auto *DC = Where.getDeclContext();
 
     ExprStack.push_back(E);
+
+    if (auto *apply = dyn_cast<ApplyExpr>(E)) {
+      bool preconcurrency = false;
+      auto declRef = apply->getFn()->getReferencedDecl();
+      if (auto *decl = declRef.getDecl()) {
+        preconcurrency = decl->preconcurrency();
+      }
+      PreconcurrencyCalleeStack.push_back(preconcurrency);
+    }
 
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
       diagnoseDeclRefAvailability(DR->getDeclRef(), DR->getSourceRange(),
@@ -3669,9 +3679,15 @@ public:
                                               EE->getLoc(),
                                               Where.getDeclContext());
 
+      bool preconcurrency = false;
+      if (!PreconcurrencyCalleeStack.empty()) {
+        preconcurrency = PreconcurrencyCalleeStack.back();
+      }
+
       for (ProtocolConformanceRef C : EE->getConformances()) {
         diagnoseConformanceAvailability(E->getLoc(), C, Where, Type(), Type(),
-                                        /*useConformanceAvailabilityErrorsOpt=*/true);
+                                        /*useConformanceAvailabilityErrorsOpt=*/true,
+                                        /*preconcurrency=*/preconcurrency);
       }
     }
 
@@ -3696,6 +3712,10 @@ public:
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
+
+    if (auto *apply = dyn_cast<ApplyExpr>(E)) {
+      PreconcurrencyCalleeStack.pop_back();
+    }
 
     return Action::Continue(E);
   }

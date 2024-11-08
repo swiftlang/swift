@@ -198,7 +198,7 @@ func requireSendable<T: Sendable>(_: T) {}
 @preconcurrency
 struct RequireSendable<T: Sendable> {}
 
-class NotSendable {} // expected-note 2 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+class NotSendable {} // expected-note 4 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
 
 typealias T = RequireSendable<NotSendable>
 // expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
@@ -206,4 +206,25 @@ typealias T = RequireSendable<NotSendable>
 func testRequirementDowngrade(ns: NotSendable) {
   requireSendable(ns)
   // expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
+}
+
+
+protocol P2 {}
+
+extension NotSendable: P2 {}
+
+@preconcurrency
+func requireSendableExistential(_: any P2 & Sendable) {}
+
+func requireSendableExistentialAlways(_: any P2 & Sendable) {}
+
+func testErasureDowngrade(ns: NotSendable) {
+  requireSendableExistential(ns)
+  // expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
+
+  withSendableClosure {
+    let ns = NotSendable()
+    requireSendableExistentialAlways(ns)
+    // expected-error@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
+  }
 }
