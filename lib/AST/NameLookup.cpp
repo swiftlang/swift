@@ -3812,7 +3812,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
         directReferencesForTypeRepr(evaluator, ctx, typeRepr, dc,
                                     defaultDirectlyReferencedTypeLookupOptions);
   } else if (Type type = attr->getType()) {
-    decls = directReferencesForType(type);
+    return type->getAnyNominal();
   }
 
   // Dig out the nominal type declarations.
