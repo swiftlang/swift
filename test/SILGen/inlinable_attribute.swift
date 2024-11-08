@@ -1,5 +1,6 @@
-// RUN: %target-swift-emit-silgen -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors -target %target-swift-5.1-abi-triple %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature IsolatedDeinit -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors -target %target-swift-5.1-abi-triple %s | %FileCheck %s
 
+// REQUIRES: swift_feature_IsolatedDeinit
 
 // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute15fragileFunctionyyF : $@convention(thin) () -> ()
 @inlinable public func fragileFunction() {

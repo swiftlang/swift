@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -target %target-swift-5.1-abi-triple -o %t/voucher_propagation
+// RUN: %target-build-swift %s -target %target-swift-5.1-abi-triple -enable-experimental-feature IsolatedDeinit -o %t/voucher_propagation
 // RUN: %target-codesign %t/voucher_propagation
 // RUN: MallocStackLogging=1 %target-run %t/voucher_propagation
 
@@ -13,6 +13,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_IsolatedDeinit
 
 import Darwin
 import Dispatch // expected-warning {{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'Dispatch'}}
