@@ -754,9 +754,10 @@ func _COWBufferForReading<T: AnyObject>(_ object: T) -> T {
 /// Returns `true` if type is a POD type. A POD type is a type that does not
 /// require any special handling on copying or destruction.
 @_transparent
+@_preInverseGenerics
 public // @testable
-func _isPOD<T>(_ type: T.Type) -> Bool {
-  return Bool(Builtin.ispod(type))
+func _isPOD<T: ~Copyable & ~Escapable>(_ type: T.Type) -> Bool {
+  Bool(Builtin.ispod(type))
 }
 
 /// Returns `true` if `type` is known to refer to a concrete type once all
