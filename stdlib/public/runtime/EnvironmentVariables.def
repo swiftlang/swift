@@ -88,8 +88,15 @@ VARIABLE(SWIFT_DEBUG_VALIDATE_EXTERNAL_GENERIC_METADATA_BUILDER, uint8_t, 0,
          "unless a validation failure occurs. Level 2 enables full debug "
          "logging in the builder.")
 
-VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED, bool, true,
-         "Enable use of prespecializations library.")
+VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_METADATA, bool, true,
+         "Enable use of metadata in prespecializations library.")
+
+VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP, bool, true,
+         "Enable use of descriptor map in prespecializations library.")
+
+VARIABLE(SWIFT_DEBUG_VALIDATE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP, bool, false,
+         "Validate results from the prespecializations map descriptor map by "
+         "comparing to a full scan.")
 
 VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH, string, "",
          "A path to a prespecializations library to use at runtime. In order "
