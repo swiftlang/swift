@@ -1781,6 +1781,9 @@ ConstraintSystem::filterDisjunction(
         return SolutionKind::Unsolved;
 
       for (auto *currentChoice : disjunction->getNestedConstraints()) {
+        if (currentChoice->isDisabled())
+          continue;
+
         if (currentChoice != choice)
           solverState->disableConstraint(currentChoice);
       }
