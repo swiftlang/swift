@@ -2517,8 +2517,11 @@ void swift::recordRequiredImportAccessLevelForDecl(
   if (auto attributedImport = sf->getImportAccessLevel(definingModule)) {
     auto importedModule = attributedImport->module.importedModule;
 
-    // If the defining module is transitively imported, mark the responsible
-    // module as requiring the minimum access level too.
+    // Ignore submodules, same behavior from `getModuleContext` above.
+    importedModule = importedModule->getTopLevelModule();
+
+    // If the defining module is transitively imported, mark the locally
+    // imported  module as requiring the minimum access level too.
     if (importedModule != definingModule)
       sf->registerRequiredAccessLevelForModule(importedModule, accessLevel);
 
