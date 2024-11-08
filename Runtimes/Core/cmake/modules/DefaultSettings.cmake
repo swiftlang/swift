@@ -17,6 +17,12 @@ macro(defaulted_option variable helptext)
   option(${variable} ${helptext} ${${variable}_default})
 endmacro()
 
+macro(defaulted_set variable type helptext)
+  if(DEFINED ${variable}_default)
+    set(${variable} ${variable}_default CACHE ${type} ${helptext})
+  endif()
+endmacro()
+
 if(APPLE)
   set(SwiftCore_ENABLE_LIBRARY_EVOLUTION_default ON)
   set(SwiftCore_ENABLE_CRASH_REPORTER_CLIENT_default ON)

@@ -66,12 +66,12 @@ defaulted_option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argum
 defaulted_option(SwiftCore_ENABLE_RUNTIME_FUNCTION_COUNTERS "Enable runtime function counter support")
 
 defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support")
-set(SwiftCore_BACKTRACER_PATH ${SwiftCore_BACKTRACER_PATH_default} CACHE STRING "Set a fixed path to the Swift backtracer")
+defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift backtracer")
 
 option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" OFF)
 option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)
 
-set(SwiftCore_OBJECT_FORMAT "${SwiftCore_OBJECT_FORMAT_default}" CACHE STRING "Object format")
+defaulted_set(SwiftCore_OBJECT_FORMAT STRING "Object format: ELF COFF")
 
 add_compile_definitions(
   $<$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>:-DSWIFT_OBJC_INTEROP>
@@ -82,7 +82,7 @@ add_compile_definitions(
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER=$<BOOL:${SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER}>>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>>)
 
-add_compile_options( $<$<AND:$<COMPILE_LANGUAGE:Swift>,$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>>:-enable-library-evolution>)
+add_compile_options($<$<AND:$<COMPILE_LANGUAGE:Swift>,$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>>:-enable-library-evolution>)
 
 include_directories(include)
 
