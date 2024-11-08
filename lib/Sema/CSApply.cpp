@@ -6403,6 +6403,8 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     arg.setExpr(convertedArg);
     newArgs.push_back(arg);
   }
+
+  ASSERT(appliedWrapperIndex == appliedPropertyWrappers.size());
   return ArgumentList::createTypeChecked(ctx, args, newArgs);
 }
 

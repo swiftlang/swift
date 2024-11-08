@@ -5047,6 +5047,10 @@ void ConstraintSystem::removePropertyWrapper(Expr *anchor) {
   auto &wrappers = found->second;
   ASSERT(!wrappers.empty());
   wrappers.pop_back();
+  if (wrappers.empty()) {
+    bool erased = appliedPropertyWrappers.erase(anchor);
+    ASSERT(erased);
+  }
 }
 
 ConstraintSystem::TypeMatchResult

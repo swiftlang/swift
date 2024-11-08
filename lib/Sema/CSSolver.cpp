@@ -431,11 +431,10 @@ void ConstraintSystem::replaySolution(const Solution &solution,
   for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {
     auto found = appliedPropertyWrappers.find(appliedWrapper.first);
     if (found == appliedPropertyWrappers.end()) {
-      appliedPropertyWrappers.insert(appliedWrapper);
+      for (auto applied : appliedWrapper.second)
+        applyPropertyWrapper(getAsExpr(appliedWrapper.first), applied);
     } else {
-      auto &existing = found->second;
-      ASSERT(existing.size() <= appliedWrapper.second.size());
-      existing = appliedWrapper.second;
+      ASSERT(found->second.size() == appliedWrapper.second.size());
     }
   }
 
