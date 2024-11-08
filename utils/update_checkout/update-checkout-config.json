@@ -3,11 +3,11 @@
     "https-clone-pattern": "https://github.com/%s.git",
     "repos" : {
         "swift": {
-            "remote": { "id": "apple/swift" } },
+            "remote": { "id": "swiftlang/swift" } },
         "cmark": {
-            "remote": { "id": "apple/swift-cmark" } },
+            "remote": { "id": "swiftlang/swift-cmark" } },
         "llbuild": {
-            "remote": { "id": "apple/swift-llbuild" } },
+            "remote": { "id": "swiftlang/swift-llbuild" } },
         "swift-argument-parser": {
             "remote": { "id": "apple/swift-argument-parser" } },
         "swift-atomics": {
@@ -21,27 +21,27 @@
         "swift-asn1": {
             "remote": { "id": "apple/swift-asn1" } },
         "swift-driver": {
-            "remote": { "id": "apple/swift-driver" } },
+            "remote": { "id": "swiftlang/swift-driver" } },
         "swift-numerics": {
             "remote": { "id": "apple/swift-numerics" } },        
         "swift-tools-support-core": {
-            "remote": { "id": "apple/swift-tools-support-core" } },
+            "remote": { "id": "swiftlang/swift-tools-support-core" } },
         "swiftpm": {
-            "remote": { "id": "apple/swift-package-manager" } },
+            "remote": { "id": "swiftlang/swift-package-manager" } },
         "swift-syntax": {
-            "remote": { "id": "apple/swift-syntax" } },
+            "remote": { "id": "swiftlang/swift-syntax" } },
         "swift-system": {
             "remote": { "id": "apple/swift-system" } },
         "swift-stress-tester": {
-            "remote": { "id": "apple/swift-stress-tester" } },
+            "remote": { "id": "swiftlang/swift-stress-tester" } },
         "swift-corelibs-xctest": {
-            "remote": { "id": "apple/swift-corelibs-xctest" } },
+            "remote": { "id": "swiftlang/swift-corelibs-xctest" } },
         "swift-corelibs-foundation": {
-            "remote": { "id": "apple/swift-corelibs-foundation" } },
+            "remote": { "id": "swiftlang/swift-corelibs-foundation" } },
         "swift-corelibs-libdispatch": {
-            "remote": { "id": "apple/swift-corelibs-libdispatch" } },
+            "remote": { "id": "swiftlang/swift-corelibs-libdispatch" } },
         "swift-integration-tests": {
-            "remote": { "id": "apple/swift-integration-tests" } },
+            "remote": { "id": "swiftlang/swift-integration-tests" } },
         "swift-xcode-playground-support": {
             "remote": { "id": "apple/swift-xcode-playground-support" } },
         "ninja": {
@@ -54,35 +54,35 @@
             "platforms": [ "Linux" ]
         },
         "swift-cmark-gfm": {
-             "remote": { "id": "apple/swift-cmark" } },
+             "remote": { "id": "swiftlang/swift-cmark" } },
         "indexstore-db": {
-            "remote": { "id": "apple/indexstore-db" } },
+            "remote": { "id": "swiftlang/indexstore-db" } },
         "sourcekit-lsp": {
-            "remote": { "id": "apple/sourcekit-lsp" } },
+            "remote": { "id": "swiftlang/sourcekit-lsp" } },
         "swift-format": {
-            "remote": { "id": "apple/swift-format" } },
+            "remote": { "id": "swiftlang/swift-format" } },
         "swift-installer-scripts": {
-            "remote": { "id": "apple/swift-installer-scripts" } },
+            "remote": { "id": "swiftlang/swift-installer-scripts" } },
         "swift-docc": {
-            "remote": { "id": "apple/swift-docc" } },
+            "remote": { "id": "swiftlang/swift-docc" } },
         "swift-lmdb": {
-            "remote": { "id": "apple/swift-lmdb" } },
+            "remote": { "id": "swiftlang/swift-lmdb" } },
         "swift-docc-render-artifact": {
-            "remote": { "id": "apple/swift-docc-render-artifact" } },
+            "remote": { "id": "swiftlang/swift-docc-render-artifact" } },
         "swift-docc-symbolkit": {
-            "remote": { "id": "apple/swift-docc-symbolkit" } },
+            "remote": { "id": "swiftlang/swift-docc-symbolkit" } },
         "swift-markdown": {
-            "remote": { "id": "apple/swift-markdown" } },
+            "remote": { "id": "swiftlang/swift-markdown" } },
         "swift-nio": {
             "remote": { "id": "apple/swift-nio" } },
         "swift-nio-ssl": {
             "remote": { "id": "apple/swift-nio-ssl" } },
         "swift-experimental-string-processing": {
-            "remote": { "id": "apple/swift-experimental-string-processing" } },
+            "remote": { "id": "swiftlang/swift-experimental-string-processing" } },
         "swift-llvm-bindings": {
-            "remote": { "id": "apple/swift-llvm-bindings" } },
+            "remote": { "id": "swiftlang/swift-llvm-bindings" } },
         "llvm-project": {
-            "remote": { "id": "apple/llvm-project" } },
+            "remote": { "id": "swiftlang/llvm-project" } },
         "curl": {
           "remote": { "id": "curl/curl" }
         },
