@@ -266,7 +266,8 @@ public:
       EndBorrow->eraseFromParent();
 
     if (auto allocation = BeginApply->getCalleeAllocationResult()) {
-      for (auto *user : allocation->getUsers()) {
+      SmallVector<SILInstruction *, 4> users(allocation->getUsers());
+      for (auto *user : users) {
         auto *dsi = cast<DeallocStackInst>(user);
         dsi->eraseFromParent();
       }
