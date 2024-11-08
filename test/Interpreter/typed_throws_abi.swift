@@ -4,6 +4,8 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(TypedThrowsABI) | %FileCheck %s
 
+// REQUIRES: executable_test
+
 import TypedThrowsABI
 
 func invoke<E: Error, each T>(_ f: () async throws(E) -> (repeat each T)) async {
