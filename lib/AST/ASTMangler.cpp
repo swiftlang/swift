@@ -1909,19 +1909,32 @@ static bool forEachConditionalConformance(const ProtocolConformance *conformance
   auto *rootConformance = conformance->getRootConformance();
 
   auto subMap = conformance->getSubstitutionMap();
-  for (auto requirement : rootConformance->getConditionalRequirements()) {
-    if (requirement.getKind() != RequirementKind::Conformance)
-      continue;
-    ProtocolDecl *proto = requirement.getProtocolDecl();
-    auto conformance = subMap.lookupConformance(
-        requirement.getFirstType()->getCanonicalType(), proto);
-    if (conformance.isInvalid()) {
-      // This should only happen when mangling invalid ASTs, but that happens
-      // for indexing purposes.
-      continue;
-    }
 
-    if (fn(requirement.getFirstType().subst(subMap), conformance))
+  auto ext = dyn_cast<ExtensionDecl>(rootConformance->getDeclContext());
+  if (!ext)
+    return false;
+
+  auto typeSig = ext->getExtendedNominal()->getGenericSignature();
+  auto extensionSig = rootConformance->getGenericSignature();
+
+  for (const auto &req : extensionSig.getRequirements()) {
+    // We set brokenPackBehavior to true here to maintain compatibility with
+    // the mangling produced by an old compiler. We could incorrectly return
+    // false from isRequirementSatisfied() here even if the requirement was
+    // satisfied, and then it would show up as a conditional requirement
+    // even though it was already part of the nominal type's generic signature.
+    if (typeSig->isRequirementSatisfied(req,
+                                        /*allowMissing=*/false,
+                                        /*brokenPackBehavior=*/true))
+      continue;
+
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    ProtocolDecl *proto = req.getProtocolDecl();
+    auto conformance = subMap.lookupConformance(
+        req.getFirstType()->getCanonicalType(), proto);
+    if (fn(req.getFirstType().subst(subMap), conformance))
       return true;
   }
 
@@ -3473,7 +3486,14 @@ void ASTMangler::gatherGenericSignatureParts(GenericSignature sig,
     genericParams = canSig.getGenericParams();
   } else {
     llvm::erase_if(reqs, [&](Requirement req) {
-      return contextSig->isRequirementSatisfied(req);
+      // We set brokenPackBehavior to true here to maintain compatibility with
+      // the mangling produced by an old compiler. We could incorrectly return
+      // false from isRequirementSatisfied() here even if the requirement was
+      // satisfied, and then it would show up as a conditional requirement
+      // even though it was already part of the nominal type's generic signature.
+      return contextSig->isRequirementSatisfied(req,
+                                                /*allowMissing=*/false,
+                                                /*brokenPackBehavior=*/true);
     });
   }
 }
