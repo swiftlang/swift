@@ -2599,7 +2599,8 @@ void IRGenSILFunction::emitSILFunction() {
                              LinkEntity::forSILFunction(CurSILFn),
                              getAsyncContextLayout(*this).getSize());
 
-    if (IGM.getOptions().EmitAsyncFramePushPopMetadata) {
+    if (IGM.getOptions().EmitAsyncFramePushPopMetadata &&
+        IGM.TargetInfo.OutputObjectFormat  == llvm::Triple::MachO) {
       CurFn->addFnAttr("async_entry");
       CurFn->addFnAttr(llvm::Attribute::NoInline);
     }
