@@ -856,6 +856,7 @@ extension ArraySlice: RangeReplaceableCollection {
 
   @inlinable
   @_semantics("array.make_mutable")
+  @_effects(notEscaping self.**)
   internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.beginCOWMutation()) {
       _copyToNewBuffer(oldCount: _buffer.count)
@@ -864,6 +865,7 @@ extension ArraySlice: RangeReplaceableCollection {
 
   @inlinable
   @_semantics("array.mutate_unknown")
+  @_effects(notEscaping self.**)
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // Due to make_mutable hoisting the situation can arise where we hoist
     // _makeMutableAndUnique out of loop and use it to replace
@@ -884,6 +886,7 @@ extension ArraySlice: RangeReplaceableCollection {
 
   @inlinable
   @_semantics("array.mutate_unknown")
+  @_effects(notEscaping self.**)
   internal mutating func _appendElementAssumeUniqueAndCapacity(
     _ oldCount: Int,
     newElement: __owned Element
@@ -927,9 +930,9 @@ extension ArraySlice: RangeReplaceableCollection {
     _endMutation()
   }
   
-  /// Adds the elements of a sequence to the end of the array.
+  /// Adds the elements of a collection to the end of the array.
   ///
-  /// Use this method to append the elements of a sequence to the end of this
+  /// Use this method to append the elements of a collection to the end of this
   /// array. This example appends the elements of a `Range<Int>` instance
   /// to an array of integers.
   ///
@@ -943,7 +946,7 @@ extension ArraySlice: RangeReplaceableCollection {
   /// - Complexity: O(*m*) on average, where *m* is the length of
   ///   `newElements`, over many calls to `append(contentsOf:)` on the same
   ///   array.
-  @inlinable
+  @inlinable @_alwaysEmitIntoClient
   @_semantics("array.append_contentsOf")
   @_effects(notEscaping self.value**)
   public mutating func append(contentsOf newElements: __owned some Collection<Element>) {
