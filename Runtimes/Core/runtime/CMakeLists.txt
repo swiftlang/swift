@@ -120,6 +120,9 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
   add_library(swiftrt OBJECT SwiftRT-ELF-WASM.cpp)
   target_compile_definitions(swiftrt PRIVATE
     -DSWIFT_ENABLE_BACKTRACING=$<BOOL:${SwiftCore_ENABLE_BACKTRACING}>)
+  target_include_directories(swiftrt PRIVATE
+    "${SwiftCore_SWIFTC_SOURCE_DIR}/include"
+    "${PROJECT_BINARY_DIR}/include")
   target_link_libraries(swiftrt PRIVATE swiftShims)
   install(TARGETS swiftrt DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift")
 elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
