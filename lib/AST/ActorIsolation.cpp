@@ -103,7 +103,7 @@ NominalTypeDecl *ActorIsolation::getActor() const {
   if (auto *instance = actorInstance.dyn_cast<VarDecl *>()) {
     actorType = instance->getTypeInContext();
   } else if (auto *expr = actorInstance.dyn_cast<Expr *>()) {
-    actorType = expr->getType();
+    actorType = expr->getType()->getRValueType();
   }
 
   if (actorType) {
