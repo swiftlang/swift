@@ -123,7 +123,7 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
     canType = GenericEnv->mapTypeIntoContext(canType)->getCanonicalType();
   }
 
-  if (canType.getAnyGeneric()) {
+  if (canType.getAnyGeneric() || t.is<BuiltinFixedArrayType>()) {
     assert(t.isObject() && "Expected only two categories: address and object");
     assert(!canType->hasTypeParameter());
     const TypeInfo &TI = Mod.getTypeInfoForLowered(canType);
@@ -3514,7 +3514,7 @@ private:
       canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
     }
 
-    if (canType.getAnyGeneric() || isa<TupleType>(canType)) {
+    if (canType.getAnyGeneric() || isa<TupleType>(canType) || ty.is<BuiltinFixedArrayType>()) {
       assert(ty.isObject() &&
              "Expected only two categories: address and object");
       assert(!canType->hasTypeParameter());
