@@ -35,21 +35,17 @@ public:
       DependencyTracker &DependencyTracker, DiagnosticEngine &diags);
 
 private:
-  /// Retrieve the module dependencies for the module with the given name.
-  ModuleDependencyVector
-  scanFilesystemForModuleDependency(Identifier moduleName,
-                                    const ModuleDependenciesCache &cache,
-                                    bool isTestableImport = false);
-
   /// Retrieve the module dependencies for the Clang module with the given name.
   ModuleDependencyVector
   scanFilesystemForClangModuleDependency(Identifier moduleName,
-                                         const ModuleDependenciesCache &cache);
+                                         StringRef moduleOutputPath,
+                                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenModules,
+                                         llvm::PrefixMapper *prefixMapper);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
   ModuleDependencyVector
-  scanFilesystemForSwiftModuleDependency(Identifier moduleName,
-                                         const ModuleDependenciesCache &cache,
+  scanFilesystemForSwiftModuleDependency(Identifier moduleName, StringRef moduleOutputPath,
+                                         llvm::PrefixMapper *prefixMapper,
                                          bool isTestableImport = false);
 
   // Worker-specific instance of CompilerInvocation

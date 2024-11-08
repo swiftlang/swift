@@ -11,9 +11,9 @@
 // RUN: sed -e "s|SWIFTLIBDIR|%swift-lib-dir|g" %t/map.json.template4 > %t/inputs/map.json
 
 // Pre-build common mandatory deps
-// RUN: %target-swift-emit-pcm -target %target-cpu-apple-macosx12.0 -module-name SwiftShims %swift-lib-dir/swift/shims/module.modulemap -o %t/inputs/SwiftShims.pcm
+// RUN: %target-swift-emit-pcm -target %target-cpu-apple-macosx12.0 -module-name SwiftShims %swift-lib-dir/swift/shims/module.modulemap -o %t/inputs/SwiftShims.pcm -Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules
 // Pre-build the clang deps with versioned code
-// RUN: %target-swift-emit-pcm -target %target-cpu-apple-macosx12.0 -module-name Bar %S/Inputs/CHeaders/ExtraCModules/module.modulemap -o %t/inputs/Bar.pcm 
+// RUN: %target-swift-emit-pcm -target %target-cpu-apple-macosx12.0 -module-name Bar %S/Inputs/CHeaders/ExtraCModules/module.modulemap -o %t/inputs/Bar.pcm -Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules
 
 // RUN: %swift-frontend -target %target-cpu-apple-macosx10.14 -O -emit-ir -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -disable-implicit-swift-modules -explicit-swift-module-map-file %t/inputs/map.json -o %t/explicit-clang-target-irgen.ll %t/test.swift -clang-target %target-cpu-apple-macosx12.0
 // RUN: %FileCheck %s < %t/explicit-clang-target-irgen.ll

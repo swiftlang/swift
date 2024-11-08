@@ -224,44 +224,25 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
 }
 
 ModuleDependencyVector
-ModuleDependencyScanningWorker::scanFilesystemForModuleDependency(
-    Identifier moduleName, const ModuleDependenciesCache &cache,
-    bool isTestableImport) {
-  // First query a Swift module, otherwise lookup a Clang module
-  ModuleDependencyVector moduleDependencies =
-      swiftScannerModuleLoader->getModuleDependencies(
-          moduleName, cache.getModuleOutputPath(),
-          cache.getAlreadySeenClangModules(), clangScanningTool,
-          *scanningASTDelegate, cache.getScanService().getPrefixMapper(),
-          isTestableImport);
-
-  if (moduleDependencies.empty())
-    moduleDependencies = clangScannerModuleLoader->getModuleDependencies(
-        moduleName, cache.getModuleOutputPath(),
-        cache.getAlreadySeenClangModules(), clangScanningTool,
-        *scanningASTDelegate, cache.getScanService().getPrefixMapper(),
-        isTestableImport);
-
-  return moduleDependencies;
-}
-
-ModuleDependencyVector
 ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
-    Identifier moduleName, const ModuleDependenciesCache &cache,
-    bool isTestableImport) {
+    Identifier moduleName, StringRef moduleOutputPath,
+    llvm::PrefixMapper *prefixMapper, bool isTestableImport) {
   return swiftScannerModuleLoader->getModuleDependencies(
-      moduleName, cache.getModuleOutputPath(),
-      cache.getAlreadySeenClangModules(), clangScanningTool,
-      *scanningASTDelegate, cache.getScanService().getPrefixMapper(), isTestableImport);
+      moduleName, moduleOutputPath,
+      {}, clangScanningTool, *scanningASTDelegate,
+      prefixMapper, isTestableImport);
 }
 
 ModuleDependencyVector
 ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
-    Identifier moduleName, const ModuleDependenciesCache &cache) {
+    Identifier moduleName,
+    StringRef moduleOutputPath,
+    const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenModules,
+    llvm::PrefixMapper *prefixMapper) {
   return clangScannerModuleLoader->getModuleDependencies(
-      moduleName, cache.getModuleOutputPath(),
-      cache.getAlreadySeenClangModules(), clangScanningTool,
-      *scanningASTDelegate, cache.getScanService().getPrefixMapper(), false);
+      moduleName, moduleOutputPath,
+      alreadySeenModules, clangScanningTool,
+      *scanningASTDelegate, prefixMapper, false);
 }
 
 template <typename Function, typename... Args>
@@ -503,7 +484,9 @@ ModuleDependencyScanner::getNamedClangModuleDependencyInfo(
   auto moduleDependencies = withDependencyScanningWorker(
       [&cache, moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
         return ScanningWorker->scanFilesystemForClangModuleDependency(
-            moduleIdentifier, cache);
+          moduleIdentifier, cache.getModuleOutputPath(),
+          cache.getAlreadySeenClangModules(),
+          cache.getScanService().getPrefixMapper());
       });
   if (moduleDependencies.empty())
     return std::nullopt;
@@ -539,7 +522,8 @@ ModuleDependencyScanner::getNamedSwiftModuleDependencyInfo(
   auto moduleDependencies = withDependencyScanningWorker(
       [&cache, moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
         return ScanningWorker->scanFilesystemForSwiftModuleDependency(
-            moduleIdentifier, cache);
+          moduleIdentifier, cache.getModuleOutputPath(),
+          cache.getScanService().getPrefixMapper());
       });
   if (moduleDependencies.empty())
     return std::nullopt;
@@ -755,21 +739,28 @@ ModuleDependencyScanner::resolveAllClangModuleDependencies(
     moduleLookupResult.insert(
         std::make_pair(unresolvedIdentifier.getKey(), std::nullopt));
 
-  std::mutex CacheAccessLock;
+  // We need a copy of the shared already-seen module set, which will be shared amongst
+  // all the workers. In `recordDependencies`, each worker will contribute its
+  // results back to the shared set for future lookups.
+  const llvm::DenseSet<clang::tooling::dependencies::ModuleID> seenClangModules =
+      cache.getAlreadySeenClangModules();
+  std::mutex cacheAccessLock;
   auto scanForClangModuleDependency =
-      [this, &cache, &moduleLookupResult, &CacheAccessLock](Identifier moduleIdentifier) {
+      [this, &cache, &moduleLookupResult,
+       &cacheAccessLock, &seenClangModules](Identifier moduleIdentifier) {
         auto moduleName = moduleIdentifier.str();
         {
-          std::lock_guard<std::mutex> guard(CacheAccessLock);
+          std::lock_guard<std::mutex> guard(cacheAccessLock);
           if (cache.hasDependency(moduleName, ModuleDependencyKind::Clang))
             return;
         }
 
         auto moduleDependencies = withDependencyScanningWorker(
-            [&cache,
+            [&cache, &seenClangModules,
              moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
               return ScanningWorker->scanFilesystemForClangModuleDependency(
-                  moduleIdentifier, cache);
+                  moduleIdentifier, cache.getModuleOutputPath(),
+                  seenClangModules, cache.getScanService().getPrefixMapper());
             });
 
         // Update the `moduleLookupResult` and cache all discovered dependencies
@@ -777,7 +768,7 @@ ModuleDependencyScanner::resolveAllClangModuleDependencies(
         // if looking for a module that was discovered as a transitive dependency
         // in this scan.
         {
-          std::lock_guard<std::mutex> guard(CacheAccessLock);
+          std::lock_guard<std::mutex> guard(cacheAccessLock);
           moduleLookupResult.insert_or_assign(moduleName, moduleDependencies);
           if (!moduleDependencies.empty())
             cache.recordDependencies(moduleDependencies);
@@ -952,7 +943,8 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
             [&cache, moduleIdentifier,
              isTestable](ModuleDependencyScanningWorker *ScanningWorker) {
               return ScanningWorker->scanFilesystemForSwiftModuleDependency(
-                  moduleIdentifier, cache, isTestable);
+                  moduleIdentifier, cache.getModuleOutputPath(),
+                  cache.getScanService().getPrefixMapper(), isTestable);
             });
         moduleLookupResult.insert_or_assign(moduleName, moduleDependencies);
       };
@@ -1094,7 +1086,8 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
         [&cache,
          moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
           return ScanningWorker->scanFilesystemForSwiftModuleDependency(
-              moduleIdentifier, cache);
+              moduleIdentifier, cache.getModuleOutputPath(),
+              cache.getScanService().getPrefixMapper());
         });
     swiftOverlayLookupResult.insert_or_assign(moduleName, moduleDependencies);
   };
