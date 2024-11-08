@@ -191,3 +191,19 @@ func conversionDowngrade() {
   withSendableClosure(ns)
   // expected-warning@-1 {{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
 }
+
+@preconcurrency
+func requireSendable<T: Sendable>(_: T) {}
+
+@preconcurrency
+struct RequireSendable<T: Sendable> {}
+
+class NotSendable {} // expected-note 2 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+
+typealias T = RequireSendable<NotSendable>
+// expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
+
+func testRequirementDowngrade(ns: NotSendable) {
+  requireSendable(ns)
+  // expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
+}

@@ -66,7 +66,8 @@ static bool diagnoseSubstitutionMapAvailability(
     SourceLoc loc, SubstitutionMap subs, const ExportContext &where,
     Type depTy = Type(), Type replacementTy = Type(),
     bool warnIfConformanceUnavailablePreSwift6 = false,
-    bool suppressParameterizationCheckForOptional = false);
+    bool suppressParameterizationCheckForOptional = false,
+    bool preconcurrency = false);
 
 /// Diagnose uses of unavailable declarations in types.
 static bool
@@ -3990,8 +3991,12 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   }
 
   if (R.isValid()) {
-    if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
-                                            Where)) {
+    if (diagnoseSubstitutionMapAvailability(
+            R.Start, declRef.getSubstitutions(), Where,
+            Type(), Type(),
+            /*warnIfConformanceUnavailablePreSwift6*/false,
+            /*suppressParameterizationCheckForOptional*/false,
+            /*preconcurrency*/D->preconcurrency())) {
       return true;
     }
   }
@@ -4489,7 +4494,8 @@ public:
         /*depTy=*/Type(),
         /*replacementTy=*/Type(),
         /*warnIfConformanceUnavailablePreSwift6=*/false,
-        /*suppressParameterizationCheckForOptional=*/ty->isOptional());
+        /*suppressParameterizationCheckForOptional=*/ty->isOptional(),
+        /*preconcurrency*/ty->getAnyNominal()->preconcurrency());
     return Action::Continue;
   }
 
@@ -4539,9 +4545,10 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 }
 
 static void diagnoseMissingConformance(
-    SourceLoc loc, Type type, ProtocolDecl *proto, const DeclContext *fromDC) {
+    SourceLoc loc, Type type, ProtocolDecl *proto, const DeclContext *fromDC,
+    bool preconcurrency) {
   assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable));
-  diagnoseMissingSendableConformance(loc, type, fromDC);
+  diagnoseMissingSendableConformance(loc, type, fromDC, preconcurrency);
 }
 
 bool
@@ -4549,7 +4556,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
                                        const ExportContext &where,
                                        Type depTy, Type replacementTy,
-                                       bool warnIfConformanceUnavailablePreSwift6) {
+                                       bool warnIfConformanceUnavailablePreSwift6,
+                                       bool preconcurrency) {
   assert(!where.isImplicit());
 
   if (conformance.isInvalid() || conformance.isAbstract())
@@ -4561,7 +4569,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     for (auto patternConf : pack->getPatternConformances()) {
       diagnosed |= diagnoseConformanceAvailability(
           loc, patternConf, where, depTy, replacementTy,
-          warnIfConformanceUnavailablePreSwift6);
+          warnIfConformanceUnavailablePreSwift6,
+          preconcurrency);
     }
     return diagnosed;
   }
@@ -4581,7 +4590,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
     if (builtinConformance->isMissing()) {
       diagnoseMissingConformance(loc, builtinConformance->getType(),
-                                 builtinConformance->getProtocol(), DC);
+                                 builtinConformance->getProtocol(), DC,
+                                 preconcurrency);
     }
   }
 
@@ -4640,7 +4650,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   SubstitutionMap subConformanceSubs = concreteConf->getSubstitutionMap();
   if (diagnoseSubstitutionMapAvailability(loc, subConformanceSubs, where,
                                           depTy, replacementTy,
-                                          warnIfConformanceUnavailablePreSwift6))
+                                          warnIfConformanceUnavailablePreSwift6,
+                                          preconcurrency))
     return true;
 
   return false;
@@ -4649,12 +4660,14 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 bool diagnoseSubstitutionMapAvailability(
     SourceLoc loc, SubstitutionMap subs, const ExportContext &where, Type depTy,
     Type replacementTy, bool warnIfConformanceUnavailablePreSwift6,
-    bool suppressParameterizationCheckForOptional) {
+    bool suppressParameterizationCheckForOptional,
+    bool preconcurrency) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
     if (diagnoseConformanceAvailability(loc, conformance, where,
                                         depTy, replacementTy,
-                                        warnIfConformanceUnavailablePreSwift6))
+                                        warnIfConformanceUnavailablePreSwift6,
+                                        preconcurrency))
       hadAnyIssues = true;
   }
 

@@ -324,7 +324,7 @@ bool diagnoseNonSendableTypesInReference(
 
 /// Produce a diagnostic for a missing conformance to Sendable.
 void diagnoseMissingSendableConformance(
-    SourceLoc loc, Type type, const DeclContext *fromDC);
+    SourceLoc loc, Type type, const DeclContext *fromDC, bool preconcurrency);
 
 /// If the given nominal type is public and does not explicitly
 /// state whether it conforms to Sendable, provide a diagnostic.
