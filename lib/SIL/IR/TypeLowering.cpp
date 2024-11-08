@@ -5264,6 +5264,16 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
     }
     return;
   }
+
+  if (auto fixedArrayTy = Ty.getAs<BuiltinFixedArrayType>()) {
+    auto fixedSize = fixedArrayTy->getFixedInhabitedSize();
+    if (fixedSize.has_value() && !fixedArrayTy->isFixedNegativeSize() )
+      fieldsCount += *fixedSize;
+    else
+      fieldsCount += 1;
+    return;
+  }
+
   if (auto *enumDecl = Ty.getEnumOrBoundGenericEnum()) {
     if (enumDecl->isIndirect()) {
       return;
