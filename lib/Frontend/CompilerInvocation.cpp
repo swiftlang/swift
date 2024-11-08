@@ -3786,7 +3786,7 @@ bool CompilerInvocation::parseArgs(
                        OPT_disable_aggressive_reg2mem,
                        SILOpts.UseAggressiveReg2MemForCodeSize);
 
-  // We ran into a LLVM backed instruction selection failure.
+  // We ran into an LLVM backend instruction selection failure.
   // This is a workaround.
   if (LangOpts.Target.isWasm())
     SILOpts.UseAggressiveReg2MemForCodeSize = false;
