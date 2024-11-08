@@ -541,6 +541,11 @@ func preciseIsolated(a: isolated MyActor) async {
   }
 }
 
+func testLValueIsolated() async {
+  var a = A() // expected-warning {{variable 'a' was never mutated}}
+  await sync(isolatedTo: a)
+}
+
 @MainActor func fromMain(ns: NotSendable) async -> NotSendable {
   await pass(value: ns, isolation: MainActor.shared)
 }
