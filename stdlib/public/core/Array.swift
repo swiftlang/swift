@@ -1203,6 +1203,22 @@ extension Array: RangeReplaceableCollection {
     _endMutation()
   }
   
+  /// Adds the elements of a collection to the end of the array.
+  ///
+  /// Use this method to append the elements of a collection to the end of this
+  /// array. This example appends the elements of a `Range<Int>` instance
+  /// to an array of integers.
+  ///
+  ///     var numbers = [1, 2, 3, 4, 5]
+  ///     numbers.append(contentsOf: 10...15)
+  ///     print(numbers)
+  ///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
+  ///
+  /// - Parameter newElements: The elements to append to the array.
+  ///
+  /// - Complexity: O(*m*) on average, where *m* is the length of
+  ///   `newElements`, over many calls to `append(contentsOf:)` on the same
+  ///   array.
   @inlinable
   @_semantics("array.append_contentsOf")
   @_effects(notEscaping self.value**)
@@ -1250,16 +1266,16 @@ extension Array: RangeReplaceableCollection {
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
-    defer {
-      _endMutation()
-    }
-      
     let wasContiguous = newElements.withContiguousStorageIfAvailable {
       append(contentsOf: $0)
       return true
     }
     if wasContiguous != nil {
       return
+    }
+      
+    defer {
+      _endMutation()
     }
 
     let newElementsCount = newElements.underestimatedCount

@@ -918,12 +918,54 @@ extension ArraySlice: RangeReplaceableCollection {
   ///   same array.
   @inlinable
   @_semantics("array.append_element")
+  @_effects(notEscaping self.value**)
   public mutating func append(_ newElement: __owned Element) {
     _makeUniqueAndReserveCapacityIfNotUnique()
     let oldCount = _getCount()
     _reserveCapacityAssumingUniqueBuffer(oldCount: oldCount)
     _appendElementAssumeUniqueAndCapacity(oldCount, newElement: newElement)
     _endMutation()
+  }
+  
+  /// Adds the elements of a sequence to the end of the array.
+  ///
+  /// Use this method to append the elements of a sequence to the end of this
+  /// array. This example appends the elements of a `Range<Int>` instance
+  /// to an array of integers.
+  ///
+  ///     var numbers = [1, 2, 3, 4, 5]
+  ///     numbers.append(contentsOf: 10...15)
+  ///     print(numbers)
+  ///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
+  ///
+  /// - Parameter newElements: The elements to append to the array.
+  ///
+  /// - Complexity: O(*m*) on average, where *m* is the length of
+  ///   `newElements`, over many calls to `append(contentsOf:)` on the same
+  ///   array.
+  @inlinable
+  @_semantics("array.append_contentsOf")
+  @_effects(notEscaping self.value**)
+  public mutating func append(contentsOf newElements: __owned some Collection<Element>) {
+    let newElementsCount = newElements.count
+    // This check prevents a data race writing to _swiftEmptyArrayStorage
+    if newElementsCount == 0 {
+      return
+    }
+    defer {
+      _endMutation()
+    }
+    reserveCapacityForAppend(newElementsCount: newElementsCount)
+    _ = _buffer.beginCOWMutation()
+
+    let oldCount = self.count
+    let startNewElements = _buffer.firstElementAddress + oldCount
+    let buf = UnsafeMutableBufferPointer(
+                start: startNewElements,
+                count: self.capacity - oldCount)
+
+    _ = buf.initialize(fromContentsOf: newElements)
+    _buffer.count += newElementsCount
   }
 
   /// Adds the elements of a sequence to the end of the array.
@@ -944,9 +986,21 @@ extension ArraySlice: RangeReplaceableCollection {
   ///   array.
   @inlinable
   @_semantics("array.append_contentsOf")
+  @_effects(notEscaping self.value**)
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
+    let wasContiguous = newElements.withContiguousStorageIfAvailable {
+      append(contentsOf: $0)
+      return true
+    }
+    if wasContiguous != nil {
+      return
+    }
+      
+    defer {
+      _endMutation()
+    }
     let newElementsCount = newElements.underestimatedCount
     reserveCapacityForAppend(newElementsCount: newElementsCount)
     _ = _buffer.beginCOWMutation()
@@ -975,11 +1029,11 @@ extension ArraySlice: RangeReplaceableCollection {
       // append them in slow sequence-only mode
       _buffer._arrayAppendSequence(IteratorSequence(remainder))
     }
-    _endMutation()
   }
 
   @inlinable
   @_semantics("array.reserve_capacity_for_append")
+  @_effects(notEscaping self.**)
   internal mutating func reserveCapacityForAppend(newElementsCount: Int) {
     let oldCount = self.count
     let oldCapacity = self.capacity
