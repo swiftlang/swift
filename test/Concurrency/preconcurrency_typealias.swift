@@ -1,10 +1,8 @@
-// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -strict-concurrency=targeted
-// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -verify-additional-prefix complete-tns- -strict-concurrency=complete
-// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -verify-additional-prefix complete-tns- -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -strict-concurrency=minimal
+// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -strict-concurrency=targeted -verify-additional-prefix targeted-complete-
+// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -strict-concurrency=complete -verify-additional-prefix targeted-complete- -verify-additional-prefix complete-tns-
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 @preconcurrency @MainActor func f() { }
 // expected-note @-1 2{{calls to global function 'f()' from outside of its actor context are implicitly asynchronous}}
@@ -31,7 +29,7 @@ func test() {
   var mutableVariable = 0
   preconcurrencyFunc {
     mutableVariable += 1 // no sendable warning unless we have complete
-    // expected-complete-tns-warning @-1 {{mutation of captured var 'mutableVariable' in concurrently-executing code; this is an error in the Swift 6 language mode}}
+    // expected-complete-tns-warning @-1 {{mutation of captured var 'mutableVariable' in concurrently-executing code}}
   }
   mutableVariable += 1
 }
@@ -49,7 +47,7 @@ func testAsync() async {
 
   var mutableVariable = 0
   preconcurrencyFunc {
-    mutableVariable += 1 // expected-warning{{mutation of captured var 'mutableVariable' in concurrently-executing code; this is an error in the Swift 6 language mode}}
+    mutableVariable += 1 // expected-targeted-complete-warning{{mutation of captured var 'mutableVariable' in concurrently-executing code}}
   }
   mutableVariable += 1
 }
