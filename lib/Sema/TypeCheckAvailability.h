@@ -276,7 +276,8 @@ bool diagnoseExplicitUnavailability(
     const RootProtocolConformance *rootConf,
     const ExtensionDecl *ext,
     const ExportContext &where,
-    bool warnIfConformanceUnavailablePreSwift6 = false);
+    bool warnIfConformanceUnavailablePreSwift6 = false,
+    bool preconcurrency = false);
 
 /// Diagnose uses of the runtime support of the given type, such as
 /// type metadata and dynamic casting.

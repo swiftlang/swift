@@ -2848,7 +2848,8 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
                                            const RootProtocolConformance *rootConf,
                                            const ExtensionDecl *ext,
                                            const ExportContext &where,
-                                           bool warnIfConformanceUnavailablePreSwift6) {
+                                           bool warnIfConformanceUnavailablePreSwift6,
+                                           bool preconcurrency) {
   auto *attr = AvailableAttr::isUnavailable(ext);
   if (!attr)
     return false;
@@ -2909,7 +2910,7 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
   diags.diagnose(loc, diag::conformance_availability_unavailable,
                  type, proto,
                  platform.empty(), platform, EncodedMessage.Message)
-      .limitBehaviorUntilSwiftVersion(behavior, 6)
+      .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
   switch (attr->getVersionAvailability(ctx)) {
@@ -4499,7 +4500,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     }
 
     if (diagnoseExplicitUnavailability(loc, rootConf, ext, where,
-                                       warnIfConformanceUnavailablePreSwift6)) {
+                                       warnIfConformanceUnavailablePreSwift6,
+                                       preconcurrency)) {
       maybeEmitAssociatedTypeNote();
       return true;
     }
