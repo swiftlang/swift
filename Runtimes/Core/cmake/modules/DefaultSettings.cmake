@@ -43,3 +43,5 @@ elseif(LINUX OR ANDROID OR BSD)
 elseif(WIN32)
   set(SwiftCore_OBJECT_FORMAT_default "coff")
 endif()
+
+include("${SwiftCore_VENDOR_MODULE_DIR}/DefaultSettings.cmake" OPTIONAL)

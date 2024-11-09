@@ -31,7 +31,8 @@
 
 cmake_minimum_required(VERSION 3.26...3.29)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
+set(SwiftCore_CMAKE_MODULES_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
+list(APPEND CMAKE_MODULE_PATH ${SwiftCore_CMAKE_MODULES_DIR})
 include(CMakeWorkarounds)
 project(SwiftCore LANGUAGES C CXX Swift VERSION 6.1)
 
@@ -47,6 +48,13 @@ set(SwiftCore_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../"
   CACHE FILEPATH "Path to the root source directory of the Swift compiler")
 
+# Hook point for vendor-specific extensions to the build system
+# Allowed extension points:
+#   - DefaultSettings.cmake
+#   - Settings.cmake
+set(SwiftCore_VENDOR_MODULE_DIR "${SwiftCore_CMAKE_MODULES_DIR}/vendor"
+  CACHE FILEPATH "Location for private build system extension")
+
 include(GNUInstallDirs)
 include(AvailabilityMacros)
 include(CompilerSettings)
@@ -54,6 +62,8 @@ include(DefaultSettings)
 include(EmitSwiftInterface)
 include(PlatformInfo)
 include(gyb)
+
+include("${SwiftCore_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
 defaulted_option(SwiftCore_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries")
 
