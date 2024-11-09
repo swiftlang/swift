@@ -715,7 +715,7 @@ bool importer::isUnavailableInSwift(
     if (version.empty())
       continue;
     if (platformAvailability->treatDeprecatedAsUnavailable(
-            decl, version, /*isAsync=*/false)) {
+            decl, version, /*isAsync=*/false, attr->isImplicit())) {
       return true;
     }
   }

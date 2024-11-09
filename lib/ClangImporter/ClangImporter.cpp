@@ -2610,7 +2610,7 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
 
 bool PlatformAvailability::treatDeprecatedAsUnavailable(
     const clang::Decl *clangDecl, const llvm::VersionTuple &version,
-    bool isAsync) const {
+    bool isAsync, bool isImplicitAvailability) const {
   assert(!version.empty() && "Must provide version when deprecated");
   unsigned major = version.getMajor();
   std::optional<unsigned> minor = version.getMinor();
@@ -2647,8 +2647,18 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
 
   case PlatformKind::macCatalyst:
   case PlatformKind::macCatalystApplicationExtension:
-    // ClangImporter does not yet support macCatalyst.
-    return false;
+    if (!isImplicitAvailability) {
+      // Anything deprecated by iOS 12 is unavailable for async import
+      // in Swift.
+      if (isAsync && !clangDecl->hasAttr<clang::SwiftAsyncAttr>()) {
+        return major <= 12;
+      }
+
+      // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
+      return major <= 7;
+    }
+
+    return major <= 13 && (!minor || *minor <= 1);
 
   case PlatformKind::watchOS:
   case PlatformKind::watchOSApplicationExtension:
