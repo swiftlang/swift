@@ -182,7 +182,6 @@ fileprivate final class ProjectGenerator {
     // group there.
     if ref.kind == .folder {
       guard groups[path] == nil else {
-        log.warning("Skipping blue folder '\(path)'; already added")
         return nil
       }
     }
@@ -211,23 +210,34 @@ fileprivate final class ProjectGenerator {
   }
 
   func generateBaseTarget(
-    _ name: String, at parentPath: RelativePath?,
+    _ name: String, at parentPath: RelativePath?, canUseBuildableFolder: Bool,
     productType: Xcode.Target.ProductType?, includeInAllTarget: Bool
   ) -> Xcode.Target? {
     guard targets[name] == nil else {
       log.warning("Duplicate target '\(name)', skipping")
       return nil
     }
-    // Make sure we can create a group for the parent path, otherwise
-    // this is nested in a folder reference and there's nothing we can do.
-    if let parentPath, !parentPath.components.isEmpty,
-       group(for: repoRelativePath.appending(parentPath)) == nil {
-      return nil
+    var buildableFolder: Xcode.FileReference?
+    if let parentPath, !parentPath.components.isEmpty {
+      // If we've been asked to use buildable folders, see if we can create
+      // a folder reference at the parent path. Otherwise, create a group at
+      // the parent path. If we can't create either a folder or group, this is
+      // nested in a folder reference and there's nothing we can do.
+      if spec.useBuildableFolders && canUseBuildableFolder {
+        buildableFolder = getOrCreateRepoRef(.folder(parentPath))
+      }
+      guard buildableFolder != nil ||
+              group(for: repoRelativePath.appending(parentPath)) != nil else {
+        return nil
+      }
     }
     let target = project.addTarget(productType: productType, name: name)
     targets[name] = target
     if includeInAllTarget {
       allTarget.addDependency(on: target)
+    }
+    if let buildableFolder {
+      target.addBuildableFolder(buildableFolder)
     }
     target.buildSettings.common.ONLY_ACTIVE_ARCH = "YES"
     target.buildSettings.common.USE_HEADERMAP = "NO"
@@ -274,8 +284,12 @@ fileprivate final class ProjectGenerator {
     }
     unbuildableSources += targetInfo.unbuildableSources
 
-    for header in targetInfo.headers {
-      getOrCreateRepoRef(.file(header))
+    // Need to defer the addition of headers since the target may want to use
+    // a buildable folder.
+    defer {
+      for header in targetInfo.headers {
+        getOrCreateRepoRef(.file(header))
+      }
     }
 
     // If we have no sources, we're done.
@@ -289,8 +303,20 @@ fileprivate final class ProjectGenerator {
       }
       return
     }
+    // Can only use buildable folders if there are no unique arguments and no
+    // unbuildable sources.
+    // TODO: To improve the coverage of buildable folders, we ought to start
+    // automatically splitting umbrella Clang targets like 'stdlib', since
+    // they always have files with unique args.
+    let canUseBuildableFolders =
+      try spec.useBuildableFolders && targetInfo.unbuildableSources.isEmpty &&
+      targetInfo.sources.allSatisfy {
+        try !buildDir.clangArgs.hasUniqueArgs(for: $0.path, parent: targetPath)
+      }
+
     let target = generateBaseTarget(
-      targetInfo.name, at: targetInfo.parentPath, productType: .staticArchive,
+      targetInfo.name, at: targetPath,
+      canUseBuildableFolder: canUseBuildableFolders, productType: .staticArchive,
       includeInAllTarget: includeInAllTarget
     )
     guard let target else { return }
@@ -464,7 +490,7 @@ fileprivate final class ProjectGenerator {
       )
     }
     let target = generateBaseTarget(
-      targetInfo.name, at: nil, productType: nil,
+      targetInfo.name, at: nil, canUseBuildableFolder: false, productType: nil,
       includeInAllTarget: includeInAllTarget
     )
     guard let target else { return nil }
@@ -505,9 +531,11 @@ fileprivate final class ProjectGenerator {
     guard checkNotExcluded(buildRule.parentPath, for: "Swift target") else {
       return nil
     }
+    // Create the target. Swift targets can always use buildable folders
+    // since they have a consistent set of arguments.
     let target = generateBaseTarget(
-      targetInfo.name, at: buildRule.parentPath, productType: .staticArchive,
-      includeInAllTarget: includeInAllTarget
+      targetInfo.name, at: buildRule.parentPath, canUseBuildableFolder: true,
+      productType: .staticArchive, includeInAllTarget: includeInAllTarget
     )
     guard let target else { return nil }
 

@@ -72,7 +72,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       addRunnableTargets: false,
       addBuildForRunnableTargets: self.addBuildForRunnableTargets,
       inferArgs: self.inferArgs, preferFolderRefs: self.preferFolderRefs,
-      mainRepoDir: mainRepoDir
+      useBuildableFolders: self.useBuildableFolders, mainRepoDir: mainRepoDir
     )
   }
 

@@ -202,6 +202,21 @@ struct ProjectOptions: ParsableArguments {
   )
   var preferFolderRefs: Bool = false
 
+  @Flag(
+    name: .customLong("buildable-folders"), inversion: .prefixedNo,
+    help: """
+      Requires Xcode 16: Enables the use of "buildable folders", allowing
+      folder references to be used for compatible targets. This allows new
+      source files to be added to a target without needing to regenerate the
+      project.
+      
+      Only supported for targets that have no per-file build settings. This
+      unfortunately means some Clang targes such as 'lib/Basic' and 'stdlib' 
+      cannot currently use buildable folders.
+      """
+  )
+  var useBuildableFolders: Bool = false
+
   @Option(help: .hidden)
   var blueFolders: String = ""
 }

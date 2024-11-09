@@ -40,6 +40,9 @@ public struct ProjectSpec {
   /// files.
   public var preferFolderRefs: Bool
 
+  /// Whether to enable the use of buildable folders for targets.
+  public var useBuildableFolders: Bool
+
   /// If provided, the paths added will be implicitly appended to this path.
   let mainRepoDir: RelativePath?
 
@@ -55,7 +58,7 @@ public struct ProjectSpec {
     addClangTargets: Bool, addSwiftTargets: Bool,
     addSwiftDependencies: Bool, addRunnableTargets: Bool,
     addBuildForRunnableTargets: Bool, inferArgs: Bool, preferFolderRefs: Bool,
-    mainRepoDir: RelativePath? = nil
+    useBuildableFolders: Bool, mainRepoDir: RelativePath? = nil
   ) {
     self.name = name
     self.buildDir = buildDir
@@ -67,6 +70,7 @@ public struct ProjectSpec {
     self.addBuildForRunnableTargets = addBuildForRunnableTargets
     self.inferArgs = inferArgs
     self.preferFolderRefs = preferFolderRefs
+    self.useBuildableFolders = useBuildableFolders
     self.mainRepoDir = mainRepoDir
   }
 
