@@ -83,6 +83,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 
   add_custom_target(embedded-darwin)
   add_dependencies(embedded-libraries embedded-darwin)
+
+  set_property(GLOBAL APPEND PROPERTY JOB_POOLS one_job=1)
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
     list(GET list 0 arch)
@@ -125,6 +127,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       INSTALL_IN_COMPONENT stdlib
       )
     add_dependencies(embedded-darwin embedded-darwin-${mod})
+    set_property(TARGET embedded-darwin-${mod} PROPERTY JOB_POOL_COMPILE one_job)
   endforeach()
 endif()
 
