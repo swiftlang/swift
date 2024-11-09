@@ -6,6 +6,8 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// REQUIRES: rdar139384166
+
 enum TL {
   @TaskLocal
   static var one: Int = 1
