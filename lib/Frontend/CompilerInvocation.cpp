@@ -3786,6 +3786,11 @@ bool CompilerInvocation::parseArgs(
                        OPT_disable_aggressive_reg2mem,
                        SILOpts.UseAggressiveReg2MemForCodeSize);
 
+  // We ran into an LLVM backend instruction selection failure.
+  // This is a workaround.
+  if (LangOpts.Target.isWasm())
+    SILOpts.UseAggressiveReg2MemForCodeSize = false;
+
   // With Swift 6, enable @_spiOnly by default. This also enables proper error
   // reporting of ioi references from spi decls.
   if (LangOpts.EffectiveLanguageVersion.isVersionAtLeast(6)) {
