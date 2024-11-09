@@ -53,7 +53,8 @@ concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl);
 static bool diagnoseExplicitUnavailability(
     SourceLoc loc, const RootProtocolConformance *rootConf,
     const ExtensionDecl *ext, const ExportContext &where,
-    bool warnIfConformanceUnavailablePreSwift6 = false);
+    bool warnIfConformanceUnavailablePreSwift6 = false,
+    bool preconcurrency = false);
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
@@ -2986,7 +2987,8 @@ getExplicitUnavailabilityDiagnosticInfo(const Decl *decl,
 bool diagnoseExplicitUnavailability(
     SourceLoc loc, const RootProtocolConformance *rootConf,
     const ExtensionDecl *ext, const ExportContext &where,
-    bool warnIfConformanceUnavailablePreSwift6) {
+    bool warnIfConformanceUnavailablePreSwift6,
+    bool preconcurrency) {
   // Invertible protocols are never unavailable.
   if (rootConf->getProtocol()->getInvertibleProtocolKind())
     return false;
@@ -3012,7 +3014,7 @@ bool diagnoseExplicitUnavailability(
   diags
       .diagnose(loc, diag::conformance_availability_unavailable, type, proto,
                 platform.empty(), platform, EncodedMessage.Message)
-      .limitBehaviorUntilSwiftVersion(behavior, 6)
+      .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
   switch (diagnosticInfo->getStatus()) {
@@ -4641,7 +4643,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       // FIXME: diagnoseExplicitUnavailability() should take unmet requirement
       if (diagnoseExplicitUnavailability(
               loc, rootConf, ext, where,
-              warnIfConformanceUnavailablePreSwift6)) {
+              warnIfConformanceUnavailablePreSwift6,
+              preconcurrency)) {
         maybeEmitAssociatedTypeNote();
         return true;
       }
