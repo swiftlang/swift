@@ -415,6 +415,15 @@ namespace {
     std::optional<SyntacticElementTarget> target;
     bool SuppressDiagnostics;
 
+    ExprRewriter(ConstraintSystem &cs, Solution &solution,
+                 std::optional<SyntacticElementTarget> target,
+                 bool suppressDiagnostics)
+        : cs(cs), dc(target ? target->getDeclContext() : cs.DC),
+          solution(solution), target(target),
+          SuppressDiagnostics(suppressDiagnostics) {}
+
+    ConstraintSystem &getConstraintSystem() const { return cs; }
+
     /// Coerce the given tuple to another tuple type.
     ///
     /// \param expr The expression we're converting.
@@ -2631,15 +2640,6 @@ namespace {
     }
     
   public:
-    ExprRewriter(ConstraintSystem &cs, Solution &solution,
-                 std::optional<SyntacticElementTarget> target,
-                 bool suppressDiagnostics)
-        : cs(cs), dc(target ? target->getDeclContext() : cs.DC),
-          solution(solution), target(target),
-          SuppressDiagnostics(suppressDiagnostics) {}
-
-    ConstraintSystem &getConstraintSystem() const { return cs; }
-
     /// Simplify the expression type and return the expression.
     ///
     /// This routine is used for 'simple' expressions that only need their
