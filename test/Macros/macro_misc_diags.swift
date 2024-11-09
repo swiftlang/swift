@@ -98,3 +98,28 @@ _ = #trailingClosure {
   // CHECK-DIAG: Client.swift:[[@LINE-1]]:27: warning: trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning
   // CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-4]]{{.*}}trailingClosurefMf_.swift:2:27: warning: trailing closure in this context is confusable with the body of the statement
 }
+
+// rdar://138997009 - Make sure we don't crash in MiscDiagnostics' implicit
+// self diagnosis.
+struct rdar138997009 {
+  func foo() {}
+  func bar() {
+    _ = {
+      _ = #trailingClosure {
+        foo()
+      }
+    }
+  }
+}
+
+class rdar138997009_Class {
+  func foo() {}
+  func bar() {
+    _ = {
+      _ = #trailingClosure {
+        foo()
+        // CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-3]]{{.*}}trailingClosurefMf_.swift:2:9: error: call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit
+      }
+    }
+  }
+}
