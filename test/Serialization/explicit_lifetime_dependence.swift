@@ -1,17 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t  %S/Inputs/def_explicit_lifetime_dependence.swift \
 // RUN: -enable-experimental-feature NonescapableTypes \
-// RUN: -disable-lifetime-dependence-diagnostics \
-// RUN: -disable-experimental-parser-round-trip
+// RUN: -disable-lifetime-dependence-diagnostics
 
 // RUN: llvm-bcanalyzer %t/def_explicit_lifetime_dependence.swiftmodule 
 
 // RUN: %target-swift-frontend -module-name lifetime-dependence -emit-sil -I %t %s \
 // RUN: -enable-experimental-feature NonescapableTypes \
-// RUN: -disable-experimental-parser-round-trip \
 // RUN: | %FileCheck %s
-
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
 // REQUIRES: swift_feature_NonescapableTypes
 
