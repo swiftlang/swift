@@ -408,6 +408,9 @@ namespace {
   /// Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
+    // Delayed items to type-check.
+    SmallVector<Decl *, 4> LocalDeclsToTypeCheck;
+
   public:
     ConstraintSystem &cs;
     DeclContext *dc;
@@ -423,6 +426,10 @@ namespace {
           SuppressDiagnostics(suppressDiagnostics) {}
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
+
+    void addLocalDeclToTypeCheck(Decl *D) {
+      LocalDeclsToTypeCheck.push_back(D);
+    }
 
     /// Coerce the given tuple to another tuple type.
     ///
@@ -5604,6 +5611,10 @@ namespace {
                       diag::add_consume_to_silence)
             .fixItInsert(coercion->getStartLoc(), "consume ");
       }
+
+      // Type-check any local decls encountered.
+      for (auto *D : LocalDeclsToTypeCheck)
+        TypeChecker::typeCheckDecl(D);
     }
 
     /// Diagnose an optional injection that is probably not what the
@@ -8805,22 +8816,15 @@ namespace {
 
   class ExprWalker : public ASTWalker, public SyntacticElementTargetRewriter {
     ExprRewriter &Rewriter;
-    SmallVector<Decl *, 4> LocalDeclsToTypeCheck;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
-
-    ~ExprWalker() {
-      // Type-check any local decls encountered.
-      for (auto *D : LocalDeclsToTypeCheck)
-        TypeChecker::typeCheckDecl(D);
-    }
 
     Solution &getSolution() const override { return Rewriter.solution; }
     DeclContext *&getCurrentDC() const override { return Rewriter.dc; }
 
     void addLocalDeclToTypeCheck(Decl *D) override {
-      LocalDeclsToTypeCheck.push_back(D);
+      Rewriter.addLocalDeclToTypeCheck(D);
     }
 
     bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
