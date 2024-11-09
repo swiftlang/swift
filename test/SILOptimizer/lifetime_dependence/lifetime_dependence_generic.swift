@@ -4,9 +4,7 @@
 // RUN:   -sil-verify-all \
 // RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
-// RUN:   -disable-experimental-parser-round-trip \
 // RUN:   -parse-stdlib -module-name Swift
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_NonescapableTypes
