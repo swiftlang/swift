@@ -199,10 +199,10 @@ fileprivate final class ProjectGenerator {
 
   @discardableResult
   private func getOrCreateRepoRef(
-    _ ref: ProjectSpec.PathReference, allowExcluded: Bool = false
+    _ ref: ProjectSpec.PathReference
   ) -> Xcode.FileReference? {
     let path = ref.path
-    guard allowExcluded || checkNotExcluded(path) else { return nil }
+    guard checkNotExcluded(path) else { return nil }
     return getOrCreateProjectRef(ref.withPath(repoRelativePath.appending(path)))
   }
 
@@ -629,8 +629,7 @@ fileprivate final class ProjectGenerator {
 
     // First add file/folder references.
     for ref in spec.referencesToAdd {
-      // Allow important references to bypass exclusion checks.
-      getOrCreateRepoRef(ref, allowExcluded: ref.isImportant)
+      getOrCreateRepoRef(ref)
     }
 
     // Gather the Swift targets to generate, including any dependencies.

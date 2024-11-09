@@ -83,14 +83,11 @@ extension ProjectSpec {
     var kind: Kind
     var path: RelativePath
 
-    /// Whether this reference should bypass exclusion checks.
-    var isImportant: Bool
-
-    static func file(_ path: RelativePath, isImportant: Bool = false) -> Self {
-      .init(kind: .file, path: path, isImportant: isImportant)
+    static func file(_ path: RelativePath) -> Self {
+      .init(kind: .file, path: path)
     }
-    static func folder(_ path: RelativePath, isImportant: Bool = false) -> Self {
-      .init(kind: .folder, path: path, isImportant: isImportant)
+    static func folder(_ path: RelativePath) -> Self {
+      .init(kind: .folder, path: path)
     }
 
     func withPath(_ newPath: RelativePath) -> Self {
@@ -145,20 +142,10 @@ extension ProjectSpec {
     self.knownUnbuildables.insert(path)
   }
 
-  public mutating func addReference(
-    to path: RelativePath, isImportant: Bool = false
-  ) {
+  public mutating func addReference(to path: RelativePath) {
     guard let path = mapPath(path, for: "file") else { return }
-    if repoRoot.appending(path).isDirectory {
-      if isImportant {
-        // Important folder references should block anything being added under
-        // them.
-        excludedPaths.append(.init(path: path))
-      }
-      referencesToAdd.append(.folder(path, isImportant: isImportant))
-    } else {
-      referencesToAdd.append(.file(path, isImportant: isImportant))
-    }
+    let isDir = repoRoot.appending(path).isDirectory
+    referencesToAdd.append(isDir ? .folder(path) : .file(path))
   }
 
   public mutating func addHeaders(in path: RelativePath) {
