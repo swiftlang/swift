@@ -2,6 +2,9 @@
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
+// wasm currently disables aggressive reg2mem
+// UNSUPPORTED: wasm
+
 public struct LargeThing {
     var  s0 : String = ""
     var  s1 : String = ""
