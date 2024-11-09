@@ -686,6 +686,30 @@ namespace swift {
     InFlightDiagnostic &limitBehaviorUntilSwiftVersion(
         DiagnosticBehavior limit, unsigned majorVersion);
 
+    /// Limits the diagnostic behavior to \c limit accordingly if
+    /// preconcurrency applies. Otherwise, the behavior limit only applies
+    /// prior to the given language mode.
+    ///
+    /// `@preconcurrency` applied to a nominal declaration or an import
+    /// statement will limit concurrency diagnostic behavior based on the
+    /// strict concurrency checking level. Under minimal checking,
+    /// preconcurrency will suppress the diagnostics. With strict concurrency
+    /// checking, including when building with the Swift 6 language mode,
+    /// preconcurrency errors are downgraded to warnings. This allows libraries
+    /// to stage in concurrency annotations even after their clients have
+    /// migrated to Swift 6 using `@preconcurrency` alongside the newly added
+    /// `@Sendable` or `@MainActor` annotations.
+    InFlightDiagnostic
+    &limitBehaviorWithPreconcurrency(DiagnosticBehavior limit,
+                                     bool preconcurrency,
+                                     unsigned languageMode = 6) {
+      if (preconcurrency) {
+        return limitBehavior(limit);
+      }
+
+      return limitBehaviorUntilSwiftVersion(limit, languageMode);
+    }
+
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings

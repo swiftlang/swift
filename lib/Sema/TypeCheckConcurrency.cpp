@@ -779,7 +779,10 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   });
 }
 
-bool SendableCheckContext::isExplicitSendableConformance() const {
+bool SendableCheckContext::warnInMinimalChecking() const {
+  if (preconcurrencyContext)
+    return false;
+
   if (!conformanceCheck)
     return false;
 
@@ -797,7 +800,7 @@ bool SendableCheckContext::isExplicitSendableConformance() const {
 DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
   // If we're not supposed to diagnose existing data races from this context,
   // ignore the diagnostic entirely.
-  if (!isExplicitSendableConformance() &&
+  if (!warnInMinimalChecking() &&
       !shouldDiagnoseExistingDataRaces(fromDC))
     return DiagnosticBehavior::Ignore;
 
@@ -816,9 +819,7 @@ SendableCheckContext::implicitSendableDiagnosticBehavior() const {
     LLVM_FALLTHROUGH;
 
   case StrictConcurrency::Minimal:
-    // Explicit Sendable conformances always diagnose, even when strict
-    // strict checking is disabled.
-    if (isExplicitSendableConformance())
+    if (warnInMinimalChecking())
       return DiagnosticBehavior::Warning;
 
     return DiagnosticBehavior::Ignore;
@@ -832,6 +833,13 @@ SendableCheckContext::implicitSendableDiagnosticBehavior() const {
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
     NominalTypeDecl *nominal) const {
+  // If we're in a preconcurrency context, don't override the default behavior
+  // based on explicit conformances. For example, a @preconcurrency @Sendable
+  // closure should not warn about an explicitly unavailable Sendable
+  // conformance in minimal checking.
+  if (preconcurrencyContext)
+    return defaultDiagnosticBehavior();
+
   if (hasExplicitSendableConformance(nominal))
     return DiagnosticBehavior::Warning;
 
@@ -1229,9 +1237,10 @@ bool swift::diagnoseNonSendableTypesInReference(
 }
 
 void swift::diagnoseMissingSendableConformance(
-    SourceLoc loc, Type type, const DeclContext *fromDC) {
+    SourceLoc loc, Type type, const DeclContext *fromDC, bool preconcurrency) {
+  SendableCheckContext sendableContext(fromDC, preconcurrency);
   diagnoseNonSendableTypes(
-      type, fromDC, /*inDerivedConformance*/Type(),
+      type, sendableContext, /*inDerivedConformance*/Type(),
       loc, diag::non_sendable_type);
 }
 
@@ -2759,11 +2768,16 @@ namespace {
           continue;
 
         auto *closure = localFunc.getAbstractClosureExpr();
+        auto *explicitClosure = dyn_cast_or_null<ClosureExpr>(closure);
+
+        bool preconcurrency = false;
+        if (explicitClosure) {
+          preconcurrency = explicitClosure->isIsolatedByPreconcurrency();
+        }
 
         // Diagnose a `self` capture inside an escaping `sending`
         // `@Sendable` closure in a deinit, which almost certainly
         // means `self` would escape deinit at runtime.
-        auto *explicitClosure = dyn_cast_or_null<ClosureExpr>(closure);
         auto *dc = getDeclContext();
         if (explicitClosure && isa<DestructorDecl>(dc) &&
             !explicitClosure->getType()->isNoEscape() &&
@@ -2773,7 +2787,8 @@ namespace {
           if (var && var->isSelfParameter()) {
             ctx.Diags.diagnose(explicitClosure->getLoc(),
                                diag::self_capture_deinit_task)
-                .warnUntilSwiftVersion(6);
+                .limitBehaviorWithPreconcurrency(DiagnosticBehavior::Warning,
+                                                 preconcurrency);
           }
         }
 
@@ -2801,6 +2816,9 @@ namespace {
         if (type->hasError())
           continue;
 
+        SendableCheckContext sendableContext(getDeclContext(),
+                                             preconcurrency);
+
         if (closure && closure->isImplicit()) {
           auto *patternBindingDecl = getTopPatternBindingDecl();
           if (patternBindingDecl && patternBindingDecl->isAsyncLet()) {
@@ -2811,20 +2829,20 @@ namespace {
 
           // Fallback to a generic implicit capture missing sendable
           // conformance diagnostic.
-          diagnoseNonSendableTypes(type, getDeclContext(),
+          diagnoseNonSendableTypes(type, sendableContext,
                                    /*inDerivedConformance*/Type(),
                                    capture.getLoc(),
                                    diag::implicit_non_sendable_capture,
                                    decl->getName());
         } else if (fnType->isSendable()) {
-          diagnoseNonSendableTypes(type, getDeclContext(),
+          diagnoseNonSendableTypes(type, sendableContext,
                                    /*inDerivedConformance*/Type(),
                                    capture.getLoc(),
                                    diag::non_sendable_capture,
                                    decl->getName(),
                                    /*closure=*/closure != nullptr);
         } else {
-          diagnoseNonSendableTypes(type, getDeclContext(),
+          diagnoseNonSendableTypes(type, sendableContext,
                                    /*inDerivedConformance*/Type(),
                                    capture.getLoc(),
                                    diag::non_sendable_isolated_capture,
@@ -4066,7 +4084,12 @@ namespace {
       if (!mayExecuteConcurrentlyWith(dc, findCapturedDeclContext(value)))
         return false;
 
-      SendableCheckContext sendableBehavior(dc);
+      bool preconcurrency = false;
+      if (auto *closure = dyn_cast<ClosureExpr>(dc)) {
+        preconcurrency = closure->isIsolatedByPreconcurrency();
+      }
+
+      SendableCheckContext sendableBehavior(dc, preconcurrency);
       auto limit = sendableBehavior.defaultDiagnosticBehavior();
 
       // Check whether this is a local variable, in which case we can
@@ -4096,7 +4119,7 @@ namespace {
             ctx.Diags
                 .diagnose(loc, diag::concurrent_access_of_inout_param,
                           param->getName())
-                .limitBehaviorUntilSwiftVersion(limit, 6);
+                .limitBehaviorWithPreconcurrency(limit, preconcurrency);
             return true;
           }
         }
@@ -4111,7 +4134,7 @@ namespace {
             loc, diag::concurrent_access_of_local_capture,
             parent.dyn_cast<LoadExpr *>(),
             var)
-          .limitBehaviorUntilSwiftVersion(limit, 6);
+          .limitBehaviorWithPreconcurrency(limit, preconcurrency);
         return true;
       }
 
@@ -4121,7 +4144,7 @@ namespace {
 
         func->diagnose(diag::local_function_executed_concurrently, func)
           .fixItInsert(func->getAttributeInsertionLoc(false), "@Sendable ")
-          .limitBehaviorUntilSwiftVersion(limit, 6);
+          .limitBehaviorWithPreconcurrency(limit, preconcurrency);
 
         // Add the @Sendable attribute implicitly, so we don't diagnose
         // again.
@@ -4131,7 +4154,8 @@ namespace {
       }
 
       // Concurrent access to some other local.
-      ctx.Diags.diagnose(loc, diag::concurrent_access_local, value);
+      ctx.Diags.diagnose(loc, diag::concurrent_access_local, value)
+        .limitBehaviorWithPreconcurrency(limit, preconcurrency);
       value->diagnose(
           diag::kind_declared_here, value->getDescriptiveKind());
       return true;
@@ -6194,7 +6218,8 @@ bool swift::contextRequiresStrictConcurrencyChecking(
     const DeclContext *dc,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
     llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency) {
-  switch (dc->getASTContext().LangOpts.StrictConcurrencyLevel) {
+  auto concurrencyLevel = dc->getASTContext().LangOpts.StrictConcurrencyLevel;
+  switch (concurrencyLevel) {
   case StrictConcurrency::Complete:
     return true;
 
@@ -6214,7 +6239,20 @@ bool swift::contextRequiresStrictConcurrencyChecking(
 
         // Don't take any more cues if this only got its type information by
         // being provided to a `@preconcurrency` operation.
+        //
+        // FIXME: contextRequiresStrictConcurrencyChecking is called from
+        // within the constraint system, but closures are only set to be isolated
+        // by preconcurrency in solution application because it's dependent on
+        // overload resolution. The constraint system either needs to check its
+        // own state on the current path, or not make type inference decisions based
+        // on concurrency checking level.
         if (isolatedByPreconcurrency(explicitClosure)) {
+          // If we're in minimal checking, preconcurrency always suppresses
+          // diagnostics. Targeted checking will still produce diagnostics if
+          // the outer context has adopted explicit concurrency features.
+          if (concurrencyLevel == StrictConcurrency::Minimal)
+            return false;
+
           dc = dc->getParent();
           continue;
         }
