@@ -2,6 +2,8 @@
 # that configuring a build for a given platform is likely to build
 # out-of-the-box without customization. This does not mean that it is the only
 # way that will work, or that it represents a shipping configuration.
+# User-specified configurations should be done through cache files or by setting
+# the variable with `-DSwiftCore_*` on the commandline.
 
 set(SwiftCore_ENABLE_BACKTRACING_default OFF) # TODO: enable this by default
 set(SwiftCore_ENABLE_COMMANDLINE_SUPPORT_default OFF) # TODO: enable this by default
@@ -10,6 +12,9 @@ set(SwiftCore_ENABLE_TYPE_PRINTING_default ON)
 
 set(SwiftCore_BACKTRACER_PATH_default "")
 
+# Provide a boolean option that a user can optionally enable.
+# Variables are defaulted based on the value of `<variable>_default`.
+# If no such default variable exists, the option is defaults to `OFF`.
 macro(defaulted_option variable helptext)
   if(NOT DEFINED ${variable}_default)
     set(${variable}_default OFF)
@@ -17,6 +22,9 @@ macro(defaulted_option variable helptext)
   option(${variable} ${helptext} ${${variable}_default})
 endmacro()
 
+# Create a defaulted cache entry
+# Entries are defaulted on the value of `<variable>_default`.
+# If no such default variable exists, the variable is not created.
 macro(defaulted_set variable type helptext)
   if(DEFINED ${variable}_default)
     set(${variable} ${variable}_default CACHE ${type} ${helptext})
