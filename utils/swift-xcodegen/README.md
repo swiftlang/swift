@@ -87,6 +87,9 @@ PROJECT CONFIGURATION:
                           on the build arguments of surrounding files. This is mainly useful for
                           files that aren't built in the default config, but are still useful to
                           edit (e.g sourcekitdAPI-InProc.cpp). (default: --infer-args)
+  --prefer-folder-refs/--no-prefer-folder-refs
+                          Whether to prefer folder references for groups containing non-source
+                          files (default: --no-prefer-folder-refs)
 
 MISC:
   --project-root-dir <project-root-dir>

@@ -193,6 +193,15 @@ struct ProjectOptions: ParsableArguments {
   )
   var inferArgs: Bool = true
 
+  @Flag(
+    name: .customLong("prefer-folder-refs"), inversion: .prefixedNo,
+    help: """
+      Whether to prefer folder references for groups containing non-source
+      files
+      """
+  )
+  var preferFolderRefs: Bool = false
+
   @Option(help: .hidden)
   var blueFolders: String = ""
 }

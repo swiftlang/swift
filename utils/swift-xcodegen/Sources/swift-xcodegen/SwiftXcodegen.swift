@@ -71,7 +71,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       addSwiftDependencies: self.addSwiftDependencies,
       addRunnableTargets: false,
       addBuildForRunnableTargets: self.addBuildForRunnableTargets,
-      inferArgs: self.inferArgs,
+      inferArgs: self.inferArgs, preferFolderRefs: self.preferFolderRefs,
       mainRepoDir: mainRepoDir
     )
   }

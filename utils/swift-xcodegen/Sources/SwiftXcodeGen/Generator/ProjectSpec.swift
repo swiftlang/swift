@@ -36,6 +36,10 @@ public struct ProjectSpec {
   /// on the build arguments of surrounding files.
   public var inferArgs: Bool
 
+  /// Whether to prefer using folder references for groups containing non-source
+  /// files.
+  public var preferFolderRefs: Bool
+
   /// If provided, the paths added will be implicitly appended to this path.
   let mainRepoDir: RelativePath?
 
@@ -50,7 +54,7 @@ public struct ProjectSpec {
     _ name: String, for buildDir: RepoBuildDir, runnableBuildDir: RepoBuildDir,
     addClangTargets: Bool, addSwiftTargets: Bool,
     addSwiftDependencies: Bool, addRunnableTargets: Bool,
-    addBuildForRunnableTargets: Bool, inferArgs: Bool,
+    addBuildForRunnableTargets: Bool, inferArgs: Bool, preferFolderRefs: Bool,
     mainRepoDir: RelativePath? = nil
   ) {
     self.name = name
@@ -62,6 +66,7 @@ public struct ProjectSpec {
     self.addRunnableTargets = addRunnableTargets
     self.addBuildForRunnableTargets = addBuildForRunnableTargets
     self.inferArgs = inferArgs
+    self.preferFolderRefs = preferFolderRefs
     self.mainRepoDir = mainRepoDir
   }
 
@@ -150,6 +155,10 @@ extension ProjectSpec {
 
   public mutating func addHeaders(in path: RelativePath) {
     guard let path = mapPath(path, for: "headers") else { return }
+    if preferFolderRefs {
+      referencesToAdd.append(.folder(path))
+      return
+    }
     do {
       for header in try buildDir.getHeaderFilePaths(for: path) {
         referencesToAdd.append(.file(header))
@@ -171,6 +180,10 @@ extension ProjectSpec {
 
   public mutating func addDocsGroup(at path: RelativePath) {
     guard let path = mapPath(path, for: "docs") else { return }
+    if preferFolderRefs {
+      referencesToAdd.append(.folder(path))
+      return
+    }
     do {
       for doc in try buildDir.getAllRepoSubpaths(of: path) where doc.isDocLike {
         referencesToAdd.append(.file(doc))
