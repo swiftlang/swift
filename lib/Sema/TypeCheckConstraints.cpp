@@ -332,7 +332,9 @@ public:
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
+    // Macro expansions will be walked when they're type-checked, not as
+    // part of the surrounding code.
+    return MacroWalking::None;
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
