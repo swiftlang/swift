@@ -25,7 +25,13 @@ fileprivate final class ProjectGenerator {
   private var project = Xcode.Project()
   private let allTarget: Xcode.Target
 
-  private var groups: [RelativePath: Xcode.Group] = [:]
+  enum CachedGroup {
+    /// Covered by a parent folder reference.
+    case covered
+    /// Present in the project.
+    case present(Xcode.Group)
+  }
+  private var groups: [RelativePath: CachedGroup] = [:]
   private var files: [RelativePath: Xcode.FileReference] = [:]
   private var targets: [String: Xcode.Target] = [:]
   private var unbuildableSources: [ClangTarget.Source] = []
@@ -103,7 +109,7 @@ fileprivate final class ProjectGenerator {
   /// for a file path relative to the project root.
   private func parentGroup(
     for path: RelativePath
-  ) -> (parentGroup: Xcode.Group, childPath: RelativePath) {
+  ) -> (parentGroup: Xcode.Group, childPath: RelativePath)? {
     guard let parent = path.parentDir else {
       // We've already handled paths under the repo, so this must be for
       // paths outside the repo.
@@ -114,18 +120,31 @@ fileprivate final class ProjectGenerator {
     if parent == repoRelativePath || parent == mainRepoDirInProject {
       return (project.mainGroup, path)
     }
-    return (group(for: parent), RelativePath(path.fileName))
+    guard let parentGroup = group(for: parent) else { return nil }
+    return (parentGroup, RelativePath(path.fileName))
   }
 
-  private func group(for path: RelativePath) -> Xcode.Group {
-    if let group = groups[path] {
-      return group
+  /// Returns the group for a given path, or `nil` if the path is covered
+  /// by a parent folder reference.
+  private func group(for path: RelativePath) -> Xcode.Group? {
+    if let result = groups[path] {
+      switch result {
+      case .covered:
+        return nil
+      case .present(let g):
+        return g
+      }
     }
-    let (parentGroup, childPath) = parentGroup(for: path)
+    guard
+      files[path] == nil, let (parentGroup, childPath) = parentGroup(for: path)
+    else {
+      groups[path] = .covered
+      return nil
+    }
     let group = parentGroup.addGroup(
       path: childPath.rawPath, pathBase: .groupDir, name: path.fileName
     )
-    groups[path] = group
+    groups[path] = .present(group)
     return group
   }
 
@@ -167,7 +186,9 @@ fileprivate final class ProjectGenerator {
         return nil
       }
     }
-    let (parentGroup, childPath) = parentGroup(for: path)
+    guard let (parentGroup, childPath) = parentGroup(for: path) else {
+      return nil
+    }
     let file = parentGroup.addFileReference(
       path: childPath.rawPath, isDirectory: ref.kind == .folder,
       pathBase: .groupDir, name: path.fileName
@@ -190,11 +211,17 @@ fileprivate final class ProjectGenerator {
   }
 
   func generateBaseTarget(
-    _ name: String, productType: Xcode.Target.ProductType?,
-    includeInAllTarget: Bool
+    _ name: String, at parentPath: RelativePath?,
+    productType: Xcode.Target.ProductType?, includeInAllTarget: Bool
   ) -> Xcode.Target? {
     guard targets[name] == nil else {
       log.warning("Duplicate target '\(name)', skipping")
+      return nil
+    }
+    // Make sure we can create a group for the parent path, otherwise
+    // this is nested in a folder reference and there's nothing we can do.
+    if let parentPath, !parentPath.components.isEmpty,
+       group(for: repoRelativePath.appending(parentPath)) == nil {
       return nil
     }
     let target = project.addTarget(productType: productType, name: name)
@@ -263,7 +290,7 @@ fileprivate final class ProjectGenerator {
       return
     }
     let target = generateBaseTarget(
-      targetInfo.name, productType: .staticArchive,
+      targetInfo.name, at: targetInfo.parentPath, productType: .staticArchive,
       includeInAllTarget: includeInAllTarget
     )
     guard let target else { return }
@@ -437,7 +464,8 @@ fileprivate final class ProjectGenerator {
       )
     }
     let target = generateBaseTarget(
-      targetInfo.name, productType: nil, includeInAllTarget: includeInAllTarget
+      targetInfo.name, at: nil, productType: nil,
+      includeInAllTarget: includeInAllTarget
     )
     guard let target else { return nil }
 
@@ -478,7 +506,7 @@ fileprivate final class ProjectGenerator {
       return nil
     }
     let target = generateBaseTarget(
-      targetInfo.name, productType: .staticArchive,
+      targetInfo.name, at: buildRule.parentPath, productType: .staticArchive,
       includeInAllTarget: includeInAllTarget
     )
     guard let target else { return nil }
@@ -599,6 +627,12 @@ fileprivate final class ProjectGenerator {
     guard !generated else { return }
     generated = true
 
+    // First add file/folder references.
+    for ref in spec.referencesToAdd {
+      // Allow important references to bypass exclusion checks.
+      getOrCreateRepoRef(ref, allowExcluded: ref.isImportant)
+    }
+
     // Gather the Swift targets to generate, including any dependencies.
     var swiftTargets: Set<SwiftTarget> = []
     for targetSource in spec.swiftTargetSources {
@@ -679,11 +713,6 @@ fileprivate final class ProjectGenerator {
         )
         runnableBuildTargets[runnable] = target
       }
-    }
-
-    for ref in spec.referencesToAdd {
-      // Allow important references to bypass exclusion checks.
-      getOrCreateRepoRef(ref, allowExcluded: ref.isImportant)
     }
 
     // Sort the groups.
