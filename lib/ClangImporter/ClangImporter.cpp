@@ -7656,6 +7656,10 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
       namespaceContext->getName() == "__gnu_cxx" && decl->getIdentifier() &&
       decl->getName() == "__normal_iterator")
     return true;
+  // Hack for certain build configurations of SwiftCompilerSources
+  // (rdar://138924133).
+  if (decl->getIdentifier() && decl->getName() == "BridgedSwiftObject")
+    return true;
 
   // If we have no way of copying the type we can't import the class
   // at all because we cannot express the correct semantics as a swift
