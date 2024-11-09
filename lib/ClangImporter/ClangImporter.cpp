@@ -2261,10 +2261,6 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
 clang::Module *
 ClangImporter::Implementation::lookupModule(StringRef moduleName) {
   auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
-  if (getClangASTContext().getLangOpts().ImplicitModules)
-    return clangHeaderSearch.lookupModule(
-        moduleName, /*ImportLoc=*/clang::SourceLocation(),
-        /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
 
   // Explicit module. Try load from modulemap.
   auto &PP = Instance->getPreprocessor();
@@ -2282,8 +2278,13 @@ ClangImporter::Implementation::lookupModule(StringRef moduleName) {
   // If not, try load it.
   auto &PrebuiltModules = Instance->getHeaderSearchOpts().PrebuiltModuleFiles;
   auto moduleFile = PrebuiltModules.find(moduleName);
-  if (moduleFile == PrebuiltModules.end())
+  if (moduleFile == PrebuiltModules.end()) {
+    if (getClangASTContext().getLangOpts().ImplicitModules)
+      return clangHeaderSearch.lookupModule(
+          moduleName, /*ImportLoc=*/clang::SourceLocation(),
+          /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
     return nullptr;
+  }
 
   clang::serialization::ModuleFile *Loaded = nullptr;
   if (!Instance->loadModuleFile(moduleFile->second, Loaded))
@@ -2293,19 +2294,7 @@ ClangImporter::Implementation::lookupModule(StringRef moduleName) {
 
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     SourceLoc importLoc, ImportPath::Module path) {
-  auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
   auto realModuleName = SwiftContext.getRealModuleName(path.front().Item).str();
-
-  // For explicit module build, module should always exist but module map might
-  // not be exist. Go straight to module loader.
-  if (Instance->getInvocation().getLangOpts().ImplicitModules) {
-    // Look up the top-level module first, to see if it exists at all.
-    clang::Module *clangModule = clangHeaderSearch.lookupModule(
-        realModuleName, /*ImportLoc=*/clang::SourceLocation(),
-        /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
-    if (!clangModule)
-      return nullptr;
-  }
 
   // Convert the Swift import path over to a Clang import path.
   SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
