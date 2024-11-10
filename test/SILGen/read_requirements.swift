@@ -14,8 +14,6 @@
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_CoroutineAccessorsUnwindOnCallerError
 
-// For CoroutineAccessorsUnwindOnCallerError
-
 // A read requirement may be satisfied by
 // - a stored property
 // - a _read accessor
@@ -33,6 +31,50 @@ public struct U : ~Copyable {}
 public protocol P1 : ~Copyable {
   @_borrowed
   var ubgs: U { get set }
+// CHECK-LABEL sil [ossa] @$s17read_requirements2P1P4ubgsAA1UVvy : {{.*}} {
+// CHECK:      bb0(
+// CHECK-SAME:     [[SELF_UNCHECKED:%[^:]+]]
+// CHECK-SAME: ):
+// CHECK:        [[SELF:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[SELF_UNCHECKED]]
+// CHECK:        [[READER:%[^,]+]] = witness_method $Self, #P1.ubgs!read
+// CHECK:        ([[VALUE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[READER]]<Self>([[SELF]])
+// CHECK:        [[VALUE_COPY_UNCHECKED:%[^,]+]] = copy_value [[VALUE]]
+// CHECK:        [[VALUE_COPY:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[VALUE_COPY_UNCHECKED]]
+// CHECK:        [[VALUE_BORROW:%[^,]+]] = begin_borrow [[VALUE_COPY]]
+// CHECK:        yield [[VALUE_BORROW:%[^,]+]]
+// CHECK:            resume [[SUCCESS:bb[0-9]+]]
+// CHECK:            unwind [[FAILURE:bb[0-9]+]]
+// CHECK:      [[SUCCESS]]:
+// CHECK:        end_borrow [[VALUE_BORROW]]
+// CHECK:        destroy_value [[VALUE_COPY]]
+// CHECK:        end_apply [[TOKEN]]
+// CHECK:      [[FAILURE]]:
+// CHECK:        end_borrow [[VALUE_BORROW]]
+// CHECK:        destroy_value [[VALUE_COPY]]
+// CHECK:        end_apply [[TOKEN]]
+// CHECK:        unwind
+// CHECK-LABEL: } // end sil function '$s17read_requirements2P1P4ubgsAA1UVvy'
+
+// CHECK-LABEL: sil [ossa] @$s17read_requirements2P1P4ubgsAA1UVvx : {{.*}} {
+// CHECK:       bb0(
+// CHECK-SAME:      [[SELF_UNCHECKED:%[^:]+]]
+// CHECK-SAME:  ):
+// CHECK:         [[SELF:%[^,]+]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[SELF_UNCHECKED]]
+// CHECK:         [[SELF_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[SELF]]
+// CHECK:         [[MODIFIER:%[^,]+]] = witness_method $Self, #P1.ubgs!modify
+// CHECK:         ([[VALUE_UNCHECKED:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[MODIFIER]]<Self>([[SELF_ACCESS]])
+// CHECK:         [[VALUE:%[^,]+]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[VALUE_UNCHECKED]]
+// CHECK:         yield [[VALUE]]
+// CHECK:             resume [[SUCCESS:bb[0-9]+]]
+// CHECK:             unwind [[FAILURE:bb[0-9]+]]
+// CHECK:       [[SUCCESS]]:
+// CHECK:         end_apply [[TOKEN]]
+// CHECK:         end_access [[SELF_ACCESS]]
+// CHECK:       [[FAILURE]]:
+// CHECK:         end_apply [[TOKEN]]
+// CHECK:         end_access [[SELF_ACCESS]]
+// CHECK:         unwind
+// CHECK-LABEL: } // end sil function '$s17read_requirements2P1P4ubgsAA1UVvx'
 }
 @available(SwiftStdlib 9999, *)
 public protocol P2 : ~Copyable {
@@ -40,6 +82,29 @@ public protocol P2 : ~Copyable {
 }
 @available(SwiftStdlib 6.0, *)
 public protocol P3 : ~Copyable {
+// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements2P3P2urAA1UVvy : {{.*}} {
+// CHECK:       bb0(
+// CHECK-SAME:      [[SELF_UNCHECKED:%[^:]+]]
+// CHECK-SAME:  ):
+// CHECK:         [[SELF:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[SELF_UNCHECKED]]
+// CHECK:         [[READER:%[^,]+]] = witness_method $Self, #P3.ur!read
+// CHECK:         ([[VALUE_UNCHECKED:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[READER]]<Self>([[SELF]])
+// CHECK:         [[VALUE_COPY:%[^,]+]] = copy_value [[VALUE_UNCHECKED]]
+// CHECK:         [[VALUE:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[VALUE_COPY]]
+// CHECK:         [[VALUE_BORROW:%[^,]+]] = begin_borrow [[VALUE]]
+// CHECK:         yield [[VALUE_BORROW:%[^,]+]]
+// CHECK:             resume [[BASIC_BLOCK1:bb[0-9]+]]
+// CHECK:             unwind [[BASIC_BLOCK2:bb[0-9]+]]
+// CHECK:       [[BASIC_BLOCK1]]:
+// CHECK:         end_borrow [[VALUE_BORROW]]
+// CHECK:         destroy_value [[VALUE]]
+// CHECK:         end_apply [[TOKEN]]
+// CHECK:       [[BASIC_BLOCK2]]:
+// CHECK:         end_borrow [[VALUE_BORROW]]
+// CHECK:         destroy_value [[VALUE]]
+// CHECK:         end_apply [[TOKEN]]
+// CHECK:         unwind
+// CHECK-LABEL: } // end sil function '$s17read_requirements2P3P2urAA1UVvy'
   var ur: U { read }
 }
 
@@ -318,21 +383,21 @@ public struct ImplAUnderscoredCoroutineAccessors : ~Copyable & P1 {
 // CHECK:         [[VALUE_BORROW:%[^,]+]] = begin_borrow [[VALUE_COPY]]
 // CHECK:         yield [[VALUE_BORROW]]
 // CHECK-SAME:        resume [[SUCCESS:bb[0-9]+]]
-// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]          
-// CHECK:       [[SUCCESS]]:                                              
+// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]
+// CHECK:       [[SUCCESS]]:
 // CHECK:         end_borrow [[VALUE_BORROW]]
 // CHECK:         destroy_value [[VALUE_COPY]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_borrow [[SELF_BORROW]]
 // CHECK:         destroy_value [[SELF_COPY]]
 // CHECK:         return
-// CHECK:       [[FAILURE]]:                                              
+// CHECK:       [[FAILURE]]:
 // CHECK:         end_borrow [[VALUE_BORROW]]
 // CHECK:         destroy_value [[VALUE_COPY]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_borrow [[SELF_BORROW]]
 // CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         unwind                                          
+// CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements34ImplAUnderscoredCoroutineAccessorsV4ubgsAA1UVvy'
 // CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvrTW : {{.*}} {
 // CHECK:       bb0(
@@ -424,21 +489,21 @@ public struct ImplBUnderscoredCoroutineAccessors : ~Copyable & P2 {
 // CHECK:         [[VALUE_BORROW:%[^,]+]] = begin_borrow [[VALUE_COPY]]
 // CHECK:         yield [[VALUE_BORROW]]
 // CHECK-SAME:        resume [[SUCCESS:bb[0-9]+]]
-// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]          
-// CHECK:       [[SUCCESS]]:                                              
+// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]
+// CHECK:       [[SUCCESS]]:
 // CHECK:         end_borrow [[VALUE_BORROW]]
 // CHECK:         destroy_value [[VALUE_COPY]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_borrow [[SELF_BORROW]]
 // CHECK:         destroy_value [[SELF_COPY]]
 // CHECK:         return
-// CHECK:       [[FAILURE]]:                                              
+// CHECK:       [[FAILURE]]:
 // CHECK:         end_borrow [[VALUE_BORROW]]
 // CHECK:         destroy_value [[VALUE_COPY]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_borrow [[SELF_BORROW]]
 // CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         unwind                                          
+// CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements34ImplBUnderscoredCoroutineAccessorsV3ursAA1UVvy'
 // CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvyTW : {{.*}} {
 // CHECK:       bb0(
@@ -508,21 +573,21 @@ public struct ImplCUnderscoredCoroutineAccessors : ~Copyable & P3 {
 // CHECK:         [[VALUE_BORROW:%[^,]+]] = begin_borrow [[VALUE_COPY]]
 // CHECK:         yield [[VALUE_BORROW]]
 // CHECK-SAME:        resume [[SUCCESS:bb[0-9]+]]
-// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]          
-// CHECK:       [[SUCCESS]]:                                              
+// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]
+// CHECK:       [[SUCCESS]]:
 // CHECK:         end_borrow [[VALUE_BORROW]]
 // CHECK:         destroy_value [[VALUE_COPY]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_borrow [[SELF_BORROW]]
 // CHECK:         destroy_value [[SELF_COPY]]
 // CHECK:         return
-// CHECK:       [[FAILURE]]:                                              
+// CHECK:       [[FAILURE]]:
 // CHECK:         end_borrow [[VALUE_BORROW]]
 // CHECK:         destroy_value [[VALUE_COPY]]
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_borrow [[SELF_BORROW]]
 // CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         unwind                                          
+// CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements34ImplCUnderscoredCoroutineAccessorsV2urAA1UVvy'
 // CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsVAA2P3A2aDP2urAA1UVvrTW : {{.*}} {
 // CHECK:       bb0(
@@ -1291,7 +1356,7 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-SAME:      [[SELF:%[^:]+]] :
 // CHECK-SAME:  ):
 // CHECK:         [[UNSAFE_POINTER:%[^,]+]] = struct_extract [[SELF]]
-// CHECK:             #ImplCUnsafeAddressors.iAddr 
+// CHECK:             #ImplCUnsafeAddressors.iAddr
 // CHECK:         return [[UNSAFE_POINTER]]
 // CHECK-LABEL: } // end sil function '$s17read_requirements21ImplCUnsafeAddressorsV2urAA1UVvlu'
 // CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements21ImplCUnsafeAddressorsV2urAA1UVvr : {{.*}} {
@@ -1533,4 +1598,28 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-SAME:        : @$s17read_requirements21ImplCUnsafeAddressorsVAA2P3A2aDP2urAA1UVvrTW
 // CHECK-NEXT:    method #P3.ur!read2
 // CHECK-SAME:      : @$s17read_requirements21ImplCUnsafeAddressorsVAA2P3A2aDP2urAA1UVvyTW
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_default_witness_table P1 {
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    method #P1.ubgs!read2
+// CHECK-SAME:      : @$s17read_requirements2P1P4ubgsAA1UVvy
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    method #P1.ubgs!modify2
+// CHECK-SAME:      : @$s17read_requirements2P1P4ubgsAA1UVvx
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_default_witness_table P2 {
+// CHECK-NEXT:    no_default
+// CHECK-unstable-NEXT:  method #P2.urs!read2
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    no_default
+// CHECK-unstable-NEXT:  method #P2.urs!modify2
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_default_witness_table P3 {
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    method #P3.ur!read2:
+// CHECK-SAME:      : @$s17read_requirements2P3P2urAA1UVvy
 // CHECK-NEXT:  }
