@@ -4347,7 +4347,8 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
       // direct-to-storage in order for the conversion to be non-ephemeral.
       auto access = asd->getAccessStrategy(
           AccessSemantics::Ordinary, AccessKind::ReadWrite,
-          DC->getParentModule(), DC->getResilienceExpansion());
+          DC->getParentModule(), DC->getResilienceExpansion(),
+          /*useOldABI=*/false);
       return access.getKind() == AccessStrategy::Storage;
     };
 

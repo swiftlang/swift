@@ -6046,8 +6046,8 @@ public:
 
   /// Given that CoroutineAccessors is enabled, is _read/_modify required for
   /// ABI stability?
-  bool
-  requiresCorrespondingUnderscoredCoroutineAccessor(AccessorKind kind) const;
+  bool requiresCorrespondingUnderscoredCoroutineAccessor(
+      AccessorKind kind, AccessorDecl const *decl = nullptr) const;
 
   /// Does this storage have any explicit observers (willSet or didSet) attached
   /// to it?
@@ -6104,9 +6104,9 @@ public:
 
   /// Determine how this storage declaration should actually be accessed.
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
-                                   AccessKind accessKind,
-                                   ModuleDecl *module,
-                                   ResilienceExpansion expansion) const;
+                                   AccessKind accessKind, ModuleDecl *module,
+                                   ResilienceExpansion expansion,
+                                   bool useOldABI) const;
 
   /// Do we need to use resilient access patterns outside of this
   /// property's resilience domain?
@@ -8440,6 +8440,10 @@ public:
   /// If this is an init accessor, retrieve a list of instance properties
   /// accessed by it.
   ArrayRef<VarDecl *> getAccessedProperties() const;
+
+  /// Whether this accessor should have a body.  Note that this will be true
+  /// even when it does not have one _yet_.
+  bool doesAccessorHaveBody() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Accessor;

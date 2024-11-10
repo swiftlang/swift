@@ -928,14 +928,22 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
   return ParameterList::create(context, elements);
 }
 
-static bool doesAccessorHaveBody(AccessorDecl *accessor) {
-  // Protocol requirements don't have bodies.
-  //
-  // FIXME: Revisit this if we ever get 'real' default implementations.
-  if (isa<ProtocolDecl>(accessor->getDeclContext()))
-    return false;
-
+bool AccessorDecl::doesAccessorHaveBody() const {
+  auto *accessor = this;
   auto *storage = accessor->getStorage();
+
+  if (isa<ProtocolDecl>(accessor->getDeclContext())) {
+    if (!accessor->getASTContext().LangOpts.hasFeature(
+            Feature::CoroutineAccessors)) {
+      return false;
+    }
+    if (!requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
+      return false;
+    }
+    return accessor->getStorage()
+        ->requiresCorrespondingUnderscoredCoroutineAccessor(
+            accessor->getAccessorKind(), accessor);
+  }
 
   // NSManaged getters and setters don't have bodies.
   if (storage->getAttrs().hasAttribute<NSManagedAttr>(/*AllowInvalid=*/true))
@@ -1201,7 +1209,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
         // Check for availability of wrappedValue.
         if (accessor->getAccessorKind() == AccessorKind::Get ||
-            isYieldingDefaultNonmutatingAccessor(accessor->getAccessorKind())) {
+            isYieldingImmutableAccessor(accessor->getAccessorKind())) {
           diagnoseDeclAvailability(
               wrappedValue,
               var->getAttachedPropertyWrappers()[i]->getRangeWithAt(), nullptr,
@@ -2203,13 +2211,15 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
 
   auto storage = accessor->getStorage();
   auto storageReadWriteImpl = storage->getReadWriteImpl();
-  auto target = (accessor->hasForcedStaticDispatch()
-                   ? TargetImpl::Ordinary
-                   : TargetImpl::Implementation);
+  ProtocolDecl *proto = llvm::dyn_cast_if_present<ProtocolDecl>(
+      accessor->getStorage()->getDeclContext()->getAsDecl());
+  auto target = (accessor->hasForcedStaticDispatch() || proto
+                     ? TargetImpl::Ordinary
+                     : TargetImpl::Implementation);
 
   // If this is a variable with an attached property wrapper, then
   // the accessors need to yield the wrappedValue or projectedValue.
-  if (isYieldingDefaultNonmutatingAccessor(accessor->getAccessorKind()) ||
+  if (isYieldingImmutableAccessor(accessor->getAccessorKind()) ||
       storageReadWriteImpl == ReadWriteImplKind::Modify) {
     if (auto var = dyn_cast<VarDecl>(storage)) {
       if (var->hasAttachedPropertyWrapper()) {
@@ -2223,11 +2233,11 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
     }
   }
 
-  SourceLoc loc = storage->getLoc();
+  SourceLoc loc =
+      accessor->getLoc().isValid() ? accessor->getLoc() : storage->getLoc();
   SmallVector<ASTNode, 1> body;
 
-  bool isModify =
-      isYieldingDefaultMutatingAccessor(accessor->getAccessorKind());
+  bool isModify = isYieldingMutableAccessor(accessor->getAccessorKind());
 
   // Special-case for a modify coroutine of a simple stored property with
   // observers. We can yield a borrowed copy of the underlying storage
@@ -2271,11 +2281,12 @@ synthesizeReadCoroutineBody(AccessorDecl *read, ASTContext &ctx) {
 /// Synthesize the body of a read coroutine.
 static std::pair<BraceStmt *, bool>
 synthesizeRead2CoroutineBody(AccessorDecl *read, ASTContext &ctx) {
-  assert(read->getStorage()->getReadImpl() != ReadImplKind::Read2);
+  assert(read->getStorage()->getReadImpl() != ReadImplKind::Read2 ||
+         isa<ProtocolDecl>(read->getStorage()->getDeclContext()->getAsDecl()));
   return synthesizeCoroutineAccessorBody(read, ctx);
 }
 
-/// Synthesize the body of a modify coroutine.
+/// Synthesize the body of a _modify coroutine.
 static std::pair<BraceStmt *, bool>
 synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
 #ifndef NDEBUG
@@ -2297,7 +2308,8 @@ synthesizeModify2CoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
   auto impl = storage->getReadWriteImpl();
   auto hasWrapper = isa<VarDecl>(storage) &&
                     cast<VarDecl>(storage)->hasAttachedPropertyWrapper();
-  assert((hasWrapper || impl != ReadWriteImplKind::Modify2) &&
+  assert((hasWrapper || impl != ReadWriteImplKind::Modify2 ||
+          isa<ProtocolDecl>(storage->getDeclContext()->getAsDecl())) &&
          impl != ReadWriteImplKind::Immutable);
 #endif
   return synthesizeCoroutineAccessorBody(modify, ctx);
@@ -2350,7 +2362,7 @@ static void finishImplicitAccessor(AccessorDecl *accessor,
   if (ctx.Stats)
     ++ctx.Stats->getFrontendCounters().NumAccessorsSynthesized;
 
-  if (doesAccessorHaveBody(accessor))
+  if (accessor->doesAccessorHaveBody())
     accessor->setBodySynthesizer(&synthesizeAccessorBody);
 }
 
@@ -2543,7 +2555,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   SourceLoc loc = storage->getLoc();
 
   bool isMutating = storage->isGetterMutating();
-  if (isYieldingDefaultMutatingAccessor(kind))
+  if (isYieldingMutableAccessor(kind))
     isMutating |= storage->isSetterMutating();
 
   auto dc = storage->getDeclContext();
@@ -2580,7 +2592,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   if (FuncDecl *getter = storage->getParsedAccessor(AccessorKind::Get)) {
     asAvailableAs.push_back(getter);
   }
-  if (isYieldingDefaultMutatingAccessor(kind)) {
+  if (isYieldingMutableAccessor(kind)) {
     if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set)) {
       asAvailableAs.push_back(setter);
     }
@@ -2593,7 +2605,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   AvailabilityInference::applyInferredAvailableAttrs(accessor, asAvailableAs);
 
   // A modify coroutine should have the same SPI visibility as the setter.
-  if (isYieldingDefaultMutatingAccessor(kind)) {
+  if (isYieldingMutableAccessor(kind)) {
     if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set))
       applyInferredSPIAccessControlAttr(accessor, setter, ctx);
   }
@@ -2630,6 +2642,15 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
                                     AbstractStorageDecl *storage,
                                     AccessorKind kind) const {
   auto &ctx = storage->getASTContext();
+
+  if (auto *accessor = storage->getAccessor(kind)) {
+    if (!isa<ProtocolDecl>(storage->getDeclContext())) {
+      return accessor;
+    }
+    assert(accessor->doesAccessorHaveBody());
+    accessor->setBodySynthesizer(&synthesizeAccessorBody);
+    return accessor;
+  }
 
   switch (kind) {
   case AccessorKind::Get:
@@ -2717,7 +2738,7 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
 /// The underscored accessor could, however, still be required for ABI
 /// stability.
 bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
-    AccessorKind kind) const {
+    AccessorKind kind, AccessorDecl const *decl) const {
   auto &ctx = getASTContext();
   assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
   assert(kind == AccessorKind::Modify2 || kind == AccessorKind::Read2);
@@ -2731,10 +2752,10 @@ bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
   if (!isExported(this))
     return false;
 
-  // The the non-underscored accessor is not present, the underscored accessor
+  // The non-underscored accessor is not present, the underscored accessor
   // won't be either.
   // TODO: CoroutineAccessors: What if only the underscored is written out?
-  auto *accessor = getOpaqueAccessor(kind);
+  auto *accessor = decl ? decl : getOpaqueAccessor(kind);
   if (!accessor)
     return false;
 
@@ -2825,7 +2846,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   if (!accessor->isImplicit())
     return false;
 
-  if (!doesAccessorHaveBody(accessor))
+  if (!accessor->doesAccessorHaveBody())
     return false;
 
   auto *DC = accessor->getDeclContext();

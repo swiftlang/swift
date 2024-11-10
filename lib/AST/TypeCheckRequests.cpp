@@ -885,9 +885,13 @@ SynthesizeAccessorRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
   auto kind = std::get<1>(getStorage());
   auto *accessor = storage->getAccessor(kind);
-  if (accessor)
-    return accessor;
-  return std::nullopt;
+  if (!accessor)
+    return std::nullopt;
+
+  if (accessor->doesAccessorHaveBody() && !accessor->hasBody())
+    return std::nullopt;
+
+  return accessor;
 }
 
 void SynthesizeAccessorRequest::cacheResult(AccessorDecl *accessor) const {

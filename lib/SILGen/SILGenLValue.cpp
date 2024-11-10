@@ -2227,7 +2227,7 @@ namespace {
       auto decl = cast<AccessorDecl>(Accessor.getFuncDecl());
 
       // 'modify' always returns an address of the right type.
-      if (isYieldingDefaultMutatingAccessor(decl->getAccessorKind())) {
+      if (isYieldingMutableAccessor(decl->getAccessorKind())) {
         assert(yields.size() == 1);
         return yields[0];
       }
@@ -3070,7 +3070,8 @@ public:
     auto accessSemantics = e->getAccessSemantics();
     AccessStrategy strategy = var->getAccessStrategy(
         accessSemantics, getFormalAccessKind(accessKind),
-        SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion());
+        SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+        /*useOldABI=*/false);
 
     auto baseFormalType = getBaseFormalType(e->getBase());
     LValue lv = visit(
@@ -3292,9 +3293,9 @@ static LValue emitLValueForNonMemberVarDecl(
     subs = SGF.F.getForwardingSubstitutionMap();
 
   auto access = getFormalAccessKind(accessKind);
-  auto strategy =
-      var->getAccessStrategy(semantics, access, SGF.SGM.M.getSwiftModule(),
-                             SGF.F.getResilienceExpansion());
+  auto strategy = var->getAccessStrategy(
+      semantics, access, SGF.SGM.M.getSwiftModule(),
+      SGF.F.getResilienceExpansion(), /*useOldABI=*/false);
 
   lv.addNonMemberVarComponent(SGF, loc, var, subs, options, accessKind,
                               strategy, formalRValueType, actorIso);
@@ -3887,6 +3888,25 @@ static bool isCurrentFunctionAccessor(SILGenFunction &SGF,
          contextAccessorDecl->getAccessorKind() == accessorKind;
 }
 
+static bool isSynthesizedDefaultImplementionatThunk(SILGenFunction &SGF) {
+  if (!SGF.FunctionDC)
+    return false;
+
+  auto *decl = SGF.FunctionDC->getAsDecl();
+  if (!decl)
+    return false;
+
+  auto *dc = decl->getDeclContext();
+  if (!dc)
+    return false;
+
+  auto *proto = dyn_cast<ProtocolDecl>(dc);
+  if (!proto)
+    return false;
+
+  return true;
+}
+
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
                                         SGFAccessKind accessKind,
                                         LValueOptions options) {
@@ -3908,11 +3928,10 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   }
 
   auto accessSemantics = e->getAccessSemantics();
-  AccessStrategy strategy =
-    var->getAccessStrategy(accessSemantics,
-                           getFormalAccessKind(accessKind),
-                           SGF.SGM.M.getSwiftModule(),
-                           SGF.F.getResilienceExpansion());
+  AccessStrategy strategy = var->getAccessStrategy(
+      accessSemantics, getFormalAccessKind(accessKind),
+      SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+      /*useOldABI=*/isSynthesizedDefaultImplementionatThunk(SGF));
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
 
@@ -3931,10 +3950,9 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
       strategy = var->getAccessStrategy(
-          accessSemantics,
-          getFormalAccessKind(accessKind),
-          SGF.SGM.M.getSwiftModule(),
-          SGF.F.getResilienceExpansion());
+          accessSemantics, getFormalAccessKind(accessKind),
+          SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+          /*useOldABI=*/false);
     }
   }
   
@@ -4119,11 +4137,10 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
 
 
   auto accessSemantics = e->getAccessSemantics();
-  auto strategy =
-    decl->getAccessStrategy(accessSemantics,
-                            getFormalAccessKind(accessKind),
-                            SGF.SGM.M.getSwiftModule(),
-                            SGF.F.getResilienceExpansion());
+  auto strategy = decl->getAccessStrategy(
+      accessSemantics, getFormalAccessKind(accessKind),
+      SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+      /*useOldABI=*/isSynthesizedDefaultImplementionatThunk(SGF));
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
   bool isContextRead = isCurrentFunctionAccessor(SGF, AccessorKind::Read);
@@ -4141,10 +4158,9 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
       strategy = decl->getAccessStrategy(
-          accessSemantics,
-          getFormalAccessKind(accessKind),
-          SGF.SGM.M.getSwiftModule(),
-          SGF.F.getResilienceExpansion());
+          accessSemantics, getFormalAccessKind(accessKind),
+          SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+          /*useOldABI=*/false);
     }
   }
 
@@ -4597,11 +4613,9 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   auto baseType = base.getType().getASTType();
   auto subMap = baseType->getContextSubstitutionMap(ivar->getDeclContext());
 
-  AccessStrategy strategy =
-    ivar->getAccessStrategy(semantics,
-                            getFormalAccessKind(accessKind),
-                            SGM.M.getSwiftModule(),
-                            F.getResilienceExpansion());
+  AccessStrategy strategy = ivar->getAccessStrategy(
+      semantics, getFormalAccessKind(accessKind), SGM.M.getSwiftModule(),
+      F.getResilienceExpansion(), /*useOldABI=*/false);
 
   auto baseAccessKind =
     getBaseAccessKind(SGM, ivar, accessKind, strategy, baseFormalType,
@@ -5316,10 +5330,9 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     SubstitutionMap substitutions,
     AccessSemantics semantics, Type propTy, SGFContext C,
     bool isBaseGuaranteed) {
-  AccessStrategy strategy =
-    storage->getAccessStrategy(semantics, AccessKind::Read,
-                               SGM.M.getSwiftModule(),
-                               F.getResilienceExpansion());
+  AccessStrategy strategy = storage->getAccessStrategy(
+      semantics, AccessKind::Read, SGM.M.getSwiftModule(),
+      F.getResilienceExpansion(), /*useOldABI=*/false);
 
   // If we should call an accessor of some kind, do so.
   if (strategy.getKind() != AccessStrategy::Storage) {

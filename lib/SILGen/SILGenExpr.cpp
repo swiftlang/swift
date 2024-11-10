@@ -3649,8 +3649,8 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
   auto semantics = AccessSemantics::Ordinary;
   auto strategy = property->getAccessStrategy(semantics, AccessKind::Write,
-                                              SGM.M.getSwiftModule(),
-                                              expansion);
+                                              SGM.M.getSwiftModule(), expansion,
+                                              /*useOldABI=*/false);
 
   LValueOptions lvOptions;
   lv.addMemberComponent(subSGF, loc, property, subs, lvOptions,
@@ -4211,12 +4211,11 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     return true;
   };
 
-  auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
-                                             storage->supportsMutation()
-                                               ? AccessKind::ReadWrite
-                                               : AccessKind::Read,
-                                             M.getSwiftModule(),
-                                             expansion);
+  auto strategy = storage->getAccessStrategy(
+      AccessSemantics::Ordinary,
+      storage->supportsMutation() ? AccessKind::ReadWrite : AccessKind::Read,
+      M.getSwiftModule(), expansion,
+      /*useOldABI=*/false);
 
   AbstractStorageDecl *externalDecl = nullptr;
   SubstitutionMap externalSubs;
