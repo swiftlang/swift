@@ -8336,16 +8336,45 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   storage->setAccessors(LBLoc, Accessors, RBLoc);
 }
 
+static std::optional<AccessorKind>
+getCorrespondingUnderscoredAccessorKind(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Read2:
+    return {AccessorKind::Read};
+  case AccessorKind::Modify2:
+    return {AccessorKind::Modify};
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
+    return std::nullopt;
+  }
+}
+
 static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,
                                          AccessorDecl *&second) {
   if (!second) return;
-  P.diagnose(second->getLoc(), diag::conflicting_accessor,
-             isa<SubscriptDecl>(first->getStorage()),
-             getAccessorNameForDiagnostic(second, /*article*/ true),
-             getAccessorNameForDiagnostic(first, /*article*/ true));
-  P.diagnose(first->getLoc(), diag::previous_accessor,
-             getAccessorNameForDiagnostic(first, /*article*/ false),
-             /*already*/ false);
+  bool underscored =
+      (getCorrespondingUnderscoredAccessorKind(first->getAccessorKind()) ==
+       second->getAccessorKind()) ||
+      (getCorrespondingUnderscoredAccessorKind(second->getAccessorKind()) ==
+       first->getAccessorKind()) ||
+      first->getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors);
+  P.diagnose(
+      second->getLoc(), diag::conflicting_accessor,
+      isa<SubscriptDecl>(first->getStorage()),
+      getAccessorNameForDiagnostic(second, /*article*/ true, underscored),
+      getAccessorNameForDiagnostic(first, /*article*/ true, underscored));
+  P.diagnose(
+      first->getLoc(), diag::previous_accessor,
+      getAccessorNameForDiagnostic(first, /*article*/ false, underscored),
+      /*already*/ false);
   second->setInvalid();
 }
 
@@ -8388,12 +8417,13 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
 
   // Okay, observers are out of the way.
 
-  // 'get', 'read', and a non-mutable addressor are all exclusive.
+  // 'get', '_read', 'read' and a non-mutable addressor are all exclusive.
   if (Get) {
     diagnoseConflictingAccessors(P, Get, Read);
     diagnoseConflictingAccessors(P, Get, Read2);
     diagnoseConflictingAccessors(P, Get, Address);
   } else if (Read) {
+    diagnoseConflictingAccessors(P, Read, Read2);
     diagnoseConflictingAccessors(P, Read, Address);
   } else if (Read2) {
     diagnoseConflictingAccessors(P, Read2, Address);
@@ -8422,11 +8452,13 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     }
   }
 
-  // A mutable addressor is exclusive with 'set' and 'modify', but
-  // 'set' and 'modify' can appear together.
+  // '_modify', 'modify' and 'unsafeMutableAddress' are all mutually exclusive.
+  // 'unsafeMutableAddress' and 'set' are mutually exclusive, but 'set' and
+  // 'modify' can appear together.
   if (Set) {
     diagnoseConflictingAccessors(P, Set, MutableAddress);
   } else if (Modify) {
+    diagnoseConflictingAccessors(P, Modify, Modify2);
     diagnoseConflictingAccessors(P, Modify, MutableAddress);
   }
 

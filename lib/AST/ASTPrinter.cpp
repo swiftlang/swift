@@ -2391,12 +2391,6 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
   }
 }
 
-static bool
-shouldPrintUnderscoredCoroutineAccessors(const AbstractStorageDecl *ASD) {
-  // TODO: CoroutineAccessors: Print only when necessary.
-  return true;
-}
-
 void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
@@ -2573,7 +2567,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       break;
     case ReadImplKind::Read2:
       if (ASD->getAccessor(AccessorKind::Read) &&
-          shouldPrintUnderscoredCoroutineAccessors(ASD)) {
+          Options.SuppressCoroutineAccessors) {
         AddAccessorToPrint(AccessorKind::Read);
       }
       AddAccessorToPrint(AccessorKind::Read2);
@@ -2607,7 +2601,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       break;
     case WriteImplKind::Modify2:
       if (ASD->getAccessor(AccessorKind::Modify) &&
-          shouldPrintUnderscoredCoroutineAccessors(ASD)) {
+          Options.SuppressCoroutineAccessors) {
         AddAccessorToPrint(AccessorKind::Modify);
       }
       AddAccessorToPrint(AccessorKind::Modify2);
