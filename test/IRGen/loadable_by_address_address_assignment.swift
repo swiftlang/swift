@@ -4,6 +4,8 @@
 
 // wasm currently disables aggressive reg2mem
 // UNSUPPORTED: wasm
+// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: CPU=wasm32
 
 public struct LargeThing {
     var  s0 : String = ""
