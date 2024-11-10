@@ -83,6 +83,11 @@ struct ClangBuildArgsProvider {
     return .init(for: .clang, args: fileArgs.sorted())
   }
 
+  /// Whether the given path has any unique args not covered by `parent`.
+  func hasUniqueArgs(for path: RelativePath, parent: RelativePath) -> Bool {
+    args.hasUniqueArgs(for: path, parent: parent)
+  }
+
   /// Whether the given file has build arguments.
   func hasBuildArgs(for path: RelativePath) -> Bool {
     !args.getArgs(for: path).isEmpty

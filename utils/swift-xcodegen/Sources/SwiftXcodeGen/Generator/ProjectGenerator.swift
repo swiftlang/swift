@@ -25,7 +25,13 @@ fileprivate final class ProjectGenerator {
   private var project = Xcode.Project()
   private let allTarget: Xcode.Target
 
-  private var groups: [RelativePath: Xcode.Group] = [:]
+  enum CachedGroup {
+    /// Covered by a parent folder reference.
+    case covered
+    /// Present in the project.
+    case present(Xcode.Group)
+  }
+  private var groups: [RelativePath: CachedGroup] = [:]
   private var files: [RelativePath: Xcode.FileReference] = [:]
   private var targets: [String: Xcode.Target] = [:]
   private var unbuildableSources: [ClangTarget.Source] = []
@@ -103,7 +109,7 @@ fileprivate final class ProjectGenerator {
   /// for a file path relative to the project root.
   private func parentGroup(
     for path: RelativePath
-  ) -> (parentGroup: Xcode.Group, childPath: RelativePath) {
+  ) -> (parentGroup: Xcode.Group, childPath: RelativePath)? {
     guard let parent = path.parentDir else {
       // We've already handled paths under the repo, so this must be for
       // paths outside the repo.
@@ -114,18 +120,31 @@ fileprivate final class ProjectGenerator {
     if parent == repoRelativePath || parent == mainRepoDirInProject {
       return (project.mainGroup, path)
     }
-    return (group(for: parent), RelativePath(path.fileName))
+    guard let parentGroup = group(for: parent) else { return nil }
+    return (parentGroup, RelativePath(path.fileName))
   }
 
-  private func group(for path: RelativePath) -> Xcode.Group {
-    if let group = groups[path] {
-      return group
+  /// Returns the group for a given path, or `nil` if the path is covered
+  /// by a parent folder reference.
+  private func group(for path: RelativePath) -> Xcode.Group? {
+    if let result = groups[path] {
+      switch result {
+      case .covered:
+        return nil
+      case .present(let g):
+        return g
+      }
     }
-    let (parentGroup, childPath) = parentGroup(for: path)
+    guard
+      files[path] == nil, let (parentGroup, childPath) = parentGroup(for: path)
+    else {
+      groups[path] = .covered
+      return nil
+    }
     let group = parentGroup.addGroup(
       path: childPath.rawPath, pathBase: .groupDir, name: path.fileName
     )
-    groups[path] = group
+    groups[path] = .present(group)
     return group
   }
 
@@ -163,11 +182,12 @@ fileprivate final class ProjectGenerator {
     // group there.
     if ref.kind == .folder {
       guard groups[path] == nil else {
-        log.warning("Skipping blue folder '\(path)'; already added")
         return nil
       }
     }
-    let (parentGroup, childPath) = parentGroup(for: path)
+    guard let (parentGroup, childPath) = parentGroup(for: path) else {
+      return nil
+    }
     let file = parentGroup.addFileReference(
       path: childPath.rawPath, isDirectory: ref.kind == .folder,
       pathBase: .groupDir, name: path.fileName
@@ -178,10 +198,10 @@ fileprivate final class ProjectGenerator {
 
   @discardableResult
   private func getOrCreateRepoRef(
-    _ ref: ProjectSpec.PathReference, allowExcluded: Bool = false
+    _ ref: ProjectSpec.PathReference
   ) -> Xcode.FileReference? {
     let path = ref.path
-    guard allowExcluded || checkNotExcluded(path) else { return nil }
+    guard checkNotExcluded(path) else { return nil }
     return getOrCreateProjectRef(ref.withPath(repoRelativePath.appending(path)))
   }
 
@@ -190,17 +210,34 @@ fileprivate final class ProjectGenerator {
   }
 
   func generateBaseTarget(
-    _ name: String, productType: Xcode.Target.ProductType?,
-    includeInAllTarget: Bool
+    _ name: String, at parentPath: RelativePath?, canUseBuildableFolder: Bool,
+    productType: Xcode.Target.ProductType?, includeInAllTarget: Bool
   ) -> Xcode.Target? {
     guard targets[name] == nil else {
       log.warning("Duplicate target '\(name)', skipping")
       return nil
     }
+    var buildableFolder: Xcode.FileReference?
+    if let parentPath, !parentPath.components.isEmpty {
+      // If we've been asked to use buildable folders, see if we can create
+      // a folder reference at the parent path. Otherwise, create a group at
+      // the parent path. If we can't create either a folder or group, this is
+      // nested in a folder reference and there's nothing we can do.
+      if spec.useBuildableFolders && canUseBuildableFolder {
+        buildableFolder = getOrCreateRepoRef(.folder(parentPath))
+      }
+      guard buildableFolder != nil ||
+              group(for: repoRelativePath.appending(parentPath)) != nil else {
+        return nil
+      }
+    }
     let target = project.addTarget(productType: productType, name: name)
     targets[name] = target
     if includeInAllTarget {
       allTarget.addDependency(on: target)
+    }
+    if let buildableFolder {
+      target.addBuildableFolder(buildableFolder)
     }
     target.buildSettings.common.ONLY_ACTIVE_ARCH = "YES"
     target.buildSettings.common.USE_HEADERMAP = "NO"
@@ -247,8 +284,12 @@ fileprivate final class ProjectGenerator {
     }
     unbuildableSources += targetInfo.unbuildableSources
 
-    for header in targetInfo.headers {
-      getOrCreateRepoRef(.file(header))
+    // Need to defer the addition of headers since the target may want to use
+    // a buildable folder.
+    defer {
+      for header in targetInfo.headers {
+        getOrCreateRepoRef(.file(header))
+      }
     }
 
     // If we have no sources, we're done.
@@ -262,8 +303,20 @@ fileprivate final class ProjectGenerator {
       }
       return
     }
+    // Can only use buildable folders if there are no unique arguments and no
+    // unbuildable sources.
+    // TODO: To improve the coverage of buildable folders, we ought to start
+    // automatically splitting umbrella Clang targets like 'stdlib', since
+    // they always have files with unique args.
+    let canUseBuildableFolders =
+      try spec.useBuildableFolders && targetInfo.unbuildableSources.isEmpty &&
+      targetInfo.sources.allSatisfy {
+        try !buildDir.clangArgs.hasUniqueArgs(for: $0.path, parent: targetPath)
+      }
+
     let target = generateBaseTarget(
-      targetInfo.name, productType: .staticArchive,
+      targetInfo.name, at: targetPath,
+      canUseBuildableFolder: canUseBuildableFolders, productType: .staticArchive,
       includeInAllTarget: includeInAllTarget
     )
     guard let target else { return }
@@ -437,7 +490,8 @@ fileprivate final class ProjectGenerator {
       )
     }
     let target = generateBaseTarget(
-      targetInfo.name, productType: nil, includeInAllTarget: includeInAllTarget
+      targetInfo.name, at: nil, canUseBuildableFolder: false, productType: nil,
+      includeInAllTarget: includeInAllTarget
     )
     guard let target else { return nil }
 
@@ -477,9 +531,11 @@ fileprivate final class ProjectGenerator {
     guard checkNotExcluded(buildRule.parentPath, for: "Swift target") else {
       return nil
     }
+    // Create the target. Swift targets can always use buildable folders
+    // since they have a consistent set of arguments.
     let target = generateBaseTarget(
-      targetInfo.name, productType: .staticArchive,
-      includeInAllTarget: includeInAllTarget
+      targetInfo.name, at: buildRule.parentPath, canUseBuildableFolder: true,
+      productType: .staticArchive, includeInAllTarget: includeInAllTarget
     )
     guard let target else { return nil }
 
@@ -599,6 +655,11 @@ fileprivate final class ProjectGenerator {
     guard !generated else { return }
     generated = true
 
+    // First add file/folder references.
+    for ref in spec.referencesToAdd {
+      getOrCreateRepoRef(ref)
+    }
+
     // Gather the Swift targets to generate, including any dependencies.
     var swiftTargets: Set<SwiftTarget> = []
     for targetSource in spec.swiftTargetSources {
@@ -679,11 +740,6 @@ fileprivate final class ProjectGenerator {
         )
         runnableBuildTargets[runnable] = target
       }
-    }
-
-    for ref in spec.referencesToAdd {
-      // Allow important references to bypass exclusion checks.
-      getOrCreateRepoRef(ref, allowExcluded: ref.isImportant)
     }
 
     // Sort the groups.
