@@ -1670,6 +1670,15 @@ def omit_extension_block_symbols: Flag<["-"], "omit-extension-block-symbols">,
         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Directly associate members and conformances with the extended nominal when generating symbol graphs instead of emitting 'swift.extension' symbols for extensions to external types">;
 
+// swift-synthesize-interface-only options
+def include_submodules : Flag<["-"], "include-submodules">,
+  Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Also print the declarations synthesized for any Clang submodules">;
+
+def print_fully_qualified_types : Flag<["-"], "print-fully-qualified-types">,
+  Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Always print fully qualified type names">;
+
 // swift-symbolgraph-extract-only options
 def output_dir : Separate<["-"], "output-dir">,
   Flags<[NoDriverOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
