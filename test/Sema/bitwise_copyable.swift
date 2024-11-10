@@ -1,11 +1,16 @@
 // RUN: %target-typecheck-verify-swift                       \
+// RUN:     -disable-experimental-parser-round-trip          \
 // RUN:     -disable-availability-checking                   \
 // RUN:     -enable-experimental-feature NonescapableTypes   \
+// RUN:     -enable-experimental-feature ValueGenerics       \
 // RUN:     -enable-experimental-feature Sensitive           \
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names
 
+// FIXME: Remove -disable-experimental-parser-round-trip when it's not required for using ValueGenerics.
+
 // REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_ValueGenerics
 // REQUIRES: swift_feature_Sensitive
 
 //==============================================================================
@@ -107,6 +112,17 @@ struct S_Implicit_Sensitive {
 func passS_Implicit_Sensitive(_ s: S_Implicit_Sensitive) {
   take1(s) // expected-error   {{type_does_not_conform_decl_owner}}
            // expected-note@-94 {{where_requirement_failure_one_subst}}
+}
+
+import Builtin
+
+func passFixedArray1N<T>(_ fa: Builtin.FixedArray<1, T>) {
+  take1(fa) // expected-error {{type_does_not_conform_decl_owner}}
+            // expected-note@-101 {{where_requirement_failure_one_subst}}
+}
+
+func passFixedArray1N<T : BitwiseCopyable>(_ fa: Builtin.FixedArray<1, T>) {
+  take1(fa)
 }
 
 //==============================================================================

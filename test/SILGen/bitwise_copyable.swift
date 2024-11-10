@@ -1,11 +1,18 @@
-// RUN: %target-swift-frontend                                  \
-// RUN:     %s                                                  \
-// RUN:     -emit-silgen                                        \
-// RUN:     -target %target-swift-5.1-abi-triple                      \
-// RUN:     -enable-experimental-feature Sensitive              \
+// RUN: %target-swift-frontend                         \
+// RUN:     %s                                         \
+// RUN:     -emit-silgen                               \
+// RUN:     -disable-experimental-parser-round-trip    \
+// RUN:     -target %target-swift-5.1-abi-triple       \
+// RUN:     -enable-experimental-feature Sensitive     \
+// RUN:     -enable-experimental-feature ValueGenerics \
 // RUN:     -enable-builtin-module
 
+// FIXME: Remove -disable-experimental-parser-round-trip when it's not required for using ValueGenerics.
+
 // REQUIRES: swift_feature_Sensitive
+// REQUIRES: swift_feature_ValueGenerics
+
+// REQUIRES: asserts
 
 // Force verification of TypeLowering's isTrivial.
 
@@ -67,4 +74,11 @@ struct S_Explicit_Sensitive {
 }
 
 func takeS_Explicit_Sensitive(_ s: S_Explicit_Sensitive) {
+}
+
+import Builtin
+
+func foo() {
+  let bricks: Builtin.FixedArray<1, Conditional<Int>>
+  let bricks2: Builtin.FixedArray<1, Conditional<String>>
 }
