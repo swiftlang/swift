@@ -7,6 +7,8 @@
 
 // wasm currently disables aggressive reg2mem
 // UNSUPPORTED: wasm
+// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: CPU=wasm32
 
 import Builtin
 import Swift
