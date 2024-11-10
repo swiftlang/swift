@@ -3631,7 +3631,7 @@ public:
     // Add universally available choice as the last one.
     conditionalSubstitutions.push_back(
         OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-            Ctx, {{VersionRange::empty(), /*unavailable=*/false}},
+            Ctx, {{VersionRange::all(), /*unavailable=*/false}},
             std::get<1>(universallyAvailable)
                 .mapReplacementTypesOutOfContext()));
 
