@@ -46,4 +46,14 @@ struct CommandArgTree {
   ) -> Set<Command.Argument> {
     getArgs(for: path).subtracting(getArgs(for: parent))
   }
+
+  /// Whether the given path has any unique args not covered by `parent`.
+  func hasUniqueArgs(for path: RelativePath, parent: RelativePath) -> Bool {
+    let args = getArgs(for: path)
+    guard !args.isEmpty else { return false }
+    // Assuming `parent` is an ancestor of path, the arguments for parent is
+    // guaranteed to be a subset of the arguments for `path`. As such, we
+    // only have to compare sizes here.
+    return args.count != getArgs(for: parent).count
+  }
 }

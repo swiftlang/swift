@@ -127,8 +127,11 @@ extension PathProtocol {
 }
 
 extension Collection where Element: PathProtocol {
+  /// Computes the common parent for a collection of paths. If there is only
+  /// a single unique path, this returns the parent for that path.
   var commonAncestor: Element? {
     guard let first = self.first else { return nil }
-    return dropFirst().reduce(first, { $0.commonAncestor(with: $1) })
+    let result = dropFirst().reduce(first, { $0.commonAncestor(with: $1) })
+    return result == first ? result.parentDir : result
   }
 }

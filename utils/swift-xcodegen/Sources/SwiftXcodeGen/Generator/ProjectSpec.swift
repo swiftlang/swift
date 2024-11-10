@@ -36,6 +36,13 @@ public struct ProjectSpec {
   /// on the build arguments of surrounding files.
   public var inferArgs: Bool
 
+  /// Whether to prefer using folder references for groups containing non-source
+  /// files.
+  public var preferFolderRefs: Bool
+
+  /// Whether to enable the use of buildable folders for targets.
+  public var useBuildableFolders: Bool
+
   /// If provided, the paths added will be implicitly appended to this path.
   let mainRepoDir: RelativePath?
 
@@ -50,8 +57,8 @@ public struct ProjectSpec {
     _ name: String, for buildDir: RepoBuildDir, runnableBuildDir: RepoBuildDir,
     addClangTargets: Bool, addSwiftTargets: Bool,
     addSwiftDependencies: Bool, addRunnableTargets: Bool,
-    addBuildForRunnableTargets: Bool, inferArgs: Bool,
-    mainRepoDir: RelativePath? = nil
+    addBuildForRunnableTargets: Bool, inferArgs: Bool, preferFolderRefs: Bool,
+    useBuildableFolders: Bool, mainRepoDir: RelativePath? = nil
   ) {
     self.name = name
     self.buildDir = buildDir
@@ -62,6 +69,8 @@ public struct ProjectSpec {
     self.addRunnableTargets = addRunnableTargets
     self.addBuildForRunnableTargets = addBuildForRunnableTargets
     self.inferArgs = inferArgs
+    self.preferFolderRefs = preferFolderRefs
+    self.useBuildableFolders = useBuildableFolders
     self.mainRepoDir = mainRepoDir
   }
 
@@ -83,14 +92,11 @@ extension ProjectSpec {
     var kind: Kind
     var path: RelativePath
 
-    /// Whether this reference should bypass exclusion checks.
-    var isImportant: Bool
-
-    static func file(_ path: RelativePath, isImportant: Bool = false) -> Self {
-      .init(kind: .file, path: path, isImportant: isImportant)
+    static func file(_ path: RelativePath) -> Self {
+      .init(kind: .file, path: path)
     }
-    static func folder(_ path: RelativePath, isImportant: Bool = false) -> Self {
-      .init(kind: .folder, path: path, isImportant: isImportant)
+    static func folder(_ path: RelativePath) -> Self {
+      .init(kind: .folder, path: path)
     }
 
     func withPath(_ newPath: RelativePath) -> Self {
@@ -145,24 +151,18 @@ extension ProjectSpec {
     self.knownUnbuildables.insert(path)
   }
 
-  public mutating func addReference(
-    to path: RelativePath, isImportant: Bool = false
-  ) {
+  public mutating func addReference(to path: RelativePath) {
     guard let path = mapPath(path, for: "file") else { return }
-    if repoRoot.appending(path).isDirectory {
-      if isImportant {
-        // Important folder references should block anything being added under
-        // them.
-        excludedPaths.append(.init(path: path))
-      }
-      referencesToAdd.append(.folder(path, isImportant: isImportant))
-    } else {
-      referencesToAdd.append(.file(path, isImportant: isImportant))
-    }
+    let isDir = repoRoot.appending(path).isDirectory
+    referencesToAdd.append(isDir ? .folder(path) : .file(path))
   }
 
   public mutating func addHeaders(in path: RelativePath) {
     guard let path = mapPath(path, for: "headers") else { return }
+    if preferFolderRefs {
+      referencesToAdd.append(.folder(path))
+      return
+    }
     do {
       for header in try buildDir.getHeaderFilePaths(for: path) {
         referencesToAdd.append(.file(header))
@@ -184,6 +184,10 @@ extension ProjectSpec {
 
   public mutating func addDocsGroup(at path: RelativePath) {
     guard let path = mapPath(path, for: "docs") else { return }
+    if preferFolderRefs {
+      referencesToAdd.append(.folder(path))
+      return
+    }
     do {
       for doc in try buildDir.getAllRepoSubpaths(of: path) where doc.isDocLike {
         referencesToAdd.append(.file(doc))

@@ -71,8 +71,8 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       addSwiftDependencies: self.addSwiftDependencies,
       addRunnableTargets: false,
       addBuildForRunnableTargets: self.addBuildForRunnableTargets,
-      inferArgs: self.inferArgs,
-      mainRepoDir: mainRepoDir
+      inferArgs: self.inferArgs, preferFolderRefs: self.preferFolderRefs,
+      useBuildableFolders: self.useBuildableFolders, mainRepoDir: mainRepoDir
     )
   }
 
@@ -192,7 +192,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
           mayHaveUnbuildableFiles: true
         )
         if self.addTestFolders {
-          spec.addReference(to: "../clang-tools-extra/test", isImportant: true)
+          spec.addReference(to: "../clang-tools-extra/test")
         } else {
           // Avoid adding any headers present in the test folder.
           spec.addExcludedPath("../clang-tools-extra/test")
@@ -263,7 +263,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
         below: "../compiler-rt", addingPrefix: "extra-"
       )
       if self.addTestFolders {
-        spec.addReference(to: "../compiler-rt/test", isImportant: true)
+        spec.addReference(to: "../compiler-rt/test")
       } else {
         // Avoid adding any headers present in the test folder.
         spec.addExcludedPath("../compiler-rt/test")

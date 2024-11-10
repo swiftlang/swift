@@ -15,6 +15,33 @@
  is only enough functionality to allow serialization of Xcode projects.
  */
 
+extension Xcode.Project {
+  fileprivate enum MinVersion {
+    case xcode8, xcode16
+
+    var objectVersion: Int {
+      switch self {
+      case .xcode8: 46
+      case .xcode16: 77
+      }
+    }
+  }
+
+  fileprivate var hasBuildableFolders: Bool {
+    var worklist: [Xcode.Reference] = []
+    worklist.append(mainGroup)
+    while let ref = worklist.popLast() {
+      if let fileRef = ref as? Xcode.FileReference, fileRef.isBuildableFolder {
+        return true
+      }
+      if let group = ref as? Xcode.Group {
+        worklist += group.subitems
+      }
+    }
+    return false
+  }
+}
+
 extension Xcode.Project: PropertyListSerializable {
 
   /// Generates and returns the contents of a `project.pbxproj` plist.  Does
@@ -31,9 +58,13 @@ extension Xcode.Project: PropertyListSerializable {
     // the serialized object dictionaries.
     let serializer = PropertyListSerializer()
     try serializer.serialize(object: self)
+    var minVersion = MinVersion.xcode8
+    if hasBuildableFolders {
+      minVersion = .xcode16
+    }
     return .dictionary([
       "archiveVersion": .string("1"),
-      "objectVersion": .string("46"),  // Xcode 8.0
+      "objectVersion": .string(String(minVersion.objectVersion)),
       "rootObject": .identifier(serializer.id(of: self)),
       "objects": .dictionary(serializer.idsToDicts),
     ])
@@ -76,61 +107,38 @@ extension Xcode.Project: PropertyListSerializable {
   }
 }
 
-/// Private helper function that constructs and returns a partial property list
-/// dictionary for references.  The caller can add to the returned dictionary.
-/// FIXME:  It would be nicer to be able to use inheritance to serialize the
-/// attributes inherited from Reference, but but in Swift 3.0 we get an error
-/// that "declarations in extensions cannot override yet".
-fileprivate func makeReferenceDict(
-  reference: Xcode.Reference,
-  serializer: PropertyListSerializer,
-  xcodeClassName: String
-) -> [String: PropertyList] {
-  var dict = [String: PropertyList]()
-  dict["isa"] = .string(xcodeClassName)
-  dict["path"] = .string(reference.path)
-  if let name = reference.name {
-    dict["name"] = .string(name)
-  }
-  dict["sourceTree"] = .string(reference.pathBase.rawValue)
-  return dict
-}
-
-extension Xcode.Group: PropertyListSerializable {
-
-  /// Called by the Serializer to serialize the Group.
-  fileprivate func serialize(to serializer: PropertyListSerializer) throws -> [String: PropertyList] {
-    // Create a `PBXGroup` plist dictionary.
-    // FIXME:  It would be nicer to be able to use inheritance for the code
-    // inherited from Reference, but but in Swift 3.0 we get an error that
-    // "declarations in extensions cannot override yet".
-    var dict = makeReferenceDict(reference: self, serializer: serializer, xcodeClassName: "PBXGroup")
-    dict["children"] = try .array(subitems.map({ reference in
-      // For the same reason, we have to cast as `PropertyListSerializable`
-      // here; as soon as we try to make Reference conform to the protocol,
-      // we get the problem of not being able to override `serialize(to:)`.
-      try .identifier(serializer.serialize(object: reference as! PropertyListSerializable))
-    }))
-    return dict
-  }
-}
-
-extension Xcode.FileReference: PropertyListSerializable {
-
-  /// Called by the Serializer to serialize the FileReference.
-  fileprivate func serialize(to serializer: PropertyListSerializer) -> [String: PropertyList] {
-    // Create a `PBXFileReference` plist dictionary.
-    // FIXME:  It would be nicer to be able to use inheritance for the code
-    // inherited from Reference, but but in Swift 3.0 we get an error that
-    // "declarations in extensions cannot override yet".
-    var dict = makeReferenceDict(reference: self, serializer: serializer, xcodeClassName: "PBXFileReference")
-    if let fileType = fileType {
-      dict["explicitFileType"] = .string(fileType)
+extension Xcode.Reference: PropertyListSerializable {
+  fileprivate dynamic func serialize(
+    to serializer: PropertyListSerializer
+  ) throws -> [String : PropertyList] {
+    var dict = [String: PropertyList]()
+    dict["path"] = .string(path)
+    if let name = name {
+      dict["name"] = .string(name)
     }
-    // FileReferences don't need to store a name if it's the same as the path.
-    if name == path {
-      dict["name"] = nil
+    dict["sourceTree"] = .string(pathBase.rawValue)
+
+    let xcodeClassName: String
+    switch self {
+    case let group as Xcode.Group:
+      xcodeClassName = "PBXGroup"
+      dict["children"] = try .array(group.subitems.map({ reference in
+        try .identifier(serializer.serialize(object: reference))
+      }))
+    case let fileRef as Xcode.FileReference:
+      xcodeClassName = fileRef.isBuildableFolder 
+        ? "PBXFileSystemSynchronizedRootGroup" : "PBXFileReference"
+      if let fileType = fileRef.fileType {
+        dict["explicitFileType"] = .string(fileType)
+      }
+      // FileReferences don't need to store a name if it's the same as the path.
+      if name == path {
+        dict["name"] = nil
+      }
+    default:
+      fatalError("Unhandled subclass")
     }
+    dict["isa"] = .string(xcodeClassName)
     return dict
   }
 }
@@ -178,6 +186,11 @@ extension Xcode.Target: PropertyListSerializable {
       // so we need a helper class here.
       try .identifier(serializer.serialize(object: TargetDependency(target: dep.target)))
     }))
+    if !buildableFolders.isEmpty {
+      dict["fileSystemSynchronizedGroups"] = .array(
+        buildableFolders.map { .identifier(serializer.id(of: $0)) }
+      )
+    }
     dict["productName"] = .string(productName)
     if let productType = productType {
       dict["productType"] = .string(productType.rawValue)

@@ -87,6 +87,18 @@ PROJECT CONFIGURATION:
                           on the build arguments of surrounding files. This is mainly useful for
                           files that aren't built in the default config, but are still useful to
                           edit (e.g sourcekitdAPI-InProc.cpp). (default: --infer-args)
+  --prefer-folder-refs/--no-prefer-folder-refs
+                          Whether to prefer folder references for groups containing non-source
+                          files (default: --no-prefer-folder-refs)
+  --buildable-folders/--no-buildable-folders
+                          Requires Xcode 16: Enables the use of "buildable folders", allowing
+                          folder references to be used for compatible targets. This allows new
+                          source files to be added to a target without needing to regenerate the
+                          project.
+
+                          Only supported for targets that have no per-file build settings. This
+                          unfortunately means some Clang targes such as 'lib/Basic' and 'stdlib'
+                          cannot currently use buildable folders. (default: --no-buildable-folders)
 
 MISC:
   --project-root-dir <project-root-dir>

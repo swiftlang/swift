@@ -135,8 +135,12 @@ public struct Xcode {
     public var objectID: String?
     public var fileType: String?
     public var isDirectory: Bool
-    
-    init(path: String, isDirectory: Bool, pathBase: RefPathBase = .groupDir, name: String? = nil, fileType: String? = nil, objectID: String? = nil) {
+    public fileprivate(set) var isBuildableFolder: Bool = false
+
+    init(
+      path: String, isDirectory: Bool, pathBase: RefPathBase = .groupDir,
+      name: String? = nil, fileType: String? = nil, objectID: String? = nil
+    ) {
       self.isDirectory = isDirectory
       super.init(path: path, pathBase: pathBase, name: name)
       self.objectID = objectID
@@ -189,6 +193,7 @@ public struct Xcode {
     public var buildPhases: [BuildPhase]
     public var productReference: FileReference?
     public var dependencies: [TargetDependency]
+    public private(set) var buildableFolders: [FileReference]
     public enum ProductType: String {
       case application = "com.apple.product-type.application"
       case staticArchive = "com.apple.product-type.library.static"
@@ -205,6 +210,7 @@ public struct Xcode {
       self.buildSettings = BuildSettingsTable()
       self.buildPhases = []
       self.dependencies = []
+      self.buildableFolders = []
     }
     
     // FIXME: There's a lot repetition in these methods; using generics to
@@ -266,7 +272,14 @@ public struct Xcode {
     public func addDependency(on target: Target) {
       dependencies.append(TargetDependency(target: target))
     }
-    
+
+    /// Turn a given folder reference into a buildable folder for this target.
+    public func addBuildableFolder(_ fileRef: FileReference) {
+      precondition(fileRef.isDirectory)
+      fileRef.isBuildableFolder = true
+      buildableFolders.append(fileRef)
+    }
+
     /// A simple wrapper to prevent ownership cycles in the `dependencies`
     /// property.
     public struct TargetDependency {
