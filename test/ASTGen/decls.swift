@@ -9,12 +9,11 @@
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen -enable-experimental-feature ValueGenerics)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature ParserASTGen -enable-experimental-feature ValueGenerics)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
-// REQUIRES: swift_feature_SwiftParser
 // REQUIRES: swift_feature_ValueGenerics
 
 // rdar://116686158
