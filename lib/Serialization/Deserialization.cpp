@@ -4559,7 +4559,7 @@ public:
         } else {
           limitedAvailability.push_back(
               OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-                  ctx, {{VersionRange::empty(), /*unavailability=*/false}},
+                  ctx, {{VersionRange::all(), /*unavailability=*/false}},
                   subMapOrError.get()));
 
           opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);
