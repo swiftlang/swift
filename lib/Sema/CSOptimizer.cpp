@@ -555,11 +555,9 @@ static void determineBestChoicesInContext(
       // Check protocol requirement(s) if this parameter is a
       // generic parameter type.
       if (genericSig && paramType->isTypeParameter()) {
-        // If candidate is not fully resolved or is matched against a
-        // dependent member type (i.e. `Self.T`), let's check conformances
-        // only and lower the score.
-        if (candidateType->hasTypeVariable() ||
-            paramType->is<DependentMemberType>()) {
+        // Light-weight check if cases where `checkRequirements` is not
+        // applicable.
+        auto checkProtocolRequirementsOnly = [&]() -> double {
           auto protocolRequirements =
               genericSig->getRequiredProtocols(paramType);
           if (llvm::all_of(protocolRequirements, [&](ProtocolDecl *protocol) {
@@ -574,29 +572,64 @@ static void determineBestChoicesInContext(
           }
 
           return 0;
+        };
+
+        // If candidate is not fully resolved or is matched against a
+        // dependent member type (i.e. `Self.T`), let's check conformances
+        // only and lower the score.
+        if (candidateType->hasTypeVariable() ||
+            paramType->is<DependentMemberType>()) {
+          return checkProtocolRequirementsOnly();
         }
 
         // Cannot match anything but generic type parameters here.
         if (!paramType->is<GenericTypeParamType>())
           return std::nullopt;
 
+        bool hasUnsatisfiableRequirements = false;
+        SmallVector<Requirement, 4> requirements;
+
+        for (const auto &requirement : genericSig.getRequirements()) {
+          if (hasUnsatisfiableRequirements)
+            break;
+
+          llvm::SmallPtrSet<GenericTypeParamType *, 2> toExamine;
+
+          auto recordReferencesGenericParams = [&toExamine](Type type) {
+            type.visit([&toExamine](Type innerTy) {
+              if (auto *GP = innerTy->getAs<GenericTypeParamType>())
+                toExamine.insert(GP);
+            });
+          };
+
+          recordReferencesGenericParams(requirement.getFirstType());
+
+          if (requirement.getKind() != RequirementKind::Layout)
+            recordReferencesGenericParams(requirement.getSecondType());
+
+          if (llvm::any_of(toExamine, [&](GenericTypeParamType *GP) {
+                return paramType->isEqual(GP);
+              })) {
+            requirements.push_back(requirement);
+            // If requirement mentions other generic parameters
+            // `checkRequirements` would because we don't have
+            // candidate substitutions for anything but the current
+            // parameter type.
+            hasUnsatisfiableRequirements |= toExamine.size() > 1;
+          }
+        }
+
+        // If some of the requirements cannot be satisfied, because
+        // they reference other generic parameters, for example:
+        // `<T, U, where T.Element == U.Element>`, let's perform a
+        // light-weight check instead of skipping this overload choice.
+        if (hasUnsatisfiableRequirements)
+          return checkProtocolRequirementsOnly();
+
         // If the candidate type is fully resolved, let's check all of
         // the requirements that are associated with the corresponding
         // parameter, if all of them are satisfied this candidate is
         // an exact match.
-
-        auto isParameterType = [&paramType](Type type) {
-          return type->isEqual(paramType);
-        };
-
-        SmallVector<Requirement, 4> requirements;
-        for (const auto &requirement : genericSig.getRequirements()) {
-          if (requirement.getFirstType().findIf(isParameterType) ||
-              (requirement.getKind() != RequirementKind::Layout &&
-               requirement.getSecondType().findIf(isParameterType)))
-            requirements.push_back(requirement);
-        }
-
         auto result = checkRequirements(
             requirements,
             [&paramType, &candidateType](SubstitutableType *type) -> Type {
