@@ -3615,7 +3615,11 @@ public:
 
     if (auto *apply = dyn_cast<ApplyExpr>(E)) {
       bool preconcurrency = false;
-      auto declRef = apply->getFn()->getReferencedDecl();
+      auto *fn = apply->getFn();
+      if (auto *selfApply = dyn_cast<SelfApplyExpr>(fn)) {
+        fn = selfApply->getFn();
+      }
+      auto declRef = fn->getReferencedDecl();
       if (auto *decl = declRef.getDecl()) {
         preconcurrency = decl->preconcurrency();
       }

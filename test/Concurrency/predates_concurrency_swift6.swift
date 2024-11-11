@@ -198,13 +198,13 @@ func requireSendable<T: Sendable>(_: T) {}
 @preconcurrency
 struct RequireSendable<T: Sendable> {}
 
-class NotSendable {} // expected-note 4 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+class NotSendable {} // expected-note 8 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
 
 class UnavailableSendable {}
 
 @available(*, unavailable)
 extension UnavailableSendable: @unchecked Sendable {}
-// expected-note@-1 4 {{conformance of 'UnavailableSendable' to 'Sendable' has been explicitly marked unavailable here}}
+// expected-note@-1 8 {{conformance of 'UnavailableSendable' to 'Sendable' has been explicitly marked unavailable here}}
 
 typealias T = RequireSendable<NotSendable>
 // expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
@@ -212,11 +212,31 @@ typealias T = RequireSendable<NotSendable>
 typealias T2 = RequireSendable<UnavailableSendable>
 // expected-warning@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable}}
 
-func testRequirementDowngrade(ns: NotSendable, us: UnavailableSendable) {
+class C {
+  @preconcurrency
+  func requireSendable<T: Sendable>(_: T) {}
+
+  @preconcurrency
+  static func requireSendableStatic<T: Sendable>(_: T) {}
+}
+
+func testRequirementDowngrade(ns: NotSendable, us: UnavailableSendable, c: C) {
   requireSendable(ns)
   // expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
 
+  c.requireSendable(ns)
+  // expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
+
+  C.requireSendableStatic(ns)
+  // expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
+
   requireSendable(us)
+  // expected-warning@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable}}
+
+  c.requireSendable(us)
+  // expected-warning@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable}}
+
+  C.requireSendableStatic(us)
   // expected-warning@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable}}
 }
 
@@ -232,11 +252,31 @@ func requireSendableExistential(_: any P2 & Sendable) {}
 
 func requireSendableExistentialAlways(_: any P2 & Sendable) {}
 
-func testErasureDowngrade(ns: NotSendable, us: UnavailableSendable) {
+extension C {
+  @preconcurrency
+  func requireSendableExistential(_: any P2 & Sendable) {}
+
+  @preconcurrency
+  static func requireSendableExistentialStatic(_: any P2 & Sendable) {}
+}
+
+func testErasureDowngrade(ns: NotSendable, us: UnavailableSendable, c: C) {
   requireSendableExistential(ns)
   // expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
 
+  c.requireSendableExistential(ns)
+  // expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
+
+  C.requireSendableExistentialStatic(ns)
+  // expected-warning@-1 {{type 'NotSendable' does not conform to the 'Sendable' protocol}}
+
   requireSendableExistential(us)
+  // expected-warning@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable}}
+
+  c.requireSendableExistential(us)
+  // expected-warning@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable}}
+
+  C.requireSendableExistentialStatic(us)
   // expected-warning@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable}}
 
   withSendableClosure {
