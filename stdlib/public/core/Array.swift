@@ -1240,7 +1240,8 @@ extension Array: RangeReplaceableCollection {
                 start: startNewElements,
                 count: _buffer.mutableCapacity - oldCount)
 
-    _ = buf.initialize(fromContentsOf: newElements)
+    let end = buf.initialize(fromContentsOf: newElements)
+    _precondition(end == buf.endIndex)
     _buffer.mutableCount = _buffer.mutableCount + newElementsCount
   }
 
