@@ -23,6 +23,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
@@ -43,6 +44,11 @@ llvm::Expected<llvm::cas::ObjectRef>
 createCompileJobCacheKeyForOutput(llvm::cas::ObjectStore &CAS,
                                   llvm::cas::ObjectRef BaseKey,
                                   unsigned InputIndex);
+
+/// Print the CompileJobKey for debugging purpose.
+llvm::Error printCompileJobCacheKey(llvm::cas::ObjectStore &CAS,
+                                    llvm::cas::ObjectRef Key,
+                                    llvm::raw_ostream &os);
 } // namespace swift
 
 #endif
