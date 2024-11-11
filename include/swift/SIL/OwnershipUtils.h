@@ -1404,6 +1404,10 @@ bool isNestedLexicalBeginBorrow(BeginBorrowInst *bbi);
 /// then the move_value is redundant.
 bool isRedundantMoveValue(MoveValueInst *mvi);
 
+/// Sets the reborrow flags for all transitively incoming phi-arguments of
+/// `forEndBorrowValue`, which is the operand value of an `end_borrow`.
+void updateReborrowFlags(SILValue forEndBorrowValue);
+
 } // namespace swift
 
 #endif

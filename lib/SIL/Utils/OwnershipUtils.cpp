@@ -2422,3 +2422,20 @@ bool swift::isRedundantMoveValue(MoveValueInst *mvi) {
   auto moveHasEscape = findPointerEscape(mvi);
   return moveHasEscape == originalHasEscape;
 }
+
+void swift::updateReborrowFlags(SILValue forEndBorrowValue) {
+  ValueWorklist worklist(forEndBorrowValue);
+  while (SILValue v = worklist.pop()) {
+    if (auto *bfi = dyn_cast<BorrowedFromInst>(v)) {
+      v = bfi->getBorrowedValue();
+    }
+    if (auto *arg = dyn_cast<SILPhiArgument>(v)) {
+      if (arg->isPhi() && !arg->isReborrow()) {
+        arg->setReborrow(true);
+        for (auto *predBlock : arg->getParent()->getPredecessorBlocks()) {
+          worklist.pushIfNotVisited(arg->getIncomingPhiValue(predBlock));
+        }
+      }
+    }
+  }
+}
