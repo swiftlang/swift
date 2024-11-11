@@ -214,6 +214,31 @@ swift::DeclAttributes BridgedDeclAttributes::unbridged() const {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedParamDecl
+//===----------------------------------------------------------------------===//
+
+swift::ParamSpecifier unbridge(BridgedParamSpecifier specifier) {
+  switch (specifier) {
+#define CASE(ID)                                                               \
+  case BridgedParamSpecifier##ID:                                              \
+    return swift::ParamSpecifier::ID;
+    CASE(Default)
+    CASE(InOut)
+    CASE(Borrowing)
+    CASE(Consuming)
+    CASE(LegacyShared)
+    CASE(LegacyOwned)
+    CASE(ImplicitlyCopyableConsuming)
+#undef CASE
+  }
+}
+
+void BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
+                                   BridgedParamSpecifier cSpecifier) {
+  cDecl.unbridged()->setSpecifier(unbridge(cSpecifier));
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedSubscriptDecl
 //===----------------------------------------------------------------------===//
 

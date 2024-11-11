@@ -45,6 +45,7 @@ class DiagnosticEngine;
 class Identifier;
 class IfConfigClauseRangeInfo;
 struct LabeledStmtInfo;
+enum class ParamSpecifier : uint8_t;
 class ProtocolConformanceRef;
 class RegexLiteralPatternFeature;
 class RegexLiteralPatternFeatureKind;
@@ -526,6 +527,10 @@ SWIFT_NAME("getter:BridgedPatternBindingInitializer.asDeclContext(self:)")
 BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
     BridgedPatternBindingInitializer cInit);
 
+SWIFT_NAME("getter:BridgedClosureExpr.asDeclContext(self:)")
+BridgedDeclContext
+BridgedClosureExpr_asDeclContext(BridgedClosureExpr cClosure);
+
 //===----------------------------------------------------------------------===//
 // MARK: DeclAttributes
 //===----------------------------------------------------------------------===//
@@ -851,6 +856,24 @@ BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
     BridgedSourceLoc cParamNameLoc, BridgedNullableTypeRepr type,
     BridgedNullableExpr defaultValue);
+
+/// The various spellings of ownership modifier that can be used in source.
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedParamSpecifier {
+  BridgedParamSpecifierDefault,
+  BridgedParamSpecifierInOut,
+  BridgedParamSpecifierBorrowing,
+  BridgedParamSpecifierConsuming,
+  BridgedParamSpecifierLegacyShared,
+  BridgedParamSpecifierLegacyOwned,
+  BridgedParamSpecifierImplicitlyCopyableConsuming,
+};
+
+BRIDGED_INLINE swift::ParamSpecifier unbridge(BridgedParamSpecifier kind);
+
+SWIFT_NAME("BridgedParamDecl.setSpecifier(self:_:)")
+BRIDGED_INLINE void
+BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
+                              BridgedParamSpecifier cSpecifier);
 
 SWIFT_NAME("BridgedConstructorDecl.setParsedBody(self:_:)")
 void BridgedConstructorDecl_setParsedBody(BridgedConstructorDecl decl,
@@ -1230,10 +1253,28 @@ BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
                                              BridgedExpr fn,
                                              BridgedArgumentList args);
 
-SWIFT_NAME("BridgedClosureExpr.createParsed(_:declContext:parameterList:body:)")
+SWIFT_NAME("BridgedClosureExpr.createParsed(_:declContext:attributes:"
+           "bracketRange:capturedSelfDecl:parameterList:asyncLoc:throwsLoc:"
+           "thrownType:arrowLoc:explicitResultType:inLoc:)")
 BridgedClosureExpr BridgedClosureExpr_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedParameterList cParamList, BridgedBraceStmt body);
+    BridgedDeclAttributes cAttributes, BridgedSourceRange cBracketRange,
+    BridgedNullableVarDecl cCapturedSelfDecl,
+    BridgedNullableParameterList cParameterList, BridgedSourceLoc cAsyncLoc,
+    BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr cThrownType,
+    BridgedSourceLoc cArrowLoc, BridgedNullableTypeRepr cExplicitResultType,
+    BridgedSourceLoc cInLoc);
+
+SWIFT_NAME("BridgedClosureExpr.setParameterList(self:_:)")
+void BridgedClosureExpr_setParameterList(BridgedClosureExpr cClosure,
+                                         BridgedParameterList cParams);
+
+SWIFT_NAME("BridgedClosureExpr.setHasAnonymousClosureVars(self:)")
+void BridgedClosureExpr_setHasAnonymousClosureVars(BridgedClosureExpr cClosure);
+
+SWIFT_NAME("BridgedClosureExpr.setBody(self:_:)")
+void BridgedClosureExpr_setBody(BridgedClosureExpr cClosure,
+                                BridgedBraceStmt cBody);
 
 SWIFT_NAME("BridgedCoerceExpr.createParsed(_:asLoc:type:)")
 BridgedCoerceExpr BridgedCoerceExpr_createParsed(BridgedASTContext cContext,

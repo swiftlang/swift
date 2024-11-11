@@ -278,36 +278,131 @@ extension ASTGenVisitor {
     return createOperatorRefExpr(token: node.operator, kind: .binaryOperator)
   }
 
-  func generate(closureExpr node: ClosureExprSyntax) -> BridgedClosureExpr {
-    let params: BridgedParameterList
+  func generate(closureSignature node: ClosureSignatureSyntax) -> GeneratedClosureSignature {
+    var result = GeneratedClosureSignature()
 
-    if let signature = node.signature {
-      // FIXME: Translate the signature, capture list, 'in' location, etc.
-      _ = signature
-      fatalError("unimplmented")
-    } else {
-      let lBraceLoc = self.generateSourceLoc(node.leftBrace)
-      params = BridgedParameterList.createParsed(
+    // Attributes.
+    visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
+      switch element {
+      case .ifConfigDecl(let ifConfigDecl):
+        return .ifConfigDecl(ifConfigDecl)
+      case .attribute(let attribute):
+        return .underlying(attribute)
+      }
+    } body: { node in
+      if let attr = self.generateDeclAttribute(attribute: node) {
+        result.attributes.add(attr)
+      }
+    }
+
+    if let node = node.capture {
+      result.bracketRange = self.generateSourceRange(node)
+      let captures = node.items.lazy.map { node in
+        self.generate(closureCapture: node)
+      }
+      result.captureList = captures.bridgedArray(in: self)
+    }
+
+    switch node.parameterClause {
+    case .parameterClause(let node):
+      result.params = self.generate(closureParameterClause: node)
+    case .simpleInput(let node):
+      result.params = self.generate(closureShorthandParameterList: node)
+    case nil:
+      result.params = .createParsed(
         self.ctx,
-        leftParenLoc: lBraceLoc,
-        parameters: .init(),
-        rightParenLoc: lBraceLoc
+        leftParenLoc: nil,
+        parameters: BridgedArrayRef(),
+        rightParenLoc: nil
       )
     }
 
-    let body = BridgedBraceStmt.createParsed(
-      self.ctx,
-      lBraceLoc: self.generateSourceLoc(node.leftBrace),
-      elements: self.generate(codeBlockItemList: node.statements),
-      rBraceLoc: self.generateSourceLoc(node.rightBrace)
-    )
+    if let effects = node.effectSpecifiers {
+      result.asyncLoc = self.generateSourceLoc(effects.asyncSpecifier)
+      result.throwsLoc = self.generateSourceLoc(effects.throwsClause)
+      result.thrownType = effects.throwsClause?.type.map(generate(type:))
+    }
 
-    return .createParsed(
+    if let returnClause = node.returnClause {
+      result.arrowLoc = self.generateSourceLoc(returnClause.arrow)
+      result.explicitResultType = self.generate(type: returnClause.type)
+    }
+
+    result.inLoc = self.generateSourceLoc(node.inKeyword)
+
+    return result
+  }
+
+  func generate(closureCapture node: ClosureCaptureSyntax) {
+    fatalError("unimplemented")
+  }
+
+  struct GeneratedClosureSignature {
+    var attributes: BridgedDeclAttributes = BridgedDeclAttributes()
+    var bracketRange: BridgedSourceRange = BridgedSourceRange(start: nil, end: nil)
+    var captureList: BridgedArrayRef = BridgedArrayRef()
+    var capturedSelfDecl: BridgedVarDecl? = nil
+    var params: BridgedParameterList? = nil
+    var asyncLoc: BridgedSourceLoc = nil
+    var throwsLoc: BridgedSourceLoc = nil
+    var thrownType: BridgedTypeRepr? = nil
+    var arrowLoc: BridgedSourceLoc = nil
+    var explicitResultType: BridgedTypeRepr? = nil
+    var inLoc: BridgedSourceLoc = nil
+  }
+
+  func generate(closureExpr node: ClosureExprSyntax) -> BridgedClosureExpr {
+    let signature: GeneratedClosureSignature
+    if let node = node.signature {
+      signature = self.generate(closureSignature: node)
+    } else {
+      signature = GeneratedClosureSignature()
+    }
+
+    let expr = BridgedClosureExpr.createParsed(
       self.ctx,
       declContext: self.declContext,
-      parameterList: params,
-      body: body
+      attributes: signature.attributes,
+      bracketRange: signature.bracketRange,
+      capturedSelfDecl: BridgedNullableVarDecl(raw: signature.capturedSelfDecl?.raw),
+      parameterList: signature.params.asNullable,
+      asyncLoc: signature.asyncLoc,
+      throwsLoc: signature.throwsLoc,
+      thrownType: signature.thrownType.asNullable,
+      arrowLoc: signature.arrowLoc,
+      explicitResultType: signature.explicitResultType.asNullable,
+      inLoc: signature.inLoc
     )
+
+    let body = self.withDeclContext(expr.asDeclContext) {
+      BridgedBraceStmt.createParsed(
+        self.ctx,
+        lBraceLoc: self.generateSourceLoc(node.leftBrace),
+        elements: self.generate(codeBlockItemList: node.statements),
+        rBraceLoc: self.generateSourceLoc(node.rightBrace)
+      )
+    }
+
+    if signature.params == nil {
+      // TODO: Handle doller identifiers inside the closure.
+      let loc = self.generateSourceLoc(node.leftBrace)
+      let params = BridgedParameterList.createParsed(
+        self.ctx,
+        leftParenLoc: loc,
+        parameters: .init(),
+        rightParenLoc: loc
+      )
+      expr.setParameterList(params)
+      expr.setHasAnonymousClosureVars()
+    }
+
+    expr.setBody(body)
+
+    if signature.captureList.count > 0 {
+      // TODO: CaptureListExpr.
+    }
+
+    return expr
   }
 
   func generate(consumeExpr node: ConsumeExprSyntax) -> BridgedConsumeExpr {
@@ -501,6 +596,10 @@ extension ASTGenVisitor {
   func generate(declReferenceExpr node: DeclReferenceExprSyntax) -> BridgedExpr {
     if node.baseName.isEditorPlaceholder {
       return generateEditorPlaceholderExpr(token: node.baseName).asExpr
+    }
+    if node.baseName.rawTokenKind == .dollarIdentifier {
+      // TODO: Handle dollar identifier in closure decl context.
+      // It's done in C++ Parser because it needs to handle inactive #if regions.
     }
     let nameAndLoc = generateDeclNameRef(declReferenceExpr: node)
     return BridgedUnresolvedDeclRefExpr.createParsed(
