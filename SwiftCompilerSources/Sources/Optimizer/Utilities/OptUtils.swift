@@ -297,6 +297,9 @@ extension Instruction {
     switch self {
     case is TermInst, is MarkUninitializedInst, is DebugValueInst:
       return false
+    case is BorrowedFromInst:
+      // A dead borrowed-from can only be removed if the argument (= operand) is also removed.
+      return false
     case let bi as BuiltinInst:
       if bi.id == .OnFastPath {
         return false
