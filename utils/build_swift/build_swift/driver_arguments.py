@@ -1497,6 +1497,10 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift Parser validation by default.')
 
+    option('--enable-experimental-pointer-bounds', toggle_true,
+           default=False,
+           help='Enable experimental bounds safe C interop.')
+
     # -------------------------------------------------------------------------
     in_group('Unsupported options')
 

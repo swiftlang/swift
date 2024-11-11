@@ -190,6 +190,7 @@
   ],
   "Pointer": [
     "Pointer.swift",
+    "PointerBounds.swift",
     "TemporaryAllocation.swift",
     "UnsafePointer.swift",
     "UnsafeRawPointer.swift",

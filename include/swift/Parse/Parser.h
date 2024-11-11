@@ -968,7 +968,8 @@ public:
                            IterableDeclContext *IDC);
 
   bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
-                                 bool &HasNestedClassDeclarations);
+                                 bool &HasNestedClassDeclarations,
+                                 bool &HasDerivativeDeclarations);
 
   bool canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations);
 
