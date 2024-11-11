@@ -1,13 +1,10 @@
 // RUN: %target-swift-frontend                         \
 // RUN:     %s                                         \
 // RUN:     -emit-silgen                               \
-// RUN:     -disable-experimental-parser-round-trip    \
 // RUN:     -target %target-swift-5.1-abi-triple       \
 // RUN:     -enable-experimental-feature Sensitive     \
 // RUN:     -enable-experimental-feature ValueGenerics \
 // RUN:     -enable-builtin-module
-
-// FIXME: Remove -disable-experimental-parser-round-trip when it's not required for using ValueGenerics.
 
 // REQUIRES: swift_feature_Sensitive
 // REQUIRES: swift_feature_ValueGenerics

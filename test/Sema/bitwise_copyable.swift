@@ -1,13 +1,10 @@
 // RUN: %target-typecheck-verify-swift                       \
-// RUN:     -disable-experimental-parser-round-trip          \
 // RUN:     -disable-availability-checking                   \
 // RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN:     -enable-experimental-feature ValueGenerics       \
 // RUN:     -enable-experimental-feature Sensitive           \
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names
-
-// FIXME: Remove -disable-experimental-parser-round-trip when it's not required for using ValueGenerics.
 
 // REQUIRES: swift_feature_NonescapableTypes
 // REQUIRES: swift_feature_ValueGenerics
