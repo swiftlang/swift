@@ -93,19 +93,6 @@ regionanalysisimpl::getApplyIsolationCrossing(SILInstruction *inst) {
 
 namespace {
 
-struct UnderlyingTrackedValueInfo {
-  SILValue value;
-
-  /// Only used for addresses.
-  std::optional<ActorIsolation> actorIsolation;
-
-  explicit UnderlyingTrackedValueInfo(SILValue value) : value(value) {}
-
-  UnderlyingTrackedValueInfo(SILValue value,
-                             std::optional<ActorIsolation> actorIsolation)
-      : value(value), actorIsolation(actorIsolation) {}
-};
-
 struct UseDefChainVisitor
     : public AccessUseDefChainVisitor<UseDefChainVisitor, SILValue> {
   bool isMerge = false;
@@ -335,95 +322,6 @@ static bool isLookThroughIfOperandAndResultNonSendable(SILInstruction *inst) {
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
     return true;
   }
-}
-
-static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
-  auto *fn = value->getFunction();
-  SILValue result = value;
-  while (true) {
-    SILValue temp = result;
-
-    if (auto *svi = dyn_cast<SingleValueInstruction>(temp)) {
-      if (isStaticallyLookThroughInst(svi)) {
-        temp = svi->getOperand(0);
-      }
-
-      // If we have a cast and our operand and result are non-Sendable, treat it
-      // as a look through.
-      if (isLookThroughIfOperandAndResultNonSendable(svi)) {
-        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn) &&
-            SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
-                                                fn)) {
-          temp = svi->getOperand(0);
-        }
-      }
-
-      if (isLookThroughIfResultNonSendable(svi)) {
-        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn)) {
-          temp = svi->getOperand(0);
-        }
-      }
-
-      if (isLookThroughIfOperandNonSendable(svi)) {
-        // If our operand is a non-Sendable type, look through this instruction.
-        if (SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
-                                                fn)) {
-          temp = svi->getOperand(0);
-        }
-      }
-    }
-
-    if (auto *inst = temp->getDefiningInstruction()) {
-      if (isStaticallyLookThroughInst(inst)) {
-        temp = inst->getOperand(0);
-      }
-    }
-
-    if (temp != result) {
-      result = temp;
-      continue;
-    }
-
-    return result;
-  }
-}
-
-static UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) {
-  // Before a check if the value we are attempting to access is Sendable. In
-  // such a case, just return early.
-  if (!SILIsolationInfo::isNonSendableType(value))
-    return UnderlyingTrackedValueInfo(value);
-
-  // Look through a project_box, so that we process it like its operand object.
-  if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
-    value = pbi->getOperand();
-  }
-
-  if (!value->getType().isAddress()) {
-    SILValue underlyingValue = getUnderlyingTrackedObjectValue(value);
-
-    // If we do not have a load inst, just return the value.
-    if (!isa<LoadInst, LoadBorrowInst>(underlyingValue)) {
-      return UnderlyingTrackedValueInfo(underlyingValue);
-    }
-
-    // If we got an address, lets see if we can do even better by looking at the
-    // address.
-    value = cast<SingleValueInstruction>(underlyingValue)->getOperand(0);
-  }
-  assert(value->getType().isAddress());
-
-  UseDefChainVisitor visitor;
-  SILValue base = visitor.visitAll(value);
-  assert(base);
-  if (base->getType().isObject())
-    return {getUnderlyingTrackedValue(base).value, visitor.actorIsolation};
-
-  return {base, visitor.actorIsolation};
-}
-
-SILValue RegionAnalysisFunctionInfo::getUnderlyingTrackedValue(SILValue value) {
-  return ::getUnderlyingTrackedValue(value).value;
 }
 
 namespace {
@@ -915,6 +813,97 @@ void RegionAnalysisValueMap::print(llvm::raw_ostream &os) const {
 #endif
 }
 
+static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
+  auto *fn = value->getFunction();
+  SILValue result = value;
+  while (true) {
+    SILValue temp = result;
+
+    if (auto *svi = dyn_cast<SingleValueInstruction>(temp)) {
+      if (isStaticallyLookThroughInst(svi)) {
+        temp = svi->getOperand(0);
+      }
+
+      // If we have a cast and our operand and result are non-Sendable, treat it
+      // as a look through.
+      if (isLookThroughIfOperandAndResultNonSendable(svi)) {
+        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn) &&
+            SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
+                                                fn)) {
+          temp = svi->getOperand(0);
+        }
+      }
+
+      if (isLookThroughIfResultNonSendable(svi)) {
+        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn)) {
+          temp = svi->getOperand(0);
+        }
+      }
+
+      if (isLookThroughIfOperandNonSendable(svi)) {
+        // If our operand is a non-Sendable type, look through this instruction.
+        if (SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
+                                                fn)) {
+          temp = svi->getOperand(0);
+        }
+      }
+    }
+
+    if (auto *inst = temp->getDefiningInstruction()) {
+      if (isStaticallyLookThroughInst(inst)) {
+        temp = inst->getOperand(0);
+      }
+    }
+
+    if (temp != result) {
+      result = temp;
+      continue;
+    }
+
+    return result;
+  }
+}
+
+RegionAnalysisValueMap::UnderlyingTrackedValueInfo
+RegionAnalysisValueMap::getUnderlyingTrackedValueHelper(SILValue value) const {
+  // Before a check if the value we are attempting to access is Sendable. In
+  // such a case, just return early.
+  if (!SILIsolationInfo::isNonSendableType(value))
+    return UnderlyingTrackedValueInfo(value);
+
+  // Look through a project_box, so that we process it like its operand object.
+  if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
+    value = pbi->getOperand();
+  }
+
+  if (!value->getType().isAddress()) {
+    SILValue underlyingValue = getUnderlyingTrackedObjectValue(value);
+
+    // If we do not have a load inst, just return the value.
+    if (!isa<LoadInst, LoadBorrowInst>(underlyingValue)) {
+      return UnderlyingTrackedValueInfo(underlyingValue);
+    }
+
+    // If we got an address, lets see if we can do even better by looking at the
+    // address.
+    value = cast<SingleValueInstruction>(underlyingValue)->getOperand(0);
+  }
+  assert(value->getType().isAddress());
+
+  UseDefChainVisitor visitor;
+  SILValue base = visitor.visitAll(value);
+  assert(base);
+  if (base->getType().isObject()) {
+    // NOTE: We purposely recurse into the cached version of our computation
+    // rather than recurse into getUnderlyingTrackedObjectValueHelper. This is
+    // safe since we know that value was previously an address so if our base is
+    // an object, it cannot be the same object.
+    return {getUnderlyingTrackedValue(base).value, visitor.actorIsolation};
+  }
+
+  return {base, visitor.actorIsolation};
+}
+
 //===----------------------------------------------------------------------===//
 //                            MARK: TrackableValue
 //===----------------------------------------------------------------------===//
@@ -988,6 +977,7 @@ namespace {
 ///
 /// 2. Just computing reachability early is a very easy way to do this.
 struct PartialApplyReachabilityDataflow {
+  RegionAnalysisValueMap &valueMap;
   PostOrderFunctionInfo *pofi;
   llvm::DenseMap<SILValue, unsigned> valueToBit;
   std::vector<std::pair<SILValue, SILInstruction *>> valueToGenInsts;
@@ -1002,8 +992,10 @@ struct PartialApplyReachabilityDataflow {
   BasicBlockData<BlockState> blockData;
   bool propagatedReachability = false;
 
-  PartialApplyReachabilityDataflow(SILFunction *fn, PostOrderFunctionInfo *pofi)
-      : pofi(pofi), blockData(fn) {}
+  PartialApplyReachabilityDataflow(SILFunction *fn,
+                                   RegionAnalysisValueMap &valueMap,
+                                   PostOrderFunctionInfo *pofi)
+      : valueMap(valueMap), pofi(pofi), blockData(fn) {}
 
   /// Begin tracking an operand of a partial apply.
   void add(Operand *op);
@@ -1035,7 +1027,7 @@ struct PartialApplyReachabilityDataflow {
 
 private:
   SILValue getRootValue(SILValue value) const {
-    return getUnderlyingTrackedValue(value).value;
+    return valueMap.getRepresentative(value);
   }
 
   unsigned getBitForValue(SILValue value) const {
@@ -1767,7 +1759,8 @@ public:
                         RegionAnalysisValueMap &valueMap,
                         IsolationHistory::Factory &historyFactory)
       : function(function), functionArgPartition(), builder(),
-        partialApplyReachabilityDataflow(function, pofi), valueMap(valueMap) {
+        partialApplyReachabilityDataflow(function, valueMap, pofi),
+        valueMap(valueMap) {
     builder.translator = this;
 
     REGIONBASEDISOLATION_LOG(
