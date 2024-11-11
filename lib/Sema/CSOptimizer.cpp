@@ -34,6 +34,19 @@ using namespace constraints;
 
 namespace {
 
+struct DisjunctionInfo {
+  /// The score of the disjunction is the highest score from its choices.
+  /// If the score is nullopt it means that the disjunction is not optimizable.
+  std::optional<double> Score;
+  /// The highest scoring choices that could be favored when disjunction
+  /// is attempted.
+  llvm::TinyPtrVector<Constraint *> FavoredChoices;
+
+  DisjunctionInfo() = default;
+  DisjunctionInfo(double score, ArrayRef<Constraint *> favoredChoices = {})
+      : Score(score), FavoredChoices(favoredChoices) {}
+};
+
 // TODO: both `isIntegerType` and `isFloatType` should be available on Type
 // as `isStdlib{Integer, Float}Type`.
 
@@ -246,16 +259,30 @@ static void findFavoredChoicesBasedOnArity(
 /// favored choices in the current context.
 static void determineBestChoicesInContext(
     ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions,
-    llvm::DenseMap<Constraint *,
-                   std::pair<double, llvm::TinyPtrVector<Constraint *>>>
-        &favorings) {
+    llvm::DenseMap<Constraint *, DisjunctionInfo> &result) {
   double bestOverallScore = 0.0;
-  // Tops scores across all of the disjunctions.
-  llvm::DenseMap<Constraint *, double> disjunctionScores;
-  llvm::DenseMap<Constraint *, llvm::TinyPtrVector<Constraint *>>
-      favoredChoicesPerDisjunction;
+
+  auto recordResult = [&bestOverallScore, &result](Constraint *disjunction,
+                                                   DisjunctionInfo &&info) {
+    bestOverallScore = std::max(bestOverallScore, info.Score.value_or(0));
+    result.try_emplace(disjunction, info);
+  };
 
   for (auto *disjunction : disjunctions) {
+    // If this is a compiler synthesized disjunction, mark it as supported
+    // and record all of the previously favored choices. Such disjunctions
+    // include - explicit coercions, IUO references,injected implicit
+    // initializers for CGFloat<->Double conversions and restrictions with
+    // multiple choices.
+    if (disjunction->countFavoredNestedConstraints() > 0) {
+      DisjunctionInfo info(/*score=*/2.0);
+      llvm::copy_if(disjunction->getNestedConstraints(),
+                    std::back_inserter(info.FavoredChoices),
+                    [](Constraint *choice) { return choice->isFavored(); });
+      recordResult(disjunction, std::move(info));
+      continue;
+    }
+
     auto applicableFn =
         getApplicableFnConstraint(cs.getConstraintGraph(), disjunction);
 
@@ -282,14 +309,14 @@ static void determineBestChoicesInContext(
     // of `OverloadedDeclRef` calls were favored purely
     // based on arity of arguments and parameters matching.
     {
-      findFavoredChoicesBasedOnArity(
-          cs, disjunction, argumentList, [&](Constraint *choice) {
-            favoredChoicesPerDisjunction[disjunction].push_back(choice);
-          });
+      llvm::TinyPtrVector<Constraint *> favoredChoices;
+      findFavoredChoicesBasedOnArity(cs, disjunction, argumentList,
+                                     [&favoredChoices](Constraint *choice) {
+                                       favoredChoices.push_back(choice);
+                                     });
 
-      if (!favoredChoicesPerDisjunction[disjunction].empty()) {
-        disjunctionScores[disjunction] = 0.01;
-        bestOverallScore = std::max(bestOverallScore, 0.01);
+      if (!favoredChoices.empty()) {
+        recordResult(disjunction, {/*score=*/0.01, favoredChoices});
         continue;
       }
     }
@@ -894,17 +921,16 @@ static void determineBestChoicesInContext(
           << " with score " << bestScore << "\n";
     }
 
-    // No matching overload choices to favor.
-    if (bestScore == 0.0)
-      continue;
-
     bestOverallScore = std::max(bestOverallScore, bestScore);
 
-    disjunctionScores[disjunction] = bestScore;
+    DisjunctionInfo info(/*score=*/bestScore);
+
     for (const auto &choice : favoredChoices) {
       if (choice.second == bestScore)
-        favoredChoicesPerDisjunction[disjunction].push_back(choice.first);
+        info.FavoredChoices.push_back(choice.first);
     }
+
+    recordResult(disjunction, std::move(info));
   }
 
   if (cs.isDebugMode() && bestOverallScore > 0) {
@@ -935,14 +961,15 @@ static void determineBestChoicesInContext(
     getLogger(/*extraIndent=*/4)
         << "Best overall score = " << bestOverallScore << '\n';
 
-    for (const auto &entry : disjunctionScores) {
+    for (auto *disjunction : disjunctions) {
+      auto &entry = result[disjunction];
       getLogger(/*extraIndent=*/4)
           << "[Disjunction '"
-          << entry.first->getNestedConstraints()[0]->getFirstType()->getString(
+          << disjunction->getNestedConstraints()[0]->getFirstType()->getString(
                  PO)
-          << "' with score = " << entry.second << '\n';
+          << "' with score = " << entry.Score.value_or(0) << '\n';
 
-      for (const auto *choice : favoredChoicesPerDisjunction[entry.first]) {
+      for (const auto *choice : entry.FavoredChoices) {
         auto &log = getLogger(/*extraIndent=*/6);
 
         log << "- ";
@@ -954,16 +981,6 @@ static void determineBestChoicesInContext(
     }
 
     getLogger() << ")\n";
-  }
-
-  if (bestOverallScore == 0)
-    return;
-
-  for (auto &entry : disjunctionScores) {
-    TinyPtrVector<Constraint *> favoredChoices;
-    for (auto *choice : favoredChoicesPerDisjunction[entry.first])
-      favoredChoices.push_back(choice);
-    favorings[entry.first] = std::make_pair(entry.second, favoredChoices);
   }
 }
 
@@ -1036,9 +1053,7 @@ ConstraintSystem::selectDisjunction() {
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return std::make_pair(disjunction, llvm::TinyPtrVector<Constraint *>());
 
-  llvm::DenseMap<Constraint *,
-                 std::pair</*bestScore=*/double, llvm::TinyPtrVector<Constraint *>>>
-      favorings;
+  llvm::DenseMap<Constraint *, DisjunctionInfo> favorings;
   determineBestChoicesInContext(*this, disjunctions, favorings);
 
   // Pick the disjunction with the smallest number of favored, then active
@@ -1052,23 +1067,16 @@ ConstraintSystem::selectDisjunction() {
         auto &[firstScore, firstFavoredChoices] = favorings[first];
         auto &[secondScore, secondFavoredChoices] = favorings[second];
 
-        bool isFirstSupported = isSupportedDisjunction(first);
-        bool isSecondSupported = isSupportedDisjunction(second);
-
         // Rank based on scores only if both disjunctions are supported.
-        if (isFirstSupported && isSecondSupported) {
+        if (firstScore && secondScore) {
           // If both disjunctions have the same score they should be ranked
           // based on number of favored/active choices.
-          if (firstScore != secondScore)
-            return firstScore > secondScore;
+          if (*firstScore != *secondScore)
+            return *firstScore > *secondScore;
         }
 
-        unsigned numFirstFavored = isFirstSupported
-                                       ? firstFavoredChoices.size()
-                                       : first->countFavoredNestedConstraints();
-        unsigned numSecondFavored =
-            isSecondSupported ? secondFavoredChoices.size()
-                              : second->countFavoredNestedConstraints();
+        unsigned numFirstFavored = firstFavoredChoices.size();
+        unsigned numSecondFavored = secondFavoredChoices.size();
 
         if (numFirstFavored == numSecondFavored) {
           if (firstActive != secondActive)
@@ -1082,7 +1090,8 @@ ConstraintSystem::selectDisjunction() {
       });
 
   if (bestDisjunction != disjunctions.end())
-    return std::make_pair(*bestDisjunction, favorings[*bestDisjunction].second);
+    return std::make_pair(*bestDisjunction,
+                          favorings[*bestDisjunction].FavoredChoices);
 
   return std::nullopt;
 }
