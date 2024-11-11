@@ -486,6 +486,10 @@ public:
   /// Determine whether this type variable represents a subscript result type.
   bool isSubscriptResultType() const;
 
+  /// Determine whether this type variable represents a result type of an
+  /// application i.e. a call, an operator, or a subscript.
+  bool isApplicationResultType() const;
+
   /// Determine whether this type variable represents an opened
   /// type parameter pack.
   bool isParameterPack() const;
