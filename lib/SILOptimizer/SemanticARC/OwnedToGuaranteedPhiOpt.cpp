@@ -268,7 +268,7 @@ bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
   }
 
   if (madeChange)
-    updateAllBorrowArguments(ctx.pm, &ctx.fn);
+    updateAllGuaranteedPhis(ctx.pm, &ctx.fn);
 
   return madeChange;
 }

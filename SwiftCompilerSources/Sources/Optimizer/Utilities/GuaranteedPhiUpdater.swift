@@ -1,4 +1,4 @@
-//===--- BorrowArgumentsUpdater.swift -------------------------------------===//
+//===--- GuaranteedPhiUpdater.swift ---------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,13 +14,13 @@ import SIL
 import OptimizerBridging
 
 /// Updates the reborrow flags and the borrowed-from instructions for all guaranteed phis in `function`.
-func updateBorrowArguments(in function: Function, _ context: some MutatingContext) {
+func updateGuaranteedPhis(in function: Function, _ context: some MutatingContext) {
   updateReborrowFlags(in: function, context)
   updateBorrowedFrom(in: function, context)
 }
 
 /// Updates the reborrow flags and the borrowed-from instructions for all `phis`.
-func updateBorrowArguments(for phis: some Sequence<Phi>, _ context: some MutatingContext) {
+func updateGuaranteedPhis(phis: some Sequence<Phi>, _ context: some MutatingContext) {
   updateReborrowFlags(for: phis, context)
   updateBorrowedFrom(for: phis, context)
 }
@@ -151,12 +151,12 @@ private func addEnclosingValues(
   return true
 }
 
-func registerBorrowArgumentsUpdater() {
-  BridgedUtilities.registerBorrowArgumentsUpdater(
+func registerGuaranteedPhiUpdater() {
+  BridgedUtilities.registerGuaranteedPhiUpdater(
     { (bridgedCtxt: BridgedPassContext, bridgedFunction: BridgedFunction) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
       let function = bridgedFunction.function;
-      updateBorrowArguments(in: function, context)
+      updateGuaranteedPhis(in: function, context)
     },
     { (bridgedCtxt: BridgedPassContext, bridgedPhiArray: BridgedArrayRef) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
@@ -170,7 +170,7 @@ func registerBorrowArgumentsUpdater() {
           }
         }
       }
-      updateBorrowArguments(for: guaranteedPhis, context)
+      updateGuaranteedPhis(phis: guaranteedPhis, context)
     }
   )
 }

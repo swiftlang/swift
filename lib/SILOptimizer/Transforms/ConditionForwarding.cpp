@@ -117,7 +117,7 @@ private:
       }
     }
     if (Changed) {
-      updateAllBorrowArguments(getPassManager(), F);
+      updateAllGuaranteedPhis(getPassManager(), F);
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
   }

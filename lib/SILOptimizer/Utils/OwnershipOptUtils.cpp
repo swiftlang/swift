@@ -1913,27 +1913,27 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
 //                            Swift Bridging
 //===----------------------------------------------------------------------===//
 
-static BridgedUtilities::UpdateFunctionFn updateAllBorrowArgumentsFunction;
-static BridgedUtilities::UpdatePhisFn updateBorrowArgumentsFunction;
+static BridgedUtilities::UpdateFunctionFn updateAllGuaranteedPhisFunction;
+static BridgedUtilities::UpdatePhisFn updateGuaranteedPhisFunction;
 
-void BridgedUtilities::registerBorrowArgumentsUpdater(UpdateFunctionFn updateAllBorrowArgumentsFn,
-                                                      UpdatePhisFn updateBorrowArgumentsFn) {
-  updateAllBorrowArgumentsFunction = updateAllBorrowArgumentsFn;
-  updateBorrowArgumentsFunction = updateBorrowArgumentsFn;
+void BridgedUtilities::registerGuaranteedPhiUpdater(UpdateFunctionFn updateAllGuaranteedPhisFn,
+                                                    UpdatePhisFn updateGuaranteedPhisFn) {
+  updateAllGuaranteedPhisFunction = updateAllGuaranteedPhisFn;
+  updateGuaranteedPhisFunction = updateGuaranteedPhisFn;
 }
 
-void swift::updateAllBorrowArguments(SILPassManager *pm, SILFunction *f) {
-  if (updateAllBorrowArgumentsFunction)
-    updateAllBorrowArgumentsFunction({pm->getSwiftPassInvocation()}, {f});
+void swift::updateAllGuaranteedPhis(SILPassManager *pm, SILFunction *f) {
+  if (updateAllGuaranteedPhisFunction)
+    updateAllGuaranteedPhisFunction({pm->getSwiftPassInvocation()}, {f});
 }
 
-void swift::updateBorrowArguments(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
-  if (!updateBorrowArgumentsFunction)
+void swift::updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
+  if (!updateGuaranteedPhisFunction)
     return;
 
   llvm::SmallVector<BridgedValue, 8> bridgedPhis;
   for (SILPhiArgument *phi : phis) {
     bridgedPhis.push_back({phi});
   }
-  updateBorrowArgumentsFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
+  updateGuaranteedPhisFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
 }
