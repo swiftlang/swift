@@ -85,6 +85,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_dependencies(embedded-libraries embedded-darwin)
 
   set_property(GLOBAL APPEND PROPERTY JOB_POOLS one_job=1)
+  set_property(TARGET embedded-darwin PROPERTY JOB_POOL_COMPILE one_job)
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
     list(GET list 0 arch)
