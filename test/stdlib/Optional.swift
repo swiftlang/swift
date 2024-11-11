@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature NonescapableTypes)
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: reflection
 
