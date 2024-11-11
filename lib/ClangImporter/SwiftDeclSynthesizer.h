@@ -285,7 +285,7 @@ public:
   FuncDecl *makeSuccessorFunc(FuncDecl *incrementFunc);
 
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
-                         clang::CXXMethodDecl *clangOperator);
+                         clang::OverloadedOperatorKind opKind);
 
   VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                               FuncDecl *setter);

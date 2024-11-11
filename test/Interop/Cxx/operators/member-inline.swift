@@ -395,4 +395,13 @@ OperatorsTestSuite.test("DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl.
   expectEqual(567, res)
 }
 
+OperatorsTestSuite.test("DerivedFromLoadableIntWrapperWithUsingDecl") {
+  var d = DerivedFromLoadableIntWrapperWithUsingDecl()
+  d.setValue(123)
+  var d1 = LoadableIntWrapper()
+  d1.value = 543
+  d += d1
+  expectEqual(666, d.getValue())
+}
+
 runAllTests()

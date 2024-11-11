@@ -440,4 +440,16 @@ struct DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl
   using AmbiguousOperatorStar::operator*;
 };
 
+struct DerivedFromLoadableIntWrapperWithUsingDecl : private LoadableIntWrapper {
+  using LoadableIntWrapper::operator-;
+  using LoadableIntWrapper::operator+=;
+
+  int getValue() const {
+    return value;
+  }
+  void setValue(int v) {
+    this->value = v;
+  }
+};
+
 #endif

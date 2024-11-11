@@ -73,3 +73,6 @@ derivedConstIter.pointee // expected-error {{value of type 'DerivedFromConstIter
 
 let derivedConstIterWithUD = DerivedFromConstIteratorPrivatelyWithUsingDecl()
 let _ = derivedConstIterWithUD.pointee
+
+var derivedIntWrapper = DerivedFromLoadableIntWrapperWithUsingDecl()
+derivedIntWrapper += LoadableIntWrapper()

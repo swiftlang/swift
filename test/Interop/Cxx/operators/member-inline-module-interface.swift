@@ -265,3 +265,15 @@
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
 // CHECK-NEXT: }
+
+// CHECK: struct DerivedFromLoadableIntWrapperWithUsingDecl {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   static func - (lhs: inout DerivedFromLoadableIntWrapperWithUsingDecl, rhs: LoadableIntWrapper) -> LoadableIntWrapper
+// CHECK-NEXT:   @available(*, unavailable, message: "use - instead")
+// CHECK-NEXT:   mutating func __operatorMinus(_ rhs: LoadableIntWrapper) -> LoadableIntWrapper
+// CHECK-NEXT:   static func += (lhs: inout DerivedFromLoadableIntWrapperWithUsingDecl, rhs: LoadableIntWrapper)
+// CHECK-NEXT:   @available(*, unavailable, message: "use += instead")
+// CHECK-NEXT:   mutating func __operatorPlusEqual(_ rhs: LoadableIntWrapper)
+// CHECK-NEXT:   func getValue() -> Int32
+// CHECK-NEXT:   mutating func setValue(_ v: Int32)
+// CHECK-NEXT: }
