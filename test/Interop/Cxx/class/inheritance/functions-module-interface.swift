@@ -15,6 +15,8 @@
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   func constInBase() -> UnsafePointer<CChar>!
 // CHECK-NEXT:   @discardableResult
+// CHECK-NEXT:   func rvalueThisInBase() -> UnsafePointer<CChar>!
+// CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   func takesArgsInBase(_ a: Int32, _ b: Int32, _ c: Int32) -> UnsafePointer<CChar>!
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   func takesNonTrivialInBase(_ a: NonTrivial) -> UnsafePointer<CChar>!
