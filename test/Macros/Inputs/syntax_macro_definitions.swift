@@ -758,6 +758,39 @@ public struct AddArbitraryMembers: MemberMacro {
   }
 }
 
+public struct MemberThatCallsCodeMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard case let .argumentList(arguments) = node.arguments,
+          let firstElement = arguments.first,
+          let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self) else {
+      throw CustomError.message("Macro requires a string literal")
+    }
+
+    let codeString = try stringLiteral.segments.map { segment in
+      switch segment {
+      case .stringSegment(let string):
+        return string.content.text
+
+      case .expressionSegment(_):
+        throw CustomError.message("Macro cannot handle string interpolation")
+      }
+    }.joined(separator: "")
+    return [
+      """
+      static var synthesizedMember: String {
+        \(raw: codeString)
+
+        return "hello"
+      }
+      """,
+    ]
+  }
+}
+
 /// Implementation of the `wrapStoredProperties` macro, which can be
 /// used to apply an attribute to all of the stored properties of a type.
 ///
