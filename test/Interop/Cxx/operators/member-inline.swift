@@ -378,4 +378,9 @@ OperatorsTestSuite.test("DerivedFromConstIterator.pointee") {
   expectEqual(234, res)
 }
 
+OperatorsTestSuite.test("SubscriptSetterConst") {
+  var setterConst = SubscriptSetterConst()
+  setterConst[0] = 10
+}
+
 runAllTests()
