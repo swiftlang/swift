@@ -64,7 +64,7 @@ struct TemplateInstantiationNamePrinter
     return "_";
   }
 
-  std::string VisitRecordType(const clang::RecordType *type) {
+  std::string VisitTagType(const clang::TagType *type) {
     auto tagDecl = type->getAsTagDecl();
     if (auto namedArg = dyn_cast_or_null<clang::NamedDecl>(tagDecl)) {
       if (auto typeDefDecl = tagDecl->getTypedefNameForAnonDecl())
