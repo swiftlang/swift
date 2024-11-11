@@ -14,7 +14,7 @@ import resilient_enum
 // Resilient structs from outside our resilience domain are manipulated via
 // value witnesses
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience30functionWithResilientTypesSize_1f010resilient_A00G0VAFn_A2FnXEtF"(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture %1, ptr %2, ptr %3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience30functionWithResilientTypesSize_1f010resilient_A00G0VAFn_A2FnXEtF"(ptr noalias sret({{.*}}) %0, ptr noalias %1, ptr %2, ptr %3)
 
 public func functionWithResilientTypesSize(_ s: __owned Size, f: (__owned Size) -> Size) -> Size {
 // CHECK: entry:
@@ -31,7 +31,7 @@ public func functionWithResilientTypesSize(_ s: __owned Size, f: (__owned Size) 
 // CHECK: [[WITNESS:%.*]] = load ptr, ptr [[WITNESS_PTR]]
 // CHECK: [[STRUCT_LOC:%.*]] = call ptr [[WITNESS]](ptr noalias [[ALLOCA]], ptr noalias %1, ptr [[METADATA]])
 
-// CHECK: call swiftcc void %2(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture [[ALLOCA]], ptr swiftself %3)
+// CHECK: call swiftcc void %2(ptr noalias sret({{.*}}) %0, ptr noalias [[ALLOCA]], ptr swiftself %3)
 
 // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 1
 // CHECK: [[WITNESS:%.*]] = load ptr, ptr [[WITNESS_PTR]]
@@ -51,7 +51,7 @@ public func functionWithResilientTypesSize(_ s: __owned Size, f: (__owned Size) 
 // Make sure we use a type metadata accessor function, and load indirect
 // field offsets from it.
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience35functionWithResilientTypesRectangleyy010resilient_A00G0VF"(ptr noalias nocapture %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience35functionWithResilientTypesRectangleyy010resilient_A00G0VF"(ptr noalias %0)
 public func functionWithResilientTypesRectangle(_ r: Rectangle) {
 // CHECK: entry:
 // CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct9RectangleVMa"([[INT]] 0)
@@ -168,7 +168,7 @@ public func partialApplyOfResilientMethod(r: ResilientStructWithMethod) {
 
 // Type is address-only in SIL, and resilient in IRGen
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience29partialApplyOfResilientMethod1sy010resilient_A04SizeV_tF"(ptr noalias nocapture %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience29partialApplyOfResilientMethod1sy010resilient_A04SizeV_tF"(ptr noalias %0)
 public func partialApplyOfResilientMethod(s: Size) {
   _ = s.method
 }
@@ -179,7 +179,7 @@ public func resilientAny(s : ResilientWeakRef) {
   wantsAny(s)
 }
 
-// CHECK-LABEL: define{{.*}} swiftcc void @"$s17struct_resilience12resilientAny1sy0c1_A016ResilientWeakRefV_tF"(ptr noalias nocapture %0)
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s17struct_resilience12resilientAny1sy0c1_A016ResilientWeakRefV_tF"(ptr noalias %0)
 // CHECK: entry:
 // CHECK: [[ANY:%.*]] = alloca %Any
 // CHECK: [[META:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct16ResilientWeakRefVMa"([[INT]] 0)

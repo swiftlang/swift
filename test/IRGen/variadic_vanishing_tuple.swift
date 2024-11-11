@@ -6,7 +6,7 @@ public func makeTuple<each T>(_ t: repeat each T) {
   takesMetatype((repeat each T).self)
 }
 
-// CHECK-LABEL: define {{(protected )?}}{{(dllexport )?}}swiftcc void @"$s24variadic_vanishing_tuple9makeTupleyyxxQpRvzlF"(ptr noalias nocapture %0, {{i32|i64}} %1, ptr %"each T")
+// CHECK-LABEL: define {{(protected )?}}{{(dllexport )?}}swiftcc void @"$s24variadic_vanishing_tuple9makeTupleyyxxQpRvzlF"(ptr noalias %0, {{i32|i64}} %1, ptr %"each T")
 // CHECK:   [[CMP:%.*]] = icmp eq [[INT]] %1, 1
 // CHECK:   br i1 [[CMP]], label %vanishing-tuple, label %actual-tuple
 

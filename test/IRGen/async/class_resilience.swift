@@ -41,7 +41,7 @@ open class MyBaseClass<T> {
 // CHECK-LABEL: @"$s16class_resilience9MyDerivedCMn" = hidden constant
 // CHECK-SAME: ptr @"$s16class_resilience9MyDerivedC4waitSiyYaF010resilient_A09BaseClassCADxyYaFTVTu"
 
-// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience14callsAwaitableyx010resilient_A09BaseClassCyxGYalF"(ptr noalias nocapture %0, ptr swiftasync %1{{.*}})
+// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience14callsAwaitableyx010resilient_A09BaseClassCyxGYalF"(ptr noalias %0, ptr swiftasync %1{{.*}})
 // CHECK-DIRECT: ptr @"$s15resilient_class9BaseClassC4waitxyYaFTjTu"
 // CHECK-INDIRECT: [[LOAD:%[0-9]+]] = load ptr, ptr inttoptr (i64 and (i64 add (i64 ptrtoint (ptr @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1), i64 -2) to ptr), align {{4|8}}
 // CHECK-INDIRECT-NEXT: select i1 icmp eq (i64 and (i64 add (i64 ptrtoint (ptr @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1), i64 1), i64 0),
@@ -52,7 +52,7 @@ public func callsAwaitable<T>(_ c: BaseClass<T>) async -> T {
   return await c.wait()
 }
 
-// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience11MyBaseClassC4waitxyYaFTj"(ptr noalias nocapture %0, ptr swiftasync %1, ptr swiftself %2) {{#([0-9]+)}} {
+// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience11MyBaseClassC4waitxyYaFTj"(ptr noalias %0, ptr swiftasync %1, ptr swiftself %2) {{#([0-9]+)}} {
 
 class MyDerived : BaseClass<Int> {
   override func wait() async -> Int {

@@ -256,7 +256,7 @@ entry:
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_inject
-// CHECK:         (ptr noalias nocapture sret({{.*}}) %0, ptr %T)
+// CHECK:         (ptr noalias sret({{.*}}) %0, ptr %T)
 sil @dynamic_inject : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int64> {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
   // CHECK: call void @swift_storeEnumTagMultiPayload(ptr {{%.*}}, ptr [[TYPE:%.*]], i32 0)
@@ -272,7 +272,7 @@ entry(%e : $*EitherOr<T, Builtin.Int64>):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_project
-// CHECK:         (ptr noalias nocapture sret({{.*}}) %0, ptr %T)
+// CHECK:         (ptr noalias sret({{.*}}) %0, ptr %T)
 sil @dynamic_project : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int64> {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
   %l = unchecked_take_enum_data_addr %e : $*EitherOr<T, Builtin.Int64>, #EitherOr.Left!enumelt
@@ -282,7 +282,7 @@ entry(%e : $*EitherOr<T, Builtin.Int64>):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_switch
-// CHECK:         (ptr noalias nocapture sret({{.*}}) %0, ptr %T)
+// CHECK:         (ptr noalias sret({{.*}}) %0, ptr %T)
 sil @dynamic_switch : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int64> {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
   // CHECK: [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
@@ -323,7 +323,7 @@ next(%x : $Builtin.Int8):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_value_semantics
-// CHECK:         (ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture %1, ptr %T)
+// CHECK:         (ptr noalias sret({{.*}}) %0, ptr noalias %1, ptr %T)
 sil @dynamic_value_semantics : $@convention(thin) <T> (@in EitherOr<T, Builtin.Int64>) -> @out EitherOr<T, Builtin.Int64> {
 entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload
@@ -361,7 +361,7 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_value_semantics2
-// CHECK:         (ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture %1, ptr %T)
+// CHECK:         (ptr noalias sret({{.*}}) %0, ptr noalias %1, ptr %T)
 sil @dynamic_value_semantics2 : $@convention(thin) <T> (@in EitherOr<T, C>) -> @out EitherOr<T, C> {
 entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload

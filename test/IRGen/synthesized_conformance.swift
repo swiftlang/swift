@@ -34,10 +34,10 @@ func doEquality<T: Equatable>(_: T) {}
 // CHECK-LABEL: define{{( dllexport| protected)?}} swiftcc void @"$s23synthesized_conformance8equalityyyF"()
 public func equality() {
     // CHECK: [[Struct_Equatable:%.*]] = call ptr @"$s23synthesized_conformance6StructVySiGACyxGSQAASQRzlWl"()
-    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance10doEqualityyyxSQRzlF"(ptr noalias nocapture {{%.*}}, ptr {{%.*}}, ptr [[Struct_Equatable]])
+    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance10doEqualityyyxSQRzlF"(ptr noalias {{%.*}}, ptr {{%.*}}, ptr [[Struct_Equatable]])
     doEquality(Struct(x: 1))
     // CHECK: [[Enum_Equatable:%.*]] = call ptr @"$s23synthesized_conformance4EnumOySiGACyxGSQAASQRzlWl"()
-    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance10doEqualityyyxSQRzlF"(ptr noalias nocapture {{%.*}}, ptr {{%.*}}, ptr [[Enum_Equatable]])
+    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance10doEqualityyyxSQRzlF"(ptr noalias {{%.*}}, ptr {{%.*}}, ptr [[Enum_Equatable]])
     doEquality(Enum.a(1))
 }
 
@@ -45,15 +45,15 @@ func doEncodable<T: Encodable>(_: T) {}
 // CHECK-LABEL: define{{( dllexport| protected)?}} swiftcc void @"$s23synthesized_conformance9encodableyyF"()
 public func encodable() {
     // CHECK: [[Struct_Encodable:%.*]] = call ptr @"$s23synthesized_conformance6StructVySiGACyxGSEAASeRzSERzlWl"()
-    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance11doEncodableyyxSERzlF"(ptr noalias nocapture {{%.*}}, ptr {{%.*}}, ptr [[Struct_Encodable]])
+    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance11doEncodableyyxSERzlF"(ptr noalias {{%.*}}, ptr {{%.*}}, ptr [[Struct_Encodable]])
     doEncodable(Struct(x: 1))
     // CHECK: [[Enum_Encodable:%.*]] = call ptr @"$s23synthesized_conformance4EnumOySiGACyxGSEAASeRzSERzlWl"()
-    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance11doEncodableyyxSERzlF"(ptr noalias nocapture {{%.*}}, ptr {{%.*}}, ptr [[Enum_Encodable]])
+    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance11doEncodableyyxSERzlF"(ptr noalias {{%.*}}, ptr {{%.*}}, ptr [[Enum_Encodable]])
     doEncodable(Enum.a(1))
     // CHECK: [[Final_Encodable:%.*]] = call ptr @"$s23synthesized_conformance5FinalCySiGACyxGSEAASERzlWl"()
-    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance11doEncodableyyxSERzlF"(ptr noalias nocapture {{%.*}}, ptr {{%.*}}, ptr [[Final_Encodable]])
+    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance11doEncodableyyxSERzlF"(ptr noalias {{%.*}}, ptr {{%.*}}, ptr [[Final_Encodable]])
     doEncodable(Final(x: 1))
     // CHECK: [[Nonfinal_Encodable:%.*]] = call ptr @"$s23synthesized_conformance8NonfinalCySiGACyxGSEAASERzlWl"()
-    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance11doEncodableyyxSERzlF"(ptr noalias nocapture {{%.*}}, ptr {{%.*}}, ptr [[Nonfinal_Encodable]])
+    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance11doEncodableyyxSERzlF"(ptr noalias {{%.*}}, ptr {{%.*}}, ptr [[Nonfinal_Encodable]])
     doEncodable(Nonfinal(x: 1))
 }

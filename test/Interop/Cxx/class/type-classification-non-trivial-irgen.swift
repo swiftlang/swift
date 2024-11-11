@@ -62,7 +62,7 @@ public func testStructWithCopyConstructorAndSubobjectCopyConstructorAndValue()
   return obj.member.value == 42
 }
 
-// CHECK-LABEL: define {{.*}}i1 @"$s4main4test3objSbSo33StructWithCopyConstructorAndValueV_tF"(ptr noalias nocapture dereferenceable(4) %0)
+// CHECK-LABEL: define {{.*}}i1 @"$s4main4test3objSbSo33StructWithCopyConstructorAndValueV_tF"(ptr noalias dereferenceable(4) %0)
 // CHECK: [[VAL:%.*]] = getelementptr inbounds %TSo33StructWithCopyConstructorAndValueV, ptr %0, i32 0, i32 0
 // CHECK: [[VAL_VAL:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[VAL]], i32 0, i32 0
 // CHECK: [[LHS:%.*]] = load i32, ptr [[VAL_VAL]]
@@ -72,7 +72,7 @@ public func test(obj: StructWithCopyConstructorAndValue) -> Bool {
   return obj.value == 42
 }
 
-// CHECK-LABEL: define {{.*}}i1 @"$s4main4test3objSbSo42StructWithSubobjectCopyConstructorAndValueV_tF"(ptr noalias nocapture dereferenceable(4) %0)
+// CHECK-LABEL: define {{.*}}i1 @"$s4main4test3objSbSo42StructWithSubobjectCopyConstructorAndValueV_tF"(ptr noalias dereferenceable(4) %0)
 // CHECK: [[TMP:%.*]] = alloca %TSo33StructWithCopyConstructorAndValueV
 // CHECK: [[MEMBER:%.*]] = getelementptr inbounds %TSo42StructWithSubobjectCopyConstructorAndValueV, ptr %0, i32 0, i32 0
 // CHECK: [[VAL:%.*]] = getelementptr inbounds %TSo33StructWithCopyConstructorAndValueV, ptr [[TMP]], i32 0, i32 0
@@ -84,7 +84,7 @@ public func test(obj: StructWithSubobjectCopyConstructorAndValue) -> Bool {
   return obj.member.value == 42
 }
 
-// CHECK-LABEL: define {{.*}}i1 @"$s4main4test3objSbSo037StructWithCopyConstructorAndSubobjectfgH5ValueV_tF"(ptr noalias nocapture dereferenceable(4) %0)
+// CHECK-LABEL: define {{.*}}i1 @"$s4main4test3objSbSo037StructWithCopyConstructorAndSubobjectfgH5ValueV_tF"(ptr noalias dereferenceable(4) %0)
 // CHECK:[[TEMP:%.*]] = alloca %TSo33StructWithCopyConstructorAndValueV
 // CHECK:[[VAL:%.*]] = getelementptr inbounds %TSo33StructWithCopyConstructorAndValueV, ptr [[TEMP]], i32 0, i32 0
 // CHECK:[[VAL_VAL:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[VAL]], i32 0, i32 0

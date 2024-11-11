@@ -113,7 +113,7 @@ func call_class_bounded_archetype(_ x: ConcreteClass) -> ConcreteClass {
   // CHECK: ret ptr [[OUT_ORIG]]
 }
 
-// CHECK: define hidden swiftcc void @"$s22class_bounded_generics04not_a1_B10_archetype{{[_0-9a-zA-Z]*}}F"(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture %1, ptr %T, ptr %T.NotClassBound)
+// CHECK: define hidden swiftcc void @"$s22class_bounded_generics04not_a1_B10_archetype{{[_0-9a-zA-Z]*}}F"(ptr noalias sret({{.*}}) %0, ptr noalias %1, ptr %T, ptr %T.NotClassBound)
 func not_class_bounded_archetype<T : NotClassBound>(_ x: T) -> T {
   return x
 }

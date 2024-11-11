@@ -18,7 +18,7 @@ entry(%e : $Error):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @alloc_boxed_existential(ptr noalias nocapture %0, ptr %T, ptr %T.Error)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @alloc_boxed_existential(ptr noalias %0, ptr %T, ptr %T.Error)
 sil @alloc_boxed_existential : $@convention(thin) <T: Error> (@in T) -> @owned Error {
 entry(%x : $*T):
   // CHECK: [[BOX_PAIR:%.*]] = call swiftcc { ptr, ptr } @swift_allocError(ptr %T, ptr %T.Error, ptr null, i1 false)

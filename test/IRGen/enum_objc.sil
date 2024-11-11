@@ -109,7 +109,7 @@ struct StructWithWeakVar {
 weak var delegate: delegateProtocol?
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @weak_optional(ptr noalias nocapture dereferenceable({{.*}}) %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @weak_optional(ptr noalias dereferenceable({{.*}}) %0)
 sil @weak_optional : $@convention(thin) (@in StructWithWeakVar?) -> () {
 entry(%x : $*StructWithWeakVar?):
   // CHECK:      icmp eq [[WORD:i32|i64]] {{%.*}}, 0

@@ -25,7 +25,7 @@ func consume<T>(_ t: T) {
 // CHECK: entry:
 // CHECK:   [[METADATA_RESPONSE:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main9NamespaceCA2A4ZangCRszlE19ExtensionNonGenericCyAE_GMa"([[INT]] 0)
 // CHECK:   [[METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
-// CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(ptr noalias nocapture {{%.*}}, ptr [[METADATA]])
+// CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(ptr noalias {{%.*}}, ptr [[METADATA]])
 // CHECK: }
 func doit() {
   consume( Namespace<Zang>.ExtensionNonGeneric() )

@@ -904,7 +904,7 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 
 // Check that a specialization for _Trivial does not call the 'destroy' value witness,
 // because it is known that the object is Trivial, i.e. contains no references.
-// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$s16eager_specialize19copyValueAndReturn2_1sxx_xztlFxxxRlzTlIetilr_Tp5"(ptr noalias nocapture sret(%swift.opaque) %0, ptr noalias nocapture %1, ptr nocapture %2, ptr %S
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$s16eager_specialize19copyValueAndReturn2_1sxx_xztlFxxxRlzTlIetilr_Tp5"(ptr noalias sret(%swift.opaque) %0, ptr noalias %1, ptr %2, ptr %S
 // CHECK-IRGEN-NEXT: entry:
 // CHECK-IRGEN:   %3 = getelementptr inbounds ptr, ptr %S, i{{.*}} -1
 // CHECK-IRGEN-NEXT:   %S.valueWitnesses = load ptr, ptr %3

@@ -51,7 +51,7 @@ import Foundation
 // CHECK: [[L6]]:                                     ; preds = %[[L5]]
 // CHECK-NEXT: %[[T9:.+]] = phi ptr [ %[[T8]], %[[L5]] ]
 // CHECK-NEXT: %[[T10:.+]] = call swiftcc ptr @"$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF"(ptr %[[T6]]) #{{[0-9]+}}
-// CHECK: call swiftcc void @"$sSA7pointeexvs"(ptr noalias nocapture %{{.+}}, ptr %[[T9]], ptr %{{.+}}) #{{[0-9]+}}
+// CHECK: call swiftcc void @"$sSA7pointeexvs"(ptr noalias %{{.+}}, ptr %[[T9]], ptr %{{.+}}) #{{[0-9]+}}
 // CHECK: call void @swift_errorRelease(ptr %[[T6]]) #{{[0-9]+}}
 // CHECK-NEXT: br label %[[L7:.+]]
 

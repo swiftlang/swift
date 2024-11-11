@@ -14,7 +14,7 @@ bb0(%x : $*T):
   %0 = tuple ()
   return %0 : $()
 }
-// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @generic(ptr noalias nocapture %0, ptr %T) {{.*}} {
+// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @generic(ptr noalias %0, ptr %T) {{.*}} {
 //   Allocate it.
 // CHECK:      [[VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr %T, {{(i32|i64)}} -1
 // CHECK-NEXT: [[VWT:%.*]] = load ptr, ptr [[VWT_ADDR]]
@@ -51,7 +51,7 @@ bb0(%x : $*T):
   %0 = tuple ()
   return %0 : $()
 }
-// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @generic_with_reuse(ptr noalias nocapture %0, ptr %T) {{.*}} {
+// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @generic_with_reuse(ptr noalias %0, ptr %T) {{.*}} {
 //   Allocate it.
 // CHECK:      [[VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr %T, {{(i32|i64)}} -1
 // CHECK-NEXT: [[VWT:%.*]] = load ptr, ptr [[VWT_ADDR]]

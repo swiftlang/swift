@@ -44,7 +44,7 @@ public class C<R> {
 
   // SIL-LABEL: // C.f<A>(_:)
   // IR-LABEL: define {{.*}} @"$s1A1CC1fyyqd__lF"
-  // IR-SAME: nocapture %[[ARG_0:.*]], {{.*}} %[[ARG_S:.*]],
+  // IR-SAME: %[[ARG_0:.*]], {{.*}} %[[ARG_S:.*]],
 #sourceLocation(file: "f.swift", line: 1)
   public func f<S>(_ s: S) {
     // SIL: debug_value %0 : $*S, let, name "s", argno 1, expr op_deref, {{.*}} scope [[F]]

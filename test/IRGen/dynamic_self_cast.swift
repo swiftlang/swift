@@ -12,7 +12,7 @@ public class SelfCasts {
     return s as! Self
   }
 
-  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc ptr @"$s17dynamic_self_cast9SelfCastsC09genericToD0yACXDxlFZ"(ptr noalias nocapture %0, ptr %T, ptr swiftself %1)
+  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc ptr @"$s17dynamic_self_cast9SelfCastsC09genericToD0yACXDxlFZ"(ptr noalias %0, ptr %T, ptr swiftself %1)
   // CHECK: call zeroext i1 @swift_dynamicCast(ptr {{%.*}}, ptr {{%.*}}, ptr %T, ptr %1, {{.*}})
   // CHECK: ret
   public static func genericToSelf<T>(_ s: T) -> Self {
@@ -26,7 +26,7 @@ public class SelfCasts {
     return s as! Self
   }
 
-  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc void @"$s17dynamic_self_cast9SelfCastsC011genericFromD0xylFZ"(ptr noalias nocapture sret({{.*}}) %0, ptr %T, ptr swiftself %1)
+  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc void @"$s17dynamic_self_cast9SelfCastsC011genericFromD0xylFZ"(ptr noalias sret({{.*}}) %0, ptr %T, ptr swiftself %1)
   // CHECK: call zeroext i1 @swift_dynamicCast(ptr {{%.*}}, ptr {{%.*}}, ptr %1, ptr %T, {{.*}})
   // CHECK: ret
   public static func genericFromSelf<T>() -> T {
@@ -49,7 +49,7 @@ public class SelfCasts {
     return s as? Self
   }
 
-  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc {{i32|i64}} @"$s17dynamic_self_cast9SelfCastsC09genericToD11ConditionalyACXDSgxlFZ"(ptr noalias nocapture %0, ptr %T, ptr swiftself %1)
+  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc {{i32|i64}} @"$s17dynamic_self_cast9SelfCastsC09genericToD11ConditionalyACXDSgxlFZ"(ptr noalias %0, ptr %T, ptr swiftself %1)
   // CHECK: call zeroext i1 @swift_dynamicCast(ptr {{%.*}}, ptr {{%.*}}, ptr %T, ptr %1, {{.*}})
   // CHECK: ret
   public static func genericToSelfConditional<T>(_ s: T) -> Self? {
@@ -63,7 +63,7 @@ public class SelfCasts {
     return s as? Self
   }
 
-  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc void @"$s17dynamic_self_cast9SelfCastsC011genericFromD11ConditionalxSgylFZ"(ptr noalias nocapture sret({{.*}}) %0, ptr %T, ptr swiftself %1)
+  // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc void @"$s17dynamic_self_cast9SelfCastsC011genericFromD11ConditionalxSgylFZ"(ptr noalias sret({{.*}}) %0, ptr %T, ptr swiftself %1)
   // CHECK: call zeroext i1 @swift_dynamicCast(ptr {{%.*}}, ptr {{%.*}}, ptr %1, ptr %T, {{.*}})
   // CHECK: ret
   public static func genericFromSelfConditional<T>() -> T? {

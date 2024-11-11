@@ -30,7 +30,7 @@ struct Owl<T : Runcible, U> {
 class Pussycat<T : Runcible, U> {
   init() {} 
 
-  // CHECK: define hidden swiftcc void @"$s16associated_types8PussycatC3eat{{[_0-9a-zA-Z]*}}F"(ptr noalias nocapture %0, ptr noalias nocapture %1, ptr noalias nocapture %2, ptr swiftself %3)
+  // CHECK: define hidden swiftcc void @"$s16associated_types8PussycatC3eat{{[_0-9a-zA-Z]*}}F"(ptr noalias %0, ptr noalias %1, ptr noalias %2, ptr swiftself %3)
   func eat(_ what: T.RuncerType.Runcee, and: T.RuncerType, with: T) { }
 }
 
@@ -71,7 +71,7 @@ func testFastRuncible<T: Runcible, U: FastRuncible>(_ t: T, u: U)
   U.RuncerType.Runcee.accelerate()
 }
 
-// CHECK: define hidden swiftcc void @"$s16associated_types16testFastRuncible_1uyx_q_tAA0E0RzAA0dE0R_10RuncerTypeQy_AFRtzr0_lF"(ptr noalias nocapture %0, ptr noalias nocapture %1, ptr %T, ptr %U, ptr %T.Runcible, ptr %U.FastRuncible) {{.*}} {
+// CHECK: define hidden swiftcc void @"$s16associated_types16testFastRuncible_1uyx_q_tAA0E0RzAA0dE0R_10RuncerTypeQy_AFRtzr0_lF"(ptr noalias %0, ptr noalias %1, ptr %T, ptr %U, ptr %T.Runcible, ptr %U.FastRuncible) {{.*}} {
 //   1. Get the type metadata for U.RuncerType.Runcee.
 //     1a. Get the type metadata for U.RuncerType.
 //         Note that we actually look things up in T, which is going to prove unfortunate.
