@@ -514,7 +514,7 @@ class LoopRotation : public SILFunctionTransform {
     }
 
     if (changed) {
-      updateBorrowedFrom(PM, f);
+      updateAllBorrowArguments(PM, f);
       // We preserve loop info and the dominator tree.
       domAnalysis->lockInvalidation();
       loopAnalysis->lockInvalidation();

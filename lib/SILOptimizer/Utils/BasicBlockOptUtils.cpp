@@ -169,7 +169,7 @@ void BasicBlockCloner::updateSSAAfterCloning() {
       }
     }
   }
-  updateBorrowedFromPhis(pm, updateSSAPhis);
+  updateBorrowArguments(pm, updateSSAPhis);
 }
 
 void BasicBlockCloner::sinkAddressProjections() {

@@ -1,4 +1,4 @@
-//===--- BorrowedFromUpdater.swift ----------------------------------------===//
+//===--- BorrowArgumentsUpdater.swift -------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -98,8 +98,8 @@ private func addEnclosingValues(
   return true
 }
 
-func registerBorrowedFromUpdater() {
-  BridgedUtilities.registerBorrowedFromUpdater(
+func registerBorrowArgumentsUpdater() {
+  BridgedUtilities.registerBorrowArgumentsUpdater(
     { (bridgedCtxt: BridgedPassContext, bridgedFunction: BridgedFunction) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
       let function = bridgedFunction.function;

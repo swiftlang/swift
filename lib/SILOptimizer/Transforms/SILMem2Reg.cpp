@@ -2297,7 +2297,7 @@ class SILMem2Reg : public SILFunctionTransform {
                                         accessBlockAnalysis, calleeAnalysis)
                           .run();
     if (madeChange) {
-      updateBorrowedFrom(getPassManager(), f);
+      updateAllBorrowArguments(getPassManager(), f);
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }
