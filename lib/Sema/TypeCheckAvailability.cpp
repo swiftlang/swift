@@ -535,8 +535,8 @@ private:
     return MacroWalking::Arguments;
   }
 
-  /// Check whether this declaration is in a source file buried within
-  /// a macro expansion of the
+  /// Check whether this declaration is within a macro expansion buffer that
+  /// will have its own type refinement context that will be lazily expanded.
   bool isDeclInMacroExpansion(Decl *decl) const override {
     // If it's not in a macro expansion relative to its context, it's not
     // considered to be in a macro expansion.
