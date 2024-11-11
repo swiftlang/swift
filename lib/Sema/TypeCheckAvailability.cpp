@@ -535,6 +535,69 @@ private:
     return MacroWalking::Arguments;
   }
 
+  /// Check whether this declaration is in a source file buried within
+  /// a macro expansion of the
+  bool isDeclInMacroExpansion(Decl *decl) const override {
+    // If it's not in a macro expansion relative to its context, it's not
+    // considered to be in a macro expansion.
+    if (!decl->isInMacroExpansionInContext())
+      return false;
+
+    auto module = decl->getDeclContext()->getParentModule();
+    auto *declFile = module->getSourceFileContainingLocation(decl->getLoc());
+    if (!declFile)
+      return false;
+
+    // Look for a parent context that implies that we are producing a
+    // type refinement context for this expansion.
+    for (auto iter = ContextStack.rbegin(), endIter = ContextStack.rend();
+         iter != endIter; ++iter) {
+      const auto &context = *iter;
+      if (auto contextRTC = context.TRC) {
+        // If the context is the same source file, don't treat it as an
+        // expansion.
+        auto introNode = contextRTC->getIntroductionNode();
+        switch (auto reason = contextRTC->getReason()) {
+        case TypeRefinementContext::Reason::Root:
+          if (auto contextFile = introNode.getAsSourceFile())
+            if (declFile == contextFile)
+              return false;
+
+          break;
+
+        case TypeRefinementContext::Reason::Decl:
+        case TypeRefinementContext::Reason::DeclImplicit:
+          // If the context is a declaration, check whether the declaration
+          // is in the same source file as this declaration.
+          if (auto contextDecl = introNode.getAsDecl()) {
+            if (decl == contextDecl)
+              return false;
+
+            auto contextModule =
+                contextDecl->getDeclContext()->getParentModule();
+            SourceLoc contextDeclLoc = contextDecl->getLoc();
+            auto contextDeclFile =
+                contextModule->getSourceFileContainingLocation(contextDeclLoc);
+            if (declFile == contextDeclFile)
+              return false;
+          }
+          break;
+
+          case TypeRefinementContext::Reason::IfStmtThenBranch:
+          case TypeRefinementContext::Reason::IfStmtElseBranch:
+          case TypeRefinementContext::Reason::ConditionFollowingAvailabilityQuery:
+          case TypeRefinementContext::Reason::GuardStmtFallthrough:
+          case TypeRefinementContext::Reason::GuardStmtElseBranch:
+          case TypeRefinementContext::Reason::WhileStmtBody:
+            // Nothing to check here.
+            break;
+        }
+      }
+    }
+
+    return true;
+  }
+
   bool shouldSkipDecl(Decl *D) const {
     // Only visit a node that has a corresponding concrete syntax node if we are
     // already walking that concrete syntax node.
