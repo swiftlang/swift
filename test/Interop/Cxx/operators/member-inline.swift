@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift)
 //
 // REQUIRES: executable_test
 
@@ -381,6 +381,18 @@ OperatorsTestSuite.test("DerivedFromConstIterator.pointee") {
 OperatorsTestSuite.test("SubscriptSetterConst") {
   var setterConst = SubscriptSetterConst()
   setterConst[0] = 10
+}
+
+OperatorsTestSuite.test("DerivedFromConstIteratorPrivatelyWithUsingDecl.pointee") {
+  let stars = DerivedFromConstIteratorPrivatelyWithUsingDecl()
+  let res = stars.pointee
+  expectEqual(234, res)
+}
+
+OperatorsTestSuite.test("DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl.pointee") {
+  let stars = DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl()
+  let res = stars.pointee
+  expectEqual(567, res)
 }
 
 runAllTests()

@@ -796,6 +796,11 @@ static llvm::cl::opt<bool>
                      llvm::cl::desc("Enable C++ interop."),
                      llvm::cl::cat(Category), llvm::cl::init(false));
 
+static llvm::cl::opt<std::string>
+    CxxInteropVersion("cxx-interoperability-mode",
+                      llvm::cl::desc("C++ interop mode."),
+                      llvm::cl::cat(Category));
+
 static llvm::cl::opt<bool>
     CxxInteropGettersSettersAsProperties("cxx-interop-getters-setters-as-properties",
         llvm::cl::desc("Imports getters and setters as computed properties."),
@@ -4382,6 +4387,14 @@ int main(int argc, char *argv[]) {
   }
   if (options::EnableCxxInterop) {
     InitInvok.getLangOptions().EnableCXXInterop = true;
+  }
+  if (!options::CxxInteropVersion.empty()) {
+    InitInvok.getLangOptions().EnableCXXInterop = true;
+    if (options::CxxInteropVersion == "upcoming-swift")
+      InitInvok.getLangOptions().cxxInteropCompatVersion =
+          version::Version({version::getUpcomingCxxInteropCompatVersion()});
+    else
+      llvm::errs() << "invalid CxxInteropVersion\n";
   }
   if (options::CxxInteropGettersSettersAsProperties) {
     InitInvok.getLangOptions().CxxInteropGettersSettersAsProperties = true;
