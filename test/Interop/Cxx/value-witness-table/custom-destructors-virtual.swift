@@ -6,7 +6,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -fno-rtti -O)
 //
 // REQUIRES: executable_test
-// XFAIL: OS=windows-msvc
 
 import CustomDestructor
 import StdlibUnittest
