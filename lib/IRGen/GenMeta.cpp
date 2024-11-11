@@ -2535,7 +2535,7 @@ namespace {
 
           SmallVector<llvm::BasicBlock *, 4> conditionalTypes;
 
-          // Pre-allocate a basic block per condition, so there it's
+          // Pre-allocate a basic block per condition, so that it's
           // possible to jump between conditions.
           for (unsigned index : indices(substitutionSet)) {
             conditionalTypes.push_back(
@@ -2619,7 +2619,7 @@ namespace {
           auto universal = substitutionSet.back();
 
           assert(universal->getAvailability().size() == 1 &&
-                 universal->getAvailability()[0].first.isEmpty());
+                 universal->getAvailability()[0].first.isAll());
 
           IGF.Builder.CreateRet(
               getResultValue(IGF, genericEnv, universal->getSubstitutions()));

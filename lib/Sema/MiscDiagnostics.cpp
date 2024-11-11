@@ -3469,7 +3469,6 @@ public:
     }
 
     // Check whether all of the underlying type candidates match up.
-    // TODO [OPAQUE SUPPORT]: diagnose multiple opaque types
 
     // There is a single unique signature, which means that all returns
     // matched.
@@ -3596,6 +3595,7 @@ public:
 
     SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *, 4>
         conditionalSubstitutions;
+    SubstitutionMap universalSubstMap = std::get<1>(universallyAvailable);
 
     for (const auto &entry : Candidates) {
       auto availabilityContext = entry.first;
@@ -3604,24 +3604,45 @@ public:
       if (!availabilityContext)
         continue;
 
+      unsigned neverAvailableCount = 0, alwaysAvailableCount = 0;
       SmallVector<AvailabilityCondition, 4> conditions;
 
       for (const auto &elt : availabilityContext->getCond()) {
         auto condition = elt.getAvailability();
 
         auto availabilityRange = condition->getAvailableRange();
-        // If there is no lower endpoint it means that the
-        // current platform is unrelated to this condition
-        // and we can ignore it.
-        if (!availabilityRange.hasLowerEndpoint())
+        // If there is no lower endpoint it means that the condition has no
+        // OS version specification that matches the target platform.
+        if (!availabilityRange.hasLowerEndpoint()) {
+          // An inactive #unavailable condition trivially evaluates to false.
+          if (condition->isUnavailability()) {
+            neverAvailableCount++;
+            continue;
+          }
+
+          // An inactive #available condition trivially evaluates to true.
+          alwaysAvailableCount++;
           continue;
+        }
 
         conditions.push_back(
             {availabilityRange, condition->isUnavailability()});
       }
 
-      if (conditions.empty())
+      // If there were any conditions that were always false, then this
+      // candidate is unreachable at runtime.
+      if (neverAvailableCount > 0)
         continue;
+
+      // If all the conditions were trivially true, then this candidate is
+      // effectively a universally available candidate and the rest of the
+      // candidates should be ignored since they are unreachable.
+      if (alwaysAvailableCount == availabilityContext->getCond().size()) {
+        universalSubstMap = std::get<1>(candidate);
+        break;
+      }
+
+      ASSERT(conditions.size() > 0);
 
       conditionalSubstitutions.push_back(
           OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
@@ -3632,9 +3653,8 @@ public:
     // Add universally available choice as the last one.
     conditionalSubstitutions.push_back(
         OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-            Ctx, {{VersionRange::empty(), /*unavailable=*/false}},
-            std::get<1>(universallyAvailable)
-                .mapReplacementTypesOutOfContext()));
+            Ctx, {{VersionRange::all(), /*unavailable=*/false}},
+            universalSubstMap.mapReplacementTypesOutOfContext()));
 
     OpaqueDecl->setConditionallyAvailableSubstitutions(
         conditionalSubstitutions);
