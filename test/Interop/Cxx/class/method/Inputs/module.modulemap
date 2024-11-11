@@ -14,3 +14,8 @@ module UnsafeProjections {
   
   export *
 }
+
+module InRegSRet {
+  header "inreg-sret.h"
+  requires cplusplus
+}
