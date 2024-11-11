@@ -138,9 +138,10 @@ namespace swift {
       return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
 
-    // Only emit diagnostics in the expansion of macros.
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
+      // Macro expansions will be walked when they're type-checked, not as
+      // part of the surrounding code.
+      return MacroWalking::None;
     }
   };
 

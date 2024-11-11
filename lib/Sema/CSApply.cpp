@@ -408,12 +408,33 @@ namespace {
   /// Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
+    // Delayed items to type-check.
+    SmallVector<Decl *, 4> LocalDeclsToTypeCheck;
+    SmallVector<MacroExpansionExpr *, 4> MacrosToExpand;
+
   public:
     ConstraintSystem &cs;
     DeclContext *dc;
     Solution &solution;
     std::optional<SyntacticElementTarget> target;
     bool SuppressDiagnostics;
+
+    ExprRewriter(ConstraintSystem &cs, Solution &solution,
+                 std::optional<SyntacticElementTarget> target,
+                 bool suppressDiagnostics)
+        : cs(cs), dc(target ? target->getDeclContext() : cs.DC),
+          solution(solution), target(target),
+          SuppressDiagnostics(suppressDiagnostics) {}
+
+    ConstraintSystem &getConstraintSystem() const { return cs; }
+
+    void addLocalDeclToTypeCheck(Decl *D) {
+      LocalDeclsToTypeCheck.push_back(D);
+    }
+
+    void addMacroToExpand(MacroExpansionExpr *E) {
+      MacrosToExpand.push_back(E);
+    }
 
     /// Coerce the given tuple to another tuple type.
     ///
@@ -2631,15 +2652,6 @@ namespace {
     }
     
   public:
-    ExprRewriter(ConstraintSystem &cs, Solution &solution,
-                 std::optional<SyntacticElementTarget> target,
-                 bool suppressDiagnostics)
-        : cs(cs), dc(target ? target->getDeclContext() : cs.DC),
-          solution(solution), target(target),
-          SuppressDiagnostics(suppressDiagnostics) {}
-
-    ConstraintSystem &getConstraintSystem() const { return cs; }
-
     /// Simplify the expression type and return the expression.
     ///
     /// This routine is used for 'simple' expressions that only need their
@@ -5528,16 +5540,19 @@ namespace {
 
       // FIXME: Expansion should be lazy.
       // i.e. 'ExpandMacroExpansionExprRequest' should be sinked into
-      // 'getRewritten()', and performed on-demand.
+      // 'getRewritten()', and performed on-demand. Unfortunately that requires
+      // auditing every ASTWalker's `getMacroWalkingBehavior` since
+      // `MacroWalking::Expansion` does not actually kick expansion.
       if (!cs.Options.contains(ConstraintSystemFlags::DisableMacroExpansions) &&
           // Do not expand macros inside macro arguments. For example for
           // '#stringify(#assert(foo))' when typechecking `#assert(foo)`,
           // we don't want to expand it.
           llvm::none_of(llvm::ArrayRef(ExprStack).drop_back(1),
                         [](Expr *E) { return isa<MacroExpansionExpr>(E); })) {
-        (void)evaluateOrDefault(cs.getASTContext().evaluator,
-                                ExpandMacroExpansionExprRequest{E},
-                                std::nullopt);
+        // We need to delay the expansion until we're done applying the solution
+        // since running MiscDiagnostics on the expansion may walk up and query
+        // the type of a parent closure, e.g `diagnoseImplicitSelfUseInClosure`.
+        addMacroToExpand(E);
       }
 
       cs.cacheExprTypes(E);
@@ -5603,6 +5618,18 @@ namespace {
             .diagnose(coercion->getLoc(),
                       diag::add_consume_to_silence)
             .fixItInsert(coercion->getStartLoc(), "consume ");
+      }
+
+      // Type-check any local decls encountered.
+      for (auto *D : LocalDeclsToTypeCheck)
+        TypeChecker::typeCheckDecl(D);
+
+      // Expand any macros encountered.
+      // FIXME: Expansion should be lazy.
+      auto &eval = cs.getASTContext().evaluator;
+      for (auto *E : MacrosToExpand) {
+        (void)evaluateOrDefault(eval, ExpandMacroExpansionExprRequest{E},
+                                std::nullopt);
       }
     }
 
@@ -8807,22 +8834,15 @@ namespace {
 
   class ExprWalker : public ASTWalker, public SyntacticElementTargetRewriter {
     ExprRewriter &Rewriter;
-    SmallVector<Decl *, 4> LocalDeclsToTypeCheck;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
-
-    ~ExprWalker() {
-      // Type-check any local decls encountered.
-      for (auto *D : LocalDeclsToTypeCheck)
-        TypeChecker::typeCheckDecl(D);
-    }
 
     Solution &getSolution() const override { return Rewriter.solution; }
     DeclContext *&getCurrentDC() const override { return Rewriter.dc; }
 
     void addLocalDeclToTypeCheck(Decl *D) override {
-      LocalDeclsToTypeCheck.push_back(D);
+      Rewriter.addLocalDeclToTypeCheck(D);
     }
 
     bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {

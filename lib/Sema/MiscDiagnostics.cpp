@@ -97,10 +97,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     DiagnoseWalker(const DeclContext *DC, bool isExprStmt)
         : IsExprStmt(isExprStmt), Ctx(DC->getASTContext()), DC(DC) {}
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
-
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       return Action::Continue();
     }
@@ -1582,7 +1578,9 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
     }
 
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
+      // Macro expansions will be walked when they're type-checked, not as
+      // part of the surrounding code.
+      return MacroWalking::None;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -4597,7 +4595,9 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
 
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
+      // Macro expansions will be walked when they're type-checked, not as
+      // part of the surrounding code.
+      return MacroWalking::None;
     }
 
     PreWalkResult<ArgumentList *>
@@ -4720,7 +4720,9 @@ public:
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
 
   MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
+    // Macro expansions will be walked when they're type-checked, not as
+    // part of the surrounding code.
+    return MacroWalking::None;
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
@@ -5582,7 +5584,9 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
     }
 
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
+      // Macro expansions will be walked when they're type-checked, not as
+      // part of the surrounding code.
+      return MacroWalking::None;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -5655,7 +5659,9 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
     }
 
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
+      // Macro expansions will be walked when they're type-checked, not as
+      // part of the surrounding code.
+      return MacroWalking::None;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -5740,7 +5746,9 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
     }
 
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
+      // Macro expansions will be walked when they're type-checked, not as
+      // part of the surrounding code.
+      return MacroWalking::None;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -5791,7 +5799,9 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
     }
 
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
+      // Macro expansions will be walked when they're type-checked, not as
+      // part of the surrounding code.
+      return MacroWalking::None;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -5922,7 +5932,9 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
     }
 
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
+      // Macro expansions will be walked when they're type-checked, not as
+      // part of the surrounding code.
+      return MacroWalking::None;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -5955,7 +5967,9 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) {}
 
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
+      // Macro expansions will be walked when they're type-checked, not as
+      // part of the surrounding code.
+      return MacroWalking::None;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -6110,7 +6124,9 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()) {}
 
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
+      // Macro expansions will be walked when they're type-checked, not as
+      // part of the surrounding code.
+      return MacroWalking::None;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
