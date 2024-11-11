@@ -326,6 +326,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION")
   endif()
 
+  if(SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
+    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS")
+  endif()
+
   if(SWIFT_ENABLE_SYNCHRONIZATION)
     list(APPEND result "-D" "SWIFT_ENABLE_SYNCHRONIZATION")
   endif()
