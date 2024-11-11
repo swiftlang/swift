@@ -2848,6 +2848,15 @@ public:
     return Bits.ValueDecl.IsUserAccessible;
   }
 
+  /// Whether this decl has been synthesized by the compiler for use by the
+  /// user.
+  ///
+  /// This is a refinement of isImplicit; all synthesized decls are implicit,
+  /// but not all implicit decls are synthesized. The difference comes down to
+  /// whether or not the decl is user-facing, e.g the implicit memberwise
+  /// initializer is considered synthesized. Decls that are only meant for the
+  /// compiler, e.g the implicit FuncDecl for a DeferStmt, are not considered
+  /// synthesized.
   bool isSynthesized() const {
     return Bits.ValueDecl.Synthesized;
   }
