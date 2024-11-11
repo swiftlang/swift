@@ -350,7 +350,8 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
                                         llvm::AttributeList &attrs,
                                         unsigned paramIndex, bool allowSRet,
                                         llvm::Type *storageType,
-                                        const TypeInfo &typeInfo) {
+                                        const TypeInfo &typeInfo,
+                                        bool useInReg = false) {
   llvm::AttrBuilder b(IGM.getLLVMContext());
   b.addAttribute(llvm::Attribute::NoAlias);
   // Bitwise takable value types are guaranteed not to capture
@@ -360,6 +361,8 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
   if (allowSRet) {
     assert(storageType);
     b.addStructRetAttr(storageType);
+    if (useInReg)
+      b.addAttribute(llvm::Attribute::InReg);
   }
   attrs = attrs.addParamAttributes(IGM.getLLVMContext(), paramIndex, b);
 }
@@ -467,7 +470,7 @@ namespace {
 
   private:
     const TypeInfo &expand(SILParameterInfo param);
-    llvm::Type *addIndirectResult(SILType resultType);
+    llvm::Type *addIndirectResult(SILType resultType, bool useInReg = false);
 
     SILFunctionConventions getSILFuncConventions() const {
       return SILFunctionConventions(FnType, IGM.getSILModule());
@@ -521,11 +524,12 @@ namespace {
 } // end namespace irgen
 } // end namespace swift
 
-llvm::Type *SignatureExpansion::addIndirectResult(SILType resultType) {
+llvm::Type *SignatureExpansion::addIndirectResult(SILType resultType,
+                                                  bool useInReg) {
   const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
   auto storageTy = resultTI.getStorageType();
   addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet(),
-                              storageTy, resultTI);
+                              storageTy, resultTI, useInReg);
   addPointerParameter(storageTy);
   return IGM.VoidTy;
 }
@@ -1560,9 +1564,9 @@ void SignatureExpansion::expandExternalSignatureTypes() {
       // returned indirect values.
       emitArg(0);
       firstParamToLowerNormally = 1;
-      addIndirectResult(resultType);
+      addIndirectResult(resultType, returnInfo.getInReg());
     } else
-      addIndirectResult(resultType);
+      addIndirectResult(resultType, returnInfo.getInReg());
   }
 
   // Use a special IR type for passing block pointers.
