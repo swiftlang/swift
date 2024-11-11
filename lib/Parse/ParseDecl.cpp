@@ -7914,7 +7914,8 @@ bool Parser::parseAccessorAfterIntroducer(
   if (requiresFeatureCoroutineAccessors(Kind) &&
       !Context.LangOpts.hasFeature(Feature::CoroutineAccessors)) {
     diagnose(Tok, diag::accessor_requires_coroutine_accessors,
-             getAccessorNameForDiagnostic(Kind, /*article*/ false));
+             getAccessorNameForDiagnostic(Kind, /*article*/ false,
+                                          /*underscored*/ false));
   }
 
   // There should be no body in the limited syntax; diagnose unexpected
@@ -7922,7 +7923,8 @@ bool Parser::parseAccessorAfterIntroducer(
   if (parsingLimitedSyntax) {
     if (Tok.is(tok::l_brace))
       diagnose(Tok, diag::unexpected_getset_implementation_in_protocol,
-               getAccessorNameForDiagnostic(Kind, /*article*/ false));
+               getAccessorNameForDiagnostic(Kind, /*article*/ false,
+                                            /*underscored*/ false));
     return false;
   }
 

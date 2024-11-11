@@ -717,13 +717,19 @@ static void diagnoseReadWriteMutatingnessMismatch(
   auto disagreesWithWriter = (isWriterMutating != isModifierMutating);
   auto disagreesWithBoth = disagreesWithReader && disagreesWithWriter;
 
+  bool hasCoroutineAccessorFeature =
+      storage->getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors);
+
   auto readerAccessor = directAccessorKindForReadImpl(storage->getReadImpl());
   StringRef readerAccessorName =
       readerAccessor.has_value()
-          ? getAccessorNameForDiagnostic(*readerAccessor, /*article=*/false)
+          ? getAccessorNameForDiagnostic(
+                *readerAccessor, /*article=*/false,
+                /*underscored=*/hasCoroutineAccessorFeature)
           : "the inherited accessor";
   StringRef writerAccessorName =
-      getAccessorNameForDiagnostic(writerAccesor, /*article=*/false);
+      getAccessorNameForDiagnostic(writerAccesor, /*article=*/false,
+                                   /*underscored=*/hasCoroutineAccessorFeature);
   unsigned diagnosticForm;
   if (isModifierMutating) {
     // modifier can't be mutating when both the setter is nonmutating and the
@@ -745,16 +751,20 @@ static void diagnoseReadWriteMutatingnessMismatch(
 
   modifyAccessor->diagnose(
       diag::readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,
-      getAccessorNameForDiagnostic(readWriterAccessor, /*article=*/false),
+      getAccessorNameForDiagnostic(readWriterAccessor, /*article=*/false,
+                                   /*underscored=*/hasCoroutineAccessorFeature),
       isModifierMutating ? SelfAccessKind::Mutating
                          : SelfAccessKind::NonMutating,
       diagnosticForm, writerAccessorName, SelfAccessKind::NonMutating,
       readerAccessorName, SelfAccessKind::Mutating);
   auto *writer = storage->getParsedAccessor(writerAccesor);
   if (disagreesWithWriter && writer) {
-    writer->diagnose(
-        diag::previous_accessor,
-        getAccessorNameForDiagnostic(writerAccesor, /*article=*/false), 0);
+    writer->diagnose(diag::previous_accessor,
+                     getAccessorNameForDiagnostic(
+                         writerAccesor,
+                         /*article=*/false,
+                         /*underscored=*/hasCoroutineAccessorFeature),
+                     0);
   }
   AccessorDecl *reader = nullptr;
   if (disagreesWithReader && readerAccessor.has_value() &&
@@ -3960,6 +3970,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);
   bool hasDidSet = storage->getParsedAccessor(AccessorKind::DidSet);
+  bool hasCoroutineAccessorFeature =
+      storage->getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors);
   if ((hasWillSet || hasDidSet) && !isa<SubscriptDecl>(storage)) {
     // Observers conflict with non-observers.
     AccessorDecl *firstNonObserver = nullptr;
@@ -3972,19 +3984,21 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
     if (firstNonObserver) {
       if (auto willSet = storage->getParsedAccessor(AccessorKind::WillSet)) {
-        willSet->diagnose(
-            diag::observing_accessor_conflicts_with_accessor, 0,
-            getAccessorNameForDiagnostic(
-                firstNonObserver->getAccessorKind(), /*article=*/ true));
+        willSet->diagnose(diag::observing_accessor_conflicts_with_accessor, 0,
+                          getAccessorNameForDiagnostic(
+                              firstNonObserver->getAccessorKind(),
+                              /*article=*/true,
+                              /*underscored=*/hasCoroutineAccessorFeature));
         willSet->setInvalid();
         hasWillSet = false;
       }
 
       if (auto didSet = storage->getParsedAccessor(AccessorKind::DidSet)) {
-        didSet->diagnose(
-            diag::observing_accessor_conflicts_with_accessor, 1,
-            getAccessorNameForDiagnostic(
-              firstNonObserver->getAccessorKind(), /*article=*/ true));
+        didSet->diagnose(diag::observing_accessor_conflicts_with_accessor, 1,
+                         getAccessorNameForDiagnostic(
+                             firstNonObserver->getAccessorKind(),
+                             /*article=*/true,
+                             /*underscored=*/hasCoroutineAccessorFeature));
         didSet->setInvalid();
         hasDidSet = false;
       }

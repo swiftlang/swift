@@ -261,8 +261,8 @@ var im_m: Int {
   modify { // expected-disabled-error{{cannot_find_in_scope}}
     fatalError()
   }
-  _modify { // expected-enabled-error{{variable with a 'modify' accessor must also have a getter, addressor, or 'read' accessor}}
-             // expected-disabled-error@-1{{cannot_find_in_scope}}
+  _modify { // expected-enabled-error{{variable with a '_modify' accessor must also have a getter, addressor, or 'read' accessor}}
+            // expected-disabled-error@-1{{cannot_find_in_scope}}
     fatalError()
   }
 }
@@ -270,7 +270,8 @@ var im_m: Int {
 // enabled: need a reader.
 // disabled: implicit getter.
 var i_mm: Int {
-  _modify { // expected-error{{variable with a 'modify' accessor must also have a getter, addressor, or 'read' accessor}}
+  _modify { // expected-enabled-error{{variable with a '_modify' accessor must also have a getter, addressor, or 'read' accessor}}
+            // expected-disabled-error@-1{{variable with a 'modify' accessor must also have a getter, addressor, or 'read' accessor}}
     fatalError()
   }
   modify { // expected-disabled-error{{'modify' accessor is only valid when experimental feature coroutine accessors is enabled}}
