@@ -64,13 +64,8 @@ bb1(%phi : @guaranteed $FakeOptional<C>):
   return %retval : $()
 }
 
-// An unreachable phi currently looks like a reborrow.
-//
-// TODO: When we have a reborrow flag, an unreachable phi can be
-// either a reborrow or forwarded, as long as it has no end_borrow.
-
 // CHECK-LABEL: sil [ossa] @introducer_unreachable : $@convention(thin) () -> () {
-// CHECK:       bb1([[A:%.*]] : @reborrow @guaranteed $C):
+// CHECK:       bb1([[A:%.*]] : @guaranteed $C):
 // CHECK-NEXT:    [[B:%.*]] = borrowed [[A]] : $C from ()
 // CHECK:       } // end sil function 'introducer_unreachable'
 sil [ossa] @introducer_unreachable : $@convention(thin) () -> () {

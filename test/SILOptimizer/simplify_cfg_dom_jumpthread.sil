@@ -49,6 +49,13 @@ enum E {
 	case C
 }
 
+enum E2 {
+  case a
+  case b(C)
+  case c(C)
+}
+
+
 class Base { }
 
 class Derived1 : Base { }
@@ -431,3 +438,62 @@ bb5(%a3 : $Builtin.Int64):
   return %a3 : $Builtin.Int64
 }
 
+// CHECK-LABEL: sil [ossa] @test_reborrow_flag1 :
+// CHECK-NOT:     @reborrow
+// CHECK:       } // end sil function 'test_reborrow_flag1'
+sil [ossa] @test_reborrow_flag1 : $@convention(thin) (@guaranteed E2) -> () {
+bb0(%0 : @guaranteed $E2):
+  %1 = begin_borrow %0 : $E2
+  switch_enum %1 : $E2, case #E2.b!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $C):
+  br bb3
+
+bb2(%5 : @guaranteed $E2):
+  br bb3
+
+bb3:
+  switch_enum %1 : $E2, case #E2.c!enumelt: bb4, default bb5
+
+bb4(%8 : @guaranteed $C):
+  end_borrow %1 : $E2
+  br bb6
+
+bb5(%11 : @guaranteed $E2):
+  end_borrow %1 : $E2
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_reborrow_flag2 :
+// CHECK:         @reborrow
+// CHECK:       } // end sil function 'test_reborrow_flag2'
+sil [ossa] @test_reborrow_flag2 : $@convention(thin) (@guaranteed E2, @in_guaranteed E2) -> () {
+bb0(%0 : @guaranteed $E2, %1 : $*E2):
+  switch_enum %0 : $E2, case #E2.b!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $C):
+  br bb3
+
+bb2(%5 : @guaranteed $E2):
+  br bb3
+
+bb3:
+  %6 = load_borrow %1 : $*E2
+  switch_enum %0 : $E2, case #E2.c!enumelt: bb4, default bb5
+
+bb4(%8 : @guaranteed $C):
+  br bb6
+
+bb5(%11 : @guaranteed $E2):
+  br bb6
+
+bb6:
+  fix_lifetime %6 : $E2
+  end_borrow %6 : $E2
+  %r = tuple ()
+  return %r : $()
+}

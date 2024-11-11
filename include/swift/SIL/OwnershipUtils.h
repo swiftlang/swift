@@ -57,14 +57,6 @@ bool canOpcodeForwardInnerGuaranteedValues(SILValue value);
 /// the operation may be trivially rewritten with Guaranteed ownership.
 bool canOpcodeForwardInnerGuaranteedValues(Operand *use);
 
-bool computeIsScoped(SILArgument *arg);
-
-bool computeIsReborrow(SILArgument *arg);
-
-// This is the use-def equivalent of use->getOperandOwnership() ==
-// OperandOwnership::GuaranteedForwarding.
-bool computeIsGuaranteedForwarding(SILValue value);
-
 /// Is the opcode that produces \p value capable of forwarding owned values?
 ///
 /// This may be true even if the current instance of the instruction is not a
