@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/unsafe_swift_decls.swiftmodule %S/Inputs/unsafe_swift_decls.swift -enable-experimental-feature AllowUnsafeAttribute
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -I %t
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -I %t -print-diagnostic-groups
 
 // Make sure everything compiles without error when unsafe code is allowed.
 // RUN: %target-swift-frontend -typecheck -enable-experimental-feature AllowUnsafeAttribute %s -I %t
@@ -20,7 +20,7 @@ protocol P {
 }
 
 struct XP: P {
-  @unsafe func f() { } // expected-warning{{unsafe instance method 'f()' cannot satisfy safe requirement}}
+  @unsafe func f() { } // expected-warning{{unsafe instance method 'f()' cannot satisfy safe requirement [Unsafe]}}
   @unsafe func g() { }
 }
 
