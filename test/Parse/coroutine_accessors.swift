@@ -26,7 +26,7 @@ var _i: Int = 0
 // Two reads
 // =============================================================================
 
-// enabled: ok
+// enabled: conflicting accessors
 // disabled: implicit getter.
 var ir_r: Int {
   read { // expected-disabled-error{{cannot_find_in_scope}}
