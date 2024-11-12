@@ -1063,7 +1063,7 @@ extension Sequence {
 internal func _copySequenceToContiguousArray<
   S: Sequence
 >(_ source: S) -> ContiguousArray<S.Element> {
-  let contigArray = withContiguousStorageIfAvailable {
+  let contigArray = source.withContiguousStorageIfAvailable {
     _copyCollectionToContiguousArray($0)
   }
   if let contigArray {
