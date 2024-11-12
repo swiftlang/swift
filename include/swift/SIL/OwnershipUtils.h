@@ -618,6 +618,12 @@ struct BorrowedValue {
   /// BorrowScopeIntroducingValue::isLocalScope().
   bool visitLocalScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
 
+  /// Returns false if the value has no scope-ending uses because all control flow
+  /// paths end in dead-end blocks.
+  bool hasLocalScopeEndingUses() const {
+    return !visitLocalScopeEndingUses([](Operand *) { return false; });
+  }
+
   bool isLocalScope() const { return kind.isLocalScope(); }
 
   /// Add this scope's live blocks into the PrunedLiveness result. This
