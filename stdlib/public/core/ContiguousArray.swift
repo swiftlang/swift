@@ -836,7 +836,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   /// - Complexity: O(*m*) on average, where *m* is the length of
   ///   `newElements`, over many calls to `append(contentsOf:)` on the same
   ///   array.
-  @inlinable @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient
   @_effects(notEscaping self.value**)
   @_semantics("array.append_contentsOf")
   public mutating func append(

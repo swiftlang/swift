@@ -946,7 +946,7 @@ extension ArraySlice: RangeReplaceableCollection {
   /// - Complexity: O(*m*) on average, where *m* is the length of
   ///   `newElements`, over many calls to `append(contentsOf:)` on the same
   ///   array.
-  @inlinable @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient
   @_semantics("array.append_contentsOf")
   @_effects(notEscaping self.value**)
   public mutating func append(contentsOf newElements: __owned some Collection<Element>) {
