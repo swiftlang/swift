@@ -31,8 +31,12 @@
 
 cmake_minimum_required(VERSION 3.26...3.29)
 
+set(CMAKE_C_VISIBILITY_PRESET "hidden")
+set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
+
 set(SwiftCore_CMAKE_MODULES_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
 list(APPEND CMAKE_MODULE_PATH ${SwiftCore_CMAKE_MODULES_DIR})
+
 include(CMakeWorkarounds)
 project(SwiftCore LANGUAGES C CXX Swift VERSION 6.1)
 
