@@ -8053,24 +8053,24 @@ NOTE(sending_function_result_with_sending_param_note, none,
 //------------------------------------------------------------------------------
 ERROR(unsafe_attr_disabled,none,
       "attribute requires '-enable-experimental-feature AllowUnsafeAttribute'", ())
-WARNING(override_safe_withunsafe,none,
+GROUPED_WARNING(override_safe_withunsafe,Unsafe,none,
       "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
-WARNING(witness_unsafe,none,
+GROUPED_WARNING(witness_unsafe,Unsafe,none,
      "unsafe %0 %1 cannot satisfy safe requirement",
       (DescriptiveDeclKind, DeclName))
-WARNING(type_witness_unsafe,none,
+GROUPED_WARNING(type_witness_unsafe,Unsafe,none,
       "unsafe type %0 cannot satisfy safe associated type %1",
       (Type, DeclName))
-WARNING(unchecked_conformance_is_unsafe,none,
+GROUPED_WARNING(unchecked_conformance_is_unsafe,Unsafe,none,
       "@unchecked conformance involves unsafe code", ())
-WARNING(unowned_unsafe_is_unsafe,none,
+GROUPED_WARNING(unowned_unsafe_is_unsafe,Unsafe,none,
       "unowned(unsafe) involves unsafe code", ())
-WARNING(nonisolated_unsafe_is_unsafe,none,
+GROUPED_WARNING(nonisolated_unsafe_is_unsafe,Unsafe,none,
       "nonisolated(unsafe) involves unsafe code", ())
-WARNING(reference_to_unsafe_decl,none,
+GROUPED_WARNING(reference_to_unsafe_decl,Unsafe,none,
       "%select{reference|call}0 to unsafe %kindbase1",
       (bool, const ValueDecl *))
-WARNING(reference_to_unsafe_typed_decl,none,
+GROUPED_WARNING(reference_to_unsafe_typed_decl,Unsafe,none,
       "%select{reference|call}0 to %kindbase1 involves unsafe type %2",
       (bool, const ValueDecl *, Type))
 NOTE(unsafe_decl_here,none,
