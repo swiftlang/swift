@@ -740,7 +740,6 @@ extension ContiguousArray: RangeReplaceableCollection {
 
   @inlinable
   @_semantics("array.make_mutable")
-  @_effects(notEscaping self.**)
   internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.beginCOWMutation()) {
       _createNewBuffer(bufferIsUnique: false,
@@ -751,7 +750,6 @@ extension ContiguousArray: RangeReplaceableCollection {
 
   @inlinable
   @_semantics("array.mutate_unknown")
-  @_effects(notEscaping self.**)
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // Due to make_mutable hoisting the situation can arise where we hoist
     // _makeMutableAndUnique out of loop and use it to replace
@@ -774,7 +772,6 @@ extension ContiguousArray: RangeReplaceableCollection {
 
   @inlinable
   @_semantics("array.mutate_unknown")
-  @_effects(notEscaping self.**)
   internal mutating func _appendElementAssumeUniqueAndCapacity(
     _ oldCount: Int,
     newElement: __owned Element
@@ -808,7 +805,6 @@ extension ContiguousArray: RangeReplaceableCollection {
   /// - Complexity: O(1) on average, over many calls to `append(_:)` on the
   ///   same array.
   @inlinable
-  @_effects(notEscaping self.value**)
   @_semantics("array.append_element")
   public mutating func append(_ newElement: __owned Element) {
     // Separating uniqueness check and capacity check allows hoisting the
@@ -837,7 +833,6 @@ extension ContiguousArray: RangeReplaceableCollection {
   ///   `newElements`, over many calls to `append(contentsOf:)` on the same
   ///   array.
   @_alwaysEmitIntoClient
-  @_effects(notEscaping self.value**)
   @_semantics("array.append_contentsOf")
   public mutating func append(
     contentsOf newElements: __owned some Collection<Element>
@@ -882,7 +877,6 @@ extension ContiguousArray: RangeReplaceableCollection {
   ///   `newElements`, over many calls to `append(contentsOf:)` on the same
   ///   array.
   @inlinable
-  @_effects(notEscaping self.value**)
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
@@ -945,7 +939,6 @@ extension ContiguousArray: RangeReplaceableCollection {
   }
 
   @inlinable
-  @_effects(notEscaping self.value**)
   @_semantics("array.reserve_capacity_for_append")
   internal mutating func reserveCapacityForAppend(newElementsCount: Int) {
     // Ensure uniqueness, mutability, and sufficient storage.  Note that
