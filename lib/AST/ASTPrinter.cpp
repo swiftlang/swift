@@ -194,24 +194,6 @@ bool PrintOptions::excludeAttr(const DeclAttribute *DA) const {
   return false;
 }
 
-/// Forces printing types with the `some` keyword, instead of the full stable
-/// reference.
-struct PrintWithOpaqueResultTypeKeywordRAII {
-  PrintWithOpaqueResultTypeKeywordRAII(PrintOptions &Options)
-      : Options(Options) {
-    SavedMode = Options.OpaqueReturnTypePrinting;
-    Options.OpaqueReturnTypePrinting =
-        PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
-  }
-  ~PrintWithOpaqueResultTypeKeywordRAII() {
-    Options.OpaqueReturnTypePrinting = SavedMode;
-  }
-
-private:
-  PrintOptions &Options;
-  PrintOptions::OpaqueReturnTypePrintingMode SavedMode;
-};
-
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
@@ -969,10 +951,19 @@ class PrintAST : public ASTVisitor<PrintAST> {
     printTypeLocWithOptions(TL, Options, printBeforeType);
   }
 
-  void printTypeLocForImplicitlyUnwrappedOptional(TypeLoc TL, bool IUO) {
-    PrintOptions options = Options;
-    options.PrintOptionalAsImplicitlyUnwrapped = IUO;
-    printTypeLocWithOptions(TL, options);
+  void printTypeLocForImplicitlyUnwrappedOptional(
+      TypeLoc TL, bool IUO, const ValueDecl *opaqueTypeNamingDecl) {
+    auto savedIOU = Options.PrintOptionalAsImplicitlyUnwrapped;
+    Options.PrintOptionalAsImplicitlyUnwrapped = IUO;
+
+    auto savedOpaqueTypeNamingDecl = Options.OpaqueReturnTypeNamingDecl;
+    if (opaqueTypeNamingDecl)
+      Options.OpaqueReturnTypeNamingDecl = opaqueTypeNamingDecl;
+
+    printTypeLocWithOptions(TL, Options);
+
+    Options.PrintOptionalAsImplicitlyUnwrapped = savedIOU;
+    Options.OpaqueReturnTypeNamingDecl = savedOpaqueTypeNamingDecl;
   }
 
   void printContextIfNeeded(const Decl *decl) {
@@ -1376,18 +1367,17 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
   printPattern(TP->getSubPattern());
   Printer << ": ";
 
-  PrintWithOpaqueResultTypeKeywordRAII x(Options);
-
-  // Make sure to check if the underlying var decl is an implicitly unwrapped
-  // optional.
-  bool isIUO = false;
+  VarDecl *varDecl = nullptr;
   if (auto *named = dyn_cast<NamedPattern>(TP->getSubPattern()))
     if (auto decl = named->getDecl())
-      isIUO = decl->isImplicitlyUnwrappedOptional();
+      varDecl = decl;
 
   const auto TyLoc = TypeLoc(TP->getTypeRepr(),
                              TP->hasType() ? TP->getType() : Type());
-  printTypeLocForImplicitlyUnwrappedOptional(TyLoc, isIUO);
+
+  printTypeLocForImplicitlyUnwrappedOptional(
+      TyLoc, varDecl ? varDecl->isImplicitlyUnwrappedOptional() : false,
+      varDecl);
 }
 
 /// Determines if we are required to print the name of a property declaration,
@@ -3882,9 +3872,8 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     }
     Printer.printDeclResultTypePre(decl, tyLoc);
 
-    PrintWithOpaqueResultTypeKeywordRAII x(Options);
     printTypeLocForImplicitlyUnwrappedOptional(
-      tyLoc, decl->isImplicitlyUnwrappedOptional());
+        tyLoc, decl->isImplicitlyUnwrappedOptional(), decl);
   }
 
   printAccessors(decl);
@@ -3966,7 +3955,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     }
 
     printTypeLocForImplicitlyUnwrappedOptional(
-      TheTypeLoc, param->isImplicitlyUnwrappedOptional());
+        TheTypeLoc, param->isImplicitlyUnwrappedOptional(), nullptr);
   }
 
   if (param->isDefaultArgument() && Options.PrintDefaultArgumentValue) {
@@ -4256,8 +4245,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         }
       }
 
-      PrintWithOpaqueResultTypeKeywordRAII x(Options);
-
       // Check if we would go down the type repr path... in such a case, see if
       // we can find a type repr and if that type has a sending type repr. In
       // such a case, look through the sending type repr since we handle it here
@@ -4284,7 +4271,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       // If we printed using type repr printing, do not print again.
       if (!usedTypeReprPrinting) {
         printTypeLocForImplicitlyUnwrappedOptional(
-            ResultTyLoc, decl->isImplicitlyUnwrappedOptional());
+            ResultTyLoc, decl->isImplicitlyUnwrappedOptional(), decl);
       }
       Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
     }
@@ -4433,9 +4420,8 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer.printDeclResultTypePre(decl, elementTy);
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
-    PrintWithOpaqueResultTypeKeywordRAII x(Options);
     printTypeLocForImplicitlyUnwrappedOptional(
-      elementTy, decl->isImplicitlyUnwrappedOptional());
+        elementTy, decl->isImplicitlyUnwrappedOptional(), decl);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
 
@@ -7241,7 +7227,11 @@ public:
     auto genericSig = namingDecl->getInnermostDeclContext()
           ->getGenericSignatureOfContext();
 
-    switch (Options.OpaqueReturnTypePrinting) {
+    auto mode = Options.OpaqueReturnTypePrinting;
+    if (Options.OpaqueReturnTypeNamingDecl == T->getDecl()->getNamingDecl())
+      mode = PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
+
+    switch (mode) {
     case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
       if (printNamedOpaque())
         return;
