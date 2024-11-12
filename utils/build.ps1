@@ -2439,6 +2439,17 @@ function Test-Format {
   }
 }
 
+function Build-LMDB() {
+  Build-SPMProject `
+    -Action Build `
+    -Src $SourceCache\swift-lmdb `
+    -Bin (Get-HostProjectBinaryCache LMDB) `
+    -Arch $HostArch `
+    -Platform Windows `
+    -UseBuiltCompilers C `
+    -BuildTargets default
+}
+
 function Build-IndexStoreDB($Arch) {
   $SDKInstallRoot = (Get-HostSwiftSDK);
 
@@ -2837,6 +2848,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-PackageManager $HostArch
   Invoke-BuildStep Build-Markdown $HostArch
   Invoke-BuildStep Build-Format $HostArch
+  Invoke-BuildStep Build-LMDB $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
 }
