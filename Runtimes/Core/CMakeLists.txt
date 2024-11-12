@@ -87,6 +87,7 @@ defaulted_option(SwiftCore_ENABLE_RUNTIME_OS_VERSIONING "Enable runtime OS versi
 defaulted_option(SwiftCore_ENABLE_STATIC_PRINT "Disable full print")
 defaulted_option(SwiftCore_ENABLE_UNICODE_DATA "Embed Unicode info in Swift Core")
 defaulted_option(SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS "Resolve absolute function pointer as identity")
+defaulted_option(SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment")
 
 defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support")
 defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift backtracer")
@@ -113,6 +114,7 @@ add_compile_definitions(
   $<$<BOOL:${SwiftCore_ENABLE_STATIC_PRINT}>:-DSWIFT_STDLIB_STATIC_PRINT> # core + concurrency
   $<$<BOOL:${SwiftCore_ENABLE_UNICODE_DATA}>:-DSWIFT_STDLIB_ENABLE_UNICODE_DATA> # Stubs
   $<$<BOOL:${SwiftCore_ENABLE_ENVIRONMENT}>:-DSWIFT_STDLIB_HAS_ENVIRON> # Concurrency, runtime, shims, platform overlay
+  $<$<BOOL:${SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT}>:-DSWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT> # Concurrency, Compatibility override, magic symbols
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER=$<BOOL:${SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER}>>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>>)
 
