@@ -253,6 +253,37 @@ static void findFavoredChoicesBasedOnArity(
     favoredChoice(choice);
 }
 
+/// Determine whether the given disjunction serves as a base of
+/// another member reference i.e. `x.y` where `x` could be overloaded.
+static bool isPartOfMemberChain(ConstraintSystem &CS, Constraint *disjunction) {
+  if (isOperatorDisjunction(disjunction))
+    return false;
+
+  auto &CG = CS.getConstraintGraph();
+
+  TypeVariableType *typeVar = nullptr;
+
+  // If disjunction is applied, the member is chained on the result.
+  if (auto appliedFn = CS.getAppliedDisjunctionArgumentFunction(disjunction)) {
+    typeVar = appliedFn->getResult()->getAs<TypeVariableType>();
+  } else {
+    typeVar = disjunction->getNestedConstraints()[0]
+                  ->getFirstType()
+                  ->getAs<TypeVariableType>();
+  }
+
+  if (!typeVar)
+    return false;
+
+  return llvm::any_of(
+      CG[typeVar].getConstraints(), [&typeVar](Constraint *constraint) {
+        if (constraint->getKind() != ConstraintKind::ValueMember)
+          return false;
+
+        return constraint->getFirstType()->isEqual(typeVar);
+      });
+}
+
 } // end anonymous namespace
 
 /// Given a set of disjunctions, attempt to determine
@@ -286,8 +317,15 @@ static void determineBestChoicesInContext(
     auto applicableFn =
         getApplicableFnConstraint(cs.getConstraintGraph(), disjunction);
 
-    if (applicableFn.isNull())
+    if (applicableFn.isNull()) {
+      // If this is a chained member reference it could be prioritized since
+      // it helps to establish context for other calls i.e. `a.b + 2` if
+      // `a` is a disjunction it should be preferred over `+`.
+      if (isPartOfMemberChain(cs, disjunction))
+        recordResult(disjunction, {/*score=*/1.0});
+
       continue;
+    }
 
     auto argFuncType =
         applicableFn.get()->getFirstType()->getAs<FunctionType>();
