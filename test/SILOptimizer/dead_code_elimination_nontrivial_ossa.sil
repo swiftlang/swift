@@ -1220,3 +1220,20 @@ bb0:
   return %t : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dce_dead_guaranteedphi :
+// bb2:
+// CHECK-LABEL: } // end sil function 'dce_dead_guaranteedphi'
+sil [ossa] @dce_dead_guaranteedphi : $@convention(thin) (@owned NonTrivialStruct) -> () {
+bb0(%0 : @owned $NonTrivialStruct):
+  %b = begin_borrow %0 : $NonTrivialStruct
+  %func = function_ref @$use_nontrivialstruct2 : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  %funcres = apply %func(%b) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  br bb2(%b : $NonTrivialStruct, %b : $NonTrivialStruct)
+
+bb2(%phi1 : @guaranteed $NonTrivialStruct, %phi2 : @guaranteed $NonTrivialStruct):
+  end_borrow %phi1 : $NonTrivialStruct
+  destroy_value %0 : $NonTrivialStruct
+  %9999 = tuple()
+  return %9999 : $()
+}
+
