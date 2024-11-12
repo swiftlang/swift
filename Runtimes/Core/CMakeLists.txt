@@ -28,6 +28,7 @@
 # Catalyst Support
 #   -- Will need shadow invocations to generate swiftmodules for Swift parts
 # Install *.abi.json, swiftdoc, and swiftsourceinfo
+# Pointer bounds (SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
 
 cmake_minimum_required(VERSION 3.26...3.29)
 
@@ -78,15 +79,27 @@ defaulted_option(SwiftCore_ENABLE_VECTOR_TYPES "Enable vector support")
 defaulted_option(SwiftCore_ENABLE_REFLECTION "Enable runtime support for mirrors and reflection support")
 defaulted_option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argument support")
 defaulted_option(SwiftCore_ENABLE_RUNTIME_FUNCTION_COUNTERS "Enable runtime function counter support")
+defaulted_option(SwiftCore_ENABLE_STDIN "Enable functions that use stdin support")
+defaulted_option(SwiftCore_ENABLE_ENVIRONMENT "Enable environment variable support")
+defaulted_option(SwiftCore_ENABLE_OVERRIDABLE_RETAIN_RELEASE "Enable override hooks for retain/release")
+defaulted_option(SwiftCore_ENABLE_MALLOC_TYPE "Enable malloc type information")
+defaulted_option(SwiftCore_ENABLE_RUNTIME_OS_VERSIONING "Enable runtime OS version detection")
+defaulted_option(SwiftCore_ENABLE_STATIC_PRINT "Disable full print")
+defaulted_option(SwiftCore_ENABLE_UNICODE_DATA "Embed Unicode info in Swift Core")
+defaulted_option(SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS "Resolve absolute function pointer as identity")
 
 defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support")
 defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift backtracer")
 
 option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" OFF)
 option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)
+option(SwiftCore_ENABLE_INTERNAL_CHECKS "" OFF)
 
 defaulted_set(SwiftCore_OBJECT_FORMAT STRING "Object format: ELF COFF")
 
+# TODO: Most of these should be attached to specific targets rather than applied
+#       globally. They can be applied as part of the library interface if they
+#       affect the behavior of libraries that build against a given target.
 add_compile_definitions(
   $<$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>:-DSWIFT_OBJC_INTEROP>
   $<$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>:-DSWIFT_LIBRARY_EVOLUTION>
@@ -94,6 +107,12 @@ add_compile_definitions(
   $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>
   $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
   $<$<BOOL:${SwiftCore_ENABLE_RUNTIME_FUNCTION_COUNTERS}>:-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS>
+  $<$<BOOL:${SwiftCore_ENABLE_STDIN}>:-DSWIFT_STDLIB_HAS_STDIN> # core + stubs
+  $<$<BOOL:${SwiftCore_ENABLE_RUNTIME_OS_VERSIONING}>:-DSWIFT_RUNTIME_OS_VERSIONING> # core + stubs
+  $<$<BOOL:${SwiftCore_ENABLE_INTERNAL_CHECKS}>:-DINTERNAL_CHECKS_ENABLED> # core
+  $<$<BOOL:${SwiftCore_ENABLE_STATIC_PRINT}>:-DSWIFT_STDLIB_STATIC_PRINT> # core + concurrency
+  $<$<BOOL:${SwiftCore_ENABLE_UNICODE_DATA}>:-DSWIFT_STDLIB_ENABLE_UNICODE_DATA> # Stubs
+  $<$<BOOL:${SwiftCore_ENABLE_ENVIRONMENT}>:-DSWIFT_STDLIB_HAS_ENVIRON> # Concurrency, runtime, shims, platform overlay
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER=$<BOOL:${SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER}>>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>>)
 
