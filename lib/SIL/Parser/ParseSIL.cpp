@@ -7175,9 +7175,14 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
 
         // If SILOwnership is enabled and we are not assuming that we are
         // parsing unqualified SIL, look for printed value ownership kinds.
-        if (F->hasOwnership() &&
-            parseSILOwnership(OwnershipKind))
-          return true;
+        if (F->hasOwnership()) {
+          if (P.Tok.is(tok::at_sign)) {
+            if (parseSILOwnership(OwnershipKind))
+              return true;
+          } else if (foundReborrow) {
+            OwnershipKind = OwnershipKind::Guaranteed;
+          }
+        }
 
         if (parseSILType(Ty))
           return true;

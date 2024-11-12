@@ -891,7 +891,7 @@ bb2:
 bb3:
   br bb4(%none_borrow : $Optional<@callee_guaranteed () -> ()>, %none : $Optional<@callee_guaranteed () -> ()>)
 
-bb4(%reborrow : @reborrow @guaranteed $Optional<@callee_guaranteed () -> ()>, %maybe : @owned $Optional<@callee_guaranteed () -> ()>):
+bb4(%reborrow : @reborrow $Optional<@callee_guaranteed () -> ()>, %maybe : @owned $Optional<@callee_guaranteed () -> ()>):
   %borrow = borrowed %reborrow : $Optional<@callee_guaranteed () -> ()> from (%maybe : $Optional<@callee_guaranteed () -> ()>)
   destroy_addr %addr : $*NonTrivialStructPair
   dealloc_stack %stack : $*NonTrivialStructPair
