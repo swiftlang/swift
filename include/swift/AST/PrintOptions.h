@@ -366,6 +366,10 @@ struct PrintOptions {
   OpaqueReturnTypePrintingMode OpaqueReturnTypePrinting =
       OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
 
+  /// If non-null, opaque types that have this naming decl should be printed as
+  /// `some P1` instead of as a stable reference.
+  const ValueDecl *OpaqueReturnTypeNamingDecl = nullptr;
+
   /// Whether to print decl attributes that are only used internally,
   /// such as _silgen_name, transparent, etc.
   bool PrintUserInaccessibleAttrs = true;
