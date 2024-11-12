@@ -2848,7 +2848,8 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
                                            const RootProtocolConformance *rootConf,
                                            const ExtensionDecl *ext,
                                            const ExportContext &where,
-                                           bool warnIfConformanceUnavailablePreSwift6) {
+                                           bool warnIfConformanceUnavailablePreSwift6,
+                                           bool preconcurrency) {
   auto *attr = AvailableAttr::isUnavailable(ext);
   if (!attr)
     return false;
@@ -2909,7 +2910,7 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
   diags.diagnose(loc, diag::conformance_availability_unavailable,
                  type, proto,
                  platform.empty(), platform, EncodedMessage.Message)
-      .limitBehaviorUntilSwiftVersion(behavior, 6)
+      .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
   switch (attr->getVersionAvailability(ctx)) {
@@ -3442,6 +3443,7 @@ class ExprAvailabilityWalker : public ASTWalker {
   ASTContext &Context;
   MemberAccessContext AccessContext = MemberAccessContext::Default;
   SmallVector<const Expr *, 16> ExprStack;
+  SmallVector<bool, 4> PreconcurrencyCalleeStack;
   const ExportContext &Where;
 
 public:
@@ -3468,6 +3470,19 @@ public:
     auto *DC = Where.getDeclContext();
 
     ExprStack.push_back(E);
+
+    if (auto *apply = dyn_cast<ApplyExpr>(E)) {
+      bool preconcurrency = false;
+      auto *fn = apply->getFn();
+      if (auto *selfApply = dyn_cast<SelfApplyExpr>(fn)) {
+        fn = selfApply->getFn();
+      }
+      auto declRef = fn->getReferencedDecl();
+      if (auto *decl = declRef.getDecl()) {
+        preconcurrency = decl->preconcurrency();
+      }
+      PreconcurrencyCalleeStack.push_back(preconcurrency);
+    }
 
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
       diagnoseDeclRefAvailability(DR->getDeclRef(), DR->getSourceRange(),
@@ -3573,9 +3588,15 @@ public:
                                               EE->getLoc(),
                                               Where.getDeclContext());
 
+      bool preconcurrency = false;
+      if (!PreconcurrencyCalleeStack.empty()) {
+        preconcurrency = PreconcurrencyCalleeStack.back();
+      }
+
       for (ProtocolConformanceRef C : EE->getConformances()) {
         diagnoseConformanceAvailability(E->getLoc(), C, Where, Type(), Type(),
-                                        /*useConformanceAvailabilityErrorsOpt=*/true);
+                                        /*useConformanceAvailabilityErrorsOpt=*/true,
+                                        /*preconcurrency=*/preconcurrency);
       }
     }
 
@@ -3600,6 +3621,10 @@ public:
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
+
+    if (auto *apply = dyn_cast<ApplyExpr>(E)) {
+      PreconcurrencyCalleeStack.pop_back();
+    }
 
     return Action::Continue(E);
   }
@@ -3875,8 +3900,12 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
       return true;
 
   if (R.isValid()) {
-    if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
-                                            Where)) {
+    if (diagnoseSubstitutionMapAvailability(
+            R.Start, declRef.getSubstitutions(), Where,
+            Type(), Type(),
+            /*warnIfConformanceUnavailablePreSwift6*/false,
+            /*suppressParameterizationCheckForOptional*/false,
+            /*preconcurrency*/D->preconcurrency())) {
       return true;
     }
   }
@@ -4348,7 +4377,8 @@ public:
         /*depTy=*/Type(),
         /*replacementTy=*/Type(),
         /*warnIfConformanceUnavailablePreSwift6=*/false,
-        /*suppressParameterizationCheckForOptional=*/ty->isOptional());
+        /*suppressParameterizationCheckForOptional=*/ty->isOptional(),
+        /*preconcurrency*/ty->getAnyNominal()->preconcurrency());
     return Action::Continue;
   }
 
@@ -4403,9 +4433,10 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 }
 
 static void diagnoseMissingConformance(
-    SourceLoc loc, Type type, ProtocolDecl *proto, const DeclContext *fromDC) {
+    SourceLoc loc, Type type, ProtocolDecl *proto, const DeclContext *fromDC,
+    bool preconcurrency) {
   assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable));
-  diagnoseMissingSendableConformance(loc, type, fromDC);
+  diagnoseMissingSendableConformance(loc, type, fromDC, preconcurrency);
 }
 
 bool
@@ -4413,7 +4444,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
                                        const ExportContext &where,
                                        Type depTy, Type replacementTy,
-                                       bool warnIfConformanceUnavailablePreSwift6) {
+                                       bool warnIfConformanceUnavailablePreSwift6,
+                                       bool preconcurrency) {
   assert(!where.isImplicit());
 
   if (conformance.isInvalid() || conformance.isAbstract())
@@ -4425,7 +4457,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     for (auto patternConf : pack->getPatternConformances()) {
       diagnosed |= diagnoseConformanceAvailability(
           loc, patternConf, where, depTy, replacementTy,
-          warnIfConformanceUnavailablePreSwift6);
+          warnIfConformanceUnavailablePreSwift6,
+          preconcurrency);
     }
     return diagnosed;
   }
@@ -4444,7 +4477,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
     if (builtinConformance->isMissing()) {
       diagnoseMissingConformance(loc, builtinConformance->getType(),
-                                 builtinConformance->getProtocol(), DC);
+                                 builtinConformance->getProtocol(), DC,
+                                 preconcurrency);
     }
   }
 
@@ -4470,7 +4504,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     }
 
     if (diagnoseExplicitUnavailability(loc, rootConf, ext, where,
-                                       warnIfConformanceUnavailablePreSwift6)) {
+                                       warnIfConformanceUnavailablePreSwift6,
+                                       preconcurrency)) {
       maybeEmitAssociatedTypeNote();
       return true;
     }
@@ -4498,7 +4533,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   SubstitutionMap subConformanceSubs = concreteConf->getSubstitutionMap();
   if (diagnoseSubstitutionMapAvailability(loc, subConformanceSubs, where,
                                           depTy, replacementTy,
-                                          warnIfConformanceUnavailablePreSwift6))
+                                          warnIfConformanceUnavailablePreSwift6,
+                                          preconcurrency))
     return true;
 
   return false;
@@ -4510,12 +4546,14 @@ swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                            const ExportContext &where,
                                            Type depTy, Type replacementTy,
                                            bool warnIfConformanceUnavailablePreSwift6,
-                                           bool suppressParameterizationCheckForOptional) {
+                                           bool suppressParameterizationCheckForOptional,
+                                           bool preconcurrency) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
     if (diagnoseConformanceAvailability(loc, conformance, where,
                                         depTy, replacementTy,
-                                        warnIfConformanceUnavailablePreSwift6))
+                                        warnIfConformanceUnavailablePreSwift6,
+                                        preconcurrency))
       hadAnyIssues = true;
   }
 

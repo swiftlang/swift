@@ -320,7 +320,7 @@ bool diagnoseNonSendableTypesInReference(
 
 /// Produce a diagnostic for a missing conformance to Sendable.
 void diagnoseMissingSendableConformance(
-    SourceLoc loc, Type type, const DeclContext *fromDC);
+    SourceLoc loc, Type type, const DeclContext *fromDC, bool preconcurrency);
 
 /// If the given nominal type is public and does not explicitly
 /// state whether it conforms to Sendable, provide a diagnostic.
@@ -374,12 +374,23 @@ static inline bool isImplicitSendableCheck(SendableCheck check) {
 /// Describes the context in which a \c Sendable check occurs.
 struct SendableCheckContext {
   const DeclContext * const fromDC;
+  bool preconcurrencyContext;
   const std::optional<SendableCheck> conformanceCheck;
 
   SendableCheckContext(
       const DeclContext *fromDC,
       std::optional<SendableCheck> conformanceCheck = std::nullopt)
-      : fromDC(fromDC), conformanceCheck(conformanceCheck) {}
+      : fromDC(fromDC),
+        preconcurrencyContext(false),
+        conformanceCheck(conformanceCheck) {}
+
+  SendableCheckContext(
+      const DeclContext *fromDC,
+      bool preconcurrencyContext,
+      std::optional<SendableCheck> conformanceCheck = std::nullopt)
+      : fromDC(fromDC),
+        preconcurrencyContext(preconcurrencyContext),
+        conformanceCheck(conformanceCheck) {}
 
   /// Determine the default diagnostic behavior for a missing/unavailable
   /// Sendable conformance in this context.
@@ -396,8 +407,8 @@ struct SendableCheckContext {
       Decl *decl,
       bool ignoreExplicitConformance = false) const;
 
-  /// Whether we are in an explicit conformance to Sendable.
-  bool isExplicitSendableConformance() const;
+  /// Whether to warn about a Sendable violation even in minimal checking.
+  bool warnInMinimalChecking() const;
 };
 
 /// Diagnose any non-Sendable types that occur within the given type, using
@@ -443,11 +454,14 @@ bool diagnoseNonSendableTypes(
   return diagnoseNonSendableTypes(
       type, fromContext, derivedConformance, typeLoc,
       [&](Type specificType, DiagnosticBehavior behavior) {
+        // FIXME: Reconcile preconcurrency declaration vs preconcurrency
+        // import behavior.
         auto preconcurrency =
           fromContext.preconcurrencyBehavior(specificType->getAnyNominal());
 
         ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
-            .limitBehaviorUntilSwiftVersion(behavior, 6)
+            .limitBehaviorWithPreconcurrency(behavior,
+                                             fromContext.preconcurrencyContext)
             .limitBehaviorIf(preconcurrency);
 
         return (behavior == DiagnosticBehavior::Ignore ||
