@@ -9705,8 +9705,11 @@ const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 /// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const DeclContext *source, unsigned index);
 
-StringRef getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article);
-StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind, bool article);
+StringRef
+getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article,
+                             std::optional<bool> underscored = std::nullopt);
+StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind, bool article,
+                                       bool underscored);
 
 void simple_display(llvm::raw_ostream &out,
                     OptionSet<NominalTypeDecl::LookupDirectFlags> options);
