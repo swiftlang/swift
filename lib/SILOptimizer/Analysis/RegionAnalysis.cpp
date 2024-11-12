@@ -93,19 +93,6 @@ regionanalysisimpl::getApplyIsolationCrossing(SILInstruction *inst) {
 
 namespace {
 
-struct UnderlyingTrackedValueInfo {
-  SILValue value;
-
-  /// Only used for addresses.
-  std::optional<ActorIsolation> actorIsolation;
-
-  explicit UnderlyingTrackedValueInfo(SILValue value) : value(value) {}
-
-  UnderlyingTrackedValueInfo(SILValue value,
-                             std::optional<ActorIsolation> actorIsolation)
-      : value(value), actorIsolation(actorIsolation) {}
-};
-
 struct UseDefChainVisitor
     : public AccessUseDefChainVisitor<UseDefChainVisitor, SILValue> {
   bool isMerge = false;
@@ -337,95 +324,6 @@ static bool isLookThroughIfOperandAndResultNonSendable(SILInstruction *inst) {
   }
 }
 
-static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
-  auto *fn = value->getFunction();
-  SILValue result = value;
-  while (true) {
-    SILValue temp = result;
-
-    if (auto *svi = dyn_cast<SingleValueInstruction>(temp)) {
-      if (isStaticallyLookThroughInst(svi)) {
-        temp = svi->getOperand(0);
-      }
-
-      // If we have a cast and our operand and result are non-Sendable, treat it
-      // as a look through.
-      if (isLookThroughIfOperandAndResultNonSendable(svi)) {
-        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn) &&
-            SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
-                                                fn)) {
-          temp = svi->getOperand(0);
-        }
-      }
-
-      if (isLookThroughIfResultNonSendable(svi)) {
-        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn)) {
-          temp = svi->getOperand(0);
-        }
-      }
-
-      if (isLookThroughIfOperandNonSendable(svi)) {
-        // If our operand is a non-Sendable type, look through this instruction.
-        if (SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
-                                                fn)) {
-          temp = svi->getOperand(0);
-        }
-      }
-    }
-
-    if (auto *inst = temp->getDefiningInstruction()) {
-      if (isStaticallyLookThroughInst(inst)) {
-        temp = inst->getOperand(0);
-      }
-    }
-
-    if (temp != result) {
-      result = temp;
-      continue;
-    }
-
-    return result;
-  }
-}
-
-static UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) {
-  // Before a check if the value we are attempting to access is Sendable. In
-  // such a case, just return early.
-  if (!SILIsolationInfo::isNonSendableType(value))
-    return UnderlyingTrackedValueInfo(value);
-
-  // Look through a project_box, so that we process it like its operand object.
-  if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
-    value = pbi->getOperand();
-  }
-
-  if (!value->getType().isAddress()) {
-    SILValue underlyingValue = getUnderlyingTrackedObjectValue(value);
-
-    // If we do not have a load inst, just return the value.
-    if (!isa<LoadInst, LoadBorrowInst>(underlyingValue)) {
-      return UnderlyingTrackedValueInfo(underlyingValue);
-    }
-
-    // If we got an address, lets see if we can do even better by looking at the
-    // address.
-    value = cast<SingleValueInstruction>(underlyingValue)->getOperand(0);
-  }
-  assert(value->getType().isAddress());
-
-  UseDefChainVisitor visitor;
-  SILValue base = visitor.visitAll(value);
-  assert(base);
-  if (base->getType().isObject())
-    return {getUnderlyingTrackedValue(base).value, visitor.actorIsolation};
-
-  return {base, visitor.actorIsolation};
-}
-
-SILValue RegionAnalysisFunctionInfo::getUnderlyingTrackedValue(SILValue value) {
-  return ::getUnderlyingTrackedValue(value).value;
-}
-
 namespace {
 
 struct TermArgSources {
@@ -637,6 +535,376 @@ static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
 }
 
 //===----------------------------------------------------------------------===//
+//                        MARK: RegionAnalysisValueMap
+//===----------------------------------------------------------------------===//
+
+SILInstruction *RegionAnalysisValueMap::maybeGetActorIntroducingInst(
+    Element trackableValueID) const {
+  if (auto value = getValueForId(trackableValueID)) {
+    auto rep = value->getRepresentative();
+    if (rep.hasRegionIntroducingInst())
+      return rep.getActorRegionIntroducingInst();
+  }
+
+  return nullptr;
+}
+
+std::optional<TrackableValue>
+RegionAnalysisValueMap::getValueForId(Element id) const {
+  auto iter = stateIndexToEquivalenceClass.find(id);
+  if (iter == stateIndexToEquivalenceClass.end())
+    return {};
+  auto iter2 = equivalenceClassValuesToState.find(iter->second);
+  if (iter2 == equivalenceClassValuesToState.end())
+    return {};
+  return {{iter2->first, iter2->second}};
+}
+
+SILValue
+RegionAnalysisValueMap::getRepresentative(Element trackableValueID) const {
+  return getValueForId(trackableValueID)->getRepresentative().getValue();
+}
+
+SILValue
+RegionAnalysisValueMap::maybeGetRepresentative(Element trackableValueID) const {
+  return getValueForId(trackableValueID)->getRepresentative().maybeGetValue();
+}
+
+RepresentativeValue
+RegionAnalysisValueMap::getRepresentativeValue(Element trackableValueID) const {
+  return getValueForId(trackableValueID)->getRepresentative();
+}
+
+SILIsolationInfo
+RegionAnalysisValueMap::getIsolationRegion(Element trackableValueID) const {
+  auto iter = getValueForId(trackableValueID);
+  if (!iter)
+    return {};
+  return iter->getValueState().getIsolationRegionInfo();
+}
+
+SILIsolationInfo
+RegionAnalysisValueMap::getIsolationRegion(SILValue value) const {
+  auto iter = equivalenceClassValuesToState.find(RepresentativeValue(value));
+  if (iter == equivalenceClassValuesToState.end())
+    return {};
+  return iter->getSecond().getIsolationRegionInfo();
+}
+
+std::pair<TrackableValue, bool>
+RegionAnalysisValueMap::initializeTrackableValue(
+    SILValue value, SILIsolationInfo newInfo) const {
+  auto info = getUnderlyingTrackedValue(value);
+  value = info.value;
+
+  auto *self = const_cast<RegionAnalysisValueMap *>(this);
+  auto iter = self->equivalenceClassValuesToState.try_emplace(
+      value, TrackableValueState(equivalenceClassValuesToState.size()));
+
+  // If we did not insert, just return the already stored value.
+  if (!iter.second) {
+    return {{iter.first->first, iter.first->second}, false};
+  }
+
+  // If we did not insert, just return the already stored value.
+  self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
+
+  // Before we do anything, see if we have a Sendable value.
+  if (!SILIsolationInfo::isNonSendableType(value->getType(), fn)) {
+    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+    return {{iter.first->first, iter.first->second}, true};
+  }
+
+  // Otherwise, we have a non-Sendable type... so wire up the isolation.
+  iter.first->getSecond().setIsolationRegionInfo(newInfo);
+
+  return {{iter.first->first, iter.first->second}, true};
+}
+
+/// If \p isAddressCapturedByPartialApply is set to true, then this value is
+/// an address that is captured by a partial_apply and we want to treat it as
+/// may alias.
+TrackableValue RegionAnalysisValueMap::getTrackableValue(
+    SILValue value, bool isAddressCapturedByPartialApply) const {
+  auto info = getUnderlyingTrackedValue(value);
+  value = info.value;
+
+  auto *self = const_cast<RegionAnalysisValueMap *>(this);
+  auto iter = self->equivalenceClassValuesToState.try_emplace(
+      value, TrackableValueState(equivalenceClassValuesToState.size()));
+
+  // If we did not insert, just return the already stored value.
+  if (!iter.second) {
+    return {iter.first->first, iter.first->second};
+  }
+
+  // If we did not insert, just return the already stored value.
+  self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
+
+  // Otherwise, we need to compute our flags.
+
+  // Treat function ref and class method as either actor isolated or
+  // sendable. Formally they are non-Sendable, so we do the check before we
+  // check the oracle.
+  if (isa<FunctionRefInst, ClassMethodInst>(value)) {
+    if (auto isolation = SILIsolationInfo::get(value)) {
+      iter.first->getSecond().setIsolationRegionInfo(isolation);
+      return {iter.first->first, iter.first->second};
+    }
+
+    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+    return {iter.first->first, iter.first->second};
+  }
+
+  // Then check our oracle to see if the value is actually sendable. If we have
+  // a Sendable value, just return early.
+  if (!SILIsolationInfo::isNonSendableType(value->getType(), fn)) {
+    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+    return {iter.first->first, iter.first->second};
+  }
+
+  // Ok, at this point we have a non-Sendable value. First process addresses.
+  if (value->getType().isAddress()) {
+    // If we were able to find this was actor isolated from finding our
+    // underlying object, use that. It is never wrong.
+    if (info.actorIsolation) {
+      SILIsolationInfo isolation;
+      if (info.value->getType().isAnyActor()) {
+        isolation = SILIsolationInfo::getActorInstanceIsolated(
+            value, info.value, info.actorIsolation->getActor());
+      } else if (info.actorIsolation->isGlobalActor()) {
+        isolation = SILIsolationInfo::getGlobalActorIsolated(
+            value, info.actorIsolation->getGlobalActor());
+      }
+
+      if (isolation) {
+        iter.first->getSecond().setIsolationRegionInfo(isolation);
+      }
+    }
+
+    auto storage = AccessStorageWithBase::compute(value);
+    if (storage.storage) {
+      // Check if we have a uniquely identified address that was not captured
+      // by a partial apply... in such a case, we treat it as no-alias.
+      if (storage.storage.isUniquelyIdentified() &&
+          !isAddressCapturedByPartialApply) {
+        iter.first->getSecond().removeFlag(TrackableValueFlag::isMayAlias);
+      }
+
+      if (auto isolation = SILIsolationInfo::get(storage.base)) {
+        iter.first->getSecond().setIsolationRegionInfo(isolation);
+      }
+    }
+  }
+
+  // Check if we have a load or load_borrow from an address. In that case, we
+  // want to look through the load and find a better root from the address we
+  // loaded from.
+  if (isa<LoadInst, LoadBorrowInst>(iter.first->first.getValue())) {
+    auto *svi = cast<SingleValueInstruction>(iter.first->first.getValue());
+
+    // See if we can use get underlying tracked value to find if it is actor
+    // isolated.
+    //
+    // TODO: Instead of using AccessStorageBase, just use our own visitor
+    // everywhere. Just haven't done it due to possible perturbations.
+    auto parentAddrInfo = getUnderlyingTrackedValue(svi);
+    if (parentAddrInfo.actorIsolation) {
+      iter.first->getSecond().setIsolationRegionInfo(
+          SILIsolationInfo::getActorInstanceIsolated(
+              svi, parentAddrInfo.value,
+              parentAddrInfo.actorIsolation->getActor()));
+    }
+
+    auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
+    if (storage.storage) {
+      if (auto isolation = SILIsolationInfo::get(storage.base)) {
+        iter.first->getSecond().setIsolationRegionInfo(isolation);
+      }
+    }
+
+    return {iter.first->first, iter.first->second};
+  }
+
+  // Ok, we have a non-Sendable type, see if we do not have any isolation
+  // yet. If we don't, attempt to infer its isolation.
+  if (!iter.first->getSecond().hasIsolationRegionInfo()) {
+    if (auto isolation = SILIsolationInfo::get(iter.first->first.getValue())) {
+      iter.first->getSecond().setIsolationRegionInfo(isolation);
+      return {iter.first->first, iter.first->second};
+    }
+  }
+
+  return {iter.first->first, iter.first->second};
+}
+
+std::optional<TrackableValue>
+RegionAnalysisValueMap::getTrackableValueForActorIntroducingInst(
+    SILInstruction *inst) const {
+  auto *self = const_cast<RegionAnalysisValueMap *>(this);
+  auto iter = self->equivalenceClassValuesToState.find(inst);
+  if (iter == self->equivalenceClassValuesToState.end())
+    return {};
+
+  // Otherwise, we need to compute our flags.
+  return {{iter->first, iter->second}};
+}
+
+std::optional<TrackableValue>
+RegionAnalysisValueMap::tryToTrackValue(SILValue value) const {
+  auto state = getTrackableValue(value);
+  if (state.isNonSendable())
+    return state;
+  return {};
+}
+
+TrackableValue RegionAnalysisValueMap::getActorIntroducingRepresentative(
+    SILInstruction *introducingInst, SILIsolationInfo actorIsolation) const {
+  auto *self = const_cast<RegionAnalysisValueMap *>(this);
+  auto iter = self->equivalenceClassValuesToState.try_emplace(
+      introducingInst,
+      TrackableValueState(equivalenceClassValuesToState.size()));
+
+  // If we did not insert, just return the already stored value.
+  if (!iter.second) {
+    return {iter.first->first, iter.first->second};
+  }
+
+  // Otherwise, wire up the value.
+  self->stateIndexToEquivalenceClass[iter.first->second.getID()] =
+      introducingInst;
+  iter.first->getSecond().setIsolationRegionInfo(actorIsolation);
+  return {iter.first->first, iter.first->second};
+}
+
+bool RegionAnalysisValueMap::valueHasID(SILValue value, bool dumpIfHasNoID) {
+  assert(getTrackableValue(value).isNonSendable() &&
+         "Can only accept non-Sendable values");
+  bool hasID = equivalenceClassValuesToState.count(value);
+  if (!hasID && dumpIfHasNoID) {
+    llvm::errs() << "FAILURE: valueHasID of ";
+    value->print(llvm::errs());
+    llvm::report_fatal_error("standard compiler error");
+  }
+  return hasID;
+}
+
+Element RegionAnalysisValueMap::lookupValueID(SILValue value) {
+  auto state = getTrackableValue(value);
+  assert(state.isNonSendable() &&
+         "only non-Sendable values should be entered in the map");
+  return state.getID();
+}
+
+void RegionAnalysisValueMap::print(llvm::raw_ostream &os) const {
+#ifndef NDEBUG
+  // Since this is just used for debug output, be inefficient to make nicer
+  // output.
+  std::vector<std::pair<unsigned, RepresentativeValue>> temp;
+  for (auto p : stateIndexToEquivalenceClass) {
+    temp.emplace_back(p.first, p.second);
+  }
+  std::sort(temp.begin(), temp.end());
+  for (auto p : temp) {
+    os << "%%" << p.first << ": ";
+    auto value = getValueForId(Element(p.first));
+    value->print(os);
+  }
+#endif
+}
+
+static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
+  auto *fn = value->getFunction();
+  SILValue result = value;
+  while (true) {
+    SILValue temp = result;
+
+    if (auto *svi = dyn_cast<SingleValueInstruction>(temp)) {
+      if (isStaticallyLookThroughInst(svi)) {
+        temp = svi->getOperand(0);
+      }
+
+      // If we have a cast and our operand and result are non-Sendable, treat it
+      // as a look through.
+      if (isLookThroughIfOperandAndResultNonSendable(svi)) {
+        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn) &&
+            SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
+                                                fn)) {
+          temp = svi->getOperand(0);
+        }
+      }
+
+      if (isLookThroughIfResultNonSendable(svi)) {
+        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn)) {
+          temp = svi->getOperand(0);
+        }
+      }
+
+      if (isLookThroughIfOperandNonSendable(svi)) {
+        // If our operand is a non-Sendable type, look through this instruction.
+        if (SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
+                                                fn)) {
+          temp = svi->getOperand(0);
+        }
+      }
+    }
+
+    if (auto *inst = temp->getDefiningInstruction()) {
+      if (isStaticallyLookThroughInst(inst)) {
+        temp = inst->getOperand(0);
+      }
+    }
+
+    if (temp != result) {
+      result = temp;
+      continue;
+    }
+
+    return result;
+  }
+}
+
+RegionAnalysisValueMap::UnderlyingTrackedValueInfo
+RegionAnalysisValueMap::getUnderlyingTrackedValueHelper(SILValue value) const {
+  // Before a check if the value we are attempting to access is Sendable. In
+  // such a case, just return early.
+  if (!SILIsolationInfo::isNonSendableType(value))
+    return UnderlyingTrackedValueInfo(value);
+
+  // Look through a project_box, so that we process it like its operand object.
+  if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
+    value = pbi->getOperand();
+  }
+
+  if (!value->getType().isAddress()) {
+    SILValue underlyingValue = getUnderlyingTrackedObjectValue(value);
+
+    // If we do not have a load inst, just return the value.
+    if (!isa<LoadInst, LoadBorrowInst>(underlyingValue)) {
+      return UnderlyingTrackedValueInfo(underlyingValue);
+    }
+
+    // If we got an address, lets see if we can do even better by looking at the
+    // address.
+    value = cast<SingleValueInstruction>(underlyingValue)->getOperand(0);
+  }
+  assert(value->getType().isAddress());
+
+  UseDefChainVisitor visitor;
+  SILValue base = visitor.visitAll(value);
+  assert(base);
+  if (base->getType().isObject()) {
+    // NOTE: We purposely recurse into the cached version of our computation
+    // rather than recurse into getUnderlyingTrackedObjectValueHelper. This is
+    // safe since we know that value was previously an address so if our base is
+    // an object, it cannot be the same object.
+    return {getUnderlyingTrackedValue(base).value, visitor.actorIsolation};
+  }
+
+  return {base, visitor.actorIsolation};
+}
+
+//===----------------------------------------------------------------------===//
 //                            MARK: TrackableValue
 //===----------------------------------------------------------------------===//
 
@@ -709,6 +977,7 @@ namespace {
 ///
 /// 2. Just computing reachability early is a very easy way to do this.
 struct PartialApplyReachabilityDataflow {
+  RegionAnalysisValueMap &valueMap;
   PostOrderFunctionInfo *pofi;
   llvm::DenseMap<SILValue, unsigned> valueToBit;
   std::vector<std::pair<SILValue, SILInstruction *>> valueToGenInsts;
@@ -723,8 +992,10 @@ struct PartialApplyReachabilityDataflow {
   BasicBlockData<BlockState> blockData;
   bool propagatedReachability = false;
 
-  PartialApplyReachabilityDataflow(SILFunction *fn, PostOrderFunctionInfo *pofi)
-      : pofi(pofi), blockData(fn) {}
+  PartialApplyReachabilityDataflow(SILFunction *fn,
+                                   RegionAnalysisValueMap &valueMap,
+                                   PostOrderFunctionInfo *pofi)
+      : valueMap(valueMap), pofi(pofi), blockData(fn) {}
 
   /// Begin tracking an operand of a partial apply.
   void add(Operand *op);
@@ -756,7 +1027,7 @@ struct PartialApplyReachabilityDataflow {
 
 private:
   SILValue getRootValue(SILValue value) const {
-    return getUnderlyingTrackedValue(value).value;
+    return valueMap.getRepresentative(value);
   }
 
   unsigned getBitForValue(SILValue value) const {
@@ -1488,7 +1759,8 @@ public:
                         RegionAnalysisValueMap &valueMap,
                         IsolationHistory::Factory &historyFactory)
       : function(function), functionArgPartition(), builder(),
-        partialApplyReachabilityDataflow(function, pofi), valueMap(valueMap) {
+        partialApplyReachabilityDataflow(function, valueMap, pofi),
+        valueMap(valueMap) {
     builder.translator = this;
 
     REGIONBASEDISOLATION_LOG(
@@ -3567,285 +3839,6 @@ void RegionAnalysisFunctionInfo::runDataflow() {
       }
     }
   }
-}
-
-//===----------------------------------------------------------------------===//
-//                              MARK: Value Map
-//===----------------------------------------------------------------------===//
-
-SILInstruction *RegionAnalysisValueMap::maybeGetActorIntroducingInst(
-    Element trackableValueID) const {
-  if (auto value = getValueForId(trackableValueID)) {
-    auto rep = value->getRepresentative();
-    if (rep.hasRegionIntroducingInst())
-      return rep.getActorRegionIntroducingInst();
-  }
-
-  return nullptr;
-}
-
-std::optional<TrackableValue>
-RegionAnalysisValueMap::getValueForId(Element id) const {
-  auto iter = stateIndexToEquivalenceClass.find(id);
-  if (iter == stateIndexToEquivalenceClass.end())
-    return {};
-  auto iter2 = equivalenceClassValuesToState.find(iter->second);
-  if (iter2 == equivalenceClassValuesToState.end())
-    return {};
-  return {{iter2->first, iter2->second}};
-}
-
-SILValue
-RegionAnalysisValueMap::getRepresentative(Element trackableValueID) const {
-  return getValueForId(trackableValueID)->getRepresentative().getValue();
-}
-
-SILValue
-RegionAnalysisValueMap::maybeGetRepresentative(Element trackableValueID) const {
-  return getValueForId(trackableValueID)->getRepresentative().maybeGetValue();
-}
-
-RepresentativeValue
-RegionAnalysisValueMap::getRepresentativeValue(Element trackableValueID) const {
-  return getValueForId(trackableValueID)->getRepresentative();
-}
-
-SILIsolationInfo
-RegionAnalysisValueMap::getIsolationRegion(Element trackableValueID) const {
-  auto iter = getValueForId(trackableValueID);
-  if (!iter)
-    return {};
-  return iter->getValueState().getIsolationRegionInfo();
-}
-
-SILIsolationInfo
-RegionAnalysisValueMap::getIsolationRegion(SILValue value) const {
-  auto iter = equivalenceClassValuesToState.find(RepresentativeValue(value));
-  if (iter == equivalenceClassValuesToState.end())
-    return {};
-  return iter->getSecond().getIsolationRegionInfo();
-}
-
-std::pair<TrackableValue, bool>
-RegionAnalysisValueMap::initializeTrackableValue(
-    SILValue value, SILIsolationInfo newInfo) const {
-  auto info = getUnderlyingTrackedValue(value);
-  value = info.value;
-
-  auto *self = const_cast<RegionAnalysisValueMap *>(this);
-  auto iter = self->equivalenceClassValuesToState.try_emplace(
-      value, TrackableValueState(equivalenceClassValuesToState.size()));
-
-  // If we did not insert, just return the already stored value.
-  if (!iter.second) {
-    return {{iter.first->first, iter.first->second}, false};
-  }
-
-  // If we did not insert, just return the already stored value.
-  self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
-
-  // Before we do anything, see if we have a Sendable value.
-  if (!SILIsolationInfo::isNonSendableType(value->getType(), fn)) {
-    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
-    return {{iter.first->first, iter.first->second}, true};
-  }
-
-  // Otherwise, we have a non-Sendable type... so wire up the isolation.
-  iter.first->getSecond().setIsolationRegionInfo(newInfo);
-
-  return {{iter.first->first, iter.first->second}, true};
-}
-
-/// If \p isAddressCapturedByPartialApply is set to true, then this value is
-/// an address that is captured by a partial_apply and we want to treat it as
-/// may alias.
-TrackableValue RegionAnalysisValueMap::getTrackableValue(
-    SILValue value, bool isAddressCapturedByPartialApply) const {
-  auto info = getUnderlyingTrackedValue(value);
-  value = info.value;
-
-  auto *self = const_cast<RegionAnalysisValueMap *>(this);
-  auto iter = self->equivalenceClassValuesToState.try_emplace(
-      value, TrackableValueState(equivalenceClassValuesToState.size()));
-
-  // If we did not insert, just return the already stored value.
-  if (!iter.second) {
-    return {iter.first->first, iter.first->second};
-  }
-
-  // If we did not insert, just return the already stored value.
-  self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
-
-  // Otherwise, we need to compute our flags.
-
-  // Treat function ref and class method as either actor isolated or
-  // sendable. Formally they are non-Sendable, so we do the check before we
-  // check the oracle.
-  if (isa<FunctionRefInst, ClassMethodInst>(value)) {
-    if (auto isolation = SILIsolationInfo::get(value)) {
-      iter.first->getSecond().setIsolationRegionInfo(isolation);
-      return {iter.first->first, iter.first->second};
-    }
-
-    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
-    return {iter.first->first, iter.first->second};
-  }
-
-  // Then check our oracle to see if the value is actually sendable. If we have
-  // a Sendable value, just return early.
-  if (!SILIsolationInfo::isNonSendableType(value->getType(), fn)) {
-    iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
-    return {iter.first->first, iter.first->second};
-  }
-
-  // Ok, at this point we have a non-Sendable value. First process addresses.
-  if (value->getType().isAddress()) {
-    // If we were able to find this was actor isolated from finding our
-    // underlying object, use that. It is never wrong.
-    if (info.actorIsolation) {
-      SILIsolationInfo isolation;
-      if (info.value->getType().isAnyActor()) {
-        isolation = SILIsolationInfo::getActorInstanceIsolated(
-            value, info.value, info.actorIsolation->getActor());
-      } else if (info.actorIsolation->isGlobalActor()) {
-        isolation = SILIsolationInfo::getGlobalActorIsolated(
-            value, info.actorIsolation->getGlobalActor());
-      }
-
-      if (isolation) {
-        iter.first->getSecond().setIsolationRegionInfo(isolation);
-      }
-    }
-
-    auto storage = AccessStorageWithBase::compute(value);
-    if (storage.storage) {
-      // Check if we have a uniquely identified address that was not captured
-      // by a partial apply... in such a case, we treat it as no-alias.
-      if (storage.storage.isUniquelyIdentified() &&
-          !isAddressCapturedByPartialApply) {
-        iter.first->getSecond().removeFlag(TrackableValueFlag::isMayAlias);
-      }
-
-      if (auto isolation = SILIsolationInfo::get(storage.base)) {
-        iter.first->getSecond().setIsolationRegionInfo(isolation);
-      }
-    }
-  }
-
-  // Check if we have a load or load_borrow from an address. In that case, we
-  // want to look through the load and find a better root from the address we
-  // loaded from.
-  if (isa<LoadInst, LoadBorrowInst>(iter.first->first.getValue())) {
-    auto *svi = cast<SingleValueInstruction>(iter.first->first.getValue());
-
-    // See if we can use get underlying tracked value to find if it is actor
-    // isolated.
-    //
-    // TODO: Instead of using AccessStorageBase, just use our own visitor
-    // everywhere. Just haven't done it due to possible perturbations.
-    auto parentAddrInfo = getUnderlyingTrackedValue(svi);
-    if (parentAddrInfo.actorIsolation) {
-      iter.first->getSecond().setIsolationRegionInfo(
-          SILIsolationInfo::getActorInstanceIsolated(
-              svi, parentAddrInfo.value,
-              parentAddrInfo.actorIsolation->getActor()));
-    }
-
-    auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
-    if (storage.storage) {
-      if (auto isolation = SILIsolationInfo::get(storage.base)) {
-        iter.first->getSecond().setIsolationRegionInfo(isolation);
-      }
-    }
-
-    return {iter.first->first, iter.first->second};
-  }
-
-  // Ok, we have a non-Sendable type, see if we do not have any isolation
-  // yet. If we don't, attempt to infer its isolation.
-  if (!iter.first->getSecond().hasIsolationRegionInfo()) {
-    if (auto isolation = SILIsolationInfo::get(iter.first->first.getValue())) {
-      iter.first->getSecond().setIsolationRegionInfo(isolation);
-      return {iter.first->first, iter.first->second};
-    }
-  }
-
-  return {iter.first->first, iter.first->second};
-}
-
-std::optional<TrackableValue>
-RegionAnalysisValueMap::getTrackableValueForActorIntroducingInst(
-    SILInstruction *inst) const {
-  auto *self = const_cast<RegionAnalysisValueMap *>(this);
-  auto iter = self->equivalenceClassValuesToState.find(inst);
-  if (iter == self->equivalenceClassValuesToState.end())
-    return {};
-
-  // Otherwise, we need to compute our flags.
-  return {{iter->first, iter->second}};
-}
-
-std::optional<TrackableValue>
-RegionAnalysisValueMap::tryToTrackValue(SILValue value) const {
-  auto state = getTrackableValue(value);
-  if (state.isNonSendable())
-    return state;
-  return {};
-}
-
-TrackableValue RegionAnalysisValueMap::getActorIntroducingRepresentative(
-    SILInstruction *introducingInst, SILIsolationInfo actorIsolation) const {
-  auto *self = const_cast<RegionAnalysisValueMap *>(this);
-  auto iter = self->equivalenceClassValuesToState.try_emplace(
-      introducingInst,
-      TrackableValueState(equivalenceClassValuesToState.size()));
-
-  // If we did not insert, just return the already stored value.
-  if (!iter.second) {
-    return {iter.first->first, iter.first->second};
-  }
-
-  // Otherwise, wire up the value.
-  self->stateIndexToEquivalenceClass[iter.first->second.getID()] =
-      introducingInst;
-  iter.first->getSecond().setIsolationRegionInfo(actorIsolation);
-  return {iter.first->first, iter.first->second};
-}
-
-bool RegionAnalysisValueMap::valueHasID(SILValue value, bool dumpIfHasNoID) {
-  assert(getTrackableValue(value).isNonSendable() &&
-         "Can only accept non-Sendable values");
-  bool hasID = equivalenceClassValuesToState.count(value);
-  if (!hasID && dumpIfHasNoID) {
-    llvm::errs() << "FAILURE: valueHasID of ";
-    value->print(llvm::errs());
-    llvm::report_fatal_error("standard compiler error");
-  }
-  return hasID;
-}
-
-Element RegionAnalysisValueMap::lookupValueID(SILValue value) {
-  auto state = getTrackableValue(value);
-  assert(state.isNonSendable() &&
-         "only non-Sendable values should be entered in the map");
-  return state.getID();
-}
-
-void RegionAnalysisValueMap::print(llvm::raw_ostream &os) const {
-#ifndef NDEBUG
-  // Since this is just used for debug output, be inefficient to make nicer
-  // output.
-  std::vector<std::pair<unsigned, RepresentativeValue>> temp;
-  for (auto p : stateIndexToEquivalenceClass) {
-    temp.emplace_back(p.first, p.second);
-  }
-  std::sort(temp.begin(), temp.end());
-  for (auto p : temp) {
-    os << "%%" << p.first << ": ";
-    auto value = getValueForId(Element(p.first));
-    value->print(os);
-  }
-#endif
 }
 
 //===----------------------------------------------------------------------===//
