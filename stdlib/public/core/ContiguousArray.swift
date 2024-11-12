@@ -860,7 +860,8 @@ extension ContiguousArray: RangeReplaceableCollection {
                 start: startNewElements,
                 count: _buffer.mutableCapacity - oldCount)
 
-    _ = buf.initialize(fromContentsOf: newElements)
+    let end = buf.initialize(fromContentsOf: newElements)
+    _precondition(end == buf.endIndex)
     _buffer.count += newElementsCount
   }
 

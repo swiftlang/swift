@@ -967,7 +967,8 @@ extension ArraySlice: RangeReplaceableCollection {
                 start: startNewElements,
                 count: self.capacity - oldCount)
 
-    _ = buf.initialize(fromContentsOf: newElements)
+    let end = buf.initialize(fromContentsOf: newElements)
+    _precondition(end == buf.endIndex)
     _buffer.count += newElementsCount
   }
 
