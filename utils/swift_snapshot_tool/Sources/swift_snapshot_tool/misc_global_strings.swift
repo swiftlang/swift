@@ -1,4 +1,4 @@
-//===--- logging.swift ----------------------------------------------------===//
+//===--- misc_global_strings.swift ----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,10 +10,4 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Foundation
-
-func log(_ msg: String) {
-  let msgWithSpace = "\(msg)\n"
-  msgWithSpace.data(using: .utf8)
-    .map(FileHandle.standardError.write)
-}
+let environmentVariables = "SWIFTC, SWIFT_FRONTEND, and SWIFT_LIBRARY_PATH"
