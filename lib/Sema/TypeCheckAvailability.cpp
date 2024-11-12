@@ -3234,7 +3234,8 @@ static void diagnoseNonRuntimeProtocol(SourceLoc Loc, TypeDecl *D) {
     auto *proto = dyn_cast<clang::ObjCProtocolDecl>(ClangD);
     if (!proto || !proto->isNonRuntimeProtocol())
       return;
-    auto *clangImporter = static_cast<ClangImporter *>(D->getASTContext().getClangModuleLoader());
+    auto *clangImporter =
+        static_cast<ClangImporter *>(D->getASTContext().getClangModuleLoader());
     assert(clangImporter && "Must have a clang importer");
 
 
@@ -3243,8 +3244,7 @@ static void diagnoseNonRuntimeProtocol(SourceLoc Loc, TypeDecl *D) {
                    D->getNameStr());
     Diags
         .diagnose(clangImporter->importSourceLocation(proto->getLocation()),
-                  diag::non_runtime_objc_protocol_metadata_not_available_note,
-                  proto->getNameAsString())
+                  diag::decl_declared_here, proto)
         .highlight(clangImporter->importSourceRange(
             proto->getAttr<clang::ObjCNonRuntimeProtocolAttr>()->getRange()));
   }

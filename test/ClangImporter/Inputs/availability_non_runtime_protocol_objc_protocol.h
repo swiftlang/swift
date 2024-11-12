@@ -6,7 +6,7 @@
 @end
 
 __attribute__((objc_non_runtime_protocol))
-@protocol ComposerMutationBridging
+@protocol ObjCNonRuntimeProtocolUsedinSwift
 @end
 
 __attribute__((objc_non_runtime_protocol))
