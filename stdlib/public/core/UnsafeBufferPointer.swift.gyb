@@ -946,7 +946,9 @@ extension UnsafeMutableBufferPointer {
         $0.count <= self.count,
         "buffer cannot contain every element from source."
       )
-      baseAddress?.initialize(from: sourceAddress, count: $0.count)
+      baseAddress.unsafelyUnwrapped.initialize(
+        from: sourceAddress, count: $0.count
+      )
       return $0.count
     }
     if let count {
@@ -1049,7 +1051,7 @@ extension UnsafeMutableBufferPointer {
         $0.count <= self.count,
         "buffer cannot contain every element from source."
       )
-      baseAddress?.update(from: sourceAddress, count: $0.count)
+      baseAddress.unsafelyUnwrapped.update(from: sourceAddress, count: $0.count)
       return $0.count
     }
     if let count {
@@ -1117,7 +1119,9 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
       source.count <= self.count,
       "buffer cannot contain every element from source."
     )
-    baseAddress?.moveInitialize(from: sourceAddress, count: source.count)
+    baseAddress.unsafelyUnwrapped.moveInitialize(
+      from: sourceAddress, count: source.count
+    )
     return startIndex.advanced(by: source.count)
   }
 }
@@ -1191,7 +1195,9 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
       source.count <= self.count,
       "buffer cannot contain every element from source."
     )
-    baseAddress?.moveUpdate(from: sourceAddress, count: source.count)
+    baseAddress.unsafelyUnwrapped.moveUpdate(
+      from: sourceAddress, count: source.count
+    )
     return startIndex.advanced(by: source.count)
   }
 }
