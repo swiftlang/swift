@@ -1561,7 +1561,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   if (!var)  // Ignore subscripts
     return;
 
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     VarDecl *Var;
     const AccessorDecl *Accessor;
@@ -1575,12 +1575,6 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
       return DRE && DRE->isImplicit() && isa<VarDecl>(DRE->getDecl()) &&
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
-    }
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -2221,7 +2215,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return nullptr;
       }
 
-      return parentContext->getInnermostClosureForSelfCapture();
+      return parentContext->getInnermostClosureForCaptures();
     }
 
     bool shouldRecordClosure(const AbstractClosureExpr *E) {
@@ -4527,7 +4521,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   if (E == nullptr || isa<ErrorExpr>(E)) return;
 
   // Walk into expressions which might have invalid trailing closures
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
 
     void diagnoseIt(const CallExpr *E) {
@@ -4572,12 +4566,6 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
 
   public:
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
 
     PreWalkResult<ArgumentList *>
     walkToArgumentListPre(ArgumentList *args) override {
@@ -4648,7 +4636,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
 
 namespace {
 
-class ObjCSelectorWalker : public ASTWalker {
+class ObjCSelectorWalker : public BaseDiagnosticWalker {
   ASTContext &Ctx;
   const DeclContext *DC;
   Type SelectorTy;
@@ -4697,12 +4685,6 @@ class ObjCSelectorWalker : public ASTWalker {
 public:
   ObjCSelectorWalker(const DeclContext *dc, Type selectorTy)
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    // Macro expansions will be walked when they're type-checked, not as
-    // part of the surrounding code.
-    return MacroWalking::None;
-  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
@@ -5208,7 +5190,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class UnintendedOptionalBehaviorWalker : public ASTWalker {
+  class UnintendedOptionalBehaviorWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     SmallPtrSet<Expr *, 16> IgnoredExprs;
 
@@ -5560,12 +5542,6 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5601,7 +5577,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class DeprecatedWritableKeyPathWalker : public ASTWalker {
+  class DeprecatedWritableKeyPathWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     const DeclContext *DC;
 
@@ -5635,12 +5611,6 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5664,7 +5634,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
 static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
                                                      const DeclContext *DC) {
-  class KVOObserveCallWalker : public ASTWalker {
+  class KVOObserveCallWalker : public BaseDiagnosticWalker {
     const ASTContext &C;
 
   public:
@@ -5722,12 +5692,6 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5748,7 +5712,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
 static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
                                                      const DeclContext *DC) {
 
-  class ExplicitLazyVarStorageAccessFinder : public ASTWalker {
+  class ExplicitLazyVarStorageAccessFinder : public BaseDiagnosticWalker {
     const ASTContext &C;
 
   public:
@@ -5775,12 +5739,6 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5799,7 +5757,7 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
 }
 
 static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
-  class ComparisonWithNaNFinder : public ASTWalker {
+  class ComparisonWithNaNFinder : public BaseDiagnosticWalker {
     const ASTContext &C;
 
   public:
@@ -5908,12 +5866,6 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5936,18 +5888,12 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     const DeclContext *DC;
 
   public:
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -6001,7 +5947,7 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
 static void
 diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
                                              const DeclContext *DC) {
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
 
   private:
@@ -6099,12 +6045,6 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
     }
   public:
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       const auto *DLE = dyn_cast_or_null<DictionaryExpr>(E);

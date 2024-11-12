@@ -515,12 +515,12 @@ public:
         const_cast<DeclContext *>(this)->getInnermostSkippedFunctionContext();
   }
 
-  /// Returns the innermost context that is a ClosureExpr, which defines how
-  /// self behaves, unless within a type context that redefines self.
+  /// Returns the innermost ClosureExpr context that can propagate its captures
+  /// to this DeclContext.
   LLVM_READONLY
-  ClosureExpr *getInnermostClosureForSelfCapture();
-  const ClosureExpr *getInnermostClosureForSelfCapture() const {
-    return const_cast<DeclContext *>(this)->getInnermostClosureForSelfCapture();
+  ClosureExpr *getInnermostClosureForCaptures();
+  const ClosureExpr *getInnermostClosureForCaptures() const {
+    return const_cast<DeclContext *>(this)->getInnermostClosureForCaptures();
   }
 
   /// Returns the semantic parent of this context.  A context has a

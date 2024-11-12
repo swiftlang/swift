@@ -2628,15 +2628,26 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
     }
   }
 
-  // If the context is a closure, type check the entire surrounding closure.
-  // Conjunction constraints ensure that statements unrelated to the one that
-  // contains the code completion token are not type checked.
-  if (auto CE = dyn_cast<ClosureExpr>(DC)) {
+  // If we're within a ClosureExpr that can propagate its captures to this
+  // DeclContext, we need to type-check the entire surrounding closure. If the
+  // completion token is contained within the closure itself, conjunction
+  // constraints ensure that statements unrelated to the one that contains the
+  // code completion token are not type checked. If it's in a nested local
+  // function, we unfortunately need to type-check everything since we need to
+  // apply the solution.
+  // FIXME: We ought to see if we can do better in that case.
+  if (auto *CE = DC->getInnermostClosureForCaptures()) {
     if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
       swift::typeCheckASTNodeAtLoc(
           TypeCheckASTNodeAtLocContext::declContext(CE->getParent()),
           CE->getLoc());
-      return false;
+
+      // If the context itself is a ClosureExpr, we should have type-checked
+      // the completion expression now. If it's a nested local declaration,
+      // fall through to type-check the AST node now that we've type-checked
+      // the surrounding closure.
+      if (isa<ClosureExpr>(DC))
+        return false;
     }
   }
 

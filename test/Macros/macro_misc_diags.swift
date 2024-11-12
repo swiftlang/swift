@@ -61,13 +61,16 @@ macro makeBinding<T>(_ x: T) = #externalMacro(module: "MacroPlugin", type: "Make
 @available(*, deprecated)
 func deprecatedFunc() -> Int { 0 }
 
-// FIXME: We also ought to be diagnosing the macro argument
+// Make sure we do MiscDiagnostics passes for both macro arguments and expansions.
+
 _ = #identity(Int)
 // CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-2]]{{.*}}identityfMf_.swift:1:1: error: expected member name or initializer call after type name
+// CHECK-DIAG: Client.swift:[[@LINE-2]]:15: error: expected member name or initializer call after type name
 
 _ = {
   _ = #identity(Int)
   // CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-2]]{{.*}}identityfMf0_.swift:1:1: error: expected member name or initializer call after type name
+  // CHECK-DIAG: Client.swift:[[@LINE-2]]:17: error: expected member name or initializer call after type name
 }
 
 _ = #identity(deprecatedFunc())
@@ -99,6 +102,14 @@ _ = #trailingClosure {
   // CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-4]]{{.*}}trailingClosurefMf_.swift:2:27: warning: trailing closure in this context is confusable with the body of the statement
 }
 
+func testOptionalToAny(_ y: Int?) {
+  _ = #trailingClosure {
+    let _: Any = y
+    // CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-3]]{{.*}}trailingClosurefMf_.swift:2:18: warning: expression implicitly coerced from 'Int?' to 'Any'
+    // CHECK-DIAG: Client.swift:[[@LINE-2]]:18: warning: expression implicitly coerced from 'Int?' to 'Any'
+  }
+}
+
 // rdar://138997009 - Make sure we don't crash in MiscDiagnostics' implicit
 // self diagnosis.
 struct rdar138997009 {
@@ -119,6 +130,7 @@ class rdar138997009_Class {
       _ = #trailingClosure {
         foo()
         // CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-3]]{{.*}}trailingClosurefMf_.swift:2:9: error: call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit
+        // CHECK-DIAG: Client.swift:[[@LINE-2]]:9: error: call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit
       }
     }
   }
