@@ -197,6 +197,7 @@ UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
 UNINTERESTING_FEATURE(GenerateForceToMainActorThunks)
+UNINTERESTING_FEATURE(Span)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
