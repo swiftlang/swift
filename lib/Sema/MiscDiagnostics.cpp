@@ -2221,7 +2221,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return nullptr;
       }
 
-      return parentContext->getInnermostClosureForSelfCapture();
+      return parentContext->getInnermostClosureForCaptures();
     }
 
     bool shouldRecordClosure(const AbstractClosureExpr *E) {

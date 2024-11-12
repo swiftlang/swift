@@ -74,7 +74,7 @@ void PostfixCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   Expr *fallbackExpr = CompletionExpr;
   DeclContext *fallbackDC = DC;
 
-  CompletionContextFinder finder(DC);
+  auto finder = CompletionContextFinder::forFallback(DC);
   if (finder.hasCompletionExpr()) {
     if (auto fallback = finder.getFallbackCompletionExpr()) {
       fallbackExpr = fallback->E;
