@@ -40,8 +40,14 @@ otherApiFunc() // expected-error {{cannot find 'otherApiFunc' in scope}}
 public func publicUseOfSPI(param: SPIClass) -> SPIClass {} // expected-error 2{{cannot find type 'SPIClass' in scope}}
 public func publicUseOfSPI2() -> [SPIClass] {} // expected-error {{cannot find type 'SPIClass' in scope}}
 
+public let o1 = PublicType()
+public let o2 = PublicType()
+
 @inlinable
-func inlinable() -> SPIClass { // expected-error {{cannot find type 'SPIClass' in scope}}
+public func inlinable() -> SPIClass { // expected-error {{cannot find type 'SPIClass' in scope}}
   spiFunc() // expected-error {{cannot find 'spiFunc' in scope}}
   _ = SPIClass() // expected-error {{cannot find 'SPIClass' in scope}}
+  let _ = o1 - o2 // expected-error {{binary operator '-' cannot be applied to two 'PublicType' operands}}
 }
+
+let _ = o1 - o2 // expected-error {{binary operator '-' cannot be applied to two 'PublicType' operands}}
