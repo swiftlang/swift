@@ -2445,10 +2445,14 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     if (auto moduleRef = clangModule->getASTFile()) {
       auto *moduleFile = Instance->getASTReader()->getModuleManager().lookup(
           *moduleRef);
+      llvm::SmallString<0> pathBuf;
+      pathBuf.reserve(256);
       Instance->getASTReader()->visitInputFileInfos(
           *moduleFile, /*IncludeSystem=*/true,
           [&](const clang::serialization::InputFileInfo &IFI, bool isSystem) {
-            SwiftDependencyTracker->addDependency(IFI.Filename, isSystem);
+            auto Filename = clang::ASTReader::ResolveImportedPath(
+                pathBuf, IFI.UnresolvedImportedFilename, *moduleFile);
+            SwiftDependencyTracker->addDependency(*Filename, isSystem);
           });
     }
   }

@@ -172,9 +172,8 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
   for (auto &clangModuleDep : clangDependencies) {
     // File dependencies for this module.
     std::vector<std::string> fileDeps;
-    for (const auto &fileDep : clangModuleDep.FileDeps) {
-      fileDeps.push_back(fileDep.getKey().str());
-    }
+    clangModuleDep.forEachFileDep(
+        [&fileDeps](StringRef fileDep) { fileDeps.emplace_back(fileDep); });
 
     std::vector<std::string> swiftArgs;
     auto addClangArg = [&](Twine arg) {
