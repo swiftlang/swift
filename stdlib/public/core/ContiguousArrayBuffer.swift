@@ -1063,6 +1063,12 @@ extension Sequence {
 internal func _copySequenceToContiguousArray<
   S: Sequence
 >(_ source: S) -> ContiguousArray<S.Element> {
+  let contigArray = withContiguousStorageIfAvailable {
+    _copyCollectionToContiguousArray($0)
+  }
+  if let contigArray {
+    return contigArray
+  }
   let initialCapacity = source.underestimatedCount
   var builder =
     _UnsafePartiallyInitializedContiguousArrayBuffer<S.Element>(
