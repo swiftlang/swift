@@ -533,11 +533,11 @@ Constructor UnsafeRawPointer.init(_:) has mangled name changing from 'Swift.Unsa
 Constructor UnsafeRawPointer.init(_:) is now with @_preInverseGenerics
 Enum MemoryLayout has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
 Enum Optional has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
-Enum Result has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable>
+Enum Result has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable, Success : ~Escapable>
 EnumElement Optional.none has declared type change from <τ_0_0> (τ_0_0?.Type) -> τ_0_0? to <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (τ_0_0?.Type) -> τ_0_0?
 EnumElement Optional.some has declared type change from <τ_0_0> (τ_0_0?.Type) -> (τ_0_0) -> τ_0_0? to <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (τ_0_0?.Type) -> (τ_0_0) -> τ_0_0?
-EnumElement Result.failure has declared type change from <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_1) -> Swift.Result<τ_0_0, τ_0_1> to <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error, τ_0_0 : ~Copyable> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_1) -> Swift.Result<τ_0_0, τ_0_1>
-EnumElement Result.success has declared type change from <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_0) -> Swift.Result<τ_0_0, τ_0_1> to <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error, τ_0_0 : ~Copyable> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_0) -> Swift.Result<τ_0_0, τ_0_1>
+EnumElement Result.failure has declared type change from <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_1) -> Swift.Result<τ_0_0, τ_0_1> to <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_1) -> Swift.Result<τ_0_0, τ_0_1>
+EnumElement Result.success has declared type change from <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_0) -> Swift.Result<τ_0_0, τ_0_1> to <τ_0_0, τ_0_1 where τ_0_1 : Swift.Error, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (Swift.Result<τ_0_0, τ_0_1>.Type) -> (τ_0_0) -> Swift.Result<τ_0_0, τ_0_1>
 Func ??(_:_:) has been removed
 Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) has mangled name changing from 'static Swift.ManagedBuffer.create(minimumCapacity: Swift.Int, makingHeaderWith: (Swift.ManagedBuffer<A, B>) throws -> A) throws -> Swift.ManagedBuffer<A, B>' to 'static (extension in Swift):Swift.ManagedBuffer< where B: ~Swift.Copyable>.create(minimumCapacity: Swift.Int, makingHeaderWith: (Swift.ManagedBuffer<A, B>) throws -> A) throws -> Swift.ManagedBuffer<A, B>'
@@ -545,6 +545,9 @@ Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) is now with @_preIn
 Func ManagedBuffer.withUnsafeMutablePointerToElements(_:) has been removed
 Func ManagedBuffer.withUnsafeMutablePointerToHeader(_:) has been removed
 Func ManagedBuffer.withUnsafeMutablePointers(_:) has been removed
+Func ManagedBufferPointer.==(_:_:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
+Func ManagedBufferPointer.==(_:_:) has mangled name changing from 'static Swift.ManagedBufferPointer.== infix(Swift.ManagedBufferPointer<A, B>, Swift.ManagedBufferPointer<A, B>) -> Swift.Bool' to 'static (extension in Swift):Swift.ManagedBufferPointer< where B: ~Swift.Copyable>.== infix(Swift.ManagedBufferPointer<A, B>, Swift.ManagedBufferPointer<A, B>) -> Swift.Bool'
+Func ManagedBufferPointer.==(_:_:) is now with @_preInverseGenerics
 Func ManagedBufferPointer._checkValidBufferClass(_:creating:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Func ManagedBufferPointer._checkValidBufferClass(_:creating:) has mangled name changing from 'static Swift.ManagedBufferPointer._checkValidBufferClass(_: Swift.AnyObject.Type, creating: Swift.Bool) -> ()' to 'static (extension in Swift):Swift.ManagedBufferPointer< where B: ~Swift.Copyable>._checkValidBufferClass(_: Swift.AnyObject.Type, creating: Swift.Bool) -> ()'
 Func ManagedBufferPointer._checkValidBufferClass(_:creating:) is now with @_preInverseGenerics
@@ -681,8 +684,8 @@ Func UnsafeRawPointer.assumingMemoryBound(to:) is now with @_preInverseGenerics
 Func UnsafeRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeRawPointer.bindMemory(to:capacity:) has mangled name changing from 'Swift.UnsafeRawPointer.bindMemory<A>(to: A.Type, capacity: Swift.Int) -> Swift.UnsafePointer<A>' to 'Swift.UnsafeRawPointer.bindMemory<A where A: ~Swift.Copyable>(to: A.Type, capacity: Swift.Int) -> Swift.UnsafePointer<A>'
 Func UnsafeRawPointer.bindMemory(to:capacity:) is now with @_preInverseGenerics
-Func _fixLifetime(_:) has generic signature change from <T> to <T where T : ~Copyable>
-Func _fixLifetime(_:) has mangled name changing from 'Swift._fixLifetime<A>(A) -> ()' to 'Swift._fixLifetime<A where A: ~Swift.Copyable>(A) -> ()'
+Func _fixLifetime(_:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Func _fixLifetime(_:) has mangled name changing from 'Swift._fixLifetime<A>(A) -> ()' to 'Swift._fixLifetime<A where A: ~Swift.Copyable, A: ~Swift.Escapable>(A) -> ()'
 Func _fixLifetime(_:) has parameter 0 changing from Default to Shared
 Func _fixLifetime(_:) is now with @_preInverseGenerics
 Func swap(_:_:) has generic signature change from <T> to <T where T : ~Copyable>
