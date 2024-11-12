@@ -1719,6 +1719,32 @@ static void diagnoseGenericArgumentsOnSelf(const TypeResolution &resolution,
   }
 }
 
+/// Diagnose when this is one of the Span types, which currently requires
+/// an experimental feature to use.
+static void diagnoseSpanType(TypeDecl *typeDecl, SourceLoc loc,
+                             const DeclContext *dc) {
+  if (loc.isInvalid())
+    return;
+
+  if (!typeDecl->isStdlibDecl())
+    return;
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::Span))
+    return;
+
+  auto nameString = typeDecl->getName().str();
+  if (nameString != "Span" && nameString != "RawSpan")
+    return;
+
+  // Don't require this in the standard library or _Concurrency library.
+  auto module = dc->getParentModule();
+  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
+    return;
+
+  ctx.Diags.diagnose(loc, diag::span_requires_feature_flag, nameString);
+}
+
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 /// \param silContext Used to look up generic parameters in SIL mode.
@@ -1854,6 +1880,9 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
+
+    diagnoseSpanType(currentDecl, repr->getLoc(), DC);
+
     repr->setValue(currentDecl, currentDC);
     return current;
   }
@@ -2074,6 +2103,8 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
     member = memberTypes.back().Member;
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
+
+    diagnoseSpanType(member, repr->getLoc(), DC);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);
