@@ -190,3 +190,103 @@ func testMultiPayloadBlock() {
 }
 
 testMultiPayloadBlock()
+
+class GenericOuterClassNSObject<T: NSObject> {
+    enum InnerEnum {
+        case x(T.Type)
+        case y(T)
+    }
+}
+
+func testNestedGenericEnumNSObject() {
+    let ptr = UnsafeMutablePointer<GenericOuterClassNSObject<ObjCPrintOnDealloc>.InnerEnum>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let x = GenericOuterClassNSObject<ObjCPrintOnDealloc>.InnerEnum.y(ObjCPrintOnDealloc())
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let y = GenericOuterClassNSObject<ObjCPrintOnDealloc>.InnerEnum.y(ObjCPrintOnDealloc())
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = GenericOuterClassNSObject<ObjCPrintOnDealloc>.InnerEnum.y(ObjCPrintOnDealloc())
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testNestedGenericEnumNSObject()
+
+class GenericOuterClassSwiftObjC<T: SwiftObjC> {
+    enum InnerEnum {
+        case x(T.Type)
+        case y(T)
+    }
+}
+
+func testNestedGenericEnumSwiftObjC() {
+    let ptr = UnsafeMutablePointer<GenericOuterClassSwiftObjC<SwiftObjC>.InnerEnum>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let x = GenericOuterClassSwiftObjC<SwiftObjC>.InnerEnum.y(SwiftObjC())
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let y = GenericOuterClassSwiftObjC<SwiftObjC>.InnerEnum.y(SwiftObjC())
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SwiftObjC deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = GenericOuterClassSwiftObjC<SwiftObjC>.InnerEnum.y(SwiftObjC())
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SwiftObjC deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SwiftObjC deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testNestedGenericEnumSwiftObjC()
