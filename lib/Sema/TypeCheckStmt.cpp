@@ -1607,6 +1607,10 @@ public:
       BraceStmt *body = caseBlock->getBody();
       limitExhaustivityChecks |= typeCheckStmt(body);
       caseBlock->setBody(body);
+
+      // CaseStmts don't go through typeCheckStmt, so manually call into
+      // performStmtDiagnostics.
+      performStmtDiagnostics(caseBlock, DC);
     }
   }
 

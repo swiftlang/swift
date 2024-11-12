@@ -5105,7 +5105,8 @@ ERROR(unknown_case_must_be_last,none,
       "'@unknown' can only be applied to the last case in a switch", ())
 
 WARNING(where_on_one_item, none,
-        "'where' only applies to the second pattern match in this case", ())
+        "'where' only applies to the second pattern match in this "
+        "'%select{case|catch}0'", (bool))
 
 NOTE(add_where_newline, none,
      "disambiguate by adding a line break between them if this is desired", ())
