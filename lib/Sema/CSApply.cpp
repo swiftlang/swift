@@ -426,13 +426,24 @@ namespace {
           solution(solution), target(target),
           SuppressDiagnostics(suppressDiagnostics) {}
 
+    ASTContext &getASTContext() const { return cs.getASTContext(); }
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
     void addLocalDeclToTypeCheck(Decl *D) {
+      // If we're doing code completion, avoid doing any further type-checking,
+      // that should instead be handled by TypeCheckASTNodeAtLocRequest.
+      if (getASTContext().CompletionCallback)
+        return;
+
       LocalDeclsToTypeCheck.push_back(D);
     }
 
     void addMacroToExpand(MacroExpansionExpr *E) {
+      // If we're doing code completion, avoid doing any further type-checking,
+      // that should instead be handled by TypeCheckASTNodeAtLocRequest.
+      if (getASTContext().CompletionCallback)
+        return;
+
       MacrosToExpand.push_back(E);
     }
 
@@ -5620,20 +5631,16 @@ namespace {
             .fixItInsert(coercion->getStartLoc(), "consume ");
       }
 
-      // If we're doing code completion, avoid doing any further type-checking,
-      // that should instead be handled by TypeCheckASTNodeAtLocRequest.
-      if (!ctx.CompletionCallback) {
-        // Type-check any local decls encountered.
-        for (auto *D : LocalDeclsToTypeCheck)
-          TypeChecker::typeCheckDecl(D);
+      // Type-check any local decls encountered.
+      for (auto *D : LocalDeclsToTypeCheck)
+        TypeChecker::typeCheckDecl(D);
 
-        // Expand any macros encountered.
-        // FIXME: Expansion should be lazy.
-        auto &eval = cs.getASTContext().evaluator;
-        for (auto *E : MacrosToExpand) {
-          (void)evaluateOrDefault(eval, ExpandMacroExpansionExprRequest{E},
-                                  std::nullopt);
-        }
+      // Expand any macros encountered.
+      // FIXME: Expansion should be lazy.
+      auto &eval = cs.getASTContext().evaluator;
+      for (auto *E : MacrosToExpand) {
+        (void)evaluateOrDefault(eval, ExpandMacroExpansionExprRequest{E},
+                                std::nullopt);
       }
     }
 
