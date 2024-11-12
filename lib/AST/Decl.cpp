@@ -6863,7 +6863,7 @@ bool ProtocolDecl::hasCircularInheritedProtocols() const {
 
 /// Returns a descriptive name for the given accessor/addressor kind.
 StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
-                                              bool article) {
+                                              bool article, bool underscored) {
   switch (accessorKind) {
   case AccessorKind::Get:
     return article ? "a getter" : "getter";
@@ -6876,9 +6876,17 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::MutableAddress:
     return article ? "a mutable addressor" : "mutable addressor";
   case AccessorKind::Read:
+    if (underscored)
+      return article ? "a '_read' accessor" : "'_read' accessor";
+    // Fall through to the non-underscored spelling.
+    LLVM_FALLTHROUGH;
   case AccessorKind::Read2:
     return article ? "a 'read' accessor" : "'read' accessor";
   case AccessorKind::Modify:
+    if (underscored)
+      return article ? "a '_modify' accessor" : "'_modify' accessor";
+    // Fall through to the non-underscored spelling.
+    LLVM_FALLTHROUGH;
   case AccessorKind::Modify2:
     return article ? "a 'modify' accessor" : "'modify' accessor";
   case AccessorKind::WillSet:
@@ -6892,9 +6900,12 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
 }
 
 StringRef swift::getAccessorNameForDiagnostic(AccessorDecl *accessor,
-                                              bool article) {
-  return getAccessorNameForDiagnostic(accessor->getAccessorKind(),
-                                      article);
+                                              bool article,
+                                              std::optional<bool> underscored) {
+  return getAccessorNameForDiagnostic(
+      accessor->getAccessorKind(), article,
+      underscored.value_or(accessor->getASTContext().LangOpts.hasFeature(
+          Feature::CoroutineAccessors)));
 }
 
 bool AbstractStorageDecl::hasStorage() const {

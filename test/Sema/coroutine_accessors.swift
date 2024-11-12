@@ -34,7 +34,7 @@ var ingnsn_m: Int {
 var ignsn_m: Int {
   mutating get { 0 }
   nonmutating set {}
-  nonmutating _modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the getter is 'mutating'}}
+  nonmutating _modify { // expected-error{{'_modify' accessor cannot be 'nonmutating' when the getter is 'mutating'}}
                         // expected-note@-3{{getter defined here}}
     var fake: Int
     yield &fake
@@ -43,7 +43,7 @@ var ignsn_m: Int {
 var ingsn_m: Int {
   get { 0 }
   set {}
-  nonmutating _modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the setter is not 'nonmutating'}}
+  nonmutating _modify { // expected-error{{'_modify' accessor cannot be 'nonmutating' when the setter is not 'nonmutating'}}
                         // expected-note@-2{{setter defined here}}
     var fake: Int
     yield &fake
@@ -52,7 +52,7 @@ var ingsn_m: Int {
 var igsn_m: Int {
   mutating get { 0 }
   set {}
-  nonmutating _modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the getter is 'mutating'}}
+  nonmutating _modify { // expected-error{{'_modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the getter is 'mutating'}}
                         // expected-note@-2{{setter defined here}}
                         // expected-note@-4{{getter defined here}}
     var fake: Int
@@ -62,7 +62,7 @@ var igsn_m: Int {
 var ingns_m: Int {
   get { 0 }
   nonmutating set {}
-  _modify { // expected-error{{'modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the getter is not 'mutating'}}
+  _modify { // expected-error{{'_modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the getter is not 'mutating'}}
             // expected-note@-2{{setter defined here}}
             // expected-note@-4{{getter defined here}}
     yield &i
@@ -116,8 +116,8 @@ var in_rnsn_m: Int {
 var i_rnsn_m: Int {
   mutating _read { yield i }
   nonmutating set {}
-  nonmutating _modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the 'read' accessor is 'mutating'}}
-                        // expected-note@-3{{'read' accessor defined here}}
+  nonmutating _modify { // expected-error{{'_modify' accessor cannot be 'nonmutating' when the '_read' accessor is 'mutating'}}
+                        // expected-note@-3{{'_read' accessor defined here}}
     var fake: Int
     yield &fake
   }
@@ -125,7 +125,7 @@ var i_rnsn_m: Int {
 var in_rsn_m: Int {
   _read { yield i }
   set {}
-  nonmutating _modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the setter is not 'nonmutating'}}
+  nonmutating _modify { // expected-error{{'_modify' accessor cannot be 'nonmutating' when the setter is not 'nonmutating'}}
                         // expected-note@-2{{setter defined here}}
     var fake: Int
     yield &fake
@@ -134,9 +134,9 @@ var in_rsn_m: Int {
 var i_rsn_m: Int {
   mutating _read { yield i }
   set {}
-  nonmutating _modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the 'read' accessor is 'mutating'}}
+  nonmutating _modify { // expected-error{{'_modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the '_read' accessor is 'mutating'}}
                         // expected-note@-2{{setter defined here}}
-                        // expected-note@-4{{'read' accessor defined here}}
+                        // expected-note@-4{{'_read' accessor defined here}}
     var fake: Int
     yield &fake
   }
@@ -144,9 +144,9 @@ var i_rsn_m: Int {
 var in_rns_m: Int {
   _read { yield i }
   nonmutating set {}
-  _modify { // expected-error{{'modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the 'read' accessor is not 'mutating'}}
+  _modify { // expected-error{{'_modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the '_read' accessor is not 'mutating'}}
             // expected-note@-2{{setter defined here}}
-            // expected-note@-4{{'read' accessor defined here}}
+            // expected-note@-4{{'_read' accessor defined here}}
     yield &i
   }
 }
@@ -198,7 +198,7 @@ var inrnsn_m: Int {
 var irnsn_m: Int {
   mutating read { yield i }
   nonmutating set {}
-  nonmutating _modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the 'read' accessor is 'mutating'}}
+  nonmutating _modify { // expected-error{{'_modify' accessor cannot be 'nonmutating' when the 'read' accessor is 'mutating'}}
                         // expected-note@-3{{'read' accessor defined here}}
     var fake: Int
     yield &fake
@@ -207,7 +207,7 @@ var irnsn_m: Int {
 var inrsn_m: Int {
   read { yield i }
   set {}
-  nonmutating _modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the setter is not 'nonmutating'}}
+  nonmutating _modify { // expected-error{{'_modify' accessor cannot be 'nonmutating' when the setter is not 'nonmutating'}}
                         // expected-note@-2{{setter defined here}}
     var fake: Int
     yield &fake
@@ -216,7 +216,7 @@ var inrsn_m: Int {
 var irsn_m: Int {
   mutating read { yield i }
   set {}
-  nonmutating _modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the 'read' accessor is 'mutating'}}
+  nonmutating _modify { // expected-error{{'_modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the 'read' accessor is 'mutating'}}
                         // expected-note@-2{{setter defined here}}
                         // expected-note@-4{{'read' accessor defined here}}
     var fake: Int
@@ -226,7 +226,7 @@ var irsn_m: Int {
 var inrns_m: Int {
   read { yield i }
   nonmutating set {}
-  _modify { // expected-error{{'modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the 'read' accessor is not 'mutating'}}
+  _modify { // expected-error{{'_modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the 'read' accessor is not 'mutating'}}
             // expected-note@-2{{setter defined here}}
             // expected-note@-4{{'read' accessor defined here}}
     yield &i
@@ -280,7 +280,7 @@ var inuansn_m: Int {
 var iuansn_m: Int {
   mutating unsafeAddress { UnsafePointer(bitPattern: 0x0)! }
   nonmutating set {}
-  nonmutating _modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the addressor is 'mutating'}}
+  nonmutating _modify { // expected-error{{'_modify' accessor cannot be 'nonmutating' when the addressor is 'mutating'}}
                         // expected-note@-3{{addressor defined here}}
     var fake: Int
     yield &fake
@@ -289,7 +289,7 @@ var iuansn_m: Int {
 var inuasn_m: Int {
   unsafeAddress { UnsafePointer(bitPattern: 0x0)! }
   set {}
-  nonmutating _modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the setter is not 'nonmutating'}}
+  nonmutating _modify { // expected-error{{'_modify' accessor cannot be 'nonmutating' when the setter is not 'nonmutating'}}
                         // expected-note@-2{{setter defined here}}
     var fake: Int
     yield &fake
@@ -298,7 +298,7 @@ var inuasn_m: Int {
 var iuasn_m: Int {
   mutating unsafeAddress { UnsafePointer(bitPattern: 0x0)! }
   set {}
-  nonmutating _modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the addressor is 'mutating'}}
+  nonmutating _modify { // expected-error{{'_modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the addressor is 'mutating'}}
                         // expected-note@-2{{setter defined here}}
                         // expected-note@-4{{addressor defined here}}
     var fake: Int
@@ -308,7 +308,7 @@ var iuasn_m: Int {
 var inuans_m: Int {
   unsafeAddress { UnsafePointer(bitPattern: 0x0)! }
   nonmutating set {}
-  _modify { // expected-error{{'modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the addressor is not 'mutating'}}
+  _modify { // expected-error{{'_modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the addressor is not 'mutating'}}
             // expected-note@-2{{setter defined here}}
             // expected-note@-4{{addressor defined here}}
     yield &i
@@ -444,8 +444,8 @@ var in_rnsnm: Int {
 var i_rnsnm: Int {
   mutating _read { yield i }
   nonmutating set {}
-  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the 'read' accessor is 'mutating'}}
-                        // expected-note@-3{{'read' accessor defined here}}
+  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when the '_read' accessor is 'mutating'}}
+                        // expected-note@-3{{'_read' accessor defined here}}
     var fake: Int
     yield &fake
   }
@@ -462,9 +462,9 @@ var in_rsnm: Int {
 var i_rsnm: Int {
   mutating _read { yield i }
   set {}
-  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the 'read' accessor is 'mutating'}}
+  nonmutating modify { // expected-error{{'modify' accessor cannot be 'nonmutating' when either the setter is not 'nonmutating' or the '_read' accessor is 'mutating'}}
                         // expected-note@-2{{setter defined here}}
-                        // expected-note@-4{{'read' accessor defined here}}
+                        // expected-note@-4{{'_read' accessor defined here}}
     var fake: Int
     yield &fake
   }
@@ -472,9 +472,9 @@ var i_rsnm: Int {
 var in_rnsm: Int {
   _read { yield i }
   nonmutating set {}
-  modify { // expected-error{{'modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the 'read' accessor is not 'mutating'}}
+  modify { // expected-error{{'modify' accessor cannot be 'mutating' when both the setter is 'nonmutating' and the '_read' accessor is not 'mutating'}}
             // expected-note@-2{{setter defined here}}
-            // expected-note@-4{{'read' accessor defined here}}
+            // expected-note@-4{{'_read' accessor defined here}}
     yield &i
   }
 }

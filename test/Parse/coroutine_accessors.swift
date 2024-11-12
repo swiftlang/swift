@@ -26,18 +26,20 @@ var _i: Int = 0
 // Two reads
 // =============================================================================
 
-// enabled: ok
+// enabled: conflicting accessors
 // disabled: implicit getter.
 var ir_r: Int {
   read { // expected-disabled-error{{cannot_find_in_scope}}
+         // expected-enabled-error@-1{{variable cannot provide both a 'read' accessor and a '_read' accessor}}
     fatalError()
   }
   _read { // expected-disabled-error{{cannot_find_in_scope}}
+         // expected-enabled-note@-1{{previous_accessor}}
     fatalError()
   }
 }
 
-// enabled: ok
+// enabled: conflicting accessors
 var igr: Int {
   get {
     1
@@ -255,14 +257,16 @@ var iumam: Int {
   }
 }
 
-// enabled: need a reader.
+// enabled: conflicting accessors.  need a reader.
 // disabled: implicit getter.
 var im_m: Int {
   modify { // expected-disabled-error{{cannot_find_in_scope}}
+           // expected-enabled-error@-1{{variable cannot provide both a 'modify' accessor and a '_modify' accessor}}
     fatalError()
   }
-  _modify { // expected-enabled-error{{variable with a 'modify' accessor must also have a getter, addressor, or 'read' accessor}}
-             // expected-disabled-error@-1{{cannot_find_in_scope}}
+  _modify { // expected-enabled-error{{variable with a '_modify' accessor must also have a getter, addressor, or 'read' accessor}}
+            // expected-disabled-error@-1{{cannot_find_in_scope}}
+            // expected-enabled-note@-2{{previous_accessor}}
     fatalError()
   }
 }
@@ -270,10 +274,13 @@ var im_m: Int {
 // enabled: need a reader.
 // disabled: implicit getter.
 var i_mm: Int {
-  _modify { // expected-error{{variable with a 'modify' accessor must also have a getter, addressor, or 'read' accessor}}
+  _modify { // expected-enabled-error{{variable with a '_modify' accessor must also have a getter, addressor, or 'read' accessor}}
+            // expected-disabled-error@-1{{variable with a 'modify' accessor must also have a getter, addressor, or 'read' accessor}}
+            // expected-note@-2{{previous_accessor}}
     fatalError()
   }
   modify { // expected-disabled-error{{'modify' accessor is only valid when experimental feature coroutine accessors is enabled}}
+           // expected-error@-1{{variable cannot provide both a 'modify' accessor and a '_modify' accessor}}
     fatalError()
   }
 }
@@ -303,9 +310,10 @@ var i_rm_m: Int {
     yield _i
   }
   modify { // expected-disabled-error{{'modify' accessor is only valid when experimental feature coroutine accessors is enabled}}
+           // expected-error@-1{{variable cannot provide both a 'modify' accessor and a '_modify' accessor}}
     yield &_i
   }
-  _modify {
+  _modify { // expected-note{{previous_accessor}}
     yield &_i
   }
 }
@@ -314,15 +322,19 @@ var i_rm_m: Int {
 // disabled: implicit getter
 var ir_rm_m: Int {
   read { // expected-disabled-error{{cannot_find_in_scope}}
+         // expected-enabled-error@-1{{variable cannot provide both a 'read' accessor and a '_read' accessor}}
     fatalError()
   }
   _read { // expected-disabled-error{{cannot_find_in_scope}}
+          // expected-enabled-note@-1{{previous_accessor}}
     fatalError()
   }
   modify { // expected-disabled-error{{cannot_find_in_scope}}
+           // expected-enabled-error@-1{{variable cannot provide both a 'modify' accessor and a '_modify' accessor}}
     fatalError()
   }
   _modify { // expected-disabled-error{{cannot_find_in_scope}}
+            // expected-enabled-note@-1{{previous_accessor}}
     fatalError()
   }
 }

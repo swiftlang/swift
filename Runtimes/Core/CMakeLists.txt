@@ -31,7 +31,8 @@
 
 cmake_minimum_required(VERSION 3.26...3.29)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
+set(SwiftCore_CMAKE_MODULES_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
+list(APPEND CMAKE_MODULE_PATH ${SwiftCore_CMAKE_MODULES_DIR})
 include(CMakeWorkarounds)
 project(SwiftCore LANGUAGES C CXX Swift VERSION 6.1)
 
@@ -47,6 +48,13 @@ set(SwiftCore_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../"
   CACHE FILEPATH "Path to the root source directory of the Swift compiler")
 
+# Hook point for vendor-specific extensions to the build system
+# Allowed extension points:
+#   - DefaultSettings.cmake
+#   - Settings.cmake
+set(SwiftCore_VENDOR_MODULE_DIR "${SwiftCore_CMAKE_MODULES_DIR}/vendor"
+  CACHE FILEPATH "Location for private build system extension")
+
 include(GNUInstallDirs)
 include(AvailabilityMacros)
 include(CompilerSettings)
@@ -54,6 +62,8 @@ include(DefaultSettings)
 include(EmitSwiftInterface)
 include(PlatformInfo)
 include(gyb)
+
+include("${SwiftCore_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
 defaulted_option(SwiftCore_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries")
 
@@ -66,23 +76,24 @@ defaulted_option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argum
 defaulted_option(SwiftCore_ENABLE_RUNTIME_FUNCTION_COUNTERS "Enable runtime function counter support")
 
 defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support")
-set(SwiftCore_BACKTRACER_PATH ${SwiftCore_BACKTRACER_PATH_default} CACHE STRING "Set a fixed path to the Swift backtracer")
+defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift backtracer")
 
 option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" OFF)
 option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)
 
-set(SwiftCore_OBJECT_FORMAT "${SwiftCore_OBJECT_FORMAT_default}" CACHE STRING "Object format")
+defaulted_set(SwiftCore_OBJECT_FORMAT STRING "Object format: ELF COFF")
 
 add_compile_definitions(
   $<$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>:-DSWIFT_OBJC_INTEROP>
   $<$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>:-DSWIFT_LIBRARY_EVOLUTION>
   $<$<BOOL:${SwiftCore_ENABLE_CRASH_REPORTER_CLIENT}>:-DSWIFT_HAVE_CRASHREPORTERCLIENT>
+  $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>
   $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
   $<$<BOOL:${SwiftCore_ENABLE_RUNTIME_FUNCTION_COUNTERS}>:-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER=$<BOOL:${SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER}>>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>>)
 
-add_compile_options( $<$<AND:$<COMPILE_LANGUAGE:Swift>,$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>>:-enable-library-evolution>)
+add_compile_options($<$<AND:$<COMPILE_LANGUAGE:Swift>,$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>>:-enable-library-evolution>)
 
 include_directories(include)
 
