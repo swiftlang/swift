@@ -147,7 +147,8 @@ extension Optional: Sendable where Wrapped: ~Copyable & ~Escapable & Sendable {}
 
 
 @_preInverseGenerics
-extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable & ~Escapable {
+extension Optional: ExpressibleByNilLiteral
+where Wrapped: ~Copyable & ~Escapable {
   /// Creates an instance initialized with `nil`.
   ///
   /// Do not call this initializer directly. It is used by the compiler when you
@@ -165,10 +166,11 @@ extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable & ~Escapabl
   }
 }
 
-extension Optional where Wrapped: ~Copyable & Escapable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Creates an instance that stores the given value.
   @_transparent
   @_preInverseGenerics
+  @lifetime(some)
   public init(_ some: consuming Wrapped) { self = .some(some) }
 }
 
