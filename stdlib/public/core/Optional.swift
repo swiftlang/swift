@@ -405,7 +405,7 @@ extension Optional where Wrapped: ~Copyable {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Takes the wrapped value being stored in this instance and returns it while
   /// also setting the instance to `nil`. If there is no value being stored in
   /// this instance, this returns `nil` instead.
@@ -423,6 +423,7 @@ extension Optional where Wrapped: ~Copyable {
   /// - Returns: The wrapped value being stored in this instance. If this
   ///   instance is `nil`, returns `nil`.
   @_alwaysEmitIntoClient
+  @lifetime(self)
   public mutating func take() -> Self {
     let result = consume self
     self = nil
@@ -583,7 +584,7 @@ public struct _OptionalNilComparisonType: ExpressibleByNilLiteral {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Returns a Boolean value indicating whether an argument matches `nil`.
   ///
   /// You can use the pattern-matching operator (`~=`) to test whether an
@@ -806,7 +807,8 @@ extension Optional where Wrapped: ~Copyable {
 ///     type as the `Wrapped` type of `optional`.
 @_transparent
 @_alwaysEmitIntoClient
-public func ?? <T: ~Copyable>(
+@lifetime(optional)
+public func ?? <T: ~Copyable & ~Escapable>(
   optional: consuming T?,
   defaultValue: @autoclosure () throws -> T // FIXME: typed throw
 ) rethrows -> T {
@@ -877,8 +879,9 @@ internal func _legacy_abi_optionalNilCoalescingOperator <T>(
 ///     `optional` have the same type.
 @_transparent
 @_alwaysEmitIntoClient
+@lifetime(optional)
 // FIXME: This needs to support typed throws.
-public func ?? <T: ~Copyable>(
+public func ?? <T: ~Copyable & ~Escapable>(
   optional: consuming T?,
   defaultValue: @autoclosure () throws -> T?
 ) rethrows -> T? {
