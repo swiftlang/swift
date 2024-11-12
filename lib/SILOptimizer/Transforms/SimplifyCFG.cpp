@@ -1790,9 +1790,7 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
     return true;
   }
 
-  if (!Element || !Element->hasAssociatedValues() || Dest->args_empty()) {
-    assert(Dest->args_empty() && "Unexpected argument at destination!");
-
+  if (Dest->args_empty()) {
     SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
 
     addToWorklist(SEI->getParent());
@@ -1802,16 +1800,25 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
     return true;
   }
 
-  auto &Mod = SEI->getModule();
-  auto OpndTy = SEI->getOperand()->getType();
-  auto Ty = OpndTy.getEnumElementType(
-      Element, Mod, TypeExpansionContext(*SEI->getFunction()));
-  auto *UED = SILBuilderWithScope(SEI)
-    .createUncheckedEnumData(SEI->getLoc(), SEI->getOperand(), Element, Ty);
-
+  // If the Dest has an argument, it's case should have an associated value or
+  // it is the default case in ossa.
+  assert((Element && Element->hasAssociatedValues()) ||
+         (SEI->getFunction()->hasOwnership() && SEI->hasDefault() &&
+          Dest == SEI->getDefaultBB()));
+  SILValue newValue;
+  if (SEI->getFunction()->hasOwnership() && SEI->hasDefault() &&
+      Dest == SEI->getDefaultBB()) {
+    newValue = SEI->getOperand();
+  } else {
+    auto OpndTy = SEI->getOperand()->getType();
+    auto Ty = OpndTy.getEnumElementType(
+        Element, SEI->getModule(), TypeExpansionContext(*SEI->getFunction()));
+    newValue = SILBuilderWithScope(SEI).createUncheckedEnumData(
+        SEI->getLoc(), SEI->getOperand(), Element, Ty);
+  }
   assert(Dest->args_size() == 1 && "Expected only one argument!");
   auto *DestArg = Dest->getArgument(0);
-  DestArg->replaceAllUsesWith(UED);
+  DestArg->replaceAllUsesWith(newValue);
   Dest->eraseArgument(0);
 
   SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
