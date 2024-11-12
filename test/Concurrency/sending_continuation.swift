@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -enable-experimental-feature TransferringArgsAndResults -verify %s -o /dev/null -parse-as-library
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -parse-as-library
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_TransferringArgsAndResults
 
 ////////////////////////
 // MARK: Declarations //
