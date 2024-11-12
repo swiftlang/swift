@@ -44,6 +44,7 @@ namespace swift {
 class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
+class AvailabilityScope;
 class BreakStmt;
 class ContextualPattern;
 class ContinueStmt;
@@ -68,7 +69,6 @@ class TypeAliasDecl;
 class TypeLoc;
 class Witness;
 class TypeResolution;
-class TypeRefinementContext;
 struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
@@ -4869,10 +4869,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Expand the children of the given type refinement context.
-class ExpandChildTypeRefinementContextsRequest
-    : public SimpleRequest<ExpandChildTypeRefinementContextsRequest,
-                           evaluator::SideEffect(TypeRefinementContext *),
+/// Expand the children of the given type availability scope.
+class ExpandChildAvailabilityScopesRequest
+    : public SimpleRequest<ExpandChildAvailabilityScopesRequest,
+                           evaluator::SideEffect(AvailabilityScope *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4881,7 +4881,7 @@ private:
   friend SimpleRequest;
 
   evaluator::SideEffect evaluate(Evaluator &evaluator,
-                                 TypeRefinementContext *parentTRC) const;
+                                 AvailabilityScope *parentScope) const;
 
 public:
   // Separate caching.

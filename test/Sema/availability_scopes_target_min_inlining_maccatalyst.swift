@@ -3,7 +3,7 @@
 // currently there are no bots that run the tests with macCatalyst as the
 // target OS.
 
-// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -target %target-cpu-apple-ios14.4-macabi -typecheck -dump-type-refinement-contexts -target-min-inlining-version min %s > %t.dump 2>&1
+// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -target %target-cpu-apple-ios14.4-macabi -typecheck -dump-availability-scopes -target-min-inlining-version min %s > %t.dump 2>&1
 // RUN: %FileCheck --strict-whitespace %s < %t.dump
 
 // REQUIRES: OS=macosx || OS=maccatalyst

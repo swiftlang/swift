@@ -1,4 +1,4 @@
-//===--- TypeRefinementContext.h - Swift Refinement Context -----*- C++ -*-===//
+//===--- AvailabilityScope.h - Swift Availability Scopes ----*- C++ -----*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,13 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the TypeRefinementContext class.  A TypeRefinementContext
-// is the semantic construct that refines a type within its lexical scope.
+// This file defines the AvailabilityScope class. An AvailabilityScope
+// is the semantic construct that refines a source range with constraints
+// declared using @available and if #available.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_TYPEREFINEMENTCONTEXT_H
-#define SWIFT_TYPEREFINEMENTCONTEXT_H
+#ifndef SWIFT_AVAILABILITYSCOPE_H
+#define SWIFT_AVAILABILITYSCOPE_H
 
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilityContext.h"
@@ -30,29 +31,24 @@
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
-  class BraceStmt;
-  class Decl;
-  class IfStmt;
-  class GuardStmt;
-  class SourceFile;
-  class Stmt;
-  class Expr;
-  class StmtConditionElement;
+class BraceStmt;
+class Decl;
+class IfStmt;
+class GuardStmt;
+class SourceFile;
+class Stmt;
+class Expr;
+class StmtConditionElement;
 
-/// Represents a lexical context in which types are refined. For now,
-/// types are refined solely for API availability checking, based on
-/// the operating system versions that the refined context may execute
-/// upon.
-///
-/// These refinement contexts form a lexical tree parallel to the AST but much
-/// more sparse: we only introduce refinement contexts when there is something
-/// to refine.
-class TypeRefinementContext : public ASTAllocated<TypeRefinementContext> {
+/// Represents a lexical context in which availability is refined. These scopes
+/// form a lexical tree parallel to the AST but much more sparse: we only
+/// introduce availability scopes when there is something to refine.
+class AvailabilityScope : public ASTAllocated<AvailabilityScope> {
 
 public:
-  /// Describes the reason a type refinement context was introduced.
+  /// Describes the reason an availability scope was introduced.
   enum class Reason {
-    /// The root refinement context.
+    /// The root availability scope.
     Root,
 
     /// The context was introduced by a declaration with an explicit
@@ -98,9 +94,9 @@ public:
   };
 
 private:
-  friend class ExpandChildTypeRefinementContextsRequest;
+  friend class ExpandChildAvailabilityScopesRequest;
 
-  /// Represents the AST node that introduced a refinement context.
+  /// Represents the AST node that introduced an availability scope.
   class IntroNode {
     Reason IntroReason;
     union {
@@ -118,9 +114,10 @@ private:
         : IntroReason(introReason), D(D) {
       (void)getAsDecl();    // check that assertion succeeds
     }
-    IntroNode(IfStmt *IS, bool IsThen) :
-    IntroReason(IsThen ? Reason::IfStmtThenBranch : Reason::IfStmtElseBranch),
-                IS(IS) {}
+    IntroNode(IfStmt *IS, bool IsThen)
+        : IntroReason(IsThen ? Reason::IfStmtThenBranch
+                             : Reason::IfStmtElseBranch),
+          IS(IS) {}
     IntroNode(PoundAvailableInfo *PAI)
         : IntroReason(Reason::ConditionFollowingAvailabilityQuery), PAI(PAI) {}
     IntroNode(GuardStmt *GS, bool IsFallthrough)
@@ -174,69 +171,68 @@ private:
   /// root context.
   const AvailabilityContext AvailabilityInfo;
 
-  std::vector<TypeRefinementContext *> Children;
+  std::vector<AvailabilityScope *> Children;
 
   struct {
     /// Whether this node has child nodes that have not yet been expanded.
     unsigned needsExpansion : 1;
   } LazyInfo = {};
 
-  void verify(const TypeRefinementContext *parent, ASTContext &ctx) const;
+  void verify(const AvailabilityScope *parent, ASTContext &ctx) const;
 
-  TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
-                        TypeRefinementContext *Parent, SourceRange SrcRange,
-                        const AvailabilityContext Info);
+  AvailabilityScope(ASTContext &Ctx, IntroNode Node, AvailabilityScope *Parent,
+                    SourceRange SrcRange, const AvailabilityContext Info);
 
 public:
-  /// Create the root refinement context for the given SourceFile.
-  static TypeRefinementContext *
-  createForSourceFile(SourceFile *SF, const AvailabilityContext Info);
+  /// Create the root availability scope for the given SourceFile.
+  static AvailabilityScope *createForSourceFile(SourceFile *SF,
+                                                const AvailabilityContext Info);
 
-  /// Create a refinement context for the given declaration.
-  static TypeRefinementContext *createForDecl(ASTContext &Ctx, Decl *D,
-                                              TypeRefinementContext *Parent,
-                                              const AvailabilityContext Info,
-                                              SourceRange SrcRange);
+  /// Create an availability scope for the given declaration.
+  static AvailabilityScope *createForDecl(ASTContext &Ctx, Decl *D,
+                                          AvailabilityScope *Parent,
+                                          const AvailabilityContext Info,
+                                          SourceRange SrcRange);
 
-  /// Create a refinement context for the given declaration.
-  static TypeRefinementContext *
-  createForDeclImplicit(ASTContext &Ctx, Decl *D, TypeRefinementContext *Parent,
+  /// Create an availability scope for the given declaration.
+  static AvailabilityScope *
+  createForDeclImplicit(ASTContext &Ctx, Decl *D, AvailabilityScope *Parent,
                         const AvailabilityContext Info, SourceRange SrcRange);
 
-  /// Create a refinement context for the Then branch of the given IfStmt.
-  static TypeRefinementContext *
-  createForIfStmtThen(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
-                      const AvailabilityContext Info);
+  /// Create an availability scope for the Then branch of the given IfStmt.
+  static AvailabilityScope *createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
+                                                AvailabilityScope *Parent,
+                                                const AvailabilityContext Info);
 
-  /// Create a refinement context for the Else branch of the given IfStmt.
-  static TypeRefinementContext *
-  createForIfStmtElse(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
-                      const AvailabilityContext Info);
+  /// Create an availability scope for the Else branch of the given IfStmt.
+  static AvailabilityScope *createForIfStmtElse(ASTContext &Ctx, IfStmt *S,
+                                                AvailabilityScope *Parent,
+                                                const AvailabilityContext Info);
 
-  /// Create a refinement context for the true-branch control flow to
+  /// Create an availability scope for the true-branch control flow to
   /// further StmtConditionElements following a #available() query in
   /// a StmtCondition.
-  static TypeRefinementContext *
+  static AvailabilityScope *
   createForConditionFollowingQuery(ASTContext &Ctx, PoundAvailableInfo *PAI,
                                    const StmtConditionElement &LastElement,
-                                   TypeRefinementContext *Parent,
+                                   AvailabilityScope *Parent,
                                    const AvailabilityContext Info);
 
-  /// Create a refinement context for the fallthrough of a GuardStmt.
-  static TypeRefinementContext *createForGuardStmtFallthrough(
+  /// Create an availability scope for the fallthrough of a GuardStmt.
+  static AvailabilityScope *createForGuardStmtFallthrough(
       ASTContext &Ctx, GuardStmt *RS, BraceStmt *ContainingBraceStmt,
-      TypeRefinementContext *Parent, const AvailabilityContext Info);
+      AvailabilityScope *Parent, const AvailabilityContext Info);
 
-  /// Create a refinement context for the else branch of a GuardStmt.
-  static TypeRefinementContext *
+  /// Create an availability scope for the else branch of a GuardStmt.
+  static AvailabilityScope *
   createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
-                         TypeRefinementContext *Parent,
+                         AvailabilityScope *Parent,
                          const AvailabilityContext Info);
 
-  /// Create a refinement context for the body of a WhileStmt.
-  static TypeRefinementContext *
+  /// Create an availability scope for the body of a WhileStmt.
+  static AvailabilityScope *
   createForWhileStmtBody(ASTContext &Ctx, WhileStmt *WS,
-                         TypeRefinementContext *Parent,
+                         AvailabilityScope *Parent,
                          const AvailabilityContext Info);
 
   Decl *getDeclOrNull() const {
@@ -246,23 +242,23 @@ public:
     return nullptr;
   }
 
-  /// Returns the reason this context was introduced.
+  /// Returns the reason this scope was introduced.
   Reason getReason() const;
-  
-  /// Returns the AST node that introduced this refinement context. Note that
-  /// this node may be different than the refined range. For example, a
-  /// refinement context covering an IfStmt Then branch will have the
+
+  /// Returns the AST node that introduced this availability scope. Note that
+  /// this node may be different than the refined range. For example, an
+  /// availability scope covering an IfStmt Then branch will have the
   /// IfStmt as the introduction node (and its reason as IfStmtThenBranch)
   /// but its source range will cover the Then branch.
   IntroNode getIntroductionNode() const { return Node; }
-  
-  /// Returns the location of the node that introduced this refinement context
+
+  /// Returns the location of the node that introduced this availability scope
   /// or an invalid location if the context reflects the minimum deployment
-  // target.
+  /// target.
   SourceLoc getIntroductionLoc() const;
 
   /// Returns the source range covering a _single_ decl-attribute or statement
-  /// condition that introduced the refinement context for a given platform
+  /// condition that introduced the availability scope for a given platform
   /// version; if zero or multiple such responsible attributes or statements
   /// exist, returns an invalid SourceRange.
   SourceRange
@@ -274,27 +270,26 @@ public:
   /// source, if applicable. Otherwise, returns null.
   std::optional<const AvailabilityRange> getExplicitAvailabilityRange() const;
 
-  /// Returns the source range on which this context refines types.
+  /// Returns the source range this scope represents.
   SourceRange getSourceRange() const { return SrcRange; }
 
-  /// Returns the availability context of code contained in this context.
+  /// Returns the availability context of code contained in this scope.
   const AvailabilityContext getAvailabilityContext() const {
     return AvailabilityInfo;
   }
 
   /// Returns the platform version range that can be assumed present at run
-  /// time when running code contained in this context.
+  /// time when running code contained in this scope.
   const AvailabilityRange getPlatformAvailabilityRange() const {
     return AvailabilityInfo.getPlatformRange();
   }
 
-  /// Adds a child refinement context.
-  void addChild(TypeRefinementContext *Child, ASTContext &Ctx);
+  /// Adds a child availability scope.
+  void addChild(AvailabilityScope *Child, ASTContext &Ctx);
 
-  /// Returns the innermost TypeRefinementContext descendant of this context
+  /// Returns the innermost AvailabilityScope descendant of this scope
   /// for the given source location.
-  TypeRefinementContext *findMostRefinedSubContext(SourceLoc Loc,
-                                                   ASTContext &Ctx);
+  AvailabilityScope *findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx);
 
   bool getNeedsExpansion() const { return LazyInfo.needsExpansion; }
 
@@ -309,15 +304,14 @@ public:
   SWIFT_DEBUG_DUMPER(dump(SourceManager &SrcMgr));
   void dump(raw_ostream &OS, SourceManager &SrcMgr) const;
   void print(raw_ostream &OS, SourceManager &SrcMgr, unsigned Indent = 0) const;
-  
+
   static StringRef getReasonName(Reason R);
 };
 
-void simple_display(llvm::raw_ostream &out,
-                    const TypeRefinementContext *trc);
+void simple_display(llvm::raw_ostream &out, const AvailabilityScope *scope);
 
-inline SourceLoc extractNearestSourceLoc(const TypeRefinementContext *TRC) {
-  return TRC->getIntroductionLoc();
+inline SourceLoc extractNearestSourceLoc(const AvailabilityScope *scope) {
+  return scope->getIntroductionLoc();
 }
 
 } // end namespace swift

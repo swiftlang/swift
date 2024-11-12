@@ -275,7 +275,7 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range items,
       continue;
 
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      auto getDerivative = [onlyDerivatives, VD]() -> AbstractFunctionDecl * {
+      auto getDerivative = [VD]() -> AbstractFunctionDecl * {
         if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
           if (AFD->getAttrs().hasAttribute<DerivativeAttr>())
             return AFD;
@@ -3674,12 +3674,12 @@ SynthesizedFileUnit &FileUnit::getOrCreateSynthesizedFile() {
   return *SynthesizedFile;
 }
 
-TypeRefinementContext *SourceFile::getTypeRefinementContext() const {
-  return TRC;
+AvailabilityScope *SourceFile::getAvailabilityScope() const {
+  return RootAvailabilityScope;
 }
 
-void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
-  TRC = Root;
+void SourceFile::setAvailabilityScope(AvailabilityScope *scope) {
+  RootAvailabilityScope = scope;
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
