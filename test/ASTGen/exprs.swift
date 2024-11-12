@@ -9,12 +9,11 @@
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
-// REQUIRES: swift_feature_SwiftParser
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -97,6 +96,7 @@ func testRepeatEach<each T>(_ t: repeat each T) -> (repeat each T) {
 func acceptClosures(x: () -> Void) {}
 func acceptClosures(x: () -> Void, y: () -> Int) {}
 func acceptClosures(x: () -> Void, y: () -> Int, _ z: () -> Void) {}
+func acceptClosures(x: (Int, String) -> Void) {}
 func testTrailingClsure() {
   acceptClosures {}
   acceptClosures() {}
@@ -104,6 +104,10 @@ func testTrailingClsure() {
   acceptClosures(x: {}) { 12 } _: {}
   acceptClosures {} y: { 42 }
   acceptClosures(x: {}, y: { 12 }) {}
+
+  acceptClosures { (x, y: String) -> Void in  }
+  acceptClosures { x, y in  }
+  acceptClosures { @Sendable x, y in  }
 }
 
 func testInOut() {
