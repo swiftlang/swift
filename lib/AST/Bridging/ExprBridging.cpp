@@ -123,23 +123,42 @@ BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
 
 BridgedClosureExpr BridgedClosureExpr_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedParameterList cParamList, BridgedBraceStmt body) {
-  DeclAttributes attributes;
-  SourceRange bracketRange;
-  SourceLoc asyncLoc;
-  SourceLoc throwsLoc;
-  SourceLoc arrowLoc;
-  SourceLoc inLoc;
-
+    BridgedDeclAttributes cAttributes, BridgedSourceRange cBracketRange,
+    BridgedNullableVarDecl cCapturedSelfDecl,
+    BridgedNullableParameterList cParameterList, BridgedSourceLoc cAsyncLoc,
+    BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr cThrownType,
+    BridgedSourceLoc cArrowLoc, BridgedNullableTypeRepr cExplicitResultType,
+    BridgedSourceLoc cInLoc) {
   ASTContext &context = cContext.unbridged();
   DeclContext *declContext = cDeclContext.unbridged();
+  TypeExpr *throwsType = nullptr;
+  if (auto *tyR = cThrownType.unbridged())
+    throwsType = new (context) TypeExpr(tyR);
+  TypeExpr *explicitResultType = nullptr;
+  if (auto *tyR = cExplicitResultType.unbridged())
+    explicitResultType = new (context) TypeExpr(tyR);
 
-  auto *out = new (context) ClosureExpr(
-      attributes, bracketRange, nullptr, cParamList.unbridged(), asyncLoc,
-      throwsLoc,
-      /*FIXME:thrownType=*/nullptr, arrowLoc, inLoc, nullptr, declContext);
-  out->setBody(body.unbridged());
-  return out;
+  return new (context)
+      ClosureExpr(cAttributes.unbridged(), cBracketRange.unbridged(),
+                  cCapturedSelfDecl.unbridged(), cParameterList.unbridged(),
+                  cAsyncLoc.unbridged(), cThrowsLoc.unbridged(), throwsType,
+                  cArrowLoc.unbridged(), cInLoc.unbridged(), explicitResultType,
+                  declContext);
+}
+
+void BridgedClosureExpr_setParameterList(BridgedClosureExpr cClosure,
+                                         BridgedParameterList cParams) {
+  cClosure.unbridged()->setParameterList(cParams.unbridged());
+}
+
+void BridgedClosureExpr_setHasAnonymousClosureVars(
+    BridgedClosureExpr cClosure) {
+  cClosure.unbridged()->setHasAnonymousClosureVars();
+}
+
+void BridgedClosureExpr_setBody(BridgedClosureExpr cClosure,
+                                BridgedBraceStmt cBody) {
+  cClosure.unbridged()->setBody(cBody.unbridged());
 }
 
 BridgedCoerceExpr BridgedCoerceExpr_createParsed(BridgedASTContext cContext,

@@ -13,6 +13,7 @@
 #include "swift/AST/ASTBridging.h"
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Expr.h"
 
 using namespace swift;
 
@@ -28,4 +29,9 @@ BridgedPatternBindingInitializer_create(BridgedDeclContext cDeclContext) {
 BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
     BridgedPatternBindingInitializer cInit) {
   return cInit.unbridged();
+}
+
+BridgedDeclContext
+BridgedClosureExpr_asDeclContext(BridgedClosureExpr cClosure) {
+  return cClosure.unbridged();
 }
