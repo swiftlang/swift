@@ -3674,12 +3674,12 @@ SynthesizedFileUnit &FileUnit::getOrCreateSynthesizedFile() {
   return *SynthesizedFile;
 }
 
-TypeRefinementContext *SourceFile::getTypeRefinementContext() const {
-  return TRC;
+AvailabilityScope *SourceFile::getAvailabilityScope() const {
+  return RootAvailabilityScope;
 }
 
-void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
-  TRC = Root;
+void SourceFile::setAvailabilityScope(AvailabilityScope *scope) {
+  RootAvailabilityScope = scope;
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {

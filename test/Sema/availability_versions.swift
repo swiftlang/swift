@@ -60,7 +60,7 @@ func functionAvailableOn51() {
   let _: Int = globalFuncAvailableOn10_9()
   let _: Int = globalFuncAvailableOn51()
 
-  // Nested functions should get their own refinement context.
+  // Nested functions should get their own availability scopes.
   @available(OSX, introduced: 52)
   func innerFunctionAvailableOn52() {
     let _: Int = globalFuncAvailableOn10_9()
@@ -645,7 +645,7 @@ func useEnums() {
         markUsed("WithAvailableByEnumElementPayload")
 
         // For the moment, we do not incorporate enum element availability into 
-        // TRC construction. Perhaps we should?
+        // scope construction. Perhaps we should?
         functionTakingEnumIntroducedOn52(p)  // expected-error {{'functionTakingEnumIntroducedOn52' is only available in macOS 52 or newer}}
           
           // expected-note@-2 {{add 'if #available' version check}}
@@ -1209,7 +1209,7 @@ func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
   }
 
   if #available(OSX 51, *) {
-    // Similarly do not want '*' to generate a warning in a refined TRC.
+    // Similarly do not want '*' to generate a warning in a refined scope.
     if #available(iOS 8.0, *) {
     }
   }

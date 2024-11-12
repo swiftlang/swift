@@ -1338,7 +1338,7 @@ def dump_scope_maps : Separate<["-"], "dump-scope-maps">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_type_refinement_contexts :
   Flag<["-"], "dump-type-refinement-contexts">,
-  HelpText<"Type-check input file(s) and dump type refinement contexts(s)">,
+  HelpText<"Type-check input file(s) and dump availability scopes">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_type_info : Flag<["-"], "dump-type-info">,

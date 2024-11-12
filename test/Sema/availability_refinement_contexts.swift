@@ -120,7 +120,7 @@ func functionWithStmtCondition() {
 
 @available(OSX 51, *)
 func functionWithUnnecessaryStmtCondition() {
-  // Shouldn't introduce refinement context for then branch when unnecessary
+  // Shouldn't introduce availability scope for then branch when unnecessary
   if #available(OSX 51, *) {
   }
 

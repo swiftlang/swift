@@ -21,6 +21,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
@@ -28,7 +29,6 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
@@ -1001,27 +1001,27 @@ bool isAvailabilitySafeForConformance(
     AvailabilityRange &requiredAvailability);
 
 /// Returns the most refined `AvailabilityContext` for the given location.
-/// If `MostRefined` is not `nullptr`, it will be set to the most refined TRC
+/// If `MostRefined` is not `nullptr`, it will be set to the most refined scope
 /// that contains the given location.
 AvailabilityContext
 availabilityAtLocation(SourceLoc loc, const DeclContext *DC,
-                       const TypeRefinementContext **MostRefined = nullptr);
+                       const AvailabilityScope **MostRefined = nullptr);
 
 /// Returns an over-approximation of the range of operating system versions
 /// that could the passed-in location could be executing upon for
 /// the target platform. If MostRefined != nullptr, set to the most-refined
-/// TRC found while approximating.
+/// scope found while approximating.
 AvailabilityRange overApproximateAvailabilityAtLocation(
     SourceLoc loc, const DeclContext *DC,
-    const TypeRefinementContext **MostRefined = nullptr);
+    const AvailabilityScope **MostRefined = nullptr);
 
-/// Walk the AST to build the hierarchy of TypeRefinementContexts
-void buildTypeRefinementContextHierarchy(SourceFile &SF);
+/// Walk the AST to build the tree of AvailabilityScopes.
+void buildAvailabilityScopes(SourceFile &SF);
 
-/// Build the hierarchy of TypeRefinementContexts for the entire
+/// Build the hierarchy of AvailabilityScopes for the entire
 /// source file, if it has not already been built. Returns the root
-/// TypeRefinementContext for the source file.
-TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
+/// AvailabilityScope for the source file.
+AvailabilityScope *getOrBuildAvailabilityScope(SourceFile *SF);
 
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
