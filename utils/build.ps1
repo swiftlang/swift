@@ -2440,7 +2440,7 @@ function Test-Format {
 }
 
 function Build-LMDB() {
-  Build-SPMProject `
+  Build-CMakeProject `
     -Action Build `
     -Src $SourceCache\swift-lmdb `
     -Bin (Get-HostProjectBinaryCache LMDB) `
