@@ -342,9 +342,9 @@ public:
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
-    // Macro expansions will be walked when they're type-checked, not as
-    // part of the surrounding code.
-    return MacroWalking::None;
+    // We only want to walk macro arguments. Expansions will be walked when
+    // they're type-checked, not as part of the surrounding code.
+    return MacroWalking::Arguments;
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
