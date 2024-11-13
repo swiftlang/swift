@@ -319,3 +319,16 @@ do {
 
   bar(Test.staticFn) // Ok
 }
+
+// Reference to static method
+do {
+  struct Outer {
+    struct Inner: Sendable {
+      var f: @Sendable () -> Void
+    }
+
+    var g = Inner(f: Outer.ff)
+
+    static func ff() {}
+  }
+}
