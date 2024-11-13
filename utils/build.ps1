@@ -2439,14 +2439,12 @@ function Test-Format {
   }
 }
 
-function Build-LMDB() {
+function Build-LMDB($Arch) {
   Build-CMakeProject `
-    -Action Build `
     -Src $SourceCache\swift-lmdb `
     -Bin (Get-HostProjectBinaryCache LMDB) `
-    -Arch $HostArch `
-    -Platform Windows `
-    -UseBuiltCompilers C `
+    -Arch $Arch `
+    -UseMSVCCompilers C `
     -BuildTargets default
 }
 
