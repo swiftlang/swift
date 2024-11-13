@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -emit-ir -module-name Foo %s | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-future-triple -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -emit-ir -module-name Foo %s | %FileCheck %s
 
 // REQUIRES: swift_feature_LayoutStringValueWitnesses
 // REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation
