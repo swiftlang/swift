@@ -878,7 +878,7 @@ bool swift::emitSwiftInterface(raw_ostream &out,
       M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention,
       Opts.InterfaceContentMode,
       useExportedModuleNames,
-      Opts.AliasModuleNames, &aliasModuleNamesTargets, Opts.ABIComments);
+      Opts.AliasModuleNames, &aliasModuleNamesTargets);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;
