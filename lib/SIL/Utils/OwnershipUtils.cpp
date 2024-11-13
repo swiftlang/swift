@@ -146,64 +146,6 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
   return false;
 }
 
-bool swift::computeIsReborrow(SILArgument *arg) {
-  if (arg->getOwnershipKind() != OwnershipKind::Guaranteed) {
-    return false;
-  }
-  if (isa<SILFunctionArgument>(arg)) {
-    return false;
-  }
-  return !computeIsGuaranteedForwarding(arg);
-}
-
-bool swift::computeIsScoped(SILArgument *arg) {
-  if (arg->getOwnershipKind() == OwnershipKind::Owned) {
-    return true;
-  }
-  return computeIsReborrow(arg);
-}
-
-// This is the use-def equivalent of use->getOperandOwnership() ==
-// OperandOwnership::GuaranteedForwarding.
-bool swift::computeIsGuaranteedForwarding(SILValue value) {
-  if (value->getOwnershipKind() != OwnershipKind::Guaranteed) {
-    return false;
-  }
-  value = lookThroughBorrowedFromDef(value);
-  // NOTE: canOpcodeForwardInnerGuaranteedValues returns true for transformation
-  // terminator results.
-  if (canOpcodeForwardInnerGuaranteedValues(value) ||
-      isa<SILFunctionArgument>(value)) {
-    return true;
-  }
-  // If not a phi, return false
-  auto *phi = dyn_cast<SILPhiArgument>(value);
-  if (!phi || !phi->isPhi()) {
-    return false;
-  }
-  // For a phi, if we find GuaranteedForwarding phi operand on any incoming
-  // path, we return true. Additional verification is added to ensure
-  // GuaranteedForwarding phi operands are found on zero or all paths in the
-  // OwnershipVerifier.
-  bool isGuaranteedForwardingPhi = false;
-  phi->visitTransitiveIncomingPhiOperands([&](auto *, auto *op) -> bool {
-    assert(op->get()->getOwnershipKind().isCompatibleWith(
-        OwnershipKind::Guaranteed));
-    auto opValue = lookThroughBorrowedFromDef(op->get());
-    if (canOpcodeForwardInnerGuaranteedValues(opValue) ||
-        isa<SILFunctionArgument>(opValue)) {
-      isGuaranteedForwardingPhi = true;
-      return false;
-    }
-    auto *phi = dyn_cast<SILPhiArgument>(opValue);
-    if (!phi || !phi->isPhi()) {
-      return false;
-    }
-    return true;
-  });
-  return isGuaranteedForwardingPhi;
-}
-
 BorrowedFromInst *swift::getBorrowedFromUser(SILValue v) {
   for (auto *use : v->getUses()) {
     if (auto *bfi = dyn_cast<BorrowedFromInst>(use->getUser())) {
@@ -2421,4 +2363,21 @@ bool swift::isRedundantMoveValue(MoveValueInst *mvi) {
   // (3) Escaping matches?  (Expensive check, saved for last.)
   auto moveHasEscape = findPointerEscape(mvi);
   return moveHasEscape == originalHasEscape;
+}
+
+void swift::updateReborrowFlags(SILValue forEndBorrowValue) {
+  ValueWorklist worklist(forEndBorrowValue);
+  while (SILValue v = worklist.pop()) {
+    if (auto *bfi = dyn_cast<BorrowedFromInst>(v)) {
+      v = bfi->getBorrowedValue();
+    }
+    if (auto *arg = dyn_cast<SILPhiArgument>(v)) {
+      if (arg->isPhi() && !arg->isReborrow()) {
+        arg->setReborrow(true);
+        for (auto *predBlock : arg->getParent()->getPredecessorBlocks()) {
+          worklist.pushIfNotVisited(arg->getIncomingPhiValue(predBlock));
+        }
+      }
+    }
+  }
 }

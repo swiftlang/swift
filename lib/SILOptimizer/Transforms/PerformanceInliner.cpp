@@ -1286,7 +1286,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (invalidatedStackNesting) {
     StackNesting::fixNesting(Caller);
   }
-  updateBorrowedFrom(pm, Caller);
+  updateAllGuaranteedPhis(pm, Caller);
 
   // If we were asked to verify our caller after inlining all callees we could
   // find into it, do so now. This makes it easier to catch verification bugs in

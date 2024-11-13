@@ -1,4 +1,4 @@
-//===--- BorrowedFromUpdater.swift ----------------------------------------===//
+//===--- GuaranteedPhiUpdater.swift ---------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,6 +12,18 @@
 
 import SIL
 import OptimizerBridging
+
+/// Updates the reborrow flags and the borrowed-from instructions for all guaranteed phis in `function`.
+func updateGuaranteedPhis(in function: Function, _ context: some MutatingContext) {
+  updateReborrowFlags(in: function, context)
+  updateBorrowedFrom(in: function, context)
+}
+
+/// Updates the reborrow flags and the borrowed-from instructions for all `phis`.
+func updateGuaranteedPhis(phis: some Sequence<Phi>, _ context: some MutatingContext) {
+  updateReborrowFlags(for: phis, context)
+  updateBorrowedFrom(for: phis, context)
+}
 
 /// Update all borrowed-from instructions in the `function`
 func updateBorrowedFrom(in function: Function, _ context: some MutatingContext) {
@@ -49,6 +61,47 @@ func updateBorrowedFrom(for phis: some Sequence<Phi>, _ context: some MutatingCo
     for phi in phis {
       if phi.value.ownership == .guaranteed {
         changed = updateBorrowedFrom(for: phi, context) || changed
+      }
+    }
+  } while changed
+}
+
+/// Updates the reborrow flags for all guaranteed phis in `function`.
+func updateReborrowFlags(in function: Function, _ context: some MutatingContext) {
+  if !function.hasOwnership {
+    return
+  }
+  var guaranteedPhis = Stack<Phi>(context)
+  defer { guaranteedPhis.deinitialize() }
+
+  for block in function.blocks.reversed() {
+    for arg in block.arguments {
+      if let phi = Phi(arg), phi.value.ownership == .guaranteed {
+        guaranteedPhis.append(phi)
+      }
+    }
+  }
+  updateReborrowFlags(for: guaranteedPhis, context)
+}
+
+/// Updates the reborrow flags for all `phis`.
+func updateReborrowFlags(for phis: some Sequence<Phi>, _ context: some MutatingContext) {
+  // TODO: clear reborrow flags before re-computing when we have complete OSSA lifetimes.
+  // It would be cleaner to first clear all flags. But this is not possible because some end_borrow instructions
+  // might be missing in dead-end blocks. This will be fixed with complete OSSA lifetimes.
+
+  if let phi = phis.first(where: { phi in true }), !phi.value.parentFunction.hasOwnership {
+    return
+  }
+
+  var changed: Bool
+  repeat {
+    changed = false
+
+    for phi in phis where phi.value.ownership == .guaranteed {
+      if !phi.value.isReborrow && phi.hasBorrowEndingUse {
+        phi.value.set(reborrow: true, context)
+        changed = true
       }
     }
   } while changed
@@ -98,12 +151,12 @@ private func addEnclosingValues(
   return true
 }
 
-func registerBorrowedFromUpdater() {
-  BridgedUtilities.registerBorrowedFromUpdater(
+func registerGuaranteedPhiUpdater() {
+  BridgedUtilities.registerGuaranteedPhiUpdater(
     { (bridgedCtxt: BridgedPassContext, bridgedFunction: BridgedFunction) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
       let function = bridgedFunction.function;
-      updateBorrowedFrom(in: function, context)
+      updateGuaranteedPhis(in: function, context)
     },
     { (bridgedCtxt: BridgedPassContext, bridgedPhiArray: BridgedArrayRef) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
@@ -117,7 +170,7 @@ func registerBorrowedFromUpdater() {
           }
         }
       }
-      updateBorrowedFrom(for: guaranteedPhis, context)
+      updateGuaranteedPhis(phis: guaranteedPhis, context)
     }
   )
 }
