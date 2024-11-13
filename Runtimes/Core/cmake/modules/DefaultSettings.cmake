@@ -8,6 +8,7 @@
 set(SwiftCore_ENABLE_BACKTRACING_default OFF) # TODO: enable this by default
 set(SwiftCore_ENABLE_COMMANDLINE_SUPPORT_default OFF) # TODO: enable this by default
 
+set(SwiftCore_ENABLE_STDIN_default ON)
 set(SwiftCore_ENABLE_TYPE_PRINTING_default ON)
 
 set(SwiftCore_BACKTRACER_PATH_default "")
@@ -36,6 +37,8 @@ if(APPLE)
   set(SwiftCore_ENABLE_CRASH_REPORTER_CLIENT_default ON)
   set(SwiftCore_ENABLE_OBJC_INTEROP_default ON)
   set(SwiftCore_ENABLE_REFLECTION_default ON)
+  set(SwiftCore_ENABLE_RUNTIME_OS_VERSIONING ON)
+  set(SwiftCore_ENABLE_OVERRIDABLE_RETAIN_RELEASE ON)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "WASM")
   set(SwiftCore_OBJECT_FORMAT_default "elf")
 elseif(LINUX OR ANDROID OR BSD)
