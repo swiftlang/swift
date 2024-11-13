@@ -364,6 +364,8 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   free(task);
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
+
 static SerialExecutorRef executorForEnqueuedJob(Job *job) {
 #if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
   return SerialExecutorRef::generic();
@@ -391,8 +393,6 @@ static void jobInvoke(void *obj, void *unused, uint32_t flags) {
 
 // Magic constant to identify Swift Job vtables to Dispatch.
 static const unsigned long dispatchSwiftObjectType = 1;
-
-#if !SWIFT_CONCURRENCY_EMBEDDED
 
 static FullMetadata<DispatchClassMetadata> jobHeapMetadata = {
   {
