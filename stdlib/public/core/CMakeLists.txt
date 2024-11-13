@@ -408,6 +408,7 @@ if(TARGET libSwiftScan)
   list(append tooling_stdlib_deps libSwiftScan)
 endif()
 
+set_property(GLOBAL APPEND PROPERTY JOB_POOLS one_job=1)
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
                   ${swiftCore_common_options}
@@ -427,6 +428,7 @@ add_swift_target_library(swiftCore
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-stdlib)
   add_dependencies(embedded-libraries embedded-stdlib)
+  set_property(TARGET embedded-stdlib PROPERTY JOB_POOL_COMPILE one_job)
 
   set(SWIFT_ENABLE_REFLECTION OFF)
   set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
@@ -461,5 +463,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       INSTALL_IN_COMPONENT stdlib
       )
     add_dependencies(embedded-stdlib embedded-stdlib-${mod})
+    set_property(TARGET embedded-stdlib-${mod} PROPERTY JOB_POOL_COMPILE one_job)
   endforeach()
 endif()
