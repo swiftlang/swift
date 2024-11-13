@@ -960,8 +960,8 @@ extension ArraySlice: RangeReplaceableCollection {
     let startNewElements = _buffer.firstElementAddress + oldCount
     let buf = UnsafeMutableBufferPointer(
                 start: startNewElements,
-                count: self.capacity - oldCount)
-
+                count: newElementsCount)
+    _debugPrecondition(buf.endIndex <= self.capacity)
     let end = buf.initialize(fromContentsOf: newElements)
     _precondition(end == buf.endIndex)
     _buffer.count += newElementsCount

@@ -853,8 +853,8 @@ extension ContiguousArray: RangeReplaceableCollection {
     let startNewElements = _buffer.mutableFirstElementAddress + oldCount
     let buf = UnsafeMutableBufferPointer(
                 start: startNewElements,
-                count: _buffer.mutableCapacity - oldCount)
-
+                count: newElementsCount)
+    _debugPrecondition(buf.endIndex <= _buffer.mutableCapacity)
     let end = buf.initialize(fromContentsOf: newElements)
     _precondition(end == buf.endIndex)
     _buffer.count += newElementsCount
