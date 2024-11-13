@@ -263,6 +263,12 @@ protected:
     assert(filePos && !filePos->filename.empty());
   }
 
+  SILLocation(FilenameAndLocation *filePos, LocationKind K, bool Implicit)
+      : storage(filePos), kindAndFlags(K, FilenameAndLocationKind) {
+    assert(filePos && !filePos->filename.empty());
+    kindAndFlags.fields.implicit = Implicit;
+  }
+
   // It is okay to pass a nullptr, but preferably, a null-location should be
   // created with `invalid()`.
   SILLocation(ASTNodeTy Node, LocationKind K)
@@ -552,6 +558,8 @@ public:
       : SILLocation(L, RegularKind, Implicit) {}
   RegularLocation(FilenameAndLocation *filePos)
     : SILLocation(filePos, RegularKind) {}
+  RegularLocation(FilenameAndLocation *filePos, bool Implicit)
+    : SILLocation(filePos, RegularKind, Implicit) {}
 
   /// Convert \p loc to a RegularLocation.
   explicit RegularLocation(SILLocation loc) : SILLocation(loc, RegularKind) {}
@@ -622,6 +630,9 @@ public:
   ReturnLocation(FilenameAndLocation *filePos)
     : SILLocation(filePos, ReturnKind) {}
 
+  ReturnLocation(FilenameAndLocation *filePos, bool Implicit)
+    : SILLocation(filePos, ReturnKind, Implicit) {}
+
   static bool isKind(const SILLocation& L) {
     return L.getKind() == ReturnKind;
   }
@@ -642,6 +653,9 @@ public:
 
   ImplicitReturnLocation(FilenameAndLocation *filePos)
     : SILLocation(filePos, ImplicitReturnKind) {}
+
+  ImplicitReturnLocation(FilenameAndLocation *filePos, bool Implicit)
+    : SILLocation(filePos, ImplicitReturnKind, Implicit) {}
 
   /// Convert \p loc to an ImplicitReturnLocation.
   explicit ImplicitReturnLocation(SILLocation Loc);

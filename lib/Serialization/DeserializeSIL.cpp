@@ -396,32 +396,36 @@ SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
 
 std::optional<SILLocation> SILDeserializer::readLoc(unsigned kind,
                                      SmallVectorImpl<uint64_t> &scratch) {
-  uint8_t LocationKind = 0;
+  unsigned LocationKind = 0, Implicit;
   SILLocation::FilenameAndLocation *FNameLoc = nullptr;
   if (kind == SIL_SOURCE_LOC_REF) {
     ValueID LocID;
-    SourceLocRefLayout::readRecord(scratch, LocID, LocationKind);
+    SourceLocRefLayout::readRecord(scratch, LocID, LocationKind, Implicit);
     if (LocID == 0)
       return std::optional<SILLocation>();
-    FNameLoc = ParsedLocs[LocID];
+    FNameLoc = ParsedLocs[LocID - 1];
   } else {
     ValueID Row = 0, Col = 0, FNameID = 0;
-    SourceLocLayout::readRecord(scratch, Row, Col, FNameID, LocationKind);
+    SourceLocLayout::readRecord(scratch, Row, Col, FNameID, LocationKind, Implicit);
 
 
     FNameLoc = SILLocation::FilenameAndLocation::alloc(
         Row, Col, MF->getIdentifierText(FNameID), SILMod);
 
-    ParsedLocs.insert({ParsedLocs.size() + 1, FNameLoc});
+    ParsedLocs.push_back(FNameLoc);
   }
 
+  // FIXME: Instructions are being deserialized as implicit as existing code in
+  // readSILInstruction also deserializes instructions as implicit by default.
+  // This suppresses some diagnostics which otherwise break tests. This should
+  // be fixed in both places
   switch(LocationKind) {
     case SILLocation::ReturnKind:
-      return ReturnLocation(FNameLoc);
+      return ReturnLocation(FNameLoc, Implicit);
     case SILLocation::ImplicitReturnKind:
-      return ImplicitReturnLocation(FNameLoc);
+      return ImplicitReturnLocation(FNameLoc, Implicit);
     default:
-      return RegularLocation(FNameLoc);
+      return RegularLocation(FNameLoc, Implicit);
   }
 }
 

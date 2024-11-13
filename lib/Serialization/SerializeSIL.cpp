@@ -3102,7 +3102,7 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
   if (SourceLocMap.find(OpaquePtr) != SourceLocMap.end()) {
     SourceLocRefLayout::emitRecord(Out, ScratchRecord,
                                    SILAbbrCodes[SourceLocRefLayout::Code],
-                                   SourceLocMap[OpaquePtr], LocationKind);
+                                   SourceLocMap[OpaquePtr], LocationKind, (unsigned)Loc.isImplicit());
     return;
   }
 
@@ -3112,7 +3112,7 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
 
   if (!SLoc.isValid()) {
     //emit empty source loc
-    SourceLocRefLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[SourceLocRefLayout::Code], 0, 0);
+    SourceLocRefLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[SourceLocRefLayout::Code], 0, 0, (unsigned)0);
     return;
   }
 
@@ -3121,7 +3121,7 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
   SourceLocMap.insert({OpaquePtr, SourceLocMap.size() + 1});
   SourceLocLayout::emitRecord(Out, ScratchRecord,
                               SILAbbrCodes[SourceLocLayout::Code], Row, Column,
-                              FNameID, LocationKind);
+                              FNameID, LocationKind, (unsigned)Loc.isImplicit());
 }
 
 void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,

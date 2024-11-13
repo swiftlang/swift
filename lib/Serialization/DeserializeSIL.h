@@ -153,7 +153,7 @@ namespace swift {
     std::optional<SILLocation> readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch);
 
     llvm::DenseMap<unsigned, const SILDebugScope *> ParsedScopes;
-    llvm::DenseMap<unsigned, SILLocation::FilenameAndLocation *> ParsedLocs;
+    llvm::SmallVector<SILLocation::FilenameAndLocation *> ParsedLocs;
 
     SILFunction *getFuncForReference(StringRef Name, SILType Ty, TypeExpansionContext context);
     SILFunction *getFuncForReference(StringRef Name, bool forDebugScope = false);
