@@ -4419,61 +4419,57 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
   }
 }
 
-// Perform MiscDiagnostics on Switch Statements.
-static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt,
-                        DeclContext *DC) {
-  // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
-  // clause only applies to the second case, and this is surprising.
-  for (auto cs : stmt->getCases()) {
-    TypeChecker::checkExistentialTypes(ctx, cs, DC);
+static void diagnoseCaseStmtAmbiguousWhereClause(const CaseStmt *CS,
+                                                 ASTContext &ctx) {
+  // The case statement can have multiple case items, each can have a where.
+  // If we find a "where", and there is a preceding item without a where, and
+  // if they are on the same source line, e.g
+  // "case .Foo, .Bar where 1 != 100:" then warn since it may be unexpected.
+  auto items = CS->getCaseLabelItems();
 
-    // The case statement can have multiple case items, each can have a where.
-    // If we find a "where", and there is a preceding item without a where, and
-    // if they are on the same source line, then warn.
-    auto items = cs->getCaseLabelItems();
-    
-    // Don't do any work for the vastly most common case.
-    if (items.size() == 1) continue;
-    
-    // Ignore the first item, since it can't have preceding ones.
-    for (unsigned i = 1, e = items.size(); i != e; ++i) {
-      // Must have a where clause.
-      auto where = items[i].getGuardExpr();
-      if (!where)
-        continue;
-      
-      // Preceding item must not.
-      if (items[i-1].getGuardExpr())
-        continue;
-      
-      // Must be on the same source line.
-      auto prevLoc = items[i-1].getStartLoc();
-      auto thisLoc = items[i].getStartLoc();
-      if (prevLoc.isInvalid() || thisLoc.isInvalid())
-        continue;
-      
-      auto &SM = ctx.SourceMgr;
-      auto prevLineCol = SM.getLineAndColumnInBuffer(prevLoc);
-      if (SM.getLineAndColumnInBuffer(thisLoc).first != prevLineCol.first)
-        continue;
+  // Don't do any work for the vastly most common case.
+  if (items.size() == 1)
+    return;
 
-      ctx.Diags.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
+  // Ignore the first item, since it can't have preceding ones.
+  for (unsigned i = 1, e = items.size(); i != e; ++i) {
+    // Must have a where clause.
+    auto where = items[i].getGuardExpr();
+    if (!where)
+      continue;
+
+    // Preceding item must not.
+    if (items[i - 1].getGuardExpr())
+      continue;
+
+    // Must be on the same source line.
+    auto prevLoc = items[i - 1].getStartLoc();
+    auto thisLoc = items[i].getStartLoc();
+    if (prevLoc.isInvalid() || thisLoc.isInvalid())
+      continue;
+
+    auto &SM = ctx.SourceMgr;
+    auto prevLineCol = SM.getLineAndColumnInBuffer(prevLoc);
+    if (SM.getLineAndColumnInBuffer(thisLoc).first != prevLineCol.first)
+      continue;
+
+    ctx.Diags
+        .diagnose(items[i].getWhereLoc(), diag::where_on_one_item,
+                  CS->getParentKind() == CaseParentKind::DoCatch)
         .highlight(items[i].getPattern()->getSourceRange())
         .highlight(where->getSourceRange());
-      
-      // Whitespace it out to the same column as the previous item.
-      std::string whitespace(prevLineCol.second-1, ' ');
-      ctx.Diags.diagnose(thisLoc, diag::add_where_newline)
-        .fixItInsert(thisLoc, "\n"+whitespace);
 
-      auto whereRange = SourceRange(items[i].getWhereLoc(),
-                                    where->getEndLoc());
-      auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, whereRange);
-      auto whereText = SM.extractText(charRange);
-      ctx.Diags.diagnose(prevLoc, diag::duplicate_where)
-        .fixItInsertAfter(items[i-1].getEndLoc(), " " + whereText.str())
-        .highlight(items[i-1].getSourceRange());
-    }
+    // Whitespace it out to the same column as the previous item.
+    std::string whitespace(prevLineCol.second - 1, ' ');
+    ctx.Diags.diagnose(thisLoc, diag::add_where_newline)
+        .fixItInsert(thisLoc, "\n" + whitespace);
+
+    auto whereRange = SourceRange(items[i].getWhereLoc(), where->getEndLoc());
+    auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, whereRange);
+    auto whereText = SM.extractText(charRange);
+    ctx.Diags.diagnose(prevLoc, diag::duplicate_where)
+        .fixItInsertAfter(items[i - 1].getEndLoc(), " " + whereText.str())
+        .highlight(items[i - 1].getSourceRange());
   }
 }
 
@@ -6194,8 +6190,8 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
 
   TypeChecker::checkExistentialTypes(ctx, const_cast<Stmt *>(S), DC);
 
-  if (auto switchStmt = dyn_cast<SwitchStmt>(S))
-    checkSwitch(ctx, switchStmt, DC);
+  if (auto *CS = dyn_cast<CaseStmt>(S))
+    diagnoseCaseStmtAmbiguousWhereClause(CS, ctx);
 
   checkStmtConditionTrailingClosure(ctx, S);
 

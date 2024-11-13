@@ -149,3 +149,99 @@ struct SubscriptWhere {
 struct OuterGeneric<T> {
   func contextuallyGenericMethod() where T == any HasAssoc {}
 }
+
+typealias HasAssocAlias = HasAssoc
+
+func testExistentialInCase(_ x: Any) {
+  switch x {
+  case is HasAssoc:
+    // expected-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    break
+  default:
+    break
+  }
+  _ = {
+    switch x {
+    case is HasAssoc:
+      // expected-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+      break
+    default:
+      break
+    }
+  }
+  switch x {
+  case is HasAssocAlias:
+    // expected-error@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+    break
+  default:
+    break
+  }
+  _ = {
+    switch x {
+    case is HasAssocAlias:
+      // expected-error@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+      break
+    default:
+      break
+    }
+  }
+  switch x {
+  case is ~Copyable:
+    // expected-error@-1 {{constraint that suppresses conformance requires 'any'}}
+    // expected-warning@-2 {{'is' test is always true}}
+    break
+  default:
+    break
+  }
+  _ = {
+    switch x {
+    case is ~Copyable:
+      // expected-error@-1 {{constraint that suppresses conformance requires 'any'}}
+      // expected-warning@-2 {{'is' test is always true}}
+      break
+    default:
+      break
+    }
+  }
+}
+
+func throwingFn() throws {}
+
+// These are downgraded to warnings until Swift 7, see protocol_types_swift7.swift.
+// https://github.com/swiftlang/swift/issues/77553
+func testExistentialInCatch() throws {
+  do {
+    try throwingFn()
+  } catch is HasAssoc {}
+  // expected-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+  _ = {
+    do {
+      try throwingFn()
+    } catch is HasAssoc {}
+    // expected-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+  }
+  do {
+    try throwingFn()
+  } catch is HasAssocAlias {}
+  // expected-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+  _ = {
+    do {
+      try throwingFn()
+    } catch is HasAssocAlias {}
+    // expected-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+  }
+  do {
+    try throwingFn()
+  } catch is ~Copyable {}
+  // expected-warning@-1 {{constraint that suppresses conformance requires 'any'}}
+  // expected-warning@-2 {{'is' test is always true}}
+
+  // FIXME: We shouldn't emit a duplicate 'always true' warning here.
+  _ = {
+    do {
+      try throwingFn()
+    } catch is ~Copyable {}
+    // expected-warning@-1 {{constraint that suppresses conformance requires 'any'}}
+    // expected-warning@-2 2{{'is' test is always true}}
+  }
+}

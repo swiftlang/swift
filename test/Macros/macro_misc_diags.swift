@@ -77,10 +77,16 @@ _ = #identity(deprecatedFunc())
 // CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-2]]{{.*}}identityfMf1_.swift:1:1: warning: 'deprecatedFunc()' is deprecated
 // CHECK-DIAG: Client.swift:[[@LINE-2]]:15: warning: 'deprecatedFunc()' is deprecated
 
-#makeBinding(deprecatedFunc())
-// CHECK-DIAG: Client.swift:[[@LINE-1]]:14: warning: 'deprecatedFunc()' is deprecated
-// CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-3]]{{.*}}makeBindingfMf_.swift:1:9: warning: 'deprecatedFunc()' is deprecated
-// CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-4]]{{.*}}makeBindingfMf_.swift:1:5: warning: initialization of immutable value 'x' was never used
+#makeBinding((deprecatedFunc(), Int, {
+  if let _ = takesClosure {} {}
+}()))
+// CHECK-DIAG: Client.swift:[[@LINE-3]]:33: error: expected member name or initializer call after type name
+// CHECK-DIAG: Client.swift:[[@LINE-4]]:15: warning: 'deprecatedFunc()' is deprecated
+// CHECK-DIAG: Client.swift:[[@LINE-4]]:27: warning: trailing closure in this context is confusable with the body of the statement
+// CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-7]]{{.*}}makeBindingfMf_.swift:1:28: error: expected member name or initializer call after type name
+// CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-8]]{{.*}}makeBindingfMf_.swift:1:10: warning: 'deprecatedFunc()' is deprecated
+// CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-9]]{{.*}}makeBindingfMf_.swift:2:27: warning: trailing closure in this context is confusable with the body of the statement
+// CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-10]]{{.*}}makeBindingfMf_.swift:1:5: warning: initialization of immutable value
 
 struct S1 {
   #makeBinding(deprecatedFunc())
@@ -98,8 +104,8 @@ func takesClosure(_ fn: () -> Void) -> Int? { nil }
 
 _ = #trailingClosure {
   if let _ = takesClosure {} {}
-  // CHECK-DIAG: Client.swift:[[@LINE-1]]:27: warning: trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning
-  // CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-4]]{{.*}}trailingClosurefMf_.swift:2:27: warning: trailing closure in this context is confusable with the body of the statement
+  // CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-3]]{{.*}}trailingClosurefMf_.swift:2:27: warning: trailing closure in this context is confusable with the body of the statement
+  // CHECK-DIAG: Client.swift:[[@LINE-2]]:27: warning: trailing closure in this context is confusable with the body of the statement
 }
 
 func testOptionalToAny(_ y: Int?) {
