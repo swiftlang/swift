@@ -85,11 +85,12 @@ func updateReborrowFlags(in function: Function, _ context: some MutatingContext)
 }
 
 /// Updates the reborrow flags for all `phis`.
+///
+/// Re-borrow flags are only set, but never cleared. If an optimization creates a dead-end block
+/// by cutting off the control flow before an `end_borrow`, the re-borrow flags still have to remain
+/// without the possibility to re-calculate them from the (now missing) `end_borrow`.
+///
 func updateReborrowFlags(for phis: some Sequence<Phi>, _ context: some MutatingContext) {
-  // TODO: clear reborrow flags before re-computing when we have complete OSSA lifetimes.
-  // It would be cleaner to first clear all flags. But this is not possible because some end_borrow instructions
-  // might be missing in dead-end blocks. This will be fixed with complete OSSA lifetimes.
-
   if let phi = phis.first(where: { phi in true }), !phi.value.parentFunction.hasOwnership {
     return
   }
