@@ -235,3 +235,13 @@ class OverridableReader : GettableTitle {
     }
   }
 }
+
+// CHECK-LABEL: sil_default_witness_table ReadableField {
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    method #ReadableField.field!read2 
+// CHECK-SAME:        : @$s19coroutine_accessors13ReadableFieldP5fieldSivy
+// CHECK-NEXT:  }
+public protocol ReadableField {
+  @_borrowed
+  var field: Int { get }
+}
