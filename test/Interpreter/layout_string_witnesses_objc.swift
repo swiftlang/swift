@@ -290,3 +290,51 @@ func testNestedGenericEnumSwiftObjC() {
 }
 
 testNestedGenericEnumSwiftObjC()
+
+struct SwiftObjCAndWeakObjC {
+    let x: SwiftObjC
+    weak var y: NSObject?
+}
+
+func testSwiftObjCAndWeakObjC() {
+    let ptr = UnsafeMutablePointer<SwiftObjCAndWeakObjC>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let x = SwiftObjCAndWeakObjC(x: SwiftObjC(), y: nil)
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let y = SwiftObjCAndWeakObjC(x: SwiftObjC(), y: nil)
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SwiftObjC deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = SwiftObjCAndWeakObjC(x: SwiftObjC(), y: nil)
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SwiftObjC deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SwiftObjC deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testSwiftObjCAndWeakObjC()
