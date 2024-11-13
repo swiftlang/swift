@@ -1159,7 +1159,7 @@ public struct UnavailablePublicStruct {
              cPublic: AtInliningTarget,
              dPublic: BetweenTargets,
              ePublic: AtDeploymentTarget,
-             fPublic: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+             fPublic: AfterDeploymentTarget,
              gPublic: Unavailable
 
   public var aPublicInit: Any = NoAvailable(),
@@ -1175,7 +1175,7 @@ public struct UnavailablePublicStruct {
       cInternal: AtInliningTarget = .init(),
       dInternal: BetweenTargets = .init(),
       eInternal: AtDeploymentTarget = .init(),
-      fInternal: AfterDeploymentTarget = .init(), // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+      fInternal: AfterDeploymentTarget = .init(),
       gInternal: Unavailable = .init()
 }
 
@@ -1562,8 +1562,7 @@ public protocol UnavailableProtoWithAssoc {
   associatedtype C: AtInliningTargetProto
   associatedtype D: BetweenTargetsProto
   associatedtype E: AtDeploymentTargetProto
-  associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  associatedtype F: AfterDeploymentTargetProto
   associatedtype G: UnavailableProto
 }
 
@@ -1596,7 +1595,7 @@ public enum UnavailableEnumWithTypeAliases {
   public typealias C = AtInliningTarget
   public typealias D = BetweenTargets
   public typealias E = AtDeploymentTarget
-  public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias F = AfterDeploymentTarget
   public typealias G = Unavailable
 }
 
@@ -1688,6 +1687,6 @@ public enum UnavailableEnumWithClasses {
   public class InheritsAtInliningTarget: AtInliningTargetClass {}
   public class InheritsBetweenTargets: BetweenTargetsClass {}
   public class InheritsAtDeploymentTarget: AtDeploymentTargetClass {}
-  public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {} // expected-error {{'AfterDeploymentTargetClass' is only available in}} expected-note 2 {{add @available attribute to enclosing class}}
+  public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {}
   public class InheritsUnavailable: UnavailableClass {}
 }

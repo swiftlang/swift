@@ -757,6 +757,8 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
 
   NodePointer topLevel = createNode(Node::Kind::Global);
 
+  NodePointer suffix = popNode(Node::Kind::Suffix);
+
   NodePointer Parent = topLevel;
   while (NodePointer FuncAttr = popNode(isFunctionAttr)) {
     Parent->addChild(FuncAttr, *this);
@@ -774,6 +776,9 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
         break;
     }
   }
+  if (suffix)
+    topLevel->addChild(suffix, *this);
+
   if (topLevel->getNumChildren() == 0)
     return nullptr;
 
@@ -799,6 +804,12 @@ NodePointer Demangler::demangleType(StringRef MangledName,
 bool Demangler::parseAndPushNodes() {
   const auto textSize = Text.size();
   while (Pos < textSize) {
+    // Programs may look up a type by NUL-terminated name with an excessive
+    // length. Keep them working by returning success if we encounter a NUL in
+    // the middle of the string where an operator is expected.
+    if (peekChar() == '\0')
+      return true;
+
     NodePointer Node = demangleOperator();
     if (!Node)
       return false;
@@ -1462,6 +1473,18 @@ NodePointer Demangler::demangleBuiltinType() {
       name.append(EltType->getText().substr(BUILTIN_TYPE_NAME_PREFIX.size()),
                   *this);
       Ty = createNode(Node::Kind::BuiltinTypeName, name);
+      break;
+    }
+    case 'V': {
+      NodePointer element = popNode(Node::Kind::Type);
+      if (!element)
+        return nullptr;
+      NodePointer size = popNode(Node::Kind::Type);
+      if (!size)
+        return nullptr;
+      Ty = createNode(Node::Kind::BuiltinFixedArray);
+      Ty->addChild(size, *this);
+      Ty->addChild(element, *this);
       break;
     }
     case 'O':
@@ -2345,6 +2368,8 @@ NodePointer Demangler::demangleImplFunctionType() {
   const char *CoroAttr = nullptr;
   if (nextIf('A'))
     CoroAttr = "yield_once";
+  else if (nextIf('I'))
+    CoroAttr = "yield_once_2";
   else if (nextIf('G'))
     CoroAttr = "yield_many";
   if (CoroAttr)
@@ -2789,6 +2814,18 @@ NodePointer Demangler::popProtocolConformance() {
 
 NodePointer Demangler::demangleThunkOrSpecialization() {
   switch (char c = nextChar()) {
+    // Thunks that are from a thunk inst. We take the TT namespace.
+    case 'T': {
+      switch (nextChar()) {
+      case 'I':
+        return createWithChild(Node::Kind::SILThunkIdentity, popNode(isEntity));
+      case 'H':
+        return createWithChild(Node::Kind::SILThunkHopToMainActorIfNeeded,
+                               popNode(isEntity));
+      default:
+        return nullptr;
+      }
+    }
     case 'c': return createWithChild(Node::Kind::CurryThunk, popNode(isEntity));
     case 'j': return createWithChild(Node::Kind::DispatchThunk, popNode(isEntity));
     case 'q': return createWithChild(Node::Kind::MethodDescriptor, popNode(isEntity));
@@ -4419,11 +4456,11 @@ NodePointer Demangler::demangleIntegerType() {
   switch (peekChar()) {
   case 'n':
     nextChar();
-    integer = createNode(Node::Kind::NegativeInteger, -demangleNatural());
+    integer = createNode(Node::Kind::NegativeInteger, -demangleIndex());
     break;
 
   default:
-    integer = createNode(Node::Kind::Integer, demangleNatural());
+    integer = createNode(Node::Kind::Integer, demangleIndex());
     break;
   }
 

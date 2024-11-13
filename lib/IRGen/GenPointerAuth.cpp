@@ -128,11 +128,14 @@ llvm::Value *irgen::emitPointerAuthSign(IRGenFunction &IGF, llvm::Value *fnPtr,
   if (auto constantFnPtr = dyn_cast<llvm::Constant>(fnPtr)) {
     if (auto constantDiscriminator =
           dyn_cast<llvm::Constant>(newAuthInfo.getDiscriminator())) {
-      llvm::Constant *other = nullptr, *address = nullptr;
-      if (constantDiscriminator->getType()->isPointerTy())
+      llvm::Constant *address = nullptr;
+      llvm::ConstantInt *other = nullptr;
+      if (constantDiscriminator->getType()->isPointerTy()) {
         address = constantDiscriminator;
-      else
-        other = constantDiscriminator;
+      } else if (auto otherDiscriminator =
+                     dyn_cast<llvm::ConstantInt>(constantDiscriminator)) {
+        other = otherDiscriminator;
+      }
       return IGF.IGM.getConstantSignedPointer(constantFnPtr,
                                               newAuthInfo.getKey(),
                                               address, other);
@@ -598,6 +601,8 @@ static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
     switch (type->getCoroutineKind()) {
     case SILCoroutineKind::YieldMany: return "yield_many:";
     case SILCoroutineKind::YieldOnce: return "yield_once:";
+    case SILCoroutineKind::YieldOnce2:
+      return "yield_once_2:";
     case SILCoroutineKind::None: llvm_unreachable("not a coroutine");
     }
     llvm_unreachable("bad coroutine kind");
@@ -716,10 +721,10 @@ IRGenModule::getConstantSignedCFunctionPointer(llvm::Constant *fn) {
   return fn;
 }
 
-llvm::Constant *IRGenModule::getConstantSignedPointer(llvm::Constant *pointer,
-                                                      unsigned key,
-                                          llvm::Constant *storageAddress,
-                                          llvm::Constant *otherDiscriminator) {
+llvm::Constant *
+IRGenModule::getConstantSignedPointer(llvm::Constant *pointer, unsigned key,
+                                      llvm::Constant *storageAddress,
+                                      llvm::ConstantInt *otherDiscriminator) {
   return clang::CodeGen::getConstantSignedPointer(getClangCGM(), pointer, key,
                                                   storageAddress,
                                                   otherDiscriminator);

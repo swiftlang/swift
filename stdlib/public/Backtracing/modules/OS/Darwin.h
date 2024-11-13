@@ -135,6 +135,8 @@ extern void _dyld_process_info_for_each_segment(dyld_process_info info, uint64_t
 // .. Code Signing SPI .........................................................
 
 #define CS_OPS_STATUS 0
+#define CS_GET_TASK_ALLOW  0x00000004
+#define CS_RUNTIME         0x00010000
 #define CS_PLATFORM_BINARY 0x04000000
 #define CS_PLATFORM_PATH   0x08000000
 extern int csops(int, unsigned int, void *, size_t);

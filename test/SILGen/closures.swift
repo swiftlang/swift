@@ -2,6 +2,8 @@
 // RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library %s -enable-experimental-feature ValueGenerics -disable-availability-checking | %FileCheck %s
 // RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library %s -enable-experimental-feature ValueGenerics -disable-availability-checking | %FileCheck %s --check-prefix=GUARANTEED
 
+// REQUIRES: swift_feature_ValueGenerics
+
 import Swift
 
 var zero = 0

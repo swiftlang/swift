@@ -11,6 +11,7 @@
 // RUN: %target-run %t/main %t/%target-library-name(layout_string_witnesses_types) | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_LayoutStringValueWitnesses
 
 // Requires runtime functions added in Swift 5.9.
 // UNSUPPORTED: use_os_stdlib
@@ -1175,6 +1176,19 @@ func testMultiPayloadError() {
     // CHECK-NEXT: SimpleClass deinitialized!
     testDestroy(ptr)
 
+    // initWithCopy
+    do {
+        let x = MultiPayloadError.error3(0, MyError(x: SimpleClass(x: 23)))
+        testInit(ptr, to: x)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
     ptr.deallocate()
 }
 
@@ -1194,6 +1208,7 @@ func testMultiPayloadErrorKeepsTagIntact() {
     switch ptr.pointee {
         case .error1: print("Get error1!")
         case .error2: print("Got error2!")
+        case .error3: print("Got error3!")
         case .empty: print("Got empty!")
     }
 
@@ -1347,6 +1362,49 @@ func testMultiPayloadOneExtraTagValue() {
 }
 
 testMultiPayloadOneExtraTagValue()
+
+func testMultiPayloadAnyObject() {
+    let ptr = UnsafeMutablePointer<MultiPayloadAnyObject>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let x = MultiPayloadAnyObject.y(SimpleClass(x: 0))
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let y = MultiPayloadAnyObject.z(SimpleClass(x: 1))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = MultiPayloadAnyObject.z(SimpleClass(x: 2))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadAnyObject()
 
 #if os(macOS)
 func testObjc() {

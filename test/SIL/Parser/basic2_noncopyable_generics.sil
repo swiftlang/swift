@@ -7,9 +7,10 @@
 // RUN: |                                                    \
 // RUN: %FileCheck %s
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 // For -enable-experimental-feature NonescapableTypes
 
-// REQUIRES: asserts
 // TODO: Once NoncopyableGenerics/NonescapableTypes is no longer behind a feature flag, merge this into basic2.
 
 sil_stage raw

@@ -46,6 +46,7 @@ add_swift_host_library(swiftSema STATIC
   ResilienceDiagnostics.cpp
   SourceLoader.cpp
   SyntacticElementTarget.cpp
+  TypeOfReference.cpp
   TypeCheckAccess.cpp
   TypeCheckAttr.cpp
   TypeCheckAvailability.cpp
@@ -94,7 +95,7 @@ target_link_libraries(swiftSema PRIVATE
 if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftSema PRIVATE
     swiftASTGen
-    swiftMacros)
+    swiftMacroEvaluation)
 endif()
 
 set_swift_llvm_is_available(swiftSema)

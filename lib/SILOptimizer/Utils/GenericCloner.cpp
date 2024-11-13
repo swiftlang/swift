@@ -51,6 +51,7 @@ SILFunction *GenericCloner::createDeclaration(
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     NewF->addSemanticsAttr(Attr);
   }
+  NewF->setOptimizationMode(Orig->getOptimizationMode());
   if (!Orig->hasOwnership()) {
     NewF->setOwnershipEliminated();
   }

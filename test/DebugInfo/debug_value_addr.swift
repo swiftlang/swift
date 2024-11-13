@@ -10,7 +10,7 @@
 // CHECK: define {{.*}}$s16debug_value_addr4testyyxlF
 // CHECK: entry:
 // CHECK-NEXT: %[[TADDR:.*]] = alloca
-// CHECK-NEXT: call void @llvm.dbg.declare({{.*}}%[[TADDR]]
+// CHECK-NEXT: #dbg_declare({{.*}}%[[TADDR]]
 // CHECK: store ptr %0, ptr %[[TADDR:.*]], align
 
 struct S<T> {

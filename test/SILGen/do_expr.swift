@@ -1,8 +1,8 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature ThenStatements -enable-experimental-feature DoExpressions %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -enable-experimental-feature ThenStatements -enable-experimental-feature DoExpressions %s
 
-// Required for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_DoExpressions
+// REQUIRES: swift_feature_ThenStatements
 
 @discardableResult
 func throwsError(_ x: Int = 0) throws -> Int { 0 }

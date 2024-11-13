@@ -1,6 +1,6 @@
 import SwiftDiagnostics
 import SwiftOperators
-import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 import SwiftSyntaxBuilder
 @_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
 
@@ -758,6 +758,39 @@ public struct AddArbitraryMembers: MemberMacro {
   }
 }
 
+public struct MemberThatCallsCodeMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard case let .argumentList(arguments) = node.arguments,
+          let firstElement = arguments.first,
+          let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self) else {
+      throw CustomError.message("Macro requires a string literal")
+    }
+
+    let codeString = try stringLiteral.segments.map { segment in
+      switch segment {
+      case .stringSegment(let string):
+        return string.content.text
+
+      case .expressionSegment(_):
+        throw CustomError.message("Macro cannot handle string interpolation")
+      }
+    }.joined(separator: "")
+    return [
+      """
+      static var synthesizedMember: String {
+        \(raw: codeString)
+
+        return "hello"
+      }
+      """,
+    ]
+  }
+}
+
 /// Implementation of the `wrapStoredProperties` macro, which can be
 /// used to apply an attribute to all of the stored properties of a type.
 ///
@@ -946,12 +979,25 @@ public struct AddAsyncMacro: PeerMacro {
     let returnType = completionHandlerParameter.parameters.first?.type
 
     let isResultReturn = returnType?.children(viewMode: .all).first?.description == "Result"
-    let successReturnType =
-      if isResultReturn {
-        returnType!.as(IdentifierTypeSyntax.self)!.genericArgumentClause?.arguments.first!.argument
-      } else {
-        returnType
+
+    let successReturnType: TypeSyntax?
+
+    if isResultReturn {
+      let argument = returnType!.as(IdentifierTypeSyntax.self)!.genericArgumentClause?.arguments.first!.argument
+
+      switch argument {
+      case .some(.type(let type)):
+        successReturnType = type
+
+      case .some(.expr(_)):
+        fatalError("expression not available here")
+
+      case .none:
+        successReturnType = nil
       }
+    } else {
+      successReturnType = returnType
+    }
 
     // Remove completionHandler and comma from the previous parameter
     var newParameterList = funcDecl.signature.parameterClause.parameters
@@ -2702,5 +2748,32 @@ public struct AddGetterMacro: AccessorMacro {
     in context: some MacroExpansionContext
   ) throws -> [AccessorDeclSyntax] {
     return ["get { 0 }"]
+  }
+}
+
+public struct HangingMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let variableDecl = declaration.as(VariableDeclSyntax.self) else {
+      return []
+    }
+
+    guard let binding: PatternBindingSyntax = variableDecl.bindings.first else {
+      return []
+    }
+
+    guard let typeAnnotation = binding.typeAnnotation else {
+      return []
+    }
+
+    let mockProperty = try VariableDeclSyntax("var BadThing: \(typeAnnotation.type)") {
+    }
+
+    return [
+      DeclSyntax(mockProperty)
+    ]
   }
 }

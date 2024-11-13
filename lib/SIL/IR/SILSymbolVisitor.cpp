@@ -735,6 +735,9 @@ public:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     auto nominal = ED->getExtendedNominal();
+    if (!nominal)
+      return;
+
     if (canSkipNominal(nominal))
       return;
 

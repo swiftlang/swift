@@ -44,6 +44,7 @@ namespace swift {
 class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
+class AvailabilityScope;
 class BreakStmt;
 class ContextualPattern;
 class ContinueStmt;
@@ -68,7 +69,6 @@ class TypeAliasDecl;
 class TypeLoc;
 class Witness;
 class TypeResolution;
-class TypeRefinementContext;
 struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
@@ -1937,10 +1937,10 @@ public:
   void cacheResult(bool value) const;
 };
 
-class RequiresOpaqueModifyCoroutineRequest :
-    public SimpleRequest<RequiresOpaqueModifyCoroutineRequest,
-                         bool(AbstractStorageDecl *),
-                         RequestFlags::SeparatelyCached> {
+class RequiresOpaqueModifyCoroutineRequest
+    : public SimpleRequest<RequiresOpaqueModifyCoroutineRequest,
+                           bool(AbstractStorageDecl *, bool isUnderscored),
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1948,8 +1948,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool
-  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl,
+                bool isUnderscored) const;
 
 public:
   // Separate caching.
@@ -2295,21 +2295,22 @@ public:
 
 /// Builds an opaque result type for a declaration.
 class OpaqueResultTypeRequest
-    : public SimpleRequest<OpaqueResultTypeRequest,
-                           OpaqueTypeDecl *(ValueDecl *),
-                           RequestFlags::Cached> {
+    : public SimpleRequest<
+          OpaqueResultTypeRequest, OpaqueTypeDecl *(ValueDecl *),
+          RequestFlags::SeparatelyCached | RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  OpaqueTypeDecl *
-  evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+  OpaqueTypeDecl *evaluate(Evaluator &evaluator, ValueDecl *VD) const;
 
 public:
-  // Caching.
+  // Split caching.
   bool isCached() const { return true; }
+  std::optional<OpaqueTypeDecl *> getCachedResult() const;
+  void cacheResult(OpaqueTypeDecl *result) const;
 };
 
 /// Determines if a function declaration is 'static'.
@@ -3050,9 +3051,9 @@ public:
   void cacheResult(ProtocolConformanceRef value) const;
 };
 
-class BraceHasReturnRequest
-    : public SimpleRequest<BraceHasReturnRequest, bool(const BraceStmt *),
-                           RequestFlags::Cached> {
+class BraceHasExplicitReturnStmtRequest
+    : public SimpleRequest<BraceHasExplicitReturnStmtRequest,
+                           bool(const BraceStmt *), RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -3926,6 +3927,25 @@ private:
 
 public:
   // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Run effects checking for an initializer expression.
+class CheckInitEffectsRequest
+    : public SimpleRequest<CheckInitEffectsRequest,
+                           evaluator::SideEffect(Initializer *, Expr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator,
+                                 Initializer *initCtx,
+                                 Expr *init) const;
+
+public:
   bool isCached() const { return true; }
 };
 
@@ -4849,11 +4869,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Expand the children of the given type refinement context.
-class ExpandChildTypeRefinementContextsRequest
-    : public SimpleRequest<ExpandChildTypeRefinementContextsRequest,
-                           std::vector<TypeRefinementContext *>(
-                               TypeRefinementContext *),
+/// Expand the children of the given type availability scope.
+class ExpandChildAvailabilityScopesRequest
+    : public SimpleRequest<ExpandChildAvailabilityScopesRequest,
+                           evaluator::SideEffect(AvailabilityScope *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4861,14 +4880,14 @@ public:
 private:
   friend SimpleRequest;
 
-  std::vector<TypeRefinementContext *>
-  evaluate(Evaluator &evaluator, TypeRefinementContext *parentTRC) const;
+  evaluator::SideEffect evaluate(Evaluator &evaluator,
+                                 AvailabilityScope *parentScope) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  std::optional<std::vector<TypeRefinementContext *>> getCachedResult() const;
-  void cacheResult(std::vector<TypeRefinementContext *> children) const;
+  std::optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect) const;
 };
 
 class SerializeAttrGenericSignatureRequest
@@ -5088,6 +5107,73 @@ public:
   bool isCached() const { return true; }
 };
 
+struct RegexLiteralPatternInfo {
+  StringRef RegexToEmit;
+  Type RegexType;
+  size_t Version;
+  ArrayRef<RegexLiteralPatternFeature> Features;
+};
+
+/// Parses the regex pattern for a given regex literal using the
+/// compiler's regex parsing library, and returns the resulting info.
+class RegexLiteralPatternInfoRequest
+    : public SimpleRequest<RegexLiteralPatternInfoRequest,
+                           RegexLiteralPatternInfo(const RegexLiteralExpr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  RegexLiteralPatternInfo evaluate(Evaluator &evaluator,
+                                   const RegexLiteralExpr *regex) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// The description for a given regex pattern feature. This is cached since
+/// the resulting string is allocated in the ASTContext for ease of bridging.
+class RegexLiteralFeatureDescriptionRequest
+    : public SimpleRequest<RegexLiteralFeatureDescriptionRequest,
+                           StringRef(RegexLiteralPatternFeatureKind,
+                                     ASTContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  StringRef evaluate(Evaluator &evaluator, RegexLiteralPatternFeatureKind kind,
+                     ASTContext *ctx) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// The availability range for a given regex pattern feature.
+class RegexLiteralFeatureAvailabilityRequest
+    : public SimpleRequest<RegexLiteralFeatureAvailabilityRequest,
+                           AvailabilityRange(RegexLiteralPatternFeatureKind,
+                                             ASTContext *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AvailabilityRange evaluate(Evaluator &evaluator,
+                             RegexLiteralPatternFeatureKind kind,
+                             ASTContext *ctx) const;
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    RegexLiteralPatternFeatureKind kind);
+SourceLoc extractNearestSourceLoc(RegexLiteralPatternFeatureKind kind);
+
 class IsUnsafeRequest
     : public SimpleRequest<IsUnsafeRequest,
                            bool(Decl *decl),
@@ -5117,6 +5203,22 @@ private:
   friend SimpleRequest;
 
   Type evaluate(Evaluator &evaluator, GenericTypeParamDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class CustomDerivativesRequest
+    : public SimpleRequest<CustomDerivativesRequest,
+                           evaluator::SideEffect(SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *sf) const;
 
 public:
   bool isCached() const { return true; }

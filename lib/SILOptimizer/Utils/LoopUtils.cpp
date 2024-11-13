@@ -17,6 +17,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
@@ -231,8 +232,8 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
 
   // The deallocation of a stack allocation must be in the loop, otherwise the
   // deallocation will be fed by a phi node of two allocations.
-  if (I->isAllocatingStack()) {
-    for (auto *UI : cast<SingleValueInstruction>(I)->getUses()) {
+  if (auto allocation = I->getStackAllocation()) {
+    for (auto *UI : allocation->getUses()) {
       if (UI->getUser()->isDeallocatingStack()) {
         if (!L->contains(UI->getUser()->getParent()))
           return false;
@@ -246,6 +247,8 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
       SILValue address = dealloc->getOperand();
       if (isa<AllocStackInst>(address) || isa<PartialApplyInst>(address))
         alloc = cast<SingleValueInstruction>(address);
+      else if (isaResultOf<BeginApplyInst>(address))
+        alloc = cast<MultipleValueInstructionResult>(address)->getParent();
     }
     if (auto *dealloc = dyn_cast<DeallocStackRefInst>(I))
       alloc = dealloc->getAllocRef();
@@ -328,6 +331,17 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
   if (isa<AwaitAsyncContinuationInst>(I) ||
       isa<GetAsyncContinuationAddrInst>(I) || isa<GetAsyncContinuationInst>(I))
     return false;
+
+  // Bail if there are any begin-borrow instructions which have no corresponding
+  // end-borrow uses. This is the case if the control flow ends in a dead-end block.
+  // After duplicating such a block, the re-borrow flags cannot be recomputed
+  // correctly for inserted phi arguments.
+  if (auto *svi  = dyn_cast<SingleValueInstruction>(I)) {
+    if (auto bv = BorrowedValue(lookThroughBorrowedFromDef(svi))) {
+      if (!bv.hasLocalScopeEndingUses())
+        return false;
+    }
+  }
 
   // Some special cases above that aren't considered isTriviallyDuplicatable
   // return true early.

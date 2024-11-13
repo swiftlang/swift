@@ -120,7 +120,7 @@ extension ASTGenVisitor {
     }
 
     let genericArguments = generics.arguments.lazy.map {
-      self.generate(type: $0.argument)
+      self.generate(genericArgument: $0.argument)
     }
 
     return BridgedUnqualifiedIdentTypeRepr.createParsed(
@@ -140,7 +140,7 @@ extension ASTGenVisitor {
     let angleRange: BridgedSourceRange
     if let generics = node.genericArgumentClause {
       genericArguments = generics.arguments.lazy.map {
-        self.generate(type: $0.argument)
+        self.generate(genericArgument: $0.argument)
       }.bridgedArray(in: self)
 
       angleRange = self.generateSourceRange(start: generics.leftAngle, end: generics.rightAngle)
@@ -356,7 +356,8 @@ extension ASTGenVisitor {
     var type = generate(type: node.baseType)
 
     // Handle specifiers.
-    if let specifier = node.specifier {
+    if case .simpleTypeSpecifier(let simpleSpecifier) = node.specifiers.first {
+      let specifier = simpleSpecifier.specifier
       if let kind = BridgedAttributedTypeSpecifier(from: specifier.keywordKind) {
         type =
           BridgedSpecifierTypeRepr.createParsed(
@@ -366,7 +367,7 @@ extension ASTGenVisitor {
             specifierLoc: self.generateSourceLoc(specifier)
           ).asTypeRepr
       } else {
-        self.diagnose(Diagnostic(node: specifier, message: UnexpectedTokenKindError(token: specifier)))
+        self.diagnose(.unexpectedTokenKind(token: specifier))
       }
     }
 

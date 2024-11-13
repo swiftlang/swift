@@ -51,7 +51,9 @@ namespace clang {
 namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
+  class ASTScope;
   class ASTWalker;
+  class AvailabilityScope;
   class BraceStmt;
   class Decl;
   class DeclAttribute;
@@ -74,15 +76,13 @@ namespace swift {
   class ProtocolConformance;
   class ProtocolDecl;
   struct PrintOptions;
+  class SourceLookupCache;
   class Token;
   class TupleType;
   class Type;
-  class TypeRefinementContext;
   class ValueDecl;
   class VarDecl;
   class VisibleDeclConsumer;
-  class ASTScope;
-  class SourceLookupCache;
 
 namespace ast_scope {
 class ASTSourceFileScope;
@@ -240,6 +240,7 @@ class ModuleDecl
     : public DeclContext, public TypeDecl, public ASTAllocated<ModuleDecl> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
+  friend class CustomDerivativesRequest;
 
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
@@ -253,6 +254,10 @@ class ModuleDecl
   mutable Identifier ExportAsName;
 
   mutable Identifier PublicModuleName;
+
+  /// Indicates a version of the Swift compiler used to generate 
+  /// .swiftinterface file that this module was produced from (if any).
+  mutable llvm::VersionTuple InterfaceCompilerVersion;
 
 public:
   /// Produces the components of a given module's full name in reverse order.
@@ -518,11 +523,20 @@ public:
     PublicModuleName = name;
   }
 
+  /// See \c InterfaceCompilerVersion
+  llvm::VersionTuple getSwiftInterfaceCompilerVersion() const {
+    return InterfaceCompilerVersion;
+  }
+
+  void setSwiftInterfaceCompilerVersion(llvm::VersionTuple version) {
+    InterfaceCompilerVersion = version;
+  }
+
   /// Retrieve the actual module name of an alias used for this module (if any).
   ///
-  /// For example, if '-module-alias Foo=Bar' is passed in when building the main module,
-  /// and this module is (a) not the main module and (b) is named Foo, then it returns
-  /// the real (physically on-disk) module name Bar.
+  /// For example, if '-module-alias Foo=Bar' is passed in when building the
+  /// main module, and this module is (a) not the main module and (b) is named
+  /// Foo, then it returns the real (physically on-disk) module name Bar.
   ///
   /// If no module aliasing is set, it will return getName(), i.e. Foo.
   Identifier getRealName() const;

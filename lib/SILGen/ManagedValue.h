@@ -324,6 +324,10 @@ public:
     assert(!hasCleanup());
     return getValue();
   }
+
+  /// Treat getValue() as used so that we can access the value directly when
+  /// debugging without needing to interpret the flag field.
+  LLVM_ATTRIBUTE_USED
   SILValue getValue() const { return valueAndFlag.getPointer(); }
   
   SILType getType() const { return getValue()->getType(); }

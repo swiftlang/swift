@@ -1,7 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature KeyPathWithStaticMembers -disable-availability-checking -disable-experimental-parser-round-trip -parse-stdlib -module-name keypaths %s | %FileCheck %s
-// FIXME: Remove '-disable-experimental-parser-round-trip'.
+// RUN: %target-swift-emit-silgen -target %target-swift-5.1-abi-triple -parse-stdlib -module-name keypaths %s | %FileCheck %s
 
-// REQUIRES: asserts
 
 import Swift
 

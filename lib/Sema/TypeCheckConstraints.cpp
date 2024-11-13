@@ -175,6 +175,16 @@ bool TypeVariableType::Implementation::isSubscriptResultType() const {
              KeyPathExpr::Component::Kind::UnresolvedSubscript;
 }
 
+bool TypeVariableType::Implementation::isApplicationResultType() const {
+  if (!(locator && locator->getAnchor()))
+    return false;
+
+  if (!locator->isLastElement<LocatorPathElt::FunctionResult>())
+    return false;
+
+  return isExpr<ApplyExpr>(locator->getAnchor()) || isSubscriptResultType();
+}
+
 bool TypeVariableType::Implementation::isParameterPack() const {
   return locator
       && locator->isForGenericParameter()
@@ -332,7 +342,9 @@ public:
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
+    // We only want to walk macro arguments. Expansions will be walked when
+    // they're type-checked, not as part of the surrounding code.
+    return MacroWalking::Arguments;
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
@@ -386,19 +398,21 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 // instead of each individual syntactic element types.
 std::optional<SyntacticElementTarget>
 TypeChecker::typeCheckExpression(SyntacticElementTarget &target,
-                                 TypeCheckExprOptions options) {
+                                 TypeCheckExprOptions options,
+                                 DiagnosticTransaction *diagnosticTransaction) {
   DeclContext *dc = target.getDeclContext();
   auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr",
                                   target.getAsExpr());
   PrettyStackTraceExpr stackTrace(Context, "type-checking", target.getAsExpr());
 
-  return typeCheckTarget(target, options);
+  return typeCheckTarget(target, options, diagnosticTransaction);
 }
 
 std::optional<SyntacticElementTarget>
 TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
-                             TypeCheckExprOptions options) {
+                             TypeCheckExprOptions options,
+                             DiagnosticTransaction *diagnosticTransaction) {
   auto errorResult = [&]() -> std::optional<SyntacticElementTarget> {
     // Fill in ErrorTypes for the target if we can.
     if (!options.contains(TypeCheckExprFlags::AvoidInvalidatingAST))
@@ -435,7 +449,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   if (options.contains(TypeCheckExprFlags::DisableMacroExpansions))
     csOptions |= ConstraintSystemFlags::DisableMacroExpansions;
 
-  ConstraintSystem cs(dc, csOptions);
+  ConstraintSystem cs(dc, csOptions, diagnosticTransaction);
 
   if (auto *expr = target.getAsExpr()) {
     // Tell the constraint system what the contextual type is.  This informs
@@ -461,7 +475,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // Apply this solution to the constraint system.
   // FIXME: This shouldn't be necessary.
   auto &solution = (*viable)[0];
-  cs.applySolution(solution);
+  cs.replaySolution(solution);
 
   // Apply the solution to the expression.
   auto resultTarget = cs.applySolution(solution, target);
@@ -523,7 +537,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     // First, let's try to type-check default expression using
     // archetypes, which guarantees that it would work for any
     // substitution of the generic parameter (if they are involved).
-    if (auto result = typeCheckExpression(defaultExprTarget, options)) {
+    if (auto result = typeCheckExpression(
+            defaultExprTarget, options, &diagnostics)) {
       defaultValue = result->getAsExpr();
       return defaultValue->getType();
     }
@@ -753,7 +768,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
   auto &solution = (*viable)[0];
 
-  cs.applySolution(solution);
+  cs.replaySolution(solution);
 
   if (auto result = cs.applySolution(solution, defaultExprTarget)) {
     // Perform syntactic diagnostics on the type-checked target.
@@ -1106,7 +1121,7 @@ TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
         setType(E, getType(FVE->getSubExpr())->getOptionalObjectType());
 
       if (auto *PE = dyn_cast<ParenExpr>(E))
-        setType(E, ParenType::get(Ctx, getType(PE->getSubExpr())));
+        setType(E, getType(PE->getSubExpr()));
 
       return Action::Continue(E);
     }
@@ -1153,7 +1168,7 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
   if (auto paren = dyn_cast<IdentityExpr>(expr)) {
     auto sub =  coerceToRValue(Context, paren->getSubExpr(), getType, setType);
     paren->setSubExpr(sub);
-    setType(paren, ParenType::get(Context, getType(sub)));
+    setType(paren, getType(sub));
     return paren;
   }
 
@@ -1506,15 +1521,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
       constraint.print(out, &getASTContext().SourceMgr);
       out << "\n";
     }
-  }
-
-  if (solverState && solverState->hasRetiredConstraints()) {
-    out.indent(indent) << "Retired Constraints:\n";
-    solverState->forEachRetired([&](Constraint &constraint) {
-      out.indent(indent + 2);
-      constraint.print(out, &getASTContext().SourceMgr);
-      out << "\n";
-    });
   }
 
   if (!ResolvedOverloads.empty()) {

@@ -592,7 +592,7 @@ func gatherEnclosingValuesFromPredecessors(
     let incomingOperand = phi.incomingOperand(inPredecessor: predecessor)
 
     for predEV in incomingOperand.value.getEnclosingValues(context) {
-      let ev = predecessor.mapToPhiInSuccessor(incomingEnclosingValue: predEV)
+      let ev = predecessor.getEnclosingValueInSuccessor(ofIncoming: predEV)
       if alreadyAdded.insert(ev) {
         enclosingValues.push(ev)
       }
@@ -601,13 +601,31 @@ func gatherEnclosingValuesFromPredecessors(
 }
 
 extension BasicBlock {
-  func mapToPhiInSuccessor(incomingEnclosingValue: Value) -> Value {
+  // Returns either the `incomingEnclosingValue` or an adjacent phi in the successor block.
+  func getEnclosingValueInSuccessor(ofIncoming incomingEnclosingValue: Value) -> Value {
     let branch = terminator as! BranchInst
-    if let incomingEV = branch.operands.first(where: { $0.value.lookThroughBorrowedFrom == incomingEnclosingValue }) {
+    if let incomingEV = branch.operands.first(where: { branchOp in
+      // Only if the lifetime of `branchOp` ends at the branch (either because it's a reborrow or an owned value),
+      // the corresponding phi argument can be the adjacent phi for the incoming value.
+      //   bb1:
+      //     %incomingEnclosingValue = some_owned_value
+      //     %2 = begin_borrow %incomingEnclosingValue  // %incomingEnclosingValue = the enclosing value of %2 in bb1
+      //     br bb2(%incomingEnclosingValue, %2)        // lifetime of incomingEnclosingValue ends here
+      //   bb2(%4 : @owned, %5 : @guaranteed):          // -> %4 = the enclosing value of %5 in bb2
+      //
+      branchOp.endsLifetime &&
+      branchOp.value.lookThroughBorrowedFrom == incomingEnclosingValue
+    }) {
       return branch.getArgument(for: incomingEV)
     }
-    // No candidates phi are outer-adjacent phis. The incoming
-    // `predDef` must dominate the current guaranteed phi.
+    // No candidates phi are outer-adjacent phis. The incomingEnclosingValue must dominate the successor block.
+    //   bb1: // dominates bb3
+    //     %incomingEnclosingValue = some_owned_value
+    //   bb2:
+    //     %2 = begin_borrow %incomingEnclosingValue
+    //     br bb3(%2)
+    //   bb3(%5 : @guaranteed):          // -> %incomingEnclosingValue = the enclosing value of %5 in bb3
+    //
     return incomingEnclosingValue
   }
 }

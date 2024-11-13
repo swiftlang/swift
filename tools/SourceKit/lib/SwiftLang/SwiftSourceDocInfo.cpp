@@ -864,7 +864,7 @@ static void setLocationInfoForClangNode(ClangNode ClangNode,
   std::pair<clang::FileID, unsigned> Decomp =
       ClangSM.getDecomposedLoc(CharRange.getBegin());
   if (!Decomp.first.isInvalid()) {
-    if (auto FE = ClangSM.getFileEntryForID(Decomp.first)) {
+    if (auto FE = ClangSM.getFileEntryRefForID(Decomp.first)) {
       Location.Filename = FE->getName();
 
       std::pair<clang::FileID, unsigned> EndDecomp =
@@ -1351,7 +1351,7 @@ getClangDeclarationName(const clang::NamedDecl *ND, NameTranslatingInfo &Info) {
       return clang::DeclarationName();
 
     ArrayRef<StringRef> Args = llvm::ArrayRef(Info.ArgNames);
-    std::vector<clang::IdentifierInfo *> Pieces;
+    std::vector<const clang::IdentifierInfo *> Pieces;
     for (unsigned i = 0; i < NumPieces; ++i) {
       if (i >= Info.ArgNames.size() || Info.ArgNames[i].empty()) {
         Pieces.push_back(OrigSel.getIdentifierInfoForSlot(i));
@@ -2335,7 +2335,7 @@ static void resolveCursorFromUSR(
 
   class CursorInfoConsumer : public SwiftASTConsumer {
     std::string InputFile;
-    StringRef USR;
+    std::string USR;
     SwiftLangSupport &Lang;
     SwiftInvocationRef ASTInvok;
     const bool TryExistingAST;
@@ -2376,7 +2376,7 @@ static void resolveCursorFromUSR(
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
 
-      if (USR.starts_with("c:")) {
+      if (StringRef(USR).starts_with("c:")) {
         LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
         CursorInfoData Info;
         Info.InternalDiagnostic = "Lookup for C/C++/ObjC USRs not implemented.";

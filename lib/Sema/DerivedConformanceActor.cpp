@@ -160,8 +160,7 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   if (auto enclosingDecl = property->getInnermostDeclWithAvailability())
     asAvailableAs.push_back(enclosingDecl);
 
-  AvailabilityInference::applyInferredAvailableAttrs(
-      property, asAvailableAs, ctx);
+  AvailabilityInference::applyInferredAvailableAttrs(property, asAvailableAs);
 
   auto getter = derived.addGetterToReadOnlyDerivedProperty(property);
   getter->setBodySynthesizer(deriveBodyActor_unownedExecutor);

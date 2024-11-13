@@ -1177,8 +1177,21 @@ public:
     llvm::Value *errorResultPtr = origParams.claimNext();
     args.add(errorResultPtr);
     if (origConv.isTypedError()) {
-      auto *typedErrorResultPtr = origParams.claimNext();
-      args.add(typedErrorResultPtr);
+      auto errorType =
+          origConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
+      auto silResultTy =
+          origConv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+      auto &errorTI = IGM.getTypeInfo(errorType);
+      auto &resultTI = IGM.getTypeInfo(silResultTy);
+      auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
+      auto &errorSchema = errorTI.nativeReturnValueSchema(IGM);
+
+      if (resultSchema.requiresIndirect() ||
+          errorSchema.shouldReturnTypedErrorIndirectly() ||
+          outConv.hasIndirectSILErrorResults()) {
+        auto *typedErrorResultPtr = origParams.claimNext();
+        args.add(typedErrorResultPtr);
+      }
     }
   }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
@@ -1354,8 +1367,21 @@ public:
     // The error result pointer is already in the appropriate position but the
     // type error address is not.
     if (origConv.isTypedError()) {
-      auto *typedErrorResultPtr = origParams.claimNext();
-      args.add(typedErrorResultPtr);
+      auto errorType =
+          origConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
+      auto silResultTy =
+          origConv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+      auto &errorTI = IGM.getTypeInfo(errorType);
+      auto &resultTI = IGM.getTypeInfo(silResultTy);
+      auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
+      auto &errorSchema = errorTI.nativeReturnValueSchema(IGM);
+
+      if (resultSchema.requiresIndirect() ||
+          errorSchema.shouldReturnTypedErrorIndirectly() ||
+          outConv.hasIndirectSILErrorResults()) {
+        auto *typedErrorResultPtr = origParams.claimNext();
+        args.add(typedErrorResultPtr);
+      }
     }
   }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
@@ -2822,11 +2848,12 @@ IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
   return callerContext;
 }
 
-llvm::Function *IRGenFunction::getOrCreateResumePrjFn(bool forPrologue) {
-  // The prologue version lacks artificial debug info as this would cause
-  // verification errors when it gets inlined.
-  auto name = forPrologue ? "__swift_async_resume_project_context_prologue"
-                          : "__swift_async_resume_project_context";
+llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
+  auto name = "__swift_async_resume_project_context";
+  // This is effectively an outlined function with `alwaysinline`. Don't emit
+  // debug locations for those to avoid creating unnecessary inlined frames.
+  // Instead, rely on the inliner to propagate the call site debug location.
+  const bool skipDebugInfo = true;
   auto Fn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
       name, IGM.Int8PtrTy, {IGM.Int8PtrTy},
       [&](IRGenFunction &IGF) {
@@ -2836,7 +2863,7 @@ llvm::Function *IRGenFunction::getOrCreateResumePrjFn(bool forPrologue) {
         auto callerContext = IGF.emitAsyncResumeProjectContext(addr);
         Builder.CreateRet(callerContext);
       },
-      false /*isNoInline*/, forPrologue));
+      false /*isNoInline*/, skipDebugInfo));
   Fn->addFnAttr(llvm::Attribute::AlwaysInline);
   return Fn;
 }
@@ -2875,9 +2902,6 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   dispatch->setDoesNotThrow();
   dispatch->addFnAttr(llvm::Attribute::AlwaysInline);
   IRGenFunction dispatchIGF(IGM, dispatch);
-  // Don't emit debug info if we are generating a function for the prologue.
-  if (IGM.DebugInfo && Builder.getCurrentDebugLocation())
-    IGM.DebugInfo->emitOutlinedFunction(dispatchIGF, dispatch, CurFn->getName());
   auto &Builder = dispatchIGF.Builder;
   auto it = dispatchIGF.CurFn->arg_begin(), end = dispatchIGF.CurFn->arg_end();
   llvm::Value *fnPtrArg = &*(it++);
@@ -2893,9 +2917,11 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
           : originalAuthInfo;
   auto callee = FunctionPointer::createSigned(
       fnPtr.getKind(), fnPtrArg, newAuthInfo, fnPtr.getSignature());
+
   auto call = Builder.CreateCall(callee, callArgs);
   call->setTailCallKind(IGM.AsyncTailCallKind);
   Builder.CreateRetVoid();
+
   return dispatch;
 }
 
@@ -2932,7 +2958,7 @@ llvm::Function *IRGenFunction::getOrCreateResumeFromSuspensionFn() {
         auto &Builder = IGF.Builder;
         Builder.CreateRet(&*IGF.CurFn->arg_begin());
       },
-      false /*isNoInline*/));
+      false /*isNoInline*/, true /*forPrologue*/));
   fn->addFnAttr(llvm::Attribute::AlwaysInline);
   return fn;
 }
@@ -2961,9 +2987,6 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   suspendFn->setDoesNotThrow();
   suspendFn->addFnAttr(llvm::Attribute::AlwaysInline);
   IRGenFunction suspendIGF(IGM, suspendFn);
-  if (IGM.DebugInfo)
-    IGM.DebugInfo->emitOutlinedFunction(suspendIGF, suspendFn,
-                                        CurFn->getName());
   auto &Builder = suspendIGF.Builder;
 
   llvm::Value *resumeFunction = suspendFn->getArg(0);

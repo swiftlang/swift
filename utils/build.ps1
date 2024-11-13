@@ -1182,7 +1182,7 @@ function Build-CMakeProject {
     }
 
     if ($UseBuiltCompilers.Contains("Swift")) {
-      $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$($BuildArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
+      $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$(Get-CMarkBinaryCache $Arch)\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
       $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
@@ -1217,13 +1217,22 @@ function Build-CMakeProject {
   }
 }
 
+enum SPMBuildAction {
+  # 'swift build'
+  Build
+  # 'swift test'
+  Test
+  # 'swift test --parallel'
+  TestParallel
+}
+
 function Build-SPMProject {
   [CmdletBinding(PositionalBinding = $false)]
   param(
+    [SPMBuildAction] $Action,
     [string] $Src,
     [string] $Bin,
     [hashtable] $Arch,
-    [switch] $Test = $false,
     [Parameter(ValueFromRemainingArguments)]
     [string[]] $AdditionalArguments
   )
@@ -1263,8 +1272,20 @@ function Build-SPMProject {
       $Arguments += @("-debug-info-format", "none")
     }
 
-    $Action = if ($Test) { "test" } else { "build" }
-    Invoke-Program "$($HostArch.ToolchainInstallRoot)\usr\bin\swift.exe" $Action @Arguments @AdditionalArguments
+    switch ($Action) {
+      Build {
+        $ActionName = "build"
+      }
+      Test {
+        $ActionName = "test"
+      }
+      TestParallel {
+        $ActionName = "test"
+        $Arguments += @("--parallel")
+      }
+    }
+
+    Invoke-Program "$($HostArch.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
   }
 
   if (-not $ToBatch) {
@@ -1326,12 +1347,16 @@ function Build-WiXProject() {
   Invoke-Program $msbuild @MSBuildArgs
 }
 
+function Get-CMarkBinaryCache($Arch) {
+  return "$($Arch.BinaryCache)\cmark-gfm-0.29.0.gfm.13"
+}
+
 function Build-CMark($Arch) {
   $ArchName = $Arch.LLVMName
 
   Build-CMakeProject `
     -Src $SourceCache\cmark `
-    -Bin "$($Arch.BinaryCache)\cmark-gfm-0.29.0.gfm.13" `
+    -Bin (Get-CMarkBinaryCache $Arch) `
     -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
     -Defines @{
@@ -1400,7 +1425,7 @@ function Build-Compilers() {
     $BuildTools = Join-Path -Path (Get-BuildProjectBinaryCache BuildTools) -ChildPath bin
 
     if ($TestClang -or $TestLLD -or $TestLLDB -or $TestLLVM -or $TestSwift) {
-      $env:Path = "$($HostArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$CompilersBinaryCache\tools\swift\libdispatch-windows-$($Arch.LLVMName)-prefix\bin;$CompilersBinaryCache\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostArch.VSName);$UnixToolsBinDir"
+      $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$CompilersBinaryCache\tools\swift\libdispatch-windows-$($Arch.LLVMName)-prefix\bin;$CompilersBinaryCache\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostArch.VSName);$UnixToolsBinDir"
       $Targets = @()
       $TestingDefines = @{
         SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "YES";
@@ -1467,6 +1492,7 @@ function Build-Compilers() {
         SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
+        SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS = "YES";
         SWIFT_ENABLE_SYNCHRONIZATION = "YES";
         SWIFT_ENABLE_VOLATILE = "YES";
         SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
@@ -1745,7 +1771,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
 
 
   Isolate-EnvVars {
-    $env:Path = "$($BuildArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$(Get-PinnedToolchainRuntime);${env:Path}"
+    $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$(Get-PinnedToolchainRuntime);${env:Path}"
 
     $CompilersBinaryCache = if ($IsCrossCompiling) {
       Get-BuildProjectBinaryCache Compilers
@@ -1772,6 +1798,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
         SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
+        SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS = "YES";
         SWIFT_ENABLE_SYNCHRONIZATION = "YES";
         SWIFT_ENABLE_VOLATILE = "YES";
         SWIFT_NATIVE_SWIFT_TOOLS_PATH = (Join-Path -Path $CompilersBinaryCache -ChildPath "bin");
@@ -1814,7 +1841,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
     Isolate-EnvVars {
       $env:SWIFTCI_USE_LOCAL_DEPS=1
       Build-SPMProject `
-        -Test `
+        -Action Test `
         -Src $SourceCache\swift-foundation `
         -Bin $OutDir `
         -Arch $HostArch
@@ -1832,7 +1859,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       $env:CURL_LIBRARY_PATH="$LibraryRoot/curl-8.9.1/usr/lib/$Platform/$ShortArch"
       $env:CURL_INCLUDE_PATH="$LibraryRoot/curl-8.9.1/usr/include"
       Build-SPMProject `
-        -Test `
+        -Action Test `
         -Src $SourceCache\swift-corelibs-foundation `
         -Bin $OutDir `
         -Arch $HostArch
@@ -2374,6 +2401,44 @@ function Build-Format($Arch) {
     }
 }
 
+function Test-Format {
+  $SwiftPMArguments = @(
+    # swift-syntax
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
+    "-Xswiftc", "-L$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
+    # swift-argument-parser
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache ArgumentParser)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache ArgumentParser)\lib",
+    # swift-cmark
+    "-Xswiftc", "-I$($SourceCache)\cmark\src\include",
+    "-Xswiftc", "-I$($SourceCache)\cmark\extensions\include",
+    "-Xlinker", "-I$($SourceCache)\cmark\extensions\include",
+    "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\src\cmark-gfm.lib",
+    "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\extensions\cmark-gfm-extensions.lib",
+    # swift-markdown
+    "-Xlinker", "$(Get-HostProjectBinaryCache Markdown)\lib\CAtomic.lib",
+    "-Xswiftc", "-I$($SourceCache)\swift-markdown\Sources\CAtomic\include",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Markdown)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Markdown)\lib",
+    # swift-format
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Format)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Format)\lib"
+  )
+  
+  Isolate-EnvVars {
+    $env:SWIFTFORMAT_BUILD_ONLY_TESTS=1
+    # Testing swift-format is faster in serial mode than in parallel mode, probably because parallel test execution
+    # launches a process for every test class and the process launching overhead on Windows is greater than any
+    # gains from parallel test execution.
+    Build-SPMProject `
+      -Action Test `
+      -Src "$SourceCache\swift-format" `
+      -Bin (Join-Path -Path $HostArch.BinaryCache -ChildPath swift-format) `
+      -Arch $HostArch `
+      @SwiftPMArguments
+  }
+}
+
 function Build-IndexStoreDB($Arch) {
   $SDKInstallRoot = (Get-HostSwiftSDK);
 
@@ -2412,6 +2477,81 @@ function Build-SourceKitLSP($Arch) {
       SwiftPM_DIR = (Get-HostProjectCMakeModules PackageManager);
       IndexStoreDB_DIR = (Get-HostProjectCMakeModules IndexStoreDB);
     }
+}
+
+function Test-SourceKitLSP {
+  $SwiftPMArguments = @(
+    # swift-syntax
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
+    "-Xswiftc", "-L$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
+    # swift-cmark
+    "-Xswiftc", "-I$($SourceCache)\cmark\src\include",
+    "-Xswiftc", "-I$($SourceCache)\cmark\extensions\include",
+    "-Xlinker", "-I$($SourceCache)\cmark\extensions\include",
+    "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\src\cmark-gfm.lib",
+    "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\extensions\cmark-gfm-extensions.lib",
+    # swift-system
+    "-Xswiftc", "-I$($SourceCache)\swift-system\Sources\CSystem\include",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache System)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache System)\lib",
+    # swift-tools-support-core
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache ToolsSupportCore)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache ToolsSupportCore)\lib",
+    # swift-llbuild
+    "-Xswiftc", "-I$($SourceCache)\llbuild\products\libllbuild\include",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache LLBuild)\products\llbuildSwift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache LLBuild)\lib",
+    # swift-argument-parser
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache ArgumentParser)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache ArgumentParser)\lib",
+    # swift-crypto
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Crypto)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Crypto)\lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache Crypto)\lib\CCryptoBoringSSL.lib",
+    # swift-package-manager
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache PackageManager)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache PackageManager)\lib",
+    # swift-markdown
+    "-Xswiftc", "-I$($SourceCache)\swift-markdown\Sources\CAtomic\inclde",
+    "-Xlinker", "$(Get-HostProjectBinaryCache Markdown)\lib\CAtomic.lib",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Markdown)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Markdown)\lib",
+    # swift-format
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Format)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Format)\lib",
+    # indexstore-db
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache IndexStoreDB)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache IndexStoreDB)\Sources\IndexStoreDB",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\CIndexStoreDB\CIndexStoreDB.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Core\Core.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Database\Database.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Index\Index.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\LLVMSupport\LLVMSupport.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Support\Support.lib",
+    # sourcekit-lsp
+    "-Xswiftc", "-I$($SourceCache)\sourcekit-lsp\Sources\CAtomics\include",
+    "-Xswiftc", "-I$($SourceCache)\sourcekit-lsp\Sources\CSourcekitd\include",
+    "-Xlinker", "$(Get-HostProjectBinaryCache SourceKitLSP)\lib\CSourcekitd.lib",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache SourceKitLSP)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache SourceKitLSP)\lib"
+  )
+
+  Isolate-EnvVars {
+    $env:SOURCEKIT_LSP_BUILD_ONLY_TESTS=1
+
+    # CI doesn't contain any sensitive information. Log everything.
+    $env:SOURCEKIT_LSP_LOG_PRIVACY_LEVEL="sensitive"
+
+    # Log with the highest log level to simplify debugging of CI failures.
+    $env:SOURCEKIT_LSP_LOG_LEVEL="debug"
+
+    Build-SPMProject `
+      -Action TestParallel `
+      -Src "$SourceCache\sourcekit-lsp" `
+      -Bin (Join-Path -Path $HostArch.BinaryCache -ChildPath sourcekit-lsp) `
+      -Arch $HostArch `
+      @SwiftPMArguments
+  }
 }
 
 function Build-TestingMacros() {
@@ -2496,6 +2636,7 @@ function Build-Inspect() {
   Isolate-EnvVars {
     $env:SWIFTCI_USE_LOCAL_DEPS=1
     Build-SPMProject `
+      -Action Build `
       -Src $SourceCache\swift\tools\swift-inspect `
       -Bin $OutDir `
       -Arch $HostArch `
@@ -2509,6 +2650,7 @@ function Build-DocC() {
   Isolate-EnvVars {
     $env:SWIFTCI_USE_LOCAL_DEPS=1
     Build-SPMProject `
+      -Action Build `
       -Src $SourceCache\swift-docc `
       -Bin $OutDir `
       -Arch $HostArch `
@@ -2527,7 +2669,7 @@ function Test-PackageManager() {
   Isolate-EnvVars {
     $env:SWIFTCI_USE_LOCAL_DEPS=1
     Build-SPMProject `
-      -Test `
+      -Action Test `
       -Src $SrcDir `
       -Bin $OutDir `
       -Arch $HostArch `
@@ -2744,6 +2886,8 @@ if (-not $IsCrossCompiling) {
   }
   if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
   if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
+  if ($Test -contains "swift-format") { Test-Format }
+  if ($Test -contains "sourcekit-lsp") { Test-SourceKitLSP }
 }
 
 # Custom exception printing for more detailed exception information

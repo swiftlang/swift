@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-ir -g -o - -module-name test -strict-concurrency=complete -swift-version 5 -enable-upcoming-feature SendingArgsAndResults -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -g -o - -module-name test -strict-concurrency=complete -swift-version 5 -enable-upcoming-feature SendingArgsAndResults -target %target-swift-5.1-abi-triple %s | %FileCheck %s
+
+// REQUIRES: swift_feature_SendingArgsAndResults
 
 // Test that we can properly reconstruct sending from various tests when
 // emitting debug info. Only place examples in here that have already failed.

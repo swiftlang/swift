@@ -907,6 +907,45 @@ static Type applyGenericArguments(Type type,
 
     return parameterized;
   }
+  
+  // Builtins have special handling.
+  if (auto bug = type->getAs<BuiltinUnboundGenericType>()) {
+    // We don't have any variadic builtins yet, but we do have value arguments.
+    auto argOptions = options.withoutContext()
+      .withContext(TypeResolverContext::ValueGenericArgument);
+    auto genericResolution = resolution.withOptions(argOptions);
+
+    // Resolve the types of the generic arguments.
+    SmallVector<Type, 2> args;
+    for (auto tyR : genericArgs) {
+      // Propagate failure.
+      Type substTy = genericResolution.resolveType(tyR, silContext);
+      if (!substTy || substTy->hasError())
+        return ErrorType::get(ctx);
+
+      args.push_back(substTy);
+    }
+    
+    // Try to form a substitution map.
+    auto subs = SubstitutionMap::get(bug->getGenericSignature(),
+                                     args,
+                                     [&](CanType dependentType,
+                                         Type conformingReplacementType,
+                                         ProtocolDecl *conformedProtocol)
+                                     -> ProtocolConformanceRef {
+                                       // no generic builtins have conformance
+                                       // requirements yet.
+                                       llvm_unreachable("not implemented yet");
+                                     });
+                                     
+    auto bound = bug->getBound(subs);
+    
+    if (bound->hasError()) {
+      diags.diagnose(loc, diag::invalid_generic_builtin_type, type);
+      return ErrorType::get(ctx);
+    }
+    return bound;
+  }
 
   // We must either have an unbound generic type, or a generic type alias.
   if (!type->is<UnboundGenericType>()) {
@@ -1680,6 +1719,32 @@ static void diagnoseGenericArgumentsOnSelf(const TypeResolution &resolution,
   }
 }
 
+/// Diagnose when this is one of the Span types, which currently requires
+/// an experimental feature to use.
+static void diagnoseSpanType(TypeDecl *typeDecl, SourceLoc loc,
+                             const DeclContext *dc) {
+  if (loc.isInvalid())
+    return;
+
+  if (!typeDecl->isStdlibDecl())
+    return;
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::Span))
+    return;
+
+  auto nameString = typeDecl->getName().str();
+  if (nameString != "Span" && nameString != "RawSpan")
+    return;
+
+  // Don't require this in the standard library or _Concurrency library.
+  auto module = dc->getParentModule();
+  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
+    return;
+
+  ctx.Diags.diagnose(loc, diag::span_requires_feature_flag, nameString);
+}
+
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 /// \param silContext Used to look up generic parameters in SIL mode.
@@ -1815,6 +1880,9 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
+
+    diagnoseSpanType(currentDecl, repr->getLoc(), DC);
+
     repr->setValue(currentDecl, currentDC);
     return current;
   }
@@ -2035,6 +2103,8 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
     member = memberTypes.back().Member;
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
+
+    diagnoseSpanType(member, repr->getLoc(), DC);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);
@@ -3102,6 +3172,7 @@ TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
 
   case TypeAttrKind::YieldMany:
   case TypeAttrKind::YieldOnce:
+  case TypeAttrKind::YieldOnce2:
     return TAR_SILCoroutine;
 
   case TypeAttrKind::CalleeOwned:
@@ -3248,6 +3319,7 @@ static bool isFunctionAttribute(TypeAttrKind attrKind) {
       TypeAttrKind::Escaping,
       TypeAttrKind::Sendable,
       TypeAttrKind::YieldOnce,
+      TypeAttrKind::YieldOnce2,
       TypeAttrKind::YieldMany,
       TypeAttrKind::Async,
   };
@@ -4251,10 +4323,21 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   auto coroutineKind = SILCoroutineKind::None;
   if (auto coroAttr = attrs ? attrs->claim(TAR_SILCoroutine) : nullptr) {
     assert(isa<YieldOnceTypeAttr>(coroAttr) ||
+           isa<YieldOnce2TypeAttr>(coroAttr) ||
            isa<YieldManyTypeAttr>(coroAttr));
-    coroutineKind = (isa<YieldOnceTypeAttr>(coroAttr)
-                       ? SILCoroutineKind::YieldOnce
-                       : SILCoroutineKind::YieldMany);
+    switch (coroAttr->getKind()) {
+    case TypeAttrKind::YieldOnce:
+      coroutineKind = SILCoroutineKind::YieldOnce;
+      break;
+    case TypeAttrKind::YieldOnce2:
+      coroutineKind = SILCoroutineKind::YieldOnce2;
+      break;
+    case TypeAttrKind::YieldMany:
+      coroutineKind = SILCoroutineKind::YieldMany;
+      break;
+    default:
+      llvm_unreachable("bad TypeAttrKind for TAR_SILCoroutine");
+    }
   }
 
   ParameterConvention callee = ParameterConvention::Direct_Unowned;
@@ -4561,6 +4644,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
 
   std::optional<TypeAttrSet> attrsBuffer;
   TypeAttrSet *attrs = nullptr;
+
+  if (auto *lifetimeRepr = dyn_cast<LifetimeDependentTypeRepr>(repr)) {
+    repr = lifetimeRepr->getBase();
+  }
   if (yieldAttrs) {
     attrs = yieldAttrs;
     assert(!isa<AttributedTypeRepr>(repr));
@@ -5593,7 +5680,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   if (options.contains(TypeResolutionFlags::SILType)) {
     if (repr->isParenType())
-      return ParenType::get(ctx, elements[0].getType());
+      return elements[0].getType();
   } else {
     // Single-element labeled tuples are not permitted outside of declarations
     // or SIL, either.
@@ -5609,7 +5696,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
     if (elements.size() == 1 && !elements[0].hasName() &&
         !elements[0].getType()->is<PackExpansionType>())
-      return ParenType::get(ctx, elements[0].getType());
+      return elements[0].getType();
   }
   
   if (moveOnlyElementIndex.has_value()) {
@@ -5881,14 +5968,17 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
                                                TypeResolutionOptions options) {
   auto subOptions = options.withoutContext(true)
       .withContext(TypeResolverContext::Inverted);
-  auto ty = resolveType(repr->getConstraint(), subOptions);
+  auto *constraintRepr = repr->getConstraint();
+  auto ty = resolveType(constraintRepr, subOptions);
   if (ty->hasError())
     return ErrorType::get(getASTContext());
 
   // If the inverted type is an existential metatype, unwrap the existential
   // metatype so we can look at the instance type. We'll re-wrap at the end.
-  ExistentialMetatypeType *existentialTy =
-      dyn_cast<ExistentialMetatypeType>(ty.get().getPointer());
+  // Note we don't look through parens.
+  ExistentialMetatypeType *existentialTy = nullptr;
+  if (!constraintRepr->isParenType())
+    existentialTy = dyn_cast<ExistentialMetatypeType>(ty.get().getPointer());
   if (existentialTy) {
     ty = existentialTy->getInstanceType();
   }

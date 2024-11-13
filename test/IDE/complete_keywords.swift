@@ -3,7 +3,7 @@
 // KW_RETURN: Keyword[return]/None: return{{; name=.+$}}
 // KW_NO_RETURN-NOT: Keyword[return]
 
-// KW_IN: Keyword[in]/None: in{{; name=.+$}}
+// KW_IN: Keyword[in]/None/Flair[CommonKeyword]: in{{; name=.+$}}
 // KW_NO_IN-NOT: Keyword[in]
 
 // KW_NO_INOUT-NOT: Keyword[inout]

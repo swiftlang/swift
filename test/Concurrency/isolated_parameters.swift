@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -DALLOW_TYPECHECKER_ERRORS -verify-additional-prefix typechecker-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -DALLOW_TYPECHECKER_ERRORS -verify-additional-prefix typechecker-
 
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -verify-additional-prefix tns-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -verify-additional-prefix tns-
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
@@ -539,6 +539,11 @@ func preciseIsolated(a: isolated MyActor) async {
     sync(isolatedTo: nil) // okay from anywhere
     sync(isolatedTo: #isolation)
   }
+}
+
+func testLValueIsolated() async {
+  var a = A() // expected-warning {{variable 'a' was never mutated}}
+  await sync(isolatedTo: a)
 }
 
 @MainActor func fromMain(ns: NotSendable) async -> NotSendable {

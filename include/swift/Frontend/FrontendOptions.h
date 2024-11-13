@@ -110,6 +110,10 @@ public:
   /// User-defined module version number.
   llvm::VersionTuple UserModuleVersion;
 
+  /// The Swift compiler version number that would be used to synthesize
+  /// swiftinterface files and subsequently their swiftmodules.
+  llvm::VersionTuple SwiftInterfaceCompilerVersion;
+
   /// A set of modules allowed to import this module.
   std::set<std::string> AllowableClients;
 
@@ -125,6 +129,7 @@ public:
   /// Include local definitions/references in the index data.
   bool IndexIncludeLocals = false;
 
+  bool SerializeDebugInfoSIL = false;
   /// If building a module from interface, ignore compiler flags
   /// specified in the swiftinterface.
   bool ExplicitInterfaceBuild = false;
@@ -155,8 +160,8 @@ public:
     /// Parse and dump scope map.
     DumpScopeMaps,
 
-    /// Parse, type-check, and dump type refinement context hierarchy
-    DumpTypeRefinementContexts,
+    /// Parse, type-check, and dump availability scopes
+    DumpAvailabilityScopes,
 
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH,             ///< Emit PCH of imported bridging header
@@ -178,20 +183,21 @@ public:
     Immediate, ///< Immediate mode
     REPL,      ///< REPL mode
 
-    EmitAssembly, ///< Emit assembly
-    EmitIRGen,    ///< Emit LLVM IR before LLVM optimizations
-    EmitIR,       ///< Emit LLVM IR after LLVM optimizations
-    EmitBC,       ///< Emit LLVM BC
-    EmitObject,   ///< Emit object file
+    EmitAssembly,   ///< Emit assembly
+    EmitLoweredSIL, ///< Emit lowered SIL before IRGen runs
+    EmitIRGen,      ///< Emit LLVM IR before LLVM optimizations
+    EmitIR,         ///< Emit LLVM IR after LLVM optimizations
+    EmitBC,         ///< Emit LLVM BC
+    EmitObject,     ///< Emit object file
 
     DumpTypeInfo, ///< Dump IRGen type info
 
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
 
-    ScanDependencies,        ///< Scan dependencies of Swift source files
-    PrintVersion,       ///< Print version information.
-    PrintFeature,       ///< Print supported feature of this compiler
+    ScanDependencies, ///< Scan dependencies of Swift source files
+    PrintVersion,     ///< Print version information.
+    PrintFeature,     ///< Print supported feature of this compiler
   };
 
   /// Indicates the action the user requested that the frontend perform.
@@ -231,6 +237,9 @@ public:
   /// Whether to enable timers tracking individual requests. This adds some
   /// runtime overhead.
   bool FineGrainedTimers = false;
+
+  /// Whether we are printing all stats even if they are zero.
+  bool PrintZeroStats = false;
 
   /// Trace changes to stats to files in StatsOutputDir.
   bool TraceStats = false;

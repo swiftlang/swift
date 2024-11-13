@@ -114,11 +114,11 @@ static llvm::cl::opt<std::string> PassPipeline(
 //                               Helper Methods
 //===----------------------------------------------------------------------===//
 
-static llvm::CodeGenOpt::Level GetCodeGenOptLevel(const SwiftLLVMOptOptions &options) {
+static llvm::CodeGenOptLevel GetCodeGenOptLevel(const SwiftLLVMOptOptions &options) {
   // TODO: Is this the right thing to do here?
   if (options.Optimized)
-    return llvm::CodeGenOpt::Default;
-  return llvm::CodeGenOpt::None;
+    return llvm::CodeGenOptLevel::Default;
+  return llvm::CodeGenOptLevel::None;
 }
 
 // Returns the TargetMachine instance or zero if no triple is provided.

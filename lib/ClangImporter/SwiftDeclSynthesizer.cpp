@@ -96,7 +96,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       params, getterType, importedDecl, clangNode);
-  getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->setAccess(importedFieldDecl->getFormalAccess());
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
 
@@ -128,7 +128,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   setterDecl->setIsObjC(false);
   setterDecl->setIsDynamic(false);
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
-  setterDecl->setAccess(AccessLevel::Public);
+  setterDecl->setAccess(importedFieldDecl->getFormalAccess());
 
   return setterDecl;
 }
@@ -2121,8 +2121,9 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
   auto diagState = clangSema.DelayedDiagnostics.push(diagPool);
 
   // Construct the method's body.
-  clang::Expr *thisExpr = new (clangCtx) clang::CXXThisExpr(
-      clang::SourceLocation(), newMethod->getThisType(), /*IsImplicit=*/false);
+  clang::Expr *thisExpr = clang::CXXThisExpr::Create(
+      clangCtx, clang::SourceLocation(), newMethod->getThisType(),
+      /*IsImplicit=*/false);
   if (castThisToNonConstThis) {
     auto baseClassPtr =
         clangCtx.getPointerType(clangCtx.getRecordType(derivedClass));

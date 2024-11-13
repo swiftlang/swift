@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -verify -sil-verify-all -disable-availability-checking
+// RUN: %target-swift-frontend -emit-sil %s -verify -sil-verify-all -target %target-swift-5.1-abi-triple
 
 ////////////////////////
 // MARK: Declarations //

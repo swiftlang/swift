@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -c -disable-availability-checking -Xllvm --sil-print-final-ossa-module -O -module-name=main -o /dev/null %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -c -target %target-swift-5.1-abi-triple -Xllvm --sil-print-final-ossa-module -O -module-name=main -o /dev/null %s 2>&1 | %FileCheck %s
  
 // REQUIRES: concurrency
 

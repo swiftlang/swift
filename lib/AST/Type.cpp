@@ -258,6 +258,8 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
+  case TypeKind::BuiltinUnboundGeneric:
+  case TypeKind::BuiltinFixedArray:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -305,7 +307,6 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   containsObjCProtocol = protoDecl->isObjC();
   containsSwiftProtocol = (!protoDecl->isObjC() &&
                            !protoDecl->isMarkerProtocol());
-  containsParameterized = false;
   representsAnyObject = false;
 
   protocols.push_back(protoDecl);
@@ -316,7 +317,6 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
   hasExplicitAnyObject = type->hasExplicitAnyObject();
   containsObjCProtocol = false;
   containsSwiftProtocol = false;
-  containsParameterized = false;
 
   auto members = type.getMembers();
   if (!members.empty() &&
@@ -331,9 +331,9 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
     if (auto protocolType = dyn_cast<ProtocolType>(member)) {
       protoDecl = protocolType->getDecl();
     } else {
-      auto parameterized = cast<ParameterizedProtocolType>(member);
-      protoDecl = parameterized->getProtocol();
-      containsParameterized = true;
+      auto *parameterizedType = member->castTo<ParameterizedProtocolType>();
+      protoDecl = parameterizedType->getProtocol();
+      parameterized.push_back(parameterizedType);
     }
     if (protoDecl->isObjC())
       containsObjCProtocol = true;
@@ -366,8 +366,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
 
 ExistentialLayout::ExistentialLayout(CanParameterizedProtocolType type)
     : ExistentialLayout(type.getBaseType()) {
-  sameTypeRequirements = type->getArgs();
-  containsParameterized = true;
+  parameterized.push_back(type);
 }
 
 ExistentialLayout TypeBase::getExistentialLayout() {
@@ -1210,14 +1209,6 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
 }
 
-
-Type TypeBase::getWithoutParens() {
-  Type Ty = this;
-  while (auto ParenTy = dyn_cast<ParenType>(Ty.getPointer()))
-    Ty = ParenTy->getUnderlyingType();
-  return Ty;
-}
-
 Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           unsigned uncurryLevel) {
   if (uncurryLevel == 0) {
@@ -1917,15 +1908,6 @@ TypeBase *TypeBase::getWithoutSyntaxSugar() {
   static_assert(std::is_base_of<SugarType, Id##Type>::value, "Sugar mismatch");
 #include "swift/AST/TypeNodes.def"
 
-ParenType::ParenType(Type baseType, RecursiveTypeProperties properties)
-    : SugarType(TypeKind::Paren, baseType, properties) {
-  // In some situations (rdar://75740683) we appear to end up with ParenTypes
-  // that contain a nullptr baseType. Once this is eliminated, we can remove
-  // the checks for `type.isNull()` in the `DiagnosticArgumentKind::Type` case
-  // of `formatDiagnosticArgument`.
-  assert(baseType && "A ParenType should always wrap a non-null type");
-}
-
 Type SugarType::getSinglyDesugaredTypeSlow() {
   // Find the generic type that implements this syntactic sugar type.
   NominalTypeDecl *implDecl;
@@ -1937,8 +1919,6 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   case TypeKind::Id: llvm_unreachable("non-sugared type?");
 #define SUGARED_TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Paren:
-    llvm_unreachable("parenthesis are sugar, but not syntax sugar");
   case TypeKind::TypeAlias:
     llvm_unreachable("bound type alias types always have an underlying type");
   case TypeKind::ArraySlice:
@@ -3755,10 +3735,18 @@ void ParameterizedProtocolType::getRequirements(
   for (unsigned i : indices(argTypes)) {
     auto argType = argTypes[i];
     auto *assocType = assocTypes[i];
-    // Do a general type substitution here because the associated type might be
-    // from an inherited protocol, in which case we will evaluate a non-trivial
-    // conformance path.
-    auto subjectType = assocType->getDeclaredInterfaceType().subst(subMap);
+
+    Type subjectType;
+    if (baseType->isTypeParameter()) {
+      // Fast path.
+      subjectType = DependentMemberType::get(baseType, assocType);
+    } else {
+      // Do a general type substitution here because the associated type might be
+      // from an inherited protocol, in which case we will evaluate a non-trivial
+      // conformance path.
+      subjectType = assocType->getDeclaredInterfaceType().subst(subMap);
+    }
+
     reqs.emplace_back(RequirementKind::SameType, subjectType, argType);
   }
 }
@@ -4188,11 +4176,6 @@ bool Type::isPrivateSystemType(bool treatNonBuiltinProtocolsAsPublic) const {
         .isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
   }
 
-  if (auto Paren = dyn_cast<ParenType>(Ty.getPointer())) {
-    Type Underlying = Paren->getUnderlyingType();
-    return Underlying.isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
-  }
-
   if (Type Unwrapped = Ty->getOptionalObjectType())
     return Unwrapped.isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
 
@@ -4333,6 +4316,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
+  case TypeKind::BuiltinUnboundGeneric:
+  case TypeKind::BuiltinFixedArray:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -4909,4 +4894,25 @@ TypeBase::getConcurrencyDiagnosticBehaviorLimit(DeclContext *declCtx) const {
   }
 
   return {};
+}
+
+GenericTypeParamKind
+TypeBase::getMatchingParamKind() {
+  if (auto gtpt = dyn_cast<GenericTypeParamType>(this)) {
+    return gtpt->getParamKind();
+  }
+  
+  if (auto arch = dyn_cast<ArchetypeType>(this)) {
+    return arch->mapTypeOutOfContext()->getMatchingParamKind();
+  }
+  
+  if (isa<IntegerType>(this)) {
+    return GenericTypeParamKind::Value;
+  }
+  
+  if (isa<PackType>(this)) {
+    return GenericTypeParamKind::Pack;
+  }
+  
+  return GenericTypeParamKind::Type;
 }

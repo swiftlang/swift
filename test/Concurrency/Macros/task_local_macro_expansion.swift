@@ -6,7 +6,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t-scratch)
 
-// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify -plugin-path %swift-plugin-dir -I %t -dump-macro-expansions %s -dump-macro-expansions 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -typecheck -verify -plugin-path %swift-plugin-dir -I %t -dump-macro-expansions %s -dump-macro-expansions 2>&1 | %FileCheck %s
 
 struct Nein {
   @TaskLocal

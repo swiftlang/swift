@@ -24,6 +24,7 @@
 #include "Dependencies.h"
 #include "TBD.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
@@ -34,7 +35,6 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TBDGenRequests.h"
-#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Edit.h"
@@ -1001,6 +1001,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
         Instance.getMainModule(), Instance.getDependencyTracker(), opts);
 
     dumpAPIIfNeeded(Instance);
+    swift::emitObjCMessageSendTraceIfNeeded(Instance.getMainModule(), opts);
   }
 
   // Contains the hadError checks internally, we still want to output the
@@ -1076,6 +1077,7 @@ static void printSingleFrontendOpt(llvm::opt::OptTable &table, options::ID id,
       table.getOption(id).hasFlag(options::AutolinkExtractOption) ||
       table.getOption(id).hasFlag(options::ModuleWrapOption) ||
       table.getOption(id).hasFlag(options::SwiftSymbolGraphExtractOption) ||
+      table.getOption(id).hasFlag(options::SwiftSynthesizeInterfaceOption) ||
       table.getOption(id).hasFlag(options::SwiftAPIDigesterOption)) {
     auto name = StringRef(table.getOptionName(id));
     if (!name.empty()) {
@@ -1105,9 +1107,9 @@ static bool printSwiftFeature(CompilerInstance &instance) {
     out << "}\n";
   };
   out << "  \"SupportedArguments\": [\n";
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELPTEXT, METAVAR, VALUES)                                      \
-  printSingleFrontendOpt(*table, swift::options::OPT_##ID, out);
+#define OPTION(...)                                                            \
+  printSingleFrontendOpt(*table,                                               \
+                         swift::options::LLVM_MAKE_OPT_ID(__VA_ARGS__), out);
 #include "swift/Option/Options.inc"
 #undef OPTION
   out << "    \"LastOption\"\n";
@@ -1233,10 +1235,10 @@ static bool performAction(CompilerInstance &Instance,
           return dumpAndPrintScopeMap(Instance,
                                       getPrimaryOrMainSourceFile(Instance));
         }, /*runDespiteErrors=*/true);
-  case FrontendOptions::ActionType::DumpTypeRefinementContexts:
+  case FrontendOptions::ActionType::DumpAvailabilityScopes:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance).getTypeRefinementContext()->dump(
+          getPrimaryOrMainSourceFile(Instance).getAvailabilityScope()->dump(
               llvm::errs(), Instance.getASTContext().SourceMgr);
           return Instance.getASTContext().hadError();
         }, /*runDespiteErrors=*/true);
@@ -1277,6 +1279,7 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::EmitSILGen:
   case FrontendOptions::ActionType::EmitSIBGen:
   case FrontendOptions::ActionType::EmitSIL:
+  case FrontendOptions::ActionType::EmitLoweredSIL:
   case FrontendOptions::ActionType::EmitSIB:
   case FrontendOptions::ActionType::EmitModuleOnly:
   case FrontendOptions::ActionType::MergeModules:
@@ -1746,6 +1749,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   runSILLoweringPasses(*SM);
 
+  // If we are asked to emit lowered SIL, dump it now and return.
+  if (Action == FrontendOptions::ActionType::EmitLoweredSIL)
+    return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
+
   // Cancellation check after SILLowering.
   if (Instance.isCancellationRequested())
     return true;
@@ -1985,7 +1992,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // hundreds or thousands of lines. Skip dumping this output in that case.
   if (!Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule()) {
     for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
-             &configurationFileStackTraces[0],
+             configurationFileStackTraces.get(),
              [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
                 std::optional<PrettyStackTraceFileContents> &trace) {
                trace.emplace(*buffer);

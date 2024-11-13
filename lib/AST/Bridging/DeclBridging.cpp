@@ -346,6 +346,8 @@ static void setParsedMembers(IterableDeclContext *IDC,
     }
   }
 
+  IDC->setMaybeHasOperatorDeclarations();
+  IDC->setMaybeHasNestedClassDeclarations();
   ctx.evaluator.cacheOutput(
       ParseMembersRequest{IDC},
       FingerprintAndMembers{std::nullopt, ctx.AllocateCopy(members)});
@@ -515,6 +517,21 @@ BridgedExtensionDecl BridgedExtensionDecl_createParsed(
       cDeclContext.unbridged(), genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
   return decl;
+}
+
+BridgedMacroExpansionDecl BridgedMacroExpansionDecl_createParsed(
+    BridgedDeclContext cDeclContext, BridgedSourceLoc cPoundLoc,
+    BridgedDeclNameRef cMacroNameRef, BridgedDeclNameLoc cMacroNameLoc,
+    BridgedSourceLoc cLeftAngleLoc, BridgedArrayRef cGenericArgs,
+    BridgedSourceLoc cRightAngleLoc, BridgedNullableArgumentList cArgList) {
+  auto *DC = cDeclContext.unbridged();
+  auto &Context = DC->getASTContext();
+  return MacroExpansionDecl::create(
+      cDeclContext.unbridged(), cPoundLoc.unbridged(),
+      cMacroNameRef.unbridged(), cMacroNameLoc.unbridged(),
+      cLeftAngleLoc.unbridged(),
+      Context.AllocateCopy(cGenericArgs.unbridged<TypeRepr *>()),
+      cRightAngleLoc.unbridged(), cArgList.unbridged());
 }
 
 BridgedOperatorDecl BridgedOperatorDecl_createParsed(

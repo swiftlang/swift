@@ -13,16 +13,13 @@
 #include "swift/AST/ASTBridging.h"
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Expr.h"
 
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
 // MARK: DeclContexts
 //===----------------------------------------------------------------------===//
-
-bool BridgedDeclContext_isLocalContext(BridgedDeclContext cDeclContext) {
-  return cDeclContext.unbridged()->isLocalContext();
-}
 
 BridgedPatternBindingInitializer
 BridgedPatternBindingInitializer_create(BridgedDeclContext cDeclContext) {
@@ -32,4 +29,9 @@ BridgedPatternBindingInitializer_create(BridgedDeclContext cDeclContext) {
 BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
     BridgedPatternBindingInitializer cInit) {
   return cInit.unbridged();
+}
+
+BridgedDeclContext
+BridgedClosureExpr_asDeclContext(BridgedClosureExpr cClosure) {
+  return cClosure.unbridged();
 }

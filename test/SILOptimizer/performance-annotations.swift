@@ -2,6 +2,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
+// REQUIRES: swift_feature_RawLayout
 
 protocol P {
   func protoMethod(_ a: Int) -> Int

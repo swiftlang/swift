@@ -69,6 +69,7 @@ extension ASTGenVisitor {
         .yields,
         .yieldMany,
         .yieldOnce,
+        .yieldOnce2,
         .thin,
         .thick,
         .unimplementable:

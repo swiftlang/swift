@@ -2130,8 +2130,8 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
                         RegexLiteralExpr *expr) {
   auto &ctx = SGF.getASTContext();
   // %0 = string_literal <regex text>
-  auto strLiteralArgs = emitStringLiteralArgs(SGF, expr, expr->getRegexText(), C,
-                                          StringLiteralExpr::Encoding::UTF8);
+  auto strLiteralArgs = emitStringLiteralArgs(
+      SGF, expr, expr->getRegexToEmit(), C, StringLiteralExpr::Encoding::UTF8);
   // %1 = function_ref String.init(
   //   _builtinStringLiteral:utf8CodeUnitCount:isASCII:)
   // %2 = apply %1(%0, ..., ...) -> $String
@@ -4989,7 +4989,14 @@ public:
       SGF.B.createEndBorrow(l, *i);
       SGF.B.createDestroyValue(l, (*i)->getOperand());
     }
-    if (forUnwind) {
+    auto *beginApply =
+        cast<BeginApplyInst>(ApplyToken->getDefiningInstruction());
+    auto isCalleeAllocated = beginApply->isCalleeAllocated();
+    auto unwindOnCallerError =
+        !isCalleeAllocated ||
+        SGF.SGM.getASTContext().LangOpts.hasFeature(
+            Feature::CoroutineAccessorsUnwindOnCallerError);
+    if (forUnwind && unwindOnCallerError) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {
       SGF.B.createEndApply(l, ApplyToken,
@@ -5049,6 +5056,10 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
                /*indirect results*/ {}, /*indirect errors*/ {},
                rawResults, ExecutorBreadcrumb());
 
+  if (substFnType->isCalleeAllocatedCoroutine()) {
+    auto allocation = rawResults.pop_back_val();
+    enterDeallocStackCleanup(allocation);
+  }
   auto token = rawResults.pop_back_val();
   auto yieldValues = llvm::ArrayRef(rawResults);
 
@@ -5989,7 +6000,8 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   return normalBB->createPhiArgument(resultType, OwnershipKind::Owned);
 }
 
-std::pair<MultipleValueInstructionResult *, CleanupHandle>
+std::tuple<MultipleValueInstructionResult *, CleanupHandle, SILValue,
+           CleanupHandle>
 SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
                                           SILType substFnType,
                                           SubstitutionMap subs,
@@ -6010,19 +6022,29 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
 
   auto *token = beginApply->getTokenResult();
 
+  CleanupHandle deallocCleanup;
+  auto *allocation = beginApply->getCalleeAllocationResult();
+  if (allocation) {
+    deallocCleanup = enterDeallocStackCleanup(allocation);
+  }
+
   Cleanups.pushCleanup<EndCoroutineApply>(token);
   auto abortCleanup = Cleanups.getTopCleanup();
 
-  return { token, abortCleanup };
+  return {token, abortCleanup, allocation, deallocCleanup};
 }
 
-void SILGenFunction::emitEndApplyWithRethrow(SILLocation loc,
-                                        MultipleValueInstructionResult *token) {
+void SILGenFunction::emitEndApplyWithRethrow(
+    SILLocation loc, MultipleValueInstructionResult *token,
+    SILValue allocation) {
   // TODO: adjust this to handle results of TryBeginApplyInst.
   assert(token->isBeginApplyToken());
 
   B.createEndApply(loc, token,
                    SILType::getEmptyTupleType(getASTContext()));
+  if (allocation) {
+    B.createDeallocStack(loc, allocation);
+  }
 }
 
 void SILGenFunction::emitYield(SILLocation loc,

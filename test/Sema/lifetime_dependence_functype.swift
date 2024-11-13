@@ -1,47 +1,48 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes
- // REQUIRES: asserts
 
- struct NC: ~Copyable {
-   var ne: NE {
-     NE()
-   }
- }
+// REQUIRES: swift_feature_NonescapableTypes
 
- struct NE: ~Escapable {
-   @_unsafeNonescapableResult
-   init() {}
- }
+struct NC: ~Copyable {
+  var ne: NE {
+    NE()
+  }
+}
 
- func transfer(_ ne: NE) -> NE {
-   ne
- }
+struct NE: ~Escapable {
+  @_unsafeNonescapableResult
+  init() {}
+}
 
- func applyAnnotatedTransfer(ne: NE, transfer: (NE) -> dependsOn(0) NE) -> NE { // expected-error{{lifetime dependencies on function types are not supported}}
-   transfer(ne)
- }
+func transfer(_ ne: NE) -> NE {
+  ne
+}
 
- func applyTransfer(ne: NE, transfer: (NE) ->  NE) -> NE {
-   transfer(ne)
- }
+func applyAnnotatedTransfer(ne: NE, @lifetime(0) transfer: (NE) -> NE) -> NE { // expected-error{{'@lifetime' attribute cannot be applied to this declaration}}
+  transfer(ne)
+}
 
- func testTransfer(nc: consuming NC) {
-   let transferred = applyTransfer(ne: nc.ne, transfer: transfer) // expected-error{{cannot convert value of type '(NE) -> _inherit(0) NE' to expected argument type '(NE) -> NE'}}
+func applyTransfer(ne: NE, transfer: (NE) ->  NE) -> NE {
+  transfer(ne)
+}
 
-   _ = consume nc
-   _ = transfer(transferred)
- }
+func testTransfer(nc: consuming NC) {
+  let transferred = applyTransfer(ne: nc.ne, transfer: transfer) // expected-error{{cannot convert value of type '(NE) -> @lifetime(copy 0) NE' to expected argument type '(NE) -> NE'}}
 
- func borrow(_ nc: borrowing NC) -> NE {
-   nc.ne
- }
+  _ = consume nc
+  _ = transfer(transferred)
+}
 
- func applyBorrow(nc: borrowing NC, borrow: (borrowing NC) -> NE) -> NE {
-   borrow(nc)
- }
+func borrow(_ nc: borrowing NC) -> NE {
+  nc.ne
+}
 
- func testBorrow(nc: consuming NC) {
-   let borrowed = applyBorrow(nc: nc, borrow: borrow) // expected-error{{cannot convert value of type '(borrowing NC) -> _scope(0) NE' to expected argument type '(borrowing NC) -> NE}}
-   _ = consume nc
-   _ = transfer(borrowed)
- }
+func applyBorrow(nc: borrowing NC, borrow: (borrowing NC) -> NE) -> NE {
+  borrow(nc)
+}
+
+func testBorrow(nc: consuming NC) {
+  let borrowed = applyBorrow(nc: nc, borrow: borrow) // expected-error{{cannot convert value of type '(borrowing NC) -> @lifetime(borrow 0) NE' to expected argument type '(borrowing NC) -> NE}}
+  _ = consume nc
+  _ = transfer(borrowed)
+}
 

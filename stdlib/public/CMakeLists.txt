@@ -171,6 +171,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
       "armv6    armv6-apple-none-macho    armv6-apple-none-macho"
       "armv6m   armv6m-apple-none-macho   armv6m-apple-none-macho"
       "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
+      "armv7m   armv7m-apple-none-macho   armv7m-apple-none-macho"
       "armv7em  armv7em-apple-none-macho  armv7em-apple-none-macho"
     )
   endif()

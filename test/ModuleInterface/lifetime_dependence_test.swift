@@ -5,7 +5,6 @@
 // RUN:     -o %t/lifetime_dependence.swiftmodule \
 // RUN:     -emit-module-interface-path %t/lifetime_dependence.swiftinterface \
 // RUN:     %S/Inputs/lifetime_dependence.swift
-// REQUIRES: asserts
 
 // Check the interfaces
 
@@ -20,13 +19,19 @@
 // RUN: %target-swift-frontend -typecheck -I %t %s \
 // RUN:    -enable-experimental-feature NonescapableTypes
 
+// REQUIRES: swift_feature_NonescapableTypes
+
 import lifetime_dependence
+// CHECK: @lifetime(borrow a)
+// CHECK-NEXT: @inlinable internal init(_ ptr: Swift.UnsafeRawBufferPointer, _ a: borrowing Swift.Array<Swift.Int>) {
+// CHECK: @lifetime(a)
+// CHECK-NEXT: @inlinable internal init(_ ptr: Swift.UnsafeRawBufferPointer, _ a: consuming lifetime_dependence.AnotherView) {
 
-// CHECK: @inlinable internal init(_ ptr: Swift.UnsafeRawBufferPointer, _ a: borrowing Swift.Array<Swift.Int>) -> dependsOn(a) Self {
-// CHECK: @inlinable internal init(_ ptr: Swift.UnsafeRawBufferPointer, _ a: consuming lifetime_dependence.AnotherView) -> dependsOn(a) Self {
+// CHECK: @lifetime(x)
+// CHECK-NEXT: @inlinable public func derive(_ x: consuming lifetime_dependence.BufferView) -> lifetime_dependence.BufferView {
 
-// CHECK: @inlinable public func derive(_ x: consuming lifetime_dependence.BufferView) ->  dependsOn(x) lifetime_dependence.BufferView {
+// CHECK: @lifetime(view)
+// CHECK-NEXT: @inlinable public func consumeAndCreate(_ view: consuming lifetime_dependence.BufferView) -> lifetime_dependence.BufferView {
 
-// CHECK: @inlinable public func consumeAndCreate(_ view: consuming lifetime_dependence.BufferView) ->  dependsOn(view) lifetime_dependence.BufferView {
-
-// CHECK: @inlinable public func deriveThisOrThat(_ this: consuming lifetime_dependence.BufferView, _ that: consuming lifetime_dependence.BufferView) ->  dependsOn(this)  dependsOn(that) lifetime_dependence.BufferView {
+// CHECK: @lifetime(this, that)
+// CHECK-NEXT: @inlinable public func deriveThisOrThat(_ this: consuming lifetime_dependence.BufferView, _ that: consuming lifetime_dependence.BufferView) -> lifetime_dependence.BufferView {

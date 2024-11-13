@@ -21,7 +21,11 @@ SWIFT_NORETURN
 SWIFT_VFORMAT(2)
 void swift::swift_Concurrency_fatalErrorv(uint32_t flags, const char *format,
                                           va_list val) {
+#if !SWIFT_CONCURRENCY_EMBEDDED
   vfprintf(stderr, format, val);
+#else
+  vprintf(format, val);
+#endif
   abort();
 }
 

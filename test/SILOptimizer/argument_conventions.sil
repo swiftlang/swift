@@ -4,6 +4,7 @@
 // RUN:   2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 import Builtin
 

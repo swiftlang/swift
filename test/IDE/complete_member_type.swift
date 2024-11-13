@@ -56,7 +56,7 @@ do {
   // MEMBER_PAREN_NO_DOT-NEXT: Keyword/None: async; name=async
   // MEMBER_PAREN_NO_DOT-NEXT: Keyword[throws]/None: throws; name=throws
   // MEMBER_PAREN_NO_DOT-NEXT: Decl[Struct]/CurrNominal: .Nested[#S.Nested#]; name=Nested
-  // MEMBER_PAREN_NO_DOT-NEXT: Keyword/None: .Type[#(S).Type#]; name=Type
+  // MEMBER_PAREN_NO_DOT-NEXT: Keyword/None: .Type[#S.Type#]; name=Type
 }
 
 do {

@@ -616,6 +616,11 @@ public:
     return MacroWalking::ArgumentsAndExpansion;
   }
 
+  /// This method determines whether the given declaration should be
+  /// considered to be in a macro expansion context. It can be configured
+  /// by subclasses.
+  virtual bool isDeclInMacroExpansion(Decl *decl) const;
+
   /// Determine whether we should walk macro arguments (as they appear in
   /// source) and the expansion (which is semantically part of the program).
   std::pair<bool, bool> shouldWalkMacroArgumentsAndExpansion() const {

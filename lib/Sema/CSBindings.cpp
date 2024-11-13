@@ -1215,8 +1215,12 @@ bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
     // as a binding because `$T0` could be inferred to
     // `(key: String, value: Int)` and binding `$T1` to `Array<(String, Int)>`
     // eagerly would be incorrect.
-    if (existing->Kind != binding.Kind)
-      continue;
+    if (existing->Kind != binding.Kind) {
+      // Array, Set and Dictionary allow conversions, everything else
+      // requires their generic arguments to match exactly.
+      if (existingType->isKnownStdlibCollectionType())
+        continue;
+    }
 
     // If new type has a type variable it shouldn't
     // be considered  viable.
@@ -1272,7 +1276,8 @@ static bool hasConversions(Type type) {
   }
 
   return !(type->is<StructType>() || type->is<EnumType>() ||
-           type->is<BuiltinType>() || type->is<ArchetypeType>());
+           type->is<BuiltinType>() || type->is<ArchetypeType>() ||
+           type->isVoid());
 }
 
 bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
@@ -1288,9 +1293,16 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
 
         return !hasConversions(binding.BindingType);
       })) {
-    // Result type of subscript could be l-value so we can't bind it early.
-    if (!TypeVar->getImpl().isSubscriptResultType() &&
-        llvm::none_of(Info.DelayedBy, [](const Constraint *constraint) {
+    bool isApplicationResultType = TypeVar->getImpl().isApplicationResultType();
+    if (llvm::none_of(Info.DelayedBy, [&isApplicationResultType](
+                                          const Constraint *constraint) {
+          // Let's not attempt to bind result type before application
+          // happens. For example because it could be discardable or
+          // l-value (subscript applications).
+          if (isApplicationResultType &&
+              constraint->getKind() == ConstraintKind::ApplicableFunction)
+            return true;
+
           return constraint->getKind() == ConstraintKind::Disjunction ||
                  constraint->getKind() == ConstraintKind::ValueMember;
         }))
@@ -1513,11 +1525,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       if (auto pointeeTy = second->lookThroughAllOptionalTypes()
                                ->getAnyPointerElementType()) {
         if (!pointeeTy->isTypeVariableOrMember()) {
-          // The binding is as a fallback in this case because $T could
-          // also be Array<X> or C-style pointer.
-          if (constraint->getKind() >= ConstraintKind::ArgumentConversion)
-            DelayedBy.push_back(constraint);
-
           return PotentialBinding(pointeeTy, AllowedBindingKind::Exact,
                                   constraint);
         }
@@ -1868,8 +1875,7 @@ void PotentialBindings::infer(Constraint *constraint) {
     DelayedBy.push_back(constraint);
     break;
 
-  case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol: {
+  case ConstraintKind::ConformsTo: {
     auto protocolTy = constraint->getSecondType();
     if (protocolTy->is<ProtocolType>())
       Protocols.push_back(constraint);
@@ -1980,7 +1986,6 @@ void PotentialBindings::retract(Constraint *constraint) {
 
   switch (constraint->getKind()) {
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
     Protocols.erase(llvm::remove_if(Protocols, isMatchingConstraint),
                     Protocols.end());
     break;

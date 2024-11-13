@@ -109,6 +109,7 @@ namespace swift {
   class ProtocolType;
   struct RawComment;
   enum class ResilienceExpansion : unsigned;
+  class ReturnStmt;
   enum class EffectKind : uint8_t;
   enum class PolymorphicEffectKind : uint8_t;
   class TrailingWhereClause;
@@ -2475,8 +2476,12 @@ public:
     getMutablePatternList()[i].setOriginalInit(E);
   }
 
-  /// Returns a fully typechecked init expression for the pattern at the given
+  /// Returns a typechecked init expression for the pattern at the given
   /// index.
+  Expr *getContextualizedInit(unsigned i) const;
+
+  /// Returns an init expression for the pattern at the given index.
+  /// The initializer is fully type checked, including effects checking.
   Expr *getCheckedAndContextualizedInit(unsigned i) const;
 
   /// Returns the result of `getCheckedAndContextualizedInit()` if the init is
@@ -2753,6 +2758,10 @@ private:
     /// output a null pointer.
     unsigned noDynamicallyReplacedDecl : 1;
 
+    /// Whether the OpaqueResultTypeRequest request was evaluated and produced
+    /// a null pointer.
+    unsigned noOpaqueResultType : 1;
+
     /// Whether the "isFinal" bit has been computed yet.
     unsigned isFinalComputed : 1;
 
@@ -2780,7 +2789,7 @@ private:
   friend class InterfaceTypeRequest;
   friend class CheckRedeclarationRequest;
   friend class ActorIsolationRequest;
-  friend class DynamicallyReplacedDeclRequest;
+  friend class OpaqueResultTypeRequest;
   friend class ApplyAccessNoteRequest;
 
   friend class Decl;
@@ -2839,6 +2848,15 @@ public:
     return Bits.ValueDecl.IsUserAccessible;
   }
 
+  /// Whether this decl has been synthesized by the compiler for use by the
+  /// user.
+  ///
+  /// This is a refinement of isImplicit; all synthesized decls are implicit,
+  /// but not all implicit decls are synthesized. The difference comes down to
+  /// whether or not the decl is user-facing, e.g the implicit memberwise
+  /// initializer is considered synthesized. Decls that are only meant for the
+  /// compiler, e.g the implicit FuncDecl for a DeferStmt, are not considered
+  /// synthesized.
   bool isSynthesized() const {
     return Bits.ValueDecl.Synthesized;
   }
@@ -2903,14 +2921,6 @@ public:
   /// Returns \c true if this value decl is inlinable with attributes
   /// \c \@usableFromInline, \c \@inlinalbe, and \c \@_alwaysEmitIntoClient
   bool isUsableFromInline() const;
-
-  /// Treat as public and allow skipping access checks if the following conditions
-  /// are met:
-  /// - This decl has a package access level,
-  /// - Has a @usableFromInline (or other inlinable) attribute,
-  /// - And is defined in a module built from a public or private
-  ///   interface that does not contain package-name.
-  bool isInterfacePackageEffectivelyPublic() const;
 
   /// Returns \c true if this declaration is *not* intended to be used directly
   /// by application developers despite the visibility.
@@ -5760,6 +5770,8 @@ private:
     unsigned RequiresOpaqueAccessors : 1;
     unsigned RequiresOpaqueModifyCoroutineComputed : 1;
     unsigned RequiresOpaqueModifyCoroutine : 1;
+    unsigned RequiresOpaqueModify2CoroutineComputed : 1;
+    unsigned RequiresOpaqueModify2Coroutine : 1;
   } LazySemanticInfo = { };
 
   /// The implementation info for the accessors.
@@ -6024,16 +6036,27 @@ public:
     return getOpaqueReadOwnership() != OpaqueReadOwnership::Borrowed;
   }
 
+  /// Does this storage require a '_read' accessor in its opaque-accessors set?
+  bool requiresOpaqueReadCoroutine() const;
+
   /// Does this storage require a 'read' accessor in its opaque-accessors set?
-  bool requiresOpaqueReadCoroutine() const {
-    return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
-  }
+  bool requiresOpaqueRead2Coroutine() const;
 
   /// Does this storage require a 'set' accessor in its opaque-accessors set?
   bool requiresOpaqueSetter() const { return supportsMutation(); }
 
-  /// Does this storage require a 'modify' accessor in its opaque-accessors set?
+  /// Does this storage require a '_modify' accessor in its opaque-accessors
+  /// set?
   bool requiresOpaqueModifyCoroutine() const;
+
+  /// Does this storage require a 'modify' accessor in its opaque-accessors
+  /// set?
+  bool requiresOpaqueModify2Coroutine() const;
+
+  /// Given that CoroutineAccessors is enabled, is _read/_modify required for
+  /// ABI stability?
+  bool requiresCorrespondingUnderscoredCoroutineAccessor(
+      AccessorKind kind, AccessorDecl const *decl = nullptr) const;
 
   /// Does this storage have any explicit observers (willSet or didSet) attached
   /// to it?
@@ -6090,9 +6113,9 @@ public:
 
   /// Determine how this storage declaration should actually be accessed.
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
-                                   AccessKind accessKind,
-                                   ModuleDecl *module,
-                                   ResilienceExpansion expansion) const;
+                                   AccessKind accessKind, ModuleDecl *module,
+                                   ResilienceExpansion expansion,
+                                   bool useOldABI) const;
 
   /// Do we need to use resilient access patterns outside of this
   /// property's resilience domain?
@@ -7675,6 +7698,18 @@ public:
   /// parsed.
   bool hasBody() const;
 
+  /// Returns a boolean value indicating whether the body, if any, contains
+  /// an explicit `return` statement.
+  ///
+  /// \returns `true` if the body contains an explicit `return` statement,
+  /// `false` otherwise.
+  bool bodyHasExplicitReturnStmt() const;
+
+  /// Finds occurrences of explicit `return` statements within the body, if any.
+  ///
+  /// \param results An out container to which the results are added.
+  void getExplicitReturnStmts(SmallVectorImpl<ReturnStmt *> &results) const;
+
   /// Returns true if the text of this function's body can be retrieved either
   /// by extracting the text from the source buffer or reading the inlinable
   /// body from a deserialized swiftmodule.
@@ -8415,6 +8450,10 @@ public:
   /// accessed by it.
   ArrayRef<VarDecl *> getAccessedProperties() const;
 
+  /// Whether this accessor should have a body.  Note that this will be true
+  /// even when it does not have one _yet_.
+  bool doesAccessorHaveBody() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Accessor;
   }
@@ -8529,6 +8568,10 @@ public:
   /// Retrieve the payload type for the enum element, which is a tuple of the
   /// associated values, or null if there are no associated values.
   Type getPayloadInterfaceType() const;
+
+  /// Retrieve the parameters of the implicit case constructor for the enum
+  /// element.
+  ArrayRef<AnyFunctionType::Param> getCaseConstructorParams() const;
 
   void setParameterList(ParameterList *params);
   ParameterList *getParameterList() const { return Params; }
@@ -8804,8 +8847,6 @@ public:
   void setStubImplementation(bool stub) {
     Bits.ConstructorDecl.HasStubImplementation = stub;
   }
-
-  bool hasLifetimeDependentReturn() const;
 
   ConstructorDecl *getOverriddenDecl() const {
     return cast_or_null<ConstructorDecl>(
@@ -9664,8 +9705,11 @@ const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 /// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const DeclContext *source, unsigned index);
 
-StringRef getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article);
-StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind, bool article);
+StringRef
+getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article,
+                             std::optional<bool> underscored = std::nullopt);
+StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind, bool article,
+                                       bool underscored);
 
 void simple_display(llvm::raw_ostream &out,
                     OptionSet<NominalTypeDecl::LookupDirectFlags> options);

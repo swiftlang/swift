@@ -110,6 +110,14 @@ static bool shouldIgnoreScoreIncreaseForCodeCompletion(
   return false;
 }
 
+void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
+  unsigned index = static_cast<unsigned>(kind);
+  CurrentScore.Data[index] += value;
+
+  if (solverState && value > 0)
+    recordChange(SolverTrail::Change::IncreasedScore(kind, value));
+}
+
 void ConstraintSystem::increaseScore(ScoreKind kind,
                                      ConstraintLocatorBuilder Locator,
                                      unsigned value) {
@@ -135,8 +143,28 @@ void ConstraintSystem::increaseScore(ScoreKind kind,
     llvm::errs() << ")\n";
   }
 
-  unsigned index = static_cast<unsigned>(kind);
-  CurrentScore.Data[index] += value;
+  increaseScore(kind, value);
+}
+
+void ConstraintSystem::replayScore(const Score &score) {
+  if (solverState) {
+    for (unsigned i = 0; i < NumScoreKinds; ++i) {
+      if (unsigned value = score.Data[i])
+        recordChange(
+          SolverTrail::Change::IncreasedScore(ScoreKind(i), value));
+    }
+  }
+  CurrentScore += score;
+}
+
+void ConstraintSystem::clearScore() {
+  for (unsigned i = 0; i < NumScoreKinds; ++i) {
+    if (unsigned value = CurrentScore.Data[i]) {
+      recordChange(
+        SolverTrail::Change::DecreasedScore(ScoreKind(i), value));
+    }
+  }
+  CurrentScore = Score();
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
@@ -815,7 +843,7 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
   return type.transformRec([&](TypeBase *type) -> std::optional<Type> {
     if (auto *tupleType = dyn_cast<TupleType>(type)) {
       if (tupleType->getNumElements() == 1)
-        return ParenType::get(ctx, tupleType->getElementType(0));
+        return tupleType->getElementType(0);
 
       SmallVector<TupleTypeElt, 8> elts;
       for (auto elt : tupleType->getElements()) {

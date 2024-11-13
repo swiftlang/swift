@@ -196,6 +196,7 @@ extension ObservableMacro: MemberMacro {
   >(
     of node: AttributeSyntax,
     providingMembersOf declaration: Declaration,
+    conformingTo protocols: [TypeSyntax],
     in context: Context
   ) throws -> [DeclSyntax] {
     guard let identified = declaration.asProtocol(NamedDeclSyntax.self) else {

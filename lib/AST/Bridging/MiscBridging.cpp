@@ -94,7 +94,7 @@ BridgedOwnedString BridgedDeclObj::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
   unbridged()->print(os);
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
@@ -105,7 +105,7 @@ BridgedOwnedString BridgedConformance::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
   unbridged().print(os);
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
@@ -119,6 +119,6 @@ BridgedOwnedString BridgedSubstitutionMap::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
   unbridged().dump(os);
-  return str;
+  return BridgedOwnedString(str);
 }
 

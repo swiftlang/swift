@@ -13,13 +13,9 @@
 #ifndef SWIFT_OPTION_OPTIONS_H
 #define SWIFT_OPTION_OPTIONS_H
 
-#include <memory>
+#include "llvm/Option/OptTable.h"
 
-namespace llvm {
-namespace opt {
-  class OptTable;
-}
-}
+#include <memory>
 
 namespace swift {
 namespace options {
@@ -33,7 +29,7 @@ namespace options {
     DoesNotAffectIncrementalBuild = (1 << 8),
     AutolinkExtractOption = (1 << 9),
     ModuleWrapOption = (1 << 10),
-    // 1 << 11 was previously `SwiftIndentOption`
+    SwiftSynthesizeInterfaceOption = (1 << 11),
     ArgumentIsPath = (1 << 12),
     ModuleInterfaceOption = (1 << 13),
     SupplementaryOutput = (1 << 14),
@@ -47,9 +43,7 @@ namespace options {
 
   enum ID {
     OPT_INVALID = 0, // This is not an option ID.
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELPTEXT, METAVAR, VALUES)                                      \
-    OPT_##ID,
+#define OPTION(...) LLVM_MAKE_OPT_ID(__VA_ARGS__),
 #include "swift/Option/Options.inc"
     LastOption
 #undef OPTION

@@ -32,6 +32,7 @@
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/DispatchShims.h"
 #include "swift/Runtime/EnvironmentVariables.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Once.h"
 #include "swift/Threading/Thread.h"
@@ -378,15 +379,6 @@ bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
   return legacyMode;
 }
 
-// Check override of executor checking mode.
-static void checkIsCurrentExecutorMode(void *context) {
-  bool useLegacyMode =
-      swift_bincompat_useLegacyNonCrashingExecutorChecks();
-  auto checkMode = static_cast<IsCurrentExecutorCheckMode *>(context);
-  *checkMode = useLegacyMode ? Legacy_NoCheckIsolated_NonCrashing
-                             : Swift6_UseCheckIsolated_AllowCrash;
-}
-
 // Implemented in Swift to avoid some annoying hard-coding about
 // TaskExecutor's protocol witness table.  We could inline this
 // with effort, though.
@@ -401,9 +393,16 @@ extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
     Job *job, HeapObject *executor, const Metadata *executorType,
     const SerialExecutorWitnessTable *wtable);
 
+namespace {
+using SwiftTaskIsCurrentExecutorOptions =
+    OptionSet<swift_task_is_current_executor_flag>;
+}
+
 SWIFT_CC(swift)
-static bool isCurrentExecutor(SerialExecutorRef expectedExecutor,
-                              IsCurrentExecutorCheckMode checkMode) {
+static bool swift_task_isCurrentExecutorWithFlagsImpl(
+    SerialExecutorRef expectedExecutor,
+    swift_task_is_current_executor_flag flags) {
+  auto options = SwiftTaskIsCurrentExecutorOptions(flags);
   auto current = ExecutorTrackingInfo::current();
 
   if (!current) {
@@ -422,14 +421,14 @@ static bool isCurrentExecutor(SerialExecutorRef expectedExecutor,
 
     // Otherwise, as last resort, let the expected executor check using
     // external means, as it may "know" this thread is managed by it etc.
-    if (checkMode == Swift6_UseCheckIsolated_AllowCrash) {
+    if (options.contains(swift_task_is_current_executor_flag::Assert)) {
       swift_task_checkIsolated(expectedExecutor); // will crash if not same context
 
       // checkIsolated did not crash, so we are on the right executor, after all!
       return true;
     }
 
-    assert(checkMode == Legacy_NoCheckIsolated_NonCrashing);
+    assert(!options.contains(swift_task_is_current_executor_flag::Assert));
     return false;
   }
 
@@ -460,7 +459,7 @@ static bool isCurrentExecutor(SerialExecutorRef expectedExecutor,
   // the crashing 'dispatch_assert_queue(main queue)' which will either crash
   // or confirm we actually are on the main queue; or the custom expected
   // executor has a chance to implement a similar queue check.
-  if (checkMode == Legacy_NoCheckIsolated_NonCrashing) {
+  if (!options.contains(swift_task_is_current_executor_flag::Assert)) {
     if ((expectedExecutor.isMainExecutor() && !currentExecutor.isMainExecutor()) ||
         (!expectedExecutor.isMainExecutor() && currentExecutor.isMainExecutor())) {
       return false;
@@ -521,7 +520,7 @@ static bool isCurrentExecutor(SerialExecutorRef expectedExecutor,
   // Note that this only works because the closure in assumeIsolated is
   // synchronous, and will not cause suspensions, as that would require the
   // presence of a Task.
-  if (checkMode == Swift6_UseCheckIsolated_AllowCrash) {
+  if (options.contains(swift_task_is_current_executor_flag::Assert)) {
     swift_task_checkIsolated(expectedExecutor); // will crash if not same context
 
     // The checkIsolated call did not crash, so we are on the right executor.
@@ -530,8 +529,18 @@ static bool isCurrentExecutor(SerialExecutorRef expectedExecutor,
 
   // In the end, since 'checkIsolated' could not be used, so we must assume
   // that the executors are not the same context.
-  assert(checkMode == Legacy_NoCheckIsolated_NonCrashing);
+  assert(!options.contains(swift_task_is_current_executor_flag::Assert));
   return false;
+}
+
+// Check override of executor checking mode.
+static void swift_task_setDefaultExecutorCheckingFlags(void *context) {
+  bool useLegacyMode = swift_bincompat_useLegacyNonCrashingExecutorChecks();
+  auto checkMode = static_cast<swift_task_is_current_executor_flag *>(context);
+  if (!useLegacyMode) {
+    *checkMode = swift_task_is_current_executor_flag(
+        *checkMode | swift_task_is_current_executor_flag::Assert);
+  }
 }
 
 SWIFT_CC(swift)
@@ -545,11 +554,14 @@ swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
   // instead must call into 'checkIsolated' or crash directly.
   //
   // Whenever we confirm an executor equality, we can return true, in any mode.
-  static IsCurrentExecutorCheckMode checkMode;
-  static swift::once_t checkModeToken;
-  swift::once(checkModeToken, checkIsCurrentExecutorMode, &checkMode);
+  static swift_task_is_current_executor_flag isCurrentExecutorFlag;
+  static swift::once_t isCurrentExecutorFlagToken;
+  swift::once(isCurrentExecutorFlagToken,
+              swift_task_setDefaultExecutorCheckingFlags,
+              &isCurrentExecutorFlag);
 
-  return isCurrentExecutor(expectedExecutor, checkMode);
+  return swift_task_isCurrentExecutorWithFlags(expectedExecutor,
+                                               isCurrentExecutorFlag);
 }
 
 /// Logging level for unexpected executors:
@@ -644,12 +656,14 @@ void swift::swift_task_reportUnexpectedExecutor(
         &details);
   }
 
-#if defined(_WIN32)
+#if defined(_WIN32) && !SWIFT_CONCURRENCY_EMBEDDED
 #define STDERR_FILENO 2
   _write(STDERR_FILENO, message, strlen(message));
-#else
+#elif !SWIFT_CONCURRENCY_EMBEDDED
   fputs(message, stderr);
   fflush(stderr);
+#else
+  puts(message);
 #endif
 #if SWIFT_STDLIB_HAS_ASL
 #pragma clang diagnostic push
@@ -1325,7 +1339,7 @@ dispatch_lock_t *DefaultActorImpl::drainLockAddr() {
 
 void DefaultActorImpl::scheduleActorProcessJob(
     JobPriority priority, TaskExecutorRef taskExecutor) {
-  Job *job = new ProcessOutOfLineJob(this, priority);
+  Job *job = swift_cxx_newObject<ProcessOutOfLineJob>(this, priority);
   SWIFT_TASK_DEBUG_LOG(
       "Scheduling processing job %p for actor %p at priority %#zx, with taskExecutor %p", job, this,
       priority, taskExecutor.getIdentity());
@@ -1356,6 +1370,7 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
   bool distributedActorIsRemote = swift_distributed_actor_is_remote(this);
 
   auto oldState = _status().load(std::memory_order_relaxed);
+  SwiftDefensiveRetainRAII thisRetainHelper{this};
   while (true) {
     auto newState = oldState;
 
@@ -1385,6 +1400,16 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
     if (needsScheduling || needsStealer)
       taskExecutor = TaskExecutorRef::fromTaskExecutorPreference(job);
 
+    // In some cases (we aren't scheduling the actor and priorities don't
+    // match) then we need to access `this` after the enqueue. But the enqueue
+    // can cause the job to run and release `this`, so we need to retain `this`
+    // in those cases. The conditional here matches the conditions where we can
+    // get to the code below that uses `this`.
+    bool willSchedule = !oldState.isScheduled() && newState.isScheduled();
+    bool priorityMismatch = oldState.getMaxPriority() != newState.getMaxPriority();
+    if (!willSchedule && priorityMismatch)
+        thisRetainHelper.defensiveRetain();
+
     // This needs to be a store release so that we also publish the contents of
     // the new Job we are adding to the atomic job queue. Pairs with consume
     // in drainOne.
@@ -1392,8 +1417,12 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
                    /* success */ std::memory_order_release,
                    /* failure */ std::memory_order_relaxed)) {
       // NOTE: `job` is off limits after this point, as another thread might run
-      // and destroy it now that it's enqueued.
+      // and destroy it now that it's enqueued. `this` is only accessible if
+      // `retainedThis` is true.
+      job = nullptr; // Ensure we can't use it accidentally.
 
+      // NOTE: only the pointer value of `this` is used here, so this one
+      // doesn't need a retain.
       traceActorStateTransition(this, oldState, newState, distributedActorIsRemote);
 
       if (!oldState.isScheduled() && newState.isScheduled()) {
@@ -1404,6 +1433,9 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
       if (oldState.getMaxPriority() != newState.getMaxPriority()) {
+        // We still need `this`, assert that we did a defensive retain.
+        assert(thisRetainHelper.isRetained());
+
         if (newState.isRunning()) {
           // Actor is running on a thread, escalate the thread running it
           SWIFT_TASK_DEBUG_LOG("[Override] Escalating actor %p which is running on %#x to %#x priority", this, newState.currentDrainer(), priority);
@@ -1413,11 +1445,12 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
         } else {
           // We are scheduling a stealer for an actor due to priority override.
           // This extra processing job has a reference on the actor. See
-          // ownership rule (2).
+          // ownership rule (2). That means that we need to retain `this`, which
+          // we'll take from the retain helper.
+          thisRetainHelper.takeRetain();
           SWIFT_TASK_DEBUG_LOG(
               "[Override] Scheduling a stealer for actor %p at %#x priority",
               this, newState.getMaxPriority());
-          swift_retain(this);
 
           scheduleActorProcessJob(newState.getMaxPriority(), taskExecutor);
         }
@@ -1677,7 +1710,7 @@ void ProcessOutOfLineJob::process(Job *job) {
   auto self = cast<ProcessOutOfLineJob>(job);
   DefaultActorImpl *actor = self->Actor;
 
-  delete self;
+  swift_cxx_deleteObject(self);
   return defaultActorDrain(actor); // 'return' forces tail call
 }
 
@@ -1749,9 +1782,14 @@ void DefaultActorImpl::deallocate() {
 void DefaultActorImpl::deallocateUnconditional() {
   concurrency::trace::actor_deallocate(this);
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   auto metadata = cast<ClassMetadata>(this->metadata);
   swift_deallocClassInstance(this, metadata->getInstanceSize(),
                              metadata->getInstanceAlignMask());
+#else
+  // Embedded Swift's runtime doesn't actually use the size/mask values.
+  swift_deallocClassInstance(this, 0, 0);
+#endif
 }
 
 bool DefaultActorImpl::tryLock(bool asDrainer) {
@@ -2074,12 +2112,16 @@ static bool isDefaultActorClass(const ClassMetadata *metadata) {
 }
 
 void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
+#if !SWIFT_CONCURRENCY_EMBEDDED
   auto metadata = cast<ClassMetadata>(actor->metadata);
   if (isDefaultActorClass(metadata))
     return swift_defaultActor_deallocate(static_cast<DefaultActor*>(actor));
 
   swift_deallocObject(actor, metadata->getInstanceSize(),
                       metadata->getInstanceAlignMask());
+#else
+  return swift_defaultActor_deallocate(static_cast<DefaultActor*>(actor));
+#endif
 }
 
 /// FIXME: only exists for the quick-and-dirty MainActor implementation.
@@ -2293,7 +2335,7 @@ public:
     auto *job = cast<IsolatedDeinitJob>(_job);
     void *object = job->Object;
     DeinitWorkFunction *work = job->Work;
-    delete job;
+    swift_cxx_deleteObject(job);
     return work(object);
   }
 
@@ -2315,12 +2357,10 @@ static void swift_task_deinitOnExecutorImpl(void *object,
   //
   // Note that isCurrentExecutor() returns true for @MainActor
   // when running on the main thread without any executor.
-  //
-  // We always use "legacy" checking mode here, because that's the desired
-  // behaviour for this use case. This does not change with SDK version or
-  // language mode.
-  if (isCurrentExecutor(newExecutor, Legacy_NoCheckIsolated_NonCrashing)) {
-    return work(object); // 'return' forces tail call
+  if (swift_task_isCurrentExecutorWithFlags(
+          newExecutor, swift_task_is_current_executor_flag::None)) {
+    TaskLocal::StopLookupScope scope;
+    return work(object);
   }
 
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
@@ -2354,7 +2394,10 @@ static void swift_task_deinitOnExecutorImpl(void *object,
       trackingInfo.enterAndShadow(newExecutor, taskExecutor);
 
       // Run the work.
-      work(object);
+      {
+        TaskLocal::StopLookupScope scope;
+        work(object);
+      }
 
       // `work` is a synchronous function, it cannot call swift_task_switch()
       // If it calls any synchronous API that may change executor inside
@@ -2379,7 +2422,7 @@ static void swift_task_deinitOnExecutorImpl(void *object,
   auto priority = currentTask ? swift_task_currentPriority(currentTask)
                               : swift_task_getCurrentThreadPriority();
 
-  auto job = new IsolatedDeinitJob(priority, object, work);
+  auto job = swift_cxx_newObject<IsolatedDeinitJob>(priority, object, work);
   swift_task_enqueue(job, newExecutor);
 #endif
 }
@@ -2516,12 +2559,16 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
 }
 
 bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
+#if !SWIFT_CONCURRENCY_EMBEDDED
   const ClassMetadata *metadata = cast<ClassMetadata>(_actor->metadata);
   if (isDefaultActorClass(metadata)) {
     return asImpl(reinterpret_cast<DefaultActor *>(_actor))->isDistributedRemote();
   } else {
     return asImpl(reinterpret_cast<NonDefaultDistributedActor *>(_actor))->isDistributedRemote();
   }
+#else
+  return false;
+#endif
 }
 
 bool DefaultActorImpl::isDistributedRemote() {

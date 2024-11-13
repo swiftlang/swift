@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target arm64-apple-macosx10.15 -enable-upcoming-feature DynamicActorIsolation -emit-silgen -verify %s | %FileCheck %s
 // REQUIRES: objc_interop
-// REQUIRES: asserts
+// REQUIRES: swift_feature_DynamicActorIsolation
 
 import Foundation
 

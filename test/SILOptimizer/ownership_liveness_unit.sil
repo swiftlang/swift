@@ -1195,7 +1195,7 @@ bb2:
   %d2 = unchecked_ref_cast %0 : $C to $D
   br bb3(%copy2 : $C, %borrow2 : $C, %d2 :$D)
 
-bb3(%outer3 : @owned $C, %inner3 : @guaranteed $C, %phi3 : @guaranteed $D):
+bb3(%outer3 : @owned $C, %inner3 : @reborrow @guaranteed $C, %phi3 : @guaranteed $D):
   specify_test "interior-liveness %inner3"
   specify_test "interior_liveness_swift %inner3"
   br bb4(%phi3 : $D)
@@ -1245,7 +1245,7 @@ bb2:
   %d2 = unchecked_ref_cast %borrow2 : $C to $D
   br bb3(%copy2 : $C, %borrow2 : $C, %d2 :$D)
 
-bb3(%outer3 : @owned $C, %inner3 : @guaranteed $C, %phi3 : @guaranteed $D):
+bb3(%outer3 : @owned $C, %inner3 : @reborrow @guaranteed $C, %phi3 : @guaranteed $D):
   specify_test "interior-liveness %inner3"
   specify_test "interior_liveness_swift %inner3"
   br bb4(%phi3 : $D)
