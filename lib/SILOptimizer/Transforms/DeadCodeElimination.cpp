@@ -317,6 +317,11 @@ void DCE::markLive() {
         break;
       }
       case SILInstructionKind::EndLifetimeInst: {
+        if (I.getOperand(0)->getType().isAddress()) {
+          // DCE cannot reason about values in memory.
+          markInstructionLive(&I);
+          break;
+        }
         // The instruction is live only if it's operand value is also live
         addReverseDependency(I.getOperand(0), &I);
         break;
