@@ -276,9 +276,9 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     FrontendStatsTracer tracer(Ctx.Stats,
                                "Type checking and Semantic analysis");
 
-    // Build the type refinement hierarchy for the primary
-    // file before type checking.
-    TypeChecker::buildTypeRefinementContextHierarchy(*SF);
+    // Build the availability scope tree for the primary file before type
+    // checking.
+    TypeChecker::buildAvailabilityScopes(*SF);
 
     // Type check the top-level elements of the source file.
     for (auto D : SF->getTopLevelDecls()) {

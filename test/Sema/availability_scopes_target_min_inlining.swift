@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -typecheck -dump-type-refinement-contexts -target-min-inlining-version min %s > %t.dump 2>&1
+// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -target %target-next-stable-abi-triple -typecheck -dump-availability-scopes -target-min-inlining-version min %s > %t.dump 2>&1
 // RUN: %FileCheck --strict-whitespace --check-prefix CHECK-%target-os %s < %t.dump
 
 // REQUIRES: swift_stable_abi

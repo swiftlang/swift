@@ -536,7 +536,7 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       // We treat the declaration as deprecated if it is deprecated on
       // all deployment targets.
       // Once availability checking is enabled by default, we should
-      // query the type refinement context hierarchy to determine
+      // query the availability scope tree to determine
       // whether a declaration is deprecated on all versions
       // allowed by the context containing the reference.
       if (DeprecatedVersion.value() <= MinVersion) {

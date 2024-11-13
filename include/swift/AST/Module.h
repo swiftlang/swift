@@ -51,7 +51,9 @@ namespace clang {
 namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
+  class ASTScope;
   class ASTWalker;
+  class AvailabilityScope;
   class BraceStmt;
   class Decl;
   class DeclAttribute;
@@ -74,15 +76,13 @@ namespace swift {
   class ProtocolConformance;
   class ProtocolDecl;
   struct PrintOptions;
+  class SourceLookupCache;
   class Token;
   class TupleType;
   class Type;
-  class TypeRefinementContext;
   class ValueDecl;
   class VarDecl;
   class VisibleDeclConsumer;
-  class ASTScope;
-  class SourceLookupCache;
 
 namespace ast_scope {
 class ASTSourceFileScope;
