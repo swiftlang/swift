@@ -17,3 +17,7 @@ public protocol P {
 
   var s: S { read set }
 }
+
+public protocol Q : P {
+  override var s: S { read set }
+}

@@ -950,6 +950,9 @@ bool AccessorDecl::doesAccessorHaveBody() const {
     if (!requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
       return false;
     }
+    if (storage->getOverrideLoc()) {
+      return false;
+    }
     return accessor->getStorage()
         ->requiresCorrespondingUnderscoredCoroutineAccessor(
             accessor->getAccessorKind(), accessor);
