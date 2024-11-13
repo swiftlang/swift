@@ -1440,11 +1440,11 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
     }
 
     case GeneratedSourceInfo::PrettyPrinted:
-    case GeneratedSourceInfo::Attribute:
       break;
 
     case GeneratedSourceInfo::DefaultArgument:
     case GeneratedSourceInfo::ReplacedFunctionBody:
+    case GeneratedSourceInfo::Attribute:
       return childNotes;
     }
 

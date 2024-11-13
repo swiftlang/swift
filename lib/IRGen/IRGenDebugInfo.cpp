@@ -296,7 +296,8 @@ public:
     if (!ForceGeneratedSourceToDisk) {
       auto BufferID = SM.findBufferContainingLoc(SL);
       if (auto generatedInfo = SM.getGeneratedSourceInfo(BufferID)) {
-        // We only care about macros, so skip everything else.
+        // We only care about macro expansion buffers,
+        // so skip everything else.
         if (generatedInfo->kind != GeneratedSourceInfo::ReplacedFunctionBody &&
             generatedInfo->kind != GeneratedSourceInfo::PrettyPrinted &&
             generatedInfo->kind != GeneratedSourceInfo::DefaultArgument &&
