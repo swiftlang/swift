@@ -109,6 +109,8 @@ struct BridgedConsumedLookupResult {
       : Name(BridgedIdentifier(name)), NameLoc(BridgedSourceLoc(sourceLoc)),
         Flag(flag) {}
 #endif
+  
+  BridgedConsumedLookupResult(void*_Nullable, void*_Nullable, int); // DO NOT CALL
 };
 
 class BridgedDeclBaseName {
