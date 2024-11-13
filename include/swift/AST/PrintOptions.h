@@ -535,10 +535,6 @@ struct PrintOptions {
   /// with types sharing a name with a module.
   bool AliasModuleNames = false;
 
-  /// Print some ABI details for public symbols as comments that can be
-  /// parsed by another tool.
-  bool PrintABIComments = false;
-
   /// Name of the modules that have been aliased in AliasModuleNames mode.
   /// Ideally we would use something other than a string to identify a module,
   /// but since one alias can apply to more than one module, strings happen
@@ -729,8 +725,7 @@ struct PrintOptions {
                                               bool useExportedModuleNames,
                                               bool aliasModuleNames,
                                               llvm::SmallSet<StringRef, 4>
-                                                *aliasModuleNamesTargets,
-                                              bool abiComments
+                                                *aliasModuleNamesTargets
                                               );
 
   /// Retrieve the set of options suitable for "Generated Interfaces", which
