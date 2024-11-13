@@ -261,7 +261,7 @@ bb0(%0 : @guaranteed $M):
 // CHECK-LABEL: sil [ossa] @rdar130427564 : {{.*}} {
 // Verify that no instructions were inserted after backedge2's terminator.  (In
 // fact, if they were, the test would crash.)
-// CHECK:       bb2([[C0:%[^,]+]] : @owned $C, [[B0:%[^,]+]] : @reborrow @guaranteed $C):
+// CHECK:       bb2([[C0:%[^,]+]] : @owned $C, [[B0:%[^,]+]] : @reborrow $C):
 // CHECK-NEXT:    [[B0F:%[^,]+]] = borrowed [[B0]] : $C from ([[C0]] : $C)
 // CHECK-NEXT:    end_borrow [[B0F]]
 // CHECK-NEXT:    destroy_value [[C0]]
@@ -276,7 +276,7 @@ fn:
   %c = apply %getC() : $@convention(thin) () -> (@owned C)
   %b = begin_borrow %c : $C
   br header(%c : $C, %b : $C)
-header(%c0 : @owned $C, %b0 : @reborrow @guaranteed $C):
+header(%c0 : @owned $C, %b0 : @reborrow $C):
   %b0f = borrowed %b0 : $C from (%c0 : $C)
   end_borrow %b0f : $C
   destroy_value %c0 : $C
@@ -289,7 +289,7 @@ backedge:
   %c1 = apply %getC() : $@convention(thin) () -> (@owned C)
   %b1 = begin_borrow %c1 : $C
   br backedge2(%c1 : $C, %b1 : $C)
-backedge2(%c2 : @owned $C, %b2 : @reborrow @guaranteed $C):
+backedge2(%c2 : @owned $C, %b2 : @reborrow $C):
   %b2f = borrowed %b2 : $C from (%c2 : $C)
   br header(%c2 : $C, %b2f : $C)
 ecit:
