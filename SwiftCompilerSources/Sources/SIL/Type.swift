@@ -56,6 +56,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isEnum: Bool { bridged.getEnumOrBoundGenericEnum() != nil }
   public var isFunction: Bool { bridged.isFunction() }
   public var isMetatype: Bool { bridged.isMetatype() }
+  public var isClassExistential: Bool { bridged.isClassExistentialType() }
   public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
 
   public var canBeClass: swift.TypeTraitResult { bridged.canBeClass() }
