@@ -552,15 +552,8 @@ bool ClangImporter::getHeaderDependencies(
     auto swiftBinaryDeps = targetModuleInfo.getAsSwiftBinaryModule();
     if (!swiftBinaryDeps->headerImport.empty()) {
       auto clangModuleDependencies = scanHeaderDependencies(swiftBinaryDeps->headerImport);
-      if (!clangModuleDependencies) {
-        // FIXME: Route this to a normal diagnostic.
-        llvm::logAllUnhandledErrors(clangModuleDependencies.takeError(),
-                                    llvm::errs());
-        Impl.SwiftContext.Diags.diagnose(
-            SourceLoc(), diag::clang_dependency_scan_error,
-            "failed to scan header dependencies");
+      if (!clangModuleDependencies)
         return true;
-      }
     }
   }
 
