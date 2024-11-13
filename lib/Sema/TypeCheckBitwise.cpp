@@ -417,9 +417,10 @@ bool swift::checkBitwiseCopyableConformance(ProtocolConformance *conformance,
       return false;
   }
 
-  // BitwiseCopyable must be added in the same source file.
+  // BitwiseCopyable must be added in the same module or its overlay.
   auto conformanceDecl = conformanceDC->getAsDecl();
-  if (conformanceDecl->getModuleContext() != nominal->getModuleContext()) {
+  if (!conformanceDecl->getModuleContext()->isSameModuleLookingThroughOverlays(
+          nominal->getModuleContext())) {
     conformanceDecl->diagnose(diag::bitwise_copyable_outside_module, nominal);
     return true;
   }
