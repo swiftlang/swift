@@ -703,7 +703,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
       *this << "@reborrow ";
     if (i.IsEscaping)
       *this << "@pointer_escape ";
-    if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
+    if (!i.IsReborrow && i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
       *this << "@" << i.OwnershipKind.value() << " ";
     }
     return *this << i.Type;
