@@ -8,3 +8,7 @@ public protocol P {
 // expected-error@+1 {{type 'S' does not conform to protocol 'P'}}
 public struct S: P {
 }
+
+extension DoesNotExist {
+  public func method() {}
+}
