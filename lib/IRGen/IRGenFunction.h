@@ -102,7 +102,8 @@ public:
   Explosion collectParameters();
   void emitScalarReturn(SILType returnResultType, SILType funcResultType,
                         Explosion &scalars, bool isSwiftCCReturn,
-                        bool isOutlined);
+                        bool isOutlined, bool mayPeepholeLoad = false,
+                        SILType errorType = {});
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();
@@ -178,7 +179,7 @@ public:
                                        bool restoreCurrentContext = true);
 
   llvm::Value *emitAsyncResumeProjectContext(llvm::Value *callerContextAddr);
-  llvm::Function *getOrCreateResumePrjFn(bool forPrologue = false);
+  llvm::Function *getOrCreateResumePrjFn();
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,

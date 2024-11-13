@@ -27,6 +27,8 @@ add_swift_host_library(swiftAST STATIC
   Attr.cpp
   AutoDiff.cpp
   Availability.cpp
+  AvailabilityContext.cpp
+  AvailabilityScope.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
   CaptureInfo.cpp
@@ -123,7 +125,6 @@ add_swift_host_library(swiftAST STATIC
   TypeCheckRequests.cpp
   TypeDeclFinder.cpp
   TypeJoinMeet.cpp
-  TypeRefinementContext.cpp
   TypeRepr.cpp
   TypeSubstitution.cpp
   TypeWalker.cpp

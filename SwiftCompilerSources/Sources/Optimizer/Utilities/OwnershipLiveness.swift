@@ -95,7 +95,7 @@ typealias InnerScopeHandler = (Value) -> WalkResult
 /// - All inner scopes are complete. (Use `innerScopeHandler` to complete them or bail-out).
 func computeInteriorLiveness(for definingValue: Value, _ context: FunctionPassContext,
                              innerScopeHandler: InnerScopeHandler? = nil) -> InstructionRange {
-  let result = InteriorLivenessResult.compute(for: definingValue, ignoreEscape: false, context)
+  let result = InteriorLivenessResult.compute(for: definingValue, ignoreEscape: false, visitInnerUses: false, context)
   switch result.pointerStatus {
   case .nonescaping:
     break
@@ -113,8 +113,9 @@ func computeInteriorLiveness(for definingValue: Value, _ context: FunctionPassCo
 /// Compute known liveness and return a range, which the caller must deinitialize.
 ///
 /// This computes a minimal liveness, ignoring pointer escaping uses.
-func computeKnownLiveness(for definingValue: Value, _ context: FunctionPassContext) -> InstructionRange {
-  return InteriorLivenessResult.compute(for: definingValue, ignoreEscape: true, context).range
+func computeKnownLiveness(for definingValue: Value, visitInnerUses: Bool = false, _ context: FunctionPassContext) -> InstructionRange {
+  return InteriorLivenessResult.compute(for: definingValue, ignoreEscape: true,
+                                        visitInnerUses: visitInnerUses, context).range
 }
 
 /// If any interior pointer may escape, then record the first instance here. If 'ignoseEscape' is true, this
@@ -161,7 +162,7 @@ struct InteriorLivenessResult: CustomDebugStringConvertible {
   let range: InstructionRange
   let pointerStatus: InteriorPointerStatus
 
-  static func compute(for definingValue: Value, ignoreEscape: Bool = false,
+  static func compute(for definingValue: Value, ignoreEscape: Bool = false, visitInnerUses: Bool,
                       _ context: FunctionPassContext,
                       innerScopeHandler: InnerScopeHandler? = nil) -> InteriorLivenessResult {
 
@@ -170,7 +171,8 @@ struct InteriorLivenessResult: CustomDebugStringConvertible {
 
     var range = InstructionRange(for: definingValue, context)
 
-    var visitor = InteriorUseWalker(definingValue: definingValue, ignoreEscape: ignoreEscape, context) {
+    var visitor = InteriorUseWalker(definingValue: definingValue, ignoreEscape: ignoreEscape,
+                                    visitInnerUses: visitInnerUses, context) {
       range.insert($0.instruction)
       return .continueWalk
     }
@@ -526,6 +528,11 @@ struct InteriorUseWalker {
 
   let definingValue: Value
   let ignoreEscape: Bool
+
+  // If true, it's not assumed that inner scopes are linear. It forces to visit
+  // all interior uses if inner scopes.
+  let visitInnerUses: Bool
+
   let useVisitor: (Operand) -> WalkResult
 
   var innerScopeHandler: InnerScopeHandler? = nil
@@ -549,12 +556,13 @@ struct InteriorUseWalker {
     visited.deinitialize()
   }
 
-  init(definingValue: Value, ignoreEscape: Bool, _ context: FunctionPassContext,
+  init(definingValue: Value, ignoreEscape: Bool, visitInnerUses: Bool, _ context: FunctionPassContext,
     visitor: @escaping (Operand) -> WalkResult) {
     assert(!definingValue.type.isAddress, "address values have no ownership")
     self.functionContext = context
     self.definingValue = definingValue
     self.ignoreEscape = ignoreEscape
+    self.visitInnerUses = visitInnerUses
     self.useVisitor = visitor
     self.visited = ValueSet(context)
   }
@@ -664,6 +672,9 @@ extension InteriorUseWalker: OwnershipUseVisitor {
     if let beginBorrow = BeginBorrowValue(resultOf: borrowInst) {
       if handleInner(borrowed: beginBorrow.value) == .abortWalk {
         return .abortWalk
+      }
+      if visitInnerUses {
+        return visitUsesOfOuter(value: beginBorrow.value)
       }
     }
     return visitInnerBorrowUses(of: borrowInst)
@@ -950,7 +961,7 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   var range = InstructionRange(for: value, context)
   defer { range.deinitialize() }
 
-  var visitor = InteriorUseWalker(definingValue: value, ignoreEscape: true, context) {
+  var visitor = InteriorUseWalker(definingValue: value, ignoreEscape: true, visitInnerUses: false, context) {
     range.insert($0.instruction)
     return .continueWalk
   }

@@ -147,6 +147,14 @@ protected:
       Value : 32
     );
 
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 1+1,
+      /// Whether this attribute was spelled `@_spi_available`.
+      IsSPI : 1,
+
+      /// Whether this attribute was spelled `@_unavailableInEmbedded`.
+      IsForEmbedded : 1
+    );
+
     SWIFT_INLINE_BITFIELD(ClangImporterSynthesizedTypeAttr, DeclAttribute, 1,
       kind : 1
     );
@@ -674,8 +682,6 @@ enum class PlatformAgnosticAvailabilityKind {
 /// Defines the @available attribute.
 class AvailableAttr : public DeclAttribute {
 public:
-#define INIT_VER_TUPLE(X) X(X.empty() ? std::optional<llvm::VersionTuple>() : X)
-
   AvailableAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
                 StringRef Message, StringRef Rename, ValueDecl *RenameDecl,
                 const llvm::VersionTuple &Introduced,
@@ -684,15 +690,7 @@ public:
                 SourceRange DeprecatedRange,
                 const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
                 PlatformAgnosticAvailabilityKind PlatformAgnostic,
-                bool Implicit, bool IsSPI)
-      : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
-        Message(Message), Rename(Rename), RenameDecl(RenameDecl),
-        INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
-        INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
-        INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
-        PlatformAgnostic(PlatformAgnostic), Platform(Platform), IsSPI(IsSPI) {}
-
-#undef INIT_VER_TUPLE
+                bool Implicit, bool IsSPI, bool IsForEmbedded = false);
 
   /// The optional message.
   const StringRef Message;
@@ -735,9 +733,6 @@ public:
   /// The platform of the availability.
   const PlatformKind Platform;
 
-  /// Whether this is available as SPI.
-  const bool IsSPI;
-
   /// Whether this is a language-version-specific entity.
   bool isLanguageVersionSpecific() const;
 
@@ -752,6 +747,12 @@ public:
 
   /// Whether this is a noasync attribute.
   bool isNoAsync() const;
+
+  /// Whether this attribute was spelled `@_spi_available`.
+  bool isSPI() const { return Bits.AvailableAttr.IsSPI; }
+
+  /// Whether this attribute was spelled `@_unavailableInEmbedded`.
+  bool isForEmbedded() const { return Bits.AvailableAttr.IsForEmbedded; }
 
   /// Returns the platform-agnostic availability.
   PlatformAgnosticAvailabilityKind getPlatformAgnosticAvailability() const {
@@ -2640,25 +2641,20 @@ public:
   }
 };
 
-class LifetimeAttr final
-    : public DeclAttribute,
-      private llvm::TrailingObjects<LifetimeAttr, LifetimeEntry> {
+class LifetimeAttr final : public DeclAttribute {
+  LifetimeEntry *entry;
 
-  friend TrailingObjects;
-
-  unsigned NumEntries = 0;
-
-  explicit LifetimeAttr(SourceLoc atLoc, SourceRange baseRange, bool implicit,
-                        ArrayRef<LifetimeEntry> entries);
+  LifetimeAttr(SourceLoc atLoc, SourceRange baseRange, bool implicit,
+               LifetimeEntry *entry)
+      : DeclAttribute(DeclAttrKind::Lifetime, atLoc, baseRange, implicit),
+        entry(entry) {}
 
 public:
   static LifetimeAttr *create(ASTContext &context, SourceLoc atLoc,
                               SourceRange baseRange, bool implicit,
-                              ArrayRef<LifetimeEntry> entries);
+                              LifetimeEntry *entry);
 
-  ArrayRef<LifetimeEntry> getLifetimeEntries() const {
-    return {getTrailingObjects<LifetimeEntry>(), NumEntries};
-  }
+  LifetimeEntry *getLifetimeEntry() const { return entry; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Lifetime;

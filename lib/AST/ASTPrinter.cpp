@@ -194,24 +194,6 @@ bool PrintOptions::excludeAttr(const DeclAttribute *DA) const {
   return false;
 }
 
-/// Forces printing types with the `some` keyword, instead of the full stable
-/// reference.
-struct PrintWithOpaqueResultTypeKeywordRAII {
-  PrintWithOpaqueResultTypeKeywordRAII(PrintOptions &Options)
-      : Options(Options) {
-    SavedMode = Options.OpaqueReturnTypePrinting;
-    Options.OpaqueReturnTypePrinting =
-        PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
-  }
-  ~PrintWithOpaqueResultTypeKeywordRAII() {
-    Options.OpaqueReturnTypePrinting = SavedMode;
-  }
-
-private:
-  PrintOptions &Options;
-  PrintOptions::OpaqueReturnTypePrintingMode SavedMode;
-};
-
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
@@ -219,8 +201,8 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool useExportedModuleNames,
                                                    bool aliasModuleNames,
                                                    llvm::SmallSet<StringRef, 4>
-                                                     *aliasModuleNamesTargets,
-                                                   bool abiComments) {
+                                                     *aliasModuleNamesTargets
+                                                   ) {
   PrintOptions result;
   result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
@@ -242,7 +224,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.PreferTypeRepr = preferTypeRepr;
   result.AliasModuleNames = aliasModuleNames;
   result.AliasModuleNamesTargets = aliasModuleNamesTargets;
-  result.PrintABIComments = abiComments;
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
@@ -783,28 +764,19 @@ class PrintAST : public ASTVisitor<PrintAST> {
     printRawComment(RC);
   }
 
-  /// If we should print a mangled name for this declaration, return that
-  /// mangled name.
-  std::optional<std::string> mangledNameToPrint(const Decl *D);
-
   void printDocumentationComment(const Decl *D) {
-    if (Options.PrintDocumentationComments) {
-      // Try to print a comment from Clang.
-      auto MaybeClangNode = D->getClangNode();
-      if (MaybeClangNode) {
-        if (auto *CD = MaybeClangNode.getAsDecl())
-          printClangDocumentationComment(CD);
-        return;
-      }
+    if (!Options.PrintDocumentationComments)
+      return;
 
-      printSwiftDocumentationComment(D);
+    // Try to print a comment from Clang.
+    auto MaybeClangNode = D->getClangNode();
+    if (MaybeClangNode) {
+      if (auto *CD = MaybeClangNode.getAsDecl())
+        printClangDocumentationComment(CD);
+      return;
     }
 
-    if (auto mangledName = mangledNameToPrint(D)) {
-      indent();
-      Printer << "// MANGLED NAME: " << *mangledName;
-      Printer.printNewline();
-    }
+    printSwiftDocumentationComment(D);
   }
 
   void printStaticKeyword(StaticSpellingKind StaticSpelling) {
@@ -969,10 +941,19 @@ class PrintAST : public ASTVisitor<PrintAST> {
     printTypeLocWithOptions(TL, Options, printBeforeType);
   }
 
-  void printTypeLocForImplicitlyUnwrappedOptional(TypeLoc TL, bool IUO) {
-    PrintOptions options = Options;
-    options.PrintOptionalAsImplicitlyUnwrapped = IUO;
-    printTypeLocWithOptions(TL, options);
+  void printTypeLocForImplicitlyUnwrappedOptional(
+      TypeLoc TL, bool IUO, const ValueDecl *opaqueTypeNamingDecl) {
+    auto savedIOU = Options.PrintOptionalAsImplicitlyUnwrapped;
+    Options.PrintOptionalAsImplicitlyUnwrapped = IUO;
+
+    auto savedOpaqueTypeNamingDecl = Options.OpaqueReturnTypeNamingDecl;
+    if (opaqueTypeNamingDecl)
+      Options.OpaqueReturnTypeNamingDecl = opaqueTypeNamingDecl;
+
+    printTypeLocWithOptions(TL, Options);
+
+    Options.PrintOptionalAsImplicitlyUnwrapped = savedIOU;
+    Options.OpaqueReturnTypeNamingDecl = savedOpaqueTypeNamingDecl;
   }
 
   void printContextIfNeeded(const Decl *decl) {
@@ -1376,18 +1357,17 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
   printPattern(TP->getSubPattern());
   Printer << ": ";
 
-  PrintWithOpaqueResultTypeKeywordRAII x(Options);
-
-  // Make sure to check if the underlying var decl is an implicitly unwrapped
-  // optional.
-  bool isIUO = false;
+  VarDecl *varDecl = nullptr;
   if (auto *named = dyn_cast<NamedPattern>(TP->getSubPattern()))
     if (auto decl = named->getDecl())
-      isIUO = decl->isImplicitlyUnwrappedOptional();
+      varDecl = decl;
 
   const auto TyLoc = TypeLoc(TP->getTypeRepr(),
                              TP->hasType() ? TP->getType() : Type());
-  printTypeLocForImplicitlyUnwrappedOptional(TyLoc, isIUO);
+
+  printTypeLocForImplicitlyUnwrappedOptional(
+      TyLoc, varDecl ? varDecl->isImplicitlyUnwrappedOptional() : false,
+      varDecl);
 }
 
 /// Determines if we are required to print the name of a property declaration,
@@ -2391,12 +2371,6 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
   }
 }
 
-static bool
-shouldPrintUnderscoredCoroutineAccessors(const AbstractStorageDecl *ASD) {
-  // TODO: CoroutineAccessors: Print only when necessary.
-  return true;
-}
-
 void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
@@ -2573,7 +2547,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       break;
     case ReadImplKind::Read2:
       if (ASD->getAccessor(AccessorKind::Read) &&
-          shouldPrintUnderscoredCoroutineAccessors(ASD)) {
+          Options.SuppressCoroutineAccessors) {
         AddAccessorToPrint(AccessorKind::Read);
       }
       AddAccessorToPrint(AccessorKind::Read2);
@@ -2607,7 +2581,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       break;
     case WriteImplKind::Modify2:
       if (ASD->getAccessor(AccessorKind::Modify) &&
-          shouldPrintUnderscoredCoroutineAccessors(ASD)) {
+          Options.SuppressCoroutineAccessors) {
         AddAccessorToPrint(AccessorKind::Modify);
       }
       AddAccessorToPrint(AccessorKind::Modify2);
@@ -3130,60 +3104,6 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
   }
 }
 
-std::optional<std::string> PrintAST::mangledNameToPrint(const Decl *D) {
-  using ASTMangler = Mangle::ASTMangler;
-
-  if (!Options.PrintABIComments)
-    return std::nullopt;
-
-  auto valueDecl = dyn_cast<ValueDecl>(D);
-  if (!valueDecl)
-    return std::nullopt;
-
-  // Anything with an access level less than "package" isn't meant to be
-  // referenced from source code outside the module.
-  if (valueDecl->getEffectiveAccess() < AccessLevel::Package)
-    return std::nullopt;
-
-  // For functions, mangle the entity directly.
-  if (auto func = dyn_cast<FuncDecl>(D)) {
-    ASTMangler mangler;
-    return mangler.mangleEntity(func);
-  }
-
-  // For initializers, mangle the allocating initializer.
-  if (auto init = dyn_cast<ConstructorDecl>(D)) {
-    ASTMangler mangler;
-    return mangler.mangleConstructorEntity(init, /*isAllocating=*/true);
-  }
-
-  // For global and static variables, mangle the entity directly.
-  if (auto var = dyn_cast<VarDecl>(D)) {
-    if (!var->isInstanceMember()) {
-      ASTMangler mangler;
-      return mangler.mangleEntity(var);
-    }
-  }
-
-  // For subscripts, mangle the entity directly.
-  if (auto subscript = dyn_cast<SubscriptDecl>(D)) {
-    ASTMangler mangler;
-    return mangler.mangleEntity(subscript);
-  }
-
-  // For nominal types, mangle the type metadata accessor.
-  if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
-    if (!isa<ProtocolDecl>(nominal) && !nominal->getGenericSignature()) {
-      ASTMangler mangler;
-      std::string name = mangler.mangleNominalType(nominal);
-      name += "Ma";
-      return name;
-    }
-  }
-
-  return std::nullopt;
-}
-
 static void suppressingFeatureIsolatedAny(PrintOptions &options,
                                           llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressIsolatedAny, true);
@@ -3599,7 +3519,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
           dyn_cast_or_null<clang::NamespaceDecl>(decl->getClangDecl())) {
     // Enum that correponds to the C++ namespace should only be printed once.
     if (!Printer.shouldPrintRedeclaredClangDecl(
-            namespaceDecl->getOriginalNamespace()))
+            namespaceDecl->getFirstDecl()))
       return;
 
     if (Options.SkipInlineCXXNamespace && namespaceDecl->isInline()) {
@@ -3884,9 +3804,8 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     }
     Printer.printDeclResultTypePre(decl, tyLoc);
 
-    PrintWithOpaqueResultTypeKeywordRAII x(Options);
     printTypeLocForImplicitlyUnwrappedOptional(
-      tyLoc, decl->isImplicitlyUnwrappedOptional());
+        tyLoc, decl->isImplicitlyUnwrappedOptional(), decl);
   }
 
   printAccessors(decl);
@@ -3968,7 +3887,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     }
 
     printTypeLocForImplicitlyUnwrappedOptional(
-      TheTypeLoc, param->isImplicitlyUnwrappedOptional());
+        TheTypeLoc, param->isImplicitlyUnwrappedOptional(), nullptr);
   }
 
   if (param->isDefaultArgument() && Options.PrintDefaultArgumentValue) {
@@ -4246,16 +4165,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
-      {
-        if (!Options.SuppressNonEscapableTypes) {
-          if (auto *typeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
-                  decl->getResultTypeRepr())) {
-            for (auto &dep : typeRepr->getLifetimeDependencies()) {
-              Printer << " " << dep.getDependsOnString() << " ";
-            }
-          }
-        }
-      }
 
       if (!Options.SuppressSendingArgsAndResults) {
         if (decl->hasSendingResult()) {
@@ -4267,8 +4176,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           }
         }
       }
-
-      PrintWithOpaqueResultTypeKeywordRAII x(Options);
 
       // Check if we would go down the type repr path... in such a case, see if
       // we can find a type repr and if that type has a sending type repr. In
@@ -4296,7 +4203,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       // If we printed using type repr printing, do not print again.
       if (!usedTypeReprPrinting) {
         printTypeLocForImplicitlyUnwrappedOptional(
-            ResultTyLoc, decl->isImplicitlyUnwrappedOptional());
+            ResultTyLoc, decl->isImplicitlyUnwrappedOptional(), decl);
       }
       Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
     }
@@ -4445,9 +4352,8 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer.printDeclResultTypePre(decl, elementTy);
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
-    PrintWithOpaqueResultTypeKeywordRAII x(Options);
     printTypeLocForImplicitlyUnwrappedOptional(
-      elementTy, decl->isImplicitlyUnwrappedOptional());
+        elementTy, decl->isImplicitlyUnwrappedOptional(), decl);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
 
@@ -4499,18 +4405,6 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
       printGenericDeclGenericParams(decl);
       printFunctionParameters(decl);
-      if (!Options.SuppressNonEscapableTypes) {
-        if (decl->hasLifetimeDependentReturn()) {
-          Printer << " -> ";
-          auto *typeRepr =
-              cast<LifetimeDependentTypeRepr>(decl->getResultTypeRepr());
-          for (auto &dep : typeRepr->getLifetimeDependencies()) {
-            Printer << dep.getDependsOnString() << " ";
-          }
-          // TODO: Handle failable initializers with lifetime dependent returns
-          Printer << "Self";
-        }
-      }
     });
 
   printDeclGenericRequirements(decl);
@@ -4770,7 +4664,7 @@ void PrintAST::visitBooleanLiteralExpr(BooleanLiteralExpr *expr) {
 }
 
 void PrintAST::visitRegexLiteralExpr(RegexLiteralExpr *expr) {
-  Printer << expr->getRegexText();
+  Printer << expr->getParsedRegexText();
 }
 
 void PrintAST::visitErrorExpr(ErrorExpr *expr) {
@@ -4948,6 +4842,10 @@ void PrintAST::visitBinaryExpr(BinaryExpr *expr) {
     Printer << operatorRef->getDecl()->getBaseName();
   } else if (auto *operatorRef = dyn_cast<DeclRefExpr>(expr->getFn())) {
     Printer << operatorRef->getDecl()->getBaseName();
+  } else if (auto *operatorRef =
+                 dyn_cast<UnresolvedDeclRefExpr>(expr->getFn())) {
+    // Synthesized `==` uses this.
+    Printer << operatorRef->getName();
   }
   Printer << " ";
   visit(expr->getRHS());
@@ -6097,6 +5995,8 @@ public:
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinVectorType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinIntegerType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinFloatType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnboundGenericType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinFixedArrayType)
 #undef ASTPRINTER_PRINT_BUILTINTYPE
 
   void visitSILTokenType(SILTokenType *T) {
@@ -6122,12 +6022,6 @@ public:
       else
         printGenericArgs(T->getExpandedGenericArgs());
     }
-  }
-
-  void visitParenType(ParenType *T) {
-    Printer << "(";
-    visit(T->getUnderlyingType()->getInOutObjectType());
-    Printer << ")";
   }
 
   void visitPackType(PackType *T) {
@@ -6207,7 +6101,7 @@ public:
         Printer << ": ";
       } else if (e == 1 && !EltType->is<PackExpansionType>()) {
         // Unlabeled one-element tuples always print the empty label to
-        // distinguish them from the older syntax for ParenType.
+        // distinguish them from the older syntax for parens.
         Printer << "_: ";
       }
       visit(EltType);
@@ -6770,6 +6664,9 @@ public:
     case SILCoroutineKind::YieldOnce:
       Printer << "@yield_once ";
       return;
+    case SILCoroutineKind::YieldOnce2:
+      Printer << "@yield_once_2 ";
+      return;
     case SILCoroutineKind::YieldMany:
       Printer << "@yield_many ";
       return;
@@ -7266,7 +7163,11 @@ public:
     auto genericSig = namingDecl->getInnermostDeclContext()
           ->getGenericSignatureOfContext();
 
-    switch (Options.OpaqueReturnTypePrinting) {
+    auto mode = Options.OpaqueReturnTypePrinting;
+    if (Options.OpaqueReturnTypeNamingDecl == T->getDecl()->getNamingDecl())
+      mode = PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
+
+    switch (mode) {
     case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
       if (printNamedOpaque())
         return;

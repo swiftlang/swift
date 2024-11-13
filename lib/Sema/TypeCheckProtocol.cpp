@@ -1466,7 +1466,7 @@ static bool contextMayExpandOperator(
 SmallVector<ValueDecl *, 4>
 swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
-  assert(req->isProtocolRequirement());
+  assert(req->isProtocolRequirement() || isa<AccessorDecl>(req));
 
   SmallVector<ValueDecl *, 4> witnesses;
 
@@ -4263,13 +4263,17 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           diagnoseSendabilityErrorBasedOn(conformance->getProtocol(), sendFrom,
                                           [&](DiagnosticBehavior limit) {
             auto &diags = DC->getASTContext().Diags;
-            diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
-                           diag::witness_not_as_sendable,
-                           witness, conformance->getProtocol())
+            auto preconcurrencyBehaviorLimit =
+                sendFrom.preconcurrencyBehavior(nominal);
+            diags
+                .diagnose(getLocForDiagnosingWitness(conformance, witness),
+                          diag::witness_not_as_sendable, witness,
+                          conformance->getProtocol())
                 .limitBehaviorUntilSwiftVersion(limit, 6)
-                .limitBehaviorIf(sendFrom.preconcurrencyBehavior(nominal));
+                .limitBehaviorIf(preconcurrencyBehaviorLimit);
             diags.diagnose(requirement, diag::less_sendable_reqt_here);
-            return false;
+            return preconcurrencyBehaviorLimit &&
+                   (*preconcurrencyBehaviorLimit == DiagnosticBehavior::Ignore);
           });
         });
       }
@@ -4308,9 +4312,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
-        if (proto->isInterfacePackageEffectivelyPublic())
-          return;
-
         bool protoForcesAccess =
           requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
         auto diagKind = protoForcesAccess
@@ -6041,7 +6042,7 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   // a new-enough OS.
   if (auto sourceFile = classDecl->getParentSourceFile()) {
     AvailabilityRange safeRangeUnderApprox{
-        AvailabilityInference::availableRange(classDecl, ctx)};
+        AvailabilityInference::availableRange(classDecl)};
     AvailabilityRange runningOSOverApprox =
         AvailabilityRange::forDeploymentTarget(ctx);
 
@@ -6828,9 +6829,32 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
 
     ResolveWitnessResult result = checker.resolveWitnessViaLookup(requirement);
 
-    if (result == ResolveWitnessResult::Missing &&
-        requirement->isSPI() &&
-        !proto->isSPI()) {
+    if (result != ResolveWitnessResult::Missing)
+      continue;
+
+    if (auto *asd = dyn_cast<AbstractStorageDecl>(requirement)) {
+      bool hasDefaults = false;
+      asd->visitExpectedOpaqueAccessors([&](auto kind) {
+        auto *accessor = asd->getOpaqueAccessor(kind);
+        if (accessor->hasBody()) {
+          hasDefaults = true;
+        }
+      });
+      if (hasDefaults) {
+        auto asdTy = asd->getInterfaceType();
+        GenericSignature reqSig = proto->getGenericSignature();
+        if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(asd)) {
+          if (subscriptDecl->isGeneric())
+            reqSig = subscriptDecl->getGenericSignature();
+        }
+        RequirementEnvironment reqEnv(proto, reqSig, proto, nullptr, nullptr);
+        auto match =
+            RequirementMatch(asd, MatchKind::ExactMatch, asdTy, reqEnv);
+        checker.recordWitness(asd, match);
+      }
+    }
+
+    if (requirement->isSPI() && !proto->isSPI()) {
       // SPI requirements need a default value, unless the protocol is SPI too.
       requirement->diagnose(diag::spi_attribute_on_protocol_requirement,
                             requirement);

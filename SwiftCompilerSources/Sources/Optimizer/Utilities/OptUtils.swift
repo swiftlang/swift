@@ -297,6 +297,9 @@ extension Instruction {
     switch self {
     case is TermInst, is MarkUninitializedInst, is DebugValueInst:
       return false
+    case is BorrowedFromInst:
+      // A dead borrowed-from can only be removed if the argument (= operand) is also removed.
+      return false
     case let bi as BuiltinInst:
       if bi.id == .OnFastPath {
         return false
@@ -305,6 +308,10 @@ extension Instruction {
       // Don't remove UncheckedEnumDataInst in OSSA in case it is responsible
       // for consuming an enum value.
       return !parentFunction.hasOwnership
+    case is ExtendLifetimeInst:
+      // An extend_lifetime can only be removed if the operand is also removed.
+      // If its operand is trivial, it will be removed by MandatorySimplification.
+      return false
     default:
       break
     }
@@ -650,27 +657,6 @@ extension Function {
 }
 
 extension FullApplySite {
-  var canInline: Bool {
-    // Some checks which are implemented in C++
-    if !FullApplySite_canInline(bridged) {
-      return false
-    }
-    // Cannot inline a non-inlinable function it an inlinable function.
-    if let calleeFunction = referencedFunction,
-       !calleeFunction.canBeInlinedIntoCaller(parentFunction.serializedKind) {
-      return false
-    }
-
-    // Cannot inline a non-ossa function into an ossa function
-    if parentFunction.hasOwnership,
-      let calleeFunction = referencedFunction,
-      !calleeFunction.hasOwnership {
-      return false
-    }
-
-    return true
-  }
-
   var inliningCanInvalidateStackNesting: Bool {
     guard let calleeFunction = referencedFunction else {
       return false
@@ -689,6 +675,10 @@ extension FullApplySite {
     }
     return false
   }
+}
+
+extension BeginApplyInst {
+  var canInline: Bool { BeginApply_canInline(bridged) }
 }
 
 extension GlobalVariable {
@@ -824,5 +814,27 @@ extension CheckedCastAddrBranchInst {
       case .willFail:    return false
       default: fatalError("unknown result from classifyDynamicCastBridged")
     }
+  }
+}
+
+extension Type {
+  /// True if a type can be expanded without a significant increase to code
+  /// size.
+  /// Expanding a type can mean expressing it as a SSA value (which ultimately
+  /// is represented as multiple SSA values in LLVM IR) instead of indirectly
+  /// via memory operations (copy_addr), or exploding an SSA value into its
+  /// constituent projections.
+  /// Once a value is represented as its projections we don't "reconstitute" the
+  /// aggregate value anymore leading to register pressure and code size bloat.
+  /// Therefore, we try to keep "larger" values indirect and not exploated
+  /// throughout the pipeline.
+  ///
+  /// False if expanding a type is invalid. For example, expanding a
+  /// struct-with-deinit drops the deinit.
+  func shouldExpand(_ context: some Context) -> Bool {
+    if !context.options.useAggressiveReg2MemForCodeSize {
+      return true
+    }
+    return context._bridged.shouldExpand(self.bridged)
   }
 }

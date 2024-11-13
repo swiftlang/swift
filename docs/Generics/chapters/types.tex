@@ -228,7 +228,7 @@ Consider the four types \texttt{Key?}, \texttt{Optional<Key>}, \texttt{Value?}, 
 \item When we consider the generic signature of the extension, we're left with just one reduced type, because both canonical types reduce to \texttt{Optional<\ttgp{0}{0}>} via the same-type requirement. Thus, all four of the original types are equal under reduced type equality.
 \end{itemize}
 
-Reduced type equality means ``equivalent as a consequence of one or more same-type requirements.'' We will define this equivalence of type parameters in \SecRef{type params} using the derived requirements formalism, and then generalize to all interface types in \SecRef{genericsigqueries}. Presenting a computable algorithm for reduced type equality is one of our main results in this book; key developments take place in \SecRef{rewritesystemintro} and \ChapRef{symbols terms rules}.
+Reduced type equality means ``equivalent as a consequence of one or more same-type requirements.'' We will define this equivalence of type parameters in \SecRef{valid type params} using the derived requirements formalism, and then generalize to all interface types in \SecRef{genericsigqueries}. Presenting a computable algorithm for reduced type equality is one of our main results in this book; key developments take place in \SecRef{rewritesystemintro} and \ChapRef{symbols terms rules}.
 
 \section{Fundamental Types}\label{fundamental types}
 
@@ -289,7 +289,7 @@ A nominal type declaration defines a family of nominal types, all sharing the sa
 
 \smallskip
 
-The specialized type where each generic argument is set to the corresponding generic parameter type is the \index{declared interface type}\emph{declared interface type} of the nominal type declaration. It is ``universal'': any specialized type is obtainable from the declared interface type by assigning a replacement type to each generic parameter type. This assignment is known as a \index{substitution map}\emph{substitution map}, and the substitution map defined by the generic arguments of a specialized type is its \index{context substitution map}\emph{context substitution map} (\SecRef{contextsubstmap}). Finally, in the case where neither the nominal type declaration nor any of its parents are generic, the declaration defines just one \index{fully-concrete type}\emph{fully-concrete} specialized type, with an empty context substitution map.
+The specialized type where each generic argument is set to the corresponding generic parameter type is the \IndexDefinition{declared interface type!nominal type declaration}\emph{declared interface type} of the nominal type declaration. It is ``universal'': any specialized type is obtainable from the declared interface type by assigning a replacement type to each generic parameter type. This assignment is known as a \index{substitution map}\emph{substitution map}, and the substitution map defined by the generic arguments of a specialized type is its \index{context substitution map}\emph{context substitution map} (\SecRef{contextsubstmap}). Finally, in the case where neither the nominal type declaration nor any of its parents are generic, the declaration defines just one \index{fully-concrete type}\emph{fully-concrete} specialized type, with an empty context substitution map.
 
 
 \begin{figure}[b!]\captionabove{Bound and unbound dependent member types}\label{type params fig}
@@ -351,16 +351,16 @@ The specialized type where each generic argument is set to the corresponding gen
 A \IndexDefinition{dependent member type}dependent member type abstracts over a concrete type that fulfills an associated type requirement. It has two structural components:
 \begin{itemize}
 \item A base type, which is a generic parameter type or another dependent member type.
-\item An \index{identifier}identifier (in which case this is an \IndexDefinition{unbound dependent member type}\emph{unbound} dependent member type), or an \index{associated type declaration}associated type declaration (in which case it is \IndexDefinition{bound dependent member type}\emph{bound}).
+\item An \index{identifier!dependent member type}identifier (in which case this is an \IndexDefinition{unbound dependent member type}\emph{unbound} dependent member type), or an \index{associated type declaration!dependent member type}associated type declaration (in which case it is \IndexDefinition{bound dependent member type}\emph{bound}).
 \end{itemize}
 
-Unbound dependent member types fit in somewhere in between type representations and ``true'' types, in that they are a syntactic construct. They appear in the \index{structural resolution stage}structural resolution stage when building a generic signature. Most type resolution happens in the \index{interface resolution stage}interface resolution stage, after a generic signature is available, and thus dependent member types appearing in the interface types of declarations are always bound.
+In \ChapRef{typeresolution}, we describe the two stages of type resolution. Unbound dependent member types appear in the \index{structural resolution stage}structural resolution stage, when we resolve the requirements in the \texttt{where} clause to feed into the generic signature construction procedure. Once we have a generic signature, we move on to \index{interface resolution stage}interface resolution stage, and dependent member types written elsewhere are fully resolved into their bound form.
 
-If \texttt{T} is the base type, \texttt{P} is a protocol and \texttt{A} is an associated type declared inside this protocol, we denote the bound dependent member type by \texttt{T.[P]A}, and the unbound dependent member type by \texttt{T.A}. The base type \texttt{T} may be another dependent member type, so we can have a series of member type accesses, like \texttt{\ttgp{0}{0}.[P]A.[Q]B}. \FigRef{type params fig} shows the recursive structure of two dependent member types, bound and unbound.
+If \texttt{T} is the base type, \texttt{P} is a protocol and \texttt{A} is an associated type declared inside this protocol, we denote the bound dependent member type by \texttt{T.[P]A}, and the unbound dependent member type by \texttt{T.A}. The base type \texttt{T} can be another dependent member type, so we get a recursive structure like \texttt{\ttgp{0}{0}.[P]A.[Q]B}. \FigRef{type params fig} illustrates this with two dependent member types, bound and unbound.
 
 A dependent member type is ``dependent'' in the C++ sense, \emph{not} a \index{dependent type}type  dependent on a value in the \index{lambda cube}``lambda cube'' sense. Generic parameter types and dependent member types are together known as \emph{type parameters}. A type that might contain type parameters but is not necessarily a type parameter itself is called an \IndexDefinition{interface type}\emph{interface type}. The above summary necessarily leaves many questions unanswered, because a significant portion of the rest of the book is devoted to type parameters. Key topics include:
 \begin{itemize}
-\item Semantic validity of type parameters (\SecRef{derived req}, \SecRef{type params}).
+\item Semantic validity of type parameters (\SecRef{derived req}, \SecRef{valid type params}).
 \item Generic signature queries (\SecRef{genericsigqueries}).
 \item Dependent member type substitution (\SecRef{abstract conformances}, \ChapRef{conformance paths}).
 \item Type resolution with bound and unbound type parameters (\ChapRef{typeresolution}).
@@ -373,7 +373,7 @@ Archetypes occur inside \index{expression}expressions and \index{SIL}SIL instruc
 
 \medskip
 
-The fundamental type kinds we surveyed above---nominal types, type parameters, and archetypes---are \textsl{the Swift types that can conform to protocols}. In other words, they can satisfy the left-hand side of a \index{conformance requirement}conformance requirement, with the details for each type given later in \SecRef{conformance lookup}. Also important are \index{constraint type}\emph{constraint types}; these are \textsl{the types appearing on the right hand side of conformance requirements}. Constraint types themselves are never the types of value-producing expressions. (Type-erased values are represented by existential types, wrapping a constraint type in a level of indirection.)
+The fundamental type kinds we surveyed above---nominal types, type parameters, and archetypes---are \textsl{the Swift types that can conform to protocols}. In other words, they can satisfy the left-hand side of a \index{conformance requirement!checking}conformance requirement, with the details for each type given later in \SecRef{conformance lookup}. Also important are \index{constraint type}\emph{constraint types}; these are \textsl{the types appearing on the right hand side of conformance requirements}. Constraint types themselves are never the types of value-producing expressions. (A type-erased value has an existential type, which wraps a constraint type, as we will see in the next section.)
 
 \paragraph{Protocol types.}
 A protocol type is the most fundamental kind of constraint type; a conformance requirement involving any other kind of constraint type can always be split up into simpler conformance requirements. A \IndexDefinition{protocol type}protocol type is a kind of \index{nominal type}nominal type, so it will have a \index{parent type}parent type if the protocol declaration is nested inside of another nominal type declaration. Unlike other nominal types, protocols cannot be nested in generic contexts (\SecRef{nested nominal types}), so neither the protocol type itself nor any of its parents can have generic arguments. Thus, there is exactly one protocol type corresponding to each protocol declaration.
@@ -599,7 +599,7 @@ A \IndexDefinition{generic function type}generic function type has the same stru
 \end{verbatim}
 \end{quote}
 
-Generic function types are the \index{interface type}interface types of generic \index{function declaration}function and \index{subscript declaration}subscript declarations. A reference to a generic function declaration from an expression always applies substitutions first, so generic function types do not appear as the types of expressions. In particular, an unsubstituted generic function value cannot be a parameter to another function, thus the Swift type system does not support \index{higher-rank polymorphism}higher-rank polymorphism. Type inference with higher-rank types is known to be \index{halting problem}\index{undecidable problem}undecidable; see \cite{wells} and \cite{practicalhigherrank}.
+Generic function types are the \index{interface type!function declaration}interface types of generic \index{function declaration}function and \index{interface type!subscript declaration}\index{subscript declaration}subscript declarations. A reference to a generic function declaration from an expression always applies substitutions first, so generic function types do not appear as the types of expressions. In particular, an unsubstituted generic function value cannot be a parameter to another function, thus the Swift type system does not support \index{limitation!higher-rank polymorphism}\index{higher-rank polymorphism}higher-rank polymorphism. Type inference with higher-rank types is known to be \index{halting problem}\index{undecidable problem!rank-3 polymorphism}undecidable; see \cite{wells} and \cite{practicalhigherrank}.
 
 Generic function types have a special behavior when their canonical type is computed. Since generic function types carry a generic signature, the parameter types and return type of a \emph{canonical} generic function type are actually \emph{reduced} types with respect to this generic signature (\SecRef{reduced types}).
 
@@ -655,16 +655,15 @@ The \IndexDefinition{dynamic Self type@dynamic \tSelf\ type}dynamic \tSelf\ type
 \ListingRef{dynamic self example} demonstrates some of the behaviors of the dynamic \tSelf\ type. Two invalid cases are shown; \texttt{invalid1()} is rejected because the type checker cannot prove that the return type is always an instance of the dynamic type of \texttt{self}, and \texttt{invalid2()} is rejected because \tSelf\ appears in contravariant position.
 
 \paragraph{Type variable types.}
-A \IndexDefinition{type variable type}type variable represents the future inferred type of an \index{expression}expression in the expression type checker's constraint system. The expression type checker builds the constraint system by walking an expression recursively, assigning new type variables to the types of sub-expressions and recording constraints between these type variables. Solving the constraint system can have three possible outcomes:
+A \IndexDefinition{type variable type}type variable represents the future inferred type of an \index{expression}expression. The \index{expression type checker}expression type checker builds a \emph{constraint system} by walking an expression recursively, assigning new type variables to each sub-expression and then recording constraints to relate these type variables. The constraint solver then searches for a \emph{solution} that assigns a concrete type to each type variable in a way that satisfies the constraints. Solving the constraint system can have three possible outcomes:
 \begin{itemize}
-\item \textbf{One solution}---every type variable has exactly one fixed type assignment; the expression is well-typed.
-\item \textbf{No solutions}---some constraints could not be solved, indicating erroneous input.
-\item \textbf{Multiple solutions}---the constraint system is underspecified and some type variables can have multiple valid fixed type assignments.
+\item \textbf{One solution}---the expression and all of its sub-expressions are well-typed.
+\item \textbf{No solutions}---the constraints cannot be satisfied, so the expression is invalid.
+\item \textbf{Multiple solutions}---the expression is ambiguous, because there is more than one possible assignment of concrete types that satisfies the constraints.
 \end{itemize}
+If there is one solution, we record the concrete type of each expression in the AST. In the case of multiple solutions, we first rank the solutions using a heuristic; if one is clearly ``better'' than the others, we proceed as in the case of one solution. Otherwise, we either have no solution, or the expression was ambiguous, so we \index{diagnostic!multiple solutions}diagnose an error.
 
-In the case of multiple solutions, the type checker uses heuristics to pick the ``best'' solution for the entire expression; if none of the solutions are clearly better than the others, an ambiguity error is \index{diagnostic!multiple solutions}diagnosed. Otherwise, we take the best solution and apply it to the expression, replacing type variables with their assigned fixed types.
-
-The utmost care must be taken when working with type variables, because unlike all other types, they are not allocated with indefinite lifetime. Type variables live in the \IndexDefinition{constraint solver arena}constraint solver arena, which grows and shrinks as the solver explores branches of the solution space. \index{type!containing type variables}Types that \emph{contain} type variables also need to be allocated in the constraint solver arena. This is also true of structures that contain types, such as \index{substitution map!containing type variables}substitution maps. Type variables ``escaping'' from the constraint solver can crash the compiler in odd ways. Assertions should be used to rule out type variables from appearing in the wrong places.
+The utmost care must be taken when working with type variables and the structures that contain them, because unlike all other types, they are not allocated with indefinite lifetime. Type variables live in the \IndexDefinition{constraint solver arena}constraint solver arena, whose lifetime is scoped to the type checking of a single expression. Structures that \emph{contain} type variables, such as other \index{type!containing type variables}types and \index{substitution map!containing type variables}substitution maps, also need to be allocated in the constraint solver arena. Type variables should never ``escape'' from the constraint solver, or the compiler will crash in odd ways. Assertions should be used to rule out type variables from appearing in the wrong places.
 
 \IndexFlag{debug-constraints}
 The printed representation of a type variable is \texttt{\$Tn}, where \texttt{n} is an incrementing integer local to the constraint system. One way to see type variables in action is to pass the \texttt{-Xfrontend~-debug-constraints} compiler flag.
@@ -840,7 +839,6 @@ case TypeKind::Struct: {
   ...
 }
 case TypeKind::Enum:
-  ...
 case TypeKind::Class:
   ...
 }

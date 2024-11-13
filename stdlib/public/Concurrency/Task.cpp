@@ -24,16 +24,17 @@
 #include "Debug.h"
 #include "Error.h"
 #include "TaskGroupPrivate.h"
+#include "TaskLocal.h"
 #include "TaskPrivate.h"
 #include "Tracing.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
-#include "swift/ABI/TaskLocal.h"
 #include "swift/ABI/TaskOptions.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
 #include <new>
@@ -214,13 +215,12 @@ InitialTaskExecutorOwnedPreferenceTaskOptionRecord::getExecutorRefFromUnownedTas
     return executorRef;
 }
 
-
 void NullaryContinuationJob::process(Job *_job) {
   auto *job = cast<NullaryContinuationJob>(_job);
 
   auto *continuation = job->Continuation;
 
-  delete job;
+  swift_cxx_deleteObject(job);
 
   auto *context =
     static_cast<ContinuationAsyncContext*>(continuation->ResumeContext);
@@ -346,7 +346,7 @@ void AsyncTask::setTaskId() {
 uint64_t AsyncTask::getTaskId() {
   // Reconstitute a full 64-bit task ID from the 32-bit job ID and the upper
   // 32 bits held in _private().
-  return (uint64_t)Id << _private().Id;
+  return ((uint64_t)_private().Id << 32) | (uint64_t)Id;
 }
 
 SWIFT_CC(swift)
@@ -392,7 +392,9 @@ static void jobInvoke(void *obj, void *unused, uint32_t flags) {
 // Magic constant to identify Swift Job vtables to Dispatch.
 static const unsigned long dispatchSwiftObjectType = 1;
 
-FullMetadata<DispatchClassMetadata> swift::jobHeapMetadata = {
+#if !SWIFT_CONCURRENCY_EMBEDDED
+
+static FullMetadata<DispatchClassMetadata> jobHeapMetadata = {
   {
     {
       /*type layout*/ nullptr,
@@ -431,10 +433,46 @@ static FullMetadata<DispatchClassMetadata> taskHeapMetadata = {
   }
 };
 
+
 const void *const swift::_swift_concurrency_debug_jobMetadata =
     static_cast<Metadata *>(&jobHeapMetadata);
 const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
     static_cast<Metadata *>(&taskHeapMetadata);
+
+const HeapMetadata *swift::jobHeapMetadataPtr =
+    static_cast<HeapMetadata *>(&jobHeapMetadata);
+const HeapMetadata *swift::taskHeapMetadataPtr =
+    static_cast<HeapMetadata *>(&taskHeapMetadata);
+
+#else // SWIFT_CONCURRENCY_EMBEDDED
+
+// This matches the embedded class metadata layout in IRGen and in
+// EmbeddedRuntime.swift.
+typedef struct EmbeddedClassMetadata {
+  void *superclass;
+  HeapObjectDestroyer *__ptrauth_swift_heap_object_destructor destroy;
+  void *ivar_destroyer;
+} EmbeddedHeapObject;
+
+static EmbeddedClassMetadata jobHeapMetadata = {
+  0, &destroyJob, 0,
+};
+
+static EmbeddedClassMetadata taskHeapMetadata = {
+  0, &destroyTask, 0,
+};
+
+const void *const swift::_swift_concurrency_debug_jobMetadata =
+    (Metadata *)(&jobHeapMetadata);
+const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
+    (Metadata *)(&taskHeapMetadata);
+
+const HeapMetadata *swift::jobHeapMetadataPtr =
+    (HeapMetadata *)(&jobHeapMetadata);
+const HeapMetadata *swift::taskHeapMetadataPtr =
+    (HeapMetadata *)(&taskHeapMetadata);
+
+#endif
 
 static void completeTaskImpl(AsyncTask *task,
                              AsyncContext *context,
@@ -958,14 +996,12 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   if (asyncLet) {
     // Initialize the refcount bits to "immortal", so that
     // ARC operations don't have any effect on the task.
-    task = new(allocation) AsyncTask(&taskHeapMetadata,
-                             InlineRefCounts::Immortal, jobFlags,
-                             function, initialContext,
-                             captureCurrentVoucher);
+    task = new (allocation)
+        AsyncTask(taskHeapMetadataPtr, InlineRefCounts::Immortal, jobFlags,
+                  function, initialContext, captureCurrentVoucher);
   } else {
-    task = new(allocation) AsyncTask(&taskHeapMetadata, jobFlags,
-                                    function, initialContext,
-                                    captureCurrentVoucher);
+    task = new (allocation) AsyncTask(taskHeapMetadataPtr, jobFlags, function,
+                                      initialContext, captureCurrentVoucher);
   }
 
   // Initialize the child fragment if applicable.
@@ -1026,48 +1062,25 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     if ((group && group->isCancelled()) || swift_task_isCancelled(parent))
       swift_task_cancel(task);
 
-    // Initialize task locals storage
-    bool taskLocalStorageInitialized = false;
-
     // Inside a task group, we may have to perform some defensive copying,
     // check if doing so is necessary, and initialize storage using partial
     // defensive copies if necessary.
     if (group) {
       assert(parent && "a task created in a group must be a child task");
-      // We are a child task in a task group; and it may happen that we are calling
-      // addTask specifically in such shape:
-      //
-      //     $local.withValue(theValue) { addTask {} }
-      //
-      // If this is the case, we MUST copy `theValue` (and any other such directly
-      // wrapping the addTask value bindings), because those values will be popped
-      // when withValue returns - breaking our structured concurrency guarantees
-      // that we rely on for the "link directly to parent's task local Item".
-      //
-      // Values set outside the task group are not subject to this problem, as
-      // their structural lifetime guarantee is upheld by the group scope
-      // out-living any addTask created tasks.
-      auto ParentLocal = parent->_private().Local;
-      // If we were going to copy ALL values anyway, we don't need to
-      // perform this defensive partial copying. In practice, we currently
-      // do not have child tasks which force copying, but we could.
-      assert(!taskCreateFlags.copyTaskLocals() &&
-             "Currently we don't have child tasks which force copying task "
-             "locals; unexpected attempt to combine the two!");
-
-      if (auto taskLocalHeadLinkType = ParentLocal.peekHeadLinkType()) {
-        if (taskLocalHeadLinkType ==
-            swift::TaskLocal::NextLinkType::IsNextCreatedInTaskGroupBody) {
-          ParentLocal.copyToOnlyOnlyFromCurrentGroup(task);
-          taskLocalStorageInitialized = true;
-        }
-      }
     }
 
-    if (!taskLocalStorageInitialized) {
-      // just initialize the storage normally
-      task->_private().Local.initializeLinkParent(task, parent);
-    }
+    // Initialize task locals with a link to the parent task.
+    //
+    // Inside a task group, we may have to perform some defensive copying,
+    // and initialize storage using partial defensive copies if necessary.
+    //
+    // If we were going to copy ALL values anyway, we don't need to
+    // perform this defensive partial copying. In practice, we currently
+    // do not have child tasks which force copying, but we could.
+    assert(!taskCreateFlags.copyTaskLocals() &&
+           "Currently we don't have child tasks which force copying task "
+           "locals; unexpected attempt to combine the two!");
+    task->_private().Local.initializeLinkParent(task, parent);
   }
 
   // Configure the initial context.
@@ -1720,7 +1733,7 @@ static NullaryContinuationJob*
 swift_task_createNullaryContinuationJobImpl(
     size_t priority,
     AsyncTask *continuation) {
-  auto *job = new NullaryContinuationJob(swift_task_getCurrent(),
+  auto *job = swift_cxx_newObject<NullaryContinuationJob>(swift_task_getCurrent(),
         static_cast<JobPriority>(priority), continuation);
 
   return job;

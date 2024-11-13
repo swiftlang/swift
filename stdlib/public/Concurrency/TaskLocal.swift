@@ -311,7 +311,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 
     @available(*, unavailable, message: "use '$myTaskLocal.withValue(_:do:)' instead")
     set {
-      fatalError("Illegal attempt to set a \(Self.self) value, use `withValue(...) { ... }` instead.")
+      fatalError("Illegal attempt to set a TaskLocal value, use `withValue(...) { ... }` instead.")
     }
   }
 

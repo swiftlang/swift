@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -enable-experimental-feature IsolatedDeinit -plugin-path %swift-plugin-dir -enable-experimental-feature IsolatedDeinit -Xfrontend -disable-availability-checking -parse-stdlib %import-libdispatch %s -o %t/a.out
+// RUN: %target-build-swift -enable-experimental-feature IsolatedDeinit -plugin-path %swift-plugin-dir -enable-experimental-feature IsolatedDeinit -target %target-swift-5.1-abi-triple -parse-stdlib %import-libdispatch %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 %target-run %t/a.out
 
@@ -8,8 +8,7 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-
-// REQUIRES: gh76538
+// REQUIRES: swift_feature_IsolatedDeinit
 
 import Swift
 import _Concurrency
@@ -89,14 +88,14 @@ class Probe {
   var probeExpectedExecutor: UnownedSerialExecutor
   let probeExpectedNumber: Int
   let probeGroup: DispatchGroup
-  
+
   init(expectedNumber: Int, group: DispatchGroup) {
     self.probeExpectedExecutor = AnotherActor.shared.unownedExecutor
     self.probeExpectedNumber = expectedNumber
     self.probeGroup = group
     group.enter()
   }
-  
+
   deinit {
     expectTrue(isCurrentExecutor(probeExpectedExecutor))
     expectEqual(probeExpectedNumber, TL.number)
@@ -136,13 +135,13 @@ if #available(SwiftStdlib 5.1, *) {
       // FIXME: isolated deinit should be clearing task locals
       await TL.$number.withValue(42) {
         await AnotherActor.shared.performTesting {
-          _ = ClassNoOp(expectedNumber: 42, group: group)
+          _ = ClassNoOp(expectedNumber: 0, group: group)
         }
       }
     }
     group.wait()
   }
-  
+
   tests.test("class sync slow path") {
     let group = DispatchGroup()
     group.enter(1)
@@ -162,7 +161,7 @@ if #available(SwiftStdlib 5.1, *) {
       TL.$number.withValue(99) {
         // Despite last release happening not on the actor itself,
         // this is still a fast path due to optimisation for deallocating actors.
-        _ = ActorNoOp(expectedNumber: 99, group: group)
+        _ = ActorNoOp(expectedNumber: 0, group: group)
       }
     }
     group.wait()

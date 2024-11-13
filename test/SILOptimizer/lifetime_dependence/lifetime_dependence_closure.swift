@@ -5,8 +5,8 @@
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature NonescapableTypes
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NonescapableTypes
 
 struct NCInt: ~Copyable {
   var value: Int
@@ -17,9 +17,9 @@ struct NCInt: ~Copyable {
 struct NEInt : ~Escapable {
   let value: Int
 
-  init(borrowed: borrowing NCInt) -> dependsOn(borrowed) Self {
+  @lifetime(borrow borrowed)
+  init(borrowed: borrowing NCInt) {
     self.value = borrowed.value
-    return self
   }
 }
 

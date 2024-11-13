@@ -34,12 +34,12 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 
 #include "SwiftToClangInteropContext.h"
 #include "clang/AST/ASTContext.h"
@@ -188,7 +188,7 @@ public:
   }
 
   bool isEmptyExtensionDecl(const ExtensionDecl *ED) {
-    auto members = ED->getMembers();
+    auto members = ED->getAllMembers();
     auto hasMembers = std::any_of(members.begin(), members.end(),
                                   [this](const Decl *D) -> bool {
       if (auto VD = dyn_cast<ValueDecl>(D))
@@ -296,8 +296,11 @@ private:
   /// Prints an encoded string, escaped properly for C.
   void printEncodedString(raw_ostream &os, StringRef str,
                           bool includeQuotes = true) {
-    // NB: We don't use raw_ostream::write_escaped() because it does hex escapes
-    // for non-ASCII chars.
+    // Per "P2361 Unevaluated string literals", we should generally print
+    // either raw Unicode characters or letter-based escape sequences for
+    // string literals in e.g. availability attributes. In particular, we
+    // must not use hex escapes. When we don't have an escape for a particular
+    // control character, we'll print its hex value in "{U+NNNN}" format.
 
     llvm::SmallString<128> Buf;
     StringRef decodedStr = Lexer::getEncodedStringSegment(str, Buf);
@@ -305,23 +308,42 @@ private:
     if (includeQuotes) os << '"';
     for (unsigned char c : decodedStr) {
       switch (c) {
+        // Note: We aren't bothering to escape single quote or question mark
+        // even though we could.
+      case '"':
+        os << '\\' << '"';
+        break;
       case '\\':
         os << '\\' << '\\';
         break;
-      case '\t':
-        os << '\\' << 't';
+      case '\a':
+        os << '\\' << 'a';
+        break;
+      case '\b':
+        os << '\\' << 'b';
+        break;
+      case '\f':
+        os << '\\' << 'f';
         break;
       case '\n':
         os << '\\' << 'n';
         break;
-      case '"':
-        os << '\\' << '"';
+      case '\r':
+        os << '\\' << 'r';
         break;
+      case '\t':
+        os << '\\' << 't';
+        break;
+      case '\v':
+        os << '\\' << 'v';
+        break;
+
       default:
         if (c < 0x20 || c == 0x7F) {
-          os << '\\' << 'x';
+          os << "{U+00";
           os << llvm::hexdigit((c >> 4) & 0xF);
           os << llvm::hexdigit((c >> 0) & 0xF);
+          os << "}";
         } else {
           os << c;
         }
@@ -349,7 +371,7 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Non objc class.
       ClangClassTypePrinter(os).printClassTypeDecl(
-          CD, [&]() { printMembers(CD->getMembers()); }, owningPrinter);
+          CD, [&]() { printMembers(CD->getAllMembers()); }, owningPrinter);
       recordEmittedDeclInCurrentCxxLexicalScope(CD);
       return;
     }
@@ -389,7 +411,7 @@ private:
       os << " : " << getNameForObjC(superDecl);
     printProtocols(CD->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
-    printMembers(CD->getMembers());
+    printMembers(CD->getAllMembers());
     os << "@end\n";
   }
 
@@ -402,13 +424,13 @@ private:
     printer.printValueTypeDecl(
         SD, /*bodyPrinter=*/
         [&]() {
-          printMembers(SD->getMembers());
+          printMembers(SD->getAllMembers());
           for (const auto *ed :
                owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
             if (!cxx_translation::isExposableToCxx(ed->getGenericSignature()))
               continue;
 
-            printMembers(ed->getMembers());
+            printMembers(ed->getAllMembers());
           }
         },
         owningPrinter);
@@ -428,7 +450,7 @@ private:
     os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
-    printMembers(ED->getMembers());
+    printMembers(ED->getAllMembers());
     os << "@end\n";
   }
 
@@ -449,7 +471,7 @@ private:
 
     printProtocols(PD->getInheritedProtocols());
     os << "\n";
-    printMembers(PD->getMembers());
+    printMembers(PD->getAllMembers());
     os << "@end\n";
   }
 
@@ -884,14 +906,14 @@ private:
           os << "  }\n"; // operator cases()'s closing bracket
           os << "\n";
 
-          printMembers(ED->getMembers());
+          printMembers(ED->getAllMembers());
 
           for (const auto *ext :
                owningPrinter.interopContext.getExtensionsForNominalType(ED)) {
             if (!cxx_translation::isExposableToCxx(ext->getGenericSignature()))
               continue;
 
-            printMembers(ext->getMembers());
+            printMembers(ext->getAllMembers());
           }
         },
         owningPrinter);
@@ -1046,6 +1068,7 @@ private:
     auto result = methodTy->getResult();
     if (result->isUninhabited())
       return getASTContext().TheEmptyTupleType;
+
     return result;
   }
 
@@ -1493,8 +1516,6 @@ private:
       StringRef comment = "") {
     std::string cRepresentationString;
     llvm::raw_string_ostream cRepresentationOS(cRepresentationString);
-    cRepresentationOS << "SWIFT_EXTERN ";
-
     DeclAndTypeClangFunctionPrinter funcPrinter(
         cRepresentationOS, owningPrinter.prologueOS, owningPrinter.typeMapping,
         owningPrinter.interopContext, owningPrinter);
@@ -1528,6 +1549,8 @@ private:
       FD->getName().print(os);
     }
     os << "\n";
+    if (representation.isObjCxxOnly())
+      os << "#endif\n";
     return representation;
   }
 
@@ -1636,6 +1659,8 @@ private:
         /*typeDeclContext=*/nullptr, FD->getModuleContext(), resultTy,
         FD->getParameters(), funcTy->isThrowing(), funcTy);
     os << "}\n";
+    if (result.isObjCxxOnly())
+      os << "#endif\n";
   }
 
   enum class PrintLeadingSpace : bool {
@@ -1923,8 +1948,9 @@ private:
 
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Documentation.
-      auto *getter = VD->getOpaqueAccessor(AccessorKind::Get);
-      printAbstractFunctionAsMethod(getter, /*isStatic=*/VD->isStatic());
+      // TODO: support read/modify accessors.
+      if (auto *getter = VD->getOpaqueAccessor(AccessorKind::Get))
+        printAbstractFunctionAsMethod(getter, /*isStatic=*/VD->isStatic());
       if (auto *setter = VD->getOpaqueAccessor(AccessorKind::Set))
         printAbstractFunctionAsMethod(setter, /*isStatic=*/VD->isStatic());
       return;
@@ -2718,11 +2744,6 @@ private:
     llvm_unreachable("Not implemented");
   }
 
-  void visitParenType(ParenType *PT,
-                      std::optional<OptionalTypeKind> optionalKind) {
-    visitPart(PT->getSinglyDesugaredType(), optionalKind);
-  }
-
   void visitSyntaxSugarType(SyntaxSugarType *SST,
                             std::optional<OptionalTypeKind> optionalKind) {
     visitPart(SST->getSinglyDesugaredType(), optionalKind);
@@ -2954,7 +2975,9 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   if (outputLang == OutputLanguageMode::Cxx) {
     if (!isExposedToThisModule(M, VD, exposedModules))
       return false;
-    if (!cxx_translation::isExposableToCxx(VD))
+    if (!cxx_translation::isExposableToCxx(
+            VD,
+            [this](const NominalTypeDecl *decl) { return isZeroSized(decl); }))
       return false;
     if (!isEnumExposableToCxx(VD, *this))
       return false;
@@ -2972,6 +2995,16 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   return true;
 }
 
+bool DeclAndTypePrinter::isZeroSized(const NominalTypeDecl *decl) {
+  if (decl->isResilient())
+    return false;
+  auto &abiDetails = interopContext.getIrABIDetails();
+  auto sizeAndAlignment = abiDetails.getTypeSizeAlignment(decl);
+  if (sizeAndAlignment)
+    return sizeAndAlignment->size == 0;
+  return false;
+}
+
 bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {
   return outputLang == OutputLanguageMode::Cxx
              ? cxx_translation::isVisibleToCxx(vd, minRequiredAccess)
@@ -2982,8 +3015,9 @@ void DeclAndTypePrinter::print(const Decl *D) {
   getImpl().print(D);
 }
 
-void DeclAndTypePrinter::print(Type ty) {
-  getImpl().print(ty, /*overridingOptionality*/ std::nullopt);
+void DeclAndTypePrinter::print(
+    Type ty, std::optional<OptionalTypeKind> overrideOptionalTypeKind) {
+  getImpl().print(ty, overrideOptionalTypeKind);
 }
 
 void DeclAndTypePrinter::printTypeName(raw_ostream &os, Type ty,

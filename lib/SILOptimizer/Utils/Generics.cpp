@@ -2324,6 +2324,9 @@ bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
 
   SILValue instance = cm->getOperand();
   SILType classTy = instance->getType();
+  if (classTy.is<MetatypeType>())
+    classTy = classTy.getLoweredInstanceTypeOfMetatype(cm->getFunction());
+
   CanType astType = classTy.getASTType();
   if (!astType->isSpecialized())
     return false;

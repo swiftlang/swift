@@ -45,6 +45,14 @@ bool BridgedAliasAnalysis::unused(BridgedValue address1, BridgedValue address2) 
 static_assert(sizeof(BridgedCalleeAnalysis::CalleeList) >= sizeof(swift::CalleeList),
               "BridgedCalleeAnalysis::CalleeList has wrong size");
 
+BridgedCalleeAnalysis::CalleeList::CalleeList(swift::CalleeList list) {
+  *reinterpret_cast<swift::CalleeList *>(&storage) = list;
+}
+
+swift::CalleeList BridgedCalleeAnalysis::CalleeList::unbridged() const {
+  return *reinterpret_cast<const swift::CalleeList *>(&storage);
+}
+
 bool BridgedCalleeAnalysis::CalleeList::isIncomplete() const {
   return unbridged().isIncomplete();
 }
@@ -509,7 +517,7 @@ void BridgedPassContext::SSAUpdater_initialize(
     BridgedFunction function, BridgedType type,
     BridgedValue::Ownership ownership) const {
   invocation->initializeSSAUpdater(function.getFunction(), type.unbridged(),
-                                   BridgedValue::castToOwnership(ownership));
+                                   BridgedValue::unbridge(ownership));
 }
 
 void BridgedPassContext::addFunctionToPassManagerWorklist(
@@ -548,9 +556,19 @@ bool BridgedPassContext::enableMoveInoutStackProtection() const {
   return mod->getOptions().EnableMoveInoutStackProtection;
 }
 
+bool BridgedPassContext::useAggressiveReg2MemForCodeSize() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().UseAggressiveReg2MemForCodeSize;
+}
+
 BridgedPassContext::AssertConfiguration BridgedPassContext::getAssertConfiguration() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return (AssertConfiguration)mod->getOptions().AssertConfig;
+}
+
+bool BridgedPassContext::shouldExpand(BridgedType ty) const {
+  swift::SILModule &mod = *invocation->getPassManager()->getModule();
+  return swift::shouldExpand(mod, ty.unbridged());
 }
 
 static_assert((int)BridgedPassContext::SILStage::Raw == (int)swift::SILStage::Raw);

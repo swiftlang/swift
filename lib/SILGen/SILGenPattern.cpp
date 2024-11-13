@@ -3316,11 +3316,11 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
   }
   
   // Check the access strategy used to read the storage.
-  auto strategy = storage->getAccessStrategy(access,
-                                             AccessKind::Read,
-                                             SGF.SGM.SwiftModule,
-                                             SGF.F.getResilienceExpansion());
-                                             
+  auto strategy =
+      storage->getAccessStrategy(access, AccessKind::Read, SGF.SGM.SwiftModule,
+                                 SGF.F.getResilienceExpansion(),
+                                 /*useOldABI=*/false);
+
   switch (strategy.getKind()) {
   case AccessStrategy::Kind::Storage:
     // Accessing storage directly benefits from borrowing.

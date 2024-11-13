@@ -423,24 +423,22 @@ public:
 
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
-      if (!storage) {
-        if (auto witness = asDerived().getWitness(reqDecl)) {
-          auto newDecl = requirementRef.withDecl(witness.getDecl());
-          // Only import C++ methods as foreign. If the following
-          // Objective-C function is imported as foreign:
-          //   () -> String
-          // It will be imported as the following type:
-          //   () -> NSString
-          // But the first is correct, so make sure we don't mark this witness
-          // as foreign.
-          if (dyn_cast_or_null<clang::CXXMethodDecl>(
-                  witness.getDecl()->getClangDecl()))
-            newDecl = newDecl.asForeign();
-          return addMethodImplementation(
-              requirementRef, getWitnessRef(newDecl, witness), witness);
-        }
-        return asDerived().addMissingMethod(requirementRef);
-      } // else, fallthrough to the usual accessor handling!
+      if (auto witness = asDerived().getWitness(reqDecl)) {
+        auto newDecl = requirementRef.withDecl(witness.getDecl());
+        // Only import C++ methods as foreign. If the following
+        // Objective-C function is imported as foreign:
+        //   () -> String
+        // It will be imported as the following type:
+        //   () -> NSString
+        // But the first is correct, so make sure we don't mark this witness
+        // as foreign.
+        if (dyn_cast_or_null<clang::CXXMethodDecl>(
+                witness.getDecl()->getClangDecl()))
+          newDecl = newDecl.asForeign();
+        return addMethodImplementation(
+            requirementRef, getWitnessRef(newDecl, witness), witness);
+      }
+      return asDerived().addMissingMethod(requirementRef);
     } else {
       // Otherwise, we need to map the storage declaration and then get
       // the appropriate accessor for it.
@@ -837,12 +835,16 @@ SILFunction *SILGenModule::emitProtocolWitness(
   if (witnessRef.isAlwaysInline())
     InlineStrategy = AlwaysInline;
 
+  SILFunction *f = M.lookUpFunction(nameBuffer);
+  if (f)
+    return f;
+
   SILGenFunctionBuilder builder(*this);
-  auto *f = builder.createFunction(
+  f = builder.createFunction(
       linkage, nameBuffer, witnessSILFnType, genericEnv,
-      SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent, serializedKind,
-      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(),
-      IsThunk, SubclassScope::NotApplicable, InlineStrategy);
+      SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent,
+      serializedKind, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
+      ProfileCounter(), IsThunk, SubclassScope::NotApplicable, InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witnessRef.getDecl()), f));
@@ -1057,6 +1059,10 @@ public:
                                SILDeclRef witnessRef,
                                IsFreeFunctionWitness_t isFree,
                                Witness witness) {
+    if (!cast<AbstractFunctionDecl>(witnessRef.getDecl())->hasBody()) {
+      addMissingDefault();
+      return;
+    }
     SILFunction *witnessFn = SGM.emitProtocolWitness(
         ProtocolConformanceRef(Proto), SILLinkage::Private, IsNotSerialized,
         requirementRef, witnessRef, isFree, witness);

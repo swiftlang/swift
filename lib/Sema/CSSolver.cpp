@@ -128,11 +128,8 @@ Solution ConstraintSystem::finalize() {
 
   // For each of the fixes, record it as an operation on the affected
   // expression.
-  unsigned firstFixIndex = 0;
-  if (solverState && solverState->PartialSolutionScope) {
-    firstFixIndex = solverState->PartialSolutionScope->numFixes;
-  }
-
+  unsigned firstFixIndex =
+      (solverState ? solverState->numPartialSolutionFixes : 0);
   for (const auto &fix :
        llvm::make_range(Fixes.begin() + firstFixIndex, Fixes.end()))
     solution.Fixes.push_back(fix);
@@ -272,9 +269,10 @@ Solution ConstraintSystem::finalize() {
   return solution;
 }
 
-void ConstraintSystem::applySolution(const Solution &solution) {
-  // Update the score.
-  CurrentScore += solution.getFixedScore();
+void ConstraintSystem::replaySolution(const Solution &solution,
+                                      bool shouldIncreaseScore) {
+  if (shouldIncreaseScore)
+    replayScore(solution.getFixedScore());
 
   // Assign fixed types to the type variables solved by this solution.
   for (auto binding : solution.typeBindings) {
@@ -433,11 +431,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {
     auto found = appliedPropertyWrappers.find(appliedWrapper.first);
     if (found == appliedPropertyWrappers.end()) {
-      appliedPropertyWrappers.insert(appliedWrapper);
+      for (auto applied : appliedWrapper.second)
+        applyPropertyWrapper(getAsExpr(appliedWrapper.first), applied);
     } else {
-      auto &existing = found->second;
-      ASSERT(existing.size() <= appliedWrapper.second.size());
-      existing = appliedWrapper.second;
+      ASSERT(found->second.size() == appliedWrapper.second.size());
     }
   }
 
@@ -646,13 +643,6 @@ ConstraintSystem::SolverState::~SolverState() {
   if (CS.inInvalidState())
     return;
 
-  // Make sure that all of the retired constraints have been returned
-  // to constraint system.
-  assert(!hasRetiredConstraints());
-
-  // Make sure that all of the generated constraints have been handled.
-  assert(generatedConstraints.empty());
-
   // Re-activate constraints which were initially marked as "active"
   // to restore original state of the constraint system.
   for (auto *constraint : activeConstraints) {
@@ -704,24 +694,32 @@ ConstraintSystem::SolverState::~SolverState() {
 }
 
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
-  : cs(cs) {
-  numTrailChanges = cs.solverState->Trail.size();
+  : cs(cs),
+    numTypeVariables(cs.TypeVariables.size()),
+    numTrailChanges(cs.solverState->Trail.size()),
+    scopeNumber(cs.solverState->beginScope()),
+    moved(0) {
+  ASSERT(!cs.failedConstraint && "Unexpected failed constraint!");
+}
 
-  numTypeVariables = cs.TypeVariables.size();
-  numFixes = cs.Fixes.size();
-
-  PreviousScore = cs.CurrentScore;
-
-  cs.solverState->registerScope(this);
-  assert(!cs.failedConstraint && "Unexpected failed constraint!");
+ConstraintSystem::SolverScope::SolverScope(SolverScope &&other)
+  : cs(other.cs),
+    numTypeVariables(other.numTypeVariables),
+    numTrailChanges(other.numTrailChanges),
+    scopeNumber(other.scopeNumber),
+    moved(0) {
+  other.moved = 1;
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
+  if (moved)
+    return;
+
   // Don't attempt to rollback from an incorrect state.
   if (cs.inInvalidState())
     return;
 
-  // Erase the end of various lists.
+  // Roll back introduced type variables.
   truncate(cs.TypeVariables, numTypeVariables);
 
   // Move any remaining active constraints into the inactive list.
@@ -736,13 +734,8 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Roll back changes to the constraint system.
   cs.solverState->Trail.undo(numTrailChanges);
 
-  // Rollback all of the changes done to constraints by the current scope,
-  // e.g. add retired constraints back to the circulation and remove generated
-  // constraints introduced by the current scope.
-  cs.solverState->rollback(this);
-
-  // Reset the previous score.
-  cs.CurrentScore = PreviousScore;
+  // Update statistics.
+  cs.solverState->endScope(scopeNumber);
 
   // Clear out other "failed" state.
   cs.failedConstraint = nullptr;
@@ -1504,7 +1497,7 @@ ConstraintSystem::solveImpl(SyntacticElementTarget &target,
     Timer.emplace(expr, *this);
 
   if (generateConstraints(target, allowFreeTypeVariables))
-    return SolutionResult::forError();;
+    return SolutionResult::forError();
 
   // Try to solve the constraint system using computed suggestions.
   SmallVector<Solution, 4> solutions;
@@ -1787,6 +1780,9 @@ ConstraintSystem::filterDisjunction(
         return SolutionKind::Unsolved;
 
       for (auto *currentChoice : disjunction->getNestedConstraints()) {
+        if (currentChoice->isDisabled())
+          continue;
+
         if (currentChoice != choice)
           solverState->disableConstraint(currentChoice);
       }

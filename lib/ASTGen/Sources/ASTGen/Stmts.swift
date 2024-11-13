@@ -14,6 +14,18 @@ import ASTBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
+protocol DoStmtOrExprSyntax {
+  var doKeyword: TokenSyntax { get }
+  var throwsClause: ThrowsClauseSyntax? { get }
+  var body: CodeBlockSyntax { get }
+  var catchClauses: CatchClauseListSyntax { get }
+}
+extension DoStmtSyntax: DoStmtOrExprSyntax {}
+extension DoExprSyntax: DoStmtOrExprSyntax {
+  // FIXME: DoExprSyntax is missing throwsClause?
+  var throwsClause: ThrowsClauseSyntax? { return nil }
+}
+
 extension ASTGenVisitor {
   func generate(stmt node: StmtSyntax) -> BridgedStmt {
     switch node.as(StmtSyntaxEnum.self) {
@@ -262,6 +274,13 @@ extension ASTGenVisitor {
   }
 
   func generate(doStmt node: DoStmtSyntax, labelInfo: BridgedLabeledStmtInfo = nil) -> BridgedStmt {
+    return self.generate(doStmtOrExpr: node, labelInfo: labelInfo)
+  }
+
+  func generate(
+    doStmtOrExpr node: some DoStmtOrExprSyntax,
+    labelInfo: BridgedLabeledStmtInfo = nil
+  ) -> BridgedStmt {
     if node.catchClauses.isEmpty {
       // FIXME: Handle
       precondition(node.throwsClause == nil)

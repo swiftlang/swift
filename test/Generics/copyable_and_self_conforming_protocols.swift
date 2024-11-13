@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -enable-experimental-feature NonescapableTypes %s -verify
 
 // REQUIRES: objc_interop
-// REQUIRES: asserts
+// REQUIRES: swift_feature_NonescapableTypes
 
 import Foundation
 

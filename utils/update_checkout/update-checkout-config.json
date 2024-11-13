@@ -43,15 +43,15 @@
         "swift-testing": {
             "remote": { "id": "swiftlang/swift-testing" } },
         "swift-corelibs-xctest": {
-            "remote": { "id": "apple/swift-corelibs-xctest" } },
+            "remote": { "id": "swiftlang/swift-corelibs-xctest" } },
         "swift-corelibs-foundation": {
-            "remote": { "id": "apple/swift-corelibs-foundation" } },  
+            "remote": { "id": "swiftlang/swift-corelibs-foundation" } },  
         "swift-foundation-icu": {
-            "remote": { "id": "apple/swift-foundation-icu" } },  
+            "remote": { "id": "swiftlang/swift-foundation-icu" } },  
         "swift-foundation": {
-            "remote": { "id": "apple/swift-foundation" } },
+            "remote": { "id": "swiftlang/swift-foundation" } },
         "swift-corelibs-libdispatch": {
-            "remote": { "id": "apple/swift-corelibs-libdispatch" } },
+            "remote": { "id": "swiftlang/swift-corelibs-libdispatch" } },
         "swift-integration-tests": {
             "remote": { "id": "swiftlang/swift-integration-tests" } },
         "swift-xcode-playground-support": {
@@ -118,10 +118,10 @@
     "default-branch-scheme": "main",
     "branch-schemes": {
         "main": {
-            "aliases": ["swift/main", "main", "stable/20230725"],
+            "aliases": ["swift/main", "main", "stable/20240723"],
             "repos": {
-                "llvm-project": "stable/20230725",
-                "swift-llvm-bindings": "stable/20230725",
+                "llvm-project": "stable/20240723",
+                "swift-llvm-bindings": "stable/20240723",
                 "swift": "main",
                 "cmark": "gfm",
                 "llbuild": "main",
@@ -151,7 +151,7 @@
                 "swift-xcode-playground-support": "main",
                 "ninja": "v1.11.1",
                 "yams": "5.0.6",
-                "cmake": "v3.24.2",
+                "cmake": "v3.30.2",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
@@ -165,7 +165,7 @@
                 "swift-experimental-string-processing": "swift/main",
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-22",
-                "wasmkit": "0.0.3",
+                "wasmkit": "0.1.2",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1"
@@ -375,7 +375,7 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch", "stable/20240723"],
+            "aliases": ["rebranch"],
             "repos": {
                 "llvm-project": "stable/20240723",
                 "swift-llvm-bindings": "stable/20240723",
@@ -408,7 +408,7 @@
                 "swift-xcode-playground-support": "main",
                 "ninja": "v1.11.1",
                 "yams": "5.0.6",
-                "cmake": "v3.24.2",
+                "cmake": "v3.30.2",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
@@ -422,7 +422,7 @@
                 "swift-experimental-string-processing": "swift/main",
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-22",
-                "wasmkit": "0.0.3",
+                "wasmkit": "0.1.2",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1"
@@ -791,7 +791,7 @@
                 "swift-xcode-playground-support": "main",
                 "ninja": "release",
                 "yams": "5.0.6",
-                "cmake": "v3.24.2",
+                "cmake": "v3.30.2",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
@@ -799,7 +799,7 @@
                 "swift-nio": "2.65.0",
                 "swift-experimental-string-processing": "swift/main",
                 "wasi-libc": "wasi-sdk-22",
-                "wasmkit": "0.0.3",
+                "wasmkit": "0.1.2",
                 "curl": "curl-8_9_1",
                 "icu": "maint/maint-69",
                 "libxml2": "v2.11.5",

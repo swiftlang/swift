@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -target %target-swift-5.9-abi-triple %s | %FileCheck %s
 
 
 

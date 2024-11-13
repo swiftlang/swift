@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-concurrency -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-experimental-concurrency -target %target-swift-5.1-abi-triple %s | %FileCheck %s
 // REQUIRES: concurrency
 
 // REQUIRES: swift_in_compiler

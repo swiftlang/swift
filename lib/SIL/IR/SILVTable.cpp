@@ -75,6 +75,22 @@ void SILVTable::updateVTableCache(const Entry &entry) {
   M.VTableEntryCache[{this, entry.getMethod()}] = entry;
 }
 
+void SILVTable::replaceEntries(ArrayRef<Entry> newEntries) {
+  auto entries = getMutableEntries();
+  ASSERT(newEntries.size() <= entries.size());
+  for (unsigned i = 0; i < entries.size(); ++i) {
+    entries[i].getImplementation()->decrementRefCount();
+    if (i < newEntries.size()) {
+      entries[i] = newEntries[i];
+      entries[i].getImplementation()->incrementRefCount();
+      updateVTableCache(entries[i]);
+    } else {
+      removeFromVTableCache(entries[i]);
+    }
+  }
+  NumEntries = newEntries.size();
+}
+
 SILVTable::SILVTable(ClassDecl *c, SILType classType,
                      SerializedKind_t serialized, ArrayRef<Entry> entries)
     : Class(c), classType(classType), SerializedKind(serialized),

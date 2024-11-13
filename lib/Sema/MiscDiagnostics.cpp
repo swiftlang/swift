@@ -39,7 +39,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/DeclObjC.h"
@@ -97,10 +96,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
   public:
     DiagnoseWalker(const DeclContext *DC, bool isExprStmt)
         : IsExprStmt(isExprStmt), Ctx(DC->getASTContext()), DC(DC) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       return Action::Continue();
@@ -1510,9 +1505,10 @@ DeferredDiags swift::findSyntacticErrorForConsume(
         break;
       }
       partial = true;
-      AccessStrategy strategy = vd->getAccessStrategy(
-          mre->getAccessSemantics(), AccessKind::Read,
-          module, ResilienceExpansion::Minimal);
+      AccessStrategy strategy =
+          vd->getAccessStrategy(mre->getAccessSemantics(), AccessKind::Read,
+                                module, ResilienceExpansion::Minimal,
+                                /*useOldABI=*/false);
       if (strategy.getKind() != AccessStrategy::Storage) {
         if (noncopyable) {
           result.emplace_back(loc, diag::consume_expression_non_storage);
@@ -1565,7 +1561,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   if (!var)  // Ignore subscripts
     return;
 
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     VarDecl *Var;
     const AccessorDecl *Accessor;
@@ -1579,10 +1575,6 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
       return DRE && DRE->isImplicit() && isa<VarDecl>(DRE->getDecl()) &&
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
-    }
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -2223,7 +2215,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return nullptr;
       }
 
-      return parentContext->getInnermostClosureForSelfCapture();
+      return parentContext->getInnermostClosureForCaptures();
     }
 
     bool shouldRecordClosure(const AbstractClosureExpr *E) {
@@ -3469,7 +3461,6 @@ public:
     }
 
     // Check whether all of the underlying type candidates match up.
-    // TODO [OPAQUE SUPPORT]: diagnose multiple opaque types
 
     // There is a single unique signature, which means that all returns
     // matched.
@@ -3596,6 +3587,7 @@ public:
 
     SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *, 4>
         conditionalSubstitutions;
+    SubstitutionMap universalSubstMap = std::get<1>(universallyAvailable);
 
     for (const auto &entry : Candidates) {
       auto availabilityContext = entry.first;
@@ -3604,24 +3596,45 @@ public:
       if (!availabilityContext)
         continue;
 
+      unsigned neverAvailableCount = 0, alwaysAvailableCount = 0;
       SmallVector<AvailabilityCondition, 4> conditions;
 
       for (const auto &elt : availabilityContext->getCond()) {
         auto condition = elt.getAvailability();
 
         auto availabilityRange = condition->getAvailableRange();
-        // If there is no lower endpoint it means that the
-        // current platform is unrelated to this condition
-        // and we can ignore it.
-        if (!availabilityRange.hasLowerEndpoint())
+        // If there is no lower endpoint it means that the condition has no
+        // OS version specification that matches the target platform.
+        if (!availabilityRange.hasLowerEndpoint()) {
+          // An inactive #unavailable condition trivially evaluates to false.
+          if (condition->isUnavailability()) {
+            neverAvailableCount++;
+            continue;
+          }
+
+          // An inactive #available condition trivially evaluates to true.
+          alwaysAvailableCount++;
           continue;
+        }
 
         conditions.push_back(
             {availabilityRange, condition->isUnavailability()});
       }
 
-      if (conditions.empty())
+      // If there were any conditions that were always false, then this
+      // candidate is unreachable at runtime.
+      if (neverAvailableCount > 0)
         continue;
+
+      // If all the conditions were trivially true, then this candidate is
+      // effectively a universally available candidate and the rest of the
+      // candidates should be ignored since they are unreachable.
+      if (alwaysAvailableCount == availabilityContext->getCond().size()) {
+        universalSubstMap = std::get<1>(candidate);
+        break;
+      }
+
+      ASSERT(conditions.size() > 0);
 
       conditionalSubstitutions.push_back(
           OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
@@ -3632,9 +3645,8 @@ public:
     // Add universally available choice as the last one.
     conditionalSubstitutions.push_back(
         OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-            Ctx, {{VersionRange::empty(), /*unavailable=*/false}},
-            std::get<1>(universallyAvailable)
-                .mapReplacementTypesOutOfContext()));
+            Ctx, {{VersionRange::all(), /*unavailable=*/false}},
+            universalSubstMap.mapReplacementTypesOutOfContext()));
 
     OpaqueDecl->setConditionallyAvailableSubstitutions(
         conditionalSubstitutions);
@@ -4407,30 +4419,9 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
   }
 }
 
-static void
-diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
-                                    const DeclContext *DC,
-                                    Expr *subjectExpr) {
-  // For now, move-only types must use the `consume` operator to be
-  // pattern matched. Pattern matching is only implemented as a consuming
-  // operation today, but we don't want to be stuck with that as the default
-  // in the fullness of time when we get borrowing pattern matching later.
-  
-  // Don't bother if the subject wasn't given a valid type, or is a copyable
-  // type.
-  auto subjectType = subjectExpr->getType();
-  if (!subjectType
-      || subjectType->hasError()
-      || !subjectType->isNoncopyable()) {
-    return;
-  }
-}
-
 // Perform MiscDiagnostics on Switch Statements.
 static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt,
                         DeclContext *DC) {
-  diagnoseMoveOnlyPatternMatchSubject(ctx, DC, stmt->getSubjectExpr());
-                        
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
@@ -4530,7 +4521,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   if (E == nullptr || isa<ErrorExpr>(E)) return;
 
   // Walk into expressions which might have invalid trailing closures
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
 
     void diagnoseIt(const CallExpr *E) {
@@ -4575,10 +4566,6 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
 
   public:
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
 
     PreWalkResult<ArgumentList *>
     walkToArgumentListPre(ArgumentList *args) override {
@@ -4649,7 +4636,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
 
 namespace {
 
-class ObjCSelectorWalker : public ASTWalker {
+class ObjCSelectorWalker : public BaseDiagnosticWalker {
   ASTContext &Ctx;
   const DeclContext *DC;
   Type SelectorTy;
@@ -4698,10 +4685,6 @@ class ObjCSelectorWalker : public ASTWalker {
 public:
   ObjCSelectorWalker(const DeclContext *dc, Type selectorTy)
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
-  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
@@ -5184,9 +5167,7 @@ static void checkLabeledStmtConditions(ASTContext &ctx,
 
     switch (elt.getKind()) {
     case StmtConditionElement::CK_Boolean:
-      break;
     case StmtConditionElement::CK_PatternBinding:
-      diagnoseMoveOnlyPatternMatchSubject(ctx, DC, elt.getInitializer());
       break;
     case StmtConditionElement::CK_Availability: {
       auto info = elt.getAvailability();
@@ -5209,7 +5190,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class UnintendedOptionalBehaviorWalker : public ASTWalker {
+  class UnintendedOptionalBehaviorWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     SmallPtrSet<Expr *, 16> IgnoredExprs;
 
@@ -5291,7 +5272,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       SmallString<16> coercionString;
       coercionString += " as ";
-      coercionString += destType->getWithoutParens()->getString();
+      coercionString += destType->getString();
 
       Ctx.Diags.diagnose(E->getLoc(), diag::silence_optional_to_any,
                          destType, coercionString.substr(1))
@@ -5561,10 +5542,6 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5600,7 +5577,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class DeprecatedWritableKeyPathWalker : public ASTWalker {
+  class DeprecatedWritableKeyPathWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     const DeclContext *DC;
 
@@ -5634,10 +5611,6 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5661,7 +5634,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
 static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
                                                      const DeclContext *DC) {
-  class KVOObserveCallWalker : public ASTWalker {
+  class KVOObserveCallWalker : public BaseDiagnosticWalker {
     const ASTContext &C;
 
   public:
@@ -5719,10 +5692,6 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5743,7 +5712,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
 static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
                                                      const DeclContext *DC) {
 
-  class ExplicitLazyVarStorageAccessFinder : public ASTWalker {
+  class ExplicitLazyVarStorageAccessFinder : public BaseDiagnosticWalker {
     const ASTContext &C;
 
   public:
@@ -5770,10 +5739,6 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5792,7 +5757,7 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
 }
 
 static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
-  class ComparisonWithNaNFinder : public ASTWalker {
+  class ComparisonWithNaNFinder : public BaseDiagnosticWalker {
     const ASTContext &C;
 
   public:
@@ -5901,10 +5866,6 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5927,16 +5888,12 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     const DeclContext *DC;
 
   public:
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -5990,7 +5947,7 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
 static void
 diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
                                              const DeclContext *DC) {
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
 
   private:
@@ -6088,10 +6045,6 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
     }
   public:
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       const auto *DLE = dyn_cast_or_null<DictionaryExpr>(E);
@@ -6377,9 +6330,6 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
       type = newType;
       continue;
     }
-
-    // Look through parentheses.
-    type = type->getWithoutParens();
 
     // Look through optionals.
     if (auto optObjectTy = type->getOptionalObjectType()) {

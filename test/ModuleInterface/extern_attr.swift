@@ -4,6 +4,8 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
 // RUN: %FileCheck %s < %t/Library.swiftinterface
 
+// REQUIRES: swift_feature_Extern
+
 // CHECK:   @_extern(c) public func externalCFunc()
 @_extern(c) public func externalCFunc()
 

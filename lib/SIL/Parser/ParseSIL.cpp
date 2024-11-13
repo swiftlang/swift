@@ -30,7 +30,6 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
-#include "swift/Parse/Parser.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -66,11 +65,6 @@ static llvm::cl::opt<bool>
 ParseIncompleteOSSA("parse-incomplete-ossa",
                     llvm::cl::desc("Parse OSSA with incomplete lifetimes"));
 
-static llvm::cl::opt<bool> DisablePopulateOwnershipFlags(
-    "disable-populate-ownership-flags",
-    llvm::cl::desc("Disable populating ownership flags"),
-    llvm::cl::init(false));
-
 //===----------------------------------------------------------------------===//
 // SILParserState implementation
 //===----------------------------------------------------------------------===//
@@ -87,11 +81,16 @@ SILParserState::~SILParserState() {
   }
 
   // Turn any debug-info-only function declarations into zombies.
-  for (auto *Fn : PotentialZombieFns)
-    if (Fn->isExternalDeclaration()) {
+  markZombies();
+}
+
+void SILParserState::markZombies() {
+  for (auto *Fn : PotentialZombieFns) {
+    if (Fn->isExternalDeclaration() && !Fn->isZombie()) {
       Fn->setInlined();
       M.eraseFunction(Fn);
     }
+  }
 }
 
 std::unique_ptr<SILModule>
@@ -125,6 +124,11 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
            "Failed to parse SIL but did not emit any errors!");
     return SILModule::createEmptyModule(desc.context, desc.conv, desc.opts);
   }
+
+  // Mark functions as zombies before calling SILVerifier as functions referred
+  //to by debug scopes only can fail verifier checks
+  parserState.markZombies();
+
   // If SIL parsing succeeded, verify the generated SIL.
   if (!parser.Diags.hadAnyError() && !DisableInputVerify) {
     silMod->verify(/*SingleFunction=*/true, !ParseIncompleteOSSA);
@@ -1027,6 +1031,42 @@ bool SILParser::parseASTType(CanType &result,
                              GenericParamList *genericParams,
                              bool forceContextualType) {
   ParserResult<TypeRepr> parsedType = P.parseType();
+  if (parsedType.isNull()) return true;
+
+  // If we weren't given a specific generic context to resolve the type
+  // within, use the contextual generic parameters and always produce
+  // a contextual type.  Otherwise, produce a contextual type only if
+  // we were asked for one.
+  bool wantContextualType = forceContextualType;
+  if (!genericSig) {
+    genericSig = ContextGenericSig;
+    wantContextualType = true;
+  }
+  if (genericParams == nullptr)
+    genericParams = ContextGenericParams;
+
+  bindSILGenericParams(parsedType.get());
+
+  auto resolvedType = performTypeResolution(
+      parsedType.get(), /*isSILType=*/false, genericSig, genericParams);
+  if (wantContextualType && genericSig) {
+    resolvedType = genericSig.getGenericEnvironment()
+        ->mapTypeIntoContext(resolvedType);
+  }
+
+  if (resolvedType->hasError())
+    return true;
+
+  result = resolvedType->getCanonicalType();
+
+  return false;
+}
+
+bool SILParser::parseASTTypeOrValue(CanType &result,
+                                    GenericSignature genericSig,
+                                    GenericParamList *genericParams,
+                                    bool forceContextualType) {
+  auto parsedType = P.parseTypeOrValue();
   if (parsedType.isNull()) return true;
 
   // If we weren't given a specific generic context to resolve the type
@@ -3030,6 +3070,21 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createBuiltin(InstLoc, Id, ResultTy, subMap, Args);
     break;
   }
+  case SILInstructionKind::MergeIsolationRegionInst: {
+    SmallVector<SILValue, 4> Args;
+    do {
+      SILValue Val;
+      if (parseTypedValueRef(Val, B))
+        return true;
+      Args.push_back(Val);
+    } while (P.consumeIf(tok::comma));
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal = B.createMergeIsolationRegion(InstLoc, Args);
+    break;
+  }
   case SILInstructionKind::OpenExistentialAddrInst:
     if (parseOpenExistAddrKind() || parseTypedValueRef(Val, B) ||
         parseVerbatim("to") || parseSILType(Ty) ||
@@ -3098,7 +3153,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     CanType paramType;
     if (parseSILType(Ty) ||
         parseVerbatim("for") ||
-        parseASTType(paramType))
+        parseASTTypeOrValue(paramType))
       return true;
 
     ResultVal = B.createTypeValue(InstLoc, Ty, paramType);
@@ -4046,6 +4101,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     auto kind = llvm::StringSwitch<ThunkInst::Kind>(attrName)
                     .Case("identity", ThunkInst::Kind::Identity)
+                    .Case("hop_to_mainactor_if_needed",
+                          ThunkInst::Kind::HopToMainActorIfNeeded)
                     .Default(ThunkInst::Kind::Invalid);
     if (!kind) {
       P.diagnose(OpcodeLoc, diag::sil_thunkinst_failed_to_parse_kind, attrName);
@@ -6883,7 +6940,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       return true;
     }
   } else if (Opcode == SILInstructionKind::BeginApplyInst) {
-    if (FTI->getCoroutineKind() != SILCoroutineKind::YieldOnce) {
+    if (FTI->getCoroutineKind() != SILCoroutineKind::YieldOnce &&
+        FTI->getCoroutineKind() != SILCoroutineKind::YieldOnce2) {
       P.diagnose(TypeLoc, diag::expected_sil_type_kind,
                  "to be a yield_once coroutine");
       return true;
@@ -7174,16 +7232,6 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   return false;
 }
 
-static void populateOwnershipFlags(SILFunction *func) {
-  for (auto &bb : *func) {
-    for (auto &arg : bb.getArguments()) {
-      if (computeIsReborrow(arg)) {
-        arg->setReborrow(true);
-      }
-    }
-  }
-}
-
 ///   decl-sil:   [[only in SIL mode]]
 ///     'sil' sil-linkage '@' identifier ':' sil-type decl-sil-body?
 ///   decl-sil-body:
@@ -7362,13 +7410,6 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           if (FunctionState.parseSILBasicBlock(B))
             return true;
         } while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof));
-
-        // OSSA uses flags to represent "reborrow", "escaping" etc.
-        // These flags are populated here as a shortcut to rewriting all
-        // existing OSSA tests with flags.
-        if (!DisablePopulateOwnershipFlags) {
-          populateOwnershipFlags(FunctionState.F);
-        }
 
         SourceLoc RBraceLoc;
         P.parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,

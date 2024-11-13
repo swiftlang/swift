@@ -234,8 +234,7 @@ EXPERIMENTAL_FEATURE(MacrosOnImports, true)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
-EXPERIMENTAL_FEATURE(GlobalActorInferenceCutoff, false)
-EXPERIMENTAL_FEATURE(KeyPathWithStaticMembers, false)
+EXPERIMENTAL_FEATURE(Span, true)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
@@ -304,11 +303,6 @@ EXPERIMENTAL_FEATURE(ParserValidation, false)
 /// Whether to perform validation of the unqualified lookup produced by
 /// ASTScope and SwiftLexicalLookup
 EXPERIMENTAL_FEATURE(UnqualifiedLookupValidation, false)
-
-/// Whether to emit diagnostics from the new parser first, and only emit
-/// diagnostics from the existing parser when there are none from the new
-/// parser.
-EXPERIMENTAL_FEATURE(ParserDiagnostics, false)
 
 /// Enables implicit some while also enabling existential `any`
 EXPERIMENTAL_FEATURE(ImplicitSome, false)
@@ -416,6 +410,9 @@ EXPERIMENTAL_FEATURE(WarnUnsafe, true)
 /// Import unsafe C and C++ constructs as @unsafe.
 EXPERIMENTAL_FEATURE(SafeInterop, true)
 
+/// Ignore resilience errors due to C++ types.
+EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
+
 // Isolated deinit
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedDeinit, true)
 
@@ -427,6 +424,15 @@ EXPERIMENTAL_FEATURE(UnspecifiedMeansMainActorIsolated, false)
 
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
+
+/// modify/read single-yield coroutines always execute code post-yield code
+EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
+
+/// modify/read coroutines use the callee-allocated ABI
+EXPERIMENTAL_FEATURE(CoroutineAccessorsAllocateInCallee, false)
+
+// When a parameter has unspecified isolation, infer it as main actor isolated.
+EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

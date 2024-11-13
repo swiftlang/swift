@@ -1,0 +1,20 @@
+if(NOT SwiftCore_SIZEOF_POINTER)
+  set(SwiftCore_SIZEOF_POINTER "${CMAKE_SIZEOF_VOID_P}" CACHE STRING "Size of a pointer in bytes")
+  message(CONFIGURE_LOG "Stdlib Pointer size: ${CMAKE_SIZEOF_VOID_P}")
+  mark_as_advanced(SwiftCore_SIZEOF_POINTER)
+endif()
+
+if(NOT SwiftCore_MODULE_TRIPLE)
+  # TODO: This logic should migrate to CMake once CMake supports installing swiftmodules
+  set(module_triple_command "${CMAKE_Swift_COMPILER}" -print-target-info)
+  if(CMAKE_Swift_COMPILER_TARGET)
+    list(APPEND module_triple_command -target ${CMAKE_Swift_COMPILER_TARGET})
+  endif()
+  execute_process(COMMAND ${module_triple_command} OUTPUT_VARIABLE target_info_json)
+  message(CONFIGURE_LOG "Swift target info: ${module_triple_command}\n"
+  "${target_info_json}")
+  string(JSON module_triple GET "${target_info_json}" "target" "moduleTriple")
+  set(SwiftCore_MODULE_TRIPLE "${module_triple}" CACHE STRING "swift module triple used for installed swiftmodule and swiftinterface files")
+  message(CONFIGURE_LOG "Swift module triple: ${module_triple}")
+  mark_as_advanced(SwiftCore_MODULE_TRIPLE)
+endif()

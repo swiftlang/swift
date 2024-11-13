@@ -200,29 +200,71 @@ AttachedResultBuilderRequest::evaluate(Evaluator &evaluator,
 
 /// Attempt to infer the result builder type for a declaration.
 static Type inferResultBuilderType(ValueDecl *decl)  {
-  auto dc = decl->getDeclContext();
-  if (!dc->isTypeContext() || isa<ProtocolDecl>(dc))
-    return Type();
-
   auto funcDecl = dyn_cast<FuncDecl>(decl);
-  if (!funcDecl || !funcDecl->hasBody() ||
-      !decl->getDeclContext()->getParentSourceFile())
+  if (!funcDecl)
     return Type();
 
-  // Check whether there are any return statements in the function's body.
-  // If there are, the result builder transform will be disabled,
-  // so don't infer a result builder.
-  if (!TypeChecker::findReturnStatements(funcDecl).empty())
-    return Type();
-
-  // Only getters can have result builders. When we find one, look at
-  // the storage declaration for the purposes of witness matching.
-  auto lookupDecl = decl;
+  // For a getter, always favor the result builder type of its storage
+  // declaration if not null. Other accessors are not supported by inference.
   if (auto accessor = dyn_cast<AccessorDecl>(funcDecl)) {
     if (accessor->getAccessorKind() != AccessorKind::Get)
       return Type();
 
-    lookupDecl = accessor->getStorage();
+    if (auto type = accessor->getStorage()->getResultBuilderType()) {
+      return type;
+    }
+  }
+
+  // Below is a list of supported inference sources (in relation to the function
+  // in question), followed by a list of inference rules.
+  //
+  // (a): Its dynamically replaced function.
+  // (b): Protocol requirements that it witnesses.
+  // (c): Protocol requirements that its dynamically replaced function
+  //     witnesses.
+  //
+  // (r1): (a) and (b) are always attempted.
+  // (r2): (c) is attempted only if (a) has no result builder.
+
+  auto *dc = decl->getDeclContext();
+
+  // Neither of the aforementioned inference sources apply to a protocol
+  // requirement.
+  if (isa<ProtocolDecl>(dc)) {
+    return Type();
+  }
+
+  // FIXME: We could infer from a dynamically replaced decl in non-type contexts too.
+  if (!dc->isTypeContext()) {
+    return Type();
+  }
+
+  // A potentially inferred result builder will not be used to transform
+  // the body in the following cases:
+  // - The function has no body.
+  // - The function was deserialized (has no parent source file) and, thus,
+  //   is already type-checked.
+  // - The body has an explicit 'return' statement, which disables the result
+  //   builder transform.
+  //
+  // In these cases, inference can be skipped as an optimization.
+  //
+  // To demostrate that skipping inference here will not affect result builder
+  // inference for other functions, suppose that the function at hand ('x') is
+  // an inference source for another function ('y'). Since 'x' is not a protocol
+  // requirement, the only inference source it can assume is (a). Consequently,
+  // the only inference source available to 'x' is (b) because a dynamically
+  // replaced declaration cannot itself be '@_dynamicReplacement'.
+  //
+  // This implies that inferring a result builder for 'x' is equivalent to
+  // attempting (b) for 'x', which in turn is equivalent to attempting (c) for
+  // 'y'. Now, recall that 'x' is (a) for 'y'. According to rule (r2), skipping
+  // inference for 'x' will cause (c) to be attempted for 'y'. We see that
+  // the result of inferring for 'x' will be considered when inferring for 'y'
+  // either way.
+  if (!funcDecl->hasBody() || !dc->getParentSourceFile() ||
+      funcDecl->bodyHasExplicitReturnStmt()) {
+    return Type();
   }
 
   // Find all of the potentially inferred result builder types.
@@ -279,11 +321,25 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
   // The set of matches from which we can infer result builder types.
   SmallVector<Match, 2> matches;
 
+  const auto getInferenceSourceResultBuilderType = [](ValueDecl *source) {
+    // We always infer for either a getter or freestanding function, so if the
+    // inference source is a storage declaration, inference should draw from
+    // the getter.
+    if (auto *storage = dyn_cast<AbstractStorageDecl>(source)) {
+      if (auto *getter = storage->getAccessor(AccessorKind::Get)) {
+        source = getter;
+      }
+    }
+
+    return source->getResultBuilderType();
+  };
+
   // Determine all of the conformances within the same context as
   // this declaration. If this declaration is a witness to any
   // requirement within one of those protocols that has a result builder
   // attached, use that result builder type.
-  auto addConformanceMatches = [&matches](ValueDecl *lookupDecl) {
+  auto addConformanceMatches = [&matches, &getInferenceSourceResultBuilderType](
+                                   ValueDecl *lookupDecl) {
     DeclContext *dc = lookupDecl->getDeclContext();
     auto idc = cast<IterableDeclContext>(dc->getAsDecl());
     auto conformances = idc->getLocalConformances(
@@ -299,7 +355,8 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
         if (!requirement)
           continue;
 
-        Type resultBuilderType = requirement->getResultBuilderType();
+        const Type resultBuilderType =
+            getInferenceSourceResultBuilderType(requirement);
         if (!resultBuilderType)
           continue;
 
@@ -323,11 +380,19 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
     }
   };
 
+  ValueDecl *lookupDecl = nullptr;
+  if (auto *accessor = dyn_cast<AccessorDecl>(funcDecl)) {
+    lookupDecl = accessor->getStorage();
+  } else {
+    lookupDecl = decl;
+  }
+
   addConformanceMatches(lookupDecl);
 
   // Look for result builder types inferred through dynamic replacements.
   if (auto replaced = lookupDecl->getDynamicallyReplacedDecl()) {
-    if (auto resultBuilderType = replaced->getResultBuilderType()) {
+    if (auto resultBuilderType =
+            getInferenceSourceResultBuilderType(replaced)) {
       matches.push_back(
         Match::forDynamicReplacement(replaced, resultBuilderType));
     } else {

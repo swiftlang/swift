@@ -50,10 +50,6 @@ static Type getArgListUniqueSugarType(ArgumentList *args, CanType resultTy) {
         return Type();
     }
 
-    // If this type is parenthesized, remove the parens.  We don't want to
-    // propagate parens from arguments to the result type.
-    argTy = argTy->getWithoutParens();
-
     // If this is the first match against the sugar type we found, use it.
     if (!uniqueSugarTy) {
       uniqueSugarTy = argTy;
@@ -214,17 +210,6 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
                          opPrecedence, isEndOfSequence);
     await->setSubExpr(sub);
     return await;
-  }
-  
-  // If this is an assignment operator, and the left operand is an optional
-  // evaluation, pull the operator into the chain.
-  if (opPrecedence && opPrecedence->isAssignment()) {
-    if (auto optEval = dyn_cast<OptionalEvaluationExpr>(LHS)) {
-      auto sub = makeBinOp(Ctx, Op, optEval->getSubExpr(), RHS,
-                           opPrecedence, isEndOfSequence);
-      optEval->setSubExpr(sub);
-      return optEval;
-    }
   }
 
   // If the right operand is a try or await, it's an error unless the operator

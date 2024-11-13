@@ -2280,8 +2280,8 @@ public:
   }
   void visitRegexLiteralExpr(RegexLiteralExpr *E, StringRef label) {
     printCommon(E, "regex_literal_expr", label);
-    
-    printFieldQuoted(E->getRegexText(), "text", LiteralValueColor);
+
+    printFieldQuoted(E->getParsedRegexText(), "text", LiteralValueColor);
     printInitializerField(E->getInitializer(), "initializer");
 
     printFoot();
@@ -3576,13 +3576,12 @@ public:
   void visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T,
                                       StringRef label) {
     printCommon("type_lifetime_dependent_return", label);
-    for (auto &dep : T->getLifetimeDependencies()) {
-      printFieldRaw(
-          [&](raw_ostream &out) {
-            out << " " << dep.getDependsOnString() << " ";
-          },
-          "");
-    }
+
+    printFieldRaw(
+        [&](raw_ostream &out) {
+          out << " " << T->getLifetimeEntry()->getString() << " ";
+        },
+        "");
     printRec(T->getBase());
     printFoot();
   }
@@ -4064,6 +4063,21 @@ namespace {
       printRec(T->getElementType());
       printFoot();
     }
+    
+    void visitBuiltinUnboundGenericType(BuiltinUnboundGenericType *T,
+                                        StringRef label) {
+      printCommon("builtin_unbound_generic_type", label);
+      printField(T->getBuiltinTypeNameString(), "name");
+      printFoot();
+    }
+    
+    void visitBuiltinFixedArrayType(BuiltinFixedArrayType *T,
+                                    StringRef label) {
+      printCommon("builtin_fixed_array_type", label);
+      printRec(T->getSize());
+      printRec(T->getElementType());
+      printFoot();
+    }
 
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
       printCommon("type_alias_type", label);
@@ -4122,14 +4136,6 @@ namespace {
       printField(T->getLevel(), "level");
 
       printRec(T->getPackType(), "pack");
-
-      printFoot();
-    }
-
-    void visitParenType(ParenType *T, StringRef label) {
-      printCommon("paren_type", label);
-
-      printRec(T->getUnderlyingType());
 
       printFoot();
     }

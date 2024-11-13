@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.9-abi-triple
 
 struct Conformance<each T: Equatable> {}
 

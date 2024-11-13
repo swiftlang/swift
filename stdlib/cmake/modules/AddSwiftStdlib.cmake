@@ -55,7 +55,7 @@ function(_add_target_variant_c_compile_link_flags)
   if("${CFLAGS_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
     # Check if there's a specific OS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "OSX")
-      if(DEFINED maccatalyst_build_flavor)
+      if(DEFINED maccatalyst_build_flavor AND DEFINED CFLAGS_DEPLOYMENT_VERSION_MACCATALYST)
         set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST})
       else()
         set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_OSX})
@@ -984,7 +984,7 @@ function(add_swift_target_library_single target name)
         -Xcc;-Xclang;-Xcc;-ivfsoverlay;-Xcc;-Xclang;-Xcc;${SWIFTLIB_SINGLE_VFS_OVERLAY})
     endif()
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
-      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
+      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-Xfrontend;-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
     if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
       swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
       foreach(directory ${SWIFTLIB_INCLUDE})
@@ -1836,6 +1836,9 @@ endfunction()
 # INSTALL_WITH_SHARED
 #   Install a static library target alongside shared libraries
 #
+# IMPORTS_NON_OSSA
+#   Imports a non-ossa module
+#
 # MACCATALYST_BUILD_FLAVOR
 #   Possible values are 'ios-like', 'macos-like', 'zippered', 'unzippered-twin'
 #   Presence of a build flavor requires SWIFT_MODULE_DEPENDS_MACCATALYST to be
@@ -1895,7 +1898,8 @@ function(add_swift_target_library name)
         SHARED
         STATIC
         NO_LINK_NAME
-        INSTALL_WITH_SHARED)
+        INSTALL_WITH_SHARED
+        IMPORTS_NON_OSSA)
   set(SWIFTLIB_single_parameter_options
         DEPLOYMENT_VERSION_IOS
         DEPLOYMENT_VERSION_OSX
@@ -2057,8 +2061,11 @@ function(add_swift_target_library name)
   # behavior for their requirements.
   if (SWIFTLIB_IS_STDLIB)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-lexical-lifetimes=false")
+  endif()
+
+  if (NOT DEFINED IMPORTS_NON_OSSA)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
   endif()
 
   if(NOT DEFINED SWIFTLIB_INSTALL_BINARY_SWIFTMODULE)
@@ -2905,7 +2912,7 @@ function(_add_swift_target_executable_single name)
 
   if(SWIFTEXE_SINGLE_SDK STREQUAL "WINDOWS")
     list(APPEND SWIFTEXE_SINGLE_COMPILE_FLAGS
-      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
+      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-Xfrontend;-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
   endif()
 
   if ("${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX")

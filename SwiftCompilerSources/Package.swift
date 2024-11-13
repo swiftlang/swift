@@ -64,7 +64,7 @@ let package = Package(
     .library(
       name: "swiftCompilerModules",
       type: .static,
-      targets: ["Basic", "SIL", "Optimizer"]),
+      targets: ["Basic", "AST", "SIL", "Optimizer"]),
   ],
   dependencies: [
   ],
@@ -75,11 +75,14 @@ let package = Package(
       name: "Basic",
       dependencies: []),
     .compilerModuleTarget(
-      name: "SIL",
+      name: "AST",
       dependencies: ["Basic"]),
     .compilerModuleTarget(
+      name: "SIL",
+      dependencies: ["Basic", "AST"]),
+    .compilerModuleTarget(
       name: "Optimizer",
-      dependencies: ["Basic", "SIL"]),
+      dependencies: ["Basic", "AST", "SIL"]),
   ],
   cxxLanguageStandard: .cxx17
 )

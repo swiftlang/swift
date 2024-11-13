@@ -190,12 +190,17 @@
   ],
   "Pointer": [
     "Pointer.swift",
+    "PointerBounds.swift",
     "TemporaryAllocation.swift",
     "UnsafePointer.swift",
     "UnsafeRawPointer.swift",
     "UnsafeBufferPointer.swift",
     "UnsafeBufferPointerSlice.swift",
     "UnsafeRawBufferPointer.swift"
+  ],
+  "Span": [
+    "RawSpan.swift",
+    "Span.swift"
   ],
   "Protocols": [
     "CompilerProtocols.swift",

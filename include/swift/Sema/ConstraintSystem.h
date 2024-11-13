@@ -77,11 +77,13 @@ std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckExpression(constraints::SyntacticElementTarget &target,
-                    OptionSet<TypeCheckExprFlags> options);
+                    OptionSet<TypeCheckExprFlags> options,
+                    DiagnosticTransaction *diagnosticTransaction = nullptr);
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckTarget(constraints::SyntacticElementTarget &target,
-                OptionSet<TypeCheckExprFlags> options);
+                OptionSet<TypeCheckExprFlags> options,
+                DiagnosticTransaction *diagnosticTransaction = nullptr);
 
 Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool, bool);
 
@@ -240,9 +242,9 @@ private:
   ASTContext &Context;
   llvm::TimeRecord StartTime;
 
-  /// The number of milliseconds from creation until
+  /// The number of seconds from creation until
   /// this timer is considered expired.
-  unsigned ThresholdInMillis;
+  unsigned ThresholdInSecs;
 
   bool PrintDebugTiming;
   bool PrintWarning;
@@ -251,7 +253,8 @@ public:
   /// This constructor sets a default threshold defined for all expressions
   /// via compiler flag `solver-expression-time-threshold`.
   ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS);
-  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS, unsigned thresholdInMillis);
+  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
+                  unsigned thresholdInSecs);
 
   ~ExpressionTimer();
 
@@ -272,20 +275,18 @@ public:
     return endTime.getProcessTime() - StartTime.getProcessTime();
   }
 
-  /// Return the remaining process time in milliseconds until the
+  /// Return the remaining process time in seconds until the
   /// threshold specified during construction is reached.
-  unsigned getRemainingProcessTimeInMillis() const {
+  unsigned getRemainingProcessTimeInSeconds() const {
     auto elapsed = unsigned(getElapsedProcessTimeInFractionalSeconds());
-    return elapsed >= ThresholdInMillis ? 0 : ThresholdInMillis - elapsed;
+    return elapsed >= ThresholdInSecs ? 0 : ThresholdInSecs - elapsed;
   }
 
   // Disable emission of warnings about expressions that take longer
   // than the warning threshold.
   void disableWarning() { PrintWarning = false; }
 
-  bool isExpired() const {
-    return getRemainingProcessTimeInMillis() == 0;
-  }
+  bool isExpired() const { return getRemainingProcessTimeInSeconds() == 0; }
 };
 
 } // end namespace constraints
@@ -484,6 +485,10 @@ public:
 
   /// Determine whether this type variable represents a subscript result type.
   bool isSubscriptResultType() const;
+
+  /// Determine whether this type variable represents a result type of an
+  /// application i.e. a call, an operator, or a subscript.
+  bool isApplicationResultType() const;
 
   /// Determine whether this type variable represents an opened
   /// type parameter pack.
@@ -1045,6 +1050,7 @@ struct Score {
   friend Score operator-(const Score &x, const Score &y) {
     Score result;
     for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      ASSERT(x.Data[i] >= y.Data[i]);
       result.Data[i] = x.Data[i] - y.Data[i];
     }
     return result;
@@ -1052,6 +1058,7 @@ struct Score {
 
   friend Score &operator-=(Score &x, const Score &y) {
     for (unsigned i = 0; i != NumScoreKinds; ++i) {
+      ASSERT(x.Data[i] >= y.Data[i]);
       x.Data[i] -= y.Data[i];
     }
     return x;
@@ -2073,14 +2080,6 @@ struct ClosureIsolatedByPreconcurrency {
   bool operator()(const ClosureExpr *expr) const;
 };
 
-/// Determine whether the given expression is part of the left-hand side
-/// of an assignment expression.
-struct IsInLeftHandSideOfAssignment {
-  ConstraintSystem &cs;
-
-  bool operator()(Expr *expr) const;
-};
-
 /// Describes the type produced when referencing a declaration.
 struct DeclReferenceType {
   /// The "opened" type, which is the type of the declaration where any
@@ -2118,6 +2117,7 @@ class ConstraintSystem {
 public:
   DeclContext *DC;
   ConstraintSystemOptions Options;
+  DiagnosticTransaction *diagnosticTransaction;
   std::optional<ExpressionTimer> Timer;
 
   friend class Solution;
@@ -2140,8 +2140,6 @@ public:
   friend class MissingMemberFailure;
   friend struct ClosureIsolatedByPreconcurrency;
   friend class SolverTrail;
-
-  class SolverScope;
 
   /// Expressions that are known to be unevaluated.
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
@@ -2531,98 +2529,38 @@ private:
     /// The number of the solution attempts we're looking at.
     unsigned SolutionAttempt;
 
-    /// Refers to the innermost partial solution scope.
-    SolverScope *PartialSolutionScope = nullptr;
+    /// The number of fixes in the innermost partial solution scope.
+    unsigned numPartialSolutionFixes = 0;
 
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
 
-    /// Check whether there are any retired constraints present.
-    bool hasRetiredConstraints() const {
-      return !retiredConstraints.empty();
-    }
-
-    /// Mark given constraint as retired along current solver path.
-    ///
-    /// \param constraint The constraint to retire temporarily.
-    void retireConstraint(Constraint *constraint) {
-      retiredConstraints.push_front(constraint);
-    }
-
-    /// Iterate over all of the retired constraints registered with
-    /// current solver state.
-    ///
-    /// \param processor The processor function to be applied to each of
-    /// the constraints retrieved.
-    void forEachRetired(llvm::function_ref<void(Constraint &)> processor) {
-      for (auto &constraint : retiredConstraints)
-        processor(constraint);
-    }
-
     /// Add new "generated" constraint along the current solver path.
     ///
     /// \param constraint The newly generated constraint.
     void addGeneratedConstraint(Constraint *constraint) {
-      assert(constraint && "Null generated constraint?");
-      generatedConstraints.push_back(constraint);
+      Trail.recordChange(SolverTrail::Change::GeneratedConstraint(constraint));
     }
 
-    /// Register given scope to be tracked by the current solver state,
-    /// this helps to make sure that all of the retired/generated constraints
-    /// are dealt with correctly when the life time of the scope ends.
-    ///
-    /// \param scope The scope to associate with current solver state.
-    void registerScope(SolverScope *scope) {
+    /// Update statistics when a scope begins.
+    unsigned beginScope() {
       ++depth;
       maxDepth = std::max(maxDepth, depth);
-      scope->scopeNumber = NumStatesExplored++;
 
       CS.incrementScopeCounter();
-      auto scopeInfo =
-        std::make_tuple(scope, retiredConstraints.begin(),
-                        generatedConstraints.size());
-      scopes.push_back(scopeInfo);
+
+      return NumStatesExplored++;
     }
 
-    /// Restore all of the retired/generated constraints to the state
-    /// before given scope. This is required because retired constraints have
-    /// to be re-introduced to the system in order of arrival (LIFO) and list
-    /// of the generated constraints has to be truncated back to the
-    /// original size.
-    ///
-    /// \param scope The solver scope to rollback.
-    void rollback(SolverScope *scope) {
+    /// Update statistics when a scope ends.
+    void endScope(unsigned scopeNumber) {
+      ASSERT(depth > 0);
       --depth;
 
-      unsigned countScopesExplored = NumStatesExplored - scope->scopeNumber;
+      unsigned countScopesExplored = NumStatesExplored - scopeNumber;
       if (countScopesExplored == 1)
         CS.incrementLeafScopes();
-
-      SolverScope *savedScope;
-      // The position of last retired constraint before given scope.
-      ConstraintList::iterator lastRetiredPos;
-      // The original number of generated constraints before given scope.
-      unsigned numGenerated;
-
-      std::tie(savedScope, lastRetiredPos, numGenerated) =
-        scopes.pop_back_val();
-
-      assert(savedScope == scope && "Scope rollback not in LIFO order!");
-
-      // Restore all of the retired constraints.
-      CS.InactiveConstraints.splice(CS.InactiveConstraints.end(),
-                                    retiredConstraints,
-                                    retiredConstraints.begin(), lastRetiredPos);
-
-      // And remove all of the generated constraints.
-      auto genStart = generatedConstraints.begin() + numGenerated,
-           genEnd = generatedConstraints.end();
-      for (auto genI = genStart; genI != genEnd; ++genI) {
-        CS.InactiveConstraints.erase(ConstraintList::iterator(*genI));
-      }
-
-      generatedConstraints.erase(genStart, genEnd);
     }
 
     /// Check whether constraint system is allowed to form solutions
@@ -2649,29 +2587,12 @@ private:
     }
 
   private:
-    /// The list of constraints that have been retired along the
-    /// current path, this list is used in LIFO fashion when
-    /// constraints are added back to the circulation.
-    ConstraintList retiredConstraints;
+    /// Depth of the solution stack.
+    unsigned depth = 0;
 
     /// The set of constraints which were active at the time of this state
     /// creating, it's used to re-activate them on destruction.
     SmallVector<Constraint *, 4> activeConstraints;
-
-    /// The current set of generated constraints.
-    SmallVector<Constraint *, 4> generatedConstraints;
-
-    /// The collection which holds association between solver scope
-    /// and position of the last retired constraint and number of
-    /// constraints generated before registration of given scope,
-    /// this helps to rollback all of the constraints retired/generated
-    /// each of the registered scopes correct (LIFO) order.
-    llvm::SmallVector<
-      std::tuple<SolverScope *, ConstraintList::iterator, unsigned>, 4> scopes;
-
-
-    /// Depth of the solution stack.
-    unsigned depth = 0;
   };
 
   class CacheExprTypes : public ASTWalker {
@@ -2841,7 +2762,7 @@ public:
   /// this object is destroyed.
   ///
   ///
-  class SolverScope {
+  struct SolverScope {
     ConstraintSystem &cs;
 
     /// The length of \c TypeVariables.
@@ -2850,29 +2771,26 @@ public:
     /// The length of \c Trail.
     unsigned numTrailChanges;
 
-    /// The length of \c Fixes.
-    ///
-    /// FIXME: Remove this.
-    unsigned numFixes;
-
-    /// The previous score.
-    Score PreviousScore;
-
     /// The scope number of this scope. Set when the scope is registered.
-    unsigned scopeNumber = 0;
+    unsigned scopeNumber : 31;
+
+    /// A moved-from scope skips doing anything in the destructor.
+    unsigned moved : 1;
+
+    explicit SolverScope(ConstraintSystem &cs);
 
     SolverScope(const SolverScope &) = delete;
+    SolverScope(SolverScope &&other);
+
     SolverScope &operator=(const SolverScope &) = delete;
+    SolverScope &operator=(SolverScope &&) = delete;
 
-    friend class ConstraintSystem;
-
-  public:
-    explicit SolverScope(ConstraintSystem &cs);
     ~SolverScope();
   };
 
   ConstraintSystem(DeclContext *dc,
-                   ConstraintSystemOptions options);
+                   ConstraintSystemOptions options,
+                   DiagnosticTransaction *diagnosticTransaction = nullptr);
   ~ConstraintSystem();
 
   /// Retrieve the constraint graph associated with this constraint system.
@@ -2903,7 +2821,8 @@ private:
   /// This operation is used to take a solution computed based on some
   /// subset of the constraints and then apply it back to the
   /// constraint system for further exploration.
-  void applySolution(const Solution &solution);
+  void replaySolution(const Solution &solution,
+                      bool shouldIncreaseScore=true);
 
   // FIXME: Perhaps these belong on ConstraintSystem itself.
   friend std::optional<BraceStmt *>
@@ -2912,11 +2831,13 @@ private:
 
   friend std::optional<SyntacticElementTarget>
   swift::TypeChecker::typeCheckExpression(
-      SyntacticElementTarget &target, OptionSet<TypeCheckExprFlags> options);
+      SyntacticElementTarget &target, OptionSet<TypeCheckExprFlags> options, DiagnosticTransaction *diagnosticTransaction);
 
   friend std::optional<SyntacticElementTarget>
-  swift::TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
-                                      OptionSet<TypeCheckExprFlags> options);
+  swift::TypeChecker::typeCheckTarget(
+      SyntacticElementTarget &target,
+      OptionSet<TypeCheckExprFlags> options,
+      DiagnosticTransaction *diagnosticTransaction);
 
   friend Type swift::TypeChecker::typeCheckParameterDefault(Expr *&,
                                                             DeclContext *, Type,
@@ -3997,7 +3918,10 @@ public:
   /// Remove an inactive constraint from the current constraint graph.
   void removeInactiveConstraint(Constraint *constraint) {
     CG.removeConstraint(constraint);
-    InactiveConstraints.erase(constraint);
+
+    auto where = InactiveConstraints.erase(constraint);
+    if (solverState)
+      recordChange(SolverTrail::Change::RetiredConstraint(where, constraint));
 
     if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
       auto &log = llvm::errs();
@@ -4007,9 +3931,6 @@ public:
                         solverState->getCurrentIndent() + 4);
       log << ")\n";
     }
-
-    if (solverState)
-      solverState->retireConstraint(constraint);
   }
 
   /// Transfer given constraint from to active list
@@ -4454,39 +4375,6 @@ public:
                                   bool wantInterfaceType = false,
                                   bool adjustForPreconcurrency = true);
 
-  /// Return the type-of-reference of the given value.
-  ///
-  /// \param baseType if non-null, return the type of a member reference to
-  ///   this value when the base has the given type
-  ///
-  /// \param UseDC The context of the access.  Some variables have different
-  ///   types depending on where they are used.
-  ///
-  /// \param locator The locator anchored at this value reference, when
-  /// it is a member reference.
-  ///
-  /// \param wantInterfaceType Whether we want the interface type, if available.
-  ///
-  /// \param getType Optional callback to extract a type for given declaration.
-  static Type
-  getUnopenedTypeOfReference(
-      VarDecl *value, Type baseType, DeclContext *UseDC,
-      llvm::function_ref<Type(VarDecl *)> getType,
-      ConstraintLocator *locator,
-      bool wantInterfaceType = false,
-      bool adjustForPreconcurrency = true,
-      llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
-        [](const AbstractClosureExpr *) {
-          return Type();
-        },
-      llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency =
-        [](const ClosureExpr *closure) {
-          return closure->isIsolatedByPreconcurrency();
-        },
-      llvm::function_ref<bool(Expr *)> isAssignTarget = [](Expr *) {
-        return false;
-      });
-
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
   Type getMemberReferenceTypeFromOpenedType(
@@ -4722,7 +4610,7 @@ public:
   /// \param getFix Optional callback to determine a fix for a given
   /// choice (first argument is a position of current choice,
   /// second - the choice in question).
-  void generateConstraints(
+  void generateOverloadConstraints(
       SmallVectorImpl<Constraint *> &constraints, Type type,
       ArrayRef<OverloadChoice> choices, DeclContext *useDC,
       ConstraintLocator *locator,
@@ -4841,10 +4729,10 @@ public:
   /// Subroutine of \c matchTypes(), which matches up a value to an
   /// existential type.
   ///
-  /// \param kind Either ConstraintKind::SelfObjectOfProtocol or
-  /// ConstraintKind::ConformsTo. Usually this uses SelfObjectOfProtocol,
-  /// but when matching the instance type of a metatype with the instance type
-  /// of an existential metatype, since we want an actual conformance check.
+  /// \param kind Either ConstraintKind::Subtype or ConstraintKind::ConformsTo.
+  /// Usually this uses Subtype, but when matching the instance type of a
+  /// metatype with the instance type of an existential metatype, since we
+  /// want an actual conformance check.
   TypeMatchResult matchExistentialTypes(Type type1, Type type2,
                                         ConstraintKind kind,
                                         TypeMatchOptions flags,
@@ -5051,7 +4939,7 @@ private:
   ///
   /// \param type The type being tested.
   /// \param protocol The protocol to which the type should conform.
-  /// \param kind Either ConstraintKind::SelfObjectOfProtocol or
+  /// \param kind Either ConstraintKind::Subtype or
   /// ConstraintKind::ConformsTo.
   /// \param locator Locator describing where this constraint occurred.
   SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,
@@ -5531,9 +5419,21 @@ private:
 
 public:
   /// Increase the score of the given kind for the current (partial) solution
-  /// along the.
+  /// along the current solver path.
   void increaseScore(ScoreKind kind, ConstraintLocatorBuilder Locator,
                      unsigned value = 1);
+
+  /// Primitive form of the above. Records a change in the trail.
+  void increaseScore(ScoreKind kind, unsigned value);
+
+  /// Apply the score from a partial solution. Records the change in the
+  /// trail.
+  void replayScore(const Score &score);
+
+  /// Temporarily zero out the score, and record this in the trail so that
+  /// we restore the score when the scope ends. Used when solving a
+  /// ConjunctionStep.
+  void clearScore();
 
   /// Determine whether this solution is guaranteed to be worse than the best
   /// solution found so far.

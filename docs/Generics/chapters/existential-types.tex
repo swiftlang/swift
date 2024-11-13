@@ -182,7 +182,7 @@ let y: any P & C = ...
 \end{Verbatim}
 First, consider \texttt{x}. The existential signature of \texttt{any P \& Q} is \texttt{<\ttgp{0}{0} where \ttgp{0}{0}:\ P>}; the requirement \texttt{\ttgp{0}{0}:\ Q} is dropped because the protocol \texttt{P} inherits from protocol \texttt{Q}. The \texttt{ExistentialLayout} also only stores the single protocol \texttt{P}. The existential type \texttt{any P \& Q} canonicalizes to \texttt{any P}.
 
-Now, look at \texttt{y}. The existential signature of \texttt{any C \& P} is \texttt{<\ttgp{0}{0} where \ttgp{0}{0}:\ C>}; notice that the conformance requirement \texttt{\ttgp{0}{0}:\ P} is dropped because the class \texttt{C} conforms to \texttt{P}. However, \texttt{any~C~\&~P} and \texttt{C} are still distinct types in the Swift type system, and the runtime representation of \texttt{any C \& P} stores a witness table for the conformance of \texttt{C} to \texttt{P} even though the conformance requirement \texttt{\ttgp{0}{0}:\ P} does not appear in the opened existential signature. This is because the list of protocols in the \texttt{ExistentialLayout} does not drop consider the conformance of \texttt{C} to \texttt{P} and retains the protocol \texttt{P}.
+Now, look at \texttt{y}. The existential signature of \texttt{any C \& P} is \texttt{<\ttgp{0}{0} where \ttgp{0}{0}:\ C>}; notice that the conformance requirement \texttt{\ttgp{0}{0}:\ P} is dropped because the class \tC\ conforms to \texttt{P}. However, \texttt{any~C~\&~P} and \tC\ are still distinct types in the Swift type system, and the runtime representation of \texttt{any C \& P} stores a witness table for the conformance of \tC\ to \texttt{P} even though the conformance requirement \texttt{\ttgp{0}{0}:\ P} does not appear in the opened existential signature. This is because the list of protocols in the \texttt{ExistentialLayout} does not drop consider the conformance of \tC\ to \texttt{P} and retains the protocol \texttt{P}.
 \end{example}
 
 \paragraph{Opaque representation} This is the most general representation, used when no other specialized representation is applicable. Consists of a three-word buffer, type metadata for the stored concrete type, followed by zero or more witness tables. If the stored concrete type fits in the three-word buffer and uses default alignment, the value is stored directly in the buffer. Otherwise, the buffer stores a pointer to a copy-on-write buffer, sized to store the concrete type. The list of witness tables has the same length and ordering as the list of protocols returned by \texttt{ExistentialLayout::getProtocols()}.
@@ -326,14 +326,14 @@ The opened existential signature of \texttt{any P<X, Int>} in \texttt{generic()}
 Applying the substitution map \texttt{X := ConcreteQ} to the type \texttt{any~P<X,~Int>} produces the type \texttt{any~P<ConcreteQ,~Int>}. This suggests that calling \texttt{generic()} with \texttt{X~:=~ConcreteQ} should output the same type metadata as a call to \texttt{concrete()}.
 
 In the compiler, you can certainly transform the second generic signature into the first as follows. We begin by applying a substitution map to each requirement of the second signature:
-\[
-\SubstMapLongC{
-\SubstType{\ttgp{0}{0}}{ConcreteQ}\\
-\SubstType{\ttgp{1}{0}}{\ttgp{0}{0}}
-}{
-\SubstConf{\ttgp{1}{0}}{\ttgp{0}{0}}{P}
+\begin{align*}
+\SubstMapC{
+&\SubstType{\ttgp{0}{0}}{ConcreteQ},\\
+&\SubstType{\ttgp{1}{0}}{\ttgp{0}{0}}
+}{\\
+&\SubstConf{\ttgp{1}{0}}{\ttgp{0}{0}}{P}
 }
-\]
+\end{align*}
 This produces a list of substituted generic requirements:
 \begin{quote}
 \begin{tabular}{|l|l|}
@@ -375,7 +375,7 @@ As input, takes the constraint type of an existential type, possibly containing 
 \item add a substitution replacing \ttgp{0}{N} with the argument type to \texttt{S},
 \item increment \texttt{N}.
 \end{enumerate}
-Let \texttt{C} be the context substitution map of the updated generic class type. For each requirement of the generic signature of the class, apply \texttt{C} to the requirement, and add the substituted requirement to \texttt{R}.
+Let \tC\ be the context substitution map of the updated generic class type. For each requirement of the generic signature of the class, apply \tC\ to the requirement, and add the substituted requirement to \texttt{R}.
 \item [Protocol type] The type remains unchanged.
 \item [Class type] The type remains unchanged.
 \end{description}

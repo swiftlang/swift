@@ -154,6 +154,8 @@ split_embedded_sources(
   EMBEDDED Slice.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift
+  EMBEDDED Span/RawSpan.swift
+  EMBEDDED Span/Span.swift
   EMBEDDED StaticString.swift
   EMBEDDED StaticPrint.swift
   EMBEDDED Stride.swift
@@ -259,6 +261,11 @@ if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
 
   list(APPEND SWIFTLIB_EMBEDDED_SOURCES SIMDVector.swift)
   list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
+endif()
+
+if (SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
+  list(APPEND SWIFTLIB_SOURCES PointerBounds.swift)
+  list(APPEND SWIFTLIB_EMBEDDED_SOURCES PointerBounds.swift)
 endif()
 
 # Freestanding and Linux/Android builds both have failures to resolve.
@@ -396,12 +403,18 @@ if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
                     BOOTSTRAPPING 1)
 endif()
 
+set(tooling_stdlib_deps)
+if(TARGET libSwiftScan)
+  list(append tooling_stdlib_deps libSwiftScan)
+endif()
+
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
                   ${swiftCore_common_options}
                   ${compile_flags_for_final_build}
                   FILE_DEPENDS
                     ${swiftCore_common_dependencies}
+                  DEPENDS ${tooling_stdlib_deps}
                   INSTALL_IN_COMPONENT
                     stdlib
                   MACCATALYST_BUILD_FLAVOR
@@ -444,6 +457,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       SDK "embedded"
       ARCHITECTURE "${arch}"
       FILE_DEPENDS ${swiftCore_common_dependencies}
+      DEPENDS ${tooling_stdlib_deps}
       INSTALL_IN_COMPONENT stdlib
       )
     add_dependencies(embedded-stdlib embedded-stdlib-${mod})

@@ -1529,7 +1529,7 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
     if (fixupClosureLifetimes(*getFunction(), dominanceAnalysis,
                               deadEndBlocksAnalysis, checkStackNesting,
                               modifiedCFG)) {
-      updateBorrowedFrom(getPassManager(), getFunction());
+      updateAllGuaranteedPhis(getPassManager(), getFunction());
       if (checkStackNesting){
         modifiedCFG |=
           StackNesting::fixNesting(getFunction()) == StackNesting::Changes::CFG;

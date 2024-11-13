@@ -12,7 +12,7 @@ bb0:
   %1 = integer_literal $Builtin.Int64, 23
   %2 = struct $Int (%1 : $Builtin.Int64)
   debug_value %2 : $Int, var, name "v"
-  // CHECK: call void @llvm.dbg.value(metadata i64 23,
+  // CHECK: #dbg_value(i64 23,
   // function_ref StdlibUnittest._blackHole <A> (A) -> ()
   %5 = function_ref @_TF14StdlibUnittest10_blackHoleurFxT_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () // user: %8
   %6 = tuple ()
@@ -20,7 +20,7 @@ bb0:
   %8 = apply %5<()>(%7) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %7 : $*()        // id: %9
 
-  // CHECK: call void @llvm.dbg.value(metadata i64 42,
+  // CHECK: #dbg_value(i64 42,
   %9 = integer_literal $Builtin.Int64, 42         // user: %10
   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %11
   debug_value %10 : $Int, var, name "v"

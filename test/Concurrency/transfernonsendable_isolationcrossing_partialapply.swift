@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 
 // This test validates how we handle partial applies that are isolated to a
 // specific isolation domain (causing isolation crossings to occur).

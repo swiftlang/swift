@@ -961,7 +961,7 @@ struct Observable<Value> {
   }
 
   @available(*, unavailable, message: "must be in a class")
-  var wrappedValue: Value { // expected-note{{'wrappedValue' has been explicitly marked unavailable here}}
+  var wrappedValue: Value { // expected-note 2{{'wrappedValue' has been explicitly marked unavailable here}}
     get { fatalError("called wrappedValue getter") }
     set { fatalError("called wrappedValue setter") }
   }
@@ -982,6 +982,13 @@ struct Observable<Value> {
 
 struct MyObservedValueType {
   @Observable // expected-error{{'wrappedValue' is unavailable: must be in a class}}
+  var observedProperty = 17
+}
+
+func takesObservable(@Observable _ observable: Int) {} // expected-error{{'wrappedValue' is unavailable: must be in a class}}
+
+class MyObservedClass {
+  @Observable
   var observedProperty = 17
 }
 

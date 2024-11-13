@@ -12,6 +12,7 @@
 // ASan cannot work in ("Interceptors are not working, AddressSanitizer is
 // loaded too late").
 // REQUIRES: no_asan
+// REQUIRES: swift_feature_Embedded
 
 public struct MyStruct {
   static var singleton = MyStruct()

@@ -573,6 +573,14 @@ MetadataResponse
 swift_getForeignTypeMetadata(MetadataRequest request,
                              ForeignTypeMetadata *nonUnique);
 
+/// Fetch a metadata record representing a `Builtin.FixedArray`
+/// of a given count and element type.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getFixedArrayTypeMetadata(MetadataRequest request,
+                                intptr_t count,
+                                const Metadata *element);
+
 /// Fetch a uniqued metadata for a tuple type.
 ///
 /// The labels argument is null if and only if there are no element

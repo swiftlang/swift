@@ -535,7 +535,7 @@ static bool checkObjCClassStubAvailability(ASTContext &ctx, const Decl *decl) {
   if (deploymentTarget.isContainedIn(stubAvailability))
     return true;
 
-  auto declAvailability = AvailabilityInference::availableRange(decl, ctx);
+  auto declAvailability = AvailabilityInference::availableRange(decl);
   return declAvailability.isContainedIn(stubAvailability);
 }
 

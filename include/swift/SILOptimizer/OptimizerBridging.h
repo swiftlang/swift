@@ -23,11 +23,7 @@
 #include "swift/AST/ASTBridging.h"
 #include "swift/SIL/SILBridging.h"
 
-#ifdef USED_IN_CPP_SOURCE
-
-#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
-
-#else // USED_IN_CPP_SOURCE
+#ifndef USED_IN_CPP_SOURCE
 
 // Pure bridging mode does not permit including any C++/llvm/swift headers.
 // See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
@@ -45,6 +41,7 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 namespace swift {
 class AliasAnalysis;
 class BasicCalleeAnalysis;
+class CalleeList;
 class DeadEndBlocks;
 class DominanceInfo;
 class PostDominanceInfo;
@@ -94,18 +91,8 @@ struct BridgedCalleeAnalysis {
   struct CalleeList {
     uint64_t storage[3];
 
-    // Ensure that this struct value type will be indirectly returned on
-    // Windows ARM64
-    CalleeList() {}
-
-#ifdef USED_IN_CPP_SOURCE
-    CalleeList(swift::CalleeList list) {
-      *reinterpret_cast<swift::CalleeList *>(&storage) = list;
-    }
-    swift::CalleeList unbridged() const {
-      return *reinterpret_cast<const swift::CalleeList *>(&storage);
-    }
-#endif
+    BRIDGED_INLINE CalleeList(swift::CalleeList list);
+    BRIDGED_INLINE swift::CalleeList unbridged() const;
 
     BRIDGED_INLINE bool isIncomplete() const;
     BRIDGED_INLINE SwiftInt getCount() const;
@@ -143,12 +130,12 @@ struct BridgedPostDomTree {
 
 struct BridgedUtilities {
   typedef void (* _Nonnull VerifyFunctionFn)(BridgedPassContext, BridgedFunction);
-  typedef void (* _Nonnull UpdateBorrowedFromFn)(BridgedPassContext, BridgedFunction);
-  typedef void (* _Nonnull UpdateBorrowedFromPhisFn)(BridgedPassContext, BridgedArrayRef);
+  typedef void (* _Nonnull UpdateFunctionFn)(BridgedPassContext, BridgedFunction);
+  typedef void (* _Nonnull UpdatePhisFn)(BridgedPassContext, BridgedArrayRef);
 
   static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
-  static void registerBorrowedFromUpdater(UpdateBorrowedFromFn updateBorrowedFromFn,
-                                          UpdateBorrowedFromPhisFn updateBorrowedFromPhisFn);
+  static void registerGuaranteedPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
+                                           UpdatePhisFn updateBorrowedFromPhisFn);
 };
 
 struct BridgedBasicBlockSet {
@@ -274,6 +261,8 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool optimizeMemoryAccesses(BridgedFunction f) const;
   BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
 
+  BRIDGED_INLINE bool shouldExpand(BridgedType type) const;
+
   // IRGen
 
   SwiftInt getStaticSize(BridgedType type) const;
@@ -385,6 +374,7 @@ struct BridgedPassContext {
     Unchecked = 2
   };
 
+  BRIDGED_INLINE bool useAggressiveReg2MemForCodeSize() const;
   BRIDGED_INLINE bool enableStackProtection() const;
   BRIDGED_INLINE bool hasFeature(BridgedFeature feature) const;
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
@@ -397,9 +387,11 @@ struct BridgedPassContext {
                                                         SwiftInt paramCount,
                                                         BridgedFunction bridgedApplySiteCallee,
                                                         bool isSerialized) const;
+
+  bool completeLifetime(BridgedValue value) const;
 };
 
-bool FullApplySite_canInline(BridgedInstruction apply);
+bool BeginApply_canInline(BridgedInstruction beginApply);
 
 enum class BridgedDynamicCastResult {
   willSucceed,

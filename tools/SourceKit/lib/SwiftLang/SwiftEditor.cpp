@@ -745,10 +745,9 @@ public:
 
     BufferID = SM.addNewSourceBuffer(std::move(BufCopy));
 
-    Parser.reset(new ParserUnit(
-        SM, SourceFileKind::Main, BufferID, CompInv.getLangOptions(),
-        CompInv.getTypeCheckerOptions(), CompInv.getSILOptions(),
-        CompInv.getModuleName()));
+    Parser.reset(new ParserUnit(SM, SourceFileKind::Main, BufferID,
+                                CompInv.getLangOptions(),
+                                CompInv.getModuleName()));
 
     registerTypeCheckerRequestFunctions(
         Parser->getParser().Context.evaluator);

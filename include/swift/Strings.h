@@ -85,6 +85,10 @@ constexpr static const StringLiteral CLANG_MODULE_DEFAULT_SPI_GROUP_NAME =
 constexpr static const StringLiteral SPI_AVAILABLE_ATTRNAME =
   "_spi_available";
 
+/// The attribute name for @_unavailableInEmbedded
+constexpr static const StringLiteral UNAVAILABLE_IN_EMBEDDED_ATTRNAME =
+    "_unavailableInEmbedded";
+
 /// A composition class containing a StringLiteral for the names of
 /// Swift builtins. The reason we use this is to ensure that we when
 /// necessary slice off the "Builtin." prefix from these names in a
@@ -172,6 +176,8 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNKNOWNOBJECT = {
 /// The name of the Builtin type for Vector
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_VEC = {
     "Builtin.Vec"};
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_FIXEDARRAY = {
+    "Builtin.FixedArray"};
 /// The name of the Builtin type for SILToken
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_SILTOKEN = {
     "Builtin.SILToken"};

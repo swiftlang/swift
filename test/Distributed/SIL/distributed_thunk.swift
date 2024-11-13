@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -enable-experimental-distributed -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -enable-experimental-distributed -target %target-swift-5.7-abi-triple | %FileCheck %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 

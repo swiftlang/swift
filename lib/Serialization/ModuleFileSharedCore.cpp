@@ -15,6 +15,7 @@
 #include "DeserializationErrors.h"
 #include "ModuleFileCoreTableInfo.h"
 #include "ModuleFormat.h"
+#include "SerializationFormat.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
@@ -147,6 +148,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       case PluginSearchOptionKind::LoadPluginExecutable:
         optKind = PluginSearchOption::Kind::LoadPluginExecutable;
         break;
+      case PluginSearchOptionKind::ResolvedPluginConfig:
+        optKind = PluginSearchOption::Kind::ResolvedPluginConfig;
+        break;
       }
       extendedInfo.addPluginSearchOption({optKind, blobData});
       break;
@@ -213,6 +217,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       break;
     case options_block::PUBLIC_MODULE_NAME:
       extendedInfo.setPublicModuleName(blobData);
+      break;
+    case options_block::SWIFT_INTERFACE_COMPILER_VERSION:
+      extendedInfo.setSwiftInterfaceCompilerVersion(blobData);
       break;
     default:
       // Unknown options record, possibly for use by a future version of the
@@ -1025,9 +1032,9 @@ ModuleFileSharedCore::readGroupTable(ArrayRef<uint64_t> Fields,
                                      StringRef BlobData) const {
   auto pMap = std::make_unique<llvm::DenseMap<unsigned, StringRef>>();
   auto Data = reinterpret_cast<const uint8_t *>(BlobData.data());
-  unsigned GroupCount = endian::readNext<uint32_t, little, unaligned>(Data);
+  unsigned GroupCount = readNext<uint32_t>(Data);
   for (unsigned I = 0; I < GroupCount; ++I) {
-    auto RawSize = endian::readNext<uint32_t, little, unaligned>(Data);
+    auto RawSize = readNext<uint32_t>(Data);
     auto RawText = StringRef(reinterpret_cast<const char *>(Data), RawSize);
     Data += RawSize;
     (*pMap)[I] = RawText;
@@ -1496,6 +1503,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       ModulePackageName = extInfo.getModulePackageName();
       ModuleExportAsName = extInfo.getExportAsName();
       PublicModuleName = extInfo.getPublicModuleName();
+      SwiftInterfaceCompilerVersion =
+          extInfo.getSwiftInterfaceCompilerVersion();
 
       hasValidControlBlock = true;
       break;

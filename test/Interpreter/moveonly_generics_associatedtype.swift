@@ -3,7 +3,7 @@
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature SuppressedAssociatedTypes) | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 
 class Backend {

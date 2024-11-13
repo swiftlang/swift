@@ -236,7 +236,7 @@ To switch to this template when drafting a pull request in a [swiftlang](https:/
 ### Commit Access
 
 Commit access is granted to contributors with a track record of submitting high-quality changes.
-If you would like commit access, please send an email to [the code owners list](code-owners@forums.swift.org) with the GitHub user name that you want to use and a list of 5 non-trivial pull requests that were accepted without modifications.
+If you would like commit access, please send an email to [the code owners list](mailto:code-owners@forums.swift.org) with the GitHub user name that you want to use and a list of 5 non-trivial pull requests that were accepted without modifications.
 
 Once you’ve been granted commit access, you will be able to commit to all of the GitHub repositories that host Swift.org projects.
 To verify that your commit access works, please make a test commit (for example, change a comment or add a blank line). The following policies apply to users with commit access:

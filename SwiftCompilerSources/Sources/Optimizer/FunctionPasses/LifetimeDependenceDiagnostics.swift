@@ -337,7 +337,7 @@ private struct LifetimeVariable {
     case .pointer(let ptrToAddr):
       self.varDecl = nil
       self.sourceLoc = ptrToAddr.location.sourceLoc
-    case .unidentified:
+    case .index, .unidentified:
       self.varDecl = nil
       self.sourceLoc = nil
     }

@@ -167,6 +167,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::CopyValueInst:

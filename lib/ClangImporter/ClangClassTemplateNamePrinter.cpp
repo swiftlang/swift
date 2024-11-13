@@ -12,6 +12,7 @@
 
 #include "ClangClassTemplateNamePrinter.h"
 #include "ImporterImpl.h"
+#include "clang/AST/TemplateArgumentVisitor.h"
 #include "clang/AST/TypeVisitor.h"
 
 using namespace swift;
@@ -34,36 +35,22 @@ struct TemplateInstantiationNamePrinter
   }
 
   std::string VisitBuiltinType(const clang::BuiltinType *type) {
-    Type swiftType = nullptr;
     switch (type->getKind()) {
     case clang::BuiltinType::Void:
-      swiftType =
-          swiftCtx.getNamedSwiftType(swiftCtx.getStdlibModule(), "Void");
-      break;
+      return "Void";
+
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)                  \
-      case clang::BuiltinType::CLANG_BUILTIN_KIND:                             \
-        swiftType = swiftCtx.getNamedSwiftType(swiftCtx.getStdlibModule(),     \
-                                               #SWIFT_TYPE_NAME);              \
-        break;
-#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)            \
-      case clang::BuiltinType::CLANG_BUILTIN_KIND:                             \
-        swiftType = swiftCtx.getNamedSwiftType(swiftCtx.getStdlibModule(),     \
-                                               #SWIFT_TYPE_NAME);              \
-        break;
+    case clang::BuiltinType::CLANG_BUILTIN_KIND:                               \
+      return #SWIFT_TYPE_NAME;
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
     default:
       break;
     }
 
-    if (swiftType) {
-      if (swiftType->is<NominalType>() || swiftType->isVoid()) {
-        return swiftType->getStringAsComponent();
-      }
-    }
-    return "_";
+    return VisitType(type);
   }
 
-  std::string VisitRecordType(const clang::RecordType *type) {
+  std::string VisitTagType(const clang::TagType *type) {
     auto tagDecl = type->getAsTagDecl();
     if (auto namedArg = dyn_cast_or_null<clang::NamedDecl>(tagDecl)) {
       if (auto typeDefDecl = tagDecl->getTypedefNameForAnonDecl())
@@ -137,43 +124,85 @@ struct TemplateInstantiationNamePrinter
             Visit(type->getElementType().getTypePtr()) + ">")
         .str();
   }
+
+  std::string VisitArrayType(const clang::ArrayType *type) {
+    return (Twine("[") + Visit(type->getElementType().getTypePtr()) + "]")
+        .str();
+  }
+
+  std::string VisitConstantArrayType(const clang::ConstantArrayType *type) {
+    return (Twine("Vector<") + Visit(type->getElementType().getTypePtr()) +
+            ", " + std::to_string(type->getSExtSize()) + ">")
+        .str();
+  }
+};
+
+struct TemplateArgumentPrinter
+    : clang::ConstTemplateArgumentVisitor<TemplateArgumentPrinter, void,
+                                          llvm::raw_svector_ostream &> {
+  TemplateInstantiationNamePrinter typePrinter;
+
+  TemplateArgumentPrinter(ASTContext &swiftCtx, NameImporter *nameImporter,
+                          ImportNameVersion version)
+      : typePrinter(swiftCtx, nameImporter, version) {}
+
+  void VisitTemplateArgument(const clang::TemplateArgument &arg,
+                             llvm::raw_svector_ostream &buffer) {
+    // Print "_" as a fallback if we couldn't emit a more meaningful type name.
+    buffer << "_";
+  }
+
+  void VisitTypeTemplateArgument(const clang::TemplateArgument &arg,
+                                 llvm::raw_svector_ostream &buffer) {
+    auto ty = arg.getAsType();
+    buffer << typePrinter.Visit(ty.getTypePtr());
+    if (ty.isConstQualified()) {
+      buffer << "_const";
+    }
+  }
+
+  void VisitIntegralTemplateArgument(const clang::TemplateArgument &arg,
+                                     llvm::raw_svector_ostream &buffer) {
+    buffer << "_";
+    if (arg.getIntegralType()->isBuiltinType()) {
+      buffer << typePrinter.Visit(arg.getIntegralType().getTypePtr()) << "_";
+    }
+    arg.getAsIntegral().print(buffer, true);
+  }
+
+  void VisitPackTemplateArgument(const clang::TemplateArgument &arg,
+                                 llvm::raw_svector_ostream &buffer) {
+    VisitTemplateArgumentArray(arg.getPackAsArray(), buffer);
+  }
+
+  void VisitTemplateArgumentArray(ArrayRef<clang::TemplateArgument> args,
+                                  llvm::raw_svector_ostream &buffer) {
+    bool needsComma = false;
+    for (auto &arg : args) {
+      // Do not try to print empty packs.
+      if (arg.getKind() == clang::TemplateArgument::ArgKind::Pack &&
+          arg.getPackAsArray().empty())
+        continue;
+
+      if (needsComma)
+        buffer << ", ";
+      Visit(arg, buffer);
+      needsComma = true;
+    }
+  }
 };
 
 std::string swift::importer::printClassTemplateSpecializationName(
     const clang::ClassTemplateSpecializationDecl *decl, ASTContext &swiftCtx,
     NameImporter *nameImporter, ImportNameVersion version) {
-  TemplateInstantiationNamePrinter templateNamePrinter(swiftCtx, nameImporter,
-                                                       version);
+  TemplateArgumentPrinter templateArgPrinter(swiftCtx, nameImporter, version);
 
-  // TODO: the following logic should probably be a ConstTemplateArgumentVisitor
   llvm::SmallString<128> storage;
   llvm::raw_svector_ostream buffer(storage);
   decl->printName(buffer);
   buffer << "<";
-  llvm::interleaveComma(
-      decl->getTemplateArgs().asArray(), buffer,
-      [&buffer, &templateNamePrinter](const clang::TemplateArgument &arg) {
-        // Use import name here so builtin types such as "int" map to their
-        // Swift equivalent ("CInt").
-        if (arg.getKind() == clang::TemplateArgument::Type) {
-          auto ty = arg.getAsType();
-          buffer << templateNamePrinter.Visit(ty.getTypePtr());
-          if (ty.isConstQualified()) {
-            buffer << "_const";
-          }
-          return;
-        } else if (arg.getKind() == clang::TemplateArgument::Integral) {
-          buffer << "_";
-          if (arg.getIntegralType()->isBuiltinType()) {
-            buffer << templateNamePrinter.Visit(
-                          arg.getIntegralType().getTypePtr())
-                   << "_";
-          }
-          arg.getAsIntegral().print(buffer, true);
-          return;
-        }
-        buffer << "_";
-      });
+  templateArgPrinter.VisitTemplateArgumentArray(
+      decl->getTemplateArgs().asArray(), buffer);
   buffer << ">";
   return buffer.str().str();
 }

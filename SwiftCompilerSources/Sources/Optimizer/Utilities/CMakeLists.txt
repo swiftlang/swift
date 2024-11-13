@@ -9,7 +9,7 @@
 swift_compiler_sources(Optimizer
   AccessUtilsTest.swift
   AddressUtils.swift
-  BorrowedFromUpdater.swift
+  GuaranteedPhiUpdater.swift
   BorrowUtils.swift
   SpecializationCloner.swift
   DiagnosticEngine.swift

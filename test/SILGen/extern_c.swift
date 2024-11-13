@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature Extern %s | %FileCheck %s
 
+// REQUIRES: swift_feature_Extern
+
 // CHECK-DAG: sil hidden_external @my_c_name : $@convention(c) (Int) -> Int
 @_extern(c, "my_c_name")
 func withCName(_ x: Int) -> Int

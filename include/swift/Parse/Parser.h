@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -930,12 +930,6 @@ public:
   /// Each item will be a declaration, statement, or expression.
   void parseTopLevelItems(SmallVectorImpl<ASTNode> &items);
 
-  /// Parse the source file via the Swift Parser using the ASTGen library.
-  void
-  parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
-                           std::optional<DiagnosticTransaction> &transaction,
-                           bool suppressDiagnostics = false);
-
   /// Parse the top-level SIL decls into the SIL module.
   /// \returns \c true if there was a parsing error.
   bool parseTopLevelSIL();
@@ -974,7 +968,8 @@ public:
                            IterableDeclContext *IDC);
 
   bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
-                                 bool &HasNestedClassDeclarations);
+                                 bool &HasNestedClassDeclarations,
+                                 bool &HasDerivativeDeclarations);
 
   bool canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations);
 
@@ -1166,6 +1161,10 @@ public:
   ParserResult<LifetimeAttr> parseLifetimeAttribute(SourceLoc AtLoc,
                                                     SourceLoc Loc);
 
+  /// Common utility to parse swift @lifetime decl attribute and SIL @lifetime
+  /// type modifier.
+  ParserResult<LifetimeEntry> parseLifetimeEntry(SourceLoc loc);
+
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   SourceLoc AtEndLoc,
@@ -1197,6 +1196,9 @@ public:
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
+    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+        isSILLifetimeDependenceToken())
+      return true;
     if (!canHaveParameterSpecifierContextualKeyword()) return false;
     if (Tok.isContextualKeyword("__shared") ||
         Tok.isContextualKeyword("__owned") ||
@@ -1208,9 +1210,6 @@ public:
     if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
         Tok.isContextualKeyword("sending"))
       return true;
-    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-        isLifetimeDependenceToken())
-      return true;
     return false;
   }
 
@@ -1221,12 +1220,9 @@ public:
     consumeToken();
   }
 
-  bool isLifetimeDependenceToken() {
-    if (!isInSILMode()) {
-      return Tok.isContextualKeyword("dependsOn");
-    }
-    return Tok.isContextualKeyword("_inherit") ||
-           Tok.isContextualKeyword("_scope");
+  bool isSILLifetimeDependenceToken() {
+    return isInSILMode() && Tok.is(tok::at_sign) &&
+           (peekToken().isContextualKeyword("lifetime"));
   }
 
   bool canHaveParameterSpecifierContextualKeyword() {
@@ -1247,15 +1243,12 @@ public:
         return true;
     }
 
-    return isLifetimeDependenceToken();
+    return false;
   }
 
   bool parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc,
                                         ConventionTypeAttr *&result,
                                         bool justChecking);
-
-  ParserStatus
-  parseLifetimeEntries(SmallVectorImpl<LifetimeEntry> &specifierList);
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
@@ -1419,6 +1412,11 @@ public:
   ParserResult<TypeRepr> parseTypeSimple(
       Diag<> MessageID, ParseTypeReason reason);
 
+  ParserResult<TypeRepr> parseTypeOrValue();
+  ParserResult<TypeRepr> parseTypeOrValue(Diag<> MessageID,
+                          ParseTypeReason reason = ParseTypeReason::Unspecified,
+                          bool fromASTGen = false);
+
   /// Parse layout constraint.
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
 
@@ -1458,7 +1456,7 @@ public:
     SourceLoc ConstLoc;
     SourceLoc SendingLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
-    SmallVector<LifetimeEntry> lifetimeEntries;
+    LifetimeEntry *lifetimeEntry = nullptr;
 
     ParsedTypeAttributeList(ParseTypeReason reason) : ParseReason(reason) {}
 
@@ -1776,8 +1774,7 @@ public:
                                               bool isExprBasic);
   ParserResult<Expr> parseExprPostfixSuffix(ParserResult<Expr> inner,
                                             bool isExprBasic,
-                                            bool periodHasKeyPathBehavior,
-                                            bool &hasBindOptional);
+                                            bool periodHasKeyPathBehavior);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprPrimary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
@@ -2121,67 +2118,6 @@ public:
   ParserResult<Expr> parseExprFromSyntaxTree();
 };
 
-/// Describes a parsed declaration name.
-struct ParsedDeclName {
-  /// The name of the context of which the corresponding entity should
-  /// become a member.
-  StringRef ContextName;
-
-  /// The base name of the declaration.
-  StringRef BaseName;
-
-  /// The argument labels for a function declaration.
-  SmallVector<StringRef, 4> ArgumentLabels;
-
-  /// Whether this is a function name (vs. a value name).
-  bool IsFunctionName = false;
-
-  /// Whether this is a getter for the named property.
-  bool IsGetter = false;
-
-  /// Whether this is a setter for the named property.
-  bool IsSetter = false;
-
-  bool IsSubscript = false;
-
-  /// For a declaration name that makes the declaration into an
-  /// instance member, the index of the "Self" parameter.
-  std::optional<unsigned> SelfIndex;
-
-  /// Determine whether this is a valid name.
-  explicit operator bool() const { return !BaseName.empty(); }
-
-  /// Whether this declaration name turns the declaration into a
-  /// member of some named context.
-  bool isMember() const { return !ContextName.empty(); }
-
-  /// Whether the result is translated into an instance member.
-  bool isInstanceMember() const {
-    return isMember() && static_cast<bool>(SelfIndex);
-  }
-
-  /// Whether the result is translated into a static/class member.
-  bool isClassMember() const {
-    return isMember() && !static_cast<bool>(SelfIndex);
-  }
-
-  /// Whether this is a property accessor.
-  bool isPropertyAccessor() const { return IsGetter || IsSetter; }
-
-  /// Whether this is an operator.
-  bool isOperator() const {
-    return Lexer::isOperator(BaseName);
-  }
-
-  /// Form a declaration name from this parsed declaration name.
-  DeclName formDeclName(ASTContext &ctx, bool isSubscript = false,
-                        bool isCxxClassTemplateSpec = false) const;
-
-  /// Form a declaration name from this parsed declaration name.
-  DeclNameRef formDeclNameRef(ASTContext &ctx, bool isSubscript = false,
-                              bool isCxxClassTemplateSpec = false) const;
-};
-
 /// To assist debugging parser crashes, tell us the location of the
 /// current token.
 class PrettyStackTraceParser : public llvm::PrettyStackTraceEntry {
@@ -2190,28 +2126,6 @@ public:
   explicit PrettyStackTraceParser(Parser &P) : P(P) {}
   void print(llvm::raw_ostream &out) const override;
 };
-
-/// Parse a stringified Swift declaration name,
-/// e.g. "Foo.translateBy(self:x:y:)".
-ParsedDeclName parseDeclName(StringRef name) LLVM_READONLY;
-
-/// Form a Swift declaration name from its constituent parts.
-DeclName formDeclName(ASTContext &ctx,
-                      StringRef baseName,
-                      ArrayRef<StringRef> argumentLabels,
-                      bool isFunctionName,
-                      bool isInitializer,
-                      bool isSubscript = false,
-                      bool isCxxClassTemplateSpec = false);
-
-/// Form a Swift declaration name reference from its constituent parts.
-DeclNameRef formDeclNameRef(ASTContext &ctx,
-                            StringRef baseName,
-                            ArrayRef<StringRef> argumentLabels,
-                            bool isFunctionName,
-                            bool isInitializer,
-                            bool isSubscript = false,
-                            bool isCxxClassTemplateSpec = false);
 
 /// Whether a given token can be the start of a decl.
 bool isKeywordPossibleDeclStart(const LangOptions &options, const Token &Tok);

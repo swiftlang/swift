@@ -17,8 +17,10 @@
 #ifndef SWIFT_AST_AVAILABILITY_H
 #define SWIFT_AST_AVAILABILITY_H
 
+#include "swift/AST/PlatformKind.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/VersionTuple.h"
 #include <optional>
 
@@ -173,6 +175,8 @@ public:
   static VersionRange allGTE(const llvm::VersionTuple &EndPoint) {
     return VersionRange(EndPoint);
   }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const;
 
 private:
   VersionRange(const llvm::VersionTuple &LowerEndpoint) {
@@ -342,20 +346,24 @@ public:
   /// to ToDecl.
   static void
   applyInferredAvailableAttrs(Decl *ToDecl,
-                              ArrayRef<const Decl *> InferredFromDecls,
-                              ASTContext &Context);
+                              ArrayRef<const Decl *> InferredFromDecls);
 
   static AvailabilityRange inferForType(Type t);
 
-  /// Returns the context where a declaration is available
-  /// We assume a declaration without an annotation is always available.
-  static AvailabilityRange availableRange(const Decl *D, ASTContext &C);
+  /// Returns the range of platform versions in which the decl is available.
+  static AvailabilityRange availableRange(const Decl *D);
+
+  /// Returns the range of platform versions in which the decl is available and
+  /// the attribute which determined this range (which may be `nullptr` if the
+  /// declaration is always available.
+  static std::pair<AvailabilityRange, const AvailableAttr *>
+  availableRangeAndAttr(const Decl *D);
 
   /// Returns true is the declaration is `@_spi_available`.
-  static bool isAvailableAsSPI(const Decl *D, ASTContext &C);
+  static bool isAvailableAsSPI(const Decl *D);
 
-  /// Returns the availability context for a declaration with the given
-  /// @available attribute.
+  /// Returns the range of platform versions in which a declaration with the
+  /// given `@available` attribute is available.
   ///
   /// NOTE: The attribute must be active on the current platform.
   static AvailabilityRange availableRange(const AvailableAttr *attr,
@@ -363,14 +371,13 @@ public:
 
   /// Returns the attribute that should be used to determine the availability
   /// range of the given declaration, or nullptr if there is none.
-  static const AvailableAttr *attrForAnnotatedAvailableRange(const Decl *D,
-                                                             ASTContext &Ctx);
+  static const AvailableAttr *attrForAnnotatedAvailableRange(const Decl *D);
 
   /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration
   /// has no availability annotation.
   static std::optional<AvailabilityRange>
-  annotatedAvailableRange(const Decl *D, ASTContext &C);
+  annotatedAvailableRange(const Decl *D);
 
   static AvailabilityRange
   annotatedAvailableRangeForAttr(const SpecializeAttr *attr, ASTContext &ctx);

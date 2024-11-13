@@ -11,6 +11,7 @@ add_swift_host_library(swiftParse STATIC
   Lexer.cpp
   ParseBridging.cpp
   ParseDecl.cpp
+  ParseDeclName.cpp
   ParseExpr.cpp
   ParseGeneric.cpp
   ParseIfConfig.cpp
@@ -39,7 +40,7 @@ endif()
 
 if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
   target_compile_definitions(swiftParse
-    PRIVATE
+    PUBLIC
     SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
   )
 endif()

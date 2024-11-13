@@ -95,6 +95,7 @@ private func registerSwiftPasses() {
   registerPass(lifetimeDependenceDiagnosticsPass, { lifetimeDependenceDiagnosticsPass.run($0) })
   registerPass(lifetimeDependenceInsertionPass, { lifetimeDependenceInsertionPass.run($0) })
   registerPass(lifetimeDependenceScopeFixupPass, { lifetimeDependenceScopeFixupPass.run($0) })
+  registerPass(loadCopyToBorrowOptimization, { loadCopyToBorrowOptimization.run($0) })
   registerPass(generalClosureSpecialization, { generalClosureSpecialization.run($0) })
   registerPass(autodiffClosureSpecialization, { autodiffClosureSpecialization.run($0) })
 
@@ -135,5 +136,5 @@ private func registerSwiftAnalyses() {
 
 private func registerUtilities() {
   registerVerifier()
-  registerBorrowedFromUpdater()
+  registerGuaranteedPhiUpdater()
 }

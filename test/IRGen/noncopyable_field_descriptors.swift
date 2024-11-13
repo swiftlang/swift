@@ -18,6 +18,7 @@
 
 // rdar://124401253
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_NonescapableTypes
 // UNSUPPORTED: CPU=arm64e
 
 @frozen

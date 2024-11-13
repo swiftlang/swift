@@ -406,11 +406,22 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
                                  ProtocolDecl *protocol) {
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {
-    // All builtin types are Sendable, Copyable, and Escapable.
     case KnownProtocolKind::Sendable:
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable: {
       ASTContext &ctx = protocol->getASTContext();
+
+      // FixedArray is Sendable, Copyable, or Escapable if its element type is.
+      if (auto bfa = dyn_cast<BuiltinFixedArrayType>(builtinType)) {
+        if (lookupConformance(bfa->getElementType(), protocol)) {
+          return ProtocolConformanceRef(
+            ctx.getBuiltinConformance(type, protocol,
+                                      BuiltinConformanceKind::Synthesized));
+        }
+        break;
+      }
+    
+      // All other builtin types are Sendable, Copyable, and Escapable.
       return ProtocolConformanceRef(
           ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
@@ -838,6 +849,10 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
   //  just pretend it it conforms.
   if (type->is<SILPackType>())
     return true;
+
+  if (type->is<SILTokenType>()) {
+    return true;
+  }
 
   // The SIL types in the AST do not have real conformances, and should have
   // been handled in SILType instead.

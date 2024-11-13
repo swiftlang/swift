@@ -282,6 +282,7 @@ namespace {
       case clang::BuiltinType::Overload:
       case clang::BuiltinType::PseudoObject:
       case clang::BuiltinType::UnknownAny:
+      case clang::BuiltinType::UnresolvedTemplate:
         return Type();
 
       // FIXME: Types that can be mapped, but aren't yet.
@@ -322,66 +323,22 @@ namespace {
       case clang::BuiltinType::ObjCSel:
         return Type();
 
-      // OpenCL types that don't have Swift equivalents.
-      case clang::BuiltinType::OCLImage1dRO:
-      case clang::BuiltinType::OCLImage1dRW:
-      case clang::BuiltinType::OCLImage1dWO:
-      case clang::BuiltinType::OCLImage1dArrayRO:
-      case clang::BuiltinType::OCLImage1dArrayRW:
-      case clang::BuiltinType::OCLImage1dArrayWO:
-      case clang::BuiltinType::OCLImage1dBufferRO:
-      case clang::BuiltinType::OCLImage1dBufferRW:
-      case clang::BuiltinType::OCLImage1dBufferWO:
-      case clang::BuiltinType::OCLImage2dRO:
-      case clang::BuiltinType::OCLImage2dRW:
-      case clang::BuiltinType::OCLImage2dWO:
-      case clang::BuiltinType::OCLImage2dArrayRO:
-      case clang::BuiltinType::OCLImage2dArrayRW:
-      case clang::BuiltinType::OCLImage2dArrayWO:
-      case clang::BuiltinType::OCLImage2dDepthRO:
-      case clang::BuiltinType::OCLImage2dDepthRW:
-      case clang::BuiltinType::OCLImage2dDepthWO:
-      case clang::BuiltinType::OCLImage2dArrayDepthRO:
-      case clang::BuiltinType::OCLImage2dArrayDepthRW:
-      case clang::BuiltinType::OCLImage2dArrayDepthWO:
-      case clang::BuiltinType::OCLImage2dMSAARO:
-      case clang::BuiltinType::OCLImage2dMSAARW:
-      case clang::BuiltinType::OCLImage2dMSAAWO:
-      case clang::BuiltinType::OCLImage2dArrayMSAARO:
-      case clang::BuiltinType::OCLImage2dArrayMSAARW:
-      case clang::BuiltinType::OCLImage2dArrayMSAAWO:
-      case clang::BuiltinType::OCLImage2dMSAADepthRO:
-      case clang::BuiltinType::OCLImage2dMSAADepthRW:
-      case clang::BuiltinType::OCLImage2dMSAADepthWO:
-      case clang::BuiltinType::OCLImage2dArrayMSAADepthRO:
-      case clang::BuiltinType::OCLImage2dArrayMSAADepthRW:
-      case clang::BuiltinType::OCLImage2dArrayMSAADepthWO:
-      case clang::BuiltinType::OCLImage3dRO:
-      case clang::BuiltinType::OCLImage3dRW:
-      case clang::BuiltinType::OCLImage3dWO:
-      case clang::BuiltinType::OCLSampler:
-      case clang::BuiltinType::OCLEvent:
-      case clang::BuiltinType::OCLClkEvent:
-      case clang::BuiltinType::OCLQueue:
-      case clang::BuiltinType::OCLReserveID:
-      case clang::BuiltinType::OCLIntelSubgroupAVCMcePayload:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImePayload:
-      case clang::BuiltinType::OCLIntelSubgroupAVCRefPayload:
-      case clang::BuiltinType::OCLIntelSubgroupAVCSicPayload:
-      case clang::BuiltinType::OCLIntelSubgroupAVCMceResult:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
-      case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
-      case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleReferenceStreamout:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualReferenceStreamout:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleReferenceStreamin:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeDualReferenceStreamin:
-        return Type();
-
       // OpenMP types that don't have Swift equivalents.
-      case clang::BuiltinType::OMPArraySection:
+      case clang::BuiltinType::ArraySection:
       case clang::BuiltinType::OMPArrayShaping:
       case clang::BuiltinType::OMPIterator:
+        return Type();
+
+      // OpenCL builtin types that don't have Swift equivalents.
+      case clang::BuiltinType::OCLClkEvent:
+      case clang::BuiltinType::OCLEvent:
+      case clang::BuiltinType::OCLSampler:
+      case clang::BuiltinType::OCLQueue:
+      case clang::BuiltinType::OCLReserveID:
+#define IMAGE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/OpenCLImageTypes.def"
+#define EXT_OPAQUE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/OpenCLExtensionTypes.def"
         return Type();
 
       // ARM SVE builtin types that don't have Swift equivalents.
@@ -401,6 +358,11 @@ namespace {
 
 #define WASM_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/WebAssemblyReferenceTypes.def"
+        return Type();
+
+      // AMDGPU builtin types that don't have Swift equivalents.
+#define AMDGPU_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/AMDGPUTypes.def"
         return Type();
 
       }
@@ -445,6 +407,17 @@ namespace {
                                                 type->getTypeClassName()),
                                clang::SourceLocation());
       // FIXME: handle pointers and fields of atomic type
+      return Type();
+    }
+
+    ImportResult VisitCountAttributedType(
+        const clang::CountAttributedType *type) {
+      // CountAttributedType is a clang type representing a pointer with
+      // a "counted_by" type attribute. For now, we don't import these
+      // into Swift.
+      // In the future we could do something more clever (such as trying to
+      // import as an Array where possible) or less clever (such as importing
+      // as the desugared, underlying pointer type).
       return Type();
     }
 
@@ -651,7 +624,7 @@ namespace {
         return Type();
       
       if (size == 1)
-        return ParenType::get(elementType->getASTContext(), elementType);
+        return elementType;
 
       SmallVector<TupleTypeElt, 8> elts{static_cast<size_t>(size), elementType};
       return TupleType::get(elts, elementType->getASTContext());
@@ -757,8 +730,7 @@ namespace {
       if (!inner)
         return Type();
 
-      return { ParenType::get(Impl.SwiftContext, inner.AbstractType),
-               inner.Hint };
+      return { inner.AbstractType, inner.Hint };
     }
 
     /// Imports the type defined by \p objcTypeParamDecl.
@@ -1282,6 +1254,10 @@ namespace {
       }
 
       return { importedType, ImportHint::ObjCPointer };
+    }
+
+    ImportResult VisitPackIndexingType(const clang::PackIndexingType *type) {
+      return Type();
     }
   };
 } // end anonymous namespace
@@ -2203,10 +2179,11 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   // C++ operators +=, -=, *=, /= may return a reference to self. This is not
   // idiomatic in Swift, let's drop these return values.
   clang::OverloadedOperatorKind op = clangDecl->getOverloadedOperator();
-  if (op == clang::OverloadedOperatorKind::OO_PlusEqual ||
-      op == clang::OverloadedOperatorKind::OO_MinusEqual ||
-      op == clang::OverloadedOperatorKind::OO_StarEqual ||
-      op == clang::OverloadedOperatorKind::OO_SlashEqual)
+  if ((op == clang::OverloadedOperatorKind::OO_PlusEqual ||
+       op == clang::OverloadedOperatorKind::OO_MinusEqual ||
+       op == clang::OverloadedOperatorKind::OO_StarEqual ||
+       op == clang::OverloadedOperatorKind::OO_SlashEqual) &&
+      clangDecl->getReturnType()->isReferenceType())
     return {SwiftContext.getVoidType(), false};
 
   // Fix up optionality.
@@ -2656,9 +2633,11 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // Swift doesn't support default values of inout parameters.
   // TODO: support default arguments of constructors
   // (https://github.com/apple/swift/issues/70124)
+  // TODO: support params with template parameters
   if (param->hasDefaultArg() && !isInOut &&
       !isa<clang::CXXConstructorDecl>(param->getDeclContext()) &&
-      impl->isDefaultArgSafeToImport(param)) {
+      impl->isDefaultArgSafeToImport(param) &&
+      !param->isTemplated()) {
     SwiftDeclSynthesizer synthesizer(*impl);
     if (CallExpr *defaultArgExpr = synthesizer.makeDefaultArgument(
             param, swiftParamTy, paramInfo->getParameterNameLoc())) {
@@ -2788,7 +2767,15 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   }
 
   // Form the parameter list.
-  return ParameterList::create(SwiftContext, parameters);
+  // Estimate locations for the begin and end of parameter list.
+  auto begin = clangDecl->getLocation();
+  auto end = begin;
+  if (!params.empty()) {
+    begin = params.front()->getBeginLoc();
+    end = params.back()->getEndLoc();
+  }
+  return ParameterList::create(SwiftContext, importSourceLoc(begin), parameters,
+                               importSourceLoc(end));
 }
 
 static bool isObjCMethodResultAudited(const clang::Decl *decl) {

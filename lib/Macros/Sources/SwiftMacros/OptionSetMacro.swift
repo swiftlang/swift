@@ -72,7 +72,7 @@ public struct OptionSetMacro {
     of attribute: AttributeSyntax,
     attachedTo decl: Decl,
     in context: Context
-  ) -> (StructDeclSyntax, EnumDeclSyntax, TypeSyntax)? {
+  ) -> (StructDeclSyntax, EnumDeclSyntax, GenericArgumentSyntax.Argument)? {
     // Determine the name of the options enum.
     let optionsEnumName: String
     if case let .argumentList(arguments) = attribute.arguments,
@@ -152,6 +152,7 @@ extension OptionSetMacro: MemberMacro {
   >(
     of attribute: AttributeSyntax,
     providingMembersOf decl: Decl,
+    conformingTo protocols: [TypeSyntax],
     in context: Context
   ) throws -> [DeclSyntax] {
     // Decode the expansion arguments.

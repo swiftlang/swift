@@ -1,7 +1,8 @@
 // RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 class NonSendable : Hashable {
   var data: Int

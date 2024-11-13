@@ -34,6 +34,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -51,8 +52,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
-#include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -1696,8 +1695,8 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   // range with both the conforming type's available range and the protocol
   // declaration's available range.
   AvailabilityRange witnessInfo =
-      AvailabilityInference::availableRange(witness, Context);
-  requirementInfo = AvailabilityInference::availableRange(requirement, Context);
+      AvailabilityInference::availableRange(witness);
+  requirementInfo = AvailabilityInference::availableRange(requirement);
 
   AvailabilityRange infoForConformingDecl =
       overApproximateAvailabilityAtLocation(dc->getAsDecl()->getLoc(), dc);

@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -enable-experimental-feature MoveOnlyEnumDeinits -enable-sil-verify-all -sil-combine %s | %FileCheck %s
 
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
+
 sil_stage canonical
 
 import Builtin

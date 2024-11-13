@@ -1073,9 +1073,11 @@ public:
     removeFromCurrent();
     TheValue = newValue;
     insertIntoCurrent();
+    updateReborrowFlags();
     verify();
   }
 
+  void updateReborrowFlags();
   void verify() const;
 
   /// Swap the given operand with the current one.

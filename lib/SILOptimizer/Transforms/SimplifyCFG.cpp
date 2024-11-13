@@ -2189,7 +2189,7 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
     }
     Builder.createBranch(loc, LiveBlock, PayLoad);
     SEI->eraseFromParent();
-    updateBorrowedFromPhis(PM, { cast<SILPhiArgument>(LiveBlock->getArgument(0)) });
+    updateGuaranteedPhis(PM, { cast<SILPhiArgument>(LiveBlock->getArgument(0)) });
   } else {
     if (SEI->getOperand()->getOwnershipKind() == OwnershipKind::Owned) {
       Builder.createDestroyValue(loc, SEI->getOperand());
@@ -3784,7 +3784,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
 
   proj->eraseFromParent();
 
-  updateBorrowedFromPhis(PM, { NewArg });
+  updateGuaranteedPhis(PM, { NewArg });
 
   return true;
 }

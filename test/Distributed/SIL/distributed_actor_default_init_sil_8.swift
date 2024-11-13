@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -verify -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -verify -target %target-swift-5.7-abi-triple -I %t | %FileCheck %s --enable-var-scope --dump-input=fail
 // REQUIRES: concurrency
 // REQUIRES: distributed
 // REQUIRES: swift_in_compiler

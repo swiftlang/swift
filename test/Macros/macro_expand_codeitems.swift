@@ -1,4 +1,5 @@
-// REQUIRES: swift_swift_parser, executable_test, asserts
+// REQUIRES: swift_swift_parser, executable_test
+// REQUIRES: swift_feature_CodeItemMacros
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
 
@@ -21,7 +22,7 @@ func testFreestandingMacroExpansion() {
   // CHECK: from stmt
   // CHECK: from usedInExpandedStmt
   // CHECK: from expr
-  // CHECK-DIAGS: struct $s9MacroUser0033macro_expand_codeitemsswift_DbGHjfMX25_2_9codeItemsfMf_3foofMu_ {
+  // CHECK-DIAGS: struct $s9MacroUser0033macro_expand_codeitemsswift_DbGHjfMX26_2_9codeItemsfMf_3foofMu_ {
   // CHECK-DIAGS: END CONTENTS OF FILE
   #codeItems
 

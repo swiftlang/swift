@@ -1071,14 +1071,9 @@ public:
   ALWAYS_NON_ESCAPING_INST(StrongRelease)
   ALWAYS_NON_ESCAPING_INST(DestroyValue)
   ALWAYS_NON_ESCAPING_INST(EndBorrow)
+  ALWAYS_NON_ESCAPING_INST(DeallocBox)
+  ALWAYS_NON_ESCAPING_INST(EndAccess)
 #undef ALWAYS_NON_ESCAPING_INST
-
-  bool visitDeallocBoxInst(DeallocBoxInst *dbi) {
-    markCurrentOpAsMutation();
-    return true;
-  }
-
-  bool visitEndAccessInst(EndAccessInst *) { return true; }
 
   bool visitApplyInst(ApplyInst *ai) {
     auto argIndex = currentOp.get()->getOperandNumber() - 1;

@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_DebugDescriptionMacro
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -enable-experimental-feature DebugDescriptionMacro -plugin-path %swift-plugin-dir -dump-macro-expansions > %t/expansions-dump.txt 2>&1

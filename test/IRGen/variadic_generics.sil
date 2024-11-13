@@ -105,9 +105,9 @@ bb0(%pack : $*Pack{Int, repeat each T, Int}, %value : $Int):
 // CHECK-LABEL: define {{.*}}@test_pack_alloc_1_dynamic(
 // CHECK-SAME:       [[INT]] [[PACK_SIZE:%[^,]+]]
 // CHECK:        [[SIZE:%[^,]+]] = add [[INT]] [[PACK_SIZE]], [[PACK_SIZE]]
-// CHECK:        [[SP_SAVE:%[^,]+]] = call ptr @llvm.stacksave()
+// CHECK:        [[SP_SAVE:%[^,]+]] = call ptr @llvm.stacksave.p0()
 // CHECK:        alloca ptr, [[INT]] [[SIZE]]
-// CHECK:        call void @llvm.stackrestore(ptr [[SP_SAVE]])
+// CHECK:        call void @llvm.stackrestore.p0(ptr [[SP_SAVE]])
 sil @test_pack_alloc_1_dynamic : $<each T> () -> () {
 // Control flow so that stack saving/restoring is emitted
 entry:

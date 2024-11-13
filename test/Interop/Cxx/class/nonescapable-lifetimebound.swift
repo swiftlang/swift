@@ -1,7 +1,8 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs  %t/test.swift -enable-experimental-feature NonescapableTypes -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1
 // RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature NonescapableTypes -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_feature_NonescapableTypes
 
 //--- Inputs/module.modulemap
 module Test {
@@ -16,6 +17,15 @@ struct SWIFT_NONESCAPABLE View {
     View() : member(nullptr) {}
     View(const int *p [[clang::lifetimebound]]) : member(p) {}
     View(const View&) = default;
+private:
+    const int *member;
+    friend struct OtherView;
+};
+
+struct SWIFT_NONESCAPABLE OtherView {
+    OtherView() : member(nullptr) {}
+    OtherView(View v [[clang::lifetimebound]]) : member(v.member) {}
+    OtherView(const OtherView&) = default;
 private:
     const int *member;
 };
@@ -68,14 +78,20 @@ private:
     const int *member;
 };
 
+View returnsImmortal() SWIFT_RETURNS_INDEPENDENT_VALUE {
+    return View();
+}
+
 // CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
-// CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> _scope(0) @autoreleased View
-// CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> _scope(0) @autoreleased View
-// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> _scope(0, 1) @autoreleased View
-// CHECK: sil [clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> _scope(0) @autoreleased View
-// CHECK: sil [clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> _scope(1) @autoreleased View
-// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@guaranteed View, @guaranteed View) -> _inherit(0, 1) @autoreleased View
-// CHECK: sil [clang View.init] {{.*}} : $@convention(c) () -> @out View
+// CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
+// CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
+// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0, borrow 1) @autoreleased View
+// CHECK: sil [clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
+// CHECK: sil [clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow 1) @autoreleased View
+// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@guaranteed View, @guaranteed View) -> @lifetime(copy 0, copy 1) @autoreleased View
+// CHECK: sil [clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
+// CHECK: sil [clang OtherView.init] {{.*}} : $@convention(c) (@guaranteed View) -> @lifetime(copy 0) @out OtherView
+// CHECK: sil [clang returnsImmortal] {{.*}} : $@convention(c) () -> @lifetime(immortal) @autoreleased View
 
 //--- test.swift
 
@@ -91,4 +107,6 @@ public func test() {
     let _ = o.handOutView2(v1)
     let _ = getViewFromEither(v1, v2)
     let defaultView = View()
+    let _ = OtherView(defaultView)
+    let _ = returnsImmortal()
 }
