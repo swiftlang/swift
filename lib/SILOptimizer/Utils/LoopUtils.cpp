@@ -17,6 +17,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
@@ -330,6 +331,17 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
   if (isa<AwaitAsyncContinuationInst>(I) ||
       isa<GetAsyncContinuationAddrInst>(I) || isa<GetAsyncContinuationInst>(I))
     return false;
+
+  // Bail if there are any begin-borrow instructions which have no corresponding
+  // end-borrow uses. This is the case if the control flow ends in a dead-end block.
+  // After duplicating such a block, the re-borrow flags cannot be recomputed
+  // correctly for inserted phi arguments.
+  if (auto *svi  = dyn_cast<SingleValueInstruction>(I)) {
+    if (auto bv = BorrowedValue(lookThroughBorrowedFromDef(svi))) {
+      if (!bv.hasLocalScopeEndingUses())
+        return false;
+    }
+  }
 
   // Some special cases above that aren't considered isTriviallyDuplicatable
   // return true early.

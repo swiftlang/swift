@@ -687,7 +687,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
     builder->createBranch(loc, contBB, {noneValue});
     builder->setInsertionPoint(contBB->begin());
 
-    updateBorrowedFromPhis(pm, { phi });
+    updateGuaranteedPhis(pm, { phi });
 
     return {lookThroughBorrowedFromUser(phi), true};
   }

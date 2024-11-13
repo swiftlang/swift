@@ -941,14 +941,7 @@ public:
     return lowering.emitStore(*this, Loc, Src, DestAddr, Qualifier);
   }
 
-  EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue) {
-    ASSERT(!SILArgument::isTerminatorResult(borrowedValue) &&
-               "terminator results do not have end_borrow");
-    ASSERT(!isa<SILFunctionArgument>(borrowedValue) &&
-           "Function arguments should never have an end_borrow");
-    return insert(new (getModule())
-                      EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
-  }
+  EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue);
 
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
                                      SILAccessKind accessKind,

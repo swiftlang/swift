@@ -628,6 +628,13 @@ extension BasicBlock {
   }
 }
 
+extension Argument {
+  func set(reborrow: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.setReborrow(reborrow)
+  }
+}
+
 extension AllocRefInstBase {
   func setIsStackAllocatable(_ context: some MutatingContext) {
     context.notifyInstructionsChanged()

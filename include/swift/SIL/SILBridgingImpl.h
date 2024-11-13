@@ -672,6 +672,9 @@ BridgedBasicBlock BridgedArgument::getParent() const {
 }
 
 bool BridgedArgument::isReborrow() const { return getArgument()->isReborrow(); }
+void BridgedArgument::setReborrow(bool reborrow) const {
+  getArgument()->setReborrow(reborrow);
+}
 
 OptionalBridgedDeclObj BridgedArgument::getVarDecl() const {
   return {llvm::dyn_cast_or_null<swift::VarDecl>(getArgument()->getDecl())};
