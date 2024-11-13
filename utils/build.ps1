@@ -2465,6 +2465,7 @@ function Build-IndexStoreDB($Arch) {
       BUILD_SHARED_LIBS = "NO";
       CMAKE_C_FLAGS = @("-I$SDKInstallRoot\usr\include", "-I$SDKInstallRoot\usr\include\Block");
       CMAKE_CXX_FLAGS = @("-I$SDKInstallRoot\usr\include", "-I$SDKInstallRoot\usr\include\Block");
+      LMDB_DIR = (Get-HostProjectCMakeModules LMDB);
     }
 }
 
