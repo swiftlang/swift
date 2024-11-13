@@ -1279,7 +1279,7 @@ constexpr InitFn initWithTakeTable[] = {
     &copyingInitWithTake,
     &copyingInitWithTake,
     &copyingInitWithTake,
-    nullptr, // Custom
+    &copyingInitWithTake,
     &metatypeInitWithTake,
     nullptr, // Generic
     &existentialInitWithTake,
