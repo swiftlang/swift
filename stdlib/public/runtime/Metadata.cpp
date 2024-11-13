@@ -7791,7 +7791,13 @@ diagnoseMetadataDependencyCycle(llvm::ArrayRef<MetadataDependency> links) {
       .errorType = "type-metadata-cycle",
       .currentStackDescription = "fetching metadata", // TODO?
       .framesToSkip = 1, // skip out to the check function
-      .memoryAddress = links.front().Value
+      .memoryAddress = links.front().Value,
+      .numExtraThreads = 0,
+      .threads = nullptr,
+      .numFixIts = 0,
+      .fixIts = nullptr,
+      .numNotes = 0,
+      .notes = nullptr,
       // TODO: describe the cycle using notes instead of one huge message?
     };
 #pragma GCC diagnostic pop

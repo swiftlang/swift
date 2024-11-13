@@ -144,6 +144,7 @@ void scopedUnlockUnderScopedLockThreaded(M &mutex) {
 
   ASSERT_EQ(count1, 500);
   ASSERT_EQ(count2, 500);
+  (void)badCount; // FIXME: Is this value meant to be tested?
 }
 
 // Test a critical section
