@@ -8205,6 +8205,16 @@ unsigned ClangImporter::Implementation::getClangSwiftAttrSourceBuffer(
   auto &sourceMgr = SwiftContext.SourceMgr;
   auto bufferID = sourceMgr.addMemBufferCopy(attributeText);
   ClangSwiftAttrSourceBuffers.insert({attributeText, bufferID});
+
+  // Note that this is for an attribute.
+  sourceMgr.setGeneratedSourceInfo(
+      bufferID,
+      {
+        GeneratedSourceInfo::Attribute,
+        CharSourceRange(),
+        sourceMgr.getRangeForBuffer(bufferID)
+      }
+  );
   return bufferID;
 }
 

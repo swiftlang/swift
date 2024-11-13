@@ -150,6 +150,8 @@ getBridgedGeneratedSourceFileKind(const GeneratedSourceInfo *genInfo) {
     return BridgedGeneratedSourceFileKindPrettyPrinted;
   case GeneratedSourceInfo::Kind::DefaultArgument:
     return BridgedGeneratedSourceFileKindDefaultArgument;
+  case GeneratedSourceInfo::Attribute:
+    return BridgedGeneratedSourceFileKindAttribute;
   }
 }
 
@@ -364,7 +366,8 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
       break;
     }
 
-    case GeneratedSourceInfo::MemberAttributeMacroExpansion: {
+    case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+    case GeneratedSourceInfo::Attribute: {
       parser.parseExpandedAttributeList(items);
       break;
     }

@@ -298,7 +298,9 @@ public:
       if (auto generatedInfo = SM.getGeneratedSourceInfo(BufferID)) {
         // We only care about macros, so skip everything else.
         if (generatedInfo->kind != GeneratedSourceInfo::ReplacedFunctionBody &&
-            generatedInfo->kind != GeneratedSourceInfo::PrettyPrinted)
+            generatedInfo->kind != GeneratedSourceInfo::PrettyPrinted &&
+            generatedInfo->kind != GeneratedSourceInfo::DefaultArgument &&
+            generatedInfo->kind != GeneratedSourceInfo::Attribute)
           if (auto *MemBuf = SM.getLLVMSourceMgr().getMemoryBuffer(BufferID)) {
             Source = MemBuf->getBuffer();
             // This is copying the buffer twice, but Xcode depends on this

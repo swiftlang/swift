@@ -122,7 +122,8 @@ public func parseSourceFile(
       .preambleMacroExpansion,
       .replacedFunctionBody,
       .prettyPrinted,
-      .defaultArgument:
+      .defaultArgument,
+      .attribute:
     parsed = Syntax(SourceFileSyntax.parse(from: &parser))
 
   case .declarationMacroExpansion,
