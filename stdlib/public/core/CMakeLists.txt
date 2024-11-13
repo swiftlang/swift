@@ -403,23 +403,21 @@ if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
                     BOOTSTRAPPING 1)
 endif()
 
-set(tooling_stdlib_deps)
-if(TARGET libSwiftScan)
-  list(append tooling_stdlib_deps libSwiftScan)
-endif()
-
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
                   ${swiftCore_common_options}
                   ${compile_flags_for_final_build}
                   FILE_DEPENDS
                     ${swiftCore_common_dependencies}
-                  DEPENDS ${tooling_stdlib_deps}
                   INSTALL_IN_COMPONENT
                     stdlib
                   MACCATALYST_BUILD_FLAVOR
                     zippered
                  )
+
+# This is a custom target that will have a dependency established on libSwiftScan
+# downstream when we configure 'tools'
+add_custom_target(stdlib_unblock)
 
 # Embedded standard library - embedded libraries are built as .swiftmodule only,
 # i.e. there is no .o or .a file produced (no binary code is actually produced)
@@ -427,6 +425,7 @@ add_swift_target_library(swiftCore
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-stdlib)
   add_dependencies(embedded-libraries embedded-stdlib)
+  add_dependencies(embedded-stdlib stdlib_unblock)
 
   set(SWIFT_ENABLE_REFLECTION OFF)
   set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
@@ -457,9 +456,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       SDK "embedded"
       ARCHITECTURE "${arch}"
       FILE_DEPENDS ${swiftCore_common_dependencies}
-      DEPENDS ${tooling_stdlib_deps}
       INSTALL_IN_COMPONENT stdlib
       )
     add_dependencies(embedded-stdlib embedded-stdlib-${mod})
+    add_dependencies(embedded-stdlib-${mod} stdlib_unblock)
   endforeach()
 endif()

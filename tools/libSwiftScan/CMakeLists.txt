@@ -69,7 +69,7 @@ add_llvm_symbol_exports(libSwiftScan ${LLVM_EXPORTED_SYMBOL_FILE})
 add_link_opts(libSwiftScan)
 
 add_dependencies(compiler libSwiftScan)
-
+add_dependencies(stdlib_unblock libSwiftScan)
 
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
 swift_install_in_component(TARGETS libSwiftScan
