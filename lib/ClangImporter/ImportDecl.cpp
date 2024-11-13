@@ -2186,7 +2186,10 @@ namespace {
       }
 
       if (Impl.SwiftContext.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-          importer::hasNonEscapableAttr(decl)) {
+          evaluateOrDefault(
+              Impl.SwiftContext.evaluator,
+              ClangTypeEscapability({decl->getTypeForDecl(), Impl}),
+              CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
         result->getAttrs().add(new (Impl.SwiftContext)
                                    NonEscapableAttr(/*Implicit=*/true));
       }
@@ -3930,7 +3933,11 @@ namespace {
       else if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl)) {
         // Assume default constructed view types have no dependencies.
         if (ctordecl->isDefaultConstructor() &&
-            importer::hasNonEscapableAttr(ctordecl->getParent()))
+            evaluateOrDefault(
+                Impl.SwiftContext.evaluator,
+                ClangTypeEscapability(
+                    {ctordecl->getParent()->getTypeForDecl(), Impl}),
+                CxxEscapability::Unknown) == CxxEscapability::NonEscapable)
           lifetimeDependencies.push_back(immortalLifetime);
       }
       if (lifetimeDependencies.empty()) {
@@ -8240,8 +8247,10 @@ bool swift::importer::isMutabilityAttr(const clang::SwiftAttrAttr *swiftAttr) {
          swiftAttr->getAttribute() == "nonmutating";
 }
 
-static bool importAsUnsafe(ASTContext &context, const clang::NamedDecl *decl,
+static bool importAsUnsafe(ClangImporter::Implementation &impl,
+                           const clang::NamedDecl *decl,
                            const Decl *MappedDecl) {
+  auto &context = impl.SwiftContext;
   if (!context.LangOpts.hasFeature(Feature::SafeInterop) ||
       !context.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
     return false;
@@ -8255,10 +8264,10 @@ static bool importAsUnsafe(ASTContext &context, const clang::NamedDecl *decl,
     return false;
 
   if (const auto *record = dyn_cast<clang::RecordDecl>(decl))
-    return evaluateOrDefault(context.evaluator,
-                             ClangTypeEscapability({record->getTypeForDecl()}),
-                             CxxEscapability::Unknown) ==
-           CxxEscapability::Unknown;
+    return evaluateOrDefault(
+               context.evaluator,
+               ClangTypeEscapability({record->getTypeForDecl(), impl, false}),
+               CxxEscapability::Unknown) == CxxEscapability::Unknown;
 
   return false;
 }
@@ -8440,7 +8449,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       }
     }
 
-    if (seenUnsafe || importAsUnsafe(SwiftContext, ClangDecl, MappedDecl)) {
+    if (seenUnsafe || importAsUnsafe(*this, ClangDecl, MappedDecl)) {
       auto attr = new (SwiftContext) UnsafeAttr(/*implicit=*/!seenUnsafe);
       MappedDecl->getAttrs().add(attr);
     }
