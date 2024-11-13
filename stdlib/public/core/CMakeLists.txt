@@ -93,7 +93,7 @@ split_embedded_sources(
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
   EMBEDDED InputStream.swift
-    NORMAL IntegerParsing.swift
+  EMBEDDED IntegerParsing.swift
   EMBEDDED Integers.swift
     NORMAL Join.swift
   EMBEDDED KeyPath.swift
