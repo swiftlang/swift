@@ -308,6 +308,10 @@ extension Instruction {
       // Don't remove UncheckedEnumDataInst in OSSA in case it is responsible
       // for consuming an enum value.
       return !parentFunction.hasOwnership
+    case is ExtendLifetimeInst:
+      // An extend_lifetime can only be removed if the operand is also removed.
+      // If its operand is trivial, it will be removed by MandatorySimplification.
+      return false
     default:
       break
     }
