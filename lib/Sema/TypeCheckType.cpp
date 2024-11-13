@@ -6143,13 +6143,16 @@ class ExistentialTypeSyntaxChecker : public ASTWalker {
   ASTContext &Ctx;
   bool checkStatements;
   bool hitTopStmt;
+  bool warnUntilSwift7;
 
   unsigned exprCount = 0;
   llvm::SmallVector<TypeRepr *, 4> reprStack;
     
 public:
-  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements)
-      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) {}
+  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements,
+                               bool warnUntilSwift7 = false)
+      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false),
+        warnUntilSwift7(warnUntilSwift7) {}
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::ArgumentsAndExpansion;
@@ -6363,6 +6366,7 @@ private:
           inverse && isAnyOrSomeMissing()) {
         auto diag = Ctx.Diags.diagnose(inverse->getTildeLoc(),
                                        diag::inverse_requires_any);
+        diag.warnUntilSwiftVersionIf(warnUntilSwift7, 7);
         emitInsertAnyFixit(diag, T);
         return;
       }
@@ -6380,6 +6384,7 @@ private:
                                proto->getDeclaredInterfaceType(),
                                proto->getDeclaredExistentialType(),
                                /*isAlias=*/false);
+        diag.warnUntilSwiftVersionIf(warnUntilSwift7, 7);
         emitInsertAnyFixit(diag, T);
       }
     } else if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
@@ -6410,6 +6415,7 @@ private:
               alias->getDeclaredInterfaceType(),
               ExistentialType::get(alias->getDeclaredInterfaceType()),
               /*isAlias=*/true);
+          diag.warnUntilSwiftVersionIf(warnUntilSwift7, 7);
           emitInsertAnyFixit(diag, T);
         }
       }
@@ -6489,7 +6495,14 @@ void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt,
   if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
     return;
 
-  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true);
+  // Previously we missed this diagnostic on 'catch' statements, downgrade
+  // to a warning until Swift 7.
+  auto downgradeUntilSwift7 = false;
+  if (auto *CS = dyn_cast<CaseStmt>(stmt))
+    downgradeUntilSwift7 = CS->getParentKind() == CaseParentKind::DoCatch;
+
+  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true,
+                                       downgradeUntilSwift7);
   stmt->walk(checker);
 }
 

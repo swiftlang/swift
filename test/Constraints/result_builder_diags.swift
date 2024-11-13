@@ -1029,3 +1029,31 @@ func testMissingElementInEmptyBuilder() {
   func test2() -> Int {}
   // expected-error@-1 {{expected expression of type 'Int' in result builder 'SingleElementBuilder'}} {{24-24=<#T##Int#>}}
 }
+
+// https://github.com/swiftlang/swift/issues/77453
+func testNoDuplicateStmtDiags() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ components: T...) -> T {
+      components.first!
+    }
+    static func buildEither<T>(first component: T) -> T {
+      component
+    }
+    static func buildEither<T>(second component: T) -> T {
+      component
+    }
+  }
+
+  func takesClosure(_ fn: () -> Void) -> Int? { nil }
+
+  @Builder
+  func foo() -> Int {
+    if let x = takesClosure {} {
+      // expected-warning@-1 {{trailing closure in this context is confusable with the body of the statement}}
+      x
+    } else {
+      1
+    }
+  }
+}

@@ -327,9 +327,10 @@ void ParentConditionalConformance::diagnoseConformanceStack(
 
 namespace {
 /// Produce any additional syntactic diagnostics for a SyntacticElementTarget.
-class SyntacticDiagnosticWalker final : public ASTWalker {
+class SyntacticDiagnosticWalker final : public BaseDiagnosticWalker {
   const SyntacticElementTarget &Target;
   bool IsTopLevelExprStmt;
+  unsigned ExprDepth = 0;
 
   SyntacticDiagnosticWalker(const SyntacticElementTarget &target,
                             bool isExprStmt)
@@ -341,25 +342,28 @@ public:
     target.walk(walker);
   }
 
-  MacroWalking getMacroWalkingBehavior() const override {
-    // We only want to walk macro arguments. Expansions will be walked when
-    // they're type-checked, not as part of the surrounding code.
-    return MacroWalking::Arguments;
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    // We only want to call the diagnostic logic for the top-level expression,
+    // since the underlying logic will visit each sub-expression. We want to
+    // continue walking however to diagnose any child statements in e.g
+    // closures.
+    if (ExprDepth == 0) {
+      auto isExprStmt = (E == Target.getAsExpr()) ? IsTopLevelExprStmt : false;
+      performSyntacticExprDiagnostics(E, Target.getDeclContext(), isExprStmt);
+    }
+    ExprDepth += 1;
+    return Action::Continue(E);
   }
 
-  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-    auto isExprStmt = (expr == Target.getAsExpr()) ? IsTopLevelExprStmt : false;
-    performSyntacticExprDiagnostics(expr, Target.getDeclContext(), isExprStmt);
-    return Action::SkipNode(expr);
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    assert(ExprDepth > 0);
+    ExprDepth -= 1;
+    return Action::Continue(E);
   }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
     performStmtDiagnostics(stmt, Target.getDeclContext());
     return Action::Continue(stmt);
-  }
-
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
   }
 
   PreWalkAction walkToTypeReprPre(TypeRepr *typeRepr) override {
