@@ -2495,7 +2495,7 @@ public:
 class MacroRoleAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<MacroRoleAttr, MacroIntroducedDeclName,
-                                    TypeExpr *> {
+                                    Expr *> {
   friend TrailingObjects;
 
   MacroSyntax syntax;
@@ -2507,22 +2507,22 @@ class MacroRoleAttr final
   MacroRoleAttr(SourceLoc atLoc, SourceRange range, MacroSyntax syntax,
                 SourceLoc lParenLoc, MacroRole role,
                 ArrayRef<MacroIntroducedDeclName> names,
-                ArrayRef<TypeExpr *> conformances,
-                SourceLoc rParenLoc, bool implicit);
+                ArrayRef<Expr *> conformances, SourceLoc rParenLoc,
+                bool implicit);
 
 public:
   static MacroRoleAttr *create(ASTContext &ctx, SourceLoc atLoc,
                                SourceRange range, MacroSyntax syntax,
                                SourceLoc lParenLoc, MacroRole role,
                                ArrayRef<MacroIntroducedDeclName> names,
-                               ArrayRef<TypeExpr *> conformances,
+                               ArrayRef<Expr *> conformances,
                                SourceLoc rParenLoc, bool implicit);
 
   size_t numTrailingObjects(OverloadToken<MacroIntroducedDeclName>) const {
     return numNames;
   }
 
-  size_t numTrailingObjects(OverloadToken<TypeExpr *>) const {
+  size_t numTrailingObjects(OverloadToken<Expr *>) const {
     return numConformances;
   }
 
@@ -2532,7 +2532,8 @@ public:
   MacroSyntax getMacroSyntax() const { return syntax; }
   MacroRole getMacroRole() const { return role; }
   ArrayRef<MacroIntroducedDeclName> getNames() const;
-  ArrayRef<TypeExpr *> getConformances() const;
+  ArrayRef<Expr *> getConformances() const;
+  MutableArrayRef<Expr *> getConformances();
   bool hasNameKind(MacroIntroducedDeclNameKind kind) const;
 
   static bool classof(const DeclAttribute *DA) {

@@ -753,86 +753,6 @@ extension ASTGenVisitor {
     return BridgedMacroIntroducedDeclName(kind: kind, name: name)
   }
 
-  struct GeneratedGenericArguments {
-    var arguments: BridgedArrayRef = .init()
-    var range: BridgedSourceRange = .init()
-  }
-
-  /// Generate 'TypeRepr' from a expression, because 'conformances' arguments in
-  /// macro role attributes are parsed as normal expressions.
-  func generateMacroIntroducedConformance(
-    expr: ExprSyntax,
-    genericArgs: GeneratedGenericArguments = GeneratedGenericArguments()
-  ) -> BridgedTypeRepr? {
-    switch expr.as(ExprSyntaxEnum.self) {
-    case .typeExpr(let node):
-      return self.generate(type: node.type)
-
-    case .declReferenceExpr(let node):
-      guard node.argumentNames == nil else {
-        // 'Foo.bar(_:baz:)'
-        break
-      }
-      let name = self.generateIdentifierAndSourceLoc(node.baseName)
-      return BridgedUnqualifiedIdentTypeRepr .createParsed(
-        self.ctx,
-        name: name.identifier,
-        nameLoc: name.sourceLoc,
-        genericArgs: genericArgs.arguments,
-        leftAngleLoc: genericArgs.range.start,
-        rightAngleLoc: genericArgs.range.end
-      ).asTypeRepr
-
-    case .memberAccessExpr(let node):
-      guard let parsedBase = node.base else {
-        // Implicit member expressions. E.g. '.Foo'
-        break
-      }
-      guard let base = self.generateMacroIntroducedConformance(expr: parsedBase) else {
-        // Unsupported base expr. E.g. 'foo().bar'
-        return nil
-      }
-      guard node.declName.argumentNames == nil else {
-        // Function name. E.g. 'Foo.bar(_:baz:)'
-        break
-      }
-      let name = self.generateIdentifierAndSourceLoc(node.declName.baseName)
-      return BridgedDeclRefTypeRepr.createParsed(
-        self.ctx,
-        base: base,
-        name: name.identifier,
-        nameLoc: name.sourceLoc,
-        genericArguments: genericArgs.arguments,
-        angleRange: genericArgs.range
-      ).asTypeRepr
-
-    case .genericSpecializationExpr(let node):
-      guard node.expression.is(MemberAccessExprSyntax.self) || node.expression.is(DeclReferenceExprSyntax.self) else {
-        break
-      }
-      let args = node.genericArgumentClause.arguments.lazy.map {
-        self.generate(genericArgument: $0.argument)
-      }
-      return self.generateMacroIntroducedConformance(
-        expr: node.expression,
-        genericArgs: GeneratedGenericArguments(
-          arguments: args.bridgedArray(in: self),
-          range: self.generateSourceRange(node.genericArgumentClause)
-        )
-      )
-
-    case .sequenceExpr:
-      // TODO: Support protocol composition.
-      break
-
-    default:
-      break
-    }
-
-    // TODO: Diagnose invalid expression for a conformance.
-    return nil
-  }
-
   func generateMacroRoleAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedMacroRoleAttr? {
     // '@freestanding' or '@attached'.
     assert(attrName == "freestanding" || attrName == "attached")
@@ -865,7 +785,7 @@ extension ASTGenVisitor {
     }
 
     var names: [BridgedMacroIntroducedDeclName] = []
-    var conformances: [BridgedTypeExpr] = []
+    var conformances: [BridgedExpr] = []
 
     enum ArgState {
       case inNames
@@ -913,9 +833,7 @@ extension ASTGenVisitor {
           names.append(name)
         }
       case .inConformances:
-        if let conformance = self.generateMacroIntroducedConformance(expr: arg.expression) {
-          conformances.append(BridgedTypeExpr.createParsed(self.ctx, type: conformance))
-        }
+        conformances.append(self.generate(expr: arg.expression))
       case .inInvalid:
         // Ignore the value.
         break

@@ -294,8 +294,8 @@ BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(
   for (auto &n : cNames.unbridged<BridgedMacroIntroducedDeclName>())
     names.push_back(n.unbridged());
 
-  SmallVector<TypeExpr *, 2> conformances;
-  for (auto &t : cConformances.unbridged<BridgedTypeExpr>())
+  SmallVector<Expr *, 2> conformances;
+  for (auto &t : cConformances.unbridged<BridgedExpr>())
     conformances.push_back(t.unbridged());
 
   return MacroRoleAttr::create(
