@@ -303,7 +303,7 @@ namespace {
 
     /// Serialize and write SILDebugScope graph in post order.
     void writeDebugScopes(const SILDebugScope *Scope, const SourceManager &SM);
-    void writeSourceLoc(SourceLoc SLoc, const SourceManager &SM);
+    void writeSourceLoc(SILLocation SLoc, const SourceManager &SM);
 
     void writeNoOperandLayout(const SILInstruction *I) {
       unsigned abbrCode = SILAbbrCodes[SILInstNoOperandLayout::Code];
@@ -695,8 +695,6 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
   SILBasicBlockLayout::emitRecord(Out, ScratchRecord, abbrCode, Args);
 
   const SILDebugScope *Prev = BB.getParent()->getDebugScope();
-  auto PrevSourceLoc =
-      BB.getParent()->getLocation().getSourceLoc().getOpaquePointerValue();
   auto &SM = BB.getParent()->getModule().getSourceManager();
   for (const SILInstruction &SI : BB) {
     if (SerializeDebugInfoSIL) {
@@ -705,9 +703,8 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
         writeDebugScopes(Prev, SM);
       }
     }
-    auto SourceLocPtr = SI.getLoc().getSourceLoc().getOpaquePointerValue();
-    if (SourceLocPtr != PrevSourceLoc && SerializeDebugInfoSIL) {
-      writeSourceLoc(SI.getLoc().getSourceLoc(), SM);
+    if (SerializeDebugInfoSIL) {
+      writeSourceLoc(SI.getLoc(), SM);
     }
 
     writeSILInstruction(SI);
@@ -3086,12 +3083,26 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
     componentValues);
 }
 
-void SILSerializer::writeSourceLoc(SourceLoc SLoc, const SourceManager &SM) {
+void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
+  auto SLoc = Loc.getSourceLoc();
   auto OpaquePtr = SLoc.getOpaquePointerValue();
+  uint8_t LocationKind;
+  switch(Loc.getKind()) {
+    case SILLocation::ReturnKind:
+      LocationKind = SILLocation::ReturnKind;
+      break;
+    case SILLocation::ImplicitReturnKind:
+      LocationKind = SILLocation::ImplicitReturnKind;
+      break;
+    //TODO: handle other cases correctly
+    default:
+      LocationKind = SILLocation::RegularKind;
+  }
+
   if (SourceLocMap.find(OpaquePtr) != SourceLocMap.end()) {
     SourceLocRefLayout::emitRecord(Out, ScratchRecord,
                                    SILAbbrCodes[SourceLocRefLayout::Code],
-                                   SourceLocMap[OpaquePtr]);
+                                   SourceLocMap[OpaquePtr], LocationKind);
     return;
   }
 
@@ -3099,17 +3110,18 @@ void SILSerializer::writeSourceLoc(SourceLoc SLoc, const SourceManager &SM) {
   ValueID Column = 0;
   ValueID FNameID = 0;
 
-  if (!SLoc.isValid())
+  if (!SLoc.isValid()) {
+    //emit empty source loc
+    SourceLocRefLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[SourceLocRefLayout::Code], 0, 0);
     return;
-
-  if (SLoc.isValid()) {
-    std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
-    FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
   }
+
+  std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
+  FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
   SourceLocMap.insert({OpaquePtr, SourceLocMap.size() + 1});
   SourceLocLayout::emitRecord(Out, ScratchRecord,
                               SILAbbrCodes[SourceLocLayout::Code], Row, Column,
-                              FNameID);
+                              FNameID, LocationKind);
 }
 
 void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,

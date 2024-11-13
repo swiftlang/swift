@@ -394,22 +394,35 @@ SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
   return maybeKind;
 }
 
-SILLocation SILDeserializer::readLoc(unsigned kind,
+std::optional<SILLocation> SILDeserializer::readLoc(unsigned kind,
                                      SmallVectorImpl<uint64_t> &scratch) {
+  uint8_t LocationKind = 0;
+  SILLocation::FilenameAndLocation *FNameLoc = nullptr;
   if (kind == SIL_SOURCE_LOC_REF) {
     ValueID LocID;
-    SourceLocRefLayout::readRecord(scratch, LocID);
-    return RegularLocation(ParsedLocs[LocID]);
+    SourceLocRefLayout::readRecord(scratch, LocID, LocationKind);
+    if (LocID == 0)
+      return std::optional<SILLocation>();
+    FNameLoc = ParsedLocs[LocID];
+  } else {
+    ValueID Row = 0, Col = 0, FNameID = 0;
+    SourceLocLayout::readRecord(scratch, Row, Col, FNameID, LocationKind);
+
+
+    FNameLoc = SILLocation::FilenameAndLocation::alloc(
+        Row, Col, MF->getIdentifierText(FNameID), SILMod);
+
+    ParsedLocs.insert({ParsedLocs.size() + 1, FNameLoc});
   }
 
-  ValueID Row = 0, Col = 0, FNameID = 0;
-  SourceLocLayout::readRecord(scratch, Row, Col, FNameID);
-
-  auto FNameLoc = SILLocation::FilenameAndLocation::alloc(
-      Row, Col, MF->getIdentifierText(FNameID), SILMod);
-
-  ParsedLocs.insert({ParsedLocs.size() + 1, FNameLoc});
-  return RegularLocation(FNameLoc);
+  switch(LocationKind) {
+    case SILLocation::ReturnKind:
+      return ReturnLocation(FNameLoc);
+    case SILLocation::ImplicitReturnKind:
+      return ImplicitReturnLocation(FNameLoc);
+    default:
+      return RegularLocation(FNameLoc);
+  }
 }
 
 llvm::Expected<const SILDebugScope *>
@@ -1084,6 +1097,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   BlocksByID.clear();
   UndefinedBlocks.clear();
   ParsedScopes.clear();
+  ParsedLocs.clear();
 
   // The first two IDs are reserved for SILUndef.
   LastValueID = 1;
