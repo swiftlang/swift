@@ -1627,6 +1627,13 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
           .errorType = "escaping-closure-violation",
           .currentStackDescription = "Closure has escaped",
           .framesToSkip = 1,
+          .memoryAddress = nullptr,
+          .numExtraThreads = 0,
+          .threads = nullptr,
+          .numFixIts = 0,
+          .fixIts = nullptr,
+          .numNotes = 0,
+          .notes = nullptr,
       };
       _swift_reportToDebugger(RuntimeErrorFlagFatal, log, &details);
     }
@@ -1728,7 +1735,13 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   RuntimeErrorDetails details = {
     .version = RuntimeErrorDetails::currentVersion,
     .errorType = "implicit-objc-entrypoint",
+    .currentStackDescription = nullptr,
     .framesToSkip = 1,
+    .memoryAddress = nullptr,
+    .numExtraThreads = 0,
+    .threads = nullptr,
+    .numFixIts = 0,
+    .fixIts = nullptr,
     .numNotes = 1,
     .notes = &note
   };
