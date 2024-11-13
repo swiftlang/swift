@@ -14,6 +14,7 @@ import ASTBridging
 import BasicBridging
 @_spi(Experimental) import SwiftLexicalLookup
 import SwiftSyntax
+import SwiftIfConfig
 
 private let rowCharWidth: Int = 30
 
@@ -69,7 +70,7 @@ public func unqualifiedLookup(
   let sllResults = sllConsumedResults(
     lookupToken: lookupToken,
     finishInSequentialScope: finishInSequentialScope,
-    buildConfiguration: buildConfiguration
+    configuredRegions: sourceFileSyntax.configuredRegions(in: buildConfiguration)
   )
 
   // Add header to the output
@@ -195,11 +196,11 @@ private func astConsumedResults(
 private func sllConsumedResults(
   lookupToken: TokenSyntax,
   finishInSequentialScope: Bool,
-  buildConfiguration: CompilerBuildConfiguration
+  configuredRegions: ConfiguredRegions
 ) -> [ConsumedLookupResult] {
   lookupToken.lookup(
     nil,
-    with: LookupConfig(finishInSequentialScope: finishInSequentialScope, buildConfiguration: buildConfiguration)
+    with: LookupConfig(finishInSequentialScope: finishInSequentialScope, configuredRegions: configuredRegions)
   )
   .flatMap { result in
     switch result {
