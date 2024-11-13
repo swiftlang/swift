@@ -343,8 +343,10 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
       sub = sub.transformRec([](Type t) -> std::optional<Type> {
-        if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
-          return openedExistential->getInterfaceType();
+        if (auto *openedExistential = t->getAs<OpenedArchetypeType>()) {
+          auto &ctx = openedExistential->getASTContext();
+          return GenericTypeParamType::getType(0, 0, ctx);
+        }
         return std::nullopt;
       });
 
@@ -377,8 +379,10 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
       sub = sub.transformRec([](Type t) -> std::optional<Type> {
-        if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
-          return openedExistential->getInterfaceType();
+        if (auto *openedExistential = t->getAs<OpenedArchetypeType>()) {
+          auto &ctx = openedExistential->getASTContext();
+          return GenericTypeParamType::getType(0, 0, ctx);
+        }
         return std::nullopt;
       });
 
