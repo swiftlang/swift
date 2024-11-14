@@ -405,7 +405,7 @@ endif()
 
 set(tooling_stdlib_deps)
 if(TARGET libSwiftScan)
-  list(append tooling_stdlib_deps libSwiftScan)
+  list(APPEND tooling_stdlib_deps libSwiftScan)
 endif()
 
 add_swift_target_library(swiftCore
