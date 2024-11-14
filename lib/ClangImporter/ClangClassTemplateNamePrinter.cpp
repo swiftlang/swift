@@ -38,6 +38,8 @@ struct TemplateInstantiationNamePrinter
     switch (type->getKind()) {
     case clang::BuiltinType::Void:
       return "Void";
+    case clang::BuiltinType::NullPtr:
+      return "nil";
 
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)                  \
     case clang::BuiltinType::CLANG_BUILTIN_KIND:                               \
