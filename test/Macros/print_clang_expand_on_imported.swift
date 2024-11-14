@@ -14,7 +14,7 @@
 
 import CompletionHandlerGlobals
 
-// CHECK: func async_divide(_ x: Double, _ y: Double, _ completionHandler: @convention(c) (Double) -> Void)
+// CHECK: func async_divide(_ x: Double, _ y: Double, _ completionHandler: @escaping (Double) -> Void)
 
 // CHECK: extension SlowComputer
 // CHECK: public func divide(_ x: Double, _ y: Double) async -> Double

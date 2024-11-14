@@ -528,6 +528,15 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               bool includeProtocolExtensionMembers,
                               GenericSignature genericSig = GenericSignature());
 
+/// Determine the module-scope context from which lookup should proceed.
+///
+/// In the common case, module-scope context is the source file in which
+/// the declaration context is nested. However, when declaration context is
+/// part of an imported Clang declaration context, it won't be nested within a
+/// source file. Rather, the source file will be on the side, and will be
+/// provided here because it contains information about the available imports.
+DeclContext *getModuleScopeLookupContext(DeclContext *dc);
+
 namespace namelookup {
 
 /// Add semantic members to \p type before attempting a semantic lookup.
