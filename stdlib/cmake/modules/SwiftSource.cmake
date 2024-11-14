@@ -635,6 +635,7 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
 
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
+  list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")
 
   list(APPEND swift_flags "-enable-experimental-feature" "ExtensionImportVisiblity")
 
