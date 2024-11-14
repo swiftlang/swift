@@ -59,7 +59,7 @@ DECL_ATTR(objc, ObjC,
 SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
   OnNominalType | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   6)
-DECL_ATTR(main, MainType,
+SIMPLE_DECL_ATTR(main, MainType,
   OnClass | OnStruct | OnEnum | OnExtension | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   7)
 SIMPLE_DECL_ATTR(_exported, Exported,
