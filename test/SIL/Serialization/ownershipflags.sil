@@ -45,7 +45,7 @@ bb0(%0 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [serialized] [ossa] @test_reborrow : $@convention(thin) (@owned Klass) -> () {
-// CHECK: bb3([[ARG:%.*]] : @reborrow @guaranteed $Klass):
+// CHECK: bb3([[ARG:%.*]] : @reborrow $Klass):
 // CHECK: } // end sil function 'test_reborrow'
 sil [serialized] [ossa] @test_reborrow : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
@@ -59,7 +59,7 @@ bb2:
   %b2 = begin_borrow %0 : $Klass
   br bb3(%b2 : $Klass)
 
-bb3(%r : @reborrow @guaranteed $Klass):
+bb3(%r : @reborrow $Klass):
   %rf = borrowed %r : $Klass from (%0 : $Klass)
   end_borrow %rf : $Klass
   destroy_value %0 : $Klass

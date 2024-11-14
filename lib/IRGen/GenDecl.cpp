@@ -6192,13 +6192,18 @@ IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType) {
 /// Should we be defining the given helper function?
 static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
                                           llvm::Constant *fn,
-                                          bool setIsNoInline) {
+                                          bool setIsNoInline,
+                                          IRLinkage *linkage) {
   auto *def = dyn_cast<llvm::Function>(fn);
   if (!def) return nullptr;
   if (!def->empty()) return nullptr;
 
   def->setAttributes(IGM.constructInitialAttributes());
-  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(def);
+  if (!linkage)
+    ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(def);
+  else
+    ApplyIRLinkage(*linkage).to(def);
+
   def->setDoesNotThrow();
   def->setCallingConv(IGM.DefaultCC);
   if (setIsNoInline)
@@ -6220,7 +6225,8 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
                         llvm::function_ref<void(IRGenFunction &IGF)> generate,
                         bool setIsNoInline,
                         bool forPrologue,
-                        bool isPerformanceConstraint) {
+                        bool isPerformanceConstraint,
+                        IRLinkage *optionalLinkageOverride) {
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(resultTy, paramTys, false);
 
@@ -6228,7 +6234,8 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
       cast<llvm::Constant>(
           Module.getOrInsertFunction(fnName, fnTy).getCallee());
 
-  if (llvm::Function *def = shouldDefineHelper(*this, fn, setIsNoInline)) {
+  if (llvm::Function *def = shouldDefineHelper(*this, fn, setIsNoInline,
+                                               optionalLinkageOverride)) {
     IRGenFunction IGF(*this, def, isPerformanceConstraint);
     if (DebugInfo && !forPrologue)
       DebugInfo->emitArtificialFunction(IGF, def);

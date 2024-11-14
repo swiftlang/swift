@@ -1356,7 +1356,7 @@ bb0(%0 : @owned $SomeClass):
   %3 = load_borrow %1 : $*SomeClass
   br bb1(%3 : $SomeClass)
 
-bb1(%5 : @reborrow @guaranteed $SomeClass):
+bb1(%5 : @reborrow $SomeClass):
   end_borrow %5 : $SomeClass
   destroy_addr %1 : $*SomeClass
   dealloc_stack %1 : $*SomeClass

@@ -290,7 +290,7 @@ bb2:
 }
 
 // CHECK-LABEL: sil [ossa] @test_reborrow :
-// CHECK:       bb1([[A:%.*]] : @reborrow @guaranteed $C):
+// CHECK:       bb1([[A:%.*]] : @reborrow $C):
 // CHECK:         [[R:%.*]] = borrowed [[A]] : $C from (%2 : $C)
 // CHECK:         end_borrow [[R]]
 // CHECK-NEXT:    end_init_let_ref %2
@@ -302,7 +302,7 @@ bb0(%0 : @owned $C, %1 : $Int):
   %4 = ref_element_addr %3 : $C, #C.a
   store %1 to [trivial] %4 : $*Int
   br bb1(%3 : $C)
-bb1(%3a : @reborrow @guaranteed $C):
+bb1(%3a : @reborrow $C):
   end_borrow %3a : $C
   %7 = begin_borrow %2 : $C
   %8 = ref_element_addr %7 : $C, #C.a

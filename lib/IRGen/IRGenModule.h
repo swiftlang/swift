@@ -147,6 +147,7 @@ namespace irgen {
   class StructLayout;
   class IRGenDebugInfo;
   class IRGenFunction;
+  struct IRLinkage;
   class LinkEntity;
   class LoadableTypeInfo;
   class MetadataLayout;
@@ -1221,7 +1222,8 @@ public:
                         llvm::function_ref<void(IRGenFunction &IGF)> generate,
                         bool setIsNoInline = false,
                         bool forPrologue = false,
-                        bool isPerformanceConstraint = false);
+                        bool isPerformanceConstraint = false,
+                        IRLinkage *optionalLinkage = nullptr);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);

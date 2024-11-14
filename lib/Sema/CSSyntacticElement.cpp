@@ -1733,20 +1733,6 @@ private:
     return Type();
   }
 
-  ASTNode visit(Stmt *S, bool performSyntacticDiagnostics = true) {
-    auto rewritten = ASTVisitor::visit(S);
-    if (!rewritten)
-      return {};
-
-    if (performSyntacticDiagnostics) {
-      if (auto *stmt = getAsStmt(rewritten)) {
-        performStmtDiagnostics(stmt, context.getAsDeclContext());
-      }
-    }
-
-    return rewritten;
-  }
-
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
     // If this is a placeholder variable with an initializer, we just need to
     // set the inferred type.
@@ -2274,7 +2260,7 @@ public:
 private:
   ASTNode visitDoStmt(DoStmt *doStmt) override {
     if (auto transformed = transformDo(doStmt)) {
-      return visit(transformed.get(), /*performSyntacticDiagnostics=*/false);
+      return visit(transformed.get());
     }
 
     auto newBody = visit(doStmt->getBody());

@@ -1462,6 +1462,101 @@ bb0(%0 : @guaranteed $X):
   return %5 : $Int32
 }
 
+// CHECK-LABEL: @test_end_borrow3
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     end_borrow %6 : $X
+// CHECK-NEXT:     %3 = ref_element_addr %2 : $X, #X.x
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     end_borrow %6 : $X
+// CHECK-NEXT:     %4 = ref_element_addr %0 : $X, #X.x
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #5.
+// CHECK-NEXT:     end_borrow %6 : $X
+// CHECK-NEXT:     %7 = ref_element_addr %6 : $X, #X.x
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #6.
+// CHECK-NEXT:     end_borrow %2 : $X
+// CHECK-NEXT:     %3 = ref_element_addr %2 : $X, #X.x
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #7.
+// CHECK-NEXT:     end_borrow %2 : $X
+// CHECK-NEXT:     %4 = ref_element_addr %0 : $X, #X.x
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #8.
+// CHECK-NEXT:     end_borrow %2 : $X
+// CHECK-NEXT:     %7 = ref_element_addr %6 : $X, #X.x
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_end_borrow3 : $@convention(thin) (@guaranteed X, @owned X) -> @owned (X, X) {
+bb0(%0 : @guaranteed $X, %1 : @owned $X):
+  %2 = begin_borrow %1 : $X
+  %3 = ref_element_addr %2 : $X, #X.x
+  %4 = ref_element_addr %0 : $X, #X.x
+  %5 = copy_value %2 : $X
+  %6 = begin_borrow %5 : $X
+  %7 = ref_element_addr %6 : $X, #X.x
+  end_borrow %6 : $X
+  end_borrow %2 : $X
+  %r = tuple (%5 : $X, %1 : $X)
+  return %r : $(X, X)
+}
+
+// CHECK-LABEL: @test_end_borrow4
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     end_borrow %3 : $X
+// CHECK-NEXT:     %4 = ref_element_addr %3 : $X, #X.x
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #5.
+// CHECK-NEXT:     end_borrow %3 : $X
+// CHECK-NEXT:     %8 = ref_element_addr %7 : $X, #X.x
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #10.
+// CHECK-NEXT:     end_borrow %7 : $X
+// CHECK-NEXT:     %4 = ref_element_addr %3 : $X, #X.x
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #11.
+// CHECK-NEXT:     end_borrow %7 : $X
+// CHECK-NEXT:     %8 = ref_element_addr %7 : $X, #X.x
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #13.
+// CHECK-NEXT:     end_borrow %2 : $X
+// CHECK-NEXT:     %4 = ref_element_addr %3 : $X, #X.x
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #14.
+// CHECK-NEXT:     end_borrow %2 : $X
+// CHECK-NEXT:     %8 = ref_element_addr %7 : $X, #X.x
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_end_borrow4 : $@convention(thin) (@guaranteed X, @in_guaranteed X) -> @owned X {
+bb0(%0 : @guaranteed $X, %1 : $*X):
+  %2 = begin_borrow %0 : $X
+  %3 = load_borrow %1 : $*X
+  %4 = ref_element_addr %3 : $X, #X.x
+  end_borrow %3 : $X
+  %6 = load [copy] %1 : $*X
+  %7 = begin_borrow %6 : $X
+  %8 = ref_element_addr %7 : $X, #X.x
+  end_borrow %7 : $X
+  end_borrow %2 : $X
+  return %6 : $X
+}
+
+// CHECK-LABEL: @test_end_borrow5
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     end_borrow %2 : $X
+// CHECK-NEXT:     %5 = ref_element_addr [immutable] %4 : $X, #X.x
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_end_borrow5 : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 : @guaranteed $X):
+  %1 = ref_element_addr [immutable] %0 : $X, #X.x
+  %2 = load_borrow %1 : $*X
+  %3 = unconditional_checked_cast %2 : $X to Derived
+  %4 = upcast %3 : $Derived to $X
+  %5 = ref_element_addr [immutable] %4 : $X, #X.x
+  end_borrow %2 : $X
+  %7 = tuple ()
+  return %7 : $()
+}
+
 // CHECK-LABEL: @test_load_borrow
 // CHECK:      PAIR #0.
 // CHECK-NEXT:     %1 = load_borrow %0 : $*X

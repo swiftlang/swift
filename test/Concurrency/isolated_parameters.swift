@@ -585,3 +585,8 @@ public actor MyActorIsolatedParameterMerge {
     }
   }
 }
+
+// rdar://138394497
+class ClassWithIsolatedAsyncInitializer {
+    init(isolation: isolated (any Actor)? = #isolation) async {}
+}

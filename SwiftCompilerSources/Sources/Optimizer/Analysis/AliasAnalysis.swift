@@ -696,11 +696,23 @@ private struct FindBeginBorrowWalker : ValueUseDefWalker {
     if value == beginBorrow {
       return .abortWalk
     }
+    if value.ownership != .guaranteed {
+      // If value is owned then it cannot be the borrowed value.
+      return .continueWalk
+    }
     return walkUpDefault(value: value, path: path)
   }
 
   mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
-    return .continueWalk
+    switch value {
+    case is FunctionArgument,
+         // Loading a value from memory cannot be the borrowed value.
+         // Note that we exclude the "regular" `load` by checking for guaranteed ownership in `walkUp`.
+         is LoadBorrowInst:
+      return .continueWalk
+    default:
+      return .abortWalk
+    }
   }
 }
 

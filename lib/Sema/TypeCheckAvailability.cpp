@@ -3560,7 +3560,7 @@ bool diagnoseExplicitUnavailability(
 }
 
 namespace {
-class ExprAvailabilityWalker : public ASTWalker {
+class ExprAvailabilityWalker : public BaseDiagnosticWalker {
   /// Models how member references will translate to accessor usage. This is
   /// used to diagnose the availability of individual accessors that may be
   /// called by the expression being checked.
@@ -3594,11 +3594,6 @@ class ExprAvailabilityWalker : public ASTWalker {
 public:
   explicit ExprAvailabilityWalker(const ExportContext &Where)
     : Context(Where.getDeclContext()->getASTContext()), Where(Where) {}
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    // Expanded source should be type checked and diagnosed separately.
-    return MacroWalking::Arguments;
-  }
 
   PreWalkAction walkToArgumentPre(const Argument &Arg) override {
     // Arguments should be walked in their own member access context which
@@ -3720,10 +3715,8 @@ public:
                                CE->getResultType(), E->getLoc(), Where);
     }
     if (AbstractClosureExpr *closure = dyn_cast<AbstractClosureExpr>(E)) {
-      if (shouldWalkIntoClosure(closure)) {
-        walkAbstractClosure(closure);
-        return Action::SkipChildren(E);
-      }
+      walkAbstractClosure(closure);
+      return Action::SkipChildren(E);
     }
 
     if (auto CE = dyn_cast<ExplicitCastExpr>(E)) {
@@ -3789,13 +3782,22 @@ public:
   }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    // We need to recursively call diagnoseExprAvailability for any
+    // sub-expressions in the statement since the availability context may
+    // differ, e.g for things like `guard #available(...)`.
+    class StmtRecurseWalker : public BaseDiagnosticWalker {
+      DeclContext *DC;
 
-    // We end up here when checking the output of the result builder transform,
-    // which includes closures that are not "separately typechecked" and yet
-    // contain statements and declarations. We need to walk them recursively,
-    // since these availability for these statements is not diagnosed from
-    // typeCheckStmt() as usual.
-    diagnoseStmtAvailability(S, Where.getDeclContext(), /*walkRecursively=*/true);
+    public:
+      StmtRecurseWalker(DeclContext *DC) : DC(DC) {}
+
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+        diagnoseExprAvailability(E, DC);
+        return Action::SkipNode(E);
+      }
+    };
+    StmtRecurseWalker W(Where.getDeclContext());
+    S->walk(W);
     return Action::SkipNode(S);
   }
 
@@ -3940,10 +3942,6 @@ private:
                              ? MemberAccessContext::Writeback
                              : AccessContext;
     walkInContext(E->getSubExpr(), accessContext);
-  }
-
-  bool shouldWalkIntoClosure(AbstractClosureExpr *closure) const {
-    return true;
   }
 
   /// Walk an abstract closure expression, checking for availability
@@ -4395,24 +4393,27 @@ void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
 namespace {
 
 class StmtAvailabilityWalker : public BaseDiagnosticWalker {
+  const Stmt *TopLevelStmt;
   DeclContext *DC;
-  bool WalkRecursively;
 
 public:
-  explicit StmtAvailabilityWalker(DeclContext *dc, bool walkRecursively)
-    : DC(dc), WalkRecursively(walkRecursively) {}
+  explicit StmtAvailabilityWalker(const Stmt *S, DeclContext *dc)
+    : TopLevelStmt(S), DC(dc) {}
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    if (!WalkRecursively && isa<BraceStmt>(S))
-      return Action::SkipNode(S);
-
-    return Action::Continue(S);
+    // `diagnoseStmtAvailability` is called for every statement, so we don't
+    // want to walk into any nested statements.
+    return Action::VisitNodeIf(S == TopLevelStmt, S);
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    if (WalkRecursively)
-      diagnoseExprAvailability(E, DC);
+    // Handled by ExprAvailabilityWalker.
     return Action::SkipNode(E);
+  }
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    // Handled by DeclAvailabilityChecker.
+    return Action::SkipNode();
   }
 
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
@@ -4433,13 +4434,8 @@ public:
 };
 }
 
-void swift::diagnoseStmtAvailability(const Stmt *S, DeclContext *DC,
-                                     bool walkRecursively) {
-  // We'll visit the individual statements when we check them.
-  if (!walkRecursively && isa<BraceStmt>(S))
-    return;
-
-  StmtAvailabilityWalker walker(DC, walkRecursively);
+void swift::diagnoseStmtAvailability(const Stmt *S, DeclContext *DC) {
+  StmtAvailabilityWalker walker(S, DC);
   const_cast<Stmt*>(S)->walk(walker);
 }
 

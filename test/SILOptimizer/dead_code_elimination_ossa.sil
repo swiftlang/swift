@@ -22,7 +22,12 @@ struct CAndBit {
 }
 
 struct MO: ~Copyable {
-    deinit
+  var x: Int
+  deinit
+}
+
+struct Outer : ~Copyable {
+  var x: MO
 }
 
 sil @dummy : $@convention(thin) () -> ()
@@ -487,3 +492,18 @@ sil [ossa] @dont_delete_move_value_lexical : $@convention(thin) () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: sil [ossa] @dont_remove_addr_end_lifetime :
+// CHECK:         end_lifetime
+// CHECK-LABEL: } // end sil function 'dont_remove_addr_end_lifetime'
+sil [ossa] @dont_remove_addr_end_lifetime : $@convention(thin) (@owned Outer) -> () {
+bb0(%0 : @owned $Outer):
+  %1 = alloc_stack $Outer
+  store %0 to [init] %1 : $*Outer 
+  %3 = struct_element_addr %1 : $*Outer, #Outer.x
+  end_lifetime %3 : $*MO
+  dealloc_stack %1 : $*Outer
+  %6 = tuple ()
+  return %6 : $()
+}
+

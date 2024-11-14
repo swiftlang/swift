@@ -59,7 +59,7 @@ func test() {
 // FILE1: Record | user | {{.*}}ClangModuleB.h | ClangModuleB.h-
 // FILE1: DEPEND END
 
-// FILE1: s1.o-{{2LQAU7D8TZHZ8|2RHC8ZJFDYDW4}}
+// FILE1: s1.o-
 // FILE1: --------
 // FILE1: has-main: 1
 // FILE1-ABSOLUTE: main-path: REMAPPED_SRC_DIR{{.*}}unit-pcm-dependency-remapped.swift
@@ -81,7 +81,7 @@ func test() {
 
 // FILE2-NOT: main.swiftmodule-
 
-// FILE2: s2.o-{{2OIL2LG8UULK6|15MCL6ZLKZKNL}}
+// FILE2: s2.o-
 // FILE2: --------
 // FILE2: has-main: 1
 // FILE2: main-path: REMAPPED_OUT_DIR{{.*}}s2.swift

@@ -30,6 +30,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/GenericRequirement.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
@@ -489,6 +490,22 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
   paramTys.push_back(ptrTy);
   collector.addPolymorphicParameterTypes(paramTys);
 
+  IRLinkage *linkage = nullptr;
+  IRLinkage privateLinkage = {
+    llvm::GlobalValue::PrivateLinkage,
+    llvm::GlobalValue::DefaultVisibility,
+    llvm::GlobalValue::DefaultStorageClass,
+  };
+  auto &TL =
+    getSILModule().Types.getTypeLowering(T, TypeExpansionContext::minimal());
+  // Opaque result types might lead to different expansions in different files.
+  // The default hidden linkonce_odr might lead to linking an implementation
+  // from another file that head a different expansion/different
+  // signature/different implementation.
+  if (TL.getRecursiveProperties().isTypeExpansionSensitive()) {
+    linkage = &privateLinkage;
+  }
+
   return getOrCreateHelperFunction(funcName, ptrTy, paramTys,
       [&](IRGenFunction &IGF) {
         auto params = IGF.collectParameters();
@@ -500,7 +517,8 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
       },
       true /*setIsNoInline*/,
       false /*forPrologue*/,
-      collector.IGF.isPerformanceConstraint);
+      collector.IGF.isPerformanceConstraint,
+      linkage);
 }
 
 void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
@@ -544,6 +562,22 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
   auto funcName = mangler.mangleOutlinedDestroyFunction(manglingBits.first,
                      manglingBits.second, collector.IGF.isPerformanceConstraint);
 
+  IRLinkage *linkage = nullptr;
+  IRLinkage privateLinkage = {
+    llvm::GlobalValue::PrivateLinkage,
+    llvm::GlobalValue::DefaultVisibility,
+    llvm::GlobalValue::DefaultStorageClass,
+  };
+  auto &TL =
+    getSILModule().Types.getTypeLowering(T, TypeExpansionContext::minimal());
+  // Opaque result types might lead to different expansions in different files.
+  // The default hidden linkonce_odr might lead to linking an implementation
+  // from another file that head a different expansion/different
+  // signature/different implementation.
+  if (TL.getRecursiveProperties().isTypeExpansionSensitive()) {
+    linkage = &privateLinkage;
+  }
+
   auto ptrTy = ti.getStorageType()->getPointerTo();
   llvm::SmallVector<llvm::Type *, 4> paramTys;
   paramTys.push_back(ptrTy);
@@ -565,7 +599,8 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
       },
       true /*setIsNoInline*/,
       false /*forPrologue*/,
-      collector.IGF.isPerformanceConstraint);
+      collector.IGF.isPerformanceConstraint,
+      linkage);
 }
 
 llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
