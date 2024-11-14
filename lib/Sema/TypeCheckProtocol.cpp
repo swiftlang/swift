@@ -4887,10 +4887,16 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   auto proto = conformance->getProtocol();
   auto &diags = ctx.Diags;
 
-  auto *const module = dc->getParentModule();
-  auto substitutingType = dc->mapTypeIntoContext(conformance->getType());
+  auto typeInContext = conformance->getType();
+  ProtocolConformanceRef conformanceInContext(conformance);
+  if (auto *genericEnv = conformance->getGenericEnvironment()) {
+    typeInContext = genericEnv->mapTypeIntoContext(typeInContext);
+    conformanceInContext =
+      conformanceInContext.subst(conformance->getType(),
+                                 genericEnv->getForwardingSubstitutionMap());
+  }
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
-      proto, substitutingType, ProtocolConformanceRef(conformance));
+      proto, typeInContext, conformanceInContext);
 
   auto reqSig = proto->getRequirementSignature().getRequirements();
 
