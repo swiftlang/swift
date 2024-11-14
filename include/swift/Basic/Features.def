@@ -354,9 +354,11 @@ EXPERIMENTAL_FEATURE(SuppressedAssociatedTypes, true)
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
-/// Enable non-escapable type attributes and function attributes that support
-/// lifetime-dependent results.
+/// Enable non-escapable types.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NonescapableTypes, true)
+
+/// Enable returning non-escapable types from functions.
+EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)

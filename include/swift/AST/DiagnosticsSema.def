@@ -8031,6 +8031,10 @@ ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
 ERROR(lifetime_dependence_duplicate_target, none,
       "invalid duplicate target lifetime dependencies on function", ())
 
+ERROR(lifetime_dependence_feature_required, none,
+      "returning ~Escapable type requires '-enable-experimental-feature "
+      "LifetimeDependence'", ())
+
 //===----------------------------------------------------------------------===//
 //                             MARK: Sending
 //===----------------------------------------------------------------------===//

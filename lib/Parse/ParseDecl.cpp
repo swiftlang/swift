@@ -2717,9 +2717,9 @@ parseLifetimeDescriptor(Parser &P,
 ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
                                                           SourceLoc loc) {
   ParserStatus status;
-  if (!Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
+  if (!Context.LangOpts.hasFeature(Feature::LifetimeDependence)) {
     diagnose(loc, diag::requires_experimental_feature, "@lifetime", false,
-             getFeatureName(Feature::NonescapableTypes));
+             getFeatureName(Feature::LifetimeDependence));
     status.setIsParseError();
     return status;
   }
@@ -5392,10 +5392,10 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     }
 
     if (P.isSILLifetimeDependenceToken()) {
-      if (!P.Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
+      if (!P.Context.LangOpts.hasFeature(Feature::LifetimeDependence)) {
         P.diagnose(Tok, diag::requires_experimental_feature,
                    "lifetime dependence specifier", false,
-                   getFeatureName(Feature::NonescapableTypes));
+                   getFeatureName(Feature::LifetimeDependence));
       }
       P.consumeToken(); // consume '@'
       auto loc = P.consumeToken(); // consume 'lifetime'

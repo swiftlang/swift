@@ -1191,7 +1191,7 @@ public:
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
-    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+    if (Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
         isSILLifetimeDependenceToken())
       return true;
     if (!canHaveParameterSpecifierContextualKeyword()) return false;
