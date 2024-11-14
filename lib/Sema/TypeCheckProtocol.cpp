@@ -6850,6 +6850,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
         RequirementEnvironment reqEnv(proto, reqSig, proto, nullptr, nullptr);
         auto match =
             RequirementMatch(asd, MatchKind::ExactMatch, asdTy, reqEnv);
+        match.WitnessSubstitutions = reqEnv.getRequirementToWitnessThunkSubs();
         checker.recordWitness(asd, match);
       }
     }
