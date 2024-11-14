@@ -8166,17 +8166,28 @@ void Parser::parseTopLevelAccessors(
     items.push_back(accessor);
 }
 
-void Parser::parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items) {
+void Parser::parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items,
+                                        bool isFromClangAttribute) {
   if (Tok.is(tok::NUM_TOKENS))
     consumeTokenWithoutFeedingReceiver();
 
   DeclAttributes attributes;
   parseDeclAttributeList(attributes);
 
+  // If this is coming from a Clang attribute, also parse modifiers.
+  if (isFromClangAttribute && !Tok.is(tok::eof)) {
+    SourceLoc staticLoc;
+    StaticSpellingKind staticSpelling;
+    parseDeclModifierList(
+        attributes, staticLoc, staticSpelling, isFromClangAttribute);
+  }
+
   // Consume remaining tokens.
   while (!Tok.is(tok::eof)) {
-    diagnose(Tok.getLoc(), diag::unexpected_attribute_expansion,
-             Tok.getText());
+    if (!isFromClangAttribute) {
+      diagnose(Tok.getLoc(), diag::unexpected_attribute_expansion,
+               Tok.getText());
+    }
     consumeToken();
   }
 

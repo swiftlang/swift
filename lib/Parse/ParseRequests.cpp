@@ -379,10 +379,12 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
     }
 
     case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-    case GeneratedSourceInfo::Attribute: {
-      parser.parseExpandedAttributeList(items);
+      parser.parseExpandedAttributeList(items, /*isFromClangAttribute=*/false);
       break;
-    }
+
+    case GeneratedSourceInfo::Attribute:
+      parser.parseExpandedAttributeList(items, /*isFromClangAttribute=*/true);
+      break;
 
     case GeneratedSourceInfo::PeerMacroExpansion: {
       if (parser.CurDeclContext->isTypeContext()) {
