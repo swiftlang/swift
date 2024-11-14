@@ -161,8 +161,8 @@ extension ASTGenVisitor {
       return self.generate(subscriptCallExpr: node).asExpr
     case .superExpr(let node):
       return self.generate(superExpr: node).asExpr
-    case .switchExpr:
-      break
+    case .switchExpr(let node):
+      return self.generate(switchExpr: node).asExpr
     case .ternaryExpr:
       preconditionFailure("TernaryExprSyntax only appear after operator folding")
     case .tryExpr(let node):
@@ -1061,6 +1061,18 @@ extension ASTGenVisitor {
 
   func generate(superExpr node: SuperExprSyntax) -> BridgedSuperRefExpr {
     return .createParsed(self.ctx, superLoc: self.generateSourceLoc(node))
+  }
+
+  func generate(switchExpr node: SwitchExprSyntax) -> BridgedSingleValueStmtExpr {
+    let stmt = self.generateSwitchStmt(switchExpr: node)
+
+    // Wrap in a SingleValueStmtExpr to embed as an expression.
+    return .createWithWrappedBranches(
+      ctx,
+      stmt: stmt.asStmt,
+      declContext: declContext,
+      mustBeExpr: true
+    )
   }
 
   func generate(tryExpr node: TryExprSyntax) -> BridgedExpr {

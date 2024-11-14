@@ -1201,17 +1201,6 @@ public:
   /// that unsafely inherits its executor.
   bool unsafelyInheritsExecutor();
 
-  /// A version of `emitHopToTargetActor` that is specialized to the needs
-  /// of various types of ConstructorDecls, like class or value initializers,
-  /// because their prolog emission is not the same as for regular functions.
-  ///
-  /// This function emits the appropriate hop_to_executor for a constructor's
-  /// prologue.
-  ///
-  /// NOTE: this does not support actor initializers!
-  void emitConstructorPrologActorHop(SILLocation loc,
-                                     std::optional<ActorIsolation> actorIso);
-
   /// Set the given global actor as the isolation for this function
   /// (generally a thunk) and hop to it.
   void emitPrologGlobalActorHop(SILLocation loc, Type globalActor);
@@ -1322,6 +1311,7 @@ public:
   /// Set up the ExpectedExecutor field for the current function and emit
   /// whatever hops or assertions are locally expected.
   void emitExpectedExecutorProlog();
+  void emitConstructorExpectedExecutorProlog();
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
