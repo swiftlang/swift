@@ -18,7 +18,13 @@ enum Numerals {
   case Four
 }
 
+enum E2 {
+  case int(Int)
+  case str(String)
+}
+
 sil [ossa] @external_func: $@convention(thin) () -> ()
+sil @useit : $@convention(thin) (@owned E2) -> ()
 
 // CHECK-LABEL: sil [ossa] @eliminate_sw_enum_addr : $@convention(thin) () -> Int {
 // CHECK-NOT: switch_enum_addr
@@ -677,5 +683,35 @@ bb0(%0 : $*Optional<NC>):
   %1 = load [take] %0 : $*Optional<NC>
   inject_enum_addr %0 : $*Optional<NC>, #Optional.none!enumelt
   return %1 : $Optional<NC>
+}
+
+// CHECK-LABEL: sil [ossa] @trivial_replacement
+// CHECK:       bb1({{.*}}:
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    destroy_value %2
+// CHECK:         apply {{%[0-9]+}}(%1)
+// CHECK:       } // end sil function 'trivial_replacement'
+sil [ossa] @trivial_replacement : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = enum $E2, #E2.int!enumelt, %0 : $Int
+  %2 = enum $Optional<E2>, #Optional.some!enumelt, %1 : $E2, forwarding: @owned
+  %3 = begin_borrow %2 : $Optional<E2>
+  switch_enum %3 : $Optional<E2>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%5 : @guaranteed $E2):
+  end_borrow %3 : $Optional<E2>
+  %7 = unchecked_enum_data %2 : $Optional<E2>, #Optional.some!enumelt
+  %8 = function_ref @useit : $@convention(thin) (@owned E2) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@owned E2) -> ()
+  br bb3
+  
+bb2:
+  end_borrow %3 : $Optional<E2>
+  destroy_value %2 : $Optional<E2>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
 }
 
