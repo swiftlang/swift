@@ -12,9 +12,9 @@
 
 import ASTBridging
 import BasicBridging
+import SwiftIfConfig
 @_spi(Experimental) import SwiftLexicalLookup
 import SwiftSyntax
-import SwiftIfConfig
 
 private let rowCharWidth: Int = 30
 
@@ -46,7 +46,10 @@ public func unqualifiedLookup(
 ) -> Bool {
   // Obtain source file and lookup position
   let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
-  let sourceFileSyntax = sourceFile.pointee.syntax
+  guard let sourceFileSyntax = sourceFile.pointee.syntax.as(SourceFileSyntax.self) else {
+    print("Could not cast exported source file to SourceFileSyntax")
+    return false
+  }
   let sourceLocationConverter = sourceFile.pointee.sourceLocationConverter
   let buildConfiguration = CompilerBuildConfiguration(
     ctx: astContext,
