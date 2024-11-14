@@ -8194,29 +8194,38 @@ bool importer::hasSameUnderlyingType(const clang::Type *a,
   return a == b->getTypeForDecl();
 }
 
-unsigned ClangImporter::Implementation::getClangSwiftAttrSourceBuffer(
-    StringRef attributeText) {
-  auto known = ClangSwiftAttrSourceBuffers.find(attributeText);
-  if (known != ClangSwiftAttrSourceBuffers.end())
-    return known->second;
+SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
+    ModuleDecl &module,
+    StringRef attributeText
+) {
+  auto &sourceFiles = ClangSwiftAttrSourceFiles[attributeText];
 
-  // Create a new buffer with a copy of the attribute text, so we don't need to
-  // rely on Clang keeping it around.
+  // Check whether we've already created a source file.
+  for (auto sourceFile : sourceFiles) {
+    if (sourceFile->getParentModule() == &module)
+      return *sourceFile;
+  }
+
+  // Create a new buffer with a copy of the attribute text,
+  // so we don't need to rely on Clang keeping it around.
   auto &sourceMgr = SwiftContext.SourceMgr;
   auto bufferID = sourceMgr.addMemBufferCopy(attributeText);
-  ClangSwiftAttrSourceBuffers.insert({attributeText, bufferID});
-  return bufferID;
-}
 
-SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
-    ModuleDecl &module, unsigned bufferID) {
-  auto known = ClangSwiftAttrSourceFiles.find(&module);
-  if (known != ClangSwiftAttrSourceFiles.end())
-    return *known->second;
+  // Note that this is for an attribute.
+  sourceMgr.setGeneratedSourceInfo(
+      bufferID,
+      {
+        GeneratedSourceInfo::Attribute,
+        CharSourceRange(),
+        sourceMgr.getRangeForBuffer(bufferID),
+        &module
+      }
+  );
 
+  // Create the source file.
   auto sourceFile = new (SwiftContext)
       SourceFile(module, SourceFileKind::Library, bufferID);
-  ClangSwiftAttrSourceFiles.insert({&module, sourceFile});
+  sourceFiles.push_back(sourceFile);
 
   return *sourceFile;
 }
@@ -8392,17 +8401,15 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
-      // Dig out a buffer with the attribute text.
-      unsigned bufferID = getClangSwiftAttrSourceBuffer(
-          swiftAttr->getAttribute());
-
       // Dig out a source file we can use for parsing.
       auto &sourceFile = getClangSwiftAttrSourceFile(
-          *MappedDecl->getDeclContext()->getParentModule(), bufferID);
+          *MappedDecl->getDeclContext()->getParentModule(),
+          swiftAttr->getAttribute());
 
       // Spin up a parser.
       swift::Parser parser(
-          bufferID, sourceFile, &SwiftContext.Diags, nullptr, nullptr);
+          sourceFile.getBufferID(), sourceFile, &SwiftContext.Diags,
+          nullptr, nullptr);
       // Prime the lexer.
       parser.consumeTokenWithoutFeedingReceiver();
 

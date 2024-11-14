@@ -65,6 +65,9 @@ public:
 
     /// The expansion of default argument at caller side
     DefaultArgument,
+
+    /// A Swift attribute expressed in C headers.
+    Attribute,
   } kind;
 
   static StringRef kindToString(GeneratedSourceInfo::Kind kind) {
@@ -80,6 +83,8 @@ public:
       return "PrettyPrinted";
     case DefaultArgument:
       return "DefaultArgument";
+    case Attribute:
+      return "Attribute";
     }
     llvm_unreachable("Invalid kind");
   }

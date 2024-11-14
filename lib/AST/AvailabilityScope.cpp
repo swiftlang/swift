@@ -55,8 +55,10 @@ AvailabilityScope::createForSourceFile(SourceFile *SF,
   case SourceFileKind::DefaultArgument: {
     // Look up the parent context in the enclosing file that this file's
     // root context should be nested under.
-    if (auto parentScope =
-            SF->getEnclosingSourceFile()->getAvailabilityScope()) {
+    auto enclosingSF = SF->getEnclosingSourceFile();
+    if (!enclosingSF)
+      break;
+    if (auto parentScope = enclosingSF->getAvailabilityScope()) {
       auto charRange = Ctx.SourceMgr.getRangeForBuffer(SF->getBufferID());
       range = SourceRange(charRange.getStart(), charRange.getEnd());
       auto originalNode = SF->getNodeInEnclosingSourceFile();

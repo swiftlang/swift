@@ -935,7 +935,6 @@ public struct AddAsyncMacro: PeerMacro {
     providingPeersOf declaration: Declaration,
     in context: Context
   ) throws -> [DeclSyntax] {
-
     // Only on functions at the moment.
     guard var funcDecl = declaration.as(FunctionDeclSyntax.self) else {
       throw CustomError.message("@addAsync only works on functions")
@@ -1083,6 +1082,37 @@ public struct AddAsyncMacro: PeerMacro {
     )
 
     funcDecl.attributes = newAttributeList
+
+    // If this declaration needs to be final, make it so.
+    let isFinal = node.attributeName.trimmedDescription.contains("AddAsyncFinal")
+    if isFinal {
+      var allModifiers = Array(funcDecl.modifiers)
+      if let openIndex = allModifiers.firstIndex(where: { $0.name.text == "open" }) {
+        allModifiers[openIndex].name = .keyword(.public)
+      } else {
+        allModifiers.append(
+          DeclModifierSyntax(
+            name: .keyword(.public),
+            trailingTrivia: .space
+          )
+        )
+      }
+
+      allModifiers.append(
+        DeclModifierSyntax(
+          name: .keyword(.final),
+          trailingTrivia: .space
+        )
+      )
+
+      funcDecl.modifiers = DeclModifierListSyntax(allModifiers)
+
+      var allAttributes = Array(funcDecl.attributes)
+        allAttributes.append(
+          .attribute("@_alwaysEmitIntoClient ")
+        )
+      funcDecl.attributes = AttributeListSyntax(allAttributes)
+    }
 
     funcDecl.leadingTrivia = .newlines(2)
 
