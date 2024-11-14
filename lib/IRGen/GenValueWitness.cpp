@@ -900,6 +900,9 @@ void addStride(ConstantStructBuilder &B, const TypeInfo *TI, IRGenModule &IGM) {
 } // end anonymous namespace
 
 bool irgen::layoutStringsEnabled(IRGenModule &IGM, bool diagnose) {
+  if (!IGM.isLayoutStringValueWitnessesFeatureAvailable(IGM.Context)) {
+    return false;
+  }
   auto moduleName = IGM.getSwiftModule()->getRealName().str();
   if (IGM.Context.blockListConfig.hasBlockListAction(
           moduleName, BlockListKeyKind::ModuleName,
