@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Assertions.h"
 
@@ -127,6 +128,16 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged())
       CDeclAttr(cName.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
                 /*Implicit=*/false);
+}
+
+BridgedCustomAttr BridgedCustomAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc, BridgedTypeRepr cType,
+    BridgedNullablePatternBindingInitializer cInitContext,
+    BridgedNullableArgumentList cArgumentList) {
+  ASTContext &context = cContext.unbridged();
+  return CustomAttr::create(
+      context, cAtLoc.unbridged(), new (context) TypeExpr(cType.unbridged()),
+      cInitContext.unbridged(), cArgumentList.unbridged());
 }
 
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(

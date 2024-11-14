@@ -606,6 +606,13 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedStringRef cName);
 
 SWIFT_NAME(
+    "BridgedCustomAttr.createParsed(_:atLoc:type:initContext:argumentList:)")
+BridgedCustomAttr BridgedCustomAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc, BridgedTypeRepr cType,
+    BridgedNullablePatternBindingInitializer cInitContext,
+    BridgedNullableArgumentList cArgumentList);
+
+SWIFT_NAME(
     "BridgedDynamicReplacementAttr.createParsed(_:atLoc:attrNameLoc:lParenLoc:"
     "replacedFunction:rParenLoc:)")
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
