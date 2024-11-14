@@ -193,3 +193,11 @@ func testOptionalChain(value: TestStruct) {
   var value: Int? = 1
   value? += 1
 }
+
+func testSwitchExpr(value: Int) {
+  let _ = switch value {
+    case 0: "foo"
+    case ...100: "bar"
+    default: "baz"
+  }
+}
