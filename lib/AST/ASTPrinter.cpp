@@ -2000,11 +2000,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
       if (dependsOnOpaque(inverse.subject))
         continue;
 
-      if (inverse.getKind() == InvertibleProtocolKind::Escapable &&
-          Options.SuppressNonEscapableTypes) {
-        continue;
-      }
-
       if (isFirstReq) {
         if (printRequirements)
           Printer << " " << tok::kw_where << " ";
@@ -3136,16 +3131,6 @@ suppressingFeatureAllowUnsafeAttribute(PrintOptions &options,
                                        llvm::function_ref<void()> action) {
   unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
   options.ExcludeAttrList.push_back(DeclAttrKind::Unsafe);
-  action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
-}
-
-static void
-suppressingFeatureNonescapableTypes(PrintOptions &options,
-                                    llvm::function_ref<void()> action) {
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DeclAttrKind::Lifetime);
-  llvm::SaveAndRestore<bool> scope(options.SuppressNonEscapableTypes, true);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
@@ -7861,26 +7846,6 @@ swift::getInheritedForPrinting(
           Results.push_back(InheritedEntry(TypeLoc::withoutLoc(inversesTy)));
         }
         continue;
-      }
-
-      // Suppress Escapable and ~Escapable.
-      if (options.SuppressNonEscapableTypes) {
-        if (auto pct = ty->getAs<ProtocolCompositionType>()) {
-          auto inverses = pct->getInverses();
-          if (inverses.contains(InvertibleProtocolKind::Escapable)) {
-            inverses.remove(InvertibleProtocolKind::Escapable);
-            ty = ProtocolCompositionType::get(decl->getASTContext(),
-                                              pct->getMembers(), inverses,
-                                              pct->hasExplicitAnyObject());
-            if (ty->isAny())
-              continue;
-          }
-        }
-
-        if (auto protoTy = ty->getAs<ProtocolType>())
-          if (protoTy->getDecl()->isSpecificProtocol(
-                  KnownProtocolKind::Escapable))
-            continue;
       }
     }
 

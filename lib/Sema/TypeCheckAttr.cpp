@@ -7693,18 +7693,10 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
   sd->setHasUnreferenceableStorage(true);
 }
 
-void AttributeChecker::visitNonEscapableAttr(NonEscapableAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-    diagnoseAndRemoveAttr(attr, diag::nonescapable_types_attr_disabled);
-  }
-}
+void AttributeChecker::visitNonEscapableAttr(NonEscapableAttr *attr) {}
 
 void AttributeChecker::visitUnsafeNonEscapableResultAttr(
-  UnsafeNonEscapableResultAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-    diagnoseAndRemoveAttr(attr, diag::nonescapable_types_attr_disabled);
-  }
-}
+    UnsafeNonEscapableResultAttr *attr) {}
 
 void AttributeChecker::visitStaticExclusiveOnlyAttr(
     StaticExclusiveOnlyAttr *attr) {

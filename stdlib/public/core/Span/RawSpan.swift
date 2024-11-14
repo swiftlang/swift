@@ -18,7 +18,6 @@
 /// owning the contiguous memory, ensuring temporal safety and avoiding
 /// use-after-free errors. Operations on `RawSpan` are bounds-checked,
 /// ensuring spcial safety and avoiding buffer overflow errors.
-@_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 @frozen
 public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
@@ -58,7 +57,6 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized byte.
   ///   - byteCount: the number of initialized bytes in the span.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @inline(__always)
   @lifetime(borrow pointer)
@@ -71,11 +69,9 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   }
 }
 
-@_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension RawSpan: @unchecked Sendable {}
 
-@_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
 
@@ -87,7 +83,6 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
@@ -106,7 +101,6 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
@@ -123,7 +117,6 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
@@ -132,7 +125,6 @@ extension RawSpan {
     self.init(_unsafeBytes: UnsafeRawBufferPointer(buffer))
   }
 
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
@@ -151,7 +143,6 @@ extension RawSpan {
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized byte.
   ///   - byteCount: the number of initialized bytes in the span.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
   public init(
@@ -170,7 +161,6 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init<T: BitwiseCopyable>(
@@ -187,7 +177,6 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init<T: BitwiseCopyable>(
@@ -206,7 +195,6 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init<T: BitwiseCopyable>(
@@ -223,7 +211,6 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init<T: BitwiseCopyable>(
@@ -244,7 +231,6 @@ extension RawSpan {
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized byte.
   ///   - byteCount: the number of initialized bytes in the span.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
   public init<T: BitwiseCopyable>(
@@ -262,7 +248,6 @@ extension RawSpan {
   /// - Parameters:
   ///   - span: An existing `Span<T>`, which will define both this
   ///           `RawSpan`'s lifetime and the memory it represents.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(borrow span)
   public init<Element: BitwiseCopyable>(
@@ -275,7 +260,6 @@ extension RawSpan {
   }
 }
 
-@_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
 
@@ -305,7 +289,6 @@ extension RawSpan {
 }
 
 //MARK: extracting sub-spans
-@_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
 
@@ -322,7 +305,6 @@ extension RawSpan {
   /// - Returns: A span over the bytes within `bounds`
   ///
   /// - Complexity: O(1)
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(_ bounds: Range<Int>) -> Self {
@@ -349,7 +331,6 @@ extension RawSpan {
   /// - Returns: A span over the bytes within `bounds`
   ///
   /// - Complexity: O(1)
-  @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(self)
@@ -373,7 +354,6 @@ extension RawSpan {
   /// - Returns: A span over the bytes within `bounds`
   ///
   /// - Complexity: O(1)
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
@@ -395,7 +375,6 @@ extension RawSpan {
   /// - Returns: A span over the bytes within `bounds`
   ///
   /// - Complexity: O(1)
-  @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(self)
@@ -414,7 +393,6 @@ extension RawSpan {
   /// - Returns: A span over all the bytes of this span.
   ///
   /// - Complexity: O(1)
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(_: UnboundedRange) -> Self {
@@ -422,7 +400,6 @@ extension RawSpan {
   }
 }
 
-@_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
 
@@ -441,7 +418,6 @@ extension RawSpan {
   ///   The closure's parameter is valid only for the duration of
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
@@ -450,7 +426,6 @@ extension RawSpan {
   }
 }
 
-@_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
 
@@ -468,7 +443,6 @@ extension RawSpan {
   /// - Parameters:
   ///   - type: The type as which to view the bytes of this span.
   /// - Returns: A typed span viewing these bytes as instances of `T`.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(self)
@@ -480,7 +454,6 @@ extension RawSpan {
 }
 
 //MARK: load
-@_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
 
@@ -501,7 +474,6 @@ extension RawSpan {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///     `offset`. The returned instance is memory-managed and unassociated
   ///     with the value in the memory referenced by this pointer.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoad<T>(
@@ -533,7 +505,6 @@ extension RawSpan {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///     `offset`. The returned instance is memory-managed and unassociated
   ///     with the value in the memory referenced by this pointer.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoad<T>(
@@ -558,7 +529,6 @@ extension RawSpan {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///     `offset`. The returned instance isn't associated
   ///     with the value in the range of memory referenced by this pointer.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
@@ -589,7 +559,6 @@ extension RawSpan {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///     `offset`. The returned instance isn't associated
   ///     with the value in the range of memory referenced by this pointer.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
@@ -599,12 +568,10 @@ extension RawSpan {
   }
 }
 
-@_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
   /// Returns a Boolean value indicating whether two `RawSpan` instances
   /// refer to the same region in memory.
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func isIdentical(to other: Self) -> Bool {
     (self._pointer == other._pointer) && (self._count == other._count)
@@ -618,7 +585,6 @@ extension RawSpan {
   /// Parameters:
   /// - span: a subrange of `self`
   /// Returns: A range of offsets within `self`
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func byteOffsets(of other: borrowing Self) -> Range<Int>? {
     if other._count > _count { return nil }
@@ -653,7 +619,6 @@ extension RawSpan {
   /// - Returns: A span with at most `maxLength` bytes.
   ///
   /// - Complexity: O(1)
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(first maxLength: Int) -> Self {
@@ -676,7 +641,6 @@ extension RawSpan {
   /// - Returns: A span leaving off the specified number of bytes at the end.
   ///
   /// - Complexity: O(1)
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(droppingLast k: Int) -> Self {
@@ -700,7 +664,6 @@ extension RawSpan {
   /// - Returns: A span with at most `maxLength` bytes.
   ///
   /// - Complexity: O(1)
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(last maxLength: Int) -> Self {
@@ -724,7 +687,6 @@ extension RawSpan {
   /// - Returns: A span starting after the specified number of bytes.
   ///
   /// - Complexity: O(1)
-  @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(droppingFirst k: Int) -> Self {

@@ -7784,9 +7784,6 @@ NOTE(note_inverse_preventing_conformance,none,
 NOTE(note_inverse_preventing_conformance_explicit,none,
      "%kind0 has '~%1' constraint preventing '%1' conformance",
      (const ValueDecl *, StringRef))
-ERROR(escapable_requires_feature_flag,none,
-      "type 'Escapable' requires -enable-experimental-feature NonescapableTypes",
-      ())
 ERROR(non_bitwise_copyable_type_class,none,
       "class cannot conform to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_type_indirect_enum,none,
@@ -7909,9 +7906,6 @@ ERROR(noncopyable_types_cannot_be_resilient, none,
 ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
-
-ERROR(nonescapable_types_attr_disabled,none,
-      "attribute requires '-enable-experimental-feature NonescapableTypes'", ())
 
 ERROR(span_requires_feature_flag,none,
       "'%0' requires -enable-experimental-feature Span",

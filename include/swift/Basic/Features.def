@@ -202,6 +202,7 @@ BASELINE_LANGUAGE_FEATURE(BorrowingSwitch, 432, "Noncopyable type pattern matchi
 CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
+LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -353,9 +354,6 @@ EXPERIMENTAL_FEATURE(SuppressedAssociatedTypes, true)
 
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
-
-/// Enable non-escapable types.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NonescapableTypes, true)
 
 /// Enable returning non-escapable types from functions.
 EXPERIMENTAL_FEATURE(LifetimeDependence, true)
