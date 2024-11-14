@@ -109,6 +109,13 @@ public:
   }
 
   void addLinkEntity(LinkEntity entity) override {
+    // Skip property descriptors for static properties, which were only
+    // introduced with SE-0438 and are therefore not present in all libraries.
+    if (entity.isPropertyDescriptor()) {
+      if (entity.getAbstractStorageDecl()->isStatic())
+        return;
+    }
+
     if (entity.hasSILFunction()) {
       addFunction(entity.getSILFunction());
       return;
