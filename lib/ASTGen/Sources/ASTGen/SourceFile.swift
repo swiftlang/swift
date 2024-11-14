@@ -122,8 +122,7 @@ public func parseSourceFile(
       .preambleMacroExpansion,
       .replacedFunctionBody,
       .prettyPrinted,
-      .defaultArgument,
-      .attribute:
+      .defaultArgument:
     parsed = Syntax(SourceFileSyntax.parse(from: &parser))
 
   case .declarationMacroExpansion,
@@ -141,7 +140,8 @@ public func parseSourceFile(
   case .accessorMacroExpansion:
     // FIXME: Implement specialized parsing.
     parsed = Syntax(SourceFileSyntax.parse(from: &parser))
-  case .memberAttributeMacroExpansion:
+  case .memberAttributeMacroExpansion,
+      .attribute:
     // FIXME: Implement specialized parsing.
     parsed = Syntax(SourceFileSyntax.parse(from: &parser))
   case .bodyMacroExpansion:
