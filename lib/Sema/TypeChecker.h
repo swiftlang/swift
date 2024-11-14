@@ -524,14 +524,13 @@ void diagnoseRequirementFailure(
     const CheckGenericArgumentsResult::RequirementFailureInfo &reqFailureInfo,
     SourceLoc errorLoc, SourceLoc noteLoc, Type targetTy,
     ArrayRef<GenericTypeParamType *> genericParams,
-    TypeSubstitutionFn substitutions, ModuleDecl *module);
+    TypeSubstitutionFn substitutions);
 
 /// Check the given generic parameter substitutions against the given
 /// requirements and report on any requirement failures in detail for
 /// diagnostic needs.
 CheckGenericArgumentsResult
-checkGenericArgumentsForDiagnostics(ModuleDecl *module,
-                                    ArrayRef<Requirement> requirements,
+checkGenericArgumentsForDiagnostics(ArrayRef<Requirement> requirements,
                                     TypeSubstitutionFn substitutions);
 
 /// Checks whether the generic requirements imposed on the nested type
@@ -575,8 +574,7 @@ checkGenericArgumentsForDiagnostics(ModuleDecl *module,
 ///
 /// \returns \c true on success.
 bool checkContextualRequirements(GenericTypeDecl *decl, Type parentTy,
-                                 SourceLoc loc, ModuleDecl *module,
-                                 GenericSignature contextSig);
+                                 SourceLoc loc, GenericSignature contextSig);
 
 /// Add any implicitly-defined constructors required for the given
 /// struct, class or actor.

@@ -538,7 +538,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     // clause, check those requirements now.
     if (!TypeChecker::checkContextualRequirements(
             genericDecl, dc->getSelfInterfaceType(), SourceLoc(),
-            dc->getParentModule(), dc->getGenericSignatureOfContext())) {
+            dc->getGenericSignatureOfContext())) {
       continue;
     }
 
