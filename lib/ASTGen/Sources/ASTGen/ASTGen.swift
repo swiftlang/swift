@@ -110,7 +110,9 @@ struct ASTGenVisitor {
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { element in
-      let astNode = generate(codeBlockItem: element)
+      guard let astNode = generate(codeBlockItem: element) else {
+        return
+      }
       if !isTopLevel {
         out.append(astNode)
         return
@@ -463,7 +465,7 @@ public func buildTopLevelASTNodes(
 /// Generate an AST node at the given source location. Returns the generated
 /// ASTNode and mutate the pointee of `endLocPtr` to the end of the node.
 private func _build<Node: SyntaxProtocol, Result>(
-  generator: (ASTGenVisitor) -> (Node) -> Result,
+  generator: (ASTGenVisitor) -> (Node) -> Result?,
   diagEngine: BridgedDiagnosticEngine,
   sourceFilePtr: UnsafeMutableRawPointer,
   sourceLoc: BridgedSourceLoc,
