@@ -1291,7 +1291,9 @@ static std::optional<AccessorKind> getAccessorKind(StringRef ident) {
       .Case("addressor", AccessorKind::Address)
       .Case("mutableAddressor", AccessorKind::MutableAddress)
       .Case("read", AccessorKind::Read)
+      .Case("read2", AccessorKind::Read2)
       .Case("modify", AccessorKind::Modify)
+      .Case("modify2", AccessorKind::Modify2)
       .Default(std::nullopt);
 }
 
