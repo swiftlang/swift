@@ -576,9 +576,18 @@ extension SimplifyContext {
     let singleUse = preserveDebugInfo ? first.uses.singleUse : first.uses.ignoreDebugUses.singleUse
     let canEraseFirst = singleUse?.instruction == second
 
-    if !canEraseFirst && first.parentFunction.hasOwnership && replacement.ownership == .owned {
-      // We cannot add more uses to `replacement` without inserting a copy.
-      return
+    if !canEraseFirst && first.parentFunction.hasOwnership {
+      if replacement.ownership == .owned {
+        // We cannot add more uses to `replacement` without inserting a copy.
+        return
+      }
+      if first.ownership == .owned {
+        // We have to insert a compensating destroy because we are deleting the second instruction but
+        // not the first one. This can happen if the first instruction is an `enum` which constructs a
+        // non-trivial enum from a trivial payload.
+        let builder = Builder(before: second, self)
+        builder.createDestroyValue(operand: first)
+      }
     }
 
     second.uses.replaceAll(with: replacement, self)
