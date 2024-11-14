@@ -3648,9 +3648,13 @@ void NecessaryBindings::restore(IRGenFunction &IGF, Address buffer,
                                     metadataState, SubMap);
 }
 
-void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
+void NecessaryBindings::save(IRGenFunction &IGF, Address buffer,
+                std::optional<SubstitutionMap> replacementSubstitutions) const {
+  SubstitutionMap subsToPass = replacementSubstitutions.has_value()
+    ? replacementSubstitutions.value()
+    : SubMap;
   emitInitOfGenericRequirementsBuffer(IGF, getRequirements(), buffer,
-                                      MetadataState::Complete, SubMap,
+                                      MetadataState::Complete, subsToPass,
                                       /*onHeapPacks=*/!NoEscape);
 }
 
