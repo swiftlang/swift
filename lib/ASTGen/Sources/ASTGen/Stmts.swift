@@ -67,11 +67,11 @@ extension ASTGenVisitor {
     return self.generateWithLegacy(node)
   }
 
-  func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode {
+  func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode? {
     // TODO: Set semicolon loc.
     switch node.item {
     case .decl(let node):
-      return .decl(self.generate(decl: node))
+      return self.generate(decl: node).map { .decl($0) }
     case .stmt(let node):
       return .stmt(self.generate(stmt: node))
     case .expr(let node):
@@ -87,7 +87,10 @@ extension ASTGenVisitor {
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { codeBlockItem in
-      allItems.append(self.generate(codeBlockItem: codeBlockItem).bridged)
+      guard let item = self.generate(codeBlockItem: codeBlockItem) else {
+        return
+      }
+      allItems.append(item.bridged)
     }
 
     return allItems.lazy.bridgedArray(in: self)

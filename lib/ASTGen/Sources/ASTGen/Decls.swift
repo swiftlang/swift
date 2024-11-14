@@ -18,7 +18,7 @@ import SwiftDiagnostics
 // MARK: - TypeDecl
 
 extension ASTGenVisitor {
-  func generate(decl node: DeclSyntax) -> BridgedDecl {
+  func generate(decl node: DeclSyntax) -> BridgedDecl? {
     switch node.as(DeclSyntaxEnum.self) {
     case .accessorDecl:
       fatalError("Should be generated as a part of another decl")
@@ -72,7 +72,7 @@ extension ASTGenVisitor {
     return self.generateWithLegacy(node)
   }
 
-  func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl {
+  func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl? {
     // TODO: Set semicolon loc.
     generate(decl: node.decl)
   }
@@ -852,7 +852,7 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   @inline(__always)
   func generate(memberBlockItemList node: MemberBlockItemListSyntax) -> [BridgedDecl] {
-    var allBridged: [BridgedDecl] = []
+    var allMembers: [BridgedDecl] = []
     visitIfConfigElements(node, of: MemberBlockItemSyntax.self) { element in
       if let ifConfigDecl = element.decl.as(IfConfigDeclSyntax.self) {
         return .ifConfigDecl(ifConfigDecl)
@@ -860,11 +860,14 @@ extension ASTGenVisitor {
 
       return .underlying(element)
     } body: { member in
+      guard let member = self.generate(decl: member.decl) else {
+        return
+      }
       // TODO: Set semicolon loc.
-      allBridged.append(self.generate(decl: member.decl))
+      allMembers.append(member)
     }
 
-    return allBridged
+    return allMembers
   }
 
   @inline(__always)
