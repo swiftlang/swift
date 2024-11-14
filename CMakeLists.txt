@@ -1430,6 +1430,10 @@ if(SWIFT_ENABLE_DISPATCH)
 endif()
 
 # Add all of the subdirectories, where we actually do work.
+add_subdirectory(include)
+if(SWIFT_INCLUDE_TOOLS)
+  add_subdirectory(lib)
+endif()
 
 ###############
 # PLEASE READ #
@@ -1482,11 +1486,7 @@ if(SWIFT_INCLUDE_APINOTES)
   add_subdirectory(apinotes)
 endif()
 
-add_subdirectory(include)
-
 if(SWIFT_INCLUDE_TOOLS)
-  add_subdirectory(lib)
-
   add_subdirectory(SwiftCompilerSources)
 
   # Always include this after including stdlib/!
