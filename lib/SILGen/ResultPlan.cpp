@@ -772,6 +772,9 @@ public:
       auto createIntrinsic =
           throws ? SGF.SGM.getCreateCheckedThrowingContinuation()
                  : SGF.SGM.getCreateCheckedContinuation();
+    auto conformances =
+        collectExistentialConformances(calleeTypeInfo.substResultType,
+                                       ctx.TheAnyType);
       auto subs =
           SubstitutionMap::get(createIntrinsic->getGenericSignature(),
                                {calleeTypeInfo.substResultType}, conformances);
