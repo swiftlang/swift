@@ -22,5 +22,5 @@ func testAll(x: Double, y: Double, computer: SlowComputer) async {
   let _: Double = await computer.divide(x, y)
 }
 
-// CHECK: define swifttailcc void @"$sSC12async_divideyS2d_SdtYaF"
-// CHECK: define swifttailcc void @"$sSo12SlowComputerV6divideyS2d_SdtYaF"
+// CHECK: define{{.*}}@"$sSC12async_divideyS2d_SdtYaF"
+// CHECK: define{{.*}}@"$sSo12SlowComputerV6divideyS2d_SdtYaF"

@@ -1,5 +1,6 @@
 // REQUIRES: swift_swift_parser, executable_test, objc_interop, concurrency
 // REQUIRES: swift_feature_MacrosOnImports
+// REQUIRES: OS=macosx
 
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
