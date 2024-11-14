@@ -114,11 +114,23 @@ ParseAbstractFunctionBodyRequest::evaluate(Evaluator &evaluator,
 
   case BodyKind::Unparsed: {
     // FIXME: How do we configure code completion?
-    SourceFile &sf = *afd->getDeclContext()->getParentSourceFile();
-    SourceManager &sourceMgr = sf.getASTContext().SourceMgr;
+    SourceManager &sourceMgr = afd->getASTContext().SourceMgr;
     unsigned bufferID =
         sourceMgr.findBufferContainingLoc(afd->getBodySourceRange().Start);
-    Parser parser(bufferID, sf, /*SIL*/ nullptr);
+    SourceFile *sf = afd->getDeclContext()->getParentSourceFile();
+    if (!sf) {
+      auto sourceFiles = sourceMgr.getSourceFilesForBufferID(bufferID);
+      auto expectedModule = afd->getParentModule();
+      for (auto checkSF: sourceFiles) {
+        if (checkSF->getParentModule() == expectedModule) {
+          sf = checkSF;
+          break;
+        }
+      }
+      assert(sf && "Could not find source file containing parsed body");
+    }
+
+    Parser parser(bufferID, *sf, /*SIL*/ nullptr);
     auto result = parser.parseAbstractFunctionBodyDelayed(afd);
     afd->setBodyKind(BodyKind::Parsed);
     return result;
@@ -150,6 +162,8 @@ getBridgedGeneratedSourceFileKind(const GeneratedSourceInfo *genInfo) {
     return BridgedGeneratedSourceFileKindPrettyPrinted;
   case GeneratedSourceInfo::Kind::DefaultArgument:
     return BridgedGeneratedSourceFileKindDefaultArgument;
+  case GeneratedSourceInfo::Attribute:
+    return BridgedGeneratedSourceFileKindAttribute;
   }
 }
 
@@ -364,7 +378,8 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
       break;
     }
 
-    case GeneratedSourceInfo::MemberAttributeMacroExpansion: {
+    case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+    case GeneratedSourceInfo::Attribute: {
       parser.parseExpandedAttributeList(items);
       break;
     }

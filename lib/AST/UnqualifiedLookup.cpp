@@ -30,6 +30,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -265,7 +266,8 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   if (!isFirstResultEnough()) {
     // If no result has been found yet, the dependency must be on a top-level
     // name, since up to now, the search has been for non-top-level names.
-    auto *moduleScopeContext = DC->getModuleScopeContext();
+    auto *moduleScopeContext = getModuleScopeLookupContext(DC);
+
     lookUpTopLevelNamesInModuleScopeContext(moduleScopeContext);
   }
 }
@@ -938,4 +940,20 @@ ValueDecl *ASTScope::lookupSingleLocalDecl(SourceFile *sf, DeclName name,
   if (result.size() != 1)
     return nullptr;
   return result[0];
+}
+
+DeclContext *swift::getModuleScopeLookupContext(DeclContext *dc) {
+  auto moduleScopeContext = dc->getModuleScopeContext();
+
+  // When the module scope context is in a Clang module but we actually
+  // have a parent source file, it's because we are within a macro
+  // expansion triggered for the imported declaration. In such cases,
+  // we want to use the parent source file as the lookup context, becauae
+  // it has the appropriate resolved imports.
+  if (isa<ClangModuleUnit>(moduleScopeContext)) {
+    if (auto parentSF = dc->getParentSourceFile())
+      return parentSF;
+  }
+
+  return moduleScopeContext;
 }

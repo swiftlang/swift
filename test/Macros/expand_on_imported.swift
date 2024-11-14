@@ -10,20 +10,17 @@
 // Diagnostics testing
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -swift-version 5 -enable-experimental-feature MacrosOnImports -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ModuleUser %s -I %t
 
+// Emit IR to ensure that we are handling the created body end-to-end.
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -swift-version 5 -g -enable-experimental-feature MacrosOnImports -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ModuleUser %s -I %t -validate-tbd-against-ir=none | %FileCheck %s
+
 import CompletionHandlerGlobals
 import macro_library
 
-// Make sure that @AddAsync works at all.
-@AddAsync
-@available(SwiftStdlib 5.1, *)
-func asyncTest(_ value: Int, completionHandler: @escaping (String) -> Void) {
-  completionHandler(String(value))
-}
-
 @available(SwiftStdlib 5.1, *)
 func testAll(x: Double, y: Double, computer: SlowComputer) async {
-  _ = await asyncTest(17)
-
   let _: Double = await async_divide(1.0, 2.0)
   let _: Double = await computer.divide(x, y)
 }
+
+// CHECK: define{{.*}}@"$sSC12async_divideyS2d_SdtYaF"
+// CHECK: define{{.*}}@"$sSo12SlowComputerV6divideyS2d_SdtYaF"

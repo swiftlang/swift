@@ -1698,7 +1698,7 @@ SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
                                                      DeclNameRef macroName,
                                                      MacroRoles roles) {
   SmallVector<MacroDecl *, 1> choices;
-  auto moduleScopeDC = dc->getModuleScopeContext();
+  auto moduleScopeDC = getModuleScopeLookupContext(dc);
   ASTContext &ctx = moduleScopeDC->getASTContext();
 
   auto addChoiceIfApplicable = [&](ValueDecl *decl) {

@@ -2798,7 +2798,11 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   Identifier name = underlying->Name == "std"
                         ? SwiftContext.Id_CxxStdlib
                         : SwiftContext.getIdentifier(underlying->Name);
-  auto wrapper = ModuleDecl::create(name, SwiftContext);
+  ImplicitImportInfo implicitImportInfo;
+  if (auto mainModule = SwiftContext.MainModule) {
+    implicitImportInfo = mainModule->getImplicitImportInfo();
+  }
+  auto wrapper = ModuleDecl::create(name, SwiftContext, implicitImportInfo);
   wrapper->setIsSystemModule(underlying->IsSystem);
   wrapper->setIsNonSwiftModule();
   wrapper->setHasResolvedImports();

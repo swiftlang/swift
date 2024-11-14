@@ -120,6 +120,12 @@ namespace swift {
   /// This walks the AST to resolve imports.
   void performImportResolution(SourceFile &SF);
 
+  /// Resolve imports for a source file generated to adapt a given
+  /// Clang module.
+  void performImportResolutionForClangMacroBuffer(
+    SourceFile &SF, ModuleDecl *clangModule
+  );
+
   /// Once type-checking is complete, this instruments code with calls to an
   /// intrinsic that record the expected values of local variables so they can
   /// be compared against the results from the debugger.

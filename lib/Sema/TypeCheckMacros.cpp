@@ -1033,8 +1033,11 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
   if (auto parentSourceFile = dc->getParentSourceFile())
     macroSourceFile->setImports(parentSourceFile->getImports());
-  else if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
-    macroSourceFile->setImports({});
+  else if (auto clangModuleUnit =
+               dyn_cast<ClangModuleUnit>(dc->getModuleScopeContext())) {
+    auto clangModule = clangModuleUnit->getParentModule();
+    performImportResolutionForClangMacroBuffer(*macroSourceFile, clangModule);
+  }
   return macroSourceFile;
 }
 
