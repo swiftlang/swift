@@ -4722,6 +4722,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
         parameterOptions |= SILParameterInfo::Sending;
         return true;
 
+      case TypeAttrKind::SILImplicitLeadingParam:
+        parameterOptions |= SILParameterInfo::ImplicitLeading;
+        return true;
+
       default:
         return false;
       }
