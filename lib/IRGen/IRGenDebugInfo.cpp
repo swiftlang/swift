@@ -2625,8 +2625,8 @@ IRGenDebugInfoImpl::computeLLVMLocCodeView(const SILDebugScope *DS,
                                            SILLocation Loc) {
   // If the scope has not changed and the line number is either zero or
   // artificial, we want to keep the most recent debug location.
-  if (DS == LastScope &&
-      (Loc.is<ArtificialUnreachableLocation>() || Loc.isLineZero(SM)))
+  if (DS == LastScope && (Loc.is<ArtificialUnreachableLocation>() ||
+                          Loc.isLineZero(SM) || Loc.isHiddenFromDebugInfo()))
     return LastFileAndLocation;
 
   // Decode the location.
@@ -2638,11 +2638,6 @@ IRGenDebugInfoImpl::computeLLVMLoc(const SILDebugScope *DS, SILLocation Loc) {
   SILFunction *Fn = DS->getInlinedFunction();
   if (Fn && (Fn->isThunk() || Fn->isTransparent()))
     return {0, 0, CompilerGeneratedFile};
-
-  // Reuse the last source location if we are still in the same scope to get a
-  // more contiguous line table.
-  if (DS == LastScope && Loc.isHiddenFromDebugInfo())
-    return LastFileAndLocation;
 
   if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
     return computeLLVMLocCodeView(DS, Loc);
