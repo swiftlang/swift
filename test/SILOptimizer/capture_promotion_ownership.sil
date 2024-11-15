@@ -1,8 +1,8 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -capture-promotion \
-// RUN: -enable-experimental-feature NonescapableTypes -module-name Swift \
+// RUN: -enable-experimental-feature LifetimeDependence -module-name Swift \
 // RUN: | %FileCheck %s
 
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 // Check to make sure that the process of promoting closure captures results in
 // a correctly cloned and modified closure function body. This test
@@ -28,8 +28,6 @@ struct Baz {
   var bar: Bar
   var x: Int
 }
-
-@_marker public protocol Escapable { }
 
 struct Nonescapable: ~Escapable {}
 

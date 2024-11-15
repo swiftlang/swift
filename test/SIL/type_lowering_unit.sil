@@ -1,8 +1,8 @@
 // RUN: %target-sil-opt -test-runner \
-// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   %s -o /dev/null 2>&1 | %FileCheck %s
 
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 sil_stage raw
 

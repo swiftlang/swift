@@ -1,10 +1,10 @@
 // RUN: %target-sil-opt -test-runner %s \
 // RUN:   -sil-verify-all \
-// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 import Builtin
 
