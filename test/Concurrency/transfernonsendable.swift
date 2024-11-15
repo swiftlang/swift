@@ -1763,7 +1763,7 @@ extension MyActor {
         _ = sc
 
         Task { // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-          // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument risks causing races in between local and caller code}}
+          // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(priority:operation:)' risks causing races in between local and caller code}}
           _ = sc
         }
 
