@@ -152,7 +152,7 @@ RequirementEnvironment::RequirementEnvironment(
 
       // All other generic parameters come from the requirement itself
       // and conform abstractly.
-      return ProtocolConformanceRef(proto);
+      return MakeAbstractConformanceForGenericType()(type, replacement, proto);
     });
 
   // If the requirement itself is non-generic, the witness thunk signature
