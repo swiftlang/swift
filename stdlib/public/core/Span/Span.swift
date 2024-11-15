@@ -474,7 +474,7 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
-//MARK: sub-spans
+// MARK: sub-spans
 @available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable {
 
@@ -588,7 +588,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
-//MARK: UnsafeBufferPointer access hatch
+// MARK: UnsafeBufferPointer access hatch
 @available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable  {
 
@@ -678,7 +678,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
-//MARK: prefixes and suffixes
+// MARK: prefixes and suffixes
 @available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable {
 
