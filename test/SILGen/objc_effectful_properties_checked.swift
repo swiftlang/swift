@@ -21,6 +21,8 @@ func testJustAsync(eff : EffProps) async {
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSO_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any, NSObject) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[BLOCK]], %0)
+  // CHECK: destroy_addr [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<NSObject, Never>
+  // CHECK: dealloc_stack [[CHECKED_CONT]] : $*CheckedContinuation<NSObject, Never>
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]]
 
   // CHECK: [[RESUME]]:
@@ -45,6 +47,8 @@ func testAsyncThrows(eff : EffProps) async {
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSO_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any, Optional<NSObject>, Optional<NSError>) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[BLOCK]], %0)
+  // CHECK: destroy_addr [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<Optional<NSObject>, any Error>
+  // CHECK: dealloc_stack [[CHECKED_CONT]] : $*CheckedContinuation<Optional<NSObject>, any Error>
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]], error [[RESUME_ERROR:bb[0-9]+]]
 
   // CHECK: [[RESUME]]:
