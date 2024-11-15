@@ -75,7 +75,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, true /*was moved*/);
+      *original.getVarInfo(), false, UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
@@ -84,7 +84,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, true /*was moved*/);
+      *original.getVarInfo(), false, UsesMoveableValueDebugInfo);
 }
 
 //===----------------------------------------------------------------------===//

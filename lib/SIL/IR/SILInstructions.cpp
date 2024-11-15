@@ -225,12 +225,13 @@ SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
   return VarInfo;
 }
 
-AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
-                               ArrayRef<SILValue> TypeDependentOperands,
-                               SILFunction &F,
-                               llvm::Optional<SILDebugVariable> Var,
-                               bool hasDynamicLifetime, bool isLexical,
-                               bool usesMoveableValueDebugInfo)
+AllocStackInst::AllocStackInst(
+    SILDebugLocation Loc, SILType elementType,
+    ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
+    llvm::Optional<SILDebugVariable> Var,
+    HasDynamicLifetime_t hasDynamicLifetime, IsLexical_t isLexical,
+    IsFromVarDecl_t isFromVarDecl,
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
       SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
                                  Var ? Var->Type.has_value() : false,
@@ -239,10 +240,11 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
       // Initialize VarInfo with a temporary raw value of 0. The real
       // initialization can only be done after `numOperands` is set (see below).
       VarInfo(0) {
-  sharedUInt8().AllocStackInst.dynamicLifetime = hasDynamicLifetime;
-  sharedUInt8().AllocStackInst.lexical = isLexical;
+  sharedUInt8().AllocStackInst.dynamicLifetime = (bool)hasDynamicLifetime;
+  sharedUInt8().AllocStackInst.lexical = (bool)isLexical;
+  sharedUInt8().AllocStackInst.fromVarDecl = (bool)isFromVarDecl;
   sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo =
-      usesMoveableValueDebugInfo || elementType.isMoveOnly();
+      (bool)usesMoveableValueDebugInfo || elementType.isMoveOnly();
   sharedUInt32().AllocStackInst.numOperands = TypeDependentOperands.size();
 
   // VarInfo must be initialized after
@@ -268,8 +270,10 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
 AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
                                        SILType elementType, SILFunction &F,
                                        llvm::Optional<SILDebugVariable> Var,
-                                       bool hasDynamicLifetime, bool isLexical,
-                                       bool wasMoved) {
+                                       HasDynamicLifetime_t hasDynamicLifetime,
+                                       IsLexical_t isLexical,
+                                       IsFromVarDecl_t isFromVarDecl,
+                                       UsesMoveableValueDebugInfo_t wasMoved) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
                                elementType.getASTType());
@@ -277,7 +281,7 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
       F.getModule(), Var, TypeDependentOperands);
   return ::new (Buffer)
       AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var,
-                     hasDynamicLifetime, isLexical, wasMoved);
+                     hasDynamicLifetime, isLexical, isFromVarDecl, wasMoved);
 }
 
 VarDecl *AllocationInst::getDecl() const {
@@ -374,12 +378,13 @@ bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() 
   return false;
 }
 
-AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
-                           ArrayRef<SILValue> TypeDependentOperands,
-                           SILFunction &F, llvm::Optional<SILDebugVariable> Var,
-                           bool hasDynamicLifetime, bool reflection,
-                           bool usesMoveableValueDebugInfo,
-                           bool hasPointerEscape)
+AllocBoxInst::AllocBoxInst(
+    SILDebugLocation Loc, CanSILBoxType BoxType,
+    ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
+    llvm::Optional<SILDebugVariable> Var,
+    HasDynamicLifetime_t hasDynamicLifetime, bool reflection,
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
+    HasPointerEscape_t hasPointerEscape)
     : NullaryInstructionWithTypeDependentOperandsBase(
           Loc, TypeDependentOperands, SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()) {
@@ -387,21 +392,23 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
   sharedUInt8().AllocBoxInst.reflection = reflection;
 
   // If we have a noncopyable type, always set uses mvoeable value debug info.
-  usesMoveableValueDebugInfo |=
-      BoxType->getLayout()->getFields()[0].getObjectType().isMoveOnly();
+  auto fieldTy = BoxType->getLayout()->getFields()[0].getObjectType();
+  if (fieldTy.isMoveOnly()) {
+    usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
+  }
 
   sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo =
-      usesMoveableValueDebugInfo;
+      (bool)usesMoveableValueDebugInfo;
 
-  sharedUInt8().AllocBoxInst.pointerEscape = hasPointerEscape;
+  sharedUInt8().AllocBoxInst.pointerEscape = (bool)hasPointerEscape;
 }
 
-AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
-                                   SILFunction &F,
-                                   llvm::Optional<SILDebugVariable> Var,
-                                   bool hasDynamicLifetime, bool reflection,
-                                   bool usesMoveableValueDebugInfo,
-                                   bool hasPointerEscape) {
+AllocBoxInst *
+AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
+                     SILFunction &F, llvm::Optional<SILDebugVariable> Var,
+                     HasDynamicLifetime_t hasDynamicLifetime, bool reflection,
+                     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
+                     HasPointerEscape_t hasPointerEscape) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
@@ -418,9 +425,10 @@ SILType AllocBoxInst::getAddressType() const {
       .getAddressType();
 }
 
-DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                               SILDebugVariable Var, bool poisonRefs,
-                               bool usesMoveableValueDebugInfo, bool trace)
+DebugValueInst::DebugValueInst(
+    SILDebugLocation DebugLoc, SILValue Operand, SILDebugVariable Var,
+    bool poisonRefs, UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
+    bool trace)
     : UnaryInstructionBase(DebugLoc, Operand),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
@@ -440,16 +448,17 @@ DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
                                        SILValue Operand, SILModule &M,
                                        SILDebugVariable Var, bool poisonRefs,
-                                       bool wasMoved, bool trace) {
+                                       UsesMoveableValueDebugInfo_t wasMoved,
+                                       bool trace) {
   void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
   return ::new (buf)
     DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace);
 }
 
-DebugValueInst *DebugValueInst::createAddr(SILDebugLocation DebugLoc,
-                                           SILValue Operand, SILModule &M,
-                                           SILDebugVariable Var,
-                                           bool wasMoved, bool trace) {
+DebugValueInst *
+DebugValueInst::createAddr(SILDebugLocation DebugLoc, SILValue Operand,
+                           SILModule &M, SILDebugVariable Var,
+                           UsesMoveableValueDebugInfo_t wasMoved, bool trace) {
   // For alloc_stack, debug_value is used to annotate the associated
   // memory location, so we shouldn't attach op_deref.
   if (!isa<AllocStackInst>(Operand))

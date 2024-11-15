@@ -879,10 +879,11 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
   }
   auto *NewInst = getBuilder().createAllocStack(
       Loc, getOpType(Inst->getElementType()), VarInfo,
-      Inst->hasDynamicLifetime(), Inst->isLexical(),
-      Inst->getUsesMoveableValueDebugInfo()
+      Inst->hasDynamicLifetime(), Inst->isLexical(), Inst->isFromVarDecl(),
+      Inst->usesMoveableValueDebugInfo()
 #ifndef NDEBUG
-    , true
+          ,
+      true
 #endif
   );
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
@@ -960,10 +961,9 @@ SILCloner<ImplClass>::visitAllocBoxInst(AllocBoxInst *Inst) {
       Inst,
       getBuilder().createAllocBox(
           Loc, this->getOpType(Inst->getType()).template castTo<SILBoxType>(),
-          VarInfo, /*hasDynamicLifetime*/ false,
-          /*reflection*/ false,
-          /*usesMoveableValueDebugInfo*/ false, /*skipVarDeclAssert*/ true
-          ));
+          VarInfo, Inst->hasDynamicLifetime(), Inst->emitReflectionMetadata(),
+          Inst->usesMoveableValueDebugInfo(),
+          /*skipVarDeclAssert*/ true, Inst->hasPointerEscape()));
 }
 
 template<typename ImplClass>
@@ -1397,8 +1397,7 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   auto *NewInst = getBuilder().createDebugValue(
       Inst->getLoc(), getOpValue(Inst->getOperand()), VarInfo,
-      Inst->poisonRefs(), Inst->getUsesMoveableValueDebugInfo(),
-      Inst->hasTrace());
+      Inst->poisonRefs(), Inst->usesMoveableValueDebugInfo(), Inst->hasTrace());
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
   recordClonedInstruction(Inst, NewInst);
 }

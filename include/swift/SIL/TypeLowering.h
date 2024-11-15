@@ -169,12 +169,6 @@ enum IsInfiniteType_t : bool {
   IsInfiniteType = true,
 };
 
-/// Does this type contain at least one non-trivial, non-eager-move type?
-enum IsLexical_t : bool {
-  IsNotLexical = false,
-  IsLexical = true,
-};
-
 /// Extended type information used by SIL.
 class TypeLowering {
 public:

@@ -144,7 +144,7 @@ func takeDictionaryPointer(_: UnsafePointer<Dictionary<Int, Int>>)
 // the test. The eagerMoveToPointer test below is sufficient.
 //
 // CHECK-LABEL: sil [stack_protection] @$s18pointer_conversion22dictionaryToRawPointeryyF : $@convention(thin) () -> () {
-// CHECK: [[A:%.*]] = alloc_stack $Dictionary<Int, Int>, var, name "d"
+// CHECK: [[A:%.*]] = alloc_stack [var_decl] $Dictionary<Int, Int>, var, name "d"
 // CHECK: [[PTR:%.*]] = address_to_pointer [stack_protection] [[A]] : $*Dictionary<Int, Int> to $Builtin.RawPointer
 // CHECK: [[UP:%.*]] = struct $UnsafeRawPointer ([[PTR]] : $Builtin.RawPointer)
 // CHECK: apply %{{.*}}([[UP]]) : $@convention(thin) (UnsafeRawPointer) -> ()
@@ -168,7 +168,7 @@ public func dictionaryToRawPointer() {
 // never sees those pointer uses. The pointer's scope must be
 // protected by a fix_lifetime.
 // CHECK-LABEL: sil [stack_protection] @$s18pointer_conversion18eagerMoveToPointer1oyyXln_tF : $@convention(thin) (@owned AnyObject) -> () {
-// CHECK: [[A:%.*]] = alloc_stack [moveable_value_debuginfo] $AnyObject, var, name "o"
+// CHECK: [[A:%.*]] = alloc_stack [var_decl] [moveable_value_debuginfo] $AnyObject, var, name "o"
 // CHECK: [[PTR:%.*]] = address_to_pointer [stack_protection] [[A]] : $*AnyObject to $Builtin.RawPointer
 // CHECK: [[UP:%.*]] = struct $UnsafePointer<AnyObject> ([[PTR]] : $Builtin.RawPointer)
 // CHECK: apply %{{.*}}([[UP]]) : $@convention(thin) (UnsafePointer<AnyObject>) -> ()
@@ -182,7 +182,7 @@ public func eagerMoveToPointer(@_eagerMove o: consuming AnyObject ) {
 }
 
 // CHECK-LABEL: sil [stack_protection] @$s18pointer_conversion15stringToPointer2ssySS_tF : $@convention(thin) (@guaranteed String) -> () {
-// CHECK:   [[A:%.*]] = alloc_stack $String, var, name "s"
+// CHECK:   [[A:%.*]] = alloc_stack [var_decl] $String, var, name "s"
 // CHECK:   [[PTR:%.*]] = address_to_pointer [stack_protection] [[A]] : $*String to $Builtin.RawPointer
 // CHECK:   [[UP:%.*]] = struct $UnsafePointer<String> ([[PTR]] : $Builtin.RawPointer)
 // CHECK:   apply {{.*}}([[UP]]) : $@convention(thin) (UnsafePointer<String>) -> ()
@@ -197,7 +197,7 @@ public func stringToPointer(ss: String) {
 }
 
 // CHECK-LABEL: sil [stack_protection] @$s18pointer_conversion19dictionaryToPointer2ddySDyS2iG_tF : $@convention(thin) (@guaranteed Dictionary<Int, Int>) -> () {
-// CHECK:   [[A:%.*]] = alloc_stack $Dictionary<Int, Int>, var, name "d"
+// CHECK:   [[A:%.*]] = alloc_stack [var_decl] $Dictionary<Int, Int>, var, name "d"
 // CHECK:   [[PTR:%.*]] = address_to_pointer [stack_protection] [[A]] : $*Dictionary<Int, Int> to $Builtin.RawPointer
 // CHECK:   [[UP:%.*]] = struct $UnsafePointer<Dictionary<Int, Int>> ([[PTR]] : $Builtin.RawPointer)
 // CHECK:   apply %{{.*}}([[UP]]) : $@convention(thin) (UnsafePointer<Dictionary<Int, Int>>) -> ()

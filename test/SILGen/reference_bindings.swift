@@ -30,8 +30,8 @@ func doSomething() {}
 
 // SIL: sil hidden @$s18reference_bindings13testBindToVaryyF : $@convention(thin) () -> () {
 // SIL: bb0:
-// SIL:   [[BOX:%.*]] = alloc_stack $Int, var, name "x"
-// SIL:   [[INOUT_BOX:%.*]] = alloc_stack $Int, var, name "x2"
+// SIL:   [[BOX:%.*]] = alloc_stack [var_decl] $Int, var, name "x"
+// SIL:   [[INOUT_BOX:%.*]] = alloc_stack [var_decl] $Int, var, name "x2"
 // SIL:   [[ACCESS:%.*]] = begin_access [modify] [static] [[BOX]]
 // SIL:   store {{%.*}} to [[INOUT_BOX]]
 // SIL:   [[FUNC:%.*]] = function_ref @$s18reference_bindings11doSomethingyyF : $@convention(thin) () -> ()
@@ -60,7 +60,7 @@ func testBindToVar() {
 
 // SIL-LABEL: sil hidden @$s18reference_bindings15testBindToInOutyySSzF : $@convention(thin) (@inout String) -> () {
 // SIL: bb0([[ARG:%.*]] : $*String):
-// SIL:   [[STACK:%.*]] = alloc_stack $String
+// SIL:   [[STACK:%.*]] = alloc_stack [var_decl] $String
 // SIL:   [[ACCESS:%.*]] = begin_access [modify] [static] [[ARG]]
 // SIL:   [[VAL:%.*]] = load [[ACCESS]]
 // SIL:   store [[VAL]] to [[STACK]]

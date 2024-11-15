@@ -77,7 +77,7 @@ public struct Container<each T> {
 // CHECK-LABEL: sil {{.*}}@$s4main9ContainerV7storageAA6StoredVyxGxQp_tvs
 // CHECK-SAME:    $@convention(method) <each T> (@pack_owned Pack{repeat Stored<each T>}, @inout Container<repeat each T>) -> () 
 //   Materialize the pack into a local tuple.
-// CHECK:         [[ARG_COPY:%.*]] = alloc_stack $(repeat Stored<each T>), let,
+// CHECK:         [[ARG_COPY:%.*]] = alloc_stack [var_decl] $(repeat Stored<each T>), let,
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each T}
@@ -120,7 +120,7 @@ struct Wrapper<Value> {
 func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T>) {
   // CHECK: [[RETURN_VAL:%.*]] : $*Pack{repeat Wrapper<each T>}
 
-  // CHECK: [[VAR:%.*]] = alloc_stack [lexical] $(repeat each T)
+  // CHECK: [[VAR:%.*]] = alloc_stack [lexical] [var_decl] $(repeat each T)
   let values = (repeat each value)
 
   // Create a temporary for the 'values' in 'each values'
@@ -167,7 +167,7 @@ func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T
 
 // CHECK-LABEL: sil hidden [ossa] @$s4main20projectTupleElementsyyAA7WrapperVyxGxQpRvzlF : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat Wrapper<each T>}) -> () {
 func projectTupleElements<each T>(_ value: repeat Wrapper<each T>) {
-  // CHECK: [[VAR:%.*]] = alloc_stack [lexical] $(repeat each T)
+  // CHECK: [[VAR:%.*]] = alloc_stack [lexical] [var_decl] $(repeat each T)
 
   // CHECK-NEXT: [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
   // CHECK-NEXT: [[ONE:%.*]] = integer_literal $Builtin.Word, 1

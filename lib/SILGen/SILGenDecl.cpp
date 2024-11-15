@@ -544,8 +544,8 @@ public:
     if (generateDebugInfo)
       DbgVar = SILDebugVariable(decl->isLet(), ArgNo);
     Box = SGF.B.createAllocBox(
-        decl, boxType, DbgVar, /*hasDynamicLifetime*/ false,
-        /*reflection*/ false, /*usesMoveableValueDebugInfo*/ false,
+        decl, boxType, DbgVar, DoesNotHaveDynamicLifetime,
+        /*reflection*/ false, DoesNotUseMoveableValueDebugInfo,
         !generateDebugInfo);
 
     // Mark the memory as uninitialized, so DI will track it for us.
@@ -566,9 +566,9 @@ public:
       //
       // Only add a lexical lifetime to the box if the the variable it stores
       // requires one.
-      Box = SGF.B.createBeginBorrow(
-          decl, Box, /*isLexical=*/lifetime.isLexical(),
-          /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
+      Box =
+          SGF.B.createBeginBorrow(decl, Box, IsLexical_t(lifetime.isLexical()),
+                                  DoesNotHavePointerEscape, IsFromVarDecl);
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
@@ -703,10 +703,11 @@ public:
       bool lexicalLifetimesEnabled =
           SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule());
       auto lifetime = SGF.F.getLifetime(vd, lowering->getLoweredType());
-      auto isLexical = lexicalLifetimesEnabled && lifetime.isLexical();
-      address =
-          SGF.emitTemporaryAllocation(vd, lowering->getLoweredType(),
-                                      /*hasDynamicLifetime=*/false, isLexical);
+      auto isLexical =
+          IsLexical_t(lexicalLifetimesEnabled && lifetime.isLexical());
+      address = SGF.emitTemporaryAllocation(vd, lowering->getLoweredType(),
+                                            DoesNotHaveDynamicLifetime,
+                                            isLexical, IsFromVarDecl);
       if (isUninitialized)
         address = SGF.B.createMarkUninitializedVar(vd, address);
       DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, *lowering);
@@ -775,7 +776,7 @@ public:
       // Then check if we have a pure move only type. In that case, we need to
       // insert a no implicit copy
       if (value->getType().isPureMoveOnly()) {
-        value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
+        value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
         return SGF.B.createMarkUnresolvedNonCopyableValueInst(
             PrologueLoc, value,
             MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -791,7 +792,7 @@ public:
       // move only wrapper and mark it as needing checking by the move cherk.
       value =
           SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
-      value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
+      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
       return SGF.B.createMarkUnresolvedNonCopyableValueInst(
           PrologueLoc, value,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -825,7 +826,7 @@ public:
     // types do not have no implicit copy attr on them.
     if (value->getOwnershipKind() == OwnershipKind::Owned &&
         value->getType().isPureMoveOnly()) {
-      value = SGF.B.createMoveValue(PrologueLoc, value, true /*isLexical*/);
+      value = SGF.B.createMoveValue(PrologueLoc, value, IsLexical);
       return SGF.B.createMarkUnresolvedNonCopyableValueInst(
           PrologueLoc, value,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -837,15 +838,14 @@ public:
     if (!vd->isNoImplicitCopy()) {
       return SGF.B.createBeginBorrow(
           PrologueLoc, value,
-          /*isLexical=*/SGF.F.getLifetime(vd, value->getType()).isLexical(),
-          /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
+          IsLexical_t(SGF.F.getLifetime(vd, value->getType()).isLexical()),
+          DoesNotHavePointerEscape, IsFromVarDecl);
     }
 
     // If we have a no implicit copy lexical, emit the instruction stream so
     // that the move checker knows to check this variable.
-    value = SGF.B.createBeginBorrow(
-        PrologueLoc, value,
-        /*isLexical*/ true, /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
+    value = SGF.B.createBeginBorrow(PrologueLoc, value, IsLexical,
+                                    DoesNotHavePointerEscape, IsFromVarDecl);
     value = SGF.B.createCopyValue(PrologueLoc, value);
     value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
     return SGF.B.createMarkUnresolvedNonCopyableValueInst(

@@ -121,7 +121,7 @@ public func useExternal() {
 // Call to a resilient function should not be specialized.
 
 // CHECK-LABEL: sil @$s1A20useExternalResilientyyF
-// CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK:  [[RES:%.*]] = alloc_stack [var_decl] $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External217externalResilientQryF : $@convention(thin) @substituted {{.*}} for <@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) __>
 // CHECK:  apply [[FUN]]([[RES]])
 // CHECK:  witness_method
@@ -229,7 +229,7 @@ func nonResilient() -> some ExternalP2 {
 }
 
 // CHECK-LABEL: sil @$s1A019usePairResilientNonC0yyF : $@convention(thin) () -> ()
-// CHECK: alloc_stack $Pair<MyInt64, @_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK: alloc_stack [var_decl] $Pair<MyInt64, @_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
 // CHECK: [[USEP:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
 // CHECK: [[FIRST_MYVALUE3:%.*]] = struct $Int64
 // CHECK: apply [[USEP]]([[FIRST_MYVALUE3]])
@@ -281,7 +281,7 @@ public func useExternalResilient2() {
 
 // In this case we should only 'peel' one layer of opaque archetypes.
 // CHECK-LABEL: sil @$s1A21useExternalResilient3yyF
-// CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK:  [[RES:%.*]] = alloc_stack [var_decl] $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External3031inlinableExternalResilientCallsD0QryF : $@convention(thin) @substituted {{.*}} for <@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) __>
 // CHECK:  apply [[FUN]]([[RES]])
 public func useExternalResilient3() {
@@ -313,7 +313,7 @@ public func testStoredProperty() {
 }
 
 // CHECK-LABEL: sil @$s1A21testResilientPropertyyyF
-// CHECK:   [[CONTAINER:%.*]] = alloc_stack $ResilientContainer
+// CHECK:   [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer
 // CHECK:   [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
 // CHECK:   [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV16computedPropertyQrvg
 // CHECK:   apply [[FUN]]([[RES]], [[CONTAINER]])
@@ -323,7 +323,7 @@ public func testResilientProperty() {
 }
 
 // CHECK-LABEL: sil @$s1A30testResilientInlinablePropertyyyF
-// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer
 // CHECK:  [[RES:%.*]] = alloc_stack $Int64
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV18inlineablePropertyQrvg
 // CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
@@ -333,7 +333,7 @@ public func testResilientInlinableProperty() {
 }
 
 // CHECK-LABEL: sil @$s1A31testResilientInlinableProperty3yyF
-// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer
 // CHECK:  [[RES:%.*]] = alloc_stack $Int64
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV19inlineableProperty2Qrvg
 // CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
@@ -343,7 +343,7 @@ public func testResilientInlinableProperty3() {
 }
 
 // CHECK-LABEL: sil @$s1A22testResilientProperty2yyF
-// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer2
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer2
 // CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External319ResilientContainer2V16computedPropertyQrvp", 0)
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V16computedPropertyQrvg
 // CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
@@ -354,7 +354,7 @@ public func testResilientProperty2() {
 
 // The inlinable property recursively calls an resilient property 'peel' one layer of opaque archetypes.
 // CHECK-LABEL: sil @$s1A31testResilientInlinableProperty2yyF
-// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer2
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer2
 // CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V18inlineablePropertyQrvg
 // CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
@@ -364,7 +364,7 @@ public func testResilientInlinableProperty2() {
 }
 
 // CHECK-LABEL: sil @$s1A035testResilientInlinablePropertyCallsbC0yyF : $@convention(thin) () -> () {
-// CHECK:   [[CONTAINTER:%.*]] = alloc_stack $ResilientContainer2
+// CHECK:   [[CONTAINTER:%.*]] = alloc_stack [var_decl] $ResilientContainer2
 // CHECK:   [[RES:%.*]] = alloc_stack $Int64
 // CHECK:   [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V023inlineablePropertyCallsB10InlineableQrvg
 // CHECK:  apply [[FUN]]([[RES]], [[CONTAINTER]])
@@ -386,7 +386,7 @@ public func testResilientInlinablePropertyCallsResilientInlinable() {
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV26eagerMoveInlineableContextyyF'
 
 // RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV17inlineableContextyyF
-// RESILIENT:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
+// RESILIENT:  [[RES:%.*]] = alloc_stack [var_decl] $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
 // RESILIENT:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV16computedPropertyQrvg
 // RESILIENT:  apply [[FUN]]([[RES]], %0)
 

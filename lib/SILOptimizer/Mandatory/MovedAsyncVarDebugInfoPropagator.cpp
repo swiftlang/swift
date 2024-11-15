@@ -97,7 +97,7 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original, SILBasicBlock *block) {
       original.getOperandForDebugValueClone()->getType(), block->getModule());
   return builder.createDebugValue(original->getLoc(), undef,
                                   *original.getVarInfo(), false,
-                                  true /*was moved*/);
+                                  UsesMoveableValueDebugInfo);
 }
 
 static DebugVarCarryingInst
@@ -110,7 +110,7 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original,
                     insertPt->getModule());
   return builder.createDebugValue(original->getLoc(), undef,
                                   *original.getVarInfo(), false,
-                                  true /*was moved*/);
+                                  UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
@@ -122,7 +122,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, true /*was moved*/);
+      *original.getVarInfo(), false, UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
@@ -134,7 +134,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, true /*was moved*/);
+      *original.getVarInfo(), false, UsesMoveableValueDebugInfo);
 }
 
 namespace {

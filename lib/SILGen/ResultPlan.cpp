@@ -198,7 +198,7 @@ public:
                       boxLayout,
                       layoutSubs));
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      resultBox = SGF.B.createBeginBorrow(loc, resultBox, /*isLexical=*/true);
+      resultBox = SGF.B.createBeginBorrow(loc, resultBox, IsLexical);
     }
 
     // Complete the cleanup to deallocate this buffer later, after we're
@@ -1076,9 +1076,8 @@ public:
     // Allocate a temporary.
     // It's flagged with "hasDynamicLifetime" because it's not possible to
     // statically verify the lifetime of the value.
-    SILValue errorTemp =
-        SGF.emitTemporaryAllocation(loc, errorTL.getLoweredType(),
-                                    /*hasDynamicLifetime*/ true);
+    SILValue errorTemp = SGF.emitTemporaryAllocation(
+        loc, errorTL.getLoweredType(), HasDynamicLifetime);
 
     // Nil-initialize it.
     SGF.emitInjectOptionalNothingInto(loc, errorTemp, errorTL);

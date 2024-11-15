@@ -48,7 +48,7 @@ struct A {
 
 // CHECK-LABEL: sil hidden @$s10addressors5test0yyF : $@convention(thin) () -> () {
 func test0() {
-// CHECK: [[A:%.*]] = alloc_stack $A
+// CHECK: [[A:%.*]] = alloc_stack [var_decl] $A
 // CHECK: [[T1:%.*]] = metatype $@thin A.Type
 // CHECK: [[T0:%.*]] = function_ref @$s10addressors1AV{{[_0-9a-zA-Z]*}}fC
 // CHECK: [[AVAL:%.*]] = apply [[T0]]([[T1]]) 
