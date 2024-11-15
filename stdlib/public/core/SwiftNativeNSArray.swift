@@ -165,14 +165,14 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
   @objc(objectAtIndexedSubscript:)
   @_effects(readonly)
   dynamic internal func objectAtSubscript(_ index: Int) -> Unmanaged<AnyObject> {
-    //TODO: exception instead of precondition, once that's possible
+    // TODO: exception instead of precondition, once that's possible
     return Unmanaged.passUnretained(contents[index])
   }
 
   @objc(objectAtIndex:)
   @_effects(readonly)
   dynamic internal func objectAt(_ index: Int) -> Unmanaged<AnyObject> {
-    //TODO: exception instead of precondition, once that's possible
+    // TODO: exception instead of precondition, once that's possible
     return Unmanaged.passUnretained(contents[index])
   }
 
@@ -180,7 +180,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
     _ aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
   ) {
     return contents.withContiguousStorageIfAvailable { objects in
-      //TODO: exceptions instead of preconditions, once that's possible
+      // TODO: exceptions instead of preconditions, once that's possible
 
       _precondition(
         _isValidArrayIndex(range.location, count: objects.count),
