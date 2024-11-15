@@ -2,12 +2,12 @@
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
-// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:   -parse-stdlib -module-name Swift
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 @_marker public protocol Escapable {}

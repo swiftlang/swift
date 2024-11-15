@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature NonescapableTypes) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature NonescapableTypes) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all ) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all ) | %FileCheck %s
 
 // REQUIRES: executable_test, asserts
 
@@ -7,7 +7,6 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // REQUIRES: rdar125805695
-// REQUIRES: swift_feature_NonescapableTypes
 
 protocol P {
   func speak()

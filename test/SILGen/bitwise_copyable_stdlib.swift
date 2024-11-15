@@ -1,4 +1,4 @@
-// R N: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DEMPTY -emit-sil -verify %s
+// R N: %target-swift-frontend  -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DEMPTY -emit-sil -verify %s
 
 // RUN: %target-swift-frontend                               \
 // RUN:     -emit-sil                                        \
@@ -7,11 +7,9 @@
 // RUN:     -module-name Swift                               \
 // RUN:     -disable-availability-checking                   \
 // RUN:     -enable-experimental-feature BuiltinModule       \
-// RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN:     -enable-builtin-module
 
 // REQUIRES: swift_feature_BuiltinModule
-// REQUIRES: swift_feature_NonescapableTypes
 
 // Force verification of TypeLowering's isTrivial.
 
