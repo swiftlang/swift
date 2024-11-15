@@ -103,14 +103,9 @@ struct BridgedConsumedLookupResult {
   SWIFT_NAME("flag")
   SwiftInt Flag;
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedConsumedLookupResult(swift::Identifier name,
-                              swift::SourceLoc sourceLoc, SwiftInt flag)
-      : Name(BridgedIdentifier(name)), NameLoc(BridgedSourceLoc(sourceLoc)),
-        Flag(flag) {}
-#endif
-  
-  BridgedConsumedLookupResult(void*_Nullable, void*_Nullable, int); // DO NOT CALL
+  BRIDGED_INLINE BridgedConsumedLookupResult(swift::Identifier name,
+                                             swift::SourceLoc sourceLoc,
+                                             SwiftInt flag);
 };
 
 class BridgedDeclBaseName {
