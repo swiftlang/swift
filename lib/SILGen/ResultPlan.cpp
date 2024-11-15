@@ -782,6 +782,7 @@ public:
       SGF.emitApplyOfLibraryIntrinsic(loc, createIntrinsic, subs,
                                       {continuationMV}, SGFContext())
           .forwardInto(SGF, loc, underlyingInit.get());
+      SGF.enterDestroyCleanup(underlyingContinuationAddr);
     } else {
       SGF.B.createStore(loc, wrappedContinuation, underlyingContinuationAddr,
                         StoreOwnershipQualifier::Trivial);
