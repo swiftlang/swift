@@ -15,7 +15,24 @@ func testit(_ arr: inout [Int]) {
 var a = [27]
 testit(&a)
 
+// Second test case:
+var gg = ""
+
+@inline(never)
+func use(_ s: String) {
+  gg = s
+}
+
+func testLoop() {
+  let a = [""]
+
+  for _ in 0..<1000 {
+    use(a[0])
+  }
+}
+
 // As a bonus, also check if the code works as expected.
 // CHECK: [27, 28]
 print(a)
 
+testLoop()
