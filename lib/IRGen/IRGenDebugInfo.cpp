@@ -347,6 +347,12 @@ private:
   /// Convert a SILLocation into the corresponding LLVM Loc.
   FileAndLocation computeLLVMLoc(const SILDebugScope *DS, SILLocation Loc);
 
+  /// Compute the LLVM DebugLoc when targeting CodeView. In CodeView, zero is
+  /// not an artificial line location; attempt to avoid those line locations near
+  /// user code to reduce the number of breaks in the linetables.
+  FileAndLocation computeLLVMLocCodeView(const SILDebugScope *DS,
+                                         SILLocation Loc);
+
   static StringRef getFilenameFromDC(const DeclContext *DC) {
     if (auto *LF = dyn_cast<LoadedFile>(DC))
       return LF->getFilename();
@@ -2618,10 +2624,20 @@ bool IRGenDebugInfoImpl::lineEntryIsSane(FileAndLocation DL,
 #endif
 
 IRGenDebugInfoImpl::FileAndLocation
+IRGenDebugInfoImpl::computeLLVMLocCodeView(const SILDebugScope *DS,
+                                           SILLocation Loc) {
+  // If the scope has not changed and the line number is either zero or
+  // artificial, we want to keep the most recent debug location.
+  if (DS == LastScope &&
+      (Loc.is<ArtificialUnreachableLocation>() || Loc.isLineZero(SM)))
+    return LastFileAndLocation;
+
+  // Decode the location.
+  return decodeFileAndLocation(Loc);
+}
+
+IRGenDebugInfoImpl::FileAndLocation
 IRGenDebugInfoImpl::computeLLVMLoc(const SILDebugScope *DS, SILLocation Loc) {
-  // NOTE: In CodeView, zero is not an artificial line location. We try to
-  //       avoid those line locations near user code to reduce the number
-  //       of breaks in the linetables.
   SILFunction *Fn = DS->getInlinedFunction();
   if (Fn && (Fn->isThunk() || Fn->isTransparent()))
     return {0, 0, CompilerGeneratedFile};
@@ -2631,24 +2647,14 @@ IRGenDebugInfoImpl::computeLLVMLoc(const SILDebugScope *DS, SILLocation Loc) {
   if (DS == LastScope && Loc.isHiddenFromDebugInfo())
     return LastFileAndLocation;
 
-  // If the scope has not changed and the line number is either zero or
-  // artificial, we want to keep the most recent debug location.
-  if (DS == LastScope &&
-      (Loc.is<ArtificialUnreachableLocation>() || Loc.isLineZero(SM)) &&
-      Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
-    return LastFileAndLocation;
+  if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
+    return computeLLVMLocCodeView(DS, Loc);
 
-  FileAndLocation L;
-  // Decode the location.
-  if (!Loc.isInPrologue() ||
-      Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
-    L = decodeFileAndLocation(Loc);
+  FileAndLocation L =
+      Loc.isInPrologue() ? FileAndLocation() : decodeFileAndLocation(Loc);
 
-  // Otherwise use a line 0 artificial location, but the file from the
-  // location. If we are emitting CodeView, we do not want to use line zero
-  // since it does not represent an artificial line location.
-  if (Loc.isHiddenFromDebugInfo() &&
-      Opts.DebugInfoFormat != IRGenDebugInfoFormat::CodeView) {
+  // Otherwise use a line 0 artificial location, but the file from the location.
+  if (Loc.isHiddenFromDebugInfo()) {
     L.Line = 0;
     L.Column = 0;
   }
