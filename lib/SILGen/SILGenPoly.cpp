@@ -7230,8 +7230,7 @@ void SILGenFunction::emitProtocolWitness(
     auto deallocCleanup = std::get<3>(tokenAndCleanups);
 
     YieldInfo witnessYieldInfo(SGM, witness, witnessFTy, witnessSubs);
-    YieldInfo reqtYieldInfo(SGM, requirement, thunkTy,
-                            reqtSubs.subst(getForwardingSubstitutionMap()));
+    YieldInfo reqtYieldInfo(SGM, requirement, thunkTy, reqtSubs);
 
     translateYields(*this, loc, witnessYields, witnessYieldInfo, reqtYieldInfo);
 
