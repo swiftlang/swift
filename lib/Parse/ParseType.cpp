@@ -588,23 +588,9 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
 ///   pack-expansion-type:
 ///     type-scalar '...'
 ///
-/// \param fromASTGen If true , this function in called from ASTGen as the
-/// fallback, so do not attempt a callback to ASTGen.
-ParserResult<TypeRepr>
-Parser::parseType(Diag<> MessageID, ParseTypeReason reason, bool fromASTGen) {
+ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
+                                         ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
-
-#if SWIFT_BUILD_SWIFT_SYNTAX
-  if (IsForASTGen && !fromASTGen) {
-    ty = parseTypeReprFromSyntaxTree();
-    // Note: there is a representational difference between the swift-syntax
-    // tree and the C++ parser tree regarding variadic parameters. In the
-    // swift-syntax tree, the ellipsis is part of the parameter declaration.
-    // In the C++ parser tree, the ellipsis is part of the type. Account for
-    // this difference by consuming the ellipsis here.
-    goto AFTER_TY_PARSE;
-  }
-#endif
 
   // Parse pack expansion 'repeat T'
   if (Tok.is(tok::kw_repeat)) {
@@ -626,7 +612,6 @@ Parser::parseType(Diag<> MessageID, ParseTypeReason reason, bool fromASTGen) {
 
   ty = parseTypeScalar(MessageID, reason);
 
-AFTER_TY_PARSE:
   if (ty.isNull())
     return ty;
 
@@ -1475,8 +1460,7 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue() {
 }
 
 ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
-                                                ParseTypeReason reason,
-                                                bool fromASTGen) {
+                                                ParseTypeReason reason) {
   // Eat any '-' preceding integer literals.
   SourceLoc minusLoc;
   if (Tok.isMinus() && peekToken().is(tok::integer_literal)) {
@@ -1492,7 +1476,7 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
   }
 
   // Otherwise, attempt to parse a regular type.
-  return parseType(MessageID, reason, fromASTGen);
+  return parseType(MessageID, reason);
 }
 
 //===----------------------------------------------------------------------===//

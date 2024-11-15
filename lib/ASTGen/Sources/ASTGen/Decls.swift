@@ -51,11 +51,12 @@ extension ASTGenVisitor {
     case .macroExpansionDecl(let node):
       return self.generate(macroExpansionDecl: node).asDecl
     case .missingDecl:
-      break
+      fatalError("unimplemented")
     case .operatorDecl(let node):
       return self.generate(operatorDecl: node)?.asDecl
     case .poundSourceLocation:
-      break
+      // #sourceLocation directives are handled elsewhere, ignore.
+      return nil
     case .precedenceGroupDecl(let node):
       return self.generate(precedenceGroupDecl: node)?.asDecl
     case .protocolDecl(let node):
@@ -69,7 +70,6 @@ extension ASTGenVisitor {
     case .variableDecl(let node):
       return self.generate(variableDecl: node).asDecl
     }
-    return self.generateWithLegacy(node)
   }
 
   func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl? {

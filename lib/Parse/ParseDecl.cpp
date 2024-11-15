@@ -6089,21 +6089,9 @@ static Parser::ParseDeclOptions getParseDeclOptions(DeclContext *DC) {
 ///     decl-import
 ///     decl-operator
 /// \endverbatim
-///
-/// \param fromASTGen If true , this function in called from ASTGen as the
-/// fallback, so do not attempt a callback to ASTGen.
 ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
                                bool IfConfigsAreDeclAttrs,
-                               llvm::function_ref<void(Decl *)> Handler,
-                               bool fromASTGen) {
-#if SWIFT_BUILD_SWIFT_SYNTAX
-  if (IsForASTGen && !fromASTGen) {
-    auto result = parseDeclFromSyntaxTree();
-    if (auto resultDecl = result.getPtrOrNull())
-      Handler(resultDecl);
-    return result;
-  }
-#endif
+                               llvm::function_ref<void(Decl *)> Handler) {
   ParseDeclOptions Flags = getParseDeclOptions(CurDeclContext);
   ParserPosition BeginParserPosition;
   if (isIDEInspectionFirstPass())

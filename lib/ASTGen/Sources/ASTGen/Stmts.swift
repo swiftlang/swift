@@ -50,7 +50,7 @@ extension ASTGenVisitor {
     case .labeledStmt(let node):
       return self.generate(labeledStmt: node)
     case .missingStmt:
-      break
+      fatalError("unimplemented")
     case .repeatStmt(let node):
       return self.generate(repeatStmt: node).asStmt
     case .returnStmt(let node):
@@ -64,7 +64,6 @@ extension ASTGenVisitor {
     case .yieldStmt(let node):
       return self.generate(yieldStmt: node).asStmt
     }
-    return self.generateWithLegacy(node)
   }
 
   func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode? {
