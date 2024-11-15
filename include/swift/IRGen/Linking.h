@@ -359,14 +359,14 @@ class LinkEntity {
     BaseConformanceDescriptor,
 
     /// A global function pointer for dynamically replaceable functions.
-    /// The pointer is a AbstractStorageDecl*.
+    /// The pointer is a AbstractFunctionDecl*.
     DynamicallyReplaceableFunctionVariableAST,
 
-    /// The pointer is a AbstractStorageDecl*.
+    /// The pointer is a AbstractFunctionDecl*.
     DynamicallyReplaceableFunctionKeyAST,
 
     /// The original implementation of a dynamically replaceable function.
-    /// The pointer is a AbstractStorageDecl*.
+    /// The pointer is a AbstractFunctionDecl*.
     DynamicallyReplaceableFunctionImpl,
 
     /// The once token used by cacheCanonicalSpecializedMetadata, by way of
@@ -1473,6 +1473,11 @@ public:
     return reinterpret_cast<ExtensionDecl*>(Pointer);
   }
 
+  const AbstractStorageDecl *getAbstractStorageDecl() const {
+    assert(getKind() == Kind::PropertyDescriptor);
+    return reinterpret_cast<AbstractStorageDecl *>(Pointer);
+  }
+
   const PointerUnion<DeclContext *, VarDecl *> getAnonymousDeclContext() const {
     assert(getKind() == Kind::AnonymousDescriptor);
     return PointerUnion<DeclContext *, VarDecl *>
@@ -1631,6 +1636,9 @@ public:
            getKind() == Kind::DispatchThunkInitializer ||
            getKind() == Kind::DispatchThunkAllocator ||
            getKind() == Kind::DispatchThunkDerivative;
+  }
+  bool isPropertyDescriptor() const {
+    return getKind() == Kind::PropertyDescriptor;
   }
   bool isNominalTypeDescriptor() const {
     return getKind() == Kind::NominalTypeDescriptor;

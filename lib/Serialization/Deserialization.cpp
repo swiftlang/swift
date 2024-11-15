@@ -6360,7 +6360,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         }
 
         introducedDeclNames = introducedDeclNames.slice(numNames);
-        SmallVector<TypeExpr *, 1> conformances;
+        SmallVector<Expr *, 1> conformances;
         for (TypeID conformanceID : introducedDeclNames) {
           auto conformance = MF.getTypeChecked(conformanceID);
           if (!conformance) {

@@ -12,12 +12,13 @@
 
 #define DEBUG_TYPE "sil-dce"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
@@ -158,6 +159,8 @@ class DCE {
   bool CallsChanged = false;
 
   bool precomputeControlInfo();
+  /// Populates borrow dependencies and disables DCE if needed.
+  void processBorrow(BorrowedValue borrow);
   void markLive();
   /// Record a reverse dependency from \p from to \p to meaning \p to is live
   /// if \p from is also live.
@@ -252,6 +255,49 @@ static BuiltinInst *getProducer(CondFailInst *CFI) {
   return nullptr;
 }
 
+void DCE::processBorrow(BorrowedValue borrow) {
+  // Populate guaranteedPhiDependencies for this borrow
+  findGuaranteedPhiDependencies(borrow);
+  if (!borrow.hasReborrow()) {
+    return;
+  }
+
+  // If the borrow was not computed from another
+  // borrow, return.
+  SILValue baseValue;
+  if (auto *beginBorrow = dyn_cast<BeginBorrowInst>(*borrow)) {
+    auto borrowOp = beginBorrow->getOperand();
+    if (borrowOp->getOwnershipKind() != OwnershipKind::Guaranteed) {
+      return;
+    }
+    baseValue = borrowOp;
+  } else {
+    auto *loadBorrow = cast<LoadBorrowInst>(*borrow);
+    auto accessBase = AccessBase::compute(loadBorrow->getOperand());
+    if (!accessBase.isReference()) {
+      return;
+    }
+    baseValue = accessBase.getReference();
+  }
+  // If the borrow was computed from another
+  // borrow, disable DCE of the outer borrow.
+  // This is because, when a reborrow is dead, DCE has to insert
+  // end_borrows in predecessor blocks and it cannot yet handle borrow
+  // nesting.
+  // TODO: Instead of disabling DCE of outer borrow, consider inserting
+  // end_borrows inside-out.
+  SmallVector<SILValue, 4> roots;
+  findGuaranteedReferenceRoots(baseValue,
+                               /*lookThroughNestedBorrows=*/false, roots);
+  // Visit the end_borrows of all the borrow scopes that this
+  // begin_borrow could be borrowing, and mark them live.
+  for (auto root : roots) {
+    visitTransitiveEndBorrows(root, [&](EndBorrowInst *endBorrow) {
+      markInstructionLive(endBorrow);
+    });
+  }
+}
+
 // Determine which instructions from this function we need to keep.
 void DCE::markLive() {
   // Find the initial set of instructions in this function that appear
@@ -327,32 +373,12 @@ void DCE::markLive() {
       }
       case SILInstructionKind::BeginBorrowInst: {
         auto *borrowInst = cast<BeginBorrowInst>(&I);
-        // Populate guaranteedPhiDependencies for this borrowInst
-        findGuaranteedPhiDependencies(BorrowedValue(borrowInst));
-        auto disableBorrowDCE = [&](SILValue borrow) {
-          visitTransitiveEndBorrows(borrow, [&](EndBorrowInst *endBorrow) {
-            markInstructionLive(endBorrow);
-          });
-        };
-        // If we have a begin_borrow of a @guaranteed operand, disable DCE'ing
-        // of parent borrow scopes. Dead reborrows needs complex handling, which
-        // is why it is disabled for now.
-        if (borrowInst->getOperand()->getOwnershipKind() ==
-            OwnershipKind::Guaranteed) {
-          SmallVector<SILValue, 4> roots;
-          findGuaranteedReferenceRoots(borrowInst->getOperand(),
-                                       /*lookThroughNestedBorrows=*/false,
-                                       roots);
-          // Visit the end_borrows of all the borrow scopes that this
-          // begin_borrow could be borrowing, and mark them live.
-          for (auto root : roots) {
-            disableBorrowDCE(root);
-          }
-        }
+        processBorrow(BorrowedValue(borrowInst));
         break;
       }
       case SILInstructionKind::LoadBorrowInst: {
-        findGuaranteedPhiDependencies(BorrowedValue(cast<LoadBorrowInst>(&I)));
+        auto *loadBorrowInst = cast<LoadBorrowInst>(&I);
+        processBorrow(BorrowedValue(loadBorrowInst));
         break;
       }
       default:

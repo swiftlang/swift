@@ -619,6 +619,10 @@ replaceBeginApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc,
   // Forward the token.
   oldBAI->getTokenResult()->replaceAllUsesWith(newBAI->getTokenResult());
 
+  if (auto *allocation = oldBAI->getCalleeAllocationResult()) {
+    allocation->replaceAllUsesWith(newBAI->getCalleeAllocationResult());
+  }
+
   auto oldYields = oldBAI->getYieldedValues();
   auto newYields = newBAI->getYieldedValues();
   assert(oldYields.size() == newYields.size());

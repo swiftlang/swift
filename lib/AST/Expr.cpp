@@ -1633,9 +1633,12 @@ Expr *DefaultArgumentExpr::getCallerSideDefaultExpr() const {
   assert(isCallerSide());
   auto &ctx = DefaultArgsOwner.getDecl()->getASTContext();
   auto *mutableThis = const_cast<DefaultArgumentExpr *>(this);
-  return evaluateOrDefault(ctx.evaluator,
+  if (auto result = evaluateOrDefault(ctx.evaluator,
                            CallerSideDefaultArgExprRequest{mutableThis},
-                           new (ctx) ErrorExpr(getSourceRange(), getType()));
+                           nullptr))
+    return result;
+
+  return new (ctx) ErrorExpr(getSourceRange(), getType());
 }
 
 ActorIsolation

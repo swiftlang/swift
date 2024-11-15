@@ -91,6 +91,7 @@ def main():
                 #   ) | rg -o -r '$3 $2' -- ' ((-[\w-]+),)? (-[\w-]+) <' \
                 #     | sed 's/ *$//' | tr ' ' '\n' \
                 #     | sort | uniq \
+                #     | grep -v -e '-c$' \
                 #     | sed -E 's/(.*)/"\1",/'
                 "--analyzer-output",
                 "--build-system",
@@ -160,7 +161,6 @@ def main():
                 "-batch-scan-input-file",
                 "-blocklist-file",
                 "-build-id",
-                "-c",
                 "-cache-replay-prefix-map",
                 "-cas-path",
                 "-cas-plugin-option",
@@ -339,6 +339,8 @@ def main():
             ]
             # Heuristic: options ending in -path expect an argument
             if arg.startswith("-") and arg.endswith("-path"):
+                is_arg_param = True
+            if arg == "-c" and args[0] == "swift":
                 is_arg_param = True
 
         # Print 2 new lines after each command line
