@@ -22,6 +22,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -504,6 +505,8 @@ enum class CxxEscapability { Escapable, NonEscapable, Unknown };
 
 struct EscapabilityLookupDescriptor final {
   const clang::Type *type;
+  ClangImporter::Implementation &impl;
+  bool annotationOnly = true;
 
   friend llvm::hash_code hash_value(const EscapabilityLookupDescriptor &desc) {
     return llvm::hash_combine(desc.type);
@@ -511,7 +514,7 @@ struct EscapabilityLookupDescriptor final {
 
   friend bool operator==(const EscapabilityLookupDescriptor &lhs,
                          const EscapabilityLookupDescriptor &rhs) {
-    return lhs.type == rhs.type;
+    return lhs.type == rhs.type && lhs.annotationOnly == rhs.annotationOnly;
   }
 
   friend bool operator!=(const EscapabilityLookupDescriptor &lhs,
