@@ -69,7 +69,7 @@ class Target {
   var crashingThread: TargetThread.ThreadID
 
   var task: task_t
-  var images: [Backtrace.Image] = []
+  var images: ImageMap
 
   var threads: [TargetThread] = []
   var crashingThreadNdx: Int = -1
@@ -193,7 +193,7 @@ class Target {
 
     mcontext = mctx
 
-    images = Backtrace.captureImages(for: task)
+    images = ImageMap.capture(for: task)
 
     fetchThreads(limit: limit, top: top, cache: cache, symbolicate: symbolicate)
   }

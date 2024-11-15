@@ -327,3 +327,6 @@ Backtraces are stored internally in a format called :download:`Compact Backtrace
 Format <CompactBacktraceFormat.md>`.  This provides us with a way to store a
 large number of frames in a much smaller space than would otherwise be possible.
 
+Similarly, where we need to store address to image mappings, we
+use :download:`Compact ImageMap Format <CompactImageMapFormat.md>` to minimise
+storage requirements.

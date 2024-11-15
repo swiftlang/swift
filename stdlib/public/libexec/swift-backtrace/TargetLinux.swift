@@ -52,7 +52,7 @@ class Target {
   var faultAddress: Address
   var crashingThread: TargetThread.ThreadID
 
-  var images: [Backtrace.Image] = []
+  var images: ImageMap
 
   var threads: [TargetThread] = []
   var crashingThreadNdx: Int = -1
@@ -133,8 +133,7 @@ class Target {
     signal = crashInfo.signal
     faultAddress = crashInfo.fault_address
 
-    images = Backtrace.captureImages(using: reader,
-                                     forProcess: Int(pid))
+    images = ImageMap.capture(using: reader, forProcess: Int(pid))
 
     do {
       try fetchThreads(threadListHead: Address(crashInfo.thread_list),

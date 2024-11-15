@@ -16,23 +16,15 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-internal import Darwin
-#elseif os(Windows)
-internal import ucrt
-#elseif canImport(Glibc)
-internal import Glibc
-#elseif canImport(Musl)
-internal import Musl
-#endif
-
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-internal import BacktracingImpl.OS.Darwin
-#endif
-
-#if os(Linux)
-internal import BacktracingImpl.ImageFormats.Elf
-#endif
+// #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+// internal import Darwin
+// #elseif os(Windows)
+// internal import ucrt
+// #elseif canImport(Glibc)
+// internal import Glibc
+// #elseif canImport(Musl)
+// internal import Musl
+// #endif
 
 /// Holds a backtrace.
 public struct Backtrace: CustomStringConvertible, Sendable {
@@ -45,8 +37,8 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   /// This is intentionally _not_ a pointer, because you shouldn't be
   /// dereferencing them; they may refer to some other process, for
   /// example.
-  public struct Address: Hashable, Codable, Sendable {
-    enum Representation: Hashable, Codable, Sendable {
+  public struct Address: Hashable, Sendable {
+    enum Representation: Hashable, Sendable {
       case null
       case sixteenBit(UInt16)
       case thirtyTwoBit(UInt32)
@@ -253,8 +245,8 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   /// Some backtracing algorithms may require this information, in which case
   /// it will be filled in by the `capture()` method.  Other algorithms may
   /// not, in which case it will be `nil` and you can capture an image list
-  /// separately yourself using `captureImages()`.
-  public var images: [Image]?
+  /// separately yourself using `ImageMap.capture()`.
+  public var images: ImageMap?
 
   /// Capture a backtrace from the current program location.
   ///
@@ -284,10 +276,10 @@ public struct Backtrace: CustomStringConvertible, Sendable {
                              limit: Int? = 64,
                              offset: Int = 0,
                              top: Int = 16,
-                             images: [Image]? = nil) throws -> Backtrace {
+                             images: ImageMap? = nil) throws -> Backtrace {
     #if os(Linux)
     // On Linux, we need the captured images to resolve async functions
-    let theImages = images ?? captureImages()
+    let theImages = images ?? ImageMap.capture()
     #else
     let theImages = images
     #endif
@@ -303,18 +295,6 @@ public struct Backtrace: CustomStringConvertible, Sendable {
                   offset: offset + 1,
                   top: top)
     }
-  }
-
-  /// Capture a list of the images currently mapped into the calling
-  /// process.
-  ///
-  /// @returns A list of `Image`s.
-  public static func captureImages() -> [Image] {
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    return captureImages(for: mach_task_self())
-    #else
-    return captureImages(using: UnsafeLocalMemoryReader())
-    #endif
   }
 
   /// Specifies options for the `symbolicated` method.
@@ -353,7 +333,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   ///            used; otherwise we will capture images at this point.
   ///
   /// - options: Symbolication options; see `SymbolicationOptions`.
-  public func symbolicated(with images: [Image]? = nil,
+  public func symbolicated(with images: ImageMap? = nil,
                            options: SymbolicationOptions = .default)
     -> SymbolicatedBacktrace? {
     return SymbolicatedBacktrace.symbolicate(
@@ -391,9 +371,10 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   }
 
   /// Initialise a Backtrace from a sequence of `RichFrame`s
-  init<Address: FixedWidthInteger>(architecture: String,
+  @_spi(Internal)
+  public init<Address: FixedWidthInteger>(architecture: String,
        frames: some Sequence<RichFrame<Address>>,
-       images: [Image]?) {
+       images: ImageMap?) {
     self.architecture = architecture
     self.representation = Array(CompactBacktraceFormat.Encoder(frames))
     self.images = images
@@ -403,20 +384,26 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 // -- Capture Implementation -------------------------------------------------
 
 extension Backtrace {
+
+  // ###FIXME: There is a problem with @_specialize here that results in the
+  //           arguments not lining up properly when this gets used from
+  //           swift-backtrace.
+
   @_spi(Internal)
-  @_specialize(exported: true, kind: full, where Ctx == HostContext, Rdr == UnsafeLocalMemoryReader)
-  @_specialize(exported: true, kind: full, where Ctx == HostContext, Rdr == RemoteMemoryReader)
-  #if os(Linux)
-  @_specialize(exported: true, kind: full, where Ctx == HostContext, Rdr == MemserverMemoryReader)
-  #endif
+  //@_specialize(exported: true, kind: full, where Ctx == HostContext, Rdr == UnsafeLocalMemoryReader)
+  //@_specialize(exported: true, kind: full, where Ctx == HostContext, Rdr == RemoteMemoryReader)
+  //#if os(Linux)
+  //@_specialize(exported: true, kind: full, where Ctx == HostContext, Rdr == MemserverMemoryReader)
+  //#endif
+  @inlinable
   public static func capture<Ctx: Context, Rdr: MemoryReader>(
     from context: Ctx,
     using memoryReader: Rdr,
-    images: [Image]?,
+    images: ImageMap?,
     algorithm: UnwindAlgorithm,
-    limit: Int?,
-    offset: Int,
-    top: Int
+    limit: Int? = 64,
+    offset: Int = 0,
+    top: Int = 16
   ) throws -> Backtrace {
     switch algorithm {
       // All of them, for now, use the frame pointer unwinder.  In the long
@@ -428,6 +415,8 @@ extension Backtrace {
                                memoryReader: memoryReader)
 
         if let limit = limit {
+          print("limit = \(limit), offset = \(offset), top = \(top)")
+
           let limited = LimitSequence(unwinder,
                                       limit: limit,
                                       offset: offset,
@@ -439,160 +428,8 @@ extension Backtrace {
         }
 
         return Backtrace(architecture: context.architecture,
-                         frames: unwinder,
+                         frames: unwinder.dropFirst(offset),
                          images: images)
     }
   }
 }
-
-// -- Darwin -----------------------------------------------------------------
-
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-extension Backtrace {
-
-  private static func withDyldProcessInfo<T>(for task: task_t,
-                                             fn: (OpaquePointer?) throws -> T)
-    rethrows -> T {
-    var kret = kern_return_t(KERN_SUCCESS)
-    let dyldInfo = _dyld_process_info_create(task, 0, &kret)
-
-    if kret != KERN_SUCCESS {
-      fatalError("error: cannot create dyld process info")
-    }
-
-    defer {
-      _dyld_process_info_release(dyldInfo)
-    }
-
-    return try fn(dyldInfo)
-  }
-
-  @_spi(Internal)
-  public static func captureImages(for process: Any) -> [Image] {
-    var images: [Image] = []
-    let task = process as! task_t
-
-    withDyldProcessInfo(for: task) { dyldInfo in
-      _dyld_process_info_for_each_image(dyldInfo) {
-        (machHeaderAddress, uuid, path) in
-
-        if let path = path, let uuid = uuid {
-          let pathString = String(cString: path)
-          let theUUID = Array(UnsafeBufferPointer(start: uuid,
-                                                  count: MemoryLayout<uuid_t>.size))
-          let name: String
-          if let slashIndex = pathString.lastIndex(of: "/") {
-            name = String(pathString.suffix(from:
-                                              pathString.index(after:slashIndex)))
-          } else {
-            name = pathString
-          }
-
-          // Find the end of the __TEXT segment
-          var endOfText = machHeaderAddress + 4096
-
-          _dyld_process_info_for_each_segment(dyldInfo, machHeaderAddress) {
-            address, size, name in
-
-            if let name = String(validatingCString: name!), name == "__TEXT" {
-              endOfText = address + size
-            }
-          }
-
-          images.append(Image(name: name,
-                              path: pathString,
-                              uniqueID: theUUID,
-                              baseAddress: Address(machHeaderAddress),
-                              endOfText: Address(endOfText)))
-        }
-      }
-    }
-
-    return images.sorted(by: { $0.baseAddress < $1.baseAddress })
-  }
-}
-#endif // os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-
-// -- Linux ------------------------------------------------------------------
-
-#if os(Linux)
-extension Backtrace {
-  private struct AddressRange {
-    var low: Address = 0
-    var high: Address = 0
-  }
-
-  @_spi(Internal)
-  @_specialize(exported: true, kind: full, where M == UnsafeLocalMemoryReader)
-  @_specialize(exported: true, kind: full, where M == RemoteMemoryReader)
-  @_specialize(exported: true, kind: full, where M == LocalMemoryReader)
-  public static func captureImages<M: MemoryReader>(
-    using reader: M,
-    forProcess pid: Int? = nil
-  ) -> [Image] {
-    var images: [Image] = []
-
-    let path: String
-    if let pid = pid {
-      path = "/proc/\(pid)/maps"
-    } else {
-      path = "/proc/self/maps"
-    }
-
-    guard let procMaps = readString(from: path) else {
-      return []
-    }
-
-    // Find all the mapped files and get high/low ranges
-    var mappedFiles: [Substring:AddressRange] = [:]
-    for match in ProcMapsScanner(procMaps) {
-      let path = stripWhitespace(match.pathname)
-      if match.inode == "0" || path == "" {
-        continue
-      }
-      guard let start = Address(match.start),
-            let end = Address(match.end) else {
-        continue
-      }
-
-      if let range = mappedFiles[path] {
-        mappedFiles[path] = AddressRange(low: min(start, range.low),
-                                         high: max(end, range.high))
-      } else {
-        mappedFiles[path] = AddressRange(low: start,
-                                         high: end)
-      }
-    }
-
-    // Look at each mapped file to see if it's an ELF image
-    for (path, range) in mappedFiles {
-      // Extract the filename from path
-      let name: Substring
-      if let slashIndex = path.lastIndex(of: "/") {
-        name = path.suffix(from: path.index(after: slashIndex))
-      } else {
-        name = path
-      }
-
-      // Inspect the image and extract the UUID and end of text
-      guard let (endOfText, uuid) = getElfImageInfo(at: M.Address(range.low)!,
-                                                    using: reader) else {
-        // Not an ELF iamge
-        continue
-      }
-
-      let image = Image(name: String(name),
-                        path: String(path),
-                        uniqueID: uuid,
-                        baseAddress: range.low,
-                        endOfText: Address(endOfText))
-
-      images.append(image)
-    }
-
-    return images.sorted(by: { $0.baseAddress < $1.baseAddress })
-  }
-}
-#endif // os(Linux)
-
-

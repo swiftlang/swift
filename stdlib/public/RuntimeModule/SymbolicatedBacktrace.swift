@@ -249,7 +249,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   public var frames: [Frame]
 
   /// A list of images found in the process.
-  public var images: [Backtrace.Image]
+  public var images: ImageMap
 
   /// True if this backtrace is a Swift runtime failure.
   public var isSwiftRuntimeFailure: Bool {
@@ -270,8 +270,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   }
 
   /// Construct a SymbolicatedBacktrace from a backtrace and a list of images.
-  private init(backtrace: Backtrace, images: [Backtrace.Image],
-               frames: [Frame]) {
+  private init(backtrace: Backtrace, images: ImageMap, frames: [Frame]) {
     self.backtrace = backtrace
     self.images = images
     self.frames = frames
@@ -291,7 +290,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   }
 
   /// Create a symbolicator.
-  private static func withSymbolicator<T>(images: [Backtrace.Image],
+  private static func withSymbolicator<T>(images: ImageMap,
                                           useSymbolCache: Bool,
                                           fn: (CSSymbolicatorRef) throws -> T) rethrows -> T {
     let binaryImageList = images.map{ image in
@@ -329,7 +328,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                  isInline: Bool,
                                  symbol: CSSymbolRef,
                                  sourceInfo: CSSourceInfoRef?,
-                                 images: [Backtrace.Image]) -> Frame {
+                                 images: ImageMap) -> Frame {
     if CSIsNull(symbol) {
       return Frame(captured: capturedFrame, symbol: nil)
     }
@@ -379,17 +378,17 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
   /// Actually symbolicate.
   internal static func symbolicate(backtrace: Backtrace,
-                                   images: [Backtrace.Image]?,
+                                   images: ImageMap?,
                                    options: Backtrace.SymbolicationOptions)
     -> SymbolicatedBacktrace? {
 
-    let theImages: [Backtrace.Image]
+    let theImages: ImageMap
     if let images = images {
       theImages = images
     } else if let images = backtrace.images {
       theImages = images
     } else {
-      theImages = Backtrace.captureImages()
+      theImages = ImageMap.capture()
     }
 
     var frames: [Frame] = []
@@ -463,9 +462,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     for frame in backtrace.frames {
       let address = frame.adjustedProgramCounter
-      if let imageNdx = theImages.firstIndex(
-           where: { address >= $0.baseAddress && address < $0.endOfText }
-         ) {
+      if let imageNdx = theImages.indexOfImage(at: address) {
         let relativeAddress = ImageSource.Address(
           address - theImages[imageNdx].baseAddress
         )

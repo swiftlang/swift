@@ -20,19 +20,23 @@ import Swift
 /// Sequences you wish to use with `LimitSequence` must use an element type
 /// that implements this protocol, so that `LimitSequence` can indicate when
 /// it omits or truncates the sequence.
+@usableFromInline
 protocol LimitableElement {
   static func omitted(_: Int) -> Self
   static var truncated: Self { get }
 }
 
 /// A `Sequence` that adds the ability to limit the output of another sequence.
+@usableFromInline
 struct LimitSequence<T: LimitableElement, S: Sequence>: Sequence
   where S.Element == T
 {
   /// The element type, which must conform to `LimitableElement`
+  @usableFromInline
   typealias Element = T
 
   /// The source sequence
+  @usableFromInline
   typealias Source = S
 
   var source: Source
@@ -62,6 +66,7 @@ struct LimitSequence<T: LimitableElement, S: Sequence>: Sequence
   ///
   /// When `LimitSequence` omits items or truncates the sequence, it will
   /// insert `.omitted(count)` or `.truncated` items into its output.
+  @usableFromInline
   init(_ source: Source, limit: Int, offset: Int = 0, top: Int = 0) {
     self.source = source
     self.limit = limit
@@ -79,6 +84,7 @@ struct LimitSequence<T: LimitableElement, S: Sequence>: Sequence
   /// This works by buffering an element ahead of where we are in the input
   /// sequence, so that it can tell whether or not there is more input to
   /// follow at any given point.
+  @usableFromInline
   struct Iterator: IteratorProtocol {
     /// The iterator for the input sequence.
     var iterator: Source.Iterator

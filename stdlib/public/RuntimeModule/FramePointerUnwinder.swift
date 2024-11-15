@@ -30,7 +30,7 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   var done: Bool
 
   #if os(Linux)
-  var images: [Backtrace.Image]?
+  var images: ImageMap?
   #endif
 
   var reader: MemoryReader
@@ -41,7 +41,7 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
   public init(context: Context,
-              images: [Backtrace.Image]?,
+              images: ImageMap?,
               memoryReader: MemoryReader) {
 
     pc = Address(context.programCounter)
@@ -87,10 +87,7 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
     let address = MemoryReader.Address(pc)
 
     if let images = images,
-       let imageNdx = images.firstIndex(
-         where: { address >= MemoryReader.Address($0.baseAddress)!
-                    && address < MemoryReader.Address($0.endOfText)! }
-       ) {
+       let imageNdx = images.indexOfImage(at: Backtrace.Address(address)) {
       let base = MemoryReader.Address(images[imageNdx].baseAddress)!
       let relativeAddress = address - base
       let cache = ElfImageCache.threadLocal
@@ -259,7 +256,6 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
     #endif
 
     asyncContext = next
-
     return .asyncResumePoint(pc)
   }
 }

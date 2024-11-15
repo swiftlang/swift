@@ -29,6 +29,7 @@ set(RUNTIME_SOURCES
   ByteSwapping.swift
   CachingMemoryReader.swift
   CompactBacktrace.swift
+  CompactImageMap.swift
   Compression.swift
   Context.swift
   CoreSymbolication.swift
@@ -38,6 +39,9 @@ set(RUNTIME_SOURCES
   ElfImageCache.swift
   FramePointerUnwinder.swift
   Image.swift
+  ImageMap.swift
+  ImageMap+Darwin.swift
+  ImageMap+Linux.swift
   ImageSource.swift
   Libc.swift
   LimitSequence.swift

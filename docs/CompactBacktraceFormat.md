@@ -25,7 +25,7 @@ information byte:
 ~~~
 
 The `version` field identifies the version of CBF that is in use; this
-document describes version `0`. The `size` field is encoded as
+document describes version `0`. The `size` field is encqoded as
 follows:
 
 | `size` | Machine word size |
