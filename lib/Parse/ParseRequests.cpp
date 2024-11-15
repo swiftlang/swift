@@ -250,10 +250,6 @@ void appendToVector(BridgedASTNode cNode, void *vecPtr) {
 }
 
 SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
-  Parser legacyParser(SF.getBufferID(), SF, /*SIL=*/nullptr,
-                      /*PersistentState=*/nullptr);
-  legacyParser.IsForASTGen = true;
-
   ASTContext &Ctx = SF.getASTContext();
   DiagnosticEngine &Diags = Ctx.Diags;
   const LangOptions &langOpts = Ctx.LangOpts;
@@ -277,7 +273,7 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   // Generate AST nodes.
   SmallVector<ASTNode, 128> items;
   swift_ASTGen_buildTopLevelASTNodes(
-      &Diags, exportedSourceFile, declContext, Ctx, legacyParser,
+      &Diags, exportedSourceFile, declContext, Ctx,
       static_cast<SmallVectorImpl<ASTNode> *>(&items), appendToVector);
 
   return SourceFileParsingResult{/*TopLevelItems=*/Ctx.AllocateCopy(items),
