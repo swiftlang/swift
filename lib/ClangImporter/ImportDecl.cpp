@@ -8214,7 +8214,7 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   sourceMgr.setGeneratedSourceInfo(
       bufferID,
       {
-        GeneratedSourceInfo::Attribute,
+        GeneratedSourceInfo::AttributeFromClang,
         CharSourceRange(),
         sourceMgr.getRangeForBuffer(bufferID),
         &module

@@ -67,7 +67,7 @@ public:
     DefaultArgument,
 
     /// A Swift attribute expressed in C headers.
-    Attribute,
+    AttributeFromClang,
   } kind;
 
   static StringRef kindToString(GeneratedSourceInfo::Kind kind) {
@@ -83,8 +83,8 @@ public:
       return "PrettyPrinted";
     case DefaultArgument:
       return "DefaultArgument";
-    case Attribute:
-      return "Attribute";
+    case AttributeFromClang:
+      return "AttributeFromClang";
     }
     llvm_unreachable("Invalid kind");
   }

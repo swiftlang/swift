@@ -301,7 +301,7 @@ public:
         if (generatedInfo->kind != GeneratedSourceInfo::ReplacedFunctionBody &&
             generatedInfo->kind != GeneratedSourceInfo::PrettyPrinted &&
             generatedInfo->kind != GeneratedSourceInfo::DefaultArgument &&
-            generatedInfo->kind != GeneratedSourceInfo::Attribute)
+            generatedInfo->kind != GeneratedSourceInfo::AttributeFromClang)
           if (auto *MemBuf = SM.getLLVMSourceMgr().getMemoryBuffer(BufferID)) {
             Source = MemBuf->getBuffer();
             // This is copying the buffer twice, but Xcode depends on this

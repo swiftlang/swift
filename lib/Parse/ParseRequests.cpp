@@ -162,7 +162,7 @@ getBridgedGeneratedSourceFileKind(const GeneratedSourceInfo *genInfo) {
     return BridgedGeneratedSourceFileKindPrettyPrinted;
   case GeneratedSourceInfo::Kind::DefaultArgument:
     return BridgedGeneratedSourceFileKindDefaultArgument;
-  case GeneratedSourceInfo::Attribute:
+  case GeneratedSourceInfo::AttributeFromClang:
     return BridgedGeneratedSourceFileKindAttribute;
   }
 }
@@ -382,7 +382,7 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
       parser.parseExpandedAttributeList(items, /*isFromClangAttribute=*/false);
       break;
 
-    case GeneratedSourceInfo::Attribute:
+    case GeneratedSourceInfo::AttributeFromClang:
       parser.parseExpandedAttributeList(items, /*isFromClangAttribute=*/true);
       break;
 
