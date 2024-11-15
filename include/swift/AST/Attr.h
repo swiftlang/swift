@@ -1904,7 +1904,7 @@ public:
 
   /// Create a copy of this attribute.
   CustomAttr *clone(ASTContext &ctx) const {
-    return create(ctx, AtLoc, getTypeExpr(), isImplicit());
+    return create(ctx, AtLoc, getTypeExpr(), initContext, argList, isImplicit());
   }
 
 private:
