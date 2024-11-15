@@ -130,3 +130,21 @@ extension ASTGenDiagnostic {
     )
   }
 }
+
+/// DeclAttributes diagnostics
+extension ASTGenDiagnostic {
+  static func expectedArgumentsInAttribute(_ attribute: AttributeSyntax) -> Self {
+    // FIXME: The diagnostic position should be at the and of the attribute name.
+    Self(
+      node: attribute,
+      message: "expected arguments for '\(attribute.attributeName.trimmedDescription)' attribute"
+    )
+  }
+
+  static func extraneousArgumentsInAttribute(_ attribute: AttributeSyntax, _ extra: some SyntaxProtocol) -> Self {
+    Self(
+      node: extra,
+      message: "unexpected arguments in '\(attribute.attributeName.trimmedDescription)' attribute"
+    )
+  }
+}
