@@ -4828,7 +4828,7 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, ModuleDecl *mod) const;
+  bool evaluate(Evaluator &evaluator, const ModuleDecl *mod) const;
 
 public:
   bool isCached() const { return true; }

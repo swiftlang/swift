@@ -4008,7 +4008,7 @@ FrontendStatsTracer::getTraceFormatter<const SourceFile *>() {
   return &TF;
 }
 
-bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) const {
+bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, const ModuleDecl *mod) const {
   // If there's no SDK path, fallback to checking whether the module was
   // in the system search path or a clang system module
   auto &ctx = mod->getASTContext();
@@ -4017,14 +4017,12 @@ bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) con
   if (sdkPath.empty() && mod->isSystemModule())
     return true;
 
-  // Some temporary module's get created with no module name and they have no
-  // files. Avoid running `getFiles` on them (which will assert if there
-  // aren't any).
-  if (!mod->hasName() || mod->getFiles().empty())
+  ArrayRef<const FileUnit *> modFiles = mod->getFiles();
+  if (modFiles.empty())
     return false;
-  
+
   StringRef modulePath;
-  auto fileUnit = mod->getFiles().front();
+  auto *fileUnit = modFiles.front();
   if (auto *LF = dyn_cast_or_null<LoadedFile>(fileUnit)) {
     modulePath = LF->getSourceFilename();
   } else if (auto *SF = dyn_cast_or_null<SourceFile>(fileUnit)) {
