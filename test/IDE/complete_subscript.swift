@@ -133,3 +133,10 @@ func testSettableSub(x: inout HasSettableSub) {
 // SETTABLE_SUBSCRIPT-DAG: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<HasSettableSub, Value>#}[']'][#Value#];
 // SETTABLE_SUBSCRIPT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]: ['[']{#(a): String#}[']'][#@lvalue Int#];
 // SETTABLE_SUBSCRIPT-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: local[#String#]; name=local
+
+// rdar://139333904 - Make sure we don't hit an assertion.
+func testFnKeyPathSubscript() {
+  // The keyPath: subscript is supported on all non-nominal types, including functions.
+  test1[#^FN_KEYPATH_SUBSCRIPT^#]
+  // FN_KEYPATH_SUBSCRIPT: Pattern/None/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<() -> (), Value>#}[']'][#Value#]; name=keyPath:
+}
