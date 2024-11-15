@@ -2522,6 +2522,16 @@ function Build-SourceKitLSP($Arch) {
     }
 }
 
+function Build-SymbolKit($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-docc-symbolkit `
+    -Bin (Get-HostProjectBinaryCache SymbolKit) `
+    -Arch $Arch `
+    -UseBuiltCompilers Swift `
+    -SwiftSDK (Get-HostSwiftSDK) `
+    -BuildTargets default
+}
+
 function Test-SourceKitLSP {
   $SwiftPMArguments = @(
     # dispatch
@@ -2889,6 +2899,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-LMDB $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
+  Invoke-BuildStep Build-SymbolKit $HostArch
   Invoke-BuildStep Build-Inspect $HostArch
 }
 
