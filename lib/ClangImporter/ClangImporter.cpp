@@ -52,7 +52,9 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Mangle.h"
+#include "clang/AST/TemplateBase.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/FileEntry.h"
@@ -84,6 +86,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Casting.h"
@@ -5055,24 +5058,59 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
 CxxEscapability
 ClangTypeEscapability::evaluate(Evaluator &evaluator,
                                 EscapabilityLookupDescriptor desc) const {
+  bool hadUnknown = false;
+  auto evaluateEscapability = [&](const clang::Type *type) {
+    auto escapability = evaluateOrDefault(
+        evaluator,
+        ClangTypeEscapability({type, desc.impl, desc.annotationOnly}),
+        CxxEscapability::Unknown);
+    if (escapability == CxxEscapability::Unknown)
+      hadUnknown = true;
+    return escapability;
+  };
+
   auto desugared = desc.type->getUnqualifiedDesugaredType();
   if (const auto *recordType = desugared->getAs<clang::RecordType>()) {
-    if (importer::hasNonEscapableAttr(recordType->getDecl()))
-      return CxxEscapability::NonEscapable;
-    if (importer::hasEscapableAttr(recordType->getDecl()))
-      return CxxEscapability::Escapable;
     auto recordDecl = recordType->getDecl();
+    if (hasNonEscapableAttr(recordDecl))
+      return CxxEscapability::NonEscapable;
+    if (hasEscapableAttr(recordDecl))
+      return CxxEscapability::Escapable;
+    auto conditionalParams =
+        importer::getConditionalEscapableAttrParams(recordDecl);
+    if (!conditionalParams.empty()) {
+      auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
+      auto templateDecl = specDecl->getSpecializedTemplate();
+      SmallVector<std::pair<unsigned, StringRef>, 4> argumentsToCheck;
+      for (auto [idx, param] :
+           llvm::enumerate(*templateDecl->getTemplateParameters())) {
+        if (conditionalParams.erase(param->getName()))
+          argumentsToCheck.push_back(std::make_pair(idx, param->getName()));
+      }
+      HeaderLoc loc{recordDecl->getLocation()};
+      for (auto name : conditionalParams)
+        desc.impl.diagnose(loc, diag::unknown_template_parameter, name);
+
+      auto &argList = specDecl->getTemplateArgs();
+      for (auto argToCheck : argumentsToCheck) {
+        auto arg = argList[argToCheck.first];
+        if (arg.getKind() != clang::TemplateArgument::Type) {
+          desc.impl.diagnose(loc, diag::type_template_parameter_expected,
+                             argToCheck.second);
+          return CxxEscapability::Unknown;
+        }
+
+        auto argEscapability = evaluateEscapability(
+            arg.getAsType()->getUnqualifiedDesugaredType());
+        if (argEscapability == CxxEscapability::NonEscapable)
+          return CxxEscapability::NonEscapable;
+      }
+      return hadUnknown ? CxxEscapability::Unknown : CxxEscapability::Escapable;
+    }
+    if (desc.annotationOnly)
+      return CxxEscapability::Unknown;
     auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
     if (!cxxRecordDecl || cxxRecordDecl->isAggregate()) {
-      bool hadUnknown = false;
-      auto evaluateEscapability = [&](const clang::Type *type) {
-        auto escapability = evaluateOrDefault(
-            evaluator, ClangTypeEscapability({type}), CxxEscapability::Unknown);
-        if (escapability == CxxEscapability::Unknown)
-          hadUnknown = true;
-        return escapability;
-      };
-
       if (cxxRecordDecl) {
         for (auto base : cxxRecordDecl->bases()) {
           auto baseEscapability = evaluateEscapability(
@@ -5092,12 +5130,16 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       return hadUnknown ? CxxEscapability::Unknown : CxxEscapability::Escapable;
     }
   }
+  if (desc.annotationOnly)
+    return CxxEscapability::Unknown;
   if (desugared->isArrayType()) {
     auto elemTy = cast<clang::ArrayType>(desugared)
                       ->getElementType()
                       ->getUnqualifiedDesugaredType();
-    return evaluateOrDefault(evaluator, ClangTypeEscapability({elemTy}),
-                             CxxEscapability::Unknown);
+    return evaluateOrDefault(
+        evaluator,
+        ClangTypeEscapability({elemTy, desc.impl, desc.annotationOnly}),
+        CxxEscapability::Unknown);
   }
 
   // Base cases
@@ -7528,6 +7570,29 @@ bool importer::hasNonEscapableAttr(const clang::RecordDecl *decl) {
 
 bool importer::hasEscapableAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, "Escapable");
+}
+
+std::set<StringRef>
+importer::getConditionalEscapableAttrParams(const clang::RecordDecl *decl) {
+  std::set<StringRef> result;
+  if (!decl->hasAttrs())
+    return result;
+  for (auto attr : decl->getAttrs()) {
+    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+      if (swiftAttr->getAttribute().starts_with("escapable_if:")) {
+        StringRef params = swiftAttr->getAttribute().drop_front(
+            StringRef("escapable_if:").size());
+        auto commaPos = params.find(',');
+        StringRef nextParam = params.take_front(commaPos);
+        while (!nextParam.empty() && commaPos != StringRef::npos) {
+          result.insert(nextParam.trim());
+          params = params.drop_front(nextParam.size() + 1);
+          commaPos = params.find(',');
+          nextParam = params.take_front(commaPos);
+        }
+      }
+  }
+  return result;
 }
 
 /// Recursively checks that there are no pointers in any fields or base classes.
