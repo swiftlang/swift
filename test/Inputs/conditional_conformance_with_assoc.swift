@@ -67,7 +67,7 @@ extension Double: P1 where B.AT2: P2, C: P3, B.AT2.AT2.AT3: P3 {
 
 // witness method for Double.generic
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlAaEP7genericyyqd__AaFRd__lFTW"(ptr noalias nocapture %0, ptr %"\CF\84_1_0", ptr %"\CF\84_1_0.P3", ptr noalias nocapture swiftself %1, ptr %Self, ptr %SelfWitnessTable)
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlAaEP7genericyyqd__AaFRd__lFTW"(ptr noalias %0, ptr %"\CF\84_1_0", ptr %"\CF\84_1_0.P3", ptr noalias nocapture swiftself %1, ptr %Self, ptr %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds ptr, ptr %SelfWitnessTable, i32 -1
 // CHECK-NEXT:    [[C_P3:%.*]] = load ptr, ptr [[C_P3_PTR]], align 8
@@ -87,7 +87,7 @@ extension Double: P1 where B.AT2: P2, C: P3, B.AT2.AT2.AT3: P3 {
 // CHECK-NEXT:    [[B_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr %Self, i64 4
 // CHECK-NEXT:    %"\CF\84_0_0.P2" = load ptr, ptr [[B_P2_PTR]], align 8
 
-// CHECK-NEXT:    call swiftcc void @"$s34conditional_conformance_with_assoc6DoubleVA2A2P3R_AA2P23AT2RpzAadF_AfaEP3AT3RPzrlE7genericyyqd__AaDRd__lF"(ptr noalias nocapture %0, ptr %"\CF\84_0_0", ptr %"\CF\84_0_1", ptr %"\CF\84_1_0", ptr %"\CF\84_0_0.P2", ptr [[C_P3]], ptr %"\CF\84_1_0.P3", ptr [[B_AT2_P2]], ptr [[B_AT2_AT2_AT3_P3]])
+// CHECK-NEXT:    call swiftcc void @"$s34conditional_conformance_with_assoc6DoubleVA2A2P3R_AA2P23AT2RpzAadF_AfaEP3AT3RPzrlE7genericyyqd__AaDRd__lF"(ptr noalias %0, ptr %"\CF\84_0_0", ptr %"\CF\84_0_1", ptr %"\CF\84_1_0", ptr %"\CF\84_0_0.P2", ptr [[C_P3]], ptr %"\CF\84_1_0.P3", ptr [[B_AT2_P2]], ptr [[B_AT2_AT2_AT3_P3]])
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
 

@@ -663,9 +663,9 @@ private:
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
       clonedBaseMembers;
 
+public:
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext);
 
-public:
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 
   // Cache for already-specialized function templates and any thunks they may

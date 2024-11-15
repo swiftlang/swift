@@ -27,12 +27,12 @@ extension Base: P1 where A: P2 {
 
 // witness method for Base.generic
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW"(ptr noalias nocapture %0, ptr %"\CF\84_1_0", ptr %"\CF\84_1_0.P3", ptr noalias nocapture swiftself dereferenceable(8) %1, ptr %Self, ptr %SelfWitnessTable)
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW"(ptr noalias %0, ptr %"\CF\84_1_0", ptr %"\CF\84_1_0.P3", ptr noalias nocapture swiftself dereferenceable(8) %1, ptr %Self, ptr %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr %SelfWitnessTable, i32 -1
 // CHECK-NEXT:    [[A_P2:%.*]] = load ptr, ptr [[A_P2_PTR]], align 8
 // CHECK-NEXT:    [[SELF:%.]] = load ptr, ptr %1, align 8
-// CHECK-NEXT:    call swiftcc void @"$s32conditional_conformance_subclass4BaseCA2A2P2RzlE7genericyyqd__AA2P3Rd__lF"(ptr noalias nocapture %0, ptr %"\CF\84_1_0", ptr [[A_P2]], ptr %"\CF\84_1_0.P3", ptr swiftself [[SELF]])
+// CHECK-NEXT:    call swiftcc void @"$s32conditional_conformance_subclass4BaseCA2A2P2RzlE7genericyyqd__AA2P3Rd__lF"(ptr noalias %0, ptr %"\CF\84_1_0", ptr [[A_P2]], ptr %"\CF\84_1_0.P3", ptr swiftself [[SELF]])
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
 

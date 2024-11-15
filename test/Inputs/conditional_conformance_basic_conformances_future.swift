@@ -30,13 +30,13 @@ extension Single: P1 where A: P2 {
 
 // witness method for Single.generic
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW"(ptr noalias nocapture %0, ptr %"\CF\84_1_0", ptr %"\CF\84_1_0.P3", ptr noalias nocapture swiftself %1, ptr %Self, ptr %SelfWitnessTable)
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW"(ptr noalias %0, ptr %"\CF\84_1_0", ptr %"\CF\84_1_0.P3", ptr noalias nocapture swiftself %1, ptr %Self, ptr %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr %SelfWitnessTable, i32 -1
 // CHECK-NEXT:    [[A_P2_i8star:%.*]] = load ptr, ptr [[A_P2_PTR]], align 8
 // CHECK-NEXT:    [[A_PTR:%.*]] = getelementptr inbounds ptr, ptr %Self, i64 2
 // CHECK-NEXT:    [[A:%.*]] = load ptr, ptr [[A_PTR]], align 8
-// CHECK-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances6SingleVA2A2P2RzlE7genericyyqd__AA2P3Rd__lF"(ptr noalias nocapture %0, ptr [[A]], ptr %"\CF\84_1_0", ptr [[A_P2_i8star]], ptr %"\CF\84_1_0.P3")
+// CHECK-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances6SingleVA2A2P2RzlE7genericyyqd__AA2P3Rd__lF"(ptr noalias %0, ptr [[A]], ptr %"\CF\84_1_0", ptr [[A_P2_i8star]], ptr %"\CF\84_1_0.P3")
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
 
@@ -187,7 +187,7 @@ extension Double: P1 where B: P2, C: P3 {
 
 // witness method for Double.generic
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlAaEP7genericyyqd__AaGRd__lFTW"(ptr noalias nocapture %0, ptr %"\CF\84_1_0", ptr %"\CF\84_1_0.P3", ptr noalias nocapture swiftself %1, ptr %Self, ptr %SelfWitnessTable)
+// CHECK-LABEL: define linkonce_odr hidden swiftcc void @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlAaEP7genericyyqd__AaGRd__lFTW"(ptr noalias %0, ptr %"\CF\84_1_0", ptr %"\CF\84_1_0.P3", ptr noalias nocapture swiftself %1, ptr %Self, ptr %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 // CHECK-NEXT:    [[B_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr %SelfWitnessTable, i32 -1
@@ -202,7 +202,7 @@ extension Double: P1 where B: P2, C: P3 {
 // CHECK-NEXT:    [[C_PTR:%.*]] = getelementptr inbounds ptr, ptr %Self, i64 3
 // CHECK-NEXT:    [[C:%.*]] = load ptr, ptr [[C_PTR]], align 8
 
-// CHECK-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances6DoubleVA2A2P2RzAA2P3R_rlE7genericyyqd__AaERd__lF"(ptr noalias nocapture %0, ptr [[B]], ptr [[C]], ptr %"\CF\84_1_0", ptr [[B_P2_i8star]], ptr [[C_P3_i8star]], ptr %"\CF\84_1_0.P3")
+// CHECK-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances6DoubleVA2A2P2RzAA2P3R_rlE7genericyyqd__AaERd__lF"(ptr noalias %0, ptr [[B]], ptr [[C]], ptr %"\CF\84_1_0", ptr [[B_P2_i8star]], ptr [[C_P3_i8star]], ptr %"\CF\84_1_0.P3")
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
 

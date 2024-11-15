@@ -1991,6 +1991,12 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
       }
     }
   }
+  if (auto usingDecl = dyn_cast<clang::UsingDecl>(named)) {
+    for (auto usingShadowDecl : usingDecl->shadows()) {
+      if (isa<clang::CXXMethodDecl>(usingShadowDecl->getTargetDecl()))
+        addEntryToLookupTable(table, usingShadowDecl, nameImporter);
+    }
+  }
 }
 
 /// Returns the nearest parent of \p module that is marked \c explicit in its

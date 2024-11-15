@@ -16,7 +16,7 @@ public enum EnumWithClassArchetypeAndDynamicSize<T : AnyObject> {
   case B(Size)
 }
 
-// CHECK-LABEL: define swiftcc void @copyDynamicMultiEnum(ptr %"EnumWithClassArchetypeAndDynamicSize<T>", ptr %U, ptr noalias nocapture swiftself %0)
+// CHECK-LABEL: define swiftcc void @copyDynamicMultiEnum(ptr %"EnumWithClassArchetypeAndDynamicSize<T>", ptr %U, ptr noalias swiftself %0)
 // CHECK: call ptr @"$s20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeOyxGRlzCr0_lWOc"(ptr %0, ptr {{.*}}, ptr %"EnumWithClassArchetypeAndDynamicSize<T>")
 // CHECK: ret void
 sil [ossa] @copyDynamicMultiEnum : $@convention(method) <T, U where T: AnyObject> (@in_guaranteed EnumWithClassArchetypeAndDynamicSize<T>) -> () {

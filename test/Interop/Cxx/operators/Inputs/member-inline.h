@@ -418,4 +418,38 @@ struct DerivedFromConstIterator : public ConstIterator {};
 
 struct DerivedFromConstIteratorPrivately : private ConstIterator {};
 
+class SubscriptSetterConst {
+public:
+  using T = int;
+
+  SubscriptSetterConst() : p(new T[10]) {}
+
+  T& operator[](int i) const {
+    return p[i];
+  }
+private:
+  T *p;
+};
+
+struct DerivedFromConstIteratorPrivatelyWithUsingDecl : private ConstIterator {
+  using ConstIterator::operator*;
+};
+
+struct DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl
+    : private AmbiguousOperatorStar {
+  using AmbiguousOperatorStar::operator*;
+};
+
+struct DerivedFromLoadableIntWrapperWithUsingDecl : private LoadableIntWrapper {
+  using LoadableIntWrapper::operator-;
+  using LoadableIntWrapper::operator+=;
+
+  int getValue() const {
+    return value;
+  }
+  void setValue(int v) {
+    this->value = v;
+  }
+};
+
 #endif

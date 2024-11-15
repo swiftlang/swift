@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=upcoming-swift
 
 import MemberInline
 
@@ -70,3 +70,9 @@ let immortalIncrement = myCounter.successor() // expected-error {{value of type 
 
 let derivedConstIter = DerivedFromConstIteratorPrivately()
 derivedConstIter.pointee // expected-error {{value of type 'DerivedFromConstIteratorPrivately' has no member 'pointee'}}
+
+let derivedConstIterWithUD = DerivedFromConstIteratorPrivatelyWithUsingDecl()
+let _ = derivedConstIterWithUD.pointee
+
+var derivedIntWrapper = DerivedFromLoadableIntWrapperWithUsingDecl()
+derivedIntWrapper += LoadableIntWrapper()

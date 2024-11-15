@@ -11,8 +11,8 @@
 //
 import resilient_struct
 
-// CHECK-LABEL: define{{.*}} swiftcc void @"$s17struct_resilience9takesSizeyy010resilient_A00D0VF"(ptr noalias nocapture %0)
-// CHECK-LLDB-LABEL: define{{.*}} swiftcc void @"$s17struct_resilience9takesSizeyy010resilient_A00D0VF"(ptr noalias nocapture dereferenceable({{8|16}}) %0)
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s17struct_resilience9takesSizeyy010resilient_A00D0VF"(ptr noalias %0)
+// CHECK-LLDB-LABEL: define{{.*}} swiftcc void @"$s17struct_resilience9takesSizeyy010resilient_A00D0VF"(ptr noalias dereferenceable({{8|16}}) %0)
 public func takesSize(_ s: Size) {}
 
 

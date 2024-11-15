@@ -23,7 +23,7 @@ public func type<T, Metatype>(of value: T) -> Metatype {
   never()
 }
 
-// CHECK: define hidden swiftcc ptr [[GENERIC_TYPEOF:@"\$s17generic_metatypes0A6TypeofyxmxlF"]](ptr noalias nocapture %0, ptr [[TYPE:%.*]])
+// CHECK: define hidden swiftcc ptr [[GENERIC_TYPEOF:@"\$s17generic_metatypes0A6TypeofyxmxlF"]](ptr noalias %0, ptr [[TYPE:%.*]])
 func genericTypeof<T>(_ x: T) -> T.Type {
   // CHECK: [[METATYPE:%.*]] = call ptr @swift_getDynamicType(ptr {{.*}}, ptr [[TYPE]], i1 false)
   // CHECK: ret ptr [[METATYPE]]
@@ -37,10 +37,10 @@ class Bar {}
 func remapToSubstitutedMetatypes(_ x: Foo, y: Bar)
   -> (Foo.Type, Bar.Type)
 {
-  // CHECK: call swiftcc ptr [[GENERIC_TYPEOF]](ptr noalias nocapture undef, ptr {{.*}} @"$s17generic_metatypes3FooVMf", {{.*}})
+  // CHECK: call swiftcc ptr [[GENERIC_TYPEOF]](ptr noalias undef, ptr {{.*}} @"$s17generic_metatypes3FooVMf", {{.*}})
   // CHECK: [[BAR_REQUEST:%.*]] = call {{.*}}@"$s17generic_metatypes3BarCMa"
   // CHECK: [[BAR:%.*]] = extractvalue {{.*}} [[BAR_REQUEST]]
-  // CHECK: [[BAR_META:%.*]] = call swiftcc ptr [[GENERIC_TYPEOF]](ptr noalias nocapture {{%.*}}, ptr [[BAR]])
+  // CHECK: [[BAR_META:%.*]] = call swiftcc ptr [[GENERIC_TYPEOF]](ptr noalias {{%.*}}, ptr [[BAR]])
   // CHECK: ret ptr [[BAR_META]]
   return (genericTypeof(x), genericTypeof(y))
 }

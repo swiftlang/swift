@@ -14,7 +14,7 @@ func passQ() {
   // CHECK: [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s39signature_conformances_multifile_future12AlsoConformsVySiGMD")
   // CHECK: [[WITNESS_TABLE:%[0-9]+]] = call ptr @"$s39signature_conformances_multifile_future12AlsoConformsVySiGACyxGAA1QAAWl"()
   // CHECK: call swiftcc void @"$s39signature_conformances_multifile_future6takesQyyxAA1QRzlF"(
-  // CHECK-SAME:   ptr noalias nocapture undef, 
+  // CHECK-SAME:   ptr noalias undef, 
   // CHECK-SAME:   ptr [[METADATA]], 
   // CHECK-SAME:   ptr [[WITNESS_TABLE]]
   // CHECK-SAME: )
@@ -29,7 +29,7 @@ func passP() {
   // CHECK: [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s39signature_conformances_multifile_future8ConformsVySiSSGMD")
   // CHECK: [[WITNESS_TABLE:%[0-9]+]] = call ptr @"$s39signature_conformances_multifile_future8ConformsVySiSSGACyxq_GAA1PAAWl"()
   // CHECK: call swiftcc void @"$s39signature_conformances_multifile_future6takesPyyxAA1PRzlF"(
-  // CHECK-SAME:   ptr noalias nocapture undef, 
+  // CHECK-SAME:   ptr noalias undef, 
   // CHECK-SAME:   ptr [[METADATA]], 
   // CHECK-SAME:   ptr [[WITNESS_TABLE]]
   // CHECK-SAME: )

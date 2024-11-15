@@ -72,7 +72,7 @@ enum InternalEither {
   case Right(ReferenceFast)
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience25functionWithResilientEnumy010resilient_A06MediumOAEF"(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture %1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience25functionWithResilientEnumy010resilient_A06MediumOAEF"(ptr noalias sret({{.*}}) %0, ptr noalias %1)
 public func functionWithResilientEnum(_ m: Medium) -> Medium {
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s14resilient_enum6MediumOMa"([[INT]] 0)
@@ -90,7 +90,7 @@ public func functionWithResilientEnum(_ m: Medium) -> Medium {
   return m
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience33functionWithIndirectResilientEnumy010resilient_A00E8ApproachOAEF"(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture %1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience33functionWithIndirectResilientEnumy010resilient_A00E8ApproachOAEF"(ptr noalias sret({{.*}}) %0, ptr noalias %1)
 public func functionWithIndirectResilientEnum(_ ia: IndirectApproach) -> IndirectApproach {
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s14resilient_enum16IndirectApproachOMa"([[INT]] 0)
@@ -172,7 +172,7 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
   return Medium.Postcard(s)
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i32|i64}} @"$s15enum_resilience19resilientSwitchTestySi0c1_A06MediumOF"(ptr noalias nocapture %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i32|i64}} @"$s15enum_resilience19resilientSwitchTestySi0c1_A06MediumOF"(ptr noalias %0)
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s14resilient_enum6MediumOMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr [[METADATA]], [[INT]] -1
@@ -250,7 +250,7 @@ public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 // CHECK:     ret void
 }
 
-// CHECK-LABEL: define internal swiftcc void @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA"(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture %1, ptr swiftself %2)
+// CHECK-LABEL: define internal swiftcc void @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA"(ptr noalias nocapture sret({{.*}}) %0, ptr noalias %1, ptr swiftself %2)
 
 
 // Enums with resilient payloads from a different resilience domain
@@ -296,7 +296,7 @@ public func getResilientEnumType() -> Any.Type {
 // from metadata -- make sure we can do that
 extension ResilientMultiPayloadGenericEnum {
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @"$s14resilient_enum32ResilientMultiPayloadGenericEnumO0B11_resilienceE16getTypeParameterxmyF"(ptr %"ResilientMultiPayloadGenericEnum<T>", ptr noalias nocapture swiftself %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @"$s14resilient_enum32ResilientMultiPayloadGenericEnumO0B11_resilienceE16getTypeParameterxmyF"(ptr %"ResilientMultiPayloadGenericEnum<T>", ptr noalias swiftself %0)
 // CHECK: [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"ResilientMultiPayloadGenericEnum<T>", [[INT]] 2
 // CHECK-NEXT: [[T:%.*]] = load ptr, ptr [[T_ADDR]]
   public func getTypeParameter() -> T.Type {
@@ -304,7 +304,7 @@ extension ResilientMultiPayloadGenericEnum {
   }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience39constructExhaustiveWithResilientMembers010resilient_A011SimpleShapeOyF"(ptr noalias nocapture sret({{.*}}) %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s15enum_resilience39constructExhaustiveWithResilientMembers010resilient_A011SimpleShapeOyF"(ptr noalias sret({{.*}}) %0)
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[WITNESSTABLE_ADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr [[METADATA]], {{(i64|i32)}} -1

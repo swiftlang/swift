@@ -33,7 +33,7 @@ func consume<T>(_ t: T) {
 // CHECK:      [[DEMANGLED_TYPE:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(
 // CHECK-SAME:     $s4main5ValueOyS2i10TestModule1PAAyHCg_GMD
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     ptr noalias nocapture %{{[0-9]+}}, 
+// CHECK-SAME:     ptr noalias %{{[0-9]+}}, 
 // CHECK-SAME:     ptr [[DEMANGLED_TYPE]]
 // CHECK-SAME:   )
 // CHECK: }

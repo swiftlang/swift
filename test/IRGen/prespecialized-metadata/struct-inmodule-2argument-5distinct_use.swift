@@ -203,7 +203,7 @@ func consume<T>(_ t: T) {
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
 // CHECK:      call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:   ptr noalias nocapture %{{[0-9]+}}, 
+// CHECK-SAME:   ptr noalias %{{[0-9]+}}, 
 // CHECK-SAME:   ptr getelementptr inbounds (
 // CHECK-SAME:     %swift.full_type, 
 // CHECK-SAME:     $s4main5ValueVyS2iGMf
@@ -212,7 +212,7 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:   )
 // CHECK-SAME: )
 // CHECK:      call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:   ptr noalias nocapture %{{[0-9]+}}, 
+// CHECK-SAME:   ptr noalias %{{[0-9]+}}, 
 // CHECK-SAME:   ptr getelementptr inbounds (
 // CHECK-SAME:     %swift.full_type, 
 // CHECK-SAME:     $s4main5ValueVySdSiGMf
@@ -221,7 +221,7 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:   )
 // CHECK-SAME: )
 // CHECK:      call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:   ptr noalias nocapture %{{[0-9]+}}, 
+// CHECK-SAME:   ptr noalias %{{[0-9]+}}, 
 // CHECK-SAME:   ptr getelementptr inbounds (
 // CHECK-SAME:     %swift.full_type, 
 // CHECK-SAME:     $s4main5ValueVySSSdGMf
@@ -230,7 +230,7 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:   )
 // CHECK-SAME: )
 // CHECK:      call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:   ptr noalias nocapture %{{[0-9]+}}, 
+// CHECK-SAME:   ptr noalias %{{[0-9]+}}, 
 // CHECK-SAME:   ptr getelementptr inbounds (
 // CHECK-SAME:     %swift.full_type, 
 // CHECK-SAME:     $s4main5ValueVys5UInt8VSSGMf
@@ -239,7 +239,7 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:   )
 // CHECK-SAME: )
 // CHECK:      call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:   ptr noalias nocapture %{{[0-9]+}}, 
+// CHECK-SAME:   ptr noalias %{{[0-9]+}}, 
 // CHECK-SAME:   ptr getelementptr inbounds (
 // CHECK-SAME:     %swift.full_type, 
 // CHECK-SAME:     $s4main5ValueVys4Int8Vs5UInt8VGMf

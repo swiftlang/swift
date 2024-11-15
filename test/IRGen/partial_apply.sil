@@ -272,7 +272,7 @@ bb0(%x : $*SwiftClassPair):
 
 sil public_external @captured_fixed_and_dependent_params : $@convention(thin) <A> (@guaranteed SwiftClass, @in A, Int) -> ()
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @partial_apply_indirect_non_fixed_layout(ptr %0, ptr noalias nocapture %1, i64 %2, ptr %T)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @partial_apply_indirect_non_fixed_layout(ptr %0, ptr noalias %1, i64 %2, ptr %T)
 // -- Round the base offset for the T field up to T's alignment.
 // CHECK:         [[T_VWTABLE_ADDR:%.*]] = getelementptr {{.*}} %T, [[WORD:i[0-9]+]] -1
 // CHECK:         [[T_VWTABLE:%.*]] = load {{.*}} [[T_VWTABLE_ADDR]]
@@ -340,8 +340,8 @@ bb0(%x : $*T):
   return %p : $@callee_owned () -> @out T
 }
 
-// CHECK-LABEL: define internal swiftcc void @"$s28captured_dependent_out_paramTA"(ptr noalias nocapture sret({{.*}}) %0, ptr swiftself %1) {{.*}} {
-// CHECK:         call swiftcc void @captured_dependent_out_param(ptr noalias nocapture sret({{.*}})
+// CHECK-LABEL: define internal swiftcc void @"$s28captured_dependent_out_paramTA"(ptr noalias sret({{.*}}) %0, ptr swiftself %1) {{.*}} {
+// CHECK:         call swiftcc void @captured_dependent_out_param(ptr noalias sret({{.*}})
 
 sil @partial_apply_dynamic_with_out_param : $@convention(thin) <T> (Int32, @owned @callee_owned (Int32) -> @out T) -> @callee_owned () -> @out T {
 bb0(%x : $Int32, %f : $@callee_owned (Int32) -> @out T):
@@ -352,7 +352,7 @@ bb0(%x : $Int32, %f : $@callee_owned (Int32) -> @out T):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @partial_apply_dynamic_with_out_param
 // CHECK:         insertvalue {{.*}} [[FORWARDER:@"\$sTA[A-Za-z0-9_]*"]]
 // CHECK:       define internal swiftcc void [[FORWARDER]]
-// CHECK:         call swiftcc void {{%.*}}(ptr noalias nocapture sret({{.*}})
+// CHECK:         call swiftcc void {{%.*}}(ptr noalias sret({{.*}})
 
 class Base {
 }
@@ -501,7 +501,7 @@ sil public_external @generic_indirect_return2 : $@convention(thin) <T> (Int) -> 
 // CHECK: ret { ptr, ptr } [[R2]]
 
 // CHECK-LABEL: define internal swiftcc void @"$s24generic_indirect_return2TA"(ptr noalias nocapture sret({{.*}}) %0, ptr swiftself %1)
-// CHECK: call swiftcc void @generic_indirect_return2(ptr noalias nocapture sret({{.*}}) %0,
+// CHECK: call swiftcc void @generic_indirect_return2(ptr noalias sret({{.*}}) %0,
 // CHECK:  ret void
 sil @partial_apply_generic_indirect_return2 : $@convention(thin) (Int) -> @callee_owned () -> @owned GenericEnum2<Int> {
   bb0(%0 : $Int):
@@ -670,7 +670,7 @@ bb0(%x : $*SwiftClassPair):
 sil public_external @closure : $@convention(thin) (@in_guaranteed ResilientInt, @guaranteed SwiftClass) -> ()
 
 // Make sure that we use the heap header size (16) for the initial offset.
-// CHECK-LABEL: define{{.*}} swiftcc void @test_initial_offset(ptr noalias nocapture %0, ptr %1)
+// CHECK-LABEL: define{{.*}} swiftcc void @test_initial_offset(ptr noalias %0, ptr %1)
 // CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct12ResilientIntVMa"
 // CHECK:   [[MD:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:   [[VWT_PTR:%.*]] = getelementptr inbounds ptr, ptr [[MD]], i64 -1
@@ -702,7 +702,7 @@ struct SomeType : Proto2 {
 
 sil @foo : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Proto1, τ_0_1 : Proto2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> ()
 
-// CHECK-64-LABEL: define{{.*}} swiftcc void @empty_followed_by_non_fixed(ptr noalias nocapture %0)
+// CHECK-64-LABEL: define{{.*}} swiftcc void @empty_followed_by_non_fixed(ptr noalias %0)
 // CHECK-64:  [[FLAGS:%.*]] = load i32, ptr
 // CHECK-64:  [[FLAGS2:%.*]] = zext i32 [[FLAGS]] to i64
 // CHECK-64:  [[ALIGNMASK:%.*]] = and i64 [[FLAGS2]], 255

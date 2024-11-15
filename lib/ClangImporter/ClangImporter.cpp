@@ -5487,6 +5487,13 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
         (fn->getClangDecl() &&
          isa<clang::FunctionTemplateDecl>(fn->getClangDecl())))
       return nullptr;
+    if (auto cxxMethod =
+            dyn_cast_or_null<clang::CXXMethodDecl>(fn->getClangDecl())) {
+      // FIXME: if this function has rvalue this, we won't be able to synthesize
+      // the accessor correctly (https://github.com/apple/swift/issues/69745).
+      if (cxxMethod->getRefQualifier() == clang::RefQualifierKind::RQ_RValue)
+        return nullptr;
+    }
 
     ASTContext &context = decl->getASTContext();
     auto out = FuncDecl::createImplicit(
@@ -7070,6 +7077,11 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
 /// Checks if a record provides the required value type lifetime operations
 /// (copy and destroy).
 static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
+  // Hack for a base type of std::optional from the Microsoft standard library.
+  if (decl->isInStdNamespace() && decl->getIdentifier() &&
+      decl->getName() == "_Optional_construct_base")
+    return true;
+
   // If we have no way of copying the type we can't import the class
   // at all because we cannot express the correct semantics as a swift
   // struct.

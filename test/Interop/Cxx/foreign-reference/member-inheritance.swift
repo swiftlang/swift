@@ -49,7 +49,7 @@ FunctionsTestSuite.test("base member FRT subscript access") {
 FunctionsTestSuite.test("base member FRT subscript accessing reference FRT") {
   let copyCounter = getCopyCounter().pointee
 
-  let base = makeBaseReturningFRTFromSubscript()!
+  var base = makeBaseReturningFRTFromSubscript()!
   var frt = base[1]
   expectEqual(frt.getX(), 1)
 

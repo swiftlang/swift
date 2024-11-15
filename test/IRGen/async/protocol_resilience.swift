@@ -26,7 +26,7 @@ public protocol MyAwaitable {
 // CHECK-LABEL: @"$s19protocol_resilience19ConformsToAwaitableVyxG010resilient_A00E0AAMc" = hidden constant
 // CHECK-SAME: ptr @"$s19protocol_resilience19ConformsToAwaitableVyxG010resilient_A00E0AaeFP4wait6ResultQzyYaFTWTu"
 
-// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s19protocol_resilience14callsAwaitabley6ResultQzxYa010resilient_A00D0RzlF"(ptr noalias nocapture %0, ptr swiftasync %1, ptr noalias nocapture %2, ptr %T, ptr %T.Awaitable)
+// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s19protocol_resilience14callsAwaitabley6ResultQzxYa010resilient_A00D0RzlF"(ptr noalias %0, ptr swiftasync %1, ptr noalias %2, ptr %T, ptr %T.Awaitable)
 // CHECK-DIRECT: ptr @"$s18resilient_protocol9AwaitableP4wait6ResultQzyYaFTjTu"
 // CHECK-INDIRECT: [[LOAD:%[0-9]+]] = load ptr, ptr inttoptr (i64 and (i64 add (i64 ptrtoint (ptr @"\01__imp_$s18resilient_protocol9AwaitableP4wait6ResultQzyYaFTjTu" to i64), i64 1), i64 -2) to ptr), align {{4|8}}
 // CHECK-INDIRECT: select i1 icmp eq (i64 and (i64 add (i64 ptrtoint (ptr @"\01__imp_$s18resilient_protocol9AwaitableP4wait6ResultQzyYaFTjTu" to i64), i64 1), i64 1), i64 0),
@@ -37,7 +37,7 @@ public func callsAwaitable<T : Awaitable>(_ t: T) async -> T.Result {
   return await t.wait()
 }
 
-// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s19protocol_resilience11MyAwaitableP4wait6ResultQzyYaFTj"(ptr noalias nocapture %0, ptr swiftasync %1, ptr noalias nocapture swiftself %2, ptr %3, ptr %4)
+// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s19protocol_resilience11MyAwaitableP4wait6ResultQzyYaFTj"(ptr noalias %0, ptr swiftasync %1, ptr noalias swiftself %2, ptr %3, ptr %4)
 
 struct ConformsToAwaitable<T> : Awaitable {
   var value: T

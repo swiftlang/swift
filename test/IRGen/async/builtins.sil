@@ -141,7 +141,7 @@ bb0:
 
 
 // CHECK-LABEL: define{{.*}} swiftcc void @testRunInline(
-// CHECK-SAME:      ptr noalias nocapture sret(%swift.opaque) [[RESULT:%[^,]+]],
+// CHECK-SAME:      ptr noalias sret(%swift.opaque) [[RESULT:%[^,]+]],
 // CHECK-SAME:      ptr [[CLOSURE:%[^,]+]],
 // CHECK-SAME:      ptr [[CLOSURE_CONTEXT:%[^,]+]],
 // CHECK-SAME:      ptr [[FUTURE_RESULT_TYPE:%[^,]+]])

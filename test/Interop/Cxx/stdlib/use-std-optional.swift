@@ -1,7 +1,6 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++17)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++17)
 //
 // REQUIRES: executable_test
-// REQUIRES: SR68068
 
 import StdlibUnittest
 import StdOptional
