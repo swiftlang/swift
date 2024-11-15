@@ -1193,6 +1193,8 @@ function Build-CMakeProject {
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
       $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
+    Write-Host "Path: ${env:Path}"
+    Write-Host (Get-Command cmake).Source @cmakeGenerateArgs
     Invoke-Program cmake.exe @cmakeGenerateArgs
 
     # Build all requested targets
