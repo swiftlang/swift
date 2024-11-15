@@ -455,7 +455,7 @@ Now check if the version string has been updated (assumes you have `platform` sh
 defined as specified in the previous subsection:
 
 ```sh
-../build/Ninja-RelWithDebInfoAssert/swift-$(platform)-$(uname -m)/bin/swift-frontend --version
+../build/Ninja-RelWithDebInfoAssert/swift-${platform}-$(uname -m)/bin/swift-frontend --version
 ```
 
 This should print your updated version string.
