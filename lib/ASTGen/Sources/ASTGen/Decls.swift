@@ -31,7 +31,7 @@ extension ASTGenVisitor {
     case .deinitializerDecl(let node):
       return self.generate(deinitializerDecl: node).asDecl
     case .editorPlaceholderDecl:
-      break
+      fatalError("EditorPlaceholderDeclSyntax should not be used")
     case .enumCaseDecl(let node):
       return self.generate(enumCaseDecl: node).asDecl
     case .enumDecl(let node):
@@ -46,8 +46,8 @@ extension ASTGenVisitor {
       return self.generate(importDecl: node).asDecl
     case .initializerDecl(let node):
       return self.generate(initializerDecl: node).asDecl
-    case .macroDecl:
-      break
+    case .macroDecl(let node):
+      return self.generate(macroDecl: node)?.asDecl
     case .macroExpansionDecl(let node):
       return self.generate(macroExpansionDecl: node).asDecl
     case .missingDecl:
@@ -460,7 +460,8 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(patternBinding binding: PatternBindingSyntax) -> BridgedPatternBindingEntry {
+  func generate(patternBinding binding: PatternBindingSyntax, attrs: DeclAttributesResult) -> BridgedPatternBindingEntry {
+    // FIXME: Apply attributes.
     let pattern = generate(pattern: binding.pattern)
     let equalLoc = generateSourceLoc(binding.initializer?.equal)
 
@@ -471,7 +472,7 @@ extension ASTGenVisitor {
       // ensures that property initializers are correctly treated as being in a
       // local context).
       if !self.declContext.isLocalContext {
-        initContext = .create(declContext: self.declContext)
+        initContext = attrs.initContext ?? .create(declContext: self.declContext)
       }
       initExpr = withDeclContext(initContext?.asDeclContext ?? self.declContext) {
         generate(expr: initializer.value)
@@ -495,14 +496,14 @@ extension ASTGenVisitor {
     )
   }
 
-  private func generateBindingEntries(for node: VariableDeclSyntax) -> BridgedArrayRef {
+  private func generateBindingEntries(for node: VariableDeclSyntax, attrs: DeclAttributesResult) -> BridgedArrayRef {
     var propagatedType: BridgedTypeRepr?
     var entries: [BridgedPatternBindingEntry] = []
 
     // Generate the bindings in reverse, keeping track of the TypeRepr to
     // propagate to earlier patterns if needed.
     for binding in node.bindings.reversed() {
-      var entry = self.generate(patternBinding: binding)
+      var entry = self.generate(patternBinding: binding, attrs: attrs)
 
       // We can potentially propagate a type annotation back if we don't have an initializer, and are a bare NamedPattern.
       let canPropagateType = binding.initializer == nil && binding.pattern.is(IdentifierPatternSyntax.self)
@@ -536,16 +537,15 @@ extension ASTGenVisitor {
   }
 
   func generate(variableDecl node: VariableDeclSyntax) -> BridgedPatternBindingDecl {
-    // TODO: Attributes and modifiers
-    let isStatic = false  // TODO: compute this
+    let attrs = self.generateDeclAttributes(node, allowStatic: true)
     let isLet = node.bindingSpecifier.keywordKind == .let
 
     return .createParsed(
       self.ctx,
       declContext: self.declContext,
       bindingKeywordLoc: self.generateSourceLoc(node.bindingSpecifier),
-      entries: self.generateBindingEntries(for: node),
-      isStatic: isStatic,
+      entries: self.generateBindingEntries(for: node, attrs: attrs),
+      isStatic: attrs.staticLoc.isValid,
       isLet: isLet
     )
   }
@@ -654,6 +654,29 @@ extension ASTGenVisitor {
     }
 
     return decl
+  }
+}
+
+extension ASTGenVisitor {
+  func generate(macroDecl node: MacroDeclSyntax) -> BridgedMacroDecl? {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
+    guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
+      return nil
+    }
+    let decl = BridgedMacroDecl.createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      macroKeywordLoc: self.generateSourceLoc(node.macroKeyword),
+      name: name,
+      nameLoc: nameLoc,
+      genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
+      paramList: self.generate(functionParameterClause: node.signature.parameterClause, forSubscript: false),
+      arrowLoc: self.generateSourceLoc(node.signature.returnClause?.arrow),
+      resultType: self.generate(type: node.signature.returnClause?.type),
+      definition: self.generate(expr: node.definition?.value)
+    )
+    decl.asDecl.setAttrs(attrs.attributes);
+    return decl;
   }
 }
 

@@ -45,6 +45,9 @@ class DiagnosticEngine;
 class Identifier;
 class IfConfigClauseRangeInfo;
 struct LabeledStmtInfo;
+enum class MacroRole : uint32_t;
+class MacroIntroducedDeclName;
+enum class MacroIntroducedDeclNameKind;
 enum class ParamSpecifier : uint8_t;
 class ProtocolConformanceRef;
 class RegexLiteralPatternFeature;
@@ -60,6 +63,7 @@ struct BridgedASTType;
 class BridgedCanType;
 class BridgedASTContext;
 struct BridgedSubstitutionMap;
+class BridgedParameterList;
 
 //===----------------------------------------------------------------------===//
 // MARK: Identifier
@@ -119,6 +123,8 @@ class BridgedDeclNameRef {
   void *_Nonnull opaque;
 
 public:
+  BRIDGED_INLINE BridgedDeclNameRef();
+
   BRIDGED_INLINE BridgedDeclNameRef(swift::DeclNameRef name);
 
   BRIDGED_INLINE swift::DeclNameRef unbridged() const;
@@ -600,6 +606,13 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedStringRef cName);
 
 SWIFT_NAME(
+    "BridgedCustomAttr.createParsed(_:atLoc:type:initContext:argumentList:)")
+BridgedCustomAttr BridgedCustomAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc, BridgedTypeRepr cType,
+    BridgedNullablePatternBindingInitializer cInitContext,
+    BridgedNullableArgumentList cArgumentList);
+
+SWIFT_NAME(
     "BridgedDynamicReplacementAttr.createParsed(_:atLoc:attrNameLoc:lParenLoc:"
     "replacedFunction:rParenLoc:)")
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
@@ -685,6 +698,51 @@ SWIFT_NAME("BridgedMainTypeAttr.createParsed(_:atLoc:nameLoc:)")
 BridgedMainTypeAttr BridgedMainTypeAttr_createParsed(BridgedASTContext cContext,
                                                      BridgedSourceLoc cAtLoc,
                                                      BridgedSourceLoc cNameLoc);
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedMacroSyntax {
+  BridgedMacroSyntaxFreestanding,
+  BridgedMacroSyntaxAttached,
+};
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedMacroIntroducedDeclNameKind {
+  BridgedMacroIntroducedDeclNameKindNamed,
+  BridgedMacroIntroducedDeclNameKindOverloaded,
+  BridgedMacroIntroducedDeclNameKindPrefixed,
+  BridgedMacroIntroducedDeclNameKindSuffixed,
+  BridgedMacroIntroducedDeclNameKindArbitrary,
+};
+
+BRIDGED_INLINE swift::MacroIntroducedDeclNameKind
+unbridge(BridgedMacroIntroducedDeclNameKind kind);
+
+struct BridgedMacroIntroducedDeclName {
+  BridgedMacroIntroducedDeclNameKind kind;
+  BridgedDeclNameRef name;
+
+  BRIDGED_INLINE swift::MacroIntroducedDeclName unbridged() const;
+};
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedMacroRole {
+#define MACRO_ROLE(Name, Description) BridgedMacroRole##Name,
+#include "swift/Basic/MacroRoles.def"
+  BridgedMacroRoleNone,
+};
+
+BRIDGED_INLINE swift::MacroRole unbridge(BridgedMacroRole cRole);
+
+SWIFT_NAME("BridgedMacroRole.init(from:)")
+BridgedMacroRole BridgedMacroRole_fromString(BridgedStringRef str);
+
+SWIFT_NAME("getter:BridgedMacroRole.isAttached(self:)")
+BRIDGED_INLINE bool BridgedMacroRole_isAttached(BridgedMacroRole role);
+
+SWIFT_NAME("BridgedMacroRoleAttr.createParsed(_:atLoc:range:syntax:lParenLoc:"
+           "role:names:conformances:rParenLoc:)")
+BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedMacroSyntax cSyntax,
+    BridgedSourceLoc cLParenLoc, BridgedMacroRole cRole, BridgedArrayRef cNames,
+    BridgedArrayRef cConformances, BridgedSourceLoc cRParenLoc);
 
 SWIFT_NAME(
     "BridgedSwiftNativeObjCRuntimeBaseAttr.createParsed(_:atLoc:range:name:)")
@@ -1002,6 +1060,16 @@ BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
     BridgedSourceLoc cNameLoc, BridgedArrayRef cInheritedTypes,
     BridgedNullableTypeRepr opaqueDefaultType,
     BridgedNullableTrailingWhereClause genericWhereClause);
+
+SWIFT_NAME(
+    "BridgedMacroDecl.createParsed(_:declContext:macroKeywordLoc:name:nameLoc:"
+    "genericParamList:paramList:arrowLoc:resultType:definition:)")
+BridgedMacroDecl BridgedMacroDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cMacroLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList cGenericParams,
+    BridgedParameterList cParams, BridgedSourceLoc cArrowLoc,
+    BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition);
 
 SWIFT_NAME("BridgedMacroExpansionDecl.createParsed(_:poundLoc:macroNameRef:"
            "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")

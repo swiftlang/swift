@@ -40,12 +40,13 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Bridging/MacroEvaluation.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "llvm/Config/config.h"
@@ -2091,7 +2092,19 @@ ResolveMacroConformances::evaluate(Evaluator &evaluator,
   auto &ctx = dc->getASTContext();
 
   SmallVector<Type, 2> protocols;
-  for (auto *typeExpr : attr->getConformances()) {
+  for (Expr *&expr : const_cast<MacroRoleAttr *>(attr)->getConformances()) {
+    using namespace constraints;
+    auto target = SyntacticElementTarget(expr, dc, CTP_Unused, Type(),
+                                         /*isDiscarded=*/true);
+    if (ConstraintSystem::preCheckTarget(target))
+      continue;
+    auto *typeExpr = dyn_cast<TypeExpr>(target.getAsExpr());
+    if (!typeExpr) {
+      ctx.Diags.diagnose(expr->getStartLoc(), diag::expected_type);
+      continue;
+    }
+    expr = typeExpr;
+
     if (auto *typeRepr = typeExpr->getTypeRepr()) {
       auto resolved =
           TypeResolution::forInterface(

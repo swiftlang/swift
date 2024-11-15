@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Assertions.h"
 
@@ -127,6 +128,16 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged())
       CDeclAttr(cName.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
                 /*Implicit=*/false);
+}
+
+BridgedCustomAttr BridgedCustomAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc, BridgedTypeRepr cType,
+    BridgedNullablePatternBindingInitializer cInitContext,
+    BridgedNullableArgumentList cArgumentList) {
+  ASTContext &context = cContext.unbridged();
+  return CustomAttr::create(
+      context, cAtLoc.unbridged(), new (context) TypeExpr(cType.unbridged()),
+      cInitContext.unbridged(), cArgumentList.unbridged());
 }
 
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
@@ -264,6 +275,44 @@ BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
                                                  BridgedInlineKind cKind) {
   return new (cContext.unbridged())
       InlineAttr(cAtLoc.unbridged(), cRange.unbridged(), unbridged(cKind));
+}
+
+BridgedMacroRole BridgedMacroRole_fromString(BridgedStringRef str) {
+  // Match the role string to the known set of roles.
+  auto role =
+      llvm::StringSwitch<std::optional<BridgedMacroRole>>(str.unbridged())
+#define MACRO_ROLE(Name, Description) .Case(Description, BridgedMacroRole##Name)
+#include "swift/Basic/MacroRoles.def"
+          .Default(std::nullopt);
+  return role.has_value() ? *role : BridgedMacroRoleNone;
+}
+
+MacroSyntax unbridge(BridgedMacroSyntax cSyntax) {
+  switch (cSyntax) {
+  case BridgedMacroSyntaxAttached:
+    return MacroSyntax::Attached;
+  case BridgedMacroSyntaxFreestanding:
+    return MacroSyntax::Freestanding;
+  }
+}
+
+BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedMacroSyntax cSyntax,
+    BridgedSourceLoc cLParenLoc, BridgedMacroRole cRole, BridgedArrayRef cNames,
+    BridgedArrayRef cConformances, BridgedSourceLoc cRParenLoc) {
+  SmallVector<MacroIntroducedDeclName, 2> names;
+  for (auto &n : cNames.unbridged<BridgedMacroIntroducedDeclName>())
+    names.push_back(n.unbridged());
+
+  SmallVector<Expr *, 2> conformances;
+  for (auto &t : cConformances.unbridged<BridgedExpr>())
+    conformances.push_back(t.unbridged());
+
+  return MacroRoleAttr::create(
+      cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
+      unbridge(cSyntax), cLParenLoc.unbridged(), unbridge(cRole), names,
+      conformances, cRParenLoc.unbridged(), /*implicit=*/false);
 }
 
 BridgedMainTypeAttr

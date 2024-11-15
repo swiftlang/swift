@@ -68,6 +68,7 @@ class Boxed<Value> {
   }
 }
 
+/// Generate AST from ``SwiftSyntax/Syntax``.
 struct ASTGenVisitor {
   let diagnosticEngine: BridgedDiagnosticEngine
 
