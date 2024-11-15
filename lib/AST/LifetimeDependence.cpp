@@ -513,16 +513,6 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     if (accessor->getAccessorKind() == AccessorKind::Set) {
       return inferSetter(accessor);
     }
-  } else if (auto *fd = dyn_cast<FuncDecl>(afd)) {
-    // Infer self dependence for a mutating function with no result.
-    //
-    // FIXME: temporary hack until we have dependsOn(self: param) syntax.
-    // Do not apply this to accessors (_modify). _modify is handled below like
-    // a mutating method.
-    if (fd->isMutating() && fd->getResultInterfaceType()->isVoid() &&
-        !dc->getSelfTypeInContext()->isEscapable()) {
-      return inferMutatingSelf(afd);
-    }
   }
 
   if (hasEscapableResultOrYield(afd)) {
