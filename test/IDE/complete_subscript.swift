@@ -1,23 +1,4 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_UNRESOLVED | %FileCheck %s -check-prefix=METATYPE_UNRESOLVED
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_UNRESOLVED_BRACKET | %FileCheck %s -check-prefix=METATYPE_UNRESOLVED_BRACKET
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_INT | %FileCheck %s -check-prefix=METATYPE_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_INT_BRACKET | %FileCheck %s -check-prefix=METATYPE_INT_BRACKET
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSTANCE_INT | %FileCheck %s -check-prefix=INSTANCE_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSTANCE_INT_BRACKET | %FileCheck %s -check-prefix=INSTANCE_INT_BRACKET
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_ARCHETYPE | %FileCheck %s -check-prefix=METATYPE_ARCHETYPE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_ARCHETYPE_BRACKET | %FileCheck %s -check-prefix=METATYPE_ARCHETYPE_BRACKET
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSTANCE_ARCHETYPE | %FileCheck %s -check-prefix=INSTANCE_ARCHETYPE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSTANCE_ARCHETYPE_BRACKET | %FileCheck %s -check-prefix=INSTANCE_ARCHETYPE_BRACKET
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_LABEL | %FileCheck %s -check-prefix=METATYPE_LABEL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSTANCE_LABEL | %FileCheck %s -check-prefix=INSTANCE_LABEL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SELF_IN_INSTANCEMETHOD | %FileCheck %s -check-prefix=SELF_IN_INSTANCEMETHOD
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_IN_INSTANCEMETHOD | %FileCheck %s -check-prefix=SUPER_IN_INSTANCEMETHOD
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SELF_IN_STATICMETHOD | %FileCheck %s -check-prefix=SELF_IN_STATICMETHOD
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_IN_STATICMETHOD | %FileCheck %s -check-prefix=SUPER_IN_STATICMETHOD
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABELED_SUBSCRIPT | %FileCheck %s -check-prefix=LABELED_SUBSCRIPT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE | %FileCheck %s -check-prefix=TUPLE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SETTABLE_SUBSCRIPT | %FileCheck %s -check-prefix=SETTABLE_SUBSCRIPT
+// RUN: %batch-code-completion
 
 struct MyStruct<T> {
   static subscript(x: Int, static defValue: T) -> MyStruct<T> {
