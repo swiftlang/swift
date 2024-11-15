@@ -854,20 +854,7 @@ exit(%outer_lifetime_3 : @guaranteed $Klass, %inner_lifetime_2 : @guaranteed $Kl
 }
 
 // CHECK-LABEL: sil [ossa] @reborrow_guaranteed_phi2 : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[EITHER:%[^,]+]] : @owned $EitherNoneOrAnyObject):
-// CHECK:         [[BORROW_EITHER:%[^,]+]] = begin_borrow [[EITHER]]
-// CHECK:         switch_enum [[BORROW_EITHER]] : $EitherNoneOrAnyObject, case #EitherNoneOrAnyObject.none!enumelt: [[NONE_BLOCK:bb[0-9]+]], case #EitherNoneOrAnyObject.any!enumelt: [[SOME_BLOCK:bb[0-9]+]]
-// CHECK:       [[SOME_BLOCK]]([[PAYLOAD:%[^,]+]] : @guaranteed $AnyObject):
-// CHECK:         end_borrow [[BORROW_EITHER]]
-// CHECK:         destroy_value [[EITHER]]
-// CHECK:         br [[EXIT:bb[0-9]+]]
-// CHECK:       [[NONE_BLOCK]]:
-// CHECK:         end_borrow [[BORROW_EITHER]]
-// CHECK:         destroy_value [[EITHER]]
-// CHECK:         br [[EXIT]]
-// CHECK:       [[EXIT]]:
-// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
-// CHECK:         return [[RETVAL]]
+// CHECK-NOT: switch_enum
 // CHECK-LABEL: } // end sil function 'reborrow_guaranteed_phi2'
 sil [ossa] @reborrow_guaranteed_phi2 : $@convention(thin) (@owned EitherNoneOrAnyObject) -> () {
 entry(%0 : @owned $EitherNoneOrAnyObject):
@@ -952,6 +939,62 @@ bb1(%4 : @guaranteed $Klass, %5 : @guaranteed $Klass):
   return %8 : $()
 }
 
+class Wrapper {
+  let val: Klass
+}
+
+class DoubleWrapper {
+  let s: StructWrapper
+}
+
+struct StructWrapper {
+  let val: Klass
+}
+
+// CHECK-LABEL: sil [ossa] @reborrow_load_borrow3 : $@convention(method) (@owned Wrapper) -> () {
+// CHECK: load_borrow
+// CHECK: end_borrow
+// CHECK: br bb1
+// CHECK-LABEL: } // end sil function 'reborrow_load_borrow3'
+sil [ossa] @reborrow_load_borrow3 : $@convention(method) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0 : $Wrapper
+  %2 = ref_element_addr %1 : $Wrapper, #Wrapper.val
+  %3 = load_borrow %2 : $*Klass
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%1 : $Wrapper, %3 : $Klass)
+
+bb1(%4 :  @guaranteed $Wrapper, %5 :  @guaranteed $Klass):
+  end_borrow %5 : $Klass
+  end_borrow %4 : $Wrapper
+  destroy_value %0 : $Wrapper
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @reborrow_load_borrow4 : $@convention(method) (@owned DoubleWrapper) -> () {
+// CHECK: load_borrow
+// CHECK: end_borrow
+// CHECK: br bb1
+// CHECK-LABEL: } // end sil function 'reborrow_load_borrow4'
+sil [ossa] @reborrow_load_borrow4 : $@convention(method) (@owned DoubleWrapper) -> () {
+bb0(%0 : @owned $DoubleWrapper):
+  %1 = begin_borrow %0 : $DoubleWrapper
+  %2 = ref_element_addr %1 : $DoubleWrapper, #DoubleWrapper.s
+  %4 = struct_element_addr %2 : $*StructWrapper, #StructWrapper.val
+  %5 = load_borrow %4 : $*Klass
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%1 : $DoubleWrapper, %5 : $Klass)
+
+bb1(%6 : @guaranteed $DoubleWrapper, %7 : @guaranteed $Klass):
+  end_borrow %7 : $Klass
+  end_borrow %6 : $DoubleWrapper
+  destroy_value %0 : $DoubleWrapper
+  %8 = tuple ()
+  return %8 : $()
+}
 
 // CHECK-LABEL: sil [ossa] @borrow_guaranteed_tuple : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $Klass, [[INSTANCE_2:%[^,]+]] : @owned $Klass):
