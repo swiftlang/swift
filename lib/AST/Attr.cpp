@@ -353,7 +353,16 @@ bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) 
   llvm_unreachable("bad DeclKind");
 }
 
+// Ensure that every DeclAttribute subclass implements its own CloneAttr.
+static void checkDeclAttributeClones() {
+#define DECL_ATTR(_,CLASS,...) \
+  CLASS##Attr *(CLASS##Attr::*ptr##CLASS)(ASTContext &) const = &CLASS##Attr::clone; \
+  (void)ptr##CLASS;
+#include "swift/AST/DeclAttr.def"
+}
+
 DeclAttribute *DeclAttribute::clone(ASTContext &ctx) const {
+  (void)checkDeclAttributeClones;
   switch (getKind()) {
 #define DECL_ATTR(_,CLASS, ...) \
   case DeclAttrKind::CLASS: return static_cast<const CLASS##Attr *>(this)->clone(ctx);

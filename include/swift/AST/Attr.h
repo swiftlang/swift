@@ -1164,7 +1164,7 @@ public:
     return DA->getKind() == DeclAttrKind::TypeEraser;
   }
 
-  UNIMPLEMENTED_CLONE(DynamicReplacementAttr)
+  UNIMPLEMENTED_CLONE(TypeEraserAttr)
 };
 
 /// Represents any sort of access control modifier.
@@ -2814,7 +2814,7 @@ public:
     return DA->getKind() == DeclAttrKind::RawLayout;
   }
 
-  UNIMPLEMENTED_CLONE(MacroRoleAttr)
+  UNIMPLEMENTED_CLONE(RawLayoutAttr)
 };
 
 class LifetimeAttr final : public DeclAttribute {
