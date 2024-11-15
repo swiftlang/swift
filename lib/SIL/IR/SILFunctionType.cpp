@@ -108,6 +108,11 @@ CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
                               getWitnessMethodConformanceOrInvalid());
 }
 
+CanType SILParameterInfo::getArgumentType(SILFunction *fn) const {
+  return getArgumentType(fn->getModule(), fn->getLoweredFunctionType(),
+                         fn->getTypeExpansionContext());
+}
+
 CanType SILParameterInfo::getArgumentType(SILModule &M,
                                           const SILFunctionType *t,
                                           TypeExpansionContext context) const {
@@ -1817,7 +1822,7 @@ private:
   /// Add a parameter that we derived from deconstructing the
   /// formal type.
   void addParameter(CanType loweredType, ParameterConvention convention,
-                    ParameterTypeFlags origFlags) {
+                    ParameterTypeFlags origFlags, bool isImplicit = false) {
     SILParameterInfo param(loweredType, convention);
 
     if (origFlags.isNoDerivative())
@@ -1826,6 +1831,8 @@ private:
       param = param.addingOption(SILParameterInfo::Sending);
     if (origFlags.isIsolated())
       param = param.addingOption(SILParameterInfo::Isolated);
+    if (isImplicit)
+      param = param.addingOption(SILParameterInfo::ImplicitLeading);
 
     Inputs.push_back(param);
     maybeAddForeignParameters();

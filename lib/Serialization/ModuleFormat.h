@@ -413,6 +413,7 @@ enum class SILParameterInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
   Isolated = 0x2,
   Sending = 0x4,
+  ImplicitLeading = 0x8,
 };
 
 using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;

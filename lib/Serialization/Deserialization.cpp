@@ -6759,6 +6759,11 @@ getActualSILParameterOptions(uint8_t raw) {
     result |= SILParameterInfo::Sending;
   }
 
+  if (options.contains(serialization::SILParameterInfoFlags::ImplicitLeading)) {
+    options -= serialization::SILParameterInfoFlags::ImplicitLeading;
+    result |= SILParameterInfo::ImplicitLeading;
+  }
+
   // Check if we have any remaining options and return none if we do. We found
   // some option that we did not understand.
   if (bool(options)) {

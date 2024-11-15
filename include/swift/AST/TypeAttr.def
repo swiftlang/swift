@@ -111,6 +111,7 @@ SIMPLE_SIL_TYPE_ATTR(captures_generics, CapturesGenerics)
 SIMPLE_SIL_TYPE_ATTR(moveOnly, MoveOnly)
 SIMPLE_SIL_TYPE_ATTR(sil_isolated, SILIsolated)
 SIMPLE_SIL_TYPE_ATTR(sil_sending, SILSending)
+SIMPLE_SIL_TYPE_ATTR(sil_implicit_leading_param, SILImplicitLeadingParam)
 
 // SIL metatype attributes.
 SIMPLE_SIL_TYPE_ATTR(thin, Thin)
