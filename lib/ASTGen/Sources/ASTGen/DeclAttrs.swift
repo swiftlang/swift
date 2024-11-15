@@ -22,6 +22,7 @@ extension ASTGenVisitor {
     var attributes: BridgedDeclAttributes
     var staticSpelling: BridgedStaticSpelling
     var staticLoc: BridgedSourceLoc
+    var initContext: BridgedPatternBindingInitializer?
   }
 
   func generateDeclAttributes(_ node: some WithAttributesSyntax & WithModifiersSyntax, allowStatic: Bool) -> DeclAttributesResult {
@@ -54,6 +55,7 @@ extension ASTGenVisitor {
     }
 
     // '@' attributes.
+    var initContext: BridgedPatternBindingInitializer? = nil
     visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
       switch element {
       case .ifConfigDecl(let ifConfigDecl):
@@ -62,7 +64,7 @@ extension ASTGenVisitor {
         return .underlying(attribute)
       }
     } body: { attribute in
-      addAttribute(self.generateDeclAttribute(attribute: attribute))
+      addAttribute(self.generateDeclAttribute(attribute: attribute, initContext: &initContext))
     }
 
     func genStatic(node: DeclModifierSyntax, spelling: BridgedStaticSpelling) {
@@ -89,14 +91,15 @@ extension ASTGenVisitor {
     return DeclAttributesResult(
       attributes: attrs,
       staticSpelling: staticSpelling,
-      staticLoc: staticLoc
+      staticLoc: staticLoc,
+      initContext: initContext
     )
   }
 }
 
 // MARK: - Decl attributes
 extension ASTGenVisitor {
-  func generateDeclAttribute(attribute node: AttributeSyntax) -> BridgedDeclAttribute? {
+  func generateDeclAttribute(attribute node: AttributeSyntax, initContext: inout BridgedPatternBindingInitializer?) -> BridgedDeclAttribute? {
     if let identTy = node.attributeName.as(IdentifierTypeSyntax.self) {
       let attrName = identTy.name.rawText
       let attrKind = BridgedDeclAttrKind(from: attrName.bridged)
@@ -135,7 +138,7 @@ extension ASTGenVisitor {
       case .mainType:
         return self.generateMainTypeAttr(attribute: node)?.asDeclAttribute
       case .macroRole:
-        fatalError("unimplemented")
+        return self.generateMacroRoleAttr(attribute: node, attrName: attrName)?.asDeclAttribute
       case .noExistentials:
         fatalError("unimplemented")
       case .noObjCBridging:
@@ -319,7 +322,7 @@ extension ASTGenVisitor {
       }
     }
 
-    return self.generateCustomAttr(attribute: node)?.asDeclAttribute
+    return self.generateCustomAttr(attribute: node, initContext: &initContext)?.asDeclAttribute
   }
 
   func generateAlignmentAttr(attribute node: AttributeSyntax) -> BridgedAlignmentAttr? {
@@ -674,6 +677,185 @@ extension ASTGenVisitor {
     )
   }
 
+  func generateMacroIntroducedDeclNameKind(declReferenceExpr node: DeclReferenceExprSyntax) -> BridgedMacroIntroducedDeclNameKind? {
+    if node.argumentNames != nil {
+      // TODO: Diagnose
+    }
+    guard node.argumentNames == nil else {
+      return nil
+    }
+    switch node.baseName.rawText {
+    case "arbitrary":
+      return .arbitrary
+    case "named":
+      return .named
+    case "overloaded":
+      return .overloaded
+    case "prefixed":
+      return .prefixed
+    case "suffixed":
+      return .suffixed
+    default:
+      return nil
+    }
+  }
+
+  func generateMacroIntroducedDeclName(expr node: ExprSyntax) -> BridgedMacroIntroducedDeclName? {
+    let kind: BridgedMacroIntroducedDeclNameKind?
+    let arguments: LabeledExprListSyntax?
+    if let kindExpr = node.as(DeclReferenceExprSyntax.self) {
+      kind = self.generateMacroIntroducedDeclNameKind(declReferenceExpr: kindExpr)
+      arguments = nil
+    } else if let callExpr =  node.as(FunctionCallExprSyntax.self) {
+      if let kindExpr = callExpr.calledExpression.as(DeclReferenceExprSyntax.self) {
+        kind = self.generateMacroIntroducedDeclNameKind(declReferenceExpr: kindExpr)
+      } else {
+        kind = nil
+      }
+      arguments = callExpr.arguments
+    } else {
+      kind = nil
+      arguments = nil
+    }
+    guard let kind else {
+      // TODO: Diagnose.
+      return nil
+    }
+
+    let name: BridgedDeclNameRef
+    switch kind {
+    case .named, .prefixed, .suffixed:
+      guard let arguments else {
+        // TODO: Diagnose
+        return nil
+      }
+      guard var arg = arguments.first?.expression else {
+        // TODO: Diagnose.
+        return nil
+      }
+      if let call = arg.as(FunctionCallExprSyntax.self), call.arguments.isEmpty {
+        // E.g. 'named(foo())', use the callee to generate the name.
+        arg = call.calledExpression
+      }
+      guard let arg = arg.as(DeclReferenceExprSyntax.self) else {
+        // TODO: Diagnose.
+        return nil
+      }
+      name = self.generateDeclNameRef(declReferenceExpr: arg).name
+      if arguments.count >= 2 {
+        // TODO: Diagnose.
+      }
+
+    case .overloaded, .arbitrary:
+      if arguments != nil {
+        // TODO: Diagnose
+      }
+      name = BridgedDeclNameRef()
+    }
+
+    return BridgedMacroIntroducedDeclName(kind: kind, name: name)
+  }
+
+  func generateMacroRoleAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedMacroRoleAttr? {
+    // '@freestanding' or '@attached'.
+    assert(attrName == "freestanding" || attrName == "attached")
+    let syntax: BridgedMacroSyntax =
+      attrName == "freestanding" ? .freestanding : .attached;
+    let isAttached = syntax == .attached
+
+    // Start consuming arguments.
+    guard
+      var args = node.arguments?.as(LabeledExprListSyntax.self)?[...]
+    else {
+      // TODO: Diagnose.
+      return nil
+    }
+
+    // Macro role.
+    let role = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+      BridgedMacroRole(from: $0.rawText.bridged)
+    }
+    guard let role = role else {
+      return nil
+    }
+    guard role != .none else {
+      // TODO: Diagnose.
+      return nil
+    }
+    if role.isAttached != isAttached {
+      // TODO: Diagnose.
+      return nil
+    }
+
+    var names: [BridgedMacroIntroducedDeclName] = []
+    var conformances: [BridgedExpr] = []
+
+    enum ArgState {
+      case inNames
+      case inConformances
+      case inInvalid
+    }
+    // Assume we're in 'names:' arguments.
+    var argState: ArgState = .inNames
+    // Seen at 'names:' argument label.
+    var seenNames = false
+    // Seen at 'conformances:' argument label.
+    var seenConformances = false
+
+    LOOP: while let arg = args.popFirst() {
+      // Argument state.
+      if let label = arg.label {
+        switch label.tokenKind {
+        case .identifier("names"):
+          argState = .inNames
+          if seenNames {
+            // TODO: Diagnose duplicated 'names:'.
+          }
+          seenNames = true
+        case .identifier("conformances"):
+          argState = .inConformances
+          if seenConformances {
+            // TODO: Diagnose duplicated 'conformances:'.
+          }
+          seenConformances = true
+        default:
+          // Invalid label.
+          // TODO: Diagnose `no argument with label '\(label)'`.
+          argState = .inInvalid
+        }
+      } else if argState == .inNames && !seenNames {
+        // E.g. `@attached(member, named(foo))` this is missing 'names:'
+        // TODO: Diagnose to insert 'names:'
+        seenNames = true
+      }
+
+      // Argument values.
+      switch argState {
+      case .inNames:
+        if let name = self.generateMacroIntroducedDeclName(expr: arg.expression) {
+          names.append(name)
+        }
+      case .inConformances:
+        conformances.append(self.generate(expr: arg.expression))
+      case .inInvalid:
+        // Ignore the value.
+        break
+      }
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateSourceRange(node),
+      syntax: syntax,
+      lParenLoc: self.generateSourceLoc(node.leftParen),
+      role: role,
+      names: names.lazy.bridgedArray(in: self),
+      conformances: conformances.lazy.bridgedArray(in: self),
+      rParenLoc: self.generateSourceLoc(node.rightParen)
+    )
+  }
+
   func generateNonSendableAttr(attribute node: AttributeSyntax) -> BridgedNonSendableAttr? {
     let kind: BridgedNonSendableKind? = self.generateSingleAttrOption(
       attribute: node,
@@ -984,16 +1166,39 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateCustomAttr(attribute node: AttributeSyntax) -> BridgedCustomAttr? {
-    guard
-      let args = node.arguments?.as(LabeledExprListSyntax.self)?[...]
-    else {
-      // TODO: Diagnose.
-      return nil
+  func generateCustomAttr(attribute node: AttributeSyntax, initContext: inout BridgedPatternBindingInitializer?) -> BridgedCustomAttr? {
+    let type = self.generate(type: node.attributeName)
+
+    let argList: BridgedArgumentList?
+    if let args = node.arguments {
+      guard let args = args.as(LabeledExprListSyntax.self) else {
+        // TODO: Diagnose?
+        return nil
+      }
+
+      if !self.declContext.isLocalContext && initContext == nil {
+        initContext = BridgedPatternBindingInitializer.create(declContext: self.declContext)
+      }
+      argList = withDeclContext(initContext?.asDeclContext ?? self.declContext) {
+        self.generateArgumentList(
+          leftParen: node.leftParen,
+          labeledExprList: args,
+          rightParen: node.rightParen,
+          trailingClosure: nil,
+          additionalTrailingClosures: nil
+        )
+      }
+    } else {
+      argList = nil
     }
 
-    _ = args
-    fatalError("unimplemented")
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      type: type,
+      initContext: initContext.asNullable,
+      argumentList: argList.asNullable
+    )
   }
 
   func generateStringLiteralTextIfNotInterpolated(expr node: some ExprSyntaxProtocol) -> BridgedStringRef? {

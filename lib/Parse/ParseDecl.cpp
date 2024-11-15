@@ -2429,7 +2429,7 @@ Parser::parseMacroRoleAttribute(
   bool sawConformances = false;
   bool sawNames = false;
   SmallVector<MacroIntroducedDeclName, 2> names;
-  SmallVector<TypeExpr *, 2> conformances;
+  SmallVector<Expr *, 2> conformances;
   auto argumentsStatus = parseList(
       tok::r_paren, lParenLoc, rParenLoc,
       /*AllowSepAfterLast=*/false, diag::expected_rparen_expr_list, [&] {
@@ -2525,9 +2525,9 @@ Parser::parseMacroRoleAttribute(
           sawConformances = true;
 
           // Parse the introduced conformances
-          auto type = parseType();
-          auto *typeExpr = new (Context) TypeExpr(type.get());
-          conformances.push_back(typeExpr);
+          auto expr = parseExpr(diag::expected_type);
+          if (expr.isNonNull())
+            conformances.push_back(expr.get());
 
           return status;
         }
