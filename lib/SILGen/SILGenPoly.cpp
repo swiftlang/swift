@@ -5438,7 +5438,10 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     SubstitutionMap &interfaceSubs,
     CanType &dynamicSelfType,
     bool withoutActuallyEscaping) {
-  return buildSILFunctionThunkType(&F, sourceType, expectedType, inputSubstType, outputSubstType, genericEnv, interfaceSubs, dynamicSelfType, withoutActuallyEscaping);
+  return buildSILFunctionThunkType(
+      &F, sourceType, expectedType, inputSubstType, outputSubstType,
+      genericEnv, interfaceSubs, dynamicSelfType,
+      withoutActuallyEscaping);
 }
 
 static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
@@ -7227,8 +7230,7 @@ void SILGenFunction::emitProtocolWitness(
     auto deallocCleanup = std::get<3>(tokenAndCleanups);
 
     YieldInfo witnessYieldInfo(SGM, witness, witnessFTy, witnessSubs);
-    YieldInfo reqtYieldInfo(SGM, requirement, thunkTy,
-                            reqtSubs.subst(getForwardingSubstitutionMap()));
+    YieldInfo reqtYieldInfo(SGM, requirement, thunkTy, reqtSubs);
 
     translateYields(*this, loc, witnessYields, witnessYieldInfo, reqtYieldInfo);
 

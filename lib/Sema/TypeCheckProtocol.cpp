@@ -4887,10 +4887,16 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   auto proto = conformance->getProtocol();
   auto &diags = ctx.Diags;
 
-  auto *const module = dc->getParentModule();
-  auto substitutingType = dc->mapTypeIntoContext(conformance->getType());
+  auto typeInContext = conformance->getType();
+  ProtocolConformanceRef conformanceInContext(conformance);
+  if (auto *genericEnv = conformance->getGenericEnvironment()) {
+    typeInContext = genericEnv->mapTypeIntoContext(typeInContext);
+    conformanceInContext =
+      conformanceInContext.subst(conformance->getType(),
+                                 genericEnv->getForwardingSubstitutionMap());
+  }
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
-      proto, substitutingType, ProtocolConformanceRef(conformance));
+      proto, typeInContext, conformanceInContext);
 
   auto reqSig = proto->getRequirementSignature().getRequirements();
 
@@ -4911,7 +4917,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   }
 
   const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
-      module, reqSig, QuerySubstitutionMap{substitutions});
+      reqSig, QuerySubstitutionMap{substitutions});
   switch (result.getKind()) {
   case CheckRequirementsResult::Success:
     // Go on to check exportability.
@@ -4924,13 +4930,13 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
     if (!conformance->isInvalid()) {
       if (result.getKind() == CheckRequirementsResult::RequirementFailure) {
         ctx.addDelayedConformanceDiag(conformance, /*isError=*/true,
-          [result, proto, substitutions, module](NormalProtocolConformance *conformance) {
+          [result, proto, substitutions](NormalProtocolConformance *conformance) {
             TypeChecker::diagnoseRequirementFailure(
               result.getRequirementFailureInfo(),
               conformance->getLoc(), conformance->getLoc(),
               proto->getDeclaredInterfaceType(),
               {proto->getSelfInterfaceType()->castTo<GenericTypeParamType>()},
-              QuerySubstitutionMap{substitutions}, module);
+              QuerySubstitutionMap{substitutions});
           });
       }
 
@@ -5335,7 +5341,7 @@ void swift::diagnoseConformanceFailure(Type T,
   if (T->hasError())
     return;
 
-  ASTContext &ctx = DC->getASTContext();
+  ASTContext &ctx = Proto->getASTContext();
   auto &diags = ctx.Diags;
 
   // If we're checking conformance of an existential type to a protocol,
@@ -5443,7 +5449,7 @@ void swift::diagnoseConformanceFailure(Type T,
                          T);
 
       // Try to suggest inheriting from NSObject instead.
-      auto classDecl = dyn_cast<ClassDecl>(DC);
+      auto classDecl = dyn_cast_or_null<ClassDecl>(DC);
       if (!classDecl)
         return;
 

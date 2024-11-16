@@ -213,8 +213,9 @@ public:
   /// interface types.
   SubstitutionMap mapReplacementTypesOutOfContext() const;
 
-  /// Verify that this substitution map is valid.
-  void verify() const;
+  /// Verify that the conformances stored in this substitution map match the
+  /// replacement types provided.
+  void verify(bool allowInvalid=true) const;
 
   /// Whether to dump the full substitution map, or just a minimal useful subset
   /// (on a single line).
