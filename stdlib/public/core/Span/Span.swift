@@ -46,6 +46,15 @@ public struct Span<Element: ~Copyable & ~Escapable>
   @usableFromInline
   internal let _count: Int
 
+  /// FIXME: Remove once supported old compilers can recognize lifetime dependence 
+  @_unsafeNonescapableResult
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal init() {
+    _pointer = nil
+    _count = 0
+  }
+
   /// Unsafely create a `Span` over initialized memory.
   ///
   /// `pointer` must point to a region of `count` initialized instances,
