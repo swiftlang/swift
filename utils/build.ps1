@@ -1237,11 +1237,17 @@ function Build-SPMProject {
     [string[]] $AdditionalArguments
   )
 
+  $ActionForOutput = switch ($Action) {
+    Build { "Building" }
+    Test { "Testing" }
+    TestParallel { "Testing" }
+  }
+
   if ($ToBatch) {
     Write-Output ""
-    Write-Output "echo Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
+    Write-Output "echo $ActionForOutput '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
   } else {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] $ActionForOutput '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
   }
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
