@@ -10540,24 +10540,29 @@ ArrayRef<VarDecl *> AccessorDecl::getAccessedProperties() const {
   return {};
 }
 
+bool AccessorDecl::isRequirementWithSynthesizedDefaultImplementation() const {
+  if (!isa<ProtocolDecl>(getDeclContext()))
+    return false;
+
+  if (!getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors)) {
+    return false;
+  }
+  if (!requiresFeatureCoroutineAccessors(getAccessorKind())) {
+    return false;
+  }
+  if (getStorage()->getOverrideLoc()) {
+    return false;
+  }
+  return getStorage()->requiresCorrespondingUnderscoredCoroutineAccessor(
+      getAccessorKind(), this);
+}
+
 bool AccessorDecl::doesAccessorHaveBody() const {
   auto *accessor = this;
   auto *storage = accessor->getStorage();
 
   if (isa<ProtocolDecl>(accessor->getDeclContext())) {
-    if (!accessor->getASTContext().LangOpts.hasFeature(
-            Feature::CoroutineAccessors)) {
-      return false;
-    }
-    if (!requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
-      return false;
-    }
-    if (storage->getOverrideLoc()) {
-      return false;
-    }
-    return accessor->getStorage()
-        ->requiresCorrespondingUnderscoredCoroutineAccessor(
-            accessor->getAccessorKind(), accessor);
+    return isRequirementWithSynthesizedDefaultImplementation();
   }
 
   // NSManaged getters and setters don't have bodies.
