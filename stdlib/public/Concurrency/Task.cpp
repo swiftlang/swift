@@ -1044,16 +1044,44 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
                        " with parent %p at base pri %zu",
                        task, task->getTaskId(), parent, basePriority);
 
+  // Configure the initial context.
+
+  // Initialize the parent context pointer to null.
+  initialContext->Parent = nullptr;
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
-  // Initialize the task-local allocator.
-  initialContext->ResumeParent =
-      runInlineOption ? &completeInlineTask
-                      : reinterpret_cast<TaskContinuationFunction *>(
-                            asyncLet         ? &completeTask
-                            : closureContext ? &completeTaskWithClosure
-                                             : &completeTaskAndRelease);
+  // Initialize the resumption funclet pointer (async return address) to
+  // the final funclet for completing the task.
+
+  // Inline tasks are unmanaged, non-throwing, and use a non-escaping
+  // task function.  The final funclet doesn't expect to get passed an error,
+  // and it doesn't clean up either the function or the task directly.
+  if (runInlineOption) {
+    initialContext->ResumeParent = &completeInlineTask;
+
+  // `async let` tasks are unmanaged and use a non-escaping task function.
+  // The final funclet shouldn't release the task or the task function.
+  } else if (asyncLet) {
+    initialContext->ResumeParent =
+      reinterpret_cast<TaskContinuationFunction*>(&completeTask);
+
+  // If we have a non-null closure context and the task function is not
+  // consumed by calling it, use a final funclet that releases both the
+  // task and the closure context.
+  } else if (closureContext && !taskCreateFlags.isTaskFunctionConsumed()) {
+    initialContext->ResumeParent =
+      reinterpret_cast<TaskContinuationFunction*>(&completeTaskWithClosure);
+
+  // Otherwise, just release the task.
+  } else {
+    initialContext->ResumeParent =
+      reinterpret_cast<TaskContinuationFunction*>(&completeTaskAndRelease);
+  }
 #pragma clang diagnostic pop
+
+  // Initialize the task-local allocator and our other private runtime
+  // state for the task.
   if ((asyncLet || (runInlineOption && runInlineOption->getAllocation())) &&
       initialSlabSize > 0) {
     assert(parent || (runInlineOption && runInlineOption->getAllocation()));
@@ -1094,14 +1122,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
            "locals; unexpected attempt to combine the two!");
     task->_private().Local.initializeLinkParent(task, parent);
   }
-
-  // Configure the initial context.
-  //
-  // FIXME: if we store a null pointer here using the standard ABI for
-  // signed null pointers, then we'll have to authenticate context pointers
-  // as if they might be null, even though the only time they ever might
-  // be is the final hop.  Store a signed null instead.
-  initialContext->Parent = nullptr;
 
   // FIXME: add discarding flag
   // FIXME: add task executor
