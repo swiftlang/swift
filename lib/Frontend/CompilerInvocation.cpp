@@ -740,6 +740,151 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   return false;
 }
 
+static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
+                                    DiagnosticEngine &Diags,
+                                    const FrontendOptions &FrontendOpts) {
+  using namespace options;
+
+  bool HadError = false;
+
+  // Enable feature upcoming/experimental features if requested. However, leave
+  // a feature disabled if an -enable-upcoming-feature flag is superseded by a
+  // -disable-upcoming-feature flag. Since only the last flag specified is
+  // honored, we iterate over them in reverse order.
+  std::vector<StringRef> psuedoFeatures;
+  llvm::SmallSet<Feature, 8> seenFeatures;
+  for (const Arg *A : Args.filtered_reverse(
+           OPT_enable_experimental_feature, OPT_disable_experimental_feature,
+           OPT_enable_upcoming_feature, OPT_disable_upcoming_feature)) {
+    auto &option = A->getOption();
+    StringRef value = A->getValue();
+    bool enableUpcoming = option.matches(OPT_enable_upcoming_feature);
+    bool enableFeature =
+        enableUpcoming || option.matches(OPT_enable_experimental_feature);
+
+    // Collect some special case pseudo-features which should be processed
+    // separately.
+    if (value.starts_with("StrictConcurrency") ||
+        value.starts_with("AvailabilityMacro=")) {
+      if (enableFeature)
+        psuedoFeatures.push_back(value);
+      continue;
+    }
+
+    // If this was specified as an "upcoming feature", it must be recognized
+    // as one.
+    auto feature = getUpcomingFeature(value);
+    if (enableUpcoming || option.matches(OPT_disable_upcoming_feature)) {
+      if (!feature)
+        continue;
+    }
+
+    // If it's not recognized as either an upcoming feature or an experimental
+    // feature, skip it.
+    if (!feature) {
+      feature = getExperimentalFeature(value);
+      if (!feature)
+        continue;
+    }
+
+    // Skip features that are already enabled or disabled.
+    if (!seenFeatures.insert(*feature).second)
+      continue;
+
+    // If the the current language mode enables the feature by default then
+    // diagnose and skip it.
+    if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
+      if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
+        Diags
+            .diagnose(SourceLoc(), diag::error_upcoming_feature_on_by_default,
+                      getFeatureName(*feature), *firstVersion)
+            .limitBehaviorIf(!enableUpcoming, DiagnosticBehavior::Warning);
+        if (enableUpcoming)
+          HadError = true;
+
+        continue;
+      }
+    }
+
+    // If this is a known experimental feature, allow it in +Asserts
+    // (non-release) builds for testing purposes.
+    if (Opts.RestrictNonProductionExperimentalFeatures &&
+        !isFeatureAvailableInProduction(*feature)) {
+      Diags.diagnose(SourceLoc(),
+                     diag::experimental_not_supported_in_production, value);
+      HadError = true;
+      continue;
+    }
+
+    // Enable the feature if requested.
+    if (enableFeature)
+      Opts.enableFeature(*feature);
+  }
+
+  // Since pseudo-features don't have a boolean on/off state, process them in
+  // the order they were specified on the command line.
+  for (auto featureName = psuedoFeatures.rbegin(), end = psuedoFeatures.rend();
+       featureName != end; ++featureName) {
+
+    // Allow StrictConcurrency to have a value that corresponds to the
+    // -strict-concurrency=<blah> settings.
+    if (featureName->starts_with("StrictConcurrency")) {
+      auto decomposed = featureName->split("=");
+      if (decomposed.first == "StrictConcurrency") {
+        if (decomposed.second == "") {
+          Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
+        } else if (auto level = parseStrictConcurrency(decomposed.second)) {
+          Opts.StrictConcurrencyLevel = *level;
+        }
+      }
+      continue;
+    }
+
+    // Hack: In order to support using availability macros in SPM packages, we
+    // need to be able to use:
+    //    .enableExperimentalFeature("AvailabilityMacro='...'")
+    // within the package manifest and the feature recognizer can't recognize
+    // this form of feature, so specially handle it here until features can
+    // maybe have extra arguments in the future.
+    if (featureName->starts_with("AvailabilityMacro=")) {
+      auto availability = featureName->split("=").second;
+      Opts.AvailabilityMacros.push_back(availability.str());
+      continue;
+    }
+  }
+
+  // Map historical flags over to experimental features. We do this for all
+  // compilers because that's how existing experimental feature flags work.
+  if (Args.hasArg(OPT_enable_experimental_static_assert))
+    Opts.enableFeature(Feature::StaticAssert);
+  if (Args.hasArg(OPT_enable_experimental_named_opaque_types))
+    Opts.enableFeature(Feature::NamedOpaqueTypes);
+  if (Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures))
+    Opts.enableFeature(Feature::FlowSensitiveConcurrencyCaptures);
+  if (Args.hasArg(OPT_enable_experimental_move_only)) {
+    // FIXME: drop addition of Feature::MoveOnly once its queries are gone.
+    Opts.enableFeature(Feature::MoveOnly);
+    Opts.enableFeature(Feature::NoImplicitCopy);
+    Opts.enableFeature(Feature::OldOwnershipOperatorSpellings);
+  }
+  if (Args.hasArg(OPT_experimental_one_way_closure_params))
+    Opts.enableFeature(Feature::OneWayClosureParameters);
+  if (Args.hasArg(OPT_enable_experimental_forward_mode_differentiation))
+    Opts.enableFeature(Feature::ForwardModeDifferentiation);
+  if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
+    Opts.enableFeature(Feature::AdditiveArithmeticDerivedConformances);
+
+  if (Args.hasArg(OPT_enable_experimental_opaque_type_erasure))
+    Opts.enableFeature(Feature::OpaqueTypeErasure);
+
+  if (Args.hasArg(OPT_enable_builtin_module))
+    Opts.enableFeature(Feature::BuiltinModule);
+
+  Opts.enableFeature(Feature::LayoutPrespecialization);
+
+  return HadError;
+}
+
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
                           const FrontendOptions &FrontendOpts) {
@@ -1012,113 +1157,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableExperimentalStringProcessing = true;
   }
 
-  auto enableUpcomingFeature = [&Opts, &Diags](Feature feature,
-                                               bool downgradeDiag) -> bool {
-    // Check if this feature was introduced already in this language version.
-    if (auto firstVersion = getFeatureLanguageVersion(feature)) {
-      if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
-        Diags
-            .diagnose(SourceLoc(), diag::error_upcoming_feature_on_by_default,
-                      getFeatureName(feature), *firstVersion)
-            .limitBehaviorIf(downgradeDiag, DiagnosticBehavior::Warning);
-        return !downgradeDiag;
-      }
-    }
-
-    Opts.enableFeature(feature);
-    return false;
-  };
-
-  // Enable experimental features.
-  for (const Arg *A : Args.filtered(OPT_enable_experimental_feature)) {
-    // Allow StrictConcurrency to have a value that corresponds to the
-    // -strict-concurrency=<blah> settings.
-    StringRef value = A->getValue();
-    if (value.starts_with("StrictConcurrency")) {
-      auto decomposed = value.split("=");
-      if (decomposed.first == "StrictConcurrency") {
-        if (decomposed.second == "") {
-          Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
-        } else if (auto level = parseStrictConcurrency(decomposed.second)) {
-          Opts.StrictConcurrencyLevel = *level;
-        }
-      }
-    }
-
-    // If this is a known experimental feature, allow it in +Asserts
-    // (non-release) builds for testing purposes.
-    if (auto feature = getExperimentalFeature(value)) {
-      if (Opts.RestrictNonProductionExperimentalFeatures &&
-          !isFeatureAvailableInProduction(*feature)) {
-        Diags.diagnose(SourceLoc(), diag::experimental_not_supported_in_production,
-                       A->getValue());
-        HadError = true;
-      } else {
-        Opts.enableFeature(*feature);
-      }
-    }
-
-    // For compatibility, upcoming features can be enabled with the
-    // -enable-experimental-feature flag too since the feature may have
-    // graduated from being experimental.
-    if (auto feature = getUpcomingFeature(value)) {
-      if (enableUpcomingFeature(*feature, /*downgradeDiag=*/true))
-        HadError = true;
-    }
-
-    // Hack: In order to support using availability macros in SPM packages, we
-    // need to be able to use:
-    //    .enableExperimentalFeature("AvailabilityMacro='...'")
-    // within the package manifest and the feature recognizer can't recognize
-    // this form of feature, so specially handle it here until features can
-    // maybe have extra arguments in the future.
-    auto strRef = StringRef(A->getValue());
-    if (strRef.starts_with("AvailabilityMacro=")) {
-      auto availability = strRef.split("=").second;
-
-      Opts.AvailabilityMacros.push_back(availability.str());
-    }
-  }
-
-  // Enable upcoming features.
-  for (const Arg *A : Args.filtered(OPT_enable_upcoming_feature)) {
-    // Ignore unknown features.
-    auto feature = getUpcomingFeature(A->getValue());
-    if (!feature)
-      continue;
-
-    if (enableUpcomingFeature(*feature, /*downgradeDiag=*/false))
-      HadError = true;
-  }
-
-  // Map historical flags over to experimental features. We do this for all
-  // compilers because that's how existing experimental feature flags work.
-  if (Args.hasArg(OPT_enable_experimental_static_assert))
-    Opts.enableFeature(Feature::StaticAssert);
-  if (Args.hasArg(OPT_enable_experimental_named_opaque_types))
-    Opts.enableFeature(Feature::NamedOpaqueTypes);
-  if (Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures))
-    Opts.enableFeature(Feature::FlowSensitiveConcurrencyCaptures);
-  if (Args.hasArg(OPT_enable_experimental_move_only)) {
-    // FIXME: drop addition of Feature::MoveOnly once its queries are gone.
-    Opts.enableFeature(Feature::MoveOnly);
-    Opts.enableFeature(Feature::NoImplicitCopy);
-    Opts.enableFeature(Feature::OldOwnershipOperatorSpellings);
-  }
-  if (Args.hasArg(OPT_experimental_one_way_closure_params))
-    Opts.enableFeature(Feature::OneWayClosureParameters);
-  if (Args.hasArg(OPT_enable_experimental_forward_mode_differentiation))
-    Opts.enableFeature(Feature::ForwardModeDifferentiation);
-  if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
-    Opts.enableFeature(Feature::AdditiveArithmeticDerivedConformances);
-
-  if (Args.hasArg(OPT_enable_experimental_opaque_type_erasure))
-    Opts.enableFeature(Feature::OpaqueTypeErasure);
-
-  if (Args.hasArg(OPT_enable_builtin_module))
-    Opts.enableFeature(Feature::BuiltinModule);
-
-  Opts.enableFeature(Feature::LayoutPrespecialization);
+  if (ParseEnabledFeatureArgs(Opts, Args, Diags, FrontendOpts))
+    HadError = true;
 
   Opts.EnableAppExtensionLibraryRestrictions |= Args.hasArg(OPT_enable_app_extension_library);
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
