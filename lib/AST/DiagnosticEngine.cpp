@@ -1336,7 +1336,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
 #include "swift/Basic/MacroRoles.def"
       case GeneratedSourceInfo::PrettyPrinted:
       case GeneratedSourceInfo::DefaultArgument:
-      case GeneratedSourceInfo::Attribute:
+      case GeneratedSourceInfo::AttributeFromClang:
         fixIts = {};
         break;
       case GeneratedSourceInfo::ReplacedFunctionBody:
@@ -1382,7 +1382,7 @@ getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
-  case GeneratedSourceInfo::Attribute:
+  case GeneratedSourceInfo::AttributeFromClang:
     return DeclName();
   }
 }
@@ -1444,7 +1444,7 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
 
     case GeneratedSourceInfo::DefaultArgument:
     case GeneratedSourceInfo::ReplacedFunctionBody:
-    case GeneratedSourceInfo::Attribute:
+    case GeneratedSourceInfo::AttributeFromClang:
       return childNotes;
     }
 

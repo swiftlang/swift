@@ -135,8 +135,6 @@ extension ASTGenVisitor {
         return self.generateImplementsAttr(attribute: node)?.asDeclAttribute
       case .inline:
         return self.generateInlineAttr(attribute: node)?.asDeclAttribute
-      case .mainType:
-        return self.generateMainTypeAttr(attribute: node)?.asDeclAttribute
       case .macroRole:
         return self.generateMacroRoleAttr(attribute: node, attrName: attrName)?.asDeclAttribute
       case .noExistentials:
@@ -229,6 +227,7 @@ extension ASTGenVisitor {
         .isolated,
         .lexicalLifetimes,
         .lldbDebuggerFunction,
+        .mainType,
         .marker,
         .moveOnly,
         .noAllocation,
@@ -637,15 +636,6 @@ extension ASTGenVisitor {
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateSourceRange(node),
       kind: kind
-    )
-  }
-
-  func generateMainTypeAttr(attribute node: AttributeSyntax) -> BridgedMainTypeAttr? {
-    // TODO: Diagnose extraneous arguments.
-    return BridgedMainTypeAttr.createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      nameLoc: self.generateSourceLoc(node.attributeName)
     )
   }
 

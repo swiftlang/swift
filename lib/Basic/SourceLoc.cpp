@@ -307,7 +307,7 @@ StringRef SourceManager::getIdentifierForBuffer(
       if (generatedInfo->kind == GeneratedSourceInfo::ReplacedFunctionBody ||
           generatedInfo->kind == GeneratedSourceInfo::PrettyPrinted ||
           generatedInfo->kind == GeneratedSourceInfo::DefaultArgument ||
-          generatedInfo->kind == GeneratedSourceInfo::Attribute)
+          generatedInfo->kind == GeneratedSourceInfo::AttributeFromClang)
         return buffer->getBufferIdentifier();
 
       if (generatedInfo->onDiskBufferCopyFileName.empty()) {
@@ -401,7 +401,7 @@ void SourceManager::setGeneratedSourceInfo(
 #include "swift/Basic/MacroRoles.def"
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
-  case GeneratedSourceInfo::Attribute:
+  case GeneratedSourceInfo::AttributeFromClang:
     break;
 
   case GeneratedSourceInfo::ReplacedFunctionBody:

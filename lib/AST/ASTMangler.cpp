@@ -4539,7 +4539,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
-  case GeneratedSourceInfo::Attribute:
+  case GeneratedSourceInfo::AttributeFromClang:
     return appendMacroExpansionLoc();
   }
   
@@ -4591,7 +4591,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
-  case GeneratedSourceInfo::Attribute:
+  case GeneratedSourceInfo::AttributeFromClang:
     llvm_unreachable("Exited above");
   }
 

@@ -1317,7 +1317,11 @@ public:
   ///
   /// Parsing a floating attribute list will produce a `MissingDecl` with
   /// the attribute list attached.
-  void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items);
+  ///
+  /// If isFromClangAttribute, we also parse modifiers and suppress any
+  /// diagnostics about bad modifiers.
+  void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items,
+                                  bool isFromClangAttribute);
 
   /// Parse the result of member macro expansion, which is a floating
   /// member list.
