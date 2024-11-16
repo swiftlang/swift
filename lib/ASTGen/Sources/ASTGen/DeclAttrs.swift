@@ -502,126 +502,98 @@ extension ASTGenVisitor {
   }
 
   func generateExposeAttr(attribute node: AttributeSyntax) -> BridgedExposeAttr? {
-    guard
-      var args = node.arguments?.as(LabeledExprListSyntax.self)?[...]
-    else {
-      // TODO: Diagnose.
-      return nil
-    }
-
-    // Exposure kind.
-    let kind: BridgedExposureKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
-      switch $0.rawText {
-      case "Cxx":
-        return .cxx
-      case "Wasn":
-        return .wasm
-      default:
+    return self.generateWithLabeledExprListArguments(attribute: node) { args in
+      // Exposure kind.
+      let kind: BridgedExposureKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+        switch $0.rawText {
+        case "Cxx":
+          return .cxx
+        case "Wasn":
+          return .wasm
+        default:
+          return nil
+        }
+      }
+      guard let kind else {
         return nil
       }
-    }
-    guard let kind else {
-      return nil
-    }
 
-    // Name.
-    let name = self.generateConsumingSimpleStringLiteralAttrOption(args: &args) ?? ""
+      // Name.
+      let name = self.generateConsumingSimpleStringLiteralAttrOption(args: &args) ?? ""
 
-    guard args.isEmpty else {
-      // TODO: Diagnose
-      return nil
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateSourceRange(node),
+        name: name,
+        kind: kind
+      )
     }
-
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
-      name: name,
-      kind: kind
-    )
   }
 
   func generateExternAttr(attribute node: AttributeSyntax) -> BridgedExternAttr? {
-    guard
-      var args = node.arguments?.as(LabeledExprListSyntax.self)?[...]
-    else {
-      // TODO: Diagnose.
-      return nil
-    }
-
-    // @_extern(wasm, module: "x", name: "y")
-    // @_extern(c[, "x"])
-    let kind: BridgedExternKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
-      switch $0.rawText {
-      case "c":
-        return .C
-      case "wasm":
-        return .wasm
-      default:
-        return nil
+    return self.generateWithLabeledExprListArguments(attribute: node) { args in
+      // @_extern(wasm, module: "x", name: "y")
+      // @_extern(c[, "x"])
+      let kind: BridgedExternKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+        switch $0.rawText {
+        case "c":
+          return .C
+        case "wasm":
+          return .wasm
+        default:
+          return nil
+        }
       }
-    }
-    guard let kind else {
-      return nil
-    }
-
-    // Module and symbol name.
-    let moduleName: BridgedStringRef?
-    let symbolName: BridgedStringRef?
-    switch kind {
-    case .C:
-      moduleName = nil
-      symbolName = args.isEmpty ? nil : self.generateConsumingSimpleStringLiteralAttrOption(args: &args)
-    case .wasm:
-      guard let _moduleName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "module") else {
-        return nil
-      }
-      guard let _symbolName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "name") else {
+      guard let kind else {
         return nil
       }
 
-      moduleName = _moduleName
-      symbolName = _symbolName
-    }
+      // Module and symbol name.
+      let moduleName: BridgedStringRef?
+      let symbolName: BridgedStringRef?
+      switch kind {
+      case .C:
+        moduleName = nil
+        symbolName = args.isEmpty ? nil : self.generateConsumingSimpleStringLiteralAttrOption(args: &args)
+      case .wasm:
+        guard let _moduleName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "module") else {
+          return nil
+        }
+        guard let _symbolName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "name") else {
+          return nil
+        }
 
-    guard args.isEmpty else {
-      // TODO: Diagnose
-      return nil
-    }
+        moduleName = _moduleName
+        symbolName = _symbolName
+      }
 
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
-      lParenLoc: self.generateSourceLoc(node.leftParen),
-      rParenLoc: self.generateSourceLoc(node.rightParen),
-      kind: kind,
-      moduleName: moduleName ?? "",
-      name: symbolName ?? ""
-    )
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateSourceRange(node),
+        lParenLoc: self.generateSourceLoc(node.leftParen),
+        rParenLoc: self.generateSourceLoc(node.rightParen),
+        kind: kind,
+        moduleName: moduleName ?? "",
+        name: symbolName ?? ""
+      )
+    }
   }
 
   func generateSectionAttr(attribute node: AttributeSyntax) -> BridgedSectionAttr? {
-    guard
-      var args = node.arguments?.as(LabeledExprListSyntax.self)?[...]
-    else {
-      // TODO: Diagnose.
-      return nil
-    }
-    guard let name = self.generateConsumingSimpleStringLiteralAttrOption(args: &args) else {
-      return nil
-    }
-    guard args.isEmpty else {
-      // TODO: Diagnose.
-      return nil
-    }
+    return self.generateWithLabeledExprListArguments(attribute: node) { args in
+      guard let name = self.generateConsumingSimpleStringLiteralAttrOption(args: &args) else {
+        return nil
+      }
 
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
-      name: name
-    )
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateSourceRange(node),
+        name: name
+      )
+    }
   }
 
   func generateImplementsAttr(attribute node: AttributeSyntax) -> BridgedImplementsAttr? {
@@ -763,97 +735,91 @@ extension ASTGenVisitor {
       attrName == "freestanding" ? .freestanding : .attached;
     let isAttached = syntax == .attached
 
-    // Start consuming arguments.
-    guard
-      var args = node.arguments?.as(LabeledExprListSyntax.self)?[...]
-    else {
-      // TODO: Diagnose.
-      return nil
-    }
+    return self.generateWithLabeledExprListArguments(attribute: node) { args in
+      // Macro role.
+      let role = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+        BridgedMacroRole(from: $0.rawText.bridged)
+      }
+      guard let role = role else {
+        return nil
+      }
+      guard role != .none else {
+        // TODO: Diagnose.
+        return nil
+      }
+      if role.isAttached != isAttached {
+        // TODO: Diagnose.
+        return nil
+      }
 
-    // Macro role.
-    let role = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
-      BridgedMacroRole(from: $0.rawText.bridged)
-    }
-    guard let role = role else {
-      return nil
-    }
-    guard role != .none else {
-      // TODO: Diagnose.
-      return nil
-    }
-    if role.isAttached != isAttached {
-      // TODO: Diagnose.
-      return nil
-    }
+      var names: [BridgedMacroIntroducedDeclName] = []
+      var conformances: [BridgedExpr] = []
 
-    var names: [BridgedMacroIntroducedDeclName] = []
-    var conformances: [BridgedExpr] = []
+      enum ArgState {
+        case inNames
+        case inConformances
+        case inInvalid
+      }
+      // Assume we're in 'names:' arguments.
+      var argState: ArgState = .inNames
+      // Seen at 'names:' argument label.
+      var seenNames = false
+      // Seen at 'conformances:' argument label.
+      var seenConformances = false
 
-    enum ArgState {
-      case inNames
-      case inConformances
-      case inInvalid
-    }
-    // Assume we're in 'names:' arguments.
-    var argState: ArgState = .inNames
-    // Seen at 'names:' argument label.
-    var seenNames = false
-    // Seen at 'conformances:' argument label.
-    var seenConformances = false
-
-    LOOP: while let arg = args.popFirst() {
-      // Argument state.
-      if let label = arg.label {
-        switch label.tokenKind {
-        case .identifier("names"):
-          argState = .inNames
-          if seenNames {
-            // TODO: Diagnose duplicated 'names:'.
+      LOOP: while let arg = args.popFirst() {
+        // Argument state.
+        if let label = arg.label {
+          switch label.tokenKind {
+          case .identifier("names"):
+            argState = .inNames
+            if seenNames {
+              // TODO: Diagnose duplicated 'names:'.
+            }
+            seenNames = true
+          case .identifier("conformances"):
+            argState = .inConformances
+            if seenConformances {
+              // TODO: Diagnose duplicated 'conformances:'.
+            }
+            seenConformances = true
+          default:
+            // Invalid label.
+            // TODO: Diagnose `no argument with label '\(label)'`.
+            argState = .inInvalid
           }
+        } else if argState == .inNames && !seenNames {
+          // E.g. `@attached(member, named(foo))` this is missing 'names:'
+          // TODO: Diagnose to insert 'names:'
           seenNames = true
-        case .identifier("conformances"):
-          argState = .inConformances
-          if seenConformances {
-            // TODO: Diagnose duplicated 'conformances:'.
+        }
+
+        // Argument values.
+        switch argState {
+        case .inNames:
+          if let name = self.generateMacroIntroducedDeclName(expr: arg.expression) {
+            names.append(name)
           }
-          seenConformances = true
-        default:
-          // Invalid label.
-          // TODO: Diagnose `no argument with label '\(label)'`.
-          argState = .inInvalid
+        case .inConformances:
+          conformances.append(self.generate(expr: arg.expression))
+        case .inInvalid:
+          // Ignore the value.
+          break
         }
-      } else if argState == .inNames && !seenNames {
-        // E.g. `@attached(member, named(foo))` this is missing 'names:'
-        // TODO: Diagnose to insert 'names:'
-        seenNames = true
       }
 
-      // Argument values.
-      switch argState {
-      case .inNames:
-        if let name = self.generateMacroIntroducedDeclName(expr: arg.expression) {
-          names.append(name)
-        }
-      case .inConformances:
-        conformances.append(self.generate(expr: arg.expression))
-      case .inInvalid:
-        // Ignore the value.
-        break
-      }
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateSourceRange(node),
+        syntax: syntax,
+        lParenLoc: self.generateSourceLoc(node.leftParen),
+        role: role,
+        names: names.lazy.bridgedArray(in: self),
+        conformances: conformances.lazy.bridgedArray(in: self),
+        rParenLoc: self.generateSourceLoc(node.rightParen)
+      )
     }
-
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
-      syntax: syntax,
-      lParenLoc: self.generateSourceLoc(node.leftParen),
-      role: role,
-      names: names.lazy.bridgedArray(in: self),
-      conformances: conformances.lazy.bridgedArray(in: self),
-      rParenLoc: self.generateSourceLoc(node.rightParen)
-    )
   }
 
   func generateNonSendableAttr(attribute node: AttributeSyntax) -> BridgedNonSendableAttr? {
@@ -1088,41 +1054,38 @@ extension ASTGenVisitor {
   }
 
   func generateSILGenNameAttr(attribute node: AttributeSyntax) -> BridgedSILGenNameAttr? {
-    guard
-      var args = node.arguments?.as(LabeledExprListSyntax.self)?[...],
-      let arg = args.popFirst()
-    else {
-      // TODO: Diagnose.
-      return nil
-    }
-
-    let isRaw: Bool
-    if let label = arg.label {
-      if label.rawText == "raw" {
-        isRaw = true
-      } else {
+    return self.generateWithLabeledExprListArguments(attribute: node) { args in
+      guard let arg = args.popFirst() else {
         // TODO: Diagnose.
         return nil
       }
-    } else {
-      isRaw = false
-    }
-    guard let name = self.generateStringLiteralTextIfNotInterpolated(expr: arg.expression) else {
-      // TODO: Diagnose.
-      return nil
-    }
-    guard args.isEmpty else {
-      // TODO: Diagnose
-      return nil
-    }
 
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
-      name: name,
-      isRaw: isRaw
-    )
+      // 'raw:'
+      let isRaw: Bool
+      if let label = arg.label {
+        if label.rawText == "raw" {
+          isRaw = true
+        } else {
+          // TODO: Diagnose.
+          return nil
+        }
+      } else {
+        isRaw = false
+      }
+
+      guard let name = self.generateStringLiteralTextIfNotInterpolated(expr: arg.expression) else {
+        // TODO: Diagnose.
+        return nil
+      }
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateSourceRange(node),
+        name: name,
+        isRaw: isRaw
+      )
+    }
   }
 
   func generateSPIAccessControlAttr(attribute node: AttributeSyntax) -> BridgedSPIAccessControlAttr? {
@@ -1212,6 +1175,30 @@ extension ASTGenVisitor {
     return nil
   }
 
+  /// Convenient method for processing an attribute with `LabeledExprListSyntax`.
+  ///
+  /// * Diagnose if the arguments are missing.
+  /// * Call `generatorFunction` callback function with a mutable _slice_ of the
+  ///   labeled expression list. The callback should "consume" the processed
+  ///   arguments and return the result.
+  /// * If the arguments is not empty after the callback, it's diagnosed.
+  func generateWithLabeledExprListArguments<T>(
+    attribute node: AttributeSyntax,
+    _ generatorFunction: (inout Slice<LabeledExprListSyntax>) throws -> T?
+  ) rethrows -> T? {
+    guard var args = node.arguments?.as(LabeledExprListSyntax.self)?[...] else {
+      self.diagnose(.expectedArgumentsInAttribute(node))
+      return nil
+    }
+    guard let result = try generatorFunction(&args) else {
+      return nil
+    }
+    if let extra = args.popFirst() {
+      self.diagnose(.extraneousArgumentsInAttribute(node, extra))
+    }
+    return result
+  }
+
   func generateConsumingAttrOption<R>(
     args: inout Slice<LabeledExprListSyntax>,
     label: SyntaxText?,
@@ -1272,7 +1259,7 @@ extension ASTGenVisitor {
       if let valueIfOmitted {
         return valueIfOmitted
       }
-      // TODO: Diagnose.
+      self.diagnose(.expectedArgumentsInAttribute(node))
       return nil
     }
 
@@ -1281,25 +1268,12 @@ extension ASTGenVisitor {
       return valueGeneratorFunction(tok)
     }
 
-    guard var arguments = arguments.as(LabeledExprListSyntax.self)?[...] else {
-      // TODO: Diagnose.
-      return nil
+    return self.generateWithLabeledExprListArguments(attribute: node) { args in
+      self.generateConsumingPlainIdentifierAttrOption(
+        args: &args,
+        valueGeneratorFunction
+      )
     }
-
-    let result = self.generateConsumingPlainIdentifierAttrOption(
-      args: &arguments,
-      valueGeneratorFunction
-    )
-    guard let result else {
-      return nil
-    }
-
-    if !arguments.isEmpty {
-      // TODO: Diagnose.
-      // But still can return the value.
-    }
-
-    return result
   }
 }
 
