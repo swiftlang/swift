@@ -12075,7 +12075,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
-  case GeneratedSourceInfo::Attribute:
+  case GeneratedSourceInfo::AttributeFromClang:
     return origDC;
   }
 }

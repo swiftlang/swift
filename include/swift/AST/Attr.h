@@ -495,7 +495,16 @@ public:
   static DeclAttribute *createSimple(const ASTContext &context,
                                      DeclAttrKind kind, SourceLoc atLoc,
                                      SourceLoc attrLoc);
+
+  /// Create a copy of this attribute.
+  DeclAttribute *clone(ASTContext &ctx) const;
 };
+
+#define UNIMPLEMENTED_CLONE(AttrType)    \
+AttrType *clone(ASTContext &ctx) const { \
+    llvm_unreachable("unimplemented");   \
+    return nullptr;                      \
+  }
 
 /// Describes a "simple" declaration attribute that carries no data.
 template<DeclAttrKind Kind>
@@ -504,16 +513,22 @@ public:
   SimpleDeclAttr(bool IsImplicit)
     : DeclAttribute(Kind, SourceLoc(), SourceLoc(), IsImplicit) {}
 
-  SimpleDeclAttr(SourceLoc AtLoc, SourceLoc NameLoc)
+  SimpleDeclAttr(SourceLoc AtLoc, SourceLoc NameLoc, bool Implicit = false)
     : DeclAttribute(Kind, AtLoc,
                     SourceRange(AtLoc.isValid() ? AtLoc : NameLoc, NameLoc),
-                    /*Implicit=*/false) { }
+                    Implicit) { }
   SimpleDeclAttr(SourceLoc NameLoc)
     : DeclAttribute(Kind, SourceLoc(), SourceRange(NameLoc, NameLoc),
                     /*Implicit=*/false) { }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == Kind;
+  }
+
+  /// Create a copy of this attribute.
+  SimpleDeclAttr<Kind> *clone(ASTContext &ctx) const {
+    return new (ctx) SimpleDeclAttr<Kind>(
+        AtLoc, Range.Start, isImplicit());
   }
 };
 
@@ -542,6 +557,11 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::SILGenName;
   }
+
+  /// Create a copy of this attribute.
+  SILGenNameAttr *clone(ASTContext &ctx) const {
+    return new (ctx) SILGenNameAttr(Name, Raw, AtLoc, Range, isImplicit());
+  }
 };
 
 /// Defines the @_section attribute.
@@ -560,6 +580,10 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Section;
   }
+
+  SectionAttr *clone(ASTContext &ctx) const {
+    return new (ctx) SectionAttr(Name, AtLoc, Range, isImplicit());
+  }
 };
 
 /// Defines the @_cdecl attribute.
@@ -577,6 +601,10 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::CDecl;
+  }
+
+  CDeclAttr *clone(ASTContext &ctx) const {
+    return new (ctx) CDeclAttr(Name, AtLoc, Range, isImplicit());
   }
 };
 
@@ -597,6 +625,10 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Semantics;
   }
+
+  SemanticsAttr *clone(ASTContext &ctx) const {
+    return new (ctx) SemanticsAttr(Value, AtLoc, Range, isImplicit());
+  }
 };
 
 /// Defines the @_alignment attribute.
@@ -612,6 +644,10 @@ public:
   
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Alignment;
+  }
+
+  AlignmentAttr *clone(ASTContext &ctx) const {
+    return new (ctx) AlignmentAttr(getValue(), AtLoc, Range, isImplicit());
   }
 };
 
@@ -638,6 +674,11 @@ public:
   
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::SwiftNativeObjCRuntimeBase;
+  }
+
+  SwiftNativeObjCRuntimeBaseAttr *clone(ASTContext &ctx) const {
+    return new (ctx) SwiftNativeObjCRuntimeBaseAttr(
+        BaseClassName, AtLoc, Range, isImplicit());
   }
 };
 
@@ -810,6 +851,9 @@ public:
                                              AbstractFunctionDecl *AsyncFunc);
 
   AvailableAttr *clone(ASTContext &C, bool implicit) const;
+  AvailableAttr *clone(ASTContext &C) const {
+    return clone(C, isImplicit());
+  }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Available;
@@ -960,33 +1004,13 @@ public:
   }
 };
 
-class MainTypeAttr final : public DeclAttribute {
-public:
-  MainTypeAttr(bool isImplicit)
-      : DeclAttribute(DeclAttrKind::MainType, SourceLoc(), SourceLoc(),
-                      isImplicit) {}
-
-  MainTypeAttr(SourceLoc AtLoc, SourceLoc NameLoc)
-      : DeclAttribute(DeclAttrKind::MainType, AtLoc,
-                      SourceRange(AtLoc.isValid() ? AtLoc : NameLoc, NameLoc),
-                      /*Implicit=*/false) {}
-
-  MainTypeAttr(SourceLoc NameLoc)
-      : DeclAttribute(DeclAttrKind::MainType, SourceLoc(),
-                      SourceRange(NameLoc, NameLoc),
-                      /*Implicit=*/false) {}
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DeclAttrKind::MainType;
-  }
-};
-
 class PrivateImportAttr final
 : public DeclAttribute {
   StringRef SourceFile;
 
   PrivateImportAttr(SourceLoc atLoc, SourceRange baseRange,
-                    StringRef sourceFile, SourceRange parentRange);
+                    StringRef sourceFile, SourceRange parentRange,
+                    bool implicit = false);
 
 public:
   static PrivateImportAttr *create(ASTContext &Ctxt, SourceLoc AtLoc,
@@ -998,6 +1022,12 @@ public:
   }
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::PrivateImport;
+  }
+
+  /// Create a copy of this attribute.
+  PrivateImportAttr *clone(ASTContext &ctx) const {
+    return new (ctx) PrivateImportAttr(
+        AtLoc, Range, SourceFile, SourceRange(), isImplicit());
   }
 };
 
@@ -1076,6 +1106,8 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::DynamicReplacement;
   }
+
+  UNIMPLEMENTED_CLONE(DynamicReplacementAttr)
 };
 
 /// The \c @_typeEraser(TypeEraserType) attribute.
@@ -1131,6 +1163,8 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::TypeEraser;
   }
+
+  UNIMPLEMENTED_CLONE(TypeEraserAttr)
 };
 
 /// Represents any sort of access control modifier.
@@ -1165,6 +1199,11 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::AccessControl;
   }
+
+  /// Create a copy of this attribute.
+  AccessControlAttr *clone(ASTContext &ctx) const {
+    return new (ctx) AccessControlAttr(AtLoc, Range, getAccess(), isImplicit());
+  }
 };
 
 /// Represents a 'private', 'internal', or 'public' marker for a setter on a
@@ -1178,6 +1217,11 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::SetterAccess;
+  }
+
+  /// Create a copy of this attribute.
+  SetterAccessAttr *clone(ASTContext &ctx) const {
+    return new (ctx) SetterAccessAttr(AtLoc, Range, getAccess(), isImplicit());
   }
 };
 
@@ -1199,6 +1243,10 @@ public:
 
   SPIAccessControlAttr *clone(ASTContext &C, bool implicit) const;
 
+  SPIAccessControlAttr *clone(ASTContext &ctx) const {
+    return clone(ctx, isImplicit());
+  }
+
   /// Name of SPIs declared by the attribute.
   ///
   /// Note: A single SPI name per attribute is currently supported but this
@@ -1216,8 +1264,9 @@ public:
 /// Represents an inline attribute.
 class InlineAttr : public DeclAttribute {
 public:
-  InlineAttr(SourceLoc atLoc, SourceRange range, InlineKind kind)
-      : DeclAttribute(DeclAttrKind::Inline, atLoc, range, /*Implicit=*/false) {
+  InlineAttr(SourceLoc atLoc, SourceRange range, InlineKind kind,
+             bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Inline, atLoc, range, implicit) {
     Bits.InlineAttr.kind = unsigned(kind);
   }
 
@@ -1228,14 +1277,18 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Inline;
   }
+
+  InlineAttr *clone(ASTContext &ctx) const {
+    return new (ctx) InlineAttr(AtLoc, Range, getKind(), isImplicit());
+  }
 };
 
 /// Represents the optimize attribute.
 class OptimizeAttr : public DeclAttribute {
 public:
-  OptimizeAttr(SourceLoc atLoc, SourceRange range, OptimizationMode mode)
-      : DeclAttribute(DeclAttrKind::Optimize, atLoc, range,
-                      /*Implicit=*/false) {
+  OptimizeAttr(SourceLoc atLoc, SourceRange range, OptimizationMode mode,
+               bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Optimize, atLoc, range, implicit) {
     Bits.OptimizeAttr.mode = unsigned(mode);
   }
 
@@ -1247,6 +1300,10 @@ public:
   }
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Optimize;
+  }
+
+  OptimizeAttr *clone(ASTContext &ctx) const {
+    return new (ctx) OptimizeAttr(AtLoc, Range, getMode(), isImplicit());
   }
 };
 
@@ -1262,9 +1319,9 @@ private:
   Mode mode;
 
 public:
-  ExclusivityAttr(SourceLoc atLoc, SourceRange range, Mode mode)
-      : DeclAttribute(DeclAttrKind::Exclusivity, atLoc, range,
-                      /*Implicit=*/false),
+  ExclusivityAttr(SourceLoc atLoc, SourceRange range, Mode mode,
+                  bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Exclusivity, atLoc, range, implicit),
         mode(mode) {}
 
   ExclusivityAttr(Mode mode)
@@ -1274,6 +1331,10 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Exclusivity;
+  }
+
+  ExclusivityAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ExclusivityAttr(AtLoc, Range, getMode(), isImplicit());
   }
 };
 
@@ -1358,15 +1419,19 @@ class RawDocCommentAttr : public DeclAttribute {
   CharSourceRange CommentRange;
 
 public:
-  RawDocCommentAttr(CharSourceRange CommentRange)
+  RawDocCommentAttr(CharSourceRange CommentRange, bool Implicit = false)
       : DeclAttribute(DeclAttrKind::RawDocComment, SourceLoc(), SourceRange(),
-                      /*Implicit=*/false),
+                      Implicit),
         CommentRange(CommentRange) {}
 
   CharSourceRange getCommentRange() const { return CommentRange; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::RawDocComment;
+  }
+
+  RawDocCommentAttr *clone(ASTContext &ctx) const {
+    return new (ctx) RawDocCommentAttr(CommentRange, isImplicit());
   }
 };
 
@@ -1390,6 +1455,10 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::ObjCBridged;
+  }
+
+  ObjCBridgedAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ObjCBridgedAttr(ObjCClass);
   }
 };
 
@@ -1429,6 +1498,11 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::SynthesizedProtocol;
+  }
+
+  SynthesizedProtocolAttr *clone(ASTContext &ctx) const {
+    return new (ctx) SynthesizedProtocolAttr(
+        protocol, getLazyLoader(), isUnchecked());
   }
 };
 
@@ -1562,6 +1636,8 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Specialize;
   }
+
+  UNIMPLEMENTED_CLONE(SpecializeAttr)
 };
 
 class StorageRestrictionsAttr final
@@ -1604,6 +1680,8 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::StorageRestrictions;
   }
+
+  UNIMPLEMENTED_CLONE(StorageRestrictionsAttr)
 };
 
 /// The @_implements attribute, which treats a decl as the implementation for
@@ -1638,6 +1716,12 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Implements;
   }
+
+  /// Create a copy of this attribute.
+  ImplementsAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ImplementsAttr(
+        AtLoc, Range, TyR, getMemberName(), getMemberNameLoc());
+  }
 };
 
 /// A limited variant of \c \@objc that's used for classes with generic ancestry.
@@ -1661,6 +1745,11 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::ObjCRuntimeName;
   }
+
+  /// Create a copy of this attribute.
+  ObjCRuntimeNameAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ObjCRuntimeNameAttr(Name, AtLoc, Range, isImplicit());
+  }
 };
 
 /// Attribute that specifies a protocol conformance that has been restated
@@ -1678,6 +1767,11 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::RestatedObjCConformance;
+  }
+
+  /// Create a copy of this attribute.
+  RestatedObjCConformanceAttr *clone(ASTContext &ctx) const {
+    return new (ctx) RestatedObjCConformanceAttr(Proto);
   }
 };
 
@@ -1739,6 +1833,12 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::ClangImporterSynthesizedType;
+  }
+
+  /// Create a copy of this attribute.
+  ClangImporterSynthesizedTypeAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ClangImporterSynthesizedTypeAttr(
+        originalTypeName, getKind());
   }
 };
 
@@ -1802,6 +1902,11 @@ public:
     return DA->getKind() == DeclAttrKind::Custom;
   }
 
+  /// Create a copy of this attribute.
+  CustomAttr *clone(ASTContext &ctx) const {
+    return create(ctx, AtLoc, getTypeExpr(), initContext, argList, isImplicit());
+  }
+
 private:
   friend class CustomAttrNominalRequest;
   void resetTypeInformation(TypeExpr *repr);
@@ -1833,6 +1938,12 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::ProjectedValueProperty;
+  }
+
+  /// Create a copy of this attribute.
+  ProjectedValuePropertyAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ProjectedValuePropertyAttr(
+        ProjectionPropertyName, AtLoc, Range, isImplicit());
   }
 };
 
@@ -1878,6 +1989,12 @@ public:
   std::optional<ActiveVersion> isActivePlatform(const ASTContext &ctx) const;
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::OriginallyDefinedIn;
+  }
+
+  /// Create a copy of this attribute.
+  OriginallyDefinedInAttr *clone(ASTContext &ctx) const {
+    return new (ctx) OriginallyDefinedInAttr(
+        AtLoc, Range, OriginalModuleName, Platform, MovedVersion, isImplicit());
   }
 };
 
@@ -2026,6 +2143,8 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Differentiable;
   }
+
+  UNIMPLEMENTED_CLONE(DifferentiableAttr)
 };
 
 /// A declaration name with location.
@@ -2165,6 +2284,8 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Derivative;
   }
+
+  UNIMPLEMENTED_CLONE(DerivativeAttr)
 };
 
 /// The `@transpose(of:)` attribute registers a function as a transpose of
@@ -2249,6 +2370,8 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Transpose;
   }
+
+  UNIMPLEMENTED_CLONE(TransposeAttr)
 };
 
 enum class NonSendableKind : uint8_t {
@@ -2279,6 +2402,11 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::NonSendable;
   }
+
+  /// Create a copy of this attribute.
+  NonSendableAttr *clone(ASTContext &ctx) const {
+    return new (ctx) NonSendableAttr(AtLoc, Range, Specificity, isImplicit());
+  }
 };
 
 /// The @_unavailableFromAsync attribute, used to make function declarations
@@ -2300,6 +2428,12 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::UnavailableFromAsync;
   }
+
+  /// Create a copy of this attribute.
+  UnavailableFromAsyncAttr *clone(ASTContext &ctx) const {
+    return new (ctx) UnavailableFromAsyncAttr(
+        Message, AtLoc, Range, isImplicit());
+  }
 };
 
 /// The `@backDeployed(...)` attribute, used to make function declarations
@@ -2308,7 +2442,7 @@ public:
 class BackDeployedAttr : public DeclAttribute {
 public:
   BackDeployedAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
-                   const llvm::VersionTuple Version, bool Implicit)
+                   const llvm::VersionTuple &Version, bool Implicit)
       : DeclAttribute(DeclAttrKind::BackDeployed, AtLoc, Range, Implicit),
         Platform(Platform), Version(Version) {}
 
@@ -2323,6 +2457,12 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::BackDeployed;
+  }
+
+  /// Create a copy of this attribute.
+  BackDeployedAttr *clone(ASTContext &ctx) const {
+    return new (ctx) BackDeployedAttr(
+        AtLoc, Range, Platform, Version, isImplicit());
   }
 };
 
@@ -2350,6 +2490,12 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Expose;
+  }
+
+  /// Create a copy of this attribute.
+  ExposeAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ExposeAttr(
+        Name, AtLoc, Range, getExposureKind(), isImplicit());
   }
 };
 
@@ -2399,6 +2545,13 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Extern;
   }
+
+  /// Create a copy of this attribute.
+  ExternAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ExternAttr(
+        ModuleName, Name, AtLoc, getLParenLoc(), getRParenLoc(), Range,
+        getExternKind(), isImplicit());
+  }
 };
 
 /// The `@_documentation(...)` attribute, used to override a symbol's visibility
@@ -2420,6 +2573,12 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Documentation;
+  }
+
+  /// Create a copy of this attribute.
+  DocumentationAttr *clone(ASTContext &ctx) const {
+    return new (ctx) DocumentationAttr(
+        AtLoc, Range, Metadata, Visibility, isImplicit());
   }
 };
 
@@ -2468,6 +2627,13 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::ObjCImplementation;
   }
+
+  /// Create a copy of this attribute.
+  ObjCImplementationAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ObjCImplementationAttr(
+        CategoryName, AtLoc, Range, isEarlyAdopter(), isImplicit(),
+        isCategoryNameInvalid());
+  }
 };
 
 /// Represents nonisolated modifier.
@@ -2487,6 +2653,11 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Nonisolated;
+  }
+
+  /// Create a copy of this attribute.
+  NonisolatedAttr *clone(ASTContext &ctx) const {
+    return new (ctx) NonisolatedAttr(AtLoc, Range, isUnsafe(), isImplicit());
   }
 };
 
@@ -2539,6 +2710,8 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::MacroRole;
   }
+
+  UNIMPLEMENTED_CLONE(MacroRoleAttr)
 };
 
 /// Specifies the raw storage used by a type.
@@ -2640,6 +2813,8 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::RawLayout;
   }
+
+  UNIMPLEMENTED_CLONE(RawLayoutAttr)
 };
 
 class LifetimeAttr final : public DeclAttribute {
@@ -2659,6 +2834,11 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Lifetime;
+  }
+
+  /// Create a copy of this attribute.
+  LifetimeAttr *clone(ASTContext &ctx) const {
+    return new (ctx) LifetimeAttr(AtLoc, Range, isImplicit(), entry);
   }
 };
 
@@ -2700,6 +2880,8 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::AllowFeatureSuppression;
   }
+
+  UNIMPLEMENTED_CLONE(AllowFeatureSuppressionAttr)
 };
 
 /// Attributes that may be applied to declarations.
@@ -3319,5 +3501,7 @@ struct EnumTraits<TypeAttrKind> {
 };
 
 } // end namespace swift
+
+#undef UNIMPLEMENTED_CLONE
 
 #endif

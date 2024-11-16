@@ -52,7 +52,6 @@
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -8222,7 +8221,7 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   sourceMgr.setGeneratedSourceInfo(
       bufferID,
       {
-        GeneratedSourceInfo::Attribute,
+        GeneratedSourceInfo::AttributeFromClang,
         CharSourceRange(),
         sourceMgr.getRangeForBuffer(bufferID),
         &module
@@ -8290,7 +8289,6 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
 
   std::optional<const clang::SwiftAttrAttr *> seenMainActorAttr;
   const clang::SwiftAttrAttr *seenMutabilityAttr = nullptr;
-  PatternBindingInitializer *initContext = nullptr;
 
   auto importAttrsFromDecl = [&](const clang::NamedDecl *ClangDecl) {
     //
@@ -8415,37 +8413,12 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
           *MappedDecl->getDeclContext()->getParentModule(),
           swiftAttr->getAttribute());
 
-      // Spin up a parser.
-      swift::Parser parser(
-          sourceFile.getBufferID(), sourceFile, &SwiftContext.Diags,
-          nullptr, nullptr);
-      // Prime the lexer.
-      parser.consumeTokenWithoutFeedingReceiver();
-
-      bool hadError = false;
-      if (parser.Tok.is(tok::at_sign)) {
-        SourceLoc atEndLoc = parser.Tok.getRange().getEnd();
-        SourceLoc atLoc = parser.consumeToken(tok::at_sign);
-        hadError = parser
-                       .parseDeclAttribute(MappedDecl->getAttrs(), atLoc,
-                                           atEndLoc, initContext,
-                                           /*isFromClangAttribute=*/true)
-                       .isError();
-      } else {
-        SourceLoc staticLoc;
-        StaticSpellingKind staticSpelling;
-        hadError = parser
-                       .parseDeclModifierList(MappedDecl->getAttrs(), staticLoc,
-                                              staticSpelling,
-                                              /*isFromClangAttribute=*/true)
-                       .isError();
-      }
-
-      if (hadError) {
-        // Complain about the unhandled attribute or modifier.
-        HeaderLoc attrLoc(swiftAttr->getLocation());
-        diagnose(attrLoc, diag::clang_swift_attr_unhandled,
-                 swiftAttr->getAttribute());
+      // Collect the attributes from the synthesized top-level declaration in
+      // the source file.
+      auto topLevelDecls = sourceFile.getTopLevelDecls();
+      for (auto decl : topLevelDecls) {
+        for (auto attr : decl->getAttrs())
+          MappedDecl->getAttrs().add(attr->clone(SwiftContext));
       }
     }
 

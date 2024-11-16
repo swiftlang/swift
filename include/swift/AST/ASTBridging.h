@@ -694,11 +694,6 @@ BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceRange cRange,
                                                  BridgedInlineKind cKind);
 
-SWIFT_NAME("BridgedMainTypeAttr.createParsed(_:atLoc:nameLoc:)")
-BridgedMainTypeAttr BridgedMainTypeAttr_createParsed(BridgedASTContext cContext,
-                                                     BridgedSourceLoc cAtLoc,
-                                                     BridgedSourceLoc cNameLoc);
-
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedMacroSyntax {
   BridgedMacroSyntaxFreestanding,
   BridgedMacroSyntaxAttached,
