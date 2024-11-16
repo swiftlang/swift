@@ -2828,6 +2828,11 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   if (accessor->getAttrs().hasAttribute<TransparentAttr>())
     return true;
 
+  // Default implementations of read2 and modify2 provided for back-deployment
+  // are transparent.
+  if (accessor->isRequirementWithSynthesizedDefaultImplementation())
+    return true;
+
   if (!accessor->isImplicit())
     return false;
 
