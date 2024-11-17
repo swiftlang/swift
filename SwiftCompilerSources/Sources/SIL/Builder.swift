@@ -29,6 +29,18 @@ public struct Builder {
   private let notificationHandler: BridgedChangeNotificationHandler
   private let notifyNewInstruction: (Instruction) -> ()
 
+  /// Return 'nil' when inserting at the start of a function or in a global initializer.
+  public var insertionBlock: BasicBlock? {
+    switch insertAt {
+    case let .before(inst):
+      return inst.parentBlock
+    case let .atEndOf(block):
+      return block
+    case .atStartOf, .staticInitializer:
+      return nil
+    }
+  }
+
   public var bridged: BridgedBuilder {
     switch insertAt {
     case .before(let inst):
