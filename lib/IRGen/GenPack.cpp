@@ -354,10 +354,12 @@ static void bindElementSignatureRequirementsAtIndex(
                       patternPackArchetype)
                   ->getCanonicalType();
           llvm::Value *_metadata = nullptr;
-          auto packConformance = ProtocolConformanceRef(proto);
+          auto packConformance = ProtocolConformanceRef::forAbstract(
+              patternPackArchetype, proto);
           auto *wtablePack = emitWitnessTableRef(IGF, patternPackArchetype,
                                                  &_metadata, packConformance);
-          auto elementConformance = ProtocolConformanceRef(proto);
+          auto elementConformance = ProtocolConformanceRef::forAbstract(
+              elementArchetype, proto);
           auto *wtable = bindWitnessTableAtIndex(
               IGF, elementArchetype, elementConformance, wtablePack, index);
           assert(wtable);

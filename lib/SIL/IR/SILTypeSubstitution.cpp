@@ -75,7 +75,8 @@ public:
              Type conformingReplacementType,
              ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
         return substOpaqueTypesWithUnderlyingTypes(
-               ProtocolConformanceRef(conformedProtocol),
+               ProtocolConformanceRef::forAbstract(conformingReplacementType,
+                                                   conformedProtocol),
                conformingReplacementType->getCanonicalType(),
                typeExpansionContext);
       },

@@ -271,12 +271,8 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   // If the protocol is invertible, fall back to a global lookup instead of
   // evaluating a conformance path, to avoid an infinite substitution issue.
-  if (proto->getInvertibleProtocolKind()) {
-    auto substType = type.subst(*this);
-    if (!substType->isTypeParameter())
-      return swift::lookupConformance(substType, proto);
-    return ProtocolConformanceRef(proto);
-  }
+  if (proto->getInvertibleProtocolKind())
+    return swift::lookupConformance(type.subst(*this), proto);
 
   auto path = genericSig->getConformancePath(type, proto);
 
@@ -300,18 +296,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     if (conformance.isAbstract()) {
       // FIXME: Rip this out once we can get a concrete conformance from
       // an archetype.
-      auto substType = type.subst(*this);
-      if (substType->hasError())
-        return ProtocolConformanceRef(proto);
-
-      if ((!substType->is<ArchetypeType>() ||
-           substType->castTo<ArchetypeType>()->getSuperclass()) &&
-          !substType->isTypeParameter() &&
-          !substType->isExistentialType()) {
-        return swift::lookupConformance(substType, proto);
-      }
-
-      return ProtocolConformanceRef(proto);
+      return swift::lookupConformance(type.subst(*this), proto);
     }
 
     // For the second step, we're looking into the requirement signature for
@@ -506,13 +491,10 @@ LookUpConformanceInOverrideSubs::operator()(CanType type,
                                             Type substType,
                                             ProtocolDecl *proto) const {
   if (type->getRootGenericParam()->getDepth() >= info.BaseDepth)
-    return ProtocolConformanceRef(proto);
+    return ProtocolConformanceRef::forAbstract(substType, proto);
 
   if (auto conformance = info.BaseSubMap.lookupConformance(type, proto))
     return conformance;
-
-  if (substType->isTypeParameter())
-    return ProtocolConformanceRef(proto);
 
   return lookupConformance(substType, proto);
 }
@@ -714,7 +696,8 @@ ProtocolConformanceRef OuterSubstitutions::operator()(
                                         Type conformingReplacementType,
                                         ProtocolDecl *conformedProtocol) const {
   if (isUnsubstitutedTypeParameter(dependentType))
-    return ProtocolConformanceRef(conformedProtocol);
+    return ProtocolConformanceRef::forAbstract(
+      conformingReplacementType, conformedProtocol);
 
   return LookUpConformanceInSubstitutionMap(subs)(
       dependentType, conformingReplacementType, conformedProtocol);

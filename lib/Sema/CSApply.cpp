@@ -121,10 +121,12 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   auto lookupConformanceFn =
       [&](CanType original, Type replacement,
           ProtocolDecl *protoType) -> ProtocolConformanceRef {
+    assert(!replacement->is<GenericTypeParamType>());
+
     if (replacement->hasError() ||
         isOpenedAnyObject(replacement) ||
         replacement->is<GenericTypeParamType>()) {
-      return ProtocolConformanceRef(protoType);
+      return ProtocolConformanceRef::forAbstract(replacement, protoType);
     }
 
     // FIXME: Retrieve the conformance from the solution itself.
@@ -133,8 +135,10 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
 
     if (conformance.isInvalid()) {
       auto synthesized = SynthesizedConformances.find(locator);
-      if (synthesized != SynthesizedConformances.end())
-        return synthesized->second;
+      if (synthesized != SynthesizedConformances.end()) {
+        return ProtocolConformanceRef::forAbstract(
+            replacement, synthesized->second);
+      }
     }
 
     return conformance;
