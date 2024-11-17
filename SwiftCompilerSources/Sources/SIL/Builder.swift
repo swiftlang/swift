@@ -482,6 +482,18 @@ public struct Builder {
       return notifyNew(endAccess.getAs(EndAccessInst.self))
   }
 
+  @discardableResult
+  public func createEndApply(beginApply: BeginApplyInst) -> EndApplyInst {
+    let endApply = bridged.createEndApply(beginApply.token.bridged)
+    return notifyNew(endApply.getAs(EndApplyInst.self))
+  }
+
+  @discardableResult
+  public func createAbortApply(beginApply: BeginApplyInst) -> AbortApplyInst {
+    let endApply = bridged.createAbortApply(beginApply.token.bridged)
+    return notifyNew(endApply.getAs(AbortApplyInst.self))
+  }
+
   public func createConvertFunction(originalFunction: Value, resultType: Type, withoutActuallyEscaping: Bool) -> ConvertFunctionInst {
     let convertFunction = bridged.createConvertFunction(originalFunction.bridged, resultType.bridged, withoutActuallyEscaping)
     return notifyNew(convertFunction.getAs(ConvertFunctionInst.self))
