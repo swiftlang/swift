@@ -1219,6 +1219,8 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 /// `end_borrow`).
 public protocol ScopedInstruction {
   var endOperands: LazyFilterSequence<UseList> { get }
+
+  var endInstructions: EndInstructions { get }
 }
 
 extension Instruction {
