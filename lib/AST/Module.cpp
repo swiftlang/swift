@@ -737,7 +737,9 @@ void SourceLookupCache::lookupClassMember(ImportPath::Access accessPath,
 //===----------------------------------------------------------------------===//
 
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
-                       ImplicitImportInfo importInfo)
+                       ImplicitImportInfo importInfo,
+                       PopulateFilesFn populateFiles,
+                       bool isMainModule)
     : DeclContext(DeclContextKind::Module, nullptr),
       TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), {}),
       ImportInfo(importInfo) {
@@ -756,7 +758,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.ImplicitDynamicEnabled = 0;
   Bits.ModuleDecl.IsSystemModule = 0;
   Bits.ModuleDecl.IsNonSwiftModule = 0;
-  Bits.ModuleDecl.IsMainModule = 0;
+  Bits.ModuleDecl.IsMainModule = isMainModule;
   Bits.ModuleDecl.HasIncrementalInfo = 0;
   Bits.ModuleDecl.HasHermeticSealAtLink = 0;
   Bits.ModuleDecl.IsEmbeddedSwiftModule = 0;
@@ -766,6 +768,22 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.CXXStdlibKind = 0;
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
   Bits.ModuleDecl.SerializePackageEnabled = 0;
+
+  // Populate the module's files.
+  SmallVector<FileUnit *, 2> files;
+  populateFiles(this, [&](FileUnit *file) {
+    // If this is a LoadedFile, make sure it loaded without error.
+    assert(!(isa<LoadedFile>(file) &&
+             cast<LoadedFile>(file)->hadLoadError()));
+
+    // Require Main and REPL files to be the first file added.
+    assert(files.empty() ||
+           !isa<SourceFile>(file) ||
+           cast<SourceFile>(file)->Kind == SourceFileKind::Library ||
+           cast<SourceFile>(file)->Kind == SourceFileKind::SIL);
+    files.push_back(file);
+  });
+  Files.emplace(std::move(files));
 }
 
 void ModuleDecl::setIsSystemModule(bool flag) {
@@ -786,20 +804,6 @@ ImplicitImportList ModuleDecl::getImplicitImports() const {
   auto *mutableThis = const_cast<ModuleDecl *>(this);
   return evaluateOrDefault(evaluator, ModuleImplicitImportsRequest{mutableThis},
                            {});
-}
-
-void ModuleDecl::addFile(FileUnit &newFile) {
-  // If this is a LoadedFile, make sure it loaded without error.
-  assert(!(isa<LoadedFile>(newFile) &&
-           cast<LoadedFile>(newFile).hadLoadError()));
-
-  // Require Main and REPL files to be the first file added.
-  assert(Files.empty() ||
-         !isa<SourceFile>(newFile) ||
-         cast<SourceFile>(newFile).Kind == SourceFileKind::Library ||
-         cast<SourceFile>(newFile).Kind == SourceFileKind::SIL);
-  Files.push_back(&newFile);
-  clearLookupCache();
 }
 
 SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
@@ -1210,7 +1214,7 @@ void SourceFile::lookupObjCMethods(
 }
 
 bool ModuleDecl::shouldCollectDisplayDecls() const {
-  for (const FileUnit *file : Files) {
+  for (const FileUnit *file : getFiles()) {
     if (!file->shouldCollectDisplayDecls())
       return false;
   }
@@ -1791,6 +1795,15 @@ void SourceFile::dumpSeparatelyImportedOverlays() const {
 
 void ModuleDecl::getImportedModulesForLookup(
     SmallVectorImpl<ImportedModule> &modules) const {
+  // FIXME: We can unfortunately end up in a cycle where we attempt to query
+  // the files for a serialized module while attempting to load its LoadedFile
+  // unit. This is because both SerializedModuleLoader and ClangImporter
+  // kick the computation of transitive module dependencies, which can end up
+  // pointing back to the original module in cases where it's an overlay. We
+  // ought to be more lazy there. This is also why
+  // `SourceFile::getImportedModules` cannot assume imports have been resolved.
+  if (!Files.has_value())
+    return;
   FORWARD(getImportedModulesForLookup, (modules));
 }
 

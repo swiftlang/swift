@@ -202,7 +202,8 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
                                                nullptr, nullptr,
                                                true),
                          true);
-  ModuleDecl *M = ModuleDecl::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
+  ModuleDecl *M =
+      ModuleDecl::createEmpty(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   std::unique_ptr<Lowering::TypeConverter> TC(
       new Lowering::TypeConverter(*M, ASTCtx.SILOpts.EnableSILOpaqueValues));
   std::unique_ptr<SILModule> SM = SILModule::createEmptyModule(M, *TC, SILOpts);

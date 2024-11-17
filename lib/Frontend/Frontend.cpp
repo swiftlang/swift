@@ -1451,10 +1451,13 @@ bool CompilerInstance::createFilesForMainModule(
 }
 
 ModuleDecl *CompilerInstance::getMainModule() const {
-  if (!MainModule) {
-    Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-    MainModule = ModuleDecl::createMainModule(*Context, ID,
-                                              getImplicitImportInfo());
+  if (MainModule)
+    return MainModule;
+
+  Identifier ID = Context->getIdentifier(Invocation.getModuleName());
+  MainModule = ModuleDecl::createMainModule(
+      *Context, ID, getImplicitImportInfo(),
+      [&](ModuleDecl *MainModule, auto addFile) {
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
     if (Invocation.getFrontendOptions().EnablePrivateImports)
@@ -1484,7 +1487,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().isSwiftVersionAtLeast(6))
       MainModule->setIsConcurrencyChecked(true);
     if (Invocation.getLangOptions().EnableCXXInterop &&
-        Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule)
+        Invocation.getLangOptions()
+            .RequireCxxInteropToImportCxxInteropModule)
       MainModule->setHasCxxInteroperability();
     if (Invocation.getLangOptions().EnableCXXInterop)
       MainModule->setCXXStdlibKind(Invocation.getLangOptions().CXXStdlib);
@@ -1506,7 +1510,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     SmallVector<FileUnit *, 16> files;
     if (!createFilesForMainModule(MainModule, files)) {
       for (auto *file : files)
-        MainModule->addFile(*file);
+        addFile(file);
     } else {
       // If we failed to load a partial module, mark the main module as having
       // "failed to load", as it will contain no files. Note that we don't try
@@ -1515,7 +1519,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       // into a partial module that failed to load.
       MainModule->setFailedToLoad();
     }
-  }
+  });
   return MainModule;
 }
 

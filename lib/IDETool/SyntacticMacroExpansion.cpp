@@ -78,12 +78,13 @@ bool SyntacticMacroExpansionInstance::setup(
 
   // Create the ModuleDecl and SourceFile.
   Identifier ID = Ctx->getIdentifier(invocation.getModuleName());
-  TheModule = ModuleDecl::create(ID, *Ctx);
-
-  SF = new (*Ctx) SourceFile(*TheModule, SourceFileKind::Main,
-                             SourceMgr.addMemBufferCopy(inputBuf));
-  SF->setImports({});
-  TheModule->addFile(*SF);
+  TheModule = ModuleDecl::create(ID, *Ctx,
+                                 [&](ModuleDecl *TheModule, auto addFile) {
+    SF = new (*Ctx) SourceFile(*TheModule, SourceFileKind::Main,
+                               SourceMgr.addMemBufferCopy(inputBuf));
+    SF->setImports({});
+    addFile(SF);
+  });
 
   return false;
 }

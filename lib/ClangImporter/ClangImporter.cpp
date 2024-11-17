@@ -1581,11 +1581,14 @@ ClangImporter::create(ASTContext &ctx,
     = clangContext.Selectors.getSelector(2, setObjectForKeyedSubscriptIdents);
 
   // Set up the imported header module.
-  auto *importedHeaderModule =
-      ModuleDecl::create(ctx.getIdentifier(CLANG_HEADER_MODULE_NAME), ctx);
-  importer->Impl.ImportedHeaderUnit =
-    new (ctx) ClangModuleUnit(*importedHeaderModule, importer->Impl, nullptr);
-  importedHeaderModule->addFile(*importer->Impl.ImportedHeaderUnit);
+  auto *importedHeaderModule = ModuleDecl::create(
+      ctx.getIdentifier(CLANG_HEADER_MODULE_NAME), ctx,
+      [&](ModuleDecl *importedHeaderModule, auto addFile) {
+        importer->Impl.ImportedHeaderUnit = new (ctx)
+            ClangModuleUnit(*importedHeaderModule, importer->Impl, nullptr);
+        addFile(importer->Impl.ImportedHeaderUnit);
+      });
+
   importedHeaderModule->setHasResolvedImports();
   importedHeaderModule->setIsNonSwiftModule(true);
 
@@ -2805,7 +2808,12 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   if (auto mainModule = SwiftContext.MainModule) {
     implicitImportInfo = mainModule->getImplicitImportInfo();
   }
-  auto wrapper = ModuleDecl::create(name, SwiftContext, implicitImportInfo);
+  ClangModuleUnit *file = nullptr;
+  auto wrapper = ModuleDecl::create(name, SwiftContext, implicitImportInfo,
+                                    [&](ModuleDecl *wrapper, auto addFile) {
+    file = new (SwiftContext) ClangModuleUnit(*wrapper, *this, underlying);
+    addFile(file);
+  });
   wrapper->setIsSystemModule(underlying->IsSystem);
   wrapper->setIsNonSwiftModule();
   wrapper->setHasResolvedImports();
@@ -2813,9 +2821,6 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
     wrapper->setExportAsName(
         SwiftContext.getIdentifier(underlying->ExportAsModule));
 
-  auto file = new (SwiftContext) ClangModuleUnit(*wrapper, *this,
-                                                 underlying);
-  wrapper->addFile(*file);
   SwiftContext.getClangModuleLoader()->findOverlayFiles(diagLoc, wrapper, file);
   cacheEntry.setPointer(file);
 
