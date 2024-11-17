@@ -1342,7 +1342,7 @@ final public class AbortApplyInst : Instruction, UnaryInstruction {
 
 extension BeginApplyInst : ScopedInstruction {
   public var endOperands: LazyFilterSequence<UseList> {
-    return token.uses.lazy.filter { _ in true }
+    return token.uses.lazy.filter { $0.endsLifetime }
   }
 }
 
