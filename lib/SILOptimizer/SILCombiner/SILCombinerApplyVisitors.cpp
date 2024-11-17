@@ -1181,7 +1181,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
                 // base type of the existential's requirements.
                 return CEI.lookupExistentialConformance(proto);
               }
-              return ProtocolConformanceRef(proto);
+              return ProtocolConformanceRef::forAbstract(substTy, proto);
             }, SubstFlags::SubstituteLocalArchetypes);
         continue;
       }
@@ -1219,7 +1219,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
             // base type of the existential's requirements.
             return CEI.lookupExistentialConformance(proto);
           }
-          return ProtocolConformanceRef(proto);
+          return ProtocolConformanceRef::forAbstract(substTy, proto);
         }, SubstFlags::SubstituteLocalArchetypes);
   }
 

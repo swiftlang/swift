@@ -5517,12 +5517,16 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
     for (auto *PD : layout.getProtocols()) {
       // If we found the protocol we're looking for, return an abstract
       // conformance to it.
-      if (PD == Proto)
-        return ProtocolConformanceRef(Proto);
+      if (PD == Proto) {
+        // FIXME: Passing an empty Type() here temporarily.
+        return ProtocolConformanceRef::forAbstract(Type(), Proto);
+      }
 
       // Now check refined protocols.
-      if (PD->inheritsFrom(Proto))
-        return ProtocolConformanceRef(Proto);
+      if (PD->inheritsFrom(Proto)) {
+        // FIXME: Passing an empty Type() here temporarily.
+        return ProtocolConformanceRef::forAbstract(Type(), Proto);
+      }
     }
 
     return allowMissing ? ProtocolConformanceRef::forMissingOrInvalid(T, Proto)

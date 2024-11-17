@@ -1875,7 +1875,8 @@ SubstitutionMap getApplySubstitutionsFromParsed(
                       proto->getDeclaredInterfaceType());
         failed = true;
 
-        return ProtocolConformanceRef(proto);
+        // FIXME: Passing an empty Type() here temporarily.
+        return ProtocolConformanceRef::forAbstract(Type(), proto);
       });
 
   return failed ? SubstitutionMap() : subMap;
@@ -8162,7 +8163,8 @@ static bool parseSILWitnessTableEntry(
         P.parseToken(tok::colon, diag::expected_sil_witness_colon))
       return true;
 
-    ProtocolConformanceRef conformance(proto);
+    // FIXME: Passing an empty Type() here temporarily.
+    auto conformance = ProtocolConformanceRef::forAbstract(Type(), proto);
     if (P.Tok.getText() != "dependent") {
       auto concrete =
         witnessState.parseProtocolConformance();

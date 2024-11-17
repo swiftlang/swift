@@ -3940,7 +3940,8 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
 
     if (silRep == SILFunctionTypeRepresentation::WitnessMethod) {
       auto proto = constant.getDecl()->getDeclContext()->getSelfProtocolDecl();
-      witnessMethodConformance = ProtocolConformanceRef(proto);
+      witnessMethodConformance = ProtocolConformanceRef::forAbstract(
+          proto->getSelfInterfaceType()->getCanonicalType(), proto);
     }
 
     // Does this constant have a preferred abstraction pattern set?

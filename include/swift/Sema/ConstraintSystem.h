@@ -1625,7 +1625,7 @@ public:
 
   /// The set of conformances synthesized during solving (i.e. for
   /// ad-hoc distributed `SerializationRequirement` conformances).
-  llvm::DenseMap<ConstraintLocator *, ProtocolConformanceRef>
+  llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
 
   /// Record a new argument matching choice for given locator that maps a
@@ -2426,7 +2426,7 @@ public:
 
   /// The set of conformances synthesized during solving (i.e. for
   /// ad-hoc distributed `SerializationRequirement` conformances).
-  llvm::DenseMap<ConstraintLocator *, ProtocolConformanceRef>
+  llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
 
 private:
@@ -4948,7 +4948,7 @@ private:
                                             TypeMatchOptions flags);
 
   void recordSynthesizedConformance(ConstraintLocator *locator,
-                                    ProtocolConformanceRef conformance);
+                                    ProtocolDecl *conformance);
 
   /// Attempt to simplify the given conformance constraint.
   ///
