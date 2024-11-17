@@ -1552,19 +1552,8 @@ bool CompilerInstance::performParseAndResolveImportsOnly() {
     }
   }
 
-  // Resolve imports for all the source files.
-  for (auto *file : mainModule->getFiles()) {
-    if (auto *SF = dyn_cast<SourceFile>(file))
-      performImportResolution(*SF);
-  }
-
-  assert(llvm::all_of(mainModule->getFiles(), [](const FileUnit *File) -> bool {
-    auto *SF = dyn_cast<SourceFile>(File);
-    if (!SF)
-      return true;
-    return SF->ASTStage >= SourceFile::ImportsResolved;
-  }) && "some files have not yet had their imports resolved");
-  mainModule->setHasResolvedImports();
+  // Resolve imports for all the source files in the module.
+  performImportResolution(mainModule);
 
   bindExtensions(*mainModule);
   return Context->hadError();

@@ -117,6 +117,9 @@ namespace swift {
                               bool TokenizeInterpolatedString = true,
                               ArrayRef<Token> SplitTokens = ArrayRef<Token>());
 
+  /// Perform import resolution for the module.
+  void performImportResolution(ModuleDecl *M);
+
   /// This walks the AST to resolve imports.
   void performImportResolution(SourceFile &SF);
 
