@@ -63,16 +63,14 @@ The following chapters need some editing:
 
 - Part II:
   - Substitution Maps
-- Part III:
-  - Conformance Paths
-- Part V:
+- Part IV:
   - Completion
 
 The following chapters are not yet written:
 
-- Part IV:
+- Part III:
   - Opaque Return Types
   - Existential Types
-- Part V:
+- Part IV:
   - The Property Map
   - Rule Minimization
