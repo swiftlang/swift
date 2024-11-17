@@ -3217,6 +3217,13 @@ class EndApplyInst;
 class AbortApplyInst;
 class EndBorrowInst;
 
+struct EndApplyFilter {
+  std::optional<Operand*> operator()(Operand *use) const;
+};
+
+using EndApplyRange = OptionalTransformRange<ValueBase::use_range,
+                                             EndApplyFilter>;
+
 /// BeginApplyInst - Represents the beginning of the full application of
 /// a yield_once coroutine (up until the coroutine yields a value back).
 class BeginApplyInst final
@@ -3266,6 +3273,8 @@ public:
     return const_cast<MultipleValueInstructionResult *>(
         &getAllResultsBuffer().drop_back(isCalleeAllocated() ? 1 : 0).back());
   }
+
+  EndApplyRange getEndApplyUses() const;
 
   MultipleValueInstructionResult *getCalleeAllocationResult() const {
     if (!isCalleeAllocated()) {
@@ -3335,6 +3344,25 @@ public:
     return getToken()->getParent<BeginApplyInst>();
   }
 };
+
+inline std::optional<Operand*>
+EndApplyFilter::operator()(Operand *use) const {
+  // An end_borrow ends the coroutine scope at a dead-end block without
+  // terminating the coroutine.
+  switch (use->getUser()->getKind()) {
+  case SILInstructionKind::EndApplyInst:
+  case SILInstructionKind::AbortApplyInst:
+  case SILInstructionKind::EndBorrowInst:
+    return use;
+  default:
+    return std::nullopt;
+  }
+}
+
+inline EndApplyRange BeginApplyInst::getEndApplyUses() const {
+  return makeOptionalTransformRange(
+    getTokenResult()->getUses(), EndApplyFilter());
+}
 
 //===----------------------------------------------------------------------===//
 // Literal instructions.
@@ -8800,6 +8828,11 @@ public:
   void resolveToNonEscaping() {
     sharedUInt8().MarkDependenceInst.dependenceKind =
       uint8_t(MarkDependenceKind::NonEscaping);
+  }
+
+  void settleToEscaping() {
+    sharedUInt8().MarkDependenceInst.dependenceKind =
+      uint8_t(MarkDependenceKind::Escaping);
   }
 
   /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
