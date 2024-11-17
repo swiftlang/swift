@@ -1330,7 +1330,7 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   }
 }
 
-final public class EndApplyInst : Instruction, UnaryInstruction {
+final public class EndApplyInst : SingleValueInstruction, UnaryInstruction {
   public var token: MultipleValueInstructionResult { operand.value as! MultipleValueInstructionResult }
   public var beginApply: BeginApplyInst { token.parentInstruction as! BeginApplyInst }
 }
