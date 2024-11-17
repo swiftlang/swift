@@ -180,7 +180,7 @@ In \ListingRef{method overrides}, the \texttt{Derived} class overrides the \text
 } =
 \texttt{(Int, (V, V)) -> ()}
 \]
-This happens to exactly equal the interface type of the subclass method \texttt{doStuff()} in \texttt{Derived}, again not including the self clause. An override with an exact type match is valid. (In fact, some variance in parameter and return types is permitted as well, but it's not particularly interesting from a generics point of view, so here is the executive summary: an override can narrow the return type, and widen the parameter types. This means it is valid to override a method returning \texttt{Optional<T>} with a method returning \texttt{T}, because a \texttt{T} can also trivially become a \texttt{Optional<T>} via an injection. Similarly, if \texttt{A} is a superclass of \texttt{B}, a method returning \texttt{A} can be overridden to return \texttt{B}, because a \texttt{B} is always an \texttt{A}. A dual set of rules are in play in method parameter position; if the original method takes an \texttt{Int} the override can accept \texttt{Optional<Int>}, etc.)
+This happens to exactly equal the interface type of the subclass method \texttt{doStuff()} in \texttt{Derived}, again not including the self clause. An override with an exact type match is valid. (In fact, some variance in parameter and return types is permitted as well, but it's not particularly interesting from a generics point of view, so here is the executive summary: an override can narrow the return type, and widen the parameter types. This means it is valid to override a method returning \texttt{Optional<T>} with a method returning \tT, because a \tT\ can also trivially become a \texttt{Optional<T>} via an injection. Similarly, if \texttt{A} is a superclass of \texttt{B}, a method returning \texttt{A} can be overridden to return \texttt{B}, because a \texttt{B} is always an \texttt{A}. A dual set of rules are in play in method parameter position; if the original method takes an \texttt{Int} the override can accept \texttt{Optional<Int>}, etc.)
 
 \paragraph{Generic overrides}
 In the non-generic case, applying the superclass substitution map directly to the interface type of a superclass method tells us what ``the type of the superclass method should be'' in the subclass, and this happens to work because the superclass method had the same generic signature as the superclass. Once this is no longer required to be so, the problem becomes more complicated, and the below details were not worked out until \IndexSwift{5.2}Swift 5.2 \cite{sr4206}.
@@ -195,12 +195,12 @@ We build the attaching map by ``extending'' the superclass substitution map, add
 \begin{enumerate}
 \item Initialize \texttt{R} to an empty list of replacement types.
 \item Initialize \texttt{C} to an empty list of conformances.
-\item Let $\texttt{G}'$ be the generic signature of \texttt{B}, and let \texttt{T} be the declared interface type of \texttt{D}.
+\item Let $\texttt{G}'$ be the generic signature of \texttt{B}, and let \tT\ be the declared interface type of \texttt{D}.
 \item (Trivial case) If $\texttt{D}=\texttt{B}$, return \texttt{G}.
-\item (Remapping) Let \texttt{S} be the context substitution map of \texttt{T} for the declaration context of \texttt{B}.
+\item (Remapping) Let \texttt{S} be the context substitution map of \tT\ for the declaration context of \texttt{B}.
 \item (Replacements) For each generic parameter of \texttt{G}, check if this is a valid generic parameter in $\texttt{G}'$. If so, this is a generic parameter of the superclass, so apply \texttt{S} and record the replacement type in \texttt{R}. Otherwise, this is an innermost generic parameter of the superclass method. Adjust the depth of this parameter by subtracting the generic context depth of \texttt{B} and adding the generic context depth of \texttt{D}, and record a new generic parameter type with the adjusted depth but identical index in \texttt{R}.
 
-\item (Conformances) For each conformance requirement \texttt{T:\ P} of \texttt{G}, first check if \texttt{T} is a valid type in $\texttt{G}'$, and if \texttt{T} conforms to \texttt{P} in $\texttt{G}'$. If so, look up the conformance \texttt{T:\ P} in \texttt{S} and record the result in \texttt{C}. Otherwise, this is a new conformance requirement present in \texttt{G} but not $\texttt{G}'$. Record the abstract conformance to \texttt{P} in \texttt{C}.
+\item (Conformances) For each conformance requirement \texttt{T:\ P} of \texttt{G}, first check if \tT\ is a valid type in $\texttt{G}'$, and if \tT\ conforms to \texttt{P} in $\texttt{G}'$. If so, look up the conformance \texttt{T:\ P} in \texttt{S} and record the result in \texttt{C}. Otherwise, this is a new conformance requirement present in \texttt{G} but not $\texttt{G}'$. Record the abstract conformance to \texttt{P} in \texttt{C}.
 
 \item (Return) Return the substitution map for \texttt{G} from \texttt{R} and \texttt{C}.
 \end{enumerate}
@@ -391,7 +391,7 @@ From the generic nominal type \texttt{Set<Array<\rT>>}, we obtain the inferred c
 
 In general, when a requirement's subject type is not a type parameter, we repeatedly rewrite it into a (possibly empty) set of simpler requirements, until only requirements about type parameters remain; this \emph{requirement desugaring} procedure is described in the next section.
 
-After desugaring, inferred requirements are passed on to \index{minimal requirement}requirement minimization, where they might become redundant. For example, the user might re-state all inferred requirements explicitly, as in our original version of \texttt{uniqueElements()}; these duplicate requirements are eliminated by requirement minimization. More elaborate examples of redundant inferred requirements can also be constructed. In the below, we infer the requirement $\ConfReq{\rT.Iterator}{IteratorProtocol}$, but it's not an explicit requirement of the generic signature of \texttt{f()} because it can be derived from $\ConfReq{\rT}{Sequence}$:
+After desugaring, inferred requirements are passed on to \index{minimal requirement}requirement minimization, where they might become redundant. For example, the user might re-state all inferred requirements explicitly, as in our original version of \texttt{uniqueElements()}; these duplicate requirements are eliminated by requirement minimization. More elaborate examples of redundant inferred requirements can also be constructed. In the below, we infer the requirement $\ConfReq{\rT.Iterator}{IteratorProtocol}$, but it's not an explicit requirement of the generic signature of \texttt{f()} because it can be derived from $\rTSequence$:
 \begin{Verbatim}
 struct G<T: IteratorProtocol> {}
 
@@ -418,7 +418,7 @@ typealias OptionalElement<T: Sequence> = Optional<T.Element>
 let x: OptionalElement<Array<Int>> = ...
 \end{Verbatim}
 
-In the above, we form the substituted underlying type \texttt{Optional<Int>} by applying a substitution map that replaces $\rT$ with \texttt{Array<Int>} to the underlying type of the type alias declaration, \texttt{Optional<T.Element>}. This gives us the \index{structural components}structural components of a type alias type: a reference to a type alias declaration, a substituted underlying type, and a substitution map. The substitution map is used when printing the sugared type's generic arguments. Cruicially to our topic at hand, this substitution map is also considered by requirement inference, making this one of a handful of language features where the appearance of a sugared type \emph{does} have a semantic effect. In this example, we infer the requirement $\ConfReq{\rT}{Sequence}$ from considering \texttt{OptionalElement<\rT>}:
+In the above, we form the substituted underlying type \texttt{Optional<Int>} by applying a substitution map that replaces $\rT$ with \texttt{Array<Int>} to the underlying type of the type alias declaration, \texttt{Optional<T.Element>}. This gives us the \index{structural components}structural components of a type alias type: a reference to a type alias declaration, a substituted underlying type, and a substitution map. The substitution map is used when printing the sugared type's generic arguments. Cruicially to our topic at hand, this substitution map is also considered by requirement inference, making this one of a handful of language features where the appearance of a sugared type \emph{does} have a semantic effect. In this example, we infer the requirement $\rTSequence$ from considering \texttt{OptionalElement<\rT>}:
 \begin{Verbatim}
 func maybePickElement<T>(_ sequence: T) -> OptionalElement<T>
 \end{Verbatim}
@@ -428,7 +428,7 @@ Mostly of theoretical interest is the fact that the underlying type of a type al
 typealias SequenceOf<T, E> = Any
     where T: Sequence, T.Element == E
 \end{Verbatim}
-The underlying type of \texttt{SequenceOf} is just \texttt{Any}, and it's generic signature has the two requirements $\ConfReq{\rT}{Sequence}$ and $\SameReq{\rU}{\rT.Element}$. Now, we can state this type alias in the inheritance clause of a generic parameter declaration:
+The underlying type of \texttt{SequenceOf} is just \texttt{Any}, and it's generic signature has the two requirements $\rTSequence$ and $\SameReq{\rU}{\rT.Element}$. Now, we can state this type alias in the inheritance clause of a generic parameter declaration:
 \begin{Verbatim}
 func sum<S: SequenceOf<S, Int>>(_: T) {...}
 \end{Verbatim}
@@ -440,7 +440,7 @@ The inheritance clause entry introduces the requirement $\ConfReq{\rT}{Any}$; th
 \]
 Applying $\Sigma$ to the generic signature of \texttt{SequenceOf} gives us our two inferred requirements:
 \begin{gather*}
-\ConfReq{\rT}{Sequence}\otimes\Sigma = \ConfReq{\rT}{Sequence}\\
+\rTSequence\otimes\Sigma = \rTSequence\\
 \SameReq{\rU}{\rT.Element}\otimes\Sigma = \SameReq{\rU}{Int}
 \end{gather*}
 These requirements survive minimization and appear in the generic signature of \texttt{sum()}. We get the same generic signature as both of the following: 
@@ -482,7 +482,7 @@ We can understand the above by decomposing $\ConfReq{\rT}{Decodable \& Encodable
 \begin{Verbatim}
 func search<E, S: Sequence<E>>(...) {}
 \end{Verbatim}
-The conformance requirement $\ConfReq{\rU}{Sequence<\rT>}$ written above decomposes into two requirements, $\ConfReq{\rU}{Sequence}$ and $\SameReq{\rU.[Sequence]Element}{\rT}$.
+The conformance requirement $\ConfReq{\rU}{Sequence<\rT>}$ written above decomposes into two requirements, $\rUSequence$ and $\SameReq{\rU.[Sequence]Element}{\rT}$.
 
 We now present requirement decomposition in the form of an algorithm. Mostly this is a restatement of the above, with additional details and a couple of edge cases.
 
@@ -596,7 +596,7 @@ Takes an arbitrary requirement as input. Outputs a list of desugared requirement
 \begin{enumerate}
 \item If \tT\ and \tC\ are two specializations of the same \index{generic class type}\index{class declaration}class declaration, add the same-type requirement $\SameReq{T}{C}$ to the worklist.
 \item If \tT\ does not have a \index{superclass type}superclass type (\ChapRef{classinheritance}), then \tT\ cannot be a subclass of~\tC; add $\TC$ to the conflict list.
-\item Otherwise, let $\tT^\prime$ be the superclass type of \tT. Add the superclass requirement $\ConfReq{$\tT^\prime$}{C}$ to the worklist.
+\item Otherwise, let $\tTp$ be the superclass type of \tT. Add the superclass requirement $\ConfReq{$\tTp$}{C}$ to the worklist.
 \end{enumerate}
 \item For a \index{layout requirement!desugaring}\textbf{layout requirement} $\TAnyObject$, any type parameters contained in the concrete type \tT\ have no bearing on the outcome. It suffices to apply \AlgRef{reqissatisfied}. If unsatisfied, add $\TAnyObject$ to the conflict list.
 \item For a \index{same-type requirement!desugaring}\textbf{same-type requirement} $\TU$, apply \AlgRef{desugar same type algo} and add the results to the output and conflict lists.
@@ -626,16 +626,20 @@ struct Concat<C: Collection> where C.Element: Collection {
 
 A \index{type parameter!prefix}type parameter is a \index{prefix}\emph{prefix} of another type parameter if it is equal to the other's base type, or the base type of the base type, at any level of nesting. So \texttt{\rT.Element} and $\rT$ are the two prefixes of \texttt{\rT.Element.Element}. From the user's point of view, if ``\texttt{C.Element.Element}'' is a meaningful utterance to write down in the program, ``\texttt{C.Element}'' certainly should be as well! This suggests a reasonable property that any ``good'' generic signature ought to have: \textsl{every prefix of a valid type parameter is itself a valid type parameter}. This is not our final condition though, so we generalize further.
 
-When we say that a \index{type parameter!validity}type parameter \tT\ is valid in a generic signature $G$, we mean that we have a derivation~$G\vdash\tT$. Only a handful of derivation steps have a type parameter as a conclusion (see \AppendixRef{derived summary}), and by inspecting these steps, we can see another way to characterize the validity of a type parameter~\tT:
+When we say that a \index{type parameter!validity}type parameter \tT\ is valid in a generic signature $G$, we mean that we have a derivation~$G\vdash\tT$. Only a few derivation steps derive type parameters, and we can also characterize them as follows.
+
+\begin{proposition}\label{valid type param alt}
+Let $G$ be a generic signature, and let \tT\ be a type parameter.
 \begin{itemize}
 \item If \tT\ is a \index{generic parameter type!validity}generic parameter, then \tT\ is valid if and only if it appears in $G$.
 \item If \tT\ is an \index{unbound dependent member type!validity}unbound \index{dependent member type!validity}dependent member type \texttt{U.A}, then \tT\ is valid if and only if some protocol \tP\ declares an associated type named \nA, and $G\vdash\ConfReq{U}{P}$.
 \item If \tT\ is a \index{bound dependent member type!validity}bound dependent member type \texttt{U.[P]A}, then \tT\ is valid if and only if $G\vdash\ConfReq{U}{P}$, where \tP\ is the parent protocol of the \index{associated type declaration!bound dependent member type}associated type declaration denoted by \texttt{[P]A}.
 \end{itemize}
+\end{proposition}
 
 If we have one of those generic signatures where every prefix of \tT\ is also valid, then in the case where \tT\ is a dependent member type above, the subject type \tU\ of $\ConfReq{U}{P}$ is a prefix of~\tT, so \tU\ must be valid. We say that $\ConfReq{U}{P}$ is a \emph{well-formed} requirement if its subject type \tU\ is valid. This idea of well-formedness allows us to subsume ``prefix validity'' with a more general idea: \textsl{every derived conformance requirement must be well-formed}. In other words, we want $G\vdash\ConfReq{U}{P}$ to imply $G\vdash\tU$ for all \tU\ and \tP.
 
-We can also find motivation in \index{type substitution!well-formed generic signature}type substitution. Let $G$ be a generic signature where some derived requirement of $G$, not necessarily a conformance requirement, contains an invalid type parameter. By \AlgRef{reqissatisfied}, no substitution map $\Sigma$ can \index{satisfied requirement!well-formed generic signature}satisfy this requirement, because after we apply $\Sigma$, the invalid type parameter becomes an error type. Recalling our earlier notion of a \index{well-formed substitution map!well-formed generic signature}well-formed \emph{substitution map} from \DefRef{valid subst map}, we conclude that~$G$ cannot have any well-formed substitution maps at all! To rule this out, we generalize our condition to cover all requirements, not just conformance requirements.
+To generalize this further, consider \index{type substitution!well-formed generic signature}type substitution. Let $G$ be a generic signature where some derived requirement of $G$, not necessarily a conformance requirement, contains an invalid type parameter. By \AlgRef{reqissatisfied}, no substitution map $\Sigma$ can \index{satisfied requirement!well-formed generic signature}satisfy this requirement, because after we apply $\Sigma$, the invalid type parameter becomes an error type. Recalling our earlier notion of a \index{well-formed substitution map!well-formed generic signature}well-formed \emph{substitution map} from \DefRef{valid subst map}, we conclude that~$G$ cannot have any well-formed substitution maps at all! To rule this out, we generalize our condition to all requirement kinds.
 
 \begin{definition}\label{valid requirement}
 A requirement is \IndexDefinition{well-formed requirement}\emph{well-formed} with respect to a generic signature~$G$ if all type parameters contained in the requirement are valid type parameters of~$G$:
@@ -769,7 +773,7 @@ We now state the general result. We need this for the proof of \ThmRef{valid the
 \begin{lemma}[Formal substitution]\label{subst lemma}
 Let $G$ be an arbitrary generic signature. Suppose that $G\vdash\tT$ and $G\vdash\TP$ for some type parameter \tT\ and protocol \tP. Then if we take a valid type parameter or derived requirement of~$\GP$ and replace \tSelf\ with \tT\ throughout, we get a valid type parameter or derived requirement of~$G$, just rooted in \tT. That is:
 \begin{itemize}
-\item If $\GP\vdash\texttt{Self.U}$, then $G\vdash\texttt{T.U}$.
+\item If $\GP\vdash\SelfU$, then $G\vdash\texttt{T.U}$.
 \item If $\GP\vdash R$, then $G\vdash R^\prime$, where $R^\prime$ is the substituted requirement obtained by replacing \tSelf\ with \tT\ in $R$.
 \end{itemize}
 \end{lemma}
@@ -872,7 +876,7 @@ To handle the derivation steps generated by the \index{associated requirement!in
 \AssocConfStepDef\\
 \AssocLayoutStepDef
 \end{gather*}
-By the induction hypothesis, $G\vdash\tT$. We must show that $G\vdash\texttt{T.U}$. The requirement on the right-hand side is obtained by replacing \tSelf\ with \tT\ in some associated conformance requirement $\ConfReq{Self.U}{Q}_\tP$. By assumption, this associated requirement is well-formed with respect to $\GP$, so we have a derivation $\GP\vdash\texttt{Self.U}$. All the conditions of \LemmaRef{subst lemma} are satisfied, thus we can construct a derivation $G\vdash\texttt{T.U}$.
+By the induction hypothesis, $G\vdash\tT$. We must show that $G\vdash\texttt{T.U}$. The requirement on the right-hand side is obtained by replacing \tSelf\ with \tT\ in some associated conformance requirement $\ConfReq{Self.U}{Q}_\tP$. By assumption, this associated requirement is well-formed with respect to $\GP$, so we have a derivation $\GP\vdash\SelfU$. All the conditions of \LemmaRef{subst lemma} are satisfied, thus we can construct a derivation $G\vdash\texttt{T.U}$.
 
 For an \IndexStep{AssocSame}associated same-type requirement $\AssocSameReq{Self.U}{Self.V}{P}$ we repeat the same construction to derive $G\vdash\texttt{T.U}$ and $G\vdash\texttt{T.V}$:
 \begin{gather*}
@@ -1049,7 +1053,7 @@ Let $G$ be a generic signature, and let $R$ be an explicit requirement of~$G$. W
 \item $\tT\ < \tU$ under the \index{type parameter order!reduced requirement}type parameter order.
 \item \tT\ is either a reduced type parameter, or identical to the right-hand side of some other (explicit) same-type requirement in~$G$.
 \item \tT\ is not identical to the left-hand side of any same-type requirement of~$G$.
-\item \tU\ has the property that the only derivations $G\vdash\SameReq{$\tU^\prime$}{U}$ where $\tU^\prime<\tU$ must involve the explicit requirement $\TU$ itself; that is, \tU\ cannot be further reduced by any other requirement of~$G$.
+\item \tU\ has the property that the only derivations $G\vdash\SameReq{$\tUp$}{U}$ where $\tUp<\tU$ must involve the explicit requirement $\TU$ itself; that is, \tU\ cannot be further reduced by any other requirement of~$G$.
 \end{enumerate}
 \end{itemize}
 \end{definition}
