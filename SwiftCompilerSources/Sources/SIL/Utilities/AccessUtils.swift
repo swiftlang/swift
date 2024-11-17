@@ -103,6 +103,12 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       }
     case let sb as StoreBorrowInst:
       self = .storeBorrow(sb)
+    case let p2a as PointerToAddressInst:
+      if let global = p2a.resultOfGlobalAddressorCall {
+        self = .global(global)
+      } else {
+        self = .pointer(p2a)
+      }
     default:
       self = .unidentified
     }
@@ -528,18 +534,9 @@ private struct AccessPathWalker : AddressUseDefWalker {
   mutating func rootDef(address: Value, path: Path) -> WalkResult {
     assert(result.base == .unidentified, "rootDef should only called once")
     // Try identifying the address a pointer originates from
-    if let p2ai = address as? PointerToAddressInst {
-      if let originatingAddr = p2ai.originatingAddress {
-        return walkUp(address: originatingAddr, path: path)
-      } else if let global = p2ai.resultOfGlobalAddressorCall {
-        self.result = AccessPath(base: .global(global), projectionPath: path.projectionPath)
-        return .continueWalk
-      } else {
-        self.result = AccessPath(base: .pointer(p2ai), projectionPath: path.projectionPath)
-        return .continueWalk
-      }
+    if let p2ai = address as? PointerToAddressInst, let originatingAddr = p2ai.originatingAddress {
+      return walkUp(address: originatingAddr, path: path)
     }
-
     let base = AccessBase(baseAddress: address)
     self.result = AccessPath(base: base, projectionPath: path.projectionPath)
     return .continueWalk
