@@ -228,25 +228,12 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 ///     protocol NoRequirements: ~Copyable { }
 ///
 /// Extensions to the `Copyable` protocol are not allowed.
-@_marker public protocol Copyable {}
+@_marker public protocol Copyable/*: ~Escapable*/ {}
 
 @_documentation(visibility: internal)
-@_marker public protocol Escapable {}
+@_marker public protocol Escapable/*: ~Copyable*/ {}
 
-#if $BitwiseCopyable2
-#if $NonescapableTypes
 @_marker public protocol BitwiseCopyable: ~Escapable { }
-#else
-@_marker public protocol BitwiseCopyable { }
-#endif
 
 @available(*, deprecated, message: "Use BitwiseCopyable")
 public typealias _BitwiseCopyable = BitwiseCopyable
-#else
-#if $NonescapableTypes
-@_marker public protocol _BitwiseCopyable: ~Escapable { }
-#else
-@_marker public protocol _BitwiseCopyable { }
-#endif
-public typealias BitwiseCopyable = _BitwiseCopyable
-#endif
