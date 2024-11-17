@@ -104,6 +104,7 @@ func gatherVariableIntroducers(for value: Value, _ context: Context)
 /// A lifetime dependence identifies its parent value, the kind of
 /// scope that the parent value represents, and a dependent value.
 struct LifetimeDependence : CustomStringConvertible {
+  // TODO: handle trivial values based on variable binding
   enum Scope : CustomStringConvertible {
     /// A guaranteed or inout argument whose scope is provided by the caller
     /// and covers the entire function and any dependent results or yields.
@@ -115,7 +116,7 @@ struct LifetimeDependence : CustomStringConvertible {
     /// An owned value whose OSSA lifetime encloses nonescapable values
     case owned(Value)
     /// An borrowed value whose OSSA lifetime encloses nonescapable values
-    case borrowed(Value)
+    case borrowed(BeginBorrowValue)
     /// Singly-initialized addressable storage (likely for an
     /// immutable address-only value). The lifetime extends until the
     /// memory is destroyed. e.g. A value produced by an @in
@@ -127,7 +128,8 @@ struct LifetimeDependence : CustomStringConvertible {
     /// If `initializingStore` is nil, then the `initialAddress` is
     /// initialized on function entry.
     case initialized(initialAddress: Value, initializingStore: Instruction?)
-    // TODO: make .unknown a SIL Verification error
+    // TODO: Add SIL verification that no mark_depedence [unresolved] has an unknown LifetimeDependence.
+    // This currently requires stack allocations to be singly initialized.
     case unknown(Value)
 
     var parentValue: Value {
@@ -136,7 +138,7 @@ struct LifetimeDependence : CustomStringConvertible {
       case let .access(beginAccess): return beginAccess
       case let .yield(value): return value
       case let .owned(value): return value
-      case let .borrowed(value): return value
+      case let .borrowed(beginBorrow): return beginBorrow.value
       case let .initialized(initialAddress, _): return initialAddress
       case let .unknown(value): return value
       }
@@ -152,8 +154,8 @@ struct LifetimeDependence : CustomStringConvertible {
         precondition(value.definingInstruction is BeginApplyInst)
       case let .owned(value):
         precondition(value.ownership == .owned)
-      case let .borrowed(value):
-        precondition(value.ownership == .guaranteed)
+      case let .borrowed(beginBorrow):
+        precondition(beginBorrow.value.ownership == .guaranteed)
       case let .initialized(initialAddress, initializingStore):
         precondition(initialAddress.type.isAddress, "expected an address")
         precondition(initialAddress is AllocStackInst
@@ -236,8 +238,7 @@ extension LifetimeDependence {
   /// For any LifetimeDependence constructed from a mark_dependence, its `dependentValue` will be the result of the
   /// mark_dependence.
   ///
-  /// TODO: Add SIL verification that all mark_depedence [unresolved]
-  /// have a valid LifetimeDependence.
+  /// Returns 'nil' for dependence on a trivial value.
   init?(_ markDep: MarkDependenceInst, _ context: some Context) {
     switch markDep.dependenceKind {
     case .Unresolved, .NonEscaping:
@@ -286,16 +287,15 @@ private extension Value {
 }
 
 extension LifetimeDependence.Scope {
-  /// Construct a lifetime dependence scope from the base value that
-  /// other values depend on. This derives the kind of dependence
-  /// scope and its parentValue from `base`.
+  /// Construct a lifetime dependence scope from the base value that other values depend on. This derives the kind of
+  /// dependence scope and its parentValue from `base`.
   ///
-  /// `base` represents the OSSA lifetime that the dependent value
-  /// must be used within. If `base` is owned, then it directly
-  /// defines the parent lifetime. If `base` is guaranteed, then it
-  /// must have a single borrow introducer, which defines the parent
-  /// lifetime. `base` must not be derived from a guaranteed phi or
-  /// forwarded (via struct/tuple) from multiple guaranteed values.
+  /// `base` represents the OSSA lifetime that the dependent value must be used within. If `base` is owned, then it
+  /// directly defines the parent lifetime. If `base` is guaranteed, then it must have a single borrow introducer, which
+  /// defines the parent lifetime. `base` must not be derived from a guaranteed phi or forwarded (via struct/tuple) from
+  /// multiple guaranteed values.
+  ///
+  /// Returns 'nil' for dependence on a trivial value.
   init?(base: Value, _ context: some Context) {
     if base.type.isAddress {
       guard let scope = Self(address: base, context) else {
@@ -321,6 +321,7 @@ extension LifetimeDependence.Scope {
     }
   }
 
+  /// Returns 'nil' for dependence on a trivial value.
   private init?(address: Value, _ context: some Context) {
     switch address.enclosingAccessScope {
     case let .scope(access):
@@ -333,6 +334,7 @@ extension LifetimeDependence.Scope {
     }
   }
 
+  /// Returns 'nil' for dependence on a trivial value.
   init?(accessBase: AccessBase, address: Value, _ context: some Context) {
     switch accessBase {
     case let .box(projectBox):
@@ -342,10 +344,7 @@ extension LifetimeDependence.Scope {
       }
       self = scope
     case let .stack(allocStack):
-      guard let scope = Self(allocation: allocStack, context) else {
-        return nil
-      }
-      self = scope
+      self = Self(allocation: allocStack, context)
     case .global:
       self = .unknown(address)
     case .class, .tail:
@@ -378,6 +377,7 @@ extension LifetimeDependence.Scope {
     }
   }
 
+  /// Returns 'nil' for dependence on a trivial value.
   private init?(guaranteed base: Value, _ context: some Context) {
     // If introducers is empty, then the dependence is on a trivial value, so
     // there is no dependence scope.
@@ -390,7 +390,7 @@ extension LifetimeDependence.Scope {
            "guaranteed phis not allowed when diagnosing lifetime dependence")
     switch beginBorrow {
     case .beginBorrow, .loadBorrow:
-      self = .borrowed(beginBorrow.value)
+      self = .borrowed(beginBorrow)
     case let .beginApply(value):
       self = .yield(value)
     case let .functionArgument(arg):
@@ -410,12 +410,33 @@ extension LifetimeDependence.Scope {
     self = .yield(result)
   }
 
-  private init?(allocation: AllocStackInst, _ context: Context) {
+  private init(allocation: AllocStackInst, _ context: Context) {
     if let initializer = allocation.accessBase.findSingleInitializer(context) {
       self = .initialized(initialAddress: initializer.initialAddress,
                           initializingStore: initializer.initializingStore)
+      return
     }
-    return nil
+    self = .unknown(allocation)
+  }
+}
+
+extension LifetimeDependence.Scope {
+  /// Ignore "irrelevent" borrow scopes: load_borrow or begin_borrow without [var_decl]
+  func ignoreBorrowScope(_ context: some Context) -> LifetimeDependence.Scope? {
+    guard case let .borrowed(beginBorrowVal) = self else {
+      return self
+    }
+    switch beginBorrowVal {
+    case let .beginBorrow(bb):
+      if bb.isFromVarDecl {
+        return self
+      }
+      return LifetimeDependence.Scope(base: bb.borrowedValue, context)?.ignoreBorrowScope(context)
+    case let .loadBorrow(lb):
+      return LifetimeDependence.Scope(base: lb.address, context)
+    default:
+      fatalError("Scope.borrowed must begin begin_borrow or load_borrow")
+    }
   }
 }
 
@@ -448,8 +469,8 @@ extension LifetimeDependence.Scope {
       // how would we ensure that the borrowed mark_dependence value
       // is within this value's OSSA lifetime?
       return computeLinearLiveness(for: value, context)
-    case let .borrowed(value):
-      return computeLinearLiveness(for: value, context)
+    case let .borrowed(beginBorrow):
+      return computeLinearLiveness(for: beginBorrow.value, context)
     case let .initialized(initialAddress, initializingStore):
       return LifetimeDependence.Scope.computeInitializedRange(
         initialAddress: initialAddress, initializingStore: initializingStore,
