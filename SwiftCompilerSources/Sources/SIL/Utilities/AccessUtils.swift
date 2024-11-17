@@ -502,9 +502,40 @@ public enum EnclosingScope {
   case base(AccessBase)
 }
 
+private struct EnclosingAccessWalker : AddressUseDefWalker {
+  var enclosingScope: EnclosingScope?
+
+  mutating func walk(startAt address: Value, initialPath: UnusedWalkingPath = UnusedWalkingPath()) {
+    if walkUp(address: address, path: UnusedWalkingPath()) == .abortWalk {
+      assert(enclosingScope == nil, "shouldn't have set an enclosing scope in an aborted walk")
+    }
+  }
+
+  mutating func rootDef(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    assert(enclosingScope == nil, "rootDef should only called once")
+    // Try identifying the address a pointer originates from
+    if let p2ai = address as? PointerToAddressInst, let originatingAddr = p2ai.originatingAddress {
+      return walkUp(address: originatingAddr, path: path)
+    }
+    enclosingScope = .base(AccessBase(baseAddress: address))
+    return .continueWalk
+  }
+
+  mutating func walkUp(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    if let ba = address as? BeginAccessInst {
+      enclosingScope = .scope(ba)
+      return .continueWalk
+    }
+    return walkUpDefault(address: address, path: path)
+  }
+}
+
 private struct AccessPathWalker : AddressUseDefWalker {
   var result = AccessPath.unidentified()
-  var foundBeginAccess: BeginAccessInst?
+
+  // List of nested BeginAccessInst: inside-out order.
+  var foundBeginAccesses = SingleInlineArray<BeginAccessInst>()
+
   let enforceConstantProjectionPath: Bool
 
   init(enforceConstantProjectionPath: Bool = false) {
@@ -570,8 +601,8 @@ private struct AccessPathWalker : AddressUseDefWalker {
       // An `index_addr` instruction cannot be derived from an address
       // projection. Bail out
       return .abortWalk
-    } else if let ba = address as? BeginAccessInst, foundBeginAccess == nil {
-      foundBeginAccess = ba
+    } else if let ba = address as? BeginAccessInst {
+      foundBeginAccesses.push(ba)
     }
     return walkUpDefault(address: address, path: path.with(indexAddr: false))
   }
@@ -624,17 +655,20 @@ extension Value {
   public var accessPathWithScope: (AccessPath, scope: BeginAccessInst?) {
     var walker = AccessPathWalker()
     walker.walk(startAt: self)
-    return (walker.result, walker.foundBeginAccess)
+    return (walker.result, walker.foundBeginAccesses.first)
   }
 
   /// Computes the enclosing access scope of this address value.
   public var enclosingAccessScope: EnclosingScope {
+    var walker = EnclosingAccessWalker()
+    walker.walk(startAt: self)
+    return walker.enclosingScope ?? .base(.unidentified)
+  }
+
+  public var accessBaseWithScopes: (AccessBase, SingleInlineArray<BeginAccessInst>) {
     var walker = AccessPathWalker()
     walker.walk(startAt: self)
-    if let ba = walker.foundBeginAccess {
-      return .scope(ba)
-    }
-    return .base(walker.result.base)
+    return (walker.result.base, walker.foundBeginAccesses)
   }
 
   /// The root definition of a reference, obtained by skipping ownership forwarding and ownership transition.
