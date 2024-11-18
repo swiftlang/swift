@@ -133,7 +133,10 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
   %trivial_mark = mark_dependence [nonescaping] %yield_mark : $C on %zero : $Builtin.Int1
   specify_test "lifetime_dependence_scope %trivial_mark"
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %trivial_mark
-// CHECK-NEXT: Trivial Dependence
+// CHECK-NEXT: Unknown:   %{{.*}} = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: Dependent: %{{.*}} = mark_dependence [nonescaping]
+// CHECK-NEXT: begin:     %{{.*}} = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: ends:{{[ ]+$}}
 // CHECK: dependence_scope: lifetime_dependence_scope with: %trivial_mark
 
   %f = ref_element_addr %borrow : $D, #D.object
