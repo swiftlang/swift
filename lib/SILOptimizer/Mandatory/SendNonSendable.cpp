@@ -2316,10 +2316,8 @@ struct DiagnosticEvaluator final
 
   void handleLocalUseAfterSend(LocalUseAfterSendError error) const {
     const auto &partitionOp = *error.op;
-    Element sentElement = error.sentElement;
-    Operand *sendingOp = error.sendingOp;
 
-    auto &operandState = operandToStateMap.get(sendingOp);
+    auto &operandState = operandToStateMap.get(error.sendingOp);
     // Ignore this if we have a gep like instruction that is returning a
     // sendable type and sendingOp was not set with closure
     // capture.
@@ -2337,7 +2335,7 @@ struct DiagnosticEvaluator final
 
     REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
     sendingOpToRequireInstMultiMap.insert(
-        sendingOp, RequireInst::forUseAfterSend(partitionOp.getSourceInst()));
+        error.sendingOp, RequireInst::forUseAfterSend(partitionOp.getSourceInst()));
   }
 
   void handleInOutSendingNotInitializedAtExitError(
@@ -2372,6 +2370,11 @@ struct DiagnosticEvaluator final
     case PartitionOpError::InOutSendingNotDisconnectedAtExit:
     case PartitionOpError::SentNeverSendable:
     case PartitionOpError::AssignNeverSendableIntoSendingResult:
+      // We are going to process these later... but dump so we can see that we
+      // handled an error here. The rest of the explicit handlers will dump as
+      // appropriate if they want to emit an error here (some will squelch the
+      // error).
+      REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
       foundVerbatimErrors.emplace_back(error);
       return;
     case PartitionOpError::InOutSendingNotInitializedAtExit: {
