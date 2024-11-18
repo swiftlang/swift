@@ -7,7 +7,7 @@ import StdSpan
 
 let arr: [Int32] = [1, 2, 3]
 arr.withUnsafeBufferPointer { ubpointer in
-    let _ = ConstSpan(ubpointer) // okay
-    let _ = ConstSpan(ubpointer.baseAddress!, ubpointer.count) 
+    let _ = ConstSpanOfInt(ubpointer) // okay
+    let _ = ConstSpanOfInt(ubpointer.baseAddress!, ubpointer.count) 
     // expected-warning@-1 {{'init(_:_:)' is deprecated: use 'init(_:)' instead.}}
 }
