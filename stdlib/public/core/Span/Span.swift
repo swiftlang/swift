@@ -703,7 +703,9 @@ extension Span where Element: BitwiseCopyable {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    try RawSpan(_elements: self).withUnsafeBytes(body)
+    try body(
+      .init(start: _pointer, count: _count * MemoryLayout<Element>.stride)
+    )
   }
 }
 
