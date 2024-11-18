@@ -61,6 +61,21 @@ struct SWIFT_ESCAPABLE_IF(F, S) MyType {
 MyPair2<Owner, Owner> i1();
 MyType<Owner, 0> i2();
 
+template<typename T>
+struct Outer {
+    struct NonTemplated {
+        template <typename S>
+        struct SWIFT_ESCAPABLE_IF(T, S) Inner {
+            T t;
+            S s;
+        };
+    };
+};
+
+Outer<View>::NonTemplated::Inner<Owner> j1();
+Outer<Owner>::NonTemplated::Inner<View> j2();
+Outer<Owner>::NonTemplated::Inner<Owner> j3();
+
 //--- test.swift
 
 import Test
@@ -85,6 +100,11 @@ public func noAnnotations() -> View {
     // CHECK: nonescapable.h:38:39: error: template parameter 'Missing' does not exist
     i2()
     // CHECK: nonescapable.h:44:33: error: template parameter 'S' expected to be a type parameter
+    j1()
+    // CHECK: nonescapable.h:62:41: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
+    j2()
+    // CHECK: nonescapable.h:63:41: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
+    j3()
     // CHECK-NOT: error
     // CHECK-NOT: warning
     return View()
