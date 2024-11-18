@@ -13935,6 +13935,13 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   } else {
     // If the overload hasn't been resolved, we can't simplify this constraint.
     auto overloadLocator = getCalleeLocator(getConstraintLocator(locator));
+
+    // If there was a problem resolving specialization expression
+    // it would be diagnosted as invalid AST node.
+    if (overloadLocator->directlyAt<ErrorExpr>()) {
+      return shouldAttemptFixes() ? SolutionKind::Error : SolutionKind::Solved;
+    }
+
     auto selectedOverload = findSelectedOverloadFor(overloadLocator);
     if (!selectedOverload)
       return formUnsolved();
