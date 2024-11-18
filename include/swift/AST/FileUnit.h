@@ -347,7 +347,7 @@ public:
 
   /// Returns the version of the Swift compiler used to create generate
   /// .swiftinterface file if this file is produced from one.
-  virtual llvm::VersionTuple getSwiftInterfaceCompilerVersion() const {
+  virtual version::Version getSwiftInterfaceCompilerVersion() const {
     return {};
   }
 

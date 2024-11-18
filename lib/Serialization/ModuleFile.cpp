@@ -1416,6 +1416,6 @@ StringRef SerializedASTFile::getPublicModuleName() const {
   return File.getPublicModuleName();
 }
 
-llvm::VersionTuple SerializedASTFile::getSwiftInterfaceCompilerVersion() const {
+version::Version SerializedASTFile::getSwiftInterfaceCompilerVersion() const {
   return File.getSwiftInterfaceCompilerVersion();
 }

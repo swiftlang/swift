@@ -257,7 +257,7 @@ class ModuleDecl
 
   /// Indicates a version of the Swift compiler used to generate 
   /// .swiftinterface file that this module was produced from (if any).
-  mutable llvm::VersionTuple InterfaceCompilerVersion;
+  mutable version::Version InterfaceCompilerVersion;
 
 public:
   /// Produces the components of a given module's full name in reverse order.
@@ -524,11 +524,11 @@ public:
   }
 
   /// See \c InterfaceCompilerVersion
-  llvm::VersionTuple getSwiftInterfaceCompilerVersion() const {
+  version::Version getSwiftInterfaceCompilerVersion() const {
     return InterfaceCompilerVersion;
   }
 
-  void setSwiftInterfaceCompilerVersion(llvm::VersionTuple version) {
+  void setSwiftInterfaceCompilerVersion(version::Version version) {
     InterfaceCompilerVersion = version;
   }
 
