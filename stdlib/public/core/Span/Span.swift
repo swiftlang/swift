@@ -95,7 +95,8 @@ extension Span where Element: ~Copyable {
   public init(
     _unsafeElements buffer: borrowing UnsafeBufferPointer<Element>
   ) {
-    let baseAddress = buffer.baseAddress //FIXME: rdar://138665760
+    //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
+    let baseAddress = buffer.baseAddress
     _precondition(
       ((Int(bitPattern: baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
@@ -204,7 +205,8 @@ extension Span where Element: BitwiseCopyable {
   public init(
     _unsafeBytes buffer: borrowing UnsafeRawBufferPointer
   ) {
-    let baseAddress = buffer.baseAddress //FIXME: rdar://138665760
+    //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
+    let baseAddress = buffer.baseAddress
     _precondition(
       ((Int(bitPattern: baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
