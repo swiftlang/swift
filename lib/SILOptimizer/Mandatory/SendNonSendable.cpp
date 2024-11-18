@@ -2335,15 +2335,7 @@ struct DiagnosticEvaluator final
       }
     }
 
-    auto rep = info->getValueMap().getRepresentative(sentElement);
-    REGIONBASEDISOLATION_LOG(
-        llvm::dbgs() << "    Emitting Error. Kind: Use After Send\n"
-                     << "        Sending Inst: " << *sendingOp->getUser()
-                     << "        Sending Op Value: " << sendingOp->get()
-                     << "        Require Inst: " << *partitionOp.getSourceInst()
-                     << "        ID:  %%" << sentElement << "\n"
-                     << "        Rep: " << *rep << "        Sending Op Num: "
-                     << sendingOp->getOperandNumber() << '\n');
+    REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
     sendingOpToRequireInstMultiMap.insert(
         sendingOp, RequireInst::forUseAfterSend(partitionOp.getSourceInst()));
   }
@@ -2351,20 +2343,10 @@ struct DiagnosticEvaluator final
   void handleInOutSendingNotInitializedAtExitError(
       InOutSendingNotInitializedAtExitError error) const {
     const PartitionOp &partitionOp = *error.op;
-    Element inoutSendingVal = error.sentElement;
     Operand *sendingOp = error.sendingOp;
 
-    auto rep = info->getValueMap().getRepresentative(inoutSendingVal);
-    REGIONBASEDISOLATION_LOG(
-        llvm::dbgs()
-        << "    Emitting Error. Kind: InOut Not Reinitialized At End Of "
-           "Function\n"
-        << "        Sending Inst: " << *sendingOp->getUser()
-        << "        Sending Op Value: " << sendingOp->get()
-        << "        Require Inst: " << *partitionOp.getSourceInst()
-        << "        ID:  %%" << inoutSendingVal << "\n"
-        << "        Rep: " << *rep
-        << "        Sending Op Num: " << sendingOp->getOperandNumber() << '\n');
+    REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
+
     sendingOpToRequireInstMultiMap.insert(
         sendingOp, RequireInst::forInOutReinitializationNeeded(
                        partitionOp.getSourceInst()));
@@ -2496,18 +2478,7 @@ void SendNonSendableImpl::emitVerbatimErrors() {
       llvm_unreachable("Handled elsewhere");
     case PartitionOpError::AssignNeverSendableIntoSendingResult: {
       auto error = erasedError.getAssignNeverSendableIntoSendingResultError();
-      auto srcRep =
-          info->getValueMap().getRepresentativeValue(error.srcElement);
-      REGIONBASEDISOLATION_LOG(
-          llvm::dbgs()
-          << "    Emitting Error. Kind: Assign Isolated Into Sending Result!\n"
-          << "        Assign Inst: " << *error.op->getSourceInst()
-          << "        Dest Value: " << *error.destValue
-          << "        Dest Element: " << error.destElement << '\n'
-          << "        Src Value: " << error.srcValue
-          << "        Src Element: " << error.srcElement << '\n'
-          << "        Src Rep: " << srcRep
-          << "        Src Isolation: " << error.srcIsolationRegionInfo << '\n');
+      REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
       AssignIsolatedIntoSendingResultDiagnosticEmitter emitter(
           error.op->getSourceOp(), error.destValue, error.srcValue,
           error.srcIsolationRegionInfo);
@@ -2520,16 +2491,7 @@ void SendNonSendableImpl::emitVerbatimErrors() {
           info->getValueMap().getRepresentative(error.inoutSendingElement);
       auto isolationRegionInfo = error.isolationInfo;
 
-      REGIONBASEDISOLATION_LOG(
-          llvm::dbgs()
-              << "    Emitting Error. Kind: InOut Sending ActorIsolated "
-                 "at end of "
-                 "Function Error!\n"
-              << "        ID:  %%" << error.inoutSendingElement << "\n"
-              << "        Rep: " << *inoutSendingVal
-              << "        Dynamic Isolation Region: ";
-          isolationRegionInfo.printForOneLineLogging(llvm::dbgs());
-          llvm::dbgs() << '\n');
+      REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
 
       InOutSendingNotDisconnectedDiagnosticEmitter emitter(
           cast<TermInst>(error.op->getSourceInst()), inoutSendingVal,
@@ -2539,26 +2501,7 @@ void SendNonSendableImpl::emitVerbatimErrors() {
     }
     case PartitionOpError::SentNeverSendable: {
       auto e = erasedError.getSentNeverSendableError();
-      auto errorLog = [&] {
-        llvm::dbgs() << "    Emitting Error. Kind: Send Non Sendable\n"
-                     << "        ID:  %%" << e.sentElement << "\n"
-                     << "        Rep: "
-                     << *info->getValueMap().getRepresentative(e.sentElement)
-                     << "        Dynamic Isolation Region: ";
-        e.isolationRegionInfo.printForOneLineLogging(llvm::dbgs());
-        llvm::dbgs() << '\n';
-        if (auto isolatedValue =
-                e.isolationRegionInfo->maybeGetIsolatedValue()) {
-          llvm::dbgs() << "        Isolated Value: " << isolatedValue;
-          auto name = inferNameHelper(isolatedValue);
-          llvm::dbgs() << "        Isolated Value Name: "
-                       << (name.has_value() ? name->get() : "none") << '\n';
-        } else {
-          llvm::dbgs() << "        Isolated Value: none\n";
-        };
-      };
-      REGIONBASEDISOLATION_LOG(errorLog());
-
+      REGIONBASEDISOLATION_LOG(e.print(llvm::dbgs(), info->getValueMap()));
       SentNeverSendableDiagnosticInferrer diagnosticInferrer(
           info->getValueMap(), e);
       diagnosticInferrer.run();

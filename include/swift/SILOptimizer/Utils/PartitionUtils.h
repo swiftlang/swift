@@ -88,6 +88,7 @@ namespace swift {
 
 class Partition;
 class SendingOperandToStateMap;
+class RegionAnalysisValueMap;
 
 /// The representative value of the equivalence class that makes up a tracked
 /// value.
@@ -380,6 +381,7 @@ public:
   IsolationHistory get() { return IsolationHistory(this); }
 };
 
+/// A struct that represents a specific "sending" operand of an ApplySite.
 struct SendingOperandState {
   /// The dynamic isolation info of the region of value when we sent.
   ///
@@ -954,6 +956,12 @@ public:
     const PartitionOp *op;
 
     UnknownCodePatternError(const PartitionOp &op) : op(&op) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
   };
 
   struct LocalUseAfterSendError {
@@ -964,6 +972,12 @@ public:
     LocalUseAfterSendError(const PartitionOp &op, Element elt,
                            Operand *sendingOp)
         : op(&op), sentElement(elt), sendingOp(sendingOp) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
   };
 
   struct SentNeverSendableError {
@@ -975,6 +989,12 @@ public:
                            SILDynamicMergedIsolationInfo isolationRegionInfo)
         : op(&op), sentElement(sentElement),
           isolationRegionInfo(isolationRegionInfo) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
   };
 
   struct AssignNeverSendableIntoSendingResultError {
@@ -992,6 +1012,12 @@ public:
         : op(&op), destElement(destElement), destValue(destValue),
           srcElement(srcElement), srcValue(srcValue),
           srcIsolationRegionInfo(srcIsolationRegionInfo) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
   };
 
   struct InOutSendingNotInitializedAtExitError {
@@ -1002,6 +1028,12 @@ public:
     InOutSendingNotInitializedAtExitError(const PartitionOp &op, Element elt,
                                           Operand *sendingOp)
         : op(&op), sentElement(elt), sendingOp(sendingOp) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
   };
 
   struct InOutSendingNotDisconnectedAtExitError {
@@ -1013,6 +1045,12 @@ public:
         const PartitionOp &op, Element elt,
         SILDynamicMergedIsolationInfo isolation)
         : op(&op), inoutSendingElement(elt), isolationInfo(isolation) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
   };
 
 #define PARTITION_OP_ERROR(NAME)                                               \
@@ -1066,6 +1104,20 @@ public:
   }
 
   Kind getKind() const { return kind; }
+
+  void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+    switch (getKind()) {
+#define PARTITION_OP_ERROR(NAME)                                               \
+  case NAME:                                                                   \
+    return get##NAME##Error().print(os, valueMap);
+#include "PartitionOpError.def"
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+    return print(llvm::dbgs(), valueMap);
+  }
 
 #define PARTITION_OP_ERROR(NAME)                                               \
   NAME##Error get##NAME##Error() const {                                       \
