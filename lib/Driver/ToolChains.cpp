@@ -270,8 +270,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_disable_dynamic_actor_isolation);
   inputArgs.AddLastArg(arguments, options::OPT_warn_concurrency);
   inputArgs.AddLastArg(arguments, options::OPT_strict_concurrency);
-  inputArgs.AddAllArgs(arguments, options::OPT_enable_experimental_feature);
-  inputArgs.AddAllArgs(arguments, options::OPT_enable_upcoming_feature);
+  inputArgs.addAllArgs(arguments, {options::OPT_enable_experimental_feature,
+                                   options::OPT_disable_experimental_feature,
+                                   options::OPT_enable_upcoming_feature,
+                                   options::OPT_disable_upcoming_feature});
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
