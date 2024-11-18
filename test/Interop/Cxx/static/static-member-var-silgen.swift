@@ -47,7 +47,7 @@ func writeSelfMember(_ m: WithIncompleteStaticMember) {
 // CHECK: [[ADDR:%.*]] = global_addr @{{_ZN26WithIncompleteStaticMember10selfMemberE|\?selfMember@WithIncompleteStaticMember@@2V1@A}} : $*WithIncompleteStaticMember
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADDR]] : $*WithIncompleteStaticMember
 // CHECK:  store %0 to [[ACCESS]] : $*WithIncompleteStaticMember
-//TODO fix undefined reference to `WithConstStaticMember::notDefined`.
+// TODO: fix undefined reference to `WithConstStaticMember::notDefined`.
 // func readNotDefinedConstMember() -> CInt {
 //   return WithConstStaticMember.notDefined
 // }

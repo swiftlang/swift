@@ -304,7 +304,7 @@ extension RawSpan {
   }
 }
 
-//MARK: extracting sub-spans
+// MARK: extracting sub-spans
 @_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
@@ -426,7 +426,7 @@ extension RawSpan {
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
 
-  //FIXME: mark closure parameter as non-escaping
+  // FIXME: mark closure parameter as non-escaping
   /// Calls the given closure with a pointer to the underlying bytes of
   /// the viewed contiguous storage.
   ///
@@ -479,7 +479,7 @@ extension RawSpan {
   }
 }
 
-//MARK: load
+// MARK: load
 @_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
@@ -633,7 +633,7 @@ extension RawSpan {
   }
 }
 
-//MARK: one-sided slicing operations
+// MARK: one-sided slicing operations
 @_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {

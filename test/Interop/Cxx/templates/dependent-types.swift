@@ -98,20 +98,20 @@ DependentTypesTestSuite.test("Complex different dependent argument and return ty
   expectEqual(m2, 42)
 }
 
-//TODO: Import issue: rdar://89028943
+// TODO: Import issue: rdar://89028943
 // DependentTypesTestSuite.test("Dependent to Reference") {
 //   var x = 42
 //   let m = dependentToRef(x) as! M<Int>
 //   expectEqual(m.getValue(), 42)
 // }
 
-//TODO: Not imported: rdar://89034440
+// TODO: Not imported: rdar://89034440
 // DependentTypesTestSuite.test("Dependent Reference.") {
 //   let m = dependentRef()
 //   expectEqual(m.getValue(), 42)
 // }
 
-//TODO: Not imported: rdar://89034440
+// TODO: Not imported: rdar://89034440
 // DependentTypesTestSuite.test("Dependent reference and reference inferred") {
   // let m = dependentRefAndRefInferred(M<Int>(value: 40), 2) as! M<Int>
   // expectEqual(m.getValue(), 42)

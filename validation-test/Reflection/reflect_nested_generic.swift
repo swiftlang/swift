@@ -65,7 +65,7 @@ reflect(enum: Outer1.C<Void>.Inner.S<(Int,Int)>?.none)
 //X64-NEXT:           (case name=none index=1)))))
 //X64-NEXT:   (case name=none index=1))
 
-//TODO:  Work out the layout for 32-bit targets
+// TODO:  Work out the layout for 32-bit targets
 
 //CHECK: Mangled name: $s22reflect_nested_generic6Outer1O1CC1SVy_yt_Si_SitGSg
 //CHECK-NEXT: Demangled name: Swift.Optional<reflect_nested_generic.Outer1.C<()>.S<(Swift.Int, Swift.Int)>>

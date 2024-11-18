@@ -66,7 +66,7 @@ class MyController: TiViewController<MyPresenter, MyView>, MyView {
     }
     
     internal func setDataItems(_: [String]) {
-        //TODO
+        // TODO
     }
 }
 

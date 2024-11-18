@@ -358,7 +358,7 @@ internal func _bridgeTaggedASCII(
 
 @_effects(readonly)
 private func _NSStringASCIIPointer(_ str: _StringSelectorHolder) -> UnsafePointer<UInt8>? {
-  //TODO(String bridging): Unconditionally asking for nul-terminated contents is
+  // TODO(String bridging): Unconditionally asking for nul-terminated contents is
   // overly conservative and hurts perf with some NSStrings
   return str._fastCStringContents(1)?._asUInt8
 }

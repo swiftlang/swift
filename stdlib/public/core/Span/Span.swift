@@ -95,7 +95,7 @@ extension Span where Element: ~Copyable {
   public init(
     _unsafeElements buffer: borrowing UnsafeBufferPointer<Element>
   ) {
-    let baseAddress = buffer.baseAddress //FIXME: rdar://138665760
+    let baseAddress = buffer.baseAddress // FIXME: rdar://138665760
     _precondition(
       ((Int(bitPattern: baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
@@ -204,7 +204,7 @@ extension Span where Element: BitwiseCopyable {
   public init(
     _unsafeBytes buffer: borrowing UnsafeRawBufferPointer
   ) {
-    let baseAddress = buffer.baseAddress //FIXME: rdar://138665760
+    let baseAddress = buffer.baseAddress // FIXME: rdar://138665760
     _precondition(
       ((Int(bitPattern: baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
@@ -448,7 +448,7 @@ extension Span where Element: ~Copyable {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
-    //FIXME: change to unsafeRawAddress when ready
+    // FIXME: change to unsafeRawAddress when ready
     unsafeAddress {
       _precondition(indices.contains(position), "Index out of bounds")
       return _unsafeAddressOfElement(unchecked: position)
@@ -468,7 +468,7 @@ extension Span where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
-    //FIXME: change to unsafeRawAddress when ready
+    // FIXME: change to unsafeRawAddress when ready
     unsafeAddress {
       _unsafeAddressOfElement(unchecked: position)
     }
@@ -529,7 +529,7 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
-//MARK: sub-spans
+// MARK: sub-spans
 @_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable {
@@ -645,7 +645,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
-//MARK: UnsafeBufferPointer access hatch
+// MARK: UnsafeBufferPointer access hatch
 @_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable  {
@@ -740,7 +740,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
-//MARK: prefixes and suffixes
+// MARK: prefixes and suffixes
 @_disallowFeatureSuppression(NonescapableTypes)
 @available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable {
