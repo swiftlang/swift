@@ -7718,17 +7718,16 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
       decl->getName() == "_Optional_construct_base")
     return true;
 
+  if (decl->hasSimpleCopyConstructor())
+    return true;
+
   // If we have no way of copying the type we can't import the class
   // at all because we cannot express the correct semantics as a swift
   // struct.
-  if (llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-        return ctor->isCopyConstructor() &&
-               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
-      }))
-    return false;
-
-  // TODO: this should probably check to make sure we actually have a copy ctor.
-  return true;
+  return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+    return ctor->isCopyConstructor() && !ctor->isDeleted() &&
+           ctor->getAccess() == clang::AccessSpecifier::AS_public;
+  });
 }
 
 static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
