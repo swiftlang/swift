@@ -114,6 +114,22 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     }
   }
 
+  /// Return 'nil' for global varabiables and unidentified addresses.
+  public var address: Value? {
+    switch self {
+      case .global, .unidentified: return nil
+      case .box(let pbi):        return pbi
+      case .stack(let asi):      return asi
+      case .class(let rea):      return rea
+      case .tail(let rta):       return rta
+      case .argument(let arg):   return arg
+      case .yield(let result):   return result
+      case .storeBorrow(let sb): return sb
+      case .pointer(let p):      return p
+      case .index(let ia):       return ia
+    }
+  }
+
   public var description: String {
     switch self {
       case .unidentified:      return "?"
