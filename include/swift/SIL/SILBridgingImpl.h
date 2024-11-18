@@ -2296,6 +2296,16 @@ BridgedInstruction BridgedBuilder::createEndAccess(BridgedValue value) const {
   return {unbridged().createEndAccess(regularLoc(), value.getSILValue(), false)};
 }
 
+BridgedInstruction BridgedBuilder::createEndApply(BridgedValue value) const {
+  swift::ASTContext &ctxt = unbridged().getASTContext();
+  return {unbridged().createEndApply(regularLoc(), value.getSILValue(),
+                                     swift::SILType::getEmptyTupleType(ctxt))};
+}
+
+BridgedInstruction BridgedBuilder::createAbortApply(BridgedValue value) const {
+  return {unbridged().createAbortApply(regularLoc(), value.getSILValue())};
+}
+
 BridgedInstruction BridgedBuilder::createConvertFunction(BridgedValue originalFunction, BridgedType resultType, bool withoutActuallyEscaping) const {
 return {unbridged().createConvertFunction(regularLoc(), originalFunction.getSILValue(), resultType.unbridged(), withoutActuallyEscaping)};
 }

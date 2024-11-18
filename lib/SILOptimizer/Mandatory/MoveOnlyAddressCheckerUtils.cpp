@@ -453,7 +453,8 @@ static bool visitScopeEndsRequiringInit(
   // Check for yields from a modify coroutine.
   if (auto bai =
           dyn_cast_or_null<BeginApplyInst>(operand->getDefiningInstruction())) {
-    for (auto *inst : bai->getTokenResult()->getUsers()) {
+    for (auto *use : bai->getEndApplyUses()) {
+      auto *inst = use->getUser();
       assert(isa<EndApplyInst>(inst) || isa<AbortApplyInst>(inst) ||
              isa<EndBorrowInst>(inst));
       visit(inst, ScopeRequiringFinalInit::Coroutine);

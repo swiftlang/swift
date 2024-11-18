@@ -1219,6 +1219,8 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 /// `end_borrow`).
 public protocol ScopedInstruction {
   var endOperands: LazyFilterSequence<UseList> { get }
+
+  var endInstructions: EndInstructions { get }
 }
 
 extension Instruction {
@@ -1330,7 +1332,7 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   }
 }
 
-final public class EndApplyInst : Instruction, UnaryInstruction {
+final public class EndApplyInst : SingleValueInstruction, UnaryInstruction {
   public var token: MultipleValueInstructionResult { operand.value as! MultipleValueInstructionResult }
   public var beginApply: BeginApplyInst { token.parentInstruction as! BeginApplyInst }
 }
@@ -1342,7 +1344,7 @@ final public class AbortApplyInst : Instruction, UnaryInstruction {
 
 extension BeginApplyInst : ScopedInstruction {
   public var endOperands: LazyFilterSequence<UseList> {
-    return token.uses.lazy.filter { _ in true }
+    return token.uses.lazy.filter { $0.endsLifetime }
   }
 }
 

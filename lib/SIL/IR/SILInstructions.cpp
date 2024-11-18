@@ -712,8 +712,8 @@ void BeginApplyInst::getCoroutineEndPoints(
     SmallVectorImpl<EndApplyInst *> &endApplyInsts,
     SmallVectorImpl<AbortApplyInst *> &abortApplyInsts,
     SmallVectorImpl<EndBorrowInst *> *endBorrowInsts) const {
-  for (auto *tokenUse : getTokenResult()->getUses()) {
-    auto *user = tokenUse->getUser();
+  for (auto *use : getEndApplyUses()) {
+    auto *user = use->getUser();
     if (auto *end = dyn_cast<EndApplyInst>(user)) {
       endApplyInsts.push_back(end);
       continue;
@@ -733,19 +733,19 @@ void BeginApplyInst::getCoroutineEndPoints(
     SmallVectorImpl<Operand *> &endApplyInsts,
     SmallVectorImpl<Operand *> &abortApplyInsts,
     SmallVectorImpl<Operand *> *endBorrowInsts) const {
-  for (auto *tokenUse : getTokenResult()->getUses()) {
-    auto *user = tokenUse->getUser();
+  for (auto *use : getEndApplyUses()) {
+    auto *user = use->getUser();
     if (isa<EndApplyInst>(user)) {
-      endApplyInsts.push_back(tokenUse);
+      endApplyInsts.push_back(use);
       continue;
     }
     if (isa<AbortApplyInst>(user)) {
-      abortApplyInsts.push_back(tokenUse);
+      abortApplyInsts.push_back(use);
       continue;
     }
 
     assert(isa<EndBorrowInst>(user));
-    abortApplyInsts.push_back(tokenUse);
+    abortApplyInsts.push_back(use);
   }
 }
 
