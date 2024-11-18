@@ -1969,12 +1969,13 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
       paramType, KnownProtocolKind::ExpressibleByStringLiteral);
 }
 
-bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
-                                              bool ignoreLabel) {
+BoundGenericType *
+swift::getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl,
+                                            bool ignoreLabel) {
   auto &ctx = decl->getASTContext();
   if (!hasSingleNonVariadicParam(decl, ctx.Id_dynamicMember,
                                  ignoreLabel))
-    return false;
+    return nullptr;
 
   auto paramTy = decl->getIndices()->get(0)->getInterfaceType();
 
@@ -1994,17 +1995,25 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
 
                         return false;
                       })) {
-      return false;
+      return nullptr;
     }
 
     paramTy = layout.getSuperclass();
     if (!paramTy)
-      return false;
+      return nullptr;
   }
 
-  return paramTy->isKeyPath() ||
-         paramTy->isWritableKeyPath() ||
-         paramTy->isReferenceWritableKeyPath();
+  if (!paramTy->isKeyPath() &&
+      !paramTy->isWritableKeyPath() &&
+      !paramTy->isReferenceWritableKeyPath()) {
+    return nullptr;
+  }
+  return paramTy->getAs<BoundGenericType>();
+}
+
+bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
+                                              bool ignoreLabel) {
+  return bool(getKeyPathTypeForDynamicMemberLookup(decl, ignoreLabel));
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at

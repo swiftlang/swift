@@ -356,3 +356,17 @@ func testSubscriptOnProtocolExtension(dyn: DynamicLookupConcrete) {
 // testSubscriptOnProtocolExt: Decl[InstanceVar]/CurrNominal:      x[#Int#];
 // testSubscriptOnProtocolExt: Decl[InstanceVar]/CurrNominal:      y[#Int#];
 }
+
+// https://github.com/swiftlang/swift/issues/77035
+@dynamicMemberLookup
+struct HasSendableKeyPath<T> {
+  subscript<U>(dynamicMember keyPath: KeyPath<T, U> & Sendable) -> HasSendableKeyPath<U> {
+    fatalError()
+  }
+}
+
+func testSendableKeyPath(_ x: HasSendableKeyPath<Point>) {
+  x.#^SENDABLE_KEYPATH_POINT^#
+  // SENDABLE_KEYPATH_POINT-DAG: Decl[InstanceVar]/CurrNominal: x[#HasSendableKeyPath<Int>#]; name=x
+  // SENDABLE_KEYPATH_POINT-DAG: Decl[InstanceVar]/CurrNominal: y[#HasSendableKeyPath<Int>#]; name=y
+}
