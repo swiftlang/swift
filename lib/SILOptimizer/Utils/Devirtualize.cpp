@@ -643,14 +643,11 @@ replaceBeginApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc,
   if (newArgBorrows.empty())
     return {newBAI, changedCFG};
 
-  SILValue token = newBAI->getTokenResult();
-
-  // The token will only be used by end_apply and abort_apply. Use that to
-  // insert the end_borrows we need /after/ those uses.
-  for (auto *use : token->getUses()) {
+  // Insert the end_borrows after end_apply and abort_apply users.
+  for (auto *use : newBAI->getEndApplyUses()) {
     SILBuilderWithScope borrowBuilder(
-        &*std::next(use->getUser()->getIterator()),
-        builder.getBuilderContext());
+      &*std::next(use->getUser()->getIterator()),
+      builder.getBuilderContext());
     for (SILValue borrow : newArgBorrows) {
       borrowBuilder.createEndBorrow(loc, borrow);
     }

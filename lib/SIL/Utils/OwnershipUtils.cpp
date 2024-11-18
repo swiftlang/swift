@@ -694,8 +694,7 @@ bool BorrowingOperand::visitScopeEndingUses(
   }
   case BorrowingOperandKind::BeginApply: {
     bool deadApply = true;
-    auto *user = cast<BeginApplyInst>(op->getUser());
-    for (auto *use : user->getTokenResult()->getUses()) {
+    for (auto *use : cast<BeginApplyInst>(op->getUser())->getEndApplyUses()) {
       deadApply = false;
       if (!visitScopeEnd(use))
         return false;

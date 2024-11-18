@@ -2682,8 +2682,8 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
       SILValue load =
           resultBuilder.emitLoadBorrowOperation(callLoc, &newResult);
       oldResult.replaceAllUsesWith(load);
-      for (auto *user : origCall->getTokenResult()->getUsers()) {
-        pass.getBuilder(user->getIterator())
+      for (auto *use : origCall->getEndApplyUses()) {
+        pass.getBuilder(use->getUser()->getIterator())
             .createEndBorrow(pass.genLoc(), load);
       }
     } else {
