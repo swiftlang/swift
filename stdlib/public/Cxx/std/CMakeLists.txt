@@ -52,6 +52,11 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     -Xfrontend -module-interface-preserve-types-as-written
     -enable-experimental-feature AssumeResilientCxxTypes
 
+    # The varying modularization of the C++ standard library on different
+    # platforms makes it difficult to enable MemberImportVisibility for this
+    # module
+    -disable-upcoming-feature MemberImportVisibility
+
     SWIFT_COMPILE_FLAGS_LINUX
     ${SWIFT_SDK_LINUX_CXX_OVERLAY_SWIFT_COMPILE_FLAGS}
 
