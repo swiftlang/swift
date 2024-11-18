@@ -398,6 +398,15 @@ void CompilerInvocation::computeCXXStdlibOptions() {
     LangOpts.CXXStdlib = toCXXStdlibKind(cxxStdlibKind);
     LangOpts.PlatformDefaultCXXStdlib = toCXXStdlibKind(cxxDefaultStdlibKind);
   }
+
+  if (!LangOpts.isUsingPlatformDefaultCXXStdlib()) {
+    // The CxxStdlib overlay was built for the platform default C++ stdlib, and
+    // its .swiftmodule file refers to implementation-specific symbols (such as
+    // namespace __1 in libc++, or namespace __cxx11 in libstdc++). Let's
+    // proactively rebuild the CxxStdlib module from its .swiftinterface if a
+    // non-default C++ stdlib is used.
+    FrontendOpts.PreferInterfaceForModules.push_back("CxxStdlib");
+  }
 }
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
