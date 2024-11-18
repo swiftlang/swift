@@ -396,8 +396,11 @@ SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
 
 std::optional<SILLocation> SILDeserializer::readLoc(unsigned kind,
                                      SmallVectorImpl<uint64_t> &scratch) {
-  unsigned LocationKind = 0, Implicit;
+  unsigned LocationKind, Implicit = 0;
   SILLocation::FilenameAndLocation *FNameLoc = nullptr;
+  // Each SourceLoc opaque pointer is serialized once. Successive appearences
+  // are serialized as references to earlier serializations, with LocID as the
+  // indexing key
   if (kind == SIL_SOURCE_LOC_REF) {
     ValueID LocID;
     SourceLocRefLayout::readRecord(scratch, LocID, LocationKind, Implicit);
@@ -415,16 +418,16 @@ std::optional<SILLocation> SILDeserializer::readLoc(unsigned kind,
     ParsedLocs.push_back(FNameLoc);
   }
 
-  // FIXME: Instructions are being deserialized as implicit as existing code in
-  // readSILInstruction also deserializes instructions as implicit by default.
-  // This suppresses some diagnostics which otherwise break tests. This should
-  // be fixed in both places
   switch(LocationKind) {
     case SILLocation::ReturnKind:
       return ReturnLocation(FNameLoc, Implicit);
     case SILLocation::ImplicitReturnKind:
       return ImplicitReturnLocation(FNameLoc, Implicit);
-    default:
+    case SILLocation::InlinedKind:
+    case SILLocation::MandatoryInlinedKind:
+    case SILLocation::CleanupKind:
+    case SILLocation::ArtificialUnreachableKind:
+    case SILLocation::RegularKind:
       return RegularLocation(FNameLoc, Implicit);
   }
 }

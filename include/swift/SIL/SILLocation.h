@@ -52,11 +52,9 @@ public:
   /// Describes a position in a source file by explicitly storing the file name,
   /// line and column.
   ///
-  /// This is used for parsed locations from a SIL file, for
+  /// This is used for parsed locations from SIL and swiftmodule files, for
   /// "-sil-based-debuginfo" (see SILDebugInfoGenerator) and for the
   /// "compiler-generated" singleton location.
-  /// In future we might also use it for de-serialized locations from a
-  /// swiftmodule file.
   struct FilenameAndLocation : public SILAllocated<FilenameAndLocation> {
     unsigned line;
     uint16_t column;
@@ -556,9 +554,7 @@ public:
                   bool isForDebugOnly = true);
   RegularLocation(SourceLoc L, bool Implicit = true)
       : SILLocation(L, RegularKind, Implicit) {}
-  RegularLocation(FilenameAndLocation *filePos)
-    : SILLocation(filePos, RegularKind) {}
-  RegularLocation(FilenameAndLocation *filePos, bool Implicit)
+  RegularLocation(FilenameAndLocation *filePos, bool Implicit = false)
     : SILLocation(filePos, RegularKind, Implicit) {}
 
   /// Convert \p loc to a RegularLocation.
@@ -627,10 +623,7 @@ public:
   /// Construct the return location for a constructor or a destructor.
   ReturnLocation(BraceStmt *BS);
 
-  ReturnLocation(FilenameAndLocation *filePos)
-    : SILLocation(filePos, ReturnKind) {}
-
-  ReturnLocation(FilenameAndLocation *filePos, bool Implicit)
+  ReturnLocation(FilenameAndLocation *filePos, bool Implicit = false)
     : SILLocation(filePos, ReturnKind, Implicit) {}
 
   static bool isKind(const SILLocation& L) {
@@ -651,10 +644,7 @@ public:
 
   ImplicitReturnLocation(AbstractFunctionDecl *AFD);
 
-  ImplicitReturnLocation(FilenameAndLocation *filePos)
-    : SILLocation(filePos, ImplicitReturnKind) {}
-
-  ImplicitReturnLocation(FilenameAndLocation *filePos, bool Implicit)
+  ImplicitReturnLocation(FilenameAndLocation *filePos, bool Implicit = false)
     : SILLocation(filePos, ImplicitReturnKind, Implicit) {}
 
   /// Convert \p loc to an ImplicitReturnLocation.

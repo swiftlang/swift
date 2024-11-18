@@ -3094,9 +3094,13 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
     case SILLocation::ImplicitReturnKind:
       LocationKind = SILLocation::ImplicitReturnKind;
       break;
-    //TODO: handle other cases correctly
-    default:
+    case SILLocation::InlinedKind:
+    case SILLocation::MandatoryInlinedKind:
+    case SILLocation::CleanupKind:
+    case SILLocation::ArtificialUnreachableKind:
+    case SILLocation::RegularKind:
       LocationKind = SILLocation::RegularKind;
+      break;
   }
 
   if (SourceLocMap.find(OpaquePtr) != SourceLocMap.end()) {
