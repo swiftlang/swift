@@ -370,10 +370,12 @@ extension Span where Element: Equatable {
   @_disallowFeatureSuppression(NonescapableTypes)
   @_alwaysEmitIntoClient
   public func _elementsEqual(_ other: some Collection<Element>) -> Bool {
+#if hasFeature(LifetimeDependence)
     let equal = other.withContiguousStorageIfAvailable {
       _elementsEqual(Span(_unsafeElements: $0))
     }
     if let equal { return equal }
+#endif
 
     guard count == other.count else { return false }
     if count == 0 { return true }
