@@ -189,6 +189,12 @@ class ToolchainTestCase(unittest.TestCase):
             'WATCHOS',
             'swift-test-stdlib-watchos-armv7k',
             'build_watchos_device')
+    test_should_skip_building_watchos_sim =\
+        generate_should_skip_building_platform(
+            'watchsimulator-x86_64',
+            'WATCHOS_SIMULATOR',
+            'swift-test-stdlib-watchsimulator-x86_64',
+            'build_watchos_simulator')
 
     def generate_should_build_full_targets_when_test(test_arg_name):
         def test(self):
