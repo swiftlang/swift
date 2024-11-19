@@ -261,8 +261,6 @@ static swiftscan_import_set_t generateHollowDiagnosticOutputImportSet(
 
 DependencyScanningTool::DependencyScanningTool()
     : ScanningService(std::make_unique<SwiftDependencyScanningService>()),
-      VersionedPCMInstanceCacheCache(
-          std::make_unique<CompilerArgInstanceCacheMap>()),
       CDC(), Alloc(), Saver(Alloc) {}
 
 llvm::ErrorOr<swiftscan_dependency_graph_t>
@@ -325,35 +323,6 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command,
     return generateHollowDiagnosticOutputImportSet(*ScanDiagnosticConsumer);
 
   return std::move(*DependenciesOrErr);
-}
-
-std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
-DependencyScanningTool::getDependencies(
-    ArrayRef<const char *> Command,
-    const std::vector<BatchScanInput> &BatchInput,
-    const llvm::StringSet<> &PlaceholderModules, StringRef WorkingDirectory) {
-  // The primary instance used to scan Swift modules
-  auto ScanDiagnosticConsumer = std::make_shared<DependencyScanDiagnosticCollector>();
-  auto QueryContextOrErr = initCompilerInstanceForScan(Command,
-                                                       WorkingDirectory,
-                                                       ScanDiagnosticConsumer);
-  if (std::error_code EC = QueryContextOrErr.getError())
-    return std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>(
-        BatchInput.size(), std::make_error_code(std::errc::invalid_argument));
-
-  auto QueryContext = std::move(*QueryContextOrErr);
-
-  // Local scan cache instance, wrapping the shared global cache.
-  ModuleDependenciesCache cache(
-      *ScanningService, QueryContext.ScanInstance->getMainModule()->getNameStr().str(),
-      QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
-      QueryContext.ScanInstance->getInvocation().getModuleScanningHash());
-  auto BatchScanResults = performBatchModuleScan(
-      *QueryContext.ScanInstance.get(), QueryContext.ScanDiagnostics.get(),
-      cache, VersionedPCMInstanceCacheCache.get(),
-      Saver, BatchInput);
-
-  return BatchScanResults;
 }
 
 std::vector<

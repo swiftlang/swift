@@ -97,17 +97,6 @@ public:
   llvm::ErrorOr<swiftscan_import_set_t>
   getImports(ArrayRef<const char *> Command, StringRef WorkingDirectory);
 
-  /// Collect the full module dependency graph for the input collection of
-  /// module names (batch inputs) and output them to the
-  /// BatchScanInput-specified output locations.
-  ///
-  /// \returns a \c std::error_code if errors occurred during scan.
-  std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
-  getDependencies(ArrayRef<const char *> Command,
-                  const std::vector<BatchScanInput> &BatchInput,
-                  const llvm::StringSet<> &PlaceholderModules,
-                  StringRef WorkingDirectory);
-
   /// Query diagnostics consumed so far.
   std::vector<DependencyScanDiagnosticCollector::ScannerDiagnosticInfo> getDiagnostics();
   /// Discared the collection of diagnostics encountered so far.
@@ -124,10 +113,6 @@ private:
   /// Shared cache of module dependencies, re-used by individual full-scan queries
   /// during the lifetime of this Tool.
   std::unique_ptr<SwiftDependencyScanningService> ScanningService;
-
-  /// Shared cache of compiler instances created during batch scanning, corresponding to
-  /// command-line options specified in the batch scan input entry.
-  std::unique_ptr<CompilerArgInstanceCacheMap> VersionedPCMInstanceCacheCache;
 
   /// Shared state mutual-exclusivity lock
   llvm::sys::SmartMutex<true> DependencyScanningToolStateLock;
