@@ -204,6 +204,9 @@ public:
   /// Complete a given \c type-simple when there is no trailing dot.
   virtual void completeTypeSimpleWithoutDot(TypeRepr *TR){};
 
+  /// Complete a given \c type-simple following a \c ~ prefix.
+  virtual void completeTypeSimpleInverted() {};
+
   /// Complete the beginning of a case statement at the top of switch stmt.
   virtual void completeCaseStmtKeyword() {};
 
@@ -291,8 +294,6 @@ public:
   virtual void completeTypeAttrInheritanceBeginning() {};
 
   virtual void completeOptionalBinding(){};
-
-  virtual void completeWithoutConstraintType(){};
 };
 
 class DoneParsingCallback {

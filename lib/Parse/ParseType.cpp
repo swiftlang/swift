@@ -227,7 +227,11 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     break;
   case tok::code_complete:
     if (CodeCompletionCallbacks) {
-      CodeCompletionCallbacks->completeTypeSimpleBeginning();
+      if (tildeLoc.isValid()) {
+        CodeCompletionCallbacks->completeTypeSimpleInverted();
+      } else {
+        CodeCompletionCallbacks->completeTypeSimpleBeginning();
+      }
     }
     return makeParserCodeCompletionResult<TypeRepr>(
         ErrorTypeRepr::create(Context, consumeToken(tok::code_complete)));
