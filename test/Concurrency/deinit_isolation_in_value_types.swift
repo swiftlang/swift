@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -parse-as-library -emit-silgen -verify %s
+// RUN: %target-swift-frontend -target %target-future-triple -parse-as-library -emit-silgen -verify %s
 
 
 @globalActor final actor FirstActor {

@@ -112,6 +112,8 @@ public:
   }
 
   void diagnoseIsolatedDeinitInValueTypes(DeclAttribute *attr) {
+    auto &C = D->getASTContext();
+
     if (isa<DestructorDecl>(D)) {
       if (auto nominal = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
         if (!isa<ClassDecl>(nominal)) {
@@ -120,6 +122,13 @@ public:
           return;
         }
       }
+
+      TypeChecker::checkAvailability(
+        attr->getRange(), C.getIsolatedDeinitAvailability(),
+        D->getDeclContext(),
+        [&](StringRef platformName, llvm::VersionTuple version) {
+          return diagnoseAndRemoveAttr(attr, diag::isolated_deinit_unavailable, platformName, version);
+        });
     }
   }
 
