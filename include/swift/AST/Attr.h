@@ -2933,11 +2933,6 @@ public:
                                  bool ignoreAppExtensions = false) const;
 
   /// Returns the first @available attribute that indicates
-  /// a declaration is unavailable, or the first one that indicates it's
-  /// potentially unavailable, or null otherwise.
-  const AvailableAttr *getPotentiallyUnavailable(const ASTContext &ctx) const;
-
-  /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or null otherwise.
   const AvailableAttr *getUnavailable(const ASTContext &ctx,
                                       bool ignoreAppExtensions = false) const;
