@@ -1,10 +1,10 @@
 // RUN: %target-swift-frontend %s \
 // RUN: -emit-sil  \
 // RUN: -enable-builtin-module \
-// RUN: -enable-experimental-feature NonescapableTypes \
+// RUN: -enable-experimental-feature LifetimeDependence \
 // RUN: | %FileCheck %s
 
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 import Builtin
 

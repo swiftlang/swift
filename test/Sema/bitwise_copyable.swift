@@ -1,12 +1,10 @@
 // RUN: %target-typecheck-verify-swift                       \
 // RUN:     -disable-availability-checking                   \
-// RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN:     -enable-experimental-feature ValueGenerics       \
 // RUN:     -enable-experimental-feature Sensitive           \
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names
 
-// REQUIRES: swift_feature_NonescapableTypes
 // REQUIRES: swift_feature_ValueGenerics
 // REQUIRES: swift_feature_Sensitive
 

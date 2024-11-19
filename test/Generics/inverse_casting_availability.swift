@@ -1,9 +1,7 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -debug-diagnostic-names -target arm64-apple-macos14.4 \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -debug-diagnostic-names -target arm64-apple-macos14.4 
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchOS || OS=xros
-// REQUIRES: swift_feature_NonescapableTypes
 
 protocol P {}
 struct NCG<T: ~Copyable> {}

@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature NonescapableTypes -disable-availability-checking -module-name main %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature LifetimeDependence -disable-availability-checking -module-name main %s | %FileCheck %s
 
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 protocol NoCopyP: ~Copyable {}
 

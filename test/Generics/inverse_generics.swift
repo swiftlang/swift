@@ -1,8 +1,8 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN: -enable-experimental-feature NonescapableTypes \
+// RUN: -enable-experimental-feature LifetimeDependence \
 // RUN: -enable-experimental-feature SuppressedAssociatedTypes
 
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 // expected-note@+1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
