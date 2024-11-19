@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -enable-builtin-module -enable-experimental-feature ValueGenerics -disable-experimental-parser-round-trip -disable-availability-checking -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -enable-builtin-module -enable-experimental-feature ValueGenerics -disable-availability-checking -o - | %FileCheck %s
 
 // REQUIRES: swift_feature_ValueGenerics
 
@@ -19,5 +19,10 @@ func genericV<let N: Int, Element>(_: Vector<N, Element>) {}
 // CHECK-DAG: !DICompositeType({{.*}}name: "Builtin.FixedArray", {{.*}}identifier: "$s$3_SiBVD"
 func concreteBA(_: Builtin.FixedArray<4, Int>) {}
 
-// CHECK-DAG: !DICompositeType({{.*}}name: "$s4main6VectorVy$1_SiGD"
+// CHECK-DAG: !DICompositeType({{.*}}name: "$s4main6VectorVy$1_SiGD", {{.*}}templateParams: ![[VECTOR_PARAMS:.*]])
+// CHECK-DAG: ![[VECTOR_PARAMS]] = !{![[COUNT_PARAM:.*]], ![[ELEMENT_PARAM:.*]]}
+// CHECK-DAG: ![[COUNT_PARAM]] = !DITemplateTypeParameter(type: ![[COUNT_TYPE:.*]])
+// CHECK-DAG: ![[COUNT_TYPE]] = !DICompositeType({{.*}}name: "$s$1_D"
+// CHECK-DAG: ![[ELEMENT_PARAM]] = !DITemplateTypeParameter(type: ![[ELEMENT_TYPE:.*]])
+// CHECK-DAG: ![[ELEMENT_TYPE]] = !DICompositeType({{.*}}name: "$sSiD"
 func concreteV(_: Vector<2, Int>) {}
