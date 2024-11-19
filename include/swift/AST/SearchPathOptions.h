@@ -530,9 +530,6 @@ public:
   /// A map of placeholder Swift module dependency information.
   std::string PlaceholderDependencyModuleMap;
 
-  /// A file containing modules we should perform batch scanning.
-  std::string BatchScanInputFilePath;
-
   /// A file containing a list of protocols whose conformances require const value extraction.
   std::string ConstGatherProtocolListFilePath;
 
