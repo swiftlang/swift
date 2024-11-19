@@ -740,6 +740,9 @@ namespace {
         if (secondType->is<IntegerType>())
           return true;
 
+        if (secondType->is<PlaceholderType>())
+          return true;
+
         return false;
       }
 
