@@ -643,8 +643,7 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
 
     // If the keyPath result type has type parameters, that might affect the
     // subscript result type.
-    auto keyPathResultTy =
-        getResultTypeOfKeypathDynamicMember(SD)->mapTypeOutOfContext();
+    auto keyPathResultTy = getResultTypeOfKeypathDynamicMember(SD);
     if (keyPathResultTy->hasTypeParameter()) {
       auto keyPathRootTy = getRootTypeOfKeypathDynamicMember(SD).subst(
           QueryTypeSubstitutionMap{subs},
