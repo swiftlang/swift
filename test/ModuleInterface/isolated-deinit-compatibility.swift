@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -target %target-swift-5.5-abi-triple -emit-silgen -verify %s
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) -DEMIT_IFACE %s -target %target-swift-5.5-abi-triple -module-name IsolatedDeinitCompatibility
-// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -target %target-swift-5.5-abi-triple -module-name IsolatedDeinitCompatibility
+// RUN: %target-swift-frontend -target %target-future-triple -emit-silgen -verify %s
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) -DEMIT_IFACE %s -target %target-future-triple -module-name IsolatedDeinitCompatibility
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -target %target-future-triple -module-name IsolatedDeinitCompatibility
 // RUN: %FileCheck %s < %t.swiftinterface
 
 
