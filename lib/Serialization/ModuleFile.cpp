@@ -314,7 +314,8 @@ ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency,
 
   return Core->getTransitiveLoadingBehavior(
       dependency.Core, ctx.LangOpts.ImportNonPublicDependencies,
-      isPartialModule, ctx.LangOpts.PackageName, forTestable);
+      isPartialModule, ctx.LangOpts.PackageName,
+      ctx.SearchPathOpts.ResolveInPackageModuleDependencies, forTestable);
 }
 
 bool ModuleFile::mayHaveDiagnosticsPointingAtBuffer() const {

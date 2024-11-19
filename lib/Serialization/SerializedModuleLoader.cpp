@@ -455,7 +455,9 @@ SerializedModuleLoaderBase::getImportsOfModule(
         loadedModuleFile.getTransitiveLoadingBehavior(
             dependency,
             /*importPrivateDependencies*/ false,
-            /*isPartialModule*/ false, packageName, isTestableImport);
+            /*isPartialModule*/ false, packageName,
+            /*resolveInPackageModuleDependencies */ true,
+            isTestableImport);
     if (dependencyTransitiveBehavior > transitiveBehavior)
       continue;
 

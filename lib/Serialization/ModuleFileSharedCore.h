@@ -681,7 +681,8 @@ public:
   /// those non-public dependencies.
   ModuleLoadingBehavior getTransitiveLoadingBehavior(
       const Dependency &dependency, bool importNonPublicDependencies,
-      bool isPartialModule, StringRef packageName, bool forTestable) const;
+      bool isPartialModule, StringRef packageName,
+      bool resolveInPackageModuleDependencies, bool forTestable) const;
 };
 
 template <typename T, typename RawData>
