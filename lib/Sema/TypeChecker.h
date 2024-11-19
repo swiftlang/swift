@@ -1271,6 +1271,18 @@ bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
 bool isValidStringDynamicMemberLookup(SubscriptDecl *decl,
                                       bool ignoreLabel = false);
 
+/// Returns the KeyPath parameter type for a valid implementation of
+/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
+/// @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)` which
+/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
+///
+/// Returns null if the given subscript is not a valid dynamic member lookup
+/// implementation.
+BoundGenericType *
+getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl,
+                                     bool ignoreLabel = false);
+
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
 /// @dynamicMemberLookup.
