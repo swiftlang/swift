@@ -5699,6 +5699,8 @@ mark_dependence
 
   %2 = mark_dependence %value : $*T on %base : $Builtin.NativeObject
 
+``%base`` must not be identical to ``%value``.
+
 Indicates that the validity of ``%value`` depends on the value of
 ``%base``. Operations that would destroy ``%base`` must not be moved
 before any instructions which depend on the result of this
@@ -5715,7 +5717,7 @@ the dependency is on the current value stored in the address.
 The optional ``nonescaping`` attribute indicates that no value derived
 from ``%value`` escapes the lifetime of ``%base``. As with escaping
 ``mark_dependence``, all values transitively forwarded from ``%value``
-must be destroyed within the lifetime of ` `%base``. Unlike escaping
+must be destroyed within the lifetime of ``%base``. Unlike escaping
 ``mark_dependence``, this must be statically verifiable. Additionally,
 unlike escaping ``mark_dependence``, derived values include copies of
 ``%value`` and values transitively forwarded from those copies. If

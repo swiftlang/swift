@@ -441,8 +441,7 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromDependsOn(
     auto kind = descriptor.getParsedLifetimeDependenceKind();
 
     if (kind == ParsedLifetimeDependenceKind::Scope &&
-        (!isGuaranteedParameterInCallee(paramConvention) &&
-         !isMutatingParameter(paramConvention))) {
+        isConsumedParameterInCallee(paramConvention)) {
       diags.diagnose(loc, diag::lifetime_dependence_cannot_use_kind, "_scope",
                      getStringForParameterConvention(paramConvention));
       return true;
