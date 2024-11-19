@@ -593,6 +593,9 @@ public:
 
   void getTypeCompletions(Type BaseType);
 
+  /// Add completions for types that can appear after a \c ~ prefix.
+  void getInvertedTypeCompletions();
+
   void getGenericRequirementCompletions(DeclContext *DC,
                                         SourceLoc CodeCompletionLoc);
 
@@ -631,8 +634,6 @@ public:
   void getStmtLabelCompletions(SourceLoc Loc, bool isContinue);
 
   void getOptionalBindingCompletions(SourceLoc Loc);
-
-  void addWithoutConstraintTypes();
 };
 
 } // end namespace ide
