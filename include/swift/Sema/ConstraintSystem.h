@@ -1479,6 +1479,9 @@ class Solution {
   /// The fixed score for this solution.
   Score FixedScore;
 
+  /// The total memory used by this solution.
+  std::optional<size_t> TotalMemory;
+
 public:
   /// Create a solution for the given constraint system.
   Solution(ConstraintSystem &cs, const Score &score)
