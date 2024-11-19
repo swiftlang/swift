@@ -8176,6 +8176,13 @@ ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
 //===----------------------------------------------------------------------===//
+// MARK: Vector
+//===----------------------------------------------------------------------===//
+
+ERROR(vector_literal_incorrect_count,none,
+      "expected %0 elements in vector literal, but got %1", (Type, Type))
+
+//===----------------------------------------------------------------------===//
 // MARK: @abi Attribute
 //===----------------------------------------------------------------------===//
 

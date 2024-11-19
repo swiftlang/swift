@@ -2722,3 +2722,17 @@ IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
   return new (cs.getAllocator())
       IgnoreKeyPathSubscriptIndexMismatch(cs, argType, locator);
 }
+
+AllowVectorLiteralCountMismatch *
+AllowVectorLiteralCountMismatch::create(ConstraintSystem &cs, Type lhsCount,
+                                        Type rhsCount,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowVectorLiteralCountMismatch(cs, lhsCount, rhsCount, locator);
+}
+
+bool AllowVectorLiteralCountMismatch::diagnose(const Solution &solution,
+                                               bool asNote) const {
+  IncorrectVectorLiteralCount failure(solution, lhsCount, rhsCount, getLocator());
+  return failure.diagnose(asNote);
+}

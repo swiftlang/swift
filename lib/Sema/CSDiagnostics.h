@@ -3234,6 +3234,24 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose when a vector literal has an incorrect number of elements for the
+/// contextual vector type it's initializing.
+///
+/// \code
+/// let x: Vector<4, Int> = [1, 2] // expected '4' elements but got '2'
+/// \endcode
+class IncorrectVectorLiteralCount final : public FailureDiagnostic {
+  Type lhsCount, rhsCount;
+
+public:
+  IncorrectVectorLiteralCount(const Solution &solution, Type lhsCount,
+                              Type rhsCount, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), lhsCount(resolveType(lhsCount)),
+        rhsCount(resolveType(rhsCount)) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
