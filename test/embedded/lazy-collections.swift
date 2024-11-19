@@ -16,5 +16,13 @@ struct Main {
     [1, 2, 3].lazy.map { $0 * 2 }.forEach { print($0, terminator: " ") }
     print("")
     // CHECK: 2 4 6
+
+    [1, 2, 3].lazy.drop(while: { $0 < 2 }).forEach { print($0, terminator: " ") }
+    print("")
+    // CHECK: 2 3
+
+    [[1, 2, 3], [4, 5, 6]].lazy.joined().forEach { print($0, terminator: " ") }
+    print("")
+    // CHECK: 1 2 3 4 5 6
   }
 }
