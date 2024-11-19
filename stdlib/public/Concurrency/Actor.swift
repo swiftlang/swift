@@ -88,6 +88,14 @@ public func _defaultActorDestroy(_ actor: AnyObject)
 @usableFromInline
 internal func _enqueueOnMain(_ job: UnownedJob)
 
+@available(SwiftStdlib 6.1, *)
+@_silgen_name("swift_actor_synchronous_wait")
+func _actorSynchronousWait(
+  _ actor: AnyObject,
+  priority: UInt8,
+  body: () -> Void
+)
+
 #if $Macros
 /// Produce a reference to the actor to which the enclosing code is
 /// isolated, or `nil` if the code is nonisolated.
@@ -109,3 +117,47 @@ public func extractIsolation<each Arg, Result>(
   return Builtin.extractFunctionIsolation(fn)
 }
 #endif
+
+extension Actor {
+  /// Synchronously wait for the given closure (function pointer + context) to
+  /// execute on the given actor and return its result.
+  ///
+  /// The operation is executed at the given priority, and is in the same way as
+  /// all other work on the actor. If the calling thread manages to take the
+  /// actor lock, it will execute jobs up until this operation is completed,
+  /// then return. Otherwise, it will block waiting for a different thread to
+  /// execute this operation.
+  ///
+  /// This operation is only available for default actors (ones that do not have
+  /// custom executors), and will trap if provided with an actor that has a
+  /// custom executor. Note that the blocking nature of this operation makes it
+  /// prone to deadlock, so it should be used sparingly.
+  ///
+  /// - Parameters:
+  ///   - priority: The priority of the synchronous operation.
+  ///     Pass `nil` to use the priority from `Task.currentPriority`.
+  ///   - operation: The synchronous operation to perform.
+  @_spi(Experimental)
+  @available(SwiftStdlib 6.1, *)
+  nonisolated
+  public func runSynchronously<T, E>(
+    priority: TaskPriority? = nil,
+    operation: sending (isolated Self) throws(E) -> T
+  ) throws(E) -> T {
+    let priority = priority ?? Task.currentPriority
+    typealias IsolatedOperation = (isolated Self) throws(E) -> T
+    typealias NonisolatedOperation = (Self) throws(E) -> T
+    return try withoutActuallyEscaping(operation) { (operation: @escaping IsolatedOperation) throws(E) in
+      let nonisolatedOperation = unsafeBitCast(operation, to: NonisolatedOperation.self)
+      var result: Result<T, E>? = nil
+      _actorSynchronousWait(self, priority: priority.rawValue) {
+        do throws(E) {
+          result = try .success(nonisolatedOperation(self))
+        } catch {
+          result = .failure(error)
+        }
+      }
+      return try result.unsafelyUnwrapped.get()
+    }
+  }
+}
