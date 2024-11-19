@@ -822,7 +822,7 @@ bool ConstraintSystem::Candidate::solve(
   ConstraintSystem cs(DC, std::nullopt);
 
   // Set up expression type checker timer for the candidate.
-  cs.Timer.emplace(E, cs);
+  cs.startExpressionTimer(E);
 
   // Generate constraints for the new system.
   if (auto generatedExpr = cs.generateConstraints(E, DC)) {
@@ -1521,7 +1521,7 @@ ConstraintSystem::solveImpl(SyntacticElementTarget &target,
 
   // Set up the expression type checker timer.
   if (Expr *expr = target.getAsExpr())
-    Timer.emplace(expr, *this);
+    startExpressionTimer(expr);
 
   if (generateConstraints(target, allowFreeTypeVariables))
     return SolutionResult::forError();
@@ -1707,7 +1707,7 @@ bool ConstraintSystem::solveForCodeCompletion(
     setContextualInfo(expr, target.getExprContextualTypeInfo());
 
     // Set up the expression type checker timer.
-    Timer.emplace(expr, *this);
+    startExpressionTimer(expr);
 
     shrink(expr);
   }
