@@ -10540,6 +10540,34 @@ ArrayRef<VarDecl *> AccessorDecl::getAccessedProperties() const {
   return {};
 }
 
+bool AccessorDecl::doesAccessorHaveBody() const {
+  auto *accessor = this;
+  auto *storage = accessor->getStorage();
+
+  if (isa<ProtocolDecl>(accessor->getDeclContext())) {
+    if (!accessor->getASTContext().LangOpts.hasFeature(
+            Feature::CoroutineAccessors)) {
+      return false;
+    }
+    if (!requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
+      return false;
+    }
+    if (storage->getOverrideLoc()) {
+      return false;
+    }
+    return accessor->getStorage()
+        ->requiresCorrespondingUnderscoredCoroutineAccessor(
+            accessor->getAccessorKind(), accessor);
+  }
+
+  // NSManaged getters and setters don't have bodies.
+  if (storage->getAttrs().hasAttribute<NSManagedAttr>(/*AllowInvalid=*/true))
+    if (accessor->isGetterOrSetter())
+      return false;
+
+  return true;
+}
+
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
   assert(getDeclContext()->isTypeContext());
   if (!isStatic())
