@@ -64,3 +64,19 @@ func foo() {
   sprites = .init(bricks: bricks) // expected-error {{cannot convert value of type 'Vector<1, MySprite>' to expected argument type 'Vector<40, MySprite>'}}
                                   // expected-note@-1 {{arguments to generic parameter 'count' ('1' and '40') are expected to be equal}}
 }
+
+// Make sure the deserialized integer generic argument gets treated as an integer
+// generic argument when we clone the generic param list for extensions.
+extension Vector where Element: ~Copyable {
+  func forEach(_ body: (borrowing Element) -> Void) {
+    for i in 0 ..< count {
+      body(self[i])
+    }
+  }
+
+  func enumerated(_ body: (Int, borrowing Element) -> Void) {
+    for i in 0 ..< count {
+      body(i, self[i])
+    }
+  }
+}

@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-silgen %s -disable-availability-checking -enable-experimental-feature ValueGenerics | %FileCheck %s
 
-// 123REQUIRES123: swift_feature_ValueGenerics
+// REQUIRES: swift_feature_ValueGenerics
 
 import Synchronization
 
