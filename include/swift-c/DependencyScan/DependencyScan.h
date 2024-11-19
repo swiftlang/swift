@@ -292,48 +292,6 @@ swiftscan_clang_detail_get_cas_fs_root_id(swiftscan_module_details_t details);
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_clang_detail_get_module_cache_key(swiftscan_module_details_t details);
 
-//=== Batch Scan Input Functions ------------------------------------------===//
-
-/// Create an \c swiftscan_batch_scan_input_t instance.
-/// The returned \c swiftscan_batch_scan_input_t is owned by the caller and must be disposed
-/// of using \c swiftscan_batch_scan_input_dispose .
-SWIFTSCAN_PUBLIC swiftscan_batch_scan_input_t *
-swiftscan_batch_scan_input_create();
-
-SWIFTSCAN_PUBLIC void
-swiftscan_batch_scan_input_set_modules(swiftscan_batch_scan_input_t *input,
-                                       int count,
-                                       swiftscan_batch_scan_entry_t *modules);
-
-//=== Batch Scan Entry Functions ------------------------------------------===//
-
-/// Create an \c swiftscan_batch_scan_entry_t instance.
-/// The returned \c swiftscan_batch_scan_entry_t is owned by the caller and must be disposed
-/// of using \c swiftscan_batch_scan_entry_dispose .
-SWIFTSCAN_PUBLIC swiftscan_batch_scan_entry_t
-swiftscan_batch_scan_entry_create();
-
-SWIFTSCAN_PUBLIC void
-swiftscan_batch_scan_entry_set_module_name(swiftscan_batch_scan_entry_t entry,
-                                           const char *name);
-
-SWIFTSCAN_PUBLIC void
-swiftscan_batch_scan_entry_set_arguments(swiftscan_batch_scan_entry_t entry,
-                                         const char *arguments);
-
-SWIFTSCAN_PUBLIC void
-swiftscan_batch_scan_entry_set_is_swift(swiftscan_batch_scan_entry_t entry,
-                                        bool is_swift);
-
-SWIFTSCAN_PUBLIC swiftscan_string_ref_t
-swiftscan_batch_scan_entry_get_module_name(swiftscan_batch_scan_entry_t entry);
-
-SWIFTSCAN_PUBLIC swiftscan_string_ref_t
-swiftscan_batch_scan_entry_get_arguments(swiftscan_batch_scan_entry_t entry);
-
-SWIFTSCAN_PUBLIC bool
-swiftscan_batch_scan_entry_get_is_swift(swiftscan_batch_scan_entry_t entry);
-
 //=== Prescan Result Functions --------------------------------------------===//
 
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
@@ -383,15 +341,6 @@ SWIFTSCAN_PUBLIC void
 swiftscan_import_set_dispose(swiftscan_import_set_t result);
 
 SWIFTSCAN_PUBLIC void
-swiftscan_batch_scan_entry_dispose(swiftscan_batch_scan_entry_t entry);
-
-SWIFTSCAN_PUBLIC void
-swiftscan_batch_scan_input_dispose(swiftscan_batch_scan_input_t *input);
-
-SWIFTSCAN_PUBLIC void
-swiftscan_batch_scan_result_dispose(swiftscan_batch_scan_result_t *result);
-
-SWIFTSCAN_PUBLIC void
 swiftscan_scan_invocation_dispose(swiftscan_scan_invocation_t invocation);
 
 //=== Feature-Query Functions ---------------------------------------------===//
@@ -426,15 +375,6 @@ SWIFTSCAN_PUBLIC void swiftscan_scanner_dispose(swiftscan_scanner_t);
 /// using \c swiftscan_dependency_graph_dispose .
 SWIFTSCAN_PUBLIC swiftscan_dependency_graph_t swiftscan_dependency_graph_create(
     swiftscan_scanner_t scanner, swiftscan_scan_invocation_t invocation);
-
-/// Invoke the scan for an input batch of modules specified in the
-/// \c swiftscan_batch_scan_input_t argument. The returned
-/// \c swiftscan_batch_scan_result_t is owned by the caller and must be disposed
-/// of using \c swiftscan_batch_scan_result_dispose .
-SWIFTSCAN_PUBLIC swiftscan_batch_scan_result_t *
-swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
-                                   swiftscan_batch_scan_input_t *batch_input,
-                                   swiftscan_scan_invocation_t invocation);
 
 /// Invoke the import prescan using arguments specified in the \c
 /// swiftscan_scan_invocation_t argument. The returned \c swiftscan_import_set_t
