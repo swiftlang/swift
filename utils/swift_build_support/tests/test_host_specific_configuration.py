@@ -290,6 +290,7 @@ class ToolchainTestCase(unittest.TestCase):
     # NOTE: test_watchos_host is not supported in open-source Swift
     test_should_skip_testing_watchos_sim =\
         generate_should_skip_testing_platform(
+            'watchsimulator-x86_64',
             'build_watchos_simulator',
             'test_watchos_simulator')
 
