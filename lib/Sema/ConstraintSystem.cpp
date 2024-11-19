@@ -140,8 +140,7 @@ ConstraintSystem::~ConstraintSystem() {
 }
 
 void ConstraintSystem::incrementScopeCounter() {
-  ++CountScopes;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
+  ++NumSolverScopes;
   if (auto *Stats = getASTContext().Stats)
     ++Stats->getFrontendCounters().NumConstraintScopes;
 }

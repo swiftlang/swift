@@ -1777,6 +1777,10 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                              Opts.DebugConstraintSolverAttempt);
   setUnsignedIntegerArgument(OPT_solver_memory_threshold,
                              Opts.SolverMemoryThreshold);
+  setUnsignedIntegerArgument(OPT_solver_scope_threshold_EQ,
+                             Opts.SolverScopeThreshold);
+  setUnsignedIntegerArgument(OPT_solver_trail_threshold_EQ,
+                             Opts.SolverTrailThreshold);
   setUnsignedIntegerArgument(OPT_solver_shrink_unsolved_threshold,
                              Opts.SolverShrinkUnsolvedThreshold);
 

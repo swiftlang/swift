@@ -827,6 +827,10 @@ def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
 
+def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">;
+
+def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">;
+
 def solver_disable_shrink :
   Flag<["-"], "solver-disable-shrink">,
   HelpText<"Disable the shrink phase of expression type checking">;
