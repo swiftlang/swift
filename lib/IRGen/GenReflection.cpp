@@ -1163,6 +1163,11 @@ public:
 };
 
 void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
+  // If this builtin is generic, don't emit anything.
+  if (builtinType->hasTypeParameter()) {
+    return;
+  }
+
   FixedTypeMetadataBuilder builder(*this, builtinType);
   builder.emit();
 }
