@@ -252,6 +252,7 @@ void appendToVector(BridgedASTNode cNode, void *vecPtr) {
 SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   ASTContext &Ctx = SF.getASTContext();
   DiagnosticEngine &Diags = Ctx.Diags;
+  SourceManager &SM = Ctx.SourceMgr;
   const LangOptions &langOpts = Ctx.LangOpts;
   const GeneratedSourceInfo *genInfo = SF.getGeneratedSourceFileInfo();
 
@@ -263,6 +264,24 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   // Parse the file.
   auto *exportedSourceFile = SF.getExportedSourceFile();
   assert(exportedSourceFile && "Couldn't parse via SyntaxParser");
+
+  // Collect virtual files.
+  // FIXME: Avoid side effects in the request.
+  // FIXME: Do this lazily in SourceManager::getVirtualFile().
+  BridgedVirtualFile *virtualFiles = nullptr;
+  size_t numVirtualFiles =
+      swift_ASTGen_virtualFiles(exportedSourceFile, &virtualFiles);
+  SourceLoc bufferStart = SM.getLocForBufferStart(SF.getBufferID());
+  for (size_t i = 0; i != numVirtualFiles; ++i) {
+    auto &VF = virtualFiles[i];
+    Ctx.SourceMgr.createVirtualFile(
+        bufferStart.getAdvancedLoc(VF.StartPosition), VF.Name.unbridged(),
+        VF.LineOffset, VF.EndPosition - VF.StartPosition);
+    StringRef name = Ctx.AllocateCopy(VF.Name.unbridged());
+    SF.VirtualFilePaths.emplace_back(
+        name, bufferStart.getAdvancedLoc(VF.NamePosition));
+  }
+  swift_ASTGen_freeBridgedVirtualFiles(virtualFiles, numVirtualFiles);
 
   // Emit parser diagnostics.
   (void)swift_ASTGen_emitParserDiagnostics(

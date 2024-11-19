@@ -94,6 +94,12 @@ intptr_t swift_ASTGen_configuredRegions(
 void swift_ASTGen_freeConfiguredRegions(
     BridgedIfConfigClauseRangeInfo *_Nullable regions, intptr_t numRegions);
 
+size_t
+swift_ASTGen_virtualFiles(void *_Nonnull sourceFile,
+                          BridgedVirtualFile *_Nullable *_Nonnull virtualFiles);
+void swift_ASTGen_freeBridgedVirtualFiles(
+    BridgedVirtualFile *_Nullable virtualFiles, size_t numFiles);
+
 #ifdef __cplusplus
 }
 #endif
