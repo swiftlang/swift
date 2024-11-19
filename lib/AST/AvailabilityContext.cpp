@@ -124,7 +124,7 @@ void AvailabilityContext::Storage::Profile(llvm::FoldingSetNodeID &id) const {
   Platform.Profile(id);
 }
 
-AvailabilityContext AvailabilityContext::getDefault(ASTContext &ctx) {
+AvailabilityContext AvailabilityContext::forInliningTarget(ASTContext &ctx) {
   PlatformInfo platformInfo{AvailabilityRange::forInliningTarget(ctx),
                             PlatformKind::none,
                             /*IsUnavailable*/ false,

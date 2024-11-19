@@ -16,17 +16,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
+#include "DerivedConformances.h"
+#include "TypeCheckAvailability.h"
+#include "TypeCheckDecl.h"
 #include "TypeChecker.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/APInt.h"
-#include "DerivedConformances.h"
-#include "TypeCheckDecl.h"
 
 using namespace swift;
 

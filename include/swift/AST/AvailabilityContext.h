@@ -52,10 +52,10 @@ private:
       ASTContext &ctx);
 
 public:
-  /// Retrieves the default `AvailabilityContext`, which is maximally available.
-  /// The platform availability range will be set to the deployment target (or
-  /// minimum inlining target when applicable).
-  static AvailabilityContext getDefault(ASTContext &ctx);
+  /// Retrieves the maximally available `AvailabilityContext` for the
+  /// compilation. The platform availability range will be set to the minimum
+  /// inlining target (which may just be the deployment target).
+  static AvailabilityContext forInliningTarget(ASTContext &ctx);
 
   /// Returns the range of platform versions which may execute code in the
   /// availability context, starting at its introduction version.
