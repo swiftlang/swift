@@ -45,13 +45,23 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
     // Indirect results are not checked here. Type checking ensures
     // that they have a lifetime dependence.
     if let lifetimeDep = LifetimeDependence(argument, context) {
-      analyze(dependence: lifetimeDep, context)
+      _ = analyze(dependence: lifetimeDep, context)
     }
   }
   for instruction in function.instructions {
     if let markDep = instruction as? MarkDependenceInst, markDep.isUnresolved {
       if let lifetimeDep = LifetimeDependence(markDep, context) {
-        analyze(dependence: lifetimeDep, context)
+        if analyze(dependence: lifetimeDep, context) {
+          // Note: This promotes the mark_dependence flag but does not invalidate SIL; preserving analyses is good,
+          // but the change won't appear in -sil-print-function. Ideally, we could notify context of a flag change
+          // without invalidating analyses.
+          lifetimeDep.resolve(context)
+        }
+      } else {
+        // For now, if the mark_dependence wasn't recognized as a lifetime dependence, conservatively settle it as
+        // escaping. In the future, we should not need this because, for escapable types, mark_dependence [unresolved]
+        // will all be settled during an early LifetimeNormalization pass.
+        markDep.settleToEscaping()
       }
       continue
     }
@@ -61,7 +71,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
       apply.resultOrYields.forEach {
         if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0,
                                                 context) {
-          analyze(dependence: lifetimeDep, context)
+          _ = analyze(dependence: lifetimeDep, context)
         }
       }
       continue
@@ -74,8 +84,9 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
 /// 1. Compute the LifetimeDependence scope.
 ///
 /// 2. Walk down all dependent values checking that they are within range.
-private func analyze(dependence: LifetimeDependence,
-  _ context: FunctionPassContext) {
+///
+/// Return true on success.
+private func analyze(dependence: LifetimeDependence, _ context: FunctionPassContext) -> Bool {
   log("Dependence scope:\n\(dependence)")
     
   // Compute this dependence scope.
@@ -91,10 +102,7 @@ private func analyze(dependence: LifetimeDependence,
   var walker = DiagnoseDependenceWalker(diagnostics, context)
   defer { walker.deinitialize() }
   _ = walker.walkDown(root: dependence.dependentValue)
-
-  if !error {
-    dependence.resolve(context)
-  }
+  return !error
 }
 
 /// Analyze and diagnose a single LifetimeDependence.
