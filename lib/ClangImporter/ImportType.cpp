@@ -1059,6 +1059,16 @@ namespace {
         // If the objc type has any generic args, convert them and bind them to
         // the imported class type.
         if (imported->getGenericParams()) {
+          auto *dc = imported->getDeclContext();
+          Type parentTy;
+          // Check if this is a nested type and if so,
+          // fetch the parent type.
+          if (dc->isTypeContext()) {
+            parentTy = dc->getDeclaredInterfaceType();
+            if (parentTy->is<ErrorType>())
+              return Type();
+          }
+
           unsigned typeParamCount = imported->getGenericParams()->size();
           auto typeArgs = type->getObjectType()->getTypeArgs();
           assert(typeArgs.empty() || typeArgs.size() == typeParamCount);
@@ -1084,7 +1094,7 @@ namespace {
           }
           assert(importedTypeArgs.size() == typeParamCount);
           importedType = BoundGenericClassType::get(
-            imported, nullptr, importedTypeArgs);
+            imported, parentTy, importedTypeArgs);
         } else {
           importedType = imported->getDeclaredInterfaceType();
         }
