@@ -206,10 +206,15 @@ protected:
       uint64_t paddingBytes = elementTI.getFixedStride().getValue()
         - elementTI.getFixedSize().getValue();
       auto byteTy = llvm::IntegerType::get(LLVMContext, 8);
-      elementTy = llvm::StructType::get(LLVMContext,
-        {elementTy,
-         llvm::ArrayType::get(byteTy, paddingBytes)},
-        /*packed*/ true);
+      auto paddingArrayTy = llvm::ArrayType::get(byteTy, paddingBytes);
+
+      if (elementTI.getFixedSize() == Size(0)) {
+        elementTy = paddingArrayTy;
+      } else {
+        elementTy = llvm::StructType::get(LLVMContext,
+          {elementTy, paddingArrayTy},
+          /*packed*/ true);
+      }
     }
     
     return llvm::ArrayType::get(elementTy, arraySize);
