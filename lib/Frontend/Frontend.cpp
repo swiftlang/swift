@@ -1493,8 +1493,10 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getSILOptions().EnableSerializePackage)
       MainModule->setSerializePackageEnabled();
 
-    if (auto compilerVersion =
-            Invocation.getFrontendOptions().SwiftInterfaceCompilerVersion) {
+    if (!Invocation.getFrontendOptions()
+             .SwiftInterfaceCompilerVersion.empty()) {
+      auto compilerVersion =
+          Invocation.getFrontendOptions().SwiftInterfaceCompilerVersion;
       MainModule->setSwiftInterfaceCompilerVersion(compilerVersion);
     }
 
