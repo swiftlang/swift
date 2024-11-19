@@ -1208,19 +1208,7 @@ bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
     if (!existingNTD || NTD != existingNTD)
       continue;
 
-    // What is going on here needs to be thoroughly re-evaluated,
-    // but at least for now, let's not filter bindings of different
-    // kinds so if we have a situation like: `Array<$T0> conv $T1`
-    // and `$T1 conv Array<(String, Int)>` we can't lose `Array<$T0>`
-    // as a binding because `$T0` could be inferred to
-    // `(key: String, value: Int)` and binding `$T1` to `Array<(String, Int)>`
-    // eagerly would be incorrect.
-    if (existing->Kind != binding.Kind) {
-      // Array, Set and Dictionary allow conversions, everything else
-      // requires their generic arguments to match exactly.
-      if (existingType->isKnownStdlibCollectionType())
-        continue;
-    }
+    // FIXME: What is going on here needs to be thoroughly re-evaluated.
 
     // If new type has a type variable it shouldn't
     // be considered  viable.
