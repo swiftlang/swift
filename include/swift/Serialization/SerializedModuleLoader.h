@@ -539,7 +539,7 @@ public:
 
   virtual StringRef getPublicModuleName() const override;
 
-  virtual llvm::VersionTuple getSwiftInterfaceCompilerVersion() const override;
+  virtual version::Version getSwiftInterfaceCompilerVersion() const override;
 
   ValueDecl *getMainDecl() const override;
 

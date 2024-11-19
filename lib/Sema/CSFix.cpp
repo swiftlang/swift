@@ -27,6 +27,7 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Version.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSFix.h"
@@ -1300,11 +1301,11 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
     // are built with 6.1+ compilers, libraries produced by earlier
     // compilers don't have required symbols.
     if (auto *module = member->getDeclContext()->getParentModule()) {
-      if (module->isBuiltFromInterface() &&
-          module->getSwiftInterfaceCompilerVersion() <
-              llvm::VersionTuple(6, 1)) {
-        return AllowInvalidRefInKeyPath::create(
-            cs, baseType, RefKind::UnsupportedStaticMember, member, locator);
+      if (module->isBuiltFromInterface()) {
+        auto compilerVersion = module->getSwiftInterfaceCompilerVersion();
+        if (!compilerVersion.isVersionAtLeast(6, 1))
+          return AllowInvalidRefInKeyPath::create(
+              cs, baseType, RefKind::UnsupportedStaticMember, member, locator);
       }
     }
 

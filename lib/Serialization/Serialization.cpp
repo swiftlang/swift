@@ -1142,11 +1142,16 @@ void Serializer::writeHeader() {
         PublicModuleName.emit(ScratchRecord, publicModuleName.str());
       }
 
-      llvm::VersionTuple compilerVersion =
-          M->getSwiftInterfaceCompilerVersion();
-      if (compilerVersion) {
+      version::Version compilerVersion = M->getSwiftInterfaceCompilerVersion();
+      if (!compilerVersion.empty()) {
         options_block::SwiftInterfaceCompilerVersionLayout Version(Out);
-        Version.emit(ScratchRecord, compilerVersion.getAsString());
+
+        SmallString<32> versionBuf;
+        llvm::raw_svector_ostream OS(versionBuf);
+
+        OS << compilerVersion;
+
+        Version.emit(ScratchRecord, OS.str());
       }
 
       if (M->isConcurrencyChecked()) {

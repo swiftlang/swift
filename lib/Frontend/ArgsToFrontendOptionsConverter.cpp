@@ -22,6 +22,7 @@
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/TargetParser/Triple.h"
@@ -302,10 +303,15 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.PublicModuleName = A->getValue();
 
   if (auto A = Args.getLastArg(OPT_swiftinterface_compiler_version)) {
-    if (Opts.SwiftInterfaceCompilerVersion.tryParse(A->getValue())) {
+    if (auto version = VersionParser::parseVersionString(
+            A->getValue(), SourceLoc(), /*Diags=*/nullptr)) {
+      Opts.SwiftInterfaceCompilerVersion = version.value();
+    }
+
+    if (Opts.SwiftInterfaceCompilerVersion.empty() ||
+        Opts.SwiftInterfaceCompilerVersion.size() > 5)
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
-    }
   }
 
   // This must be called after computing module name, module abi name,
