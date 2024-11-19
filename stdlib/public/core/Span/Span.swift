@@ -95,7 +95,8 @@ extension Span where Element: ~Copyable {
   public init(
     _unsafeElements buffer: borrowing UnsafeBufferPointer<Element>
   ) {
-    let baseAddress = buffer.baseAddress //FIXME: rdar://138665760
+    //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
+    let baseAddress = buffer.baseAddress
     _precondition(
       ((Int(bitPattern: baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
@@ -204,7 +205,8 @@ extension Span where Element: BitwiseCopyable {
   public init(
     _unsafeBytes buffer: borrowing UnsafeRawBufferPointer
   ) {
-    let baseAddress = buffer.baseAddress //FIXME: rdar://138665760
+    //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
+    let baseAddress = buffer.baseAddress
     _precondition(
       ((Int(bitPattern: baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
@@ -318,87 +320,6 @@ extension Span where Element: BitwiseCopyable {
     self.init(
       _unsafeBytes: .init(start: bytes._pointer, count: bytes.byteCount)
     )
-  }
-}
-
-@_disallowFeatureSuppression(NonescapableTypes)
-@available(SwiftStdlib 6.1, *)
-extension Span where Element: Equatable {
-
-  /// Returns a Boolean value indicating whether this and another span
-  /// contain equal elements in the same order.
-  ///
-  /// - Parameters:
-  ///   - other: A span to compare to this one.
-  /// - Returns: `true` if this sequence and `other` contain equivalent items,
-  ///   using `areEquivalent` as the equivalence test; otherwise, `false.`
-  ///
-  /// - Complexity: O(*m*), where *m* is the lesser of the length of the
-  ///   sequence and the length of `other`.
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public func _elementsEqual(_ other: Self) -> Bool {
-    guard count == other.count else { return false }
-    if count == 0 { return true }
-
-    // This could be short-cut with a layout constraint
-    // where stride equals size, as long as there is
-    // at most 1 unused bit pattern, e.g.:
-    // if Element is BitwiseEquatable {
-    // return _swift_stdlib_memcmp(lhs.baseAddress, rhs.baseAddress, count) == 0
-    // }
-    if _pointer != other._pointer {
-      for o in 0..<count {
-        if self[unchecked: o] != other[unchecked: o] { return false }
-      }
-    }
-    return true
-  }
-
-  /// Returns a Boolean value indicating whether this span and a Collection
-  /// contain equal elements in the same order.
-  ///
-  /// - Parameters:
-  ///   - other: A Collection to compare to this span.
-  /// - Returns: `true` if this sequence and `other` contain equivalent items,
-  ///   using `areEquivalent` as the equivalence test; otherwise, `false.`
-  ///
-  /// - Complexity: O(*m*), where *m* is the lesser of the length of the
-  ///   sequence and the length of `other`.
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public func _elementsEqual(_ other: some Collection<Element>) -> Bool {
-    let equal = other.withContiguousStorageIfAvailable {
-      _elementsEqual(Span(_unsafeElements: $0))
-    }
-    if let equal { return equal }
-
-    guard count == other.count else { return false }
-    if count == 0 { return true }
-
-    return _elementsEqual(AnySequence(other))
-  }
-
-  /// Returns a Boolean value indicating whether this span and a Sequence
-  /// contain equal elements in the same order.
-  ///
-  /// - Parameters:
-  ///   - other: A Sequence to compare to this span.
-  /// - Returns: `true` if this sequence and `other` contain equivalent items,
-  ///   using `areEquivalent` as the equivalence test; otherwise, `false.`
-  ///
-  /// - Complexity: O(*m*), where *m* is the lesser of the length of the
-  ///   sequence and the length of `other`.
-  @_disallowFeatureSuppression(NonescapableTypes)
-  @_alwaysEmitIntoClient
-  public func _elementsEqual(_ other: some Sequence<Element>) -> Bool {
-    var offset = 0
-    for otherElement in other {
-      if offset >= count { return false }
-      if self[unchecked: offset] != otherElement { return false }
-      offset += 1
-    }
-    return offset == count
   }
 }
 
@@ -701,7 +622,9 @@ extension Span where Element: BitwiseCopyable {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    try RawSpan(_elements: self).withUnsafeBytes(body)
+    try body(
+      .init(start: _pointer, count: _count * MemoryLayout<Element>.stride)
+    )
   }
 }
 
