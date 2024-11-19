@@ -125,13 +125,6 @@ public:
     }
     auto ipk = getInvertibleProtocolKind(*kp);
     if (ipk) {
-      // Gate the '~Escapable' type behind a specific flag for now.
-      // Uses of 'Escapable' itself are already diagnosed; return ErrorType.
-      if (*ipk == InvertibleProtocolKind::Escapable &&
-          !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        return ErrorType::get(ctx);
-      }
-
       return ProtocolCompositionType::getInverseOf(ctx, *ipk);
     }
     auto rpk = getRepressibleProtocolKind(*kp);

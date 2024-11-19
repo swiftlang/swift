@@ -1,7 +1,7 @@
 // RUN: %target-sil-opt %s \
-// RUN:   -enable-experimental-feature NonescapableTypes | %FileCheck %s
+// RUN:   -enable-experimental-feature LifetimeDependence | %FileCheck %s
 
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 sil_stage canonical
 

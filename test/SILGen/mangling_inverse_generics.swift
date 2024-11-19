@@ -1,13 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-silgen %s -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -parse-as-library \
 // RUN:   > %t/test.silgen
 
 // RUN: %FileCheck %s < %t/test.silgen
 // RUN: %swift-demangle < %t/test.silgen | %FileCheck %s --check-prefix=DEMANGLED
-
-// REQUIRES: swift_feature_NonescapableTypes
 
 
 protocol NoncopyableProto: ~Copyable {}

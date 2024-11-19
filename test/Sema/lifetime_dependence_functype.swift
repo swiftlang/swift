@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature LifetimeDependence
 
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct NC: ~Copyable {
   var ne: NE {

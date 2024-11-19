@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
-// RUN:     -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature LifetimeDependence \
 // RUN:     -enable-experimental-feature SE427NoInferenceOnExtension \
 // RUN:     -o %t/NoncopyableGenerics_Misc.swiftmodule \
 // RUN:     -emit-module-interface-path %t/NoncopyableGenerics_Misc.swiftinterface \
@@ -10,7 +10,7 @@
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
-// RUN:     -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature LifetimeDependence \
 // RUN:     -enable-experimental-feature SE427NoInferenceOnExtension \
 // RUN:     -o %t/Swiftskell.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Swiftskell.swiftinterface \
@@ -25,25 +25,25 @@
 
 // RUN: %target-swift-frontend -compile-module-from-interface \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
-// RUN:     -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature LifetimeDependence \
 // RUN:     -enable-experimental-feature SE427NoInferenceOnExtension \
 // RUN:    %t/NoncopyableGenerics_Misc.swiftinterface -o %t/NoncopyableGenerics_Misc.swiftmodule
 
 // RUN: %target-swift-frontend -compile-module-from-interface \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
-// RUN:     -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature LifetimeDependence \
 // RUN:     -enable-experimental-feature SE427NoInferenceOnExtension \
 // RUN:    %t/Swiftskell.swiftinterface -o %t/Swiftskell.swiftmodule
 
 // RUN: %target-swift-frontend -emit-silgen -I %t %s \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
-// RUN:    -enable-experimental-feature NonescapableTypes \
+// RUN:    -enable-experimental-feature LifetimeDependence \
 // RUN:     -enable-experimental-feature SE427NoInferenceOnExtension \
 // RUN:    -o %t/final.silgen
 
 // RUN: %FileCheck %s --check-prefix=CHECK-SILGEN < %t/final.silgen
 
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_SE427NoInferenceOnExtension
 // REQUIRES: swift_feature_SuppressedAssociatedTypes
 
@@ -123,8 +123,6 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: extension {{.*}}.Outer.InnerStruct {
 // CHECK-MISC-NEXT: #if compiler(>=5.3) && $NonescapableTypes
 // CHECK-MISC-NEXT:   public func hello<T>(_ t: T) where T : ~Escapable
-// CHECK-MISC-NEXT:   #else
-// CHECK-MISC-NEXT:   public func hello<T>(_ t: T)
 // CHECK-MISC-NEXT:   #endif
 
 // CHECK-MISC: @_preInverseGenerics public func old_swap<T>(_ a: inout T, _ b: inout T) where T : ~Copyable

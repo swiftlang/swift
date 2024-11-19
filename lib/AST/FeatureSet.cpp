@@ -249,6 +249,19 @@ static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureLifetimeDependence(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<LifetimeAttr>()) {
+    return true;
+  }
+  auto *afd = dyn_cast<AbstractFunctionDecl>(decl);
+  if (!afd) {
+    return false;
+  }
+  return afd->getInterfaceType()
+      ->getAs<AnyFunctionType>()
+      ->hasLifetimeDependencies();
+}
+
 UNINTERESTING_FEATURE(DynamicActorIsolation)
 UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)

@@ -634,6 +634,8 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "SE427NoInferenceOnExtension")
   list(APPEND swift_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
+  list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")
+
   list(APPEND swift_flags "-enable-upcoming-feature" "MemberImportVisibility")
 
   if (SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE)

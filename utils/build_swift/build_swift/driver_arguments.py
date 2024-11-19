@@ -1473,10 +1473,6 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift distributed actors.')
 
-    option('--enable-experimental-nonescapable-types', toggle_true,
-           default=False,
-           help='Enable experimental NonescapableTypes.')
-
     option('--enable-experimental-string-processing', toggle_true,
            default=True,
            help='Enable experimental Swift string processing.')

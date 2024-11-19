@@ -1,8 +1,7 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature NonescapableTypes -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift  -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
 
-// REQUIRES: swift_feature_NonescapableTypes
 
 //--- Inputs/module.modulemap
 module Test {
