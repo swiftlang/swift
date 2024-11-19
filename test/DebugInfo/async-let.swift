@@ -3,6 +3,7 @@
 // RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK
 
 // REQUIRES: concurrency
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
 public actor Alice {
   let bob = Bob()
