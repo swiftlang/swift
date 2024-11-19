@@ -89,8 +89,10 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   // If this type variable is not the representative of its equivalence class,
   // add it to its representative's set of equivalences.
   auto typeVarRep = CS.getRepresentative(typeVar);
-  if (typeVar != typeVarRep)
-    mergeNodes(typeVar, typeVarRep);
+  if (typeVar != typeVarRep) {
+    mergeNodesPre(typeVar);
+    mergeNodes(typeVarRep, typeVar);
+  }
   else if (auto fixed = CS.getFixedType(typeVarRep)) {
     // Bind the type variable.
     bindTypeVariable(typeVar, fixed);
@@ -251,32 +253,6 @@ void ConstraintGraphNode::addToEquivalenceClass(
   if (EquivalenceClass.empty())
     EquivalenceClass.push_back(getTypeVariable());
   EquivalenceClass.append(typeVars.begin(), typeVars.end());
-
-  {
-    for (auto *newMember : typeVars) {
-      auto &node = CG[newMember];
-
-      for (auto *constraint : node.getConstraints()) {
-        introduceToInference(constraint);
-
-        if (!isUsefulForReferencedVars(constraint))
-          continue;
-
-        notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
-          referencedVar.introduceToInference(constraint);
-        });
-      }
-
-      // FIXME: Perhaps this also needs to be split up into two stages,
-      // where the first stage runs before we merge the equivalence
-      // classes
-      node.notifyReferencingVars(
-        [&](ConstraintGraphNode &node, Constraint *constraint) {
-          node.retractFromInference(constraint);
-          node.introduceToInference(constraint);
-        });
-    }
-  }
 }
 
 void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
@@ -525,31 +501,60 @@ void ConstraintGraph::removeConstraint(TypeVariableType *typeVar,
   OrphanedConstraints.pop_back();
 }
 
+void ConstraintGraph::mergeNodesPre(TypeVariableType *typeVar2) {
+  // Merge equivalence class from the non-representative type variable.
+  auto &nonRepNode = (*this)[typeVar2];
+
+  for (auto *newMember : nonRepNode.getEquivalenceClassUnsafe()) {
+    auto &node = (*this)[newMember];
+
+    node.notifyReferencingVars(
+      [&](ConstraintGraphNode &node, Constraint *constraint) {
+        node.retractFromInference(constraint);
+      });
+  }
+}
+
 void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
                                  TypeVariableType *typeVar2) {
-  assert(CS.getRepresentative(typeVar1) == CS.getRepresentative(typeVar2) &&
-         "type representatives don't match");
-  
   // Retrieve the node for the representative that we're merging into.
-  auto typeVarRep = CS.getRepresentative(typeVar1);
-  auto &repNode = (*this)[typeVarRep];
+  ASSERT(CS.getRepresentative(typeVar1) == typeVar1);
 
-  // Retrieve the node for the non-representative.
-  assert((typeVar1 == typeVarRep || typeVar2 == typeVarRep) &&
-         "neither type variable is the new representative?");
-  auto typeVarNonRep = typeVar1 == typeVarRep? typeVar2 : typeVar1;
+  auto &repNode = (*this)[typeVar1];
 
   // Record the change, if there are active scopes.
   if (CS.isRecordingChanges()) {
     CS.recordChange(
       SolverTrail::Change::ExtendedEquivalenceClass(
-                        typeVarRep,
+                        typeVar1,
                         repNode.getEquivalenceClass().size()));
   }
 
   // Merge equivalence class from the non-representative type variable.
-  auto &nonRepNode = (*this)[typeVarNonRep];
-  repNode.addToEquivalenceClass(nonRepNode.getEquivalenceClassUnsafe());
+  auto &nonRepNode = (*this)[typeVar2];
+
+  auto typeVars = nonRepNode.getEquivalenceClassUnsafe();
+  repNode.addToEquivalenceClass(typeVars);
+
+  for (auto *newMember : typeVars) {
+    auto &node = (*this)[newMember];
+
+    for (auto *constraint : node.getConstraints()) {
+      repNode.introduceToInference(constraint);
+
+      if (!isUsefulForReferencedVars(constraint))
+        continue;
+
+      repNode.notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
+        referencedVar.introduceToInference(constraint);
+      });
+    }
+
+    node.notifyReferencingVars(
+      [&](ConstraintGraphNode &node, Constraint *constraint) {
+        node.introduceToInference(constraint);
+      });
+  }
 }
 
 void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {

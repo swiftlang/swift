@@ -261,10 +261,17 @@ public:
   /// Primitive form for SolverTrail::Change::undo().
   void removeConstraint(TypeVariableType *typeVar, Constraint *constraint);
 
+  /// Prepare to merge the given node into some other node.
+  ///
+  /// This records graph changes that must be undone after the merge has
+  /// been undone.
+  void mergeNodesPre(TypeVariableType *typeVar2);
+
   /// Merge the two nodes for the two given type variables.
   ///
   /// The type variables must actually have been merged already; this
-  /// operation merges the two nodes.
+  /// operation merges the two nodes. This also records graph changes
+  /// that must be undone before the merge can be undone.
   void mergeNodes(TypeVariableType *typeVar1, TypeVariableType *typeVar2);
 
   /// Bind the given type variable to the given fixed type.
