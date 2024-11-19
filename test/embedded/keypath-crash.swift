@@ -42,4 +42,14 @@ public struct State<Wrapped> {
   }
 }
 
+public struct S<T> {
+  public private(set) subscript(x: Int) -> Int {
+     get {
+       return 27
+     }
+     mutating set {
+     }
+   }
+}
+
 // CHECK: define {{.*}}@main(
