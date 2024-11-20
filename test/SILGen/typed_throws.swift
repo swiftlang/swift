@@ -27,6 +27,15 @@ func throwsConcrete() throws(MyError) {
   throw .fail
 }
 
+// CHECK-LABEL: sil hidden [no_locks] [ossa] @$s12typed_throws0B25ConcreteWithoutAllocatingyyAA7MyErrorOYKF : $@convention(thin) () -> @error MyError
+@_noLocks
+func throwsConcreteWithoutAllocating() throws(MyError) {
+  // CHECK-NOT: swift_willThrowTyped
+  // CHECK: throw [[ERROR:%.*]] : $MyError
+  // CHECK: return
+  throw .fail
+}
+
 class ClassError: Error { }
 
 // CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B10ClassErroryyAA0cD0CYKF : $@convention(thin) () -> @error ClassError

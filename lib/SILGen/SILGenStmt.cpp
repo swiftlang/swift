@@ -1531,6 +1531,24 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   return destBB;
 }
 
+/// Determine whether the given performance constraints allow the emission of
+/// the willThrow call, which can be dynamically hooked to allocate memory.
+static bool performanceConstraintsAllowWillThrow(
+    PerformanceConstraints perfConstraints
+) {
+  switch (perfConstraints) {
+    case PerformanceConstraints::None:
+      return true;
+
+    case PerformanceConstraints::NoAllocation:
+    case PerformanceConstraints::NoLocks:
+    case PerformanceConstraints::NoRuntime:
+    case PerformanceConstraints::NoExistentials:
+    case PerformanceConstraints::NoObjCBridging:
+      return false;
+  }
+}
+
 void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
                                bool emitWillThrow) {
   assert(ThrowDest.isValid() &&
@@ -1566,7 +1584,8 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     bool isExistentialBox = exnMV.getType() == existentialBoxType;
 
     // If we are supposed to emit a call to swift_willThrow(Typed), do so now.
-    if (emitWillThrow) {
+    if (emitWillThrow &&
+        performanceConstraintsAllowWillThrow(F.getPerfConstraints())) {
       ASTContext &ctx = SGM.getASTContext();
       if (isExistentialBox) {
         // Generate a call to the 'swift_willThrow' runtime function to allow the
