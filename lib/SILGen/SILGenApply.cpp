@@ -3412,11 +3412,18 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
 namespace {
 
 class ArgEmitter {
+public:
+  enum Flag {
+    IsYield = 0x1,
+    IsForCoroutine = 0x2,
+  };
+  using OptionSet = OptionSet<Flag>;
+
+private:
   SILGenFunction &SGF;
   SILLocation ApplyLoc;
   SILFunctionTypeRepresentation Rep;
-  bool IsYield;
-  bool IsForCoroutine;
+  OptionSet Options;
   ForeignInfo Foreign;
   ClaimedParamsRef ParamInfos;
   SmallVectorImpl<ManagedValue> &Args;
@@ -3427,13 +3434,11 @@ class ArgEmitter {
 
 public:
   ArgEmitter(SILGenFunction &SGF, SILLocation applyLoc,
-             SILFunctionTypeRepresentation Rep,
-             bool isYield, bool isForCoroutine, ClaimedParamsRef paramInfos,
-             SmallVectorImpl<ManagedValue> &args,
+             SILFunctionTypeRepresentation Rep, OptionSet options,
+             ClaimedParamsRef paramInfos, SmallVectorImpl<ManagedValue> &args,
              SmallVectorImpl<DelayedArgument> &delayedArgs,
              const ForeignInfo &foreign)
-      : SGF(SGF), ApplyLoc(applyLoc),
-        Rep(Rep), IsYield(isYield), IsForCoroutine(isForCoroutine),
+      : SGF(SGF), ApplyLoc(applyLoc), Rep(Rep), Options(options),
         Foreign(foreign), ParamInfos(paramInfos), Args(args),
         DelayedArguments(delayedArgs) {}
 
@@ -3559,7 +3564,7 @@ private:
     // If we have a guaranteed +0 parameter...
     if (param.isGuaranteedInCaller() || isShared) {
       // And this is a yield, emit a borrowed r-value.
-      if (IsYield) {
+      if (Options.contains(Flag::IsYield)) {
         if (tryEmitBorrowed(std::move(arg), loweredSubstArgType,
                             loweredSubstParamType, origParamType, paramSlice))
           return;
@@ -3610,7 +3615,7 @@ private:
 
     // Handle yields of storage reference expressions specially so that we
     // don't emit them as +1 r-values and then expand.
-    if (IsYield) {
+    if (Options.contains(Flag::IsYield)) {
       if (auto result = std::move(arg).findStorageReferenceExprForBorrow()) {
         emitExpandedBorrowed(result, origParamType);
         return;
@@ -3858,7 +3863,8 @@ private:
 
     auto convertOwnershipConvention = [&](ManagedValue value) {
       return convertOwnershipConventionGivenParamInfo(
-          SGF, param, origParam, value, loc, IsForCoroutine);
+          SGF, param, origParam, value, loc,
+          Options.contains(Flag::IsForCoroutine));
     };
 
     auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
@@ -4423,10 +4429,9 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
 
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
-  auto emitter = ArgEmitter(SGF, info.loc, info.functionRepresentation,
-                            /*yield*/ false, /*coroutine*/ false,
-                            info.paramsToEmit, loweredArgs,
-                            delayedArgs, ForeignInfo{});
+  auto emitter =
+      ArgEmitter(SGF, info.loc, info.functionRepresentation, {},
+                 info.paramsToEmit, loweredArgs, delayedArgs, ForeignInfo{});
 
   emitter.emitSingleArg(ArgumentSource(info.loc, std::move(value)),
                         info.origResultType);
@@ -4818,9 +4823,11 @@ public:
             const ForeignInfo &foreign) && {
     auto params = lowering.claimParams(origFormalType, getParams(), foreign);
 
-    ArgEmitter emitter(SGF, Loc, lowering.Rep, /*yield*/ false,
-                       /*isForCoroutine*/ substFnType->isCoroutine(), params,
-                       args, delayedArgs, foreign);
+    ArgEmitter::OptionSet options;
+    if (substFnType->isCoroutine())
+      options |= ArgEmitter::IsForCoroutine;
+    ArgEmitter emitter(SGF, Loc, lowering.Rep, options, params, args,
+                       delayedArgs, foreign);
     emitter.emitPreparedArgs(std::move(Args), origFormalType);
   }
 
@@ -6069,8 +6076,8 @@ void SILGenFunction::emitYield(SILLocation loc,
          origYield.getConvention()});
   }
 
-  ArgEmitter emitter(*this, loc, fnType->getRepresentation(), /*yield*/ true,
-                     /*isForCoroutine*/ false, ClaimedParamsRef(substYieldTys),
+  ArgEmitter emitter(*this, loc, fnType->getRepresentation(),
+                     ArgEmitter::IsYield, ClaimedParamsRef(substYieldTys),
                      yieldArgs, delayedArgs, ForeignInfo{});
 
   for (auto i : indices(valueSources)) {
@@ -7077,10 +7084,9 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
   SmallVector<ManagedValue, 4> argValues;
   SmallVector<DelayedArgument, 2> delayedArgs;
 
-  ArgEmitter emitter(SGF, applyLoc, SILFunctionTypeRepresentation::Thin,
-                     /*yield*/ false,
-                     /*isForCoroutine*/ false, ClaimedParamsRef(substParamTys),
-                     argValues, delayedArgs, ForeignInfo{});
+  ArgEmitter emitter(SGF, applyLoc, SILFunctionTypeRepresentation::Thin, {},
+                     ClaimedParamsRef(substParamTys), argValues, delayedArgs,
+                     ForeignInfo{});
 
   emitter.emitPreparedArgs(std::move(args), origFnType);
 
@@ -7765,9 +7771,7 @@ SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
 
   SmallVector<ManagedValue, 4> argValues;
   SmallVector<DelayedArgument, 2> delayedArgs;
-  ArgEmitter emitter(*this, loc, fnType->getRepresentation(),
-                     /*yield*/ false,
-                     /*isForCoroutine*/ false,
+  ArgEmitter emitter(*this, loc, fnType->getRepresentation(), {},
                      ClaimedParamsRef(fnType->getParameters()), argValues,
                      delayedArgs, ForeignInfo{});
 

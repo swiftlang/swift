@@ -12,18 +12,87 @@
 
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 
-#include "swift/AST/ASTWalker.h"
-#include "swift/AST/Expr.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/ApplySite.h"
-#include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/PatternMatch.h"
-#include "swift/SIL/SILGlobalVariable.h"
+// We only use this so we can implement print on our type erased errors.
+#include "swift/SILOptimizer/Analysis/RegionAnalysis.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 
 using namespace swift;
-using namespace swift::PatternMatch;
 using namespace swift::PartitionPrimitives;
+
+//===----------------------------------------------------------------------===//
+//                           MARK: PartitionOpError
+//===----------------------------------------------------------------------===//
+
+void PartitionOpError::UnknownCodePatternError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: Unknown Code Pattern Error\n"
+     << "        Inst: " << *op->getSourceInst();
+}
+
+void PartitionOpError::LocalUseAfterSendError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: Use After Send\n"
+     << "        Sending Inst: " << *sendingOp->getUser()
+     << "        Sending Op Value: " << sendingOp->get()
+     << "        Require Inst: " << *op->getSourceInst() << "        ID:  %%"
+     << sentElement << "\n"
+     << "        Rep: " << valueMap.getRepresentativeValue(sentElement)
+     << "        Sending Op Num: " << sendingOp->getOperandNumber() << '\n';
+}
+
+void PartitionOpError::SentNeverSendableError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &info) const {
+  os << "    Emitting Error. Kind: Sent Non Sendable\n"
+     << "        ID:  %%" << sentElement << "\n"
+     << "        Rep: " << *info.getRepresentative(sentElement)
+     << "        Dynamic Isolation Region: ";
+  isolationRegionInfo.printForOneLineLogging(os);
+  os << '\n';
+  if (auto isolatedValue = isolationRegionInfo->maybeGetIsolatedValue()) {
+    os << "        Isolated Value: " << isolatedValue;
+    auto name = VariableNameInferrer::inferName(isolatedValue);
+    os << "        Isolated Value Name: "
+       << (name.has_value() ? name->get() : "none") << '\n';
+  } else {
+    os << "        Isolated Value: none\n";
+  };
+}
+
+void PartitionOpError::AssignNeverSendableIntoSendingResultError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: Assign Isolated Into Sending Result!\n"
+     << "        Assign Inst: " << *op->getSourceInst()
+     << "        Dest Value: " << *destValue
+     << "        Dest Element: " << destElement << '\n'
+     << "        Src Value: " << srcValue
+     << "        Src Element: " << srcElement << '\n'
+     << "        Src Rep: " << valueMap.getRepresentativeValue(srcElement)
+     << "        Src Isolation: " << srcIsolationRegionInfo << '\n';
+}
+
+void PartitionOpError::InOutSendingNotInitializedAtExitError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOut Not Reinitialized At End Of "
+        "Function\n"
+     << "        Sending Inst: " << *sendingOp->getUser()
+     << "        Sending Op Value: " << sendingOp->get()
+     << "        Require Inst: " << *op->getSourceInst() << "        ID:  %%"
+     << sentElement << "\n"
+     << "        Rep: " << valueMap.getRepresentativeValue(sentElement)
+     << "        Sending Op Num: " << sendingOp->getOperandNumber() << '\n';
+}
+
+void PartitionOpError::InOutSendingNotDisconnectedAtExitError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOut Sending ActorIsolated "
+        "at end of "
+        "Function Error!\n"
+     << "        ID:  %%" << inoutSendingElement << "\n"
+     << "        Rep: " << valueMap.getRepresentativeValue(inoutSendingElement)
+     << "        Dynamic Isolation Region: ";
+  isolationInfo.printForOneLineLogging(os);
+  os << '\n';
+}
 
 //===----------------------------------------------------------------------===//
 //                             MARK: PartitionOp

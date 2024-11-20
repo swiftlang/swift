@@ -507,6 +507,7 @@ public:
   operator bool() const { return bool(innerInfo); }
 
   SILIsolationInfo *operator->() { return &innerInfo; }
+  const SILIsolationInfo *operator->() const { return &innerInfo; }
 
   SILIsolationInfo getIsolationInfo() const { return innerInfo; }
 
