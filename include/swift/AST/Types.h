@@ -5348,6 +5348,18 @@ public:
     return getParameters().back();
   }
 
+  /// Return SILParameterInfo for the isolated parameter in this SILFunctionType
+  /// if one exists. Returns None otherwise.
+  std::optional<SILParameterInfo> maybeGetIsolatedParameter() const {
+    for (auto param : getParameters()) {
+      if (param.hasOption(SILParameterInfo::Isolated)) {
+        return param;
+      }
+    }
+
+    return {};
+  }
+
   struct IndirectMutatingParameterFilter {
     bool operator()(SILParameterInfo param) const {
       return param.isIndirectMutating();
