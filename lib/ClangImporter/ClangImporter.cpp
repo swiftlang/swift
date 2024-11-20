@@ -36,6 +36,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -51,6 +52,7 @@
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclBase.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Mangle.h"
@@ -5080,31 +5082,41 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         importer::getConditionalEscapableAttrParams(recordDecl);
     if (!conditionalParams.empty()) {
       auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
-      auto templateDecl = specDecl->getSpecializedTemplate();
       SmallVector<std::pair<unsigned, StringRef>, 4> argumentsToCheck;
-      for (auto [idx, param] :
-           llvm::enumerate(*templateDecl->getTemplateParameters())) {
-        if (conditionalParams.erase(param->getName()))
-          argumentsToCheck.push_back(std::make_pair(idx, param->getName()));
-      }
       HeaderLoc loc{recordDecl->getLocation()};
+      while (specDecl) {
+        auto templateDecl = specDecl->getSpecializedTemplate();
+        for (auto [idx, param] :
+             llvm::enumerate(*templateDecl->getTemplateParameters())) {
+          if (conditionalParams.erase(param->getName()))
+            argumentsToCheck.push_back(std::make_pair(idx, param->getName()));
+        }
+        auto &argList = specDecl->getTemplateArgs();
+        for (auto argToCheck : argumentsToCheck) {
+          auto arg = argList[argToCheck.first];
+          if (arg.getKind() != clang::TemplateArgument::Type) {
+            desc.impl.diagnose(loc, diag::type_template_parameter_expected,
+                               argToCheck.second);
+            return CxxEscapability::Unknown;
+          }
+
+          auto argEscapability = evaluateEscapability(
+              arg.getAsType()->getUnqualifiedDesugaredType());
+          if (argEscapability == CxxEscapability::NonEscapable)
+            return CxxEscapability::NonEscapable;
+        }
+        clang::DeclContext *rec = specDecl;
+        specDecl = nullptr;
+        while ((rec = rec->getParent())) {
+          specDecl = dyn_cast<clang::ClassTemplateSpecializationDecl>(rec);
+          if (specDecl)
+            break;
+        }
+      }
+
       for (auto name : conditionalParams)
         desc.impl.diagnose(loc, diag::unknown_template_parameter, name);
 
-      auto &argList = specDecl->getTemplateArgs();
-      for (auto argToCheck : argumentsToCheck) {
-        auto arg = argList[argToCheck.first];
-        if (arg.getKind() != clang::TemplateArgument::Type) {
-          desc.impl.diagnose(loc, diag::type_template_parameter_expected,
-                             argToCheck.second);
-          return CxxEscapability::Unknown;
-        }
-
-        auto argEscapability = evaluateEscapability(
-            arg.getAsType()->getUnqualifiedDesugaredType());
-        if (argEscapability == CxxEscapability::NonEscapable)
-          return CxxEscapability::NonEscapable;
-      }
       return hadUnknown ? CxxEscapability::Unknown : CxxEscapability::Escapable;
     }
     if (desc.annotationOnly)
