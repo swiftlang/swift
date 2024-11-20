@@ -128,6 +128,16 @@ const clang::Module *ClangNode::getClangModule() const {
   return nullptr;
 }
 
+const clang::Module *ClangNode::getOwningClangModule() const {
+  if (auto *M = getAsModule())
+    return M;
+  if (auto D = getAsDecl())
+    return D->getOwningModule();
+  if (auto MI = getAsModuleMacro())
+    return MI->getOwningModule();
+  return nullptr;
+}
+
 void ClangNode::dump() const {
   if (auto D = getAsDecl())
     D->dump();
