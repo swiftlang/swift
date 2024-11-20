@@ -89,8 +89,10 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   // If this type variable is not the representative of its equivalence class,
   // add it to its representative's set of equivalences.
   auto typeVarRep = CS.getRepresentative(typeVar);
-  if (typeVar != typeVarRep)
-    mergeNodes(typeVar, typeVarRep);
+  if (typeVar != typeVarRep) {
+    mergeNodesPre(typeVar);
+    mergeNodes(typeVarRep, typeVar);
+  }
   else if (auto fixed = CS.getFixedType(typeVarRep)) {
     // Bind the type variable.
     bindTypeVariable(typeVar, fixed);
@@ -177,7 +179,9 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   Constraints.pop_back();
 }
 
-void ConstraintGraphNode::notifyReferencingVars() const {
+void ConstraintGraphNode::notifyReferencingVars(
+    llvm::function_ref<void(ConstraintGraphNode &,
+                            Constraint *)> notification) const {
   SmallVector<TypeVariableType *, 4> stack;
 
   stack.push_back(TypeVar);
@@ -199,7 +203,7 @@ void ConstraintGraphNode::notifyReferencingVars() const {
             affectedVar->getImpl().getRepresentative(/*record=*/nullptr);
 
         if (!repr->getImpl().getFixedType(/*record=*/nullptr))
-          CG[repr].reintroduceToInference(constraint);
+          notification(CG[repr], constraint);
       }
     }
   };
@@ -236,7 +240,7 @@ void ConstraintGraphNode::notifyReferencingVars() const {
 }
 
 void ConstraintGraphNode::notifyReferencedVars(
-    llvm::function_ref<void(ConstraintGraphNode &)> notification) {
+    llvm::function_ref<void(ConstraintGraphNode &)> notification) const {
   for (auto *fixedBinding : getReferencedVars()) {
     notification(CG[fixedBinding]);
   }
@@ -249,25 +253,6 @@ void ConstraintGraphNode::addToEquivalenceClass(
   if (EquivalenceClass.empty())
     EquivalenceClass.push_back(getTypeVariable());
   EquivalenceClass.append(typeVars.begin(), typeVars.end());
-
-  {
-    for (auto *newMember : typeVars) {
-      auto &node = CG[newMember];
-
-      for (auto *constraint : node.getConstraints()) {
-        introduceToInference(constraint);
-
-        if (!isUsefulForReferencedVars(constraint))
-          continue;
-
-        notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
-          referencedVar.introduceToInference(constraint);
-        });
-      }
-
-      node.notifyReferencingVars();
-    }
-  }
 }
 
 void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
@@ -343,19 +328,17 @@ void ConstraintGraphNode::retractFromInference(Constraint *constraint) {
   }
 }
 
-void ConstraintGraphNode::reintroduceToInference(Constraint *constraint) {
-  retractFromInference(constraint);
-  introduceToInference(constraint);
-}
-
-void ConstraintGraphNode::introduceToInference(Type fixedType) {
+void ConstraintGraphNode::updateFixedType(
+    Type fixedType,
+    llvm::function_ref<void (ConstraintGraphNode &,
+                             Constraint *)> notification) const {
   // Notify all of the type variables that reference this one.
   //
   // Since this type variable has been replaced with a fixed type
   // all of the concrete types that reference it are going to change,
   // which means that all of the not-yet-attempted bindings should
   // change as well.
-  notifyReferencingVars();
+  notifyReferencingVars(notification);
 
   if (!fixedType->hasTypeVariable())
     return;
@@ -371,9 +354,25 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
     // all of the constraints that reference bound type variable.
     for (auto *constraint : getConstraints()) {
       if (isUsefulForReferencedVars(constraint))
-        node.reintroduceToInference(constraint);
+        notification(node, constraint);
     }
   }
+}
+
+void ConstraintGraphNode::retractFromInference(Type fixedType) {
+  return updateFixedType(
+      fixedType,
+      [](ConstraintGraphNode &node, Constraint *constraint) {
+        node.retractFromInference(constraint);
+      });
+}
+
+void ConstraintGraphNode::introduceToInference(Type fixedType) {
+  return updateFixedType(
+      fixedType,
+      [](ConstraintGraphNode &node, Constraint *constraint) {
+        node.introduceToInference(constraint);
+      });
 }
 
 #pragma mark Graph mutation
@@ -486,31 +485,60 @@ void ConstraintGraph::removeConstraint(TypeVariableType *typeVar,
   OrphanedConstraints.pop_back();
 }
 
+void ConstraintGraph::mergeNodesPre(TypeVariableType *typeVar2) {
+  // Merge equivalence class from the non-representative type variable.
+  auto &nonRepNode = (*this)[typeVar2];
+
+  for (auto *newMember : nonRepNode.getEquivalenceClassUnsafe()) {
+    auto &node = (*this)[newMember];
+
+    node.notifyReferencingVars(
+      [&](ConstraintGraphNode &node, Constraint *constraint) {
+        node.retractFromInference(constraint);
+      });
+  }
+}
+
 void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
                                  TypeVariableType *typeVar2) {
-  assert(CS.getRepresentative(typeVar1) == CS.getRepresentative(typeVar2) &&
-         "type representatives don't match");
-  
   // Retrieve the node for the representative that we're merging into.
-  auto typeVarRep = CS.getRepresentative(typeVar1);
-  auto &repNode = (*this)[typeVarRep];
+  ASSERT(CS.getRepresentative(typeVar1) == typeVar1);
 
-  // Retrieve the node for the non-representative.
-  assert((typeVar1 == typeVarRep || typeVar2 == typeVarRep) &&
-         "neither type variable is the new representative?");
-  auto typeVarNonRep = typeVar1 == typeVarRep? typeVar2 : typeVar1;
+  auto &repNode = (*this)[typeVar1];
 
   // Record the change, if there are active scopes.
   if (CS.isRecordingChanges()) {
     CS.recordChange(
       SolverTrail::Change::ExtendedEquivalenceClass(
-                        typeVarRep,
+                        typeVar1,
                         repNode.getEquivalenceClass().size()));
   }
 
   // Merge equivalence class from the non-representative type variable.
-  auto &nonRepNode = (*this)[typeVarNonRep];
-  repNode.addToEquivalenceClass(nonRepNode.getEquivalenceClassUnsafe());
+  auto &nonRepNode = (*this)[typeVar2];
+
+  auto typeVars = nonRepNode.getEquivalenceClassUnsafe();
+  repNode.addToEquivalenceClass(typeVars);
+
+  for (auto *newMember : typeVars) {
+    auto &node = (*this)[newMember];
+
+    for (auto *constraint : node.getConstraints()) {
+      repNode.introduceToInference(constraint);
+
+      if (!isUsefulForReferencedVars(constraint))
+        continue;
+
+      repNode.notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
+        referencedVar.introduceToInference(constraint);
+      });
+    }
+
+    node.notifyReferencingVars(
+      [&](ConstraintGraphNode &node, Constraint *constraint) {
+        node.introduceToInference(constraint);
+      });
+  }
 }
 
 void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
@@ -535,6 +563,10 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
     if (CS.isRecordingChanges())
       CS.recordChange(SolverTrail::Change::RelatedTypeVariables(typeVar, otherTypeVar));
   }
+}
+
+void ConstraintGraph::retractFromInference(TypeVariableType *typeVar, Type fixed) {
+  (*this)[typeVar].retractFromInference(fixed);
 }
 
 void ConstraintGraph::introduceToInference(TypeVariableType *typeVar, Type fixed) {

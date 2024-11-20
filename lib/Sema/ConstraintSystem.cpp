@@ -173,9 +173,13 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   assert(typeVar2 == getRepresentative(typeVar2) &&
          "typeVar2 is not the representative");
   assert(typeVar1 != typeVar2 && "cannot merge type with itself");
-  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
 
-  // Merge nodes in the constraint graph.
+  // Always merge 'up' the constraint stack, because it is simpler.
+  if (typeVar1->getImpl().getID() > typeVar2->getImpl().getID())
+    std::swap(typeVar1, typeVar2);
+
+  CG.mergeNodesPre(typeVar2);
+  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
   CG.mergeNodes(typeVar1, typeVar2);
 
   if (updateWorkList) {
@@ -205,6 +209,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   assert(!type->hasError() &&
          "Should not be assigning a type involving ErrorType!");
 
+  CG.retractFromInference(typeVar, type);
   typeVar->getImpl().assignFixedType(type, getTrail());
 
   if (!updateState)
