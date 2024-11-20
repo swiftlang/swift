@@ -3816,8 +3816,13 @@ namespace {
             func->setImportAsStaticMember();
           }
         }
-        // Someday, maybe this will need to be 'open' for C++ virtual methods.
-        func->setAccess(AccessLevel::Public);
+        // Someday, maybe this may need to be 'open' for C++ virtual methods.
+        AccessLevel accessLevel =
+          (decl->getAccess() == clang::AccessSpecifier::AS_private ||
+           decl->getAccess() == clang::AccessSpecifier::AS_protected)
+              ? AccessLevel::Private
+              : AccessLevel::Public;
+        func->setAccess(accessLevel);
 
         if (!importFuncWithoutSignature) {
           bool success = processSpecialImportedFunc(
