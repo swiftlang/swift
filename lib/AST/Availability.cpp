@@ -689,6 +689,9 @@ AvailabilityRange ASTContext::getSwiftFutureAvailability() const {
   } else if (target.isWatchOS()) {
     return AvailabilityRange(
         VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
+  } else if (target.isXROS()) {
+    return AvailabilityRange(
+        VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));
   } else {
     return AvailabilityRange::alwaysAvailable();
   }
