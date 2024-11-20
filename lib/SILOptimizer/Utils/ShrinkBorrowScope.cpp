@@ -296,8 +296,8 @@ Dataflow::Effect Dataflow::effectForPhi(SILBasicBlock *block) {
 }
 
 /// Finds end_access instructions which are barriers to hoisting because the
-/// access scopes they contain barriers to hoisting.  Hoisting end_borrows into
-/// such access scopes could introduce exclusivity violations.
+/// access scopes they end contain barriers to hoisting.  Hoisting end_borrows
+/// into such access scopes could introduce exclusivity violations.
 ///
 /// Implements BarrierAccessScopeFinder::Visitor
 class BarrierAccessScopeFinder final {
