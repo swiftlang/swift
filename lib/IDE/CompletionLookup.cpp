@@ -715,8 +715,8 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
         return T;
 
       // If we are doing implicit member lookup on a protocol and we have found
-      // a declaration in an extension, use the extension's `Self` type for the
-      // generic substitution.
+      // a declaration in a constrained extension, use the extension's `Self`
+      // type for the generic substitution.
       // Eg in the following, the `Self` type returned by `qux` is
       // `MyGeneric<Int>`, not `MyProto` because of the `Self` type restriction.
       // ```
@@ -732,9 +732,11 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
       // ```
       if (MaybeNominalType->isExistentialType()) {
         Type SelfType;
-        if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
-          SelfType = ED->getGenericSignature()->getConcreteType(
-              ED->getSelfInterfaceType());
+        if (auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+          if (ED->getSelfProtocolDecl() && ED->isConstrainedExtension()) {
+            auto Sig = ED->getGenericSignature();
+            SelfType = Sig->getConcreteType(ED->getSelfInterfaceType());
+          }
         }
         if (SelfType) {
           MaybeNominalType = SelfType;
