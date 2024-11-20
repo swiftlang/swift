@@ -1872,7 +1872,7 @@ size_t Solution::getTotalMemory() const {
     return *TotalMemory;
 
   const_cast<Solution *>(this)->TotalMemory
-       = sizeof(*this) + typeBindings.getMemorySize() +
+       = sizeof(*this) + size_in_bytes(typeBindings) +
          overloadChoices.getMemorySize() +
          ConstraintRestrictions.getMemorySize() +
          (Fixes.size() * sizeof(void *)) + DisjunctionChoices.getMemorySize() +

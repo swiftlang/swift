@@ -1497,7 +1497,7 @@ public:
   DeclContext *getDC() const;
 
   /// The set of type bindings.
-  llvm::DenseMap<TypeVariableType *, Type> typeBindings;
+  llvm::MapVector<TypeVariableType *, Type> typeBindings;
   
   /// The set of overload choices along with their types.
   llvm::DenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
