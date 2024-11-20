@@ -1863,7 +1863,11 @@ static inline size_t size_in_bytes(const T &x) {
 }
 
 size_t Solution::getTotalMemory() const {
-  return sizeof(*this) + typeBindings.getMemorySize() +
+  if (TotalMemory)
+    return *TotalMemory;
+
+  const_cast<Solution *>(this)->TotalMemory
+       = sizeof(*this) + typeBindings.getMemorySize() +
          overloadChoices.getMemorySize() +
          ConstraintRestrictions.getMemorySize() +
          (Fixes.size() * sizeof(void *)) + DisjunctionChoices.getMemorySize() +
@@ -1887,6 +1891,8 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(argumentLists) +
          size_in_bytes(ImplicitCallAsFunctionRoots) +
          size_in_bytes(SynthesizedConformances);
+
+  return *TotalMemory;
 }
 
 DeclContext *Solution::getDC() const { return constraintSystem->DC; }
