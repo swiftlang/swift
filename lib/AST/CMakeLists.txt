@@ -65,6 +65,7 @@ add_swift_host_library(swiftAST STATIC
   ImportCache.cpp
   IndexSubset.cpp
   InlinableText.cpp
+  JSONASTDumper.cpp
   LayoutConstraint.cpp
   LifetimeDependence.cpp
   LocalArchetypeRequirementCollector.cpp
