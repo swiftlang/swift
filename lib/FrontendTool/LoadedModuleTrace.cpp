@@ -853,8 +853,8 @@ public:
   }
 };
 
-static void createObjCMessageTraceFile(const InputFile &input, ModuleDecl *MD) {
-  StringRef tracePath = input.getModuleObjCTracePath();
+static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
+  StringRef tracePath = input.getFineModuleTracePath();
   if (tracePath.empty()) {
     // we basically rely on the passing down of module trace file path
     // as an indicator that this job needs to emit an ObjC message trace file.
@@ -893,7 +893,7 @@ static void createObjCMessageTraceFile(const InputFile &input, ModuleDecl *MD) {
     return;
   }
   ObjcMethodReferenceCollector collector(MD);
-  for (auto *SF : filesToWalk) {
+  for (auto *SF: filesToWalk) {
     collector.setFileBeforeVisiting(SF);
     collector.walk(*SF);
   }
@@ -915,14 +915,14 @@ static void createObjCMessageTraceFile(const InputFile &input, ModuleDecl *MD) {
   }
 }
 
-bool swift::emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
-                                             const FrontendOptions &opts) {
+bool swift::emitFineModuleTraceIfNeeded(ModuleDecl *mainModule,
+                                        const FrontendOptions &opts) {
   ASTContext &ctxt = mainModule->getASTContext();
   assert(!ctxt.hadError() &&
          "We should've already exited earlier if there was an error.");
 
   opts.InputsAndOutputs.forEachInput([&](const InputFile &input) {
-    createObjCMessageTraceFile(input, mainModule);
+    createFineModuleTraceFile(input, mainModule);
     return true;
   });
   return false;
