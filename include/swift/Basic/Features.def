@@ -202,6 +202,7 @@ BASELINE_LANGUAGE_FEATURE(BorrowingSwitch, 432, "Noncopyable type pattern matchi
 CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
+LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -219,7 +220,6 @@ UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
 UPCOMING_FEATURE(DynamicActorIsolation, 423, 6)
 UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, 6)
 UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
-UPCOMING_FEATURE(GlobalActorInferenceCutoff, 0449, 6)
 
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
@@ -235,7 +235,7 @@ EXPERIMENTAL_FEATURE(MacrosOnImports, true)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
-EXPERIMENTAL_FEATURE(KeyPathWithStaticMembers, false)
+EXPERIMENTAL_FEATURE(Span, true)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
@@ -301,11 +301,6 @@ EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 /// Swift parser.
 EXPERIMENTAL_FEATURE(ParserValidation, false)
 
-/// Whether to emit diagnostics from the new parser first, and only emit
-/// diagnostics from the existing parser when there are none from the new
-/// parser.
-EXPERIMENTAL_FEATURE(ParserDiagnostics, false)
-
 /// Enables implicit some while also enabling existential `any`
 EXPERIMENTAL_FEATURE(ImplicitSome, false)
 
@@ -360,9 +355,8 @@ EXPERIMENTAL_FEATURE(SuppressedAssociatedTypes, true)
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
-/// Enable non-escapable type attributes and function attributes that support
-/// lifetime-dependent results.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NonescapableTypes, true)
+/// Enable returning non-escapable types from functions.
+EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)

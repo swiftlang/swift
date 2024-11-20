@@ -276,11 +276,9 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     FrontendStatsTracer tracer(Ctx.Stats,
                                "Type checking and Semantic analysis");
 
-    if (!Ctx.LangOpts.DisableAvailabilityChecking) {
-      // Build the type refinement hierarchy for the primary
-      // file before type checking.
-      TypeChecker::buildTypeRefinementContextHierarchy(*SF);
-    }
+    // Build the availability scope tree for the primary file before type
+    // checking.
+    TypeChecker::buildAvailabilityScopes(*SF);
 
     // Type check the top-level elements of the source file.
     for (auto D : SF->getTopLevelDecls()) {
@@ -404,34 +402,13 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   FrontendStatsTracer tracer(Ctx.Stats,
                              "load-derivative-configurations");
 
-  class DerivativeFinder : public ASTWalker {
-  public:
-    DerivativeFinder() {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
-
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
-        for (auto *derAttr : afd->getAttrs().getAttributes<DerivativeAttr>()) {
-          // Resolve derivative function configurations from `@derivative`
-          // attributes by type-checking them.
-          (void)derAttr->getOriginalFunction(D->getASTContext());
-        }
-      }
-
-      return Action::Continue();
-    }
-  };
-
   switch (SF.Kind) {
   case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::MacroExpansion:
   case SourceFileKind::Main: {
-    DerivativeFinder finder;
-    SF.walkContext(finder);
+    CustomDerivativesRequest request(&SF);
+    evaluateOrDefault(SF.getASTContext().evaluator, request, {});
     return;
   }
   case SourceFileKind::SIL:

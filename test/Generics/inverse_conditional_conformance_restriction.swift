@@ -1,6 +1,7 @@
-// RUN: %target-typecheck-verify-swift \
-// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN: %target-typecheck-verify-swift \ 
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes
+
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 protocol P {}
 protocol Q {}

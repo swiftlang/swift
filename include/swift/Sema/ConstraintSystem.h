@@ -77,11 +77,13 @@ std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckExpression(constraints::SyntacticElementTarget &target,
-                    OptionSet<TypeCheckExprFlags> options);
+                    OptionSet<TypeCheckExprFlags> options,
+                    DiagnosticTransaction *diagnosticTransaction = nullptr);
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckTarget(constraints::SyntacticElementTarget &target,
-                OptionSet<TypeCheckExprFlags> options);
+                OptionSet<TypeCheckExprFlags> options,
+                DiagnosticTransaction *diagnosticTransaction = nullptr);
 
 Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool, bool);
 
@@ -240,9 +242,9 @@ private:
   ASTContext &Context;
   llvm::TimeRecord StartTime;
 
-  /// The number of milliseconds from creation until
+  /// The number of seconds from creation until
   /// this timer is considered expired.
-  unsigned ThresholdInMillis;
+  unsigned ThresholdInSecs;
 
   bool PrintDebugTiming;
   bool PrintWarning;
@@ -251,7 +253,8 @@ public:
   /// This constructor sets a default threshold defined for all expressions
   /// via compiler flag `solver-expression-time-threshold`.
   ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS);
-  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS, unsigned thresholdInMillis);
+  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
+                  unsigned thresholdInSecs);
 
   ~ExpressionTimer();
 
@@ -272,20 +275,18 @@ public:
     return endTime.getProcessTime() - StartTime.getProcessTime();
   }
 
-  /// Return the remaining process time in milliseconds until the
+  /// Return the remaining process time in seconds until the
   /// threshold specified during construction is reached.
-  unsigned getRemainingProcessTimeInMillis() const {
+  unsigned getRemainingProcessTimeInSeconds() const {
     auto elapsed = unsigned(getElapsedProcessTimeInFractionalSeconds());
-    return elapsed >= ThresholdInMillis ? 0 : ThresholdInMillis - elapsed;
+    return elapsed >= ThresholdInSecs ? 0 : ThresholdInSecs - elapsed;
   }
 
   // Disable emission of warnings about expressions that take longer
   // than the warning threshold.
   void disableWarning() { PrintWarning = false; }
 
-  bool isExpired() const {
-    return getRemainingProcessTimeInMillis() == 0;
-  }
+  bool isExpired() const { return getRemainingProcessTimeInSeconds() == 0; }
 };
 
 } // end namespace constraints
@@ -484,6 +485,10 @@ public:
 
   /// Determine whether this type variable represents a subscript result type.
   bool isSubscriptResultType() const;
+
+  /// Determine whether this type variable represents a result type of an
+  /// application i.e. a call, an operator, or a subscript.
+  bool isApplicationResultType() const;
 
   /// Determine whether this type variable represents an opened
   /// type parameter pack.
@@ -1193,9 +1198,6 @@ struct Score {
 /// variable.
 using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
 
-using OpenedTypeMap =
-    llvm::DenseMap<GenericTypeParamType *, TypeVariableType *>;
-
 /// Describes the information about a case label item that needs to be tracked
 /// within the constraint system.
 struct CaseLabelItemInfo {
@@ -1477,6 +1479,9 @@ class Solution {
   /// The fixed score for this solution.
   Score FixedScore;
 
+  /// The total memory used by this solution.
+  std::optional<size_t> TotalMemory;
+
 public:
   /// Create a solution for the given constraint system.
   Solution(ConstraintSystem &cs, const Score &score)
@@ -1620,7 +1625,7 @@ public:
 
   /// The set of conformances synthesized during solving (i.e. for
   /// ad-hoc distributed `SerializationRequirement` conformances).
-  llvm::DenseMap<ConstraintLocator *, ProtocolConformanceRef>
+  llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
 
   /// Record a new argument matching choice for given locator that maps a
@@ -2112,6 +2117,7 @@ class ConstraintSystem {
 public:
   DeclContext *DC;
   ConstraintSystemOptions Options;
+  DiagnosticTransaction *diagnosticTransaction;
   std::optional<ExpressionTimer> Timer;
 
   friend class Solution;
@@ -2420,7 +2426,7 @@ public:
 
   /// The set of conformances synthesized during solving (i.e. for
   /// ad-hoc distributed `SerializationRequirement` conformances).
-  llvm::DenseMap<ConstraintLocator *, ProtocolConformanceRef>
+  llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
 
 private:
@@ -2783,7 +2789,8 @@ public:
   };
 
   ConstraintSystem(DeclContext *dc,
-                   ConstraintSystemOptions options);
+                   ConstraintSystemOptions options,
+                   DiagnosticTransaction *diagnosticTransaction = nullptr);
   ~ConstraintSystem();
 
   /// Retrieve the constraint graph associated with this constraint system.
@@ -2824,11 +2831,13 @@ private:
 
   friend std::optional<SyntacticElementTarget>
   swift::TypeChecker::typeCheckExpression(
-      SyntacticElementTarget &target, OptionSet<TypeCheckExprFlags> options);
+      SyntacticElementTarget &target, OptionSet<TypeCheckExprFlags> options, DiagnosticTransaction *diagnosticTransaction);
 
   friend std::optional<SyntacticElementTarget>
-  swift::TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
-                                      OptionSet<TypeCheckExprFlags> options);
+  swift::TypeChecker::typeCheckTarget(
+      SyntacticElementTarget &target,
+      OptionSet<TypeCheckExprFlags> options,
+      DiagnosticTransaction *diagnosticTransaction);
 
   friend Type swift::TypeChecker::typeCheckParameterDefault(Expr *&,
                                                             DeclContext *, Type,
@@ -4227,7 +4236,7 @@ public:
   ///                     corresponding opened type variables.
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openType(Type type, OpenedTypeMap &replacements,
+  Type openType(Type type, ArrayRef<OpenedType> replacements,
                 ConstraintLocatorBuilder locator);
 
   /// "Open" an opaque archetype type, similar to \c openType.
@@ -4238,7 +4247,7 @@ public:
   /// opening its pattern and shape types and connecting them to the
   /// aforementioned variable via special constraints.
   Type openPackExpansionType(PackExpansionType *expansion,
-                             OpenedTypeMap &replacements,
+                             ArrayRef<OpenedType> replacements,
                              ConstraintLocatorBuilder locator);
 
   /// Update OpenedPackExpansionTypes and record a change in the trail.
@@ -4271,7 +4280,7 @@ public:
   /// \returns The opened type, or \c type if there are no archetypes in it.
   FunctionType *openFunctionType(AnyFunctionType *funcType,
                                  ConstraintLocatorBuilder locator,
-                                 OpenedTypeMap &replacements,
+                                 SmallVectorImpl<OpenedType> &replacements,
                                  DeclContext *outerDC);
 
   /// Open the generic parameter list and its requirements,
@@ -4279,20 +4288,18 @@ public:
   void openGeneric(DeclContext *outerDC,
                    GenericSignature signature,
                    ConstraintLocatorBuilder locator,
-                   OpenedTypeMap &replacements);
+                   SmallVectorImpl<OpenedType> &replacements);
 
   /// Open the generic parameter list creating type variables for each of the
   /// type parameters.
   void openGenericParameters(DeclContext *outerDC,
                              GenericSignature signature,
-                             OpenedTypeMap &replacements,
+                             SmallVectorImpl<OpenedType> &replacements,
                              ConstraintLocatorBuilder locator);
 
   /// Open a generic parameter into a type variable and record
   /// it in \c replacements.
-  TypeVariableType *openGenericParameter(DeclContext *outerDC,
-                                         GenericTypeParamType *parameter,
-                                         OpenedTypeMap &replacements,
+  TypeVariableType *openGenericParameter(GenericTypeParamType *parameter,
                                          ConstraintLocatorBuilder locator);
 
   /// Given generic signature open its generic requirements,
@@ -4319,7 +4326,7 @@ public:
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
-         const OpenedTypeMap &replacements,
+         SmallVectorImpl<OpenedType> &replacements,
          bool fixmeAllowDuplicates=false);
 
   /// Check whether the given type conforms to the given protocol and if
@@ -4331,7 +4338,7 @@ public:
   FunctionType *adjustFunctionTypeForConcurrency(
       FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
       unsigned numApplies, bool isMainDispatchQueue,
-      OpenedTypeMap &replacements, ConstraintLocatorBuilder locator);
+      ArrayRef<OpenedType> replacements, ConstraintLocatorBuilder locator);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///
@@ -4371,7 +4378,7 @@ public:
   Type getMemberReferenceTypeFromOpenedType(
       Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
       ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
-      OpenedTypeMap &replacements);
+      ArrayRef<OpenedType> replacements);
 
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
@@ -4387,7 +4394,7 @@ public:
   DeclReferenceType getTypeOfMemberReference(
       Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
       FunctionRefKind functionRefKind, ConstraintLocator *locator,
-      OpenedTypeMap *replacements = nullptr);
+      SmallVectorImpl<OpenedType> *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
@@ -4939,7 +4946,7 @@ private:
                                             TypeMatchOptions flags);
 
   void recordSynthesizedConformance(ConstraintLocator *locator,
-                                    ProtocolConformanceRef conformance);
+                                    ProtocolDecl *conformance);
 
   /// Attempt to simplify the given conformance constraint.
   ///

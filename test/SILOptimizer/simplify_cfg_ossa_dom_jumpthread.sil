@@ -511,11 +511,12 @@ bb7(%r : $Builtin.Int32, %carg2 : $Builtin.Int32):
 
 // CHECK-LABEL: sil [ossa] @jumpthread_switch_enum5
 // CHECK:      bb0:
-// CHECK:        br bb2
+// CHECK:        br bb1
 // CHECK:      bb1:
-// CHECK-NEXT:   br bb2
+// CHECK-NEXT:   cond_br undef, bb2, bb3
 // CHECK:      bb2:
-// CHECK:        cond_br undef, bb1, bb3
+// CHECK-NEXT:   unchecked_enum_data
+// CHECK-NEXT:   br bb1
 // CHECK:      bb3:
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return

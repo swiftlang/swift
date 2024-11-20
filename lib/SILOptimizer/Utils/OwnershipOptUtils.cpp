@@ -1913,27 +1913,27 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
 //                            Swift Bridging
 //===----------------------------------------------------------------------===//
 
-static BridgedUtilities::UpdateBorrowedFromFn updateBorrowedFromFunction;
-static BridgedUtilities::UpdateBorrowedFromPhisFn updateBorrowedFromPhisFunction;
+static BridgedUtilities::UpdateFunctionFn updateAllGuaranteedPhisFunction;
+static BridgedUtilities::UpdatePhisFn updateGuaranteedPhisFunction;
 
-void BridgedUtilities::registerBorrowedFromUpdater(UpdateBorrowedFromFn updateBorrowedFromFn,
-                                                   UpdateBorrowedFromPhisFn updateBorrowedFromPhisFn) {
-  updateBorrowedFromFunction = updateBorrowedFromFn;
-  updateBorrowedFromPhisFunction = updateBorrowedFromPhisFn;
+void BridgedUtilities::registerGuaranteedPhiUpdater(UpdateFunctionFn updateAllGuaranteedPhisFn,
+                                                    UpdatePhisFn updateGuaranteedPhisFn) {
+  updateAllGuaranteedPhisFunction = updateAllGuaranteedPhisFn;
+  updateGuaranteedPhisFunction = updateGuaranteedPhisFn;
 }
 
-void swift::updateBorrowedFrom(SILPassManager *pm, SILFunction *f) {
-  if (updateBorrowedFromFunction)
-    updateBorrowedFromFunction({pm->getSwiftPassInvocation()}, {f});
+void swift::updateAllGuaranteedPhis(SILPassManager *pm, SILFunction *f) {
+  if (updateAllGuaranteedPhisFunction)
+    updateAllGuaranteedPhisFunction({pm->getSwiftPassInvocation()}, {f});
 }
 
-void swift::updateBorrowedFromPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
-  if (!updateBorrowedFromPhisFunction)
+void swift::updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
+  if (!updateGuaranteedPhisFunction)
     return;
 
   llvm::SmallVector<BridgedValue, 8> bridgedPhis;
   for (SILPhiArgument *phi : phis) {
     bridgedPhis.push_back({phi});
   }
-  updateBorrowedFromPhisFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
+  updateGuaranteedPhisFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
 }

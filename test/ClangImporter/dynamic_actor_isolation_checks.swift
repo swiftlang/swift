@@ -4,9 +4,9 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-availability-checking -enable-upcoming-feature DynamicActorIsolation -emit-silgen -module-name preconcurrency_conformances %t/src/checks.swift | %FileCheck %t/src/checks.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-availability-checking -swift-version 6 -disable-dynamic-actor-isolation -emit-silgen -module-name preconcurrency_conformances %t/src/checks_disabled.swift | %FileCheck %t/src/checks_disabled.swift
 
-// REQUIRES: asserts
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_DynamicActorIsolation
 
 //--- checks.swift
 import Foundation

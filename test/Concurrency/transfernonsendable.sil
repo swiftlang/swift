@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -transfer-non-sendable -strict-concurrency=complete %s -o /dev/null -verify
+// RUN: %target-sil-opt -send-non-sendable -strict-concurrency=complete %s -o /dev/null -verify
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

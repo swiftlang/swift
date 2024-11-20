@@ -958,6 +958,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_OPEN_PACK_ELEMENT);
   BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_GET);
   BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_SET);
+  BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE);
+  BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE_REF);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -1140,11 +1142,16 @@ void Serializer::writeHeader() {
         PublicModuleName.emit(ScratchRecord, publicModuleName.str());
       }
 
-      llvm::VersionTuple compilerVersion =
-          M->getSwiftInterfaceCompilerVersion();
-      if (compilerVersion) {
+      version::Version compilerVersion = M->getSwiftInterfaceCompilerVersion();
+      if (!compilerVersion.empty()) {
         options_block::SwiftInterfaceCompilerVersionLayout Version(Out);
-        Version.emit(ScratchRecord, compilerVersion.getAsString());
+
+        SmallString<32> versionBuf;
+        llvm::raw_svector_ostream OS(versionBuf);
+
+        OS << compilerVersion;
+
+        Version.emit(ScratchRecord, OS.str());
       }
 
       if (M->isConcurrencyChecked()) {
@@ -1243,6 +1250,18 @@ void Serializer::writeHeader() {
             PluginSearchOpt.emit(
                 ScratchRecord,
                 uint8_t(PluginSearchOptionKind::LoadPluginExecutable), optStr);
+            continue;
+          }
+          case PluginSearchOption::Kind::ResolvedPluginConfig: {
+            auto &opt = elem.get<PluginSearchOption::ResolvedPluginConfig>();
+            std::string optStr =
+                opt.LibraryPath + "#" + opt.ExecutablePath + "#";
+            llvm::interleave(
+                opt.ModuleNames, [&](auto &name) { optStr += name; },
+                [&]() { optStr += ","; });
+            PluginSearchOpt.emit(
+                ScratchRecord,
+                uint8_t(PluginSearchOptionKind::ResolvedPluginConfig), optStr);
             continue;
           }
           }
@@ -3031,7 +3050,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isUnconditionallyDeprecated(),
           theAttr->isNoAsync(),
           theAttr->isPackageDescriptionVersionSpecific(),
-          theAttr->IsSPI,
+          theAttr->isSPI(),
+          theAttr->isForEmbedded(),
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
@@ -3081,13 +3101,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       ObjCImplementationDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord,
           abbrCode, theAttr->isImplicit(), theAttr->isCategoryNameInvalid(),
           theAttr->isEarlyAdopter(), categoryNameID);
-      return;
-    }
-
-    case DeclAttrKind::MainType: {
-      auto abbrCode = S.DeclTypeAbbrCodes[MainTypeDeclAttrLayout::Code];
-      MainTypeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                         DA->isImplicit());
       return;
     }
 
@@ -3384,13 +3397,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       unsigned numNames = introducedDeclNames.size();
 
-      (void)evaluateOrDefault(S.getASTContext().evaluator,
-                              ResolveMacroConformances{theAttr, D}, {});
+      auto conformances =
+          evaluateOrDefault(S.getASTContext().evaluator,
+                            ResolveMacroConformances{theAttr, D}, {});
 
       unsigned numConformances = 0;
-      for (auto conformance : theAttr->getConformances()) {
-        introducedDeclNames.push_back(
-            S.addTypeRef(conformance->getInstanceType()));
+      for (auto conformance : conformances) {
+        introducedDeclNames.push_back(S.addTypeRef(conformance));
         ++numConformances;
       }
 
@@ -5525,11 +5538,6 @@ public:
                                   variableData);
   }
 
-  void visitParenType(const ParenType *parenTy) {
-    using namespace decls_block;
-    serializeSimpleWrapper<ParenTypeLayout>(parenTy->getUnderlyingType());
-  }
-
   void visitTupleType(const TupleType *tupleTy) {
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[TupleTypeLayout::Code];
@@ -5714,7 +5722,10 @@ public:
     using namespace decls_block;
 
     auto resultType = S.addTypeRef(fnTy->getResult());
-    auto clangType = S.addClangTypeRef(fnTy->getClangTypeInfo().getType());
+    auto clangType =
+      S.getASTContext().LangOpts.UseClangFunctionTypes
+      ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
+      : ClangTypeID(0);
 
     auto isolation = encodeIsolation(fnTy->getIsolation());
 
@@ -6134,11 +6145,11 @@ void Serializer::writeAllDeclsAndTypes() {
   BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 9);
   using namespace decls_block;
   registerDeclTypeAbbr<BuiltinAliasTypeLayout>();
+  registerDeclTypeAbbr<BuiltinFixedArrayTypeLayout>();
   registerDeclTypeAbbr<TypeAliasTypeLayout>();
   registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
   registerDeclTypeAbbr<AssociatedTypeDeclLayout>();
   registerDeclTypeAbbr<NominalTypeLayout>();
-  registerDeclTypeAbbr<ParenTypeLayout>();
   registerDeclTypeAbbr<TupleTypeLayout>();
   registerDeclTypeAbbr<TupleTypeEltLayout>();
   registerDeclTypeAbbr<FunctionTypeLayout>();
@@ -7015,7 +7026,7 @@ void Serializer::writeToStream(
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
     S.writeHeader();
     S.writeInputBlock();
-    S.writeSIL(SILMod, options.SerializeAllSIL);
+    S.writeSIL(SILMod, options.SerializeAllSIL, options.SerializeDebugInfoSIL);
     S.writeAST(DC);
 
     if (S.hadError)

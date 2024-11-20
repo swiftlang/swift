@@ -3,12 +3,10 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
+// RUN:   -enable-experimental-feature LifetimeDependence 
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
 
 // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence should be expressed by a builtin that is
 // hidden within the function body.

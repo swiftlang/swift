@@ -3137,7 +3137,7 @@ static bool usePrespecialized(
 
       auto newSubstMap = SubstitutionMap::get(
           apply.getSubstitutionMap().getGenericSignature(), newSubs,
-          apply.getSubstitutionMap().getConformances());
+          LookUpConformanceInModule());
 
       ReabstractionInfo layoutReInfo = ReabstractionInfo(
           funcBuilder.getModule().getSwiftModule(),

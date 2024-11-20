@@ -70,8 +70,8 @@ Our generic signature depends on \tSequence\ and \texttt{IteratorProtocol}. Both
 
 Here are the requirements of $G$ and \tSequence\ that will define our rewrite rules:
 \begin{gather*}
-\ConfReq{\rT}{Sequence}\\
-\ConfReq{\rU}{Sequence}\\
+\rTSequence\\
+\rUSequence\\
 \ConfReq{\rT.Element}{Equatable}\\
 \SameReq{\rT.Element}{\rU.Element}\\[\medskipamount]
 \AssocConfReq{Self.Iterator}{IteratorProtocol}{Sequence}\\
@@ -136,23 +136,23 @@ Once again, we can show the intermediate terms in our path:
 \end{gather*}
 \end{example}
 
-\section{Correctness}
+\section{Correctness}\label{rqm correctness}
 
 We saw some examples of encoding derived requirements as word problems. We now make this precise. We prove two theorems, to establish that we can translate derivations into rewrite paths, and vice versa. We use the algebra of rewriting from \SecRef{rewrite graph}.
 
-We begin with a preliminary result. In \SecRef{derived req}, we defined the \IndexStep{AssocConf}\textsc{AssocConf} and \IndexStep{AssocConf}\textsc{AssocSame} inference rules via formal substitution: if \tT\ is some type parameter of~$G$ known to conform to some protocol~\tP, and \texttt{Self.U} is some type parameter of~$\GP$, then \texttt{T.U} denotes the replacement of \tSelf\ with \tT\ in \texttt{Self.U}. We can relate this to the requirement machine \index{monoid operation!in requirement machine}monoid operation.
+We begin with a preliminary result. In \SecRef{derived req}, we defined the \IndexStep{AssocConf}\textsc{AssocConf} and \IndexStep{AssocConf}\textsc{AssocSame} inference rules via formal substitution: if \tT\ is some type parameter of~$G$ known to conform to some protocol~\tP, and \SelfU\ is some type parameter of~$\GP$, then \texttt{T.U} denotes the replacement of \tSelf\ with \tT\ in \SelfU. We can relate this to the requirement machine \index{monoid operation!in requirement machine}monoid operation.
 
 \begin{lemma}\label{type param composition lemma}
 Let $G$ be a generic signature, and let $\AR$ be the requirement machine for~$G$. Further, suppose that:
 \begin{enumerate}
 \item \tT\ is some type parameter of~$G$,
 \item \tP\ is some protocol, and $\Term(\tT)\cdot\pP\sim\Term(\tT)$,
-\item \texttt{Self.U} is some type parameter of~$\GP$. 
+\item \SelfU\ is some type parameter of~$\GP$. 
 \end{enumerate}
-Then $\Term(\tT)\cdot\TermP{P}(\texttt{Self.U}) \sim \Term(\texttt{T.U})$.
+Then $\Term(\tT)\cdot\TermP{P}(\SelfU) \sim \Term(\texttt{T.U})$.
 \end{lemma}
 \begin{proof}
-Note that $\TermP{P}(\texttt{Self.U})=\pP\cdot u$ for some $u\in A^*$, by definition of ``$\TermP{P}$''. We also let $t := \Term(\texttt{T})$, so that $\Term(\texttt{T.U})=t\cdot u$. Now, if $p$ is a rewrite path from $t\cdot\pP$~to~$t$, then $p\WR u$ is a rewrite path from $t\cdot\pP\cdot u$~to~$t\cdot u$.
+Note that $\TermP{P}(\SelfU)=\pP\cdot u$ for some $u\in A^*$, by definition of ``$\TermP{P}$''. We also let $t := \Term(\tT)$, so that $\Term(\texttt{T.U})=t\cdot u$. Now, if $p$ is a rewrite path from $t\cdot\pP$~to~$t$, then $p\WR u$ is a rewrite path from $t\cdot\pP\cdot u$~to~$t\cdot u$.
 \end{proof}
 
 \begin{example}
@@ -276,11 +276,11 @@ $\ConfReq{T.U}{Q}$&
 \begin{tikzcd}
 \Term(\texttt{T.U})\cdot\pQ \arrow [rr, Rightarrow, "\cdots" description]
 &&
-\Term(\tT) \cdot \TermP{P}(\texttt{Self.U}) \cdot \pQ \arrow [d, Rightarrow]
+\Term(\tT) \cdot \TermP{P}(\SelfU) \cdot \pQ \arrow [d, Rightarrow]
 \\
 \Term(\texttt{T.U})
 &&
-\Term(\tT) \cdot \TermP{P}(\texttt{Self.U}) \arrow [ll, Rightarrow, "\cdots" description]
+\Term(\tT) \cdot \TermP{P}(\SelfU) \arrow [ll, Rightarrow, "\cdots" description]
 \end{tikzcd}
 \\
 \midrule
@@ -289,7 +289,7 @@ $\SameReq{T.U}{T.V}$&
 \begin{tikzcd}
 \Term(\texttt{T.U}) \arrow [rr, Rightarrow, "\cdots" description]
 &&
-\Term(\tT) \cdot \TermP{P}(\texttt{Self.U}) \arrow [d, Rightarrow]
+\Term(\tT) \cdot \TermP{P}(\SelfU) \arrow [d, Rightarrow]
 \\
 \Term(\texttt{T.V})
 &&
@@ -439,13 +439,13 @@ If $z=\Term(\tT)\cdot\pP$ for some unbound type parameter \tT\ and protocol \pP:
 If $z=\rU \cdot \pSequence \cdot \pSequence \cdot \nIterator \cdot \pIterator$,
 \begin{gather*}
 \Type(z) = \texttt{\rU.Iterator},\\
-\Chart(z) = \{\ConfReq{\rU}{Sequence},\\
-\phantom{\Chart(z) = \{}\ConfReq{\rU}{Sequence},\\
+\Chart(z) = \{\rUSequence,\\
+\phantom{\Chart(z) = \{}\rUSequence,\\
 \phantom{\Chart(z) = \{}\ConfReq{\rU.Iterator}{IteratorProtocol}\}.
 \end{gather*}
 \end{example}
 
-We can say a lot more if we add the assumptions that \tT\ is a \emph{valid} type parameter, and our generic signature $G$ is well-formed. (We lose nothing by doing this, because otherwise we diagnose an error and reject the program; see \SecRef{generic signature validity}). Having done so, we see that rewriting a standard term into an admissible term is tantamount to simultaneously \index{derived requirement!in requirement machine}deriving a same-type requirement \textsl{together with every conformance requirement in the destination term's chart}.
+We can say a lot more if we add the assumptions that \tT\ is a \emph{valid} type parameter, and our generic signature $G$ is well-formed. (We lose nothing by doing this, because otherwise we diagnose an error and reject the program; see \SecRef{generic signature validity}.) Having done so, we see that rewriting a standard term into an admissible term is tantamount to simultaneously \index{derived requirement!in requirement machine}deriving a same-type requirement \textsl{together with every conformance requirement in the destination term's chart}.
 
 \begin{theorem}\label{type chart theorem}
 Let $G$ be a well-formed generic signature, let $\AR$ be the requirement machine for~$G$, and let $t$ be a standard term such that $\Type(t)$ is a \index{valid type parameter!in requirement machine}valid type parameter of~$G$. Suppose we are given a term $z\in A^*$ such that $t \sim z$. Then $z$ is an admissible term, and furthermore:
@@ -454,8 +454,6 @@ Let $G$ be a well-formed generic signature, let $\AR$ be the requirement machine
 \item $G \vdash \ConfReq{$\Type(u)$}{P}$ for each $\ConfReq{$\Type(u)$}{P}\in\Chart(z)$.
 \end{enumerate}
 \end{theorem}
-
-\newcommand{\Case}[1]{\smallskip\par($\bigstar$ Case #1.)}
 
 \begin{proof}
 \LemmaRef{rewriting admissible term} already shows that $z$ is an admissible term. To establish the principal conclusion, we reason as follows:
@@ -533,7 +531,7 @@ z=\Dst(s)=x\cdot\pP\cdot u\cdot y\\[\medskipamount]
 \end{gather*}
 As in Case~1, we ``discard'' our prior derivation of $\ConfReq{$\Type(x\cdot u)$}{Q}$.
 
-\Case{4} A negative rewrite step for an associated conformance requirement has the following general form, where $x$ is an admissible term, $(\pP\cdot u,\pP\cdot u\cdot \pQ)\in R$ for some~$u$ that contains only name symbols, and the right whisker~$y$ is as before:
+\Case{4} A negative rewrite step for an associated conformance requirement has the following general form, where $x$ is an admissible term, $(\pP\cdot u\cdot \pQ,\pP\cdot u)\in R$ for some~$u$ that contains only name symbols, and the right whisker~$y$ is as before:
 \[x\WL (\pP\cdot u\Rightarrow\pP\cdot u\cdot\pQ)\WR y\]
 The rewrite step inserts a protocol symbol~$\pQ$. Again, $\Type(x\cdot \pP \cdot u)=\Type(x\cdot u)$:
 \begin{gather*}
@@ -556,12 +554,12 @@ z^\prime=\Src(s)=u\cdot y\\
 z=\Dst(s)=v\cdot y
 \end{gather*}
 In this case, $\Type(z)$ and $\Type(z^\prime)$ are not identical, so we must first derive the same-type requirement $G\vdash\SameReq{$\Type(t)$}{$\Type(z)$}$. We now write $u\cdot y$ instead of $z^\prime$, so the induction hypothesis gave us this same-type requirement:
-\[ \AnyStep{\SameReq{$\Type(u\cdot y)$}{$\Type(v\cdot y)$}}{1} \]
+\[ \AnyStep{\SameReq{$\Type(t)$}{$\Type(u\cdot y)$}}{1} \]
 We now use the assumption that $G$ is well-formed. Because $\Type(u\cdot y)$ appears in the above requirement, the well-formedness of $G$ allows us to derive $G\vdash\Type(u\cdot y)$:
 \[ \AnyStep{\Type(u\cdot y)}{2} \]
 Next, we derive $\SameReq{$\Type(u)$}{$\Type(v)$}$ with a \IndexStep{Same}\textsc{Same} elementary statement:
 \[ \SameStep{$\Type(u)$}{$\Type(v)$}{3} \]
-Furthermore, $\Type(u)$ is a prefix of $\Type(u\cdot y)$. We apply \LemmaRef{general member type} to $G\vdash\texttt{$\Type(u\cdot y)$}$ and $G\vdash\SameReq{$\Type(u)$}{$\Type(v)$}$ to derive $G\vdash\SameReq{$\Type(u\cdot y)$}{$\Type(v\cdot y)$}$, or in other words, $\SameReq{$\Type(z^\prime)$}{$\Type(z)$}$:
+Furthermore, $\Type(u)$ is a prefix of $\Type(u\cdot y)$. We apply \LemmaRef{general member type} to $G\vdash\texttt{$\Type(v\cdot y)$}$ and $G\vdash\SameReq{$\Type(u)$}{$\Type(v)$}$ to derive $G\vdash\SameReq{$\Type(u\cdot y)$}{$\Type(v\cdot y)$}$, or in other words, $\SameReq{$\Type(z^\prime)$}{$\Type(z)$}$:
 \[
 \AnyStep{\SameReq{$\Type(z^\prime)$}{$\Type(z)$}}{4}
 \]
@@ -706,7 +704,7 @@ We already introduced name symbols at the beginning of this chapter and there is
 \paragraph{Protocol symbols.}
 The reduction order on \index{protocol symbol!reduction order}protocol symbols has the property that if a protocol~\tQ\ inherits from a protocol~\tP, then $\pP<\pQ$.
 
-Consider the \index{directed graph}directed graph where the vertices are protocol declarations, and for each pair of protocols \tQ\ and \tP\ such that \tQ\ \index{inherited protocol!in requirement machine}inherits from \tP, there is an edge with \index{source vertex}source~\tQ\ and \index{destination vertex}destination~\tP. Define $\mathsf{depth}(\tP)\in\NN$ as the number of protocols we can reach from \tP, excluding \tP\ itself. To compute the ``$\mathsf{depth}$'' of a protocol, we evaluate the \index{all inherited protocols request}\Request{all inherited protocols request} with~\tP, which returns the set of all protocols reachable from \tP, and then take the number of elements in this set.
+Consider the \index{directed graph!protocol inheritance graph}directed graph where the vertices are protocol declarations, and for each pair of protocols \tQ\ and \tP\ such that \tQ\ \index{inherited protocol!in requirement machine}inherits from \tP, there is an edge with \index{source vertex}source~\tQ\ and \index{destination vertex}destination~\tP. Define $\mathsf{depth}(\tP)\in\NN$ as the number of protocols we can reach from \tP, excluding \tP\ itself. To compute the ``$\mathsf{depth}$'' of a protocol, we evaluate the \index{all inherited protocols request}\Request{all inherited protocols request} with~\tP, which returns the set of all protocols reachable from \tP, and then take the number of elements in this set.
 
 \begin{algorithm}[Protocol reduction order]\label{protocol reduction order} \IndexDefinition{protocol reduction order}Takes two protocol declarations \tP\ and \tQ\ as input, and returns one of ``$<$'', ``$>$'' or ``$=$'' as output.
 \begin{enumerate}
@@ -805,7 +803,7 @@ We're forming the symbol because we're translating an explicit or associated req
 Receives an interface type~\tX\ as input, and optionally, a protocol~\tP. As output, returns a pattern type together with a list of substitution terms. Note that the type \tX\ must not itself be a type parameter.
 \begin{enumerate}
 \item Initialize $S$ with an empty list of terms, and let $i:=0$.
-\item Perform a pre-order walk over the tree structure of \texttt{T}, transforming each type parameter~\tT\ contained in \tX\ to form the pattern type~\texttt{Y}:
+\item Perform a pre-order walk over the tree structure of \tT, transforming each type parameter~\tT\ contained in \tX\ to form the pattern type~\texttt{Y}:
 \begin{enumerate}
 \item If we're lowering an explicit requirement, let $t := \Term(\tT)$. Otherwise, let $t := \TermP{P}(\tT)$. Set $S\leftarrow S + \{t\}$.
 \item Replace \tT\ with the generic parameter type \ttgp{0}{i} in \tX.
@@ -1092,7 +1090,7 @@ In a \index{protocol machine}\textbf{protocol machine} or \index{protocol minimi
 \begin{tabular}{lll}
 \toprule
 &\textbf{Property rules:}&\\
-&\multicolumn{2}{l}{$\ConfRule{\TermP{P}(\texttt{Self.U})}{s}$}\\
+&\multicolumn{2}{l}{$\ConfRule{\TermP{P}(\SelfU)}{s}$}\\
 \midrule
 $\RuleP{P}\, \AssocConfReq{Self.U}{Q}{P}$ & $s = \pQ$&protocol symbol\\
 $\RuleP{P}\, \AssocConfReq{Self.U}{AnyObject}{P}$ & $s = \layoutsym{AnyObject}$&layout symbol\\
@@ -1100,7 +1098,7 @@ $\RuleP{P}\, \AssocConfReq{Self.U}{C}{P}$ & $s = \supersym{\tC;\,\ldots}$&superc
 $\RuleP{P}\, \AssocSameReq{Self.U}{X}{P}$ & $s = \concretesym{\tX;\,\ldots}$&concrete type symbol\\
 \midrule
 &\textbf{Same-type rules:}&\\
-$\RuleP{P}\, \AssocSameReq{Self.U}{Self.V}{P}$ & \multicolumn{2}{l}{$\TermP{P}(\texttt{Self.U})\sim\TermP{P}(\texttt{Self.V})$}\\
+$\RuleP{P}\, \AssocSameReq{Self.U}{Self.V}{P}$ & \multicolumn{2}{l}{$\TermP{P}(\SelfU)\sim\TermP{P}(\texttt{Self.V})$}\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1110,11 +1108,11 @@ $\RuleP{P}\, \AssocSameReq{Self.U}{Self.V}{P}$ & \multicolumn{2}{l}{$\TermP{P}(\
 \begin{algorithm}[Build rule from associated requirement]\label{build rule protocol}
 Takes a desugared requirement and a protocol declaration~\tP\ as input, and outputs a pair of terms.
 \begin{enumerate}
-\item For an \index{conformance requirement!in requirement machine}\textbf{associated conformance requirement} $\AssocConfReq{Self.U}{Q}{P}$, return the pair $(\TermP{P}(\texttt{Self.U})\cdot s,\,\TermP{P}(\texttt{Self.U}))$ where $s$ is the protocol symbol $\pP$.
-\item For an \index{layout requirement!in requirement machine}\textbf{associated layout requirement} $\AssocConfReq{Self.U}{AnyObject}{P}$, return the pair $(\TermP{P}(\texttt{Self.U})\cdot s,\,\TermP{P}(\texttt{Self.U}))$ where $s$ is the symbol $\layoutsym{AnyObject}$.
-\item For an \index{superclass requirement!in requirement machine}\textbf{associated superclass requirement} $\AssocConfReq{Self.U}{C}{P}$, return the pair of $(\TermP{P}(\texttt{Self.U})\cdot s,\,\TermP{P}(\texttt{Self.U}))$ where $s$ is the superclass symbol from \AlgRef{concretesymbolcons} applied to \tC.
-\item For an \index{same-type requirement!in requirement machine}\textbf{associated same-type requirement} $\AssocSameReq{Self.U}{X}{P}$ with \tX\ a \textbf{concrete type}, return the pair $(\TermP{P}(\texttt{Self.U})\cdot s,\,\TermP{P}(\texttt{Self.U}))$ where $s$ is the concrete type symbol from \AlgRef{concretesymbolcons} applied to \tX.
-\item For a \textbf{associated same-type requirement} $\AssocSameReq{Self.U}{Self.V}{P}$ with \texttt{Self.V} a \textbf{type parameter}, return the pair $(\TermP{P}(\texttt{Self.U})),\, \TermP{P}(\texttt{Self.V}))$.
+\item For an \index{conformance requirement!in requirement machine}\textbf{associated conformance requirement} $\AssocConfReq{Self.U}{Q}{P}$, return the pair $(\TermP{P}(\SelfU)\cdot s,\,\TermP{P}(\SelfU))$ where $s$ is the protocol symbol $\pP$.
+\item For an \index{layout requirement!in requirement machine}\textbf{associated layout requirement} $\AssocConfReq{Self.U}{AnyObject}{P}$, return the pair $(\TermP{P}(\SelfU)\cdot s,\,\TermP{P}(\SelfU))$ where $s$ is the symbol $\layoutsym{AnyObject}$.
+\item For an \index{superclass requirement!in requirement machine}\textbf{associated superclass requirement} $\AssocConfReq{Self.U}{C}{P}$, return the pair of $(\TermP{P}(\SelfU)\cdot s,\,\TermP{P}(\SelfU))$ where $s$ is the superclass symbol from \AlgRef{concretesymbolcons} applied to \tC.
+\item For an \index{same-type requirement!in requirement machine}\textbf{associated same-type requirement} $\AssocSameReq{Self.U}{X}{P}$ with \tX\ a \textbf{concrete type}, return the pair $(\TermP{P}(\SelfU)\cdot s,\,\TermP{P}(\SelfU))$ where $s$ is the concrete type symbol from \AlgRef{concretesymbolcons} applied to \tX.
+\item For a \textbf{associated same-type requirement} $\AssocSameReq{Self.U}{Self.V}{P}$ with \texttt{Self.V} a \textbf{type parameter}, return the pair $(\TermP{P}(\SelfU)),\, \TermP{P}(\texttt{Self.V}))$.
 \end{enumerate}
 \end{algorithm}
 
@@ -1129,7 +1127,7 @@ Takes a desugared requirement and a protocol declaration~\tP\ as input, and outp
 \verb|associatedtype A|&& $\pP\cdot\nA \sim \aPA$\\
 \midrule
 \multicolumn{3}{c}{\textbf{Protocol type alias rules:}}\\
-\verb|typealias A = Self.U|&& $\pP\cdot\nA \sim \TermP{P}(\texttt{Self.U})$\\
+\verb|typealias A = Self.U|&& $\pP\cdot\nA \sim \TermP{P}(\SelfU)$\\
 \verb|typealias A = X|&& $\ConfRule{\pP\cdot\nA}{\concretesym{\tX;\, \ldots}}$\\
 \bottomrule
 \end{tabular}
@@ -1272,7 +1270,7 @@ Recall that \index{protocol type alias}protocol type aliases appear as member ty
 
 In the \index{interface resolution stage!protocol type alias}interface resolution stage, we already have a generic signature, and we can issue generic signature queries against the type parameter~\tT\ to find the declaration of \texttt{A}. We then substitute \tSelf\ with \tT\ in the \index{underlying type}underlying type of \nA. However, protocol type aliases can also appear in the requirements of a \Index{where clause@\texttt{where} clause!protocol type alias}\texttt{where} clause, which are resolved in the structural resolution stage, \emph{while} we're building the current context's generic signature.
 
-In this case, type resolution don't know anything about \texttt{T} yet, so the resolved type is always an unbound dependent member type \texttt{T.A}. Therefore, in a source program with protocol type aliases, an \index{unbound dependent member type!protocol type alias}unbound dependent member type may refer to the name of a \emph{type alias} declaration, and not just an associated type declaration. This gives us a new behavior that is \index{limitation!of derived requirements}not part of the \index{derived requirement!protocol type alias}derived requirements formalism. Instead, we just describe how it is implemented at the level of rewrite rules here.
+In this case, type resolution don't know anything about \tT\ yet, so the resolved type is always an unbound dependent member type \texttt{T.A}. Therefore, in a source program with protocol type aliases, an \index{unbound dependent member type!protocol type alias}unbound dependent member type may refer to the name of a \emph{type alias} declaration, and not just an associated type declaration. This gives us a new behavior that is \index{limitation!of derived requirements}not part of the \index{derived requirement!protocol type alias}derived requirements formalism. Instead, we just describe how it is implemented at the level of rewrite rules here.
 
 Each protocol type alias \nA\ in a protocol~\tP\ defines a \IndexDefinition{protocol type alias rule}\emph{protocol type alias rule} in the protocol machine for \tP\ as follows. We imagine an associated \index{associated same-type requirement!protocol type alias}same-type requirement that equates the unbound dependent member type \texttt{Self.A} on the left-hand side, with the \index{underlying type!in requirement machine}underlying type of~\nA\  on the right-hand side. Then, the protocol type alias rule for~\nA\ is precisely the rule we would get if we applied ``$\RuleP{P}$'' to our imaginary requirement.
 
@@ -1287,8 +1285,8 @@ Takes a protocol \tP, and a type alias declaration \nA, understood to be a membe
 \end{itemize}
 \item If the underlying type of \nA\ is some concrete type \tX, use \AlgRef{concretesymbolcons} to build a concrete type symbol, and return this pair representing a property rule:
 \[(\pP \cdot \nA \cdot \concretesym{\tX;\,\ldots},\, \pP \cdot \nA)\]
-\item If the underlying type of \nA\ is some other type parameter \texttt{Self.U}, use \AlgRef{build term protocol} to translate it into a term, and return this pair representing a same-type rule:
-\[(\pP \cdot \nA,\, \TermP{P}(\texttt{Self.U}))\]
+\item If the underlying type of \nA\ is some other type parameter \SelfU, use \AlgRef{build term protocol} to translate it into a term, and return this pair representing a same-type rule:
+\[(\pP \cdot \nA,\, \TermP{P}(\SelfU))\]
 \end{enumerate}
 \end{algorithm}
 

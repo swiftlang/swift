@@ -5412,35 +5412,38 @@ bool ConstraintSystem::repairFailures(
 
   if (auto *VD = getAsDecl<ValueDecl>(anchor)) {
     // Matching a witness to an protocol requirement.
-    if (isa<ProtocolDecl>(VD->getDeclContext()) &&
-        VD->isProtocolRequirement() &&
-        VD->preconcurrency() &&
-        path[0].is<LocatorPathElt::Witness>() &&
-        // Note that the condition below is very important,
-        // we need to wait until the very last moment to strip
-        // the concurrency annotations from the innermost type.
-        conversionsOrFixes.empty()) {
-      // Allow requirements to introduce `swift_attr` and other
-      // concurrency related annotations (e.g. `& Sendable` or `@Sendable`)
-      // (note that `swift_attr` in type contexts weren't supported
-      // before) and for witnesses to adopt them gradually by matching
-      // with a warning in non-strict concurrency mode.
-      if (!(Context.isSwiftVersionAtLeast(6) ||
-            Context.LangOpts.StrictConcurrencyLevel ==
-                StrictConcurrency::Complete)) {
-        auto strippedLHS = lhs->stripConcurrency(/*recursive=*/true,
-                                                 /*dropGlobalActor=*/true);
-        auto strippedRHS = rhs->stripConcurrency(/*recursive=*/true,
-                                                 /*dropGlobalActor=*/true);
+    if (auto witnessElt = path[0].getAs<LocatorPathElt::Witness>()) {
+      if (isa<ProtocolDecl>(VD->getDeclContext()) &&
+          VD->isProtocolRequirement()) {
+        auto *witness = witnessElt->getDecl();
+        if ((VD->preconcurrency() || witness->preconcurrency()) &&
+            // Note that the condition below is very important,
+            // we need to wait until the very last moment to strip
+            // the concurrency annotations from the innermost type.
+            conversionsOrFixes.empty()) {
+          // Allow requirements/witnesses to introduce `swift_attr` and other
+          // concurrency related annotations (e.g. `& Sendable` or `@Sendable`)
+          // (note that `swift_attr` in type contexts weren't supported
+          // before) and for witnesses to adopt them gradually by matching
+          // with a warning in non-strict concurrency mode.
+          if (!(Context.isSwiftVersionAtLeast(6) ||
+                Context.LangOpts.StrictConcurrencyLevel ==
+                    StrictConcurrency::Complete)) {
+            auto strippedLHS = lhs->stripConcurrency(/*recursive=*/true,
+                                                     /*dropGlobalActor=*/true);
+            auto strippedRHS = rhs->stripConcurrency(/*recursive=*/true,
+                                                     /*dropGlobalActor=*/true);
 
-        // If nothing got stripped there is no reason to re-match
-        // the types.
-        if (!strippedLHS->isEqual(lhs) || !strippedRHS->isEqual(rhs)) {
-          auto result = matchTypes(strippedLHS, strippedRHS, matchKind,
-                                   flags | TMF_ApplyingFix, locator);
-          if (!result.isFailure()) {
-            increaseScore(SK_MissingSynthesizableConformance, locator);
-            return true;
+            // If nothing got stripped there is no reason to re-match
+            // the types.
+            if (!strippedLHS->isEqual(lhs) || !strippedRHS->isEqual(rhs)) {
+              auto result = matchTypes(strippedLHS, strippedRHS, matchKind,
+                                       flags | TMF_ApplyingFix, locator);
+              if (!result.isFailure()) {
+                increaseScore(SK_MissingSynthesizableConformance, locator);
+                return true;
+              }
+            }
           }
         }
       }
@@ -8346,8 +8349,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
 void ConstraintSystem::recordSynthesizedConformance(
                                            ConstraintLocator *locator,
-                                           ProtocolConformanceRef conformance) {
-  bool inserted = SynthesizedConformances.insert({locator, conformance}).second;
+                                           ProtocolDecl *proto) {
+  bool inserted = SynthesizedConformances.insert({locator, proto}).second;
   ASSERT(inserted);
 
   if (solverState)
@@ -8509,13 +8512,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       // dynamically during IRGen.
       if (auto *witness = dyn_cast<FuncDecl>(witnessInfo->first)) {
         auto synthesizeConformance = [&]() {
-          ProtocolConformanceRef synthesized(protocol);
           auto witnessLoc = getConstraintLocator(
               locator.getAnchor(), LocatorPathElt::Witness(witness));
           // FIXME: Why are we recording the same locator more than once here?
           if (SynthesizedConformances.count(witnessLoc) == 0)
-            recordSynthesizedConformance(witnessLoc, synthesized);
-          return recordConformance(synthesized);
+            recordSynthesizedConformance(witnessLoc, protocol);
+          return SolutionKind::Solved;
         };
 
         if (witness->isGeneric()) {
@@ -10146,6 +10148,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         if (!isa_and_nonnull<FuncDecl>(decl))
           return false;
 
+        if (!decl->isInstanceMember())
+          return false;
+
         auto hasAppliedSelf = decl->hasCurriedSelf() &&
                               doesMemberRefApplyCurriedSelf(baseObjTy, decl);
         return getNumApplications(decl, hasAppliedSelf, functionRefKind) <
@@ -10403,9 +10408,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     baseExpr = UDE->getBase();
     baseType = getType(baseExpr);
     if (baseType->is<MetatypeType>()) {
-      auto instanceType = baseType->getAs<MetatypeType>()
-                              ->getInstanceType()
-                              ->getWithoutParens();
+      auto instanceType = baseType->getAs<MetatypeType>()->getInstanceType();
       if (!cs.isTypeReference(baseExpr) && instanceType->isExistentialType()) {
         return AllowInvalidInitRef::onProtocolMetatype(
             cs, baseType, init, /*isStaticallyDerived=*/true,
@@ -10423,7 +10426,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
       // If this is an initializer call without explicit mention
       // of `.init` on metatype value.
       if (auto *AMT = baseType->getAs<AnyMetatypeType>()) {
-        auto instanceType = AMT->getInstanceType()->getWithoutParens();
+        auto instanceType = AMT->getInstanceType();
         if (!cs.isTypeReference(baseExpr)) {
           if (baseType->is<MetatypeType>() &&
               instanceType->isAnyExistentialType()) {
@@ -11531,10 +11534,9 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
     // Find the opened type for this callee and substitute in the type
     // parameters.
     auto substitutions = cs.getOpenedTypes(calleeLocator);
-    if (!substitutions.empty()) {
-      OpenedTypeMap replacements(substitutions.begin(), substitutions.end());
-      builderType = cs.openType(builderType, replacements, locator);
-    }
+    if (!substitutions.empty())
+      builderType = cs.openType(builderType, substitutions, locator);
+
     assert(!builderType->hasTypeParameter());
   }
   return builderType;
@@ -13932,6 +13934,13 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   } else {
     // If the overload hasn't been resolved, we can't simplify this constraint.
     auto overloadLocator = getCalleeLocator(getConstraintLocator(locator));
+
+    // If there was a problem resolving specialization expression
+    // it would be diagnosted as invalid AST node.
+    if (overloadLocator->directlyAt<ErrorExpr>()) {
+      return shouldAttemptFixes() ? SolutionKind::Error : SolutionKind::Solved;
+    }
+
     auto selectedOverload = findSelectedOverloadFor(overloadLocator);
     if (!selectedOverload)
       return formUnsolved();

@@ -1,16 +1,17 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -O -I %S/Inputs/CTypes -enable-experimental-feature LayoutStringValueWitnesses -enable-layout-string-value-witnesses -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-swift-frontend -target %target-future-triple -O -I %S/Inputs/CTypes -enable-experimental-feature LayoutStringValueWitnesses -enable-layout-string-value-witnesses -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
 
 // NOTE: We have to build this as dylib to turn private external symbols into local symbols, so we can observe potential issues with linkage
-// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -O -I %S/Inputs/CTypes -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -target %target-future-triple -O -I %S/Inputs/CTypes -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
 // RUN: %target-codesign %t/%target-library-name(layout_string_witnesses_types)
-// RUN: %target-swift-frontend -O -enable-experimental-feature LayoutStringValueWitnesses -enable-layout-string-value-witnesses -enable-library-evolution -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -O -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -O -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -module-name layout_string_witnesses_static -llayout_string_witnesses_types -L%t %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s %target-rpath(%t)
+// RUN: %target-swift-frontend -target %target-future-triple -O -enable-experimental-feature LayoutStringValueWitnesses -enable-layout-string-value-witnesses -enable-library-evolution -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -target %target-future-triple -O -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -target %target-future-triple -O -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -module-name layout_string_witnesses_static -llayout_string_witnesses_types -L%t %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(layout_string_witnesses_types) | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_LayoutStringValueWitnesses
 
 // Requires runtime functions added in Swift 5.9.
 // UNSUPPORTED: use_os_stdlib
@@ -1361,6 +1362,49 @@ func testMultiPayloadOneExtraTagValue() {
 }
 
 testMultiPayloadOneExtraTagValue()
+
+func testMultiPayloadAnyObject() {
+    let ptr = UnsafeMutablePointer<MultiPayloadAnyObject>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let x = MultiPayloadAnyObject.y(SimpleClass(x: 0))
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let y = MultiPayloadAnyObject.z(SimpleClass(x: 1))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = MultiPayloadAnyObject.z(SimpleClass(x: 2))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testMultiPayloadAnyObject()
 
 #if os(macOS)
 func testObjc() {

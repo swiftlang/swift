@@ -103,7 +103,6 @@ UNINTERESTING_FEATURE(OpaqueTypeErasure)
 UNINTERESTING_FEATURE(PackageCMO)
 UNINTERESTING_FEATURE(ParserRoundTrip)
 UNINTERESTING_FEATURE(ParserValidation)
-UNINTERESTING_FEATURE(ParserDiagnostics)
 UNINTERESTING_FEATURE(ImplicitSome)
 UNINTERESTING_FEATURE(ParserASTGen)
 UNINTERESTING_FEATURE(BuiltinMacros)
@@ -197,9 +196,8 @@ UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
-UNINTERESTING_FEATURE(GlobalActorInferenceCutoff)
-UNINTERESTING_FEATURE(KeyPathWithStaticMembers)
 UNINTERESTING_FEATURE(GenerateForceToMainActorThunks)
+UNINTERESTING_FEATURE(Span)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
@@ -249,6 +247,19 @@ static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   }
 
   return false;
+}
+
+static bool usesFeatureLifetimeDependence(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<LifetimeAttr>()) {
+    return true;
+  }
+  auto *afd = dyn_cast<AbstractFunctionDecl>(decl);
+  if (!afd) {
+    return false;
+  }
+  return afd->getInterfaceType()
+      ->getAs<AnyFunctionType>()
+      ->hasLifetimeDependencies();
 }
 
 UNINTERESTING_FEATURE(DynamicActorIsolation)

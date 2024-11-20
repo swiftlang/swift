@@ -158,6 +158,7 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
         self.cmake_options.define('COMPILER_RT_DEFAULT_TARGET_ONLY:BOOL', 'TRUE')
         self.cmake_options.define('COMPILER_RT_BAREMETAL_BUILD:BOOL', 'TRUE')
         self.cmake_options.define('COMPILER_RT_BUILD_XRAY:BOOL', 'FALSE')
+        self.cmake_options.define('COMPILER_RT_BUILD_PROFILE:BOOL', 'TRUE')
         self.cmake_options.define('COMPILER_RT_INCLUDE_TESTS:BOOL', 'FALSE')
         self.cmake_options.define('COMPILER_RT_HAS_FPIC_FLAG:BOOL', 'FALSE')
         self.cmake_options.define('COMPILER_RT_EXCLUDE_ATOMIC_BUILTIN:BOOL', 'FALSE')

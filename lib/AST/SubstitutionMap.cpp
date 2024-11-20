@@ -60,10 +60,8 @@ SubstitutionMap::SubstitutionMap(
                                 ArrayRef<Type> replacementTypes,
                                 ArrayRef<ProtocolConformanceRef> conformances)
   : storage(Storage::get(genericSig, replacementTypes, conformances)) {
-#ifndef NDEBUG
   if (genericSig->getASTContext().LangOpts.VerifyAllSubstitutionMaps)
     verify();
-#endif
 }
 
 ArrayRef<ProtocolConformanceRef> SubstitutionMap::getConformances() const {
@@ -273,12 +271,8 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   // If the protocol is invertible, fall back to a global lookup instead of
   // evaluating a conformance path, to avoid an infinite substitution issue.
-  if (proto->getInvertibleProtocolKind()) {
-    auto substType = type.subst(*this);
-    if (!substType->isTypeParameter())
-      return swift::lookupConformance(substType, proto);
-    return ProtocolConformanceRef(proto);
-  }
+  if (proto->getInvertibleProtocolKind())
+    return swift::lookupConformance(type.subst(*this), proto);
 
   auto path = genericSig->getConformancePath(type, proto);
 
@@ -302,18 +296,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     if (conformance.isAbstract()) {
       // FIXME: Rip this out once we can get a concrete conformance from
       // an archetype.
-      auto substType = type.subst(*this);
-      if (substType->hasError())
-        return ProtocolConformanceRef(proto);
-
-      if ((!substType->is<ArchetypeType>() ||
-           substType->castTo<ArchetypeType>()->getSuperclass()) &&
-          !substType->isTypeParameter() &&
-          !substType->isExistentialType()) {
-        return swift::lookupConformance(substType, proto);
-      }
-
-      return ProtocolConformanceRef(proto);
+      return swift::lookupConformance(type.subst(*this), proto);
     }
 
     // For the second step, we're looking into the requirement signature for
@@ -508,13 +491,10 @@ LookUpConformanceInOverrideSubs::operator()(CanType type,
                                             Type substType,
                                             ProtocolDecl *proto) const {
   if (type->getRootGenericParam()->getDepth() >= info.BaseDepth)
-    return ProtocolConformanceRef(proto);
+    return ProtocolConformanceRef::forAbstract(substType, proto);
 
   if (auto conformance = info.BaseSubMap.lookupConformance(type, proto))
     return conformance;
-
-  if (substType->isTypeParameter())
-    return ProtocolConformanceRef(proto);
 
   return lookupConformance(substType, proto);
 }
@@ -534,78 +514,109 @@ SubstitutionMap::getOverrideSubstitutions(const NominalTypeDecl *baseNominal,
              LookUpConformanceInOverrideSubs(info));
 }
 
-void SubstitutionMap::verify() const {
-#ifndef NDEBUG
+void SubstitutionMap::verify(bool allowInvalid) const {
   if (empty())
+    return;
+
+  auto genericSig = getGenericSignature();
+  auto &ctx = genericSig->getASTContext();
+
+  if (ctx.isRecursivelyConstructingRequirementMachine(
+        genericSig.getCanonicalSignature()))
     return;
 
   unsigned conformanceIndex = 0;
 
-  for (const auto &req : getGenericSignature().getRequirements()) {
+  for (const auto &req : genericSig.getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 
     SWIFT_DEFER { ++conformanceIndex; };
-    auto substType = req.getFirstType().subst(*this);
-    if (substType->isTypeParameter() ||
-        substType->is<ArchetypeType>() ||
-        substType->isTypeVariableOrMember() ||
-        substType->is<UnresolvedType>() ||
-        substType->hasError())
-      continue;
-
     auto conformance = getConformances()[conformanceIndex];
 
-    if (conformance.isInvalid())
-      continue;
+    auto substType = req.getFirstType().subst(*this);
 
-    // All of the conformances should be concrete.
-    if (!conformance.isConcrete()) {
-      llvm::dbgs() << "Concrete type cannot have abstract conformance:\n";
-      substType->dump(llvm::dbgs());
-      llvm::dbgs() << "SubstitutionMap:\n";
-      dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
-      llvm::dbgs() << "Requirement:\n";
-      req.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
-    assert(conformance.isConcrete() && "Conformance should be concrete");
-    
-    if (substType->is<UnboundGenericType>())
+    // Unwrap various strange things.
+    substType = substType->getReferenceStorageReferent();
+    if (auto *selfType = substType->getAs<DynamicSelfType>())
+      substType = selfType->getSelfType();
+
+    // Don't bother validating these cases.
+    if (allowInvalid && substType->hasUnboundGenericType())
+      return;
+
+    if (conformance.isInvalid()) {
+      if (!allowInvalid) {
+        llvm::errs() << "Unexpected invalid conformance in substitution map:\n";
+        dump(llvm::dbgs());
+        llvm::errs() << "\n";
+        abort();
+      }
+
       continue;
-    
-    auto conformanceTy = conformance.getConcrete()->getType();
-    if (conformanceTy->hasTypeParameter()
-        && !substType->hasTypeParameter()) {
-      conformanceTy = conformance.getConcrete()->getDeclContext()
-        ->mapTypeIntoContext(conformanceTy);
     }
-    
-    if (!substType->isEqual(conformanceTy)) {
-      llvm::dbgs() << "Conformance must match concrete replacement type:\n";
-      substType->dump(llvm::dbgs());
-      llvm::dbgs() << "Conformance type:\n";
-      conformance.getConcrete()->getType()->dump(llvm::dbgs());
-      llvm::dbgs() << "Conformance:\n";
-      conformance.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
-      llvm::dbgs() << "SubstitutionMap:\n";
-      dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
-      llvm::dbgs() << "Requirement:\n";
-      req.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
+
+    if (conformance.isAbstract()) {
+      if (!substType->isTypeParameter() &&
+          !substType->is<PackElementType>() &&
+          !substType->is<ArchetypeType>() &&
+          !substType->isTypeVariableOrMember() &&
+          !substType->is<UnresolvedType>() &&
+          !substType->is<PlaceholderType>() &&
+          !substType->is<ErrorType>()) {
+        llvm::errs() << "Unexpected abstract conformance in substitution map:\n";
+        dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
+      }
+
+      continue;
     }
-    assert(substType->isEqual(conformanceTy)
-           && "conformance should match corresponding type");
+
+    if (conformance.isPack()) {
+      // FIXME: Implement some kind of check here.
+      continue;
+    }
+
+    auto *concrete = conformance.getConcrete();
 
     if (substType->isExistentialType()) {
-      assert(isa<SelfProtocolConformance>(conformance.getConcrete()) &&
-              "Existential type cannot have normal conformance");
+      if (req.getProtocolDecl()->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+          isa<BuiltinProtocolConformance>(concrete)) {
+        continue;
+      }
+
+      if (!isa<SelfProtocolConformance>(concrete)) {
+        // A superclass-constrained self-conforming existential might conform
+        // concretely.
+        if (substType->getSuperclass())
+          continue;
+
+        llvm::errs() << "Expected to find a self conformance:\n";
+        substType->dump(llvm::errs());
+        llvm::errs() << "Substitution map:\n";
+        dump(llvm::errs());
+        llvm::errs() << "\n";
+        abort();
+      }
+
+      continue;
+    }
+
+    if (substType->isTypeParameter())
+      continue;
+
+    if (!concrete->getType()->isEqual(substType)) {
+      llvm::errs() << "Conformance with wrong conforming type:\n";
+      concrete->getType()->dump(llvm::errs());
+      llvm::errs() << "Should be:\n";
+      substType->dump(llvm::errs());
+      llvm::errs() << "Substitution map:\n";
+      dump(llvm::errs());
+      llvm::errs() << "\n";
+      abort();
     }
   }
-#endif
 }
 
 void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
@@ -685,7 +696,8 @@ ProtocolConformanceRef OuterSubstitutions::operator()(
                                         Type conformingReplacementType,
                                         ProtocolDecl *conformedProtocol) const {
   if (isUnsubstitutedTypeParameter(dependentType))
-    return ProtocolConformanceRef(conformedProtocol);
+    return ProtocolConformanceRef::forAbstract(
+      conformingReplacementType, conformedProtocol);
 
   return LookUpConformanceInSubstitutionMap(subs)(
       dependentType, conformingReplacementType, conformedProtocol);

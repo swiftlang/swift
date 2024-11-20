@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy %s
 
+// REQUIRES: swift_feature_NoImplicitCopy
+
 // This testStruct specifically testStructs how DI and the move checkers interact with each other
 
 func testStructSimpleNoInit() {

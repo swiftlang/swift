@@ -697,8 +697,8 @@ namespace {
     auto *lhs = args->getExpr(0);
     auto *rhs = args->getExpr(1);
 
-    auto firstArgTy = CS.getType(lhs)->getWithoutParens();
-    auto secondArgTy = CS.getType(rhs)->getWithoutParens();
+    auto firstArgTy = CS.getType(lhs);
+    auto secondArgTy = CS.getType(rhs);
 
     auto isOptionalWithMatchingObjectType = [](Type optional,
                                                Type object) -> bool {
@@ -980,8 +980,7 @@ namespace {
     }
 
     /// If the provided type is a tuple, decomposes it into a matching set of
-    /// function params. Otherwise produces a single parameter of the type,
-    /// stripping a ParenType if needed.
+    /// function params. Otherwise produces a single parameter of the type.
     void decomposeTuple(Type ty,
                         SmallVectorImpl<AnyFunctionType::Param> &result) {
       switch (ty->getKind()) {
@@ -989,11 +988,6 @@ namespace {
         auto tupleTy = cast<TupleType>(ty.getPointer());
         for (auto &elt : tupleTy->getElements())
           result.emplace_back(elt.getType(), elt.getName());
-        return;
-      }
-      case TypeKind::Paren: {
-        auto pty = cast<ParenType>(ty.getPointer());
-        result.emplace_back(pty->getUnderlyingType(), Identifier());
         return;
       }
       default:
@@ -1536,7 +1530,7 @@ namespace {
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
         if (!knownType)
-          knownType = CS.getVarType(VD);
+          knownType = VD->getTypeInContext();
 
         if (knownType) {
           // An out-of-scope type variable(s) could appear the type of
@@ -2063,7 +2057,7 @@ namespace {
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
-      return ParenType::get(CS.getASTContext(), CS.getType(expr->getSubExpr()));
+      return CS.getType(expr->getSubExpr());
     }
 
     Type visitTupleExpr(TupleExpr *expr) {
@@ -2426,7 +2420,7 @@ namespace {
 
           Type externalType;
           if (param->getTypeRepr()) {
-            auto declaredTy = CS.getVarType(param);
+            auto declaredTy = param->getTypeInContext();
 
             // If closure parameter couldn't be resolved, let's record
             // a fix to make sure that type resolution diagnosed the
@@ -2607,7 +2601,7 @@ namespace {
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             bindPatternVarsOneWay);
 
-        return setType(ParenType::get(CS.getASTContext(), underlyingType));
+        return setType(underlyingType);
       }
       case PatternKind::Binding: {
         auto *subPattern = cast<BindingPattern>(pattern)->getSubPattern();
@@ -4003,6 +3997,10 @@ namespace {
       auto results = namelookup::lookupMacros(CurDC, DeclNameRef(moduleName),
                                               DeclNameRef(macroName), roles);
       for (const auto &result : results) {
+        // Ignore invalid results. This matches the OverloadedDeclRefExpr
+        // logic.
+        if (result->isInvalid())
+          continue;
         OverloadChoice choice = OverloadChoice(Type(), result, functionRefKind);
         choices.push_back(choice);
       }
@@ -4905,7 +4903,7 @@ bool ConstraintSystem::generateConstraints(
 
   case SyntacticElementTarget::Kind::uninitializedVar: {
     if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
-      auto propertyType = getVarType(wrappedVar);
+      auto propertyType = wrappedVar->getTypeInContext();
       if (propertyType->hasError())
         return true;
 
@@ -5047,6 +5045,10 @@ void ConstraintSystem::removePropertyWrapper(Expr *anchor) {
   auto &wrappers = found->second;
   ASSERT(!wrappers.empty());
   wrappers.pop_back();
+  if (wrappers.empty()) {
+    bool erased = appliedPropertyWrappers.erase(anchor);
+    ASSERT(erased);
+  }
 }
 
 ConstraintSystem::TypeMatchResult

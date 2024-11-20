@@ -672,6 +672,9 @@ BridgedBasicBlock BridgedArgument::getParent() const {
 }
 
 bool BridgedArgument::isReborrow() const { return getArgument()->isReborrow(); }
+void BridgedArgument::setReborrow(bool reborrow) const {
+  getArgument()->setReborrow(reborrow);
+}
 
 OptionalBridgedDeclObj BridgedArgument::getVarDecl() const {
   return {llvm::dyn_cast_or_null<swift::VarDecl>(getArgument()->getDecl())};
@@ -1382,6 +1385,10 @@ BridgedInstruction::MarkDependenceKind BridgedInstruction::MarkDependenceInst_de
 
 void BridgedInstruction::MarkDependenceInst_resolveToNonEscaping() const {
   getAs<swift::MarkDependenceInst>()->resolveToNonEscaping();
+}
+
+void BridgedInstruction::MarkDependenceInst_settleToEscaping() const {
+  getAs<swift::MarkDependenceInst>()->settleToEscaping();
 }
 
 SwiftInt BridgedInstruction::BeginAccessInst_getAccessKind() const {
@@ -2291,6 +2298,16 @@ BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, Brid
 
 BridgedInstruction BridgedBuilder::createEndAccess(BridgedValue value) const {
   return {unbridged().createEndAccess(regularLoc(), value.getSILValue(), false)};
+}
+
+BridgedInstruction BridgedBuilder::createEndApply(BridgedValue value) const {
+  swift::ASTContext &ctxt = unbridged().getASTContext();
+  return {unbridged().createEndApply(regularLoc(), value.getSILValue(),
+                                     swift::SILType::getEmptyTupleType(ctxt))};
+}
+
+BridgedInstruction BridgedBuilder::createAbortApply(BridgedValue value) const {
+  return {unbridged().createAbortApply(regularLoc(), value.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createConvertFunction(BridgedValue originalFunction, BridgedType resultType, bool withoutActuallyEscaping) const {

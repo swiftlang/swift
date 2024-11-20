@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -dump-ast %s -target %target-swift-5.1-abi-triple -enable-experimental-feature ClosureIsolation | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ClosureIsolation
 
 func acceptClosure<T>(_: () -> T) { }
 func acceptSendableClosure<T>(_: @Sendable () -> T) { }

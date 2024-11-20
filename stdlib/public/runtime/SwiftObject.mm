@@ -1380,11 +1380,19 @@ id swift_dynamicCastObjCProtocolConditional(id object,
   return object;
 }
 
+#if OBJC_SUPPORTSLAZYREALIZATION_DEFINED
+static bool checkObjCSupportsLazyRealization() {
+  if (!SWIFT_RUNTIME_WEAK_CHECK(_objc_supportsLazyRealization))
+    return false;
+  return SWIFT_RUNTIME_WEAK_USE(_objc_supportsLazyRealization());
+}
+#endif
+
 // Check whether the current ObjC runtime supports lazy realization. If it does,
 // then we can avoid forcing realization of classes before we use them.
 static bool objcSupportsLazyRealization() {
 #if OBJC_SUPPORTSLAZYREALIZATION_DEFINED
-  return SWIFT_LAZY_CONSTANT(_objc_supportsLazyRealization());
+  return SWIFT_LAZY_CONSTANT(checkObjCSupportsLazyRealization());
 #else
   return false;
 #endif
@@ -1619,6 +1627,13 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
           .errorType = "escaping-closure-violation",
           .currentStackDescription = "Closure has escaped",
           .framesToSkip = 1,
+          .memoryAddress = nullptr,
+          .numExtraThreads = 0,
+          .threads = nullptr,
+          .numFixIts = 0,
+          .fixIts = nullptr,
+          .numNotes = 0,
+          .notes = nullptr,
       };
       _swift_reportToDebugger(RuntimeErrorFlagFatal, log, &details);
     }
@@ -1720,7 +1735,13 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   RuntimeErrorDetails details = {
     .version = RuntimeErrorDetails::currentVersion,
     .errorType = "implicit-objc-entrypoint",
+    .currentStackDescription = nullptr,
     .framesToSkip = 1,
+    .memoryAddress = nullptr,
+    .numExtraThreads = 0,
+    .threads = nullptr,
+    .numFixIts = 0,
+    .fixIts = nullptr,
     .numNotes = 1,
     .notes = &note
   };

@@ -1209,14 +1209,6 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
 }
 
-
-Type TypeBase::getWithoutParens() {
-  Type Ty = this;
-  while (auto ParenTy = dyn_cast<ParenType>(Ty.getPointer()))
-    Ty = ParenTy->getUnderlyingType();
-  return Ty;
-}
-
 Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           unsigned uncurryLevel) {
   if (uncurryLevel == 0) {
@@ -1916,15 +1908,6 @@ TypeBase *TypeBase::getWithoutSyntaxSugar() {
   static_assert(std::is_base_of<SugarType, Id##Type>::value, "Sugar mismatch");
 #include "swift/AST/TypeNodes.def"
 
-ParenType::ParenType(Type baseType, RecursiveTypeProperties properties)
-    : SugarType(TypeKind::Paren, baseType, properties) {
-  // In some situations (rdar://75740683) we appear to end up with ParenTypes
-  // that contain a nullptr baseType. Once this is eliminated, we can remove
-  // the checks for `type.isNull()` in the `DiagnosticArgumentKind::Type` case
-  // of `formatDiagnosticArgument`.
-  assert(baseType && "A ParenType should always wrap a non-null type");
-}
-
 Type SugarType::getSinglyDesugaredTypeSlow() {
   // Find the generic type that implements this syntactic sugar type.
   NominalTypeDecl *implDecl;
@@ -1936,8 +1919,6 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   case TypeKind::Id: llvm_unreachable("non-sugared type?");
 #define SUGARED_TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Paren:
-    llvm_unreachable("parenthesis are sugar, but not syntax sugar");
   case TypeKind::TypeAlias:
     llvm_unreachable("bound type alias types always have an underlying type");
   case TypeKind::ArraySlice:
@@ -2325,15 +2306,11 @@ public:
           QueryTypeSubstitutionMap{newParamsMap},
           LookUpConformanceInModule());
         
-        if (newSubstTy->isTypeParameter()) {
-          newConformances.push_back(ProtocolConformanceRef(proto));
-        } else {
-          auto newConformance
-            = lookupConformance(newSubstTy, proto, /*allowMissing=*/true);
-          if (!newConformance)
-            return CanType();
-          newConformances.push_back(newConformance);
-        }
+        auto newConformance
+          = lookupConformance(newSubstTy, proto, /*allowMissing=*/true);
+        if (!newConformance)
+          return CanType();
+        newConformances.push_back(newConformance);
       }
     }
 
@@ -3754,10 +3731,18 @@ void ParameterizedProtocolType::getRequirements(
   for (unsigned i : indices(argTypes)) {
     auto argType = argTypes[i];
     auto *assocType = assocTypes[i];
-    // Do a general type substitution here because the associated type might be
-    // from an inherited protocol, in which case we will evaluate a non-trivial
-    // conformance path.
-    auto subjectType = assocType->getDeclaredInterfaceType().subst(subMap);
+
+    Type subjectType;
+    if (baseType->isTypeParameter()) {
+      // Fast path.
+      subjectType = DependentMemberType::get(baseType, assocType);
+    } else {
+      // Do a general type substitution here because the associated type might be
+      // from an inherited protocol, in which case we will evaluate a non-trivial
+      // conformance path.
+      subjectType = assocType->getDeclaredInterfaceType().subst(subMap);
+    }
+
     reqs.emplace_back(RequirementKind::SameType, subjectType, argType);
   }
 }
@@ -4185,11 +4170,6 @@ bool Type::isPrivateSystemType(bool treatNonBuiltinProtocolsAsPublic) const {
 
     return Type(NAT->getSinglyDesugaredType())
         .isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
-  }
-
-  if (auto Paren = dyn_cast<ParenType>(Ty.getPointer())) {
-    Type Underlying = Paren->getUnderlyingType();
-    return Underlying.isPrivateSystemType(treatNonBuiltinProtocolsAsPublic);
   }
 
   if (Type Unwrapped = Ty->getOptionalObjectType())

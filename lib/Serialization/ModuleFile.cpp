@@ -314,7 +314,8 @@ ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency,
 
   return Core->getTransitiveLoadingBehavior(
       dependency.Core, ctx.LangOpts.ImportNonPublicDependencies,
-      isPartialModule, ctx.LangOpts.PackageName, forTestable);
+      isPartialModule, ctx.LangOpts.PackageName,
+      ctx.SearchPathOpts.ResolveInPackageModuleDependencies, forTestable);
 }
 
 bool ModuleFile::mayHaveDiagnosticsPointingAtBuffer() const {
@@ -713,8 +714,15 @@ void ModuleFile::loadObjCMethods(
       continue;
 
     // Deserialize the method and add it to the list.
+    // Drop methods with errors.
+    auto funcOrError = getDeclChecked(std::get<2>(result));
+    if (!funcOrError) {
+      diagnoseAndConsumeError(funcOrError.takeError());
+      continue;
+    }
+
     if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(
-                      getDecl(std::get<2>(result)))) {
+                      funcOrError.get())) {
       methods.push_back(func);
     }
   }
@@ -1409,6 +1417,6 @@ StringRef SerializedASTFile::getPublicModuleName() const {
   return File.getPublicModuleName();
 }
 
-llvm::VersionTuple SerializedASTFile::getSwiftInterfaceCompilerVersion() const {
+version::Version SerializedASTFile::getSwiftInterfaceCompilerVersion() const {
   return File.getSwiftInterfaceCompilerVersion();
 }

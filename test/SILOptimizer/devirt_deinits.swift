@@ -19,6 +19,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: embedded_stdlib
+// REQUIRES: swift_feature_Embedded
 
 // UNSUPPORTED: use_os_stdlib
 

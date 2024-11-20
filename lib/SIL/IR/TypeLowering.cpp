@@ -3000,6 +3000,7 @@ bool TypeConverter::visitAggregateLeaves(
     return isa<SILPackType>(ty) ||
            isa<TupleType>(ty) ||
            isa<PackExpansionType>(ty) ||
+           isa<BuiltinFixedArrayType>(ty) ||
            ty.getEnumOrBoundGenericEnum() ||
            ty.getStructOrBoundGenericStruct();
   };
@@ -3036,6 +3037,13 @@ bool TypeConverter::visitAggregateLeaves(
         insertIntoWorklist(expansion.getPatternType(),
                            origTy.getPackExpansionPatternType(),
                            field, index);
+      } else if (auto array = dyn_cast<BuiltinFixedArrayType>(ty)) {
+        auto origBFA = origTy.getAs<BuiltinFixedArrayType>();
+        insertIntoWorklist(
+            array->getElementType(),
+            AbstractionPattern(origTy.getGenericSignatureOrNull(),
+                               origBFA->getElementType()),
+            field, index);
       } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
         for (auto *structField : decl->getStoredProperties()) {
           auto subMap = ty->getContextSubstitutionMap();
@@ -5264,6 +5272,16 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
     }
     return;
   }
+
+  if (auto fixedArrayTy = Ty.getAs<BuiltinFixedArrayType>()) {
+    auto fixedSize = fixedArrayTy->getFixedInhabitedSize();
+    if (fixedSize.has_value() && !fixedArrayTy->isFixedNegativeSize() )
+      fieldsCount += *fixedSize;
+    else
+      fieldsCount += 1;
+    return;
+  }
+
   if (auto *enumDecl = Ty.getEnumOrBoundGenericEnum()) {
     if (enumDecl->isIndirect()) {
       return;

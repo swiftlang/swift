@@ -25,6 +25,9 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[ARG]], [[BLOCK]], %0)
   // CHECK: [[COPY:%.*]] = copy_value [[ARG]]
+  // CHECK: destroy_addr [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<Int, Never>
+  // CHECK: dealloc_stack [[CHECKED_CONT]] : $*CheckedContinuation<Int, Never>
+  // CHECK: dealloc_stack %20 : $*@block_storage Any
   // CHECK: destroy_value [[ARG]]
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]]
   // CHECK: [[RESUME]]:
@@ -50,6 +53,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[STRING_COMPLETION_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any, Optional<NSString>, Optional<NSError>) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[BLOCK]], %0)
+  // CHECK: destroy_addr [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<String, any Error>
+  // CHECK: dealloc_stack [[CHECKED_CONT]] : $*CheckedContinuation<String, any Error>
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
   // CHECK: [[RESUME]]:
   // CHECK: [[RESULT:%.*]] = load [take] [[RESUME_BUF]]
@@ -207,6 +212,8 @@ func testSlowServerFromMain(slowServer: SlowServer) async throws {
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[ARG]], [[BLOCK]], %0)
   // CHECK: [[COPY:%.*]] = copy_value [[ARG]]
+  // CHECK: destroy_addr [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<Int, Never>
+  // CHECK: dealloc_stack [[CHECKED_CONT]] : $*CheckedContinuation<Int, Never>
   // CHECK: destroy_value [[ARG]]
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]]
   // CHECK: [[RESUME]]:
@@ -232,6 +239,8 @@ func testSlowServerFromMain(slowServer: SlowServer) async throws {
 // CHECK: [[CHECKED_CONT:%.*]] = alloc_stack $CheckedContinuation<String, any Error>
 // CHECK: {{.*}} = apply [[CHECKED_CONT_INIT_FN]]<String>([[CHECKED_CONT]], [[UNSAFE_CONT]]) : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, any Error>) -> @out CheckedContinuation<τ_0_0, any Error>
 // CHECK: copy_addr [take] [[CHECKED_CONT]] to [init] [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<String, any Error>
+// CHECK: destroy_addr [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<String, any Error>
+// CHECK: dealloc_stack [[CHECKED_CONT]] : $*CheckedContinuation<String, any Error>
 // CHECK: cond_br {{.*}}, [[RESUME:bb[0-9]+]], [[ERROR:bb[0-9]+]]
 //
 // CHECK: [[ERROR]]:
@@ -268,6 +277,7 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 // CHECK:  [[OPTIONAL_BLK:%.*]] = enum {{.*}}, #Optional.some!enumelt, [[BLOCK]]
 // CHECK:  {{.*}} = apply [[METH]]([[STRING_ARG]], [[OPTIONAL_BLK]], {{%.*}}) : $@convention(objc_method) (NSString, Optional<@convention(block) (Optional<NSString>, Optional<NSError>) -> ()>, SlowServer) -> ()
 // CHECK:  [[STRING_ARG_COPY:%.*]] = copy_value [[STRING_ARG]] : $NSString
+// CHECK:  destroy_addr [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<String, any Error>
 // CHECK:  dealloc_stack [[CHECKED_CONT]] : $*CheckedContinuation<String, any Error>
 // CHECK:  dealloc_stack [[STORE_ALLOC]] : $*@block_storage Any
 // CHECK:  destroy_value [[STRING_ARG]] : $NSString
@@ -302,6 +312,8 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 // CHECK:        [[METH:%.*]] = objc_method {{%.*}} : $@objc_metatype Person.Type, #Person.asCustomer!foreign
 // CHECK:        get_async_continuation_addr NSObject, [[RESULT_BUF]] : $*NSObject
 // CHECK:        = apply [[METH]]
+// CHECK:        destroy_addr {{.*}} : $*CheckedContinuation<NSObject, Never>
+// CHECK:       dealloc_stack {{.*}} : $*CheckedContinuation<NSObject, Never>
 // CHECK:        dealloc_stack {{%.*}} : $*@block_storage
 // CHECK:        await_async_continuation {{%.*}} : $Builtin.RawUnsafeContinuation, resume bb1
 // CHECK:    bb1:
@@ -349,6 +361,8 @@ extension OptionalMemberLookups {
   // CHECK:         = function_ref @$sIeyB_yt18objc_async_checked21OptionalMemberLookupsRzlTz_ : $@convention(c) @pseudogeneric <τ_0_0 where τ_0_0 : OptionalMemberLookups> (@inout_aliasable @block_storage Any) -> ()
   // CHECK:         [[BLOCK:%[0-9]+]] = init_block_storage_header {{.*}} : $*@block_storage Any
   // CHECK:         = apply [[METH]]([[BLOCK]], [[SELF]]) : $@convention(objc_method) (@convention(block) () -> (), Self) -> ()
+  // CHECK:         destroy_addr [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<(), Never>
+  // CHECK:         dealloc_stack [[CHECKED_CONT]] : $*CheckedContinuation<(), Never>
   // CHECK:         await_async_continuation {{.*}} : $Builtin.RawUnsafeContinuation, resume bb1
   // CHECK:         hop_to_executor {{.*}} : $MainActor
   // CHECK:        } // end sil function '$s18objc_async_checked21OptionalMemberLookupsPAAE19testForceDirectCallyyYaF'

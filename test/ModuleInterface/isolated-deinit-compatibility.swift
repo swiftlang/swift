@@ -3,6 +3,8 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -enable-experimental-feature IsolatedDeinit -target %target-swift-5.5-abi-triple -module-name IsolatedDeinitCompatibility
 // RUN: %FileCheck %s < %t.swiftinterface
 
+// REQUIRES: swift_feature_IsolatedDeinit
+
 // MARK: Sync deinit in class
 
 // CHECK-NOT: #

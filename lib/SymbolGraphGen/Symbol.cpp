@@ -413,7 +413,8 @@ void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
       OS.attributeArray("parameters", [&]() {
         for (const auto *Param : *ParamList) {
           auto ExternalName = Param->getArgumentName().str();
-          auto InternalName = Param->getParameterName().str();
+          // `getNameStr()` returns "_" if the parameter is unnamed.
+          auto InternalName = Param->getNameStr();
 
           OS.object([&]() {
             if (ExternalName.empty()) {

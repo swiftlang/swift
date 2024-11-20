@@ -305,7 +305,7 @@ exit:
 // CHECK:   [[BORROW1:%[^,]+]] = begin_borrow %1
 // CHECK:   [[BORROW2:%[^,]+]] = begin_borrow %1
 // CHECK:   br [[EXIT:bb[0-9]+]]([[C]] : $C, [[BORROW1]] : $C, [[BORROW2]] :
-// CHECK: [[EXIT]]({{%[^,]+}} : @owned $C, [[GUARANTEED1:%[^,]+]] : @reborrow @guaranteed $C, [[GUARANTEED2:%[^,]+]] :
+// CHECK: [[EXIT]]({{%[^,]+}} : @owned $C, [[GUARANTEED1:%[^,]+]] : @reborrow $C, [[GUARANTEED2:%[^,]+]] :
 // CHECK: } // end sil function 'pay_the_phi'
 //
 // CHECK:[[GUARANTEED1]] = argument of [[EXIT]]
@@ -331,7 +331,7 @@ exit(%owned : @owned $C, %guaranteed_1 : @guaranteed $C, %guaranteed_2 : @guaran
 }
 
 // CHECK-LABEL: pay_the_phi_forward: visit_inner_adjacent_phis with: %reborrow
-// CHECK: bb1(%{{.*}} : @reborrow @guaranteed $C, [[INNER:%.*]] : @guaranteed $D):    // Preds: bb0
+// CHECK: bb1(%{{.*}} : @reborrow $C, [[INNER:%.*]] : @guaranteed $D):    // Preds: bb0
 // CHECK: } // end sil function 'pay_the_phi_forward'
 // CHECK: [[INNER]] = argument of bb1 : $D
 // CHECK: pay_the_phi_forward: visit_inner_adjacent_phis with: %reborrow
@@ -1195,7 +1195,7 @@ bb2:
   %d2 = unchecked_ref_cast %0 : $C to $D
   br bb3(%copy2 : $C, %borrow2 : $C, %d2 :$D)
 
-bb3(%outer3 : @owned $C, %inner3 : @guaranteed $C, %phi3 : @guaranteed $D):
+bb3(%outer3 : @owned $C, %inner3 : @reborrow $C, %phi3 : @guaranteed $D):
   specify_test "interior-liveness %inner3"
   specify_test "interior_liveness_swift %inner3"
   br bb4(%phi3 : $D)
@@ -1245,7 +1245,7 @@ bb2:
   %d2 = unchecked_ref_cast %borrow2 : $C to $D
   br bb3(%copy2 : $C, %borrow2 : $C, %d2 :$D)
 
-bb3(%outer3 : @owned $C, %inner3 : @guaranteed $C, %phi3 : @guaranteed $D):
+bb3(%outer3 : @owned $C, %inner3 : @reborrow $C, %phi3 : @guaranteed $D):
   specify_test "interior-liveness %inner3"
   specify_test "interior_liveness_swift %inner3"
   br bb4(%phi3 : $D)

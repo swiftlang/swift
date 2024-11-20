@@ -8,6 +8,7 @@
 // RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/MemberImportVisibility -import-objc-header %S/Inputs/MemberImportVisibility/Bridging.h -verify -swift-version 5 -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_MemberImportVisibility
 
 import Categories_B
 import Categories_E

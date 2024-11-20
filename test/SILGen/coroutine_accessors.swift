@@ -1,23 +1,27 @@
 // RUN: %target-swift-emit-silgen                           \
 // RUN:     %s                                              \
+// RUN:     -enable-library-evolution                       \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-NOUNWIND
 
 // RUN: %target-swift-emit-silgen                                              \
 // RUN:     %s                                                                 \
+// RUN:     -enable-library-evolution                                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors                    \
 // RUN:     -enable-experimental-feature CoroutineAccessorsUnwindOnCallerError \
 // RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-UNWIND
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: swift_feature_CoroutineAccessorsUnwindOnCallerError
 
+@frozen
 public struct S {
 public var o: any AnyObject
 public var _i: Int = 0
 
 public var irm: Int {
 // CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivy :
-// CHECK-SAME:      $@yield_once
+// CHECK-SAME:      $@yield_once_2
 // CHECK-SAME:      @convention(method)
 // CHECK-SAME:      (@guaranteed S)
 // CHECK-SAME:      ->
@@ -28,7 +32,7 @@ public var irm: Int {
     yield _i
   }
 // CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivx :
-// CHECK-SAME:      $@yield_once
+// CHECK-SAME:      $@yield_once_2
 // CHECK-SAME:      @convention(method)
 // CHECK-SAME:      (@inout S)
 // CHECK-SAME:      ->
@@ -176,13 +180,13 @@ class OverridableGetter : ReadableTitle {
   var title: String = ""
 }
 //   The read witness thunk does a direct call to the concrete read accessor.
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s19coroutine_accessors17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW
-// CHECK:       function_ref @$s19coroutine_accessors17OverridableGetterC5titleSSvr
-// CHECK-LABEL: // end sil function '$s19coroutine_accessors17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW'
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s19coroutine_accessors17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvyTW
+// CHECK:       function_ref @$s19coroutine_accessors17OverridableGetterC5titleSSvy
+// CHECK-LABEL: // end sil function '$s19coroutine_accessors17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvyTW'
 //   The concrete read accessor is generated on-demand and does a class dispatch to the getter.
-// CHECK-LABEL: sil shared [ossa] @$s19coroutine_accessors17OverridableGetterC5titleSSvr
+// CHECK-LABEL: sil shared [ossa] @$s19coroutine_accessors17OverridableGetterC5titleSSvy
 // CHECK:       class_method %0 : $OverridableGetter, #OverridableGetter.title!getter
-// CHECK-LABEL: // end sil function '$s19coroutine_accessors17OverridableGetterC5titleSSvr'
+// CHECK-LABEL: // end sil function '$s19coroutine_accessors17OverridableGetterC5titleSSvy'
 
 class ImplementedReader : ReadableTitle {
   var _title: String = ""
@@ -211,10 +215,11 @@ protocol GettableTitle {
 // CHECK:       bb0(
 // CHECK-SAME:      [[SELF:%[^,]+]] :
 // CHECK-SAME:  ):
-// CHECK:         [[READER:%[^,]+]] = class_method [[SELF]] : $OverridableReader, #OverridableReader.title!read
-// CHECK:         ([[TITLE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[READER]]([[SELF]])
+// CHECK:         [[READER:%[^,]+]] = class_method [[SELF]] : $OverridableReader, #OverridableReader.title!read2
+// CHECK:         ([[TITLE:%[^,]+]], [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]]]) = begin_apply [[READER]]([[SELF]])
 // CHECK:         [[RETVAL:%[^,]+]] = copy_value [[TITLE]]
 // CHECK:         end_apply [[TOKEN]] as $()
+// CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function '$s19coroutine_accessors17OverridableReaderC5titleSSvg'
 
@@ -229,4 +234,14 @@ class OverridableReader : GettableTitle {
       yield _title
     }
   }
+}
+
+// CHECK-LABEL: sil_default_witness_table ReadableField {
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    method #ReadableField.field!read2 
+// CHECK-SAME:        : @$s19coroutine_accessors13ReadableFieldP5fieldSivy
+// CHECK-NEXT:  }
+public protocol ReadableField {
+  @_borrowed
+  var field: Int { get }
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -168,10 +168,6 @@ public:
   bool InInactiveClauseEnvironment = false;
   bool InSwiftKeyPath = false;
   bool InFreestandingMacroArgument = false;
-
-  /// This Parser is a fallback parser for ASTGen.
-  // Note: This doesn't affect anything in non-SWIFT_BUILD_SWIFT_SYNTAX envs.
-  bool IsForASTGen = false;
 
   /// Whether we should delay parsing nominal type, extension, and function
   /// bodies.
@@ -930,12 +926,6 @@ public:
   /// Each item will be a declaration, statement, or expression.
   void parseTopLevelItems(SmallVectorImpl<ASTNode> &items);
 
-  /// Parse the source file via the Swift Parser using the ASTGen library.
-  void
-  parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
-                           std::optional<DiagnosticTransaction> &transaction,
-                           bool suppressDiagnostics = false);
-
   /// Parse the top-level SIL decls into the SIL module.
   /// \returns \c true if there was a parsing error.
   bool parseTopLevelSIL();
@@ -963,8 +953,7 @@ public:
 
   ParserStatus parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
                          bool IfConfigsAreDeclAttrs,
-                         llvm::function_ref<void(Decl *)> Handler,
-                         bool fromASTGen = false);
+                         llvm::function_ref<void(Decl *)> Handler);
 
   std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
@@ -974,7 +963,8 @@ public:
                            IterableDeclContext *IDC);
 
   bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
-                                 bool &HasNestedClassDeclarations);
+                                 bool &HasNestedClassDeclarations,
+                                 bool &HasDerivativeDeclarations);
 
   bool canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations);
 
@@ -1201,7 +1191,7 @@ public:
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
-    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+    if (Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
         isSILLifetimeDependenceToken())
       return true;
     if (!canHaveParameterSpecifierContextualKeyword()) return false;
@@ -1327,7 +1317,11 @@ public:
   ///
   /// Parsing a floating attribute list will produce a `MissingDecl` with
   /// the attribute list attached.
-  void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items);
+  ///
+  /// If isFromClangAttribute, we also parse modifiers and suppress any
+  /// diagnostics about bad modifiers.
+  void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items,
+                                  bool isFromClangAttribute);
 
   /// Parse the result of member macro expansion, which is a floating
   /// member list.
@@ -1401,8 +1395,7 @@ public:
   ParserResult<TypeRepr> parseType();
   ParserResult<TypeRepr>
   parseType(Diag<> MessageID,
-            ParseTypeReason reason = ParseTypeReason::Unspecified,
-            bool fromASTGen = false);
+            ParseTypeReason reason = ParseTypeReason::Unspecified);
 
   /// Parse a type optionally prefixed by a list of named opaque parameters. If
   /// no params present, return 'type'. Otherwise, return 'type-named-opaque'.
@@ -1416,6 +1409,11 @@ public:
 
   ParserResult<TypeRepr> parseTypeSimple(
       Diag<> MessageID, ParseTypeReason reason);
+
+  ParserResult<TypeRepr> parseTypeOrValue();
+  ParserResult<TypeRepr>
+  parseTypeOrValue(Diag<> MessageID,
+                   ParseTypeReason reason = ParseTypeReason::Unspecified);
 
   /// Parse layout constraint.
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
@@ -1975,7 +1973,7 @@ public:
 
   bool isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                         ArrayRef<ASTNode> ParsedDecls);
-  ParserResult<Stmt> parseStmt(bool fromASTGen = false);
+  ParserResult<Stmt> parseStmt();
   ParserStatus parseExprOrStmt(ASTNode &Result);
   ParserResult<Stmt> parseStmtBreak();
   ParserResult<Stmt> parseStmtContinue();
@@ -2102,81 +2100,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Code completion second pass.
 
-  void performIDEInspectionSecondPassImpl(
-      IDEInspectionDelayedDeclState &info);
-
-  //===--------------------------------------------------------------------===//
-  // ASTGen support.
-
-  /// Parse a TypeRepr from the syntax tree. i.e. SF->getExportedSourceFile()
-  ParserResult<TypeRepr> parseTypeReprFromSyntaxTree();
-  /// Parse a Stmt from the syntax tree. i.e. SF->getExportedSourceFile()
-  ParserResult<Stmt> parseStmtFromSyntaxTree();
-  /// Parse a Decl from the syntax tree. i.e. SF->getExportedSourceFile()
-  ParserResult<Decl> parseDeclFromSyntaxTree();
-  /// Parse an Expr from the syntax tree. i.e. SF->getExportedSourceFile()
-  ParserResult<Expr> parseExprFromSyntaxTree();
-};
-
-/// Describes a parsed declaration name.
-struct ParsedDeclName {
-  /// The name of the context of which the corresponding entity should
-  /// become a member.
-  StringRef ContextName;
-
-  /// The base name of the declaration.
-  StringRef BaseName;
-
-  /// The argument labels for a function declaration.
-  SmallVector<StringRef, 4> ArgumentLabels;
-
-  /// Whether this is a function name (vs. a value name).
-  bool IsFunctionName = false;
-
-  /// Whether this is a getter for the named property.
-  bool IsGetter = false;
-
-  /// Whether this is a setter for the named property.
-  bool IsSetter = false;
-
-  bool IsSubscript = false;
-
-  /// For a declaration name that makes the declaration into an
-  /// instance member, the index of the "Self" parameter.
-  std::optional<unsigned> SelfIndex;
-
-  /// Determine whether this is a valid name.
-  explicit operator bool() const { return !BaseName.empty(); }
-
-  /// Whether this declaration name turns the declaration into a
-  /// member of some named context.
-  bool isMember() const { return !ContextName.empty(); }
-
-  /// Whether the result is translated into an instance member.
-  bool isInstanceMember() const {
-    return isMember() && static_cast<bool>(SelfIndex);
-  }
-
-  /// Whether the result is translated into a static/class member.
-  bool isClassMember() const {
-    return isMember() && !static_cast<bool>(SelfIndex);
-  }
-
-  /// Whether this is a property accessor.
-  bool isPropertyAccessor() const { return IsGetter || IsSetter; }
-
-  /// Whether this is an operator.
-  bool isOperator() const {
-    return Lexer::isOperator(BaseName);
-  }
-
-  /// Form a declaration name from this parsed declaration name.
-  DeclName formDeclName(ASTContext &ctx, bool isSubscript = false,
-                        bool isCxxClassTemplateSpec = false) const;
-
-  /// Form a declaration name from this parsed declaration name.
-  DeclNameRef formDeclNameRef(ASTContext &ctx, bool isSubscript = false,
-                              bool isCxxClassTemplateSpec = false) const;
+  void performIDEInspectionSecondPassImpl(IDEInspectionDelayedDeclState &info);
 };
 
 /// To assist debugging parser crashes, tell us the location of the
@@ -2187,28 +2111,6 @@ public:
   explicit PrettyStackTraceParser(Parser &P) : P(P) {}
   void print(llvm::raw_ostream &out) const override;
 };
-
-/// Parse a stringified Swift declaration name,
-/// e.g. "Foo.translateBy(self:x:y:)".
-ParsedDeclName parseDeclName(StringRef name) LLVM_READONLY;
-
-/// Form a Swift declaration name from its constituent parts.
-DeclName formDeclName(ASTContext &ctx,
-                      StringRef baseName,
-                      ArrayRef<StringRef> argumentLabels,
-                      bool isFunctionName,
-                      bool isInitializer,
-                      bool isSubscript = false,
-                      bool isCxxClassTemplateSpec = false);
-
-/// Form a Swift declaration name reference from its constituent parts.
-DeclNameRef formDeclNameRef(ASTContext &ctx,
-                            StringRef baseName,
-                            ArrayRef<StringRef> argumentLabels,
-                            bool isFunctionName,
-                            bool isInitializer,
-                            bool isSubscript = false,
-                            bool isCxxClassTemplateSpec = false);
 
 /// Whether a given token can be the start of a decl.
 bool isKeywordPossibleDeclStart(const LangOptions &options, const Token &Tok);

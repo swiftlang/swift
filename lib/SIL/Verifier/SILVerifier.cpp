@@ -1069,6 +1069,24 @@ public:
             what + " must be Optional<Builtin.Executor>");
   }
 
+  /// Require the operand to be an object of some type that conforms to
+  /// Actor or DistributedActor.
+  void requireAnyActorType(SILValue value, bool allowOptional,
+                           bool allowExecutor, const Twine &what) {
+    auto type = value->getType();
+    require(type.isObject(), what + " must be an object type");
+
+    auto actorType = type.getASTType();
+    if (allowOptional) {
+      if (auto objectType = actorType.getOptionalObjectType())
+        actorType = objectType;
+    }
+    if (allowExecutor && isa<BuiltinExecutorType>(actorType))
+      return;
+    require(actorType->isAnyActorType(),
+            what + " must be some kind of actor type");
+  }
+
   /// Assert that two types are equal.
   void requireSameType(Type type1, Type type2, const Twine &complaint) {
     _require(type1->isEqual(type2), complaint,
@@ -1258,11 +1276,6 @@ public:
   void visitSILArgument(SILArgument *arg) {
     CurArgument = arg;
     checkLegalType(arg->getFunction(), arg, nullptr);
-
-    // Ensure flags on the argument are not stale.
-    require(!arg->getFunction()->hasOwnership() ||
-                computeIsReborrow(arg) == arg->isReborrow(),
-            "Stale reborrow flag");
 
     if (checkLinearLifetime) {
       checkValueBaseOwnership(arg);
@@ -2120,6 +2133,12 @@ public:
   void checkAbortApplyInst(AbortApplyInst *AI) {
     require(getAsResultOf<BeginApplyInst>(AI->getOperand())->isBeginApplyToken(),
             "operand of abort_apply must be a begin_apply");
+    auto *mvi = getAsResultOf<BeginApplyInst>(AI->getOperand());
+    auto *bai = cast<BeginApplyInst>(mvi->getParent());
+    require(!bai->getSubstCalleeType()->isCalleeAllocatedCoroutine() ||
+                AI->getFunction()->getASTContext().LangOpts.hasFeature(
+                    Feature::CoroutineAccessorsUnwindOnCallerError),
+            "abort_apply of callee-allocated yield-once coroutine!?");
   }
 
   void checkEndApplyInst(EndApplyInst *AI) {
@@ -2161,6 +2180,11 @@ public:
               "llvm.invariant.end parameter #2 must be an integer literal");
       break;
     }
+  }
+
+  void checkMergeIsolationRegionInst(MergeIsolationRegionInst *mir) {
+    require(mir->getNumOperands() >= 2, "Must have at least two parameters");
+    require(F.hasOwnership(), "Only valid when OSSA is enabled");
   }
 
   void checkMarkDependencInst(MarkDependenceInst *MDI) {
@@ -3362,6 +3386,8 @@ public:
   void checkRetainValueInst(RetainValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
+    require(!I->getOperand()->getType().isMoveOnly(),
+            "retain value operand type must be copyable");
     require(!F.hasOwnership(),
             "retain_value is only in functions with unqualified ownership");
   }
@@ -5800,10 +5826,21 @@ public:
     if (HI->getModule().getStage() == SILStage::Lowered) {
       requireOptionalExecutorType(executor,
                                   "hop_to_executor operand in lowered SIL");
+    } else {
+      requireAnyActorType(executor,
+                          /*allow optional*/ true,
+                          /*allow executor*/ true,
+                          "hop_to_executor operand");
     }
   }
 
   void checkExtractExecutorInst(ExtractExecutorInst *EEI) {
+    requireObjectType(BuiltinExecutorType, EEI,
+                      "extract_executor result");
+    requireAnyActorType(EEI->getExpectedExecutor(),
+                        /*allow optional*/ false,
+                        /*allow executor*/ false,
+                        "extract_executor operand");
     if (EEI->getModule().getStage() == SILStage::Lowered) {
       require(false,
               "extract_executor instruction should have been lowered away");

@@ -1182,7 +1182,7 @@ function Build-CMakeProject {
     }
 
     if ($UseBuiltCompilers.Contains("Swift")) {
-      $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$(Get-CMark-BinaryCache($Arch))\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
+      $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$(Get-CMarkBinaryCache $Arch)\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
       $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
@@ -1237,11 +1237,17 @@ function Build-SPMProject {
     [string[]] $AdditionalArguments
   )
 
+  $ActionForOutput = switch ($Action) {
+    Build { "Building" }
+    Test { "Testing" }
+    TestParallel { "Testing" }
+  }
+
   if ($ToBatch) {
     Write-Output ""
-    Write-Output "echo Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
+    Write-Output "echo $ActionForOutput '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
   } else {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] $ActionForOutput '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
   }
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
@@ -1347,15 +1353,16 @@ function Build-WiXProject() {
   Invoke-Program $msbuild @MSBuildArgs
 }
 
-function Get-CMark-BinaryCache($Arch) {
+function Get-CMarkBinaryCache($Arch) {
   return "$($Arch.BinaryCache)\cmark-gfm-0.29.0.gfm.13"
 }
+
 function Build-CMark($Arch) {
   $ArchName = $Arch.LLVMName
 
   Build-CMakeProject `
     -Src $SourceCache\cmark `
-    -Bin (Get-CMark-BinaryCache($Arch)) `
+    -Bin (Get-CMarkBinaryCache $Arch) `
     -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
     -Defines @{
@@ -1424,7 +1431,7 @@ function Build-Compilers() {
     $BuildTools = Join-Path -Path (Get-BuildProjectBinaryCache BuildTools) -ChildPath bin
 
     if ($TestClang -or $TestLLD -or $TestLLDB -or $TestLLVM -or $TestSwift) {
-      $env:Path = "$(Get-CMark-BinaryCache($Arch))\src;$CompilersBinaryCache\tools\swift\libdispatch-windows-$($Arch.LLVMName)-prefix\bin;$CompilersBinaryCache\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostArch.VSName);$UnixToolsBinDir"
+      $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$CompilersBinaryCache\tools\swift\libdispatch-windows-$($Arch.LLVMName)-prefix\bin;$CompilersBinaryCache\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostArch.VSName);$UnixToolsBinDir"
       $Targets = @()
       $TestingDefines = @{
         SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "YES";
@@ -1491,6 +1498,7 @@ function Build-Compilers() {
         SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
+        SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS = "YES";
         SWIFT_ENABLE_SYNCHRONIZATION = "YES";
         SWIFT_ENABLE_VOLATILE = "YES";
         SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
@@ -1769,7 +1777,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
 
 
   Isolate-EnvVars {
-    $env:Path = "$(Get-CMark-BinaryCache($Arch))\src;$(Get-PinnedToolchainRuntime);${env:Path}"
+    $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$(Get-PinnedToolchainRuntime);${env:Path}"
 
     $CompilersBinaryCache = if ($IsCrossCompiling) {
       Get-BuildProjectBinaryCache Compilers
@@ -1796,6 +1804,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
         SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
+        SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS = "YES";
         SWIFT_ENABLE_SYNCHRONIZATION = "YES";
         SWIFT_ENABLE_VOLATILE = "YES";
         SWIFT_NATIVE_SWIFT_TOOLS_PATH = (Join-Path -Path $CompilersBinaryCache -ChildPath "bin");
@@ -2410,8 +2419,8 @@ function Test-Format {
     "-Xswiftc", "-I$($SourceCache)\cmark\src\include",
     "-Xswiftc", "-I$($SourceCache)\cmark\extensions\include",
     "-Xlinker", "-I$($SourceCache)\cmark\extensions\include",
-    "-Xlinker", "$(Get-CMark-BinaryCache($HostArch))\src\cmark-gfm.lib",
-    "-Xlinker", "$(Get-CMark-BinaryCache($HostArch))\extensions\cmark-gfm-extensions.lib",
+    "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\src\cmark-gfm.lib",
+    "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\extensions\cmark-gfm-extensions.lib",
     # swift-markdown
     "-Xlinker", "$(Get-HostProjectBinaryCache Markdown)\lib\CAtomic.lib",
     "-Xswiftc", "-I$($SourceCache)\swift-markdown\Sources\CAtomic\include",
@@ -2485,8 +2494,8 @@ function Test-SourceKitLSP {
     "-Xswiftc", "-I$($SourceCache)\cmark\src\include",
     "-Xswiftc", "-I$($SourceCache)\cmark\extensions\include",
     "-Xlinker", "-I$($SourceCache)\cmark\extensions\include",
-    "-Xlinker", "$(Get-CMark-BinaryCache($HostArch))\src\cmark-gfm.lib",
-    "-Xlinker", "$(Get-CMark-BinaryCache($HostArch))\extensions\cmark-gfm-extensions.lib",
+    "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\src\cmark-gfm.lib",
+    "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\extensions\cmark-gfm-extensions.lib",
     # swift-system
     "-Xswiftc", "-I$($SourceCache)\swift-system\Sources\CSystem\include",
     "-Xswiftc", "-I$(Get-HostProjectBinaryCache System)\swift",

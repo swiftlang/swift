@@ -13,6 +13,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_IsolatedDeinit
 
 import Darwin
 import Dispatch // expected-warning {{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'Dispatch'}}
@@ -266,14 +267,6 @@ func adopt(voucher: voucher_t?) {
   os_release(voucher_adopt(os_retain(voucher)))
 }
 
-// Dummy global variable to suppress stack propagation
-// TODO: Remove it after disabling allocation on stack for classes with isolated deinit
-var x: AnyObject? = nil
-func preventAllocationOnStack(_ object: AnyObject) {
-  x = object
-  x = nil
-}
-
 let tests = TestSuite("Voucher Propagation")
 
 if #available(SwiftStdlib 5.1, *) {
@@ -444,15 +437,15 @@ if #available(SwiftStdlib 5.1, *) {
       Task {
         await AnotherActor.shared.performTesting {
           adopt(voucher: v1)
-          preventAllocationOnStack(ClassWithIsolatedDeinit(expectedVoucher: v1, group: group))
+          _ = ClassWithIsolatedDeinit(expectedVoucher: v1, group: group)
         }
         await AnotherActor.shared.performTesting {
           adopt(voucher: v2)
-          preventAllocationOnStack(ActorWithSelfIsolatedDeinit(expectedVoucher: v2, group: group))
+          _ = ActorWithSelfIsolatedDeinit(expectedVoucher: v2, group: group)
         }
         await AnotherActor.shared.performTesting {
           adopt(voucher: v3)
-          preventAllocationOnStack(ActorWithDeinitIsolatedOnAnother(expectedVoucher: v3, group: group))
+          _ = ActorWithDeinitIsolatedOnAnother(expectedVoucher: v3, group: group)
         }
       }
       group.wait()
@@ -467,11 +460,11 @@ if #available(SwiftStdlib 5.1, *) {
       Task {
         do {
           adopt(voucher: v1)
-          preventAllocationOnStack(ActorWithDeinitIsolatedOnAnother(expectedVoucher: v1, group: group))
+          _ = ActorWithDeinitIsolatedOnAnother(expectedVoucher: v1, group: group)
         }
         do {
           adopt(voucher: v2)
-          preventAllocationOnStack(ClassWithIsolatedDeinit(expectedVoucher: v2, group: group))
+          _ = ClassWithIsolatedDeinit(expectedVoucher: v2, group: group)
         }
       }
       group.wait()

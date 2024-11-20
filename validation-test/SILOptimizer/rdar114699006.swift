@@ -17,6 +17,7 @@
 // No need to run this test that has a hard-coded target of macos10.13 on other
 // platforms.
 // REQUIRES: OS=macosx
+// REQUIRES: STDLIB_VARIANT=macosx-x86_64
 
 // Verify that after RetainSinking runs, the retain of the __EmptyArrayStorage
 // is _above_ the call to $sSD17dictionaryLiteralSDyxq_Gx_q_td_tcfCSS_SSTg5

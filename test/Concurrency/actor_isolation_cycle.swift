@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 public protocol P {
   associatedtype T

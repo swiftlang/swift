@@ -343,8 +343,10 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
       sub = sub.transformRec([](Type t) -> std::optional<Type> {
-        if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
-          return openedExistential->getInterfaceType();
+        if (auto *openedExistential = t->getAs<OpenedArchetypeType>()) {
+          auto &ctx = openedExistential->getASTContext();
+          return GenericTypeParamType::getType(0, 0, ctx);
+        }
         return std::nullopt;
       });
 
@@ -377,8 +379,10 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
       sub = sub.transformRec([](Type t) -> std::optional<Type> {
-        if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
-          return openedExistential->getInterfaceType();
+        if (auto *openedExistential = t->getAs<OpenedArchetypeType>()) {
+          auto &ctx = openedExistential->getASTContext();
+          return GenericTypeParamType::getType(0, 0, ctx);
+        }
         return std::nullopt;
       });
 
@@ -1396,12 +1400,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return;
     }
 
-    case TypeKind::Paren:
-      assert(DWARFMangling && "sugared types are only legal for the debugger");
-      appendType(cast<ParenType>(tybase)->getUnderlyingType(), sig, forDecl);
-      appendOperator("XSp");
-      return;
-
     case TypeKind::ArraySlice:
       assert(DWARFMangling && "sugared types are only legal for the debugger");
       appendType(cast<ArraySliceType>(tybase)->getBaseType(), sig, forDecl);
@@ -1685,11 +1683,14 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       appendOperator("$");
 
+      auto value = integer->getValue().getSExtValue();
+
       if (integer->isNegative()) {
-        appendOperator("n");
+        appendOperator("n", Index(-value));
+      } else {
+        appendOperator("", Index(value));
       }
 
-      appendOperator(integer->getDigitsText());
       return;
     }
 
@@ -1912,19 +1913,32 @@ static bool forEachConditionalConformance(const ProtocolConformance *conformance
   auto *rootConformance = conformance->getRootConformance();
 
   auto subMap = conformance->getSubstitutionMap();
-  for (auto requirement : rootConformance->getConditionalRequirements()) {
-    if (requirement.getKind() != RequirementKind::Conformance)
-      continue;
-    ProtocolDecl *proto = requirement.getProtocolDecl();
-    auto conformance = subMap.lookupConformance(
-        requirement.getFirstType()->getCanonicalType(), proto);
-    if (conformance.isInvalid()) {
-      // This should only happen when mangling invalid ASTs, but that happens
-      // for indexing purposes.
-      continue;
-    }
 
-    if (fn(requirement.getFirstType().subst(subMap), conformance))
+  auto ext = dyn_cast<ExtensionDecl>(rootConformance->getDeclContext());
+  if (!ext)
+    return false;
+
+  auto typeSig = ext->getExtendedNominal()->getGenericSignature();
+  auto extensionSig = rootConformance->getGenericSignature();
+
+  for (const auto &req : extensionSig.getRequirements()) {
+    // We set brokenPackBehavior to true here to maintain compatibility with
+    // the mangling produced by an old compiler. We could incorrectly return
+    // false from isRequirementSatisfied() here even if the requirement was
+    // satisfied, and then it would show up as a conditional requirement
+    // even though it was already part of the nominal type's generic signature.
+    if (typeSig->isRequirementSatisfied(req,
+                                        /*allowMissing=*/false,
+                                        /*brokenPackBehavior=*/true))
+      continue;
+
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    ProtocolDecl *proto = req.getProtocolDecl();
+    auto conformance = subMap.lookupConformance(
+        req.getFirstType()->getCanonicalType(), proto);
+    if (fn(req.getFirstType().subst(subMap), conformance))
       return true;
   }
 
@@ -3476,7 +3490,14 @@ void ASTMangler::gatherGenericSignatureParts(GenericSignature sig,
     genericParams = canSig.getGenericParams();
   } else {
     llvm::erase_if(reqs, [&](Requirement req) {
-      return contextSig->isRequirementSatisfied(req);
+      // We set brokenPackBehavior to true here to maintain compatibility with
+      // the mangling produced by an old compiler. We could incorrectly return
+      // false from isRequirementSatisfied() here even if the requirement was
+      // satisfied, and then it would show up as a conditional requirement
+      // even though it was already part of the nominal type's generic signature.
+      return contextSig->isRequirementSatisfied(req,
+                                                /*allowMissing=*/false,
+                                                /*brokenPackBehavior=*/true);
     });
   }
 }
@@ -3629,10 +3650,17 @@ void ASTMangler::appendGenericSignatureParts(
   ArrayRef<Requirement> requirements = parts.requirements;
   ArrayRef<InverseRequirement> inverseRequirements = parts.inverses;
 
-  // Mangle which generic parameters are pack parameters.
+  // Mangle the kind for each generic parameter.
   for (auto param : params) {
+    // Regular type parameters have no marker.
+
     if (param->isParameterPack())
       appendOpWithGenericParamIndex("Rv", param);
+
+    if (param->isValue()) {
+      appendType(param->getValueType(), sig);
+      appendOpWithGenericParamIndex("RV", param);
+    }
   }
 
   // Mangle the requirements.
@@ -4511,6 +4539,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     return appendMacroExpansionLoc();
   }
   
@@ -4562,6 +4591,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     llvm_unreachable("Exited above");
   }
 

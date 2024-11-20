@@ -47,7 +47,6 @@ namespace {
     SILValue visitStructExtractInst(StructExtractInst *SEI);
     SILValue visitEnumInst(EnumInst *EI);
     SILValue visitSelectEnumInst(SelectEnumInst *SEI);
-    SILValue visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
     SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
     SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
     SILValue visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
@@ -167,24 +166,6 @@ SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *sei) {
   // struct_extract(struct(x, y), x) -> x
   if (auto *si = dyn_cast<StructInst>(op))
     return si->getFieldValue(sei->getField());
-
-  return SILValue();
-}
-
-SILValue
-InstSimplifier::visitUncheckedEnumDataInst(UncheckedEnumDataInst *uedi) {
-  if (uedi->getOperand()->getType().isValueTypeWithDeinit())
-    return SILValue();
-  // (unchecked_enum_data (enum payload)) -> payload
-  auto opt = lookThroughOwnershipInsts(uedi->getOperand());
-  if (auto *ei = dyn_cast<EnumInst>(opt)) {
-    if (ei->getElement() != uedi->getElement())
-      return SILValue();
-
-    assert(ei->hasOperand() &&
-           "Should only get data from an enum with payload.");
-    return lookThroughOwnershipInsts(ei->getOperand());
-  }
 
   return SILValue();
 }

@@ -241,9 +241,11 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   ClangImporterOptions clangOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts;
   CASOptions casOpts;
+  SerializationOptions serializationOpts =
+      CachedCI->getASTContext().SerializationOpts;
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
-                      symbolOpts, casOpts, tmpSM, tmpDiags));
+                      symbolOpts, casOpts, serializationOpts, tmpSM, tmpDiags));
   tmpCtx->CancellationFlag = CancellationFlag;
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);

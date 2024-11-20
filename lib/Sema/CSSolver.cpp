@@ -431,11 +431,10 @@ void ConstraintSystem::replaySolution(const Solution &solution,
   for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {
     auto found = appliedPropertyWrappers.find(appliedWrapper.first);
     if (found == appliedPropertyWrappers.end()) {
-      appliedPropertyWrappers.insert(appliedWrapper);
+      for (auto applied : appliedWrapper.second)
+        applyPropertyWrapper(getAsExpr(appliedWrapper.first), applied);
     } else {
-      auto &existing = found->second;
-      ASSERT(existing.size() <= appliedWrapper.second.size());
-      existing = appliedWrapper.second;
+      ASSERT(found->second.size() == appliedWrapper.second.size());
     }
   }
 
@@ -1498,7 +1497,7 @@ ConstraintSystem::solveImpl(SyntacticElementTarget &target,
     Timer.emplace(expr, *this);
 
   if (generateConstraints(target, allowFreeTypeVariables))
-    return SolutionResult::forError();;
+    return SolutionResult::forError();
 
   // Try to solve the constraint system using computed suggestions.
   SmallVector<Solution, 4> solutions;
@@ -1781,6 +1780,9 @@ ConstraintSystem::filterDisjunction(
         return SolutionKind::Unsolved;
 
       for (auto *currentChoice : disjunction->getNestedConstraints()) {
+        if (currentChoice->isDisabled())
+          continue;
+
         if (currentChoice != choice)
           solverState->disableConstraint(currentChoice);
       }

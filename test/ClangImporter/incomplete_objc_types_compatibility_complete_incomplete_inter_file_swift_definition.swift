@@ -5,6 +5,7 @@
 // RUN: not %target-swift-frontend -enable-upcoming-feature ImportObjcForwardDeclarations -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/IncompleteTypes -I %t %t/incomplete_definition.swift %t/full_definition.swift -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_ImportObjcForwardDeclarations
 
 //--- full_definition.swift
 

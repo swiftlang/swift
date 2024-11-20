@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -enable-experimental-concurrency -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation %s -verify-additional-prefix complete-and-tns-
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 ////
 // some functions to play with

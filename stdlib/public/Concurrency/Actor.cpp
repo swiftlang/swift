@@ -1782,9 +1782,14 @@ void DefaultActorImpl::deallocate() {
 void DefaultActorImpl::deallocateUnconditional() {
   concurrency::trace::actor_deallocate(this);
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   auto metadata = cast<ClassMetadata>(this->metadata);
   swift_deallocClassInstance(this, metadata->getInstanceSize(),
                              metadata->getInstanceAlignMask());
+#else
+  // Embedded Swift's runtime doesn't actually use the size/mask values.
+  swift_deallocClassInstance(this, 0, 0);
+#endif
 }
 
 bool DefaultActorImpl::tryLock(bool asDrainer) {
@@ -2107,12 +2112,16 @@ static bool isDefaultActorClass(const ClassMetadata *metadata) {
 }
 
 void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
+#if !SWIFT_CONCURRENCY_EMBEDDED
   auto metadata = cast<ClassMetadata>(actor->metadata);
   if (isDefaultActorClass(metadata))
     return swift_defaultActor_deallocate(static_cast<DefaultActor*>(actor));
 
   swift_deallocObject(actor, metadata->getInstanceSize(),
                       metadata->getInstanceAlignMask());
+#else
+  return swift_defaultActor_deallocate(static_cast<DefaultActor*>(actor));
+#endif
 }
 
 /// FIXME: only exists for the quick-and-dirty MainActor implementation.
@@ -2350,7 +2359,8 @@ static void swift_task_deinitOnExecutorImpl(void *object,
   // when running on the main thread without any executor.
   if (swift_task_isCurrentExecutorWithFlags(
           newExecutor, swift_task_is_current_executor_flag::None)) {
-    return work(object); // 'return' forces tail call
+    TaskLocal::StopLookupScope scope;
+    return work(object);
   }
 
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
@@ -2384,7 +2394,10 @@ static void swift_task_deinitOnExecutorImpl(void *object,
       trackingInfo.enterAndShadow(newExecutor, taskExecutor);
 
       // Run the work.
-      work(object);
+      {
+        TaskLocal::StopLookupScope scope;
+        work(object);
+      }
 
       // `work` is a synchronous function, it cannot call swift_task_switch()
       // If it calls any synchronous API that may change executor inside
@@ -2546,12 +2559,16 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
 }
 
 bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
+#if !SWIFT_CONCURRENCY_EMBEDDED
   const ClassMetadata *metadata = cast<ClassMetadata>(_actor->metadata);
   if (isDefaultActorClass(metadata)) {
     return asImpl(reinterpret_cast<DefaultActor *>(_actor))->isDistributedRemote();
   } else {
     return asImpl(reinterpret_cast<NonDefaultDistributedActor *>(_actor))->isDistributedRemote();
   }
+#else
+  return false;
+#endif
 }
 
 bool DefaultActorImpl::isDistributedRemote() {

@@ -28,7 +28,7 @@ let swiftSourceDirectory = #filePath
 let swiftSetttings: [SwiftSetting] = [
   .interoperabilityMode(.Cxx),
   .unsafeFlags([
-    "-Xcc", "-DCOMPILED_WITH_SWIFT",
+    "-Xcc", "-DCOMPILED_WITH_SWIFT", "-Xcc", "-DPURE_BRIDGING_MODE",
     "-Xcc", "-UIBOutlet", "-Xcc", "-UIBAction", "-Xcc", "-UIBInspectable",
     "-Xcc", "-I\(swiftSourceDirectory)/include",
     "-Xcc", "-I\(swiftSourceDirectory)/../llvm-project/llvm/include",

@@ -20,6 +20,7 @@
 #include "BitPatternBuilder.h"
 #include "ExtraInhabitants.h"
 #include "GenCall.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -584,22 +585,50 @@ struct EmbeddedSwiftResultTypeOptionRecordTraits {
     IGF.Builder.CreateStore(
         TI.getStaticAlignmentMask(IGF.IGM),
         IGF.Builder.CreateStructGEP(optionsRecord, 2, Size()));
+
+    auto schema = IGF.getOptions().PointerAuth.ValueWitnesses;
     // initializeWithCopy witness
-    IGF.Builder.CreateStore(
-        IGF.IGM.getOrCreateValueWitnessFunction(
-            ValueWitness::InitializeWithCopy, packing, canType, lowered, TI),
-        IGF.Builder.CreateStructGEP(optionsRecord, 3, Size()));
+    {
+      auto gep = IGF.Builder.CreateStructGEP(optionsRecord, 3, Size());
+      llvm::Value *witness = IGF.IGM.getOrCreateValueWitnessFunction(
+          ValueWitness::InitializeWithCopy, packing, canType, lowered, TI);
+      auto discriminator = llvm::ConstantInt::get(
+          IGF.IGM.Int64Ty,
+          SpecialPointerAuthDiscriminators::InitializeWithCopy);
+      auto storageAddress = gep.getAddress();
+      auto info =
+          PointerAuthInfo::emit(IGF, schema, storageAddress, discriminator);
+      if (schema) witness = emitPointerAuthSign(IGF, witness, info);
+      IGF.Builder.CreateStore(witness, gep);
+    }
     // storeEnumTagSinglePayload witness
-    IGF.Builder.CreateStore(
-        IGF.IGM.getOrCreateValueWitnessFunction(
-            ValueWitness::StoreEnumTagSinglePayload, packing, canType, lowered,
-            TI),
-        IGF.Builder.CreateStructGEP(optionsRecord, 4, Size()));
+    {
+      auto gep = IGF.Builder.CreateStructGEP(optionsRecord, 4, Size());
+      llvm::Value *witness = IGF.IGM.getOrCreateValueWitnessFunction(
+          ValueWitness::StoreEnumTagSinglePayload, packing, canType, lowered,
+          TI);
+      auto discriminator = llvm::ConstantInt::get(
+          IGF.IGM.Int64Ty,
+          SpecialPointerAuthDiscriminators::StoreEnumTagSinglePayload);
+      auto storageAddress = gep.getAddress();
+      auto info =
+          PointerAuthInfo::emit(IGF, schema, storageAddress, discriminator);
+      if (schema) witness = emitPointerAuthSign(IGF, witness, info);
+      IGF.Builder.CreateStore(witness, gep);
+    }
     // destroy witness
-    IGF.Builder.CreateStore(
-        IGF.IGM.getOrCreateValueWitnessFunction(ValueWitness::Destroy, packing,
-                                                canType, lowered, TI),
-        IGF.Builder.CreateStructGEP(optionsRecord, 5, Size()));
+    {
+      auto gep = IGF.Builder.CreateStructGEP(optionsRecord, 5, Size());
+      llvm::Value *witness = IGF.IGM.getOrCreateValueWitnessFunction(
+          ValueWitness::Destroy, packing, canType, lowered, TI);
+      auto discriminator = llvm::ConstantInt::get(
+          IGF.IGM.Int64Ty, SpecialPointerAuthDiscriminators::Destroy);
+      auto storageAddress = gep.getAddress();
+      auto info =
+          PointerAuthInfo::emit(IGF, schema, storageAddress, discriminator);
+      if (schema) witness = emitPointerAuthSign(IGF, witness, info);
+      IGF.Builder.CreateStore(witness, gep);
+    }
   }
 };
 } // end anonymous namespace

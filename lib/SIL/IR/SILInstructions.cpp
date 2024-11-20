@@ -70,7 +70,7 @@ public:
   }
 
   void addTo(SmallVectorImpl<SILValue> &typeDependentOperands,
-             SILFunction &f);
+             SILInstructionContext context);
 };
 
 }
@@ -113,15 +113,18 @@ void TypeDependentOperandCollector::collect(SubstitutionMap subs) {
 /// Given that we've collected a set of type dependencies, add operands
 /// for those dependencies to the given vector.
 void TypeDependentOperandCollector::addTo(SmallVectorImpl<SILValue> &operands,
-                                          SILFunction &F) {
+                                          SILInstructionContext context) {
   for (GenericEnvironment *genericEnv : genericEnvs) {
-    SILValue def = F.getModule().getLocalGenericEnvironmentDef(genericEnv, &F);
-    assert(def->getFunction() == &F &&
+    SILValue def = context.getModule().getLocalGenericEnvironmentDef(
+        genericEnv, context.getFunction());
+    assert(def->getFunction() == context.getFunction() &&
            "def of local environment is in wrong function");
     operands.push_back(def);
   }
-  if (hasDynamicSelf)
-    operands.push_back(F.getDynamicSelfMetadata());
+  if (hasDynamicSelf) {
+    assert(context.getFunction());
+    operands.push_back(context.getFunction()->getDynamicSelfMetadata());
+  }
 }
 
 /// Collects all root local archetypes from a type and a substitution list, and
@@ -130,12 +133,22 @@ void TypeDependentOperandCollector::addTo(SmallVectorImpl<SILValue> &operands,
 /// of corresponding operands for the instruction being formed, because we need
 /// to reserve enough memory for these operands.
 template <class... Sources>
-static void collectTypeDependentOperands(
-                      SmallVectorImpl<SILValue> &typeDependentOperands,
-                      SILFunction &F, Sources &&... sources) {
+static void
+collectTypeDependentOperands(SmallVectorImpl<SILValue> &typeDependentOperands,
+                             SILInstructionContext context,
+                             Sources &&...sources) {
   TypeDependentOperandCollector collector;
   collector.collectAll(std::forward<Sources>(sources)...);
-  collector.addTo(typeDependentOperands, F);
+  collector.addTo(typeDependentOperands, context);
+}
+
+template <class... Sources>
+static void
+collectTypeDependentOperands(SmallVectorImpl<SILValue> &typeDependentOperands,
+                             SILFunction &function, Sources &&...sources) {
+  collectTypeDependentOperands(typeDependentOperands,
+                               SILInstructionContext::forFunction(function),
+                               std::forward<Sources>(sources)...);
 }
 
 //===----------------------------------------------------------------------===//
@@ -516,19 +529,22 @@ BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
                                  SILType ReturnType,
                                  SubstitutionMap Substitutions,
                                  ArrayRef<SILValue> Args,
-                                 SILModule &M) {
-  auto Size = totalSizeToAlloc<swift::Operand>(Args.size());
-  auto Buffer = M.allocateInst(Size, alignof(BuiltinInst));
+                                 SILInstructionContext context) {
+  SmallVector<SILValue, 32> allOperands;
+  copy(Args, std::back_inserter(allOperands));
+  collectTypeDependentOperands(allOperands, context, Substitutions);
+  auto Size = totalSizeToAlloc<swift::Operand>(allOperands.size());
+  auto Buffer = context.getModule().allocateInst(Size, alignof(BuiltinInst));
   return ::new (Buffer) BuiltinInst(Loc, Name, ReturnType, Substitutions,
-                                    Args);
+                                    allOperands, Args.size());
 }
 
 BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
                          SILType ReturnType, SubstitutionMap Subs,
-                         ArrayRef<SILValue> Args)
-    : InstructionBaseWithTrailingOperands(Args, Loc, ReturnType), Name(Name),
-      Substitutions(Subs) {
-}
+                         ArrayRef<SILValue> allOperands,
+                         unsigned numNormalOperands)
+    : InstructionBaseWithTrailingOperands(allOperands, Loc, ReturnType),
+      Name(Name), Substitutions(Subs), numNormalOperands(numNormalOperands) {}
 
 IncrementProfilerCounterInst *IncrementProfilerCounterInst::create(
     SILDebugLocation Loc, unsigned CounterIdx, StringRef PGOFuncName,
@@ -696,8 +712,8 @@ void BeginApplyInst::getCoroutineEndPoints(
     SmallVectorImpl<EndApplyInst *> &endApplyInsts,
     SmallVectorImpl<AbortApplyInst *> &abortApplyInsts,
     SmallVectorImpl<EndBorrowInst *> *endBorrowInsts) const {
-  for (auto *tokenUse : getTokenResult()->getUses()) {
-    auto *user = tokenUse->getUser();
+  for (auto *use : getEndApplyUses()) {
+    auto *user = use->getUser();
     if (auto *end = dyn_cast<EndApplyInst>(user)) {
       endApplyInsts.push_back(end);
       continue;
@@ -717,19 +733,19 @@ void BeginApplyInst::getCoroutineEndPoints(
     SmallVectorImpl<Operand *> &endApplyInsts,
     SmallVectorImpl<Operand *> &abortApplyInsts,
     SmallVectorImpl<Operand *> *endBorrowInsts) const {
-  for (auto *tokenUse : getTokenResult()->getUses()) {
-    auto *user = tokenUse->getUser();
+  for (auto *use : getEndApplyUses()) {
+    auto *user = use->getUser();
     if (isa<EndApplyInst>(user)) {
-      endApplyInsts.push_back(tokenUse);
+      endApplyInsts.push_back(use);
       continue;
     }
     if (isa<AbortApplyInst>(user)) {
-      abortApplyInsts.push_back(tokenUse);
+      abortApplyInsts.push_back(use);
       continue;
     }
 
     assert(isa<EndBorrowInst>(user));
-    abortApplyInsts.push_back(tokenUse);
+    abortApplyInsts.push_back(use);
   }
 }
 
@@ -2493,7 +2509,7 @@ OpenPackElementInst *OpenPackElementInst::create(
                                      PackType *packSubstitution) {
     collector.collect(packSubstitution->getCanonicalType());
   });
-  collector.addTo(typeDependentOperands, F);
+  collector.addTo(typeDependentOperands, SILInstructionContext::forFunction(F));
 
   SILType type = SILType::getSILTokenType(F.getASTContext());
 
@@ -3535,4 +3551,12 @@ TypeValueInst *TypeValueInst::create(SILFunction &F, SILDebugLocation loc,
     F.getModule().allocateInst(size, alignof(TypeValueInst));
   return ::new (buffer)
       TypeValueInst(loc, typeDependentOperands, valueType, paramType);
+}
+
+MergeIsolationRegionInst *
+MergeIsolationRegionInst::create(SILDebugLocation loc, ArrayRef<SILValue> args,
+                                 SILModule &mod) {
+  auto size = totalSizeToAlloc<swift::Operand>(args.size());
+  auto buffer = mod.allocateInst(size, alignof(MergeIsolationRegionInst));
+  return ::new (buffer) MergeIsolationRegionInst(loc, args);
 }

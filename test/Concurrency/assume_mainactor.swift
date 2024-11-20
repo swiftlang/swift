@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -swift-version 6 -emit-silgen -enable-experimental-feature UnspecifiedMeansMainActorIsolated %s | %FileCheck %s
 // RUN: %target-swift-frontend -swift-version 6 -emit-sil -enable-experimental-feature UnspecifiedMeansMainActorIsolated %s -verify
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_UnspecifiedMeansMainActorIsolated
 
 // READ THIS! This test is meant to FileCheck the specific isolation when
 // UnspecifiedMeansMainActorIsolated is enabled. Please do not put other types

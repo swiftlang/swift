@@ -1,11 +1,9 @@
 // RUN: %target-swift-frontend %s -emit-sil \
-// RUN: -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip \
+// RUN: -enable-experimental-feature LifetimeDependence \
 // RUN: | %FileCheck %s
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct NCContainer : ~Copyable {
   let ptr: UnsafeRawBufferPointer

@@ -1633,9 +1633,12 @@ Expr *DefaultArgumentExpr::getCallerSideDefaultExpr() const {
   assert(isCallerSide());
   auto &ctx = DefaultArgsOwner.getDecl()->getASTContext();
   auto *mutableThis = const_cast<DefaultArgumentExpr *>(this);
-  return evaluateOrDefault(ctx.evaluator,
+  if (auto result = evaluateOrDefault(ctx.evaluator,
                            CallerSideDefaultArgExprRequest{mutableThis},
-                           new (ctx) ErrorExpr(getSourceRange(), getType()));
+                           nullptr))
+    return result;
+
+  return new (ctx) ErrorExpr(getSourceRange(), getType());
 }
 
 ActorIsolation
@@ -2784,6 +2787,28 @@ unsigned RegexLiteralExpr::getVersion() const {
   auto &eval = getASTContext().evaluator;
   return evaluateOrDefault(eval, RegexLiteralPatternInfoRequest{this}, {})
       .Version;
+}
+
+ArrayRef<RegexLiteralPatternFeature>
+RegexLiteralExpr::getPatternFeatures() const {
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, RegexLiteralPatternInfoRequest{this}, {})
+      .Features;
+}
+
+StringRef
+RegexLiteralPatternFeatureKind::getDescription(ASTContext &ctx) const {
+  auto &eval = ctx.evaluator;
+  return evaluateOrDefault(
+      eval, RegexLiteralFeatureDescriptionRequest{*this, &ctx}, {});
+}
+
+AvailabilityRange
+RegexLiteralPatternFeatureKind::getAvailability(ASTContext &ctx) const {
+  auto &eval = ctx.evaluator;
+  return evaluateOrDefault(eval,
+                           RegexLiteralFeatureAvailabilityRequest{*this, &ctx},
+                           AvailabilityRange::alwaysAvailable());
 }
 
 TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,

@@ -624,7 +624,7 @@ namespace {
         return Type();
       
       if (size == 1)
-        return ParenType::get(elementType->getASTContext(), elementType);
+        return elementType;
 
       SmallVector<TupleTypeElt, 8> elts{static_cast<size_t>(size), elementType};
       return TupleType::get(elts, elementType->getASTContext());
@@ -730,8 +730,7 @@ namespace {
       if (!inner)
         return Type();
 
-      return { ParenType::get(Impl.SwiftContext, inner.AbstractType),
-               inner.Hint };
+      return { inner.AbstractType, inner.Hint };
     }
 
     /// Imports the type defined by \p objcTypeParamDecl.
@@ -2634,9 +2633,11 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // Swift doesn't support default values of inout parameters.
   // TODO: support default arguments of constructors
   // (https://github.com/apple/swift/issues/70124)
+  // TODO: support params with template parameters
   if (param->hasDefaultArg() && !isInOut &&
       !isa<clang::CXXConstructorDecl>(param->getDeclContext()) &&
-      impl->isDefaultArgSafeToImport(param)) {
+      impl->isDefaultArgSafeToImport(param) &&
+      !param->isTemplated()) {
     SwiftDeclSynthesizer synthesizer(*impl);
     if (CallExpr *defaultArgExpr = synthesizer.makeDefaultArgument(
             param, swiftParamTy, paramInfo->getParameterNameLoc())) {
@@ -2766,7 +2767,15 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   }
 
   // Form the parameter list.
-  return ParameterList::create(SwiftContext, parameters);
+  // Estimate locations for the begin and end of parameter list.
+  auto begin = clangDecl->getLocation();
+  auto end = begin;
+  if (!params.empty()) {
+    begin = params.front()->getBeginLoc();
+    end = params.back()->getEndLoc();
+  }
+  return ParameterList::create(SwiftContext, importSourceLoc(begin), parameters,
+                               importSourceLoc(end));
 }
 
 static bool isObjCMethodResultAudited(const clang::Decl *decl) {

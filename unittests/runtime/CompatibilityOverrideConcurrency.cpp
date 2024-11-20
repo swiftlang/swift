@@ -332,7 +332,8 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startOnMainActorImpl) {
 
 TEST_F(CompatibilityOverrideConcurrencyTest,
        test_swift_task_isCurrentExecutorWithFlags) {
-  swift_task_isCurrentExecutorWithFlags(swift_task_getMainExecutor(), 0);
+  swift_task_isCurrentExecutorWithFlags(
+      swift_task_getMainExecutor(), swift_task_is_current_executor_flag::None);
 }
 
 #if RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST

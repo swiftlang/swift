@@ -31,7 +31,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
-#include "swift/Parse/Parser.h"
+#include "swift/Parse/ParseDeclName.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"

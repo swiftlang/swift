@@ -130,12 +130,12 @@ struct BridgedPostDomTree {
 
 struct BridgedUtilities {
   typedef void (* _Nonnull VerifyFunctionFn)(BridgedPassContext, BridgedFunction);
-  typedef void (* _Nonnull UpdateBorrowedFromFn)(BridgedPassContext, BridgedFunction);
-  typedef void (* _Nonnull UpdateBorrowedFromPhisFn)(BridgedPassContext, BridgedArrayRef);
+  typedef void (* _Nonnull UpdateFunctionFn)(BridgedPassContext, BridgedFunction);
+  typedef void (* _Nonnull UpdatePhisFn)(BridgedPassContext, BridgedArrayRef);
 
   static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
-  static void registerBorrowedFromUpdater(UpdateBorrowedFromFn updateBorrowedFromFn,
-                                          UpdateBorrowedFromPhisFn updateBorrowedFromPhisFn);
+  static void registerGuaranteedPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
+                                           UpdatePhisFn updateBorrowedFromPhisFn);
 };
 
 struct BridgedBasicBlockSet {
@@ -261,6 +261,8 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool optimizeMemoryAccesses(BridgedFunction f) const;
   BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
 
+  BRIDGED_INLINE bool shouldExpand(BridgedType type) const;
+
   // IRGen
 
   SwiftInt getStaticSize(BridgedType type) const;
@@ -372,6 +374,7 @@ struct BridgedPassContext {
     Unchecked = 2
   };
 
+  BRIDGED_INLINE bool useAggressiveReg2MemForCodeSize() const;
   BRIDGED_INLINE bool enableStackProtection() const;
   BRIDGED_INLINE bool hasFeature(BridgedFeature feature) const;
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;

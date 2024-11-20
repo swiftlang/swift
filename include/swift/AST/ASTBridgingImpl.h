@@ -16,10 +16,14 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ArgumentList.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
-#include "swift/AST/Stmt.h"
+#include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -48,6 +52,9 @@ swift::DeclBaseName BridgedDeclBaseName::unbridged() const {
 //===----------------------------------------------------------------------===//
 // MARK: BridgedDeclNameRef
 //===----------------------------------------------------------------------===//
+
+BridgedDeclNameRef::BridgedDeclNameRef()
+    : BridgedDeclNameRef(swift::DeclNameRef()) {}
 
 BridgedDeclNameRef::BridgedDeclNameRef(swift::DeclNameRef name)
   : opaque(name.getOpaqueValue()) {}
@@ -96,6 +103,26 @@ BridgedStringRef BridgedASTContext_allocateCopyString(BridgedASTContext bridged,
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedDeclContext
+//===----------------------------------------------------------------------===//
+
+bool BridgedDeclContext_isLocalContext(BridgedDeclContext dc) {
+  return dc.unbridged()->isLocalContext();
+}
+
+bool BridgedDeclContext_isTypeContext(BridgedDeclContext dc) {
+  return dc.unbridged()->isTypeContext();
+}
+
+bool BridgedDeclContext_isModuleScopeContext(BridgedDeclContext dc) {
+  return dc.unbridged()->isModuleScopeContext();
+}
+
+BridgedASTContext BridgedDeclContext_getASTContext(BridgedDeclContext dc) {
+  return dc.unbridged()->getASTContext();
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedDeclObj
 //===----------------------------------------------------------------------===//
 
@@ -140,6 +167,16 @@ BridgedASTType BridgedDeclObj::Class_getSuperclass() const {
   return {getAs<swift::ClassDecl>()->getSuperclass().getPointer()};
 }
 
+BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
+  return {getAs<swift::ClassDecl>()->getDestructor()};
+}
+
+bool BridgedDeclObj::Destructor_isIsolated() const {
+  auto dd = getAs<swift::DestructorDecl>();
+  auto ai = swift::getActorIsolation(dd);
+  return ai.isActorIsolated();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedASTNode
 //===----------------------------------------------------------------------===//
@@ -178,6 +215,31 @@ swift::DeclAttributes BridgedDeclAttributes::unbridged() const {
   swift::DeclAttributes attrs;
   attrs.setRawAttributeChain(chain.unbridged());
   return attrs;
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedParamDecl
+//===----------------------------------------------------------------------===//
+
+swift::ParamSpecifier unbridge(BridgedParamSpecifier specifier) {
+  switch (specifier) {
+#define CASE(ID)                                                               \
+  case BridgedParamSpecifier##ID:                                              \
+    return swift::ParamSpecifier::ID;
+    CASE(Default)
+    CASE(InOut)
+    CASE(Borrowing)
+    CASE(Consuming)
+    CASE(LegacyShared)
+    CASE(LegacyOwned)
+    CASE(ImplicitlyCopyableConsuming)
+#undef CASE
+  }
+}
+
+void BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
+                                   BridgedParamSpecifier cSpecifier) {
+  cDecl.unbridged()->setSpecifier(unbridge(cSpecifier));
 }
 
 //===----------------------------------------------------------------------===//
@@ -323,6 +385,47 @@ BridgedConformance BridgedConformanceArray::getAt(SwiftInt index) const {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: Macros
+//===----------------------------------------------------------------------===//
+
+swift::MacroRole unbridge(BridgedMacroRole cRole) {
+  switch (cRole) {
+#define MACRO_ROLE(Name, Description)                                          \
+  case BridgedMacroRole##Name:                                                 \
+    return swift::MacroRole::Name;
+#include "swift/Basic/MacroRoles.def"
+  case BridgedMacroRoleNone:
+    break;
+  }
+  llvm_unreachable("invalid macro role");
+}
+
+swift::MacroIntroducedDeclNameKind
+unbridge(BridgedMacroIntroducedDeclNameKind kind) {
+  switch (kind) {
+#define CASE(ID)                                                               \
+  case BridgedMacroIntroducedDeclNameKind##ID:                                 \
+    return swift::MacroIntroducedDeclNameKind::ID;
+    CASE(Named)
+    CASE(Overloaded)
+    CASE(Prefixed)
+    CASE(Suffixed)
+    CASE(Arbitrary)
+#undef CASE
+  }
+}
+
+bool BridgedMacroRole_isAttached(BridgedMacroRole role) {
+  return isAttachedMacro(unbridge(role));
+}
+
+swift::MacroIntroducedDeclName
+BridgedMacroIntroducedDeclName::unbridged() const {
+  return swift::MacroIntroducedDeclName(unbridge(kind),
+                                        name.unbridged().getFullName());
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedSubstitutionMap
 //===----------------------------------------------------------------------===//
 
@@ -377,6 +480,40 @@ swift::IfConfigClauseRangeInfo BridgedIfConfigClauseRangeInfo::unbridged() const
                                         bodyLoc.unbridged(),
                                         endLoc.unbridged(),
                                         clauseKind);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedRegexLiteralPatternFeature
+//===----------------------------------------------------------------------===//
+
+BridgedRegexLiteralPatternFeatureKind::BridgedRegexLiteralPatternFeatureKind(
+    SwiftInt rawValue)
+    : RawValue(rawValue) {
+  ASSERT(rawValue >= 0);
+  ASSERT(rawValue == RawValue);
+}
+
+BridgedRegexLiteralPatternFeatureKind::BridgedRegexLiteralPatternFeatureKind(
+    UnbridgedTy kind)
+    : RawValue(kind.getRawValue()) {}
+
+BridgedRegexLiteralPatternFeatureKind::UnbridgedTy
+BridgedRegexLiteralPatternFeatureKind::unbridged() const {
+  return UnbridgedTy(RawValue);
+}
+
+BridgedRegexLiteralPatternFeature::BridgedRegexLiteralPatternFeature(
+    UnbridgedTy feature)
+    : Range(feature.getRange()), Kind(feature.getKind()) {}
+
+BridgedRegexLiteralPatternFeature::UnbridgedTy
+BridgedRegexLiteralPatternFeature::unbridged() const {
+  return UnbridgedTy(Kind.unbridged(), Range.unbridged());
+}
+
+BridgedRegexLiteralPatternFeatures::UnbridgedTy
+BridgedRegexLiteralPatternFeatures::unbridged() const {
+  return UnbridgedTy(Data, Count);
 }
 
 //===----------------------------------------------------------------------===//

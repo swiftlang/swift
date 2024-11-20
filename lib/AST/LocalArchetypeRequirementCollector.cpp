@@ -265,7 +265,7 @@ swift::buildSubstitutionMapWithCapturedEnvironments(
     [&](CanType origType, Type substType,
         ProtocolDecl *proto) -> ProtocolConformanceRef {
       if (origType->getRootGenericParam()->getDepth() >= baseDepth)
-        return ProtocolConformanceRef(proto);
+        return ProtocolConformanceRef::forAbstract(substType, proto);
       return baseSubMap.lookupConformance(origType, proto);
     });
 }

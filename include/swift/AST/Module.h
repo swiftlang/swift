@@ -51,7 +51,9 @@ namespace clang {
 namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
+  class ASTScope;
   class ASTWalker;
+  class AvailabilityScope;
   class BraceStmt;
   class Decl;
   class DeclAttribute;
@@ -74,15 +76,13 @@ namespace swift {
   class ProtocolConformance;
   class ProtocolDecl;
   struct PrintOptions;
+  class SourceLookupCache;
   class Token;
   class TupleType;
   class Type;
-  class TypeRefinementContext;
   class ValueDecl;
   class VarDecl;
   class VisibleDeclConsumer;
-  class ASTScope;
-  class SourceLookupCache;
 
 namespace ast_scope {
 class ASTSourceFileScope;
@@ -240,6 +240,7 @@ class ModuleDecl
     : public DeclContext, public TypeDecl, public ASTAllocated<ModuleDecl> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
+  friend class CustomDerivativesRequest;
 
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
@@ -256,7 +257,7 @@ class ModuleDecl
 
   /// Indicates a version of the Swift compiler used to generate 
   /// .swiftinterface file that this module was produced from (if any).
-  mutable llvm::VersionTuple InterfaceCompilerVersion;
+  mutable version::Version InterfaceCompilerVersion;
 
 public:
   /// Produces the components of a given module's full name in reverse order.
@@ -523,11 +524,11 @@ public:
   }
 
   /// See \c InterfaceCompilerVersion
-  llvm::VersionTuple getSwiftInterfaceCompilerVersion() const {
+  version::Version getSwiftInterfaceCompilerVersion() const {
     return InterfaceCompilerVersion;
   }
 
-  void setSwiftInterfaceCompilerVersion(llvm::VersionTuple version) {
+  void setSwiftInterfaceCompilerVersion(version::Version version) {
     InterfaceCompilerVersion = version;
   }
 

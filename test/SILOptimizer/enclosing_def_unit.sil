@@ -187,7 +187,7 @@ bb3(%reborrow3 : @guaranteed $C):
 
 // CHECK-LABEL: enclosing_def_reborrow: find_enclosing_defs with: %reborrow_inner3
 // CHECK: sil [ossa] @enclosing_def_reborrow : $@convention(thin) (@guaranteed C) -> () {
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C, %{{.*}} : @reborrow @guaranteed $C):
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C, %{{.*}} : @reborrow $C):
 // CHECK: } // end sil function 'enclosing_def_reborrow'
 // CHECK: Enclosing Defs:
 // CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
@@ -195,7 +195,7 @@ bb3(%reborrow3 : @guaranteed $C):
 
 // CHECK-LABEL: enclosing_def_reborrow: enclosing_values with: %reborrow_inner3
 // CHECK: sil [ossa] @enclosing_def_reborrow : $@convention(thin) (@guaranteed C) -> () {
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C, %{{.*}} : @reborrow @guaranteed $C):
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C, %{{.*}} : @reborrow $C):
 // CHECK: } // end sil function 'enclosing_def_reborrow'
 // CHECK: Enclosing values for: %{{.*}} = argument of bb2 : $C
 // CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
@@ -222,7 +222,7 @@ bb3(%reborrow_inner3 : @guaranteed $C):
 
 // CHECK-LABEL: enclosing_def_cycle: find_enclosing_defs with: %forward
 // CHECK: sil [ossa] @enclosing_def_cycle : $@convention(thin) (@guaranteed C) -> () {
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C,
+// CHECK: bb1([[REBORROW:%.*]] : @guaranteed $C,
 // CHECK: } // end sil function 'enclosing_def_cycle'
 // CHECK: Enclosing Defs:
 // CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
@@ -230,10 +230,11 @@ bb3(%reborrow_inner3 : @guaranteed $C):
 
 // CHECK-LABEL: enclosing_def_cycle: enclosing_values with: %forward
 // CHECK: sil [ossa] @enclosing_def_cycle : $@convention(thin) (@guaranteed C) -> () {
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C,
+// CHECK: bb1([[REBORROW:%.*]] : @guaranteed $C,
 // CHECK: } // end sil function 'enclosing_def_cycle'
 // CHECK: Enclosing values for: %{{.*}} = argument of bb1 : $C
-// CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
+// CHECK-NEXT: %1 = begin_borrow %0
+// CHECK-NEXT: %0 = argument of bb0
 // CHECK-NEXT: enclosing_def_cycle: enclosing_values with: %forward
 sil [ossa] @enclosing_def_cycle : $@convention(thin) (@guaranteed C) -> () {
 entry(%0 : @guaranteed $C):

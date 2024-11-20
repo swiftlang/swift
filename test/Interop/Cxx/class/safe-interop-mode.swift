@@ -1,9 +1,12 @@
 
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs  %t/test.swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -enable-experimental-feature NonescapableTypes -enable-experimental-feature SafeInterop -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1
+// RUN: %target-swift-frontend -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs  %t/test.swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe  -enable-experimental-feature SafeInterop -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_AllowUnsafeAttribute
+// REQUIRES: swift_feature_SafeInterop
+// REQUIRES: swift_feature_WarnUnsafe
 
 //--- Inputs/module.modulemap
 module Test {
@@ -42,6 +45,11 @@ struct UnknownEscapabilityAggregate {
     Unannotated unann;
 };
 
+struct MyContainer {
+    int begin() const { return 0; }
+    int end() const { return -1; }
+};
+
 //--- test.swift
 
 import Test
@@ -57,7 +65,8 @@ func useUnsafeParam2(x: UnsafeReference) { // expected-warning{{reference to uns
 func useUnsafeParam3(x: UnknownEscapabilityAggregate) { // expected-warning{{reference to unsafe struct 'UnknownEscapabilityAggregate'}}
 }
 
-func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate) {
+func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer) {
+    let _ = c.__beginUnsafe() // expected-warning{{call to unsafe instance method '__beginUnsafe'}}
 }
 
 func useCfType(x: CFArray) {

@@ -247,8 +247,6 @@ SILValue SILSSAUpdater::getValueInMiddleOfBlock(SILBasicBlock *block) {
     addNewEdgeValueToBranch(pair.first->getTerminator(), block, pair.second,
                             deleter);
   }
-  // Set the reborrow flag on the newly created phi.
-  phiArg->setReborrow(computeIsReborrow(phiArg));
 
   if (insertedPhis)
     insertedPhis->push_back(phiArg);
@@ -359,9 +357,6 @@ public:
     auto *ti = predBlock->getTerminator();
 
     changeEdgeValue(ti, phiBlock, phiArgIndex, value);
-
-    // Set the reborrow flag.
-    phi->setReborrow(computeIsReborrow(phi));
   }
 
   /// Check if an instruction is a PHI.

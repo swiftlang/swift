@@ -3259,3 +3259,24 @@ bb21:
   %75 = tuple ()
   return %75 : $()
 }
+
+// CHECK-LABEL: sil @simplify_switch_enum_unreachable :
+// CHECK-NOT:     switch_enum
+// CHECK:       } // end sil function 'simplify_switch_enum_unreachable'
+sil @simplify_switch_enum_unreachable : $@convention(thin) (@owned Optional<String>) -> () {
+bb0(%0 : $Optional<String>):
+  switch_enum %0 : $Optional<String>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb4
+
+bb4:
+  unreachable
+
+bb5:
+  %1 = unchecked_enum_data %0 : $Optional<String>, #Optional.some!enumelt
+  release_value %1 : $String
+  br bb6
+
+bb6:
+  %17 = tuple ()
+  return %17 : $()
+}
+

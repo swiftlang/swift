@@ -225,6 +225,13 @@ InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
   return *this;
 }
 
+InFlightDiagnostic &InFlightDiagnostic::highlightChars(CharSourceRange Range) {
+  assert(IsActive && "Cannot modify an inactive diagnostic");
+  if (Engine && Range.getStart().isValid())
+    Engine->getActiveDiagnostic().addRange(Range);
+  return *this;
+}
+
 /// Add an insertion fix-it to the currently-active diagnostic.  The
 /// text is inserted immediately *after* the token specified.
 ///
@@ -700,8 +707,8 @@ static bool typeSpellingIsAmbiguous(Type type,
   for (auto arg : Args) {
     if (arg.getKind() == DiagnosticArgumentKind::Type) {
       auto argType = arg.getAsType();
-      if (argType && argType->getWithoutParens().getPointer() != type.getPointer() &&
-          argType->getWithoutParens().getString(PO) == type.getString(PO)) {
+      if (argType && argType.getPointer() != type.getPointer() &&
+          argType.getString(PO) == type.getString(PO)) {
         // Currently, existential types are spelled the same way
         // as protocols and compositions. We can remove this once
         // existenials are printed with 'any'.
@@ -893,41 +900,20 @@ static void formatDiagnosticArgument(StringRef Modifier,
     // Compute the appropriate print options for this argument.
     auto printOptions = PrintOptions::forDiagnosticArguments();
     if (Arg.getKind() == DiagnosticArgumentKind::Type) {
-      type = Arg.getAsType()->getWithoutParens();
-      if (type.isNull()) {
-        // FIXME: We should never receive a nullptr here, but this is causing
-        // crashes (rdar://75740683). Remove once ParenType never contains
-        // nullptr as the underlying type.
-        Out << "<null>";
-        break;
-      }
+      type = Arg.getAsType();
       if (type->getASTContext().TypeCheckerOpts.PrintFullConvention)
         printOptions.PrintFunctionRepresentationAttrs =
             PrintOptions::FunctionRepresentationMode::Full;
       needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
     } else if (Arg.getKind() == DiagnosticArgumentKind::FullyQualifiedType) {
-      type = Arg.getAsFullyQualifiedType().getType()->getWithoutParens();
-      if (type.isNull()) {
-        // FIXME: We should never receive a nullptr here, but this is causing
-        // crashes (rdar://75740683). Remove once ParenType never contains
-        // nullptr as the underlying type.
-        Out << "<null>";
-        break;
-      }
+      type = Arg.getAsFullyQualifiedType().getType();
       if (type->getASTContext().TypeCheckerOpts.PrintFullConvention)
         printOptions.PrintFunctionRepresentationAttrs =
             PrintOptions::FunctionRepresentationMode::Full;
       needsQualification = true;
     } else {
       assert(Arg.getKind() == DiagnosticArgumentKind::WitnessType);
-      type = Arg.getAsWitnessType().getType()->getWithoutParens();
-      if (type.isNull()) {
-        // FIXME: We should never receive a nullptr here, but this is causing
-        // crashes (rdar://75740683). Remove once ParenType never contains
-        // nullptr as the underlying type.
-        Out << "<null>";
-        break;
-      }
+      type = Arg.getAsWitnessType().getType();
       printOptions.PrintGenericRequirements = false;
       printOptions.PrintInverseRequirements = false;
       needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
@@ -1350,6 +1336,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
 #include "swift/Basic/MacroRoles.def"
       case GeneratedSourceInfo::PrettyPrinted:
       case GeneratedSourceInfo::DefaultArgument:
+      case GeneratedSourceInfo::AttributeFromClang:
         fixIts = {};
         break;
       case GeneratedSourceInfo::ReplacedFunctionBody:
@@ -1395,6 +1382,7 @@ getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     return DeclName();
   }
 }
@@ -1456,6 +1444,7 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
 
     case GeneratedSourceInfo::DefaultArgument:
     case GeneratedSourceInfo::ReplacedFunctionBody:
+    case GeneratedSourceInfo::AttributeFromClang:
       return childNotes;
     }
 

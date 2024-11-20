@@ -21,6 +21,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
@@ -28,7 +29,6 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
@@ -524,14 +524,13 @@ void diagnoseRequirementFailure(
     const CheckGenericArgumentsResult::RequirementFailureInfo &reqFailureInfo,
     SourceLoc errorLoc, SourceLoc noteLoc, Type targetTy,
     ArrayRef<GenericTypeParamType *> genericParams,
-    TypeSubstitutionFn substitutions, ModuleDecl *module);
+    TypeSubstitutionFn substitutions);
 
 /// Check the given generic parameter substitutions against the given
 /// requirements and report on any requirement failures in detail for
 /// diagnostic needs.
 CheckGenericArgumentsResult
-checkGenericArgumentsForDiagnostics(ModuleDecl *module,
-                                    ArrayRef<Requirement> requirements,
+checkGenericArgumentsForDiagnostics(ArrayRef<Requirement> requirements,
                                     TypeSubstitutionFn substitutions);
 
 /// Checks whether the generic requirements imposed on the nested type
@@ -575,8 +574,7 @@ checkGenericArgumentsForDiagnostics(ModuleDecl *module,
 ///
 /// \returns \c true on success.
 bool checkContextualRequirements(GenericTypeDecl *decl, Type parentTy,
-                                 SourceLoc loc, ModuleDecl *module,
-                                 GenericSignature contextSig);
+                                 SourceLoc loc, GenericSignature contextSig);
 
 /// Add any implicitly-defined constructors required for the given
 /// struct, class or actor.
@@ -607,11 +605,13 @@ Type typeCheckExpression(Expr *&expr, DeclContext *dc,
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckExpression(constraints::SyntacticElementTarget &target,
-                    TypeCheckExprOptions options = TypeCheckExprOptions());
+                    TypeCheckExprOptions options = TypeCheckExprOptions(),
+                    DiagnosticTransaction *diagnosticTransaction);
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckTarget(constraints::SyntacticElementTarget &target,
-                TypeCheckExprOptions options = TypeCheckExprOptions());
+                TypeCheckExprOptions options = TypeCheckExprOptions(),
+                DiagnosticTransaction *diagnosticTransaction);
 
 /// Remove any solutions from the provided vector that require more fixes than
 /// the best score or don't contain a type for the code completion token.
@@ -999,27 +999,27 @@ bool isAvailabilitySafeForConformance(
     AvailabilityRange &requiredAvailability);
 
 /// Returns the most refined `AvailabilityContext` for the given location.
-/// If `MostRefined` is not `nullptr`, it will be set to the most refined TRC
+/// If `MostRefined` is not `nullptr`, it will be set to the most refined scope
 /// that contains the given location.
 AvailabilityContext
 availabilityAtLocation(SourceLoc loc, const DeclContext *DC,
-                       const TypeRefinementContext **MostRefined = nullptr);
+                       const AvailabilityScope **MostRefined = nullptr);
 
 /// Returns an over-approximation of the range of operating system versions
 /// that could the passed-in location could be executing upon for
 /// the target platform. If MostRefined != nullptr, set to the most-refined
-/// TRC found while approximating.
+/// scope found while approximating.
 AvailabilityRange overApproximateAvailabilityAtLocation(
     SourceLoc loc, const DeclContext *DC,
-    const TypeRefinementContext **MostRefined = nullptr);
+    const AvailabilityScope **MostRefined = nullptr);
 
-/// Walk the AST to build the hierarchy of TypeRefinementContexts
-void buildTypeRefinementContextHierarchy(SourceFile &SF);
+/// Walk the AST to build the tree of AvailabilityScopes.
+void buildAvailabilityScopes(SourceFile &SF);
 
-/// Build the hierarchy of TypeRefinementContexts for the entire
+/// Build the hierarchy of AvailabilityScopes for the entire
 /// source file, if it has not already been built. Returns the root
-/// TypeRefinementContext for the source file.
-TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
+/// AvailabilityScope for the source file.
+AvailabilityScope *getOrBuildAvailabilityScope(SourceFile *SF);
 
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
@@ -1032,25 +1032,11 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 /// is allowed.
 std::optional<Diagnostic> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
 
-/// Same as \c checkDeclarationAvailability but doesn't give a reason for
-/// unavailability.
-bool isDeclarationUnavailable(
-    const Decl *D, const DeclContext *referenceDC,
-    llvm::function_ref<AvailabilityRange()> getAvailabilityRange);
-
-/// Checks whether a declaration should be considered unavailable when
-/// referred to at the given location and, if so, returns the unmet required
-/// version range. Returns None is the declaration is definitely available.
-std::optional<AvailabilityRange>
-checkDeclarationAvailability(const Decl *D, const ExportContext &Where);
-
-/// Checks whether a conformance should be considered unavailable when
-/// referred to at the given location and, if so, returns the unmet required
-/// version range. Returns None is the declaration is definitely available.
-std::optional<AvailabilityRange>
-checkConformanceAvailability(const RootProtocolConformance *Conf,
-                             const ExtensionDecl *Ext,
-                             const ExportContext &Where);
+bool checkAvailability(
+    SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
+    const DeclContext *ReferenceDC,
+    llvm::function_ref<InFlightDiagnostic(StringRef, llvm::VersionTuple)>
+        Diagnose);
 
 bool checkAvailability(SourceRange ReferenceRange,
                        AvailabilityRange RequiredAvailability,
@@ -1284,6 +1270,18 @@ bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
 /// `ExpressibleByStringLiteral` protocol.
 bool isValidStringDynamicMemberLookup(SubscriptDecl *decl,
                                       bool ignoreLabel = false);
+
+/// Returns the KeyPath parameter type for a valid implementation of
+/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
+/// @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)` which
+/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
+///
+/// Returns null if the given subscript is not a valid dynamic member lookup
+/// implementation.
+BoundGenericType *
+getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl,
+                                     bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for

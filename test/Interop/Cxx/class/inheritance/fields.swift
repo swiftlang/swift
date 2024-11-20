@@ -117,4 +117,11 @@ FieldsTestSuite.test("Structs with virtual methods") {
   expectEqual(derived.d, 42)
 }
 
+FieldsTestSuite.test("Field in tail padding of base class") {
+  let usesBaseTailPadding = DerivedUsesBaseTailPadding()
+  expectEqual(usesBaseTailPadding.field2, 789)
+  expectEqual(usesBaseTailPadding.field4, 456)
+  expectEqual(usesBaseTailPadding.field8, 123)
+}
+
 runAllTests()

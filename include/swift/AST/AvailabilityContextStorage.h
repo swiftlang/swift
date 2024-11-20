@@ -36,6 +36,9 @@ struct AvailabilityContext::PlatformInfo {
   /// platform.
   unsigned IsUnavailable : 1;
 
+  /// Whether or not the context is `@_unavailableInEmbedded`.
+  unsigned IsUnavailableInEmbedded : 1;
+
   /// Whether or not the context is considered deprecated on the current
   /// platform.
   unsigned IsDeprecated : 1;
@@ -49,17 +52,7 @@ struct AvailabilityContext::PlatformInfo {
   /// availability is more restrictive. Returns true if any field was updated.
   bool constrainWith(const Decl *decl);
 
-  bool constrainRange(const AvailabilityRange &other) {
-    if (!other.isContainedIn(Range))
-      return false;
-
-    Range = other;
-    return true;
-  }
-
   bool constrainUnavailability(std::optional<PlatformKind> unavailablePlatform);
-
-  bool constrainDeprecated(bool deprecated);
 
   /// Returns true if `other` is as available or is more available.
   bool isContainedIn(const PlatformInfo &other) const;
@@ -67,6 +60,7 @@ struct AvailabilityContext::PlatformInfo {
   void Profile(llvm::FoldingSetNodeID &ID) const {
     Range.getRawVersionRange().Profile(ID);
     ID.AddBoolean(IsUnavailable);
+    ID.AddBoolean(IsUnavailableInEmbedded);
     ID.AddInteger(static_cast<uint8_t>(UnavailablePlatform));
     ID.AddBoolean(IsDeprecated);
   }

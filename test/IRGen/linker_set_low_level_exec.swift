@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 // https://github.com/apple/swift/issues/73321
 // UNSUPPORTED: OS=windows-msvc

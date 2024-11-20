@@ -14,6 +14,7 @@
 #define SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
@@ -200,74 +201,6 @@ public:
   const AvailableAttr *shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
 };
 
-/// Represents the reason a declaration is considered unavailable in a certain
-/// context.
-class UnmetAvailabilityRequirement {
-public:
-  enum class Kind {
-    /// The declaration is referenced in a context in which it is
-    /// generally unavailable. For example, a reference to a declaration that is
-    /// unavailable on macOS from a context that may execute on macOS has this
-    /// unmet requirement.
-    AlwaysUnavailable,
-
-    /// The declaration is referenced in a context in which it is considered
-    /// obsolete. For example, a reference to a declaration that is obsolete in
-    /// macOS 13 from a context that may execute on macOS 13 or later has this
-    /// unmet requirement.
-    Obsoleted,
-
-    /// The declaration is only available in a different version. For example,
-    /// the declaration might only be introduced in the Swift 6 language mode
-    /// while the module is being compiled in the Swift 5 language mode.
-    RequiresVersion,
-
-    /// The declaration is referenced in a context that does not have an
-    /// adequate minimum version constraint. For example, a reference to a
-    /// declaration that is introduced in macOS 13 from a context that may
-    /// execute on earlier versions of macOS has this unmet requirement. This
-    /// kind of unmet requirement can be addressed by tightening the minimum
-    /// version of the context with `if #available(...)` or by adding or
-    /// adjusting an `@available` attribute.
-    IntroducedInNewerVersion,
-  };
-
-private:
-  Kind kind;
-  const AvailableAttr *attr;
-
-  UnmetAvailabilityRequirement(Kind kind, const AvailableAttr *attr)
-      : kind(kind), attr(attr){};
-
-public:
-  static UnmetAvailabilityRequirement
-  forAlwaysUnavailable(const AvailableAttr *attr) {
-    return UnmetAvailabilityRequirement(Kind::AlwaysUnavailable, attr);
-  }
-
-  static UnmetAvailabilityRequirement forObsoleted(const AvailableAttr *attr) {
-    return UnmetAvailabilityRequirement(Kind::Obsoleted, attr);
-  }
-
-  static UnmetAvailabilityRequirement
-  forRequiresVersion(const AvailableAttr *attr) {
-    return UnmetAvailabilityRequirement(Kind::RequiresVersion, attr);
-  }
-
-  static UnmetAvailabilityRequirement
-  forIntroducedInNewerVersion(const AvailableAttr *attr) {
-    return UnmetAvailabilityRequirement(Kind::IntroducedInNewerVersion, attr);
-  }
-
-  Kind getKind() const { return kind; }
-  const AvailableAttr *getAttr() const { return attr; }
-
-  /// Returns the required range for `IntroducedInNewerVersion` requirements, or
-  /// `std::nullopt` otherwise.
-  std::optional<AvailabilityRange>
-  getRequiredNewerAvailabilityRange(ASTContext &ctx) const;
-};
-
 /// Check if a declaration is exported as part of a module's external interface.
 /// This includes public and @usableFromInline decls.
 bool isExported(const ValueDecl *VD);
@@ -278,12 +211,8 @@ bool isExported(const Decl *D);
 void diagnoseExprAvailability(const Expr *E, DeclContext *DC);
 
 /// Diagnose uses of unavailable declarations in statements (via patterns, etc)
-/// but not expressions, unless \p walkRecursively was specified.
-///
-/// \param walkRecursively Whether nested statements and expressions should
-/// be visited, too.
-void diagnoseStmtAvailability(const Stmt *S, DeclContext *DC,
-                              bool walkRecursively=false);
+/// but not expressions.
+void diagnoseStmtAvailability(const Stmt *S, DeclContext *DC);
 
 /// Checks both a TypeRepr and a Type, but avoids emitting duplicate
 /// diagnostics by only checking the Type if the TypeRepr succeeded.
@@ -297,7 +226,8 @@ diagnoseConformanceAvailability(SourceLoc loc,
                                 const ExportContext &context,
                                 Type depTy=Type(),
                                 Type replacementTy=Type(),
-                                bool warnIfConformanceUnavailablePreSwift6 = false);
+                                bool warnIfConformanceUnavailablePreSwift6 = false,
+                                bool preconcurrency = false);
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
@@ -313,11 +243,19 @@ void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 
 /// Checks whether a declaration should be considered unavailable when referred
 /// to in the given declaration context and availability context and, if so,
-/// returns a result that describes the unmet availability requirements.
+/// returns a result that describes the unsatisfied constraint.
 /// Returns `std::nullopt` if the declaration is available.
-std::optional<UnmetAvailabilityRequirement>
-checkDeclarationAvailability(const Decl *decl, const DeclContext *declContext,
-                             AvailabilityContext availabilityContext);
+std::optional<AvailabilityConstraint>
+getUnsatisfiedAvailabilityConstraint(const Decl *decl,
+                                     const DeclContext *declContext,
+                                     AvailabilityContext availabilityContext);
+
+/// Checks whether a declaration should be considered unavailable when referred
+/// to at the given source location in the given decl context and, if so,
+/// returns a result that describes the unsatisfied constraint.
+/// Returns `std::nullopt` if the declaration is available.
+std::optional<AvailabilityConstraint> getUnsatisfiedAvailabilityConstraint(
+    const Decl *decl, const DeclContext *referenceDC, SourceLoc referenceLoc);
 
 /// Diagnose uses of the runtime support of the given type, such as
 /// type metadata and dynamic casting.

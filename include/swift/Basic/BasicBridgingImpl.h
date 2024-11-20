@@ -13,6 +13,8 @@
 #ifndef SWIFT_BASIC_BASICBRIDGINGIMPL_H
 #define SWIFT_BASIC_BASICBRIDGINGIMPL_H
 
+#include "swift/Basic/Assertions.h"
+
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
@@ -121,6 +123,16 @@ BridgedCharSourceRange::BridgedCharSourceRange(swift::CharSourceRange range)
 
 swift::CharSourceRange BridgedCharSourceRange::unbridged() const {
   return swift::CharSourceRange(Start.unbridged(), ByteLength);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedSwiftVersion
+//===----------------------------------------------------------------------===//
+
+BridgedSwiftVersion::BridgedSwiftVersion(SwiftInt major, SwiftInt minor)
+    : Major(major), Minor(minor) {
+  ASSERT(major >= 0 && minor >= 0);
+  ASSERT(major == Major && minor == Minor);
 }
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

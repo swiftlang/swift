@@ -637,3 +637,40 @@ bb0:
   %13 = tuple ()
   return %13 : $()
 }
+
+// Remove trivial move_value + extend_lifetime
+//
+// CHECK-LABEL: sil [ossa] @move_extend_lifetime : $@convention(thin) (@thin Trivial.Type) -> () {
+// CHECK: bb0(%0 : $@thin Trivial.Type):
+// CHECK-NOT: move_value
+// CHECK-NOT: extend_lifetime
+// CHECK-LABEL: } // end sil function 'move_extend_lifetime'
+sil [ossa] @move_extend_lifetime : $@convention(thin) (@thin Trivial.Type) -> () {
+bb0(%0 : $@thin Trivial.Type):
+  %mv = move_value [var_decl] %0 : $@thin Trivial.Type
+  extend_lifetime %mv : $@thin Trivial.Type
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil @captureType : $@convention(thin) (@thin Trivial.Type) -> ()
+sil @takeClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+
+// SILGen pattern binding can (incorrectly) create a local variable to hold the value a function argument. This results
+// in an extend_lifetime that directly uses the argument value. Ensure that MoveOnlyTypeEliminator erases the
+// extend_lifetime.
+//
+// CHECK-LABEL: sil [ossa] @arg_extend_lifetime : $@convention(thin) (@thin Trivial.Type) -> () {
+// CHECK-NOT: extend_lifetime
+// CHECK-LABEL: } // end sil function 'arg_extend_lifetime'
+sil [ossa] @arg_extend_lifetime : $@convention(thin) (@thin Trivial.Type) -> () {
+bb0(%0 : $@thin Trivial.Type):
+  %cf = function_ref @captureType : $@convention(thin) (@thin Trivial.Type) -> ()
+  %closure = partial_apply [callee_guaranteed] [on_stack] %cf(%0) : $@convention(thin) (@thin Trivial.Type) -> ()
+  %f = function_ref @takeClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = apply %f(%closure) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %closure : $@noescape @callee_guaranteed () -> ()
+  extend_lifetime %0 : $@thin Trivial.Type
+  %13 = tuple ()
+  return %13 : $()
+}

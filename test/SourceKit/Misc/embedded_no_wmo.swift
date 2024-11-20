@@ -18,6 +18,7 @@ final public class X<T> {
 // REQUIRES: swift_in_compiler
 // REQUIRES: embedded_stdlib
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 // check that SourceKit does not crash on this
 

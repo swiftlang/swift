@@ -643,8 +643,7 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
 
     // If the keyPath result type has type parameters, that might affect the
     // subscript result type.
-    auto keyPathResultTy =
-        getResultTypeOfKeypathDynamicMember(SD)->mapTypeOutOfContext();
+    auto keyPathResultTy = getResultTypeOfKeypathDynamicMember(SD);
     if (keyPathResultTy->hasTypeParameter()) {
       auto keyPathRootTy = getRootTypeOfKeypathDynamicMember(SD).subst(
           QueryTypeSubstitutionMap{subs},
@@ -2965,6 +2964,22 @@ void CompletionLookup::getTypeCompletions(Type BaseType) {
   }
 }
 
+void CompletionLookup::getInvertedTypeCompletions() {
+  Kind = LookupKind::Type;
+
+  auto addCompletion = [&](InvertibleProtocolKind invertableKind) {
+    auto *P = Ctx.getProtocol(getKnownProtocolKind(invertableKind));
+    if (!P)
+      return;
+
+    addNominalTypeRef(P, DeclVisibilityKind::VisibleAtTopLevel,
+                      DynamicLookupInfo());
+  };
+#define INVERTIBLE_PROTOCOL(Name, Bit)         \
+  addCompletion(InvertibleProtocolKind::Name);
+#include "swift/ABI/InvertibleProtocols.def"
+}
+
 void CompletionLookup::getGenericRequirementCompletions(
     DeclContext *DC, SourceLoc CodeCompletionLoc) {
   auto genericSig = DC->getGenericSignatureOfContext();
@@ -3490,10 +3505,4 @@ void CompletionLookup::getOptionalBindingCompletions(SourceLoc Loc) {
 
   lookupVisibleDecls(FilteringConsumer, Loc, CurrDeclContext,
                      /*IncludeTopLevel=*/false);
-}
-
-void CompletionLookup::addWithoutConstraintTypes() {
-  auto *CopyableDecl = Ctx.getProtocol(KnownProtocolKind::Copyable);
-  addNominalTypeRef(CopyableDecl, DeclVisibilityKind::VisibleAtTopLevel,
-                    DynamicLookupInfo());
 }

@@ -39,7 +39,6 @@
 #include "swift/IRGen/TBDGen.h"
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
@@ -52,9 +51,9 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/BLAKE3.h"
 #include "llvm/Support/HashingOutputBackend.h"
-#include "llvm/TargetParser/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/VirtualOutputBackend.h"
+#include "llvm/TargetParser/Host.h"
 
 #include <memory>
 
@@ -104,6 +103,7 @@ class CompilerInvocation {
   TBDGenOptions TBDGenOpts;
   ModuleInterfaceOptions ModuleInterfaceOpts;
   CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   llvm::MemoryBuffer *IDEInspectionTargetBuffer = nullptr;
 
   /// The offset that IDEInspection wants to further examine in offset of bytes
@@ -326,6 +326,11 @@ public:
 
   IRGenOptions &getIRGenOptions() { return IRGenOpts; }
   const IRGenOptions &getIRGenOptions() const { return IRGenOpts; }
+
+  SerializationOptions &getSerializationOptions() { return SerializationOpts; }
+  const SerializationOptions &getSerializationOptions() const {
+    return SerializationOpts;
+  }
 
   void setParseStdlib() {
     FrontendOpts.ParseStdlib = true;

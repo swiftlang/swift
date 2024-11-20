@@ -1,4 +1,5 @@
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature SymbolLinkageMarkers -emit-module-path %t/a.swiftmodule -module-name a %s

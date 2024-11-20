@@ -40,12 +40,13 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Bridging/MacroEvaluation.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "llvm/Config/config.h"
@@ -198,6 +199,14 @@ MacroDefinition MacroDefinitionRequest::evaluate(
       TypeCheckExprFlags::DisableMacroExpansions);
   if (!typeCheckedType)
     return MacroDefinition::forInvalid();
+
+  // If the expanded macro was one of the the magic literal expressions
+  // (like #file), there's nothing to expand.
+  if (auto magicLiteral =
+          dyn_cast<MagicIdentifierLiteralExpr>(definition)) {
+    StringRef expansionText = externalMacroName.unbridged();
+    return MacroDefinition::forExpanded(ctx, expansionText, { }, { });
+  }
 
   // Dig out the macro that was expanded.
   auto expansion = cast<MacroExpansionExpr>(definition);
@@ -1025,8 +1034,11 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
   if (auto parentSourceFile = dc->getParentSourceFile())
     macroSourceFile->setImports(parentSourceFile->getImports());
-  else if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
-    macroSourceFile->setImports({});
+  else if (auto clangModuleUnit =
+               dyn_cast<ClangModuleUnit>(dc->getModuleScopeContext())) {
+    auto clangModule = clangModuleUnit->getParentModule();
+    performImportResolutionForClangMacroBuffer(*macroSourceFile, clangModule);
+  }
   return macroSourceFile;
 }
 
@@ -1105,9 +1117,10 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
       return nullptr;
 
     case BuiltinMacroKind::IsolationMacro:
-      // Create a buffer full of scratch space; this will be populated
-      // much later.
-      std::string scratchSpace(128, ' ');
+      // Create a buffer with "nil" plus a bunch of scratch space. This
+      // will be populated much later.
+      std::string scratchSpace = "nil";
+      scratchSpace.append(125, ' ');
       evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
           scratchSpace,
           adjustMacroExpansionBufferName(*discriminator));
@@ -1351,11 +1364,12 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   if (!attrSourceFile)
     return nullptr;
 
-  // If the declaration has no source location and comes from a Clang module,
+  // If the declaration comes from a Clang module,
   // pretty-print the declaration and use that location.
   SourceLoc attachedToLoc = attachedTo->getLoc();
-  if (attachedToLoc.isInvalid() &&
-      isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
+  bool isPrettyPrintedDecl = false;
+  if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
+    isPrettyPrintedDecl = true;
     attachedToLoc = evaluateOrDefault(
         ctx.evaluator, PrettyPrintDeclRequest{attachedTo}, SourceLoc());
   }
@@ -1501,7 +1515,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
       searchDecl = var->getParentPatternBinding();
 
     auto startLoc = searchDecl->getStartLoc();
-    if (startLoc.isInvalid() && isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
+    if (isPrettyPrintedDecl) {
       startLoc = attachedToLoc;
     }
 
@@ -2078,7 +2092,19 @@ ResolveMacroConformances::evaluate(Evaluator &evaluator,
   auto &ctx = dc->getASTContext();
 
   SmallVector<Type, 2> protocols;
-  for (auto *typeExpr : attr->getConformances()) {
+  for (Expr *&expr : const_cast<MacroRoleAttr *>(attr)->getConformances()) {
+    using namespace constraints;
+    auto target = SyntacticElementTarget(expr, dc, CTP_Unused, Type(),
+                                         /*isDiscarded=*/true);
+    if (ConstraintSystem::preCheckTarget(target))
+      continue;
+    auto *typeExpr = dyn_cast<TypeExpr>(target.getAsExpr());
+    if (!typeExpr) {
+      ctx.Diags.diagnose(expr->getStartLoc(), diag::expected_type);
+      continue;
+    }
+    expr = typeExpr;
+
     if (auto *typeRepr = typeExpr->getTypeRepr()) {
       auto resolved =
           TypeResolution::forInterface(

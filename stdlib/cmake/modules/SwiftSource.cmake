@@ -326,6 +326,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION")
   endif()
 
+  if(SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
+    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS")
+  endif()
+
   if(SWIFT_ENABLE_SYNCHRONIZATION)
     list(APPEND result "-D" "SWIFT_ENABLE_SYNCHRONIZATION")
   endif()
@@ -629,10 +633,10 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "SuppressedAssociatedTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "SE427NoInferenceOnExtension")
   list(APPEND swift_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
-
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
+  list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")
 
-  list(APPEND swift_flags "-enable-experimental-feature" "ExtensionImportVisiblity")
+  list(APPEND swift_flags "-enable-upcoming-feature" "MemberImportVisibility")
 
   if (SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE)
     list(APPEND swift_flags "-strict-concurrency=complete")

@@ -788,6 +788,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt AssignInst_getAssignOwnership() const;
   BRIDGED_INLINE MarkDependenceKind MarkDependenceInst_dependenceKind() const;
   BRIDGED_INLINE void MarkDependenceInst_resolveToNonEscaping() const;
+  BRIDGED_INLINE void MarkDependenceInst_settleToEscaping() const;
   BRIDGED_INLINE SwiftInt BeginAccessInst_getAccessKind() const;
   BRIDGED_INLINE bool BeginAccessInst_isStatic() const;
   BRIDGED_INLINE bool BeginAccessInst_isUnsafe() const;
@@ -864,6 +865,7 @@ struct BridgedArgument {
   BRIDGED_INLINE swift::SILArgument * _Nonnull getArgument() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getParent() const;
   BRIDGED_INLINE bool isReborrow() const;
+  BRIDGED_INLINE void setReborrow(bool reborrow) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getVarDecl() const;
   BRIDGED_INLINE void copyFlags(BridgedArgument fromArgument) const;
 };
@@ -927,7 +929,7 @@ struct BridgedSuccessorArray {
 };
 
 struct BridgedDeclRef {
-  uint64_t storage[4];
+  uint64_t storage[3];
 
   BRIDGED_INLINE BridgedDeclRef(swift::SILDeclRef declRef);
   BRIDGED_INLINE swift::SILDeclRef unbridged() const;
@@ -938,7 +940,7 @@ struct BridgedDeclRef {
 };
 
 struct BridgedVTableEntry {
-  uint64_t storage[6];
+  uint64_t storage[5];
 
   enum class Kind {
     Normal,
@@ -980,7 +982,7 @@ struct OptionalBridgedVTable {
 };
 
 struct BridgedWitnessTableEntry {
-  uint64_t storage[6];
+  uint64_t storage[5];
 
   enum class Kind {
     invalid,
@@ -1193,6 +1195,10 @@ struct BridgedBuilder{
     BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind dependenceKind) const;
     
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndAccess(BridgedValue value) const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndApply(BridgedValue value) const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAbortApply(BridgedValue value) const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createConvertFunction(BridgedValue originalFunction, BridgedType resultType, bool withoutActuallyEscaping) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createConvertEscapeToNoEscape(BridgedValue originalFunction, BridgedType resultType, bool isLifetimeGuaranteed) const;

@@ -413,6 +413,43 @@ public:
 #endif
 };
 
+//===----------------------------------------------------------------------===//
+// MARK: BridgedSwiftVersion
+//===----------------------------------------------------------------------===//
+
+class BridgedSwiftVersion {
+  unsigned Major;
+  unsigned Minor;
+
+public:
+  BridgedSwiftVersion() : Major(0), Minor(0) {}
+
+  BRIDGED_INLINE
+  SWIFT_NAME("init(major:minor:)")
+  BridgedSwiftVersion(SwiftInt major, SwiftInt minor);
+
+  unsigned getMajor() const { return Major; }
+  unsigned getMinor() const { return Minor; }
+};
+
+//===----------------------------------------------------------------------===//
+// MARK: GeneratedSourceInfo
+//===----------------------------------------------------------------------===//
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedGeneratedSourceFileKind {
+#define MACRO_ROLE(Name, Description)                                          \
+  BridgedGeneratedSourceFileKind##Name##MacroExpansion,
+#include "swift/Basic/MacroRoles.def"
+#undef MACRO_ROLE
+
+  BridgedGeneratedSourceFileKindReplacedFunctionBody,
+  BridgedGeneratedSourceFileKindPrettyPrinted,
+  BridgedGeneratedSourceFileKindDefaultArgument,
+  BridgedGeneratedSourceFileKindAttribute,
+
+  BridgedGeneratedSourceFileKindNone,
+};
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #ifndef PURE_BRIDGING_MODE

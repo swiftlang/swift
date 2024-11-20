@@ -280,21 +280,21 @@ DeclContext *DeclContext::getInnermostSkippedFunctionContext() {
   return nullptr;
 }
 
-ClosureExpr *DeclContext::getInnermostClosureForSelfCapture() {
-  auto dc = this;
-  if (auto closure = dyn_cast<ClosureExpr>(dc)) {
-    return closure;
-  }
+ClosureExpr *DeclContext::getInnermostClosureForCaptures() {
+  auto *DC = this;
+  do {
+    if (auto *CE = dyn_cast<ClosureExpr>(DC))
+      return CE;
 
-  // Stop searching if we find a type decl, since types always
-  // redefine what 'self' means, even when nested inside a closure.
-  if (dc->isTypeContext()) {
-    return nullptr;
-  }
-
-  if (auto parent = dc->getParent()) {
-    return parent->getInnermostClosureForSelfCapture();
-  }
+    // Autoclosures and AbstractFunctionDecls can propagate captures.
+    switch (DC->getContextKind()) {
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::AbstractFunctionDecl:
+      continue;
+    default:
+      return nullptr;
+    }
+  } while ((DC = DC->getParent()));
 
   return nullptr;
 }

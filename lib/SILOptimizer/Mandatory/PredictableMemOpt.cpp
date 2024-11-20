@@ -38,6 +38,9 @@
 
 using namespace swift;
 
+static llvm::cl::opt<bool> EnableAggressiveExpansionBlocking(
+  "enable-aggressive-expansion-blocking", llvm::cl::init(false));
+
 STATISTIC(NumLoadPromoted, "Number of loads promoted");
 STATISTIC(NumLoadTakePromoted, "Number of load takes promoted");
 STATISTIC(NumDestroyAddrPromoted, "Number of destroy_addrs promoted");
@@ -3152,6 +3155,13 @@ static AllocationInst *getOptimizableAllocation(SILInstruction *i) {
   // Do not perform this on move only values since we introduce copies to
   // promote things.
   if (getMemoryType(alloc).isMoveOnly())
+    return nullptr;
+
+  // Don't promote large types.
+  auto &mod = alloc->getFunction()->getModule();
+  if (EnableAggressiveExpansionBlocking &&
+      mod.getOptions().UseAggressiveReg2MemForCodeSize &&
+      !shouldExpand(mod, alloc->getType().getObjectType()))
     return nullptr;
 
   // Otherwise we are good to go. Lets try to optimize this memory!

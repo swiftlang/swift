@@ -27,6 +27,7 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Version.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSFix.h"
@@ -294,10 +295,16 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
 
   // For a @preconcurrency callee outside of a strict concurrency
   // context, ignore.
-  if (cs.hasPreconcurrencyCallee(locator) &&
-      !contextRequiresStrictConcurrencyChecking(
-          cs.DC, GetClosureType{cs}, ClosureIsolatedByPreconcurrency{cs}))
+  if (cs.hasPreconcurrencyCallee(locator)) {
+    // Preconcurrency failures are always downgraded to warnings, even in
+    // Swift 6 mode.
+    if (contextRequiresStrictConcurrencyChecking(
+            cs.DC, GetClosureType{cs}, ClosureIsolatedByPreconcurrency{cs})) {
+      return FixBehavior::DowngradeToWarning;
+    }
+
     return FixBehavior::Suppress;
+  }
 
   // Otherwise, warn until Swift 6.
   if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6))
@@ -1231,7 +1238,15 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
                                         bool asNote) const {
   switch (Kind) {
   case RefKind::StaticMember: {
-    return false;
+    InvalidStaticMemberRefInKeyPath failure(solution, BaseType, Member,
+                                            getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::UnsupportedStaticMember: {
+    UnsupportedStaticMemberRefInKeyPath failure(solution, BaseType, Member,
+                                                getLocator());
+    return failure.diagnose(asNote);
   }
 
   case RefKind::EnumCase: {
@@ -1281,12 +1296,23 @@ AllowInvalidRefInKeyPath *
 AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
                                  ValueDecl *member,
                                  ConstraintLocator *locator) {
+  if (member->isStatic() && !isa<FuncDecl>(member)) {
+    // References to static members are supported only for modules that
+    // are built with 6.1+ compilers, libraries produced by earlier
+    // compilers don't have required symbols.
+    if (auto *module = member->getDeclContext()->getParentModule()) {
+      if (module->isBuiltFromInterface()) {
+        auto compilerVersion = module->getSwiftInterfaceCompilerVersion();
+        if (!compilerVersion.isVersionAtLeast(6, 1))
+          return AllowInvalidRefInKeyPath::create(
+              cs, baseType, RefKind::UnsupportedStaticMember, member, locator);
+      }
+    }
 
-  if (!cs.getASTContext().LangOpts.hasFeature(
-          Feature::KeyPathWithStaticMembers) &&
-      member->isStatic())
-    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::StaticMember,
-                                            member, locator);
+    if (!baseType->getRValueType()->is<AnyMetatypeType>())
+      return AllowInvalidRefInKeyPath::create(
+          cs, baseType, RefKind::StaticMember, member, locator);
+  }
 
   // Referencing (instance or static) methods in key path is
   // not currently allowed.

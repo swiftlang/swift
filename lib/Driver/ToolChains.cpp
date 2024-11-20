@@ -204,6 +204,12 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-disable-objc-interop");
   }
 
+  if (const Arg *arg = inputArgs.getLastArg(
+        options::OPT_experimental_serialize_debug_info)) {
+    arguments.push_back(
+        inputArgs.MakeArgString(Twine("-experimental-serialize-debug-info")));
+  }
+
   if (inputArgs.hasArg(options::OPT_experimental_hermetic_seal_at_link)) {
     arguments.push_back("-enable-llvm-vfe");
     arguments.push_back("-enable-llvm-wme");
@@ -264,8 +270,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_disable_dynamic_actor_isolation);
   inputArgs.AddLastArg(arguments, options::OPT_warn_concurrency);
   inputArgs.AddLastArg(arguments, options::OPT_strict_concurrency);
-  inputArgs.AddAllArgs(arguments, options::OPT_enable_experimental_feature);
-  inputArgs.AddAllArgs(arguments, options::OPT_enable_upcoming_feature);
+  inputArgs.addAllArgs(arguments, {options::OPT_enable_experimental_feature,
+                                   options::OPT_disable_experimental_feature,
+                                   options::OPT_enable_upcoming_feature,
+                                   options::OPT_disable_upcoming_feature});
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
@@ -708,6 +716,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-silgen";
   case file_types::TY_SIL:
     return "-emit-sil";
+  case file_types::TY_LoweredSIL:
+    return "-emit-lowered-sil";
   case file_types::TY_RawSIB:
     return "-emit-sibgen";
   case file_types::TY_SIB:
@@ -1008,6 +1018,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_RawSIL:
     case file_types::TY_RawSIB:
     case file_types::TY_SIL:
+    case file_types::TY_LoweredSIL:
     case file_types::TY_SIB:
     case file_types::TY_PCH:
     case file_types::TY_ClangModuleFile:

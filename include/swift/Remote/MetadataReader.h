@@ -1481,7 +1481,7 @@ public:
       return 0;
     };
 
-    switch (auto kind = flags.getKind()) {
+    switch (flags.getKind()) {
     case ContextDescriptorKind::Module:
       baseSize = sizeof(TargetModuleContextDescriptor<Runtime>);
       break;

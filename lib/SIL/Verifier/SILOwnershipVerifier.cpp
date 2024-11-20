@@ -583,8 +583,7 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
   // If we have a guaranteed value, make sure that all uses are before our
   // end_yield.
   SmallVector<Operand *, 4> coroutineEndUses;
-  for (auto *use : yield->getParent<BeginApplyInst>()->
-                     getTokenResult()->getUses()) {
+  for (auto *use : yield->getParent<BeginApplyInst>()->getEndApplyUses()) {
     coroutineEndUses.push_back(use);
   }
 

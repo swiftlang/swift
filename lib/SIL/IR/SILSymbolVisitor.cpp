@@ -735,6 +735,9 @@ public:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     auto nominal = ED->getExtendedNominal();
+    if (!nominal)
+      return;
+
     if (canSkipNominal(nominal))
       return;
 
@@ -819,6 +822,11 @@ public:
           if (Resilient || WitnessMethodElimination) {
             Visitor.addDispatchThunk(declRef);
             Visitor.addMethodDescriptor(declRef);
+          }
+          auto *decl =
+              llvm::dyn_cast_or_null<AbstractFunctionDecl>(declRef.getDecl());
+          if (decl && decl->hasBody()) {
+            Visitor.addFunction(declRef);
           }
         }
 

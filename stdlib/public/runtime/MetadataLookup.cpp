@@ -164,7 +164,7 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
       break;
         
     default:
-      if (auto typeContext = dyn_cast<TypeContextDescriptor>(descriptor)) {
+      if (isa<TypeContextDescriptor>(descriptor)) {
         nodeKind = Node::Kind::TypeSymbolicReference;
         isType = true;
         break;
@@ -2453,6 +2453,13 @@ public:
 
   TypeLookupErrorOr<BuiltType> createNegativeIntegerType(intptr_t value) {
     return BuiltType(value);
+  }
+
+  TypeLookupErrorOr<BuiltType> createBuiltinFixedArrayType(BuiltType size,
+                                                           BuiltType element) {
+    return BuiltType(swift_getFixedArrayTypeMetadata(MetadataState::Abstract,
+                                                     size.getValue(),
+                                                     element.getMetadata()));
   }
 };
 

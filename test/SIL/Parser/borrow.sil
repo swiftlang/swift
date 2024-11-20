@@ -54,7 +54,7 @@ sil [ossa] @foo : $@convention(thin) () -> () {
 }
 
 // CHECK-LABEL: sil [ossa] @reborrowTest : $@convention(thin) (@owned C) -> () {
-// CHECK:       bb3([[ARG:%.*]] : @reborrow @guaranteed $C):
+// CHECK:       bb3([[ARG:%.*]] : @reborrow $C):
 // CHECK-NEXT:    {{%.*}} = borrowed [[ARG]] : $C from (%0 : $C)
 // CHECK:       } // end sil function 'reborrowTest'
 sil [ossa] @reborrowTest : $@convention(thin) (@owned C) -> () {
@@ -69,7 +69,7 @@ bb2:
   %b2 = begin_borrow %0 : $C
   br bb3(%b2 : $C)
 
-bb3(%r : @reborrow @guaranteed $C):
+bb3(%r : @reborrow $C):
   %f = borrowed %r : $C from (%0 : $C)
   end_borrow %f : $C
   destroy_value %0 : $C

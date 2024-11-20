@@ -317,6 +317,7 @@ protected:
     SHARED_FIELD(SILFunctionArgument, uint32_t noImplicitCopy : 1,
                  lifetimeAnnotation : 2, closureCapture : 1,
                  parameterPack : 1);
+    SHARED_FIELD(MergeRegionIsolationInst, uint32_t numOperands);
 
     // Do not use `_sharedUInt32_private` outside of SILNode.
   } _sharedUInt32_private;

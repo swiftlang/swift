@@ -30,7 +30,9 @@ struct OverrideSection {
   Override_ ## name name;
 #include "CompatibilityOverride.def"
 };
-  
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-designated-field-initializers"
 OverrideSection Swift50Overrides
 __attribute__((used, section("__DATA,__swift_hooks"))) = {
   .version = 0,
@@ -41,6 +43,7 @@ __attribute__((used, section("__DATA,__swift_hooks"))) = {
   // the Compatibility51 library is always linked when the 50 library is.
   .conformsToSwiftProtocol = swift51override_conformsToSwiftProtocol,
 };
+#pragma clang diagnostic pop
 
 // Allow this library to get force-loaded by autolinking
 __attribute__((weak, visibility("hidden")))

@@ -387,7 +387,7 @@ PASS(TempRValueOpt, "temp-rvalue-opt",
      "Remove short-lived immutable temporary copies")
 PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
-PASS(TransferNonSendable, "transfer-non-sendable",
+PASS(SendNonSendable, "send-non-sendable",
      "Checks calls that send non-sendable values between isolation domains")
 PASS(LowerTupleAddrConstructor, "lower-tuple-addr-constructor",
      "Lower tuple addr constructor to tuple_element_addr+copy_addr")
@@ -531,6 +531,7 @@ SWIFT_SILCOMBINE_PASS(DestroyValueInst)
 SWIFT_SILCOMBINE_PASS(DestructureStructInst)
 SWIFT_SILCOMBINE_PASS(DestructureTupleInst)
 SWIFT_SILCOMBINE_PASS(TypeValueInst)
+SWIFT_SILCOMBINE_PASS(UncheckedEnumDataInst)
 
 #undef IRGEN_PASS
 #undef SWIFT_MODULE_PASS

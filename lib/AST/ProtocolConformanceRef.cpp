@@ -33,16 +33,10 @@
 
 using namespace swift;
 
-ProtocolConformanceRef::ProtocolConformanceRef(ProtocolDecl *protocol,
-                                               ProtocolConformance *conf) {
-  assert(protocol != nullptr &&
-         "cannot construct ProtocolConformanceRef with null protocol");
-  if (conf) {
-    assert(protocol == conf->getProtocol() && "protocol conformance mismatch");
-    Union = conf;
-  } else {
-    Union = protocol;
-  }
+ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
+    Type subjectType, ProtocolDecl *proto) {
+  // Temporary implementation:
+  return ProtocolConformanceRef(proto);
 }
 
 bool ProtocolConformanceRef::isInvalid() const {

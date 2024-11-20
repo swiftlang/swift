@@ -148,6 +148,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       case PluginSearchOptionKind::LoadPluginExecutable:
         optKind = PluginSearchOption::Kind::LoadPluginExecutable;
         break;
+      case PluginSearchOptionKind::ResolvedPluginConfig:
+        optKind = PluginSearchOption::Kind::ResolvedPluginConfig;
+        break;
       }
       extendedInfo.addPluginSearchOption({optKind, blobData});
       break;
@@ -1850,6 +1853,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
                                           bool importNonPublicDependencies,
                                           bool isPartialModule,
                                           StringRef packageName,
+                                          bool resolveInPackageModuleDependencies,
                                           bool forTestable) const {
   if (isPartialModule) {
     // Keep the merge-module behavior for legacy support. In that case
@@ -1889,6 +1893,9 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
   }
 
   if (dependency.isPackageOnly()) {
+    if (!resolveInPackageModuleDependencies)
+      return ModuleLoadingBehavior::Ignored;
+
     // Package dependencies are usually loaded only for import from the same
     // package.
     if ((!packageName.empty() && packageName == getModulePackageName()) ||

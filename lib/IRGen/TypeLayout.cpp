@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeLayout.h"
+#include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "EnumPayload.h"
 #include "FixedTypeInfo.h"
@@ -70,7 +71,7 @@ public:
     Bridge = 0x08,
     Block = 0x09,
     ObjC = 0x0a,
-    Custom = 0x0b,
+    NativeSwiftObjC = 0x0b,
 
     // reserved
     // Metatype = 0x0c,
@@ -1293,9 +1294,17 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
   case ScalarKind::BlockReference:
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Block, size);
     break;
-  case ScalarKind::ObjCReference:
+  case ScalarKind::ObjCReference: {
+    if (auto *classDecl = representative.getClassOrBoundGenericClass()) {
+      if (!classDecl->hasClangNode()) {
+        B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeSwiftObjC,
+                      size);
+        break;
+      }
+    }
     B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC, size);
     break;
+  }
   case ScalarKind::ThickFunc:
     B.addSkip(IGM.getPointerSize().getValue());
     B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong,

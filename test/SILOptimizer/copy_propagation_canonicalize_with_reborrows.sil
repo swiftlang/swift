@@ -13,7 +13,7 @@ sil [ossa] @getX : $@convention(thin) () -> (@owned X)
 sil [ossa] @holdX : $@convention(thin) (@guaranteed X) -> ()
 
 // CHECK-LABEL: sil [ossa] @nohoist_destroy_over_reborrow_endborrow : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow @guaranteed $X, [[VALUE:%[^,]+]] : @owned $X):
+// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow $X, [[VALUE:%[^,]+]] : @owned $X):
 // CHECK:         [[BF:%.*]] = borrowed [[REBORROW]] : $X from ([[VALUE]] : $X)
 // CHECK:         end_borrow [[BF]]
 // CHECK:         destroy_value [[VALUE]]
@@ -36,7 +36,7 @@ exit:
 }
 
 // CHECK-LABEL: sil [ossa] @hoist_destroy_over_unrelated_endborrow : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[UNRELATED:%[^,]+]] : @reborrow @guaranteed $X, [[VALUE:%[^,]+]] : @owned $X):
+// CHECK:       {{bb[0-9]+}}([[UNRELATED:%[^,]+]] : @reborrow $X, [[VALUE:%[^,]+]] : @owned $X):
 // CHECK:         destroy_value [[VALUE]]
 // CHECK:         [[BF:%.*]] = borrowed [[UNRELATED]] : $X from (%0 : $X)
 // CHECK:         end_borrow [[BF]]
@@ -61,8 +61,8 @@ exit:
 }
 
 // CHECK-LABEL: sil [ossa] @nohoist_destroy_over_reborrow_reborrow_endborrow : {{.*}} {
-// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @reborrow @guaranteed $X, {{%[^,]+}} : @owned $X):
-// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow @guaranteed $X, [[VALUE:%[^,]+]] : @owned $X):
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @reborrow $X, {{%[^,]+}} : @owned $X):
+// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow $X, [[VALUE:%[^,]+]] : @owned $X):
 // CHECK:         [[BF:%.*]] = borrowed [[REBORROW]] : $X from ([[VALUE]] : $X)
 // CHECK:         end_borrow [[BF]]
 // CHECK:         destroy_value [[VALUE]]
@@ -88,8 +88,8 @@ exit:
 }
 
 // CHECK-LABEL: sil [ossa] @hoist_destroy_over_unrelated_reborrow_reborrow_endborrow : {{.*}} {
-// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @reborrow @guaranteed $X, {{%[^,]+}} : @owned $X):
-// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow @guaranteed $X, [[VALUE:%[^,]+]] : @owned $X):
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @reborrow $X, {{%[^,]+}} : @owned $X):
+// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow $X, [[VALUE:%[^,]+]] : @owned $X):
 // CHECK:         destroy_value [[VALUE]]
 // CHECK:         [[BF:%.*]] = borrowed [[REBORROW]] : $X from (%0 : $X)
 // CHECK:         end_borrow [[BF]]
@@ -117,7 +117,7 @@ exit:
 }
 
 // CHECK-LABEL: sil [ossa] @nohoist_destroy_over_forward_reborrow_endborrow : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow @guaranteed $X, [[VALUE:%[^,]+]] : @owned $X):
+// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow $X, [[VALUE:%[^,]+]] : @owned $X):
 // CHECK:         [[BF:%.*]] = borrowed [[REBORROW]] : $X from ([[VALUE]] : $X)
 // CHECK:         end_borrow [[BF]]
 // CHECK:         destroy_value [[VALUE]]
@@ -143,7 +143,7 @@ exit:
 }
 
 // CHECK-LABEL: sil [ossa] @nohoist_destroy_over_reborrow_loop : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow @guaranteed $FakeOptional<X>, [[VALUE:%[^,]+]] : @owned $FakeOptional<X>):
+// CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow $FakeOptional<X>, [[VALUE:%[^,]+]] : @owned $FakeOptional<X>):
 // CHECK:         [[BF:%.*]] = borrowed [[REBORROW]] : $FakeOptional<X> from ([[VALUE]] : $FakeOptional<X>)
 // CHECK:         cond_br undef, [[LOOP:bb[0-9]+]], [[BODY:bb[0-9]+]]
 // CHECK:       [[LOOP]]:
@@ -183,7 +183,7 @@ exit:
 // a non-lifetime ending use and extend liveness beyond the instruction where
 // the reborrow occurs.
 // CHECK-LABEL: sil [ossa] @reborrow_adjacent_to_consume_doesnt_extend_lifetime : {{.*}} {
-// CHECK:       bb1([[REBORROW:%[^,]+]] : @reborrow @guaranteed $X, [[VALUE:%[^,]+]] :
+// CHECK:       bb1([[REBORROW:%[^,]+]] : @reborrow $X, [[VALUE:%[^,]+]] :
 // CHECK:         [[R:%.*]] = borrowed [[REBORROW]] : $X from ([[VALUE]] : $X)
 // CHECK:       {{bb[0-9]+}}:
 // CHECK:         end_borrow [[R]]
@@ -307,10 +307,10 @@ bb1(%4 : @guaranteed $X, %5 : @owned $X):
 // end_borrow/destroy maintain their position.
 //
 // CHECK-LABEL: sil [ossa] @reborrow_adjacent_to_consume : $@convention(thin) () -> () {
-// CHECK: bb1(%{{.*}} : @reborrow @guaranteed $X, %{{.*}} : @owned $X):
+// CHECK: bb1(%{{.*}} : @reborrow $X, %{{.*}} : @owned $X):
 // CHECK-NEXT:   borrowed
 // CHECK-NEXT:   br bb2
-// CHECK: bb2(%{{.*}} : @reborrow @guaranteed $X, %{{.*}} : @owned $X):
+// CHECK: bb2(%{{.*}} : @reborrow $X, %{{.*}} : @owned $X):
 // CHECK-NEXT:   borrowed
 // CHECK-NEXT:   end_borrow
 // CHECK-NEXT:   destroy_value
@@ -341,10 +341,10 @@ bb2(%6 : @guaranteed $X, %7 : @owned $X):
 // Lifetime analysis is successful; the copy/destroy in bb2 are removed.
 //
 // CHECK-LABEL: sil [ossa] @reborrow_no_adjacent_consume : $@convention(thin) () -> () {
-// CHECK: bb1(%{{.*}} : @reborrow @guaranteed $X, %{{.*}} : @owned $X):
+// CHECK: bb1(%{{.*}} : @reborrow $X, %{{.*}} : @owned $X):
 // CHECK-NEXT:   borrowed
 // CHECK-NEXT:   br bb2
-// CHECK: bb2(%{{.*}} : @reborrow @guaranteed $X):
+// CHECK: bb2(%{{.*}} : @reborrow $X):
 // CHECK-NEXT:   borrowed
 // CHECK-NEXT:   end_borrow
 // CHECK-NEXT:   destroy_value

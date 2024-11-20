@@ -17,6 +17,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -62,6 +63,30 @@ AvailabilityRange AvailabilityRange::forInliningTarget(const ASTContext &Ctx) {
 
 AvailabilityRange AvailabilityRange::forRuntimeTarget(const ASTContext &Ctx) {
   return AvailabilityRange(VersionRange::allGTE(Ctx.LangOpts.RuntimeVersion));
+}
+
+std::optional<AvailabilityRange>
+AvailabilityConstraint::getRequiredNewerAvailabilityRange(
+    ASTContext &ctx) const {
+  switch (kind) {
+  case Kind::AlwaysUnavailable:
+  case Kind::RequiresVersion:
+  case Kind::Obsoleted:
+    return std::nullopt;
+  case Kind::IntroducedInNewerVersion:
+    return AvailabilityInference::availableRange(attr, ctx);
+  }
+}
+
+bool AvailabilityConstraint::isConditionallySatisfiable() const {
+  switch (kind) {
+  case Kind::AlwaysUnavailable:
+  case Kind::RequiresVersion:
+  case Kind::Obsoleted:
+    return false;
+  case Kind::IntroducedInNewerVersion:
+    return true;
+  }
 }
 
 namespace {
@@ -114,7 +139,7 @@ static void mergeWithInferredAvailability(const AvailableAttr *Attr,
 
   // The merge of two introduction versions is the maximum of the two versions.
   if (mergeIntoInferredVersion(Attr->Introduced, Inferred.Introduced, std::max)) {
-    Inferred.IsSPI = Attr->IsSPI;
+    Inferred.IsSPI = Attr->isSPI();
   }
 
   // The merge of deprecated and obsoleted versions takes the minimum.
@@ -596,7 +621,7 @@ AvailabilityRange AvailabilityInference::availableRange(const Decl *D) {
 
 bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
   if (auto attr = attrForAvailableRange(D))
-    return attr->IsSPI;
+    return attr->isSPI();
 
   return false;
 }

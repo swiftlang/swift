@@ -31,6 +31,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
@@ -3216,6 +3217,13 @@ class EndApplyInst;
 class AbortApplyInst;
 class EndBorrowInst;
 
+struct EndApplyFilter {
+  std::optional<Operand*> operator()(Operand *use) const;
+};
+
+using EndApplyRange = OptionalTransformRange<ValueBase::use_range,
+                                             EndApplyFilter>;
+
 /// BeginApplyInst - Represents the beginning of the full application of
 /// a yield_once coroutine (up until the coroutine yields a value back).
 class BeginApplyInst final
@@ -3265,6 +3273,8 @@ public:
     return const_cast<MultipleValueInstructionResult *>(
         &getAllResultsBuffer().drop_back(isCalleeAllocated() ? 1 : 0).back());
   }
+
+  EndApplyRange getEndApplyUses() const;
 
   MultipleValueInstructionResult *getCalleeAllocationResult() const {
     if (!isCalleeAllocated()) {
@@ -3334,6 +3344,25 @@ public:
     return getToken()->getParent<BeginApplyInst>();
   }
 };
+
+inline std::optional<Operand*>
+EndApplyFilter::operator()(Operand *use) const {
+  // An end_borrow ends the coroutine scope at a dead-end block without
+  // terminating the coroutine.
+  switch (use->getUser()->getKind()) {
+  case SILInstructionKind::EndApplyInst:
+  case SILInstructionKind::AbortApplyInst:
+  case SILInstructionKind::EndBorrowInst:
+    return use;
+  default:
+    return std::nullopt;
+  }
+}
+
+inline EndApplyRange BeginApplyInst::getEndApplyUses() const {
+  return makeOptionalTransformRange(
+    getTokenResult()->getUses(), EndApplyFilter());
+}
 
 //===----------------------------------------------------------------------===//
 // Literal instructions.
@@ -4150,6 +4179,24 @@ public:
   ~KeyPathInst();
 };
 
+struct SILInstructionContext {
+  using Storage = TaggedUnion<SILModule *, SILFunction *>;
+  Storage storage;
+
+  static SILInstructionContext forModule(SILModule &M) { return {Storage(&M)}; }
+
+  static SILInstructionContext forFunction(SILFunction &F) {
+    return {Storage(&F)};
+  }
+
+  static SILInstructionContext forFunctionInModule(SILFunction *F,
+                                                   SILModule &M);
+
+  SILFunction *getFunction();
+
+  SILModule &getModule();
+};
+
 /// Represents an invocation of builtin functionality provided by the code
 /// generator.
 class BuiltinInst final
@@ -4164,13 +4211,16 @@ class BuiltinInst final
   /// The substitutions.
   SubstitutionMap Substitutions;
 
+  unsigned numNormalOperands;
+
   BuiltinInst(SILDebugLocation DebugLoc, Identifier Name, SILType ReturnType,
-              SubstitutionMap Substitutions, ArrayRef<SILValue> Args);
+              SubstitutionMap Substitutions, ArrayRef<SILValue> Args,
+              unsigned numNormalOperands);
 
   static BuiltinInst *create(SILDebugLocation DebugLoc, Identifier Name,
-                             SILType ReturnType,
-                             SubstitutionMap Substitutions,
-                             ArrayRef<SILValue> Args, SILModule &M);
+                             SILType ReturnType, SubstitutionMap Substitutions,
+                             ArrayRef<SILValue> Args,
+                             SILInstructionContext context);
 
 public:
   /// Return the name of the builtin operation.
@@ -4216,13 +4266,19 @@ public:
 
   /// The arguments to the builtin.
   OperandValueArrayRef getArguments() const {
-    return OperandValueArrayRef(getAllOperands());
+    return OperandValueArrayRef(getArgumentOperands());
   }
   ArrayRef<Operand> getArgumentOperands() const {
-    return getAllOperands();
+    return getAllOperands().slice(0, numNormalOperands);
   }
   MutableArrayRef<Operand> getArgumentOperands() {
-    return getAllOperands();
+    return getAllOperands().slice(0, numNormalOperands);
+  }
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return getAllOperands().drop_front(numNormalOperands);
+  }
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return getAllOperands().drop_front(numNormalOperands);
   }
 };
 
@@ -8774,6 +8830,11 @@ public:
       uint8_t(MarkDependenceKind::NonEscaping);
   }
 
+  void settleToEscaping() {
+    sharedUInt8().MarkDependenceInst.dependenceKind =
+      uint8_t(MarkDependenceKind::Escaping);
+  }
+
   /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
   bool visitNonEscapingLifetimeEnds(
     llvm::function_ref<bool (Operand*)> visitScopeEnd,
@@ -11635,6 +11696,25 @@ public:
   /// Return the parameter type that defined this value.
   CanType getParamType() const {
     return ParamType;
+  }
+};
+
+class MergeIsolationRegionInst final
+    : public InstructionBaseWithTrailingOperands<
+          SILInstructionKind::MergeIsolationRegionInst,
+          MergeIsolationRegionInst, NonValueInstruction> {
+  friend SILBuilder;
+
+  MergeIsolationRegionInst(SILDebugLocation loc, ArrayRef<SILValue> operands)
+      : InstructionBaseWithTrailingOperands(operands, loc) {}
+
+  static MergeIsolationRegionInst *
+  create(SILDebugLocation loc, ArrayRef<SILValue> operands, SILModule &mod);
+
+public:
+  /// Return the SILValues for all operands of this instruction.
+  OperandValueArrayRef getArguments() const {
+    return OperandValueArrayRef(getAllOperands());
   }
 };
 

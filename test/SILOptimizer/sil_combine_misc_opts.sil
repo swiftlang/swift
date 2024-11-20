@@ -111,7 +111,7 @@ bb0(%0 : @guaranteed $S):
   %3 = begin_borrow %2 : $Klass
   br bb1(%3 : $Klass)
 
-bb1(%5 : @reborrow @guaranteed $Klass):
+bb1(%5 : @reborrow $Klass):
   %6 = borrowed %5 : $Klass from (%2 : $Klass)
   end_borrow %6 : $Klass
   destroy_value %2 : $Klass

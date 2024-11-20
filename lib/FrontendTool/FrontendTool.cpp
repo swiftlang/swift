@@ -24,6 +24,7 @@
 #include "Dependencies.h"
 #include "TBD.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
@@ -34,7 +35,6 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TBDGenRequests.h"
-#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Edit.h"
@@ -1235,10 +1235,10 @@ static bool performAction(CompilerInstance &Instance,
           return dumpAndPrintScopeMap(Instance,
                                       getPrimaryOrMainSourceFile(Instance));
         }, /*runDespiteErrors=*/true);
-  case FrontendOptions::ActionType::DumpTypeRefinementContexts:
+  case FrontendOptions::ActionType::DumpAvailabilityScopes:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance).getTypeRefinementContext()->dump(
+          getPrimaryOrMainSourceFile(Instance).getAvailabilityScope()->dump(
               llvm::errs(), Instance.getASTContext().SourceMgr);
           return Instance.getASTContext().hadError();
         }, /*runDespiteErrors=*/true);
@@ -1279,6 +1279,7 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::EmitSILGen:
   case FrontendOptions::ActionType::EmitSIBGen:
   case FrontendOptions::ActionType::EmitSIL:
+  case FrontendOptions::ActionType::EmitLoweredSIL:
   case FrontendOptions::ActionType::EmitSIB:
   case FrontendOptions::ActionType::EmitModuleOnly:
   case FrontendOptions::ActionType::MergeModules:
@@ -1747,6 +1748,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return !opts.AllowModuleWithCompilerErrors;
 
   runSILLoweringPasses(*SM);
+
+  // If we are asked to emit lowered SIL, dump it now and return.
+  if (Action == FrontendOptions::ActionType::EmitLoweredSIL)
+    return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
 
   // Cancellation check after SILLowering.
   if (Instance.isCancellationRequested())

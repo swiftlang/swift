@@ -27,11 +27,12 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/BlockList.h"
 #include "swift/Basic/CASOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
-#include "swift/Basic/BlockList.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Basic/DarwinSDKInfo.h"
@@ -266,7 +267,8 @@ class ASTContext final {
       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
-      SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      SerializationOptions &serializationOpts, SourceManager &SourceMgr,
+      DiagnosticEngine &Diags,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
 
 public:
@@ -283,7 +285,8 @@ public:
       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
-      SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      SerializationOptions &serializationOpts, SourceManager &SourceMgr,
+      DiagnosticEngine &Diags,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
   ~ASTContext();
 
@@ -313,6 +316,9 @@ public:
 
   /// The CAS options used by this AST context.
   const CASOptions &CASOpts;
+
+  /// Options for Serialization
+  const SerializationOptions &SerializationOpts;
 
   /// The source manager object.
   SourceManager &SourceMgr;

@@ -1698,7 +1698,7 @@ SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
                                                      DeclNameRef macroName,
                                                      MacroRoles roles) {
   SmallVector<MacroDecl *, 1> choices;
-  auto moduleScopeDC = dc->getModuleScopeContext();
+  auto moduleScopeDC = getModuleScopeLookupContext(dc);
   ASTContext &ctx = moduleScopeDC->getASTContext();
 
   auto addChoiceIfApplicable = [&](ValueDecl *decl) {
@@ -3812,7 +3812,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
         directReferencesForTypeRepr(evaluator, ctx, typeRepr, dc,
                                     defaultDirectlyReferencedTypeLookupOptions);
   } else if (Type type = attr->getType()) {
-    decls = directReferencesForType(type);
+    return type->getAnyNominal();
   }
 
   // Dig out the nominal type declarations.

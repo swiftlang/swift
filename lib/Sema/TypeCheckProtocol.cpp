@@ -1197,7 +1197,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     // Open up the type of the requirement.
     reqLocator =
         cs->getConstraintLocator(req, ConstraintLocator::ProtocolRequirement);
-    OpenedTypeMap reqReplacements;
+    SmallVector<OpenedType, 4> reqReplacements;
     reqType = cs->getTypeOfMemberReference(selfTy, req, dc,
                                            /*isDynamicResult=*/false,
                                            FunctionRefKind::DoubleApply,
@@ -1466,7 +1466,7 @@ static bool contextMayExpandOperator(
 SmallVector<ValueDecl *, 4>
 swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
-  assert(req->isProtocolRequirement());
+  assert(req->isProtocolRequirement() || isa<AccessorDecl>(req));
 
   SmallVector<ValueDecl *, 4> witnesses;
 
@@ -4263,13 +4263,17 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           diagnoseSendabilityErrorBasedOn(conformance->getProtocol(), sendFrom,
                                           [&](DiagnosticBehavior limit) {
             auto &diags = DC->getASTContext().Diags;
-            diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
-                           diag::witness_not_as_sendable,
-                           witness, conformance->getProtocol())
+            auto preconcurrencyBehaviorLimit =
+                sendFrom.preconcurrencyBehavior(nominal);
+            diags
+                .diagnose(getLocForDiagnosingWitness(conformance, witness),
+                          diag::witness_not_as_sendable, witness,
+                          conformance->getProtocol())
                 .limitBehaviorUntilSwiftVersion(limit, 6)
-                .limitBehaviorIf(sendFrom.preconcurrencyBehavior(nominal));
+                .limitBehaviorIf(preconcurrencyBehaviorLimit);
             diags.diagnose(requirement, diag::less_sendable_reqt_here);
-            return false;
+            return preconcurrencyBehaviorLimit &&
+                   (*preconcurrencyBehaviorLimit == DiagnosticBehavior::Ignore);
           });
         });
       }
@@ -4308,9 +4312,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
-        if (proto->isInterfacePackageEffectivelyPublic())
-          return;
-
         bool protoForcesAccess =
           requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
         auto diagKind = protoForcesAccess
@@ -4886,10 +4887,16 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   auto proto = conformance->getProtocol();
   auto &diags = ctx.Diags;
 
-  auto *const module = dc->getParentModule();
-  auto substitutingType = dc->mapTypeIntoContext(conformance->getType());
+  auto typeInContext = conformance->getType();
+  ProtocolConformanceRef conformanceInContext(conformance);
+  if (auto *genericEnv = conformance->getGenericEnvironment()) {
+    typeInContext = genericEnv->mapTypeIntoContext(typeInContext);
+    conformanceInContext =
+      conformanceInContext.subst(conformance->getType(),
+                                 genericEnv->getForwardingSubstitutionMap());
+  }
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
-      proto, substitutingType, ProtocolConformanceRef(conformance));
+      proto, typeInContext, conformanceInContext);
 
   auto reqSig = proto->getRequirementSignature().getRequirements();
 
@@ -4910,7 +4917,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   }
 
   const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
-      module, reqSig, QuerySubstitutionMap{substitutions});
+      reqSig, QuerySubstitutionMap{substitutions});
   switch (result.getKind()) {
   case CheckRequirementsResult::Success:
     // Go on to check exportability.
@@ -4923,13 +4930,13 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
     if (!conformance->isInvalid()) {
       if (result.getKind() == CheckRequirementsResult::RequirementFailure) {
         ctx.addDelayedConformanceDiag(conformance, /*isError=*/true,
-          [result, proto, substitutions, module](NormalProtocolConformance *conformance) {
+          [result, proto, substitutions](NormalProtocolConformance *conformance) {
             TypeChecker::diagnoseRequirementFailure(
               result.getRequirementFailureInfo(),
               conformance->getLoc(), conformance->getLoc(),
               proto->getDeclaredInterfaceType(),
               {proto->getSelfInterfaceType()->castTo<GenericTypeParamType>()},
-              QuerySubstitutionMap{substitutions}, module);
+              QuerySubstitutionMap{substitutions});
           });
       }
 
@@ -5334,7 +5341,7 @@ void swift::diagnoseConformanceFailure(Type T,
   if (T->hasError())
     return;
 
-  ASTContext &ctx = DC->getASTContext();
+  ASTContext &ctx = Proto->getASTContext();
   auto &diags = ctx.Diags;
 
   // If we're checking conformance of an existential type to a protocol,
@@ -5442,7 +5449,7 @@ void swift::diagnoseConformanceFailure(Type T,
                          T);
 
       // Try to suggest inheriting from NSObject instead.
-      auto classDecl = dyn_cast<ClassDecl>(DC);
+      auto classDecl = dyn_cast_or_null<ClassDecl>(DC);
       if (!classDecl)
         return;
 
@@ -5510,12 +5517,16 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
     for (auto *PD : layout.getProtocols()) {
       // If we found the protocol we're looking for, return an abstract
       // conformance to it.
-      if (PD == Proto)
-        return ProtocolConformanceRef(Proto);
+      if (PD == Proto) {
+        // FIXME: Passing an empty Type() here temporarily.
+        return ProtocolConformanceRef::forAbstract(Type(), Proto);
+      }
 
       // Now check refined protocols.
-      if (PD->inheritsFrom(Proto))
-        return ProtocolConformanceRef(Proto);
+      if (PD->inheritsFrom(Proto)) {
+        // FIXME: Passing an empty Type() here temporarily.
+        return ProtocolConformanceRef::forAbstract(Type(), Proto);
+      }
     }
 
     return allowMissing ? ProtocolConformanceRef::forMissingOrInvalid(T, Proto)
@@ -6828,9 +6839,33 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
 
     ResolveWitnessResult result = checker.resolveWitnessViaLookup(requirement);
 
-    if (result == ResolveWitnessResult::Missing &&
-        requirement->isSPI() &&
-        !proto->isSPI()) {
+    if (result != ResolveWitnessResult::Missing)
+      continue;
+
+    if (auto *asd = dyn_cast<AbstractStorageDecl>(requirement)) {
+      bool hasDefaults = false;
+      asd->visitExpectedOpaqueAccessors([&](auto kind) {
+        auto *accessor = asd->getOpaqueAccessor(kind);
+        if (accessor->hasBody()) {
+          hasDefaults = true;
+        }
+      });
+      if (hasDefaults) {
+        auto asdTy = asd->getInterfaceType();
+        GenericSignature reqSig = proto->getGenericSignature();
+        if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(asd)) {
+          if (subscriptDecl->isGeneric())
+            reqSig = subscriptDecl->getGenericSignature();
+        }
+        RequirementEnvironment reqEnv(proto, reqSig, proto, nullptr, nullptr);
+        auto match =
+            RequirementMatch(asd, MatchKind::ExactMatch, asdTy, reqEnv);
+        match.WitnessSubstitutions = reqEnv.getRequirementToWitnessThunkSubs();
+        checker.recordWitness(asd, match);
+      }
+    }
+
+    if (requirement->isSPI() && !proto->isSPI()) {
       // SPI requirements need a default value, unless the protocol is SPI too.
       requirement->diagnose(diag::spi_attribute_on_protocol_requirement,
                             requirement);

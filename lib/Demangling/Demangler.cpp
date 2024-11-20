@@ -804,6 +804,12 @@ NodePointer Demangler::demangleType(StringRef MangledName,
 bool Demangler::parseAndPushNodes() {
   const auto textSize = Text.size();
   while (Pos < textSize) {
+    // Programs may look up a type by NUL-terminated name with an excessive
+    // length. Keep them working by returning success if we encounter a NUL in
+    // the middle of the string where an operator is expected.
+    if (peekChar() == '\0')
+      return true;
+
     NodePointer Node = demangleOperator();
     if (!Node)
       return false;
@@ -2810,7 +2816,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
   switch (char c = nextChar()) {
     // Thunks that are from a thunk inst. We take the TT namespace.
     case 'T': {
-      switch (char c = nextChar()) {
+      switch (nextChar()) {
       case 'I':
         return createWithChild(Node::Kind::SILThunkIdentity, popNode(isEntity));
       case 'H':
@@ -4450,11 +4456,11 @@ NodePointer Demangler::demangleIntegerType() {
   switch (peekChar()) {
   case 'n':
     nextChar();
-    integer = createNode(Node::Kind::NegativeInteger, -demangleNatural());
+    integer = createNode(Node::Kind::NegativeInteger, -demangleIndex());
     break;
 
   default:
-    integer = createNode(Node::Kind::Integer, demangleNatural());
+    integer = createNode(Node::Kind::Integer, demangleIndex());
     break;
   }
 

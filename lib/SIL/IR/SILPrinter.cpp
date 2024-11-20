@@ -703,7 +703,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
       *this << "@reborrow ";
     if (i.IsEscaping)
       *this << "@pointer_escape ";
-    if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
+    if (!i.IsReborrow && i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
       *this << "@" << i.OwnershipKind.value() << " ";
     }
     return *this << i.Type;
@@ -1658,7 +1658,13 @@ public:
     *this << ") : ";
     *this << BI->getType();
   }
-  
+
+  void visitMergeIsolationRegionInst(MergeIsolationRegionInst *mir) {
+    llvm::interleave(
+        mir->getArguments(), [&](SILValue v) { *this << getIDAndType(v); },
+        [&] { *this << ", "; });
+  }
+
   void visitAllocGlobalInst(AllocGlobalInst *AGI) {
     if (AGI->getReferencedGlobal()) {
       AGI->getReferencedGlobal()->printName(PrintState.OS);

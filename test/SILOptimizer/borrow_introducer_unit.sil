@@ -126,21 +126,16 @@ none(%phi : @guaranteed $FakeOptional<C>):
   return %retval : $()
 }
 
-// An unreachable phi currently looks like a reborrow.
-//
-// TODO: When we have a reborrow flag, an unreachable phi can be
-// either a reborrow or forwarded, as long as it has no end_borrow.
+// An unreachable phi can be either a reborrow or forwarded, as long as it has no end_borrow.
 
 // CHECK-LABEL: introducer_unreachable: find_borrow_introducers with: %phiCycle
 // CHECK: } // end sil function 'introducer_unreachable'
 // CHECK: Introducers:
-// CHECK-NEXT: argument of bb1 : $C
 // CHECK-NEXT: introducer_unreachable: find_borrow_introducers with: %phiCycle
 
 // CHECK-LABEL: introducer_unreachable: borrow_introducers with: %phiCycle
 // CHECK: } // end sil function 'introducer_unreachable'
 // CHECK: Borrow introducers for: %1 = argument of bb1 : $C
-// CHECK-NEXT: argument of bb1 : $C
 // CHECK-NEXT: introducer_unreachable: borrow_introducers with: %phiCycle
 sil [ossa] @introducer_unreachable : $@convention(thin) () -> () {
 entry:
@@ -206,7 +201,7 @@ exit:
 // paths, but should only appear in the introducer list once.
 //
 // CHECK-LABEL: introducer_revisit_reborrow: find_borrow_introducers with: %aggregate2
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C
 // CHECK: } // end sil function 'introducer_revisit_reborrow'
 // CHECK: Introducers:
 // CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
@@ -214,7 +209,7 @@ exit:
 // CHECK-NEXT: introducer_revisit_reborrow: find_borrow_introducers with: %aggregate2
 
 // CHECK-LABEL: introducer_revisit_reborrow: borrow_introducers with: %aggregate2
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C
 // CHECK: } // end sil function 'introducer_revisit_reborrow'
 // CHECK: Borrow introducers for:  %{{.*}} = struct $PairC (%{{.*}} : $C, %{{.*}} : $C)
 // CHECK-NEXT: %0 = argument of bb0 : $C
@@ -245,7 +240,7 @@ exit:
 // CHECK-LABEL: introducer_multiple_borrow: find_borrow_introducers with: %aggregate2
 // CHECK: begin_borrow %0 : $C  
 // CHECK: [[BORROW2:%.*]] = begin_borrow %0 : $C
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C
 // CHECK: } // end sil function 'introducer_multiple_borrow'
 // CHECK: Introducers:
 // CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
@@ -256,7 +251,7 @@ exit:
 // CHECK-LABEL: introducer_multiple_borrow: borrow_introducers with: %aggregate2
 // CHECK: begin_borrow %0 : $C  
 // CHECK: [[BORROW2:%.*]] = begin_borrow %0 : $C
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow @guaranteed $C
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C
 // CHECK: } // end sil function 'introducer_multiple_borrow'
 // CHECK: Borrow introducers for: %{{.*}} = struct $PairC (%{{.*}} : $C, %{{.*}} : $C)
 // CHECK-NEXT: %0 = argument of bb0 : $C
