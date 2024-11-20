@@ -8115,3 +8115,12 @@ bool importer::isCxxConstReferenceType(const clang::Type *type) {
   auto pointeeType = getCxxReferencePointeeTypeOrNone(type);
   return pointeeType && pointeeType->isConstQualified();
 }
+
+std::optional<StringRef> importer::getSwiftPrivateFileID(const clang::Decl *decl) {
+  auto attrPrefix = StringRef("implementation_file:");
+  for (auto attr : decl->getAttrs())
+    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+      if (swiftAttr->getAttribute().starts_with(attrPrefix))
+        return swiftAttr->getAttribute().drop_front(attrPrefix.size());
+  return {};
+}

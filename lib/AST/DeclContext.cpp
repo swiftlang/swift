@@ -28,6 +28,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1298,15 +1299,20 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
       return usePkg->isSamePackageAs(srcPkg);
     }
   }
-  // Do not allow access if the sourceDC is in a different file
-  auto useSF = useDC->getOutermostParentSourceFile();
-  if (useSF != sourceDC->getOutermostParentSourceFile())
-    return false;
 
   // Do not allow access if the sourceDC does not represent a type.
   auto sourceNTD = sourceDC->getSelfNominalTypeDecl();
   if (!sourceNTD)
     return false;
+
+  // Do not allow access if the sourceDC is in a different file
+  auto useSF = useDC->getOutermostParentSourceFile();
+  if (useSF != sourceDC->getOutermostParentSourceFile()) {
+    auto clangDecl = sourceNTD->getDecl()->getClangDecl();
+    bool blessedUseSF = clangDecl && importer::getSwiftPrivateFileID(clangDecl) == useSF->getFileID();
+    if (!blessedUseSF)
+      return false;
+  }
 
   // Compare the private scopes and iterate over the parent types.
   sourceDC = getPrivateDeclContext(sourceDC, useSF);

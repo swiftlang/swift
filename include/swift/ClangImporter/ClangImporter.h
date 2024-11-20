@@ -729,6 +729,8 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
                                      NominalTypeDecl *selfType,
                                      std::optional<Type> parameterType);
 
+std::optional<llvm::StringRef> getSwiftPrivateFileID(const clang::Decl* decl);
+
 } // namespace importer
 
 struct ClangInvocationFileMapping {
