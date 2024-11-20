@@ -14672,13 +14672,26 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::CGFloatToDouble: {
     // Prefer CGFloat -> Double over other way araund.
     auto impact =
-        restriction == ConversionRestrictionKind::CGFloatToDouble ? 1 : 10;
+        restriction == ConversionRestrictionKind::CGFloatToDouble ? 2 : 10;
 
     if (restriction == ConversionRestrictionKind::DoubleToCGFloat) {
       if (auto *anchor = locator.trySimplifyToExpr()) {
         if (auto depth = getExprDepth(anchor))
           impact = (*depth + 1) * impact;
       }
+    } else if (locator.directlyAt<AssignExpr>() ||
+               locator.endsWith<LocatorPathElt::ContextualType>()) {
+      // Situations like:
+      //
+      //  let _: Double = <<CGFloat>>
+      //  <var/property of type Double> = <<CGFloat>>
+      //
+      // Used to be supported due to an incorrect fix added in
+      // diagnostic mode. Lower impact here means that right-hand
+      // side of the assignment is allowed to maintain CGFloat
+      // until the very end which minimizes the number of conversions
+      // used and keeps literals as Double when possible.
+      impact = 1;
     }
 
     increaseScore(SK_ImplicitValueConversion, locator, impact);
