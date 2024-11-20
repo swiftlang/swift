@@ -2692,7 +2692,6 @@ function Build-Installer($Arch) {
 
   $Properties = @{
     BundleFlavor = "offline";
-    DEVTOOLS_ROOT = "$($Arch.ToolchainInstallRoot)\";
     TOOLCHAIN_ROOT = "$($Arch.ToolchainInstallRoot)\";
     INCLUDE_SWIFT_INSPECT = $INCLUDE_SWIFT_INSPECT;
     SWIFT_INSPECT_BUILD = "$($Arch.BinaryCache)\swift-inspect\release";
