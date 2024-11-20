@@ -328,17 +328,17 @@ void ConstraintGraphNode::retractFromInference(Constraint *constraint) {
   }
 }
 
-void ConstraintGraphNode::retractFromInference(Type fixedType) {
+void ConstraintGraphNode::updateFixedType(
+    Type fixedType,
+    llvm::function_ref<void (ConstraintGraphNode &,
+                             Constraint *)> notification) const {
   // Notify all of the type variables that reference this one.
   //
   // Since this type variable has been replaced with a fixed type
   // all of the concrete types that reference it are going to change,
   // which means that all of the not-yet-attempted bindings should
   // change as well.
-  notifyReferencingVars(
-    [&](ConstraintGraphNode &node, Constraint *constraint) {
-      node.retractFromInference(constraint);
-    });
+  notifyReferencingVars(notification);
 
   if (!fixedType->hasTypeVariable())
     return;
@@ -354,41 +354,25 @@ void ConstraintGraphNode::retractFromInference(Type fixedType) {
     // all of the constraints that reference bound type variable.
     for (auto *constraint : getConstraints()) {
       if (isUsefulForReferencedVars(constraint))
-        node.retractFromInference(constraint);
+        notification(node, constraint);
     }
   }
 }
 
+void ConstraintGraphNode::retractFromInference(Type fixedType) {
+  return updateFixedType(
+      fixedType,
+      [](ConstraintGraphNode &node, Constraint *constraint) {
+        node.retractFromInference(constraint);
+      });
+}
+
 void ConstraintGraphNode::introduceToInference(Type fixedType) {
-  // Notify all of the type variables that reference this one.
-  //
-  // Since this type variable has been replaced with a fixed type
-  // all of the concrete types that reference it are going to change,
-  // which means that all of the not-yet-attempted bindings should
-  // change as well.
-  notifyReferencingVars(
-    [&](ConstraintGraphNode &node, Constraint *constraint) {
-      node.introduceToInference(constraint);
-    });
-
-  if (!fixedType->hasTypeVariable())
-    return;
-
-  SmallPtrSet<TypeVariableType *, 4> referencedVars;
-  fixedType->getTypeVariables(referencedVars);
-
-  for (auto *referencedVar : referencedVars) {
-    auto &node = CG[referencedVar];
-
-    // Newly referred vars need to re-introduce all constraints associated
-    // with this type variable since they are now going to be used in
-    // all of the constraints that reference bound type variable.
-    for (auto *constraint : getConstraints()) {
-      if (isUsefulForReferencedVars(constraint)) {
+  return updateFixedType(
+      fixedType,
+      [](ConstraintGraphNode &node, Constraint *constraint) {
         node.introduceToInference(constraint);
-      }
-    }
-  }
+      });
 }
 
 #pragma mark Graph mutation
