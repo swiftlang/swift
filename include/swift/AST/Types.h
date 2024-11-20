@@ -84,6 +84,7 @@ enum class ReferenceCounting : uint8_t;
 enum class ResilienceExpansion : unsigned;
 class SILModule;
 class SILType;
+class SourceLoc;
 class TypeAliasDecl;
 class TypeDecl;
 class NominalTypeDecl;
@@ -2319,6 +2320,28 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::TypeAlias;
+  }
+};
+
+/// A type has been introduced at some fixed location in the AST.
+class LocatableType final : public SugarType, public llvm::FoldingSetNode {
+  SourceLoc Loc;
+
+  LocatableType(SourceLoc loc, Type underlying,
+                RecursiveTypeProperties properties);
+
+public:
+  SourceLoc getLoc() const { return Loc; }
+
+  static LocatableType *get(SourceLoc loc, Type underlying);
+
+  void Profile(llvm::FoldingSetNodeID &id) const;
+
+  static void Profile(llvm::FoldingSetNodeID &id, SourceLoc loc,
+                      Type underlying);
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Locatable;
   }
 };
 

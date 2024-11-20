@@ -533,6 +533,19 @@ case TypeKind::Id:
                                 newUnderlyingTy);
     }
 
+    case TypeKind::Locatable: {
+      auto locatable = cast<LocatableType>(base);
+      Type oldUnderlyingTy = Type(locatable->getSinglyDesugaredType());
+      Type newUnderlyingTy = doIt(oldUnderlyingTy, pos);
+      if (!newUnderlyingTy)
+        return Type();
+
+      if (oldUnderlyingTy.getPointer() == newUnderlyingTy.getPointer())
+        return t;
+
+      return LocatableType::get(locatable->getLoc(), newUnderlyingTy);
+    }
+
     case TypeKind::ErrorUnion: {
       auto errorUnion = cast<ErrorUnionType>(base);
       bool anyChanged = false;

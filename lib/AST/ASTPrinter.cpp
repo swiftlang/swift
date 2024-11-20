@@ -6009,6 +6009,10 @@ public:
     }
   }
 
+  void visitLocatableType(LocatableType *T) {
+    visit(T->getSinglyDesugaredType());
+  }
+
   void visitPackType(PackType *T) {
     if (Options.PrintExplicitPackTypes || Options.PrintTypesForDebugging)
       Printer << "Pack{";

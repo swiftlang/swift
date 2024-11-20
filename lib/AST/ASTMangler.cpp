@@ -1296,6 +1296,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
     case TypeKind::BuiltinUnboundGeneric:
+    case TypeKind::Locatable:
       llvm_unreachable("not a real type");
     case TypeKind::BuiltinFixedArray: {
       auto bfa = cast<BuiltinFixedArrayType>(tybase);
