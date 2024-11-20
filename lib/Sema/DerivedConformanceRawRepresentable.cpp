@@ -16,17 +16,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
+#include "DerivedConformances.h"
+#include "TypeCheckAvailability.h"
+#include "TypeCheckDecl.h"
 #include "TypeChecker.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/APInt.h"
-#include "DerivedConformances.h"
-#include "TypeCheckDecl.h"
 
 using namespace swift;
 
@@ -236,38 +237,35 @@ struct RuntimeVersionCheck {
 /// information about the runtime check needed to ensure it is available to
 /// \c versionCheck and returns true.
 static bool
-checkAvailability(const EnumElementDecl *elt, ASTContext &C,
+checkAvailability(const EnumElementDecl *elt, DeclContext *dc,
+                  AvailabilityContext availabilityContext,
                   std::optional<RuntimeVersionCheck> &versionCheck) {
-  auto *attr = elt->getAttrs().getPotentiallyUnavailable(C);
+  auto &C = dc->getASTContext();
+  auto constraint =
+      getUnsatisfiedAvailabilityConstraint(elt, dc, availabilityContext);
 
   // Is it always available?
-  if (!attr)
+  if (!constraint)
     return true;
 
-  // For type-checking purposes, iOS availability is inherited for visionOS
-  // targets. However, it is not inherited for the sake of code-generation
-  // of runtime availability queries, and is assumed to be available.
-  if ((attr->Platform == PlatformKind::iOS ||
-       attr->Platform == PlatformKind::iOSApplicationExtension) &&
-      C.LangOpts.Target.isXROS())
+  // Some constraints are active for type checking but can't translate to
+  // runtime restrictions.
+  if (!constraint->isActiveForRuntimeQueries(C))
     return true;
-
-  AvailableVersionComparison availability = attr->getVersionAvailability(C);
-
-  assert(availability != AvailableVersionComparison::Available &&
-         "DeclAttributes::getPotentiallyUnavailable() shouldn't "
-         "return an available attribute");
 
   // Is it never available?
-  if (availability != AvailableVersionComparison::PotentiallyUnavailable)
+  if (!constraint->isConditionallySatisfiable())
     return false;
 
   // It's conditionally available; create a version constraint and return true.
-  assert(attr->getPlatformAgnosticAvailability() ==
-             PlatformAgnosticAvailabilityKind::None &&
-         "can only express #available(somePlatform version) checks");
-  versionCheck.emplace(attr->Platform, *attr->Introduced);
+  auto platform = constraint->getPlatform();
+  auto range = constraint->getRequiredNewerAvailabilityRange(C);
 
+  // Only platform version constraints are supported currently.
+  ASSERT(platform != PlatformKind::none);
+  ASSERT(range);
+
+  versionCheck.emplace(platform, range->getRawMinimumVersion());
   return true;
 }
 
@@ -294,6 +292,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   
   auto parentDC = initDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
+  auto availabilityContext = AvailabilityContext::forDeploymentTarget(C);
 
   auto nominalTypeDecl = parentDC->getSelfNominalTypeDecl();
   auto enumDecl = cast<EnumDecl>(nominalTypeDecl);
@@ -317,7 +316,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     // information about that check in versionCheck and keep processing this
     // element.
     std::optional<RuntimeVersionCheck> versionCheck(std::nullopt);
-    if (!checkAvailability(elt, C, versionCheck))
+    if (!checkAvailability(elt, parentDC, availabilityContext, versionCheck))
       continue;
 
     // litPat = elt.rawValueExpr as a pattern
