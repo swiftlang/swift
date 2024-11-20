@@ -110,6 +110,10 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
 % end
 }
 
+// FIXME: The ASTPrinter should print this synthesized conformance.
+// rdar://140291657
+extension Unsafe${Mutable}BufferPointer: BitwiseCopyable where Element: ~Copyable {}
+
 @available(*, unavailable)
 extension Unsafe${Mutable}BufferPointer: Sendable where Element: ~Copyable {}
 
