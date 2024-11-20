@@ -5060,18 +5060,35 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     anchor = apply->getFn();
   }
 
-  if (argLabel.hasDollarPrefix() && (!param || !param->hasExternalPropertyWrapper())) {
+  auto recordPropertyWrapperFix = [&](ConstraintFix *fix) -> TypeMatchResult {
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
     recordAnyTypeVarAsPotentialHole(paramType);
 
-    auto *loc = getConstraintLocator(locator);
-    auto *fix = RemoveProjectedValueArgument::create(*this, wrapperType, param, loc);
     if (recordFix(fix))
       return getTypeMatchFailure(locator);
 
     return getTypeMatchSuccess();
+  };
+
+  // Incorrect use of projected value argument
+  if (argLabel.hasDollarPrefix() &&
+      (!param || !param->hasExternalPropertyWrapper())) {
+    auto *loc = getConstraintLocator(locator);
+    auto *fix =
+        RemoveProjectedValueArgument::create(*this, wrapperType, param, loc);
+    return recordPropertyWrapperFix(fix);
+  }
+
+  // Missing wrapped value initializer
+  auto wrapperInfo = param->getAttachedPropertyWrapperTypeInfo(0);
+  if (!argLabel.hasDollarPrefix() && !wrapperInfo.wrappedValueInit &&
+      param->hasExternalPropertyWrapper()) {
+    auto *loc = getConstraintLocator(locator);
+    auto *fix = UsePropertyWrapper::create(
+        *this, param, /*usingProjection=*/true, paramType, wrapperType, loc);
+    return recordPropertyWrapperFix(fix);
   }
 
   if (argLabel.hasDollarPrefix()) {
