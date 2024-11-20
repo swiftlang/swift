@@ -244,7 +244,10 @@ public:
   /// Retrieve the constraint system this graph describes.
   ConstraintSystem &getConstraintSystem() const { return CS; }
 
-  /// Access the node corresponding to the given type variable.
+  /// Add a new vertex to the graph.
+  void addTypeVariable(TypeVariableType *typeVar);
+
+  /// Look up the vertex associated with the given type variable.
   ConstraintGraphNode &operator[](TypeVariableType *typeVar);
 
   /// Add a new constraint to the graph.

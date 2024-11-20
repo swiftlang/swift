@@ -50,18 +50,16 @@ ConstraintGraph::~ConstraintGraph() {
 
 #pragma mark Graph accessors
 
-ConstraintGraphNode &
-ConstraintGraph::operator[](TypeVariableType *typeVar) {
+void ConstraintGraph::addTypeVariable(TypeVariableType *typeVar) {
   // Check whether we've already created a node for this type variable.
   auto &impl = typeVar->getImpl();
-  if (auto nodePtr = impl.getGraphNode()) {
-    assert(impl.getGraphIndex() < TypeVariables.size() && "Out-of-bounds index");
-    assert(TypeVariables[impl.getGraphIndex()] == typeVar && 
-           "Type variable mismatch");
-    ASSERT(nodePtr->TypeVar == typeVar &&
-           "Use-after-free");
-    return *nodePtr;
-  }
+
+  // ComponentStep::Scope re-introduces type variables that are already
+  // in the graph, but not in ConstraintSystem::TypeVariables.
+  if (impl.getGraphNode())
+    return;
+
+  ASSERT(!impl.hasRepresentativeOrFixed());
 
   // Allocate the new node.
   ConstraintGraphNode *nodePtr;
@@ -85,19 +83,21 @@ ConstraintGraph::operator[](TypeVariableType *typeVar) {
   // create new nodes during an undo.
   if (CS.solverState)
     CS.recordChange(SolverTrail::Change::AddedTypeVariable(typeVar));
+}
 
-  // If this type variable is not the representative of its equivalence class,
-  // add it to its representative's set of equivalences.
-  auto typeVarRep = CS.getRepresentative(typeVar);
-  if (typeVar != typeVarRep) {
-    mergeNodesPre(typeVar);
-    mergeNodes(typeVarRep, typeVar);
+ConstraintGraphNode &
+ConstraintGraph::operator[](TypeVariableType *typeVar) {
+  // Check whether we've already created a node for this type variable.
+  auto &impl = typeVar->getImpl();
+  auto *nodePtr = impl.getGraphNode();
+  if (!nodePtr) {
+    llvm::errs() << "Type variable $T" << impl.getID() << " not in constraint graph\n";
+    abort();
   }
-  else if (auto fixed = CS.getFixedType(typeVarRep)) {
-    // Bind the type variable.
-    bindTypeVariable(typeVar, fixed);
-  }
-
+  ASSERT(nodePtr->TypeVar == typeVar && "Use-after-free");
+  DEBUG_ASSERT(impl.getGraphIndex() < TypeVariables.size() && "Out-of-bounds index");
+  DEBUG_ASSERT(TypeVariables[impl.getGraphIndex()] == typeVar &&
+               "Type variable mismatch");
   return *nodePtr;
 }
 

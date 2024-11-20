@@ -162,7 +162,7 @@ void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
   TypeVariables.insert(typeVar);
 
   // Notify the constraint graph.
-  (void)CG[typeVar];
+  CG.addTypeVariable(typeVar);
 }
 
 void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
