@@ -795,13 +795,9 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     // diagnose and skip it.
     if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
       if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
-        Diags
-            .diagnose(SourceLoc(), diag::error_upcoming_feature_on_by_default,
-                      getFeatureName(*feature), *firstVersion)
-            .limitBehaviorIf(!enableUpcoming, DiagnosticBehavior::Warning);
-        if (enableUpcoming)
-          HadError = true;
-
+        Diags.diagnose(SourceLoc(),
+                       diag::warning_upcoming_feature_on_by_default,
+                       getFeatureName(*feature), *firstVersion);
         continue;
       }
     }
