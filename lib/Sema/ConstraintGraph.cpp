@@ -98,14 +98,18 @@ ConstraintGraph::operator[](TypeVariableType *typeVar) {
 }
 
 void ConstraintGraphNode::reset() {
-  ASSERT(TypeVar);
+  if (CONDITIONAL_ASSERT_enabled()) {
+    ASSERT(TypeVar);
+    ASSERT(Constraints.empty());
+    ASSERT(ConstraintIndex.empty());
+    ASSERT(ReferencedBy.empty());
+    ASSERT(References.empty());
+    ASSERT(EquivalenceClass.size() <= 1);
+  }
+
   TypeVar = nullptr;
-  Bindings.reset();
-  Constraints.clear();
-  ConstraintIndex.clear();
-  ReferencedBy.clear();
-  References.clear();
   EquivalenceClass.clear();
+  Bindings.reset();
 }
 
 bool ConstraintGraphNode::forRepresentativeVar() const {
