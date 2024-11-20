@@ -129,20 +129,12 @@ extension ASTGenVisitor {
         return self.generateExposeAttr(attribute: node)?.asDeclAttribute
       case .extern:
         return self.generateExternAttr(attribute: node)?.asDeclAttribute
-      case .extractConstantsFromMembers:
-        fatalError("unimplemented")
       case .implements:
         return self.generateImplementsAttr(attribute: node)?.asDeclAttribute
       case .inline:
         return self.generateInlineAttr(attribute: node)?.asDeclAttribute
       case .macroRole:
         return self.generateMacroRoleAttr(attribute: node, attrName: attrName)?.asDeclAttribute
-      case .noExistentials:
-        fatalError("unimplemented")
-      case .noObjCBridging:
-        fatalError("unimplemented")
-      case .noRuntime:
-        fatalError("unimplemented")
       case .nonSendable:
         return self.generateNonSendableAttr(attribute: node)?.asDeclAttribute
       case .nonisolated:
@@ -168,16 +160,12 @@ extension ASTGenVisitor {
         return self.generateSectionAttr(attribute: node)?.asDeclAttribute
       case .semantics:
         return self.generateSemanticsAttr(attribute: node)?.asDeclAttribute
-      case .sensitive:
-        fatalError("unimplemented")
       case .silGenName:
         return self.generateSILGenNameAttr(attribute: node)?.asDeclAttribute
       case .specialize:
         fatalError("unimplemented")
       case .spiAccessControl:
         return self.generateSPIAccessControlAttr(attribute: node)?.asDeclAttribute
-      case .staticExclusiveOnly:
-        fatalError("unimplemented")
       case .storageRestrictions:
         fatalError("unimplemented")
       case .swiftNativeObjCRuntimeBase:
@@ -207,6 +195,7 @@ extension ASTGenVisitor {
         .disfavoredOverload,
         .dynamicMemberLookup,
         .emitAssemblyVisionRemarks,
+        .extractConstantsFromMembers,
         .fixedLayout,
         .frozen,
         .gkInspectable,
@@ -233,9 +222,12 @@ extension ASTGenVisitor {
         .noAllocation,
         .noDerivative,
         .noEagerMove,
+        .noExistentials,
+        .noRuntime,
         .noImplicitCopy,
         .noLocks,
         .noMetadata,
+        .noObjCBridging,
         .nonEphemeral,
         .nonEscapable,
         .nonObjC,
@@ -251,9 +243,11 @@ extension ASTGenVisitor {
         .requiresStoredPropertyInits,
         .resultBuilder,
         .sendable,
+        .sensitive,
         .spiOnly,
         .showInInterface,
         .specializeExtension,
+        .staticExclusiveOnly,
         .testable,
         .transparent,
         .uiApplicationMain,
