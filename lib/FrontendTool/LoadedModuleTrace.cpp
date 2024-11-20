@@ -854,7 +854,8 @@ public:
 };
 
 static void createObjCMessageTraceFile(const InputFile &input, ModuleDecl *MD) {
-  if (input.getLoadedModuleTracePath().empty()) {
+  StringRef tracePath = input.getModuleObjCTracePath();
+  if (tracePath.empty()) {
     // we basically rely on the passing down of module trace file path
     // as an indicator that this job needs to emit an ObjC message trace file.
     // FIXME: add a separate swift-frontend flag for ObjC message trace path
@@ -881,15 +882,6 @@ static void createObjCMessageTraceFile(const InputFile &input, ModuleDecl *MD) {
   // No source files to walk, abort.
   if (filesToWalk.empty()) {
     return;
-  }
-  llvm::SmallString<128> tracePath;
-  if (const char *P = ::getenv("SWIFT_COMPILER_OBJC_MESSAGE_TRACE_PATH")) {
-    StringRef FilePath = P;
-    llvm::sys::path::append(tracePath, FilePath);
-  } else {
-    llvm::sys::path::append(tracePath, input.getLoadedModuleTracePath());
-    llvm::sys::path::remove_filename(tracePath);
-    llvm::sys::path::append(tracePath, ".SWIFT_FINE_DEPENDENCY_TRACE.json");
   }
   // Write output via atomic append.
   llvm::vfs::OutputConfig config;
