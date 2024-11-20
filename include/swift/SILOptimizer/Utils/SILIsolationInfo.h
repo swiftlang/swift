@@ -434,17 +434,21 @@ public:
     return {};
   }
 
+  static bool isNonSendableType(SILType type, SILFunction *fn) {
+    return isNonSendableType(type.getASTType(), fn);
+  }
+
+  static bool isNonSendableType(SILValue value) {
+    return isNonSendableType(value->getType(), value->getFunction());
+  }
+
   /// A helper that is used to ensure that we treat certain builtin values as
   /// non-Sendable that the AST level otherwise thinks are non-Sendable.
   ///
   /// E.x.: Builtin.RawPointer and Builtin.NativeObject
   ///
   /// TODO: Fix the type checker.
-  static bool isNonSendableType(SILType type, SILFunction *fn);
-
-  static bool isNonSendableType(SILValue value) {
-    return isNonSendableType(value->getType(), value->getFunction());
-  }
+  static bool isNonSendableType(CanType type, SILFunction *fn);
 
   bool hasSameIsolation(ActorIsolation actorIsolation) const;
 

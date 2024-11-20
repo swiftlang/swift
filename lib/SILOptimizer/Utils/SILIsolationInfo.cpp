@@ -1215,18 +1215,18 @@ void SILIsolationInfo::printForOneLineLogging(llvm::raw_ostream &os) const {
 //
 // NOTE: We special case RawPointer and NativeObject to ensure they are
 // treated as non-Sendable and strict checking is applied to it.
-bool SILIsolationInfo::isNonSendableType(SILType type, SILFunction *fn) {
+bool SILIsolationInfo::isNonSendableType(CanType type, SILFunction *fn) {
   // Treat Builtin.NativeObject, Builtin.RawPointer, and Builtin.BridgeObject as
   // non-Sendable.
-  if (type.getASTType()->is<BuiltinNativeObjectType>() ||
-      type.getASTType()->is<BuiltinRawPointerType>() ||
-      type.getASTType()->is<BuiltinBridgeObjectType>()) {
+  if (type->is<BuiltinNativeObjectType>() ||
+      type->is<BuiltinRawPointerType>() ||
+      type->is<BuiltinBridgeObjectType>()) {
     return true;
   }
 
   // Treat Builtin.SILToken as Sendable. It cannot escape from the current
   // function. We should change isSendable to hardwire this.
-  if (type.getASTType()->is<SILTokenType>()) {
+  if (type->is<SILTokenType>()) {
     return false;
   }
 
@@ -1237,12 +1237,17 @@ bool SILIsolationInfo::isNonSendableType(SILType type, SILFunction *fn) {
   // getConcurrencyDiagnosticBehavior could cause us to prevent a
   // "preconcurrency" unneeded diagnostic when just using Sendable values. We
   // only want to trigger that if we analyze a non-Sendable type.
-  if (type.isSendable(fn))
+  if (type->isSendableType())
     return false;
 
   // Grab out behavior. If it is none, then we have a type that we want to treat
   // as non-Sendable.
-  auto behavior = type.getConcurrencyDiagnosticBehavior(fn);
+  auto declRef = fn->getDeclRef();
+  if (!declRef)
+    return {};
+
+  auto *fromDC = declRef.getInnermostDeclContext();
+  auto behavior = type->getConcurrencyDiagnosticBehaviorLimit(fromDC);
   if (!behavior)
     return true;
 

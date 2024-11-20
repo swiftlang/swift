@@ -1907,7 +1907,7 @@ func offByOneWithImplicitPartialApply() {
   }
 }
 
-protocol Progress {
+protocol Progress { // expected-note {{}}
   associatedtype AssocType
   var x: AssocType { get }
   func checkCancellation() throws
@@ -1920,6 +1920,20 @@ func testCaptureDiagnosticMapsTypeIntoContext<T : Progress>(_ x: NonSendableKlas
   await withTaskGroup(of: Void.self) { group in
     group.addTask { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
       print(z) // expected-tns-note {{closure captures 'z' which is accessible to code in the current task}}
+    }
+  }
+}
+
+// We used to crash here since we were using an API that wanted a SIL Type and
+// we were creating a SILType from a CanType that needed to be lowered.
+func testUseCanTypeNonSendableCheckAPI(y: any Progress) async {
+  @Sendable func test() {
+    print(y) // expected-warning {{capture of 'y' with non-sendable type 'any Progress' in a `@Sendable` local function}}
+  }
+  await withTaskGroup(of: Void.self) { group in
+    group.addTask { // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+      // expected-tns-note @-1 {{Passing task-isolated value of non-Sendable type '() async -> ()' as a 'sending' parameter to instance method 'addTask(priority:operation:)' risks causing races inbetween task-isolated uses and uses reachable from 'addTask(priority:operation:)'}}
+      test()
     }
   }
 }
