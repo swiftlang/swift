@@ -2697,10 +2697,6 @@ public:
   /// we're exploring.
   SolverState *solverState = nullptr;
 
-  bool isRecordingChanges() const {
-    return solverState && !solverState->Trail.isUndoActive();
-  }
-
   void recordChange(SolverTrail::Change change) {
     solverState->Trail.recordChange(change);
   }

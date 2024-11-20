@@ -1771,7 +1771,7 @@ void PotentialBindings::infer(Constraint *constraint) {
     return;
 
   // Record the change, if there are active scopes.
-  if (CS.isRecordingChanges())
+  if (CS.solverState && !CS.solverState->Trail.isUndoActive())
     CS.recordChange(SolverTrail::Change::InferredBindings(TypeVar, constraint));
 
   switch (constraint->getKind()) {
@@ -1945,7 +1945,7 @@ void PotentialBindings::retract(Constraint *constraint) {
     return;
 
   // Record the change, if there are active scopes.
-  if (CS.isRecordingChanges())
+  if (CS.solverState && !CS.solverState->Trail.isUndoActive())
     CS.recordChange(SolverTrail::Change::RetractedBindings(TypeVar, constraint));
 
   LLVM_DEBUG(

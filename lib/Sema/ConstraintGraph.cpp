@@ -77,10 +77,6 @@ void ConstraintGraph::addTypeVariable(TypeVariableType *typeVar) {
   // Record this type variable.
   TypeVariables.push_back(typeVar);
 
-  // Record the change, if there are active scopes. Note that we specifically
-  // check CS.solverState and not CS.isRecordingChanges(), because we want
-  // recordChange() to assert if there's an active undo. It is not valid to
-  // create new nodes during an undo.
   if (CS.solverState)
     CS.recordChange(SolverTrail::Change::AddedTypeVariable(typeVar));
 }
@@ -507,7 +503,7 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
   auto &repNode = (*this)[typeVar1];
 
   // Record the change, if there are active scopes.
-  if (CS.isRecordingChanges()) {
+  if (CS.solverState) {
     CS.recordChange(
       SolverTrail::Change::ExtendedEquivalenceClass(
                         typeVar1,
@@ -560,7 +556,7 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
     node.addReferencedVar(otherTypeVar);
 
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::RelatedTypeVariables(typeVar, otherTypeVar));
   }
 }
