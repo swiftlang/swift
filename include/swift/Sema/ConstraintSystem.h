@@ -30,7 +30,6 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Sema/CSBindings.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/CSTrail.h"
 #include "swift/Sema/Constraint.h"
