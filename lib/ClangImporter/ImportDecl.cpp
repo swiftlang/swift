@@ -1691,7 +1691,7 @@ namespace {
               new (C) StructDecl(loc, name, loc, std::nullopt, nullptr, dc);
           SourceLoc end = Impl.importSourceLoc(decl->getEndLoc());
           errorWrapper->setBraces(SourceRange(loc, end));
-          errorWrapper->setAccess(convertClangAccess(decl));
+          errorWrapper->setAccess(AccessLevel::Public);
           errorWrapper->getAttrs().add(
             new (Impl.SwiftContext) FrozenAttr(/*IsImplicit*/true));
 
