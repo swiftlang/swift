@@ -8834,17 +8834,6 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   if (ClangDecl->isInvalidDecl())
     return nullptr;
 
-  // Private and protected C++ class members should never be used from Swift,
-  // however, parts of the Swift typechecker rely on being able to iterate over
-  // all of the stored fields of a particular struct. This means we still need
-  // to add private fields to the Swift AST.
-  // 
-  // Other kinds of private and protected C++ decls are not relevant for Swift.
-  clang::AccessSpecifier access = ClangDecl->getAccess();
-  if ((access == clang::AS_protected || access == clang::AS_private) &&
-      !isa<clang::FieldDecl>(ClangDecl))
-    return nullptr;
-
   bool SkippedOverTypedef = false;
   Decl *Result = nullptr;
   if (auto *UnderlyingDecl = canSkipOverTypedef(*this, ClangDecl,
@@ -9540,8 +9529,6 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
     // This means we found a member in a C++ record's base class.
     if (swiftDecl->getClangDecl() != clangRecord) {
       auto namedMember = cast<ValueDecl>(member);
-      if (namedMember->getFormalAccess() < AccessLevel::Public)
-        continue;
       // Do not clone the base member into the derived class
       // when the derived class already has a member of such
       // name and arity.
