@@ -125,6 +125,37 @@ func testCatch(_ b: Bool) throws -> Int? {
   }
 }
 
+enum ErrorEnum: Error {
+  case failed
+  case tryAgain
+}
+
+@_noLocks
+func concreteError(_ b: Bool) throws(ErrorEnum) -> Int {
+  if b {
+    return 28
+  }
+
+  throw .tryAgain
+}
+
+func concreteErrorOther(_ b: Bool) throws(ErrorEnum) -> Int {
+  if b {
+    return 28
+  }
+
+  throw .tryAgain
+}
+
+@_noLocks
+func testCatchConcrete(_ b: Bool) -> Int {
+  do {
+    return try concreteError(b) + concreteErrorOther(b)
+  } catch {
+    return 17
+  }
+}
+
 @_noLocks
 func testRecursion(_ i: Int) -> Int {
   if i > 0 {
