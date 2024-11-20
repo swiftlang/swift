@@ -3603,6 +3603,15 @@ StringRef SourceFile::getFilename() const {
   return SM.getIdentifierForBuffer(BufferID);
 }
 
+SmallString<64> SourceFile::getFileID() const {
+  SmallString<64> result;
+  auto filename = getFilename();
+
+  if (!filename.empty())
+    computeFileID(getParentModule(), llvm::sys::path::filename(filename), result);
+  return result;
+}
+
 StringRef SourceFile::getBuffer() const {
   SourceManager &SM = getASTContext().SourceMgr;
   return SM.getEntireTextForBuffer(BufferID);

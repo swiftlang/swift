@@ -643,6 +643,10 @@ public:
   /// Otherwise, return an empty string.
   StringRef getFilename() const;
 
+  // Compute the fileID of this file, if it corresponds to a file on disk.
+  // Otherwise, return an empty string.
+  SmallString<64> getFileID() const;
+
   /// Retrieve the source text buffer.
   StringRef getBuffer() const;
 
