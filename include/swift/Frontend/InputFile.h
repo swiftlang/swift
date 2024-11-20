@@ -133,6 +133,9 @@ public:
   StringRef getLoadedModuleTracePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.LoadedModuleTracePath;
   }
+  StringRef getModuleObjCTracePath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs.ModuleObjCTracePath;
+  }
   StringRef getSerializedDiagnosticsPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs
         .SerializedDiagnosticsPath;
