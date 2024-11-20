@@ -1428,7 +1428,7 @@ void TypeChecker::buildAvailabilityScopes(SourceFile &SF) {
   // The root availability scope reflects the fact that all parts of
   // the source file are guaranteed to be executing on at least the minimum
   // platform version for inlining.
-  auto AvailabilityContext = AvailabilityContext::getDefault(Context);
+  auto AvailabilityContext = AvailabilityContext::forInliningTarget(Context);
   AvailabilityScope *RootScope =
       AvailabilityScope::createForSourceFile(&SF, AvailabilityContext);
   SF.setAvailabilityScope(RootScope);
@@ -1493,7 +1493,7 @@ TypeChecker::availabilityAtLocation(SourceLoc loc, const DeclContext *DC,
   // this will be a real problem.
 
   // We can assume we are running on at least the minimum inlining target.
-  auto baseAvailability = AvailabilityContext::getDefault(Context);
+  auto baseAvailability = AvailabilityContext::forInliningTarget(Context);
   auto isInvalidLoc = [SF](SourceLoc loc) {
     return SF ? loc.isInvalid() : true;
   };
