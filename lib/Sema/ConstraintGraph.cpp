@@ -50,8 +50,8 @@ ConstraintGraph::~ConstraintGraph() {
 
 #pragma mark Graph accessors
 
-std::pair<ConstraintGraphNode &, unsigned>
-ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
+ConstraintGraphNode &
+ConstraintGraph::operator[](TypeVariableType *typeVar) {
   // Check whether we've already created a node for this type variable.
   auto &impl = typeVar->getImpl();
   if (auto nodePtr = impl.getGraphNode()) {
@@ -60,7 +60,7 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
            "Type variable mismatch");
     ASSERT(nodePtr->TypeVar == typeVar &&
            "Use-after-free");
-    return { *nodePtr, impl.getGraphIndex() };
+    return *nodePtr;
   }
 
   // Allocate the new node.
@@ -98,7 +98,7 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
     bindTypeVariable(typeVar, fixed);
   }
 
-  return { *nodePtr, index };
+  return *nodePtr;
 }
 
 void ConstraintGraphNode::reset() {

@@ -1099,8 +1099,8 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
     return nullptr;
 
   auto &CG = getConstraintGraph();
-  auto result = CG.lookupNode(typeVar);
-  auto equivalence = result.first.getEquivalenceClass();
+  auto &result = CG[typeVar];
+  auto equivalence = result.getEquivalenceClass();
   auto member = llvm::find_if(equivalence, [=](TypeVariableType *eq) {
     auto *loc = eq->getImpl().getLocator();
     if (!loc)

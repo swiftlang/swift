@@ -245,13 +245,7 @@ public:
   ConstraintSystem &getConstraintSystem() const { return CS; }
 
   /// Access the node corresponding to the given type variable.
-  ConstraintGraphNode &operator[](TypeVariableType *typeVar) {
-    return lookupNode(typeVar).first;
-  }
-
-  /// Retrieve the node and index corresponding to the given type variable.
-  std::pair<ConstraintGraphNode &, unsigned> 
-  lookupNode(TypeVariableType *typeVar);
+  ConstraintGraphNode &operator[](TypeVariableType *typeVar);
 
   /// Add a new constraint to the graph.
   void addConstraint(Constraint *constraint);
