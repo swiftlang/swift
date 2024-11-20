@@ -869,6 +869,18 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     return OpaqueReadOwnership::Borrowed;
   };
 
+  if (auto *accessorDecl = storage->getAccessor(AccessorKind::Read)) {
+    auto lifetimeDependencies = accessorDecl->getLifetimeDependencies();
+    if (lifetimeDependencies.has_value() && !lifetimeDependencies->empty()) {
+      for (auto &lifetimeDependenceInfo : *lifetimeDependencies) {
+        if (lifetimeDependenceInfo.hasScopeLifetimeParamIndices()) {
+          // A scoped lifetime dependence borrows its source.
+          return OpaqueReadOwnership::Borrowed;
+        }
+      }
+    }
+  }
+
   if (storage->getAccessor(AccessorKind::Read2))
     return OpaqueReadOwnership::Borrowed;
 
