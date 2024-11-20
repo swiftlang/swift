@@ -1906,3 +1906,20 @@ func offByOneWithImplicitPartialApply() {
       }
   }
 }
+
+protocol Progress {
+  associatedtype AssocType
+  var x: AssocType { get }
+  func checkCancellation() throws
+}
+
+// We used to crash here since the closure diagnostic would not map z's type
+// into the current context.
+func testCaptureDiagnosticMapsTypeIntoContext<T : Progress>(_ x: NonSendableKlass, y: T) async throws {
+  let z = y.x
+  await withTaskGroup(of: Void.self) { group in
+    group.addTask { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      print(z) // expected-tns-note {{closure captures 'z' which is accessible to code in the current task}}
+    }
+  }
+}

@@ -1667,6 +1667,7 @@ bool SentNeverSendableDiagnosticInferrer::initForSendingPartialApply(
   for (auto capture : ce->getCaptureInfo().getCaptures()) {
     auto *decl = capture.getDecl();
     auto type = decl->getInterfaceType()->getCanonicalType();
+    type = pai->getFunction()->mapTypeIntoContext(type)->getCanonicalType();
     auto silType = SILType::getPrimitiveObjectType(type);
     if (!SILIsolationInfo::isNonSendableType(silType, pai->getFunction()))
       continue;
