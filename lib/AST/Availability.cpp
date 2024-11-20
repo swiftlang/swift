@@ -680,18 +680,19 @@ AvailabilityRange AvailabilityInference::inferForType(Type t) {
 AvailabilityRange ASTContext::getSwiftFutureAvailability() const {
   auto target = LangOpts.Target;
 
-  if (target.isMacOSX() ) {
+  auto getFutureAvailabilityRange = []() -> AvailabilityRange {
     return AvailabilityRange(
         VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
+  };
+
+  if (target.isMacOSX()) {
+    return getFutureAvailabilityRange();
   } else if (target.isiOS()) {
-    return AvailabilityRange(
-        VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
+    return getFutureAvailabilityRange();
   } else if (target.isWatchOS()) {
-    return AvailabilityRange(
-        VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
+    return getFutureAvailabilityRange();
   } else if (target.isXROS()) {
-    return AvailabilityRange(
-        VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));
+    return getFutureAvailabilityRange();
   } else {
     return AvailabilityRange::alwaysAvailable();
   }
