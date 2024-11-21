@@ -557,7 +557,7 @@ std::optional<llvm::VersionTuple>
 Decl::getIntroducedOSVersion(PlatformKind Kind) const {
   for (auto *attr: getAttrs()) {
     if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-      if (ava->Platform == Kind && ava->Introduced) {
+      if (ava->getPlatform() == Kind && ava->Introduced) {
         return ava->Introduced;
       }
     }
@@ -9253,7 +9253,8 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
     // `getAttrs` is in reverse source order, so the last attribute is the
     // first in source
     if (!attr->Rename.empty() &&
-        (attr->Platform == PlatformKind::none || !avAttr) && !attr->isNoAsync()) {
+        (attr->getPlatform() == PlatformKind::none || !avAttr) &&
+        !attr->isNoAsync()) {
       avAttr = attr;
     }
   }

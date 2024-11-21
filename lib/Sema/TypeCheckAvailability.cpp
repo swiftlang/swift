@@ -354,7 +354,7 @@ static bool isInsideCompatibleUnavailableDeclaration(
 
   // Refuse calling universally unavailable functions from unavailable code,
   // but allow the use of types.
-  PlatformKind platform = attr->Platform;
+  PlatformKind platform = attr->getPlatform();
   if (platform == PlatformKind::none && !attr->isForEmbedded() &&
       !isa<TypeDecl>(D) && !isa<ExtensionDecl>(D))
     return false;
@@ -3004,7 +3004,7 @@ getExplicitUnavailabilityDiagnosticInfo(const Decl *decl,
 
   case PlatformAgnosticAvailabilityKind::None:
   case PlatformAgnosticAvailabilityKind::Unavailable:
-    if (attr->Platform != PlatformKind::none) {
+    if (attr->getPlatform() != PlatformKind::none) {
       platform = attr->prettyPlatformString();
       versionedPlatform = platform;
     }

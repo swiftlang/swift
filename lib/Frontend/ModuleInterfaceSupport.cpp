@@ -456,8 +456,8 @@ class InheritedProtocolCollector {
         // attributes for the same platform; formally they'd need to be merged.
         bool alreadyHasMoreSpecificAttrForThisPlatform =
             llvm::any_of(*cache, [nextAttr](const AvailableAttr *existingAttr) {
-          return existingAttr->Platform == nextAttr->Platform;
-        });
+              return existingAttr->getPlatform() == nextAttr->getPlatform();
+            });
         if (alreadyHasMoreSpecificAttrForThisPlatform)
           continue;
         cache->push_back(nextAttr);

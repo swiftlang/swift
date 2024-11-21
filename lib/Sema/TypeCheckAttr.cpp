@@ -2164,14 +2164,14 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // Make sure there isn't a more specific attribute we should be using instead.
   // findMostSpecificActivePlatform() is O(N), so only do this if we're checking
   // an iOS attribute while building for macCatalyst.
-  if (attr->Platform == PlatformKind::iOS &&
+  if (attr->getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
     if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
       return;
     }
   }
 
-  if (attr->Platform == PlatformKind::iOS &&
+  if (attr->getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
       return;
@@ -4798,7 +4798,7 @@ void AttributeChecker::checkBackDeployedAttrs(
     // Unavailable decls cannot be back deployed.
     if (auto unavailableAttrPair = VD->getSemanticUnavailableAttr()) {
       auto unavailableAttr = unavailableAttrPair.value().first;
-      if (!inheritsAvailabilityFromPlatform(unavailableAttr->Platform,
+      if (!inheritsAvailabilityFromPlatform(unavailableAttr->getPlatform(),
                                             Attr->Platform)) {
         auto platformString = prettyPlatformString(Attr->Platform);
         llvm::VersionTuple ignoredVersion;

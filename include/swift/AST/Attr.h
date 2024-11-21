@@ -147,7 +147,13 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 1+1,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 8+8+1+1,
+      /// A `PlatformKind` value.
+      Platform : 8,
+
+      /// A `PlatformAgnosticAvailabilityKind` value.
+      PlatformAgnostic : 8,
+
       /// Whether this attribute was spelled `@_spi_available`.
       IsSPI : 1,
 
@@ -700,7 +706,7 @@ enum class AvailableVersionComparison {
 };
 
 /// Describes the platform-agnostic availability of a declaration.
-enum class PlatformAgnosticAvailabilityKind {
+enum class PlatformAgnosticAvailabilityKind : uint8_t {
   /// The associated availability attribute is not platform-agnostic.
   None,
   /// The declaration is deprecated, but can still be used.
@@ -768,12 +774,6 @@ public:
   /// Indicates where the Obsoleted version was specified.
   const SourceRange ObsoletedRange;
 
-  /// Indicates if the declaration has platform-agnostic availability.
-  const PlatformAgnosticAvailabilityKind PlatformAgnostic;
-
-  /// The platform of the availability.
-  const PlatformKind Platform;
-
   /// Whether this is a language-version-specific entity.
   bool isLanguageVersionSpecific() const;
 
@@ -795,9 +795,15 @@ public:
   /// Whether this attribute was spelled `@_unavailableInEmbedded`.
   bool isForEmbedded() const { return Bits.AvailableAttr.IsForEmbedded; }
 
+  /// Returns the platform that the attribute applies to (may be `none`).
+  PlatformKind getPlatform() const {
+    return static_cast<PlatformKind>(Bits.AvailableAttr.Platform);
+  }
+
   /// Returns the platform-agnostic availability.
   PlatformAgnosticAvailabilityKind getPlatformAgnosticAvailability() const {
-    return PlatformAgnostic;
+    return static_cast<PlatformAgnosticAvailabilityKind>(
+        Bits.AvailableAttr.PlatformAgnostic);
   }
 
   /// Determine if a given declaration should be considered unavailable given
@@ -808,18 +814,16 @@ public:
 
   /// Returns true if the availability applies to a specific
   /// platform.
-  bool hasPlatform() const {
-    return Platform != PlatformKind::none;
-  }
+  bool hasPlatform() const { return getPlatform() != PlatformKind::none; }
 
   /// Returns the string for the platform of the attribute.
   StringRef platformString() const {
-    return swift::platformString(Platform);
+    return swift::platformString(getPlatform());
   }
 
   /// Returns the human-readable string for the platform of the attribute.
   StringRef prettyPlatformString() const {
-    return swift::prettyPlatformString(Platform);
+    return swift::prettyPlatformString(getPlatform());
   }
 
   /// Returns true if this attribute is active given the current platform.

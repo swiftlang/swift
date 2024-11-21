@@ -1341,9 +1341,9 @@ static bool isABIPlaceHolder(Decl *D) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
   for (auto *ATT: D->getAttrs()) {
     if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->Platform != PlatformKind::none && AVA->Introduced &&
+      if (AVA->getPlatform() != PlatformKind::none && AVA->Introduced &&
           AVA->Introduced->getMajor() == 9999) {
-        Platforms.insert(AVA->Platform);
+        Platforms.insert(AVA->getPlatform());
       }
     }
   }
@@ -1363,7 +1363,7 @@ StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
     return StringRef();
   for (auto *ATT: D->getAttrs()) {
     if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->Platform == Kind && AVA->Introduced) {
+      if (AVA->getPlatform() == Kind && AVA->Introduced) {
         return buffer(AVA->Introduced->getAsString());
       }
     }

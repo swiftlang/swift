@@ -3055,7 +3055,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
-          static_cast<unsigned>(theAttr->Platform),
+          static_cast<unsigned>(theAttr->getPlatform()),
           renameDeclID,
           theAttr->Message.size(),
           theAttr->Rename.size(),
