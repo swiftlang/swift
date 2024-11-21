@@ -40,7 +40,7 @@ endif()
 # The builtin targets are used to build the compiler-rt builtins.
 set(LLVM_BUILTIN_TARGETS ${DEFAULT_BUILTIN_TARGETS} CACHE STRING "")
 
-# The runtime targets are used to build the compiler-rt profile library.
+# The runtime targets are used to build the profile and sanitizer libs from compiler-rt.
 set(LLVM_RUNTIME_TARGETS
       x86_64-unknown-windows-msvc
       aarch64-unknown-windows-msvc
@@ -58,8 +58,10 @@ foreach(target ${LLVM_RUNTIME_TARGETS})
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_LIBFUZZER NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_ORC NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_PROFILE YES CACHE BOOL "")
-  set(RUNTIMES_${target}_COMPILER_RT_BUILD_SANITIZERS NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_XRAY NO CACHE BOOL "")
+  # Sanitizers will be configured, but not built. We have separate build
+  # steps for that, because we need a different shell for each target.
+  set(RUNTIMES_${target}_COMPILER_RT_BUILD_SANITIZERS NO CACHE BOOL "")
 endforeach()
 
 foreach(target ${LLVM_BUILTIN_TARGETS})
