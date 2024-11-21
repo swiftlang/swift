@@ -249,11 +249,12 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // Create a new module and file for the code completion buffer, similar to how
   // we handle new lines of REPL input.
   auto *newModule = ModuleDecl::create(
-      Ctx.getIdentifier("REPL_Code_Completion"), Ctx, implicitImports);
-  auto &newSF =
-      *new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID);
-  newModule->addFile(newSF);
+      Ctx.getIdentifier("REPL_Code_Completion"), Ctx, implicitImports,
+      [&](ModuleDecl *newModule, auto addFile) {
+    addFile(new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID));
+  });
 
+  auto &newSF = newModule->getMainSourceFile();
   performImportResolution(newSF);
   bindExtensions(*newModule);
 

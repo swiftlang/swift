@@ -1135,7 +1135,7 @@ ASTBuilder::getAcceptableTypeDeclCandidate(ValueDecl *decl,
 
 DeclContext *ASTBuilder::getNotionalDC() {
   if (!NotionalDC) {
-    NotionalDC = ModuleDecl::create(Ctx.getIdentifier(".RemoteAST"), Ctx);
+    NotionalDC = ModuleDecl::createEmpty(Ctx.getIdentifier(".RemoteAST"), Ctx);
     NotionalDC = new (Ctx) TopLevelCodeDecl(NotionalDC);
   }
   return NotionalDC;
