@@ -81,6 +81,10 @@ llvm::cl::opt<bool>
 SILPrintTypes("sil-print-types", llvm::cl::init(false),
                    llvm::cl::desc("always print type annotations for instruction operands in SIL output"));
 
+llvm::cl::opt<bool>
+SILPrintNoUses("sil-print-no-uses", llvm::cl::init(false),
+                   llvm::cl::desc("omit use comments in SIL output"));
+
 llvm::cl::opt<bool> SILPrintGenericSpecializationInfo(
     "sil-print-generic-specialization-info", llvm::cl::init(false),
     llvm::cl::desc("Include generic specialization"
@@ -828,6 +832,9 @@ public:
   }
 
   void printBlockArgumentUses(const SILBasicBlock *BB) {
+    if (SILPrintNoUses)
+      return;
+
     if (BB->args_empty())
       return;
 
@@ -942,7 +949,7 @@ public:
     printBlockArguments(BB);
     *this << ":";
 
-    if (!BB->pred_empty()) {
+    if (!BB->pred_empty() && !SILPrintNoUses) {
       PrintState.OS.PadToColumn(50);
       
       *this << "// Preds:";
@@ -1032,6 +1039,9 @@ public:
   }
 
   void printUserList(ArrayRef<SILValue> values, SILNodePointer node) {
+    if (SILPrintNoUses)
+      return;
+
     // If the set of values is empty, we need to print the ID of
     // the instruction.  Otherwise, if none of the values has a use,
     // we don't need to do anything.
