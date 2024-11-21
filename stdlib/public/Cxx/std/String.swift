@@ -19,7 +19,7 @@ extension std.string {
   ///
   /// - Complexity: O(*n*), where *n* is the number of UTF-8 code units in the
   ///   Swift string.
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ string: String) {
     self = string.withCString(encodedAs: UTF8.self) { buffer in
 #if os(Windows)
@@ -33,7 +33,7 @@ extension std.string {
     }
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ string: UnsafePointer<CChar>?) {
     if let str = string {
 #if os(Windows)
@@ -56,7 +56,7 @@ extension std.u16string {
   ///
   /// - Complexity: O(*n*), where *n* is the number of UTF-16 code units in the
   ///   Swift string.
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ string: String) {
     self.init()
     for char in string.utf16 {
@@ -71,7 +71,7 @@ extension std.u32string {
   ///
   /// - Complexity: O(*n*), where *n* is the number of UTF-32 code units in the
   ///   Swift string.
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ string: String) {
     self.init()
     for char in string.unicodeScalars {
@@ -83,21 +83,21 @@ extension std.u32string {
 // MARK: Initializing C++ string from a Swift String literal
 
 extension std.string: ExpressibleByStringLiteral {
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(stringLiteral value: String) {
     self.init(value)
   }
 }
 
 extension std.u16string: ExpressibleByStringLiteral {
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(stringLiteral value: String) {
     self.init(value)
   }
 }
 
 extension std.u32string: ExpressibleByStringLiteral {
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(stringLiteral value: String) {
     self.init(value)
   }
@@ -106,27 +106,27 @@ extension std.u32string: ExpressibleByStringLiteral {
 // MARK: Concatenating and comparing C++ strings
 
 extension std.string: Equatable, Comparable {
-  @inlinable
+  @_alwaysEmitIntoClient
   public static func ==(lhs: std.string, rhs: std.string) -> Bool {
     return lhs.compare(rhs) == 0
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public static func <(lhs: std.string, rhs: std.string) -> Bool {
     return lhs.compare(rhs) < 0
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public static func +=(lhs: inout std.string, rhs: std.string) {
     lhs.append(rhs)
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public mutating func append(_ other: std.string) {
     __appendUnsafe(other) // ignore the returned pointer
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public static func +(lhs: std.string, rhs: std.string) -> std.string {
     var copy = lhs
     copy += rhs
@@ -135,27 +135,27 @@ extension std.string: Equatable, Comparable {
 }
 
 extension std.u16string: Equatable, Comparable {
-  @inlinable
+  @_alwaysEmitIntoClient
   public static func ==(lhs: std.u16string, rhs: std.u16string) -> Bool {
     return lhs.compare(rhs) == 0
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public static func <(lhs: std.u16string, rhs: std.u16string) -> Bool {
     return lhs.compare(rhs) < 0
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public static func +=(lhs: inout std.u16string, rhs: std.u16string) {
     lhs.append(rhs)
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public mutating func append(_ other: std.u16string) {
     __appendUnsafe(other) // ignore the returned pointer
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public static func +(lhs: std.u16string, rhs: std.u16string) -> std.u16string {
     var copy = lhs
     copy += rhs
@@ -164,27 +164,27 @@ extension std.u16string: Equatable, Comparable {
 }
 
 extension std.u32string: Equatable, Comparable {
-  @inlinable
+  @_alwaysEmitIntoClient
   public static func ==(lhs: std.u32string, rhs: std.u32string) -> Bool {
     return lhs.compare(rhs) == 0
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public static func <(lhs: std.u32string, rhs: std.u32string) -> Bool {
     return lhs.compare(rhs) < 0
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public static func +=(lhs: inout std.u32string, rhs: std.u32string) {
     lhs.append(rhs)
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public mutating func append(_ other: std.u32string) {
     __appendUnsafe(other) // ignore the returned pointer
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public static func +(lhs: std.u32string, rhs: std.u32string) -> std.u32string {
     var copy = lhs
     copy += rhs
@@ -195,7 +195,7 @@ extension std.u32string: Equatable, Comparable {
 // MARK: Hashing C++ strings
 
 extension std.string: Hashable {
-  @inlinable
+  @_alwaysEmitIntoClient
   public func hash(into hasher: inout Hasher) {
     // Call std::hash<std::string>::operator()
     let cxxHash = __swift_interopHashOfString().callAsFunction(self)
@@ -204,7 +204,7 @@ extension std.string: Hashable {
 }
 
 extension std.u16string: Hashable {
-  @inlinable
+  @_alwaysEmitIntoClient
   public func hash(into hasher: inout Hasher) {
     // Call std::hash<std::u16string>::operator()
     let cxxHash = __swift_interopHashOfU16String().callAsFunction(self)
@@ -213,7 +213,7 @@ extension std.u16string: Hashable {
 }
 
 extension std.u32string: Hashable {
-  @inlinable
+  @_alwaysEmitIntoClient
   public func hash(into hasher: inout Hasher) {
     // Call std::hash<std::u32string>::operator()
     let cxxHash = __swift_interopHashOfU32String().callAsFunction(self)
@@ -224,42 +224,42 @@ extension std.u32string: Hashable {
 // MARK: Getting a Swift description of a C++ string
 
 extension std.string: CustomDebugStringConvertible {
-  @inlinable
+  @_alwaysEmitIntoClient
   public var debugDescription: String {
     return "std.string(\(String(self)))"
   }
 }
 
 extension std.u16string: CustomDebugStringConvertible {
-  @inlinable
+  @_alwaysEmitIntoClient
   public var debugDescription: String {
     return "std.u16string(\(String(self)))"
   }
 }
 
 extension std.u32string: CustomDebugStringConvertible {
-  @inlinable
+  @_alwaysEmitIntoClient
   public var debugDescription: String {
     return "std.u32string(\(String(self)))"
   }
 }
 
 extension std.string: CustomStringConvertible {
-  @inlinable
+  @_alwaysEmitIntoClient
   public var description: String {
     return String(self)
   }
 }
 
 extension std.u16string: CustomStringConvertible {
-  @inlinable
+  @_alwaysEmitIntoClient
   public var description: String {
     return String(self)
   }
 }
 
 extension std.u32string: CustomStringConvertible {
-  @inlinable
+  @_alwaysEmitIntoClient
   public var description: String {
     return String(self)
   }
@@ -275,7 +275,7 @@ extension String {
   /// (`"\u{FFFD}"`).
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ string.
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ cxxString: std.string) {
     let buffer = UnsafeBufferPointer<CChar>(
       start: cxxString.__c_strUnsafe(),
@@ -294,7 +294,7 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ UTF-16
   ///   string.
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ cxxU16String: std.u16string) {
     let buffer = UnsafeBufferPointer<UInt16>(
       start: cxxU16String.__dataUnsafe(),
@@ -311,7 +311,7 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ UTF-32
   ///   string.
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ cxxU32String: std.u32string) {
     let buffer = UnsafeBufferPointer<Unicode.Scalar>(
       start: cxxU32String.__dataUnsafe(),
@@ -334,7 +334,7 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ string
   ///   view.
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ cxxStringView: std.string_view) {
     let buffer = UnsafeBufferPointer<CChar>(
       start: cxxStringView.__dataUnsafe(),
@@ -354,7 +354,7 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ UTF-16
   ///   string view.
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ cxxU16StringView: std.u16string_view) {
     let buffer = UnsafeBufferPointer<UInt16>(
       start: cxxU16StringView.__dataUnsafe(),
@@ -372,7 +372,7 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ UTF-32
   ///   string view.
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ cxxU32StringView: std.u32string_view) {
     let buffer = UnsafeBufferPointer<Unicode.Scalar>(
       start: cxxU32StringView.__dataUnsafe(),
