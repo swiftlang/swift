@@ -4231,6 +4231,11 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
   return false;
 }
 
+ValueDecl *ValueDecl::getRenamedDecl(const AvailableAttr *attr) const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           RenamedDeclRequest{this, attr}, nullptr);
+}
+
 SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   // Some decls have a parent/child split where the introducer keyword is on the
   // parent, but the attributes are on the children. If this is a child in such
@@ -9259,8 +9264,7 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
     }
   }
 
-  auto *renamedDecl = evaluateOrDefault(
-      getASTContext().evaluator, RenamedDeclRequest{this, avAttr}, nullptr);
+  auto *renamedDecl = getRenamedDecl(avAttr);
   auto *alternative = dyn_cast_or_null<AbstractFunctionDecl>(renamedDecl);
   if (!alternative || !alternative->hasAsync())
     return nullptr;

@@ -1835,8 +1835,7 @@ private:
                           const ValueDecl *D, bool includeQuotes) {
     assert(!AvAttr->Rename.empty());
 
-    auto *renamedDecl = evaluateOrDefault(
-        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr}, nullptr);
+    auto *renamedDecl = D->getRenamedDecl(AvAttr);
     if (renamedDecl) {
       assert(shouldInclude(renamedDecl) &&
              "ObjC printer logic mismatch with renamed decl");

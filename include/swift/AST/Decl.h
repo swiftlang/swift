@@ -3262,6 +3262,10 @@ public:
   /// @_dynamicReplacement(for: ...), compute the original declaration
   /// that this declaration dynamically replaces.
   ValueDecl *getDynamicallyReplacedDecl() const;
+
+  /// Performs a request to look up the decl that this decl has been renamed to
+  /// if `attr` indicates that it has been renamed.
+  ValueDecl *getRenamedDecl(const AvailableAttr *attr) const;
 };
 
 /// This is a common base class for declarations which declare a type.
