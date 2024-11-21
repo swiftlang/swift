@@ -379,8 +379,7 @@ DeclAttributes::isUnavailableInSwiftVersion(
       if (available->isInvalid())
         continue;
 
-      if (available->getPlatformAgnosticAvailability() ==
-          PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
+      if (available->isLanguageVersionSpecific()) {
         if (available->Introduced.has_value() &&
             available->Introduced.value() > vers)
           return true;
