@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-silgen -verify %s | %FileCheck %s
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-silgen -verify -strict-concurrency=complete %s | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -Xllvm -sil-print-types -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -Xllvm -sil-print-types -emit-silgen -verify -strict-concurrency=complete %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency

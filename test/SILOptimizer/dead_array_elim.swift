@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil -primary-file %s | grep -v debug_value | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil -primary-file %s | grep -v debug_value | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: swift_in_compiler

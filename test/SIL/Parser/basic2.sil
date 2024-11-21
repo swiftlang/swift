@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -enable-experimental-feature ValueGenerics | %target-sil-opt -enable-experimental-feature ValueGenerics | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -enable-experimental-feature ValueGenerics | %target-sil-opt -sil-print-types -enable-experimental-feature ValueGenerics | %FileCheck %s
 
 // REQUIRES: swift_feature_ValueGenerics
 

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -release-hoisting %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -release-hoisting %s | %FileCheck %s
 // REQUIRES: PTRSIZE=64
 // REQUIRES: OS=macosx
 

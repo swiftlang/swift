@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
 
 import InlineStaticMemberVar
 

@@ -1,18 +1,18 @@
 // RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.52
 
-// RUN: %target-swift-emit-silgen -target %target-cpu-apple-macosx10.52 -emit-sorted-sil %s -o %t.fragile.sil
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-cpu-apple-macosx10.52 -emit-sorted-sil %s -o %t.fragile.sil
 // RUN: %FileCheck -check-prefixes=CHECK,CHECK-NO-EXTENSION %s < %t.fragile.sil
 // RUN: %FileCheck -check-prefixes=NEGATIVE,NEGATIVE-NO-EXTENSION %s < %t.fragile.sil
 
-// RUN: %target-swift-emit-silgen -target %target-cpu-apple-macosx10.52 -emit-sorted-sil %s -o %t.extensions-fragile.sil -application-extension
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-cpu-apple-macosx10.52 -emit-sorted-sil %s -o %t.extensions-fragile.sil -application-extension
 // RUN: %FileCheck -check-prefixes=CHECK,CHECK-EXTENSION %s < %t.extensions-fragile.sil
 // RUN: %FileCheck -check-prefixes=NEGATIVE,NEGATIVE-EXTENSION %s < %t.extensions-fragile.sil
 
-// RUN: %target-swift-emit-silgen -target %target-cpu-apple-macosx10.52 -emit-sorted-sil %s -enable-library-evolution -o %t.resilient.sil
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-cpu-apple-macosx10.52 -emit-sorted-sil %s -enable-library-evolution -o %t.resilient.sil
 // RUN: %FileCheck -check-prefixes=CHECK,CHECK-NO-EXTENSION %s < %t.resilient.sil
 // RUN: %FileCheck -check-prefixes=NEGATIVE,NEGATIVE-NO-EXTENSION %s < %t.resilient.sil
 
-// RUN: %target-swift-emit-silgen -target %target-cpu-apple-macosx10.52 -emit-sorted-sil %s -enable-library-evolution -o %t.extensions-resilient.sil -application-extension
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-cpu-apple-macosx10.52 -emit-sorted-sil %s -enable-library-evolution -o %t.extensions-resilient.sil -application-extension
 // RUN: %FileCheck -check-prefixes=CHECK,CHECK-EXTENSION %s < %t.extensions-resilient.sil
 // RUN: %FileCheck -check-prefixes=NEGATIVE,NEGATIVE-EXTENSION %s < %t.extensions-resilient.sil
 

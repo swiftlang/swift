@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -access-enforcement-opts -I %S/Inputs/abi %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -access-enforcement-opts -I %S/Inputs/abi %s | %FileCheck %s
 
 sil_stage canonical
 

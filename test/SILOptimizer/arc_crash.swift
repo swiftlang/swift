@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O %s -parse-as-library -emit-sil -enforce-exclusivity=none -Xllvm -sil-disable-pass=function-signature-opts | %FileCheck %s
+// RUN: %target-swift-frontend -O %s -parse-as-library -Xllvm -sil-print-types -emit-sil -enforce-exclusivity=none -Xllvm -sil-disable-pass=function-signature-opts | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sil-verify-all %s -module-name test -emit-sil -o - -verify | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-frontend -sil-verify-all %s -module-name test -Xllvm -sil-print-types -emit-sil -o - -verify | %FileCheck %s --enable-var-scope
 
 
 // Constructor calls are dispatched dynamically for open classes, even if

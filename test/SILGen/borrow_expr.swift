@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only -o - -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-move-only -o - -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
 
 final class Klass {
     func useKlass() {}

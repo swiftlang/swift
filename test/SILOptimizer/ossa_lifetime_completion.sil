@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt                     \
+// RUN: %target-sil-opt -sil-print-types                     \
 // RUN:     -test-runner                    \
 // RUN:     -enable-ossa-complete-lifetimes \
 // RUN:     %s                              \

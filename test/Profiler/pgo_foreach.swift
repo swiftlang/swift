@@ -6,7 +6,7 @@
 
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
 // need to move counts attached to expr for this
-// RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-sorted-sil -emit-sil -module-name pgo_foreach -o - | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-sorted-sil -Xllvm -sil-print-types -emit-sil -module-name pgo_foreach -o - | %FileCheck %s --check-prefix=SIL
 // need to lower switch_enum(addr) into IR for this
 // %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-ir -module-name pgo_foreach -o - | %FileCheck %s --check-prefix=IR
 // need to check Opt support

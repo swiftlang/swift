@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
 // OSSA form of tests from simplify_cfg.sil and simplify_cfg_simple.sil.
 //

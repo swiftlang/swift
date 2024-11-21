@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -g -emit-sil %s -parse-as-library -module-name a | %FileCheck %s
+// RUN: %target-swift-frontend -g -Xllvm -sil-print-types -emit-sil %s -parse-as-library -module-name a | %FileCheck %s
 open class C {
   public func fun() {}
 

@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-move-only-type-eliminator  %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-trivial-move-only-type-eliminator  %s | %FileCheck --check-prefix=TRIVIAL %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-move-only-type-eliminator  %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-trivial-move-only-type-eliminator  %s | %FileCheck --check-prefix=TRIVIAL %s
 
 sil_stage raw
 

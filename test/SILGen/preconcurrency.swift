@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name preconcurrency -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name preconcurrency -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 class C {
   @preconcurrency func f(_: Sendable) { }

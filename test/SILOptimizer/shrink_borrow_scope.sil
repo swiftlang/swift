@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -update-borrowed-from -compute-side-effects -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -compute-side-effects -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

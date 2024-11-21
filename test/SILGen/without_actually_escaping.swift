@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name without_actually_escaping %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name without_actually_escaping %s | %FileCheck %s
 
 var escapeHatch: Any = 0
 
