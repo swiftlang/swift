@@ -35,11 +35,11 @@ static std::optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
                                               Type type);
 
 bool BindingSet::forClosureResult() const {
-  return Info.TypeVar->getImpl().isClosureResultType();
+  return TypeVar->getImpl().isClosureResultType();
 }
 
 bool BindingSet::forGenericParameter() const {
-  return bool(Info.TypeVar->getImpl().getGenericParameter());
+  return bool(TypeVar->getImpl().getGenericParameter());
 }
 
 bool BindingSet::canBeNil() const {
@@ -54,10 +54,10 @@ bool BindingSet::isDirectHole() const {
     return false;
 
   return Bindings.empty() && getNumViableLiteralBindings() == 0 &&
-         Defaults.empty() && Info.TypeVar->getImpl().canBindToHole();
+         Defaults.empty() && TypeVar->getImpl().canBindToHole();
 }
 
-bool PotentialBindings::isGenericParameter() const {
+static bool isGenericParameter(TypeVariableType *TypeVar) {
   auto *locator = TypeVar->getImpl().getLocator();
   return locator && locator->isLastElement<LocatorPathElt::GenericParameter>();
 }
@@ -178,7 +178,7 @@ bool BindingSet::involvesTypeVariables() const {
 
 bool BindingSet::isPotentiallyIncomplete() const {
   // Generic parameters are always potentially incomplete.
-  if (Info.isGenericParameter())
+  if (isGenericParameter(TypeVar))
     return true;
 
   // Key path literal type is incomplete until there is a
@@ -1168,7 +1168,8 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
   } while (true);
 }
 
-void PotentialBindings::addPotentialBinding(PotentialBinding binding) {
+void PotentialBindings::addPotentialBinding(TypeVariableType *TypeVar,
+                                            PotentialBinding binding) {
   assert(!binding.BindingType->is<ErrorType>());
 
   // If the type variable can't bind to an lvalue, make sure the
@@ -1418,7 +1419,7 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar,
          "not a representative");
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
 
-  BindingSet bindings{CG[typeVar].getCurrentBindings()};
+  BindingSet bindings(*this, typeVar, CG[typeVar].getCurrentBindings());
 
   if (finalize) {
     llvm::SmallDenseMap<TypeVariableType *, BindingSet> cache;
@@ -1461,7 +1462,9 @@ static std::optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
 }
 
 std::optional<PotentialBinding>
-PotentialBindings::inferFromRelational(Constraint *constraint) {
+PotentialBindings::inferFromRelational(ConstraintSystem &CS,
+                                       TypeVariableType *TypeVar,
+                                       Constraint *constraint) {
   assert(constraint->getClassification() ==
              ConstraintClassification::Relational &&
          "only relational constraints handled here");
@@ -1657,7 +1660,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     // Since inference now happens during constraint generation,
     // this hack should be allowed in both `Solving`
     // (during non-diagnostic mode) and `ConstraintGeneration` phases.
-    if (isGenericParameter() &&
+    if (isGenericParameter(TypeVar) &&
         (!CS.shouldAttemptFixes() ||
          CS.getPhase() == ConstraintSystemPhase::ConstraintGeneration)) {
       type = fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape(false));
@@ -1766,12 +1769,14 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
-void PotentialBindings::infer(Constraint *constraint) {
+void PotentialBindings::infer(ConstraintSystem &CS,
+                              TypeVariableType *TypeVar,
+                              Constraint *constraint) {
   if (!Constraints.insert(constraint).second)
     return;
 
   // Record the change, if there are active scopes.
-  if (CS.isRecordingChanges())
+  if (CS.solverState && !CS.solverState->Trail.isUndoActive())
     CS.recordChange(SolverTrail::Change::InferredBindings(TypeVar, constraint));
 
   switch (constraint->getKind()) {
@@ -1787,11 +1792,11 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::LValueObject: {
-    auto binding = inferFromRelational(constraint);
+    auto binding = inferFromRelational(CS, TypeVar, constraint);
     if (!binding)
       break;
 
-    addPotentialBinding(*binding);
+    addPotentialBinding(TypeVar, *binding);
     break;
   }
   case ConstraintKind::KeyPathApplication: {
@@ -1940,12 +1945,14 @@ void PotentialBindings::infer(Constraint *constraint) {
   }
 }
 
-void PotentialBindings::retract(Constraint *constraint) {
+void PotentialBindings::retract(ConstraintSystem &CS,
+                                TypeVariableType *TypeVar,
+                                Constraint *constraint) {
   if (!Constraints.erase(constraint))
     return;
 
   // Record the change, if there are active scopes.
-  if (CS.isRecordingChanges())
+  if (CS.solverState && !CS.solverState->Trail.isUndoActive())
     CS.recordChange(SolverTrail::Change::RetractedBindings(TypeVar, constraint));
 
   LLVM_DEBUG(
@@ -2009,6 +2016,23 @@ void PotentialBindings::retract(Constraint *constraint) {
   SubtypeOf.remove_if(hasMatchingSource);
   SupertypeOf.remove_if(hasMatchingSource);
   EquivalentTo.remove_if(hasMatchingSource);
+}
+
+void PotentialBindings::reset() {
+  if (CONDITIONAL_ASSERT_enabled()) {
+    ASSERT(Constraints.empty());
+    ASSERT(Bindings.empty());
+    ASSERT(Protocols.empty());
+    ASSERT(Literals.empty());
+    ASSERT(Defaults.empty());
+    ASSERT(DelayedBy.empty());
+    ASSERT(AdjacentVars.empty());
+    ASSERT(SubtypeOf.empty());
+    ASSERT(SupertypeOf.empty());
+    ASSERT(EquivalentTo.empty());
+  }
+
+  AssociatedCodeCompletionToken = ASTNode();
 }
 
 void BindingSet::forEachLiteralRequirement(

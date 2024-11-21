@@ -1350,6 +1350,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   const auto &bindings2 = solutions[idx2].typeBindings;
 
   for (const auto &binding1 : bindings1) {
+    if (!binding1.second)
+      continue;
+
     auto *typeVar = binding1.first;
     auto *loc = typeVar->getImpl().getLocator();
 
@@ -1373,6 +1376,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // let's consider it.
     auto binding2 = bindings2.find(typeVar);
     if (binding2 == bindings2.end())
+      continue;
+
+    if (!binding2->second)
       continue;
 
     TypeBindingsToCompare typesToCompare(binding1.second, binding2->second);
