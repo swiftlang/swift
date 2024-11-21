@@ -1,5 +1,10 @@
 // REQUIRES: OS=macosx
 
+// This test fails under ASAN because of an ODR violation (which is strictly
+// speaking a bug: https://github.com/swiftlang/swift/issues/77771).  Disable
+// for ASAN until it's fixed.
+// UNSUPPORTED: asan
+
 // RUN: %target-swift-frontend -load-pass-plugin=nonexistent.dylib %s -emit-ir -o /dev/null 2>&1 | %FileCheck -check-prefix=CHECK-UNABLE-LOAD %s
 // CHECK-UNABLE-LOAD: error: unable to load plugin 'nonexistent.dylib': 'Could not load library{{.*}}'
 
