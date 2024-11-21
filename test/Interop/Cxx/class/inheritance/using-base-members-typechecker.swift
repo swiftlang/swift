@@ -6,11 +6,11 @@ import UsingBaseMembers
 
 let a = PublicBasePrivateInheritance()
 let _ = a.publicGetter()
-a.notExposed() // expected-error {{value of type 'PublicBasePrivateInheritance' has no member 'notExposed'}}
+a.notExposed() // expected-error {{'notExposed' is inaccessible due to 'private' protection level}}
 
 let b = PublicBaseProtectedInheritance()
 let _ = b.publicGetter()
-b.notExposed() // expected-error {{value of type 'PublicBaseProtectedInheritance' has no member 'notExposed'}}
+b.notExposed() // expected-error {{'notExposed' is inaccessible due to 'private' protection level}}
 
 let _ = UsingBaseConstructorWithParam(566 as Int32)
 let _ = UsingBaseConstructorWithParam(566 as UInt32)
