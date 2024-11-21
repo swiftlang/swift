@@ -1275,66 +1275,36 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
 }
 } // namespace
 
-static void serializeDependencyCache(CompilerInstance &instance,
-                                     const ModuleDependenciesCache &cache) {
-  const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
-  ASTContext &Context = instance.getASTContext();
-  auto savePath = opts.SerializedDependencyScannerCachePath;
-  module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Context.Diags, instance.getOutputBackend(), savePath, cache);
-  if (opts.EmitDependencyScannerCacheRemarks) {
-    Context.Diags.diagnose(SourceLoc(), diag::remark_save_cache, savePath);
-  }
-}
-
-static void deserializeDependencyCache(CompilerInstance &instance,
-                                       ModuleDependenciesCache &cache) {
-  const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
-  ASTContext &Context = instance.getASTContext();
-  auto loadPath = opts.SerializedDependencyScannerCachePath;
-  if (module_dependency_cache_serialization::readInterModuleDependenciesCache(
-          loadPath, cache)) {
-    Context.Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed,
-                           loadPath);
-  } else if (opts.EmitDependencyScannerCacheRemarks) {
-    Context.Diags.diagnose(SourceLoc(), diag::remark_reuse_cache, loadPath);
-  }
-}
-
-bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
-  ASTContext &Context = instance.getASTContext();
-  const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
-  std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
+bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
+  ASTContext &ctx = CI.getASTContext();
+  const FrontendOptions &opts = CI.getInvocation().getFrontendOptions();
+  std::string depGraphOutputPath = opts.InputsAndOutputs.getSingleOutputFilename();
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
-  SwiftDependencyScanningService *service = Context.Allocate<SwiftDependencyScanningService>();
+  SwiftDependencyScanningService *service = ctx.Allocate<SwiftDependencyScanningService>();
   ModuleDependenciesCache cache(
-      *service, instance.getMainModule()->getNameStr().str(),
-      instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
-      instance.getInvocation().getModuleScanningHash());
+      *service, CI.getMainModule()->getNameStr().str(),
+      CI.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
+      CI.getInvocation().getModuleScanningHash());
 
-  if (opts.ReuseDependencyScannerCache)
-    deserializeDependencyCache(instance, cache);
-
-  if (service->setupCachingDependencyScanningService(instance))
+  // ACTODO: Deserialize cache
+  
+  if (service->setupCachingDependencyScanningService(CI))
     return true;
-
-
 
   // Execute scan
   llvm::ErrorOr<swiftscan_dependency_graph_t> dependenciesOrErr =
-      performModuleScan(instance, nullptr, cache);
+      performModuleScan(CI, nullptr, cache);
 
   // Serialize the dependency cache if -serialize-dependency-scan-cache
   // is specified
-  if (opts.SerializeDependencyScannerCache)
-    serializeDependencyCache(instance, cache);
+  // ACTODO: Serialize cache
 
   if (dependenciesOrErr.getError())
     return true;
   auto dependencies = std::move(*dependenciesOrErr);
 
-  if (writeJSONToOutput(Context.Diags, instance.getOutputBackend(), path,
+  if (writeJSONToOutput(ctx.Diags, CI.getOutputBackend(), depGraphOutputPath,
                         dependencies))
     return true;
 
@@ -1342,7 +1312,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   // FIXME: We shouldn't need this, but it's masking bugs in our scanning
   // logic where we don't create a fresh context when scanning Swift interfaces
   // that includes their own command-line flags.
-  Context.Diags.resetHadAnyError();
+  ctx.Diags.resetHadAnyError();
   return false;
 }
 

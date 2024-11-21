@@ -57,6 +57,12 @@ using IsFrameworkField = BCFixed<1>;
 using IsSystemField = BCFixed<1>;
 /// A bit that indicates whether or not a module is that of a static archive
 using IsStaticField = BCFixed<1>;
+/// A bit taht indicates whether or not a link library is a force-load one
+using IsForceLoadField = BCFixed<1>;
+
+/// Source location fields
+using LineNumberField = BCFixed<32>;
+using ColumnNumberField = BCFixed<32>;
 
 /// Arrays of various identifiers, distinguished for readability
 using IdentifierIDArryField = llvm::BCArray<IdentifierIDField>;
@@ -65,9 +71,12 @@ using ModuleIDArryField = llvm::BCArray<IdentifierIDField>;
 /// Identifiers used to refer to the above arrays
 using FileIDArrayIDField = IdentifierIDField;
 using ContextHashIDField = IdentifierIDField;
+using ModuleCacheKeyIDField = IdentifierIDField;
 using ImportArrayIDField = IdentifierIDField;
 using FlagIDArrayIDField = IdentifierIDField;
 using DependencyIDArrayIDField = IdentifierIDField;
+using AuxiliaryFilesArrayIDField = IdentifierIDField;
+using SourceLocationIDArrayIDField = IdentifierIDField;
 
 /// The ID of the top-level block containing the dependency graph
 const unsigned GRAPH_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID;
@@ -81,6 +90,9 @@ namespace graph_block {
 enum {
   METADATA = 1,
   MODULE_NODE,
+  LINK_LIBRARY_NODE,
+  SOURCE_LOCATION_NODE,
+  IMPORT_STATEMENT_NODE,
   SWIFT_INTERFACE_MODULE_DETAILS_NODE,
   SWIFT_SOURCE_MODULE_DETAILS_NODE,
   SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE,
@@ -117,6 +129,26 @@ using IdentifierNodeLayout = BCRecordLayout<IDENTIFIER_NODE, BCBlob>;
 using IdentifierArrayLayout =
     BCRecordLayout<IDENTIFIER_ARRAY_NODE, IdentifierIDArryField>;
 
+using LinkLibraryLayout =
+    BCRecordLayout<LINK_LIBRARY_NODE,            // ID
+                   IdentifierIDField,            // libraryName
+                   IsFrameworkField,             // isFramework
+                   IsForceLoadField              // forceLoad
+                   >;
+
+using SourceLocationLayout =
+    BCRecordLayout<LINK_LIBRARY_NODE,            // ID
+                   IdentifierIDField,            // bufferIdentifier
+                   LineNumberField,              // lineNumber
+                   ColumnNumberField             // columnNumber
+                   >;
+
+using ImportStatementLayout =
+    BCRecordLayout<LINK_LIBRARY_NODE,            // ID
+                   IdentifierIDField,            // importIdentifier
+                   SourceLocationIDArrayIDField  // importLocations
+                   >;
+
 // After the array records, we have a sequence of Module info
 // records, each of which is followed by one of:
 // - SwiftInterfaceModuleDetails
@@ -130,7 +162,14 @@ using ModuleInfoLayout =
                    ContextHashIDField,           // contextHash
                    ImportArrayIDField,           // moduleImports
                    ImportArrayIDField,           // optionalModuleImports
-                   DependencyIDArrayIDField      // resolvedDirectModuleDependencies
+                   // ACTODO: LinkLibrariesArrayIDField,           // linkLibraries
+                   DependencyIDArrayIDField,       // importedSwiftModules
+                   DependencyIDArrayIDField,       // importedClangModules
+                   DependencyIDArrayIDField,       // crossImportOverlayModules
+                   DependencyIDArrayIDField,       // swiftOverlayDependencies
+                   ModuleCacheKeyIDField,          // moduleCacheKey
+                   AuxiliaryFilesArrayIDField      // auxiliaryFiles
+                   // ACTODO: MacroDependenciesArrayIDField,           // macroDependencies
                    >;
 
 using SwiftInterfaceModuleDetailsLayout =
@@ -147,7 +186,6 @@ using SwiftInterfaceModuleDetailsLayout =
                    FileIDArrayIDField,                  // sourceFiles
                    FileIDArrayIDField,                  // bridgingSourceFiles
                    IdentifierIDField,                   // bridgingModuleDependencies
-                   DependencyIDArrayIDField,            // swiftOverlayDependencies
                    IdentifierIDField,                   // CASFileSystemRootID
                    IdentifierIDField,                   // bridgingHeaderIncludeTree
                    IdentifierIDField,                   // moduleCacheKey
@@ -161,7 +199,6 @@ using SwiftSourceModuleDetailsLayout =
                    FileIDArrayIDField,               // sourceFiles
                    FileIDArrayIDField,               // bridgingSourceFiles
                    FileIDArrayIDField,               // bridgingModuleDependencies
-                   DependencyIDArrayIDField,         // swiftOverlayDependencies
                    IdentifierIDField,                // CASFileSystemRootID
                    IdentifierIDField,                // bridgingHeaderIncludeTree
                    FlagIDArrayIDField,               // buildCommandLine
@@ -173,7 +210,6 @@ using SwiftBinaryModuleDetailsLayout =
                    FileIDField,                      // compiledModulePath
                    FileIDField,                      // moduleDocPath
                    FileIDField,                      // moduleSourceInfoPath
-                   DependencyIDArrayIDField,         // swiftOverlayDependencies
                    FileIDField,                      // headerImport
                    IdentifierIDField,                // headerModuleDependencies
                    FileIDArrayIDField,               // headerSourceFiles
@@ -220,7 +256,7 @@ bool readInterModuleDependenciesCache(llvm::StringRef path,
 /// Returns true if there was an error.
 bool writeInterModuleDependenciesCache(DiagnosticEngine &diags,
                                        llvm::vfs::OutputBackend &backend,
-                                       llvm::StringRef path,
+                                       llvm::StringRef outputPath,
                                        const ModuleDependenciesCache &cache);
 
 /// Tries to write out the given dependency cache with the given

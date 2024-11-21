@@ -769,6 +769,15 @@ public:
   setLinkLibraries(const ArrayRef<LinkLibrary> linkLibraries) {
     storage->linkLibraries.assign(linkLibraries.begin(), linkLibraries.end());
   }
+  
+  const ArrayRef<std::string> getAuxiliaryFiles() const {
+    return storage->auxiliaryFiles;
+  }
+  
+  void
+  setAuxiliaryFiles(const ArrayRef<std::string> auxiliaryFiles) {
+    storage->auxiliaryFiles.assign(auxiliaryFiles.begin(), auxiliaryFiles.end());
+  }
 
   bool isStaticLibrary() const {
     if (auto *detail = getAsSwiftInterfaceModule())
