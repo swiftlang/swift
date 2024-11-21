@@ -166,7 +166,7 @@ void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
   TypeVariables.insert(typeVar);
 
   // Notify the constraint graph.
-  (void)CG[typeVar];
+  CG.addTypeVariable(typeVar);
 }
 
 void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
@@ -1103,8 +1103,8 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
     return nullptr;
 
   auto &CG = getConstraintGraph();
-  auto result = CG.lookupNode(typeVar);
-  auto equivalence = result.first.getEquivalenceClass();
+  auto &result = CG[typeVar];
+  auto equivalence = result.getEquivalenceClass();
   auto member = llvm::find_if(equivalence, [=](TypeVariableType *eq) {
     auto *loc = eq->getImpl().getLocator();
     if (!loc)
@@ -1810,8 +1810,15 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
     // variable representing the argument to retrieve protocol requirements from
     // it. Look for a ArgumentConversion constraint that allows us to retrieve
     // the argument type var.
-    for (auto argConstraint :
-         CS.getConstraintGraph()[typeVar].getConstraints()) {
+    auto &cg = CS.getConstraintGraph();
+
+    // FIXME: The type variable is not going to be part of the constraint graph
+    // at this point unless it was created at the outermost decision level;
+    // otherwise it has already been rolled back! Work around this by creating
+    // an empty node if one doesn't exist.
+    cg.addTypeVariable(typeVar);
+
+    for (auto argConstraint : cg[typeVar].getConstraints()) {
       if (argConstraint->getKind() == ConstraintKind::ArgumentConversion &&
           argConstraint->getFirstType()->getRValueType()->isEqual(typeVar)) {
         if (auto argTV =
@@ -1876,7 +1883,7 @@ size_t Solution::getTotalMemory() const {
     return *TotalMemory;
 
   const_cast<Solution *>(this)->TotalMemory
-       = sizeof(*this) + typeBindings.getMemorySize() +
+       = sizeof(*this) + size_in_bytes(typeBindings) +
          overloadChoices.getMemorySize() +
          ConstraintRestrictions.getMemorySize() +
          (Fixes.size() * sizeof(void *)) + DisjunctionChoices.getMemorySize() +

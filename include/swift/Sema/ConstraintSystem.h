@@ -30,7 +30,6 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Sema/CSBindings.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/CSTrail.h"
 #include "swift/Sema/Constraint.h"
@@ -1494,7 +1493,7 @@ public:
   DeclContext *getDC() const;
 
   /// The set of type bindings.
-  llvm::DenseMap<TypeVariableType *, Type> typeBindings;
+  llvm::MapVector<TypeVariableType *, Type> typeBindings;
   
   /// The set of overload choices along with their types.
   llvm::DenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
@@ -2688,10 +2687,6 @@ public:
   /// system, and carries temporary state related to the current path
   /// we're exploring.
   SolverState *solverState = nullptr;
-
-  bool isRecordingChanges() const {
-    return solverState && !solverState->Trail.isUndoActive();
-  }
 
   void recordChange(SolverTrail::Change change) {
     solverState->Trail.recordChange(change);

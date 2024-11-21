@@ -103,8 +103,10 @@ Solution ConstraintSystem::finalize() {
     // This type variable has no binding. Allowed only
     // when `FreeTypeVariableBinding::Allow` is set,
     // which is checked above.
-    if (!getFixedType(tv))
+    if (!getFixedType(tv)) {
+      solution.typeBindings[tv] = Type();
       continue;
+    }
 
     solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
   }
@@ -274,10 +276,15 @@ void ConstraintSystem::replaySolution(const Solution &solution,
   if (shouldIncreaseScore)
     replayScore(solution.getFixedScore());
 
-  // Assign fixed types to the type variables solved by this solution.
   for (auto binding : solution.typeBindings) {
     // If we haven't seen this type variable before, record it now.
     addTypeVariable(binding.first);
+  }
+
+  // Assign fixed types to the type variables solved by this solution.
+  for (auto binding : solution.typeBindings) {
+    if (!binding.second)
+      continue;
 
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.

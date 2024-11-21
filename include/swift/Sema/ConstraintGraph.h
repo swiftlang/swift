@@ -84,7 +84,10 @@ public:
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClass() const;
 
-  inference::PotentialBindings &getCurrentBindings();
+  inference::PotentialBindings &getCurrentBindings() {
+    assert(forRepresentativeVar());
+    return Bindings;
+  }
 
 private:
   /// Determines whether the type variable associated with this node
@@ -180,7 +183,7 @@ private:
   TypeVariableType *TypeVar;
 
   /// The set of bindings associated with this type variable.
-  std::optional<inference::PotentialBindings> Bindings;
+  inference::PotentialBindings Bindings;
 
   /// The vector of constraints that mention this type variable, in a stable
   /// order for iteration.
@@ -244,14 +247,11 @@ public:
   /// Retrieve the constraint system this graph describes.
   ConstraintSystem &getConstraintSystem() const { return CS; }
 
-  /// Access the node corresponding to the given type variable.
-  ConstraintGraphNode &operator[](TypeVariableType *typeVar) {
-    return lookupNode(typeVar).first;
-  }
+  /// Add a new vertex to the graph.
+  void addTypeVariable(TypeVariableType *typeVar);
 
-  /// Retrieve the node and index corresponding to the given type variable.
-  std::pair<ConstraintGraphNode &, unsigned> 
-  lookupNode(TypeVariableType *typeVar);
+  /// Look up the vertex associated with the given type variable.
+  ConstraintGraphNode &operator[](TypeVariableType *typeVar);
 
   /// Add a new constraint to the graph.
   void addConstraint(Constraint *constraint);
