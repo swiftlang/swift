@@ -9838,8 +9838,7 @@ Solution::coerceToType(Expr *expr, Type toType, ConstraintLocator *locator) {
 }
 
 bool Solution::hasType(ASTNode node) const {
-  auto result = nodeTypes.find(node);
-  if (result != nodeTypes.end())
+  if (nodeTypes.count(node))
     return true;
 
   auto &cs = getConstraintSystem();
@@ -9848,8 +9847,11 @@ bool Solution::hasType(ASTNode node) const {
 
 bool Solution::hasType(const KeyPathExpr *KP, unsigned ComponentIndex) const {
   assert(KP && "Expected non-null key path parameter!");
-  return keyPathComponentTypes.find(std::make_pair(KP, ComponentIndex))
-            != keyPathComponentTypes.end();
+  if (keyPathComponentTypes.count(std::make_pair(KP, ComponentIndex)))
+    return true;
+
+  auto &cs = getConstraintSystem();
+  return cs.hasType(KP, ComponentIndex);
 }
 
 Type Solution::getType(ASTNode node) const {
@@ -9861,9 +9863,23 @@ Type Solution::getType(ASTNode node) const {
   return cs.getType(node);
 }
 
+void Solution::setType(ASTNode node, Type type) {
+  nodeTypes[node] = type;
+  constraintSystem->setType(node, type);
+}
+
 Type Solution::getType(const KeyPathExpr *KP, unsigned I) const {
-  assert(hasType(KP, I) && "Expected type to have been set!");
-  return keyPathComponentTypes.find(std::make_pair(KP, I))->second;
+  auto result = keyPathComponentTypes.find(std::make_pair(KP, I));
+  if (result != keyPathComponentTypes.end())
+    return result->second;
+
+  auto &cs = getConstraintSystem();
+  return cs.getType(KP, I);
+}
+
+void Solution::setType(const KeyPathExpr *KP, unsigned I, Type T) {
+  keyPathComponentTypes[{KP, I}] = T;
+  constraintSystem->setType(KP, I, T);
 }
 
 TypeVariableType *
@@ -9891,6 +9907,62 @@ void Solution::setExprTypes(Expr *expr) const {
 
   SetExprTypes SET(*this);
   expr->walk(SET);
+}
+
+namespace {
+
+class CacheExprTypes : public ASTWalker {
+  Expr *RootExpr;
+  Solution &solution;
+  bool ExcludeRoot;
+
+public:
+  CacheExprTypes(Expr *expr, Solution &solution, bool excludeRoot)
+      : RootExpr(expr), solution(solution), ExcludeRoot(excludeRoot) {}
+
+  /// Walk everything in a macro
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
+  PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
+    if (ExcludeRoot && expr == RootExpr) {
+      assert(!expr->getType() && "Unexpected type in root of expression!");
+      return Action::Continue(expr);
+    }
+
+    if (expr->getType())
+      solution.cacheType(expr);
+
+    if (auto kp = dyn_cast<KeyPathExpr>(expr))
+      for (auto i : indices(kp->getComponents()))
+        if (kp->getComponents()[i].getComponentType())
+          solution.cacheType(kp, i);
+
+    return Action::Continue(expr);
+  }
+
+  /// Ignore statements.
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+    return Action::SkipNode(stmt);
+  }
+
+  /// Ignore declarations.
+  PreWalkAction walkToDeclPre(Decl *decl) override {
+    return Action::SkipNode();
+  }
+};
+
+}
+
+void Solution::cacheExprTypes(Expr *expr) {
+  bool excludeRoot = false;
+  expr->walk(CacheExprTypes(expr, *this, excludeRoot));
+}
+
+void Solution::cacheSubExprTypes(Expr *expr) {
+  bool excludeRoot = true;
+  expr->walk(CacheExprTypes(expr, *this, excludeRoot));
 }
 
 /// MARK: SolutionResult implementation.

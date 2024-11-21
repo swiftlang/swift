@@ -1749,6 +1749,30 @@ public:
   /// Retrieve the type of the given node, as recorded in this solution.
   Type getType(ASTNode node) const;
 
+  /// Set the type in our type map for the given node. This is used in CSApply
+  /// to set the types of synthesized Exprs.
+  void setType(ASTNode node, Type type);
+
+  void setType(const KeyPathExpr *KP, unsigned I, Type T);
+
+  /// Cache the type of the expression argument and return that same
+  /// argument.
+  template <typename T>
+  T *cacheType(T *E) {
+    assert(E->getType() && "Expected a type!");
+    setType(E, E->getType());
+    return E;
+  }
+
+  /// Cache the type of the expression argument and return that same
+  /// argument.
+  KeyPathExpr *cacheType(KeyPathExpr *E, unsigned I) {
+    auto componentTy = E->getComponents()[I].getComponentType();
+    assert(componentTy && "Expected a type!");
+    setType(E, I, componentTy);
+    return E;
+  }
+
   /// Retrieve the type of the \p ComponentIndex-th component in \p KP.
   Type getType(const KeyPathExpr *KP, unsigned ComponentIndex) const;
 
@@ -1845,6 +1869,13 @@ public:
 
   /// Dump this solution.
   void dump(raw_ostream &OS, unsigned indent) const LLVM_ATTRIBUTE_USED;
+
+  /// Cache the types of the given expression and all subexpressions.
+  void cacheExprTypes(Expr *expr);
+
+  /// Cache the types of the expressions under the given expression
+  /// (but not the type of the given expression).
+  void cacheSubExprTypes(Expr *expr);
 };
 
 /// Describes the differences between several solutions to the same
