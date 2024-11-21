@@ -759,21 +759,26 @@ namespace {
           new (ctx) DeclRefExpr(ref, loc, implicit, semantics, fullType);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
-      Expr *result = adjustTypeForDeclReference(
-          declRefExpr, fullType, adjustedFullType, locator);
-      // If we have to load, do so now.
-      if (loadImmediately)
-        result = cs.addImplicitLoadExpr(result);
 
-      result = forceUnwrapIfExpected(result, locator);
+      Expr *result = forceUnwrapIfExpected(declRefExpr, locator);
 
       if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
         if (AnyFunctionRef(fnDecl).hasExternalPropertyWrapperParameters() &&
             (declRefExpr->getFunctionRefKind() == FunctionRefKind::Compound ||
              declRefExpr->getFunctionRefKind() == FunctionRefKind::Unapplied)) {
-          result = buildSingleCurryThunk(result, fnDecl, locator);
+          // We don't need to do any further adjustment once we've built the
+          // curry thunk.
+          return buildSingleCurryThunk(result, fnDecl,
+                                       adjustedFullType->castTo<FunctionType>(),
+                                       locator);
         }
       }
+
+      result = adjustTypeForDeclReference(result, fullType, adjustedFullType,
+                                          locator);
+      // If we have to load, do so now.
+      if (loadImmediately)
+        result = cs.addImplicitLoadExpr(result);
 
       return result;
     }
@@ -1406,39 +1411,18 @@ namespace {
     /// parameters.
     /// \param declOrClosure The underlying function-like declaration or
     /// closure we're going to call.
+    /// \param thunkTy The type of the resulting thunk. This should be the
+    /// type of the \c fnExpr, with any potential adjustments for things like
+    /// concurrency.
     /// \param locator The locator pinned on the function reference carried
     /// by \p fnExpr. If the function has associated applied property wrappers,
     /// the locator is used to pull them in.
     AutoClosureExpr *buildSingleCurryThunk(Expr *fnExpr,
                                            DeclContext *declOrClosure,
+                                           FunctionType *thunkTy,
                                            ConstraintLocatorBuilder locator) {
-      auto *const thunkTy = cs.getType(fnExpr)->castTo<FunctionType>();
-
       return buildSingleCurryThunk(/*baseExpr=*/nullptr, fnExpr, declOrClosure,
                                    thunkTy, locator);
-    }
-
-    /// Build a "{ args in base.fn(args) }" single-expression curry thunk.
-    ///
-    /// \param baseExpr The base expression to be captured.
-    /// \param fnExpr The expression to be called by consecutively applying
-    /// the \p baseExpr and thunk parameters.
-    /// \param declOrClosure The underlying function-like declaration or
-    /// closure we're going to call.
-    /// \param locator The locator pinned on the function reference carried
-    /// by \p fnExpr. If the function has associated applied property wrappers,
-    /// the locator is used to pull them in.
-    AutoClosureExpr *buildSingleCurryThunk(Expr *baseExpr, Expr *fnExpr,
-                                           DeclContext *declOrClosure,
-                                           ConstraintLocatorBuilder locator) {
-      assert(baseExpr);
-      auto *const thunkTy = cs.getType(fnExpr)
-                                ->castTo<FunctionType>()
-                                ->getResult()
-                                ->castTo<FunctionType>();
-
-      return buildSingleCurryThunk(baseExpr, fnExpr, declOrClosure, thunkTy,
-                                   locator);
     }
 
     /// Build a "{ self in { args in self.fn(args) } }" nested curry thunk.
@@ -1909,9 +1893,10 @@ namespace {
       // have side effects, instead of abstracting out a 'self' parameter.
       const auto isSuperPartialApplication = needsCurryThunk && isSuper;
       if (isSuperPartialApplication) {
-        ref = buildSingleCurryThunk(base, declRefExpr,
-                                    cast<AbstractFunctionDecl>(member),
-                                    memberLocator);
+        ref = buildSingleCurryThunk(
+            base, declRefExpr, cast<AbstractFunctionDecl>(member),
+            adjustedOpenedType->castTo<FunctionType>(),
+            memberLocator);
       } else if (needsCurryThunk) {
         // Another case where we want to build a single closure is when
         // we have a partial application of a static member. It is better
@@ -1927,14 +1912,13 @@ namespace {
                                              cs.getType(base));
             cs.setType(base, base->getType());
 
-            auto *closure = buildSingleCurryThunk(
-                base, declRefExpr, cast<AbstractFunctionDecl>(member),
-                memberLocator);
-
             // Skip the code below -- we're not building an extra level of
             // call by applying the metatype; instead, the closure we just
             // built is the curried reference.
-            return closure;
+            return buildSingleCurryThunk(
+                base, declRefExpr, cast<AbstractFunctionDecl>(member),
+                adjustedOpenedType->castTo<FunctionType>(),
+                memberLocator);
           } else {
             // Add a useless ".self" to avoid downstream diagnostics, in case
             // the type ref is still a TypeExpr.
@@ -8874,8 +8858,10 @@ namespace {
         rewriteFunction(closure);
 
         if (AnyFunctionRef(closure).hasExternalPropertyWrapperParameters()) {
+          auto *thunkTy = Rewriter.cs.getType(closure)->castTo<FunctionType>();
           return Action::SkipNode(Rewriter.buildSingleCurryThunk(
-              closure, closure, Rewriter.cs.getConstraintLocator(closure)));
+              closure, closure, thunkTy,
+              Rewriter.cs.getConstraintLocator(closure)));
         }
 
         return Action::SkipNode(closure);
