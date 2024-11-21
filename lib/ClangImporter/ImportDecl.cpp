@@ -9589,7 +9589,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         // compare it to the converted inheritance access specifier; this relies
         // on convertClangAccess() being a linear mapping.
         auto adjustedAccess = std::min(newDecl->getFormalAccess(),
-                                          convertClangAccess(inheritance));
+                                       convertClangAccess(inheritance));
         newDecl->overwriteAccess(adjustedAccess);
 
         // Also adjust access of accessors
