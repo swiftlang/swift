@@ -93,3 +93,11 @@ struct Test3: Element {
     }
   }
 }
+
+struct Test4: Element {
+  var body: some Element { // expected-note {{opaque return type declared here}}
+    FakeElement()
+    // expected-error@-1 {{return type of property 'body' requires that 'FakeElement' conform to 'Element'}}
+    Element1()
+  }
+}
