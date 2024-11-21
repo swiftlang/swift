@@ -3121,17 +3121,15 @@ public:
 
   /// Get the type for an node.
   Type getType(ASTNode node) const {
-    assert(hasType(node) && "Expected type to have been set!");
-    // FIXME: lvalue differences
-    //    assert((!E->getType() ||
-    //            E->getType()->isEqual(ExprTypes.find(E)->second)) &&
-    //           "Mismatched types!");
-    return NodeTypes.find(node)->second;
+    auto found = NodeTypes.find(node);
+    ASSERT(found != NodeTypes.end());
+    return found->second;
   }
 
   Type getType(const KeyPathExpr *KP, unsigned I) const {
-    assert(hasType(KP, I) && "Expected type to have been set!");
-    return KeyPathComponentTypes.find(std::make_pair(KP, I))->second;
+    auto found = KeyPathComponentTypes.find(std::make_pair(KP, I));
+    ASSERT(found != KeyPathComponentTypes.end());
+    return found->second;
   }
 
   /// Retrieve the type of the node, if known.
