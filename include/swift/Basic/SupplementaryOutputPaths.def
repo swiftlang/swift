@@ -106,6 +106,7 @@ OUTPUT(FixItsOutputPath, TY_SwiftFixIt)
 /// to each .swiftmodule that was loaded while building module NAME for target
 /// TARGET. This format is subject to arbitrary change, however.
 OUTPUT(LoadedModuleTracePath, TY_ModuleTrace)
+OUTPUT(FineModuleTracePath,   TY_FineModuleTrace)
 
 /// The path to which we should output a TBD file.
 ///

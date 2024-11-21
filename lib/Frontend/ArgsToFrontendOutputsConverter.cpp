@@ -455,6 +455,24 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       file_types::TY_ModuleTrace, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
+  // We piggy-back on the loadedModuleTracePath to decide (1) whether
+  // to emit the fine module Trace file, and (2) where to emit the fine module
+  // trace file if the path isn't explicitly given by
+  // SWIFT_COMPILER_OBJC_MESSAGE_TRACE_PATH.
+  // FIXME: we probably need to move this to a frontend argument.
+  llvm::SmallString<128> FineModuleTracePath;
+  if (!loadedModuleTracePath.empty()) {
+    if (const char *P = ::getenv("SWIFT_COMPILER_OBJC_MESSAGE_TRACE_PATH")) {
+      StringRef FilePath = P;
+      llvm::sys::path::append(FineModuleTracePath, FilePath);
+    } else {
+      llvm::sys::path::append(FineModuleTracePath, loadedModuleTracePath);
+      llvm::sys::path::remove_filename(FineModuleTracePath);
+      llvm::sys::path::append(FineModuleTracePath,
+                              ".SWIFT_FINE_DEPENDENCY_TRACE.json");
+    }
+  }
+
   auto tbdPath = determineSupplementaryOutputFilename(
       OPT_emit_tbd, pathsFromArguments.TBDPath, file_types::TY_TBD, "",
       defaultSupplementaryOutputPathExcludingExtension);
@@ -520,6 +538,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.SerializedDiagnosticsPath = serializedDiagnosticsPath;
   sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
+  sop.FineModuleTracePath = FineModuleTracePath.str().str();
   sop.TBDPath = tbdPath;
   sop.ModuleInterfaceOutputPath = ModuleInterfaceOutputPath;
   sop.PrivateModuleInterfaceOutputPath = PrivateModuleInterfaceOutputPath;

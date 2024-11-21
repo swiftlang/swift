@@ -73,6 +73,7 @@ TYPE("tbd",                 TBD,                       "tbd",             "")
 // engineers can see more details on the "Swift module traces" page in the
 // Swift section of the internal wiki.
 TYPE("module-trace",        ModuleTrace,               "trace.json",      "")
+TYPE("fine-module-trace",   FineModuleTrace,           "",                "")
 
 // Complete dependency information for the given Swift files as JSON.
 TYPE("json-dependencies",   JSONDependencies,          "dependencies.json",      "")
