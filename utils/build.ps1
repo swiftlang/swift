@@ -138,6 +138,7 @@ param(
   [switch] $SkipRedistInstall = $false,
   [switch] $SkipPackaging = $false,
   [switch] $IncludeDS2 = $false,
+  [switch] $IncludeSanitizers = $false,
   [string[]] $Test = @(),
   [string] $Stage = "",
   [string] $BuildTo = "",
