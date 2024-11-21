@@ -1,9 +1,9 @@
-// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature NonescapableTypes %s -Xllvm -sil-print-final-ossa-module | %FileCheck %s
-// RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature NonescapableTypes %s
+// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature LifetimeDependence %s -Xllvm -sil-print-final-ossa-module | %FileCheck %s
+// RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature LifetimeDependence %s
 
 // REQUIRES: swift_feature_MoveOnlyClasses
 // REQUIRES: swift_feature_NoImplicitCopy
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 // This file contains tests that used to crash due to verifier errors. It must
 // be separate from moveonly_addresschecker_diagnostics since when we fail on

@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes -enable-experimental-feature SuppressedAssociatedTypes
+// RUN: %target-typecheck-verify-swift  -enable-experimental-feature SuppressedAssociatedTypes
 
-// REQUIRES: swift_feature_NonescapableTypes
 // REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 

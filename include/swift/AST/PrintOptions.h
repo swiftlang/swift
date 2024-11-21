@@ -397,9 +397,6 @@ struct PrintOptions {
   /// Replace BitwiseCopyable with _BitwiseCopyable.
   bool SuppressBitwiseCopyable = false;
 
-  /// Suppress ~Escapable types and lifetime dependence annotations
-  bool SuppressNonEscapableTypes = false;
-
   /// Suppress modify/read accessors.
   bool SuppressCoroutineAccessors = false;
 

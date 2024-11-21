@@ -1,10 +1,10 @@
 // RUN: %target-sil-opt -test-runner %s \
 // RUN:     -module-name Swift \
-// RUN:     -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature LifetimeDependence \
 // RUN:     -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 sil_stage canonical
 

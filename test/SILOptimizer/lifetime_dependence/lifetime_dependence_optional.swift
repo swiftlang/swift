@@ -2,10 +2,10 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature LifetimeDependence
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 // Simply test that it is possible for a module to define a pseudo-Optional type without triggering any compiler errors.
 
