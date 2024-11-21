@@ -450,6 +450,18 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedGeneratedSourceFileKind {
   BridgedGeneratedSourceFileKindNone,
 };
 
+//===----------------------------------------------------------------------===//
+// MARK: VirtualFile
+//===----------------------------------------------------------------------===//
+
+struct BridgedVirtualFile {
+  size_t StartPosition;
+  size_t EndPosition;
+  BridgedStringRef Name;
+  ptrdiff_t LineOffset;
+  size_t NamePosition;
+};
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #ifndef PURE_BRIDGING_MODE
