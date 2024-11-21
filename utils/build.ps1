@@ -1075,6 +1075,53 @@ function Build-CMakeProject {
       } else {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath  "swiftc.exe")
       }
+
+      $DebugSwiftC = $Defines["CMAKE_Swift_COMPILER"]
+      Write-Host "DEBUG DEBUG DEBUG CMAKE_Swift_COMPILER: $DebugSwiftC"
+      $SwiftCDepDlls = dumpbin /Dependents $DebugSwiftC
+      Write-Host "DEBUG DEBUG DEBUG SwiftCDepDlls: $SwiftCDepDlls"
+      $SwiftCImports = dumpbin /Imports $DebugSwiftC
+      Write-Host "DEBUG DEBUG DEBUG SwiftCImports: $SwiftCImports"
+
+      $BinFolder = Split-Path $DebugSwiftC
+      Write-Host "DEBUG DEBUG DEBUG BinFolder: $BinFolder"
+      $DumpChildren = Get-ChildItem $BinFolder
+      Write-Host "DEBUG DEBUG DEBUG DumpChildren: $DumpChildren"
+
+      $SwiftDriver = Join-Path -Path $BinFolder -ChildPath "swift-driver.exe"
+      Write-Host "DEBUG DEBUG DEBUG SwiftDriver: $SwiftDriver"
+      $SwiftDriverDepDlls = dumpbin /Dependents $SwiftDriver
+      Write-Host "DEBUG DEBUG DEBUG SwiftDriverDepDlls: $SwiftDriverDepDlls"
+      $SwiftDriverImports = dumpbin /Imports $SwiftDriver
+      Write-Host "DEBUG DEBUG DEBUG SwiftDriverImports: $SwiftDriverImports"
+
+      $Dlls = @(
+        "swiftCore.dll"
+        "swift_Concurrency.dll"
+        "swiftWinSDK.dll"
+        "swiftCRT.dll"
+        "Foundation.dll"
+        "swiftDispatch.dll"
+        "BlocksRuntime.dll"
+      )
+
+      foreach ($Dll in $Dlls) {
+        $DllPath = Join-Path -Path $BinFolder -ChildPath $Dll
+        if (-Not (Test-Path $DllPath)) {
+          # Search through PATH to find the DLL
+          $DllPath = Get-Command $Dll -ErrorAction SilentlyContinue
+          if ($DllPath) {
+            $DllPath = $DllPath.Path
+          } else {
+            Write-Host "DEBUG DEBUG DEBUG Could not find ${Dll} in PATH"
+            continue
+          }
+        }
+        Write-Host "DEBUG DEBUG DEBUG Found ${Dll}: $DllPath"
+        $DllExports = dumpbin /exports $DllPath
+        Write-Host "DEBUG DEBUG DEBUG DllExports for ${Dll}: $DllExports"
+      }
+
       if (-not ($Platform -eq "Windows")) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_WORKS = "YES"
       }
