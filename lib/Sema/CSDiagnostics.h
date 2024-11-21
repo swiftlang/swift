@@ -259,6 +259,10 @@ public:
         Apply = dyn_cast<ApplyExpr>(parentExpr);
   }
 
+  virtual SourceLoc getLoc() const override {
+    return FailureDiagnostic::getLoc();
+  }
+
   unsigned getRequirementIndex() const {
     auto reqElt =
         getLocator()->castLastElementTo<LocatorPathElt::AnyRequirement>();
@@ -340,6 +344,8 @@ public:
            reqElt.getRequirementKind() == RequirementKind::Layout);
 #endif
   }
+
+  virtual SourceLoc getLoc() const override;
 
   bool diagnoseAsError() override;
 
