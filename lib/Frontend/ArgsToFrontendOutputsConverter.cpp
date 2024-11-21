@@ -458,11 +458,11 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   // We piggy-back on the loadedModuleTracePath to decide (1) whether
   // to emit the fine module Trace file, and (2) where to emit the fine module
   // trace file if the path isn't explicitly given by
-  // SWIFT_COMPILER_OBJC_MESSAGE_TRACE_PATH.
+  // SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH.
   // FIXME: we probably need to move this to a frontend argument.
   llvm::SmallString<128> FineModuleTracePath;
   if (!loadedModuleTracePath.empty()) {
-    if (const char *P = ::getenv("SWIFT_COMPILER_OBJC_MESSAGE_TRACE_PATH")) {
+    if (const char *P = ::getenv("SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH")) {
       StringRef FilePath = P;
       llvm::sys::path::append(FineModuleTracePath, FilePath);
     } else {
