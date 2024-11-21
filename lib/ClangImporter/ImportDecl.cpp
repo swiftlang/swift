@@ -9588,8 +9588,15 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         // we just use the Swift AccessLevel that it got converted to and
         // compare it to the converted inheritance access specifier; this relies
         // on convertClangAccess() being a linear mapping.
-        newDecl->overwriteAccess(std::min(newDecl->getFormalAccess(),
-                                          convertClangAccess(inheritance)));
+        auto adjustedAccess = std::min(newDecl->getFormalAccess(),
+                                          convertClangAccess(inheritance));
+        newDecl->overwriteAccess(adjustedAccess);
+
+        // Also adjust access of accessors
+        if (auto asd = dyn_cast<AbstractStorageDecl>(newDecl))
+          for (auto acc : asd->getAllAccessors())
+            acc->overwriteAccess(adjustedAccess);
+
         swiftDecl->addMember(newDecl);
       }
       continue;
