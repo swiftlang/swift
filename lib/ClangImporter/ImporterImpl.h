@@ -544,8 +544,6 @@ private:
   /// These are re-used when parsing the Swift attributes on import.
   llvm::StringMap<llvm::TinyPtrVector<SourceFile *>> ClangSwiftAttrSourceFiles;
 
-  llvm::SmallPtrSet<const clang::FunctionDecl *, 16> funcsWithPointerBounds;
-
 public:
   /// The Swift lookup table for the bridging header.
   std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
@@ -1360,7 +1358,8 @@ public:
       ImportTypeAttrs attrs,
       OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
       bool resugarNSErrorPointer = true,
-      std::optional<unsigned> completionHandlerErrorParamIndex = std::nullopt);
+      std::optional<unsigned> completionHandlerErrorParamIndex = std::nullopt,
+      bool *isSafePointer = nullptr);
 
   /// Import the given Clang type into Swift.
   ///
@@ -1377,7 +1376,7 @@ public:
       bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
       ImportTypeAttrs attrs,
       OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
-      bool resugarNSErrorPointer = true);
+      bool resugarNSErrorPointer = true, bool *isSafePointer = nullptr);
 
   /// Import the given Clang type into Swift, returning the
   /// Swift parameters and result type and whether we should treat it
@@ -1410,7 +1409,8 @@ public:
       DeclContext *dc, const clang::FunctionDecl *clangDecl,
       ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
       bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
-      ArrayRef<GenericTypeParamDecl *> genericParams);
+      ArrayRef<GenericTypeParamDecl *> genericParams,
+      bool *hasSafePointerParam);
 
   /// Import the given function return type.
   ///
@@ -1424,7 +1424,8 @@ public:
   /// imported.
   ImportedType importFunctionReturnType(DeclContext *dc,
                                         const clang::FunctionDecl *clangDecl,
-                                        bool allowNSUIntegerAsInt);
+                                        bool allowNSUIntegerAsInt,
+                                        bool *isSafePointer = nullptr);
 
   /// Import the parameter list for a function
   ///
@@ -1441,7 +1442,8 @@ public:
       DeclContext *dc, const clang::FunctionDecl *clangDecl,
       ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
       bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
-      ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType);
+      ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType,
+      bool *hasSafePointerParam);
 
   struct ImportParameterTypeResult {
     /// The imported parameter Swift type.
@@ -1452,6 +1454,8 @@ public:
     bool isConsuming;
     /// If the parameter is implicitly unwrapped or not.
     bool isParamTypeImplicitlyUnwrapped;
+    /// If the parameter has (potentially nested) safe pointer types
+    bool isSafePointer;
   };
 
   /// Import a parameter type

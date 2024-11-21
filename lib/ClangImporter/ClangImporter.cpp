@@ -578,9 +578,8 @@ void importer::getNormalInvocationArguments(
     }
   }
 
-#ifdef SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS
-  invokationsArgStrs.push_back("-fexperimental-bounds-safety-attributes");
-#endif
+  if (LangOpts.EnableBoundsSafetyInterop)
+    invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
 
   // Set C language options.
   if (triple.isOSDarwin()) {

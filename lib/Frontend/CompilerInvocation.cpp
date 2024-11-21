@@ -1449,6 +1449,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));
 
+  Opts.EnableBoundsSafetyInterop =
+      Args.hasArg(OPT_enable_experimental_bounds_safety_interop);
+
   Opts.CForeignReferenceTypes =
       Args.hasArg(OPT_experimental_c_foreign_reference_types);
 

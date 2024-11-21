@@ -8,8 +8,7 @@ void swiftAttr(int len, int * p) __attribute__((swift_attr("@PointerBounds(.coun
 
 void shared(int len, int * __counted_by(len) p1, int * __counted_by(len) p2);
 
-// TODO: test this when counted_by expressions land
-// void complexExpr(int len, int offset, int * __counted_by(len - offset) p);
+void complexExpr(int len, int offset, int * __counted_by(len - offset) p);
 
 void nullUnspecified(int len, int * __counted_by(len) _Null_unspecified p);
 

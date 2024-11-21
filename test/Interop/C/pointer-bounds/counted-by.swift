@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -disable-availability-checking -plugin-path %swift-plugin-dir -o %t/CountedBy.swiftmodule -I %S/Inputs %s
+// RUN: %target-swift-frontend -emit-module -disable-availability-checking -plugin-path %swift-plugin-dir -o %t/CountedBy.swiftmodule -I %S/Inputs -enable-experimental-bounds-safety-interop %s
 
 // Check that ClangImporter correctly infers and expands @PointerBounds macros for functions with __counted_by parameters.
 
@@ -21,11 +21,10 @@ public func callShared(_ len: CInt, _ p1: UnsafeMutableBufferPointer<CInt>, _ p2
   shared(len, p1, p2)
 }
 
-// Blocked by missing clang functionality right now
-//@inlinable
-//public func callComplexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
-//  complexExpr(len, offset, p)
-//}
+@inlinable
+public func callComplexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
+  complexExpr(len, offset, p)
+}
 
 
 @inlinable
