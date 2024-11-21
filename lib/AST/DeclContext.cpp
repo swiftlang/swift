@@ -1308,8 +1308,14 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
   // Do not allow access if the sourceDC is in a different file
   auto useSF = useDC->getOutermostParentSourceFile();
   if (useSF != sourceDC->getOutermostParentSourceFile()) {
-    auto clangDecl = sourceNTD->getDecl()->getClangDecl();
-    bool blessedUseSF = clangDecl && importer::getSwiftPrivateFileID(clangDecl) == useSF->getFileID();
+    // This might be a C++ declaration with a SWIFT_IMPLEMENTATION_FILEID
+    // attribute, which asks us to treat it as if it were defined in the file
+    // with the specified FileID.
+    bool blessedUseSF = false;
+    if (auto clangDecl = sourceNTD->getDecl()->getClangDecl()) {
+      auto blessedFileID = importer::getSwiftImplementationFileID(clangDecl);
+      blessedUseSF = !blessedFileID.empty() && blessedFileID[0].first == useSF->getFileID();
+    }
     if (!blessedUseSF)
       return false;
   }

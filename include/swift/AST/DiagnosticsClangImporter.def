@@ -208,6 +208,11 @@ NOTE(iterator_method_unavailable, none, "C++ method '%0' that returns an "
 NOTE(iterator_potentially_unsafe, none, "C++ methods that return iterators "
                                         "are potentially unsafe; try using Swift collection APIs instead", ())
 
+ERROR(more_than_one_implementation_fileid_attr, none,
+    "SWIFT_IMPLEMENTATION_FILEID can only be specified once, but multiple were found on '%0'",
+    (StringRef))
+NOTE(more_than_one_implementation_fileid_attr_here, none, "annotated here", ())
+
 ERROR(reference_type_must_have_retain_release_attr, none,
       "reference type '%1' must have %select{'retain:'|'release:'}0 Swift "
       "attribute",

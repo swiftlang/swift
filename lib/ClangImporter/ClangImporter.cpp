@@ -8109,14 +8109,19 @@ bool importer::isCxxConstReferenceType(const clang::Type *type) {
   return pointeeType && pointeeType->isConstQualified();
 }
 
-std::optional<StringRef> importer::getSwiftPrivateFileID(const clang::Decl *decl) {
-  // FIXME: document behavior. this is greedy about attrs, i.e., it assumes
-  // there is only one implementation_file attr.
-  auto attrPrefix = StringRef("implementation_file:");
+SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
+importer::getSwiftImplementationFileID(const clang::Decl *decl) {
+  llvm::SmallVector<std::pair<StringRef, clang::SourceLocation>, 1> files;
+  auto prefix = StringRef("implementation_file:");
+
   if (decl->hasAttrs())
-    for (auto attr : decl->getAttrs())
-      if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-        if (swiftAttr->getAttribute().starts_with(attrPrefix))
-          return swiftAttr->getAttribute().drop_front(attrPrefix.size());
-  return {};
+    for (const auto *attr : decl->getAttrs())
+      if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+        if (swiftAttr->getAttribute().starts_with(prefix))
+          files.push_back({
+              swiftAttr->getAttribute().drop_front(prefix.size()),
+              attr->getLocation()
+              });
+
+  return files;
 }

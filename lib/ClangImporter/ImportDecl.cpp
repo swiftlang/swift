@@ -2908,6 +2908,13 @@ namespace {
                              "are not yet available in Swift");
       }
 
+      auto implFileAnnotations = importer::getSwiftImplementationFileID(decl);
+      if (implFileAnnotations.size() > 1) {
+        Impl.diagnose(HeaderLoc(decl->getLocation()), diag::more_than_one_implementation_fileid_attr, decl->getName());
+        for (auto annote : implFileAnnotations)
+          Impl.diagnose(HeaderLoc(annote.second), diag::more_than_one_implementation_fileid_attr_here);
+      }
+
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
         validateForeignReferenceType(decl, classDecl);
 

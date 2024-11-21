@@ -729,7 +729,8 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
                                      NominalTypeDecl *selfType,
                                      std::optional<Type> parameterType);
 
-std::optional<llvm::StringRef> getSwiftPrivateFileID(const clang::Decl* decl);
+SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
+getSwiftImplementationFileID(const clang::Decl *decl);
 
 } // namespace importer
 
