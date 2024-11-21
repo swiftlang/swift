@@ -2959,18 +2959,16 @@ IRGenModule::getAddrOfModuleContextDescriptor(ModuleDecl *D,
 llvm::Constant *
 IRGenModule::getAddrOfObjCModuleContextDescriptor() {
   if (!ObjCModule)
-    ObjCModule = ModuleDecl::create(
-      Context.getIdentifier(MANGLING_MODULE_OBJC),
-      Context);
+    ObjCModule = ModuleDecl::createEmpty(
+        Context.getIdentifier(MANGLING_MODULE_OBJC), Context);
   return getAddrOfModuleContextDescriptor(ObjCModule);
 }
 
 llvm::Constant *
 IRGenModule::getAddrOfClangImporterModuleContextDescriptor() {
   if (!ClangImporterModule)
-    ClangImporterModule = ModuleDecl::create(
-      Context.getIdentifier(MANGLING_MODULE_CLANG_IMPORTER),
-      Context);
+    ClangImporterModule = ModuleDecl::createEmpty(
+        Context.getIdentifier(MANGLING_MODULE_CLANG_IMPORTER), Context);
   return getAddrOfModuleContextDescriptor(ClangImporterModule);
 }
 
@@ -2993,9 +2991,9 @@ IRGenModule::getAddrOfAnonymousContextDescriptor(
 
 llvm::Constant *
 IRGenModule::getAddrOfOriginalModuleContextDescriptor(StringRef Name) {
-  return getAddrOfModuleContextDescriptor(OriginalModules.insert({Name,
-    ModuleDecl::create(Context.getIdentifier(Name), Context)})
-                                          .first->getValue());
+  auto *M = ModuleDecl::createEmpty(Context.getIdentifier(Name), Context);
+  return getAddrOfModuleContextDescriptor(
+      OriginalModules.insert({Name, M}).first->getValue());
 }
 
 void IRGenFunction::

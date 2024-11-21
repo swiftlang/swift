@@ -314,7 +314,9 @@ private:
   // FIXME: Do we really need to bloat all modules with this?
   DebuggerClient *DebugClient = nullptr;
 
-  SmallVector<FileUnit *, 2> Files;
+  /// The list of files in the module. This is guaranteed to be set once module
+  /// construction has completed. It must not be mutated afterwards.
+  std::optional<SmallVector<FileUnit *, 2>> Files;
 
   llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
     declaredCrossImports;
@@ -359,24 +361,55 @@ private:
   /// Used by the debugger to bypass resilient access to fields.
   bool BypassResilience = false;
 
-  ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo);
+public:
+  using PopulateFilesFn = llvm::function_ref<void(
+      ModuleDecl *, llvm::function_ref<void(FileUnit *)>)>;
+
+private:
+  ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo,
+             PopulateFilesFn populateFiles, bool isMainModule);
 
 public:
   /// Creates a new module with a given \p name.
   ///
   /// \param importInfo Information about which modules should be implicitly
   /// imported by each file of this module.
-  static ModuleDecl *
-  create(Identifier name, ASTContext &ctx,
-         ImplicitImportInfo importInfo = ImplicitImportInfo()) {
-    return new (ctx) ModuleDecl(name, ctx, importInfo);
+  /// \param populateFiles A function which populates the files for the module.
+  /// Once called, the module's list of files may not change.
+  static ModuleDecl *create(Identifier name, ASTContext &ctx,
+                            ImplicitImportInfo importInfo,
+                            PopulateFilesFn populateFiles) {
+    return new (ctx) ModuleDecl(name, ctx, importInfo, populateFiles,
+                                /*isMainModule*/ false);
   }
 
+  /// Creates a new module with a given \p name.
+  ///
+  /// \param populateFiles A function which populates the files for the module.
+  /// Once called, the module's list of files may not change.
+  static ModuleDecl *create(Identifier name, ASTContext &ctx,
+                            PopulateFilesFn populateFiles) {
+    return new (ctx) ModuleDecl(name, ctx, ImplicitImportInfo(), populateFiles,
+                                /*isMainModule*/ false);
+  }
+
+  /// Creates a new main module with a given \p name. The main module is the
+  /// module being built by the compiler, containing the primary source files.
+  ///
+  /// \param importInfo Information about which modules should be implicitly
+  /// imported by each file of this module.
+  /// \param populateFiles A function which populates the files for the module.
+  /// Once called, the module's list of files may not change.
   static ModuleDecl *createMainModule(ASTContext &ctx, Identifier name,
-                                      ImplicitImportInfo iinfo) {
-    auto *Mod = ModuleDecl::create(name, ctx, iinfo);
-    Mod->Bits.ModuleDecl.IsMainModule = true;
-    return Mod;
+                                      ImplicitImportInfo iinfo,
+                                      PopulateFilesFn populateFiles) {
+    return new (ctx) ModuleDecl(name, ctx, iinfo, populateFiles,
+                                /*isMainModule*/ true);
+  }
+
+  /// Creates an empty module with a given \p name.
+  static ModuleDecl *createEmpty(Identifier name, ASTContext &ctx) {
+    return create(name, ctx, ImplicitImportInfo(), [](auto, auto) {});
   }
 
   using Decl::getASTContext;
@@ -398,24 +431,11 @@ public:
   /// Only to be called by MemoryBufferSerializedModuleLoader.
   void setBypassResilience() { BypassResilience = true; }
 
-  ArrayRef<FileUnit *> getFiles() {
-    ASSERT(!Files.empty() || failedToLoad());
-    return Files;
+  ArrayRef<FileUnit *> getFiles() const {
+    ASSERT(Files.has_value() &&
+           "Attempting to query files before setting them");
+    return *Files;
   }
-  ArrayRef<const FileUnit *> getFiles() const {
-    return { Files.begin(), Files.size() };
-  }
-
-  /// Add the given file to this module.
-  ///
-  /// FIXME: Remove this function from public view. Modules never need to add
-  /// files once they are created.
-  ///
-  /// \warning There are very few safe points to call this function once a
-  /// \c ModuleDecl has been created. If you find yourself needing to insert
-  /// a file in the middle of e.g. semantic analysis, use a \c
-  /// SynthesizedFileUnit instead.
-  void addFile(FileUnit &newFile);
 
   /// Produces the source file that contains the given source location, or
   /// \c nullptr if the source location isn't in this module.

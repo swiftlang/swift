@@ -1637,22 +1637,25 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   assert(moduleInputBuffer);
 
-  auto M = ModuleDecl::create(moduleID.Item, Ctx);
-  M->setIsSystemModule(isSystemModule);
-  if (AllowMemoryCache)
-    Ctx.addLoadedModule(M);
-  SWIFT_DEFER { M->setHasResolvedImports(); };
+  LoadedFile *file = nullptr;
+  auto *M = ModuleDecl::create(moduleID.Item, Ctx,
+                               [&](ModuleDecl *M, auto addFile) {
+    M->setIsSystemModule(isSystemModule);
+    if (AllowMemoryCache)
+      Ctx.addLoadedModule(M);
 
-  llvm::sys::path::native(moduleInterfacePath);
-  auto *file =
-      loadAST(*M, moduleID.Loc, moduleInterfacePath, moduleInterfaceSourcePath,
-              std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
-              std::move(moduleSourceInfoInputBuffer), isFramework);
-  if (file) {
-    M->addFile(*file);
-  } else {
-    M->setFailedToLoad();
-  }
+    llvm::sys::path::native(moduleInterfacePath);
+    file = loadAST(*M, moduleID.Loc, moduleInterfacePath,
+                   moduleInterfaceSourcePath, std::move(moduleInputBuffer),
+                   std::move(moduleDocInputBuffer),
+                   std::move(moduleSourceInfoInputBuffer), isFramework);
+    if (file) {
+      addFile(file);
+    } else {
+      M->setFailedToLoad();
+    }
+    M->setHasResolvedImports();
+  });
 
   if (dependencyTracker && file) {
     auto DepPath = file->getFilename();
@@ -1694,25 +1697,32 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   MemoryBuffers.erase(bufIter);
   assert(moduleInputBuffer);
 
-  auto *M = ModuleDecl::create(moduleID.Item, Ctx);
-  SWIFT_DEFER { M->setHasResolvedImports(); };
-  if (AllowMemoryCache)
-    Ctx.addLoadedModule(M);
+  auto *M = ModuleDecl::create(moduleID.Item, Ctx,
+                               [&](ModuleDecl *M, auto addFile) {
+    if (AllowMemoryCache)
+      Ctx.addLoadedModule(M);
 
-  auto *file = loadAST(*M, moduleID.Loc, /*moduleInterfacePath=*/"",
-                       /*moduleInterfaceSourcePath=*/"",
-                       std::move(moduleInputBuffer), {}, {}, isFramework);
-  if (!file) {
+    auto *file = loadAST(*M, moduleID.Loc, /*moduleInterfacePath=*/"",
+                         /*moduleInterfaceSourcePath=*/"",
+                         std::move(moduleInputBuffer), {}, {}, isFramework);
+    if (!file) {
+      M->setFailedToLoad();
+      return;
+    }
+
+    addFile(file);
+    M->setHasResolvedImports();
+  });
+  if (M->failedToLoad()) {
     Ctx.removeLoadedModule(moduleID.Item);
     return nullptr;
   }
-
   // The MemoryBuffer loader is used by LLDB during debugging. Modules imported
   // from .swift_ast sections are never produced from textual interfaces. By
   // disabling resilience the debugger can directly access private members.
   if (BypassResilience)
     M->setBypassResilience();
-  M->addFile(*file);
+
   return M;
 }
 

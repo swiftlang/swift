@@ -292,8 +292,7 @@ void CompletionLookup::addSubModuleNames(
   for (auto &Pair : SubModuleNameVisibilityPairs) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Declaration, SemanticContextKind::None);
-    auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
-    MD->setFailedToLoad();
+    auto *MD = ModuleDecl::createEmpty(Ctx.getIdentifier(Pair.first), Ctx);
     Builder.setAssociatedDecl(MD);
     Builder.addBaseName(MD->getNameStr());
     Builder.addTypeAnnotation("Module");
@@ -367,8 +366,7 @@ void CompletionLookup::addImportModuleNames() {
     if (ModuleName == mainModuleName || isHiddenModuleName(ModuleName))
       continue;
 
-    auto MD = ModuleDecl::create(ModuleName, Ctx);
-    MD->setFailedToLoad();
+    auto *MD = ModuleDecl::createEmpty(ModuleName, Ctx);
 
     std::optional<ContextualNotRecommendedReason> Reason = std::nullopt;
 

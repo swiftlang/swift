@@ -44,20 +44,18 @@ SemaTest::SemaTest()
   auto *stdlib = Context.getStdlibModule(/*loadIfAbsent=*/true);
   assert(stdlib && "Failed to load standard library");
 
-  auto *module =
-      ModuleDecl::create(Context.getIdentifier("SemaTests"), Context);
+  DC = ModuleDecl::create(Context.getIdentifier("SemaTests"), Context,
+                          [&](ModuleDecl *M, auto addFile) {
+    auto bufferID = Context.SourceMgr.addMemBufferCopy("// nothing\n");
+    MainFile = new (Context) SourceFile(*M, SourceFileKind::Main, bufferID);
 
-  auto bufferID = Context.SourceMgr.addMemBufferCopy("// nothing\n");
-  MainFile = new (Context) SourceFile(*module, SourceFileKind::Main,
-                                      bufferID);
+    AttributedImport<ImportedModule> stdlibImport{
+        {ImportPath::Access(), stdlib},
+        /*options=*/{}};
 
-  AttributedImport<ImportedModule> stdlibImport{{ImportPath::Access(), stdlib},
-                                                /*options=*/{}};
-
-  MainFile->setImports(stdlibImport);
-  module->addFile(*MainFile);
-
-  DC = module;
+    MainFile->setImports(stdlibImport);
+    addFile(MainFile);
+  });
 }
 
 Type SemaTest::getStdlibType(StringRef name) const {

@@ -266,6 +266,19 @@ private:
 // MARK: performImportResolution
 //===----------------------------------------------------------------------===//
 
+void swift::performImportResolution(ModuleDecl *M) {
+  for (auto *file : M->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+
+    performImportResolution(*SF);
+    assert(SF->ASTStage >= SourceFile::ImportsResolved &&
+           "file has not had its imports resolved");
+  }
+  M->setHasResolvedImports();
+}
+
 /// performImportResolution - This walks the AST to resolve imports.
 ///
 /// Before we can type-check a source file, we need to make declarations
