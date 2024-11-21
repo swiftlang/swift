@@ -9540,6 +9540,10 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         cast<clang::FieldDecl>(m)->isUnnamedBitField())
       continue;
 
+    // Skip this member if it is being inherited but was declared private.
+    if (inheritance != clang::AS_none && nd->getAccess() == clang::AS_private)
+      continue;
+
     // Make sure we always pull in record fields. Everything else had better
     // be canonical. Note that this check mostly catches nested C++ types since
     // we import nested C struct types by C's usual convention of chucking them
