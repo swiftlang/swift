@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend  -I %t/lib/swift -typecheck %s %S/Inputs/objc_send_collector_2.swift -module-name main -swift-version 5 -F %S/Inputs/mock-sdk -emit-loaded-module-trace-path %t/.MODULE_TRACE
 // RUN: cat %t/.SWIFT_FINE_DEPENDENCY_TRACE.json | %{python} -c 'import json, sys; json.dump(json.loads(sys.stdin.read()), sys.stdout, sort_keys=True, indent=2)' | %FileCheck %s
 
-// RUN: SWIFT_COMPILER_OBJC_MESSAGE_TRACE_PATH=%t/given_trace.json %target-swift-frontend  -I %t/lib/swift -typecheck %s %S/Inputs/objc_send_collector_2.swift -module-name main -swift-version 5 -F %S/Inputs/mock-sdk -emit-loaded-module-trace-path %t/.MODULE_TRACE
+// RUN: SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH=%t/given_trace.json %target-swift-frontend  -I %t/lib/swift -typecheck %s %S/Inputs/objc_send_collector_2.swift -module-name main -swift-version 5 -F %S/Inputs/mock-sdk -emit-loaded-module-trace-path %t/.MODULE_TRACE
 // RUN: cat %t/given_trace.json | %{python} -c 'import json, sys; json.dump(json.loads(sys.stdin.read()), sys.stdout, sort_keys=True, indent=2)' | %FileCheck %s
 
 // REQUIRES: objc_interop
