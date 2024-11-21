@@ -693,7 +693,7 @@ static void reportAttributes(ASTContext &Ctx,
   for (auto Attr : getDeclAttributes(D, Scratch)) {
     if (auto Av = dyn_cast<AvailableAttr>(Attr)) {
       UIdent PlatformUID;
-      switch (Av->Platform) {
+      switch (Av->getPlatform()) {
       case PlatformKind::none:
         PlatformUID = UIdent(); break;
       case PlatformKind::iOS:

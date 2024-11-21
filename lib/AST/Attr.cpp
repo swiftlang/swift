@@ -413,13 +413,14 @@ DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx,
     if (!avAttr->isActivePlatform(ctx))
       continue;
 
-    if (ignoreAppExtensions && isApplicationExtensionPlatform(avAttr->Platform))
+    if (ignoreAppExtensions &&
+        isApplicationExtensionPlatform(avAttr->getPlatform()))
       continue;
 
     // We have an attribute that is active for the platform, but
     // is it more specific than our current best?
-    if (!bestAttr || inheritsAvailabilityFromPlatform(avAttr->Platform,
-                                                      bestAttr->Platform)) {
+    if (!bestAttr || inheritsAvailabilityFromPlatform(
+                         avAttr->getPlatform(), bestAttr->getPlatform())) {
       bestAttr = avAttr;
     }
   }
@@ -452,7 +453,7 @@ DeclAttributes::getUnavailable(const ASTContext &ctx,
         continue;
 
       if (ignoreAppExtensions &&
-          isApplicationExtensionPlatform(AvAttr->Platform))
+          isApplicationExtensionPlatform(AvAttr->getPlatform()))
         continue;
 
       // Unconditional unavailable.
@@ -582,8 +583,8 @@ const AvailableAttr *DeclAttributes::getNoAsync(const ASTContext &ctx) const {
           bestAttr = avAttr;
         } else if (bestAttr && avAttr->hasPlatform() &&
                    bestAttr->hasPlatform() &&
-                   inheritsAvailabilityFromPlatform(avAttr->Platform,
-                                                    bestAttr->Platform)) {
+                   inheritsAvailabilityFromPlatform(avAttr->getPlatform(),
+                                                    bestAttr->getPlatform())) {
           // if they both have a viable platform, use the better one
           bestAttr = avAttr;
         } else if (avAttr->hasPlatform() && !bestAttr->hasPlatform()) {
@@ -655,7 +656,7 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   if (!AvailAttr->Rename.empty())
     return false;
 
-  switch (AvailAttr->PlatformAgnostic) {
+  switch (AvailAttr->getPlatformAgnosticAvailability()) {
   case PlatformAgnosticAvailabilityKind::Deprecated:
   case PlatformAgnosticAvailabilityKind::Unavailable:
   case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
@@ -682,10 +683,11 @@ static bool isShortFormAvailabilityImpliedByOther(const AvailableAttr *Attr,
 
   for (auto *DA : Others) {
     auto *Other = cast<AvailableAttr>(DA);
-    if (Attr->Platform == Other->Platform)
+    if (Attr->getPlatform() == Other->getPlatform())
       continue;
 
-    if (!inheritsAvailabilityFromPlatform(Attr->Platform, Other->Platform))
+    if (!inheritsAvailabilityFromPlatform(Attr->getPlatform(),
+                                          Other->getPlatform()))
       continue;
 
     if (Attr->Introduced == Other->Introduced)
@@ -730,7 +732,7 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
       if (!Options.IsForSwiftInterface &&
           isShortFormAvailabilityImpliedByOther(AvailAttr, Attrs))
         continue;
-      Printer << platformString(AvailAttr->Platform) << " "
+      Printer << platformString(AvailAttr->getPlatform()) << " "
               << AvailAttr->Introduced.value().getAsString() << ", ";
     }
     Printer << "*";
@@ -959,7 +961,7 @@ static std::optional<PlatformKind>
 referencedPlatform(const DeclAttribute *attr) {
   switch (attr->getKind()) {
   case DeclAttrKind::Available:
-    return static_cast<const AvailableAttr *>(attr)->Platform;
+    return static_cast<const AvailableAttr *>(attr)->getPlatform();
   case DeclAttrKind::BackDeployed:
     return static_cast<const BackDeployedAttr *>(attr)->Platform;
   case DeclAttrKind::OriginallyDefinedIn:

@@ -6627,12 +6627,12 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
            : nullptr) {
     bool anyPlatformSpecificAttrs = false;
     for (auto available: enclosing->getAttrs().getAttributes<AvailableAttr>()) {
-      if (available->Platform == PlatformKind::none)
+      if (available->getPlatform() == PlatformKind::none)
         continue;
 
       auto attr = new (ctx) AvailableAttr(
           SourceLoc(), SourceRange(),
-          available->Platform,
+          available->getPlatform(),
           available->Message,
           "", nullptr,
           available->Introduced.value_or(noVersion), SourceRange(),

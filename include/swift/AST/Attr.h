@@ -768,12 +768,14 @@ public:
   /// Indicates where the Obsoleted version was specified.
   const SourceRange ObsoletedRange;
 
+private:
   /// Indicates if the declaration has platform-agnostic availability.
   const PlatformAgnosticAvailabilityKind PlatformAgnostic;
 
-  /// The platform of the availability.
+  /// The platform that the attribute applies to (may be `none`).
   const PlatformKind Platform;
 
+public:
   /// Whether this is a language-version-specific entity.
   bool isLanguageVersionSpecific() const;
 
@@ -794,6 +796,9 @@ public:
 
   /// Whether this attribute was spelled `@_unavailableInEmbedded`.
   bool isForEmbedded() const { return Bits.AvailableAttr.IsForEmbedded; }
+
+  /// Returns the platform that the attribute applies to (may be `none`).
+  PlatformKind getPlatform() const { return Platform; }
 
   /// Returns the platform-agnostic availability.
   PlatformAgnosticAvailabilityKind getPlatformAgnosticAvailability() const {

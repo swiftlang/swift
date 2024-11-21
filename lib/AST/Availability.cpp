@@ -66,7 +66,7 @@ AvailabilityRange AvailabilityRange::forRuntimeTarget(const ASTContext &Ctx) {
 }
 
 PlatformKind AvailabilityConstraint::getPlatform() const {
-  return attr->Platform;
+  return attr->getPlatform();
 }
 
 std::optional<AvailabilityRange>
@@ -94,10 +94,10 @@ bool AvailabilityConstraint::isConditionallySatisfiable() const {
 }
 
 bool AvailabilityConstraint::isActiveForRuntimeQueries(ASTContext &ctx) const {
-  if (attr->Platform == PlatformKind::none)
+  if (attr->getPlatform() == PlatformKind::none)
     return true;
 
-  return swift::isPlatformActive(attr->Platform, ctx.LangOpts,
+  return swift::isPlatformActive(attr->getPlatform(), ctx.LangOpts,
                                  /*forTargetVariant=*/false,
                                  /*forRuntimeQuery=*/true);
 }
@@ -220,14 +220,14 @@ void AvailabilityInference::applyInferredAvailableAttrs(
         // Skip an attribute from an outer declaration if it is for a platform
         // that was already handled implicitly by an attribute from an inner
         // declaration.
-        if (llvm::any_of(MergedAttrs,
-                         [&AvAttr](const AvailableAttr *MergedAttr) {
-                           return inheritsAvailabilityFromPlatform(
-                               AvAttr->Platform, MergedAttr->Platform);
-                         }))
+        if (llvm::any_of(
+                MergedAttrs, [&AvAttr](const AvailableAttr *MergedAttr) {
+                  return inheritsAvailabilityFromPlatform(
+                      AvAttr->getPlatform(), MergedAttr->getPlatform());
+                }))
           continue;
 
-        mergeWithInferredAvailability(AvAttr, Inferred[AvAttr->Platform]);
+        mergeWithInferredAvailability(AvAttr, Inferred[AvAttr->getPlatform()]);
         PendingAttrs.push_back(AvAttr);
 
         if (Message.empty() && !AvAttr->Message.empty())
@@ -302,12 +302,12 @@ static bool isBetterThan(const AvailableAttr *newAttr,
     return true;
 
   // If they belong to the same platform, the one that introduces later wins.
-  if (prevAttr->Platform == newAttr->Platform)
+  if (prevAttr->getPlatform() == newAttr->getPlatform())
     return prevAttr->Introduced.value() < newAttr->Introduced.value();
 
   // If the new attribute's platform inherits from the old one, it wins.
-  return inheritsAvailabilityFromPlatform(newAttr->Platform,
-                                          prevAttr->Platform);
+  return inheritsAvailabilityFromPlatform(newAttr->getPlatform(),
+                                          prevAttr->getPlatform());
 }
 
 static const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
@@ -348,7 +348,8 @@ bool AvailabilityInference::updateIntroducedPlatformForFallback(
     const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform,
     llvm::VersionTuple &PlatformVer) {
   std::optional<llvm::VersionTuple> IntroducedVersion = attr->Introduced;
-  if (attr->Platform == PlatformKind::iOS && IntroducedVersion.has_value() &&
+  if (attr->getPlatform() == PlatformKind::iOS &&
+      IntroducedVersion.has_value() &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     // We re-map the iOS introduced version to the corresponding visionOS version
     auto PotentiallyRemappedIntroducedVersion =
@@ -367,7 +368,8 @@ bool AvailabilityInference::updateDeprecatedPlatformForFallback(
     const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform,
     llvm::VersionTuple &PlatformVer) {
   std::optional<llvm::VersionTuple> DeprecatedVersion = attr->Deprecated;
-  if (attr->Platform == PlatformKind::iOS && DeprecatedVersion.has_value() &&
+  if (attr->getPlatform() == PlatformKind::iOS &&
+      DeprecatedVersion.has_value() &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     // We re-map the iOS deprecated version to the corresponding visionOS version
     auto PotentiallyRemappedDeprecatedVersion =
@@ -386,7 +388,8 @@ bool AvailabilityInference::updateObsoletedPlatformForFallback(
     const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform,
     llvm::VersionTuple &PlatformVer) {
   std::optional<llvm::VersionTuple> ObsoletedVersion = attr->Obsoleted;
-  if (attr->Platform == PlatformKind::iOS && ObsoletedVersion.has_value() &&
+  if (attr->getPlatform() == PlatformKind::iOS &&
+      ObsoletedVersion.has_value() &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     // We re-map the iOS obsoleted version to the corresponding visionOS version
     auto PotentiallyRemappedObsoletedVersion =
@@ -403,7 +406,7 @@ bool AvailabilityInference::updateObsoletedPlatformForFallback(
 
 void AvailabilityInference::updatePlatformStringForFallback(
     const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform) {
-  if (attr->Platform == PlatformKind::iOS &&
+  if (attr->getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     Platform = swift::prettyPlatformString(PlatformKind::visionOS);
   }
@@ -525,7 +528,7 @@ bool Decl::isUnreachableAtRuntime() const {
     return false;
 
   // Universally unavailable declarations are always unreachable.
-  if (unavailableAttr->Platform == PlatformKind::none)
+  if (unavailableAttr->getPlatform() == PlatformKind::none)
     return true;
 
   // FIXME: Support zippered frameworks (rdar://125371621)
