@@ -892,15 +892,20 @@ static AccessLevel convertClangAccess(const clang::Decl *decl) {
   case clang::AS_protected:
     // Swift does not have a notion of protected fields, so map C++ 'protected'
     // to Swift 'private'.
+    return AccessLevel::Private;
+
   case clang::AS_private:
     // N.B. Swift 'private' is more restrictive than C++ 'private' because it
     // also cares about what source file the member is accessed.
     return AccessLevel::Private;
+
   case clang::AS_none:
-    // FIXME: When exactly does AS_none appear? For now, return Private and see
-    // when and how things break, because I can't seem to find how or why
-    // a member would be assigned this.
-    return AccessLevel::Private;
+    // The fictional 'none' specifier is given to top-level C++ declarations,
+    // for which C++ lacks the syntax to give an access specifier. (It may also
+    // be used in other cases I'm not aware of.) Those declarations are globally
+    // visible and thus correspond to Swift 'public' (with the same caveats
+    // about Swift 'public' vs 'open'; see above).
+    return AccessLevel::Public;
   }
 }
 
