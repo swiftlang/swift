@@ -454,6 +454,7 @@ enum HostComponent {
   LMDB
   SymbolKit
   DocC
+  SwiftInspect
 }
 
 function Get-HostProjectBinaryCache([HostComponent]$Project) {
@@ -2636,18 +2637,20 @@ function Install-HostToolchain() {
 }
 
 function Build-Inspect() {
-  $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath swift-inspect
-  $SDKInstallRoot = (Get-HostSwiftSDK) `
+  $SDKRoot = Get-HostSwiftSDK
 
-  Isolate-EnvVars {
-    $env:SWIFTCI_USE_LOCAL_DEPS=1
-    Build-SPMProject `
-      -Action Build `
-      -Src $SourceCache\swift\tools\swift-inspect `
-      -Bin $OutDir `
-      -Arch $HostArch `
-      -Xcc "-I$SDKInstallRoot\usr\include\swift\SwiftRemoteMirror" -Xlinker "$SDKInstallRoot\usr\lib\swift\windows\$($HostArch.LLVMName)\swiftRemoteMirror.lib"
-  }
+  Build-CMakeProject `
+    -Src $SourceCache\swift\tools\swift-inspect `
+    -Bin (Get-HostProjectBinaryCache SwiftInspect) `
+    -InstallTo "$($HostArch.ToolchainInstallRoot)\usr" `
+    -Arch $HostArch `
+    -UseBuiltCompilers Swift `
+    -UseSwiftSwiftDriver `
+    -SwiftSDK $SDKRoot `
+    -Defines @{
+      CMAKE_Swift_FLAGS = @("-Xcc", "-I$SDKRoot\usr\include\swift\SwiftRemoteMirror");
+      ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
+    }
 }
 
 function Build-DocC() {
@@ -2686,17 +2689,14 @@ function Test-PackageManager() {
 function Build-Installer($Arch) {
   # TODO(hjyamauchi) Re-enable the swift-inspect and swift-docc builds
   # when cross-compiling https://github.com/apple/swift/issues/71655
-  $INCLUDE_SWIFT_INSPECT = if ($IsCrossCompiling) { "false" } else { "true" }
   $INCLUDE_SWIFT_DOCC = if ($IsCrossCompiling) { "false" } else { "true" }
   $ENABLE_MIMALLOC = if ($Allocator -eq "mimalloc" -and $Arch -eq $ArchX64) { "true" } else { "false" }
 
   $Properties = @{
     BundleFlavor = "offline";
     TOOLCHAIN_ROOT = "$($Arch.ToolchainInstallRoot)\";
-    INCLUDE_SWIFT_INSPECT = $INCLUDE_SWIFT_INSPECT;
-    SWIFT_INSPECT_BUILD = "$($Arch.BinaryCache)\swift-inspect\release";
-    INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     ENABLE_MIMALLOC = $ENABLE_MIMALLOC;
+    INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$($Arch.BinaryCache)\swift-docc\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
   }
