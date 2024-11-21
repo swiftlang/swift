@@ -2234,15 +2234,16 @@ AvailableAttr::AvailableAttr(
       Message(Message), Rename(Rename), RenameDecl(RenameDecl),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
-      INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
-      PlatformAgnostic(PlatformAgnostic), Platform(Platform) {
+      INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange) {
+  Bits.AvailableAttr.Platform = static_cast<uint8_t>(Platform);
+  Bits.AvailableAttr.PlatformAgnostic = static_cast<uint8_t>(PlatformAgnostic);
   Bits.AvailableAttr.IsSPI = IsSPI;
 
   if (IsForEmbedded) {
     // FIXME: The IsForEmbedded bit should be removed when library availability
     // conditions are implemented (rdar://138802876)
     Bits.AvailableAttr.IsForEmbedded = true;
-    assert(Platform == PlatformKind::none);
+    assert(getPlatform() == PlatformKind::none);
   }
 }
 
@@ -2279,7 +2280,7 @@ AvailableAttr *AvailableAttr::createForAlternative(
 }
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
-  return isPlatformActive(Platform, ctx.LangOpts);
+  return isPlatformActive(getPlatform(), ctx.LangOpts);
 }
 
 bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
@@ -2290,14 +2291,14 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
   return new (C) AvailableAttr(implicit ? SourceLoc() : AtLoc,
                                implicit ? SourceRange() : getRange(),
-                               Platform, Message, Rename, RenameDecl,
+                               getPlatform(), Message, Rename, RenameDecl,
                                Introduced ? *Introduced : llvm::VersionTuple(),
                                implicit ? SourceRange() : IntroducedRange,
                                Deprecated ? *Deprecated : llvm::VersionTuple(),
                                implicit ? SourceRange() : DeprecatedRange,
                                Obsoleted ? *Obsoleted : llvm::VersionTuple(),
                                implicit ? SourceRange() : ObsoletedRange,
-                               PlatformAgnostic,
+                               getPlatformAgnosticAvailability(),
                                implicit,
                                isSPI(),
                                isForEmbedded());
@@ -2332,10 +2333,10 @@ OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,
 }
 
 bool AvailableAttr::isLanguageVersionSpecific() const {
-  if (PlatformAgnostic ==
+  if (getPlatformAgnosticAvailability() ==
       PlatformAgnosticAvailabilityKind::SwiftVersionSpecific)
     {
-      assert(Platform == PlatformKind::none &&
+      assert(getPlatform() == PlatformKind::none &&
              (Introduced.has_value() ||
               Deprecated.has_value() ||
               Obsoleted.has_value()));
@@ -2345,10 +2346,10 @@ bool AvailableAttr::isLanguageVersionSpecific() const {
 }
 
 bool AvailableAttr::isPackageDescriptionVersionSpecific() const {
-  if (PlatformAgnostic ==
+  if (getPlatformAgnosticAvailability() ==
       PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific)
     {
-      assert(Platform == PlatformKind::none &&
+      assert(getPlatform() == PlatformKind::none &&
              (Introduced.has_value() ||
               Deprecated.has_value() ||
               Obsoleted.has_value()));
@@ -2358,7 +2359,7 @@ bool AvailableAttr::isPackageDescriptionVersionSpecific() const {
 }
 
 bool AvailableAttr::isUnconditionallyUnavailable() const {
-  switch (PlatformAgnostic) {
+  switch (getPlatformAgnosticAvailability()) {
   case PlatformAgnosticAvailabilityKind::None:
   case PlatformAgnosticAvailabilityKind::Deprecated:
   case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
@@ -2375,7 +2376,7 @@ bool AvailableAttr::isUnconditionallyUnavailable() const {
 }
 
 bool AvailableAttr::isUnconditionallyDeprecated() const {
-  switch (PlatformAgnostic) {
+  switch (getPlatformAgnosticAvailability()) {
   case PlatformAgnosticAvailabilityKind::None:
   case PlatformAgnosticAvailabilityKind::Unavailable:
   case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
@@ -2392,7 +2393,8 @@ bool AvailableAttr::isUnconditionallyDeprecated() const {
 }
 
 bool AvailableAttr::isNoAsync() const {
-  return PlatformAgnostic == PlatformAgnosticAvailabilityKind::NoAsync;
+  return getPlatformAgnosticAvailability() ==
+         PlatformAgnosticAvailabilityKind::NoAsync;
 }
 
 llvm::VersionTuple AvailableAttr::getActiveVersion(const ASTContext &ctx) const {
