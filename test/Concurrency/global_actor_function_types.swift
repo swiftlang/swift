@@ -413,3 +413,28 @@ extension GlobalType {
     rhs: GlobalType
   ) -> Bool { true }
 }
+
+func takesMainActorFn(_ x: @MainActor () -> Int) {}
+func takesMainActorAutoclosure(_ x: @autoclosure @MainActor () -> Int) {}
+
+func nonisolatedIntFn() -> Int { 0 }
+@MainActor func mainActorIntFn() -> Int { 0 }
+
+struct HasMainActorFns {
+  @MainActor static func staticFn() -> Int { 0 }
+  @MainActor func instanceFn() -> Int { 0 }
+}
+
+func testGlobalActorAutoclosure(_ x: HasMainActorFns) {
+  takesMainActorFn(nonisolatedIntFn)
+  takesMainActorFn(mainActorIntFn)
+
+  // Make sure we respect global actors on autoclosures.
+  takesMainActorAutoclosure(nonisolatedIntFn())
+  takesMainActorAutoclosure(mainActorIntFn())
+
+  // Including autoclosure thunks.
+  takesMainActorFn(HasMainActorFns.staticFn)
+  takesMainActorFn(HasMainActorFns.instanceFn(x))
+  takesMainActorFn(x.instanceFn)
+}
