@@ -2645,48 +2645,6 @@ private:
     SmallVector<Constraint *, 4> activeConstraints;
   };
 
-  class CacheExprTypes : public ASTWalker {
-    Expr *RootExpr;
-    ConstraintSystem &CS;
-    bool ExcludeRoot;
-
-  public:
-    CacheExprTypes(Expr *expr, ConstraintSystem &cs, bool excludeRoot)
-        : RootExpr(expr), CS(cs), ExcludeRoot(excludeRoot) {}
-
-    /// Walk everything in a macro
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::ArgumentsAndExpansion;
-    }
-
-    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
-      if (ExcludeRoot && expr == RootExpr) {
-        assert(!expr->getType() && "Unexpected type in root of expression!");
-        return Action::Continue(expr);
-      }
-
-      if (expr->getType())
-        CS.cacheType(expr);
-
-      if (auto kp = dyn_cast<KeyPathExpr>(expr))
-        for (auto i : indices(kp->getComponents()))
-          if (kp->getComponents()[i].getComponentType())
-            CS.cacheType(kp, i);
-
-      return Action::Continue(expr);
-    }
-
-    /// Ignore statements.
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return Action::SkipNode(stmt);
-    }
-
-    /// Ignore declarations.
-    PreWalkAction walkToDeclPre(Decl *decl) override {
-      return Action::SkipNode();
-    }
-  };
-
 public:
   /// Retrieve the first constraint that has failed along the solver's path, or
   /// \c nullptr if no constraint has failed.
@@ -2731,19 +2689,6 @@ public:
   /// has left-over active/inactive constraints which should
   /// have been simplified.
   bool inInvalidState() const { return InvalidState; }
-
-  /// Cache the types of the given expression and all subexpressions.
-  void cacheExprTypes(Expr *expr) {
-    bool excludeRoot = false;
-    expr->walk(CacheExprTypes(expr, *this, excludeRoot));
-  }
-
-  /// Cache the types of the expressions under the given expression
-  /// (but not the type of the given expression).
-  void cacheSubExprTypes(Expr *expr) {
-    bool excludeRoot = true;
-    expr->walk(CacheExprTypes(expr, *this, excludeRoot));
-  }
 
   /// The current solver state.
   ///
