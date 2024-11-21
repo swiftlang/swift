@@ -5993,7 +5993,7 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   // TODO: try to find a non-mutable type to use as the superclass.
 
   auto theClass = Impl.createDeclWithClangNode<ClassDecl>(
-      decl, convertClangAccess(decl), SourceLoc(), className, SourceLoc(),
+      decl, AccessLevel::Public, SourceLoc(), className, SourceLoc(),
       std::nullopt, nullptr, dc, /*isActor*/ false);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
