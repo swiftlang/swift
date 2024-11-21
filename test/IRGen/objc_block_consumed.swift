@@ -7,7 +7,7 @@
 // We want to test that IRGen doesn't assert on this code. SIL is the best place
 // to file check that the block parameter is actually +1.
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 // REQUIRES: objc_interop
 
 import gizmo
