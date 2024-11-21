@@ -1922,6 +1922,11 @@ def driver_scan_dependencies_non_lib:
   HelpText<"Use calls to `swift-frontend -scan-dependencies` instead of "
            "dedicated dependency scanning library">;
 
+def always_rebuild_module_dependencies:
+  Flag<["-"], "always-rebuild-module-dependencies">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Always rebuild module dependencies">;
+
 def driver_warn_unused_options:
   Flag<["-"], "driver-warn-unused-options">,
   Flags<[HelpHidden, NewDriverOnlyOption]>,
