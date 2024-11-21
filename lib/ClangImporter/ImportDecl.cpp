@@ -2184,8 +2184,7 @@ namespace {
                                    MoveOnlyAttr(/*Implicit=*/true));
       }
 
-      if (Impl.SwiftContext.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-          evaluateOrDefault(
+      if (evaluateOrDefault(
               Impl.SwiftContext.evaluator,
               ClangTypeEscapability({decl->getTypeForDecl(), Impl}),
               CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
@@ -3866,6 +3865,10 @@ namespace {
     void addLifetimeDependencies(const clang::FunctionDecl *decl,
                                  AbstractFunctionDecl *result) {
       if (decl->getTemplatedKind() == clang::FunctionDecl::TK_FunctionTemplate)
+        return;
+
+      if (!result->getASTContext().LangOpts.hasFeature(
+              Feature::LifetimeDependence))
         return;
 
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
