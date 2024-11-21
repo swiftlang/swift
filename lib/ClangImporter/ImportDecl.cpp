@@ -7887,7 +7887,7 @@ void addCompletionHandlerAttribute(Decl *asyncImport,
     if (member != asyncImport && isa<AbstractFunctionDecl>(member) &&
         !member->getAttrs().hasAttribute<AvailableAttr>()) {
       member->getAttrs().add(
-          AvailableAttr::createForAlternative(SwiftContext, asyncFunc));
+          AvailableAttr::createForAsyncAlternative(SwiftContext, asyncFunc));
     }
   }
 }

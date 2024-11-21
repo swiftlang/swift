@@ -2267,8 +2267,9 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
     Kind, /* isImplicit */ false, /*SPI*/false);
 }
 
-AvailableAttr *AvailableAttr::createForAlternative(
-    ASTContext &C, AbstractFunctionDecl *AsyncFunc) {
+AvailableAttr *
+AvailableAttr::createForAsyncAlternative(ASTContext &C,
+                                         AbstractFunctionDecl *AsyncFunc) {
   llvm::VersionTuple NoVersion;
   return new (C) AvailableAttr(
     SourceLoc(), SourceRange(), PlatformKind::none, "", "", AsyncFunc,

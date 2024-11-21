@@ -851,8 +851,8 @@ public:
 
   /// Create an AvailableAttr that indicates the given \p AsyncFunc should be
   /// preferentially used in async contexts
-  static AvailableAttr *createForAlternative(ASTContext &C,
-                                             AbstractFunctionDecl *AsyncFunc);
+  static AvailableAttr *
+  createForAsyncAlternative(ASTContext &C, AbstractFunctionDecl *AsyncFunc);
 
   AvailableAttr *clone(ASTContext &C, bool implicit) const;
   AvailableAttr *clone(ASTContext &C) const {
