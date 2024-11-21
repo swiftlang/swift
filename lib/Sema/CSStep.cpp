@@ -891,16 +891,18 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   // by dropping all scoring information.
   CS.clearScore();
 
-  // Reset the scope counter to avoid "too complex" failures
-  // when closure has a lot of elements in the body.
-  CS.CountScopes = 0;
+  // Reset the scope and trail counters to avoid "too complex"
+  // failures when closure has a lot of elements in the body.
+  CS.NumSolverScopes = 0;
+  CS.NumTrailSteps = 0;
 
   // If timer is enabled, let's reset it so that each element
   // (expression) gets a fresh time slice to get solved. This
   // is important for closures with large number of statements
   // in them.
   if (CS.Timer) {
-    CS.Timer.emplace(element.getLocator(), CS);
+    CS.Timer.reset();
+    CS.startExpressionTimer(element.getLocator());
   }
 
   auto success = element.attempt(CS);

@@ -52,11 +52,6 @@ using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
 
-ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS)
-    : ExpressionTimer(
-          Anchor, CS,
-          CS.getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold) {}
-
 ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
                                  unsigned thresholdInSecs)
     : Anchor(Anchor), Context(CS.getASTContext()),
@@ -139,9 +134,18 @@ ConstraintSystem::~ConstraintSystem() {
   delete &CG;
 }
 
+void ConstraintSystem::startExpressionTimer(ExpressionTimer::AnchorType anchor) {
+  ASSERT(!Timer);
+
+  unsigned timeout = getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold;
+  if (timeout == 0)
+    return;
+
+  Timer.emplace(anchor, *this, timeout);
+}
+
 void ConstraintSystem::incrementScopeCounter() {
-  ++CountScopes;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
+  ++NumSolverScopes;
   if (auto *Stats = getASTContext().Stats)
     ++Stats->getFrontendCounters().NumConstraintScopes;
 }

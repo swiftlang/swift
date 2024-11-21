@@ -250,9 +250,6 @@ private:
   bool PrintWarning;
 
 public:
-  /// This constructor sets a default threshold defined for all expressions
-  /// via compiler flag `solver-expression-time-threshold`.
-  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS);
   ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
                   unsigned thresholdInSecs);
 
@@ -2170,13 +2167,20 @@ private:
   /// Counter for type variables introduced.
   unsigned TypeCounter = 0;
 
+  /// The number of changes recorded in the trail so far during the
+  /// solution of this constraint system.
+  ///
+  /// This is a rough proxy for how much work the solver did.
+  unsigned NumTrailSteps = 0;
+
   /// The number of scopes created so far during the solution
   /// of this constraint system.
   ///
-  /// This is a measure of complexity of the solution space. A new
-  /// scope is created every time we attempt a type variable binding
-  /// or explore an option in a disjunction.
-  unsigned CountScopes = 0;
+  /// A new scope is created every time we attempt a type variable
+  /// binding or explore an option in a disjunction.
+  ///
+  /// This is a measure of complexity of the solution space.
+  unsigned NumSolverScopes = 0;
 
   /// High-water mark of measured memory usage in any sub-scope we
   /// explored.
@@ -2539,24 +2543,12 @@ private:
     }
 
     /// Update statistics when a scope begins.
-    unsigned beginScope() {
-      ++depth;
-      maxDepth = std::max(maxDepth, depth);
-
-      CS.incrementScopeCounter();
-
-      return NumStatesExplored++;
-    }
+    unsigned beginScope();
 
     /// Update statistics when a scope ends.
-    void endScope(unsigned scopeNumber) {
-      ASSERT(depth > 0);
-      --depth;
-
-      unsigned countScopesExplored = NumStatesExplored - scopeNumber;
-      if (countScopesExplored == 1)
-        CS.incrementLeafScopes();
-    }
+    void endScope(unsigned scopeNumber,
+                  uint64_t startTrailSteps,
+                  uint64_t endTrailSteps);
 
     /// Check whether constraint system is allowed to form solutions
     /// even with unbound type variables present.
@@ -2760,11 +2752,11 @@ public:
   struct SolverScope {
     ConstraintSystem &cs;
 
-    /// The length of \c TypeVariables.
-    unsigned numTypeVariables;
+    /// The length of \c TypeVariables at the start of the scope.
+    unsigned startTypeVariables;
 
-    /// The length of \c Trail.
-    unsigned numTrailChanges;
+    /// The length of \c Trail at the start of the scope.
+    uint64_t startTrailSteps;
 
     /// The scope number of this scope. Set when the scope is registered.
     unsigned scopeNumber : 31;
@@ -5499,7 +5491,9 @@ public:
   /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
   void optimizeConstraints(Expr *e);
-  
+
+  void startExpressionTimer(ExpressionTimer::AnchorType anchor);
+
   /// Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   std::pair<bool, SourceRange> isAlreadyTooComplex = {false, SourceRange()};
@@ -5538,9 +5532,16 @@ public:
       return true;
     }
 
-    // Bail out once we've looked at a really large number of
-    // choices.
-    if (CountScopes > getASTContext().TypeCheckerOpts.SolverBindingThreshold) {
+    auto &opts = getASTContext().TypeCheckerOpts;
+
+    // Bail out once we've looked at a really large number of choices.
+    if (opts.SolverScopeThreshold && NumSolverScopes > opts.SolverScopeThreshold) {
+      isAlreadyTooComplex.first = true;
+      return true;
+    }
+
+    // Bail out once we've taken a really large number of steps.
+    if (opts.SolverTrailThreshold && NumTrailSteps > opts.SolverTrailThreshold) {
       isAlreadyTooComplex.first = true;
       return true;
     }
