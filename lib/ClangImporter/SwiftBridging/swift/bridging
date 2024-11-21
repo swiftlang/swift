@@ -180,6 +180,11 @@
 #define SWIFT_RETURNS_UNRETAINED                                               \
   __attribute__((swift_attr("returns_unretained")))
 
+/// Specifies that the non-public members of a C++ class, struct, or union can
+/// be accessed from extensions of that type, in the given file ID.
+#define SWIFT_PRIVATE_FILEID(_fileID) \
+  __attribute__((swift_attr("private_fileid:" _fileID)))
+
 #else  // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 
 // Empty defines for compilers that don't support `attribute(swift_attr)`.
@@ -198,6 +203,7 @@
 #define SWIFT_ESCAPABLE
 #define SWIFT_RETURNS_RETAINED
 #define SWIFT_RETURNS_UNRETAINED
+#define SWIFT_PRIVATE_FILEID(_fileID)
 
 #endif // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 
