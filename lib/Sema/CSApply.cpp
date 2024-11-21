@@ -407,6 +407,50 @@ static bool willHaveConfusingConsumption(Type type,
   }
 }
 
+Expr *Solution::buildAutoClosureExpr(Expr *expr,
+                                     FunctionType *closureType,
+                                     DeclContext *ClosureContext,
+                                     bool isDefaultWrappedValue,
+                                     bool isAsyncLetWrapper) {
+  auto &Context = constraintSystem->getASTContext();
+  bool isInDefaultArgumentContext = false;
+  if (auto *init = dyn_cast<Initializer>(getDC())) {
+    auto initKind = init->getInitializerKind();
+    isInDefaultArgumentContext =
+        initKind == InitializerKind::DefaultArgument ||
+        (initKind == InitializerKind::PatternBinding && isDefaultWrappedValue);
+  }
+
+  auto info = closureType->getExtInfo();
+  auto newClosureType = closureType;
+
+  if (isInDefaultArgumentContext && info.isNoEscape())
+    newClosureType = closureType->withExtInfo(info.withNoEscape(false))
+                         ->castTo<FunctionType>();
+
+  auto *closure = new (Context)
+      AutoClosureExpr(expr, newClosureType, ClosureContext);
+
+  closure->setParameterList(ParameterList::createEmpty(Context));
+
+  if (isAsyncLetWrapper)
+    closure->setThunkKind(AutoClosureExpr::Kind::AsyncLet);
+
+  Expr *result = closure;
+
+  if (!newClosureType->isEqual(closureType)) {
+    assert(isInDefaultArgumentContext);
+    assert(newClosureType
+               ->withExtInfo(newClosureType->getExtInfo().withNoEscape(true))
+               ->isEqual(closureType));
+    result = new (Context) FunctionConversionExpr(closure, closureType);
+  }
+
+  auto &cs = getConstraintSystem();
+  cs.cacheExprTypes(result);
+  return result;
+}
+
 namespace {
 
   /// Rewrites an expression by applying the solution of a constraint
@@ -6299,7 +6343,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
         argExpr = coerceToType(
             argExpr, closureType->getResult(),
             argLoc.withPathElement(ConstraintLocator::AutoclosureResult));
-        argExpr = cs.buildAutoClosureExpr(argExpr, closureType, dc);
+        argExpr = solution.buildAutoClosureExpr(argExpr, closureType, dc);
       }
 
       argExpr = coerceToType(argExpr, generatorInputType, argLoc);
@@ -6351,15 +6395,15 @@ ArgumentList *ExprRewriter::coerceCallArguments(
         bool isDefaultWrappedValue =
             target->propertyWrapperHasInitialWrappedValue();
         auto *placeholder = injectWrappedValuePlaceholder(
-            cs.buildAutoClosureExpr(argExpr, closureType, dc,
-                                    isDefaultWrappedValue),
+            solution.buildAutoClosureExpr(argExpr, closureType, dc,
+                                          isDefaultWrappedValue),
             /*isAutoClosure=*/true);
         argExpr = CallExpr::createImplicitEmpty(ctx, placeholder);
         argExpr->setType(closureType->getResult());
         cs.cacheType(argExpr);
       }
 
-      convertedArg = cs.buildAutoClosureExpr(argExpr, closureType, dc);
+      convertedArg = solution.buildAutoClosureExpr(argExpr, closureType, dc);
     } else {
       convertedArg = coerceToType(argExpr, paramType, argLoc);
     }
@@ -8984,7 +9028,8 @@ static bool isSendingInitializer(Expr *initializer) {
 /// operation but not the timing, e.g., the call itself will actually occur
 /// when one of the variables in the async let is referenced.
 static Expr *wrapAsyncLetInitializer(
-      ConstraintSystem &cs, Expr *initializer, DeclContext *dc) {
+      Solution &solution, Expr *initializer, DeclContext *dc) {
+  auto &cs = solution.getConstraintSystem();
   auto &ctx = dc->getASTContext();
 
   // Form the autoclosure type. It is always 'async', and will be 'throws'.
@@ -9007,7 +9052,7 @@ static Expr *wrapAsyncLetInitializer(
   // Form the autoclosure expression. The actual closure here encapsulates the
   // child task.
   auto closureType = FunctionType::get({ }, initializerType, extInfo);
-  Expr *autoclosureExpr = cs.buildAutoClosureExpr(
+  Expr *autoclosureExpr = solution.buildAutoClosureExpr(
       initializer, closureType, dc, /*isDefaultWrappedValue=*/false,
       /*isAsyncLetWrapper=*/true);
 
@@ -9182,7 +9227,7 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
   // task.
   if (target.isAsyncLetInitializer()) {
     resultTarget.setExpr(wrapAsyncLetInitializer(
-        cs, resultTarget.getAsExpr(), resultTarget.getDeclContext()));
+        solution, resultTarget.getAsExpr(), resultTarget.getDeclContext()));
   }
 
   // If this property has an opaque result type, set the underlying type
@@ -9704,8 +9749,8 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     // conversion.
     if (FunctionType *autoclosureParamType =
             target.getAsAutoclosureParamType()) {
-      resultExpr = cs.buildAutoClosureExpr(resultExpr, autoclosureParamType,
-                                           target.getDeclContext());
+      resultExpr = solution.buildAutoClosureExpr(resultExpr, autoclosureParamType,
+                                                 target.getDeclContext());
     }
 
     solution.setExprTypes(resultExpr);
