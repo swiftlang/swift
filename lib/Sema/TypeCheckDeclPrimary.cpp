@@ -916,8 +916,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
           static AvailabilityRange from(const ValueDecl *VD) {
             AvailabilityRange result;
             for (auto *attr : VD->getAttrs().getAttributes<AvailableAttr>()) {
-              if (attr->PlatformAgnostic ==
-                    PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
+              if (attr->isLanguageVersionSpecific()) {
                 if (attr->Introduced)
                   result.introduced = attr->Introduced;
                 if (attr->Obsoleted)

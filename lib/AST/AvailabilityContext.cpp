@@ -58,7 +58,7 @@ bool AvailabilityContext::PlatformInfo::constrainWith(const Decl *decl) {
     isConstrained |= constrainRange(Range, *range);
 
   if (auto *attr = decl->getAttrs().getUnavailable(ctx)) {
-    isConstrained |= constrainUnavailability(attr->Platform);
+    isConstrained |= constrainUnavailability(attr->getPlatform());
     isConstrained |=
         CONSTRAIN_BOOL(IsUnavailableInEmbedded, attr->isForEmbedded());
   }

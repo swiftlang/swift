@@ -114,7 +114,7 @@ namespace {
 bool isUnavailableOrObsoleted(const Decl *D) {
   if (const auto *Avail =
         D->getAttrs().getUnavailable(D->getASTContext())) {
-    if (Avail->Platform != PlatformKind::none) {
+    if (Avail->getPlatform() != PlatformKind::none) {
       switch (Avail->getVersionAvailability(D->getASTContext())) {
         case AvailableVersionComparison::Unavailable:
         case AvailableVersionComparison::Obsoleted:

@@ -1686,8 +1686,8 @@ public:
     };
 
     for (auto AvAttr : D->getAttrs().getAttributes<AvailableAttr>()) {
-      if (AvAttr->Platform == PlatformKind::none) {
-        if (AvAttr->PlatformAgnostic ==
+      if (AvAttr->getPlatform() == PlatformKind::none) {
+        if (AvAttr->getPlatformAgnosticAvailability() ==
             PlatformAgnosticAvailabilityKind::Unavailable) {
           // Availability for *
           if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
@@ -1741,7 +1741,7 @@ public:
       }
 
       const char *plat;
-      switch (AvAttr->Platform) {
+      switch (AvAttr->getPlatform()) {
       case PlatformKind::macOS:
         plat = "macos";
         break;

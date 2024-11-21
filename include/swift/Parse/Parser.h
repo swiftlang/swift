@@ -2042,7 +2042,7 @@ public:
   };
 
   /// Parse a comma-separated list of availability specifications. Try to
-  /// expand availability macros when /p Source is not a command line macro.
+  /// expand availability macros when \p Source is not a command line macro.
   ParserStatus
   parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
                             AvailabilitySpecSource Source);
