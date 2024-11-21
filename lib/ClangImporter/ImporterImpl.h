@@ -40,6 +40,7 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/AST/DeclVisitor.h"
 #include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -1630,7 +1631,8 @@ private:
   loadAllMembersOfObjcContainer(Decl *D,
                                 const clang::ObjCContainerDecl *objcContainer);
   void loadAllMembersOfRecordDecl(NominalTypeDecl *swiftDecl,
-                                  const clang::RecordDecl *clangRecord);
+                                  const clang::RecordDecl *clangRecord,
+                                  clang::AccessSpecifier inheritance = clang::AS_none);
 
   void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
                            Decl *D, DeclContext *DC,
