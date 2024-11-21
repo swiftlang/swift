@@ -213,8 +213,6 @@ bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
     return false;
   visitedFuncs[function] = PerformanceConstraints::None;
 
-  NonErrorHandlingBlocks neBlocks(function);
-
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       if (visitInst(&inst, PerformanceConstraints::None, parentLoc)) {
@@ -282,8 +280,6 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
                                               LocWithParent *parentLoc) {
   if (!function->isDefinition())
     return false;
-
-  NonErrorHandlingBlocks neBlocks(function);
 
   for (SILBasicBlock &block : *function) {
     // Exclude fatal-error blocks.
