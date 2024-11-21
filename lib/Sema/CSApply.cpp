@@ -1577,8 +1577,8 @@ namespace {
                          ConstraintLocatorBuilder memberLocator, bool Implicit,
                          AccessSemantics semantics) {
       const auto &choice = overload.choice;
-      const auto openedType = overload.openedType;
-      const auto adjustedOpenedType = overload.adjustedOpenedType;
+      const auto openedType = simplifyType(overload.openedType);
+      const auto adjustedOpenedType = simplifyType(overload.adjustedOpenedType);
 
       ValueDecl *member = choice.getDecl();
 
@@ -1639,7 +1639,7 @@ namespace {
       // If we're referring to a member type, it's just a type
       // reference.
       if (auto *TD = dyn_cast<TypeDecl>(member)) {
-        Type refType = simplifyType(adjustedOpenedType);
+        Type refType = adjustedOpenedType;
         auto ref = TypeExpr::createForDecl(memberLoc, TD, dc);
         cs.setType(ref, refType);
         auto *result = new (context) DotSyntaxBaseIgnoredExpr(
@@ -1770,10 +1770,8 @@ namespace {
         ref->setImplicit(Implicit);
         // FIXME: FunctionRefKind
 
-        auto computeRefType = [&](Type openedType) {
-          // Compute the type of the reference.
-          Type refType = simplifyType(openedType);
-
+        // Compute the type of the reference.
+        auto computeRefType = [&](Type refType) {
           // If the base was an opened existential, erase the opened
           // existential.
           if (openedExistential) {
@@ -1859,7 +1857,7 @@ namespace {
         // type having 'Self' swapped for the appropriate replacement
         // type -- usually the base object type.
         if (hasDynamicSelf) {
-          const auto conversionTy = simplifyType(adjustedOpenedType);
+          const auto conversionTy = adjustedOpenedType;
           if (!containerTy->isEqual(conversionTy)) {
             result = cs.cacheType(new (context) CovariantReturnConversionExpr(
                 result, conversionTy));
@@ -1967,7 +1965,7 @@ namespace {
             
             auto *closure = buildSingleCurryThunk(
               baseRef, declRefExpr, cast<AbstractFunctionDecl>(member),
-              simplifyType(adjustedOpenedType)->castTo<FunctionType>(),
+              adjustedOpenedType->castTo<FunctionType>(),
               memberLocator);
               
             // Wrap the closure in a capture list.
@@ -1994,7 +1992,7 @@ namespace {
           // must be downcast to the opened archetype before being erased to the
           // subclass existential to cope with the expectations placed
           // on 'CovariantReturnConversionExpr'.
-          curryThunkTy = simplifyType(adjustedOpenedType)->castTo<FunctionType>();
+          curryThunkTy = adjustedOpenedType->castTo<FunctionType>();
         } else {
           curryThunkTy = adjustedRefTy->castTo<FunctionType>();
 
@@ -2060,7 +2058,7 @@ namespace {
         apply = ConstructorRefCallExpr::create(context, ref, base);
       } else if (isUnboundInstanceMember) {
         ref = adjustTypeForDeclReference(
-            ref, cs.getType(ref), cs.simplifyType(adjustedOpenedType),
+            ref, cs.getType(ref), adjustedOpenedType,
             locator);
 
         // Reference to an unbound instance method.
