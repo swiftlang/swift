@@ -305,8 +305,14 @@ Type ConstraintSystem::getInstanceType(TypeExpr *E) {
   return ErrorType::get(getType(E)->getASTContext());
 }
 
-Type ConstraintSystem::getResultType(const AbstractClosureExpr *E) {
-  return E->getResultType([&](Expr *E) -> Type { return getType(E); });
+Type Solution::getInstanceType(TypeExpr *E) {
+  if (!hasType(E))
+    return Type();
+
+  if (auto metaType = getType(E)->getAs<MetatypeType>())
+    return metaType->getInstanceType();
+
+  return ErrorType::get(getType(E)->getASTContext());
 }
 
 static bool buildObjCKeyPathString(KeyPathExpr *E,

@@ -1839,6 +1839,11 @@ public:
   /// expression type map.
   bool isStaticallyDerivedMetatype(Expr *E) const;
 
+  /// Call TypeExpr::getInstanceType on the given expression, using a
+  /// custom accessor for the type on the expression that reads the
+  /// type from the Solution's expression type map.
+  Type getInstanceType(TypeExpr *E);
+
   /// Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
 
@@ -4229,11 +4234,6 @@ public:
   /// custom accessor for the type on the expression that reads the
   /// type from the ConstraintSystem expression type map.
   Type getInstanceType(TypeExpr *E);
-
-  /// Call AbstractClosureExpr::getResultType on the given expression,
-  /// using a custom accessor for the type on the expression that
-  /// reads the type from the ConstraintSystem expression type map.
-  Type getResultType(const AbstractClosureExpr *E);
 
 private:
   /// Introduce the constraints associated with the given type variable
