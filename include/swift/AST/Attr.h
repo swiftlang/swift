@@ -147,12 +147,16 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 8+8+1+1,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 8+8+1+1+1+1,
       /// A `PlatformKind` value.
       Platform : 8,
 
       /// A `PlatformAgnosticAvailabilityKind` value.
       PlatformAgnostic : 8,
+
+      /// State storage for `RenamedDeclRequest`.
+      HasComputedRenamedDecl : 1,
+      HasRenamedDecl : 1,
 
       /// Whether this attribute was spelled `@_spi_available`.
       IsSPI : 1,
@@ -861,6 +865,22 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Available;
+  }
+
+  bool hasCachedRenamedDecl() const {
+    return Bits.AvailableAttr.HasRenamedDecl;
+  }
+
+private:
+  friend class RenamedDeclRequest;
+
+  bool hasComputedRenamedDecl() const {
+    return Bits.AvailableAttr.HasComputedRenamedDecl;
+  }
+
+  void setComputedRenamedDecl(bool hasRenamedDecl) {
+    Bits.AvailableAttr.HasComputedRenamedDecl = true;
+    Bits.AvailableAttr.HasRenamedDecl = hasRenamedDecl;
   }
 };
 

@@ -2236,6 +2236,8 @@ AvailableAttr::AvailableAttr(
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange) {
   Bits.AvailableAttr.Platform = static_cast<uint8_t>(Platform);
   Bits.AvailableAttr.PlatformAgnostic = static_cast<uint8_t>(PlatformAgnostic);
+  Bits.AvailableAttr.HasComputedRenamedDecl = false;
+  Bits.AvailableAttr.HasRenamedDecl = false;
   Bits.AvailableAttr.IsSPI = IsSPI;
 
   if (IsForEmbedded) {
