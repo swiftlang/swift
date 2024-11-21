@@ -2687,6 +2687,21 @@ namespace {
             varType = TypeChecker::getOptionalType(var->getLoc(), varType);
         }
 
+        auto makeTypeLocatableIfPossible = [&var](Type type) -> Type {
+          if (auto loc = var->getLoc()) {
+            return LocatableType::get(loc, type);
+          }
+          return type;
+        };
+
+        auto useLocatableTypes = [&]() -> bool {
+          if (!CS.inSalvageMode())
+            return false;
+
+          return var->isImplicit() &&
+                 var->getNameStr().starts_with("$__builder");
+        };
+
         // When we are supposed to bind pattern variables, create a fresh
         // type variable and a one-way constraint to assign it to either the
         // deduced type or the externally-imposed type.
@@ -2711,6 +2726,9 @@ namespace {
 
           CS.addConstraint(ConstraintKind::OneWayEqual, oneWayVarType,
                            varType, locator);
+
+          if (useLocatableTypes())
+            oneWayVarType = makeTypeLocatableIfPossible(oneWayVarType);
         }
 
         // Ascribe a type to the declaration so it's always available to
@@ -2771,6 +2789,9 @@ namespace {
             CS.addConstraint(ConstraintKind::Equal, declTy, varType,
                              CS.getConstraintLocator(locator));
           }
+
+          if (useLocatableTypes())
+            declTy = makeTypeLocatableIfPossible(declTy);
 
           CS.setType(var, declTy);
         }
