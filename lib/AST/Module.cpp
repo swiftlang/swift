@@ -3608,7 +3608,8 @@ SmallString<64> SourceFile::getFileID() const {
   auto filename = getFilename();
 
   if (!filename.empty())
-    computeFileID(getParentModule(), llvm::sys::path::filename(filename), result);
+    computeFileID(getParentModule(), llvm::sys::path::filename(filename),
+                  result);
   return result;
 }
 

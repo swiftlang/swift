@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
@@ -23,17 +23,17 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "clang/AST/ASTContext.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "clang/AST/ASTContext.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
 #define DEBUG_TYPE "Name lookup"
@@ -1314,7 +1314,8 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
     bool blessedUseSF = false;
     if (auto clangDecl = sourceNTD->getDecl()->getClangDecl()) {
       auto blessedFileID = importer::getSwiftImplementationFileID(clangDecl);
-      blessedUseSF = !blessedFileID.empty() && blessedFileID[0].first == useSF->getFileID();
+      blessedUseSF = !blessedFileID.empty() &&
+                     blessedFileID[0].first == useSF->getFileID();
     }
     if (!blessedUseSF)
       return false;

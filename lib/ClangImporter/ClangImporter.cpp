@@ -7327,8 +7327,9 @@ Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
   return Impl.importDecl(decl, Impl.CurrentVersion);
 }
 
-ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
-    ValueDecl *decl, DeclContext *newContext) {
+ValueDecl *
+ClangImporter::Implementation::importBaseMemberDecl(ValueDecl *decl,
+                                                    DeclContext *newContext) {
   // Make sure we don't clone the decl again for this class, as that would
   // result in multiple definitions of the same symbol.
   std::pair<ValueDecl *, DeclContext *> key = {decl, newContext};
@@ -8118,10 +8119,8 @@ importer::getSwiftImplementationFileID(const clang::Decl *decl) {
     for (const auto *attr : decl->getAttrs())
       if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
         if (swiftAttr->getAttribute().starts_with(prefix))
-          files.push_back({
-              swiftAttr->getAttribute().drop_front(prefix.size()),
-              attr->getLocation()
-              });
+          files.push_back({swiftAttr->getAttribute().drop_front(prefix.size()),
+                           attr->getLocation()});
 
   return files;
 }

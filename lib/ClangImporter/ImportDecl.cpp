@@ -1444,11 +1444,10 @@ namespace {
               // Create a typealias for this CF typedef.
               TypeAliasDecl *typealias = nullptr;
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                            Decl, convertClangAccess(Decl->getAccess()),
-                            Impl.importSourceLoc(Decl->getBeginLoc()),
-                            SourceLoc(), Name,
-                            Impl.importSourceLoc(Decl->getLocation()),
-                            /*genericparams*/nullptr, DC);
+                  Decl, convertClangAccess(Decl->getAccess()),
+                  Impl.importSourceLoc(Decl->getBeginLoc()), SourceLoc(), Name,
+                  Impl.importSourceLoc(Decl->getLocation()),
+                  /*genericparams*/ nullptr, DC);
               typealias->setUnderlyingType(
                   underlying->getDeclaredInterfaceType());
 
@@ -1463,11 +1462,10 @@ namespace {
               // Create a typealias for this CF typedef.
               TypeAliasDecl *typealias = nullptr;
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                            Decl, convertClangAccess(Decl->getAccess()),
-                            Impl.importSourceLoc(Decl->getBeginLoc()),
-                            SourceLoc(), Name,
-                            Impl.importSourceLoc(Decl->getLocation()),
-                            /*genericparams*/nullptr, DC);
+                  Decl, convertClangAccess(Decl->getAccess()),
+                  Impl.importSourceLoc(Decl->getBeginLoc()), SourceLoc(), Name,
+                  Impl.importSourceLoc(Decl->getLocation()),
+                  /*genericparams*/ nullptr, DC);
               typealias->setUnderlyingType(
                 Impl.SwiftContext.getAnyObjectType());
 
@@ -1532,12 +1530,10 @@ namespace {
         return nullptr;
 
       auto Loc = Impl.importSourceLoc(Decl->getLocation());
-      auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(Decl,
-                                      convertClangAccess(Decl->getAccess()),
-                                      Impl.importSourceLoc(Decl->getBeginLoc()),
-                                      SourceLoc(), Name,
-                                      Loc,
-                                      /*genericparams*/nullptr, DC);
+      auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(
+          Decl, convertClangAccess(Decl->getAccess()),
+          Impl.importSourceLoc(Decl->getBeginLoc()), SourceLoc(), Name, Loc,
+          /*genericparams*/ nullptr, DC);
 
       Result->setUnderlyingType(SwiftType);
 
@@ -1642,8 +1638,8 @@ namespace {
 
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-            decl, convertClangAccess(decl->getAccess()), Loc, name, Loc, std::nullopt, nullptr,
-            dc);
+            decl, convertClangAccess(decl->getAccess()), Loc, name, Loc,
+            std::nullopt, nullptr, dc);
 
         auto options = getDefaultMakeStructRawValuedOptions();
         options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
@@ -2210,8 +2206,8 @@ namespace {
             ArrayRef<InheritedEntry>{}, nullptr, dc, false);
       else
         result = Impl.createDeclWithClangNode<StructDecl>(
-            decl, convertClangAccess(decl->getAccess()), loc, name, loc, std::nullopt, nullptr,
-            dc);
+            decl, convertClangAccess(decl->getAccess()), loc, name, loc,
+            std::nullopt, nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       if (recordHasMoveOnlySemantics(decl)) {
@@ -2910,9 +2906,12 @@ namespace {
 
       auto implFileAnnotations = importer::getSwiftImplementationFileID(decl);
       if (implFileAnnotations.size() > 1) {
-        Impl.diagnose(HeaderLoc(decl->getLocation()), diag::more_than_one_implementation_fileid_attr, decl->getName());
+        Impl.diagnose(HeaderLoc(decl->getLocation()),
+                      diag::more_than_one_implementation_fileid_attr,
+                      decl->getName());
         for (auto annote : implFileAnnotations)
-          Impl.diagnose(HeaderLoc(annote.second), diag::more_than_one_implementation_fileid_attr_here);
+          Impl.diagnose(HeaderLoc(annote.second),
+                        diag::more_than_one_implementation_fileid_attr_here);
       }
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
@@ -3244,12 +3243,10 @@ namespace {
       auto type = importedType.getType();
 
       // Map this indirect field to a Swift variable.
-      auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
-                       convertClangAccess(decl->getAccess()),
-                       /*IsStatic*/false,
-                       VarDecl::Introducer::Var,
-                       Impl.importSourceLoc(decl->getBeginLoc()),
-                       name, dc);
+      auto result = Impl.createDeclWithClangNode<VarDecl>(
+          decl, convertClangAccess(decl->getAccess()),
+          /*IsStatic*/ false, VarDecl::Introducer::Var,
+          Impl.importSourceLoc(decl->getBeginLoc()), name, dc);
       result->setInterfaceType(type);
       result->setIsObjC(false);
       result->setIsDynamic(false);
@@ -4158,13 +4155,10 @@ namespace {
       }
 
       auto type = importedType.getType();
-      auto result =
-        Impl.createDeclWithClangNode<VarDecl>(decl,
-                              convertClangAccess(decl->getAccess()),
-                              /*IsStatic*/ false,
-                              VarDecl::Introducer::Var,
-                              Impl.importSourceLoc(decl->getLocation()),
-                              name, dc);
+      auto result = Impl.createDeclWithClangNode<VarDecl>(
+          decl, convertClangAccess(decl->getAccess()),
+          /*IsStatic*/ false, VarDecl::Introducer::Var,
+          Impl.importSourceLoc(decl->getLocation()), name, dc);
       if (decl->getType().isConstQualified()) {
         // Note that in C++ there are ways to change the values of const
         // members, so we don't use WriteImplKind::Immutable storage.
@@ -4227,11 +4221,10 @@ namespace {
       auto introducer = Impl.shouldImportGlobalAsLet(decl->getType())
                         ? VarDecl::Introducer::Let
                         : VarDecl::Introducer::Var;
-      auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
-                       convertClangAccess(decl->getAccess()),
-                       /*IsStatic*/isStatic, introducer,
-                       Impl.importSourceLoc(decl->getLocation()),
-                       name, dc);
+      auto result = Impl.createDeclWithClangNode<VarDecl>(
+          decl, convertClangAccess(decl->getAccess()),
+          /*IsStatic*/ isStatic, introducer,
+          Impl.importSourceLoc(decl->getLocation()), name, dc);
       result->setIsObjC(false);
       result->setIsDynamic(false);
 
@@ -4315,8 +4308,8 @@ namespace {
           Impl.SwiftContext, loc, genericParams, loc);
 
       auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-          decl, convertClangAccess(decl->getAccess()), loc, name, loc, std::nullopt,
-          genericParamList, dc);
+          decl, convertClangAccess(decl->getAccess()), loc, name, loc,
+          std::nullopt, genericParamList, dc);
 
       auto attr = AvailableAttr::createPlatformAgnostic(
           Impl.SwiftContext, "Un-specialized class templates are not currently "
@@ -4384,12 +4377,9 @@ namespace {
 
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(
-            decl,
-            convertClangAccess(decl->getAccess()),
-            Impl.importSourceLoc(decl->getBeginLoc()),
-            SourceLoc(), Name,
-            Loc,
-            /*genericparams*/nullptr, importedDC);
+            decl, convertClangAccess(decl->getAccess()),
+            Impl.importSourceLoc(decl->getBeginLoc()), SourceLoc(), Name, Loc,
+            /*genericparams*/ nullptr, importedDC);
         Result->setUnderlyingType(SwiftTypeDecl->getDeclaredInterfaceType());
 
         return Result;
@@ -6070,9 +6060,11 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
 
   // Create the type alias.
   auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-      decl, convertClangAccess(decl->getAccess()), Impl.importSourceLoc(decl->getBeginLoc()),
-      SourceLoc(), compatibilityName.getBaseIdentifier(Impl.SwiftContext),
-      Impl.importSourceLoc(decl->getLocation()), /*generic params*/nullptr, dc);
+      decl, convertClangAccess(decl->getAccess()),
+      Impl.importSourceLoc(decl->getBeginLoc()), SourceLoc(),
+      compatibilityName.getBaseIdentifier(Impl.SwiftContext),
+      Impl.importSourceLoc(decl->getLocation()), /*generic params*/ nullptr,
+      dc);
 
   auto *GTD = dyn_cast<GenericTypeDecl>(typeDecl);
   if (GTD && !isa<ProtocolDecl>(GTD)) {
@@ -6167,7 +6159,8 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto Loc = Impl.importSourceLoc(decl->getLocation());
 
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-      decl, convertClangAccess(decl->getAccess()), Loc, name, Loc, std::nullopt, nullptr, dc);
+      decl, convertClangAccess(decl->getAccess()), Loc, name, Loc, std::nullopt,
+      nullptr, dc);
 
   // Import the type of the underlying storage
   ImportDiagnosticAdder addImportDiag(Impl, decl, decl->getLocation());
@@ -6459,7 +6452,8 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
 
   // Create a struct with the underlying type as a field.
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-      decl, convertClangAccess(decl->getAccess()), Loc, name, Loc, std::nullopt, nullptr, dc);
+      decl, convertClangAccess(decl->getAccess()), Loc, name, Loc, std::nullopt,
+      nullptr, dc);
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = structDecl;
 
   // Compute the underlying type.
@@ -6715,9 +6709,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   Type swiftPropertyType = importedType.getType();
 
   auto property = Impl.createDeclWithClangNode<VarDecl>(
-      getter, convertClangAccess(getter->getAccess()), /*IsStatic*/isStatic,
-      VarDecl::Introducer::Var, SourceLoc(),
-      propertyName, dc);
+      getter, convertClangAccess(getter->getAccess()), /*IsStatic*/ isStatic,
+      VarDecl::Introducer::Var, SourceLoc(), propertyName, dc);
   property->setInterfaceType(swiftPropertyType);
   property->setIsObjC(false);
   property->setIsDynamic(false);
@@ -9595,7 +9588,8 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         // we just use the Swift AccessLevel that it got converted to and
         // compare it to the converted inheritance access specifier; this relies
         // on convertClangAccess() being a linear mapping.
-        newDecl->overwriteAccess(std::min(newDecl->getFormalAccess(), convertClangAccess(inheritance)));
+        newDecl->overwriteAccess(std::min(newDecl->getFormalAccess(),
+                                          convertClangAccess(inheritance)));
         swiftDecl->addMember(newDecl);
       }
       continue;
@@ -9626,7 +9620,8 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       // In this scenario, all of base's members are inherited by cxxRecord with
       // private access, so they should not be accessible by derived classes of
       // cxxRecord (i.e., swiftDecl).
-      if (inheritance != clang::AS_none && base.getAccessSpecifier() == clang::AS_private)
+      if (inheritance != clang::AS_none &&
+          base.getAccessSpecifier() == clang::AS_private)
         continue;
 
       clang::QualType baseType = base.getType();
@@ -9638,7 +9633,8 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         continue;
 
       auto *baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-      loadAllMembersOfRecordDecl(swiftDecl, baseRecord, base.getAccessSpecifier());
+      loadAllMembersOfRecordDecl(swiftDecl, baseRecord,
+                                 base.getAccessSpecifier());
     }
   }
 }
