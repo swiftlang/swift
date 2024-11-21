@@ -822,7 +822,7 @@ namespace {
                                           locator);
       // If we have to load, do so now.
       if (loadImmediately)
-        result = cs.addImplicitLoadExpr(result);
+        result = solution.addImplicitLoadExpr(result);
 
       return result;
     }
@@ -991,7 +991,7 @@ namespace {
           (isNonMutatingMember(member) ||
            member->getDeclContext()->getDeclaredInterfaceType()
              ->hasReferenceSemantics())) {
-        base = cs.coerceToRValue(base);
+        base = solution.coerceToRValue(base);
         isLValue = false;
       }
 
@@ -1775,14 +1775,14 @@ namespace {
         if (!base)
           return nullptr;
 
-        base = cs.coerceToRValue(base);
+        base = solution.coerceToRValue(base);
       }
       assert(base && "Unable to convert base?");
 
       // Handle dynamic references.
       if (!needsCurryThunk &&
           (isDynamic || member->getAttrs().hasAttribute<OptionalAttr>())) {
-        base = cs.coerceToRValue(base);
+        base = solution.coerceToRValue(base);
         Expr *ref = new (ctx) DynamicMemberRefExpr(base, dotLoc, memberRef,
                                                    memberLoc);
         ref->setImplicit(Implicit);
@@ -1884,7 +1884,7 @@ namespace {
 
         // If we need to load, do so now.
         if (loadImmediately) {
-          result = cs.addImplicitLoadExpr(result);
+          result = solution.addImplicitLoadExpr(result);
         }
 
         return forceUnwrapIfExpected(result, memberLocator);
@@ -2253,7 +2253,7 @@ namespace {
         // Dig the key path expression out of the arguments.
         auto *indexKP = args->getUnaryExpr();
         assert(indexKP);
-        indexKP = cs.coerceToRValue(indexKP);
+        indexKP = solution.coerceToRValue(indexKP);
         auto keyPathExprTy = cs.getType(indexKP);
         auto keyPathTy = applicationTy->getParams().front().getOldType();
 
@@ -2267,7 +2267,7 @@ namespace {
             valueTy = ctx.getAnyExistentialType();
             valueTy = OptionalType::get(valueTy);
             resultIsLValue = false;
-            base = cs.coerceToRValue(base);
+            base = solution.coerceToRValue(base);
             baseTy = cs.getType(base);
             // We don't really want to attempt AnyKeyPath application
             // if we know a more specific key path type is being applied.
@@ -2296,7 +2296,7 @@ namespace {
             // PartialKeyPath<T> is rvalue T -> rvalue Any
             valueTy = ctx.getAnyExistentialType();
             resultIsLValue = false;
-            base = cs.coerceToRValue(base);
+            base = solution.coerceToRValue(base);
           } else {
             // *KeyPath<T, U> is T -> U, with rvalueness based on mutability
             // of base and keypath
@@ -2305,12 +2305,12 @@ namespace {
             // The result may be an lvalue based on the base and key path kind.
             if (keyPathBGT->isKeyPath()) {
               resultIsLValue = false;
-              base = cs.coerceToRValue(base);
+              base = solution.coerceToRValue(base);
             } else if (keyPathBGT->isWritableKeyPath()) {
               resultIsLValue = cs.getType(base)->hasLValueType();
             } else if (keyPathBGT->isReferenceWritableKeyPath()) {
               resultIsLValue = true;
-              base = cs.coerceToRValue(base);
+              base = solution.coerceToRValue(base);
             } else {
               llvm_unreachable("unknown key path class!");
             }
@@ -2404,7 +2404,7 @@ namespace {
         if (!base)
           return nullptr;
         
-        base = cs.coerceToRValue(base);
+        base = solution.coerceToRValue(base);
       }
       if (!base)
         return nullptr;
@@ -3481,7 +3481,7 @@ namespace {
 
       switch (selected.choice.getKind()) {
       case OverloadChoiceKind::DeclViaBridge: {
-        base = cs.coerceToRValue(base);
+        base = solution.coerceToRValue(base);
 
         // Look through an implicitly unwrapped optional.
         auto baseTy = cs.getType(base);
@@ -3973,7 +3973,7 @@ namespace {
 
     Expr *visitPackElementExpr(PackElementExpr *expr) {
       if (auto *packRefExpr = expr->getPackRefExpr()) {
-        packRefExpr = cs.coerceToRValue(packRefExpr);
+        packRefExpr = solution.coerceToRValue(packRefExpr);
         auto packRefType = cs.getType(packRefExpr);
         if (auto patternType =
                 getPatternTypeOfSingleUnlabeledPackExpansionTuple(
@@ -3994,7 +3994,7 @@ namespace {
 
     Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       Expr *base = expr->getBase();
-      base = cs.coerceToRValue(base);
+      base = solution.coerceToRValue(base);
       expr->setBase(base);
 
       return simplifyExprType(expr);
@@ -4123,7 +4123,7 @@ namespace {
       auto resultTy = simplifyType(cs.getType(expr));
       cs.setType(expr, resultTy);
 
-      auto cond = cs.coerceToRValue(expr->getCondExpr());
+      auto cond = solution.coerceToRValue(expr->getCondExpr());
       expr->setCondExpr(cond);
 
       // Coerce the then/else branches to the common type.
@@ -4143,7 +4143,7 @@ namespace {
 
     Expr *visitIsExpr(IsExpr *expr) {
       // Turn the subexpression into an rvalue.
-      auto sub = cs.coerceToRValue(expr->getSubExpr());
+      auto sub = solution.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
 
       // Simplify and update the type we checked against.
@@ -4524,7 +4524,7 @@ namespace {
       }
 
       // Turn the subexpression into an rvalue.
-      auto rvalueSub = cs.coerceToRValue(expr->getSubExpr());
+      auto rvalueSub = solution.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(rvalueSub);
 
       // If we weren't explicitly told by the caller which disjunction choice,
@@ -4570,7 +4570,7 @@ namespace {
     // Rewrite ForcedCheckedCastExpr based on what the solver computed.
     Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       // The subexpression is always an rvalue.
-      auto sub = cs.coerceToRValue(expr->getSubExpr());
+      auto sub = solution.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
 
       const auto fromType = cs.getType(sub);
@@ -4634,7 +4634,7 @@ namespace {
         assert(expr->isImplicit());
         assert(expr->getCastType());
 
-        auto sub = cs.coerceToRValue(expr->getSubExpr());
+        auto sub = solution.coerceToRValue(expr->getSubExpr());
         expr->setSubExpr(sub);
 
         return expr;
@@ -4665,7 +4665,7 @@ namespace {
              "cast requires TypeRepr; implicit casts are superfluous");
 
       // The subexpression is always an rvalue.
-      auto sub = cs.coerceToRValue(expr->getSubExpr());
+      auto sub = solution.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
 
       // Simplify and update the type we're casting to.
@@ -6972,7 +6972,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   // Load tuples with lvalue elements.
   if (auto tupleType = fromType->getAs<TupleType>()) {
     if (tupleType->hasLValueType()) {
-      expr = cs.coerceToRValue(expr);
+      expr = solution.coerceToRValue(expr);
     }
   }
 
@@ -6985,10 +6985,11 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
                                           conformances, argConversions));
 }
 
-Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
+Expr *Solution::addImplicitLoadExpr(Expr *expr) {
+  auto &cs = getConstraintSystem();
   return TypeChecker::addImplicitLoadExpr(
-      getASTContext(), expr, [this](Expr *expr) { return getType(expr); },
-      [this](Expr *expr, Type type) { setType(expr, type); });
+      cs.getASTContext(), expr, [&cs](Expr *expr) { return cs.getType(expr); },
+      [&cs](Expr *expr, Type type) { cs.setType(expr, type); });
 }
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
@@ -7118,7 +7119,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::HashableToAnyHashable: {
       // We want to check conformance on the rvalue, as that's what has
       // the Hashable conformance
-      expr = cs.coerceToRValue(expr);
+      expr = solution.coerceToRValue(expr);
 
       // Find the conformance of the source type to Hashable.
       auto hashable = ctx.getProtocol(KnownProtocolKind::Hashable);
@@ -7276,7 +7277,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         argExpr = assignment->getSrc();
 
       // Load the value for conversion.
-      argExpr = cs.coerceToRValue(argExpr);
+      argExpr = solution.coerceToRValue(argExpr);
 
       auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {argExpr});
       auto *implicitInit = CallExpr::createImplicit(
@@ -7387,7 +7388,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto fromLValue = cast<LValueType>(desugaredFromType);
     auto toIO = toType->getAs<InOutType>();
     if (!toIO)
-      return coerceToType(cs.addImplicitLoadExpr(expr), toType, locator);
+      return coerceToType(solution.addImplicitLoadExpr(expr), toType, locator);
 
     // In an 'inout' operator like "i += 1", the operand is converted from
     // an implicit lvalue to an inout argument.
@@ -7433,7 +7434,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       break;
 
     if (fromTuple->hasLValueType() && !toTuple->hasLValueType())
-      return coerceToType(cs.coerceToRValue(expr), toType, locator);
+      return coerceToType(solution.coerceToRValue(expr), toType, locator);
 
     SmallVector<unsigned, 4> sources;
     if (!computeTupleShuffle(fromTuple, toTuple, sources)) {
@@ -8252,8 +8253,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         auto *args = apply->getArgs();
         assert(args->size() == 2 && "should have two arguments");
 
-        auto *existential = cs.coerceToRValue(args->getExpr(0));
-        auto *body = cs.coerceToRValue(args->getExpr(1));
+        auto *existential = solution.coerceToRValue(args->getExpr(0));
+        auto *body = solution.coerceToRValue(args->getExpr(1));
 
         auto bodyFnTy = cs.getType(body)->castTo<FunctionType>();
         auto openedTy = getBaseType(bodyFnTy, /*wantsRValue*/ false);
@@ -8339,7 +8340,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // The function is always an rvalue.
-  fn = cs.coerceToRValue(fn);
+  fn = solution.coerceToRValue(fn);
 
   // Resolve applications of decls with special semantics.
   if (auto declRef =
@@ -8920,10 +8921,11 @@ namespace {
   };
 } // end anonymous namespace
 
-Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
+Expr *Solution::coerceToRValue(Expr *expr) {
+  auto &cs = getConstraintSystem();
   return TypeChecker::coerceToRValue(
-      getASTContext(), expr, [&](Expr *expr) { return getType(expr); },
-      [&](Expr *expr, Type type) { setType(expr, type); });
+      cs.getASTContext(), expr, [&cs](Expr *expr) { return cs.getType(expr); },
+      [&cs](Expr *expr, Type type) { cs.setType(expr, type); });
 }
 
 namespace {

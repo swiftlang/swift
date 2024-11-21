@@ -1839,6 +1839,12 @@ public:
   /// expression type map.
   bool isStaticallyDerivedMetatype(Expr *E) const;
 
+  /// Coerce the given expression to an rvalue, if it isn't already.
+  Expr *coerceToRValue(Expr *expr);
+
+  /// Add implicit "load" expressions to the given expression.
+  Expr *addImplicitLoadExpr(Expr *expr);
+
   /// Build implicit autoclosure expression wrapping a given expression.
   /// Given expression represents computed result of the closure.
   ///
@@ -4235,12 +4241,6 @@ private:
   void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
 
 public:
-
-  /// Coerce the given expression to an rvalue, if it isn't already.
-  Expr *coerceToRValue(Expr *expr);
-
-  /// Add implicit "load" expressions to the given expression.
-  Expr *addImplicitLoadExpr(Expr *expr);
 
   /// "Open" the unbound generic type represented by the given declaration and
   /// parent type by introducing fresh type variables for generic parameters
