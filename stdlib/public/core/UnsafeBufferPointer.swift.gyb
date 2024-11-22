@@ -257,6 +257,13 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 
   @inlinable
   @_preInverseGenerics
+  public var indices: Range<Int> {
+    // Not checked because init forbids negative count.
+    unsafe Range(uncheckedBounds: (0, count))
+  }
+
+  @inlinable
+  @_preInverseGenerics
   public func index(after i: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for UnsafeBufferPointer performance. The
@@ -682,13 +689,6 @@ extension Unsafe${Mutable}BufferPointer:
     // NOTE: In release mode, this method is a no-op for performance reasons.
     _debugPrecondition(range.lowerBound >= bounds.lowerBound)
     _debugPrecondition(range.upperBound <= bounds.upperBound)
-  }
-
-  @inlinable // unsafe-performance
-  @safe
-  public var indices: Indices {
-    // Not checked because init forbids negative count.
-    return unsafe Indices(uncheckedBounds: (startIndex, endIndex))
   }
 
   /// Accesses a contiguous subrange of the buffer's elements.
