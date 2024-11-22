@@ -1264,6 +1264,8 @@ namespace {
         args.emplace_back(SourceLoc(), calleeParam.getLabel(), paramRef);
       }
 
+      ASSERT(appliedWrapperIndex == appliedPropertyWrappers.size());
+
       // SILGen knows how to emit property-wrapped parameters, but the
       // corresponding parameter types need to match the backing wrapper types.
       // To handle this, build a new callee function type out of the adjusted
