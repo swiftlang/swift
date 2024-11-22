@@ -1313,9 +1313,9 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
     // with the specified FileID.
     bool blessedUseSF = false;
     if (auto clangDecl = sourceNTD->getDecl()->getClangDecl()) {
-      auto blessedFileID = importer::getSwiftImplementationFileID(clangDecl);
-      blessedUseSF = !blessedFileID.empty() &&
-                     blessedFileID[0].first == useSF->getFileID();
+      auto blessedFileID = importer::getPrivateFileIDAttrs(clangDecl);
+      if (!blessedFileID.empty())
+        blessedUseSF = useSF->matchesFileID(blessedFileID[0].first);
     }
     if (!blessedUseSF)
       return false;

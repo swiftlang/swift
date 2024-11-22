@@ -643,10 +643,6 @@ public:
   /// Otherwise, return an empty string.
   StringRef getFilename() const;
 
-  // Compute the fileID of this file, if it corresponds to a file on disk.
-  // Otherwise, return an empty string.
-  SmallString<64> getFileID() const;
-
   /// Retrieve the source text buffer.
   StringRef getBuffer() const;
 
@@ -656,6 +652,14 @@ public:
   void clearScope() {
     Scope = nullptr;
   }
+
+  /// Whether the given string matches the file ID of this file.
+  bool matchesFileID(StringRef fileID) const;
+
+  /// Parses a file ID string into the module name and file name (with ".swift"
+  /// suffix). Returns nullopt if the file ID string is invalid.
+  static std::optional<std::pair<StringRef, StringRef>>
+  parseFileID(StringRef fileID);
 
   /// Retrieves the previously set delayed parser state, asserting that it
   /// exists.

@@ -729,8 +729,13 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
                                      NominalTypeDecl *selfType,
                                      std::optional<Type> parameterType);
 
+/// Read file IDs from 'private_fileid' Swift attributes on a Clang decl.
+///
+/// May return >1 fileID when a decl is annotated more than once, which should
+/// be treated as an error and appropriately diagnosed (using the included
+/// SourceLocation).
 SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
-getSwiftImplementationFileID(const clang::Decl *decl);
+getPrivateFileIDAttrs(const clang::Decl *decl);
 
 } // namespace importer
 

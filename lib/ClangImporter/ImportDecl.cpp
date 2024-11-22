@@ -2561,6 +2561,44 @@ namespace {
       return result;
     }
 
+    void validatePrivateFileIDAttributes(const clang::CXXRecordDecl *decl) {
+      auto anns = importer::getPrivateFileIDAttrs(decl);
+
+      if (anns.size() > 1) {
+        Impl.diagnose(HeaderLoc(decl->getLocation()),
+                      diag::private_fileid_attr_repeated, decl->getName());
+        for (auto ann : anns)
+          Impl.diagnose(HeaderLoc(ann.second), diag::private_fileid_attr_here);
+      } else if (anns.size() == 1) {
+        auto ann = anns[0];
+        if (!SourceFile::parseFileID(ann.first)) {
+          Impl.diagnose(HeaderLoc(ann.second),
+                        diag::private_fileid_attr_format_invalid,
+                        decl->getName());
+          Impl.diagnose({}, diag::private_fileid_attr_format_specification);
+
+          if (ann.first.count('/') > 1) {
+            // Try to construct a suggestion from predictable mistakes.
+            SmallString<32> suggestion;
+
+            // Mistake #1: confusing fileID for filePath => writing too many
+            // '/'s
+            suggestion.append(ann.first.split('/').first);
+            suggestion.push_back('/');
+            suggestion.append(ann.first.rsplit('/').second);
+
+            // Mistake #2: forgetting to use filename with .swift extension
+            if (!suggestion.ends_with(".swift"))
+              suggestion.append(".swift");
+
+            if (SourceFile::parseFileID(suggestion))
+              Impl.diagnose({}, diag::private_fileid_attr_format_suggestion,
+                            suggestion);
+          }
+        }
+      }
+    }
+
     void validateForeignReferenceType(const clang::CXXRecordDecl *decl,
                                       ClassDecl *classDecl) {
 
@@ -2751,6 +2789,16 @@ namespace {
             Diagnostic(diag::incomplete_record, Impl.SwiftContext.AllocateCopy(
                                                     decl->getNameAsString())),
             decl->getLocation());
+
+        auto privateAnnotations = importer::getPrivateFileIDAttrs(decl);
+        if (!privateAnnotations.empty()) {
+          Impl.diagnose(HeaderLoc(decl->getLocation()),
+                        diag::private_fileid_attr_on_incomplete_type,
+                        decl->getName());
+          for (auto ann : privateAnnotations)
+            Impl.diagnose(HeaderLoc(ann.second),
+                          diag::private_fileid_attr_here);
+        }
       }
 
       decl = decl->getDefinition();
@@ -2904,15 +2952,7 @@ namespace {
                              "are not yet available in Swift");
       }
 
-      auto implFileAnnotations = importer::getSwiftImplementationFileID(decl);
-      if (implFileAnnotations.size() > 1) {
-        Impl.diagnose(HeaderLoc(decl->getLocation()),
-                      diag::more_than_one_implementation_fileid_attr,
-                      decl->getName());
-        for (auto annote : implFileAnnotations)
-          Impl.diagnose(HeaderLoc(annote.second),
-                        diag::more_than_one_implementation_fileid_attr_here);
-      }
+      validatePrivateFileIDAttributes(decl);
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
         validateForeignReferenceType(decl, classDecl);

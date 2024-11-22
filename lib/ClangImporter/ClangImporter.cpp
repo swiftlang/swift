@@ -8111,9 +8111,9 @@ bool importer::isCxxConstReferenceType(const clang::Type *type) {
 }
 
 SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
-importer::getSwiftImplementationFileID(const clang::Decl *decl) {
+importer::getPrivateFileIDAttrs(const clang::Decl *decl) {
   llvm::SmallVector<std::pair<StringRef, clang::SourceLocation>, 1> files;
-  auto prefix = StringRef("implementation_file:");
+  auto prefix = StringRef("private_fileid:");
 
   if (decl->hasAttrs())
     for (const auto *attr : decl->getAttrs())

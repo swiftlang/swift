@@ -3603,16 +3603,6 @@ StringRef SourceFile::getFilename() const {
   return SM.getIdentifierForBuffer(BufferID);
 }
 
-SmallString<64> SourceFile::getFileID() const {
-  SmallString<64> result;
-  auto filename = getFilename();
-
-  if (!filename.empty())
-    computeFileID(getParentModule(), llvm::sys::path::filename(filename),
-                  result);
-  return result;
-}
-
 StringRef SourceFile::getBuffer() const {
   SourceManager &SM = getASTContext().SourceMgr;
   return SM.getEntireTextForBuffer(BufferID);
@@ -3622,6 +3612,32 @@ ASTScope &SourceFile::getScope() {
   if (!Scope)
     Scope = new (getASTContext()) ASTScope(this);
   return *Scope.get();
+}
+
+bool SourceFile::matchesFileID(StringRef fileID) const {
+  // Never match with SourceFiles that do not correpond to a file on disk
+  if (getFilename().empty())
+    return false;
+
+  auto parsed = parseFileID(fileID);
+  if (!parsed)
+    return false;
+
+  auto moduleName = parsed->first;
+  auto fileName = parsed->second;
+
+  return moduleName == getParentModule()->getNameStr() &&
+         fileName == llvm::sys::path::filename(getFilename());
+}
+
+std::optional<std::pair<StringRef, StringRef>>
+SourceFile::parseFileID(StringRef fileID) {
+  auto names = fileID.split('/');
+  auto moduleName = names.first;
+  auto fileName = names.second;
+  if (moduleName.empty() || fileName.empty() || !fileName.ends_with(".swift"))
+    return {};
+  return {{moduleName, fileName}};
 }
 
 Identifier SourceFile::getPrivateDiscriminator(bool createIfMissing) const {
