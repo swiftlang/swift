@@ -744,11 +744,13 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     }
 
     auto inner = makeParserResult(new (Context) KeyPathDotExpr(dotLoc));
+    bool unusedHasBindOptional = false;
 
     // Inside a keypath's path, the period always behaves normally: the key path
     // behavior is only the separation between type and path.
     pathResult = parseExprPostfixSuffix(inner, /*isExprBasic=*/true,
-                                        /*periodHasKeyPathBehavior=*/false);
+                                        /*periodHasKeyPathBehavior=*/false,
+                                        unusedHasBindOptional);
     parseStatus |= pathResult;
   }
 
@@ -1223,7 +1225,10 @@ getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
 
 ParserResult<Expr>
 Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
-                               bool periodHasKeyPathBehavior) {
+                               bool periodHasKeyPathBehavior,
+                               bool &hasBindOptional) {
+  hasBindOptional = false;
+
   // Handle suffix expressions.
   while (1) {
     // FIXME: Better recovery.
@@ -1309,8 +1314,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         // In this case, we want to consume the trailing closure because
         // otherwise it will get parsed as a get-set clause on a variable
         // declared by `baseExpr.<complete>` which is clearly wrong.
+        bool hasBindOptional = false;
         parseExprPostfixSuffix(makeParserResult(CCExpr), isExprBasic,
-                               periodHasKeyPathBehavior);
+                               periodHasKeyPathBehavior, hasBindOptional);
 
         return makeParserCodeCompletionResult(CCExpr);
       }
@@ -1400,6 +1406,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (consumeIf(tok::question_postfix)) {
       Result = makeParserResult(Result, new (Context) BindOptionalExpr(
                                             Result.get(), TokLoc, /*depth*/ 0));
+      hasBindOptional = true;
       continue;
     }
 
@@ -1468,14 +1475,19 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       }
 
       llvm::TinyPtrVector<ASTNode> activeElements;
+      llvm::SmallPtrSet<Expr *, 4> exprsWithBindOptional;
       auto ICD = parseIfConfig(
           IfConfigContext::PostfixExpr,
           [&](bool isActive) {
             // Although we know the '#if' body starts with period,
             // '#elseif'/'#else' bodies might start with invalid tokens.
             if (isAtStartOfPostfixExprSuffix() || Tok.is(tok::pound_if)) {
+              bool exprHasBindOptional = false;
               auto expr = parseExprPostfixSuffix(Result, isExprBasic,
-                                                 periodHasKeyPathBehavior);
+                                                 periodHasKeyPathBehavior,
+                                                 exprHasBindOptional);
+              if (exprHasBindOptional)
+                exprsWithBindOptional.insert(expr.get());
 
               if (isActive)
                 activeElements.push_back(expr.get());
@@ -1497,6 +1509,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (SourceMgr.rangeContainsIDEInspectionTarget(charRange) &&
           L->isCodeCompletion())
         status.setHasCodeCompletion();
+      hasBindOptional |= exprsWithBindOptional.contains(expr);
       Result = makeParserResult(status, expr);
       continue;
     }
@@ -1592,8 +1605,20 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   if (Result.isNull())
     return Result;
 
-  return parseExprPostfixSuffix(Result, isExprBasic,
-                                /*periodHasKeyPathBehavior=*/InSwiftKeyPath);
+  bool hasBindOptional = false;
+  Result = parseExprPostfixSuffix(Result, isExprBasic,
+                                  /*periodHasKeyPathBehavior=*/InSwiftKeyPath,
+                                  hasBindOptional);
+  if (Result.isParseErrorOrHasCompletion() || Result.hasCodeCompletion())
+    return Result;
+
+  // If we had a ? suffix expression, bind the entire postfix chain
+  // within an OptionalEvaluationExpr.
+  if (hasBindOptional) {
+    Result = makeParserResult(new (Context) OptionalEvaluationExpr(Result.get()));
+  }
+
+  return Result;
 }
 
 /// parseExprPrimary
