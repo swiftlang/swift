@@ -3038,7 +3038,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       ENCODE_VER_TUPLE(Deprecated, theAttr->Deprecated)
       ENCODE_VER_TUPLE(Obsoleted, theAttr->Obsoleted)
 
-      auto renameDeclID = S.addDeclRef(theAttr->RenameDecl);
+      assert(theAttr->Rename.empty() || !theAttr->hasCachedRenamedDecl());
+
       llvm::SmallString<32> blob;
       blob.append(theAttr->Message);
       blob.append(theAttr->Rename);
@@ -3056,7 +3057,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
           static_cast<unsigned>(theAttr->getPlatform()),
-          renameDeclID,
           theAttr->Message.size(),
           theAttr->Rename.size(),
           blob);
