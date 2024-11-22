@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 // https://github.com/apple/swift/issues/63682
 // Test that we adjust to abstraction differences when assigning in generated

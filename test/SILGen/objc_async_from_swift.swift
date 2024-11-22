@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -I %S/Inputs/custom-modules  -target %target-swift-5.1-abi-triple %s -verify | %FileCheck --implicit-check-not=hop_to_executor --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -emit-silgen -I %S/Inputs/custom-modules  -target %target-swift-5.1-abi-triple %s -verify | %FileCheck --implicit-check-not=hop_to_executor --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 

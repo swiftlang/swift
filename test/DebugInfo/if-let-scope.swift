@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -g -emit-sil %s -parse-as-library -module-name a | %FileCheck %s
+// RUN: %target-swift-frontend -g -Xllvm -sil-print-types -emit-sil %s -parse-as-library -module-name a | %FileCheck %s
 func use<T>(_ t: T) {}
 public func f(value: String?) {
   // CHECK: sil_scope [[S0:[0-9]+]] { loc "{{.*}}":3:13

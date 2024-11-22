@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -update-borrowed-from -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all -module-name Swift %s | %FileCheck %s
-// RUN: %target-sil-opt -update-borrowed-from -copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK-NOSCOPES
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all -module-name Swift %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK-NOSCOPES
 //
 // Most CopyPropagation tests are still in copy_propagation_opaque.sil.
 //

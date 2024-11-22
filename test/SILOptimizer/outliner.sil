@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -outliner %s -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -outliner %s -enable-sil-verify-all | %FileCheck %s
 
 // REQUIRES: OS=macosx
 

@@ -1504,14 +1504,23 @@ bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc,
   Loc = P.Tok.getLoc();
 
   UnresolvedValueName Name;
-  SILType Ty;
-  if (parseValueName(Name) ||
-      P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
-      parseSILType(Ty))
+  if (parseValueName(Name))
     return true;
-  
-  Result = getLocalValue(Name, Ty, RegularLocation(Loc), B);
-  return false;
+
+  if (P.consumeIf(tok::colon)) {
+    SILType Ty;
+    parseSILType(Ty);
+    Result = getLocalValue(Name, Ty, RegularLocation(Loc), B);
+    return false;
+  } else {
+    ValueBase *&Entry = LocalValues[Name.Name];
+    if (!Entry) {
+      P.diagnose(Name.NameLoc, diag::sil_forward_ref_value_needs_type, Name.Name);
+      return true;
+    }
+    Result = SILValue(Entry);
+    return false;
+  }
 }
 
 /// Look up whether the given string corresponds to a SIL opcode.
@@ -7432,6 +7441,15 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     }
 
     FunctionState.F->setLinkage(resolveSILLinkage(FnLinkage, isDefinition));
+    switch (FunctionState.F->getLinkage()) {
+    case SILLinkage::PublicExternal:
+    case SILLinkage::PackageExternal:
+      if (!FunctionState.F->isExternalDeclaration() && !FunctionState.F->isAnySerialized())
+        FunctionState.F->getModule().setParsedAsSerializedSIL();
+      break;
+    default:
+      break;
+    }
   }
 
   if (FunctionState.diagnoseProblems())

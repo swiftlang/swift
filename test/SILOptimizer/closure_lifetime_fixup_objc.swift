@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -sil-verify-all -emit-sil -enable-copy-propagation=false -o - -I %S/Inputs/usr/include | %FileCheck %s
+// RUN: %target-swift-frontend %s -sil-verify-all -Xllvm -sil-print-types -emit-sil -enable-copy-propagation=false -o - -I %S/Inputs/usr/include | %FileCheck %s
 // REQUIRES: objc_interop
 
 // REQUIRES: swift_in_compiler

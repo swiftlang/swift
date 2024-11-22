@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s --check-prefix=CHECK-SILGEN
-// RUN: %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil %s | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s --check-prefix=CHECK-SILGEN
+// RUN: %target-swift-frontend -enable-experimental-forward-mode-differentiation -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=CHECK-SIL
 
 // Simple differentiation transform test: check SIL before and after the transform.
 
