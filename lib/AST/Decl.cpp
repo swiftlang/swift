@@ -979,7 +979,7 @@ const ExternalSourceLocs *Decl::getSerializedLocs() const {
 StringRef Decl::getAlternateModuleName() const {
   for (auto *Att: Attrs) {
     if (auto *OD = dyn_cast<OriginallyDefinedInAttr>(Att)) {
-      if (OD->isActivePlatform(getASTContext())) {
+      if (!OD->isInvalid() && OD->isActivePlatform(getASTContext())) {
         return OD->OriginalModuleName;
       }
     }
