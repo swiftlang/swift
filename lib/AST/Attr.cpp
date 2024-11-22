@@ -1113,7 +1113,8 @@ ParsedDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
   return Attr;
 }
 
-static void printAvailableAttr(const AvailableAttr *Attr, ASTPrinter &Printer,
+static void printAvailableAttr(const Decl *D, const AvailableAttr *Attr,
+                               ASTPrinter &Printer,
                                const PrintOptions &Options) {
   if (Attr->isLanguageVersionSpecific())
     Printer << "swift";
@@ -1138,17 +1139,19 @@ static void printAvailableAttr(const AvailableAttr *Attr, ASTPrinter &Printer,
 
   if (!Attr->Rename.empty()) {
     Printer << ", renamed: \"" << Attr->Rename << "\"";
-  } else if (Attr->RenameDecl) {
-    Printer << ", renamed: \"";
-    if (auto *Accessor = dyn_cast<AccessorDecl>(Attr->RenameDecl)) {
-      SmallString<32> Name;
-      llvm::raw_svector_ostream OS(Name);
-      Accessor->printUserFacingName(OS);
-      Printer << Name.str();
-    } else {
-      Printer << Attr->RenameDecl->getName();
+  } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (auto *renamedDecl = VD->getRenamedDecl(Attr)) {
+      Printer << ", renamed: \"";
+      if (auto *Accessor = dyn_cast<AccessorDecl>(renamedDecl)) {
+        SmallString<32> Name;
+        llvm::raw_svector_ostream OS(Name);
+        Accessor->printUserFacingName(OS);
+        Printer << Name.str();
+      } else {
+        Printer << renamedDecl->getName();
+      }
+      Printer << "\"";
     }
-    Printer << "\"";
   }
 
   // If there's no message, but this is specifically an imported
@@ -1365,7 +1368,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer.printAttrName("@available");
     }
     Printer << "(";
-    printAvailableAttr(Attr, Printer, Options);
+    printAvailableAttr(D, Attr, Printer, Options);
     Printer << ")";
     break;
   }
@@ -1464,7 +1467,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << "availability: ";
       auto numAttrs = availAttrs.size();
       if (numAttrs == 1) {
-        printAvailableAttr(availAttrs[0], Printer, Options);
+        printAvailableAttr(D, availAttrs[0], Printer, Options);
         Printer << "; ";
       } else {
         SmallVector<const DeclAttribute *, 8> tmp(availAttrs.begin(),

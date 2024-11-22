@@ -235,7 +235,9 @@ void AvailabilityInference::applyInferredAvailableAttrs(
 
         if (Rename.empty() && !AvAttr->Rename.empty()) {
           Rename = AvAttr->Rename;
-          RenameDecl = AvAttr->RenameDecl;
+          if (auto *VD = dyn_cast<ValueDecl>(D)) {
+            RenameDecl = VD->getRenamedDecl(AvAttr);
+          }
         }
       }
 
