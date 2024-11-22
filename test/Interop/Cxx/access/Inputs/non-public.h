@@ -11,18 +11,18 @@
 #define TEST_PRIVATE private
 #endif
 
-#define members(prefix) \
-  void prefix##Method(void) const { } \
-  void prefix##MutatingMethod(void) { } \
-  int prefix##Var; \
-  static void prefix##StaticFunc(void); \
-  static int prefix##StaticVar; \
-  enum prefix##Enum { prefix##EnumCase }; \
-  typedef int prefix##Typedef; \
-  struct prefix##Struct { }
+#define members(prefix)                                                        \
+  void prefix##Method(void) const {}                                           \
+  void prefix##MutatingMethod(void) {}                                         \
+  int prefix##Var;                                                             \
+  static void prefix##StaticFunc(void);                                        \
+  static int prefix##StaticVar;                                                \
+  enum prefix##Enum{prefix##EnumCase};                                         \
+  typedef int prefix##Typedef;                                                 \
+  struct prefix##Struct {}
 
-TEST_CLASS __attribute__((__swift_attr__("private_fileid:main/blessed.swift")))
-MyClass {
+TEST_CLASS __attribute__((
+    __swift_attr__("private_fileid:main/blessed.swift"))) MyClass {
 public:
   members(pub);
 TEST_PRIVATE:
