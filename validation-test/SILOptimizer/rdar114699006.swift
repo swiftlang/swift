@@ -6,6 +6,7 @@
 // RUN:     -target x86_64-apple-macos10.13 \
 // RUN:     -emit-ir           \
 // RUN:     -o /dev/null       \
+// RUN:     -Xllvm -sil-print-types \
 // RUN:     -Xllvm -sil-print-function='$s4main1CCACycfc' \
 // RUN:     2>&1 | %FileCheck %s
 
