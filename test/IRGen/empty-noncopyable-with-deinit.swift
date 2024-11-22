@@ -5,6 +5,10 @@
 // CHECK: [[BOX_3:@[A-Za-z0-9.]+]] = private constant %swift.full_boxmetadata { ptr [[DESTROY_BOX_3:@[A-Za-z0-9.]+]],
 // CHECK: [[BOX_4:@[A-Za-z0-9.]+]] = private constant %swift.full_boxmetadata { ptr [[DESTROY_BOX_4:@[A-Za-z0-9.]+]],
 
+// We don't really need to test arm64e, and doing so would mean tweaking the
+// test to cope with ptrauth.
+// UNSUPPORTED: CPU=arm64e
+
 @_silgen_name("mystery_destroy")
 func mystery_destroy() {}
 
