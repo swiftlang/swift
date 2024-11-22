@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 // Make sure we do not call the getter to get the oldValue and pass it to didSet
 // when the didSet does not reference the oldValue in its body.

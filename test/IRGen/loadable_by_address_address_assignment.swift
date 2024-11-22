@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s  -O -Xllvm -sil-print-after=loadable-address -c -o %t/t.o 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s  -O -Xllvm -sil-print-types -Xllvm -sil-print-after=loadable-address -c -o %t/t.o 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -emit-sil -enable-experimental-feature IsolatedDeinit | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -Xllvm -sil-print-types -emit-sil -enable-experimental-feature IsolatedDeinit | %FileCheck %s
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_IsolatedDeinit
 

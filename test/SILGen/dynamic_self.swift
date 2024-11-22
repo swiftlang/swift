@@ -1,9 +1,9 @@
-// RUN: %target-swift-emit-silgen -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -swift-version 4 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -swift-version 4 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: %target-swift-emit-ir -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
-// RUN: %target-swift-emit-silgen -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -swift-version 5 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -swift-version 5 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: %target-swift-emit-ir -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 protocol P {

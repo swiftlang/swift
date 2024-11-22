@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -I %S/../IDE/Inputs/custom-modules %s -enable-objc-interop -I %S/Inputs/usr/include | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %S/../IDE/Inputs/custom-modules %s -enable-objc-interop -I %S/Inputs/usr/include | %FileCheck %s
 
 import ImportAsMember
 

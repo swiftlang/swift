@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -opt-mode=none -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
-// RUN: %target-sil-opt -opt-mode=speed -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
+// RUN: %target-sil-opt -sil-print-types -opt-mode=none -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
+// RUN: %target-sil-opt -sil-print-types -opt-mode=speed -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
 
 import Builtin
 

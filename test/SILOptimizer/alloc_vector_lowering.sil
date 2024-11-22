@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -alloc-vector-lowering -enable-experimental-feature FixedArrays | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -alloc-vector-lowering -enable-experimental-feature FixedArrays | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_FixedArrays

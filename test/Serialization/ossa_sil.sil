@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-module -module-name ossa -o %t/ossa.swiftmodule %s
-// RUN: %target-sil-opt %t/ossa.swiftmodule | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %t/ossa.swiftmodule | %FileCheck %s
 
 sil_stage canonical
 

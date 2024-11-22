@@ -6,10 +6,10 @@
 // RUN: -parse-as-library -emit-module -emit-module-path %t/Lib.swiftmodule -I%t \
 // RUN: -Xfrontend -experimental-package-cmo -Xfrontend -experimental-allow-non-resilient-access \
 // RUN: -O -wmo -enable-library-evolution
-// RUN: %target-sil-opt %t/Lib.swiftmodule -sil-verify-all -o %t/Lib.sil
+// RUN: %target-sil-opt -sil-print-types %t/Lib.swiftmodule -sil-verify-all -o %t/Lib.sil
 
-// RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -emit-silgen %t/main.swift -o %t/MAIN.sil
-// RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -emit-sil -O %t/main.swift -o %t/Main-opt.sil
+// RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -Xllvm -sil-print-types -emit-silgen %t/main.swift -o %t/MAIN.sil
+// RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -Xllvm -sil-print-types -emit-sil -O %t/main.swift -o %t/Main-opt.sil
 
 // RUN: %FileCheck %s --check-prefix=CHECK < %t/Lib.sil
 // RUN: %FileCheck %s --check-prefix=CHECK-MAIN-OPT < %t/Main-opt.sil
