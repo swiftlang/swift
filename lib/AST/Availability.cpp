@@ -183,13 +183,10 @@ static AvailableAttr *createAvailableAttr(PlatformKind Platform,
       Inferred.Obsoleted.value_or(llvm::VersionTuple());
 
   return new (Context)
-      AvailableAttr(SourceLoc(), SourceRange(), Platform,
-                    Message, Rename, RenameDecl,
-                    Introduced, /*IntroducedRange=*/SourceRange(),
-                    Deprecated, /*DeprecatedRange=*/SourceRange(),
-                    Obsoleted, /*ObsoletedRange=*/SourceRange(),
-                    Inferred.PlatformAgnostic, /*Implicit=*/true,
-                    Inferred.IsSPI);
+      AvailableAttr(SourceLoc(), SourceRange(), Platform, Message, Rename,
+                    Introduced, SourceRange(), Deprecated, SourceRange(),
+                    Obsoleted, SourceRange(), Inferred.PlatformAgnostic,
+                    /*Implicit=*/true, Inferred.IsSPI);
 }
 
 void AvailabilityInference::applyInferredAvailableAttrs(
@@ -246,6 +243,7 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   }
 
   DeclAttributes &Attrs = ToDecl->getAttrs();
+  auto *ToValueDecl = dyn_cast<ValueDecl>(ToDecl);
 
   // Create an availability attribute for each observed platform and add
   // to ToDecl.
@@ -253,8 +251,12 @@ void AvailabilityInference::applyInferredAvailableAttrs(
     auto *Attr = createAvailableAttr(Pair.first, Pair.second, Message,
                                      Rename, RenameDecl, Context);
 
-    if (Attr)
+    if (Attr) {
+      if (RenameDecl && ToValueDecl)
+        ToValueDecl->setRenamedDecl(Attr, RenameDecl);
+
       Attrs.add(Attr);
+    }
   }
 }
 

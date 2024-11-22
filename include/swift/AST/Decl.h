@@ -3266,6 +3266,11 @@ public:
   /// Performs a request to look up the decl that this decl has been renamed to
   /// if `attr` indicates that it has been renamed.
   ValueDecl *getRenamedDecl(const AvailableAttr *attr) const;
+
+  /// Directly sets the renamed decl corresponding to `attr`. This should only
+  /// be used when synthesizing an `AvailableAttr`, before calling
+  /// `getRenamedDecl()`.
+  void setRenamedDecl(const AvailableAttr *attr, ValueDecl *renameDecl) const;
 };
 
 /// This is a common base class for declarations which declare a type.

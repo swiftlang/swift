@@ -5657,9 +5657,9 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     platformAgnostic = PlatformAgnosticAvailabilityKind::None;
 
   auto attr = new (ctx) AvailableAttr(
-      SourceLoc(), SourceRange(), platform, message, rename, renameDecl,
-      Introduced, SourceRange(), Deprecated, SourceRange(), Obsoleted,
-      SourceRange(), platformAgnostic, isImplicit, isSPI, isForEmbedded);
+      SourceLoc(), SourceRange(), platform, message, rename, Introduced,
+      SourceRange(), Deprecated, SourceRange(), Obsoleted, SourceRange(),
+      platformAgnostic, isImplicit, isSPI, isForEmbedded);
   return attr;
 }
 

@@ -2226,14 +2226,14 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
 
 AvailableAttr::AvailableAttr(
     SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
-    StringRef Message, StringRef Rename, ValueDecl *RenameDecl,
+    StringRef Message, StringRef Rename,
     const llvm::VersionTuple &Introduced, SourceRange IntroducedRange,
     const llvm::VersionTuple &Deprecated, SourceRange DeprecatedRange,
     const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
     PlatformAgnosticAvailabilityKind PlatformAgnostic, bool Implicit,
     bool IsSPI, bool IsForEmbedded)
     : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
-      Message(Message), Rename(Rename), RenameDecl(RenameDecl),
+      Message(Message), Rename(Rename),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange) {
@@ -2265,23 +2265,10 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
     assert(!Obsoleted.empty());
   }
   return new (C) AvailableAttr(
-    SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename, nullptr,
-    NoVersion, SourceRange(),
-    NoVersion, SourceRange(),
-    Obsoleted, SourceRange(),
-    Kind, /* isImplicit */ false, /*SPI*/false);
-}
-
-AvailableAttr *
-AvailableAttr::createForAsyncAlternative(ASTContext &C,
-                                         AbstractFunctionDecl *AsyncFunc) {
-  llvm::VersionTuple NoVersion;
-  return new (C) AvailableAttr(
-    SourceLoc(), SourceRange(), PlatformKind::none, "", "", AsyncFunc,
-    NoVersion, SourceRange(),
-    NoVersion, SourceRange(),
-    NoVersion, SourceRange(),
-    PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true, /*SPI*/false);
+      SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
+      /*Introduced=*/NoVersion, SourceRange(), /*Deprecated=*/NoVersion,
+      SourceRange(), Obsoleted, SourceRange(), Kind, /*Implicit=*/false,
+      /*SPI=*/false);
 }
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
@@ -2294,19 +2281,16 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 }
 
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
-  return new (C) AvailableAttr(implicit ? SourceLoc() : AtLoc,
-                               implicit ? SourceRange() : getRange(),
-                               getPlatform(), Message, Rename, RenameDecl,
-                               Introduced ? *Introduced : llvm::VersionTuple(),
-                               implicit ? SourceRange() : IntroducedRange,
-                               Deprecated ? *Deprecated : llvm::VersionTuple(),
-                               implicit ? SourceRange() : DeprecatedRange,
-                               Obsoleted ? *Obsoleted : llvm::VersionTuple(),
-                               implicit ? SourceRange() : ObsoletedRange,
-                               getPlatformAgnosticAvailability(),
-                               implicit,
-                               isSPI(),
-                               isForEmbedded());
+  return new (C) AvailableAttr(
+      implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
+      getPlatform(), Message, Rename,
+      Introduced ? *Introduced : llvm::VersionTuple(),
+      implicit ? SourceRange() : IntroducedRange,
+      Deprecated ? *Deprecated : llvm::VersionTuple(),
+      implicit ? SourceRange() : DeprecatedRange,
+      Obsoleted ? *Obsoleted : llvm::VersionTuple(),
+      implicit ? SourceRange() : ObsoletedRange,
+      getPlatformAgnosticAvailability(), implicit, isSPI(), isForEmbedded());
 }
 
 std::optional<OriginallyDefinedInAttr::ActiveVersion>
