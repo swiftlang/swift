@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRGenDebugInfo.h"
+#include "DebugTypeInfo.h"
 #include "GenEnum.h"
 #include "GenOpaque.h"
 #include "GenStruct.h"
@@ -23,13 +24,17 @@
 #include "IRBuilder.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Attr.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
@@ -61,6 +66,7 @@
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -68,6 +74,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include <cstddef>
 
 #define DEBUG_TYPE "debug-info"
 
@@ -150,6 +157,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::DenseMap<const void *, llvm::TrackingMDNodeRef> DIModuleCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIFileCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> RuntimeErrorFnCache;
+  llvm::StringSet<> OriginallyDefinedInTypes;
   TrackingDIRefMap DIRefMap;
   TrackingDIRefMap InnerTypeCache;
   /// \}
@@ -1026,9 +1034,12 @@ private:
     Mangle::ASTMangler Mangler;
     std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
 
+    bool IsTypeOriginallyDefinedIn =
+        containsOriginallyDefinedIn(DbgTy.getType());
     // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
+    // There's no way to round trip when respecting @_originallyDefinedIn for a type.
     if (!Opts.DisableRoundTripDebugTypes &&
-        !Ty->getASTContext().LangOpts.EnableCXXInterop) {
+        !Ty->getASTContext().LangOpts.EnableCXXInterop && !IsTypeOriginallyDefinedIn) {
       // Make sure we can reconstruct mangled types for the debugger.
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, Result, Sig);
@@ -1506,7 +1517,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
   /// anchor any typedefs that may appear in parameters so they can be
   /// resolved in the debugger without needing to query the Swift module.
   llvm::DINodeArray
-  collectGenericParams(NominalOrBoundGenericNominalType *BGT) {
+  collectGenericParams(NominalOrBoundGenericNominalType *BGT, bool AsForwardDeclarations = false) {
 
     // Collect the generic args from the type and its parent.
     std::vector<Type> GenericArgs;
@@ -1521,7 +1532,8 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     SmallVector<llvm::Metadata *, 16> TemplateParams;
     for (auto Arg : GenericArgs) {
       DebugTypeInfo ParamDebugType;
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes &&
+          !AsForwardDeclarations)
         // For the DwarfTypes level don't generate just a forward declaration
         // for the generic type parameters.
         ParamDebugType = DebugTypeInfo::getFromTypeInfo(
@@ -1789,26 +1801,6 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     }
 
     llvm::DIType *SpecificationOf = nullptr;
-    if (auto *TypeDecl = DbgTy.getType()->getNominalOrBoundGenericNominal()) {
-      // If this is a nominal type that has the @_originallyDefinedIn attribute,
-      // IRGenDebugInfo emits a forward declaration of the type as a child
-      // of the original module, and the type with a specification pointing to
-      // the forward declaraation. We do this so LLDB has enough information to
-      // both find the type in reflection metadata (the parent module name) and
-      // find it in the swiftmodule (the module name in the type mangled name).
-      if (auto Attribute =
-              TypeDecl->getAttrs().getAttribute<OriginallyDefinedInAttr>()) {
-        auto Identifier = IGM.getSILModule().getASTContext().getIdentifier(
-            Attribute->OriginalModuleName);
-
-        void *Key = (void *)Identifier.get();
-        auto InnerScope =
-            getOrCreateModule(Key, TheCU, Attribute->OriginalModuleName, {});
-        SpecificationOf = DBuilder.createForwardDecl(
-            llvm::dwarf::DW_TAG_structure_type, TypeDecl->getNameStr(),
-            InnerScope, File, 0, llvm::dwarf::DW_LANG_Swift, 0, 0);
-      }
-    }
 
     // Here goes!
     switch (BaseTy->getKind()) {
@@ -2338,6 +2330,106 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     }
   }
 
+  /// Returns true if the type's mangled name is affected by an
+  /// @_originallyDefinedIn annotation. This annotation can be on the type
+  /// itself, one of its generic arguments, etc.
+  bool containsOriginallyDefinedIn(Type T) {
+    if (auto *MT = llvm::dyn_cast<MetatypeType>(T))
+      if (containsOriginallyDefinedIn(MT->getInstanceType()))
+        return true;
+    ;
+
+    auto *TypeDecl = T->getNominalOrBoundGenericNominal();
+    if (!TypeDecl)
+      return false;
+
+    // Find the outermost type, since only those can be annotated with
+    // @_originallyDefinedIn.
+    NominalTypeDecl *ParentDecl = TypeDecl;
+    while (llvm::isa_and_nonnull<NominalTypeDecl>(ParentDecl->getParent()))
+      ParentDecl = llvm::cast<NominalTypeDecl>(ParentDecl->getParent());
+
+    if (ParentDecl->getAttrs().hasAttribute<OriginallyDefinedInAttr>())
+      return true;
+
+    // If the type is a bound generic, the type of the substituted generic
+    // arguments might be annotated with @_originallyDefinedIn.
+    if (auto *BGT = llvm::dyn_cast<BoundGenericType>(T))
+      for (auto &Arg : BGT->getGenericArgs())
+        if (containsOriginallyDefinedIn(Arg))
+          return true;
+
+    // A typealias inside a function mentions the function's signature, so check
+    // if any types in the generic signature are annotated with
+    // @_originallyDefinedIn.
+    if (auto *TAT = llvm::dyn_cast<TypeAliasType>(T)) {
+      auto D = TAT->getDecl()->getDeclContext();
+      if (auto AFD = llvm::dyn_cast<AbstractFunctionDecl>(D)) {
+        for (auto &Param : *AFD->getParameters())
+          if (containsOriginallyDefinedIn(Param->getInterfaceType()))
+            return true;
+
+        for (auto &Req : AFD->getGenericSignature().getRequirements())
+          if (containsOriginallyDefinedIn(Req.getFirstType()) ||
+              containsOriginallyDefinedIn(Req.getSecondType()))
+            return true;
+
+        if (auto FD = llvm::dyn_cast<FuncDecl>(D))
+          if (containsOriginallyDefinedIn(FD->getResultInterfaceType()))
+            return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// Returns the decl of the type's parent chain annotated by
+  /// @_originallyDefinedIn. Returns null if no type is annotated.
+  NominalTypeDecl *getDeclAnnotatedByOriginallyDefinedIn(DebugTypeInfo DbgTy) {
+    auto Type = DbgTy.getType();
+    auto *TypeDecl = Type->getNominalOrBoundGenericNominal();
+    if (!TypeDecl)
+      return nullptr;
+
+    // Find the outermost type, since only those can have @_originallyDefinedIn
+    // attached to them.
+    NominalTypeDecl *ParentDecl = TypeDecl;
+    while (llvm::isa_and_nonnull<NominalTypeDecl>(ParentDecl->getParent()))
+      ParentDecl = llvm::cast<NominalTypeDecl>(ParentDecl->getParent());
+
+    if (ParentDecl->getAttrs().hasAttribute<OriginallyDefinedInAttr>())
+      return ParentDecl;;
+
+    return nullptr;
+  }
+
+  /// If this is a nominal type that has the @_originallyDefinedIn
+  /// attribute, IRGenDebugInfo emits an imported declaration of the type as
+  /// a child of the real module. We do this so LLDB has enough
+  /// information to both find the type in reflection metadata (the module name
+  /// in the type's mangled name), and find it in the swiftmodule (the type's
+  /// imported declaration's parent module name).
+  void handleOriginallyDefinedIn(DebugTypeInfo DbgTy, llvm::DIType *DITy,
+                                 StringRef MangledName, llvm::DIFile *File) {
+    if (OriginallyDefinedInTypes.contains(MangledName))
+      return;
+
+    // Force the generation of the generic type parameters as forward
+    // declarations, as those types might be annotated with
+    // @_originallyDefinedIn.
+    if (auto *BoundDecl = llvm::dyn_cast<BoundGenericType>(DbgTy.getType()))
+      collectGenericParams(BoundDecl, /*AsForwardDeclarations=*/true);
+
+    NominalTypeDecl *OriginallyDefinedInDecl = getDeclAnnotatedByOriginallyDefinedIn(DbgTy);
+    if (!OriginallyDefinedInDecl)
+      return;
+
+    // Emit the imported declaration under the real swiftmodule the type lives on.
+    auto RealModule = getOrCreateContext(OriginallyDefinedInDecl->getParent());
+    DBuilder.createImportedDeclaration(RealModule, DITy, File, 0, MangledName);
+    OriginallyDefinedInTypes.insert(MangledName);
+  }
+
   llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy,
                                 llvm::DIScope *Scope = nullptr) {
     // Is this an empty type?
@@ -2382,7 +2474,18 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       ClangDecl = AliasDecl->getClangDecl();
     } else if (auto *ND = DbgTy.getType()->getNominalOrBoundGenericNominal()) {
       TypeDecl = ND;
-      Context = ND->getParent();
+      // If this is an originally defined in type, we want to emit this type's scope 
+      // to be the ABI module.
+      if (auto Attribute =
+              ND->getAttrs().getAttribute<OriginallyDefinedInAttr>()) {
+        auto Identifier = IGM.getSILModule().getASTContext().getIdentifier(
+            Attribute->OriginalModuleName);
+        void *Key = (void *)Identifier.get();
+        Scope =
+            getOrCreateModule(Key, TheCU, Attribute->OriginalModuleName, {});
+      } else {
+        Context = ND->getParent();
+      }
       ClangDecl = ND->getClangDecl();
     } else if (auto BNO = dyn_cast<BuiltinType>(DbgTy.getType())) {
       Context = BNO->getASTContext().TheBuiltinModule;
@@ -2431,6 +2534,8 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       FwdDeclTypes.emplace_back(
           std::piecewise_construct, std::make_tuple(MangledName),
           std::make_tuple(static_cast<llvm::Metadata *>(FwdDecl)));
+
+      handleOriginallyDefinedIn(DbgTy, FwdDecl, MangledName, getFile(Scope));
       return FwdDecl;
     }
     llvm::DIType *DITy = createType(DbgTy, MangledName, Scope, getFile(Scope));
@@ -2459,6 +2564,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     // Store it in the cache.
     DITypeCache.insert({DbgTy.getType(), llvm::TrackingMDNodeRef(DITy)});
 
+    handleOriginallyDefinedIn(DbgTy, DITy, MangledName, getFile(Scope));
     return DITy;
   }
 };
