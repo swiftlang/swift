@@ -8688,28 +8688,12 @@ void ClangImporter::Implementation::importBoundsAttributes(
   auto &sourceFile = getClangSwiftAttrSourceFile(
       *MappedDecl->getDeclContext()->getParentModule(), MacroString);
 
-  // Spin up a parser.
-  swift::Parser parser(sourceFile.getBufferID(), sourceFile,
-                       &SwiftContext.Diags, nullptr, nullptr);
-  // Prime the lexer.
-  parser.consumeTokenWithoutFeedingReceiver();
-
-  bool hadError = false;
-  assert(parser.Tok.is(tok::at_sign));
-  SourceLoc atEndLoc = parser.Tok.getRange().getEnd();
-  SourceLoc atLoc = parser.consumeToken(tok::at_sign);
-  DeclContext *DC = MappedDecl->getParent();
-  auto initContext = PatternBindingInitializer::create(DC);
-  hadError = parser
-                 .parseDeclAttribute(MappedDecl->getAttrs(), atLoc, atEndLoc,
-                                     initContext,
-                                     /*isFromClangAttribute=*/true)
-                 .isError();
-  if (hadError) {
-    HeaderLoc attrLoc(ClangDecl->getLocation());
-    diagnose(attrLoc, diag::clang_pointer_bounds_unhandled,
-             MappedDecl->getName(), MacroString);
-    return;
+  // Collect the attributes from the synthesized top-level declaration in
+  // the source file.
+  auto topLevelDecls = sourceFile.getTopLevelDecls();
+  for (auto decl : topLevelDecls) {
+    for (auto attr : decl->getAttrs())
+      MappedDecl->getAttrs().add(attr->clone(SwiftContext));
   }
 }
 

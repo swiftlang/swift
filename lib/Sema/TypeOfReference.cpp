@@ -983,6 +983,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     return { openedType, openedType, openedType, openedType, Type() };
   }
 
+  // FIXME: implement this properly
+  if (auto enumElem = dyn_cast<EnumElementDecl>(value)) {
+    Type interfaceType = enumElem->getInterfaceType();
+    return {interfaceType, interfaceType, interfaceType, interfaceType, Type()};
+  }
+
   // Only remaining case: unqualified reference to a property.
   auto *varDecl = cast<VarDecl>(value);
 
