@@ -233,9 +233,7 @@ Type SubstitutionMap::lookupSubstitution(GenericTypeParamType *genericParam) con
 
 ProtocolConformanceRef
 SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
-  ASSERT(type->isTypeParameter());
-
-  if (empty())
+  if (!type->isTypeParameter() || empty())
     return ProtocolConformanceRef::forInvalid();
 
   auto genericSig = getGenericSignature();
