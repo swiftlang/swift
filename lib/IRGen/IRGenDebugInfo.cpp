@@ -23,13 +23,17 @@
 #include "IRBuilder.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Attr.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
@@ -137,7 +141,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
       return Line == other.Line && Column == other.Column && File == other.File;
     }
   };
-  
+
   /// Various caches.
   /// \{
   llvm::StringSet<> VarNames;
@@ -150,6 +154,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::DenseMap<const void *, llvm::TrackingMDNodeRef> DIModuleCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIFileCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> RuntimeErrorFnCache;
+  llvm::StringSet<> OriginallyDefinedInTypes;
   TrackingDIRefMap DIRefMap;
   TrackingDIRefMap InnerTypeCache;
   /// \}
@@ -1026,9 +1031,12 @@ private:
     Mangle::ASTMangler Mangler(IGM.Context);
     std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
 
+    bool IsTypeOriginallyDefinedIn =
+        containsOriginallyDefinedIn(DbgTy.getType());
     // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
+    // There's no way to round trip when respecting @_originallyDefinedIn for a type.
     if (!Opts.DisableRoundTripDebugTypes &&
-        !Ty->getASTContext().LangOpts.EnableCXXInterop) {
+        !Ty->getASTContext().LangOpts.EnableCXXInterop && !IsTypeOriginallyDefinedIn) {
       // Make sure we can reconstruct mangled types for the debugger.
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, Result, Sig);
@@ -1507,7 +1515,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
   /// anchor any typedefs that may appear in parameters so they can be
   /// resolved in the debugger without needing to query the Swift module.
   llvm::DINodeArray
-  collectGenericParams(NominalOrBoundGenericNominalType *BGT) {
+  collectGenericParams(NominalOrBoundGenericNominalType *BGT, bool AsForwardDeclarations = false) {
 
     // Collect the generic args from the type and its parent.
     std::vector<Type> GenericArgs;
@@ -1522,7 +1530,8 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     SmallVector<llvm::Metadata *, 16> TemplateParams;
     for (auto Arg : GenericArgs) {
       DebugTypeInfo ParamDebugType;
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes &&
+          !AsForwardDeclarations)
         // For the DwarfTypes level don't generate just a forward declaration
         // for the generic type parameters.
         ParamDebugType = DebugTypeInfo::getFromTypeInfo(
@@ -1790,39 +1799,19 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     }
 
     llvm::DIType *SpecificationOf = nullptr;
-    if (auto *TypeDecl = DbgTy.getType()->getNominalOrBoundGenericNominal()) {
-      // If this is a nominal type that has the @_originallyDefinedIn attribute,
-      // IRGenDebugInfo emits a forward declaration of the type as a child
-      // of the original module, and the type with a specification pointing to
-      // the forward declaraation. We do this so LLDB has enough information to
-      // both find the type in reflection metadata (the parent module name) and
-      // find it in the swiftmodule (the module name in the type mangled name).
-      if (auto Attribute =
-              TypeDecl->getAttrs().getAttribute<OriginallyDefinedInAttr>()) {
-        auto Identifier = IGM.getSILModule().getASTContext().getIdentifier(
-            Attribute->OriginalModuleName);
-
-        void *Key = (void *)Identifier.get();
-        auto InnerScope =
-            getOrCreateModule(Key, TheCU, Attribute->OriginalModuleName, {});
-        SpecificationOf = DBuilder.createForwardDecl(
-            llvm::dwarf::DW_TAG_structure_type, TypeDecl->getNameStr(),
-            InnerScope, File, 0, llvm::dwarf::DW_LANG_Swift, 0, 0);
-      }
-    }
 
     // Here goes!
     switch (BaseTy->getKind()) {
     case TypeKind::BuiltinUnboundGeneric:
       llvm_unreachable("not a real type");
-      
+
     case TypeKind::BuiltinFixedArray: {
       // TODO: provide proper array debug info
       unsigned FwdDeclLine = 0;
       return createOpaqueStruct(Scope, "Builtin.FixedArray", MainFile, FwdDeclLine,
                                 SizeInBits, AlignInBits, Flags, MangledName);
     }
-    
+
     case TypeKind::BuiltinPackIndex:
     case TypeKind::BuiltinInteger: {
       Encoding = llvm::dwarf::DW_ATE_unsigned;
@@ -1846,7 +1835,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       break;
     }
 
-    case TypeKind::BuiltinNativeObject: 
+    case TypeKind::BuiltinNativeObject:
     case TypeKind::BuiltinBridgeObject:
     case TypeKind::BuiltinRawPointer:
     case TypeKind::BuiltinRawUnsafeContinuation:
@@ -1928,7 +1917,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       assert(SizeInBits ==
              CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
-        if (ClassTy->isSpecialized()) 
+        if (ClassTy->isSpecialized())
           return createSpecializedStructOrClassType(
               ClassTy, Decl, Scope, L.File, L.Line, SizeInBits, AlignInBits,
               Flags, MangledName);
@@ -2011,7 +2000,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       auto L = getFileAndLocation(Decl);
       unsigned FwdDeclLine = 0;
 
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) 
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
         return createSpecializedStructOrClassType(
             ClassTy, Decl, Scope, L.File, L.Line, SizeInBits, AlignInBits,
             Flags, MangledName);
@@ -2315,8 +2304,8 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     unsigned CachedSizeInBits = getSizeInBits(CachedType);
     if ((SizeInBits && CachedSizeInBits != *SizeInBits) ||
         (!SizeInBits && CachedSizeInBits)) {
-      // In some situation a specialized type is emitted with size 0, even if the real 
-      // type has a size.
+      // In some situation a specialized type is emitted with size 0, even if
+      // the real type has a size.
       if (DbgTy.getType()->isSpecialized() && SizeInBits && *SizeInBits > 0 &&
           CachedSizeInBits == 0)
         return true;
@@ -2336,13 +2325,110 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
   /// needed to correctly calculate the layout of more complex types built on
   /// top of them.
   void createSpecialStlibBuiltinTypes() {
-    if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::ASTTypes) 
+    if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::ASTTypes)
       return;
     for (auto BuiltinType: IGM.getOrCreateSpecialStlibBuiltinTypes()) {
       auto DbgTy = DebugTypeInfo::getFromTypeInfo(
           BuiltinType, IGM.getTypeInfoForUnlowered(BuiltinType), IGM);
       DBuilder.retainType(getOrCreateType(DbgTy));
     }
+  }
+
+  /// A TypeWalker that finds if a given type's mangling is affected by an
+  /// @_originallyDefinedIn annotation.
+  struct OriginallyDefinedInFinder : public TypeWalker {
+    bool visitedOriginallyDefinedIn = false;
+
+    TypeWalker::Action walkToTypePre(Type T) override {
+      if (visitedOriginallyDefinedIn)
+        return TypeWalker::Action::Stop;
+
+      // A typealias inside a function used that function's signature as part of
+      // its mangling, so check if any types in the generic signature are
+      // annotated with @_originallyDefinedIn.
+      if (auto *TAT = llvm::dyn_cast<TypeAliasType>(T)) {
+        auto D = TAT->getDecl()->getDeclContext();
+        if (auto AFD = llvm::dyn_cast<AbstractFunctionDecl>(D)) {
+          OriginallyDefinedInFinder InnerWalker;
+          AFD->getInterfaceType().walk(InnerWalker);
+          if (InnerWalker.visitedOriginallyDefinedIn) {
+            visitedOriginallyDefinedIn = true;
+            return TypeWalker::Action::Stop;
+          }
+        }
+      }
+
+      auto *TypeDecl = T->getNominalOrBoundGenericNominal();
+      if (!TypeDecl)
+        return TypeWalker::Action::Continue;
+
+      NominalTypeDecl *ParentDecl = TypeDecl;
+      while (llvm::isa_and_nonnull<NominalTypeDecl>(ParentDecl->getParent()))
+        ParentDecl = llvm::cast<NominalTypeDecl>(ParentDecl->getParent());
+
+      if (ParentDecl->getAttrs().hasAttribute<OriginallyDefinedInAttr>()) {
+        visitedOriginallyDefinedIn = true;
+        return TypeWalker::Action::Stop;
+      }
+
+      return TypeWalker::Action::Continue;
+    }
+  };
+
+  /// Returns true if the type's mangled name is affected by an
+  /// @_originallyDefinedIn annotation. This annotation can be on the type
+  /// itself, one of its generic arguments, etc.
+  bool containsOriginallyDefinedIn(Type T) {
+    OriginallyDefinedInFinder Walker;
+    T.walk(Walker);
+    return Walker.visitedOriginallyDefinedIn;
+  }
+
+  /// Returns the decl of the type's parent chain annotated by
+  /// @_originallyDefinedIn. Returns null if no type is annotated.
+  NominalTypeDecl *getDeclAnnotatedByOriginallyDefinedIn(DebugTypeInfo DbgTy) {
+    auto Type = DbgTy.getType();
+    auto *TypeDecl = Type->getNominalOrBoundGenericNominal();
+    if (!TypeDecl)
+      return nullptr;
+
+    // Find the outermost type, since only those can have @_originallyDefinedIn
+    // attached to them.
+    NominalTypeDecl *ParentDecl = TypeDecl;
+    while (llvm::isa_and_nonnull<NominalTypeDecl>(ParentDecl->getParent()))
+      ParentDecl = llvm::cast<NominalTypeDecl>(ParentDecl->getParent());
+
+    if (ParentDecl->getAttrs().hasAttribute<OriginallyDefinedInAttr>())
+      return ParentDecl;;
+
+    return nullptr;
+  }
+
+  /// If this is a nominal type that has the @_originallyDefinedIn
+  /// attribute, IRGenDebugInfo emits an imported declaration of the type as
+  /// a child of the real module. We do this so LLDB has enough
+  /// information to both find the type in reflection metadata (the module name
+  /// in the type's mangled name), and find it in the swiftmodule (the type's
+  /// imported declaration's parent module name).
+  void handleOriginallyDefinedIn(DebugTypeInfo DbgTy, llvm::DIType *DITy,
+                                 StringRef MangledName, llvm::DIFile *File) {
+    if (OriginallyDefinedInTypes.contains(MangledName))
+      return;
+
+    // Force the generation of the generic type parameters as forward
+    // declarations, as those types might be annotated with
+    // @_originallyDefinedIn.
+    if (auto *BoundDecl = llvm::dyn_cast<BoundGenericType>(DbgTy.getType()))
+      collectGenericParams(BoundDecl, /*AsForwardDeclarations=*/true);
+
+    NominalTypeDecl *OriginallyDefinedInDecl = getDeclAnnotatedByOriginallyDefinedIn(DbgTy);
+    if (!OriginallyDefinedInDecl)
+      return;
+
+    // Emit the imported declaration under the real swiftmodule the type lives on.
+    auto RealModule = getOrCreateContext(OriginallyDefinedInDecl->getParent());
+    DBuilder.createImportedDeclaration(RealModule, DITy, File, 0, MangledName);
+    OriginallyDefinedInTypes.insert(MangledName);
   }
 
   llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy,
@@ -2389,7 +2475,18 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       ClangDecl = AliasDecl->getClangDecl();
     } else if (auto *ND = DbgTy.getType()->getNominalOrBoundGenericNominal()) {
       TypeDecl = ND;
-      Context = ND->getParent();
+      // If this is an originally defined in type, we want to emit this type's
+      // scope to be the ABI module.
+      if (auto Attribute =
+              ND->getAttrs().getAttribute<OriginallyDefinedInAttr>()) {
+        auto Identifier = IGM.getSILModule().getASTContext().getIdentifier(
+            Attribute->OriginalModuleName);
+        void *Key = (void *)Identifier.get();
+        Scope =
+            getOrCreateModule(Key, TheCU, Attribute->OriginalModuleName, {});
+      } else {
+        Context = ND->getParent();
+      }
       ClangDecl = ND->getClangDecl();
     } else if (auto BNO = dyn_cast<BuiltinType>(DbgTy.getType())) {
       Context = BNO->getASTContext().TheBuiltinModule;
@@ -2438,6 +2535,8 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       FwdDeclTypes.emplace_back(
           std::piecewise_construct, std::make_tuple(MangledName),
           std::make_tuple(static_cast<llvm::Metadata *>(FwdDecl)));
+
+      handleOriginallyDefinedIn(DbgTy, FwdDecl, MangledName, getFile(Scope));
       return FwdDecl;
     }
     llvm::DIType *DITy = createType(DbgTy, MangledName, Scope, getFile(Scope));
@@ -2466,6 +2565,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     // Store it in the cache.
     DITypeCache.insert({DbgTy.getType(), llvm::TrackingMDNodeRef(DITy)});
 
+    handleOriginallyDefinedIn(DbgTy, DITy, MangledName, getFile(Scope));
     return DITy;
   }
 };
