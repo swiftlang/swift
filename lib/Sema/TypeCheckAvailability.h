@@ -247,7 +247,6 @@ void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 /// Returns `std::nullopt` if the declaration is available.
 std::optional<AvailabilityConstraint>
 getUnsatisfiedAvailabilityConstraint(const Decl *decl,
-                                     const DeclContext *declContext,
                                      AvailabilityContext availabilityContext);
 
 /// Checks whether a declaration should be considered unavailable when referred

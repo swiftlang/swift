@@ -3103,9 +3103,8 @@ bool diagnoseExplicitUnavailability(
 
 std::optional<AvailabilityConstraint>
 swift::getUnsatisfiedAvailabilityConstraint(
-    const Decl *decl, const DeclContext *declContext,
-    AvailabilityContext availabilityContext) {
-  auto &ctx = declContext->getASTContext();
+    const Decl *decl, AvailabilityContext availabilityContext) {
+  auto &ctx = decl->getASTContext();
 
   // Generic parameters are always available.
   if (isa<GenericTypeParamDecl>(decl))
@@ -3148,8 +3147,7 @@ swift::getUnsatisfiedAvailabilityConstraint(const Decl *decl,
                                             const DeclContext *referenceDC,
                                             SourceLoc referenceLoc) {
   return getUnsatisfiedAvailabilityConstraint(
-      decl, referenceDC,
-      TypeChecker::availabilityAtLocation(referenceLoc, referenceDC));
+      decl, TypeChecker::availabilityAtLocation(referenceLoc, referenceDC));
 }
 
 /// Check if this is a subscript declaration inside String or
@@ -4190,7 +4188,7 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   auto &ctx = DC->getASTContext();
 
   auto constraint =
-      getUnsatisfiedAvailabilityConstraint(D, DC, Where.getAvailability());
+      getUnsatisfiedAvailabilityConstraint(D, Where.getAvailability());
 
   if (constraint && !constraint->isConditionallySatisfiable()) {
     // FIXME: diagnoseExplicitUnavailability should take an unmet requirement
@@ -4699,8 +4697,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       return true;
     }
 
-    auto constraint = getUnsatisfiedAvailabilityConstraint(
-        ext, where.getDeclContext(), where.getAvailability());
+    auto constraint =
+        getUnsatisfiedAvailabilityConstraint(ext, where.getAvailability());
     if (constraint) {
       // FIXME: diagnoseExplicitUnavailability() should take unmet requirement
       if (diagnoseExplicitUnavailability(
