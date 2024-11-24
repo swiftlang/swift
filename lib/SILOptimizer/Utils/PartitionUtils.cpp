@@ -94,6 +94,14 @@ void PartitionOpError::InOutSendingNotDisconnectedAtExitError::print(
   os << '\n';
 }
 
+void PartitionOpError::NonSendableIsolationCrossingResultError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: NonSendableIsolationCrossingResultError\n"
+        "        Inst: "
+     << *op->getSourceInst() << "        Result ID: %%" << returnValueElement
+     << '\n';
+}
+
 //===----------------------------------------------------------------------===//
 //                             MARK: PartitionOp
 //===----------------------------------------------------------------------===//
@@ -152,6 +160,10 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
     os << "inout_sending_at_function_exit ";
     if (extraSpace)
       os << extraSpaceLiteral;
+    os << "%%" << opArgs[0];
+    break;
+  case PartitionOpKind::NonSendableIsolationCrossingResult:
+    os << "nonsendable_isolationcrossing_result ";
     os << "%%" << opArgs[0];
     break;
   }

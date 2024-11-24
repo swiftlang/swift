@@ -849,26 +849,6 @@ private:
 
   void initForApply(Operand *op, ApplyExpr *expr);
   void initForAutoclosure(Operand *op, AutoClosureExpr *expr);
-
-  Expr *getFoundExprForSelf(ApplyExpr *sourceApply) {
-    if (auto callExpr = dyn_cast<CallExpr>(sourceApply))
-      if (auto calledExpr =
-              dyn_cast<DotSyntaxCallExpr>(callExpr->getDirectCallee()))
-        return calledExpr->getBase();
-    return nullptr;
-  }
-
-  Expr *getFoundExprForParam(ApplyExpr *sourceApply, unsigned argNum) {
-    auto *expr = sourceApply->getArgs()->getExpr(argNum);
-
-    // If we have an erasure expression, lets use the original type. We do
-    // this since we are not saying the specific parameter that is the
-    // issue and we are using the type to explain it to the user.
-    if (auto *erasureExpr = dyn_cast<ErasureExpr>(expr))
-      expr = erasureExpr->getSubExpr();
-
-    return expr;
-  }
 };
 
 } // namespace
@@ -2285,6 +2265,223 @@ void AssignIsolatedIntoSendingResultDiagnosticEmitter::emit() {
 }
 
 //===----------------------------------------------------------------------===//
+//              MARK: NonSendableIsolationCrossingResult Emitter
+//===----------------------------------------------------------------------===//
+
+/// Add Fix-It text for the given nominal type to adopt Sendable.
+static void addSendableFixIt(const NominalTypeDecl *nominal,
+                             InFlightDiagnostic &diag, bool unchecked) {
+  if (nominal->getInherited().empty()) {
+    SourceLoc fixItLoc = nominal->getBraces().Start;
+    diag.fixItInsert(fixItLoc,
+                     unchecked ? ": @unchecked Sendable" : ": Sendable");
+  } else {
+    auto fixItLoc = nominal->getInherited().getEndLoc();
+    diag.fixItInsertAfter(fixItLoc,
+                          unchecked ? ", @unchecked Sendable" : ", Sendable");
+  }
+}
+
+/// Add Fix-It text for the given generic param declaration type to adopt
+/// Sendable.
+static void addSendableFixIt(const GenericTypeParamDecl *genericArgument,
+                             InFlightDiagnostic &diag, bool unchecked) {
+  if (genericArgument->getInherited().empty()) {
+    auto fixItLoc = genericArgument->getLoc();
+    diag.fixItInsertAfter(fixItLoc,
+                          unchecked ? ": @unchecked Sendable" : ": Sendable");
+  } else {
+    auto fixItLoc = genericArgument->getInherited().getEndLoc();
+    diag.fixItInsertAfter(fixItLoc,
+                          unchecked ? ", @unchecked Sendable" : ", Sendable");
+  }
+}
+
+namespace {
+
+struct NonSendableIsolationCrossingResultDiagnosticEmitter {
+  RegionAnalysisValueMap &valueMap;
+
+  using Error = PartitionOpError::NonSendableIsolationCrossingResultError;
+  Error error;
+
+  bool emittedErrorDiagnostic = false;
+
+  /// The value assigned as the equivalence class representative. It is
+  /// guaranteed to be from the isolation crossing function since we never treat
+  /// isolation crossing functions as being look through.
+  SILValue representative;
+
+  NonSendableIsolationCrossingResultDiagnosticEmitter(
+      RegionAnalysisValueMap &valueMap, Error error)
+      : valueMap(valueMap), error(error),
+        representative(valueMap.getRepresentative(error.returnValueElement)) {}
+
+  void emit();
+
+  ASTContext &getASTContext() const {
+    return error.op->getSourceInst()->getFunction()->getASTContext();
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
+                                   U &&...args) {
+    emittedErrorDiagnostic = true;
+    return std::move(getASTContext()
+                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
+                         .warnUntilSwiftVersion(6));
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
+    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+
+  std::optional<DiagnosticBehavior> getBehaviorLimit() const {
+    return representative->getType().getConcurrencyDiagnosticBehavior(
+        representative->getFunction());
+  }
+
+  void emitUnknownPatternError() {
+    if (shouldAbortOnUnknownPatternMatchError()) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
+    diagnoseError(error.op->getSourceInst(),
+                  diag::regionbasedisolation_unknown_pattern)
+        .limitBehaviorIf(getBehaviorLimit());
+  }
+
+  Type getType() const {
+    if (auto *applyExpr =
+            error.op->getSourceInst()->getLoc().getAsASTNode<ApplyExpr>()) {
+      return applyExpr->getType();
+    }
+
+    // If we do not have an ApplyExpr, see if we can just infer the type from
+    // the SILFunction type. This is only used in SIL test cases.
+    if (auto fas = FullApplySite::isa(error.op->getSourceInst())) {
+      return fas.getSubstCalleeType()
+          ->getAllResultsSubstType(fas.getModule(),
+                                   fas.getFunction()->getTypeExpansionContext())
+          .getASTType();
+    }
+
+    return Type();
+  }
+
+  const ValueDecl *getCalledDecl() const {
+    if (auto *applyExpr =
+            error.op->getSourceInst()->getLoc().getAsASTNode<ApplyExpr>()) {
+      if (auto calledValue =
+              applyExpr->getCalledValue(true /*look through conversions*/)) {
+        return calledValue;
+      }
+    }
+
+    return nullptr;
+  }
+
+  std::optional<ApplyIsolationCrossing> getIsolationCrossing() const {
+    if (auto *applyExpr =
+            error.op->getSourceInst()->getLoc().getAsASTNode<ApplyExpr>()) {
+      if (auto isolationCrossing = applyExpr->getIsolationCrossing()) {
+        return *isolationCrossing;
+      }
+    }
+
+    // If we have a SIL based test case, just return the actual isolation
+    // crossing.
+    if (auto fas = FullApplySite::isa(error.op->getSourceInst())) {
+      if (auto isolationCrossing = fas.getIsolationCrossing())
+        return *isolationCrossing;
+    }
+
+    return {};
+  }
+};
+
+} // namespace
+
+void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
+  auto isolationCrossing = getIsolationCrossing();
+  if (!isolationCrossing)
+    return emitUnknownPatternError();
+
+  auto type = getType();
+  if (auto *decl = getCalledDecl()) {
+    diagnoseError(error.op->getSourceInst(), diag::rbi_isolation_crossing_result,
+                  type, isolationCrossing->getCalleeIsolation(), getCalledDecl(),
+                  isolationCrossing->getCallerIsolation())
+      .limitBehaviorIf(getBehaviorLimit());
+  } else {
+    diagnoseError(error.op->getSourceInst(), diag::rbi_isolation_crossing_result_no_decl,
+                  type, isolationCrossing->getCalleeIsolation(),
+                  isolationCrossing->getCallerIsolation())
+      .limitBehaviorIf(getBehaviorLimit());
+  }
+  if (type->is<FunctionType>()) {
+    diagnoseNote(error.op->getSourceInst(),
+                 diag::rbi_nonsendable_function_type);
+    return;
+  }
+
+  auto *moduleDecl = error.op->getSourceInst()->getModule().getSwiftModule();
+  if (auto *nominal = type->getNominalOrBoundGenericNominal()) {
+    // If the nominal type is in the current module, suggest adding `Sendable`
+    // if it makes sense.
+    if (nominal->getParentModule() == moduleDecl &&
+        (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))) {
+      auto note = nominal->diagnose(diag::rbi_add_nominal_sendable_conformance,
+                                    nominal);
+      addSendableFixIt(nominal, note, /*unchecked*/ false);
+    } else {
+      nominal->diagnose(diag::rbi_non_sendable_nominal, nominal);
+    }
+    return;
+  }
+
+  if (auto genericArchetype = type->getAs<ArchetypeType>()) {
+    auto interfaceType = genericArchetype->getInterfaceType();
+    if (auto genericParamType = interfaceType->getAs<GenericTypeParamType>()) {
+      auto *genericParamTypeDecl = genericParamType->getDecl();
+      if (genericParamTypeDecl &&
+          genericParamTypeDecl->getModuleContext() == moduleDecl) {
+        auto diag = genericParamTypeDecl->diagnose(
+            diag::rbi_add_generic_parameter_sendable_conformance, type);
+        addSendableFixIt(genericParamTypeDecl, diag, /*unchecked=*/false);
+        return;
+      }
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                         MARK: Diagnostic Evaluator
 //===----------------------------------------------------------------------===//
 
@@ -2370,6 +2567,7 @@ struct DiagnosticEvaluator final
     case PartitionOpError::InOutSendingNotDisconnectedAtExit:
     case PartitionOpError::SentNeverSendable:
     case PartitionOpError::AssignNeverSendableIntoSendingResult:
+    case PartitionOpError::NonSendableIsolationCrossingResult:
       // We are going to process these later... but dump so we can see that we
       // handled an error here. The rest of the explicit handlers will dump as
       // appropriate if they want to emit an error here (some will squelch the
@@ -2508,6 +2706,14 @@ void SendNonSendableImpl::emitVerbatimErrors() {
       SentNeverSendableDiagnosticInferrer diagnosticInferrer(
           info->getValueMap(), e);
       diagnosticInferrer.run();
+      continue;
+    }
+    case PartitionOpError::NonSendableIsolationCrossingResult: {
+      auto e = erasedError.getNonSendableIsolationCrossingResultError();
+      REGIONBASEDISOLATION_LOG(e.print(llvm::dbgs(), info->getValueMap()));
+      NonSendableIsolationCrossingResultDiagnosticEmitter diagnosticInferrer(
+          info->getValueMap(), e);
+      diagnosticInferrer.emit();
       continue;
     }
     }
