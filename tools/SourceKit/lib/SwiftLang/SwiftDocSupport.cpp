@@ -443,7 +443,7 @@ static bool initDocEntityInfo(const Decl *D,
     SwiftLangSupport::printUSR((const ValueDecl*)DefaultImplementationOf, OS);
   }
 
-  Info.IsUnavailable = AvailableAttr::isUnavailable(D);
+  Info.IsUnavailable = D->isUnavailable();
   Info.IsDeprecated = D->getAttrs().isDeprecated(D->getASTContext());
   Info.IsOptional = D->getAttrs().hasAttribute<OptionalAttr>();
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {

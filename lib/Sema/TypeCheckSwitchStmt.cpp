@@ -814,7 +814,7 @@ namespace {
               children, std::back_inserter(arr), [&](EnumElementDecl *eed) {
                 // Don't force people to match unavailable cases since they
                 // should not be instantiated at run time.
-                if (AvailableAttr::isUnavailable(eed)) {
+                if (eed->isUnavailable()) {
                   return Space();
                 }
 

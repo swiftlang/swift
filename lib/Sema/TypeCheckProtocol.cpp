@@ -6391,7 +6391,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         // as long as the inherited conformance isn't unavailable.
         auto *conformance = SendableConformance->getRootConformance();
         auto *decl = conformance->getDeclContext()->getAsDecl();
-        if (!AvailableAttr::isUnavailable(decl)) {
+        if (!decl->isUnavailable()) {
           continue;
         }
 

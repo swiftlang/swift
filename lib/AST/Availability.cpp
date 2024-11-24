@@ -486,6 +486,8 @@ bool Decl::isAvailableAsSPI() const {
   return AvailabilityInference::isAvailableAsSPI(this);
 }
 
+bool Decl::isUnavailable() const { return AvailableAttr::isUnavailable(this); }
+
 std::optional<AvailableAttrDeclPair>
 SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator, const Decl *decl,
                                          bool ignoreAppExtensions) const {

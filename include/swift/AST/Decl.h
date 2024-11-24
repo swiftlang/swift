@@ -1378,15 +1378,28 @@ public:
   /// @_originalDefinedIn attribute, this function returns this module name.
   StringRef getAlternateModuleName() const;
 
-  // Is this Decl an SPI? It can be directly marked with @_spi or is defined in
-  // an @_spi context.
+  /// Is this Decl an SPI? It can be directly marked with @_spi or is defined in
+  /// an @_spi context.
   bool isSPI() const;
 
+  /// Returns true if the attribute providing the platform availability
+  /// introduction for this decl is an `@_spi_available` attribute.
   bool isAvailableAsSPI() const;
 
   /// Determine whether this Decl has either Private or FilePrivate access,
   /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
+
+  /// Returns true if the decl is always unavailable in this compilation
+  /// context. For example, the decl could be marked explicitly unavailable on
+  /// either the current platform or in the current language mode. Returns false
+  /// for declarations that are only _potentially_ unavailable because of a
+  /// condition that could be satisfied at runtime (like requiring an operating
+  /// system version that is higher than the current deployment target).
+  ///
+  /// Note that this query only considers the attributes that are attached
+  /// directly to this decl (or the extension it is declared in, if applicable).
+  bool isUnavailable() const;
 
   /// Retrieve the @available attribute that provides the OS version range that
   /// this declaration is available in.
@@ -1406,7 +1419,7 @@ public:
   /// the attribute.
   ///
   /// Note that this notion of unavailability is broader than that which is
-  /// checked by \c AvailableAttr::isUnavailable.
+  /// checked by \c isUnavailable().
   std::optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticUnavailableAttr(bool ignoreAppExtensions = false) const;
 

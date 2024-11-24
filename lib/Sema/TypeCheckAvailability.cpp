@@ -4180,7 +4180,7 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (accessor) {
     // If the property/subscript is unconditionally unavailable, don't bother
     // with any of the rest of this.
-    if (AvailableAttr::isUnavailable(accessor->getStorage()))
+    if (accessor->getStorage()->isUnavailable())
       return false;
   }
 
@@ -4792,7 +4792,7 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
     return false;
 
   // Skip unavailable decls.
-  if (AvailableAttr::isUnavailable(decl))
+  if (decl->isUnavailable())
     return false;
 
   // Warn on decls without an introduction version.

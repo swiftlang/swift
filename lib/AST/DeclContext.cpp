@@ -1534,7 +1534,7 @@ bool DeclContext::isAlwaysAvailableConformanceContext() const {
   if (ext == nullptr)
     return true;
 
-  if (AvailableAttr::isUnavailable(ext))
+  if (ext->isUnavailable())
     return false;
 
   auto &ctx = getASTContext();

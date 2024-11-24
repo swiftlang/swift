@@ -804,7 +804,7 @@ struct DeclInfo {
     // The synthesized properties $foo and _foo aren't unavailable even if
     // the original property foo is, so check them rather than the original
     // property.
-    Unavailable = AvailableAttr::isUnavailable(VD);
+    Unavailable = VD->isUnavailable();
     // No point computing the rest since they won't be used anyway.
     if (Unavailable)
       return;

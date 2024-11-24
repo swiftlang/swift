@@ -1767,8 +1767,8 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     if (D->isPrivateSystemDecl(false))
       return true;
   }
-  if (AvailableAttr::isUnavailable(D))
-     return true;
+  if (D->isUnavailable())
+    return true;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     switch (getAccessLevel(VD)) {
     case AccessLevel::Internal:
