@@ -384,7 +384,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   unsigned NumTypeVariables : 11;
 
   /// The kind of function reference, for member references.
-  unsigned TheFunctionRefInfo : 2;
+  unsigned TheFunctionRefInfo : 3;
 
   /// The trailing closure matching for an applicable function constraint,
   /// if any. 0 = None, 1 = Forward, 2 = Backward.
@@ -799,13 +799,11 @@ public:
 
   /// Determine the kind of function reference we have for a member reference.
   FunctionRefInfo getFunctionRefInfo() const {
-    if (Kind == ConstraintKind::ValueMember ||
-        Kind == ConstraintKind::UnresolvedValueMember ||
-        Kind == ConstraintKind::ValueWitness)
-      return static_cast<FunctionRefInfo>(TheFunctionRefInfo);
+    ASSERT(Kind == ConstraintKind::ValueMember ||
+           Kind == ConstraintKind::UnresolvedValueMember ||
+           Kind == ConstraintKind::ValueWitness);
 
-    // Conservative answer: drop all of the labels.
-    return FunctionRefInfo::Compound;
+    return FunctionRefInfo::fromOpaque(TheFunctionRefInfo);
   }
 
   /// Retrieve the set of constraints in a disjunction.

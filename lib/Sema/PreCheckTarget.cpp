@@ -979,29 +979,12 @@ TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
 }
 
 namespace {
-/// Update the function reference kind based on adding a direct call to a
-/// callee with this kind.
-FunctionRefInfo addingDirectCall(FunctionRefInfo kind) {
-  switch (kind) {
-  case FunctionRefInfo::Unapplied:
-    return FunctionRefInfo::SingleApply;
-
-  case FunctionRefInfo::SingleApply:
-  case FunctionRefInfo::DoubleApply:
-    return FunctionRefInfo::DoubleApply;
-
-  case FunctionRefInfo::Compound:
-    return FunctionRefInfo::Compound;
-  }
-
-  llvm_unreachable("Unhandled FunctionRefInfo in switch.");
-}
-
 /// Update a direct callee expression node that has a function reference kind
 /// based on seeing a call to this callee.
 template <typename E, typename = decltype(((E *)nullptr)->getFunctionRefInfo())>
 void tryUpdateDirectCalleeImpl(E *callee, int) {
-  callee->setFunctionRefInfo(addingDirectCall(callee->getFunctionRefInfo()));
+  callee->setFunctionRefInfo(
+      callee->getFunctionRefInfo().addingApplicationLevel());
 }
 
 /// Version of tryUpdateDirectCalleeImpl for when the callee

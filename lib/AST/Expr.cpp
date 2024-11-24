@@ -41,21 +41,6 @@ using namespace swift;
                 "Exprs are BumpPtrAllocated; the destructor is never called");
 #include "swift/AST/ExprNodes.def"
 
-StringRef swift::getFunctionRefInfoStr(FunctionRefInfo refKind) {
-  switch (refKind) {
-  case FunctionRefInfo::Unapplied:
-    return "unapplied";
-  case FunctionRefInfo::SingleApply:
-    return "single";
-  case FunctionRefInfo::DoubleApply:
-    return "double";
-  case FunctionRefInfo::Compound:
-    return "compound";
-  }
-
-  llvm_unreachable("Unhandled FunctionRefInfo in switch.");
-}
-
 //===----------------------------------------------------------------------===//
 // Expr methods.
 //===----------------------------------------------------------------------===//

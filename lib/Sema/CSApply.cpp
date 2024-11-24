@@ -764,8 +764,10 @@ namespace {
 
       if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
         if (AnyFunctionRef(fnDecl).hasExternalPropertyWrapperParameters() &&
-            (declRefExpr->getFunctionRefInfo() == FunctionRefInfo::Compound ||
-             declRefExpr->getFunctionRefInfo() == FunctionRefInfo::Unapplied)) {
+            // FIXME(FunctionRefInfo): This should just be `isUnapplied()`, see
+            // the FIXME in `unwrapPropertyWrapperParameterTypes`.
+            (declRefExpr->getFunctionRefInfo().isCompoundName() ||
+             declRefExpr->getFunctionRefInfo().isUnappliedBaseName())) {
           // We don't need to do any further adjustment once we've built the
           // curry thunk.
           return buildSingleCurryThunk(result, fnDecl,
@@ -4799,7 +4801,7 @@ namespace {
       }
       DeclRefExpr *fnRef = new (ctx) DeclRefExpr(undefinedDecl, DeclNameLoc(),
                                                  /*Implicit=*/true);
-      fnRef->setFunctionRefInfo(FunctionRefInfo::SingleApply);
+      fnRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
       StringRef msg = "attempt to evaluate editor placeholder";
       Expr *argExpr = new (ctx) StringLiteralExpr(msg, E->getLoc(),

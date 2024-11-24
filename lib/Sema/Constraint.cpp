@@ -202,7 +202,7 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
       Locator(locator) {
   assert(kind == ConstraintKind::ValueMember ||
          kind == ConstraintKind::UnresolvedValueMember);
-  TheFunctionRefInfo = static_cast<unsigned>(functionRefInfo);
+  TheFunctionRefInfo = functionRefInfo.getOpaqueValue();
   assert(getFunctionRefInfo() == functionRefInfo);
   assert(member && "Member constraint has no member");
   assert(useDC && "Member constraint has no use DC");
@@ -223,7 +223,7 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
   Member.Second = second;
   Member.Member.Ref = requirement;
   Member.UseDC = useDC;
-  TheFunctionRefInfo = static_cast<unsigned>(functionRefInfo);
+  TheFunctionRefInfo = functionRefInfo.getOpaqueValue();
 
   assert(kind == ConstraintKind::ValueWitness);
   assert(getFunctionRefInfo() == functionRefInfo);
