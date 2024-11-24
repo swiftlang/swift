@@ -128,10 +128,10 @@ static bool isUnappliedFunctionRef(const OverloadChoice &Choice) {
   if (!Choice.isDecl()) {
     return false;
   }
-  switch (Choice.getFunctionRefKind()) {
-  case FunctionRefKind::Unapplied:
+  switch (Choice.getFunctionRefInfo()) {
+  case FunctionRefInfo::Unapplied:
     return true;
-  case FunctionRefKind::SingleApply:
+  case FunctionRefInfo::SingleApply:
     if (auto BaseTy = Choice.getBaseType()) {
       // We consider curried member calls as unapplied. E.g.
       //   MyStruct.someInstanceFunc(theInstance)#^COMPLETE^#

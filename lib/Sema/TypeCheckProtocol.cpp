@@ -1200,7 +1200,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     SmallVector<OpenedType, 4> reqReplacements;
     reqType = cs->getTypeOfMemberReference(selfTy, req, dc,
                                            /*isDynamicResult=*/false,
-                                           FunctionRefKind::DoubleApply,
+                                           FunctionRefInfo::DoubleApply,
                                            reqLocator,
                                            &reqReplacements)
         .adjustedReferenceType;
@@ -1236,11 +1236,11 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     if (witness->getDeclContext()->isTypeContext()) {
       openWitnessType = cs->getTypeOfMemberReference(
           selfTy, witness, dc, /*isDynamicResult=*/false,
-          FunctionRefKind::DoubleApply, witnessLocator)
+          FunctionRefInfo::DoubleApply, witnessLocator)
         .adjustedReferenceType;
     } else {
       openWitnessType = cs->getTypeOfReference(
-          witness, FunctionRefKind::DoubleApply, witnessLocator,
+          witness, FunctionRefInfo::DoubleApply, witnessLocator,
           /*useDC=*/nullptr)
         .adjustedReferenceType;
     }

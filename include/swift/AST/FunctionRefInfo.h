@@ -1,4 +1,4 @@
-//===--- FunctionRefKind.h - Function reference kind ------------*- C++ -*-===//
+//===--- FunctionRefInfo.h - Function reference info ------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the FunctionRefKind enum, which is used to describe how
+// This file defines the FunctionRefInfo enum, which is used to describe how
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_FUNCTION_REF_KIND_H
-#define SWIFT_AST_FUNCTION_REF_KIND_H
+#ifndef SWIFT_AST_FUNCTION_REF_INFO_H
+#define SWIFT_AST_FUNCTION_REF_INFO_H
 
 #include "llvm/ADT/StringRef.h"
 
@@ -28,7 +28,7 @@ namespace swift {
 /// How a function is referenced comes down to how it was spelled in
 /// the source code, e.g., was it called in the source code and was it
 /// spelled as a compound name.
-enum class FunctionRefKind : unsigned {
+enum class FunctionRefInfo : unsigned {
   /// The function was referenced using a bare function name (e.g.,
   /// 'f') and not directly called.
   Unapplied,
@@ -45,8 +45,8 @@ enum class FunctionRefKind : unsigned {
 
 /// Produce a string describing a function reference kind, for
 /// debugging purposes.
-llvm::StringRef getFunctionRefKindStr(FunctionRefKind refKind);
+llvm::StringRef getFunctionRefInfoStr(FunctionRefInfo refKind);
 
 }
 
-#endif // SWIFT_AST_FUNCTION_REF_KIND_H
+#endif // SWIFT_AST_FUNCTION_REF_INFO_H

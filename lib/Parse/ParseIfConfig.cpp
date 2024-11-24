@@ -184,7 +184,7 @@ class ValidateIfConfigCondition :
     if (!UDE)
       return getDeclRefStr(E, DeclRefKind::Ordinary).has_value();
 
-    return UDE->getFunctionRefKind() == FunctionRefKind::Unapplied &&
+    return UDE->getFunctionRefInfo() == FunctionRefInfo::Unapplied &&
            isModulePath(UDE->getBase());
   }
 

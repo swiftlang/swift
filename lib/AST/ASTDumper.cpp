@@ -407,8 +407,8 @@ static StringRef getDumpString(MagicIdentifierLiteralExpr::Kind kind) {
 static StringRef getDumpString(ObjectLiteralExpr::LiteralKind kind) {
   return ObjectLiteralExpr::getLiteralKindPlainName(kind);
 }
-static StringRef getDumpString(FunctionRefKind kind) {
-  return getFunctionRefKindStr(kind);
+static StringRef getDumpString(FunctionRefInfo kind) {
+  return getFunctionRefInfoStr(kind);
 }
 static StringRef getDumpString(ParamSpecifier specifier) {
   return ParamDecl::getSpecifierSpelling(specifier);
@@ -2306,7 +2306,7 @@ public:
     printDeclRefField(E->getDeclRef(), "decl");
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       printFlag(getDumpString(E->getAccessSemantics()), AccessLevelColor);
-    printField(E->getFunctionRefKind(), "function_ref",
+    printField(E->getFunctionRefInfo(), "function_ref",
                ExprModifierColor);
 
     printFoot();
@@ -2338,7 +2338,7 @@ public:
 
     printFieldQuoted(E->getDecls()[0]->getBaseName(), "name", IdentifierColor);
     printField(E->getDecls().size(), "number_of_decls", ExprModifierColor);
-    printField(E->getFunctionRefKind(), "function_ref", ExprModifierColor);
+    printField(E->getFunctionRefInfo(), "function_ref", ExprModifierColor);
 
     if (!E->isForOperator()) {
       for (auto D : E->getDecls()) {
@@ -2356,7 +2356,7 @@ public:
     printCommon(E, "unresolved_decl_ref_expr", label);
 
     printFieldQuoted(E->getName(), "name", IdentifierColor);
-    printField(E->getFunctionRefKind(), "function_ref", ExprModifierColor);
+    printField(E->getFunctionRefInfo(), "function_ref", ExprModifierColor);
 
     printFoot();
   }
@@ -2397,7 +2397,7 @@ public:
     printCommon(E, "unresolved_member_expr", label);
 
     printFieldQuoted(E->getName(), "name", ExprModifierColor);
-    printField(E->getFunctionRefKind(), "function_ref", ExprModifierColor);
+    printField(E->getFunctionRefInfo(), "function_ref", ExprModifierColor);
     printFoot();
   }
   void visitDotSelfExpr(DotSelfExpr *E, StringRef label) {
@@ -2520,7 +2520,7 @@ public:
     printCommon(E, "unresolved_dot_expr", label);
 
     printFieldQuoted(E->getName(), "field");
-    printField(E->getFunctionRefKind(), "function_ref", ExprModifierColor);
+    printField(E->getFunctionRefInfo(), "function_ref", ExprModifierColor);
 
     if (E->getBase()) {
       printRec(E->getBase());

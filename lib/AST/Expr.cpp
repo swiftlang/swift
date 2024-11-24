@@ -41,19 +41,19 @@ using namespace swift;
                 "Exprs are BumpPtrAllocated; the destructor is never called");
 #include "swift/AST/ExprNodes.def"
 
-StringRef swift::getFunctionRefKindStr(FunctionRefKind refKind) {
+StringRef swift::getFunctionRefInfoStr(FunctionRefInfo refKind) {
   switch (refKind) {
-  case FunctionRefKind::Unapplied:
+  case FunctionRefInfo::Unapplied:
     return "unapplied";
-  case FunctionRefKind::SingleApply:
+  case FunctionRefInfo::SingleApply:
     return "single";
-  case FunctionRefKind::DoubleApply:
+  case FunctionRefInfo::DoubleApply:
     return "double";
-  case FunctionRefKind::Compound:
+  case FunctionRefInfo::Compound:
     return "compound";
   }
 
-  llvm_unreachable("Unhandled FunctionRefKind in switch.");
+  llvm_unreachable("Unhandled FunctionRefInfo in switch.");
 }
 
 //===----------------------------------------------------------------------===//
