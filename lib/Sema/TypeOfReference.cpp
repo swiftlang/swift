@@ -667,22 +667,6 @@ static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
 unsigned constraints::getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
                                          FunctionRefInfo functionRefInfo,
                                          ConstraintLocatorBuilder locator) {
-  // FIXME: Narrow hack for rdar://139234188 - Currently we set
-  // FunctionRefInfo::Compound for enum element patterns with tuple
-  // sub-patterns to ensure the member has argument labels stripped. As such,
-  // we need to account for the correct application level here. We ought to be
-  // setting the correct FunctionRefInfo and properly handling the label
-  // matching in the solver though.
-  if (auto lastElt = locator.last()) {
-    if (auto matchElt = lastElt->getAs<LocatorPathElt::PatternMatch>()) {
-      if (auto *EP = dyn_cast<EnumElementPattern>(matchElt->getPattern()))
-        return (EP->hasSubPattern() ? 1 : 0) + hasAppliedSelf;
-    }
-  }
-  // FIXME(FunctionRefInfo): This matches the old behavior, but is wrong.
-  if (functionRefInfo.isCompoundName())
-    return 0 + hasAppliedSelf;
-
   switch (functionRefInfo.getApplyLevel()) {
   case FunctionRefInfo::ApplyLevel::Unapplied:
     return 0 + hasAppliedSelf;
