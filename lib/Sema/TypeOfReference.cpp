@@ -708,16 +708,8 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
   SmallVector<AnyFunctionType::Param, 4> adjustedParamTypes;
 
   DeclNameLoc nameLoc;
-  auto *ref = getAsExpr(locator.getAnchor());
-  if (auto *declRef = dyn_cast<DeclRefExpr>(ref)) {
-    nameLoc = declRef->getNameLoc();
-  } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(ref)) {
-    nameLoc = dotExpr->getNameLoc();
-  } else if (auto *overloadedRef = dyn_cast<OverloadedDeclRefExpr>(ref)) {
-    nameLoc = overloadedRef->getNameLoc();
-  } else if (auto *memberExpr = dyn_cast<UnresolvedMemberExpr>(ref)) {
-    nameLoc = memberExpr->getNameLoc();
-  }
+  if (auto *ref = getAsExpr(locator.getAnchor()))
+    nameLoc = ref->getNameLoc();
 
   for (unsigned i : indices(*paramList)) {
     Identifier argLabel;
