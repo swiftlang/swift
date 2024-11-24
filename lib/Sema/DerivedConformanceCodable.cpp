@@ -1110,7 +1110,7 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
           -> std::tuple<EnumElementDecl *, BraceStmt *> {
         SmallVector<ASTNode, 3> caseStatements;
 
-        if (elt->getAttrs().isUnavailable(C)) {
+        if (elt->isUnavailable()) {
           // This case is not encodable because it is unavailable and therefore
           // should not be instantiable at runtime. Skipping this case will
           // result in the SIL pipeline giving the switch a default case for
@@ -1713,7 +1713,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
           if (!codingKeyCase)
             return std::make_tuple(nullptr, nullptr);
 
-          if (elt->getAttrs().isUnavailable(C)) {
+          if (elt->isUnavailable()) {
             // generate:
             //       throw DecodingError.dataCorrupted(
             //         DecodingError.Context(

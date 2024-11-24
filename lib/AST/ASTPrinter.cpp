@@ -2153,7 +2153,7 @@ bool isNonSendableExtension(const Decl *D) {
   ASTContext &ctx = D->getASTContext();
 
   const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D);
-  if (!ED || !ED->getAttrs().isUnavailable(ctx))
+  if (!ED || !ED->isUnavailable())
     return false;
 
   auto nonSendable =
@@ -2193,8 +2193,7 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
         return false;
     }
 
-    if (Options.SkipUnavailable &&
-        D->getAttrs().isUnavailable(D->getASTContext()))
+    if (Options.SkipUnavailable && D->isUnavailable())
       return false;
   }
 

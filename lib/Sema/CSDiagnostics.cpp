@@ -4246,7 +4246,7 @@ findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
     ASTContext &ctx = a->getASTContext();
 
     // Is one more available than the other?
-    WORSE(->getAttrs().isUnavailable(ctx));
+    WORSE(->isUnavailable());
     WORSE(->getAttrs().isDeprecated(ctx));
 
     // Does one have a shorter name (so the non-matching prefix is shorter)?

@@ -523,8 +523,6 @@ static void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   if (isa<ParamDecl>(VD))
     return; // Parameters don't have interesting related declarations.
 
-  auto &ctx = VD->getASTContext();
-
   llvm::SmallDenseMap<DeclName, unsigned, 16> NamesSeen;
   ++NamesSeen[VD->getName()];
 
@@ -553,7 +551,7 @@ static void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
 
   SmallVector<ValueDecl *, 8> RelatedDecls;
   for (auto result : results) {
-    if (result->getAttrs().isUnavailable(ctx))
+    if (result->isUnavailable())
       continue;
 
     if (result != VD) {

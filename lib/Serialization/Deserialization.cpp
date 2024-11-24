@@ -6813,8 +6813,7 @@ DESERIALIZE_TYPE(BUILTIN_ALIAS_TYPE)(
   }
 
   // Look through compatibility aliases that are now unavailable.
-  if (alias->getAttrs().isUnavailable(MF.getContext()) &&
-      alias->isCompatibilityAlias()) {
+  if (alias->isUnavailable() && alias->isCompatibilityAlias()) {
     return alias->getUnderlyingType();
   }
 
@@ -6909,8 +6908,7 @@ Expected<Type> DESERIALIZE_TYPE(NAME_ALIAS_TYPE)(
     return underlyingType;
 
   // Look through compatibility aliases that are now unavailable.
-  if (alias && alias->getAttrs().isUnavailable(MF.getContext()) &&
-      alias->isCompatibilityAlias()) {
+  if (alias && alias->isUnavailable() && alias->isCompatibilityAlias()) {
     return alias->getUnderlyingType().subst(subMapOrError.get());
   }
 
@@ -8692,7 +8690,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
     assert(allowCompilerErrors() || !req || isOpaque || witness ||
            req->getAttrs().hasAttribute<OptionalAttr>() ||
-           req->getAttrs().isUnavailable(getContext()));
+           req->isUnavailable());
     if (!witness && !isOpaque) {
       trySetWitness(Witness());
       continue;

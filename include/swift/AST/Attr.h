@@ -2931,10 +2931,6 @@ public:
     return UnaryOperatorKind::None;
   }
 
-  bool isUnavailable(const ASTContext &ctx) const {
-    return getUnavailable(ctx) != nullptr;
-  }
-
   bool isDeprecated(const ASTContext &ctx) const {
     return getDeprecated(ctx) != nullptr;
   }
