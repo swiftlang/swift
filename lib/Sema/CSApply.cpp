@@ -764,10 +764,7 @@ namespace {
 
       if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
         if (AnyFunctionRef(fnDecl).hasExternalPropertyWrapperParameters() &&
-            // FIXME(FunctionRefInfo): This should just be `isUnapplied()`, see
-            // the FIXME in `unwrapPropertyWrapperParameterTypes`.
-            (declRefExpr->getFunctionRefInfo().isCompoundName() ||
-             declRefExpr->getFunctionRefInfo().isUnappliedBaseName())) {
+            declRefExpr->getFunctionRefInfo().isUnapplied()) {
           // We don't need to do any further adjustment once we've built the
           // curry thunk.
           return buildSingleCurryThunk(result, fnDecl,

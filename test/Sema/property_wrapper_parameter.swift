@@ -159,6 +159,23 @@ struct ProjectionWrapper<Value> {
   }
 }
 
+// https://github.com/swiftlang/swift/issues/77823
+// Make sure we correctly handle compound applied functions.
+func testCompoundApplication() {
+  func foo(@ProjectionWrapper x: Int) {}
+
+  foo(x:)(0)
+  foo($x:)(ProjectionWrapper(wrappedValue: 0))
+
+  foo(x:)(ProjectionWrapper(wrappedValue: 0)) // expected-error {{cannot convert value of type 'ProjectionWrapper<Int>' to expected argument type 'Int'}}
+  foo(x:)(ProjectionWrapper(wrappedValue: "")) // expected-error {{cannot convert value of type 'ProjectionWrapper<String>' to expected argument type 'Int'}}
+  foo(x:)("") // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+
+  foo($x:)(ProjectionWrapper(wrappedValue: "")) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  foo($x:)(0) // expected-error {{cannot convert value of type 'Int' to expected argument type 'ProjectionWrapper<Int>'}}
+  foo($x:)("") // expected-error {{cannot convert value of type 'String' to expected argument type 'ProjectionWrapper<Int>'}}
+}
+
 func testImplicitPropertyWrapper() {
   typealias PropertyWrapperTuple = (ProjectionWrapper<Int>, Int, ProjectionWrapper<Int>)
 
