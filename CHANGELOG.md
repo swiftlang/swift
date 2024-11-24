@@ -5,6 +5,29 @@
 
 ## Swift 6.1
 
+* Projected value initializers are now correctly injected into calls when
+  an argument exactly matches a parameter with an external property wrapper.
+
+  For example:
+
+  ```swift
+  struct Binding {
+    ...
+	init(projectedValue: Self) { ... }
+  }
+
+  func checkValue(@Binding value: Int) {}
+
+  func use(v: Binding<Int>) {
+    checkValue($value: v)
+	// Transformed into: `checkValue(value: Binding(projectedValue: v))`
+  }
+  ```
+
+  Previous versions of the Swift compiler incorrectly omitted projected value
+  initializer injection in the call to `checkValue` because the argument type
+  matched the parameter type exactly.
+
 * [SE-0444][]:
   When the upcoming feature `MemberImportVisibility` is enabled, Swift will
   require that a module be directly imported in a source file when resolving
