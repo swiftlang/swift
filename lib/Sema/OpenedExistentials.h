@@ -81,6 +81,10 @@ public:
     return DepMemberTyRefs & pos.value();
   }
 
+  bool hasRef(std::optional<TypePosition> pos = std::nullopt) const {
+    return hasDirectRef(pos) || hasDependentMemberTypeRef(pos);
+  }
+
   bool hasNonCovariantRef() const {
     const uint8_t notCovariant = ~TypePosition::Covariant;
     return (DirectRefs & notCovariant) || (DepMemberTyRefs & notCovariant);
@@ -93,9 +97,7 @@ public:
   GenericParameterReferenceInfo &
   operator|=(const GenericParameterReferenceInfo &other);
 
-  explicit operator bool() const {
-    return hasDirectRef() || hasDependentMemberTypeRef();
-  }
+  explicit operator bool() const { return hasRef(); }
 };
 
 /// Find references to the given generic parameter in the type signature of the
@@ -112,12 +114,23 @@ findGenericParameterReferences(const ValueDecl *value, CanGenericSignature sig,
 /// Find references to 'Self' in the type signature of this declaration.
 GenericParameterReferenceInfo findExistentialSelfReferences(const ValueDecl *value);
 
-/// Determine whether referencing the given member on the
-/// given existential base type is supported. This is the case only if the
-/// type of the member, spelled in the context of \p baseTy, does not contain
-/// 'Self' or 'Self'-rooted dependent member types in non-covariant position.
-bool isMemberAvailableOnExistential(Type baseTy,
-                                    const ValueDecl *member);
+/// Describes the limitation on accessing a protocol member on a value of
+/// existential type.
+enum class ExistentialMemberAccessLimitation : uint8_t {
+  /// The member can be freely accessed on the existential.
+  None,
+  /// The storage member is available only for reads.
+  ReadOnly,
+  /// The storage member is available only for writes.
+  WriteOnly,
+  /// Accessing the member on the existential is not supported.
+  Unsupported,
+};
+
+/// Compute the limitations on accessing the given member on a value of the
+/// given existential base type.
+ExistentialMemberAccessLimitation
+isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member);
 
 /// Flags that should be applied to the existential argument type after
 /// opening.

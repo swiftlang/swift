@@ -505,6 +505,9 @@ static bool doesStorageProduceLValue(
   if (!storage->isSetterAccessibleFrom(useDC))
     return false;
 
+  //  if (baseType) {
+  //    isMemberAvailableOnExistential(baseType, storage)
+  //  }
   // If there is no base, or the base is an lvalue, then a reference
   // produces an lvalue.
   if (!baseType || baseType->is<LValueType>())

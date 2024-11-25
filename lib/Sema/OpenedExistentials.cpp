@@ -513,8 +513,8 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
   return false;
 }
 
-bool swift::isMemberAvailableOnExistential(
-    Type baseTy, const ValueDecl *member) {
+ExistentialMemberAccessLimitation
+swift::isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member) {
 
   auto &ctx = member->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(baseTy);
@@ -525,27 +525,68 @@ bool swift::isMemberAvailableOnExistential(
   auto origParam = dc->getSelfInterfaceType()->castTo<GenericTypeParamType>();
   auto openedParam = existentialSig.SelfType->castTo<GenericTypeParamType>();
 
+  // An accessor or non-storage member is not available if its interface type
+  // contains a non-covariant reference to a 'Self'-rooted type parameter in the
+  // context of the base type's existential signature.
   auto info = findGenericParameterReferences(
       member, existentialSig.OpenedSig, origParam, openedParam,
       std::nullopt);
 
-  if (info.hasNonCovariantRef()) {
-    return false;
+  auto result = ExistentialMemberAccessLimitation::None;
+  if (!info) {
+    // Nothing to do.
+  } else if (info.hasRef(TypePosition::Invariant)) {
+    // An invariant reference is decisive.
+    result = ExistentialMemberAccessLimitation::Unsupported;
+  } else if (isa<AbstractFunctionDecl>(member)) {
+    // Anything non-covariant is decisive for functions.
+    if (info.hasRef(TypePosition::Contravariant)) {
+      result = ExistentialMemberAccessLimitation::Unsupported;
+    }
+  } else {
+    const auto isGetterUnavailable = info.hasRef(TypePosition::Contravariant);
+    auto isSetterUnavailable = true;
+
+    if (isa<VarDecl>(member)) {
+      // For properties, the setter is unavailable if the interface type has a
+      // covariant reference, which becomes contravariant is the setter.
+      isSetterUnavailable = info.hasRef(TypePosition::Covariant);
+    } else {
+      // For subscripts specifically, we must scan the setter directly because
+      // whether a covariant reference in the interface type becomes
+      // contravariant in the setter depends on the location of the reference
+      // (in the indices or the result type).
+      auto *setter =
+          cast<SubscriptDecl>(member)->getAccessor(AccessorKind::Set);
+      const auto setterInfo = setter ? findGenericParameterReferences(
+                                           setter, existentialSig.OpenedSig,
+                                           origParam, openedParam, std::nullopt)
+                                     : GenericParameterReferenceInfo();
+
+      isSetterUnavailable = setterInfo.hasRef(TypePosition::Contravariant);
+    }
+
+    if (isGetterUnavailable && isSetterUnavailable) {
+      result = ExistentialMemberAccessLimitation::Unsupported;
+    } else if (isGetterUnavailable) {
+      result = ExistentialMemberAccessLimitation::WriteOnly;
+    } else if (isSetterUnavailable) {
+      result = ExistentialMemberAccessLimitation::ReadOnly;
+    }
   }
 
-  // FIXME: Appropriately diagnose assignments instead.
-  if (auto *const storageDecl = dyn_cast<AbstractStorageDecl>(member)) {
-    if (info.hasCovariantGenericParamResult() &&
-        storageDecl->supportsMutation())
-      return false;
-  }
+  // If the member access is not supported whatsoever, we are done.
+  if (result == ExistentialMemberAccessLimitation::Unsupported)
+    return result;
 
+  // Before proceeding with the result, see if we find a generic requirement
+  // that cannot be satisfied; if we do, the member is unavailable after all.
   if (doesMemberHaveUnfulfillableConstraintsWithExistentialBase(existentialSig,
                                                                 member)) {
-    return false;
+    return ExistentialMemberAccessLimitation::Unsupported;
   }
 
-  return true;
+  return result;
 }
 
 std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
