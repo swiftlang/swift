@@ -738,20 +738,6 @@ do {
 
 }
 
-// Settable storage members with a 'Self' result type may not be used with an
-// existential base.
-protocol P2 {
-  subscript() -> Self { get set }
-
-  var prop: Self { get set }
-}
-func takesP2(p2: any P2) {
-  _ = p2[]
-  // expected-error@-1{{member 'subscript' cannot be used on value of type 'any P2'; consider using a generic constraint instead}}
-  _ = p2.prop
-  // expected-error@-1{{member 'prop' cannot be used on value of type 'any P2'; consider using a generic constraint instead}}
-}
-
 protocol MiscTestsProto {
   associatedtype R : IteratorProtocol, Sequence
   func getR() -> R

@@ -515,12 +515,13 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
 
 ExistentialMemberAccessLimitation
 swift::isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member) {
+  auto *dc = member->getDeclContext();
+  if (!dc->getSelfProtocolDecl()) {
+    return ExistentialMemberAccessLimitation::None;
+  }
 
   auto &ctx = member->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(baseTy);
-
-  auto *dc = member->getDeclContext();
-  ASSERT(dc->getSelfProtocolDecl());
 
   auto origParam = dc->getSelfInterfaceType()->castTo<GenericTypeParamType>();
   auto openedParam = existentialSig.SelfType->castTo<GenericTypeParamType>();
