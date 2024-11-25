@@ -29,13 +29,10 @@ using namespace swift;
 
 GenericParameterReferenceInfo &
 GenericParameterReferenceInfo::operator|=(const GenericParameterReferenceInfo &other) {
-  hasCovariantSelfResult |= other.hasCovariantSelfResult;
-  if (other.selfRef > selfRef) {
-    selfRef = other.selfRef;
-  }
-  if (other.assocTypeRef > assocTypeRef) {
-    assocTypeRef = other.assocTypeRef;
-  }
+  DirectRefs |= other.DirectRefs;
+  DepMemberTyRefs |= other.DepMemberTyRefs;
+  HasCovariantGenericParamResult |= other.HasCovariantGenericParamResult;
+
   return *this;
 }
 
@@ -296,9 +293,9 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
   // A direct reference to 'Self'.
   if (type->is<GenericTypeParamType>()) {
     if (position == TypePosition::Covariant && canBeCovariantResult)
-      return GenericParameterReferenceInfo::forCovariantResult();
+      return GenericParameterReferenceInfo::forCovariantGenericParamResult();
 
-    return GenericParameterReferenceInfo::forSelfRef(position);
+    return GenericParameterReferenceInfo::forDirectRef(position);
   }
 
   if (origParam != openedParam) {
@@ -332,7 +329,7 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
   }
 
   // A reference to an associated type rooted on 'Self'.
-  return GenericParameterReferenceInfo::forAssocTypeRef(position);
+  return GenericParameterReferenceInfo::forDependentMemberTypeRef(position);
 }
 
 GenericParameterReferenceInfo
@@ -393,7 +390,7 @@ bool HasSelfOrAssociatedTypeRequirementsRequest::evaluate(
     // For value members, look at their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
       const auto info = findExistentialSelfReferences(valueMember);
-      if (info.selfRef > TypePosition::Covariant || info.assocTypeRef) {
+      if (info.hasNonCovariantRef() || info.hasDependentMemberTypeRef()) {
         return true;
       }
     }
@@ -532,14 +529,14 @@ bool swift::isMemberAvailableOnExistential(
       member, existentialSig.OpenedSig, origParam, openedParam,
       std::nullopt);
 
-  if (info.selfRef > TypePosition::Covariant ||
-      info.assocTypeRef > TypePosition::Covariant) {
+  if (info.hasNonCovariantRef()) {
     return false;
   }
 
   // FIXME: Appropriately diagnose assignments instead.
   if (auto *const storageDecl = dyn_cast<AbstractStorageDecl>(member)) {
-    if (info.hasCovariantSelfResult && storageDecl->supportsMutation())
+    if (info.hasCovariantGenericParamResult() &&
+        storageDecl->supportsMutation())
       return false;
   }
 
@@ -686,8 +683,7 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
       callee, existentialSig.OpenedSig, genericParam,
       existentialSig.SelfType->castTo<GenericTypeParamType>(),
       /*skipParamIdx=*/paramIdx);
-  if (referenceInfo.selfRef > TypePosition::Covariant ||
-      referenceInfo.assocTypeRef > TypePosition::Covariant)
+  if (referenceInfo.hasNonCovariantRef())
     return std::nullopt;
 
   return std::make_tuple(genericParam, paramTypeVar, argTy, adjustments);
