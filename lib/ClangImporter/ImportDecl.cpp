@@ -2532,19 +2532,18 @@ namespace {
 
       enum class RetainReleaseOperationKind {
         notAfunction,
-        doesntReturnVoid,
+        doesntReturnVoidOrSelf,
         invalidParameters,
         valid
       };
 
       auto getOperationValidity =
-          [&](ValueDecl *operation) -> RetainReleaseOperationKind {
+          [&](ValueDecl *operation,
+              CustomRefCountingOperationKind operationKind)
+          -> RetainReleaseOperationKind {
         auto operationFn = dyn_cast<FuncDecl>(operation);
         if (!operationFn)
           return RetainReleaseOperationKind::notAfunction;
-
-        if (!operationFn->getResultInterfaceType()->isVoid())
-          return RetainReleaseOperationKind::doesntReturnVoid;
 
         if (operationFn->getParameters()->size() != 1)
           return RetainReleaseOperationKind::invalidParameters;
@@ -2557,6 +2556,16 @@ namespace {
         }
 
         swift::NominalTypeDecl *paramDecl = paramType->getAnyNominal();
+
+        // The return type should be void (for release functions), or void
+        // or the parameter type (for retain functions).
+        auto resultInterfaceType = operationFn->getResultInterfaceType();
+        if (!resultInterfaceType->isVoid()) {
+          if (operationKind == CustomRefCountingOperationKind::release ||
+              !resultInterfaceType->lookThroughSingleOptionalType()->isEqual(paramType))
+            return RetainReleaseOperationKind::doesntReturnVoidOrSelf;
+        }
+
         // The parameter of the retain/release function should be pointer to the
         // same FRT or a base FRT.
         if (paramDecl != classDecl) {
@@ -2570,6 +2579,7 @@ namespace {
           }
           return RetainReleaseOperationKind::invalidParameters;
         }
+
         return RetainReleaseOperationKind::valid;
       };
 
@@ -2608,7 +2618,8 @@ namespace {
       } else if (retainOperation.kind ==
                  CustomRefCountingOperationResult::foundOperation) {
         RetainReleaseOperationKind operationKind =
-            getOperationValidity(retainOperation.operation);
+            getOperationValidity(retainOperation.operation,
+                                 CustomRefCountingOperationKind::retain);
         HeaderLoc loc(decl->getLocation());
         switch (operationKind) {
         case RetainReleaseOperationKind::notAfunction:
@@ -2617,11 +2628,11 @@ namespace {
               diag::foreign_reference_types_retain_release_not_a_function_decl,
               false, retainOperation.name);
           break;
-        case RetainReleaseOperationKind::doesntReturnVoid:
+        case RetainReleaseOperationKind::doesntReturnVoidOrSelf:
           Impl.diagnose(
               loc,
-              diag::foreign_reference_types_retain_release_non_void_return_type,
-              false, retainOperation.name);
+              diag::foreign_reference_types_retain_non_void_or_self_return_type,
+              retainOperation.name);
           break;
         case RetainReleaseOperationKind::invalidParameters:
           Impl.diagnose(loc,
@@ -2672,7 +2683,8 @@ namespace {
       } else if (releaseOperation.kind ==
                  CustomRefCountingOperationResult::foundOperation) {
         RetainReleaseOperationKind operationKind =
-            getOperationValidity(releaseOperation.operation);
+            getOperationValidity(releaseOperation.operation,
+                                 CustomRefCountingOperationKind::release);
         HeaderLoc loc(decl->getLocation());
         switch (operationKind) {
         case RetainReleaseOperationKind::notAfunction:
@@ -2681,11 +2693,11 @@ namespace {
               diag::foreign_reference_types_retain_release_not_a_function_decl,
               true, releaseOperation.name);
           break;
-        case RetainReleaseOperationKind::doesntReturnVoid:
+        case RetainReleaseOperationKind::doesntReturnVoidOrSelf:
           Impl.diagnose(
               loc,
-              diag::foreign_reference_types_retain_release_non_void_return_type,
-              true, releaseOperation.name);
+              diag::foreign_reference_types_release_non_void_return_type,
+              releaseOperation.name);
           break;
         case RetainReleaseOperationKind::invalidParameters:
           Impl.diagnose(loc,
