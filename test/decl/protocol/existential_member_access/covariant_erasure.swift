@@ -1,5 +1,17 @@
 // RUN: %target-typecheck-verify-swift -target %target-swift-5.9-abi-triple
 
+/// Used to verify the type of an expression. Use like this:
+/// ```
+/// var types = SwiftTypePair(typeOf: expr, type2: SwiftType<Int>.self)
+/// types.assertTypesAreEqual()
+/// ```
+struct SwiftType<T> {}
+struct SwiftTypePair<T1, T2> {
+  init(typeOf: T1, type2: SwiftType<T2>.Type) {}
+
+  mutating func assertTypesAreEqual() where T1 == T2 {}
+}
+
 class ClassBase {}
 class ClassDerived<T>: ClassBase {}
 
@@ -43,18 +55,69 @@ where A1: CovariantAssocTypeErasureDerived,
 do {
   let exist: any CovariantAssocTypeErasure
 
-  let _: Any = exist.method1()
-  let _: AnyObject = exist.method2()
-  let _: any CovariantAssocTypeErasure = exist.method3()
-  let _: ClassBase = exist.method4()
-  let _: ClassBase = exist.method5()
-  let _: any ClassBase & CovariantAssocTypeErasure = exist.method6()
-  let _: any ClassBase & CovariantAssocTypeErasure = exist.method7()
-  let _: Any? = exist.method8()
-  let _: (AnyObject, Bool) = exist.method9()
-  let _: any CovariantAssocTypeErasure.Type = exist.method10()
-  let _: Array<ClassBase> = exist.method11()
-  let _: Dictionary<String, ClassBase> = exist.method12()
+  do {
+    var types = SwiftTypePair(typeOf: exist.method1(), type2: SwiftType<Any>.self)
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(typeOf: exist.method2(), type2: SwiftType<AnyObject>.self)
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method3(),
+      type2: SwiftType<any CovariantAssocTypeErasure>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(typeOf: exist.method4(), type2: SwiftType<ClassBase>.self)
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(typeOf: exist.method5(), type2: SwiftType<ClassBase>.self)
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method6(),
+      type2: SwiftType<any ClassBase & CovariantAssocTypeErasure>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method7(),
+      type2: SwiftType<any ClassBase & CovariantAssocTypeErasure>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(typeOf: exist.method8(), type2: SwiftType<Any?>.self)
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(typeOf: exist.method9(), type2: SwiftType<(AnyObject, Bool)>.self)
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method10(),
+      type2: SwiftType<any CovariantAssocTypeErasure.Type>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(typeOf: exist.method11(), type2: SwiftType<Array<ClassBase>>.self)
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method12(),
+      type2: SwiftType<Dictionary<String, ClassBase>>.self
+    )
+    types.assertTypesAreEqual()
+  }
 
   let _ = exist.method1()
   let _ = exist.method2()
@@ -72,17 +135,82 @@ do {
 do {
   let exist: any CovariantAssocTypeErasureDerived
 
-  let _: any CovariantAssocTypeErasureDerived = exist.method1()
-  let _: ClassBase = exist.method2()
-  let _: any CovariantAssocTypeErasureDerived = exist.method3()
-  let _: any ClassBase & CovariantAssocTypeErasureDerived = exist.method4()
-  let _: any ClassBase & CovariantAssocTypeErasureDerived = exist.method5()
-  let _: any ClassBase & CovariantAssocTypeErasureDerived = exist.method6()
-  let _: any ClassBase & CovariantAssocTypeErasure & Sequence = exist.method7()
-
-  let _: (any CovariantAssocTypeErasureDerived)? = exist.method8()
-  let _: (ClassBase, Bool) = exist.method9()
-  let _: any CovariantAssocTypeErasureDerived.Type = exist.method10()
-  let _: Array<any ClassBase & CovariantAssocTypeErasureDerived> = exist.method11()
-  let _: Dictionary<String, any ClassBase & CovariantAssocTypeErasureDerived> = exist.method12()
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method1(),
+      type2: SwiftType<any CovariantAssocTypeErasureDerived>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(typeOf: exist.method2(), type2: SwiftType<ClassBase>.self)
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method3(),
+      type2: SwiftType<any CovariantAssocTypeErasureDerived>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method4(),
+      type2: SwiftType<any ClassBase & CovariantAssocTypeErasureDerived>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method5(),
+      type2: SwiftType<any ClassBase & CovariantAssocTypeErasureDerived>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method6(),
+      type2: SwiftType<any ClassBase & CovariantAssocTypeErasureDerived>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method7(),
+      type2: SwiftType<any ClassBase & CovariantAssocTypeErasure & Sequence>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method8(),
+      type2: SwiftType<(any CovariantAssocTypeErasureDerived)?>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(typeOf: exist.method9(), type2: SwiftType<(ClassBase, Bool)>.self)
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method10(),
+      type2: SwiftType<any CovariantAssocTypeErasureDerived.Type>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method11(),
+      type2: SwiftType<Array<any ClassBase & CovariantAssocTypeErasureDerived>>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method12(),
+      type2: SwiftType<Dictionary<String, any ClassBase & CovariantAssocTypeErasureDerived>>.self
+    )
+    types.assertTypesAreEqual()
+  }
 }

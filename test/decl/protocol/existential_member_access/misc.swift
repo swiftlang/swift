@@ -1,5 +1,17 @@
 // RUN: %target-typecheck-verify-swift -target %target-swift-5.9-abi-triple
 
+/// Used to verify the type of an expression. Use like this:
+/// ```
+/// var types = SwiftTypePair(typeOf: expr, type2: SwiftType<Int>.self)
+/// types.assertTypesAreEqual()
+/// ```
+struct SwiftType<T> {}
+struct SwiftTypePair<T1, T2> {
+  init(typeOf: T1, type2: SwiftType<T2>.Type) {}
+
+  mutating func assertTypesAreEqual() where T1 == T2 {}
+}
+
 protocol MiscTestsProto {
   associatedtype R : IteratorProtocol, Sequence
   func getR() -> R
@@ -10,7 +22,12 @@ protocol MiscTestsProto {
 }
 do {
   func miscTests(_ arg: any MiscTestsProto) {
-    var r: any Sequence & IteratorProtocol = arg.getR()
+    var r = arg.getR()
+    do {
+      var types = SwiftTypePair(typeOf: r, type2: SwiftType<any Sequence & IteratorProtocol>.self)
+      types.assertTypesAreEqual()
+    }
+
     r.makeIterator() // expected-warning {{result of call to 'makeIterator()' is unused}}
     r.next() // expected-warning {{result of call to 'next()' is unused}}
     r.nonexistent() // expected-error {{value of type 'any IteratorProtocol & Sequence' has no member 'nonexistent'}}

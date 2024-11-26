@@ -1,5 +1,17 @@
 // RUN: %target-typecheck-verify-swift -target %target-swift-5.9-abi-triple
 
+/// Used to verify the type of an expression. Use like this:
+/// ```
+/// var types = SwiftTypePair(typeOf: expr, type2: SwiftType<Int>.self)
+/// types.assertTypesAreEqual()
+/// ```
+struct SwiftType<T> {}
+struct SwiftTypePair<T1, T2> {
+  init(typeOf: T1, type2: SwiftType<T2>.Type) {}
+
+  mutating func assertTypesAreEqual() where T1 == T2 {}
+}
+
 struct Struct<T> {
   class Nested {}
   struct NestedGeneric<U> {}
@@ -46,24 +58,52 @@ do {
   let _ = exist.method3 // expected-error {{member 'method3' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
   let _ = exist.property1 // expected-error {{member 'property1' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
   // Covariant 'Self' erasure works in conjunction with concrete associated types.
-  let _: (Bool, any ConcreteAssocTypes) = exist.property2 // ok
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.property2,
+      type2: SwiftType<(Bool, any ConcreteAssocTypes)>.self
+    )
+    types.assertTypesAreEqual()
+  }
+
   let _ = exist.property3 // expected-error {{member 'property3' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
   let _ = exist[subscript1: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
   let _ = exist[subscript2: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
   let _ = exist[subscript3: false] // expected-error {{member 'subscript' cannot be used on value of type 'any ConcreteAssocTypes'; consider using a generic constraint instead}}
 
-  let _: (
-    Struct<Bool>, (any ConcreteAssocTypes).Type, () -> Bool
-  ) -> any Class<Struct<Bool>.Nested> & ConcreteAssocTypes = exist.method4
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.method4,
+      type2: SwiftType<
+        (
+          Struct<Bool>, (any ConcreteAssocTypes).Type, () -> Bool
+        ) -> any Class<Struct<Bool>.Nested> & ConcreteAssocTypes
+      >.self
+    )
+    types.assertTypesAreEqual()
+  }
 
-  let _: (
-    Struct<Bool>, (any ConcreteAssocTypes).Type, () -> Bool
-  ) -> any Class<Struct<Bool>.Nested> & ConcreteAssocTypes = exist.property4
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist.property4,
+      type2: SwiftType<
+        (
+          Struct<Bool>, (any ConcreteAssocTypes).Type, () -> Bool
+        ) -> any Class<Struct<Bool>.Nested> & ConcreteAssocTypes
+      >.self
+    )
+    types.assertTypesAreEqual()
+  }
 
-  let _: any Class<Struct<Bool>.Nested> & ConcreteAssocTypes =
-  exist[
-    subscript4: Struct<Bool>(), (any ConcreteAssocTypes).self, { true }
-  ]
+  do {
+    var types = SwiftTypePair(
+      typeOf: exist[
+        subscript4: Struct<Bool>(), (any ConcreteAssocTypes).self, { true }
+      ],
+      type2: SwiftType<any Class<Struct<Bool>.Nested> & ConcreteAssocTypes>.self
+    )
+    types.assertTypesAreEqual()
+  }
 }
 
 protocol ConcreteAssocTypeComposition1 {

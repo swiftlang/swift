@@ -50,6 +50,18 @@ do {
   instance[static_invariantSelfSubscript: ()] // expected-error {{static member 'subscript' cannot be used on instance of type 'any TypeMemberOnInstanceAndViceVersa'}}
 }
 
+/// Used to verify the type of an expression. Use like this:
+/// ```
+/// var types = SwiftTypePair(typeOf: expr, type2: SwiftType<Int>.self)
+/// types.assertTypesAreEqual()
+/// ```
+struct SwiftType<T> {}
+struct SwiftTypePair<T1, T2> {
+  init(typeOf: T1, type2: SwiftType<T2>.Type) {}
+
+  mutating func assertTypesAreEqual() where T1 == T2 {}
+}
+
 // Test that covariant erasure turns metatypes into existential metatypes.
 protocol CovariantMetatypes {
   func covariantSelfMetatype1(_: (Self.Type.Type.Type) -> Void)
@@ -73,23 +85,105 @@ protocol CovariantMetatypes {
   subscript(covariantAssocMetatypeSubscript2 _: Void) -> (A.Type, A.Type.Type) { get }
 }
 do {
-  func testCovariantMetatypes(arg: any CovariantMetatypes) {
-    arg.covariantSelfMetatype1 { (_: any CovariantMetatypes.Type.Type.Type) in }
-    let _: (any CovariantMetatypes.Type, any CovariantMetatypes.Type.Type) = arg.covariantSelfMetatype2()
+  let meta: any CovariantMetatypes
 
-    let _: any CovariantMetatypes.Type.Type.Type = arg.covariantSelfMetatypeProp1
-    let _: (any CovariantMetatypes.Type, any CovariantMetatypes.Type.Type) = arg.covariantSelfMetatypeProp2
+  meta.covariantSelfMetatype1 { x in
+    var types = SwiftTypePair(
+      typeOf: x,
+      type2: SwiftType<any CovariantMetatypes.Type.Type.Type>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: meta.covariantSelfMetatype2(),
+      type2: SwiftType<(any CovariantMetatypes.Type, any CovariantMetatypes.Type.Type)>.self
+    )
+    types.assertTypesAreEqual()
+  }
 
-    let _: any CovariantMetatypes.Type = arg[covariantSelfMetatypeSubscript1: { (_: any CovariantMetatypes.Type.Type.Type) in }]
-    let _: (any CovariantMetatypes.Type, any CovariantMetatypes.Type.Type) = arg[covariantSelfMetatypeSubscript2: ()]
+  do {
+    var types = SwiftTypePair(
+      typeOf: meta.covariantSelfMetatypeProp1,
+      type2: SwiftType<any CovariantMetatypes.Type.Type.Type>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: meta.covariantSelfMetatypeProp2,
+      type2: SwiftType<(any CovariantMetatypes.Type, any CovariantMetatypes.Type.Type)>.self
+    )
+    types.assertTypesAreEqual()
+  }
 
-    arg.covariantAssocMetatype1 { (_: Any.Type.Type.Type) in }
-    let _: (Any.Type, Any.Type.Type) = arg.covariantAssocMetatype2()
+  do {
+    var types = SwiftTypePair(
+      typeOf: meta[
+        covariantSelfMetatypeSubscript1: { x in
+          var types = SwiftTypePair(
+            typeOf: x,
+            type2: SwiftType<any CovariantMetatypes.Type.Type.Type>.self
+          )
+          types.assertTypesAreEqual()
+        }
+      ],
+      type2: SwiftType<any CovariantMetatypes.Type>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: meta[covariantSelfMetatypeSubscript2: ()],
+      type2: SwiftType<(any CovariantMetatypes.Type, any CovariantMetatypes.Type.Type)>.self
+    )
+    types.assertTypesAreEqual()
+  }
 
-    let _: Any.Type.Type.Type = arg.covariantAssocMetatypeProp1
-    let _: (Any.Type, Any.Type.Type) = arg.covariantAssocMetatypeProp2
+  meta.covariantAssocMetatype1 { x in
+    var types = SwiftTypePair(typeOf: x, type2: SwiftType<Any.Type.Type.Type>.self)
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: meta.covariantAssocMetatype2(),
+      type2: SwiftType<(Any.Type, Any.Type.Type)>.self
+    )
+    types.assertTypesAreEqual()
+  }
 
-    let _: Any.Type = arg[covariantAssocMetatypeSubscript1: { (_: Any.Type.Type.Type) in }]
-    let _: (Any.Type, Any.Type.Type) = arg[covariantAssocMetatypeSubscript2: ()]
+  do {
+    var types = SwiftTypePair(
+      typeOf: meta.covariantAssocMetatypeProp1,
+      type2: SwiftType<Any.Type.Type.Type>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: meta.covariantAssocMetatypeProp2,
+      type2: SwiftType<(Any.Type, Any.Type.Type)>.self
+    )
+    types.assertTypesAreEqual()
+  }
+
+  do {
+    var types = SwiftTypePair(
+      typeOf: meta[
+        covariantAssocMetatypeSubscript1: { x in
+          var types = SwiftTypePair(typeOf: x, type2: SwiftType<Any.Type.Type.Type>.self)
+          types.assertTypesAreEqual()
+        }
+      ],
+      type2: SwiftType<Any.Type>.self
+    )
+    types.assertTypesAreEqual()
+  }
+  do {
+    var types = SwiftTypePair(
+      typeOf: meta[covariantAssocMetatypeSubscript2: ()],
+      type2: SwiftType<(Any.Type, Any.Type.Type)>.self
+    )
+    types.assertTypesAreEqual()
   }
 }
