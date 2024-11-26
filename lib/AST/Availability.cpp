@@ -554,6 +554,21 @@ const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
   return result;
 }
 
+bool Decl::isUnavailableInCurrentSwiftVersion() const {
+  llvm::VersionTuple vers = getASTContext().LangOpts.EffectiveLanguageVersion;
+  for (auto attr :
+       getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
+    if (attr->isLanguageVersionSpecific()) {
+      if (attr->Introduced.has_value() && attr->Introduced.value() > vers)
+        return true;
+      if (attr->Obsoleted.has_value() && attr->Obsoleted.value() <= vers)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 static const AvailableAttr *
 getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
   auto &ctx = D->getASTContext();

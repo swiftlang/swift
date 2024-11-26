@@ -370,29 +370,6 @@ DeclAttribute *DeclAttribute::clone(ASTContext &ctx) const {
   }
 }
 
-bool
-DeclAttributes::isUnavailableInSwiftVersion(
-  const version::Version &effectiveVersion) const {
-  llvm::VersionTuple vers = effectiveVersion;
-  for (auto attr : *this) {
-    if (auto available = dyn_cast<AvailableAttr>(attr)) {
-      if (available->isInvalid())
-        continue;
-
-      if (available->isLanguageVersionSpecific()) {
-        if (available->Introduced.has_value() &&
-            available->Introduced.value() > vers)
-          return true;
-        if (available->Obsoleted.has_value() &&
-            available->Obsoleted.value() <= vers)
-          return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 const AvailableAttr *
 DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx,
                                                bool ignoreAppExtensions) const {

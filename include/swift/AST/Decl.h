@@ -1402,6 +1402,10 @@ public:
   /// will be deprecated in the future, or `nullptr` otherwise.
   const AvailableAttr *getSoftDeprecatedAttr() const;
 
+  /// Returns true if the decl has been marked unavailable in the Swift language
+  /// version that is currently active.
+  bool isUnavailableInCurrentSwiftVersion() const;
+
   /// Returns true if the decl is always unavailable in the current compilation
   /// context. For example, the decl could be marked explicitly unavailable on
   /// either the current platform or in the current language mode. Returns false

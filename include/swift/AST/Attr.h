@@ -2925,11 +2925,6 @@ public:
     return UnaryOperatorKind::None;
   }
 
-  /// Determine whether there is a swiftVersionSpecific attribute that's
-  /// unavailable relative to the provided language version.
-  bool
-  isUnavailableInSwiftVersion(const version::Version &effectiveVersion) const;
-
   /// Finds the most-specific platform-specific attribute that is
   /// active for the current platform.
   const AvailableAttr *

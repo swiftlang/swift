@@ -453,9 +453,7 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
   // Predicate that determines whether a lookup result should
   // be unavailable except as a last-ditch effort.
   auto unavailableLookupResult = [&](const LookupResultEntry &result) {
-    auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
-    return result.getValueDecl()->getAttrs().isUnavailableInSwiftVersion(
-        effectiveVersion);
+    return result.getValueDecl()->isUnavailableInCurrentSwiftVersion();
   };
 
   // If all of the results we found are unavailable, keep looking.
