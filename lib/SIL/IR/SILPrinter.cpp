@@ -3079,7 +3079,8 @@ public:
       break;
     }
     case KeyPathPatternComponent::Kind::GettableProperty:
-    case KeyPathPatternComponent::Kind::SettableProperty: {
+    case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method: {
       *this << (kind == KeyPathPatternComponent::Kind::GettableProperty
                   ? "gettable_property $" : "settable_property $")
             << component.getComponentType() << ", "

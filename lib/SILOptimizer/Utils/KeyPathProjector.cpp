@@ -641,6 +641,7 @@ private:
             (comp, std::move(parent), loc, builder);
         break;
       case KeyPathPatternComponent::Kind::GettableProperty:
+      case KeyPathPatternComponent::Kind::Method:
         projector = std::make_unique<GettablePropertyProjector>
             (keyPath, comp, std::move(parent), keyPath->getSubstitutions(),
              beginAccess, loc, builder);
