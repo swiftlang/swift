@@ -66,7 +66,7 @@ If no such Windows SDK is installed, it will be downloaded from nuget.
 Include the ds2 remote debug server in the SDK.
 This component is currently only supported in Android builds.
 
-.PARAMETER IncludeSanitizers
+.PARAMETER BuildSanitizers
 If set, include ASAN and UBSAN artifacts in the toolchain.
 
 .PARAMETER SkipBuild
@@ -138,7 +138,7 @@ param(
   [switch] $SkipRedistInstall = $false,
   [switch] $SkipPackaging = $false,
   [switch] $IncludeDS2 = $false,
-  [switch] $IncludeSanitizers = $false,
+  [switch] $BuildSanitizers = $false,
   [string[]] $Test = @(),
   [string] $Stage = "",
   [string] $BuildTo = "",
@@ -2775,7 +2775,7 @@ if (-not $SkipBuild) {
 
   Invoke-BuildStep Build-CMark $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
-  if ($IncludeSanitizers) {
+  if ($BuildSanitizers) {
     $InstallTo = "$($HostArch.ToolchainInstallRoot)\usr"
     foreach ($Arch in $WindowsSDKArchs) {
       Invoke-BuildStep Build-Sanitizers Windows $Arch $InstallTo
