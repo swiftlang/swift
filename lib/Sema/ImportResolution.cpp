@@ -192,6 +192,11 @@ public:
 
   void addImplicitImports();
 
+  void addImplicitImport(ModuleDecl *module) {
+    boundImports.push_back(ImportedModule(module));
+    bindPendingImports();
+  }
+
   /// Retrieve the finalized imports.
   ArrayRef<AttributedImport<ImportedModule>> getFinishedImports() const {
     return boundImports;
@@ -299,6 +304,22 @@ void swift::performImportResolution(SourceFile &SF) {
 
   SF.ASTStage = SourceFile::ImportsResolved;
   verify(SF);
+}
+
+void swift::performImportResolutionForClangMacroBuffer(
+    SourceFile &SF, ModuleDecl *clangModule
+) {
+  // If we've already performed import resolution, bail.
+  if (SF.ASTStage == SourceFile::ImportsResolved)
+    return;
+
+  ImportResolver resolver(SF);
+  resolver.addImplicitImport(clangModule);
+
+  SF.setImports(resolver.getFinishedImports());
+  SF.setImportedUnderlyingModule(resolver.getUnderlyingClangModule());
+
+  SF.ASTStage = SourceFile::ImportsResolved;
 }
 
 //===----------------------------------------------------------------------===//

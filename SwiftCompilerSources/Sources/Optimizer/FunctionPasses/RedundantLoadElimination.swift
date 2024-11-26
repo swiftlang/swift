@@ -480,9 +480,14 @@ private struct InstructionScanner {
 
   private mutating func visit(instruction: Instruction) -> ScanResult {
     switch instruction {
-    case is FixLifetimeInst, is EndAccessInst, is BeginBorrowInst, is EndBorrowInst:
-      return .transparent
-
+    case is FixLifetimeInst, is EndAccessInst, is EndBorrowInst:
+      // Those scope-ending instructions are only irrelevant if the preceding load is not changed.
+      // If it is changed from `load [copy]` -> `load [take]` the memory effects of those scope-ending
+      // instructions prevent that the `load [take]` will illegally mutate memory which is protected
+      // from mutation by the scope.
+      if load.loadOwnership != .take {
+        return .transparent
+      }
     case let precedingLoad as LoadInst:
       if precedingLoad == load {
         // We need to stop the data flow analysis when we visit the original load again.

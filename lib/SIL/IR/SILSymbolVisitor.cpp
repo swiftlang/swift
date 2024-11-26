@@ -823,6 +823,11 @@ public:
             Visitor.addDispatchThunk(declRef);
             Visitor.addMethodDescriptor(declRef);
           }
+          auto *decl =
+              llvm::dyn_cast_or_null<AbstractFunctionDecl>(declRef.getDecl());
+          if (decl && decl->hasBody()) {
+            Visitor.addFunction(declRef);
+          }
         }
 
         void addAssociatedType(AssociatedType associatedType) {

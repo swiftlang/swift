@@ -2429,7 +2429,7 @@ Parser::parseMacroRoleAttribute(
   bool sawConformances = false;
   bool sawNames = false;
   SmallVector<MacroIntroducedDeclName, 2> names;
-  SmallVector<TypeExpr *, 2> conformances;
+  SmallVector<Expr *, 2> conformances;
   auto argumentsStatus = parseList(
       tok::r_paren, lParenLoc, rParenLoc,
       /*AllowSepAfterLast=*/false, diag::expected_rparen_expr_list, [&] {
@@ -2525,9 +2525,9 @@ Parser::parseMacroRoleAttribute(
           sawConformances = true;
 
           // Parse the introduced conformances
-          auto type = parseType();
-          auto *typeExpr = new (Context) TypeExpr(type.get());
-          conformances.push_back(typeExpr);
+          auto expr = parseExpr(diag::expected_type);
+          if (expr.isNonNull())
+            conformances.push_back(expr.get());
 
           return status;
         }
@@ -6089,21 +6089,9 @@ static Parser::ParseDeclOptions getParseDeclOptions(DeclContext *DC) {
 ///     decl-import
 ///     decl-operator
 /// \endverbatim
-///
-/// \param fromASTGen If true , this function in called from ASTGen as the
-/// fallback, so do not attempt a callback to ASTGen.
 ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
                                bool IfConfigsAreDeclAttrs,
-                               llvm::function_ref<void(Decl *)> Handler,
-                               bool fromASTGen) {
-#if SWIFT_BUILD_SWIFT_SYNTAX
-  if (IsForASTGen && !fromASTGen) {
-    auto result = parseDeclFromSyntaxTree();
-    if (auto resultDecl = result.getPtrOrNull())
-      Handler(resultDecl);
-    return result;
-  }
-#endif
+                               llvm::function_ref<void(Decl *)> Handler) {
   ParseDeclOptions Flags = getParseDeclOptions(CurDeclContext);
   ParserPosition BeginParserPosition;
   if (isIDEInspectionFirstPass())

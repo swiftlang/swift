@@ -244,6 +244,17 @@ bool ArrayAllocation::replaceGetElements() {
     if (EltValueIt == ElementValueMap.end())
       continue;
 
+    SILValue element = EltValueIt->second;
+
+    // In OSSA we only insert a copy_value of the element at the array initialization
+    // point. This would result in an over-consume if the getElement is in a loop.
+    // Therefore require that both semantic calls are in the same block.
+    if (ArrayValue->getFunction()->hasOwnership() &&
+        !element->getType().isTrivial(ArrayValue->getFunction()) &&
+        ArrayValue->getParentBlock() != GetElementCall->getParent()) {
+      continue;
+    }
+
     Changed |= GetElement.replaceByValue(EltValueIt->second);
   }
   return Changed;

@@ -74,6 +74,8 @@ FEATURE(IsolatedAny,                                    (6, 0))
 FEATURE(NoncopyableGenerics,                            (6, 0))
 FEATURE(InitRawStructMetadata,                          (6, 0))
 
+FEATURE(LayoutStringValueWitnesses,                     (6, 1))
+
 FEATURE(TaskExecutor,                                   FUTURE)
 FEATURE(Differentiation,                                FUTURE)
 FEATURE(ClearSensitive,                                 FUTURE)

@@ -1919,3 +1919,23 @@ bb6:
   %17 = tuple ()
   return %17 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @simplify_switch_enum_unreachable :
+// CHECK-NOT:     switch_enum
+// CHECK:       } // end sil function 'simplify_switch_enum_unreachable'
+sil [ossa] @simplify_switch_enum_unreachable : $@convention(thin) (A) -> () {
+bb0(%0 : $A):
+  switch_enum %0 : $A, case #A.B!enumelt: bb1, default bb2
+
+bb1:
+  unreachable
+
+bb2(%defaultArg : $A):
+  apply undef(%defaultArg) : $@convention(thin) (A) -> ()
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+

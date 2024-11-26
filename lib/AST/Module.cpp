@@ -862,6 +862,7 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
       // replaced function bodies. The body is actually different code to the
       // original file.
     case GeneratedSourceInfo::PrettyPrinted:
+    case GeneratedSourceInfo::Attribute:
       // No original location, return the original buffer/location
       return {startBufferID, startLoc};
     }
@@ -1148,6 +1149,7 @@ std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::Attribute:
     return std::nullopt;
   }
 }

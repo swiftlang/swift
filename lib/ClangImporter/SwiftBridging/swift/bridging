@@ -39,6 +39,12 @@
 
 #define _CXX_INTEROP_STRINGIFY(_x) #_x
 
+#define _CXX_INTEROP_CONCAT_(a,b,c,d,e,f,g,i,j,k,l,m,n,o,p,...)         \
+  #a "," #b "," #c "," #d "," #e "," #f "," #g "," #i "," #j "," #k "," \
+  #l "," #m "," #n "," #o "," #p
+#define _CXX_INTEROP_CONCAT(...) \
+  _CXX_INTEROP_CONCAT_(__VA_ARGS__,,,,,,,,,,,,,,,,,)
+
 /// Specifies that a C++ `class` or `struct` is reference-counted using
 /// the given `retain` and `release` functions. This annotation lets Swift import
 /// such a type as reference counted type in Swift, taking advantage of Swift's
@@ -172,6 +178,11 @@
 #define SWIFT_ESCAPABLE \
   __attribute__((swift_attr("Escapable")))
 
+/// Specifies that a C++ `class` or `struct` should be imported as a escapable
+/// Swift value if all of the specified template arguments are escapable.
+#define SWIFT_ESCAPABLE_IF(...) \
+  __attribute__((swift_attr("escapable_if:" _CXX_INTEROP_CONCAT(__VA_ARGS__))))
+
 /// Specifies that the return value is passed as owned for C++ functions and
 /// methods returning types annotated as `SWIFT_SHARED_REFERENCE`
 #define SWIFT_RETURNS_RETAINED __attribute__((swift_attr("returns_retained")))
@@ -196,6 +207,7 @@
 #define SWIFT_NONCOPYABLE
 #define SWIFT_NONESCAPABLE
 #define SWIFT_ESCAPABLE
+#define SWIFT_ESCAPABLE_IF(...)
 #define SWIFT_RETURNS_RETAINED
 #define SWIFT_RETURNS_UNRETAINED
 

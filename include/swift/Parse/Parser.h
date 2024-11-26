@@ -169,10 +169,6 @@ public:
   bool InSwiftKeyPath = false;
   bool InFreestandingMacroArgument = false;
 
-  /// This Parser is a fallback parser for ASTGen.
-  // Note: This doesn't affect anything in non-SWIFT_BUILD_SWIFT_SYNTAX envs.
-  bool IsForASTGen = false;
-
   /// Whether we should delay parsing nominal type, extension, and function
   /// bodies.
   bool isDelayedParsingEnabled() const;
@@ -957,8 +953,7 @@ public:
 
   ParserStatus parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
                          bool IfConfigsAreDeclAttrs,
-                         llvm::function_ref<void(Decl *)> Handler,
-                         bool fromASTGen = false);
+                         llvm::function_ref<void(Decl *)> Handler);
 
   std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
@@ -1396,8 +1391,7 @@ public:
   ParserResult<TypeRepr> parseType();
   ParserResult<TypeRepr>
   parseType(Diag<> MessageID,
-            ParseTypeReason reason = ParseTypeReason::Unspecified,
-            bool fromASTGen = false);
+            ParseTypeReason reason = ParseTypeReason::Unspecified);
 
   /// Parse a type optionally prefixed by a list of named opaque parameters. If
   /// no params present, return 'type'. Otherwise, return 'type-named-opaque'.
@@ -1413,9 +1407,9 @@ public:
       Diag<> MessageID, ParseTypeReason reason);
 
   ParserResult<TypeRepr> parseTypeOrValue();
-  ParserResult<TypeRepr> parseTypeOrValue(Diag<> MessageID,
-                          ParseTypeReason reason = ParseTypeReason::Unspecified,
-                          bool fromASTGen = false);
+  ParserResult<TypeRepr>
+  parseTypeOrValue(Diag<> MessageID,
+                   ParseTypeReason reason = ParseTypeReason::Unspecified);
 
   /// Parse layout constraint.
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
@@ -1975,7 +1969,7 @@ public:
 
   bool isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                         ArrayRef<ASTNode> ParsedDecls);
-  ParserResult<Stmt> parseStmt(bool fromASTGen = false);
+  ParserResult<Stmt> parseStmt();
   ParserStatus parseExprOrStmt(ASTNode &Result);
   ParserResult<Stmt> parseStmtBreak();
   ParserResult<Stmt> parseStmtContinue();
@@ -2102,20 +2096,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Code completion second pass.
 
-  void performIDEInspectionSecondPassImpl(
-      IDEInspectionDelayedDeclState &info);
-
-  //===--------------------------------------------------------------------===//
-  // ASTGen support.
-
-  /// Parse a TypeRepr from the syntax tree. i.e. SF->getExportedSourceFile()
-  ParserResult<TypeRepr> parseTypeReprFromSyntaxTree();
-  /// Parse a Stmt from the syntax tree. i.e. SF->getExportedSourceFile()
-  ParserResult<Stmt> parseStmtFromSyntaxTree();
-  /// Parse a Decl from the syntax tree. i.e. SF->getExportedSourceFile()
-  ParserResult<Decl> parseDeclFromSyntaxTree();
-  /// Parse an Expr from the syntax tree. i.e. SF->getExportedSourceFile()
-  ParserResult<Expr> parseExprFromSyntaxTree();
+  void performIDEInspectionSecondPassImpl(IDEInspectionDelayedDeclState &info);
 };
 
 /// To assist debugging parser crashes, tell us the location of the

@@ -139,6 +139,7 @@ sil @use_2_64 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
 sil @use_a : $@convention(thin) (A) -> ()
 sil @use_twofield : $@convention(thin) (TwoField) -> ()
 sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> TwoField
+sil @consumeB : $@convention(thin) (@owned B) -> ()
 
 // We have a bug in the old projection code which this test case exposes.
 // Make sure its handled properly in the new projection.
@@ -1492,3 +1493,41 @@ bb0:
   dealloc_stack %1 : $*Optional<B>
   return %3 : $Optional<B>
 }
+
+// CHECK-LABEL: sil [ossa] @dont_take_in_borrow_scope :
+// CHECK:         load [copy]
+// CHECK:         end_borrow
+// CHECK:         load [take]
+// CHECK-LABEL: } // end sil function 'dont_take_in_borrow_scope'
+sil [ossa] @dont_take_in_borrow_scope : $@convention(thin) (@in B) -> () {
+bb0(%0 : $*B):
+  %1 = load_borrow %0 : $*B
+  %2 = load [copy] %0 : $*B
+  %3 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned B) -> ()
+  end_borrow %1 : $B
+  %6 = load [take] %0 : $*B
+  %7 = apply %3(%6) : $@convention(thin) (@owned B) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_in_borrow_scope :
+// CHECK:         load [copy]
+// CHECK:         copy_value
+// CHECK:         end_borrow
+// CHECK-NOT:     load
+// CHECK-LABEL: } // end sil function 'copy_in_borrow_scope'
+sil [ossa] @copy_in_borrow_scope : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = load_borrow %0 : $*B
+  %2 = load [copy] %0 : $*B
+  %3 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned B) -> ()
+  end_borrow %1 : $B
+  %6 = load [copy] %0 : $*B
+  %7 = apply %3(%6) : $@convention(thin) (@owned B) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+

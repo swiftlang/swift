@@ -10149,6 +10149,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         if (!isa_and_nonnull<FuncDecl>(decl))
           return false;
 
+        if (!decl->isInstanceMember())
+          return false;
+
         auto hasAppliedSelf = decl->hasCurriedSelf() &&
                               doesMemberRefApplyCurriedSelf(baseObjTy, decl);
         return getNumApplications(decl, hasAppliedSelf, functionRefKind) <

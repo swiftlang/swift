@@ -93,10 +93,15 @@ enum X {
   case C(Int32)
 }
 
-// CHECK-LABEL: simplify_switch_include_args
+// CHECK-LABEL: sil [ossa] @simplify_switch_include_args :
+// CHECK:         tuple
+// CHECK-NEXT:    enum $X
+// CHECK-NEXT:    unchecked_enum_data
+// CHECK-NEXT:    tuple_extract
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'simplify_switch_include_args'
 sil [ossa] @simplify_switch_include_args : $@convention(thin) (Int32, Int32) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32):
-// CHECK: return %0 : $Int32
   %2 = tuple (%0 : $Int32, %1 : $Int32)
   %3 = enum $X, #X.B!enumelt, %2 : $(Int32, Int32)
   switch_enum %3 : $X, case #X.A!enumelt: bb1, case #X.B!enumelt: bb3, case #X.C!enumelt: bb5
