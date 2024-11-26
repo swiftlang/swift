@@ -404,48 +404,6 @@ DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx,
   return bestAttr;
 }
 
-const AvailableAttr *DeclAttributes::getNoAsync(const ASTContext &ctx) const {
-  const AvailableAttr *bestAttr = nullptr;
-  for (const DeclAttribute *attr : *this) {
-    if (const AvailableAttr *avAttr = dyn_cast<AvailableAttr>(attr)) {
-      if (avAttr->isInvalid())
-        continue;
-
-      if (avAttr->getPlatformAgnosticAvailability() ==
-          PlatformAgnosticAvailabilityKind::NoAsync) {
-        // An API may only be unavailable on specific platforms.
-        // If it doesn't have a platform associated with it, then it's
-        // unavailable for all platforms, so we should include it. If it does
-        // have a platform and we are not that platform, then it doesn't apply
-        // to us.
-        const bool isGoodForPlatform =
-            (avAttr->hasPlatform() && avAttr->isActivePlatform(ctx)) ||
-            !avAttr->hasPlatform();
-
-        if (!isGoodForPlatform)
-          continue;
-
-        if (!bestAttr) {
-          // If there is no best attr selected
-          // and the attr either has an active platform, or doesn't have one at
-          // all, select it.
-          bestAttr = avAttr;
-        } else if (bestAttr && avAttr->hasPlatform() &&
-                   bestAttr->hasPlatform() &&
-                   inheritsAvailabilityFromPlatform(avAttr->getPlatform(),
-                                                    bestAttr->getPlatform())) {
-          // if they both have a viable platform, use the better one
-          bestAttr = avAttr;
-        } else if (avAttr->hasPlatform() && !bestAttr->hasPlatform()) {
-          // Use the one more specific
-          bestAttr = avAttr;
-        }
-      }
-    }
-  }
-  return bestAttr;
-}
-
 const BackDeployedAttr *
 DeclAttributes::getBackDeployed(const ASTContext &ctx,
                                 bool forTargetVariant) const {

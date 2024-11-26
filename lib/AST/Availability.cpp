@@ -554,6 +554,42 @@ const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
   return result;
 }
 
+const AvailableAttr *Decl::getNoAsyncAttr() const {
+  auto &ctx = getASTContext();
+  const AvailableAttr *bestAttr = nullptr;
+
+  for (auto attr :
+       getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
+
+    if (attr->getPlatformAgnosticAvailability() !=
+        PlatformAgnosticAvailabilityKind::NoAsync)
+      continue;
+
+    if (attr->hasPlatform() && !attr->isActivePlatform(ctx))
+      continue;
+
+    if (!bestAttr) {
+      bestAttr = attr;
+      continue;
+    }
+
+    if (!bestAttr) {
+      // If there is no best attr selected  and the attr either has an active
+      // platform, or doesn't have one at all, select it.
+      bestAttr = attr;
+    } else if (bestAttr && attr->hasPlatform() && bestAttr->hasPlatform() &&
+               inheritsAvailabilityFromPlatform(attr->getPlatform(),
+                                                bestAttr->getPlatform())) {
+      // if they both have a viable platform, use the better one
+      bestAttr = attr;
+    } else if (attr->hasPlatform() && !bestAttr->hasPlatform()) {
+      // Use the one more specific
+      bestAttr = attr;
+    }
+  }
+  return bestAttr;
+}
+
 bool Decl::isUnavailableInCurrentSwiftVersion() const {
   llvm::VersionTuple vers = getASTContext().LangOpts.EffectiveLanguageVersion;
   for (auto attr :

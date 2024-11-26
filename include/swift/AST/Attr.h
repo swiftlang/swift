@@ -2931,11 +2931,6 @@ public:
   findMostSpecificActivePlatform(const ASTContext &ctx,
                                  bool ignoreAppExtensions = false) const;
 
-  /// Returns the first @available attribute that indicates
-  /// a declaration is unavailable from asynchronous contexts, or null
-  /// otherwise.
-  const AvailableAttr *getNoAsync(const ASTContext &ctx) const;
-
   /// Returns the `@backDeployed` attribute that is active for the current
   /// platform.
   const BackDeployedAttr *getBackDeployed(const ASTContext &ctx,

@@ -1402,6 +1402,10 @@ public:
   /// will be deprecated in the future, or `nullptr` otherwise.
   const AvailableAttr *getSoftDeprecatedAttr() const;
 
+  /// Returns the first @available attribute that indicates this decl is
+  /// unavailable from asynchronous contexts, or `nullptr` otherwise.
+  const AvailableAttr *getNoAsyncAttr() const;
+
   /// Returns true if the decl has been marked unavailable in the Swift language
   /// version that is currently active.
   bool isUnavailableInCurrentSwiftVersion() const;
