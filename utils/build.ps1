@@ -2777,8 +2777,12 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Compilers $HostArch
   if ($IncludeSanitizers) {
     $InstallTo = "$($HostArch.ToolchainInstallRoot)\usr"
-    Invoke-BuildStep Build-Sanitizers Windows $ArchX64 $InstallTo
-    Invoke-BuildStep Build-Sanitizers Windows $ArchARM64 $InstallTo
+    foreach ($Arch in $WindowsSDKArchs) {
+      Invoke-BuildStep Build-Sanitizers Windows $Arch $InstallTo
+    }
+    foreach ($Arch in $AndroidSDKArchs) {
+      Invoke-BuildStep Build-Sanitizers Windows $Arch $InstallTo
+    }
   }
 }
 
