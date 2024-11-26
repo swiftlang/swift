@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %S/Inputs/def_structA.swift
 
 // This uses '-primary-file' to ensure we're conservative with lazy SIL emission.
-// RUN: %target-swift-emit-silgen -primary-file %s -I %t | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -primary-file %s -I %t | %FileCheck %s
 
 import def_structA
 

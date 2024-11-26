@@ -1,10 +1,10 @@
-// RUN: %target-swift-emit-silgen                           \
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types                           \
 // RUN:     %s                                              \
 // RUN:     -enable-library-evolution                       \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-NORMAL,CHECK-%target-abi-stability
 
-// RUN: %target-swift-emit-silgen                                              \
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types                                              \
 // RUN:     %s                                                                 \
 // RUN:     -enable-library-evolution                                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors                    \

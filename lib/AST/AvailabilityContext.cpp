@@ -58,7 +58,7 @@ bool AvailabilityContext::PlatformInfo::constrainWith(const Decl *decl) {
     isConstrained |= constrainRange(Range, *range);
 
   if (auto *attr = decl->getAttrs().getUnavailable(ctx)) {
-    isConstrained |= constrainUnavailability(attr->Platform);
+    isConstrained |= constrainUnavailability(attr->getPlatform());
     isConstrained |=
         CONSTRAIN_BOOL(IsUnavailableInEmbedded, attr->isForEmbedded());
   }
@@ -124,13 +124,24 @@ void AvailabilityContext::Storage::Profile(llvm::FoldingSetNodeID &id) const {
   Platform.Profile(id);
 }
 
-AvailabilityContext AvailabilityContext::getDefault(ASTContext &ctx) {
-  PlatformInfo platformInfo{AvailabilityRange::forInliningTarget(ctx),
-                            PlatformKind::none,
+AvailabilityContext
+AvailabilityContext::forPlatformRange(const AvailabilityRange &range,
+                                      ASTContext &ctx) {
+  PlatformInfo platformInfo{range, PlatformKind::none,
                             /*IsUnavailable*/ false,
                             /*IsUnavailableInEmbedded*/ false,
                             /*IsDeprecated*/ false};
   return AvailabilityContext(Storage::get(platformInfo, ctx));
+}
+
+AvailabilityContext AvailabilityContext::forInliningTarget(ASTContext &ctx) {
+  return AvailabilityContext::forPlatformRange(
+      AvailabilityRange::forInliningTarget(ctx), ctx);
+}
+
+AvailabilityContext AvailabilityContext::forDeploymentTarget(ASTContext &ctx) {
+  return AvailabilityContext::forPlatformRange(
+      AvailabilityRange::forDeploymentTarget(ctx), ctx);
 }
 
 AvailabilityContext

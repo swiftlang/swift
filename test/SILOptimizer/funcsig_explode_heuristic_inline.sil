@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all -sil-inline-generics -inline -function-signature-opts -enable-expand-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all -sil-inline-generics -inline -function-signature-opts -enable-expand-all %s | %FileCheck %s
 
 sil_stage canonical
 

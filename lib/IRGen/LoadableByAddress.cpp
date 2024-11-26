@@ -2590,6 +2590,10 @@ void LoadableByAddress::recreateSingleApply(
     // Use the new token result.
     oldApply->getTokenResult()->replaceAllUsesWith(newApply->getTokenResult());
 
+    if (auto *allocation = oldApply->getCalleeAllocationResult()) {
+      allocation->replaceAllUsesWith(newApply->getCalleeAllocationResult());
+    }
+
     // Rewrite all the yields.
     auto oldYields = oldApply->getOrigCalleeType()->getYields();
     auto oldYieldedValues = oldApply->getYieldedValues();

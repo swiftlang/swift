@@ -567,6 +567,15 @@ public:
   /// dependencies in the scanner itself.
   bool ScannerModuleValidation = false;
 
+  /// Whether this compilation should attempt to resolve in-package
+  /// imports of its module dependencies.
+  ///
+  /// Source compilation and 'package' textual interface compilation both
+  /// require that package-only imports of module dependencies be resolved.
+  /// Otherwise, compilation of non-package textual interfaces, even if
+  /// "in-package", must not require package-only module dependencies.
+  bool ResolveInPackageModuleDependencies = false;
+
   /// Return all module search paths that (non-recursively) contain a file whose
   /// name is in \p Filenames.
   SmallVector<const ModuleSearchPath *, 4>

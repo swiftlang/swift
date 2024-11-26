@@ -130,8 +130,7 @@ swift::getDistributedActorAsActorConformanceRef(ASTContext &C) {
   auto distributedActorAsActorConformance =
       getDistributedActorAsActorConformance(C);
 
-  auto actorProto = C.getProtocol(KnownProtocolKind::Actor);
-  return ProtocolConformanceRef(actorProto, distributedActorAsActorConformance);
+  return ProtocolConformanceRef(distributedActorAsActorConformance);
 }
 NormalProtocolConformance *
 swift::getDistributedActorAsActorConformance(ASTContext &C) {

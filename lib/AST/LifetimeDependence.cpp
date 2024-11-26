@@ -216,7 +216,15 @@ static Type getResultOrYield(AbstractFunctionDecl *afd) {
 }
 
 static bool hasEscapableResultOrYield(AbstractFunctionDecl *afd) {
-  return getResultOrYield(afd)->isEscapable();
+  auto resultType = getResultOrYield(afd);
+  // FIXME: This check is temporary until rdar://139976667 is fixed.
+  // ModuleType created with ModuleType::get methods are ~Copyable and
+  // ~Escapable because the Copyable and Escapable conformance is not added to
+  // them by default.
+  if (resultType->is<ModuleType>()) {
+    return true;
+  }
+  return resultType->isEscapable();
 }
 
 static std::optional<LifetimeDependenceKind>
@@ -433,8 +441,7 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromDependsOn(
     auto kind = descriptor.getParsedLifetimeDependenceKind();
 
     if (kind == ParsedLifetimeDependenceKind::Scope &&
-        (!isGuaranteedParameterInCallee(paramConvention) &&
-         !isMutatingParameter(paramConvention))) {
+        isConsumedParameterInCallee(paramConvention)) {
       diags.diagnose(loc, diag::lifetime_dependence_cannot_use_kind, "_scope",
                      getStringForParameterConvention(paramConvention));
       return true;
@@ -508,28 +515,18 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     return std::nullopt;
   }
 
+  if (afd->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
+    return std::nullopt;
+  }
+
   // Setters infer 'self' dependence on 'newValue'.
   if (auto accessor = dyn_cast<AccessorDecl>(afd)) {
     if (accessor->getAccessorKind() == AccessorKind::Set) {
       return inferSetter(accessor);
     }
-  } else if (auto *fd = dyn_cast<FuncDecl>(afd)) {
-    // Infer self dependence for a mutating function with no result.
-    //
-    // FIXME: temporary hack until we have dependsOn(self: param) syntax.
-    // Do not apply this to accessors (_modify). _modify is handled below like
-    // a mutating method.
-    if (fd->isMutating() && fd->getResultInterfaceType()->isVoid() &&
-        !dc->getSelfTypeInContext()->isEscapable()) {
-      return inferMutatingSelf(afd);
-    }
   }
 
   if (hasEscapableResultOrYield(afd)) {
-    return std::nullopt;
-  }
-
-  if (afd->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
     return std::nullopt;
   }
 
@@ -545,6 +542,11 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     if (cd->getParameters()->size() == 0) {
       return std::nullopt;
     }
+  }
+
+  if (!ctx.LangOpts.hasFeature(Feature::LifetimeDependence)) {
+    diags.diagnose(returnLoc, diag::lifetime_dependence_feature_required);
+    return std::nullopt;
   }
 
   if (!cd && afd->hasImplicitSelfDecl()) {

@@ -137,7 +137,7 @@ getModifiedFunctionDeclList(const SourceFile &SF, SourceManager &tmpSM,
   registerParseRequestFunctions(tmpCtx.evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx.evaluator);
 
-  ModuleDecl *tmpM = ModuleDecl::create(Identifier(), tmpCtx);
+  ModuleDecl *tmpM = ModuleDecl::createEmpty(Identifier(), tmpCtx);
   auto tmpBufferID = tmpSM.addNewSourceBuffer(std::move(*tmpBuffer));
   SourceFile *tmpSF = new (tmpCtx)
       SourceFile(*tmpM, SF.Kind, tmpBufferID, SF.getParsingOptions());

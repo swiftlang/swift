@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-objc-interop -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-objc-interop -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 class X {
   init() {

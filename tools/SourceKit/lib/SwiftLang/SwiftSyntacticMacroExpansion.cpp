@@ -30,7 +30,7 @@ void SwiftLangSupport::expandMacroSyntactically(
     CategorizedEditsReceiver receiver) {
 
   std::string error;
-  auto instance = SyntacticMacroExpansions->getInstance(args, error);
+  auto instance = SyntacticMacroExpansions->getInstance(args, inputBuf, error);
   if (!instance) {
     return receiver(
         RequestResult<ArrayRef<CategorizedEdits>>::fromError(error));
@@ -85,6 +85,6 @@ void SwiftLangSupport::expandMacroSyntactically(
   }
 
   RequestRefactoringEditConsumer consumer(receiver);
-  instance->expandAll(inputBuf, expansions, consumer);
+  instance->expandAll(expansions, consumer);
   // consumer automatically send the results on destruction.
 }

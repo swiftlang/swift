@@ -8349,8 +8349,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
 void ConstraintSystem::recordSynthesizedConformance(
                                            ConstraintLocator *locator,
-                                           ProtocolConformanceRef conformance) {
-  bool inserted = SynthesizedConformances.insert({locator, conformance}).second;
+                                           ProtocolDecl *proto) {
+  bool inserted = SynthesizedConformances.insert({locator, proto}).second;
   ASSERT(inserted);
 
   if (solverState)
@@ -8512,13 +8512,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       // dynamically during IRGen.
       if (auto *witness = dyn_cast<FuncDecl>(witnessInfo->first)) {
         auto synthesizeConformance = [&]() {
-          ProtocolConformanceRef synthesized(protocol);
           auto witnessLoc = getConstraintLocator(
               locator.getAnchor(), LocatorPathElt::Witness(witness));
           // FIXME: Why are we recording the same locator more than once here?
           if (SynthesizedConformances.count(witnessLoc) == 0)
-            recordSynthesizedConformance(witnessLoc, synthesized);
-          return recordConformance(synthesized);
+            recordSynthesizedConformance(witnessLoc, protocol);
+          return SolutionKind::Solved;
         };
 
         if (witness->isGeneric()) {
@@ -11535,10 +11534,9 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
     // Find the opened type for this callee and substitute in the type
     // parameters.
     auto substitutions = cs.getOpenedTypes(calleeLocator);
-    if (!substitutions.empty()) {
-      OpenedTypeMap replacements(substitutions.begin(), substitutions.end());
-      builderType = cs.openType(builderType, replacements, locator);
-    }
+    if (!substitutions.empty())
+      builderType = cs.openType(builderType, substitutions, locator);
+
     assert(!builderType->hasTypeParameter());
   }
   return builderType;
@@ -13936,6 +13934,13 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   } else {
     // If the overload hasn't been resolved, we can't simplify this constraint.
     auto overloadLocator = getCalleeLocator(getConstraintLocator(locator));
+
+    // If there was a problem resolving specialization expression
+    // it would be diagnosted as invalid AST node.
+    if (overloadLocator->directlyAt<ErrorExpr>()) {
+      return shouldAttemptFixes() ? SolutionKind::Error : SolutionKind::Solved;
+    }
+
     auto selectedOverload = findSelectedOverloadFor(overloadLocator);
     if (!selectedOverload)
       return formUnsolved();
@@ -14667,13 +14672,26 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::CGFloatToDouble: {
     // Prefer CGFloat -> Double over other way araund.
     auto impact =
-        restriction == ConversionRestrictionKind::CGFloatToDouble ? 1 : 10;
+        restriction == ConversionRestrictionKind::CGFloatToDouble ? 2 : 10;
 
     if (restriction == ConversionRestrictionKind::DoubleToCGFloat) {
       if (auto *anchor = locator.trySimplifyToExpr()) {
         if (auto depth = getExprDepth(anchor))
           impact = (*depth + 1) * impact;
       }
+    } else if (locator.directlyAt<AssignExpr>() ||
+               locator.endsWith<LocatorPathElt::ContextualType>()) {
+      // Situations like:
+      //
+      //  let _: Double = <<CGFloat>>
+      //  <var/property of type Double> = <<CGFloat>>
+      //
+      // Used to be supported due to an incorrect fix added in
+      // diagnostic mode. Lower impact here means that right-hand
+      // side of the assignment is allowed to maintain CGFloat
+      // until the very end which minimizes the number of conversions
+      // used and keeps literals as Double when possible.
+      impact = 1;
     }
 
     increaseScore(SK_ImplicitValueConversion, locator, impact);

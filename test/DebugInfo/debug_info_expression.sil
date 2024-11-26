@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -sil-verify-all -g -emit-sil -o - | %FileCheck --check-prefix=CHECK-SIL %s
+// RUN: %target-swift-frontend %s -sil-verify-all -g -Xllvm -sil-print-types -emit-sil -o - | %FileCheck --check-prefix=CHECK-SIL %s
 // RUN: %target-swift-frontend -disable-debugger-shadow-copies -primary-file %s -emit-ir -g -o - | %FileCheck %s
 import Builtin
 import Swift

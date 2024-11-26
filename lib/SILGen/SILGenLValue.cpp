@@ -1088,7 +1088,8 @@ namespace {
 
       SmallVector<ProtocolConformanceRef, 2> conformances;
       for (auto proto : OpenedArchetype->getConformsTo())
-        conformances.push_back(ProtocolConformanceRef(proto));
+        conformances.push_back(ProtocolConformanceRef::forAbstract(
+          OpenedArchetype, proto));
 
       SILValue ref;
       if (base.getType().is<ExistentialMetatypeType>()) {

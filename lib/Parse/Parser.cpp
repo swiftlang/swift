@@ -1146,7 +1146,7 @@ struct ParserUnit::Implementation {
     parsingOpts |= ParsingFlags::DisableDelayedBodies;
     parsingOpts |= ParsingFlags::DisablePoundIfEvaluation;
 
-    auto *M = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
+    auto *M = ModuleDecl::createEmpty(Ctx.getIdentifier(ModuleName), Ctx);
     SF = new (Ctx) SourceFile(*M, SFKind, BufferID, parsingOpts);
   }
 

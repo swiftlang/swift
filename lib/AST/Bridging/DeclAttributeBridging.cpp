@@ -315,14 +315,6 @@ BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(
       conformances, cRParenLoc.unbridged(), /*implicit=*/false);
 }
 
-BridgedMainTypeAttr
-BridgedMainTypeAttr_createParsed(BridgedASTContext cContext,
-                                 BridgedSourceLoc cAtLoc,
-                                 BridgedSourceLoc cNameLoc) {
-  return new (cContext.unbridged())
-      MainTypeAttr(cAtLoc.unbridged(), cNameLoc.unbridged());
-}
-
 BridgedSwiftNativeObjCRuntimeBaseAttr
 BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    BridgedSourceLoc cAtLoc,

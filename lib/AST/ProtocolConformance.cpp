@@ -976,8 +976,7 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto origType = getType();
-    if (!origType->hasTypeParameter() &&
-        !origType->hasArchetype())
+    if (IFS.isInvariant(origType))
       return ProtocolConformanceRef(mutableThis);
 
     auto substType = origType.subst(IFS);
@@ -998,8 +997,7 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
 
   case ProtocolConformanceKind::Builtin: {
     auto origType = getType();
-    if (!origType->hasTypeParameter() &&
-        !origType->hasArchetype())
+    if (IFS.isInvariant(origType))
       return ProtocolConformanceRef(mutableThis);
 
     auto substType = origType.subst(IFS);
@@ -1022,18 +1020,14 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
 
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
+    auto origType = getType();
+    if (IFS.isInvariant(origType))
+      return ProtocolConformanceRef(mutableThis);
+
     auto inheritedConformance
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
 
-    auto origType = getType();
-    if (!origType->hasTypeParameter() &&
-        !origType->hasArchetype()) {
-      return ProtocolConformanceRef(mutableThis);
-    }
-
-    auto origBaseType = inheritedConformance->getType();
-    if (origBaseType->hasTypeParameter() ||
-        origBaseType->hasArchetype()) {
+    if (!IFS.isInvariant(inheritedConformance->getType())) {
       // Substitute into the superclass.
       auto substConformance = inheritedConformance->subst(IFS);
       if (!substConformance.isConcrete())

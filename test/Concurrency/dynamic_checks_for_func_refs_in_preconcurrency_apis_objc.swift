@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target arm64-apple-macosx10.15 -enable-upcoming-feature DynamicActorIsolation -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target arm64-apple-macosx10.15 -enable-upcoming-feature DynamicActorIsolation -Xllvm -sil-print-types -emit-silgen -verify %s | %FileCheck %s
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_DynamicActorIsolation
 

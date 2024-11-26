@@ -28,6 +28,11 @@ if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
   set(swift_cxxstdlib_darwin_dependencies Darwin)
 endif()
 
+set(swift_cxxstdlib_dependencies)
+if(NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT)
+  set(swift_cxxstdlib_dependencies _Builtin_float)
+endif()
+
 #
 # C++ Standard Library Overlay.
 #
@@ -38,7 +43,7 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     Chrono.swift
     String.swift
 
-    SWIFT_MODULE_DEPENDS Cxx
+    SWIFT_MODULE_DEPENDS Cxx ${swift_cxxstdlib_dependencies}
     SWIFT_MODULE_DEPENDS_IOS ${swift_cxxstdlib_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_OSX ${swift_cxxstdlib_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_TVOS ${swift_cxxstdlib_darwin_dependencies}
@@ -51,6 +56,11 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     -cxx-interoperability-mode=default
     -Xfrontend -module-interface-preserve-types-as-written
     -enable-experimental-feature AssumeResilientCxxTypes
+
+    # The varying modularization of the C++ standard library on different
+    # platforms makes it difficult to enable MemberImportVisibility for this
+    # module
+    -disable-upcoming-feature MemberImportVisibility
 
     SWIFT_COMPILE_FLAGS_LINUX
     ${SWIFT_SDK_LINUX_CXX_OVERLAY_SWIFT_COMPILE_FLAGS}

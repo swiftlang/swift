@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen -parse-stdlib -module-name Swift %s | %FileCheck %s
 
 @_marker protocol Copyable {}
 @_marker protocol Escapable {}

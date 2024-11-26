@@ -542,7 +542,7 @@ public:
 
           if (CS.isDebugMode()) {
             CS.solverState->Trail.dumpActiveScopeChanges(
-              llvm::errs(), ActiveChoice->first.numTrailChanges,
+              llvm::errs(), ActiveChoice->first.startTrailSteps,
               CS.solverState->getCurrentIndent());
           }
           
@@ -893,8 +893,12 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   std::optional<Score> BestScore;
 
   /// The number of constraint solver scopes already explored
-  /// before accepting this conjunction.
-  llvm::SaveAndRestore<unsigned> OuterScopeCount;
+  /// before attempting this conjunction.
+  llvm::SaveAndRestore<unsigned> OuterNumSolverScopes;
+
+  /// The number of trail steps already recorded before attempting
+  /// this conjunction.
+  llvm::SaveAndRestore<unsigned> OuterNumTrailSteps;
 
   /// The number of milliseconds until outer constraint system
   /// is considered "too complex" if timer is enabled.
@@ -929,7 +933,9 @@ public:
       : BindingStep(cs, {cs, conjunction},
                     conjunction->isIsolated() ? IsolatedSolutions : solutions),
         BestScore(getBestScore()),
-        OuterScopeCount(cs.CountScopes, 0), Conjunction(conjunction),
+        OuterNumSolverScopes(cs.NumSolverScopes, 0),
+        OuterNumTrailSteps(cs.NumTrailSteps, 0),
+        Conjunction(conjunction),
         OuterSolutions(solutions) {
     assert(conjunction->getKind() == ConstraintKind::Conjunction);
 

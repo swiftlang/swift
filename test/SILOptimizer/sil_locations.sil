@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all -mandatory-inlining -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-print-debuginfo -enable-sil-verify-all -mandatory-inlining -emit-verbose-sil %s | %FileCheck %s
 
 import Builtin
 import Swift

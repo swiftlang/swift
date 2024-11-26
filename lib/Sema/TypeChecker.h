@@ -524,14 +524,13 @@ void diagnoseRequirementFailure(
     const CheckGenericArgumentsResult::RequirementFailureInfo &reqFailureInfo,
     SourceLoc errorLoc, SourceLoc noteLoc, Type targetTy,
     ArrayRef<GenericTypeParamType *> genericParams,
-    TypeSubstitutionFn substitutions, ModuleDecl *module);
+    TypeSubstitutionFn substitutions);
 
 /// Check the given generic parameter substitutions against the given
 /// requirements and report on any requirement failures in detail for
 /// diagnostic needs.
 CheckGenericArgumentsResult
-checkGenericArgumentsForDiagnostics(ModuleDecl *module,
-                                    ArrayRef<Requirement> requirements,
+checkGenericArgumentsForDiagnostics(ArrayRef<Requirement> requirements,
                                     TypeSubstitutionFn substitutions);
 
 /// Checks whether the generic requirements imposed on the nested type
@@ -575,8 +574,7 @@ checkGenericArgumentsForDiagnostics(ModuleDecl *module,
 ///
 /// \returns \c true on success.
 bool checkContextualRequirements(GenericTypeDecl *decl, Type parentTy,
-                                 SourceLoc loc, ModuleDecl *module,
-                                 GenericSignature contextSig);
+                                 SourceLoc loc, GenericSignature contextSig);
 
 /// Add any implicitly-defined constructors required for the given
 /// struct, class or actor.
@@ -1272,6 +1270,18 @@ bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
 /// `ExpressibleByStringLiteral` protocol.
 bool isValidStringDynamicMemberLookup(SubscriptDecl *decl,
                                       bool ignoreLabel = false);
+
+/// Returns the KeyPath parameter type for a valid implementation of
+/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
+/// @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)` which
+/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
+///
+/// Returns null if the given subscript is not a valid dynamic member lookup
+/// implementation.
+BoundGenericType *
+getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl,
+                                     bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for

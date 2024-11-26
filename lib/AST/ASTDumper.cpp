@@ -1171,10 +1171,6 @@ namespace {
 
       }, "opaque_interface", TypeColor);
 
-      if (auto underlyingSubs = OTD->getUniqueUnderlyingTypeSubstitutions()) {
-        printRec(*underlyingSubs);
-      }
-
       printFoot();
     }
 

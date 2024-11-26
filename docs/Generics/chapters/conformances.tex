@@ -42,7 +42,7 @@ The constituent parts of a normal conformance are the following:
 \item A \textbf{value witness} for each \index{value requirement}value requirement of the protocol. This is a reference to a value declaration, together with a substitution map. The value declaration is either a member of the conforming nominal type, an extension, a \index{superclass}superclass, or a \index{protocol extension}protocol extension.
 \end{itemize}
 
-Every nominal type and extension declaration has a list of \IndexDefinition{local conformance}\emph{local conformances}, which are normal conformances stated in the declaration's inheritance clause. In our example, $\ConfReq{Horse}{Animal}$ is a local conformance of the nominal type declaration \texttt{Horse}, while $\ConfReq{Cow}{Animal}$ is a local conformance of the extension of \texttt{Cow}. In \index{SILGen}SILGen, we generate a witness table for each local conformance of a declaration in each primary file.
+Every nominal type and extension declaration has a list of \IndexDefinition{local conformance}\emph{local conformances}, which are normal conformances stated in the declaration's inheritance clause. In our example, $\ConfReq{Horse}{Animal}$ is a local conformance of the nominal type declaration \texttt{Horse}, while $\ConfReq{Cow}{Animal}$ is a local conformance of the extension of \texttt{Cow}. In \index{SILGen}SILGen, we generate a witness table for each local conformance of each declaration in each primary file.
 
 In addition, every nominal type declaration also has a \IndexDefinition{conformance lookup table}\emph{conformance lookup table}. This is how global conformance lookup will \emph{find} a conformance, in the next section. In this table, we collect the local conformances from the nominal type itself, and all of its extensions. In Swift, conformances are inherited, so the conformance lookup table for a \index{class declaration}class has an additional behavior; it also collects all conformances from its \index{superclass}superclass, and its superclass, and so on. To ensure that such a conformance inherited from a superclass has the correct conforming type, we introduce a little bit of bookkeeping.
 
@@ -273,7 +273,7 @@ Let's recap the various forms of the \index{$\otimes$}$\otimes$ operator we've w
 \begin{gather*}
 \TypeObj{G}\otimes\SubMapObj{G}{H}\longrightarrow\TypeObj{H}
 \end{gather*}
-We can substitute conformances (\SecRef{conformance subst}):
+We can substitute conformances (the present section):
 \begin{gather*}
 \ConfObj{G}\otimes\SubMapObj{G}{H}\longrightarrow\ConfObj{H}
 \end{gather*}
@@ -389,7 +389,7 @@ Recall the specialized conformance $\ArrayIntSequence$ from \ExRef{specialized c
 \end{gather*}
 \end{example}
 
-Projecting a type witness from a normal or specialized conformance has the property that any type parameters appearing in the type witness are valid in the output generic signature of the conformance. In other words, if $\XP\in\ConfObj{G}$ and \nA\ is an associated type of \tP, then $\APA\otimes\XP\in\TypeObj{G}$. (When we get to abstract conformances, we will see the property holds there as well.) If we take \IndexSetDefinition{assoctype}{\AssocTypeObj{P}}$\AssocTypeObj{P}$ to mean the set of all associated type declarations of a fixed protocol \tP, and $\ConfPObj{P}{G}$ as the subset of $\ConfObj{G}$ containing only conformances to this \tP, then for each protocol \tP, type witness projection defines this additional form of the \index{$\otimes$}$\otimes$ operation:
+Projecting a type witness from a normal or specialized conformance has the property that any type parameters appearing in the type witness are valid in the output generic signature of the conformance. In other words, if $\XP\in\ConfObj{G}$ and \nA\ is an associated type of \tP, then $\APA\otimes\XP\in\TypeObj{G}$. (When we get to abstract conformances, we will see the property holds there as well.) If we take \IndexSetDefinition{assoctype}{\AssocTypeObj{P}}$\AssocTypeObj{P}$ to mean the set of all associated type declarations of a fixed protocol \tP, and $\ConfPObj{P}{G}$ as the subset of $\ConfObj{G}$ containing only conformances to this \tP, then for each protocol \tP, \IndexDefinition{type witness projection}type witness projection defines this additional form of the \index{$\otimes$}$\otimes$ operation:
 \[\AssocTypeObj{P}\otimes\ConfPObj{P}{G}\longrightarrow\TypeObj{G}\]
 
 We will now study the relationship between \index{global conformance lookup}global conformance lookup and type witness projection, which will help us to better understand the material in the next section. If $\tX=\tXd\otimes\Sigma$ conforms to \tP, and \tP\ declares an associated type \nA, we can write down the ``general type witness expression'' below:
@@ -428,7 +428,7 @@ To make this concrete, with the \texttt{Element} type witness of $\ArrayIntSeque
 \section{Abstract Conformances}\label{abstract conformances}
 
 An \IndexDefinition{abstract conformance}\emph{abstract conformance} represents the conformance of a \index{type parameter}type parameter to a protocol. If \tT\ is a type parameter and \tP\ is a protocol, global conformance lookup forms an abstract conformance when given \tT\ and \tP:
-\[\PP\otimes\texttt{T} = \TP\]
+\[\PP\otimes\tT = \TP\]
 We say that an abstract conformance $\TP$ is \IndexDefinition{valid abstract conformance}\emph{valid} in a \index{generic signature}generic signature~$G$ if the conformance requirement $\TP$ can be \index{derived requirement!abstract conformance}derived from~$G$ (\SecRef{derived req}). Thus, there is no ambiguity in our two respective formalisms using the same notation $\TP$ to denote both conformance requirements and abstract conformances.
 
 We will use abstract conformances to fill in the part of \AlgRef{type subst algo} we have not explained yet, namely how to apply a substitution map to a bound dependent member type. To do this, we must complete our type substitution algebra by defining the two fundamental operations of type witness projection and conformance substitution with an abstract conformance. Suppose that $G\vdash\TP$, and~\tP\ declares an associated type~\nA. In \SecRef{bound type params}, we saw that we can derive the \index{bound dependent member type!validity}\index{dependent member type!validity}bound dependent member type \texttt{T.[P]A} by applying the \IndexStep{AssocDecl}\textsc{AssocDecl} inference rule to a derivation of $\TP$:
@@ -450,10 +450,10 @@ Recall the \texttt{firstTwoEqual()} function from \ExRef{motivating derived reqs
 \end{quote}
 We can express each one of \texttt{\rT.[Sequence]Element} and \texttt{\rU.[Sequence]Element} as the type witness of an abstract conformance:
 \begin{gather*}
-\PSequence \otimes \texttt{\rT} = \ConfReq{\rT}{Sequence}\\
-\AElement \otimes \ConfReq{\rT}{Sequence} = \texttt{\rT.[Sequence]Element}\\[\medskipamount]
-\PSequence \otimes \texttt{\rU} = \ConfReq{\rU}{Sequence}\\
-\AElement \otimes \ConfReq{\rU}{Sequence} = \texttt{\rU.[Sequence]Element}
+\PSequence \otimes \texttt{\rT} = \rTSequence\\
+\AElement \otimes \rTSequence = \texttt{\rT.[Sequence]Element}\\[\medskipamount]
+\PSequence \otimes \texttt{\rU} = \rUSequence\\
+\AElement \otimes \rUSequence = \texttt{\rU.[Sequence]Element}
 \end{gather*}
 \end{example}
 
@@ -464,7 +464,7 @@ The right-hand side has but one interpretation, since we require $\otimes$ to be
 We're applying the substitution map $\Sigma$ to the abstract conformance $\TP$, and then we get the final result by projecting a type witness from this substituted conformance. This new form of conformance substitution is called \IndexDefinition{local conformance lookup}\emph{local conformance lookup}, by analogy with \index{global conformance lookup!compatibility}global conformance lookup, because it plays a similar role.
 
 While we won't fully explain the implementation of local conformance lookup until \ChapRef{conformance paths}, we can completely \emph{specify} its behavior now. Suppose that $\TP$ and $\Sigma$ are as above. Since $\TP=\PP\otimes\tT$, we also have:
-\[\TP\otimes\Sigma=(\PP\otimes\texttt{T})\otimes\Sigma=\PP\otimes(\texttt{T}\otimes\Sigma)\]
+\[\TP\otimes\Sigma=(\PP\otimes\tT)\otimes\Sigma=\PP\otimes(\tT\otimes\Sigma)\]
 In other words, local conformance lookup of $\TP$ in $\Sigma$ must find the \emph{same} conformance as global conformance lookup of $\tT\otimes\Sigma$ to \tP.
 
 \paragraph{Substitution maps.}
@@ -518,11 +518,11 @@ Let's discuss how we populate the root conformances when we construct $\Sigma$. 
 \PSequence \otimes (\rU \otimes \Sigma) = \ConfReq{Set<Int>}{Sequence}\tag{2}
 \end{gather*}
 The third conformance requirement has subject type $\texttt{\rT.[Sequence]Element}$. We can write this dependent member type as the type witness of a root abstract conformance:
-\[\texttt{\rT.[Sequence]Element} = \AElement \otimes \ConfReq{\rT}{Sequence}\]
+\[\texttt{\rT.[Sequence]Element} = \AElement \otimes \rTSequence\]
 To substitute this dependent member type, we project the type witness for \texttt{Element} from root conformance~(1), which gives us \texttt{Int}. We then look up its conformance to \texttt{Equatable} to get the final root conformance~(3):
 \begin{gather*}
 \Proto{Equatable} \otimes \texttt{\rT.[Sequence]Element} \otimes \Sigma\\
-\qquad {} = \Proto{Equatable} \otimes \AElement \otimes (\ConfReq{\rT}{Sequence} \otimes \Sigma)\\
+\qquad {} = \Proto{Equatable} \otimes \AElement \otimes (\rTSequence \otimes \Sigma)\\
 \qquad {} = \Proto{Equatable} \otimes \AElement \otimes \ConfReq{Array<Int>}{Sequence}\\
 \qquad {} = \Proto{Equatable} \otimes (\rT \otimes \SubMapInt)\\
 \qquad {} = \Proto{Equatable} \otimes \texttt{Int}\\
@@ -531,7 +531,7 @@ To substitute this dependent member type, we project the type witness for \textt
 The type parameters \texttt{\rT.Element} and \texttt{\rU.Element} are equivalent in $G$, so we would expect that $\texttt{\rU.[Sequence]Element}\otimes\Sigma=\texttt{Int}$ also. Indeed, once we know that the type witness for \texttt{Element} in $\ConfReq{Set<\rT>}{Sequence}$ is \rT, we see that:
 \begin{gather*}
 \texttt{\rU.[Sequence]Element}\otimes\Sigma\\
-\qquad {} = \AElement \otimes (\ConfReq{\rU}{Sequence} \otimes \Sigma)\\
+\qquad {} = \AElement \otimes (\rUSequence \otimes \Sigma)\\
 \qquad {} = \AElement \otimes \ConfReq{Set<Int>}{Sequence}\\
 \qquad {} = \rT \otimes \SubMapInt\\
 \qquad {} = \texttt{Int}
@@ -557,24 +557,24 @@ Applying $\Sigma_{\XP}$ to \Index{protocol Self type@protocol \tSelf\ type}\tSel
 
 \section{Associated Conformances}\label{associated conformances}
 
-In addition to providing a type witness for each associated type, a normal conformance must also satisfy each \index{associated requirement!conformance checker}associated requirement in the protocol's \index{requirement signature!conformance checker}requirement signature (\SecRef{requirement sig}). We check associated requirements in the \index{conformance checker}conformance checker, when we visit each normal conformance declared in a \index{primary file!conformance checker}primary file. We will discuss the general case of how requirements are checked and diagnosed in \SecRef{checking generic arguments}, while this section will focus on \index{associated conformance requirement}associated conformance requirements in particular, which are of great importance to type substitution.
+In addition to providing a type witness for each associated type, a normal conformance must also satisfy each \index{associated requirement!conformance checker}associated requirement in the protocol's \index{requirement signature!conformance checker}requirement signature (\SecRef{requirement sig}). We check associated requirements in the \index{conformance checker}conformance checker, when we visit each normal conformance declared in a \index{primary file!conformance checker}primary file. We will discuss the general case of how requirements are checked and \index{diagnostic!conformance checker}diagnosed in \SecRef{checking generic arguments}, while this section will focus on \index{associated conformance requirement}associated conformance requirements in particular, which are of great importance to type substitution.
 
-Suppose that $d$ is a \index{nominal type declaration}nominal type declaration that conforms to \tP, so we have a normal conformance $\NormalConf$, and \tP\ states an associated conformance requirement $\AssocConfReq{Self.U}{Q}{P}$. To check the requirement, we must replace \IndexSelf\tSelf\ with $\tXd$ in the subject type \texttt{Self.U} of our requirement, and then check that the substituted type conforms to \tQ. The type parameter \texttt{Self.U} is written with respect to the \index{protocol generic signature}protocol generic signature of \tP, so we apply the protocol substitution map $\Sigma_{\NormalConf}$ to \texttt{Self.U} and then follow with global conformance lookup:
+Suppose that $d$ is a \index{nominal type declaration}nominal type declaration that conforms to \tP, so we have a normal conformance $\NormalConf$, and \tP\ states an associated conformance requirement $\AssocConfReq{Self.U}{Q}{P}$. To check the requirement, we must replace \IndexSelf\tSelf\ with $\tXd$ in the subject type \SelfU\ of our requirement, and then check that the substituted type conforms to \tQ. The type parameter \SelfU\ is written with respect to the \index{protocol generic signature}protocol generic signature of \tP, so we apply the protocol substitution map $\Sigma_{\NormalConf}$ to \SelfU\ and then follow with global conformance lookup:
 \[
-\PQ \otimes \big(\texttt{Self.U} \otimes \Sigma_{\NormalConf}\big)
+\PQ \otimes \big(\SelfU \otimes \Sigma_{\NormalConf}\big)
 \]
 The result is the \IndexDefinition{associated conformance}\emph{associated conformance} that witnesses the associated conformance requirement $\AssocConfReq{Self.U}{Q}{P}$. Inside each normal conformance, we record a table of its associated conformances, indexed by the associated conformance requirements of its protocol. We lazily populate this table from the \IndexDefinition{associated conformance request}\Request{associated conformance request}. The request receives a normal conformance and an associated conformance requirement as input, and then proceeds as above; first applying the protocol substitution map to the requirement's subject type, and then performing a \index{global conformance lookup!associated conformance}global conformance lookup.
 
 \paragraph{Projection.}
-In the type substitution algebra, we denote an associated conformance requirement by $\SelfUQ$. Associated conformance projection gives us this new form of the $\otimes$ operator. With a \index{normal conformance!associated conformance}normal conformance, projection evaluates the associated conformance request, as above:
-\[\SelfUQ \otimes \NormalConf := \PQ \otimes \big(\texttt{Self.U} \otimes \Sigma_{\NormalConf}\big)\]
+In the type substitution algebra, we denote an associated conformance requirement by $\SelfUQ$. \IndexDefinition{associated conformance projection}Associated conformance projection gives us this new form of the $\otimes$ operator. With a \index{normal conformance!associated conformance}normal conformance, projection evaluates the associated conformance request, as above:
+\[\SelfUQ \otimes \NormalConf := \PQ \otimes \big(\SelfU \otimes \Sigma_{\NormalConf}\big)\]
 The associativity of $\otimes$ determines associated conformance projection with a \index{specialized conformance!associated conformance}specialized conformance $\XP=\NormalConf\otimes\Sigma$. First, we project the associated conformance from the underlying normal conformance $\NormalConf$, and then we apply $\Sigma$ to this conformance:
 \begin{gather*}
 \SelfUQ\otimes\XP\\
 \qquad {} = \SelfUQ\otimes\bigl(\NormalConf\otimes\Sigma\bigr)\\
 \qquad {} = \bigl(\SelfUQ\otimes\NormalConf\bigr)\otimes\Sigma
 \end{gather*}
-We also define associated conformance projection from an \index{abstract conformance!associated conformance}abstract conformance. Recall that if $G\vdash\TP$ and $\AssocConfReq{Self.U}{Q}{P}$ is an associated requirement of~\tP, we can apply the \IndexStep{AssocConf}\textsc{AssocConf} inference rule to derive the conformance requirement $\ConfReq{T.U}{Q}$, where \texttt{T.U} denotes the type parameter obtained from \texttt{Self.U} by replacing \texttt{Self} with \tT:
+We also define associated conformance projection from an \index{abstract conformance!associated conformance}abstract conformance. Recall that if $G\vdash\TP$ and $\AssocConfReq{Self.U}{Q}{P}$ is an associated requirement of~\tP, we can apply the \IndexStep{AssocConf}\textsc{AssocConf} inference rule to derive the conformance requirement $\ConfReq{T.U}{Q}$, where \texttt{T.U} denotes the type parameter obtained from \SelfU\ by replacing \texttt{Self} with \tT:
 \begin{gather*}
 \AnyStep{\TP}{1}\\
 \AssocConfStep{1}{T.U}{Q}{2}
@@ -595,33 +595,33 @@ Recall that when a protocol \tP\ \index{inherited protocol}inherits from another
 \]
 
 \begin{example}\label{protocol inherit assoc conf}
-We described the \tCollection\ protocol, which inherits from \tSequence, in \ExRef{protocol collection example}. The standard library \texttt{Array} also conforms to \tCollection, and not just \tSequence. Consider the specialized conformance $\ArrayIntCollection$. We can project $\AssocConf{Self}{Sequence}$ from $\ArrayIntCollection$, which takes us back to the specialized conformance $\ArrayIntSequence$ of \ExRef{specialized conf example}:
+We described the \tCollection\ protocol, which inherits from \tSequence, in \ExRef{protocol collection example}. The standard library \texttt{Array} also conforms to \tCollection, and not just \tSequence. Consider the specialized conformance $\ArrayIntCollection$. We can project $\SelfSequence$ from $\ArrayIntCollection$, which takes us back to the specialized conformance $\ArrayIntSequence$ of \ExRef{specialized conf example}:
 \begin{gather*}
-\AssocConf{Self}{Sequence} \otimes \ArrayIntCollection \\
-\qquad {} = \AssocConf{Self}{Sequence} \otimes \ArrayCollection \otimes \SubMapInt\\
+\SelfSequence \otimes \ArrayIntCollection \\
+\qquad {} = \SelfSequence \otimes \ArrayCollection \otimes \SubMapInt\\
 \qquad {} = \ArraySequence \otimes \SubMapInt\\
 \qquad {} = \ArrayIntSequence
 \end{gather*}
 Now, let's say that $\Sigma$ is the protocol substitution map for $\ArrayIntCollection$, so we're replacing \rT\ with \texttt{Array<Int>}. We're going to apply $\Sigma$ to the type parameter $\texttt{\rT.[Sequence]Element}$ of $G_{\tCollection}$:
 \begin{gather*}
 \texttt{\rT.[Sequence]Element} \otimes \Sigma \\
-\qquad {} = \AElement \otimes \ConfReq{\rT}{Sequence} \otimes \Sigma
+\qquad {} = \AElement \otimes \rTSequence \otimes \Sigma
 \end{gather*}
-This time, $\ConfReq{\rT}{Sequence}$ is not an explicit requirement of our generic signature, so $\ConfReq{Array<Int>}{Sequence}$ is not a root conformance of~$\Sigma$. Local conformance lookup must take one extra step. Here is a derivation of $G_\tCollection\vdash\ConfReq{\rT}{Sequence}$:
+This time, $\rTSequence$ is not an explicit requirement of our generic signature, so $\ConfReq{Array<Int>}{Sequence}$ is not a root conformance of~$\Sigma$. Local conformance lookup must take one extra step. Here is a derivation of $G_\tCollection\vdash\rTSequence$:
 \begin{gather*}
 \ConfStep{\rT}{Collection}{1}\\
 \AssocConfStep{1}{\rT}{Sequence}{2}
 \end{gather*}
 In the type substitution algebra, this is a statement about abstract conformances:
 \begin{gather*}
-\AssocConf{Self}{Sequence} \otimes \ConfReq{\rT}{Collection} = \ConfReq{\rT}{Sequence}
+\SelfSequence \otimes \rTCollection = \rTSequence
 \end{gather*}
-We've found a \index{conformance path}\emph{conformance path} for $\ConfReq{\rT}{Sequence}$ in $G_\tCollection$. A conformance path tells local conformance lookup how to get the substituted conformance by projecting a series of associated conformances from a root conformance in the substitution map:
+We've found a \index{conformance path}\emph{conformance path} for $\rTSequence$ in $G_\tCollection$. A conformance path tells local conformance lookup how to get the substituted conformance by projecting a series of associated conformances from a root conformance in the substitution map:
 \begin{gather*}
 \texttt{\rT.[Sequence]Element} \otimes \Sigma \\
-\qquad {} = \AElement \otimes {\underbrace{\AssocConf{Self}{Sequence} \otimes \ConfReq{\rT}{Collection}\strut}_{\text{conformance path}}} \otimes \Sigma
+\qquad {} = \AElement \otimes {\underbrace{\SelfSequence \otimes \rTCollection\strut}_{\text{conformance path}}} \otimes \Sigma
 \end{gather*}
-We evaluate $\ConfReq{\rT}{Collection} \otimes \Sigma$ first, to get the root conformance from $\Sigma$. Then, we project the associated conformance $\ConfReq{Array<\rT>}{Sequence}$, and from there, the type witness for \nElement, to get \texttt{Int}:
+We evaluate $\rTCollection \otimes \Sigma$ first, to get the root conformance from $\Sigma$. Then, we project the associated conformance $\ConfReq{Array<\rT>}{Sequence}$, and from there, the type witness for \nElement, to get \texttt{Int}:
 \[\texttt{\rT.[Sequence]Element} \otimes \Sigma = \texttt{Int}\]
 \ChapRef{conformance paths} will show that we can always find a conformance path for an arbitrary abstract conformance.
 \end{example}
@@ -634,7 +634,7 @@ Recall that \tSequence\ has a single associated conformance requirement $\AssocC
 \end{gather*}
 When we project this associated conformance, we receive a specialized conformance of \texttt{IndexingIterator<Array<\rT>>} to \tIterator:
 \begin{gather*}
-\AssocConf{Self.Iterator}{IteratorProtocol} \otimes \ArraySequence\\
+\SelfIterator \otimes \ArraySequence\\
 {} = \PIterator \otimes \texttt{IndexingIterator<Array<\rT>>}\\
 {} = \ConfReq{IndexingIterator<Array<\rT>>}{IteratorProtocol}
 \end{gather*}
@@ -647,7 +647,7 @@ Let's look at (1) first. The standard library's \texttt{IndexingIterator} type i
 \begin{Verbatim}
 struct IndexingIterator<Elements: Collection>: IteratorProtocol {
   typealias Element = Elements.Element
-  func next() -> Element? {
+  mutating func next() -> Element? {
     ...
   }
 }
@@ -672,7 +672,7 @@ Let's project the type witness for \nElement\ from our associated conformance (1
 This is like the previous example, except we're replacing \rT\ with \texttt{Array<\rT>}, and not \texttt{Array<Int>}, but otherwise we can use the same conformance path:
 \begin{gather*}
 \texttt{\rT.[Sequence]Element} \otimes \Sigma \\
-\qquad {} = \AElement \otimes \AssocConf{Self}{Sequence} \otimes \ConfReq{\rT}{Collection} \otimes \Sigma \\
+\qquad {} = \AElement \otimes \SelfSequence \otimes \rTCollection \otimes \Sigma \\
 \qquad {} = \AElement \otimes \ArraySequence \\
 \qquad {} = \rT
 \end{gather*}
@@ -870,9 +870,9 @@ The first behavior handles a rather common scenario. Suppose we have a \tSequenc
 \begin{Verbatim}
 struct Fibonacci: Sequence {
   struct Iterator: IteratorProtocol {
-    func next() -> Int? { ... }
-    func makeIterator() -> Iterator { ... }
+    mutating func next() -> Int? { ... }
   }
+  func makeIterator() -> Iterator { ... }
 }
 \end{Verbatim}
 Consider the nested type declaration first. We deduce the type witness for \nElement\ from \texttt{next()} in the \tIterator\ conformance:
@@ -881,7 +881,7 @@ Now consider the outer type declaration. The \tSequence\ protocol has a single v
 \[\AIterator\otimes\ConfReq{Fibonacci}{Sequence}=\texttt{Fibonacci.Iterator}\]
 We cannot deduce the \nElement\ type witness in $\ConfReq{Fibonacci}{Sequence}$ from the value requirements of \tSequence, so instead we consider the \index{associated same-type requirement!associated type inference}associated same-type requirement $\AssocSameReq{Self.Element}{Self.Iterator.Element}{Sequence}$. The left-hand side is exactly the type witness we're trying to infer, and the right-hand side can be resolved given the type witnesses known so far:
 \begin{gather*}
-\AIElement \otimes \AssocConf{Self.Iterator}{IteratorProtocol} \\
+\AIElement \otimes \SelfIterator \\
 \qquad {} \otimes \ConfReq{Fibonacci}{Sequence} = \tInt
 \end{gather*}
 This allows us to conclude that $\AElement \otimes\ConfReq{Fibonacci}{Sequence} = \texttt{Int}$.
@@ -934,17 +934,17 @@ struct S: P {  // error
 \end{example}
 
 \begin{example}
-A \index{limitation!associated type inference}limitation of the current associated type inference implementation is that we only consider a single conformance at a time, so we miss certain deductions that would be possible if the problem instance could describe multiple conformances at once. For example, we are unable to deduce that \texttt{A} must be \texttt{Int} here:
+A \index{limitation!associated type inference}limitation of the current associated type inference implementation is that we only consider a single conformance at a time, so we miss certain deductions that would be possible if the problem instance could describe multiple conformances at once. For example, we are unable to deduce that \texttt{Food} must be \texttt{Int} here:
 \begin{Verbatim}
-protocol Base { associatedtype A }
+protocol Base { associatedtype Food }
 
-protocol Derived: Base { func f(_: A) }
+protocol Derived: Base { func eat(_: Food) }
 
-struct S: Derived {
-  func f(_: Int) {}
+struct Snack: Derived {
+  func eat(_: Int) {}
 }
 \end{Verbatim}
-The workaround that persists to this day is to re-declare \texttt{A} in \texttt{Derived}.
+This is a long-standing bug; the workaround is to re-declare \texttt{Food} in \texttt{Derived}~\cite{sr2235}. 
 \end{example}
 
 \paragraph{Boolean satisfiability.}
@@ -984,7 +984,7 @@ We will encode the above 3CNF formula as an instance of associated type inferenc
 struct T {}
 struct F {}
 \end{Verbatim}
-We then declare a nominal type named \texttt{Solver} that is common to all 3CNF formulas, and an \texttt{Instance} protocol that encodes each clause of some specific 3CNF formula. Finally, associated type inference will kick in and solve 3SAT when we state the conformance of \texttt{Solver} to \texttt{Instance}. We will look at \texttt{Solver} first:
+We then declare a nominal type named \texttt{Solver} that is common to all 3CNF formulas, and an \texttt{Instance} protocol that encodes each clause of our specific 3CNF formula. Finally, associated type inference will kick in and solve 3SAT when we state the conformance of \texttt{Solver} to \texttt{Instance}. We will look at \texttt{Solver} first:
 \begin{Verbatim}
 struct Solver: Instance {
 \end{Verbatim}
@@ -1009,7 +1009,7 @@ This completes the \texttt{Solver}:
 \end{Verbatim}
 \pagebreak
 
-Now, we fill out the \texttt{Instance} protocol, in which we encode the variables and clauses of a 3CNF formula. For each variable $x_i$, we declare an associated type \texttt{XiP} to represent the literal $x_i$, and an associated type \texttt{XiN} to represent the literal $\neg x_i$:
+Now, we fill out the \texttt{Instance} protocol, in which we encode the variables and clauses of our 3CNF formula. For each variable $x_i$, we declare an associated type \texttt{XiP} to represent the literal $x_i$, and an associated type \texttt{XiN} to represent the literal $\neg x_i$:
 \begin{Verbatim}
 protocol Instance {
   associatedtype X1P; associatedtype X1N
@@ -1207,6 +1207,16 @@ See also \SecRef{substmapsourcecoderef}. A static method for constructing a \Ind
 \begin{itemize}
 \item \texttt{getProtocolSubstitutions()} builds a new substitution map from a conforming type and a conformance of this type to a protocol.
 \end{itemize}
+
+\subsection*{Type Substitution}
+
+Key source files:
+\begin{itemize}
+\item \SourceFile{lib/AST/TypeSubstitution.cpp}
+\end{itemize}
+
+\apiref{TypeSubstituter::transformDependentMemberType()}{method}
+Implements \AlgRef{dependent member type substitution}.
 
 \subsection*{Lazy Loading}
 

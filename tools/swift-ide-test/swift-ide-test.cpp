@@ -1762,12 +1762,15 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   // implicit stdlib import.
   ImplicitImportInfo importInfo;
   importInfo.StdlibKind = ImplicitStdlibKind::Stdlib;
-  auto *M = ModuleDecl::create(ctx.getIdentifier(Invocation.getModuleName()),
-                               ctx, importInfo);
-  auto bufferID = ctx.SourceMgr.addMemBufferCopy("// nothing\n");
-  auto *SF =
-      new (ctx) SourceFile(*M, SourceFileKind::Main, bufferID);
-  M->addFile(*SF);
+
+  auto *M = ModuleDecl::create(
+      ctx.getIdentifier(Invocation.getModuleName()), ctx, importInfo,
+      [&](ModuleDecl *M, auto addFile) {
+    auto bufferID = ctx.SourceMgr.addMemBufferCopy("// nothing\n");
+    addFile(new (ctx) SourceFile(*M, SourceFileKind::Main, bufferID));
+  });
+
+  auto *SF = &M->getMainSourceFile();
   performImportResolution(*SF);
 
   REPLCompletions REPLCompl;

@@ -28,6 +28,39 @@ function(swift_configure_lit_site_cfg source_path destination_path installed_nam
   endif()
 endfunction()
 
+function(swift_generate_lit_swift_features_cfg output_path)
+  if(SWIFT_COMPILER_IS_MSVC_LIKE)
+    set(test_lit_swift_features_cmd
+      "${CMAKE_C_COMPILER}" "/P" "/EP" "/I" "${SWIFT_MAIN_INCLUDE_DIR}" "/TC"
+      "/Fi<<<OUTPUT_FILE>>>")
+  else()
+    set(test_lit_swift_features_cmd
+      "${CMAKE_C_COMPILER}" "-E" "-P" "-I${SWIFT_MAIN_INCLUDE_DIR}" "-x" "c" "-o"
+      "<<<OUTPUT_FILE>>>")
+  endif()
+
+  list(
+    TRANSFORM test_lit_swift_features_cmd
+    REPLACE "<<<OUTPUT_FILE>>>" "${output_path}")
+  add_custom_command(
+    OUTPUT "${output_path}"
+    COMMAND
+      ${test_lit_swift_features_cmd}
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.swift-features.cfg.inc"
+    DEPENDS
+      "lit.swift-features.cfg.inc"
+      "${SWIFT_MAIN_INCLUDE_DIR}/swift/Basic/Features.def"
+  )
+
+  # Execute during generation once, so one can run Lit without rebuilding the
+  # test suite dependencies first.
+  execute_process(
+    COMMAND
+      ${test_lit_swift_features_cmd}
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.swift-features.cfg.inc"
+  )
+endfunction()
+
 function(normalize_boolean_spelling var_name)
   if(${var_name})
     set("${var_name}" TRUE PARENT_SCOPE)
@@ -254,16 +287,6 @@ if(NOT "${COVERAGE_DB}" STREQUAL "")
       COMMENT "Touching covering tests")
 endif()
 
-if(SWIFT_COMPILER_IS_MSVC_LIKE)
-  set(C_PREPROCESSOR_COMMAND
-    "${CMAKE_C_COMPILER}" "/P" "/EP" "/I" "${SWIFT_MAIN_INCLUDE_DIR}" "/TC"
-    "/Fi<<<OUTPUT_FILE>>>")
-else()
-  set(C_PREPROCESSOR_COMMAND
-    "${CMAKE_C_COMPILER}" "-E" "-P" "-I${SWIFT_MAIN_INCLUDE_DIR}" "-x" "c" "-o"
-    "<<<OUTPUT_FILE>>>")
-endif()
-
 foreach(SDK ${SWIFT_SDKS})
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
     # macCatalyst needs to run two sets of tests: one with the normal macosx target triple
@@ -315,33 +338,8 @@ foreach(SDK ${SWIFT_SDKS})
           "${validation_test_bin_dir}/lit.site.cfg"
           "validation-test${VARIANT_SUFFIX}.lit.site.cfg")
 
-      set(test_lit_swift_features_cmd ${C_PREPROCESSOR_COMMAND})
-      list(
-        TRANSFORM test_lit_swift_features_cmd
-        REPLACE "<<<OUTPUT_FILE>>>" "${test_bin_dir}/lit.swift-features.cfg")
-      add_custom_command(
-        OUTPUT "${test_bin_dir}/lit.swift-features.cfg"
-        COMMAND
-          ${test_lit_swift_features_cmd}
-          "${CMAKE_CURRENT_SOURCE_DIR}/lit.swift-features.cfg.inc"
-        DEPENDS
-          "lit.swift-features.cfg.inc"
-          "${SWIFT_MAIN_INCLUDE_DIR}/swift/Basic/Features.def"
-      )
-
-      set(validation_test_lit_swift_features_cmd ${C_PREPROCESSOR_COMMAND})
-      list(
-        TRANSFORM validation_test_lit_swift_features_cmd
-        REPLACE "<<<OUTPUT_FILE>>>" "${validation_test_bin_dir}/lit.swift-features.cfg")
-      add_custom_command(
-        OUTPUT "${validation_test_bin_dir}/lit.swift-features.cfg"
-        COMMAND
-          ${validation_test_lit_swift_features_cmd}
-          "${CMAKE_CURRENT_SOURCE_DIR}/lit.swift-features.cfg.inc"
-        DEPENDS
-          "lit.swift-features.cfg.inc"
-          "${SWIFT_MAIN_INCLUDE_DIR}/swift/Basic/Features.def"
-      )
+      swift_generate_lit_swift_features_cfg("${test_bin_dir}/lit.swift-features.cfg")
+      swift_generate_lit_swift_features_cfg("${validation_test_bin_dir}/lit.swift-features.cfg")
       add_custom_target(lit_swift_features_cfg_${VARIANT_SUFFIX}
         DEPENDS
           "${test_bin_dir}/lit.swift-features.cfg"

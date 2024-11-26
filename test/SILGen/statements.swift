@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name statements -Xllvm -sil-full-demangle -parse-as-library -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name statements -Xllvm -sil-full-demangle -parse-as-library -verify %s | %FileCheck %s
 
 class MyClass { 
   func foo() { }

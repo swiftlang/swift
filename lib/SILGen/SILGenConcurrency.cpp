@@ -819,8 +819,7 @@ SILGenFunction::emitDistributedActorAsAnyActor(SILLocation loc,
       getDistributedActorAsActorConformance(ctx);
   auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
   auto distributedActorType = distributedActorSubs.getReplacementTypes()[0];
-  auto ref = ProtocolConformanceRef(
-      actorProto, ctx.getSpecializedConformance(
+  auto ref = ProtocolConformanceRef(ctx.getSpecializedConformance(
                       distributedActorType, distributedActorAsActorConformance,
                       distributedActorSubs));
   ProtocolConformanceRef conformances[1] = {ref};

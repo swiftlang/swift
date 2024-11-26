@@ -166,7 +166,8 @@ operator()(CanType dependentType, Type conformingReplacementType,
       return lookupConformance(archetypeType, conformedProtocol);
     }
   }
-  return ProtocolConformanceRef(conformedProtocol);
+  return ProtocolConformanceRef::forAbstract(
+    conformingReplacementType, conformedProtocol);
 }
 
 static Type substGenericFunctionType(GenericFunctionType *genericFnType,
@@ -1197,7 +1198,7 @@ ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
 ProtocolConformanceRef ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(CanType maybeOpaqueType, Type replacementType,
            ProtocolDecl *protocol) const {
-  auto abstractRef = ProtocolConformanceRef(protocol);
+  auto abstractRef = ProtocolConformanceRef::forAbstract(maybeOpaqueType, protocol);
   
   auto archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
   if (!archetype) {

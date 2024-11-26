@@ -823,8 +823,8 @@ inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
 }
 
 inline SourceFile &ModuleDecl::getMainSourceFile() const {
-  assert(!Files.empty() && "No files added yet");
-  return *cast<SourceFile>(Files.front());
+  assert(!getFiles().empty() && "No files in module");
+  return *cast<SourceFile>(getFiles().front());
 }
 
 inline FileUnit *ModuleDecl::EntryPointInfoTy::getEntryPointFile() const {

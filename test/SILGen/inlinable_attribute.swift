@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature IsolatedDeinit -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors -target %target-swift-5.1-abi-triple %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature IsolatedDeinit -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors -target %target-swift-5.1-abi-triple %s | %FileCheck %s
 
 // REQUIRES: swift_feature_IsolatedDeinit
 

@@ -1191,7 +1191,7 @@ public:
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
-    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+    if (Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
         isSILLifetimeDependenceToken())
       return true;
     if (!canHaveParameterSpecifierContextualKeyword()) return false;
@@ -1317,7 +1317,11 @@ public:
   ///
   /// Parsing a floating attribute list will produce a `MissingDecl` with
   /// the attribute list attached.
-  void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items);
+  ///
+  /// If isFromClangAttribute, we also parse modifiers and suppress any
+  /// diagnostics about bad modifiers.
+  void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items,
+                                  bool isFromClangAttribute);
 
   /// Parse the result of member macro expansion, which is a floating
   /// member list.
@@ -2038,7 +2042,7 @@ public:
   };
 
   /// Parse a comma-separated list of availability specifications. Try to
-  /// expand availability macros when /p Source is not a command line macro.
+  /// expand availability macros when \p Source is not a command line macro.
   ParserStatus
   parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
                             AvailabilitySpecSource Source);

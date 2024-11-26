@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -target %target-swift-5.1-abi-triple -parse-stdlib -module-name keypaths %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-swift-5.1-abi-triple -parse-stdlib -module-name keypaths %s | %FileCheck %s
 
 
 import Swift

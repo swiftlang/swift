@@ -10,12 +10,12 @@
 // RUN: %FileCheck %t/src/A.swift < %t/A.swiftinterface
 
 // Build the client using module
-// RUN: %target-swift-emit-sil -verify -module-name Client -I %t %t/src/Client.swift | %FileCheck %t/src/Client.swift
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -verify -module-name Client -I %t %t/src/Client.swift | %FileCheck %t/src/Client.swift
 
 // RUN: rm %t/A.swiftmodule
 
 // Re-build the client using interface
-// RUN: %target-swift-emit-sil -verify -module-name Client -I %t %t/src/Client.swift | %FileCheck %t/src/Client.swift
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -verify -module-name Client -I %t %t/src/Client.swift | %FileCheck %t/src/Client.swift
 
 // REQUIRES: asserts
 

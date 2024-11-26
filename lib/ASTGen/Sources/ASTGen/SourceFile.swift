@@ -15,7 +15,7 @@ import SwiftDiagnostics
 import SwiftIfConfig
 @_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftParserDiagnostics
-import SwiftSyntax
+@_spi(Compiler) import SwiftSyntax
 
 /// Describes a source file that has been "exported" to the C++ part of the
 /// compiler, with enough information to interface with the C++ layer.
@@ -298,4 +298,47 @@ public func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   }
 
   return resultSyntax
+}
+
+@_cdecl("swift_ASTGen_virtualFiles")
+@usableFromInline
+func getVirtualFiles(
+  sourceFilePtr: UnsafeMutableRawPointer,
+  cVirtualFilesOut: UnsafeMutablePointer<UnsafeMutablePointer<BridgedVirtualFile>?>
+) -> Int {
+  let sourceFilePtr = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
+  let virtualFiles = sourceFilePtr.pointee.sourceLocationConverter.lineTable.virtualFiles
+  guard !virtualFiles.isEmpty else {
+    cVirtualFilesOut.pointee = nil
+    return 0
+  }
+
+  let cArrayBuf: UnsafeMutableBufferPointer<BridgedVirtualFile> = .allocate(capacity: virtualFiles.count)
+  _ = cArrayBuf.initialize(
+    from: virtualFiles.lazy.map({ virtualFile in
+      BridgedVirtualFile(
+        StartPosition: virtualFile.startPosition.utf8Offset,
+        EndPosition: virtualFile.endPosition.utf8Offset,
+        Name: allocateBridgedString(virtualFile.fileName),
+        LineOffset: virtualFile.lineOffset,
+        NamePosition: virtualFile.fileNamePosition.utf8Offset
+      )
+    })
+  )
+
+  cVirtualFilesOut.pointee = cArrayBuf.baseAddress
+  return cArrayBuf.count
+}
+
+@_cdecl("swift_ASTGen_freeBridgedVirtualFiles")
+func freeVirtualFiles(
+  cVirtualFiles: UnsafeMutablePointer<BridgedVirtualFile>?,
+  numFiles: Int
+) {
+  let buffer = UnsafeMutableBufferPointer<BridgedVirtualFile>(start: cVirtualFiles, count: numFiles)
+  for vFile in buffer {
+    freeBridgedString(bridged: vFile.Name)
+  }
+  buffer.deinitialize()
+  buffer.deallocate()
 }

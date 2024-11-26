@@ -773,11 +773,11 @@ private:
     auto platform = targetPlatform(module->getASTContext().LangOpts);
     for (auto *attr : decl->getAttrs()) {
       if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-        if (ava->Platform == PlatformKind::none) {
+        if (ava->getPlatform() == PlatformKind::none) {
           hasFallbackUnavailability = ava->isUnconditionallyUnavailable();
           continue;
         }
-        if (ava->Platform != platform)
+        if (ava->getPlatform() != platform)
           continue;
         unavailable = ava->isUnconditionallyUnavailable();
         if (ava->Introduced)

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature ThenStatements -enable-experimental-feature DoExpressions %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature ThenStatements -enable-experimental-feature DoExpressions %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -enable-experimental-feature ThenStatements -enable-experimental-feature DoExpressions %s
 
 // REQUIRES: swift_feature_DoExpressions

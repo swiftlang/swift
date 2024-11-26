@@ -1,5 +1,5 @@
 // RUN: not %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded 2>&1 | %FileCheck %s --check-prefix CHECK-EXISTENTIALS
-// RUN: %target-swift-frontend -emit-sil %s -enable-experimental-feature Embedded -throws-as-traps | %FileCheck %s --check-prefix CHECK-TRAPS-SIL
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s -enable-experimental-feature Embedded -throws-as-traps | %FileCheck %s --check-prefix CHECK-TRAPS-SIL
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded -throws-as-traps | %FileCheck %s --check-prefix CHECK-TRAPS-IR
 
 // REQUIRES: swift_in_compiler

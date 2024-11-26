@@ -1,5 +1,5 @@
 
-// RUN: %target-sil-opt -array-element-propagation %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -array-element-propagation %s | %FileCheck %s
 sil_stage canonical
 
 import Builtin

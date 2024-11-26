@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name specialize_checked_cast_branch -emit-sil -O -sil-inline-threshold 0 -Xllvm -sil-disable-pass=function-signature-opts %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -module-name specialize_checked_cast_branch -Xllvm -sil-print-types -emit-sil -O -sil-inline-threshold 0 -Xllvm -sil-disable-pass=function-signature-opts %s -o - | %FileCheck %s
 
 class C {}
 class D : C {}

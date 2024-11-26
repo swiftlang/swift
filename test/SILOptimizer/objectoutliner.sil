@@ -1,4 +1,4 @@
-// RUN: %sil-opt -enable-sil-verify-all %s -object-outliner | %FileCheck %s
+// RUN: %sil-opt -sil-print-types -enable-sil-verify-all %s -object-outliner | %FileCheck %s
 
 // Note: Intentionally not using %target-sil-opt, because we need at least a
 //       swift 5.1 deployment target.

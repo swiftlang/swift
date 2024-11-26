@@ -603,7 +603,7 @@ public:
     return Core->UserModuleVersion;
   }
 
-  llvm::VersionTuple getSwiftInterfaceCompilerVersion() const {
+  version::Version getSwiftInterfaceCompilerVersion() const {
     return Core->SwiftInterfaceCompilerVersion;
   }
 

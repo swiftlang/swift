@@ -4458,9 +4458,9 @@ namespace {
     }
 
     // Attempt to resolve the global actor type of a closure.
-    Type resolveGlobalActorType(ClosureExpr *closure) {
+    Type resolveGlobalActorType(AbstractClosureExpr *ACE) {
       // Check whether the closure's type has a global actor already.
-      if (Type closureType = getType(closure)) {
+      if (Type closureType = getType(ACE)) {
         if (auto closureFnType = closureType->getAs<FunctionType>()) {
           if (Type globalActor = closureFnType->getGlobalActor())
             return globalActor;
@@ -4468,7 +4468,11 @@ namespace {
       }
 
       // Look for an explicit attribute.
-      return getExplicitGlobalActor(closure);
+      if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+        if (auto globalActor = getExplicitGlobalActor(CE))
+          return globalActor;
+      }
+      return Type();
     }
 
   public:
@@ -4480,14 +4484,16 @@ namespace {
         AbstractClosureExpr *closure) {
       bool preconcurrency = false;
 
-      if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+      if (auto explicitClosure = dyn_cast<ClosureExpr>(closure))
         preconcurrency = explicitClosure->isIsolatedByPreconcurrency();
 
-        // If the closure specifies a global actor, use it.
-        if (Type globalActor = resolveGlobalActorType(explicitClosure))
-          return ActorIsolation::forGlobalActor(globalActor)
-              .withPreconcurrency(preconcurrency);
+      // If the closure specifies a global actor, use it.
+      if (Type globalActor = resolveGlobalActorType(closure)) {
+        return ActorIsolation::forGlobalActor(globalActor)
+          .withPreconcurrency(preconcurrency);
+      }
 
+      if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
         if (auto *attr =
                 explicitClosure->getAttrs().getAttribute<NonisolatedAttr>();
             attr && ctx.LangOpts.hasFeature(Feature::ClosureIsolation)) {
@@ -4943,7 +4949,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
         // Substitute into the global actor type.
         auto conformance = std::get<0>(isolated);
         auto requirementSubs = SubstitutionMap::getProtocolSubstitutions(
-            conformance->getProtocol(), dc->getSelfTypeInContext(),
+            conformance->getProtocol(), dc->getSelfInterfaceType(),
             ProtocolConformanceRef(conformance));
         Type globalActor = isolation.getGlobalActor().subst(requirementSubs);
         if (!globalActorTypes.insert(globalActor->getCanonicalType()).second)
@@ -6627,12 +6633,12 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
            : nullptr) {
     bool anyPlatformSpecificAttrs = false;
     for (auto available: enclosing->getAttrs().getAttributes<AvailableAttr>()) {
-      if (available->Platform == PlatformKind::none)
+      if (available->getPlatform() == PlatformKind::none)
         continue;
 
       auto attr = new (ctx) AvailableAttr(
           SourceLoc(), SourceRange(),
-          available->Platform,
+          available->getPlatform(),
           available->Message,
           "", nullptr,
           available->Introduced.value_or(noVersion), SourceRange(),

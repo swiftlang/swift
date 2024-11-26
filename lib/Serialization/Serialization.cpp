@@ -1142,11 +1142,16 @@ void Serializer::writeHeader() {
         PublicModuleName.emit(ScratchRecord, publicModuleName.str());
       }
 
-      llvm::VersionTuple compilerVersion =
-          M->getSwiftInterfaceCompilerVersion();
-      if (compilerVersion) {
+      version::Version compilerVersion = M->getSwiftInterfaceCompilerVersion();
+      if (!compilerVersion.empty()) {
         options_block::SwiftInterfaceCompilerVersionLayout Version(Out);
-        Version.emit(ScratchRecord, compilerVersion.getAsString());
+
+        SmallString<32> versionBuf;
+        llvm::raw_svector_ostream OS(versionBuf);
+
+        OS << compilerVersion;
+
+        Version.emit(ScratchRecord, OS.str());
       }
 
       if (M->isConcurrencyChecked()) {
@@ -3050,7 +3055,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
-          static_cast<unsigned>(theAttr->Platform),
+          static_cast<unsigned>(theAttr->getPlatform()),
           renameDeclID,
           theAttr->Message.size(),
           theAttr->Rename.size(),
@@ -3096,13 +3101,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       ObjCImplementationDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord,
           abbrCode, theAttr->isImplicit(), theAttr->isCategoryNameInvalid(),
           theAttr->isEarlyAdopter(), categoryNameID);
-      return;
-    }
-
-    case DeclAttrKind::MainType: {
-      auto abbrCode = S.DeclTypeAbbrCodes[MainTypeDeclAttrLayout::Code];
-      MainTypeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                         DA->isImplicit());
       return;
     }
 

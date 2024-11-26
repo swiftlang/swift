@@ -270,8 +270,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_disable_dynamic_actor_isolation);
   inputArgs.AddLastArg(arguments, options::OPT_warn_concurrency);
   inputArgs.AddLastArg(arguments, options::OPT_strict_concurrency);
-  inputArgs.AddAllArgs(arguments, options::OPT_enable_experimental_feature);
-  inputArgs.AddAllArgs(arguments, options::OPT_enable_upcoming_feature);
+  inputArgs.addAllArgs(arguments, {options::OPT_enable_experimental_feature,
+                                   options::OPT_disable_experimental_feature,
+                                   options::OPT_enable_upcoming_feature,
+                                   options::OPT_disable_upcoming_feature});
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
@@ -347,6 +349,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_cxx_interoperability_mode);
   inputArgs.AddLastArg(arguments, options::OPT_enable_builtin_module);
   inputArgs.AddLastArg(arguments, options::OPT_compiler_assertions);
+  inputArgs.AddLastArg(arguments, options::OPT_load_pass_plugin_EQ);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -761,6 +764,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_SwiftDeps:
   case file_types::TY_ExternalSwiftDeps:
   case file_types::TY_ModuleTrace:
+  case file_types::TY_FineModuleTrace:
   case file_types::TY_TBD:
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
@@ -1036,6 +1040,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ExternalSwiftDeps:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
+    case file_types::TY_FineModuleTrace:
     case file_types::TY_YAMLOptRecord:
     case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
