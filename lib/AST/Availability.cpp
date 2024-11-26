@@ -486,6 +486,74 @@ bool Decl::isAvailableAsSPI() const {
   return AvailabilityInference::isAvailableAsSPI(this);
 }
 
+const AvailableAttr *Decl::getDeprecatedAttr() const {
+  auto &ctx = getASTContext();
+  auto attrs = getAttrs();
+  const AvailableAttr *result = nullptr;
+  const AvailableAttr *bestActive = attrs.findMostSpecificActivePlatform(ctx);
+
+  for (auto attr :
+       attrs.getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
+    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
+      continue;
+
+    if (!attr->isActivePlatform(ctx) && !attr->isLanguageVersionSpecific() &&
+        !attr->isPackageDescriptionVersionSpecific())
+      continue;
+
+    // Unconditional deprecated.
+    if (attr->isUnconditionallyDeprecated())
+      return attr;
+
+    std::optional<llvm::VersionTuple> deprecatedVersion = attr->Deprecated;
+
+    StringRef deprecatedPlatform = attr->prettyPlatformString();
+    llvm::VersionTuple remappedDeprecatedVersion;
+    if (AvailabilityInference::updateDeprecatedPlatformForFallback(
+            attr, ctx, deprecatedPlatform, remappedDeprecatedVersion))
+      deprecatedVersion = remappedDeprecatedVersion;
+
+    if (!deprecatedVersion.has_value())
+      continue;
+
+    llvm::VersionTuple minVersion = attr->getActiveVersion(ctx);
+
+    // We treat the declaration as deprecated if it is deprecated on
+    // all deployment targets.
+    if (deprecatedVersion.value() <= minVersion) {
+      result = attr;
+    }
+  }
+  return result;
+}
+
+const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
+  auto &ctx = getASTContext();
+  auto attrs = getAttrs();
+  const AvailableAttr *result = nullptr;
+  const AvailableAttr *bestActive = attrs.findMostSpecificActivePlatform(ctx);
+
+  for (auto attr :
+       attrs.getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
+    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
+      continue;
+
+    if (!attr->isActivePlatform(ctx) && !attr->isLanguageVersionSpecific() &&
+        !attr->isPackageDescriptionVersionSpecific())
+      continue;
+
+    std::optional<llvm::VersionTuple> deprecatedVersion = attr->Deprecated;
+    if (!deprecatedVersion.has_value())
+      continue;
+
+    llvm::VersionTuple activeVersion = attr->getActiveVersion(ctx);
+
+    if (deprecatedVersion.value() > activeVersion)
+      result = attr;
+  }
+  return result;
+}
+
 static const AvailableAttr *
 getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
   auto &ctx = D->getASTContext();

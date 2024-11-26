@@ -4243,11 +4243,10 @@ findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
     WORSE(== nullptr);
 
     assert((a && b) && "neither should be null here");
-    ASTContext &ctx = a->getASTContext();
 
     // Is one more available than the other?
     WORSE(->isUnavailable());
-    WORSE(->getAttrs().isDeprecated(ctx));
+    WORSE(->isDeprecated());
 
     // Does one have a shorter name (so the non-matching prefix is shorter)?
     WORSE(->getName().getBaseName().userFacingName().size());

@@ -1390,6 +1390,18 @@ public:
   /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
 
+  /// Returns true if the declaration is deprecated at the current deployment
+  /// target.
+  bool isDeprecated() const { return getDeprecatedAttr() != nullptr; }
+
+  /// Returns the first `@available` attribute that indicates that this decl
+  /// is deprecated on current deployment target, or `nullptr` otherwise.
+  const AvailableAttr *getDeprecatedAttr() const;
+
+  /// Returns the first `@available` attribute that indicates that this decl
+  /// will be deprecated in the future, or `nullptr` otherwise.
+  const AvailableAttr *getSoftDeprecatedAttr() const;
+
   /// Returns true if the decl is always unavailable in the current compilation
   /// context. For example, the decl could be marked explicitly unavailable on
   /// either the current platform or in the current language mode. Returns false

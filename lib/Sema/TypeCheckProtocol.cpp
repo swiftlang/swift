@@ -1822,8 +1822,6 @@ checkWitnessAvailability(ValueDecl *requirement,
 
 RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
                                               const RequirementMatch &match) {
-  auto &ctx = getASTContext();
-
   if (!match.OptionalAdjustments.empty())
     return CheckKind::OptionalityConflict;
 
@@ -1900,9 +1898,8 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
   bool isDefaultWitness = false;
   if (auto *nominal = match.Witness->getDeclContext()->getSelfNominalTypeDecl())
     isDefaultWitness = isa<ProtocolDecl>(nominal);
-  if (isDefaultWitness &&
-      match.Witness->getAttrs().isDeprecated(ctx) &&
-      !requirement->getAttrs().isDeprecated(ctx)) {
+  if (isDefaultWitness && match.Witness->isDeprecated() &&
+      !requirement->isDeprecated()) {
     auto conformanceContext = ExportContext::forConformance(DC, Proto);
     if (!conformanceContext.isDeprecated()) {
       return RequirementCheck(CheckKind::DefaultWitnessDeprecated);
@@ -4433,7 +4430,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             auto &ctx = witness->getASTContext();
             auto &diags = ctx.Diags;
             SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-            auto *attr = witness->getAttrs().getDeprecated(ctx);
+            auto *attr = witness->getDeprecatedAttr();
             EncodedDiagnosticMessage EncodedMessage(attr->Message);
             diags.diagnose(diagLoc, diag::witness_deprecated,
                            witness, conformance->getProtocol()->getName(),
@@ -6623,7 +6620,6 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
   }
 
   WitnessChecker::RequirementEnvironmentCache reqEnvCache;
-  ASTContext &ctx = nominal->getASTContext();
   for (auto proto : nominal->getAllProtocols()) {
     // We only care about Objective-C protocols.
     if (!proto->isObjC()) continue;

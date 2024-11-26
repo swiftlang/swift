@@ -1473,7 +1473,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       ObjCName(Ctx.getObjcName(D)),
       InitKind(Ctx.getInitKind(D)),
       IsImplicit(D->isImplicit()),
-      IsDeprecated(D->getAttrs().isDeprecated(D->getASTContext())),
+      IsDeprecated(D->isDeprecated()),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)),
       IsFromExtension(isDeclaredInExtension(D)),
       DeclAttrs(collectDeclAttributes(D)) {

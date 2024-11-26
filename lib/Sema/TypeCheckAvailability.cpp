@@ -2308,13 +2308,13 @@ diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
 /// declaration is deprecated or null otherwise.
 static const AvailableAttr *getDeprecated(const Decl *D) {
   auto &Ctx = D->getASTContext();
-  if (auto *Attr = D->getAttrs().getDeprecated(Ctx))
+  if (auto *Attr = D->getDeprecatedAttr())
     return Attr;
 
   if (Ctx.LangOpts.WarnSoftDeprecated) {
     // When -warn-soft-deprecated is specified, treat any declaration that is
     // deprecated in the future as deprecated.
-    if (auto *Attr = D->getAttrs().getSoftDeprecated(Ctx))
+    if (auto *Attr = D->getSoftDeprecatedAttr())
       return Attr;
   }
 

@@ -2925,10 +2925,6 @@ public:
     return UnaryOperatorKind::None;
   }
 
-  bool isDeprecated(const ASTContext &ctx) const {
-    return getDeprecated(ctx) != nullptr;
-  }
-
   /// Determine whether there is a swiftVersionSpecific attribute that's
   /// unavailable relative to the provided language version.
   bool
@@ -2939,14 +2935,6 @@ public:
   const AvailableAttr *
   findMostSpecificActivePlatform(const ASTContext &ctx,
                                  bool ignoreAppExtensions = false) const;
-
-  /// Returns the first @available attribute that indicates
-  /// a declaration is deprecated on all deployment targets, or null otherwise.
-  const AvailableAttr *getDeprecated(const ASTContext &ctx) const;
-
-  /// Returns the first @available attribute that indicates
-  /// a declaration will be deprecated in the future, or null otherwise.
-  const AvailableAttr *getSoftDeprecated(const ASTContext &ctx) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable from asynchronous contexts, or null

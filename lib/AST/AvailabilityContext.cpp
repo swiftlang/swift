@@ -52,7 +52,6 @@ bool AvailabilityContext::PlatformInfo::constrainWith(
 
 bool AvailabilityContext::PlatformInfo::constrainWith(const Decl *decl) {
   bool isConstrained = false;
-  auto &ctx = decl->getASTContext();
 
   if (auto range = AvailabilityInference::annotatedAvailableRange(decl))
     isConstrained |= constrainRange(Range, *range);
@@ -63,8 +62,7 @@ bool AvailabilityContext::PlatformInfo::constrainWith(const Decl *decl) {
         CONSTRAIN_BOOL(IsUnavailableInEmbedded, attr->isForEmbedded());
   }
 
-  isConstrained |=
-      CONSTRAIN_BOOL(IsDeprecated, decl->getAttrs().isDeprecated(ctx));
+  isConstrained |= CONSTRAIN_BOOL(IsDeprecated, decl->isDeprecated());
 
   return isConstrained;
 }
