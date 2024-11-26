@@ -2972,6 +2972,7 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   switch (getKind()) {
   case Kind::StoredProperty:
   case Kind::GettableProperty:
+  case Kind::Method:
   case Kind::OptionalChain:
   case Kind::OptionalWrap:
   case Kind::OptionalForce:
@@ -2999,6 +3000,7 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
   case KeyPathPatternComponent::Kind::SettableProperty:
     forFunction(component.getComputedPropertyForSettable());
     LLVM_FALLTHROUGH;
+  case KeyPathPatternComponent::Kind::Method:
   case KeyPathPatternComponent::Kind::GettableProperty:
     forFunction(component.getComputedPropertyForGettable());
 
@@ -3053,7 +3055,8 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
     case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::TupleElement:
       break;
-    
+
+    case KeyPathPatternComponent::Kind::Method:
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
       for (auto &index : component.getArguments()) {
@@ -3135,7 +3138,8 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
     case KeyPathPatternComponent::Kind::TupleElement:
       ID.AddInteger(component.getTupleIndex());
       break;
-    
+
+    case KeyPathPatternComponent::Kind::Method:
     case KeyPathPatternComponent::Kind::SettableProperty:
       ID.AddPointer(component.getComputedPropertyForSettable());
       LLVM_FALLTHROUGH;
@@ -3260,7 +3264,8 @@ visitReferencedFunctionsAndMethods(
   case KeyPathPatternComponent::Kind::SettableProperty:
     functionCallBack(getComputedPropertyForSettable());
     LLVM_FALLTHROUGH;
-  case KeyPathPatternComponent::Kind::GettableProperty: {
+  case KeyPathPatternComponent::Kind::GettableProperty:
+  case KeyPathPatternComponent::Kind::Method: {
     functionCallBack(getComputedPropertyForGettable());
     auto id = getComputedPropertyId();
     switch (id.getKind()) {

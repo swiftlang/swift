@@ -902,6 +902,9 @@ SILSerializer::writeKeyPathPatternComponent(
     };
 
   switch (component.getKind()) {
+  case KeyPathPatternComponent::Kind::Method:
+    printf("SerializeSIL:writeKeyPathPatternComponent");
+    break;
   case KeyPathPatternComponent::Kind::StoredProperty:
     handleComponentCommon(KeyPathComponentKindEncoding::StoredProperty);
     ListOfValues.push_back(S.addDeclRef(component.getStoredPropertyDecl()));
