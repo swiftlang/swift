@@ -394,7 +394,8 @@ void verifyKeyPathComponent(SILModule &M,
   }
     
   case KeyPathPatternComponent::Kind::GettableProperty:
-  case KeyPathPatternComponent::Kind::SettableProperty: {
+  case KeyPathPatternComponent::Kind::SettableProperty:
+  case KeyPathPatternComponent::Kind::Method: {
     if (forPropertyDescriptor) {
       require(component.getIndices().empty() && !component.getIndexEquals() &&
                   !component.getIndexHash(),
@@ -5927,6 +5928,7 @@ public:
         switch (component.getKind()) {
         case KeyPathPatternComponent::Kind::GettableProperty:
         case KeyPathPatternComponent::Kind::SettableProperty:
+        case KeyPathPatternComponent::Kind::Method:
           hasIndices = !component.getIndices().empty();
           break;
         
