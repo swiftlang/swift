@@ -2162,18 +2162,18 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     return;
 
   // Make sure there isn't a more specific attribute we should be using instead.
-  // findMostSpecificActivePlatform() is O(N), so only do this if we're checking
-  // an iOS attribute while building for macCatalyst.
+  // getActiveAvailableAttrForCurrentPlatform() is O(N), so only do this if
+  // we're checking an iOS attribute while building for macCatalyst.
   if (attr->getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
-    if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
+    if (attr != D->getActiveAvailableAttrForCurrentPlatform()) {
       return;
     }
   }
 
   if (attr->getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
-    if (attr != D->getAttrs().findMostSpecificActivePlatform(Ctx)) {
+    if (attr != D->getActiveAvailableAttrForCurrentPlatform()) {
       return;
     }
   }

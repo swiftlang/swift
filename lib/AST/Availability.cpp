@@ -486,11 +486,36 @@ bool Decl::isAvailableAsSPI() const {
   return AvailabilityInference::isAvailableAsSPI(this);
 }
 
+const AvailableAttr *
+Decl::getActiveAvailableAttrForCurrentPlatform(bool ignoreAppExtensions) const {
+  auto &ctx = getASTContext();
+  const AvailableAttr *bestAttr = nullptr;
+
+  for (auto attr :
+       getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
+    if (!attr->hasPlatform() || !attr->isActivePlatform(ctx))
+      continue;
+
+    if (ignoreAppExtensions &&
+        isApplicationExtensionPlatform(attr->getPlatform()))
+      continue;
+
+    // We have an attribute that is active for the platform, but is it more
+    // specific than our current best?
+    if (!bestAttr || inheritsAvailabilityFromPlatform(
+                         attr->getPlatform(), bestAttr->getPlatform())) {
+      bestAttr = attr;
+    }
+  }
+
+  return bestAttr;
+}
+
 const AvailableAttr *Decl::getDeprecatedAttr() const {
   auto &ctx = getASTContext();
   auto attrs = getAttrs();
   const AvailableAttr *result = nullptr;
-  const AvailableAttr *bestActive = attrs.findMostSpecificActivePlatform(ctx);
+  const AvailableAttr *bestActive = getActiveAvailableAttrForCurrentPlatform();
 
   for (auto attr :
        attrs.getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
@@ -531,7 +556,7 @@ const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
   auto &ctx = getASTContext();
   auto attrs = getAttrs();
   const AvailableAttr *result = nullptr;
-  const AvailableAttr *bestActive = attrs.findMostSpecificActivePlatform(ctx);
+  const AvailableAttr *bestActive = getActiveAvailableAttrForCurrentPlatform();
 
   for (auto attr :
        attrs.getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
@@ -608,10 +633,9 @@ bool Decl::isUnavailableInCurrentSwiftVersion() const {
 static const AvailableAttr *
 getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
   auto &ctx = D->getASTContext();
-  auto attrs = D->getAttrs();
   const AvailableAttr *result = nullptr;
   const AvailableAttr *bestActive =
-      attrs.findMostSpecificActivePlatform(ctx, ignoreAppExtensions);
+      D->getActiveAvailableAttrForCurrentPlatform(ignoreAppExtensions);
 
   for (auto attr :
        D->getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {

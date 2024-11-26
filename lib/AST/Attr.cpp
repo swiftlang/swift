@@ -370,40 +370,6 @@ DeclAttribute *DeclAttribute::clone(ASTContext &ctx) const {
   }
 }
 
-const AvailableAttr *
-DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx,
-                                               bool ignoreAppExtensions) const {
-  const AvailableAttr *bestAttr = nullptr;
-
-  for (auto attr : *this) {
-    auto *avAttr = dyn_cast<AvailableAttr>(attr);
-    if (!avAttr)
-      continue;
-
-    if (avAttr->isInvalid())
-      continue;
-
-    if (!avAttr->hasPlatform())
-      continue;
-
-    if (!avAttr->isActivePlatform(ctx))
-      continue;
-
-    if (ignoreAppExtensions &&
-        isApplicationExtensionPlatform(avAttr->getPlatform()))
-      continue;
-
-    // We have an attribute that is active for the platform, but
-    // is it more specific than our current best?
-    if (!bestAttr || inheritsAvailabilityFromPlatform(
-                         avAttr->getPlatform(), bestAttr->getPlatform())) {
-      bestAttr = avAttr;
-    }
-  }
-
-  return bestAttr;
-}
-
 const BackDeployedAttr *
 DeclAttributes::getBackDeployed(const ASTContext &ctx,
                                 bool forTargetVariant) const {

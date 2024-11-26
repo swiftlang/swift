@@ -2925,12 +2925,6 @@ public:
     return UnaryOperatorKind::None;
   }
 
-  /// Finds the most-specific platform-specific attribute that is
-  /// active for the current platform.
-  const AvailableAttr *
-  findMostSpecificActivePlatform(const ASTContext &ctx,
-                                 bool ignoreAppExtensions = false) const;
-
   /// Returns the `@backDeployed` attribute that is active for the current
   /// platform.
   const BackDeployedAttr *getBackDeployed(const ASTContext &ctx,
