@@ -486,14 +486,71 @@ bool Decl::isAvailableAsSPI() const {
   return AvailabilityInference::isAvailableAsSPI(this);
 }
 
-bool Decl::isUnavailable() const { return AvailableAttr::isUnavailable(this); }
+static const AvailableAttr *
+getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
+  auto &ctx = D->getASTContext();
+  auto attrs = D->getAttrs();
+  const AvailableAttr *result = nullptr;
+  const AvailableAttr *bestActive =
+      attrs.findMostSpecificActivePlatform(ctx, ignoreAppExtensions);
+
+  for (auto attr :
+       D->getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
+    // If this is a platform-specific attribute and it isn't the most
+    // specific attribute for the current platform, we're done.
+    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
+      continue;
+
+    // If this attribute doesn't apply to the active platform, we're done.
+    if (!attr->isActivePlatform(ctx) && !attr->isLanguageVersionSpecific() &&
+        !attr->isPackageDescriptionVersionSpecific())
+      continue;
+
+    if (ignoreAppExtensions &&
+        isApplicationExtensionPlatform(attr->getPlatform()))
+      continue;
+
+    // Unconditional unavailable.
+    if (attr->isUnconditionallyUnavailable())
+      return attr;
+
+    switch (attr->getVersionAvailability(ctx)) {
+    case AvailableVersionComparison::Available:
+    case AvailableVersionComparison::PotentiallyUnavailable:
+      break;
+
+    case AvailableVersionComparison::Obsoleted:
+    case AvailableVersionComparison::Unavailable:
+      result = attr;
+      break;
+    }
+  }
+  return result;
+}
+
+const AvailableAttr *Decl::getUnavailableAttr(bool ignoreAppExtensions) const {
+  if (auto attr = getDeclUnavailableAttr(this, ignoreAppExtensions))
+    return attr;
+
+  // If D is an extension member, check if the extension is unavailable.
+  //
+  // Skip decls imported from Clang, they could be associated to the wrong
+  // extension and inherit undesired unavailability. The ClangImporter
+  // associates Objective-C protocol members to the first category where the
+  // protocol is directly or indirectly adopted, no matter its availability
+  // and the availability of other categories. rdar://problem/53956555
+  if (!getClangNode())
+    if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext()))
+      return ext->getUnavailableAttr(ignoreAppExtensions);
+
+  return nullptr;
+}
 
 std::optional<AvailableAttrDeclPair>
 SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator, const Decl *decl,
                                          bool ignoreAppExtensions) const {
   // Directly marked unavailable.
-  if (auto attr = decl->getAttrs().getUnavailable(decl->getASTContext(),
-                                                  ignoreAppExtensions))
+  if (auto attr = decl->getUnavailableAttr(ignoreAppExtensions))
     return std::make_pair(attr, decl);
 
   if (auto *parent =

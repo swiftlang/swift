@@ -428,52 +428,6 @@ DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx,
 }
 
 const AvailableAttr *
-DeclAttributes::getUnavailable(const ASTContext &ctx,
-                               bool ignoreAppExtensions) const {
-  const AvailableAttr *conditional = nullptr;
-  const AvailableAttr *bestActive =
-      findMostSpecificActivePlatform(ctx, ignoreAppExtensions);
-
-  for (auto Attr : *this)
-    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-      if (AvAttr->isInvalid())
-        continue;
-
-      // If this is a platform-specific attribute and it isn't the most
-      // specific attribute for the current platform, we're done.
-      if (AvAttr->hasPlatform() &&
-          (!bestActive || AvAttr != bestActive))
-        continue;
-
-      // If this attribute doesn't apply to the active platform, we're done.
-      if (!AvAttr->isActivePlatform(ctx) &&
-          !AvAttr->isLanguageVersionSpecific() &&
-          !AvAttr->isPackageDescriptionVersionSpecific())
-        continue;
-
-      if (ignoreAppExtensions &&
-          isApplicationExtensionPlatform(AvAttr->getPlatform()))
-        continue;
-
-      // Unconditional unavailable.
-      if (AvAttr->isUnconditionallyUnavailable())
-        return AvAttr;
-
-      switch (AvAttr->getVersionAvailability(ctx)) {
-      case AvailableVersionComparison::Available:
-      case AvailableVersionComparison::PotentiallyUnavailable:
-        break;
-
-      case AvailableVersionComparison::Obsoleted:
-      case AvailableVersionComparison::Unavailable:
-        conditional = AvAttr;
-        break;
-      }
-    }
-  return conditional;
-}
-
-const AvailableAttr *
 DeclAttributes::getDeprecated(const ASTContext &ctx) const {
   const AvailableAttr *conditional = nullptr;
   const AvailableAttr *bestActive = findMostSpecificActivePlatform(ctx);
@@ -2438,25 +2392,6 @@ AvailableVersionComparison AvailableAttr::getVersionAvailability(
 
   // The entity is available.
   return AvailableVersionComparison::Available;
-}
-
-const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
-  ASTContext &ctx = D->getASTContext();
-  if (auto attr = D->getAttrs().getUnavailable(ctx))
-    return attr;
-
-  // If D is an extension member, check if the extension is unavailable.
-  //
-  // Skip decls imported from Clang, they could be associated to the wrong
-  // extension and inherit undesired unavailability. The ClangImporter
-  // associates Objective-C protocol members to the first category where the
-  // protocol is directly or indirectly adopted, no matter its availability
-  // and the availability of other categories. rdar://problem/53956555
-  if (!D->getClangNode())
-    if (auto ext = dyn_cast<ExtensionDecl>(D->getDeclContext()))
-        return AvailableAttr::isUnavailable(ext);
-
-  return nullptr;
 }
 
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,

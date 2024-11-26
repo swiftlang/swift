@@ -111,8 +111,7 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
 }
 
 static bool isUnavailableOrObsoletedOnPlatform(const Decl *D) {
-  if (const auto *Avail =
-        D->getAttrs().getUnavailable(D->getASTContext())) {
+  if (const auto *Avail = D->getUnavailableAttr()) {
     if (Avail->getPlatform() != PlatformKind::none)
       return true;
   }

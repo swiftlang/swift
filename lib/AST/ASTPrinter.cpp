@@ -2150,8 +2150,6 @@ bool ShouldPrintChecker::shouldPrint(const Pattern *P,
 }
 
 bool isNonSendableExtension(const Decl *D) {
-  ASTContext &ctx = D->getASTContext();
-
   const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D);
   if (!ED || !ED->isUnavailable())
     return false;

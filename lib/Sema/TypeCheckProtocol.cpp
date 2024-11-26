@@ -4357,7 +4357,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
 
     case CheckKind::Unavailable: {
-      auto *attr = requirement->getAttrs().getUnavailable(getASTContext());
+      auto *attr = requirement->getUnavailableAttr();
       diagnoseOverrideOfUnavailableDecl(witness, requirement, attr);
       break;
     }
@@ -4415,7 +4415,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         [witness, requirement](NormalProtocolConformance *conformance) {
           auto &diags = witness->getASTContext().Diags;
           SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-          auto *attr = AvailableAttr::isUnavailable(witness);
+          auto *attr = witness->getUnavailableAttr();
           EncodedDiagnosticMessage EncodedMessage(attr->Message);
           diags.diagnose(diagLoc, diag::witness_unavailable, witness,
                          conformance->getProtocol(), EncodedMessage.Message);

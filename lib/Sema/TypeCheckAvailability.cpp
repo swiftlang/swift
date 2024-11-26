@@ -370,7 +370,7 @@ static bool isInsideCompatibleUnavailableDeclaration(
 
 const AvailableAttr *
 ExportContext::shouldDiagnoseDeclAsUnavailable(const Decl *D) const {
-  auto attr = AvailableAttr::isUnavailable(D);
+  auto attr = D->getUnavailableAttr();
   if (!attr)
     return nullptr;
 
@@ -2929,11 +2929,10 @@ static bool diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
                                            const ExportContext &Where,
                                            const Expr *call,
                                            DeclAvailabilityFlags Flags) {
-  return diagnoseExplicitUnavailability(D, R, Where, Flags,
-                                        [=](InFlightDiagnostic &diag) {
-    fixItAvailableAttrRename(diag, R, D, AvailableAttr::isUnavailable(D),
-                             call);
-  });
+  return diagnoseExplicitUnavailability(
+      D, R, Where, Flags, [=](InFlightDiagnostic &diag) {
+        fixItAvailableAttrRename(diag, R, D, D->getUnavailableAttr(), call);
+      });
 }
 
 /// Represents common information needed to emit diagnostics about explicitly
@@ -3110,7 +3109,7 @@ swift::getUnsatisfiedAvailabilityConstraint(
   if (isa<GenericTypeParamDecl>(decl))
     return std::nullopt;
 
-  if (auto attr = AvailableAttr::isUnavailable(decl)) {
+  if (auto attr = decl->getUnavailableAttr()) {
     if (isInsideCompatibleUnavailableDeclaration(decl, availabilityContext,
                                                  attr))
       return std::nullopt;
@@ -4043,7 +4042,7 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   if (D->getModuleContext()->isBuiltinModule())
     return false;
 
-  if (auto *attr = AvailableAttr::isUnavailable(D)) {
+  if (auto *attr = D->getUnavailableAttr()) {
     if (diagnoseIncDecRemoval(D, R, attr))
       return true;
     if (isa_and_nonnull<ApplyExpr>(call) &&

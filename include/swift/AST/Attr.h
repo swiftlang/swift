@@ -809,12 +809,6 @@ public:
         Bits.AvailableAttr.PlatformAgnostic);
   }
 
-  /// Determine if a given declaration should be considered unavailable given
-  /// the current settings.
-  ///
-  /// \returns The attribute responsible for making the declaration unavailable.
-  static const AvailableAttr *isUnavailable(const Decl *D);
-
   /// Returns true if the availability applies to a specific
   /// platform.
   bool hasPlatform() const { return getPlatform() != PlatformKind::none; }
@@ -2945,11 +2939,6 @@ public:
   const AvailableAttr *
   findMostSpecificActivePlatform(const ASTContext &ctx,
                                  bool ignoreAppExtensions = false) const;
-
-  /// Returns the first @available attribute that indicates
-  /// a declaration is unavailable, or null otherwise.
-  const AvailableAttr *getUnavailable(const ASTContext &ctx,
-                                      bool ignoreAppExtensions = false) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is deprecated on all deployment targets, or null otherwise.

@@ -1390,7 +1390,7 @@ public:
   /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
 
-  /// Returns true if the decl is always unavailable in this compilation
+  /// Returns true if the decl is always unavailable in the current compilation
   /// context. For example, the decl could be marked explicitly unavailable on
   /// either the current platform or in the current language mode. Returns false
   /// for declarations that are only _potentially_ unavailable because of a
@@ -1399,7 +1399,13 @@ public:
   ///
   /// Note that this query only considers the attributes that are attached
   /// directly to this decl (or the extension it is declared in, if applicable).
-  bool isUnavailable() const;
+  bool isUnavailable() const { return getUnavailableAttr() != nullptr; }
+
+  /// If the decl is always unavailable in the current compilation
+  /// context, returns the attribute attached to the decl (or its parent
+  /// extension) that makes it unavailable.
+  const AvailableAttr *
+  getUnavailableAttr(bool ignoreAppExtensions = false) const;
 
   /// Retrieve the @available attribute that provides the OS version range that
   /// this declaration is available in.

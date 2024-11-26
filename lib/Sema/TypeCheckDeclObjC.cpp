@@ -3314,8 +3314,6 @@ private:
     if (!VD)
       return;
 
-    ASTContext &ctx = VD->getASTContext();
-
     // Also skip overrides, unless they override an unavailable decl, which
     // makes them not formally overrides anymore.
     if (VD->getOverriddenDecl() && !VD->getOverriddenDecl()->isUnavailable())
