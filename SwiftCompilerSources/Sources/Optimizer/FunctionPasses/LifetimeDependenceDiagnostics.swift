@@ -9,6 +9,15 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// Pass dependencies:
+///
+/// - After MoveOnly checking fixes non-Copyable lifetimes.
+///
+/// - Before MoveOnlyTypeEliminator removes ownership operations on trivial types, which loses variable information
+/// required for diagnostics.
+///
+//===----------------------------------------------------------------------===//
 
 import AST
 import SIL
