@@ -562,22 +562,34 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
 void TypeBase::getTypeVariables(
     SmallPtrSetImpl<TypeVariableType *> &typeVariables) {
   // If we know we don't have any type variables, we're done.
-  if (hasTypeVariable()) {
-    auto addTypeVariables = [&](Type type) -> bool {
-      if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+  if (!hasTypeVariable())
+    return;
+
+  class Walker : public TypeWalker {
+    SmallPtrSetImpl<TypeVariableType *> &typeVariables;
+
+  public:
+    explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVariables)
+        : typeVariables(typeVariables) {}
+
+    Action walkToTypePre(Type ty) override {
+      // Skip children that don't contain type variables.
+      if (!ty->hasTypeVariable())
+        return Action::SkipNode;
+
+      if (auto tv = dyn_cast<TypeVariableType>(ty.getPointer())) {
         typeVariables.insert(tv);
       }
 
-      return false;
-    };
+      return Action::Continue;
+    }
+  };
 
-    // Use Type::findIf() to walk the types, finding type variables along the
-    // way.
-    getCanonicalType().findIf(addTypeVariables);
-    Type(this).findIf(addTypeVariables);
-    assert((!typeVariables.empty() || hasError()) &&
-           "Did not find type variables!");
-  }
+  Walker walker(typeVariables);
+  Type(this).walk(walker);
+
+  assert((!typeVariables.empty() || hasError()) &&
+         "Did not find type variables!");
 }
 
 static bool isLegalSILType(CanType type);
