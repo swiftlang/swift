@@ -7232,17 +7232,16 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
   outVals.swap(argValues);
 }
 
-PreparedArguments
-SILGenFunction::prepareSubscriptIndices(SILLocation loc,
-                                        SubscriptDecl *subscript,
-                                        SubstitutionMap subs,
-                                        AccessStrategy strategy,
-                                        ArgumentList *argList) {
+PreparedArguments SILGenFunction::prepareIndices(SILLocation loc,
+                                                 ValueDecl *decl,
+                                                 SubstitutionMap subs,
+                                                 AccessStrategy strategy,
+                                                 ArgumentList *argList) {
   // TODO: use the real abstraction pattern from the accessor(s) in the
   // strategy.
   // Currently we use the substituted type so that we can reconstitute these
   // as RValues.
-  Type interfaceType = subscript->getInterfaceType();
+  Type interfaceType = decl->getInterfaceType();
 
   CanFunctionType substFnType;
   if (subs)
@@ -7900,10 +7899,11 @@ SILGenFunction::emitDynamicSubscriptGetterApply(SILLocation loc,
                 emitManagedRValueWithCleanup(optResult, optTL));
 }
 
-SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
-    SILLocation loc, SubscriptDecl *subscript,
-    SubstitutionMap subs, ArgumentList *argList) {
-  Type interfaceType = subscript->getInterfaceType();
+SmallVector<ManagedValue, 4>
+SILGenFunction::emitKeyPathOperands(SILLocation loc, ValueDecl *decl,
+                                    SubstitutionMap subs,
+                                    ArgumentList *argList) {
+  Type interfaceType = decl->getInterfaceType();
   CanFunctionType substFnType =
       subs ? cast<FunctionType>(interfaceType->castTo<GenericFunctionType>()
                                     ->substGenericArgs(subs)
@@ -7920,10 +7920,9 @@ SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
                      ClaimedParamsRef(fnType->getParameters()), argValues,
                      delayedArgs, ForeignInfo{});
 
-  auto prepared =
-      prepareSubscriptIndices(loc, subscript, subs,
-                              // Strategy doesn't matter
-                              AccessStrategy::getStorage(), argList);
+  auto prepared = prepareIndices(loc, decl, subs,
+                                 // Strategy doesn't matter
+                                 AccessStrategy::getStorage(), argList);
   emitter.emitPreparedArgs(std::move(prepared), origFnType);
 
   if (!delayedArgs.empty())

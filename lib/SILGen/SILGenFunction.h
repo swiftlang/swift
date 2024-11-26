@@ -1138,18 +1138,21 @@ public:
                            bool isSelfConformance, bool isPreconcurrency,
                            std::optional<ActorIsolation> enterIsolation);
 
-  /// Generates subscript arguments for keypath. This function handles lowering
-  /// of all index expressions including default arguments.
+  /// Generates subscript or method arguments for keypath. This function handles
+  /// lowering of all arguments or index expressions including default
+  /// arguments.
   ///
   /// \returns Lowered index arguments.
-  /// \param subscript - The subscript decl who's arguments are being lowered.
-  /// \param subs - Used to get subscript function type and to substitute generic args.
-  /// \param argList - The argument list of the subscript.
-  SmallVector<ManagedValue, 4>
-  emitKeyPathSubscriptOperands(SILLocation loc,
-                               SubscriptDecl *subscript,
-                               SubstitutionMap subs,
-                               ArgumentList *argList);
+  /// \param decl - The subscript or method decl whose arguments are being
+  /// lowered.
+  /// \param subs - Used to get subscript or method function type and to
+  /// substitute generic args.
+  /// \param argList - The argument list of the
+  /// subscript or method.
+  SmallVector<ManagedValue, 4> emitKeyPathOperands(SILLocation loc,
+                                                   ValueDecl *decl,
+                                                   SubstitutionMap subs,
+                                                   ArgumentList *argList);
 
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,
@@ -1930,11 +1933,10 @@ public:
                                 const FunctionTypeInfo &typeContext,
                                 SubstitutionMap subs);
 
-  PreparedArguments prepareSubscriptIndices(SILLocation loc,
-                                            SubscriptDecl *subscript,
-                                            SubstitutionMap subs,
-                                            AccessStrategy strategy,
-                                            ArgumentList *argList);
+  PreparedArguments prepareIndices(SILLocation loc, ValueDecl *decl,
+                                   SubstitutionMap subs,
+                                   AccessStrategy strategy,
+                                   ArgumentList *argList);
 
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,

@@ -4286,7 +4286,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
     actorIso = getActorIsolation(decl);
 
   auto *argList = e->getArgs();
-  auto indices = SGF.prepareSubscriptIndices(e, decl, subs, strategy, argList);
+  auto indices = SGF.prepareIndices(e, decl, subs, strategy, argList);
 
   lv.addMemberSubscriptComponent(SGF, e, decl, subs,
                                  options, e->isSuper(), accessKind, strategy,

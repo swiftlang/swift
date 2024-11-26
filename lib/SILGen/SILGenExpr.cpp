@@ -3175,13 +3175,10 @@ RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
                 ManagedValue::forObjectRValueWithoutOwnership(selectorValue));
 }
 
-static ManagedValue
-emitKeyPathRValueBase(SILGenFunction &subSGF,
-                      AbstractStorageDecl *storage,
-                      SILLocation loc,
-                      SILValue paramArg,
-                      CanType &baseType,
-                      SubstitutionMap subs) {
+static ManagedValue emitKeyPathRValueBase(SILGenFunction &subSGF,
+                                          ValueDecl *storage, SILLocation loc,
+                                          SILValue paramArg, CanType &baseType,
+                                          SubstitutionMap subs) {
   // If the storage is at global scope, then the base value () is a formality.
   // There no real argument to pass to the underlying accessors.
   if (!storage->getDeclContext()->isTypeContext())
@@ -3237,16 +3234,14 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
 
 using IndexTypePair = std::pair<CanType, SILType>;
 
-/// Helper function to load the captured indexes out of a key path component
-/// in order to invoke the accessors on that key path. A component with captured
-/// indexes passes down a pointer to those captures to the accessor thunks,
-/// which we can copy out of to produce values we can pass to the real
-/// accessor functions.
-static PreparedArguments
-loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
-                                   AbstractStorageDecl *storage,
-                                   ArrayRef<IndexTypePair> indexes,
-                                   SILValue pointer) {
+/// Helper function to load the captured indexes out of a key path
+/// component in order to invoke the accessors on that key path. A component
+/// with captured indexes passes down a pointer to those captures to the
+/// accessor thunks, which we can copy out of to produce values we can pass to
+/// the real accessor functions.
+static PreparedArguments loadIndexValuesForKeyPathComponent(
+    SILGenFunction &SGF, SILLocation loc, ValueDecl *storage,
+    ArrayRef<IndexTypePair> indexes, SILValue pointer) {
   // If not a subscript, do nothing.
   if (!isa<SubscriptDecl>(storage))
     return PreparedArguments();
@@ -4125,12 +4120,10 @@ lowerKeyPathSubscriptIndexTypes(
   }
 }
 
-static void
-lowerKeyPathSubscriptIndexPatterns(
-                 SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
-                 ArrayRef<IndexTypePair> indexTypes,
-                 ArrayRef<ProtocolConformanceRef> indexHashables,
-                 unsigned &baseOperand) {
+static void lowerKeyPathMemberIndexPatterns(
+    SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
+    ArrayRef<IndexTypePair> indexTypes,
+    ArrayRef<ProtocolConformanceRef> indexHashables, unsigned &baseOperand) {
   for (unsigned i : indices(indexTypes)) {
     CanType formalTy;
     SILType loweredTy;
@@ -4352,7 +4345,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     SILFunction *indexEquals = nullptr, *indexHash = nullptr;
     // Property descriptors get their index information from the client.
     if (!forPropertyDescriptor) {
-      lowerKeyPathSubscriptIndexPatterns(indexPatterns,
+      lowerKeyPathMemberIndexPatterns(indexPatterns,
                                          indexTypes, indexHashables,
                                          baseOperand);
       
@@ -4442,7 +4435,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
         break;
 
       auto subscript = cast<SubscriptDecl>(decl);
-      auto loweredArgs = SGF.emitKeyPathSubscriptOperands(
+      auto loweredArgs = SGF.emitKeyPathOperands(
           E, subscript, component.getDeclRef().getSubstitutions(),
           component.getArgs());
 
