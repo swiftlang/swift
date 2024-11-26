@@ -1952,12 +1952,33 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   return UnderlyingType;
 }
 
-ArrayRef<Type> TypeAliasType::getDirectGenericArgs() const {
-  if (!typealias->isGeneric()) return { };
+GenericSignature TypeAliasType::getGenericSignature() const {
+  return typealias->getGenericSignature();
+}
 
-  // Otherwise, the innermost replacement types are the direct
-  // generic arguments.
-  return getSubstitutionMap().getInnermostReplacementTypes();
+SubstitutionMap TypeAliasType::getSubstitutionMap() const {
+  auto genericSig = typealias->getGenericSignature();
+  if (!genericSig)
+    return SubstitutionMap();
+
+  SubstitutionMap parentSubMap;
+  DeclContext *dc = typealias->getDeclContext();
+
+  if (dc->isLocalContext()) {
+    if (auto parentSig = dc->getGenericSignatureOfContext())
+      parentSubMap = parentSig->getIdentitySubstitutionMap();
+  } else if (auto parent = getParent()) {
+    parentSubMap = parent->getContextSubstitutionMap(dc);
+  }
+
+  SmallVector<Type, 4> replacements(
+      parentSubMap.getReplacementTypes().begin(),
+      parentSubMap.getReplacementTypes().end());
+  for (auto arg : getDirectGenericArgs())
+    replacements.push_back(arg);
+
+  return SubstitutionMap::get(genericSig, replacements,
+                              LookUpConformanceInModule());
 }
 
 GenericTypeParamType::GenericTypeParamType(GenericTypeParamDecl *param,
