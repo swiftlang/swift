@@ -3720,7 +3720,7 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
-  SILFunction *getComputedPropertyGetter() const {
+  SILFunction *getComputedPropertyForGettable() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3735,7 +3735,7 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
-  SILFunction *getComputedPropertySetter() const {
+  SILFunction *getComputedPropertyForSettable() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::GettableProperty:
@@ -3750,7 +3750,7 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
-  ArrayRef<Index> getSubscriptIndices() const {
+  ArrayRef<Index> getIndices() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3765,7 +3765,7 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
-  SILFunction *getSubscriptIndexEquals() const {
+  SILFunction *getIndexEquals() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3779,7 +3779,7 @@ public:
     }
     llvm_unreachable("unhandled kind");
   }
-  SILFunction *getSubscriptIndexHash() const {
+  SILFunction *getIndexHash() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
