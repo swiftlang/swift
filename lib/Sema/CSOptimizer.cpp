@@ -530,17 +530,21 @@ static void determineBestChoicesInContext(
         scoreCandidateMatch =
             [&](GenericSignature genericSig, Type candidateType, Type paramType,
                 MatchOptions options) -> std::optional<double> {
-      auto areEqual = [&options](Type a, Type b) {
-        // Double<->CGFloat implicit conversion support for literals
-        // only since in this case the conversion might not result in
-        // score penalty.
-        if (options.contains(MatchFlag::Literal) &&
-            ((a->isDouble() && b->isCGFloat()) ||
-             (a->isCGFloat() && b->isDouble())))
-          return true;
-
+      auto areEqual = [&](Type a, Type b) {
         return a->getDesugaredType()->isEqual(b->getDesugaredType());
       };
+
+      // Allow CGFloat -> Double widening conversions between
+      // candidate argument types and parameter types. This would
+      // make sure that Double is always preferred over CGFloat
+      // when using literals and ranking supported disjunction
+      // choices. Narrowing conversion (Double -> CGFloat) should
+      // be delayed as much as possible.
+      if (options.contains(MatchFlag::OnParam)) {
+        if (candidateType->isCGFloat() && paramType->isDouble()) {
+          return options.contains(MatchFlag::Literal) ? 0.2 : 0.9;
+        }
+      }
 
       if (options.contains(MatchFlag::ExactOnly))
         return areEqual(candidateType, paramType) ? 1 : 0;
@@ -559,12 +563,12 @@ static void determineBestChoicesInContext(
           if (candidateType->isInt() &&
               TypeChecker::conformsToKnownProtocol(
                   paramType, KnownProtocolKind::ExpressibleByIntegerLiteral))
-            return 0.2;
+            return paramType->isDouble() ? 0.2 : 0.3;
 
           if (candidateType->isDouble() &&
               TypeChecker::conformsToKnownProtocol(
                   paramType, KnownProtocolKind::ExpressibleByFloatLiteral))
-            return 0.2;
+            return 0.3;
         }
 
         return 0;
@@ -916,6 +920,19 @@ static void determineBestChoicesInContext(
           // with a lot of favored overloads because on the result type alone.
           if (decl->isOperator() && !isStandardComparisonOperator(decl)) {
             if (llvm::any_of(resultTypes, [&](const Type candidateResultTy) {
+                  // Avoid increasing weight based on CGFloat result type
+                  // match because that could require narrowing conversion
+                  // in the arguments and that is always detrimental.
+                  //
+                  // For example, `has_CGFloat_param(1.0 + 2.0)` should use
+                  // `+(_: Double, _: Double) -> Double` instead of
+                  // `+(_: CGFloat, _: CGFloat) -> CGFloat` which would match
+                  // parameter of `has_CGFloat_param` exactly but use a
+                  // narrowing conversion for both literals.
+                  if (candidateResultTy->lookThroughAllOptionalTypes()
+                          ->isCGFloat())
+                    return false;
+
                   return scoreCandidateMatch(genericSig,
                                              overloadType->getResult(),
                                              candidateResultTy,
