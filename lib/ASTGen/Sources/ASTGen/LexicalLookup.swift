@@ -38,7 +38,7 @@ private let rowCharWidth: Int = 30
 /// Additionally, when matching fails, the function prints console output with the two results compared.
 @_cdecl("swift_ASTGen_validateUnqualifiedLookup")
 public func unqualifiedLookup(
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeMutableRawPointer,
   astContext: BridgedASTContext,
   lookupAt: BridgedSourceLoc,
   finishInSequentialScope: Bool,
@@ -51,10 +51,7 @@ public func unqualifiedLookup(
     return false
   }
   let sourceLocationConverter = sourceFile.pointee.sourceLocationConverter
-  let buildConfiguration = CompilerBuildConfiguration(
-    ctx: astContext,
-    sourceBuffer: sourceFile.pointee.buffer
-  )
+  let configuredRegions = sourceFile.pointee.configuredRegions(astContext: astContext)
 
   guard let lookupPosition = sourceFile.pointee.position(of: lookupAt),
     let lookupToken = sourceFileSyntax.token(at: lookupPosition)
@@ -73,7 +70,7 @@ public func unqualifiedLookup(
   let sllResults = sllConsumedResults(
     lookupToken: lookupToken,
     finishInSequentialScope: finishInSequentialScope,
-    configuredRegions: sourceFileSyntax.configuredRegions(in: buildConfiguration)
+    configuredRegions: configuredRegions
   )
 
   // Add header to the output
@@ -201,11 +198,39 @@ private func sllConsumedResults(
   finishInSequentialScope: Bool,
   configuredRegions: ConfiguredRegions
 ) -> [ConsumedLookupResult] {
-  lookupToken.lookup(
+  let resultsWithoutMacroReordering = lookupToken.lookup(
     nil,
     with: LookupConfig(finishInSequentialScope: finishInSequentialScope, configuredRegions: configuredRegions)
   )
-  .flatMap { result in
+
+  // Early reordering of macro declaration parameters with its generic parameters.
+  var results: [LookupResult] = []
+  var previousMacroResult: LookupResult?
+
+  for result in resultsWithoutMacroReordering {
+    if let unwrappedMacroResult = previousMacroResult,
+      result.scope.is(GenericParameterClauseSyntax.self)
+    {
+      results += [result, unwrappedMacroResult]
+      previousMacroResult = nil
+      continue
+    } else if let unwrappedMacroResult = previousMacroResult {
+      results.append(unwrappedMacroResult)
+      previousMacroResult = nil
+    }
+
+    if result.scope.is(MacroDeclSyntax.self) {
+      previousMacroResult = result
+    } else {
+      results.append(result)
+    }
+  }
+
+  if let previousMacroResult {
+    results.append(previousMacroResult)
+  }
+
+  return results.flatMap { result in
     switch result {
     case .lookInMembers(let lookInMembers):
       return [
