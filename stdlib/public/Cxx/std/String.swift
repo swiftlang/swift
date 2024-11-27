@@ -198,7 +198,7 @@ extension std.string: Hashable {
   @_alwaysEmitIntoClient
   public func hash(into hasher: inout Hasher) {
     // Call std::hash<std::string>::operator()
-    let cxxHash = __swift_interopHashOfString().callAsFunction(self)
+    let cxxHash = __swift_interopComputeHashOfString(self)
     hasher.combine(cxxHash)
   }
 }
@@ -207,7 +207,7 @@ extension std.u16string: Hashable {
   @_alwaysEmitIntoClient
   public func hash(into hasher: inout Hasher) {
     // Call std::hash<std::u16string>::operator()
-    let cxxHash = __swift_interopHashOfU16String().callAsFunction(self)
+    let cxxHash = __swift_interopComputeHashOfU16String(self)
     hasher.combine(cxxHash)
   }
 }
@@ -216,7 +216,7 @@ extension std.u32string: Hashable {
   @_alwaysEmitIntoClient
   public func hash(into hasher: inout Hasher) {
     // Call std::hash<std::u32string>::operator()
-    let cxxHash = __swift_interopHashOfU32String().callAsFunction(self)
+    let cxxHash = __swift_interopComputeHashOfU32String(self)
     hasher.combine(cxxHash)
   }
 }
