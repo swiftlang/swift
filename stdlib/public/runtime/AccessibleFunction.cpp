@@ -152,8 +152,9 @@ _searchForFunctionRecord(AccessibleFunctionsState &S, llvm::StringRef name) {
     for (auto &record : section) {
       auto recordName =
           swift::Demangle::makeSymbolicMangledNameStringRef(record.Name.get());
-      if (recordName == name)
+      if (recordName == name) {
         return traceState.end(&record);
+      }
     }
   }
   return nullptr;
