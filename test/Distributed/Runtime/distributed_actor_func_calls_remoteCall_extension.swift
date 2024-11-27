@@ -40,7 +40,9 @@ func test() async throws {
   let ref = try KappaProtocolImpl.resolve(id: local.id, using: system)
 
   let reply = try await ref.echo(name: "Caplin")
-  // CHECK: >> remoteCall: on:main.KappaProtocolImpl, target:main.$KappaProtocol.echo(name:), invocation:FakeInvocationEncoder(genericSubs: [main.KappaProtocolImpl], arguments: ["Caplin"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+  // CHECK: >> remoteCall: on:main.KappaProtocolImpl, target:echo(name:), invocation:FakeInvocationEncoder(genericSubs: [main.KappaProtocolImpl], arguments: ["Caplin"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+  // CHECK: > execute distributed target: echo(name:), identifier: $s4main13KappaProtocolPAAE4echo4nameS2S_tYaKFTE
+  // CHECK: > decode generic subs: [main.KappaProtocolImpl]
 
   // CHECK: << remoteCall return: Echo: Caplin
   print("reply: \(reply)")
