@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil -disable-availability-checking %s | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -enable-ossa-modules -O -emit-sil -disable-availability-checking %s | %IRGenFileCheck %s
 
 // REQUIRES: synchronization
 
