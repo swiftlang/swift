@@ -233,7 +233,7 @@ class ToolchainTestCase(unittest.TestCase):
             'stress_test')
 
     def generate_should_skip_testing_platform(
-            host_target, build_arg_name, test_arg_name):
+            host_target, build_arg_name, test_arg_name, extra_test_arg_name=None):
         def test(self):
             args = self.default_args()
             setattr(args, build_arg_name, True)
@@ -245,6 +245,8 @@ class ToolchainTestCase(unittest.TestCase):
             self.assertEqual(len(before.swift_test_run_targets), 0)
 
             setattr(args, test_arg_name, True)
+            if extra_test_arg_name is not None:
+                setattr(args, extra_test_arg_name, True)
             after = HostSpecificConfiguration(host_target, args)
             self.assertIn('check-swift-{}'.format(host_target),
                           after.swift_test_run_targets)
@@ -292,7 +294,8 @@ class ToolchainTestCase(unittest.TestCase):
         generate_should_skip_testing_platform(
             'watchsimulator-x86_64',
             'build_watchos_simulator',
-            'test_watchos_simulator')
+            'test_watchos_simulator',
+            'test_watchos_64bit_simulator')
 
     def generate_should_allow_testing_only_host(
             host_target, build_arg_name, test_arg_name, host_test_arg_name):
