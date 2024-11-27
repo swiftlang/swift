@@ -4452,12 +4452,32 @@ void ASTMangler::appendDistributedThunk(
     return nullptr;
   };
 
-  if (auto *P = referenceInProtocolContextOrRequirement()) {
-    appendContext(P->getDeclContext(), base,
-                  thunk->getAlternateModuleName());
-    appendIdentifier(Twine("$", P->getNameStr()).str());
-    appendOperator("C"); // necessary for roundtrip, though we don't use it
+  // Determine if we should mangle with a $Target substitute decl context,
+  // this matters for @Resolvable calls / protocol calls where the caller
+  // does not know the type of the recipient distributed actor, and we use the
+  // $Target type as substitute to then generically invoke it on the type of the
+  // recipient, whichever 'protocol Type'-conforming type it will be.
+  NominalTypeDecl *stubActorDecl = nullptr;
+  if (auto P = referenceInProtocolContextOrRequirement()) {
+    auto &C = thunk->getASTContext();
+    auto M = thunk->getModuleContext();
+
+    SmallVector<ValueDecl *, 1> stubClassLookupResults;
+    C.lookupInModule(M, ("$" + P->getNameStr()).str(), stubClassLookupResults);
+
+    if (stubClassLookupResults.size() > 0) {
+      stubActorDecl =
+          dyn_cast_or_null<NominalTypeDecl>(stubClassLookupResults.front());
+    }
+  }
+
+  if (stubActorDecl) {
+    // Effectively mangle the thunk as if it was declared on the $StubTarget
+    // type, rather than on a `protocol Target`.
+    appendContext(stubActorDecl, base, thunk->getAlternateModuleName());
   } else {
+    // There's no need to replace the context, this is a normal concrete type
+    // remote call identifier.
     appendContextOf(thunk, base);
   }
 
