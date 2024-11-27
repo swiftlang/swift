@@ -108,7 +108,7 @@ function(_add_host_variant_swift_sanitizer_flags target)
       message(SEND_ERROR "unsupported value for LLVM_USE_SANITIZER: ${LLVM_USE_SANITIZER}")
     endif()
 
-    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:${_Swift_SANITIZER_FLAGS}>)
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:SHELL:${_Swift_SANITIZER_FLAGS}>)
   endif()
 endfunction()
 
