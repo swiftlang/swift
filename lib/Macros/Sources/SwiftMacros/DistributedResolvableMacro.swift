@@ -180,14 +180,14 @@ extension DistributedResolvableMacro {
     // Don't duplicate the ActorSystem type parameter if it already was declared
     // on the protocol as a primary associated type;
     // otherwise, add it as first primary associated type.
-    let actorSystemTypeParam: [String] =
-      if primaryTypeParams.contains("ActorSystem") {
-        []
-      } else if isGenericOverActorSystem {
-        ["ActorSystem"]
-      } else {
-        []
-      }
+    let actorSystemTypeParam: [String]
+    if primaryTypeParams.contains("ActorSystem") {
+      actorSystemTypeParam = []
+    } else if isGenericOverActorSystem {
+      actorSystemTypeParam = ["ActorSystem"]
+    } else {
+      actorSystemTypeParam = []
+    }
 
     // Prepend the actor system type parameter, as we want it to be the first one
     primaryTypeParams = actorSystemTypeParam + primaryTypeParams
@@ -215,20 +215,20 @@ extension DistributedResolvableMacro {
       }
     }
 
-    let stubActorBody: String =
-      if isGenericOverActorSystem {
-        // there may be no `where` clause specifying an actor system,
-        // but perhaps there is a typealias (or extension with a typealias),
-        // specifying a concrete actor system so we let this synthesize
-        // an empty `$Greeter` -- this may fail, or succeed depending on
-        // surrounding code using a default distributed actor system,
-        // or extensions providing it.
-        ""
-      } else if let specificActorSystemRequirement {
-        "\(typealiasActorSystem(access: accessModifiers, proto, specificActorSystemRequirement))"
-      } else {
-        ""
-      }
+    let stubActorBody: String
+    if isGenericOverActorSystem {
+      // there may be no `where` clause specifying an actor system,
+      // but perhaps there is a typealias (or extension with a typealias),
+      // specifying a concrete actor system so we let this synthesize
+      // an empty `$Greeter` -- this may fail, or succeed depending on
+      // surrounding code using a default distributed actor system,
+      // or extensions providing it.
+      stubActorBody = ""
+    } else if let specificActorSystemRequirement {
+      stubActorBody = "\(typealiasActorSystem(access: accessModifiers, proto, specificActorSystemRequirement))"
+    } else {
+      stubActorBody = ""
+    }
 
     return [
       """
