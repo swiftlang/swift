@@ -1097,6 +1097,79 @@ selectBestBindingDisjunction(ConstraintSystem &cs,
   return firstBindDisjunction;
 }
 
+/// Prioritize `build{Block, Expression, ...}` and any chained
+/// members that are connected to individual builder elements
+/// i.e. `ForEach(...) { ... }.padding(...)`, once `ForEach`
+/// is resolved, `padding` should be prioritized because its
+/// requirements can help prune the solution space before the
+/// body is checked.
+static Constraint *
+selectDisjunctionInResultBuilderContext(ConstraintSystem &cs,
+                                        ArrayRef<Constraint *> disjunctions) {
+  auto context = AnyFunctionRef::fromDeclContext(cs.DC);
+  if (!context)
+    return nullptr;
+
+  if (!cs.getAppliedResultBuilderTransform(context.value()))
+    return nullptr;
+
+  std::pair<Constraint *, unsigned> best{nullptr, 0};
+  for (auto *disjunction : disjunctions) {
+    auto *member =
+        getAsExpr<UnresolvedDotExpr>(disjunction->getLocator()->getAnchor());
+    if (!member)
+      continue;
+
+    // Attempt `build{Block, Expression, ...} first because they
+    // provide contextual information for the inner calls.
+    if (isResultBuilderMethodReference(cs.getASTContext(), member))
+      return disjunction;
+
+    Expr *curr = member;
+    bool disqualified = false;
+    // Walk up the parent expression chain and check whether this
+    // disjunction represents one of the members in a chain that
+    // leads up to `buildExpression` (if defined by the builder)
+    // or to a pattern binding for `$__builderN` (the walk won't
+    // find any argument position locations in that case).
+    while (auto parent = cs.getParentExpr(curr)) {
+      if (!(isExpr<CallExpr>(parent) || isExpr<UnresolvedDotExpr>(parent))) {
+        disqualified = true;
+        break;
+      }
+
+      if (auto *call = getAsExpr<CallExpr>(parent)) {
+        // The current parent appears in an argument position.
+        if (call->getFn() != curr) {
+          // Allow expressions that appear in a argument position to
+          // `build{Expression, Block, ...} methods.
+          if (auto *UDE = getAsExpr<UnresolvedDotExpr>(call->getFn())) {
+            disqualified =
+                !isResultBuilderMethodReference(cs.getASTContext(), UDE);
+          } else {
+            disqualified = true;
+          }
+        }
+      }
+
+      if (disqualified)
+        break;
+
+      curr = parent;
+    }
+
+    if (disqualified)
+      continue;
+
+    if (auto depth = cs.getExprDepth(member)) {
+      if (!best.first || best.second > depth)
+        best = std::make_pair(disjunction, depth.value());
+    }
+  }
+
+  return best.first;
+}
+
 std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
 ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
@@ -1110,6 +1183,11 @@ ConstraintSystem::selectDisjunction() {
 
   llvm::DenseMap<Constraint *, DisjunctionInfo> favorings;
   determineBestChoicesInContext(*this, disjunctions, favorings);
+
+  if (auto *disjunction =
+          selectDisjunctionInResultBuilderContext(*this, disjunctions)) {
+    return std::make_pair(disjunction, favorings[disjunction].FavoredChoices);
+  }
 
   // Pick the disjunction with the smallest number of favored, then active
   // choices.
