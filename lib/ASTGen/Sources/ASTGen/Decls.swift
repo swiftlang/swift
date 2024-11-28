@@ -378,8 +378,24 @@ extension ASTGenVisitor {
     accessorDecl node: AccessorDeclSyntax,
     for storage: BridgedAbstractStorageDecl
   ) -> BridgedAccessorDecl? {
-    // FIXME: Attributes.
     var attrs = BridgedDeclAttributes()
+
+    // '@' attributes.
+    var initContext: BridgedPatternBindingInitializer? = nil
+    visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
+      switch element {
+      case .ifConfigDecl(let ifConfigDecl):
+        return .ifConfigDecl(ifConfigDecl)
+      case .attribute(let attribute):
+        return .underlying(attribute)
+      }
+    } body: { node in
+      if let attr = self.generateDeclAttribute(attribute: node, initContext: &initContext) {
+        attrs.add(attr)
+      }
+    }
+
+    // The modifier
     if
       let modifier = node.modifier,
       let attr = self.generate(declModifier: modifier) {
@@ -461,7 +477,6 @@ extension ASTGenVisitor {
   }
 
   func generate(patternBinding binding: PatternBindingSyntax, attrs: DeclAttributesResult) -> BridgedPatternBindingEntry {
-    // FIXME: Apply attributes.
     let pattern = generate(pattern: binding.pattern)
     let equalLoc = generateSourceLoc(binding.initializer?.equal)
 
@@ -545,6 +560,7 @@ extension ASTGenVisitor {
       declContext: self.declContext,
       bindingKeywordLoc: self.generateSourceLoc(node.bindingSpecifier),
       entries: self.generateBindingEntries(for: node, attrs: attrs),
+      attributes: attrs.attributes,
       isStatic: attrs.staticLoc.isValid,
       isLet: isLet
     )
@@ -560,7 +576,7 @@ extension ASTGenVisitor {
       staticSpelling: attrs.staticSpelling,
       subscriptKeywordLoc: self.generateSourceLoc(node.subscriptKeyword),
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      parameterList: self.generate(functionParameterClause: node.parameterClause, forSubscript: true),
+      parameterList: self.generate(functionParameterClause: node.parameterClause, for: .subscript),
       arrowLoc: self.generateSourceLoc(node.returnClause.arrow),
       returnType: self.generate(type: node.returnClause.type)
     )
@@ -592,7 +608,7 @@ extension ASTGenVisitor {
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      parameterList: self.generate(functionParameterClause: node.signature.parameterClause, forSubscript: false),
+      parameterList: self.generate(functionParameterClause: node.signature.parameterClause, for: name.isOperator ? .operator : .function),
       asyncSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.asyncSpecifier),
       throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsClause?.throwsSpecifier),
       thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
@@ -620,7 +636,7 @@ extension ASTGenVisitor {
       failabilityMarkLoc: self.generateSourceLoc(node.optionalMark),
       isIUO: node.optionalMark?.rawTokenKind == .exclamationMark,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      parameterList: self.generate(functionParameterClause: node.signature.parameterClause, forSubscript: false),
+      parameterList: self.generate(functionParameterClause: node.signature.parameterClause, for: .initializer),
       asyncSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.asyncSpecifier),
       throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsClause?.throwsSpecifier),
       thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
@@ -670,7 +686,7 @@ extension ASTGenVisitor {
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      paramList: self.generate(functionParameterClause: node.signature.parameterClause, forSubscript: false),
+      paramList: self.generate(functionParameterClause: node.signature.parameterClause, for: .macro),
       arrowLoc: self.generateSourceLoc(node.signature.returnClause?.arrow),
       resultType: self.generate(type: node.signature.returnClause?.type),
       definition: self.generate(expr: node.definition?.value)
