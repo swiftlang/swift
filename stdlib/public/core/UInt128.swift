@@ -280,7 +280,9 @@ extension UInt128 {
   public func dividedReportingOverflow(
     by other: Self
   ) -> (partialValue: Self, overflow: Bool) {
-    if other == .zero { return (self, true) }
+    if _slowPath(other == .zero) {
+      return (self, true)
+    }
     // Unsigned divide never overflows.
     return (Self(Builtin.udiv_Int128(self._value, other._value)), false)
   }
@@ -290,7 +292,9 @@ extension UInt128 {
   public func remainderReportingOverflow(
     dividingBy other: Self
   ) -> (partialValue: Self, overflow: Bool) {
-    if other == .zero { return (self, true) }
+    if _slowPath(other == .zero) {
+      return (self, true)
+    }
     // Unsigned divide never overflows.
     return (Self(Builtin.urem_Int128(self._value, other._value)), false)
   }
