@@ -303,13 +303,19 @@ public struct ObservationTrackedMacro: AccessorMacro {
       return []
     }
 
-    let initAccessor: AccessorDeclSyntax =
+    var accessors: [AccessorDeclSyntax] = []
+
+    if property.initializer == nil || !property.willSetAccessors.isEmpty || !property.didSetAccessors.isEmpty {
+      let initAccessor: AccessorDeclSyntax =
       """
       @storageRestrictions(initializes: _\(identifier))
       init(initialValue) {
       _\(identifier) = initialValue
       }
       """
+
+      accessors.append(initAccessor)
+    }
 
     let getAccessor: AccessorDeclSyntax =
       """
@@ -337,8 +343,10 @@ public struct ObservationTrackedMacro: AccessorMacro {
       yield &_\(identifier)
       }
       """
+    
+    accessors.append(contentsOf: [getAccessor, setAccessor, modifyAccessor])
 
-    return [initAccessor, getAccessor, setAccessor, modifyAccessor]
+    return accessors
   }
 }
 
