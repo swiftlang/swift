@@ -1043,18 +1043,21 @@ function Build-CMakeProject {
       }
     }
 
-    if ($UseMSVCCompilers.Contains("C")) {
-      TryAdd-KeyValue $Defines CMAKE_C_COMPILER cl
-      if ($EnableCaching) {
+    if ($EnableCaching) {
+      if ($UseMSVCCompilers.Contains("C") -Or $UsePinnedCompilers.Contains("C")) {
         TryAdd-KeyValue $Defines CMAKE_C_COMPILER_LAUNCHER sccache
       }
+      if ($UseMSVCCompilers.Contains("CXX") -Or $UsePinnedCompilers.Contains("CXX")) {
+        TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_LAUNCHER sccache
+      }
+    }
+
+    if ($UseMSVCCompilers.Contains("C")) {
+      TryAdd-KeyValue $Defines CMAKE_C_COMPILER cl
       Append-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
     }
     if ($UseMSVCCompilers.Contains("CXX")) {
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER cl
-      if ($EnableCaching) {
-        TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_LAUNCHER sccache
-      }
       Append-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
     }
     if ($UsePinnedCompilers.Contains("ASM") -Or $UseBuiltCompilers.Contains("ASM")) {
