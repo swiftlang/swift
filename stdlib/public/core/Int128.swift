@@ -366,7 +366,13 @@ extension Int128 {
   @available(SwiftStdlib 6.0, *)
   @_transparent
   public static func /(a: Self, b: Self) -> Self {
-    a.dividedReportingOverflow(by: b).partialValue
+    if _slowPath(b == .zero) {
+      _preconditionFailure("Division by zero")
+    }
+    if _slowPath(a == .min && b == (-1 as Self)) {
+      _preconditionFailure("Division results in an overflow")
+    }
+    return Self(Builtin.sdiv_Int128(a._value, b._value))
   }
 
   @available(SwiftStdlib 6.0, *)
@@ -378,7 +384,13 @@ extension Int128 {
   @available(SwiftStdlib 6.0, *)
   @_transparent
   public static func %(a: Self, b: Self) -> Self {
-    a.remainderReportingOverflow(dividingBy: b).partialValue
+    if _slowPath(b == .zero) {
+      _preconditionFailure("Division by zero in remainder operation")
+    }
+    if _slowPath(a == .min && b == (-1 as Self)) {
+      _preconditionFailure("Division results in an overflow in remainder operation")
+    }
+    return Self(Builtin.srem_Int128(a._value, b._value))
   }
 
   @available(SwiftStdlib 6.0, *)
