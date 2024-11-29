@@ -829,11 +829,16 @@ function Fetch-Dependencies {
   }
 }
 
-function Get-PinnedToolchainTool() {
+function Get-PinnedToolchainTool([string] $Name) {
   if (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\$(Get-PinnedToolchainVersion)+Asserts\usr\bin") {
-    return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\$(Get-PinnedToolchainVersion)+Asserts\usr\bin"
+    $Path = "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\$(Get-PinnedToolchainVersion)+Asserts\usr\bin"
+  } else {
+    $Path = "$BinaryCache\toolchains\${PinnedToolchain}\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin"
   }
-  return "$BinaryCache\toolchains\${PinnedToolchain}\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin"
+  if ($Name) {
+    $Path = "$Path\$Name"
+  }
+  return $Path
 }
 
 function Get-PinnedToolchainSDK() {
@@ -862,6 +867,10 @@ $CompilersBinaryCache = if ($IsCrossCompiling) {
   Get-BuildProjectBinaryCache Compilers
 } else {
   Get-HostProjectBinaryCache Compilers
+}
+
+function Get-BuiltToolchainTool([string] $Name) {
+  return if ($Name) { "$CompilersBinaryCache\bin\$Name" } else { "$CompilersBinaryCache\bin" }
 }
 
 function Get-ClangDriverName([Platform] $Platform, [string] $Lang) {
@@ -1033,7 +1042,7 @@ function Build-CMakeProject {
         # Use a built lld linker as the Android's NDK linker might be too
         # old and not support all required relocations needed by the Swift
         # runtime.
-        $ldPath = ([IO.Path]::Combine($CompilersBinaryCache, "bin", "ld.lld"))
+        $ldPath = (Get-BuiltToolchainTool "ld.lld")
         Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "--ld-path=$ldPath"
         Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "--ld-path=$ldPath"
       }
@@ -1056,9 +1065,9 @@ function Build-CMakeProject {
     if ($UsePinnedCompilers.Contains("ASM") -Or $UseBuiltCompilers.Contains("ASM")) {
       $Driver = (Get-ClangDriverName $Platform -Lang "ASM")
       if ($UseBuiltCompilers.Contains("ASM")) {
-        TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
+        TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER (Get-BuiltToolchainTool $Driver)
       } else {
-        TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath $Driver)
+        TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER (Get-PinnedToolchainTool $Driver)
       }
       Append-FlagsDefine $Defines CMAKE_ASM_FLAGS "--target=$($Arch.LLVMTarget)"
       if ($Platform -eq "Windows") {
@@ -1068,9 +1077,9 @@ function Build-CMakeProject {
     if ($UsePinnedCompilers.Contains("C") -Or $UseBuiltCompilers.Contains("C")) {
       $Driver = (Get-ClangDriverName $Platform -Lang "C")
       if ($UseBuiltCompilers.Contains("C")) {
-        TryAdd-KeyValue $Defines CMAKE_C_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
+        TryAdd-KeyValue $Defines CMAKE_C_COMPILER (Get-BuiltToolchainTool $Driver)
       } else {
-        TryAdd-KeyValue $Defines CMAKE_C_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath $Driver)
+        TryAdd-KeyValue $Defines CMAKE_C_COMPILER (Get-PinnedToolchainTool $Driver)
       }
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER_TARGET $Arch.LLVMTarget
 
@@ -1087,9 +1096,9 @@ function Build-CMakeProject {
     if ($UsePinnedCompilers.Contains("CXX") -Or $UseBuiltCompilers.Contains("CXX")) {
       $Driver = (Get-ClangDriverName $Platform -Lang "CXX")
       if ($UseBuiltCompilers.Contains("CXX")) {
-        TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
+        TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER (Get-BuiltToolchainTool $Driver)
       } else {
-        TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath $Driver)
+        TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER (Get-PinnedToolchainTool $Driver)
       }
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_TARGET $Arch.LLVMTarget
 
@@ -1109,9 +1118,9 @@ function Build-CMakeProject {
       if ($UseSwiftSwiftDriver) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER ([IO.Path]::Combine($DriverBinaryCache, "bin", "swiftc.exe"))
       } elseif ($UseBuiltCompilers.Contains("Swift")) {
-        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", "swiftc.exe"))
+        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER (Get-BuiltToolchainTool "swiftc.exe")
       } else {
-        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath  "swiftc.exe")
+        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER (Get-PinnedToolchainTool "swiftc.exe")
       }
       if (-not ($Platform -eq "Windows")) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_WORKS = "YES"
