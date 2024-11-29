@@ -356,6 +356,7 @@ extension UInt128 {
     if _slowPath(b == .zero) {
       _preconditionFailure("Division by zero")
     }
+    // Unsigned divide never overflows.
     return Self(Builtin.udiv_Int128(a._value, b._value))
   }
 
@@ -371,6 +372,7 @@ extension UInt128 {
     if _slowPath(b == .zero) {
       _preconditionFailure("Division by zero in remainder operation")
     }
+    // Unsigned divide never overflows.
     return Self(Builtin.urem_Int128(a._value, b._value))
   }
 
