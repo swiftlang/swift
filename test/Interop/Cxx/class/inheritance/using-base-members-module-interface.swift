@@ -21,6 +21,7 @@
 // CHECK-NEXT: }
 
 // CHECK: struct UsingBaseConstructorWithParam {
+// CHECK-NEXT:   init(consuming _: consuming IntBox)
 // CHECK-NEXT:   init(_: IntBox)
 // CHECK-NEXT:   init(_: UInt32)
 // CHECK-NEXT:   init(_: Int32)
@@ -29,6 +30,7 @@
 
 // CHECK: struct UsingBaseConstructorEmpty {
 // CHECK-NEXT:   init()
+// CHECK-NEXT:   init(consuming _: consuming Empty)
 // CHECK-NEXT:   init(_: Empty)
 // CHECK-NEXT:   var value: Int32
 // CHECK-NEXT: }

@@ -1478,10 +1478,14 @@ static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
 }
 
 static void
-addEmptyArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
-                                 SmallVectorImpl<StringRef> &argumentNames) {
-  for (size_t i = 0; i < funcDecl->param_size(); ++i)
-    argumentNames.push_back(StringRef());
+addDefaultArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
+                                   SmallVectorImpl<StringRef> &argumentNames) {
+  for (size_t i = 0; i < funcDecl->param_size(); ++i) {
+    if (funcDecl->getParamDecl(i)->getType()->isRValueReferenceType())
+      argumentNames.push_back("consuming");
+    else
+      argumentNames.push_back(StringRef());
+  }
   if (funcDecl->isVariadic())
     argumentNames.push_back(StringRef());
 }
@@ -1863,7 +1867,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     // If we couldn't find a constructor decl, bail.
     if (!ctor)
       return ImportedName();
-    addEmptyArgNamesForClangFunction(ctor, argumentNames);
+    addDefaultArgNamesForClangFunction(ctor, argumentNames);
     break;
   }
 
@@ -1876,7 +1880,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (toType->isBooleanType()) {
       isFunction = true;
       baseName = "__convertToBool";
-      addEmptyArgNamesForClangFunction(conversionDecl, argumentNames);
+      addDefaultArgNamesForClangFunction(conversionDecl, argumentNames);
       break;
     }
     return ImportedName();
@@ -1928,7 +1932,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                               : clang::getOperatorSpelling(op);
       baseName = swiftCtx.getIdentifier(operatorName).str();
       isFunction = true;
-      addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
+      addDefaultArgNamesForClangFunction(functionDecl, argumentNames);
       if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(functionDecl)) {
         if (op == clang::OverloadedOperatorKind::OO_Star &&
             cxxMethod->param_empty()) {
@@ -1947,7 +1951,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_Call:
       baseName = "callAsFunction";
       isFunction = true;
-      addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
+      addDefaultArgNamesForClangFunction(functionDecl, argumentNames);
       break;
     case clang::OverloadedOperatorKind::OO_Subscript: {
       auto returnType = functionDecl->getReturnType();
@@ -1965,7 +1969,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         result.info.accessorKind = ImportedAccessorKind::SubscriptSetter;
       }
       isFunction = true;
-      addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
+      addDefaultArgNamesForClangFunction(functionDecl, argumentNames);
       break;
     }
     default:
@@ -1996,7 +2000,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     if (auto function = dyn_cast<clang::FunctionDecl>(D)) {
       isFunction = true;
-      addEmptyArgNamesForClangFunction(function, argumentNames);
+      addDefaultArgNamesForClangFunction(function, argumentNames);
     }
     break;
 

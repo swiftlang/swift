@@ -1445,6 +1445,8 @@ public:
     swift::Type swiftTy;
     /// If the parameter is or not inout.
     bool isInOut;
+    /// If the parameter should be imported as consuming.
+    bool isConsuming;
     /// If the parameter is implicitly unwrapped or not.
     bool isParamTypeImplicitlyUnwrapped;
   };
