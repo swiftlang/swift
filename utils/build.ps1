@@ -857,6 +857,21 @@ function Get-PinnedToolchainVersion() {
   throw "PinnedVersion must be set"
 }
 
+function Get-ClangDriverName([Platform] $Platform, [string] $Lang) {
+  switch ($Platform) {
+    Windows {
+      "clang-cl.exe"
+    }
+    Android {
+      switch ($Lang) {
+        C { "clang.exe" }
+        ASM { "clang.exe" }
+        CXX { "clang++.exe" }
+      }
+    }
+  }
+}
+
 function TryAdd-KeyValue([hashtable]$Hashtable, [string]$Key, [string]$Value) {
   if (-not $Hashtable.Contains($Key)) {
     $Hashtable.Add($Key, $Value)
@@ -1038,7 +1053,7 @@ function Build-CMakeProject {
       Append-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
     }
     if ($UsePinnedCompilers.Contains("ASM") -Or $UseBuiltCompilers.Contains("ASM")) {
-      $Driver = if ($Platform -eq "Windows") { "clang-cl.exe" } else { "clang.exe" }
+      $Driver = (Get-ClangDriverName $Platform -Lang "ASM")
       if ($UseBuiltCompilers.Contains("ASM")) {
         TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
       } else {
@@ -1050,7 +1065,7 @@ function Build-CMakeProject {
       }
     }
     if ($UsePinnedCompilers.Contains("C") -Or $UseBuiltCompilers.Contains("C")) {
-      $Driver = if ($Platform -eq "Windows") { "clang-cl.exe" } else { "clang.exe" }
+      $Driver = (Get-ClangDriverName $Platform -Lang "C")
       if ($UseBuiltCompilers.Contains("C")) {
         TryAdd-KeyValue $Defines CMAKE_C_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
       } else {
@@ -1069,7 +1084,7 @@ function Build-CMakeProject {
       Append-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
     }
     if ($UsePinnedCompilers.Contains("CXX") -Or $UseBuiltCompilers.Contains("CXX")) {
-      $Driver = if ($Platform -eq "Windows") { "clang-cl.exe" } else { "clang++.exe" }
+      $Driver = (Get-ClangDriverName $Platform -Lang "CXX")
       if ($UseBuiltCompilers.Contains("CXX")) {
         TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
       } else {
