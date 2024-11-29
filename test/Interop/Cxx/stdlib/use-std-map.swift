@@ -427,6 +427,103 @@ StdMapTestSuite.test("UnorderedMap.merge(map)") {
   expectEqual(m[3], 3)
 }
 
+StdMapTestSuite.test("Map.merge(CxxDictionary)") {
+  // Empty map merging with empty map.
+  var emptyMap = initEmptyMap()
+  emptyMap.merge(initEmptyUnorderedMap()) { v0, _ in v0 }
+  expectTrue(emptyMap.empty())
+
+  emptyMap.merge(initEmptyUnorderedMap()) { _, v1 in v1 }
+  expectTrue(emptyMap.empty())
+
+  // Empty map merging with non-empty map.
+  emptyMap.merge(initUnorderedMap()) { v0, _ in v0 }
+  expectEqual(emptyMap[1], 3)
+  expectEqual(emptyMap[2], 2)
+  expectEqual(emptyMap[3], 3)
+
+  emptyMap = initEmptyMap()
+  emptyMap.merge(initUnorderedMap()) { _, v1 in v1 }
+  expectEqual(emptyMap[1], 3)
+  expectEqual(emptyMap[2], 2)
+  expectEqual(emptyMap[3], 3)
+
+  // Non-empty map merging with empty map.
+  var map = initMap()
+  map.merge(initUnorderedMap()) { v0, _ in v0 }
+  expectEqual(emptyMap[1], 3)
+  expectEqual(emptyMap[2], 2)
+  expectEqual(emptyMap[3], 3)
+
+  map.merge(initEmptyUnorderedMap()) { _, v1 in v1 }
+  expectEqual(map[1], 3)
+  expectEqual(map[2], 2)
+  expectEqual(map[3], 3)
+
+  // Non-empty map merging with non-empty map.
+  let noneEmptydMap = UnorderedMap([1: 4, 2: 5, 3: 6, 4: 7])
+  map.merge(noneEmptydMap) { v0, _ in v0 }
+  expectEqual(map[1], 3)
+  expectEqual(map[2], 2)
+  expectEqual(map[3], 3)
+  expectEqual(map[4], 7)
+
+  map.merge(noneEmptydMap) { _, v1 in v1 }
+  expectEqual(map[1], 4)
+  expectEqual(map[2], 5)
+  expectEqual(map[3], 6)
+  expectEqual(map[4], 7)
+}
+
+StdMapTestSuite.test("UnorderedMap.merge(CxxDictionary)") {
+  // Empty map merging with empty map.
+  var emptyMap = initEmptyUnorderedMap()
+  emptyMap.merge(initEmptyMap()) { v0, _ in v0 }
+  expectTrue(emptyMap.empty())
+
+  emptyMap.merge(initEmptyMap()) { _, v1 in v1 }
+  expectTrue(emptyMap.empty())
+
+  // Empty map merging with non-empty map.
+  emptyMap.merge(initMap()) { v0, _ in v0 }
+  expectEqual(emptyMap[1], 3)
+  expectEqual(emptyMap[2], 2)
+  expectEqual(emptyMap[3], 3)
+
+  emptyMap = initEmptyUnorderedMap()
+  emptyMap.merge(initMap()) { _, v1 in v1 }
+  expectEqual(emptyMap[1], 3)
+  expectEqual(emptyMap[2], 2)
+  expectEqual(emptyMap[3], 3)
+
+  // Non-empty map merging with empty map.
+  var map = initUnorderedMap()
+  map.merge(initEmptyMap()) { _, v1 in v1 }
+  expectEqual(map[1], 3)
+  expectEqual(map[2], 2)
+  expectEqual(map[3], 3)
+
+  map.merge(initEmptyMap()) { v0, _ in v0 }
+  expectEqual(map[1], 3)
+  expectEqual(map[2], 2)
+  expectEqual(map[3], 3)
+
+  // Non-empty map merging with non-empty map.
+  let noneEmptyMap = Map([1: 4, 2: 5, 3: 6, 4: 7])
+
+  map.merge(noneEmptyMap) { v0, _ in v0 }
+  expectEqual(map[1], 3)
+  expectEqual(map[2], 2)
+  expectEqual(map[3], 3)
+  expectEqual(map[4], 7)
+
+  map.merge(noneEmptyMap) { _, v1 in v1 }
+  expectEqual(map[1], 4)
+  expectEqual(map[2], 5)
+  expectEqual(map[3], 6)
+  expectEqual(map[4], 7)
+}
+
 // `merging` is implemented by calling `merge`, so we can skip this test
 
 runAllTests()

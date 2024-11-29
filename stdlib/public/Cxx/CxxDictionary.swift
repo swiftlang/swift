@@ -174,10 +174,10 @@ extension CxxDictionary {
   }
 
   @inlinable
-  public mutating func merge<S: Sequence>(
+  public mutating func merge<S: Sequence, E>(
     _ other: __owned S,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where S.Element == (Key, Value) {
     for (key, value) in other {
       var iter = self.__findMutatingUnsafe(key)
       if iter != self.__endMutatingUnsafe() {
@@ -190,10 +190,10 @@ extension CxxDictionary {
   }
 
   @inlinable
-  public mutating func merge(
+  public mutating func merge<E>(
     _ other: __owned Dictionary<Key, Value>,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where Key: Hashable {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where Key: Hashable {
     for (key, value) in other {
       var iter = self.__findMutatingUnsafe(key)
       if iter != self.__endMutatingUnsafe() {
@@ -206,10 +206,10 @@ extension CxxDictionary {
   }
 
   @inlinable
-  public mutating func merge(
-    _ other: __owned Self,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows {
+  public mutating func merge<T: CxxDictionary, E>(
+    _ other: __owned T,
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where T.Key == Key, T.Value == Value {
     var iterator = other.__beginUnsafe()
     while iterator != other.__endUnsafe() {
       var iter = self.__findMutatingUnsafe(iterator.pointee.first)
@@ -224,30 +224,30 @@ extension CxxDictionary {
   }
 
   @inlinable
-  public __consuming func merging<S: Sequence>(
+  public __consuming func merging<S: Sequence, E>(
     _ other: __owned S,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows -> Self where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) -> Self where S.Element == (Key, Value) {
     var result = self
     try result.merge(other, uniquingKeysWith: combine)
     return result
   }
 
   @inlinable
-  public __consuming func merging(
+  public __consuming func merging<E>(
       _ other: __owned Dictionary<Key, Value>,
-      uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows -> Self where Key: Hashable {
+      uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) -> Self where Key: Hashable {
     var result = self
     try result.merge(other, uniquingKeysWith: combine)
     return result
   }
 
   @inlinable
-  public __consuming func merging(
-    _ other: __owned Self,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows -> Self {
+  public __consuming func merging<T: CxxDictionary, E>(
+    _ other: __owned T,
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) -> Self where T.Key == Key, T.Value == Value {
     var result = self
     try result.merge(other, uniquingKeysWith: combine)
     return result
