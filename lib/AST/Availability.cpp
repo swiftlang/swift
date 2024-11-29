@@ -233,12 +233,8 @@ void AvailabilityInference::applyInferredAvailableAttrs(
         if (Message.empty() && !AvAttr->Message.empty())
           Message = AvAttr->Message;
 
-        if (Rename.empty() && !AvAttr->Rename.empty()) {
+        if (Rename.empty() && !AvAttr->Rename.empty())
           Rename = AvAttr->Rename;
-          if (auto *VD = dyn_cast<ValueDecl>(D)) {
-            RenameDecl = VD->getRenamedDecl(AvAttr);
-          }
-        }
       }
 
       MergedAttrs.append(PendingAttrs);
