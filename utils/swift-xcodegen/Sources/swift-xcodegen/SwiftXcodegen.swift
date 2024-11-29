@@ -292,6 +292,14 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
     let buildDirPath = buildDir.absoluteInWorkingDir.resolvingSymlinks
     log.info("Generating project for '\(buildDirPath)'...")
 
+    if projectOpts.useBuildableFolders {
+      log.note("""
+        Buildable folders are enabled by default, which requires Xcode 16. You \
+        can pass '--no-buildable-folders' to disable this. See the '--help' entry \
+        for more info.
+        """)
+    }
+
     let projectRootDir = self.projectRootDir?.absoluteInWorkingDir
     let buildDir = try NinjaBuildDir(at: buildDirPath, projectRootDir: projectRootDir)
     let outputDir = miscOptions.outputDir?.absoluteInWorkingDir ?? buildDir.projectRootDir

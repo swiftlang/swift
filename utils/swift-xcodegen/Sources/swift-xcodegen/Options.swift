@@ -200,7 +200,7 @@ struct ProjectOptions: ParsableArguments {
       files
       """
   )
-  var preferFolderRefs: Bool = false
+  var preferFolderRefs: Bool = true
 
   @Flag(
     name: .customLong("buildable-folders"), inversion: .prefixedNo,
@@ -215,7 +215,7 @@ struct ProjectOptions: ParsableArguments {
       cannot currently use buildable folders.
       """
   )
-  var useBuildableFolders: Bool = false
+  var useBuildableFolders: Bool = true
 
   @Option(help: .hidden)
   var blueFolders: String = ""
