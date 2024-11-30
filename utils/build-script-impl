@@ -459,7 +459,8 @@ function verify_host_is_supported() {
     case ${host} in
       freebsd-arm64             \
       | freebsd-x86_64          \
-      | openbsd-amd64           \
+      | openbsd-x86_64          \
+      | openbsd-aarch64         \
       | cygwin-x86_64           \
       | haiku-x86_64            \
       | linux-x86_64            \
