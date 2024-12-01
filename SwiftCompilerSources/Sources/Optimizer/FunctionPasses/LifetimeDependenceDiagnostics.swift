@@ -320,7 +320,7 @@ private struct LifetimeVariable {
       self = Self(introducer: allocStack)
     case .global(let globalVar):
       self.varDecl = globalVar.varDecl
-      self.sourceLoc = nil
+      self.sourceLoc = varDecl?.nameLoc
     case .class(let refAddr):
       self.varDecl = refAddr.varDecl
       self.sourceLoc = refAddr.location.sourceLoc
