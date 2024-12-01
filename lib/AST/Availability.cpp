@@ -716,16 +716,27 @@ bool Decl::isUnreachableAtRuntime() const {
   if (isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext()))
     return false;
 
-  auto unavailableAttrAndDecl =
-      getSemanticUnavailableAttr(/*ignoreAppExtensions=*/true);
-  if (!unavailableAttrAndDecl)
+  if (auto *parent =
+          AvailabilityInference::parentDeclForInferredAvailability(this)) {
+    if (parent->isUnreachableAtRuntime())
+      return true;
+  }
+
+  auto *unavailableAttr = getUnavailableAttr(/*ignoreAppExtensions=*/true);
+  if (!unavailableAttr)
     return false;
 
-  // getSemanticUnavailableAttr() can return an @available attribute that makes
-  // its declaration unavailable conditionally due to deployment target. Only
+  // getUnavailableAttr() can return an @available attribute that is
+  // obsoleted for certain deployment targets or language modes. These decls
+  // can still be reached by code in other modules that is compiled with
+  // a different deployment target or language mode.
+  if (!unavailableAttr->isUnconditionallyUnavailable())
+    return false;
+
+  // getUnavailableAttr() can return an @available attribute that makes its
+  // declaration unavailable conditionally due to deployment target. Only
   // stub or skip a declaration that is unavailable regardless of deployment
   // target.
-  auto *unavailableAttr = unavailableAttrAndDecl->first;
   if (!unavailableAttr->isUnconditionallyUnavailable())
     return false;
 
