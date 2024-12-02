@@ -563,36 +563,29 @@ namespace {
     const clang::RecordDecl *ClangDecl;
 
     const clang::CXXConstructorDecl *findCopyConstructor() const {
-      const clang::CXXRecordDecl *cxxRecordDecl =
-          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      for (auto method : cxxRecordDecl->methods()) {
-        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isCopyConstructor() &&
-              ctor->getAccess() == clang::AS_public &&
-              // rdar://106964356
-              // ctor->doesThisDeclarationHaveABody() &&
-              !ctor->isDeleted())
-            return ctor;
-        }
+      for (auto ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isCopyConstructor() &&
+            ctor->getAccess() == clang::AS_public &&
+            // rdar://106964356
+            // ctor->doesThisDeclarationHaveABody() &&
+            !ctor->isDeleted())
+          return ctor;
       }
       return nullptr;
     }
 
     const clang::CXXConstructorDecl *findMoveConstructor() const {
-      const clang::CXXRecordDecl *cxxRecordDecl =
-          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      for (auto method : cxxRecordDecl->methods()) {
-        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isMoveConstructor() &&
-              ctor->getAccess() == clang::AS_public &&
-              ctor->doesThisDeclarationHaveABody() &&
-              !ctor->isDeleted())
-            return ctor;
-        }
+      for (auto ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isMoveConstructor() &&
+            ctor->getAccess() == clang::AS_public &&
+            ctor->doesThisDeclarationHaveABody() && !ctor->isDeleted())
+          return ctor;
       }
       return nullptr;
     }
