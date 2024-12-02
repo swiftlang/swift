@@ -358,7 +358,8 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
                                         llvm::AttributeList &attrs,
                                         unsigned paramIndex, bool allowSRet,
                                         llvm::Type *storageType,
-                                        const TypeInfo &typeInfo) {
+                                        const TypeInfo &typeInfo,
+                                        bool useInReg = false) {
   llvm::AttrBuilder b(IGM.getLLVMContext());
   b.addAttribute(llvm::Attribute::NoAlias);
   // Bitwise takable value types are guaranteed not to capture
@@ -368,6 +369,8 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
   if (allowSRet) {
     assert(storageType);
     b.addStructRetAttr(storageType);
+    if (useInReg)
+      b.addAttribute(llvm::Attribute::InReg);
   }
   attrs = attrs.addParamAttributes(IGM.getLLVMContext(), paramIndex, b);
 }
@@ -475,7 +478,7 @@ namespace {
 
   private:
     const TypeInfo &expand(SILParameterInfo param);
-    llvm::Type *addIndirectResult(SILType resultType);
+    llvm::Type *addIndirectResult(SILType resultType, bool useInReg = false);
 
     SILFunctionConventions getSILFuncConventions() const {
       return SILFunctionConventions(FnType, IGM.getSILModule());
@@ -533,11 +536,12 @@ namespace {
 } // end namespace irgen
 } // end namespace swift
 
-llvm::Type *SignatureExpansion::addIndirectResult(SILType resultType) {
+llvm::Type *SignatureExpansion::addIndirectResult(SILType resultType,
+                                                  bool useInReg) {
   const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
   auto storageTy = resultTI.getStorageType();
   addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet(),
-                              storageTy, resultTI);
+                              storageTy, resultTI, useInReg);
   addPointerParameter(storageTy);
   return IGM.VoidTy;
 }
@@ -1449,9 +1453,15 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   // Generate function info for this signature.
   auto extInfo = clang::FunctionType::ExtInfo();
 
-  auto &FI = clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
-                                             clangResultTy, paramTys, extInfo,
-                                             clang::CodeGen::RequiredArgs::All);
+  bool isCXXMethod =
+      FnType->getRepresentation() == SILFunctionTypeRepresentation::CXXMethod;
+  auto &FI = isCXXMethod ?
+      clang::CodeGen::arrangeCXXMethodCall(IGM.ClangCodeGen->CGM(),
+          clangResultTy, paramTys, extInfo, {},
+          clang::CodeGen::RequiredArgs::All) :
+      clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
+          clangResultTy, paramTys, extInfo, {},
+          clang::CodeGen::RequiredArgs::All);
   ForeignInfo.ClangInfo = &FI;
 
   assert(FI.arg_size() == paramTys.size() &&
@@ -1573,16 +1583,14 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   if (returnInfo.isIndirect()) {
     auto resultType = getSILFuncConventions().getSingleSILResultType(
         IGM.getMaximalTypeExpansionContext());
-    if (IGM.Triple.isWindowsMSVCEnvironment() &&
-        FnType->getRepresentation() ==
-            SILFunctionTypeRepresentation::CXXMethod) {
+    if (returnInfo.isSRetAfterThis()) {
       // Windows ABI places `this` before the
       // returned indirect values.
       emitArg(0);
       firstParamToLowerNormally = 1;
-      addIndirectResult(resultType);
+      addIndirectResult(resultType, returnInfo.getInReg());
     } else
-      addIndirectResult(resultType);
+      addIndirectResult(resultType, returnInfo.getInReg());
   }
 
   // Use a special IR type for passing block pointers.
@@ -2534,11 +2542,12 @@ public:
 
         // Windows ABI places `this` before the
         // returned indirect values.
-        bool isThisFirst = IGF.IGM.Triple.isWindowsMSVCEnvironment();
-        if (!isThisFirst)
+        auto &returnInfo =
+            getCallee().getForeignInfo().ClangInfo->getReturnInfo();
+        if (returnInfo.isIndirect() && !returnInfo.isSRetAfterThis())
           passIndirectResults();
         adjusted.add(arg);
-        if (isThisFirst)
+        if (returnInfo.isIndirect() && returnInfo.isSRetAfterThis())
           passIndirectResults();
       }
 
@@ -3115,9 +3124,10 @@ void CallEmission::emitToUnmappedMemory(Address result) {
   assert(LastArgWritten == 1 && "emitting unnaturally to indirect result");
 
   Args[0] = result.getAddress();
-  if (IGF.IGM.Triple.isWindowsMSVCEnvironment() &&
-      getCallee().getRepresentation() ==
-          SILFunctionTypeRepresentation::CXXMethod &&
+
+  auto *FI = getCallee().getForeignInfo().ClangInfo;
+  if (FI && FI->getReturnInfo().isIndirect() &&
+      FI->getReturnInfo().isSRetAfterThis() &&
       Args[1] == getCallee().getCXXMethodSelf()) {
     // C++ methods in MSVC ABI pass `this` before the
     // indirectly returned value.
@@ -3482,10 +3492,10 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
       emitToMemory(temp, substResultTI, isOutlined);
       return;
     }
-    if (IGF.IGM.Triple.isWindowsMSVCEnvironment() &&
-        getCallee().getRepresentation() ==
-            SILFunctionTypeRepresentation::CXXMethod &&
-        substResultType.isVoid()) {
+
+    auto *FI = getCallee().getForeignInfo().ClangInfo;
+    if (FI && FI->getReturnInfo().isIndirect() &&
+        FI->getReturnInfo().isSRetAfterThis() && substResultType.isVoid()) {
       // Some C++ methods return a value but are imported as
       // returning `Void` (e.g. `operator +=`). In this case
       // we should allocate the correct temp indirect return

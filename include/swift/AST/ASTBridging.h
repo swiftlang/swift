@@ -80,6 +80,10 @@ class BridgedDeclBaseName {
   BridgedIdentifier Ident;
 
 public:
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedDeclBaseName() : Ident() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedDeclBaseName(swift::DeclBaseName baseName) : Ident(baseName.Ident) {}
 
@@ -106,6 +110,10 @@ class BridgedDeclNameRef {
   void *_Nonnull opaque;
 
 public:
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedDeclNameRef() : opaque() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedDeclNameRef(swift::DeclNameRef name) : opaque(name.getOpaqueValue()) {}
 
@@ -162,6 +170,10 @@ class BridgedASTContext {
   swift::ASTContext * _Nonnull Ctx;
 
 public:
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedASTContext() : Ctx() {}
+
 #ifdef USED_IN_CPP_SOURCE
   SWIFT_UNAVAILABLE("Use init(raw:) instead")
   BridgedASTContext(swift::ASTContext &ctx) : Ctx(&ctx) {}
@@ -317,6 +329,10 @@ class BridgedDiagnosticArgument {
   int64_t storage[3];
 
 public:
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedDiagnosticArgument() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedDiagnosticArgument(const swift::DiagnosticArgument &arg) {
     *reinterpret_cast<swift::DiagnosticArgument *>(&storage) = arg;
@@ -334,6 +350,10 @@ class BridgedDiagnosticFixIt {
   int64_t storage[7];
 
 public:
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedDiagnosticFixIt() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedDiagnosticFixIt(const swift::DiagnosticInfo::FixIt &fixit){
     *reinterpret_cast<swift::DiagnosticInfo::FixIt *>(&storage) = fixit;
@@ -1333,6 +1353,10 @@ class BridgedStmtConditionElement {
   void *_Nonnull Raw;
 
 public:
+  // Ensure that this struct value type will be indirectly returned on
+  // Windows ARM64
+  BridgedStmtConditionElement() {}
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedStmtConditionElement(swift::StmtConditionElement elem)
       : Raw(elem.getOpaqueValue()) {}
