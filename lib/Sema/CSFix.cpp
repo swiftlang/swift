@@ -2264,7 +2264,7 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
     return nullptr;
 
   // Don't diagnose for function members e.g. Foo? = .none(0).
-  if (functionRefInfo != FunctionRefInfo::Unapplied)
+  if (!functionRefInfo.isUnappliedBaseName())
     return nullptr;
 
   Type underlyingBaseType = baseTy->getMetatypeInstanceType();

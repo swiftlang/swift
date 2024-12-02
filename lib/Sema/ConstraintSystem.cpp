@@ -1953,15 +1953,19 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
     return IUOReferenceKind::Value;
 
   auto refKind = getFunctionRefInfo();
-  assert(!forSecondApplication || refKind == FunctionRefInfo::DoubleApply);
+  assert(!forSecondApplication || refKind.isDoubleApply());
 
-  switch (refKind) {
-  case FunctionRefInfo::Unapplied:
-  case FunctionRefInfo::Compound:
+  // Compound references currently never produce IUOs.
+  // FIXME(FunctionRefInfo): They should.
+  if (refKind.isCompoundName())
+    return std::nullopt;
+
+  switch (refKind.getApplyLevel()) {
+  case FunctionRefInfo::ApplyLevel::Unapplied:
     // Such references never produce IUOs.
     return std::nullopt;
-  case FunctionRefInfo::SingleApply:
-  case FunctionRefInfo::DoubleApply: {
+  case FunctionRefInfo::ApplyLevel::SingleApply:
+  case FunctionRefInfo::ApplyLevel::DoubleApply:
     // Check whether this is a curried function reference e.g
     // (Self) -> (Args...) -> Ret. Such a function reference can only produce
     // an IUO on the second application.
@@ -1969,7 +1973,6 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
     if (forSecondApplication != isCurried)
       return std::nullopt;
     break;
-  }
   }
   return IUOReferenceKind::ReturnValue;
 }

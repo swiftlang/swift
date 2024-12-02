@@ -1935,7 +1935,7 @@ ConstraintSystem::matchFunctionResultTypes(Type expectedResult, Type fnResult,
             getCalleeLocator(getConstraintLocator(innerCall));
         if (auto innerOverload = findSelectedOverloadFor(innerCalleeLoc)) {
           auto choice = innerOverload->choice;
-          if (choice.getFunctionRefInfo() == FunctionRefInfo::DoubleApply) {
+          if (choice.getFunctionRefInfo().isDoubleApply()) {
             isSecondApply = true;
             selected.emplace(*innerOverload);
           }
@@ -9895,10 +9895,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         // Otherwise adjust base type and reference kind to make it
         // look as if lookup was done on the instance, that helps
         // with diagnostics.
-        auto choice = instanceTy->isAnyObject()
-                          ? candidate
-                          : OverloadChoice(instanceTy, decl,
-                                           FunctionRefInfo::SingleApply);
+        auto choice =
+            instanceTy->isAnyObject()
+                ? candidate
+                : OverloadChoice(instanceTy, decl,
+                                 FunctionRefInfo::singleBaseNameApply());
 
         const bool invalidMethodRef = isa<FuncDecl>(decl) && !hasInstanceMethods;
         const bool invalidMemberRef = !isa<FuncDecl>(decl) && !hasInstanceMembers;
@@ -10791,7 +10792,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
         return simplifyValueWitnessConstraint(
             ConstraintKind::ValueWitness, baseTy, makeIterator, memberTy, useDC,
-            FunctionRefInfo::SingleApply, flags, locator);
+            FunctionRefInfo::singleBaseNameApply(), flags, locator);
       }
 
       // Handle `next` reference.
@@ -10809,7 +10810,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
         return simplifyValueWitnessConstraint(
             ConstraintKind::ValueWitness, baseTy, next, memberTy, useDC,
-            FunctionRefInfo::SingleApply, flags, locator);
+            FunctionRefInfo::singleBaseNameApply(), flags, locator);
       }
     }
   }
@@ -13060,8 +13061,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     // TODO: Revisit this if `static func callAsFunction` is to be supported.
     // Static member constraint requires `FunctionRefInfo::DoubleApply`.
     addValueMemberConstraint(origLValueType2,
-                             DeclNameRef(ctx.Id_callAsFunction),
-                             memberTy, DC, FunctionRefInfo::SingleApply,
+                             DeclNameRef(ctx.Id_callAsFunction), memberTy, DC,
+                             FunctionRefInfo::singleBaseNameApply(),
                              /*outerAlternatives*/ {}, memberLoc);
     // Add new applicable function constraint based on the member type
     // variable.
@@ -13271,10 +13272,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     }
 
     // Construct the instance from the input arguments.
-    auto simplified = simplifyConstructionConstraint(instance2, func1, subflags,
-                                          /*FIXME?*/ DC,
-                                          FunctionRefInfo::SingleApply,
-                                          getConstraintLocator(outerLocator));
+    auto simplified = simplifyConstructionConstraint(
+        instance2, func1, subflags,
+        /*FIXME?*/ DC, FunctionRefInfo::singleBaseNameApply(),
+        getConstraintLocator(outerLocator));
 
     // Record any fixes we attempted to get to the correct solution.
     if (simplified == SolutionKind::Solved) {
@@ -13340,7 +13341,7 @@ lookupDynamicCallableMethods(NominalTypeDecl *decl, ConstraintSystem &CS,
   DeclNameRef methodName({ ctx, ctx.Id_dynamicallyCall, { argumentName } });
   auto matches = CS.performMemberLookup(
       ConstraintKind::ValueMember, methodName, type,
-      FunctionRefInfo::SingleApply, CS.getConstraintLocator(locator),
+      FunctionRefInfo::singleBaseNameApply(), CS.getConstraintLocator(locator),
       /*includeInaccessibleMembers*/ false);
   // Filter valid candidates.
   auto candidates = matches.ViableCandidates;
@@ -13499,8 +13500,8 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   SmallVector<OverloadChoice, 4> choices;
   for (auto candidate : candidates) {
     if (candidate->isInvalid()) continue;
-    choices.push_back(
-      OverloadChoice(type2, candidate, FunctionRefInfo::SingleApply));
+    choices.push_back(OverloadChoice(type2, candidate,
+                                     FunctionRefInfo::singleBaseNameApply()));
   }
 
   if (choices.empty()) {
@@ -14728,7 +14729,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     addValueMemberConstraint(MetatypeType::get(type2, getASTContext()),
                              DeclNameRef(DeclBaseName::createConstructor()),
-                             memberTy, DC, FunctionRefInfo::DoubleApply,
+                             memberTy, DC,
+                             FunctionRefInfo::doubleBaseNameApply(),
                              /*outerAlternatives=*/{}, memberLoc);
 
     addConstraint(ConstraintKind::ApplicableFunction,

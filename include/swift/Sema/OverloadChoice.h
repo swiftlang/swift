@@ -122,15 +122,12 @@ class OverloadChoice {
   /// choice represents a key-path based dynamic lookup.
   llvm::PointerIntPair<Identifier, 1, unsigned> DynamicMember;
 
-  /// This holds the kind of function reference (Unapplied, SingleApply,
-  /// DoubleApply, Compound).
-  /// FIXME: This needs two bits. Can we pack them somewhere?
-  FunctionRefInfo TheFunctionRefInfo;
+  /// This holds the kind of function reference.
+  /// FIXME: This needs three bits. Can we pack them somewhere?
+  FunctionRefInfo TheFunctionRefInfo = FunctionRefInfo::unappliedBaseName();
 
 public:
-  OverloadChoice()
-    : BaseAndDeclKind(nullptr, 0), DeclOrKind(),
-      TheFunctionRefInfo(FunctionRefInfo::Unapplied) {}
+  OverloadChoice() : BaseAndDeclKind(nullptr, 0), DeclOrKind() {}
 
   OverloadChoice(Type base, ValueDecl *value,
                  FunctionRefInfo functionRefInfo)
@@ -144,8 +141,7 @@ public:
   }
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
-      : BaseAndDeclKind(base, 0), DeclOrKind(uint32_t(kind)),
-        TheFunctionRefInfo(FunctionRefInfo::Unapplied) {
+      : BaseAndDeclKind(base, 0), DeclOrKind(uint32_t(kind)) {
     assert(base && "Must have a base type for overload choice");
     assert(!base->hasTypeParameter());
     assert(kind != OverloadChoiceKind::Decl &&
@@ -157,16 +153,13 @@ public:
 
   OverloadChoice(Type base, unsigned index)
       : BaseAndDeclKind(base, 0),
-        DeclOrKind(uint32_t(OverloadChoiceKind::TupleIndex)+index),
-        TheFunctionRefInfo(FunctionRefInfo::Unapplied) {
+        DeclOrKind(uint32_t(OverloadChoiceKind::TupleIndex) + index) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
   }
 
   bool isInvalid() const {
     return BaseAndDeclKind.getPointer().isNull() &&
-           BaseAndDeclKind.getInt() == 0 &&
-           DeclOrKind.isNull() &&
-           TheFunctionRefInfo == FunctionRefInfo::Unapplied;
+           BaseAndDeclKind.getInt() == 0 && DeclOrKind.isNull();
   }
 
   /// Retrieve an overload choice for a declaration that was found via
@@ -223,7 +216,7 @@ public:
     result.DeclOrKind = value;
     result.DynamicMember.setPointer(name);
     result.DynamicMember.setInt(isKeyPathBased);
-    result.TheFunctionRefInfo = FunctionRefInfo::SingleApply;
+    result.TheFunctionRefInfo = FunctionRefInfo::singleBaseNameApply();
     return result;
   }
 

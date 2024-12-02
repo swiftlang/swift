@@ -193,16 +193,16 @@ protected:
     LiteralCapacity : 32
   );
 
-  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2+1+1,
+  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+3+1+1,
     Semantics : 2, // an AccessSemantics
-    FunctionRefInfo : 2,
+    FunctionRefInfo : 3,
     IsImplicitlyAsync : 1,
     IsImplicitlyThrows : 1
   );
 
-  SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+2,
+  SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+3,
     DeclRefKind : 2,
-    FunctionRefInfo : 2
+    FunctionRefInfo : 3
   );
 
   SWIFT_INLINE_BITFIELD(MemberRefExpr, LookupExpr, 2,
@@ -225,8 +225,8 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD(UnresolvedDotExpr, Expr, 2,
-    FunctionRefInfo : 2
+  SWIFT_INLINE_BITFIELD(UnresolvedDotExpr, Expr, 3,
+    FunctionRefInfo : 3
   );
 
   SWIFT_INLINE_BITFIELD_FULL(SubscriptExpr, LookupExpr, 2,
@@ -235,12 +235,12 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicSubscriptExpr, DynamicLookupExpr);
 
-  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 2,
-    FunctionRefInfo : 2
+  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 3,
+    FunctionRefInfo : 3
   );
 
-  SWIFT_INLINE_BITFIELD(OverloadSetRefExpr, Expr, 2,
-    FunctionRefInfo : 2
+  SWIFT_INLINE_BITFIELD(OverloadSetRefExpr, Expr, 3,
+    FunctionRefInfo : 3
   );
 
   SWIFT_INLINE_BITFIELD(BooleanLiteralExpr, LiteralExpr, 1,
@@ -1230,12 +1230,10 @@ public:
               Type Ty = Type())
     : Expr(ExprKind::DeclRef, Implicit, Ty), D(D), Loc(Loc),
       implicitActorHopTarget(ActorIsolation::forUnspecified()) {
-    Bits.DeclRefExpr.Semantics = (unsigned) semantics;
-    Bits.DeclRefExpr.FunctionRefInfo =
-      static_cast<unsigned>(Loc.isCompound() ? FunctionRefInfo::Compound
-                                             : FunctionRefInfo::Unapplied);
+    Bits.DeclRefExpr.Semantics = (unsigned)semantics;
     Bits.DeclRefExpr.IsImplicitlyAsync = false;
     Bits.DeclRefExpr.IsImplicitlyThrows = false;
+    setFunctionRefInfo(FunctionRefInfo::unapplied(Loc));
   }
 
   /// Retrieve the declaration to which this expression refers.
@@ -1301,12 +1299,13 @@ public:
 
   /// Retrieve the kind of function reference.
   FunctionRefInfo getFunctionRefInfo() const {
-    return static_cast<FunctionRefInfo>(Bits.DeclRefExpr.FunctionRefInfo);
+    return FunctionRefInfo::fromOpaque(Bits.DeclRefExpr.FunctionRefInfo);
   }
 
   /// Set the kind of function reference.
   void setFunctionRefInfo(FunctionRefInfo refKind) {
-    Bits.DeclRefExpr.FunctionRefInfo = static_cast<unsigned>(refKind);
+    Bits.DeclRefExpr.FunctionRefInfo = refKind.getOpaqueValue();
+    ASSERT(refKind == getFunctionRefInfo() && "FunctionRefInfo truncated");
   }
 
   static bool classof(const Expr *E) {
@@ -1508,8 +1507,7 @@ protected:
   OverloadSetRefExpr(ExprKind Kind, ArrayRef<ValueDecl*> decls,
                      FunctionRefInfo functionRefInfo, bool Implicit, Type Ty)
       : Expr(Kind, Implicit, Ty), Decls(decls) {
-    Bits.OverloadSetRefExpr.FunctionRefInfo =
-      static_cast<unsigned>(functionRefInfo);
+    setFunctionRefInfo(functionRefInfo);
   }
 
 public:
@@ -1530,13 +1528,13 @@ public:
 
   /// Retrieve the kind of function reference.
   FunctionRefInfo getFunctionRefInfo() const {
-    return static_cast<FunctionRefInfo>(
-             Bits.OverloadSetRefExpr.FunctionRefInfo);
+    return FunctionRefInfo::fromOpaque(Bits.OverloadSetRefExpr.FunctionRefInfo);
   }
 
   /// Set the kind of function reference.
   void setFunctionRefInfo(FunctionRefInfo refKind) {
-    Bits.OverloadSetRefExpr.FunctionRefInfo = static_cast<unsigned>(refKind);
+    Bits.OverloadSetRefExpr.FunctionRefInfo = refKind.getOpaqueValue();
+    ASSERT(refKind == getFunctionRefInfo() && "FunctionRefInfo truncated");
   }
 
   static bool classof(const Expr *E) {
@@ -1584,9 +1582,7 @@ public:
       : Expr(ExprKind::UnresolvedDeclRef, /*Implicit=*/loc.isInvalid()),
         Name(name), Loc(loc) {
     Bits.UnresolvedDeclRefExpr.DeclRefKind = static_cast<unsigned>(refKind);
-    Bits.UnresolvedDeclRefExpr.FunctionRefInfo =
-      static_cast<unsigned>(Loc.isCompound() ? FunctionRefInfo::Compound
-                                             : FunctionRefInfo::Unapplied);
+    setFunctionRefInfo(FunctionRefInfo::unapplied(loc));
   }
 
   static UnresolvedDeclRefExpr *createImplicit(
@@ -1617,13 +1613,14 @@ public:
 
   /// Retrieve the kind of function reference.
   FunctionRefInfo getFunctionRefInfo() const {
-    return static_cast<FunctionRefInfo>(
-             Bits.UnresolvedDeclRefExpr.FunctionRefInfo);
+    return FunctionRefInfo::fromOpaque(
+        Bits.UnresolvedDeclRefExpr.FunctionRefInfo);
   }
 
   /// Set the kind of function reference.
   void setFunctionRefInfo(FunctionRefInfo refKind) {
-    Bits.UnresolvedDeclRefExpr.FunctionRefInfo = static_cast<unsigned>(refKind);
+    Bits.UnresolvedDeclRefExpr.FunctionRefInfo = refKind.getOpaqueValue();
+    ASSERT(refKind == getFunctionRefInfo() && "FunctionRefInfo truncated");
   }
 
   DeclNameLoc getNameLoc() const { return Loc; }
@@ -1901,8 +1898,9 @@ public:
                        bool implicit)
     : Expr(ExprKind::UnresolvedMember, implicit), DotLoc(dotLoc),
       NameLoc(nameLoc), Name(name) {
-    // FIXME: Really, we should be setting this to `FunctionRefInfo::Compound`
-    // if `NameLoc` is compound, but this would be a source break for cases like
+    // FIXME(FunctionRefInfo): Really, we should be passing `nameLoc` directly,
+    // allowing the FunctionRefInfo to be treated as compound. This would
+    // require us to enable IUOs for compound names, e.g:
     // ```
     // struct S {
     //   static func makeS(_: Int) -> S! { S() }
@@ -1910,10 +1908,8 @@ public:
     //
     // let s: S = .makeS(_:)(0)
     // ```
-    // Instead, we should store compound-ness as a separate bit from applied/
-    // unapplied.
-    Bits.UnresolvedMemberExpr.FunctionRefInfo =
-        static_cast<unsigned>(FunctionRefInfo::Unapplied);
+    setFunctionRefInfo(
+        FunctionRefInfo::unapplied(DeclNameLoc(nameLoc.getBaseNameLoc())));
   }
 
   DeclNameRef getName() const { return Name; }
@@ -1927,15 +1923,16 @@ public:
 
   /// Retrieve the kind of function reference.
   FunctionRefInfo getFunctionRefInfo() const {
-    return static_cast<FunctionRefInfo>(
+    return FunctionRefInfo::fromOpaque(
         Bits.UnresolvedMemberExpr.FunctionRefInfo);
   }
 
   /// Set the kind of function reference.
   void setFunctionRefInfo(FunctionRefInfo refKind) {
-    Bits.UnresolvedMemberExpr.FunctionRefInfo = static_cast<unsigned>(refKind);
+    Bits.UnresolvedMemberExpr.FunctionRefInfo = refKind.getOpaqueValue();
+    ASSERT(refKind == getFunctionRefInfo() && "FunctionRefInfo truncated");
   }
-  
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedMember;
   }
@@ -2627,9 +2624,7 @@ public:
       : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr),
         DotLoc(dotloc), NameLoc(nameloc), Name(name),
         OuterAlternatives(outerAlternatives) {
-    Bits.UnresolvedDotExpr.FunctionRefInfo =
-      static_cast<unsigned>(NameLoc.isCompound() ? FunctionRefInfo::Compound
-                                                 : FunctionRefInfo::Unapplied);
+    setFunctionRefInfo(FunctionRefInfo::unapplied(nameloc));
   }
 
   static UnresolvedDotExpr *createImplicit(
@@ -2693,12 +2688,13 @@ public:
 
   /// Retrieve the kind of function reference.
   FunctionRefInfo getFunctionRefInfo() const {
-    return static_cast<FunctionRefInfo>(Bits.UnresolvedDotExpr.FunctionRefInfo);
+    return FunctionRefInfo::fromOpaque(Bits.UnresolvedDotExpr.FunctionRefInfo);
   }
 
   /// Set the kind of function reference.
   void setFunctionRefInfo(FunctionRefInfo refKind) {
-    Bits.UnresolvedDotExpr.FunctionRefInfo = static_cast<unsigned>(refKind);
+    Bits.UnresolvedDotExpr.FunctionRefInfo = refKind.getOpaqueValue();
+    ASSERT(refKind == getFunctionRefInfo() && "FunctionRefInfo truncated");
   }
 
   static bool classof(const Expr *E) {

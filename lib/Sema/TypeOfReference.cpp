@@ -633,14 +633,18 @@ static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
                                             bool isCurriedInstanceReference,
                                             FunctionRefInfo functionRefInfo) {
   unsigned numParameterLists = decl->getNumCurryLevels();
-  switch (functionRefInfo) {
-  case FunctionRefInfo::Unapplied:
-  case FunctionRefInfo::Compound:
-    // Always remove argument labels from unapplied references and references
-    // that use a compound name.
+
+  // Always remove argument labels from compound references, they have already
+  // had their argument labels specified.
+  if (functionRefInfo.isCompoundName())
     return numParameterLists;
 
-  case FunctionRefInfo::SingleApply:
+  switch (functionRefInfo.getApplyLevel()) {
+  case FunctionRefInfo::ApplyLevel::Unapplied:
+    // Always remove argument labels from unapplied references.
+    return numParameterLists;
+
+  case FunctionRefInfo::ApplyLevel::SingleApply:
     // If we have fewer than two parameter lists, leave the labels.
     if (numParameterLists < 2)
       return 0;
@@ -651,7 +655,7 @@ static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
     // always unlabeled, so this operation is a no-op for the actual application.
     return isCurriedInstanceReference ? numParameterLists : 1;
 
-  case FunctionRefInfo::DoubleApply:
+  case FunctionRefInfo::ApplyLevel::DoubleApply:
     // Never remove argument labels from a double application.
     return 0;
   }
@@ -675,15 +679,18 @@ unsigned constraints::getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
         return (EP->hasSubPattern() ? 1 : 0) + hasAppliedSelf;
     }
   }
-  switch (functionRefInfo) {
-  case FunctionRefInfo::Unapplied:
-  case FunctionRefInfo::Compound:
+  // FIXME(FunctionRefInfo): This matches the old behavior, but is wrong.
+  if (functionRefInfo.isCompoundName())
     return 0 + hasAppliedSelf;
 
-  case FunctionRefInfo::SingleApply:
+  switch (functionRefInfo.getApplyLevel()) {
+  case FunctionRefInfo::ApplyLevel::Unapplied:
+    return 0 + hasAppliedSelf;
+
+  case FunctionRefInfo::ApplyLevel::SingleApply:
     return 1 + hasAppliedSelf;
 
-  case FunctionRefInfo::DoubleApply:
+  case FunctionRefInfo::ApplyLevel::DoubleApply:
     return 2;
   }
 
@@ -697,8 +704,11 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
                                     FunctionRefInfo functionRefInfo, FunctionType *functionType,
                                     ConstraintLocatorBuilder locator) {
   // Only apply property wrappers to unapplied references to functions.
-  if (!(functionRefInfo == FunctionRefInfo::Compound ||
-        functionRefInfo == FunctionRefInfo::Unapplied)) {
+  // FIXME(FunctionRefInfo): This should just be `isUnapplied()`, which would
+  // fix https://github.com/swiftlang/swift/issues/77823, but we also need to
+  // correctly handle the wrapping in matchCallArguments.
+  if (!(functionRefInfo.isCompoundName() ||
+        functionRefInfo.isUnappliedBaseName())) {
     return functionType;
   }
 
@@ -727,7 +737,7 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
 
   for (unsigned i : indices(*paramList)) {
     Identifier argLabel;
-    if (functionRefInfo == FunctionRefInfo::Compound) {
+    if (functionRefInfo.isCompoundName()) {
       auto &context = cs.getASTContext();
       auto argLabelLoc = nameLoc.getArgumentLabelLoc(i);
       auto argLabelToken = Lexer::getTokenAtLocation(context.SourceMgr, argLabelLoc);
@@ -2014,11 +2024,11 @@ void ConstraintSystem::bindOverloadType(
                            // FIXME: Should propagate name-as-written through.
                            : DeclNameRef(choice.getName());
 
-    addValueMemberConstraint(LValueType::get(rootTy), memberName, memberTy,
-                             useDC,
-                             isSubscriptRef ? FunctionRefInfo::DoubleApply
-                                            : FunctionRefInfo::Unapplied,
-                             /*outerAlternatives=*/{}, keyPathLoc);
+    addValueMemberConstraint(
+        LValueType::get(rootTy), memberName, memberTy, useDC,
+        isSubscriptRef ? FunctionRefInfo::doubleBaseNameApply()
+                       : FunctionRefInfo::unappliedBaseName(),
+        /*outerAlternatives=*/{}, keyPathLoc);
 
     // In case of subscript things are more complicated comparing to "dot"
     // syntax, because we have to get "applicable function" constraint
@@ -2496,7 +2506,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       // a better fix for this is to port over the #selector diagnostics from
       // CSApply to constraint fixes, and not attempt invalid disjunction
       // choices based on the selector kind on the valid code path.
-      if (choice.getFunctionRefInfo() == FunctionRefInfo::Unapplied &&
+      if (choice.getFunctionRefInfo().isUnappliedBaseName() &&
           !UnevaluatedRootExprs.contains(getAsExpr(anchor))) {
         increaseScore(SK_UnappliedFunction, locator);
       }

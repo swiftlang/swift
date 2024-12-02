@@ -2505,7 +2505,7 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
   auto declRefExpr = new (ctx)
       DeclRefExpr(ConcreteDeclRef(funcDecl), DeclNameLoc(), /*Implicit*/ true);
   declRefExpr->setType(funcDecl->getInterfaceType());
-  declRefExpr->setFunctionRefInfo(FunctionRefInfo::SingleApply);
+  declRefExpr->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
   auto callExpr = CallExpr::createImplicit(
       ctx, declRefExpr, ArgumentList::forImplicitUnlabeled(ctx, {}));
