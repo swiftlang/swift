@@ -1095,7 +1095,9 @@ public:
 
   /// Get the source location of the function.
   SILLocation getLocation() const {
-    assert(DebugScope && "no scope/location");
+    if (!DebugScope) {
+      return SILLocation::invalid();
+    }
     return getDebugScope()->Loc;
   }
 
