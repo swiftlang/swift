@@ -1,6 +1,7 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift  -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s -check-prefix=CHECK-NO-LIFETIMES
 
 
 //--- Inputs/module.modulemap
@@ -91,6 +92,19 @@ View returnsImmortal() SWIFT_RETURNS_INDEPENDENT_VALUE {
 // CHECK: sil [clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
 // CHECK: sil [clang OtherView.init] {{.*}} : $@convention(c) (@guaranteed View) -> @lifetime(copy 0) @out OtherView
 // CHECK: sil [clang returnsImmortal] {{.*}} : $@convention(c) () -> @lifetime(immortal) @autoreleased View
+
+// CHECK-NO-LIFETIMES: nonescapable.h:36:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:40:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:46:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:53:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:23:10: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:27:10: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:4:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:5:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:13:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:14:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:68:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES-NOT: error
 
 //--- test.swift
 
