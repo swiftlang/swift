@@ -4843,6 +4843,7 @@ StringRef swift::getNameForParamSpecifier(ParamSpecifier specifier) {
   case ParamSpecifier::ImplicitlyCopyableConsuming:
     return "implicitly_copyable_consuming";
   }
+  llvm_unreachable("bad ParamSpecifier");
 }
 
 std::optional<DiagnosticBehavior>
