@@ -4362,7 +4362,6 @@ namespace {
     }
 
     Decl *VisitUsingShadowDecl(const clang::UsingShadowDecl *decl) {
-      // FIXME: understand this
       // Only import:
       //   1. Types
       //   2. C++ methods from privately inherited base classes
