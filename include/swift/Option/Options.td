@@ -1417,7 +1417,7 @@ def Xcc : Separate<["-"], "Xcc">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;
 
 def Xclang_linker : Separate<["-"], "Xclang-linker">, Flags<[HelpHidden]>,
-  MetaVarName<"<arg>">, HelpText<"Pass <arg> to Clang when it is use for linking.">;
+  MetaVarName<"<arg>">, HelpText<"Pass <arg> to Clang when it is used for linking.">;
 
 def Xllvm : Separate<["-"], "Xllvm">,
   Flags<[FrontendOption, HelpHidden]>,
