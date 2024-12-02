@@ -259,8 +259,9 @@ private:
       }
     }
     // If any of this block's predecessors haven't already been visited, it
-    // means that they aren't in the region and consequently this block is a
-    // barrier block.
+    // means EITHER that those predecessors aren't in the region OR that a
+    // barrier was encountered when visiting some (iterative) successor of that
+    // predecessor.  Either way, this block is a barrier block as a result.
     if (llvm::any_of(block->getSuccessorBlocks(), [&](SILBasicBlock *block) {
           return !visited.contains(block);
         })) {
