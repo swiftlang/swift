@@ -536,20 +536,17 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityRange &info,
     return;
 
   llvm::VersionTuple noVersion;
-  auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
-                                      targetPlatform(C.LangOpts),
-                                      /*Message=*/StringRef(),
-                                      /*Rename=*/StringRef(),
-                                      /*RenameDecl=*/nullptr,
-                                      info.getRawMinimumVersion(),
-                                      /*IntroducedRange*/SourceRange(),
-                                      /*Deprecated=*/noVersion,
-                                      /*DeprecatedRange*/SourceRange(),
-                                      /*Obsoleted=*/noVersion,
-                                      /*ObsoletedRange*/SourceRange(),
-                                      PlatformAgnosticAvailabilityKind::None,
-                                      /*Implicit=*/false,
-                                      /*SPI*/false);
+  auto AvAttr = new (C) AvailableAttr(
+      SourceLoc(), SourceRange(), targetPlatform(C.LangOpts),
+      /*Message=*/StringRef(),
+      /*Rename=*/StringRef(), info.getRawMinimumVersion(),
+      /*IntroducedRange=*/SourceRange(),
+      /*Deprecated=*/noVersion,
+      /*DeprecatedRange=*/SourceRange(),
+      /*Obsoleted=*/noVersion,
+      /*ObsoletedRange=*/SourceRange(), PlatformAgnosticAvailabilityKind::None,
+      /*Implicit=*/false,
+      /*SPI=*/false);
 
   decl->getAttrs().add(AvAttr);
 }
@@ -1316,14 +1313,13 @@ namespace {
                 : llvm::VersionTuple(majorVersion);
           attr = new (ctx) AvailableAttr(
               SourceLoc(), SourceRange(), PlatformKind::none,
-              /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
-              /*RenameDecl=*/nullptr,
-              /*Introduced*/introducedVersion, SourceRange(),
-              /*Deprecated*/llvm::VersionTuple(), SourceRange(),
-              /*Obsoleted*/llvm::VersionTuple(), SourceRange(),
+              /*Message=*/StringRef(), ctx.AllocateCopy(renamed.str()),
+              /*Introduced=*/introducedVersion, SourceRange(),
+              /*Deprecated=*/llvm::VersionTuple(), SourceRange(),
+              /*Obsoleted=*/llvm::VersionTuple(), SourceRange(),
               PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
-              /*Implicit*/false,
-              /*SPI*/false);
+              /*Implicit=*/false,
+              /*SPI=*/false);
         }
       }
 
@@ -2880,15 +2876,16 @@ namespace {
         auto availability = Impl.SwiftContext.getSwift58Availability();
         if (!availability.isAlwaysAvailable()) {
           assert(availability.hasMinimumVersion());
-          auto AvAttr = new (Impl.SwiftContext) AvailableAttr(
-              SourceLoc(), SourceRange(),
-              targetPlatform(Impl.SwiftContext.LangOpts), "", "",
-              /*RenameDecl=*/nullptr, availability.getRawMinimumVersion(),
-              /*IntroducedRange=*/SourceRange(), {},
-              /*DeprecatedRange=*/SourceRange(), {},
-              /*ObsoletedRange=*/SourceRange(),
-              PlatformAgnosticAvailabilityKind::None, /*Implicit=*/false,
-              false);
+          auto AvAttr = new (Impl.SwiftContext)
+              AvailableAttr(SourceLoc(), SourceRange(),
+                            targetPlatform(Impl.SwiftContext.LangOpts),
+                            /*Message=*/"", /*Rename=*/"",
+                            availability.getRawMinimumVersion(),
+                            /*IntroducedRange=*/SourceRange(), {},
+                            /*DeprecatedRange=*/SourceRange(), {},
+                            /*ObsoletedRange=*/SourceRange(),
+                            PlatformAgnosticAvailabilityKind::None,
+                            /*Implicit=*/false, false);
           classDecl->getAttrs().add(AvAttr);
         }
       }
@@ -7883,12 +7880,28 @@ void addCompletionHandlerAttribute(Decl *asyncImport,
     return;
 
   for (auto *member : members) {
+    if (member == asyncImport)
+      continue;
+
+    auto afd = dyn_cast<AbstractFunctionDecl>(member);
+    if (!afd)
+      continue;
+
     // Only add the attribute to functions that don't already have availability
-    if (member != asyncImport && isa<AbstractFunctionDecl>(member) &&
-        !member->getAttrs().hasAttribute<AvailableAttr>()) {
-      member->getAttrs().add(
-          AvailableAttr::createForAlternative(SwiftContext, asyncFunc));
-    }
+    if (afd->getAttrs().hasAttribute<AvailableAttr>())
+      continue;
+
+    llvm::VersionTuple NoVersion;
+    auto *attr = new (SwiftContext)
+        AvailableAttr(SourceLoc(), SourceRange(), PlatformKind::none,
+                      /*Message=*/"", /*Rename=*/"", /*Introduced=*/NoVersion,
+                      SourceRange(), /*Deprecated=*/NoVersion, SourceRange(),
+                      /*Obsoleted=*/NoVersion, SourceRange(),
+                      PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true,
+                      /*SPI=*/false);
+
+    afd->setRenamedDecl(attr, asyncFunc);
+    afd->getAttrs().add(attr);
   }
 }
 
@@ -8696,18 +8709,11 @@ void ClangImporter::Implementation::importAttributes(
       if (!replacement.empty())
         swiftReplacement = getSwiftNameFromClangName(replacement);
 
-      auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
-                                          platformK.value(),
-                                          message, swiftReplacement,
-                                          /*RenameDecl=*/nullptr,
-                                          introduced,
-                                          /*IntroducedRange=*/SourceRange(),
-                                          deprecated,
-                                          /*DeprecatedRange=*/SourceRange(),
-                                          obsoleted,
-                                          /*ObsoletedRange=*/SourceRange(),
-                                          PlatformAgnostic, /*Implicit=*/false,
-                                          EnableClangSPI && IsSPI);
+      auto AvAttr = new (C) AvailableAttr(
+          SourceLoc(), SourceRange(), platformK.value(), message,
+          swiftReplacement, introduced, SourceRange(), deprecated,
+          SourceRange(), obsoleted, SourceRange(), PlatformAgnostic,
+          /*Implicit=*/false, EnableClangSPI && IsSPI);
 
       MappedDecl->getAttrs().add(AvAttr);
     }

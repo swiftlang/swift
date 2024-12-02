@@ -6637,16 +6637,13 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
         continue;
 
       auto attr = new (ctx) AvailableAttr(
-          SourceLoc(), SourceRange(),
-          available->getPlatform(),
+          SourceLoc(), SourceRange(), available->getPlatform(),
           available->Message,
-          "", nullptr,
-          available->Introduced.value_or(noVersion), SourceRange(),
-          available->Deprecated.value_or(noVersion), SourceRange(),
-          available->Obsoleted.value_or(noVersion), SourceRange(),
-          PlatformAgnosticAvailabilityKind::Unavailable,
-          /*implicit=*/true,
-          available->isSPI());
+          /*Rename=*/"", available->Introduced.value_or(noVersion),
+          SourceRange(), available->Deprecated.value_or(noVersion),
+          SourceRange(), available->Obsoleted.value_or(noVersion),
+          SourceRange(), PlatformAgnosticAvailabilityKind::Unavailable,
+          /*Implicit=*/true, available->isSPI());
       ext->getAttrs().add(attr);
       anyPlatformSpecificAttrs = true;
     }
@@ -6658,14 +6655,12 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
 
   // Add the blanket "unavailable".
 
-  auto attr = new (ctx) AvailableAttr(SourceLoc(), SourceRange(),
-                                      PlatformKind::none, "", "", nullptr,
-                                      noVersion, SourceRange(),
-                                      noVersion, SourceRange(),
-                                      noVersion, SourceRange(),
-                                      PlatformAgnosticAvailabilityKind::Unavailable,
-                                      false,
-                                      false);
+  auto attr = new (ctx) AvailableAttr(
+      SourceLoc(), SourceRange(), PlatformKind::none, /*Message*/ "",
+      /*Rename=*/"", /*Introduced=*/noVersion, SourceRange(),
+      /*Deprecated=*/noVersion, SourceRange(), /*Obsoleted=*/noVersion,
+      SourceRange(), PlatformAgnosticAvailabilityKind::Unavailable,
+      /*Implicit=*/false, /*SPI=*/false);
   ext->getAttrs().add(attr);
 }
 

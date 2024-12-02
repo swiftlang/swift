@@ -147,12 +147,16 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 8+8+1+1,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 8+8+1+1+1+1,
       /// A `PlatformKind` value.
       Platform : 8,
 
       /// A `PlatformAgnosticAvailabilityKind` value.
       PlatformAgnostic : 8,
+
+      /// State storage for `RenamedDeclRequest`.
+      HasComputedRenamedDecl : 1,
+      HasRenamedDecl : 1,
 
       /// Whether this attribute was spelled `@_spi_available`.
       IsSPI : 1,
@@ -730,7 +734,7 @@ enum class PlatformAgnosticAvailabilityKind : uint8_t {
 class AvailableAttr : public DeclAttribute {
 public:
   AvailableAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
-                StringRef Message, StringRef Rename, ValueDecl *RenameDecl,
+                StringRef Message, StringRef Rename,
                 const llvm::VersionTuple &Introduced,
                 SourceRange IntroducedRange,
                 const llvm::VersionTuple &Deprecated,
@@ -748,13 +752,12 @@ public:
   /// This should take the form of an operator, identifier, or full function
   /// name, optionally with a prefixed type, similar to the syntax used for
   /// the `NS_SWIFT_NAME` annotation in Objective-C.
+  ///
+  /// \c ValueDecl::getRenamedDecl() can be used to look up the declaration
+  /// referred to by this string. Note that this attribute can have a rename
+  /// target that was provided directly when synthesized and therefore can have
+  /// a rename decl even when this string is empty.
   const StringRef Rename;
-
-  /// The declaration referred to by \c Rename. Note that this is only set for
-  /// deserialized attributes or inferred attributes from ObjectiveC code.
-  /// \c ValueDecl::getRenamedDecl should be used to find the declaration
-  /// corresponding to \c Rename.
-  ValueDecl *RenameDecl;
 
   /// Indicates when the symbol was introduced.
   const std::optional<llvm::VersionTuple> Introduced;
@@ -849,11 +852,6 @@ public:
                          llvm::VersionTuple Obsoleted
                          = llvm::VersionTuple());
 
-  /// Create an AvailableAttr that indicates the given \p AsyncFunc should be
-  /// preferentially used in async contexts
-  static AvailableAttr *createForAlternative(ASTContext &C,
-                                             AbstractFunctionDecl *AsyncFunc);
-
   AvailableAttr *clone(ASTContext &C, bool implicit) const;
   AvailableAttr *clone(ASTContext &C) const {
     return clone(C, isImplicit());
@@ -861,6 +859,22 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Available;
+  }
+
+  bool hasCachedRenamedDecl() const {
+    return Bits.AvailableAttr.HasRenamedDecl;
+  }
+
+private:
+  friend class RenamedDeclRequest;
+
+  bool hasComputedRenamedDecl() const {
+    return Bits.AvailableAttr.HasComputedRenamedDecl;
+  }
+
+  void setComputedRenamedDecl(bool hasRenamedDecl) {
+    Bits.AvailableAttr.HasComputedRenamedDecl = true;
+    Bits.AvailableAttr.HasRenamedDecl = hasRenamedDecl;
   }
 };
 

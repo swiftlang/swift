@@ -4085,8 +4085,9 @@ public:
 
 class RenamedDeclRequest
     : public SimpleRequest<RenamedDeclRequest,
-                           ValueDecl *(const ValueDecl *, const AvailableAttr *),
-                           RequestFlags::Cached> {
+                           ValueDecl *(const ValueDecl *,
+                                       const AvailableAttr *),
+                           RequestFlags::Cached | RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -4098,6 +4099,8 @@ private:
 
 public:
   bool isCached() const { return true; }
+  std::optional<ValueDecl *> getCachedResult() const;
+  void cacheResult(ValueDecl *value) const;
 };
 
 using AvailableAttrDeclPair = std::pair<const AvailableAttr *, const Decl *>;

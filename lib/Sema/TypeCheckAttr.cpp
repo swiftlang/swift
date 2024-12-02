@@ -7871,9 +7871,6 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   if (!attached || !attr)
     return nullptr;
 
-  if (attr->RenameDecl)
-    return attr->RenameDecl;
-
   if (attr->Rename.empty())
     return nullptr;
 

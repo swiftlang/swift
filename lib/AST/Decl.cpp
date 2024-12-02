@@ -4231,6 +4231,19 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
   return false;
 }
 
+ValueDecl *ValueDecl::getRenamedDecl(const AvailableAttr *attr) const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           RenamedDeclRequest{this, attr}, nullptr);
+}
+
+void ValueDecl::setRenamedDecl(const AvailableAttr *attr,
+                               ValueDecl *renameDecl) const {
+  // This is only designed to be used with decls synthesized by ClangImporter.
+  assert(hasClangNode());
+  getASTContext().evaluator.cacheNonEmptyOutput(RenamedDeclRequest{this, attr},
+                                                std::move(renameDecl));
+}
+
 SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   // Some decls have a parent/child split where the introducer keyword is on the
   // parent, but the attributes are on the children. If this is a child in such
@@ -9240,30 +9253,26 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
   if (hasAsync())
     return nullptr;
 
-  const AvailableAttr *avAttr = nullptr;
+  // Prefer the first availability attribute with no platform and a valid
+  // rename target, falling back to the first with a rename. Note that
+  // `getAttrs` is in reverse source order, so the last attribute is the
+  // first in source.
+  AbstractFunctionDecl *alternative = nullptr;
   for (const auto *attr : getAttrs().getAttributes<AvailableAttr>()) {
-    // If there's an attribute with an already-resolved rename decl, use it
-    if (attr->RenameDecl) {
-      avAttr = attr;
-      break;
-    }
+    if (attr->isNoAsync())
+      continue;
 
-    // Otherwise prefer the first availability attribute with no platform and
-    // rename parameter, falling back to the first with a rename. Note that
-    // `getAttrs` is in reverse source order, so the last attribute is the
-    // first in source
-    if (!attr->Rename.empty() &&
-        (attr->getPlatform() == PlatformKind::none || !avAttr) &&
-        !attr->isNoAsync()) {
-      avAttr = attr;
+    if (attr->getPlatform() != PlatformKind::none && alternative != nullptr)
+      continue;
+
+    if (auto *renamedDecl = getRenamedDecl(attr)) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(renamedDecl)) {
+        if (afd->hasAsync())
+          alternative = afd;
+      }
     }
   }
 
-  auto *renamedDecl = evaluateOrDefault(
-      getASTContext().evaluator, RenamedDeclRequest{this, avAttr}, nullptr);
-  auto *alternative = dyn_cast_or_null<AbstractFunctionDecl>(renamedDecl);
-  if (!alternative || !alternative->hasAsync())
-    return nullptr;
   return alternative;
 }
 

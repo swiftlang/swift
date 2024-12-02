@@ -1623,6 +1623,34 @@ void ResolveRawLayoutTypeRequest::cacheResult(Type value) const {
 }
 
 //----------------------------------------------------------------------------//
+// RenamedDeclRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<ValueDecl *> RenamedDeclRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  auto attr = std::get<1>(getStorage());
+
+  if (attr->hasComputedRenamedDecl()) {
+    if (attr->hasCachedRenamedDecl())
+      return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+
+    return nullptr;
+  }
+
+  return std::nullopt;
+}
+
+void RenamedDeclRequest::cacheResult(ValueDecl *value) const {
+  auto decl = std::get<0>(getStorage());
+  auto attr = const_cast<AvailableAttr *>(std::get<1>(getStorage()));
+
+  attr->setComputedRenamedDecl(value != nullptr);
+  if (value)
+    decl->getASTContext().evaluator.cacheNonEmptyOutput(*this,
+                                                        std::move(value));
+}
+
+//----------------------------------------------------------------------------//
 // TypeCheckSourceFileRequest computation.
 //----------------------------------------------------------------------------//
 
