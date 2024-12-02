@@ -59,6 +59,7 @@
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/LangStandard.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
@@ -5998,6 +5999,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
   NominalTypeDecl *recordDecl = desc.recordDecl;
   DeclName name = desc.name;
+  clang::AccessSpecifier inheritance = desc.inheritance;
 
   auto &ctx = recordDecl->getASTContext();
   auto allResults = evaluateOrDefault(
@@ -6016,8 +6018,28 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       if (isa<clang::CXXConstructorDecl>(named) && isa<ClassDecl>(recordDecl))
         continue;
 
-      if (auto import = clangModuleLoader->importDeclDirectly(named))
-        result.push_back(cast<ValueDecl>(import));
+      // Skip this member if it is being inherited but was declared private.
+      if (inheritance != clang::AS_none && named->getAccess() == clang::AS_private)
+        continue;
+
+      if (auto import = clangModuleLoader->importDeclDirectly(named)) {
+        auto newDecl = cast<ValueDecl>(import);
+
+        // If newDecl is being imported because of inheritance, adjust its
+        // access to match C++ inheritance semantics. For more details,
+        // see ClangImporter::Implementation::loadAllMembersOfRecordDecl.
+        if (inheritance != clang::AS_none) {
+          auto adjustedAccess = std::min(newDecl->getFormalAccess(),
+                                         importer::convertClangAccess(inheritance));
+          newDecl->overwriteAccess(adjustedAccess);
+
+          // Also adjust access of accessors, for imported storage decls
+          if (auto asd = dyn_cast<AbstractStorageDecl>(newDecl))
+            for (auto acc : asd->getAllAccessors())
+              acc->overwriteAccess(adjustedAccess);
+        }
+        result.push_back(newDecl);
+      }
     }
   }
 
@@ -6034,7 +6056,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       foundNameArities.insert(getArity(valueDecl));
 
     for (auto base : cxxRecord->bases()) {
-      if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+      // Skip this base class if this is a case of nested private inheritance.
+      // See ClangImporter::Implementation::loadAllMembersOfRecordDecl for more
+      // details.
+      if (inheritance != clang::AS_none &&
+          base.getAccessSpecifier() == clang::AS_private)
         continue;
 
       clang::QualType baseType = base.getType();
@@ -6053,7 +6079,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         // Add Clang members that are imported lazily.
         auto baseResults = evaluateOrDefault(
             ctx.evaluator,
-            ClangRecordMemberLookup({cast<NominalTypeDecl>(import), name}), {});
+            ClangRecordMemberLookup({cast<NominalTypeDecl>(import), name,
+                                     base.getAccessSpecifier()}), {});
         // Add members that are synthesized eagerly, such as subscripts.
         for (auto member :
              cast<NominalTypeDecl>(import)->getCurrentMembersWithoutLoading()) {

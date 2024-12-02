@@ -23,6 +23,7 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
 #include "clang/AST/Type.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -134,9 +135,11 @@ private:
 struct ClangRecordMemberLookupDescriptor final {
   NominalTypeDecl *recordDecl;
   DeclName name;
+  clang::AccessSpecifier inheritance;
 
-  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
-      : recordDecl(recordDecl), name(name) {
+  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name,
+      clang::AccessSpecifier inheritance=clang::AS_none)
+      : recordDecl(recordDecl), name(name), inheritance(inheritance) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
   }
 
