@@ -8454,6 +8454,11 @@ public:
   /// even when it does not have one _yet_.
   bool doesAccessorHaveBody() const;
 
+  /// Whether this accessor is a protocol requirement for which a default
+  /// implementation must be provided for back-deployment.  For example, read2
+  /// and modify2 requirements with early enough availability.
+  bool isRequirementWithSynthesizedDefaultImplementation() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Accessor;
   }
