@@ -2079,7 +2079,7 @@ private:
     auto &ctx = cs.getASTContext();
 
     auto *resultExpr = getVoidExpr(ctx);
-    cs.cacheExprTypes(resultExpr);
+    cs.cacheType(resultExpr);
 
     auto *returnStmt = ReturnStmt::createImplicit(ctx, resultExpr);
 

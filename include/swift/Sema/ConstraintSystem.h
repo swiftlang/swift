@@ -1749,6 +1749,30 @@ public:
   /// Retrieve the type of the given node, as recorded in this solution.
   Type getType(ASTNode node) const;
 
+  /// Set the type in our type map for the given node. This is used in CSApply
+  /// to set the types of synthesized Exprs.
+  void setType(ASTNode node, Type type);
+
+  void setType(const KeyPathExpr *KP, unsigned I, Type T);
+
+  /// Cache the type of the expression argument and return that same
+  /// argument.
+  template <typename T>
+  T *cacheType(T *E) {
+    assert(E->getType() && "Expected a type!");
+    setType(E, E->getType());
+    return E;
+  }
+
+  /// Cache the type of the expression argument and return that same
+  /// argument.
+  KeyPathExpr *cacheType(KeyPathExpr *E, unsigned I) {
+    auto componentTy = E->getComponents()[I].getComponentType();
+    assert(componentTy && "Expected a type!");
+    setType(E, I, componentTy);
+    return E;
+  }
+
   /// Retrieve the type of the \p ComponentIndex-th component in \p KP.
   Type getType(const KeyPathExpr *KP, unsigned ComponentIndex) const;
 
@@ -1815,6 +1839,39 @@ public:
   /// expression type map.
   bool isStaticallyDerivedMetatype(Expr *E) const;
 
+  /// Call TypeExpr::getInstanceType on the given expression, using a
+  /// custom accessor for the type on the expression that reads the
+  /// type from the Solution's expression type map.
+  Type getInstanceType(TypeExpr *E);
+
+  /// Coerce the given expression to an rvalue, if it isn't already.
+  Expr *coerceToRValue(Expr *expr);
+
+  /// Add implicit "load" expressions to the given expression.
+  Expr *addImplicitLoadExpr(Expr *expr);
+
+  /// Build implicit autoclosure expression wrapping a given expression.
+  /// Given expression represents computed result of the closure.
+  ///
+  /// The \p ClosureDC must be the deepest possible context that
+  /// contains this autoclosure expression. For example,
+  ///
+  /// func foo() {
+  ///   _ = { $0 || $1 || $2 }
+  /// }
+  ///
+  /// Even though the decl context of $1 (after solution application) is
+  /// `||`'s autoclosure parameter, we cannot know this until solution
+  /// application has finished because autoclosure expressions are expanded in
+  /// depth-first order then \c ContextualizeClosures comes around to clean up.
+  /// All that is required is that the explicit closure be the context since it
+  /// is the innermost context that can introduce potential new capturable
+  /// declarations.
+  Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
+                             DeclContext *ClosureDC,
+                             bool isDefaultWrappedValue = false,
+                             bool isAsyncLetWrapper = false);
+
   /// Retrieve the argument list that is associated with a call at the given
   /// locator.
   ArgumentList *getArgumentList(ConstraintLocator *locator) const;
@@ -1823,6 +1880,13 @@ public:
 
   /// Dump this solution.
   void dump(raw_ostream &OS, unsigned indent) const LLVM_ATTRIBUTE_USED;
+
+  /// Cache the types of the given expression and all subexpressions.
+  void cacheExprTypes(Expr *expr);
+
+  /// Cache the types of the expressions under the given expression
+  /// (but not the type of the given expression).
+  void cacheSubExprTypes(Expr *expr);
 };
 
 /// Describes the differences between several solutions to the same
@@ -2581,48 +2645,6 @@ private:
     SmallVector<Constraint *, 4> activeConstraints;
   };
 
-  class CacheExprTypes : public ASTWalker {
-    Expr *RootExpr;
-    ConstraintSystem &CS;
-    bool ExcludeRoot;
-
-  public:
-    CacheExprTypes(Expr *expr, ConstraintSystem &cs, bool excludeRoot)
-        : RootExpr(expr), CS(cs), ExcludeRoot(excludeRoot) {}
-
-    /// Walk everything in a macro
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::ArgumentsAndExpansion;
-    }
-
-    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
-      if (ExcludeRoot && expr == RootExpr) {
-        assert(!expr->getType() && "Unexpected type in root of expression!");
-        return Action::Continue(expr);
-      }
-
-      if (expr->getType())
-        CS.cacheType(expr);
-
-      if (auto kp = dyn_cast<KeyPathExpr>(expr))
-        for (auto i : indices(kp->getComponents()))
-          if (kp->getComponents()[i].getComponentType())
-            CS.cacheType(kp, i);
-
-      return Action::Continue(expr);
-    }
-
-    /// Ignore statements.
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return Action::SkipNode(stmt);
-    }
-
-    /// Ignore declarations.
-    PreWalkAction walkToDeclPre(Decl *decl) override {
-      return Action::SkipNode();
-    }
-  };
-
 public:
   /// Retrieve the first constraint that has failed along the solver's path, or
   /// \c nullptr if no constraint has failed.
@@ -2667,19 +2689,6 @@ public:
   /// has left-over active/inactive constraints which should
   /// have been simplified.
   bool inInvalidState() const { return InvalidState; }
-
-  /// Cache the types of the given expression and all subexpressions.
-  void cacheExprTypes(Expr *expr) {
-    bool excludeRoot = false;
-    expr->walk(CacheExprTypes(expr, *this, excludeRoot));
-  }
-
-  /// Cache the types of the expressions under the given expression
-  /// (but not the type of the given expression).
-  void cacheSubExprTypes(Expr *expr) {
-    bool excludeRoot = true;
-    expr->walk(CacheExprTypes(expr, *this, excludeRoot));
-  }
 
   /// The current solver state.
   ///
@@ -3112,17 +3121,15 @@ public:
 
   /// Get the type for an node.
   Type getType(ASTNode node) const {
-    assert(hasType(node) && "Expected type to have been set!");
-    // FIXME: lvalue differences
-    //    assert((!E->getType() ||
-    //            E->getType()->isEqual(ExprTypes.find(E)->second)) &&
-    //           "Mismatched types!");
-    return NodeTypes.find(node)->second;
+    auto found = NodeTypes.find(node);
+    ASSERT(found != NodeTypes.end());
+    return found->second;
   }
 
   Type getType(const KeyPathExpr *KP, unsigned I) const {
-    assert(hasType(KP, I) && "Expected type to have been set!");
-    return KeyPathComponentTypes.find(std::make_pair(KP, I))->second;
+    auto found = KeyPathComponentTypes.find(std::make_pair(KP, I));
+    ASSERT(found != KeyPathComponentTypes.end());
+    return found->second;
   }
 
   /// Retrieve the type of the node, if known.
@@ -4171,23 +4178,12 @@ public:
   /// type from the ConstraintSystem expression type map.
   Type getInstanceType(TypeExpr *E);
 
-  /// Call AbstractClosureExpr::getResultType on the given expression,
-  /// using a custom accessor for the type on the expression that
-  /// reads the type from the ConstraintSystem expression type map.
-  Type getResultType(const AbstractClosureExpr *E);
-
 private:
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
   void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
 
 public:
-
-  /// Coerce the given expression to an rvalue, if it isn't already.
-  Expr *coerceToRValue(Expr *expr);
-
-  /// Add implicit "load" expressions to the given expression.
-  Expr *addImplicitLoadExpr(Expr *expr);
 
   /// "Open" the unbound generic type represented by the given declaration and
   /// parent type by introducing fresh type variables for generic parameters
@@ -4832,28 +4828,6 @@ public:
                                          FunctionRefKind functionRefKind,
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
-
-  /// Build implicit autoclosure expression wrapping a given expression.
-  /// Given expression represents computed result of the closure.
-  ///
-  /// The \p ClosureDC must be the deepest possible context that
-  /// contains this autoclosure expression. For example,
-  ///
-  /// func foo() {
-  ///   _ = { $0 || $1 || $2 }
-  /// }
-  ///
-  /// Even though the decl context of $1 (after solution application) is
-  /// `||`'s autoclosure parameter, we cannot know this until solution
-  /// application has finished because autoclosure expressions are expanded in
-  /// depth-first order then \c ContextualizeClosures comes around to clean up.
-  /// All that is required is that the explicit closure be the context since it
-  /// is the innermost context that can introduce potential new capturable
-  /// declarations.
-  Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
-                             DeclContext *ClosureDC,
-                             bool isDefaultWrappedValue = false,
-                             bool isAsyncLetWrapper = false);
 
   /// Builds a type-erased return expression that can be used in dynamic
   /// replacement.
