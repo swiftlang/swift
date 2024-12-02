@@ -879,10 +879,10 @@ AccessLevel importer::convertClangAccess(clang::AccessSpecifier access) {
   case clang::AS_public:
     // C++ 'public' is actually closer to Swift 'open' than Swift 'public',
     // since C++ 'public' does not prevent users from subclassing a type or
-    // overriding a method. However, both operations are currently unsupported
-    // across the interop boundary, and it is not clear that Swift 'open'
-    // correctly models other C++ restrictions (e.g., 'final'), so we
-    // conservatively map C++ public to Swift public.
+    // overriding a method. However, subclassing and overriding are currently
+    // unsupported across the interop boundary, so we conservatively map C++
+    // 'public' to Swift 'public' in case there are other C++ subtleties that
+    // are being missed at this time (e.g., C++ 'final' vs Swift 'final').
     return AccessLevel::Public;
 
   case clang::AS_protected:
