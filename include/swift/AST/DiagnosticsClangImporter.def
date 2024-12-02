@@ -223,7 +223,7 @@ WARNING(private_fileid_attr_format_invalid, none,
 REMARK(private_fileid_attr_format_specification, none,
     "file IDs have the following format: 'ModuleName/FileName.swift'", ())
 NOTE(private_fileid_attr_format_suggestion, none,
-    "perhaps you meant '%0'?", (StringRef))
+    "did you mean '%0'?", (StringRef))
 
 ERROR(reference_type_must_have_retain_release_attr, none,
       "reference type '%1' must have %select{'retain:'|'release:'}0 Swift "
