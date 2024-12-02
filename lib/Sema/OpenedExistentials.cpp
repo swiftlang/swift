@@ -800,20 +800,6 @@ static Type typeEraseExistentialSelfReferences(
               return parameterized->getBaseType();
           }
         }
-        /*
-        if (auto lvalue = dyn_cast<LValueType>(t)) {
-          auto objTy = lvalue->getObjectType();
-          auto erasedTy =
-            typeEraseExistentialSelfReferences(
-              objTy, currPos,
-              containsFn, predicateFn, eraseFn);
-
-          if (erasedTy.getPointer() == objTy.getPointer())
-            return Type(lvalue);
-
-          return erasedTy;
-        }
-        */
 
         if (!predicateFn(t)) {
           // Recurse.
