@@ -689,28 +689,6 @@ const AvailableAttr *Decl::getUnavailableAttr(bool ignoreAppExtensions) const {
   return nullptr;
 }
 
-std::optional<AvailableAttrDeclPair>
-SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator, const Decl *decl,
-                                         bool ignoreAppExtensions) const {
-  // Directly marked unavailable.
-  if (auto attr = decl->getUnavailableAttr(ignoreAppExtensions))
-    return std::make_pair(attr, decl);
-
-  if (auto *parent =
-          AvailabilityInference::parentDeclForInferredAvailability(decl))
-    return parent->getSemanticUnavailableAttr(ignoreAppExtensions);
-
-  return std::nullopt;
-}
-
-std::optional<AvailableAttrDeclPair>
-Decl::getSemanticUnavailableAttr(bool ignoreAppExtensions) const {
-  auto &eval = getASTContext().evaluator;
-  return evaluateOrDefault(
-      eval, SemanticUnavailableAttrRequest{this, ignoreAppExtensions},
-      std::nullopt);
-}
-
 static bool isDeclCompletelyUnavailable(const Decl *decl) {
   // Don't trust unavailability on declarations from clang modules.
   if (isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext()))

@@ -4122,25 +4122,6 @@ public:
   bool isCached() const { return true; }
 };
 
-class SemanticUnavailableAttrRequest
-    : public SimpleRequest<SemanticUnavailableAttrRequest,
-                           std::optional<AvailableAttrDeclPair>(
-                               const Decl *decl, bool ignoreAppExtensions),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  std::optional<AvailableAttrDeclPair>
-  evaluate(Evaluator &evaluator, const Decl *decl,
-           bool ignoreAppExtensions) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 enum class SemanticDeclAvailability : uint8_t {
   /// The decl is potentially available in some contexts and/or under certain
   /// deployment conditions.

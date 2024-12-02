@@ -814,11 +814,17 @@ private:
     if (D->getDeclContext()->isLocalContext())
       return false;
 
-    // As a convenience, SPI decls and explicitly unavailable decls are
-    // constrained to the deployment target. There's not much benefit to
-    // checking these declarations at a lower availability version floor since
-    // neither can be used by API clients.
-    if (D->isSPI() || D->getSemanticUnavailableAttr())
+    // As a convenience, explicitly unavailable decls are constrained to the
+    // deployment target. There's not much benefit to checking these decls at a
+    // lower availability version floor since they can't be invoked by clients.
+    if (getCurrentScope()->getAvailabilityContext().isUnavailable() ||
+        D->isUnavailable())
+      return true;
+
+    // To remain compatible with a lot of existing SPIs that are declared
+    // without availability attributes, constrain them to the deployment target
+    // too.
+    if (D->isSPI())
       return true;
 
     return !::isExported(D);

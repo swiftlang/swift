@@ -4795,10 +4795,12 @@ void AttributeChecker::checkBackDeployedAttrs(
     if (Attr != ActiveAttr)
       continue;
 
+    auto availability =
+        TypeChecker::availabilityAtLocation(D->getLoc(), D->getDeclContext());
+
     // Unavailable decls cannot be back deployed.
-    if (auto unavailableAttrPair = VD->getSemanticUnavailableAttr()) {
-      auto unavailableAttr = unavailableAttrPair.value().first;
-      if (!inheritsAvailabilityFromPlatform(unavailableAttr->getPlatform(),
+    if (auto unavailablePlatform = availability.getUnavailablePlatformKind()) {
+      if (!inheritsAvailabilityFromPlatform(*unavailablePlatform,
                                             Attr->Platform)) {
         auto platformString = prettyPlatformString(Attr->Platform);
         llvm::VersionTuple ignoredVersion;
@@ -4808,9 +4810,21 @@ void AttributeChecker::checkBackDeployedAttrs(
 
         diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
                  platformString);
-        diagnose(unavailableAttr->AtLoc, diag::availability_marked_unavailable,
-                 VD)
-            .highlight(unavailableAttr->getRange());
+
+        // Find the attribute that makes the declaration unavailable.
+        const Decl *attrDecl = D;
+        do {
+          if (auto *unavailableAttr = attrDecl->getUnavailableAttr()) {
+            diagnose(unavailableAttr->AtLoc,
+                     diag::availability_marked_unavailable, VD)
+                .highlight(unavailableAttr->getRange());
+            break;
+          }
+
+          attrDecl = AvailabilityInference::parentDeclForInferredAvailability(
+              attrDecl);
+        } while (attrDecl);
+
         continue;
       }
     }
