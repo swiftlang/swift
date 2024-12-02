@@ -938,8 +938,8 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///
   /// For more information about the available rounding rules, see the
   /// `FloatingPointRoundingRule` enumeration. To round a value using the
-  /// default "schoolbook rounding", you can use the shorter `rounded()`
-  /// method instead.
+  /// default "schoolbook rounding" of `.toNearestOrAwayFromZero`, you can use
+  /// the shorter `rounded()` method instead.
   ///
   ///     print(x.rounded())
   ///     // Prints "7.0"
@@ -974,8 +974,8 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///
   /// For more information about the available rounding rules, see the
   /// `FloatingPointRoundingRule` enumeration. To round a value using the
-  /// default "schoolbook rounding", you can use the shorter `round()` method
-  /// instead.
+  /// default "schoolbook rounding" of `.toNearestOrAwayFromZero`, you can use
+  /// the shorter `round()` method instead.
   ///
   ///     var w1 = 6.5
   ///     w1.round()
