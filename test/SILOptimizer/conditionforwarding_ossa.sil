@@ -14,6 +14,8 @@ class C {
   init()
 }
 
+final class D: C {}
+
 sil [ossa] @callee : $@convention(thin) () -> ()
 sil [ossa] @use_enum : $@convention(thin) (E) -> ()
 sil [ossa] @use_int : $@convention(thin) (Builtin.Int64) -> ()
@@ -388,3 +390,32 @@ bb6:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @cast_with_type_dependent_operand : 
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'cast_with_type_dependent_operand'
+sil [ossa] @cast_with_type_dependent_operand : $@convention(method) (@guaranteed C, @guaranteed D) -> () {
+bb0(%0 : @guaranteed  $C, %1 : @guaranteed  $D):
+  checked_cast_br C in %0 to @dynamic_self D, bb1, bb2
+
+bb1(%3 : @guaranteed  $D):
+  %4 = enum $Optional<D>, #Optional.some!enumelt, %3
+  br bb3(%4)
+
+bb2(%6 : @guaranteed  $C):
+  %7 = enum $Optional<D>, #Optional.none!enumelt
+  br bb3(%7)
+
+bb3(%9 : @guaranteed  $Optional<D>):
+  %10 = borrowed %9 from (%0)
+  switch_enum %10, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
+
+bb4(%12 : @guaranteed  $D):
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %15 = tuple ()
+  return %15
+}
