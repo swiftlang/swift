@@ -333,6 +333,8 @@ static Expr *getMemberChainSubExpr(Expr *expr) {
     return SE->getBase();
   } else if (auto *DSE = dyn_cast<DotSelfExpr>(expr)) {
     return DSE->getSubExpr();
+  } else if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
+    return USE->getSubExpr();
   } else if (auto *CCE = dyn_cast<CodeCompletionExpr>(expr)) {
     return CCE->getBase();
   } else {
