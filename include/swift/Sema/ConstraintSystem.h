@@ -6434,7 +6434,8 @@ bool isResultBuilderMethodReference(ASTContext &, UnresolvedDotExpr *);
 
 /// Determine the number of applications applied to the given overload.
 unsigned getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
-                            FunctionRefKind functionRefKind);
+                            FunctionRefKind functionRefKind,
+                            ConstraintLocatorBuilder locator);
 
 } // end namespace constraints
 
