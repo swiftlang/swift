@@ -763,6 +763,13 @@ SemanticDeclAvailabilityRequest::evaluate(Evaluator &evaluator,
   return SemanticDeclAvailability::PotentiallyAvailable;
 }
 
+bool Decl::isSemanticallyUnavailable() const {
+  auto availability = evaluateOrDefault(
+      getASTContext().evaluator, SemanticDeclAvailabilityRequest{this},
+      SemanticDeclAvailability::PotentiallyAvailable);
+  return availability != SemanticDeclAvailability::PotentiallyAvailable;
+}
+
 bool Decl::isUnreachableAtRuntime() const {
   auto availability = evaluateOrDefault(
       getASTContext().evaluator, SemanticDeclAvailabilityRequest{this},

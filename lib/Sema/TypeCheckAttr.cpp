@@ -5007,7 +5007,7 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
   auto parentIsUnavailable = [](const Decl *D) -> bool {
     if (auto *parent =
             AvailabilityInference::parentDeclForInferredAvailability(D)) {
-      return parent->getSemanticUnavailableAttr() != std::nullopt;
+      return parent->isSemanticallyUnavailable();
     }
     return false;
   };

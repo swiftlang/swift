@@ -1881,7 +1881,7 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
       }
 
       if (auto adoptingNominal = DC->getSelfNominalTypeDecl()) {
-        if (adoptingNominal->getSemanticUnavailableAttr())
+        if (adoptingNominal->isSemanticallyUnavailable())
           return true;
       }
 
