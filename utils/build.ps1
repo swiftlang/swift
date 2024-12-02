@@ -856,6 +856,20 @@ function Test-CMakeAtLeast([int]$Major, [int]$Minor, [int]$Patch = 0) {
   return [int]$Matches.3 -ge $Patch
 }
 
+function Test-SCCacheAtLeast([int]$Major, [int]$Minor, [int]$Patch = 0) {
+  if ($ToBatch) { return $false }
+
+  $SCCacheVersionString = @(& sccache.exe --version)[0]
+  if (-not ($SCCacheVersionString -match "sccache (\d+)\.(\d+)(?:\.(\d+))?")) {
+    throw "Unexpected SCCache version string format"
+  }
+
+  if ([int]$Matches.1 -ne $Major) { return [int]$Matches.1 -gt $Major }
+  if ([int]$Matches.2 -ne $Minor) { return [int]$Matches.2 -gt $Minor }
+  if ($null -eq $Matches.3) { return 0 -gt $Patch }
+  return [int]$Matches.3 -ge $Patch
+}
+
 enum Platform {
   Windows
   Android
@@ -2744,6 +2758,13 @@ try {
 Fetch-Dependencies
 
 if (-not $SkipBuild) {
+  if (-Not (Test-CMakeAtLeast -Major 3 -Minor 28)) {
+    throw "Minimum required CMake version is 3.28"
+  }
+  if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
+    throw "Minimum required sccache version is 0.7.4"
+  }
+
   Invoke-BuildStep Build-CMark $BuildArch
   Invoke-BuildStep Build-BuildTools $BuildArch
   if ($IsCrossCompiling) {
