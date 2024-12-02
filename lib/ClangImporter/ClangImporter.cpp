@@ -5099,21 +5099,29 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         auto &argList = specDecl->getTemplateArgs();
         for (auto argToCheck : argumentsToCheck) {
           auto arg = argList[argToCheck.first];
-          if (arg.getKind() != clang::TemplateArgument::Type) {
-            desc.impl.diagnose(loc, diag::type_template_parameter_expected,
-                               argToCheck.second);
-            return CxxEscapability::Unknown;
-          }
+          llvm::SmallVector<clang::TemplateArgument, 1> nonPackArgs;
+          if (arg.getKind() == clang::TemplateArgument::Pack) {
+            auto pack = arg.getPackAsArray();
+            nonPackArgs.assign(pack.begin(), pack.end());
+          } else
+            nonPackArgs.push_back(arg);
+          for (auto nonPackArg : nonPackArgs) {
+            if (nonPackArg.getKind() != clang::TemplateArgument::Type) {
+              desc.impl.diagnose(loc, diag::type_template_parameter_expected,
+                                 argToCheck.second);
+              return CxxEscapability::Unknown;
+            }
 
-          auto argEscapability = evaluateEscapability(
-              arg.getAsType()->getUnqualifiedDesugaredType());
-          if (argEscapability == CxxEscapability::NonEscapable)
-            return CxxEscapability::NonEscapable;
+            auto argEscapability = evaluateEscapability(
+                nonPackArg.getAsType()->getUnqualifiedDesugaredType());
+            if (argEscapability == CxxEscapability::NonEscapable)
+              return CxxEscapability::NonEscapable;
+          }
         }
-        clang::DeclContext *rec = specDecl;
+        clang::DeclContext *dc = specDecl;
         specDecl = nullptr;
-        while ((rec = rec->getParent())) {
-          specDecl = dyn_cast<clang::ClassTemplateSpecializationDecl>(rec);
+        while ((dc = dc->getParent())) {
+          specDecl = dyn_cast<clang::ClassTemplateSpecializationDecl>(dc);
           if (specDecl)
             break;
         }
