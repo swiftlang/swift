@@ -101,13 +101,22 @@ func errorExistential(_ b: Bool) throws -> Int {
   if b {
     return 28
   }
-  throw MyError()
+  throw MyError() // expected-error{{Using type 'MyError' can cause metadata allocation or locks}}
+}
+
+@_noLocks
+func concreteThrowsExistential(_ b: Bool) throws -> Int {
+  if b {
+    return 28
+  }
+
+  throw ErrorEnum.tryAgain // expected-error{{Using type 'any Error' can cause metadata allocation or locks}}
 }
 
 @_noLocks
 func multipleThrows(_ b1: Bool, _ b2: Bool) throws -> Int {
   if b1 {
-    throw MyError()
+    throw MyError() // expected-error{{Using type 'MyError' can cause metadata allocation or locks}}
   }
   if b2 {
     throw MyError2()
@@ -119,7 +128,7 @@ func multipleThrows(_ b1: Bool, _ b2: Bool) throws -> Int {
 func testCatch(_ b: Bool) throws -> Int? {
   do {
     return try errorExistential(true)
-  } catch let e as MyError {
+  } catch let e as MyError { // expected-error{{this code performs reference counting operations which can cause locking}}
     print(e)
     return nil
   }
