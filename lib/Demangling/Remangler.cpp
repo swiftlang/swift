@@ -1795,6 +1795,7 @@ ManglingError Remangler::mangleGetter(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
+#if 0 // STAGING: To be switched over to soon.
   switch (Flavor) {
   case ManglingFlavor::Default:
     Buffer << MANGLING_PREFIX_STR;
@@ -1803,6 +1804,9 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
     Buffer << MANGLING_PREFIX_EMBEDDED_STR;
     break;
   }
+#else
+  Buffer << MANGLING_PREFIX_STR;
+#endif
   bool mangleInReverseOrder = false;
   for (auto Iter = node->begin(), End = node->end(); Iter != End; ++Iter) {
     Node *Child = *Iter;

@@ -674,27 +674,27 @@ public:
 };
 
 /// Remangle a demangled parse tree.
-ManglingErrorOr<std::string> mangleNode(NodePointer root,
-                                        Mangle::ManglingFlavor Flavor);
+ManglingErrorOr<std::string>
+mangleNode(NodePointer root,
+           Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default);
 
 using SymbolicResolver = llvm::function_ref<Demangle::NodePointer(
     SymbolicReferenceKind, const void *)>;
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
-ManglingErrorOr<std::string> mangleNode(NodePointer root,
-                                        SymbolicResolver resolver,
-                                        Mangle::ManglingFlavor Flavor);
+ManglingErrorOr<std::string>
+mangleNode(NodePointer root, SymbolicResolver resolver,
+           Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default);
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
 ///
 /// The returned string is owned by \p Factory. This means \p Factory must stay
 /// alive as long as the returned string is used.
-ManglingErrorOr<llvm::StringRef> mangleNode(NodePointer root,
-                                            SymbolicResolver resolver,
-                                            NodeFactory &Factory,
-                                            Mangle::ManglingFlavor Flavor);
+ManglingErrorOr<llvm::StringRef>
+mangleNode(NodePointer root, SymbolicResolver resolver, NodeFactory &Factory,
+           Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default);
 
 /// Remangle in the old mangling scheme.
 ///
@@ -814,10 +814,9 @@ llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
 
 /// Produce the mangled name for the nominal type descriptor of a type
 /// referenced by its module and type name.
-std::string mangledNameForTypeMetadataAccessor(llvm::StringRef moduleName,
-                                               llvm::StringRef typeName,
-                                               Node::Kind typeKind,
-                                               Mangle::ManglingFlavor Flavor);
+std::string mangledNameForTypeMetadataAccessor(
+    llvm::StringRef moduleName, llvm::StringRef typeName, Node::Kind typeKind,
+    Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default);
 
 SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle
