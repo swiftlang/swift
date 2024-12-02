@@ -932,7 +932,7 @@ bool isDeclRefinementOf(ValueDecl *declA, ValueDecl *declB);
 /// the given set of declarations.
 Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                    DeclNameLoc NameLoc, bool Implicit,
-                   FunctionRefKind functionRefKind);
+                   FunctionRefInfo functionRefInfo);
 /// @}
 
 /// Retrieve a specific, known protocol.

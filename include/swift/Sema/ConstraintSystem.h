@@ -3717,7 +3717,7 @@ public:
   /// Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclNameRef name, Type memberTy,
                                 DeclContext *useDC,
-                                FunctionRefKind functionRefKind,
+                                FunctionRefInfo functionRefInfo,
                                 ArrayRef<OverloadChoice> outerAlternatives,
                                 ConstraintLocatorBuilder locator) {
     assert(baseTy);
@@ -3726,7 +3726,7 @@ public:
     assert(useDC);
     switch (simplifyMemberConstraint(
         ConstraintKind::ValueMember, baseTy, name, memberTy, useDC,
-        functionRefKind, outerAlternatives, TMF_GenerateConstraints, locator)) {
+        functionRefInfo, outerAlternatives, TMF_GenerateConstraints, locator)) {
     case SolutionKind::Unsolved:
       llvm_unreachable("Unsolved result when generating constraints!");
 
@@ -3737,7 +3737,7 @@ public:
       if (shouldRecordFailedConstraint()) {
         recordFailedConstraint(Constraint::createMemberOrOuterDisjunction(
             *this, ConstraintKind::ValueMember, baseTy, memberTy, name, useDC,
-            functionRefKind, outerAlternatives, getConstraintLocator(locator)));
+            functionRefInfo, outerAlternatives, getConstraintLocator(locator)));
       }
       break;
     }
@@ -3747,7 +3747,7 @@ public:
   /// to the constraint system.
   void addUnresolvedValueMemberConstraint(Type baseTy, DeclNameRef name,
                                           Type memberTy, DeclContext *useDC,
-                                          FunctionRefKind functionRefKind,
+                                          FunctionRefInfo functionRefInfo,
                                           ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
@@ -3755,7 +3755,7 @@ public:
     assert(useDC);
     switch (simplifyMemberConstraint(ConstraintKind::UnresolvedValueMember,
                                      baseTy, name, memberTy,
-                                     useDC, functionRefKind,
+                                     useDC, functionRefInfo,
                                      /*outerAlternatives=*/{},
                                      TMF_GenerateConstraints, locator)) {
     case SolutionKind::Unsolved:
@@ -3769,7 +3769,7 @@ public:
         recordFailedConstraint(
           Constraint::createMember(*this, ConstraintKind::UnresolvedValueMember,
                                    baseTy, memberTy, name,
-                                   useDC, functionRefKind,
+                                   useDC, functionRefInfo,
                                    getConstraintLocator(locator)));
       }
       break;
@@ -3779,14 +3779,14 @@ public:
   /// Add a value witness constraint to the constraint system.
   void addValueWitnessConstraint(
       Type baseTy, ValueDecl *requirement, Type memberTy, DeclContext *useDC,
-      FunctionRefKind functionRefKind, ConstraintLocatorBuilder locator) {
+      FunctionRefInfo functionRefInfo, ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
     assert(requirement);
     assert(useDC);
     switch (simplifyValueWitnessConstraint(
         ConstraintKind::ValueWitness, baseTy, requirement, memberTy, useDC,
-        functionRefKind, TMF_GenerateConstraints, locator)) {
+        functionRefInfo, TMF_GenerateConstraints, locator)) {
     case SolutionKind::Unsolved:
       llvm_unreachable("Unsolved result when generating constraints!");
 
@@ -4333,7 +4333,7 @@ public:
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfReference(
                           ValueDecl *decl,
-                          FunctionRefKind functionRefKind,
+                          FunctionRefInfo functionRefInfo,
                           ConstraintLocatorBuilder locator,
                           DeclContext *useDC);
 
@@ -4375,7 +4375,7 @@ public:
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfMemberReference(
       Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
-      FunctionRefKind functionRefKind, ConstraintLocator *locator,
+      FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
       SmallVectorImpl<OpenedType> *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
@@ -4829,7 +4829,7 @@ public:
   /// referenced.
   MemberLookupResult performMemberLookup(ConstraintKind constraintKind,
                                          DeclNameRef memberName, Type baseTy,
-                                         FunctionRefKind functionRefKind,
+                                         FunctionRefInfo functionRefInfo,
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
@@ -4903,7 +4903,7 @@ private:
                                               FunctionType *fnType,
                                               TypeMatchOptions flags,
                                               DeclContext *DC,
-                                              FunctionRefKind functionRefKind,
+                                              FunctionRefInfo functionRefInfo,
                                               ConstraintLocator *locator);
 
   /// Attempt to simplify the given superclass constraint.
@@ -4959,14 +4959,14 @@ private:
   /// Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(
       ConstraintKind kind, Type baseType, DeclNameRef member, Type memberType,
-      DeclContext *useDC, FunctionRefKind functionRefKind,
+      DeclContext *useDC, FunctionRefInfo functionRefInfo,
       ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the given value witness constraint.
   SolutionKind simplifyValueWitnessConstraint(
       ConstraintKind kind, Type baseType, ValueDecl *member, Type memberType,
-      DeclContext *useDC, FunctionRefKind functionRefKind,
+      DeclContext *useDC, FunctionRefInfo functionRefInfo,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the optional object constraint.
@@ -6434,7 +6434,7 @@ bool isResultBuilderMethodReference(ASTContext &, UnresolvedDotExpr *);
 
 /// Determine the number of applications applied to the given overload.
 unsigned getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
-                            FunctionRefKind functionRefKind,
+                            FunctionRefInfo functionRefInfo,
                             ConstraintLocatorBuilder locator);
 
 } // end namespace constraints

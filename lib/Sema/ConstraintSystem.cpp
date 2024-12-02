@@ -1952,16 +1952,16 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
   if (!decl->getInterfaceType()->is<AnyFunctionType>())
     return IUOReferenceKind::Value;
 
-  auto refKind = getFunctionRefKind();
-  assert(!forSecondApplication || refKind == FunctionRefKind::DoubleApply);
+  auto refKind = getFunctionRefInfo();
+  assert(!forSecondApplication || refKind == FunctionRefInfo::DoubleApply);
 
   switch (refKind) {
-  case FunctionRefKind::Unapplied:
-  case FunctionRefKind::Compound:
+  case FunctionRefInfo::Unapplied:
+  case FunctionRefInfo::Compound:
     // Such references never produce IUOs.
     return std::nullopt;
-  case FunctionRefKind::SingleApply:
-  case FunctionRefKind::DoubleApply: {
+  case FunctionRefInfo::SingleApply:
+  case FunctionRefInfo::DoubleApply: {
     // Check whether this is a curried function reference e.g
     // (Self) -> (Args...) -> Ret. Such a function reference can only produce
     // an IUO on the second application.

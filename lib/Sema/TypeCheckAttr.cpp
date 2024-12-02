@@ -3036,7 +3036,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     CS.addDisjunctionConstraint(typeEqualityConstraints, locator);
     CS.addValueMemberConstraint(
         nominal->getInterfaceType(), DeclNameRef(context.Id_main),
-        Type(mainType), declContext, FunctionRefKind::SingleApply, {}, locator);
+        Type(mainType), declContext, FunctionRefInfo::SingleApply, {}, locator);
   }
 
   FuncDecl *mainFunction = nullptr;
