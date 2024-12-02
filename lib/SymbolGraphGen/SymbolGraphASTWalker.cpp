@@ -110,26 +110,16 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
   return SG;
 }
 
-namespace {
-bool isUnavailableOrObsoleted(const Decl *D) {
-  if (const auto *Avail =
-        D->getAttrs().getUnavailable(D->getASTContext())) {
-    if (Avail->getPlatform() != PlatformKind::none) {
-      switch (Avail->getVersionAvailability(D->getASTContext())) {
-        case AvailableVersionComparison::Unavailable:
-        case AvailableVersionComparison::Obsoleted:
-          return true;
-        default:
-          break;
-      }
-    }
+static bool isUnavailableOrObsoletedOnPlatform(const Decl *D) {
+  if (const auto *Avail = D->getUnavailableAttr()) {
+    if (Avail->getPlatform() != PlatformKind::none)
+      return true;
   }
   return false;
 }
-} // end anonymous namespace
 
 bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
-  if (isUnavailableOrObsoleted(D)) {
+  if (isUnavailableOrObsoletedOnPlatform(D)) {
     return false;
   }
 
@@ -171,7 +161,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
       return false;
     }
 
-    if (isUnavailableOrObsoleted(ExtendedNominal)) {
+    if (isUnavailableOrObsoletedOnPlatform(ExtendedNominal)) {
       return false;
     }
 

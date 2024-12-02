@@ -1822,8 +1822,6 @@ checkWitnessAvailability(ValueDecl *requirement,
 
 RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
                                               const RequirementMatch &match) {
-  auto &ctx = getASTContext();
-
   if (!match.OptionalAdjustments.empty())
     return CheckKind::OptionalityConflict;
 
@@ -1853,8 +1851,7 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     return RequirementCheck(CheckKind::Availability, requiredAvailability);
   }
 
-  if (requirement->getAttrs().isUnavailable(ctx) &&
-      match.Witness->getDeclContext() == DC) {
+  if (requirement->isUnavailable() && match.Witness->getDeclContext() == DC) {
     return RequirementCheck(CheckKind::Unavailable);
   }
 
@@ -1876,11 +1873,10 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     }
   }
 
-  if (match.Witness->getAttrs().isUnavailable(ctx) &&
-      !requirement->getAttrs().isUnavailable(ctx)) {
+  if (match.Witness->isUnavailable() && !requirement->isUnavailable()) {
     auto nominalOrExtensionIsUnavailable = [&]() {
       if (auto extension = dyn_cast<ExtensionDecl>(DC)) {
-        if (extension->getAttrs().isUnavailable(ctx))
+        if (extension->isUnavailable())
           return true;
       }
 
@@ -1902,9 +1898,8 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
   bool isDefaultWitness = false;
   if (auto *nominal = match.Witness->getDeclContext()->getSelfNominalTypeDecl())
     isDefaultWitness = isa<ProtocolDecl>(nominal);
-  if (isDefaultWitness &&
-      match.Witness->getAttrs().isDeprecated(ctx) &&
-      !requirement->getAttrs().isDeprecated(ctx)) {
+  if (isDefaultWitness && match.Witness->isDeprecated() &&
+      !requirement->isDeprecated()) {
     auto conformanceContext = ExportContext::forConformance(DC, Proto);
     if (!conformanceContext.isDeprecated()) {
       return RequirementCheck(CheckKind::DefaultWitnessDeprecated);
@@ -4014,14 +4009,12 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
 static bool allowOptionalWitness(ProtocolDecl *proto,
                                  NormalProtocolConformance *conformance,
                                  ValueDecl *requirement) {
-  auto Attrs = requirement->getAttrs();
-
   // An optional requirement is trivially satisfied with an empty requirement.
-  if (Attrs.hasAttribute<OptionalAttr>())
+  if (requirement->getAttrs().hasAttribute<OptionalAttr>())
     return true;
 
   // An 'unavailable' requirement is treated like an optional requirement.
-  if (Attrs.isUnavailable(proto->getASTContext()))
+  if (requirement->isUnavailable())
     return true;
 
   // A requirement with a satisfied Obj-C alternative requirement is effectively
@@ -4209,7 +4202,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   bool ignoringNames = false;
   bool considerRenames =
       !canDerive && !requirement->getAttrs().hasAttribute<OptionalAttr>() &&
-      !requirement->getAttrs().isUnavailable(getASTContext());
+      !requirement->isUnavailable();
 
   if (findBestWitness(requirement,
                       considerRenames ? &ignoringNames : nullptr,
@@ -4361,7 +4354,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
 
     case CheckKind::Unavailable: {
-      auto *attr = requirement->getAttrs().getUnavailable(getASTContext());
+      auto *attr = requirement->getUnavailableAttr();
       diagnoseOverrideOfUnavailableDecl(witness, requirement, attr);
       break;
     }
@@ -4419,7 +4412,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         [witness, requirement](NormalProtocolConformance *conformance) {
           auto &diags = witness->getASTContext().Diags;
           SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-          auto *attr = AvailableAttr::isUnavailable(witness);
+          auto *attr = witness->getUnavailableAttr();
           EncodedDiagnosticMessage EncodedMessage(attr->Message);
           diags.diagnose(diagLoc, diag::witness_unavailable, witness,
                          conformance->getProtocol(), EncodedMessage.Message);
@@ -4437,7 +4430,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             auto &ctx = witness->getASTContext();
             auto &diags = ctx.Diags;
             SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-            auto *attr = witness->getAttrs().getDeprecated(ctx);
+            auto *attr = witness->getDeprecatedAttr();
             EncodedDiagnosticMessage EncodedMessage(attr->Message);
             diags.diagnose(diagLoc, diag::witness_deprecated,
                            witness, conformance->getProtocol()->getName(),
@@ -5158,7 +5151,7 @@ void ConformanceChecker::resolveValueWitnesses() {
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&
           requirement->getName() == witness->getName() &&
-          !requirement->getAttrs().isUnavailable(getASTContext())) {
+          !requirement->isUnavailable()) {
         // The witness must also be @objc.
         if (!witness->isObjC()) {
           bool isOptional =
@@ -6391,7 +6384,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         // as long as the inherited conformance isn't unavailable.
         auto *conformance = SendableConformance->getRootConformance();
         auto *decl = conformance->getDeclContext()->getAsDecl();
-        if (!AvailableAttr::isUnavailable(decl)) {
+        if (!decl->isUnavailable()) {
           continue;
         }
 
@@ -6504,7 +6497,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         unsigned bestScore = UINT_MAX;
         for (auto req : unsatisfiedReqs) {
           // Skip unavailable requirements.
-          if (req->getAttrs().isUnavailable(Context)) continue;
+          if (req->isUnavailable()) continue;
 
           // Score this particular optional requirement.
           auto score = scorePotentiallyMatching(req, value, bestScore);
@@ -6569,7 +6562,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       if (!req->isObjC()) continue;
 
       // Skip unavailable requirements.
-      if (req->getAttrs().isUnavailable(Context)) continue;
+      if (req->isUnavailable()) continue;
 
       // Record this requirement.
       if (auto funcReq = dyn_cast<AbstractFunctionDecl>(req)) {
@@ -6627,7 +6620,6 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
   }
 
   WitnessChecker::RequirementEnvironmentCache reqEnvCache;
-  ASTContext &ctx = nominal->getASTContext();
   for (auto proto : nominal->getAllProtocols()) {
     // We only care about Objective-C protocols.
     if (!proto->isObjC()) continue;
@@ -6641,7 +6633,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
       if (isa<TypeDecl>(req)) continue;
 
       // Skip unavailable requirements.
-      if (req->getAttrs().isUnavailable(ctx)) continue;
+      if (req->isUnavailable()) continue;
 
       // Dig out the conformance.
       if (!conformance.has_value()) {

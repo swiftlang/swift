@@ -413,7 +413,7 @@ bool swift::checkBitwiseCopyableConformance(ProtocolConformance *conformance,
 
   // If this is an always-unavailable conformance, there's nothing to check.
   if (auto ext = dyn_cast<ExtensionDecl>(conformanceDC)) {
-    if (AvailableAttr::isUnavailable(ext))
+    if (ext->isUnavailable())
       return false;
   }
 

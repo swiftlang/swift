@@ -2931,7 +2931,7 @@ public:
 
         if (auto req = dyn_cast<ValueDecl>(member)) {
           if (!normal->hasWitness(req)) {
-            if ((req->getAttrs().isUnavailable(Ctx) ||
+            if ((req->isUnavailable() ||
                  req->getAttrs().hasAttribute<OptionalAttr>()) &&
                 proto->isObjC()) {
               continue;

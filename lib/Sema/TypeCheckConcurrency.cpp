@@ -249,7 +249,7 @@ bool IsDefaultActorRequest::evaluate(
   if (foundExecutorPropertyImpl) {
     if (!isDefaultActor &&
         classDecl->getASTContext().LangOpts.isConcurrencyModelTaskToThread() &&
-        !AvailableAttr::isUnavailable(classDecl)) {
+        !classDecl->isUnavailable()) {
       classDecl->diagnose(
           diag::concurrency_task_to_thread_model_custom_executor,
           "task-to-thread concurrency model");
@@ -5633,9 +5633,10 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
   IsolationSource defaultIsolationSource;
 
-  // If we are supposed to infer main actor isolation by default, make our
-  // default isolation main actor.
-  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated)) {
+  // If we are supposed to infer main actor isolation by default for entities
+  // within our module, make our default isolation main actor.
+  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated) &&
+      value->getModuleContext() == ctx.MainModule) {
     defaultIsolation = ActorIsolation::forMainActor(ctx);
   }
 
@@ -6478,7 +6479,7 @@ bool swift::checkSendableConformance(
   // superclass conformance to find an unavailable attribute.
   if (auto ext = dyn_cast<ExtensionDecl>(
           conformance->getRootConformance()->getDeclContext())) {
-    if (AvailableAttr::isUnavailable(ext))
+    if (ext->isUnavailable())
       return false;
   }
 

@@ -78,9 +78,9 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
     const ValueDecl *D, CodeCompletionDiagnosticSeverity &severity,
     llvm::raw_ostream &Out) {
   bool isSoftDeprecated = false;
-  const AvailableAttr *Attr = D->getAttrs().getDeprecated(Ctx);
+  const AvailableAttr *Attr = D->getDeprecatedAttr();
   if (!Attr) {
-    Attr = D->getAttrs().getSoftDeprecated(Ctx);
+    Attr = D->getSoftDeprecatedAttr();
     isSoftDeprecated = true;
   }
   if (!Attr)

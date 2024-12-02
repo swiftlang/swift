@@ -1264,6 +1264,8 @@ namespace {
         args.emplace_back(SourceLoc(), calleeParam.getLabel(), paramRef);
       }
 
+      ASSERT(appliedWrapperIndex == appliedPropertyWrappers.size());
+
       // SILGen knows how to emit property-wrapped parameters, but the
       // corresponding parameter types need to match the backing wrapper types.
       // To handle this, build a new callee function type out of the adjusted
@@ -6288,9 +6290,17 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // `sending` parameter etc.
     applyFlagsToArgument(paramIdx, argExpr);
 
-    // If the types exactly match, this is easy.
+    auto canShortcutConversion = [&](Type argType, Type paramType) {
+      if (shouldInjectWrappedValuePlaceholder ||
+          paramInfo.hasExternalPropertyWrapper(paramIdx))
+        return false;
+
+      return argType->isEqual(paramType);
+    };
+
     auto paramType = param.getOldType();
-    if (argType->isEqual(paramType) && !shouldInjectWrappedValuePlaceholder) {
+
+    if (canShortcutConversion(argType, paramType)) {
       newArgs.push_back(arg);
       continue;
     }

@@ -1000,7 +1000,7 @@ public:
       return true;
 
     // Do not annotate references to unavailable decls.
-    if (AvailableAttr::isUnavailable(D))
+    if (D->isUnavailable())
       return true;
 
     auto &SM = D->getASTContext().SourceMgr;

@@ -237,12 +237,12 @@ struct RuntimeVersionCheck {
 /// information about the runtime check needed to ensure it is available to
 /// \c versionCheck and returns true.
 static bool
-checkAvailability(const EnumElementDecl *elt, DeclContext *dc,
+checkAvailability(const EnumElementDecl *elt,
                   AvailabilityContext availabilityContext,
                   std::optional<RuntimeVersionCheck> &versionCheck) {
-  auto &C = dc->getASTContext();
+  auto &C = elt->getASTContext();
   auto constraint =
-      getUnsatisfiedAvailabilityConstraint(elt, dc, availabilityContext);
+      getUnsatisfiedAvailabilityConstraint(elt, availabilityContext);
 
   // Is it always available?
   if (!constraint)
@@ -316,7 +316,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     // information about that check in versionCheck and keep processing this
     // element.
     std::optional<RuntimeVersionCheck> versionCheck(std::nullopt);
-    if (!checkAvailability(elt, parentDC, availabilityContext, versionCheck))
+    if (!checkAvailability(elt, availabilityContext, versionCheck))
       continue;
 
     // litPat = elt.rawValueExpr as a pattern
