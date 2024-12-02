@@ -741,6 +741,12 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
       return .ignore
     }
     if user == apply {
+      if apply.isCallee(operand: operand) {
+        // If the address "escapes" to the callee of the apply it means that the address was captured
+        // by an inout_aliasable operand of an partial_apply.
+        // Therefore assume that the called function will both, read and write, to the address.
+        return .abort
+      }
       let e = calleeAnalysis.getSideEffects(of: apply, operand: operand, path: path.projectionPath)
       result.merge(with: e)
     }
