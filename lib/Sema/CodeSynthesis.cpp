@@ -1177,7 +1177,7 @@ static void collectNonOveriddenSuperclassInits(
       continue;
 
     // Skip unavailable superclass initializers.
-    if (AvailableAttr::isUnavailable(superclassCtor))
+    if (superclassCtor->isUnavailable())
       continue;
 
     if (!overriddenInits.count(superclassCtor))

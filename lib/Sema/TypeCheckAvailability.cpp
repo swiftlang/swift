@@ -370,7 +370,7 @@ static bool isInsideCompatibleUnavailableDeclaration(
 
 const AvailableAttr *
 ExportContext::shouldDiagnoseDeclAsUnavailable(const Decl *D) const {
-  auto attr = AvailableAttr::isUnavailable(D);
+  auto attr = D->getUnavailableAttr();
   if (!attr)
     return nullptr;
 
@@ -2308,13 +2308,13 @@ diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
 /// declaration is deprecated or null otherwise.
 static const AvailableAttr *getDeprecated(const Decl *D) {
   auto &Ctx = D->getASTContext();
-  if (auto *Attr = D->getAttrs().getDeprecated(Ctx))
+  if (auto *Attr = D->getDeprecatedAttr())
     return Attr;
 
   if (Ctx.LangOpts.WarnSoftDeprecated) {
     // When -warn-soft-deprecated is specified, treat any declaration that is
     // deprecated in the future as deprecated.
-    if (auto *Attr = D->getAttrs().getSoftDeprecated(Ctx))
+    if (auto *Attr = D->getSoftDeprecatedAttr())
       return Attr;
   }
 
@@ -2929,11 +2929,10 @@ static bool diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
                                            const ExportContext &Where,
                                            const Expr *call,
                                            DeclAvailabilityFlags Flags) {
-  return diagnoseExplicitUnavailability(D, R, Where, Flags,
-                                        [=](InFlightDiagnostic &diag) {
-    fixItAvailableAttrRename(diag, R, D, AvailableAttr::isUnavailable(D),
-                             call);
-  });
+  return diagnoseExplicitUnavailability(
+      D, R, Where, Flags, [=](InFlightDiagnostic &diag) {
+        fixItAvailableAttrRename(diag, R, D, D->getUnavailableAttr(), call);
+      });
 }
 
 /// Represents common information needed to emit diagnostics about explicitly
@@ -3103,15 +3102,14 @@ bool diagnoseExplicitUnavailability(
 
 std::optional<AvailabilityConstraint>
 swift::getUnsatisfiedAvailabilityConstraint(
-    const Decl *decl, const DeclContext *declContext,
-    AvailabilityContext availabilityContext) {
-  auto &ctx = declContext->getASTContext();
+    const Decl *decl, AvailabilityContext availabilityContext) {
+  auto &ctx = decl->getASTContext();
 
   // Generic parameters are always available.
   if (isa<GenericTypeParamDecl>(decl))
     return std::nullopt;
 
-  if (auto attr = AvailableAttr::isUnavailable(decl)) {
+  if (auto attr = decl->getUnavailableAttr()) {
     if (isInsideCompatibleUnavailableDeclaration(decl, availabilityContext,
                                                  attr))
       return std::nullopt;
@@ -3148,8 +3146,7 @@ swift::getUnsatisfiedAvailabilityConstraint(const Decl *decl,
                                             const DeclContext *referenceDC,
                                             SourceLoc referenceLoc) {
   return getUnsatisfiedAvailabilityConstraint(
-      decl, referenceDC,
-      TypeChecker::availabilityAtLocation(referenceLoc, referenceDC));
+      decl, TypeChecker::availabilityAtLocation(referenceLoc, referenceDC));
 }
 
 /// Check if this is a subscript declaration inside String or
@@ -4045,7 +4042,7 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   if (D->getModuleContext()->isBuiltinModule())
     return false;
 
-  if (auto *attr = AvailableAttr::isUnavailable(D)) {
+  if (auto *attr = D->getUnavailableAttr()) {
     if (diagnoseIncDecRemoval(D, R, attr))
       return true;
     if (isa_and_nonnull<ApplyExpr>(call) &&
@@ -4113,7 +4110,7 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
   }
 
   // @available(noasync) spelling
-  if (const AvailableAttr *attr = D->getAttrs().getNoAsync(ctx)) {
+  if (const AvailableAttr *attr = D->getNoAsyncAttr()) {
     SourceLoc diagLoc = call ? call->getLoc() : R.Start;
     auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl,
                                    D, attr->Message);
@@ -4182,7 +4179,7 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (accessor) {
     // If the property/subscript is unconditionally unavailable, don't bother
     // with any of the rest of this.
-    if (AvailableAttr::isUnavailable(accessor->getStorage()))
+    if (accessor->getStorage()->isUnavailable())
       return false;
   }
 
@@ -4190,7 +4187,7 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   auto &ctx = DC->getASTContext();
 
   auto constraint =
-      getUnsatisfiedAvailabilityConstraint(D, DC, Where.getAvailability());
+      getUnsatisfiedAvailabilityConstraint(D, Where.getAvailability());
 
   if (constraint && !constraint->isConditionallySatisfiable()) {
     // FIXME: diagnoseExplicitUnavailability should take an unmet requirement
@@ -4699,8 +4696,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       return true;
     }
 
-    auto constraint = getUnsatisfiedAvailabilityConstraint(
-        ext, where.getDeclContext(), where.getAvailability());
+    auto constraint =
+        getUnsatisfiedAvailabilityConstraint(ext, where.getAvailability());
     if (constraint) {
       // FIXME: diagnoseExplicitUnavailability() should take unmet requirement
       if (diagnoseExplicitUnavailability(
@@ -4794,7 +4791,7 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
     return false;
 
   // Skip unavailable decls.
-  if (AvailableAttr::isUnavailable(decl))
+  if (decl->isUnavailable())
     return false;
 
   // Warn on decls without an introduction version.

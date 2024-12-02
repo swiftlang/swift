@@ -4377,7 +4377,7 @@ bool ValueDecl::shouldHideFromEditor() const {
       getAttrs().hasAttribute<ShowInInterfaceAttr>())
     return true;
 
-  if (AvailableAttr::isUnavailable(this))
+  if (isUnavailable())
     return true;
 
   // Hide 'swift_private' clang decls. They are imported with '__' prefix.

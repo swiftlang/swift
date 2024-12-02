@@ -2145,7 +2145,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // Mark the imported Swift function as unavailable.
     // That will ensure that the function will not be
     // usable from Swift, even though it is imported.
-    if (!decl->getAttrs().isUnavailable(ctx)) {
+    if (!decl->isUnavailable()) {
       StringRef unavailabilityMsgRef = "return type is unavailable in Swift";
       auto ua =
           AvailableAttr::createPlatformAgnostic(ctx, unavailabilityMsgRef);

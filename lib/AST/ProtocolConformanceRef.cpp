@@ -335,7 +335,7 @@ bool ProtocolConformanceRef::hasUnavailableConformance() const {
   auto concrete = getConcrete();
   auto *dc = concrete->getRootConformance()->getDeclContext();
   auto ext = dyn_cast<ExtensionDecl>(dc);
-  if (ext && AvailableAttr::isUnavailable(ext))
+  if (ext && ext->isUnavailable())
     return true;
 
   // Check the conformances in the substitution map.

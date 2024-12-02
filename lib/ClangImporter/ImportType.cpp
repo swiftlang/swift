@@ -907,7 +907,7 @@ namespace {
 #endif
 
       // If the imported typealias is unavailable, return the underlying type.
-      if (decl->getAttrs().isUnavailable(Impl.SwiftContext))
+      if (decl->isUnavailable())
         return underlyingResult;
 
       return { mappedType, underlyingResult.Hint };

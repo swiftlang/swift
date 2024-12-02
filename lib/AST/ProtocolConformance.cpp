@@ -731,12 +731,11 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
           //  funcs; there seems to be a problem that we mark completed, but
           //  afterwards will record the thunk witness;
           (dyn_cast<FuncDecl>(requirement)
-            ? (dyn_cast<FuncDecl>(requirement)->isDistributed() ||
-               dyn_cast<FuncDecl>(requirement)->isDistributedThunk())
-            : false) ||
+               ? (dyn_cast<FuncDecl>(requirement)->isDistributed() ||
+                  dyn_cast<FuncDecl>(requirement)->isDistributedThunk())
+               : false) ||
           requirement->getAttrs().hasAttribute<OptionalAttr>() ||
-          requirement->getAttrs().isUnavailable(
-                                        requirement->getASTContext())) &&
+          requirement->isUnavailable()) &&
          "Conformance already complete?");
   Mapping[requirement] = witness;
 }

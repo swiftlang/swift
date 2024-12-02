@@ -839,7 +839,7 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
   return false;
 }
 
-/// FIXME: This should use AvailableAttr::isUnavailable() or similar.
+/// FIXME: This should use Decl::getUnavailableAttr() or similar.
 bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) const {
   return llvm::any_of(D->getAttrs(), [](const auto *Attr) { 
     if (const auto *AvAttr = dyn_cast<AvailableAttr>(Attr)) {

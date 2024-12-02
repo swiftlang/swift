@@ -1378,15 +1378,60 @@ public:
   /// @_originalDefinedIn attribute, this function returns this module name.
   StringRef getAlternateModuleName() const;
 
-  // Is this Decl an SPI? It can be directly marked with @_spi or is defined in
-  // an @_spi context.
+  /// Is this Decl an SPI? It can be directly marked with @_spi or is defined in
+  /// an @_spi context.
   bool isSPI() const;
 
+  /// Returns true if the attribute providing the platform availability
+  /// introduction for this decl is an `@_spi_available` attribute.
   bool isAvailableAsSPI() const;
 
   /// Determine whether this Decl has either Private or FilePrivate access,
   /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
+
+  /// Returns the active platform-specific `@available` attribute for this decl.
+  /// There may be multiple `@available` attributes that are relevant to the
+  /// current platform, but the returned one has the highest priority.
+  const AvailableAttr *getActiveAvailableAttrForCurrentPlatform(
+      bool ignoreAppExtensions = false) const;
+
+  /// Returns true if the declaration is deprecated at the current deployment
+  /// target.
+  bool isDeprecated() const { return getDeprecatedAttr() != nullptr; }
+
+  /// Returns the first `@available` attribute that indicates that this decl
+  /// is deprecated on current deployment target, or `nullptr` otherwise.
+  const AvailableAttr *getDeprecatedAttr() const;
+
+  /// Returns the first `@available` attribute that indicates that this decl
+  /// will be deprecated in the future, or `nullptr` otherwise.
+  const AvailableAttr *getSoftDeprecatedAttr() const;
+
+  /// Returns the first @available attribute that indicates this decl is
+  /// unavailable from asynchronous contexts, or `nullptr` otherwise.
+  const AvailableAttr *getNoAsyncAttr() const;
+
+  /// Returns true if the decl has been marked unavailable in the Swift language
+  /// version that is currently active.
+  bool isUnavailableInCurrentSwiftVersion() const;
+
+  /// Returns true if the decl is always unavailable in the current compilation
+  /// context. For example, the decl could be marked explicitly unavailable on
+  /// either the current platform or in the current language mode. Returns false
+  /// for declarations that are only _potentially_ unavailable because of a
+  /// condition that could be satisfied at runtime (like requiring an operating
+  /// system version that is higher than the current deployment target).
+  ///
+  /// Note that this query only considers the attributes that are attached
+  /// directly to this decl (or the extension it is declared in, if applicable).
+  bool isUnavailable() const { return getUnavailableAttr() != nullptr; }
+
+  /// If the decl is always unavailable in the current compilation
+  /// context, returns the attribute attached to the decl (or its parent
+  /// extension) that makes it unavailable.
+  const AvailableAttr *
+  getUnavailableAttr(bool ignoreAppExtensions = false) const;
 
   /// Retrieve the @available attribute that provides the OS version range that
   /// this declaration is available in.
@@ -1406,7 +1451,7 @@ public:
   /// the attribute.
   ///
   /// Note that this notion of unavailability is broader than that which is
-  /// checked by \c AvailableAttr::isUnavailable.
+  /// checked by \c isUnavailable().
   std::optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticUnavailableAttr(bool ignoreAppExtensions = false) const;
 

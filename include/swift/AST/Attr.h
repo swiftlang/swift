@@ -809,12 +809,6 @@ public:
         Bits.AvailableAttr.PlatformAgnostic);
   }
 
-  /// Determine if a given declaration should be considered unavailable given
-  /// the current settings.
-  ///
-  /// \returns The attribute responsible for making the declaration unavailable.
-  static const AvailableAttr *isUnavailable(const Decl *D);
-
   /// Returns true if the availability applies to a specific
   /// platform.
   bool hasPlatform() const { return getPlatform() != PlatformKind::none; }
@@ -2930,43 +2924,6 @@ public:
       return UnaryOperatorKind::Postfix;
     return UnaryOperatorKind::None;
   }
-
-  bool isUnavailable(const ASTContext &ctx) const {
-    return getUnavailable(ctx) != nullptr;
-  }
-
-  bool isDeprecated(const ASTContext &ctx) const {
-    return getDeprecated(ctx) != nullptr;
-  }
-
-  /// Determine whether there is a swiftVersionSpecific attribute that's
-  /// unavailable relative to the provided language version.
-  bool
-  isUnavailableInSwiftVersion(const version::Version &effectiveVersion) const;
-
-  /// Finds the most-specific platform-specific attribute that is
-  /// active for the current platform.
-  const AvailableAttr *
-  findMostSpecificActivePlatform(const ASTContext &ctx,
-                                 bool ignoreAppExtensions = false) const;
-
-  /// Returns the first @available attribute that indicates
-  /// a declaration is unavailable, or null otherwise.
-  const AvailableAttr *getUnavailable(const ASTContext &ctx,
-                                      bool ignoreAppExtensions = false) const;
-
-  /// Returns the first @available attribute that indicates
-  /// a declaration is deprecated on all deployment targets, or null otherwise.
-  const AvailableAttr *getDeprecated(const ASTContext &ctx) const;
-
-  /// Returns the first @available attribute that indicates
-  /// a declaration will be deprecated in the future, or null otherwise.
-  const AvailableAttr *getSoftDeprecated(const ASTContext &ctx) const;
-
-  /// Returns the first @available attribute that indicates
-  /// a declaration is unavailable from asynchronous contexts, or null
-  /// otherwise.
-  const AvailableAttr *getNoAsync(const ASTContext &ctx) const;
 
   /// Returns the `@backDeployed` attribute that is active for the current
   /// platform.
