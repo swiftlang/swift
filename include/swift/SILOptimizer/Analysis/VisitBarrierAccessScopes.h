@@ -156,7 +156,7 @@ public:
       // whose successors are in the region) blocks in the region only the top
       // of which was already visited.  Either way, the instructions between the
       // local gen and its kill have not yet been visited.  Visit them now.
-      auto foundLocalKill = visitBlockFromGenUntilBegin(instruction);
+      auto foundLocalKill = visitBlockFromGenThroughKill(instruction);
       assert(foundLocalKill && "local gen without local kill?!");
       (void)foundLocalKill;
     }
@@ -165,13 +165,14 @@ public:
 private:
   /// Entry points for visiting: they visit increasingly large portions of a
   /// block.
-  /// - visitBlockFromGenUntilBegin: Instructions and phi until a kill.
+  /// - visitBlockFromGenThroughKill: Instructions and phi through the first
+  ///                                 kill.
   /// - visitBlockFromGen: Instructions, phi, and begin.
   /// - visitBlock: End, instructions, phi, and begin.
 
   /// Visit instructions and phis starting from the specified gen until a kill
   /// is found.
-  bool visitBlockFromGenUntilBegin(SILInstruction *from) {
+  bool visitBlockFromGenThroughKill(SILInstruction *from) {
     assert(effects.effectForInstruction(from) == Effects::Effect::Gen());
     for (auto *instruction = from; instruction;
          instruction = instruction->getPreviousInstruction()) {
@@ -198,7 +199,7 @@ private:
         [&](SILBasicBlock *successor) { return visited.contains(successor); }));
 
     visited.insert(block);
-    bool foundLocalKill = visitBlockFromGenUntilBegin(from);
+    bool foundLocalKill = visitBlockFromGenThroughKill(from);
     assert(!foundLocalKill && "found local kill for non-local gen?!");
     (void)foundLocalKill;
     visitBlockBegin(block);
