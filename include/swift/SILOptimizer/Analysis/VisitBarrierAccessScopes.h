@@ -199,9 +199,21 @@ private:
         [&](SILBasicBlock *successor) { return visited.contains(successor); }));
 
     visited.insert(block);
-    bool foundLocalKill = visitBlockFromGenThroughKill(from);
-    assert(!foundLocalKill && "found local kill for non-local gen?!");
-    (void)foundLocalKill;
+    for (auto *instruction = from; instruction;
+         instruction = instruction->getPreviousInstruction()) {
+      if (visitInstruction(instruction)) {
+        // New kills are incrementally added as access scopes are determined to
+        // be barriers.  For this reason, gens may newly be discovered to be
+        // local.  This can only happen when the kill which makes the gen local
+        // ends an access scope (i.e. is an end_access).
+        assert(isa<EndAccessInst>(instruction) &&
+               "found preexisting local kill for initially-non-local gen?!");
+        // Even so, the remainder of the block must still be visited.
+      }
+    }
+    if (block->hasPhi()) {
+      visitPhi(block);
+    }
     visitBlockBegin(block);
   }
 
