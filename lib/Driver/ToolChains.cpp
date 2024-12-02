@@ -761,6 +761,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_SwiftDeps:
   case file_types::TY_ExternalSwiftDeps:
   case file_types::TY_ModuleTrace:
+  case file_types::TY_FineModuleTrace:
   case file_types::TY_TBD:
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
@@ -1036,6 +1037,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ExternalSwiftDeps:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
+    case file_types::TY_FineModuleTrace:
     case file_types::TY_YAMLOptRecord:
     case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:

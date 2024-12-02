@@ -853,16 +853,17 @@ public:
   }
 };
 
-static std::optional<int> createObjCMessageTraceFile(const InputFile &input,
-                                                     ModuleDecl *MD,
-                                        std::vector<SourceFile*> &filesToWalk) {
-  if (input.getLoadedModuleTracePath().empty()) {
+static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
+  StringRef tracePath = input.getFineModuleTracePath();
+  if (tracePath.empty()) {
     // we basically rely on the passing down of module trace file path
     // as an indicator that this job needs to emit an ObjC message trace file.
     // FIXME: add a separate swift-frontend flag for ObjC message trace path
     // specifically.
-    return {};
+    return;
   }
+  auto &ctx = MD->getASTContext();
+  std::vector<SourceFile*> filesToWalk;
   for (auto *FU : MD->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(FU)) {
       switch (SF->Kind) {
@@ -880,50 +881,48 @@ static std::optional<int> createObjCMessageTraceFile(const InputFile &input,
   }
   // No source files to walk, abort.
   if (filesToWalk.empty()) {
-    return {};
+    return;
   }
-  llvm::SmallString<128> tracePath;
-  if (const char *P = ::getenv("SWIFT_COMPILER_OBJC_MESSAGE_TRACE_DIRECTORY")) {
-    StringRef DirPath = P;
-    llvm::sys::path::append(tracePath, DirPath);
-  } else {
-    llvm::sys::path::append(tracePath, input.getLoadedModuleTracePath());
-    llvm::sys::path::remove_filename(tracePath);
-    llvm::sys::path::append(tracePath, ".SWIFT_FINE_DEPENDENCY_TRACE");
+  // Write output via atomic append.
+  llvm::vfs::OutputConfig config;
+  config.setAppend().setAtomicWrite();
+  auto outputFile = ctx.getOutputBackend().createFile(tracePath, config);
+  if (!outputFile) {
+    ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output, tracePath,
+                       toString(outputFile.takeError()));
+    return;
   }
-  if (!llvm::sys::fs::exists(tracePath)) {
-    if (llvm::sys::fs::create_directory(tracePath))
-      return {};
+  ObjcMethodReferenceCollector collector(MD);
+  for (auto *SF: filesToWalk) {
+    collector.setFileBeforeVisiting(SF);
+    collector.walk(*SF);
   }
-  SmallString<32> fileName(MD->getNameStr());
-  fileName.append("-%%%%-%%%%-%%%%.json");
-  llvm::sys::path::append(tracePath, fileName);
-  int tmpFD;
-  if (llvm::sys::fs::createUniqueFile(tracePath.str(), tmpFD, tracePath)) {
-    return {};
+
+  // print this json line.
+  std::string stringBuffer;
+  {
+    llvm::raw_string_ostream memoryBuffer(stringBuffer);
+    collector.serializeAsJson(memoryBuffer);
   }
-  return tmpFD;
+  stringBuffer += "\n";
+
+  // Write output via atomic append.
+  *outputFile << stringBuffer;
+  if (auto err = outputFile->keep()) {
+    ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                       tracePath, toString(std::move(err)));
+    return;
+  }
 }
 
-bool swift::emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
-                                             const FrontendOptions &opts) {
+bool swift::emitFineModuleTraceIfNeeded(ModuleDecl *mainModule,
+                                        const FrontendOptions &opts) {
   ASTContext &ctxt = mainModule->getASTContext();
   assert(!ctxt.hadError() &&
          "We should've already exited earlier if there was an error.");
 
   opts.InputsAndOutputs.forEachInput([&](const InputFile &input) {
-    std::vector<SourceFile*> filesToWalk;
-    auto tmpFD = createObjCMessageTraceFile(input, mainModule, filesToWalk);
-    if (!tmpFD)
-      return false;
-    // Write the contents of the buffer.
-    llvm::raw_fd_ostream out(*tmpFD, /*shouldClose=*/true);
-    ObjcMethodReferenceCollector collector(mainModule);
-    for (auto *SF : filesToWalk) {
-      collector.setFileBeforeVisiting(SF);
-      collector.walk(*SF);
-    }
-    collector.serializeAsJson(out);
+    createFineModuleTraceFile(input, mainModule);
     return true;
   });
   return false;
