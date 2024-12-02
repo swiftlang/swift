@@ -1692,3 +1692,21 @@ bb0(%0 : $Int, %1 : $Builtin.Int64, %2 : $Builtin.RawPointer):
   return %r : $()
 }
 
+sil @closure_with_inout : $@convention(thin) (@inout_aliasable Int) -> ()
+
+// CHECK-LABEL: sil @closure_with_inout_reads_argument :
+// CHECK:         store %0
+// CHECK:       end sil function 'closure_with_inout_reads_argument'
+sil @closure_with_inout_reads_argument : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to %1
+  %3 = function_ref @closure_with_inout : $@convention(thin) (@inout_aliasable Int) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%1) : $@convention(thin) (@inout_aliasable Int) -> ()
+  %50 = apply %4() : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %4 : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %1 : $*Int
+  %r = tuple ()
+  return %r
+}
+

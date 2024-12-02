@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s | %FileCheck %s
 
 // Generated from
 // var x : Int32 = 2

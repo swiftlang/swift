@@ -2755,8 +2755,11 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   if (forDefinition && !gvar->hasInitializer()) {
     if (initVal) {
       gvar->setInitializer(initVal);
-      if (var->isLet() ||
-          (var->isInitializedObject() && canMakeStaticObjectReadOnly(var->getLoweredType()))) {
+      if (var->isLet() &&
+          // Even if it's a `let`, we cannot allocate an object as constant, because it's header
+          // (metadata, ref-count) is initialized at runtime.
+          // Exception: if it's an array for which we can initialize the header statically.
+          (!var->isInitializedObject() || canMakeStaticObjectReadOnly(var->getLoweredType()))) {
         gvar->setConstant(true);
       }
     } else {

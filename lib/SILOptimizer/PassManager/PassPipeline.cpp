@@ -403,7 +403,6 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addSimplifyCFG();
   P.addPerformanceConstantPropagation();
   P.addSimplifyCFG();
-  P.addArrayElementPropagation();
   // End of unrolling passes.
   P.addABCOpt();
   // Cleanup.
@@ -467,14 +466,10 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   addSimplifyCFGSILCombinePasses(P);
 
-  P.addArrayElementPropagation();
-
   // Perform a round of loop/array optimization in the mid-level pipeline after
   // potentially inlining semantic calls, e.g. Array append. The high level
   // pipeline only optimizes semantic calls *after* inlining (see
-  // addHighLevelLoopOptPasses). For example, the high-level pipeline may
-  // perform ArrayElementPropagation and after inlining a level of semantic
-  // calls, the mid-level pipeline may handle uniqueness hoisting. Do this as
+  // addHighLevelLoopOptPasses). Do this as
   // late as possible before inlining because it must run between runs of the
   // inliner when the pipeline restarts.
   if (OpLevel == OptimizationLevelKind::MidLevel) {

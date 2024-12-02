@@ -8,6 +8,20 @@ import SwiftShims
 
 sil_global hidden @$s3nix2ggSSvp : $String
 
+class C {
+  @_hasStorage var a: Builtin.Int64
+  @_hasStorage var b: Builtin.Int64
+}
+
+sil_global [let] @gc : $C = {
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = integer_literal $Builtin.Int64, 3
+  // CHECK: %initval = object $C (%0, %1, [tail_elems] %2, %3)
+  %initval = object $C (%0, %1, [tail_elems] %2, %3)
+}
+
 sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 [%1: noescape **]
 [global: read,write,copy,deinit_barrier]

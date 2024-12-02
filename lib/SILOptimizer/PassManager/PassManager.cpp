@@ -1879,11 +1879,14 @@ BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
-BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, bool isPrivate) const {
-  return {SILGlobalVariable::create(
+BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, BridgedLinkage linkage, bool isLet) const {
+  auto *global = SILGlobalVariable::create(
       *invocation->getPassManager()->getModule(),
-      isPrivate ? SILLinkage::Private : SILLinkage::Public, IsNotSerialized,
-      name.unbridged(), type.unbridged())};
+      (swift::SILLinkage)linkage, IsNotSerialized,
+      name.unbridged(), type.unbridged());
+  if (isLet)
+    global->setLet(true);
+  return {global};
 }
 
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {

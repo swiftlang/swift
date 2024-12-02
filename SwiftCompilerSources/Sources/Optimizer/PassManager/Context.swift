@@ -227,6 +227,14 @@ extension MutatingContext {
     }
   }
 
+  func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
+    if function.isDefinition {
+      return true
+    }
+    _bridged.loadFunction(function.bridged, loadCalleesRecursively)
+    return function.isDefinition
+  }
+
   private func notifyNewInstructions(from: Instruction, to: Instruction) {
     var inst = from
     while inst != to {
@@ -303,14 +311,6 @@ struct FunctionPassContext : MutatingContext {
       let nameStr = BridgedStringRef(data: nameBuffer.baseAddress, count: nameBuffer.count)
       return _bridged.loadFunction(nameStr, loadCalleesRecursively).function
     }
-  }
-
-  func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
-    if function.isDefinition {
-      return true
-    }
-    _bridged.loadFunction(function.bridged, loadCalleesRecursively)
-    return function.isDefinition
   }
 
   /// Looks up a function in the `Swift` module.
@@ -391,9 +391,9 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func createGlobalVariable(name: String, type: Type, isPrivate: Bool) -> GlobalVariable {
+  func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool) -> GlobalVariable {
     let gv = name._withBridgedStringRef {
-      _bridged.createGlobalVariable($0, type.bridged, isPrivate)
+      _bridged.createGlobalVariable($0, type.bridged, linkage.bridged, isLet)
     }
     return gv.globalVar
   }
