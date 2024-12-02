@@ -80,7 +80,7 @@ extension ProtBase {
     func ext() {
         publ()
         prot()
-        priv() // expected-error {{value of type 'ProtBase' has no member 'priv'}}
+        priv() // expected-error {{cannot find 'priv' in scope}}
     }
 }
 func fProtBase(v: ProtBase) {
