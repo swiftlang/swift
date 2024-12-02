@@ -295,7 +295,9 @@ private func transitivelyErase(load: LoadInst, _ context: SimplifyContext) {
       context.erase(instruction: inst)
       return
     }
-    let operandInst = inst.operands[0].value as! SingleValueInstruction
+    guard let operandInst = inst.operands[0].value as? SingleValueInstruction else {
+      return
+    }
     context.erase(instruction: inst)
     inst = operandInst
   }

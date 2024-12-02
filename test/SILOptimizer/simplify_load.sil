@@ -530,3 +530,16 @@ bb0:
   return %2
 }
 
+// CHECK-LABEL: sil @load_from_begin_cow_mutation :
+// CHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK:         return [[I]]
+// CHECK:       } // end sil function 'load_from_begin_cow_mutation'
+sil @load_from_begin_cow_mutation : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = global_value @gc : $D
+  (%1, %2) = begin_cow_mutation %0
+  %3 = ref_element_addr %2, #D.d
+  %4 = load %3
+  return %4
+}
+
