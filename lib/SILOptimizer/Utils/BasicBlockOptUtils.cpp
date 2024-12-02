@@ -55,19 +55,6 @@ ReachingReturnBlocks::ReachingReturnBlocks(SILFunction *function)
   }
 }
 
-NonErrorHandlingBlocks::NonErrorHandlingBlocks(SILFunction *function)
-    : worklist(function->getEntryBlock()) {
-  while (SILBasicBlock *block = worklist.pop()) {
-    if (auto ta = dyn_cast<TryApplyInst>(block->getTerminator())) {
-      worklist.pushIfNotVisited(ta->getNormalBB());
-    } else {
-      for (SILBasicBlock *succ : block->getSuccessorBlocks()) {
-        worklist.pushIfNotVisited(succ);
-      }
-    }
-  }
-}
-
 bool swift::removeUnreachableBlocks(SILFunction &f) {
   ReachableBlocks reachable(&f);
   // Visit all the blocks without doing any extra work.
