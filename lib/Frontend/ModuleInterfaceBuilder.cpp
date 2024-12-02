@@ -279,6 +279,7 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   // optimization pipeline.
   SerializationOptions SerializationOpts;
   std::string OutPathStr = OutputPath.str();
+  SerializationOpts.StaticLibrary = FEOpts.Static;
   SerializationOpts.OutputPath = OutPathStr.c_str();
   SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
   SerializationOpts.AutolinkForceLoad =
