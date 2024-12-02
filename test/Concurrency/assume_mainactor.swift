@@ -70,7 +70,7 @@ struct NonIsolatedStructContainingKlass {
 
 @globalActor
 actor CustomActor {
-  static let shared = CustomActor()
+  static nonisolated let shared = CustomActor()
 }
 
 // CHECK: // unspecifiedAsync<A>(_:)
@@ -198,4 +198,10 @@ actor MyActor2 {
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor8MyActor2C1xACyt_tcfc : $@convention(method) (@owned MyActor2) -> @owned MyActor2 {
   @CustomActor
   init(x: ()) {}
+}
+
+@CustomActor func validateThatPrintIsStillNonIsolated() {
+  // Since we are in a CustomActor, we can only call this if print is
+  // NonIsolated and not if print was inferred to be main actor.
+  print("123")
 }
