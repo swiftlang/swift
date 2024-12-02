@@ -6550,7 +6550,19 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
           maybeDiagnoseFunctionRef(unwrappedFnExpr);
           return;
         }
+      } else if (auto conv = dyn_cast<FunctionConversionExpr>(semanticExpr)) {
+        // Look through a function conversion that only adds or removes
+        // `@Sendable`.
+        auto ty1 = conv->getType()->castTo<AnyFunctionType>();
+        auto ty2 = conv->getSubExpr()->getType()->castTo<AnyFunctionType>();
+
+        if (ty1->withExtInfo(ty1->getExtInfo().withSendable(false))
+            ->isEqual(ty2->withExtInfo(ty2->getExtInfo().withSendable(false)))) {
+          maybeDiagnoseFunctionRef(conv->getSubExpr()->getSemanticsProvidingExpr());
+          return;
+        }
       }
+
       ctx.Diags.diagnose(expr->getLoc(),
                          diag::invalid_differentiable_function_conversion_expr);
     };
