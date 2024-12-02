@@ -76,8 +76,13 @@ PROJECT CONFIGURATION:
                           Generate a target for C/C++ files in the standard library (default: --stdlib)
   --stdlib-swift/--no-stdlib-swift
                           Generate targets for Swift files in the standard library. This requires
-                          using Xcode with a main development snapshot (and as such is disabled
-                          by default). (default: --no-stdlib-swift)
+                          using Xcode with a main development Swift snapshot, and as such is
+                          disabled by default.
+
+                          A development snapshot is necessary to avoid spurious build/live issues
+                          due to the fact that the the stdlib is built using the just-built Swift
+                          compiler, which may support features not yet supported by the Swift
+                          compiler in Xcode's toolchain. (default: --no-stdlib-swift)
   --test-folders/--no-test-folders
                           Add folder references for test files (default: --test-folders)
   --unittests/--no-unittests
@@ -89,7 +94,7 @@ PROJECT CONFIGURATION:
                           edit (e.g sourcekitdAPI-InProc.cpp). (default: --infer-args)
   --prefer-folder-refs/--no-prefer-folder-refs
                           Whether to prefer folder references for groups containing non-source
-                          files (default: --no-prefer-folder-refs)
+                          files (default: --prefer-folder-refs)
   --buildable-folders/--no-buildable-folders
                           Requires Xcode 16: Enables the use of "buildable folders", allowing
                           folder references to be used for compatible targets. This allows new
@@ -98,7 +103,7 @@ PROJECT CONFIGURATION:
 
                           Only supported for targets that have no per-file build settings. This
                           unfortunately means some Clang targes such as 'lib/Basic' and 'stdlib'
-                          cannot currently use buildable folders. (default: --no-buildable-folders)
+                          cannot currently use buildable folders. (default: --buildable-folders)
 
 MISC:
   --project-root-dir <project-root-dir>
