@@ -475,6 +475,9 @@ SWIFT_REQUEST(TypeChecker, SemanticAvailableRangeAttrRequest,
 SWIFT_REQUEST(TypeChecker, SemanticUnavailableAttrRequest,
               Optional<AvailableAttrDeclPair>(const Decl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SemanticDeclAvailabilityRequest,
+              SemanticDeclAvailability(const Decl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
               FunctionType::ExtInfo(ClosureExpr *),
               Cached, NoLocationInfo)
