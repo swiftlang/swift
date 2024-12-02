@@ -809,6 +809,10 @@ public:
             /*needPrintType=*/true};
   }
 
+  void markBlockAsPrinted(const SILBasicBlock *block) {
+    printedBlocks.insert(block);
+  }
+
   //===--------------------------------------------------------------------===//
   // Big entrypoints.
   void print(const SILFunction *F) {
@@ -932,7 +936,7 @@ public:
 #endif
 
   void print(const SILBasicBlock *BB) {
-    printedBlocks.insert(BB);
+    markBlockAsPrinted(BB);
 
     // Output uses for BB arguments. These are put into place as comments before
     // the block header.
@@ -3677,6 +3681,7 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
     {
       SILPrintContext Ctx(OS);
       SILPrinter Printer(Ctx);
+      Printer.markBlockAsPrinted(&StaticInitializerBlock);
       for (const SILInstruction &I : StaticInitializerBlock) {
         Printer.print(&I);
       }

@@ -12,7 +12,7 @@
 
 // Second test (bonus): check if the optimization is done: statically initialize the array of function pointers.
 
-// RUN: %target-build-swift -O -wmo -parse-as-library -module-name=Test %s -emit-sil | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-build-swift -O -wmo -parse-as-library -module-name=Test %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s -check-prefix=CHECK-SIL
 
 // REQUIRES: executable_test
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
