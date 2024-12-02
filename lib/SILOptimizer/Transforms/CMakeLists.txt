@@ -6,7 +6,6 @@ target_sources(swiftSILOptimizer PRIVATE
   AccessEnforcementWMO.cpp
   AllocBoxToStack.cpp
   ArrayCountPropagation.cpp
-  ArrayElementValuePropagation.cpp
   COWOpts.cpp
   CSE.cpp
   ConditionForwarding.cpp

@@ -134,7 +134,7 @@ struct AliasAnalysis {
         if let apply = inst as? FullApplySite {
           // Workaround for quadratic complexity in ARCSequenceOpts.
           // We need to use an ever lower budget to not get into noticeable compile time troubles.
-          let effect = aa.getOwnershipEffect(of: apply, for: obj, path: path)
+          let effect = aa.getOwnershipEffect(of: apply, for: obj, path: path, complexityBudget: budget / 10)
           return effect.destroy
         }
         return obj.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: false),
@@ -421,10 +421,10 @@ struct AliasAnalysis {
   }
 
   private func getOwnershipEffect(of apply: FullApplySite, for value: Value,
-                                  path: SmallProjectionPath) -> SideEffects.Ownership {
+                                  path: SmallProjectionPath,
+                                  complexityBudget: Int) -> SideEffects.Ownership {
     let visitor = FullApplyEffectsVisitor(apply: apply, calleeAnalysis: context.calleeAnalysis, isAddress: false)
-    let budget = getComplexityBudget(for: apply.parentFunction)
-    if let result = value.at(path).visit(using: visitor, complexityBudget: budget, context) {
+    if let result = value.at(path).visit(using: visitor, complexityBudget: complexityBudget, context) {
       // The resulting effects are the argument effects to which `value` escapes to.
       return result.ownership
     } else {

@@ -24,13 +24,13 @@ sil_global [let] @g1 : $Int32 = {
 sil_global [let] @gobj : $Obj
 sil_global @gobj_var : $Obj
 
-// CHECK-LABEL: sil_global private @outline_global_simpleTv_ : $Obj = {
+// CHECK-LABEL: sil_global private [let] @outline_global_simpleTv_ : $Obj = {
 // CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 1
 // CHECK-NEXT:    %1 = struct $Int64 (%0 : $Builtin.Int64)
 // CHECK-NEXT:    %initval = object $Obj (%1 : $Int64)
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: sil_global private @outline_global_tailelemsTv_ : $Obj = {
+// CHECK-LABEL: sil_global private [let] @outline_global_tailelemsTv_ : $Obj = {
 // CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 1
 // CHECK-NEXT:    %1 = struct $Int64 (%0 : $Builtin.Int64)
 // CHECK-NEXT:    %2 = integer_literal $Builtin.Int64, 2
@@ -40,7 +40,7 @@ sil_global @gobj_var : $Obj
 // CHECK-NEXT:    %initval = object $Obj (%1 : $Int64, [tail_elems] %3 : $Int64, %5 : $Int64)
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: sil_global private @tuple_tailelemsTv_ : $Obj = {
+// CHECK-LABEL: sil_global private [let] @tuple_tailelemsTv_ : $Obj = {
 // CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 27
 // CHECK-NEXT:    %1 = struct $Int64 (%0 : $Builtin.Int64)
 // CHECK-NEXT:    %2 = integer_literal $Builtin.Int64, 1
@@ -58,7 +58,7 @@ sil_global @gobj_var : $Obj
 // CHECK-NEXT:    %initval = object $Obj (%1 : $Int64, [tail_elems] %6 : $(Int64, Bool), %11 : $(Int64, Bool), %13 : $(Int64, Bool))
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: sil_global private @outline_global_addressTv_ : $Obj = {
+// CHECK-LABEL: sil_global private [let] @outline_global_addressTv_ : $Obj = {
 // CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 1
 // CHECK-NEXT:    %1 = struct $Int64 (%0 : $Builtin.Int64)
 // CHECK-NEXT:    %2 = global_addr @g1 : $*Int32

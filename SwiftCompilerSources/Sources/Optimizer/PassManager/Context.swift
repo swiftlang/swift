@@ -391,9 +391,9 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func createGlobalVariable(name: String, type: Type, isPrivate: Bool) -> GlobalVariable {
+  func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool) -> GlobalVariable {
     let gv = name._withBridgedStringRef {
-      _bridged.createGlobalVariable($0, type.bridged, isPrivate)
+      _bridged.createGlobalVariable($0, type.bridged, linkage.bridged, isLet)
     }
     return gv.globalVar
   }
