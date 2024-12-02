@@ -239,6 +239,11 @@ add_library(swiftCore
   "${CMAKE_CURRENT_BINARY_DIR}/UnsafeRawBufferPointer.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Tuple.swift")
 
+# https://github.com/swiftlang/swift/issues/77705 - Freestanding and Linux/Android builds both have failures to resolve.
+if(NOT LINUX AND NOT ANDROID)
+  target_sources(swiftCore PRIVATE ObjectIdentifier+DebugDescription.swift)
+endif()
+
 set_target_properties(swiftCore PROPERTIES Swift_MODULE_NAME Swift)
 
 if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
