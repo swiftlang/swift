@@ -5615,7 +5615,6 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   DEF_VER_TUPLE_PIECES(Introduced);
   DEF_VER_TUPLE_PIECES(Deprecated);
   DEF_VER_TUPLE_PIECES(Obsoleted);
-  DeclID renameDeclID;
   unsigned rawPlatform, messageSize, renameSize;
 
   // Decode the record, pulling the version tuple information.
@@ -5623,7 +5622,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
       scratch, isImplicit, isUnavailable, isDeprecated, isNoAsync,
       isPackageDescriptionVersionSpecific, isSPI, isForEmbedded,
       LIST_VER_TUPLE_PIECES(Introduced), LIST_VER_TUPLE_PIECES(Deprecated),
-      LIST_VER_TUPLE_PIECES(Obsoleted), rawPlatform, renameDeclID, messageSize,
+      LIST_VER_TUPLE_PIECES(Obsoleted), rawPlatform, messageSize,
       renameSize);
 
   auto maybePlatform = platformFromUnsigned(rawPlatform);
@@ -5631,11 +5630,6 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     return llvm::make_error<InvalidEnumValueError>(rawPlatform, "PlatformKind");
 
   PlatformKind platform = maybePlatform.value();
-
-  ValueDecl *renameDecl = nullptr;
-  if (renameDeclID) {
-    renameDecl = cast<ValueDecl>(MF.getDecl(renameDeclID));
-  }
 
   StringRef message = blobData.substr(0, messageSize);
   blobData = blobData.substr(messageSize);
@@ -5663,9 +5657,9 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     platformAgnostic = PlatformAgnosticAvailabilityKind::None;
 
   auto attr = new (ctx) AvailableAttr(
-      SourceLoc(), SourceRange(), platform, message, rename, renameDecl,
-      Introduced, SourceRange(), Deprecated, SourceRange(), Obsoleted,
-      SourceRange(), platformAgnostic, isImplicit, isSPI, isForEmbedded);
+      SourceLoc(), SourceRange(), platform, message, rename, Introduced,
+      SourceRange(), Deprecated, SourceRange(), Obsoleted, SourceRange(),
+      platformAgnostic, isImplicit, isSPI, isForEmbedded);
   return attr;
 }
 

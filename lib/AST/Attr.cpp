@@ -1113,7 +1113,8 @@ ParsedDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
   return Attr;
 }
 
-static void printAvailableAttr(const AvailableAttr *Attr, ASTPrinter &Printer,
+static void printAvailableAttr(const Decl *D, const AvailableAttr *Attr,
+                               ASTPrinter &Printer,
                                const PrintOptions &Options) {
   if (Attr->isLanguageVersionSpecific())
     Printer << "swift";
@@ -1138,17 +1139,19 @@ static void printAvailableAttr(const AvailableAttr *Attr, ASTPrinter &Printer,
 
   if (!Attr->Rename.empty()) {
     Printer << ", renamed: \"" << Attr->Rename << "\"";
-  } else if (Attr->RenameDecl) {
-    Printer << ", renamed: \"";
-    if (auto *Accessor = dyn_cast<AccessorDecl>(Attr->RenameDecl)) {
-      SmallString<32> Name;
-      llvm::raw_svector_ostream OS(Name);
-      Accessor->printUserFacingName(OS);
-      Printer << Name.str();
-    } else {
-      Printer << Attr->RenameDecl->getName();
+  } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (auto *renamedDecl = VD->getRenamedDecl(Attr)) {
+      Printer << ", renamed: \"";
+      if (auto *Accessor = dyn_cast<AccessorDecl>(renamedDecl)) {
+        SmallString<32> Name;
+        llvm::raw_svector_ostream OS(Name);
+        Accessor->printUserFacingName(OS);
+        Printer << Name.str();
+      } else {
+        Printer << renamedDecl->getName();
+      }
+      Printer << "\"";
     }
-    Printer << "\"";
   }
 
   // If there's no message, but this is specifically an imported
@@ -1365,7 +1368,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer.printAttrName("@available");
     }
     Printer << "(";
-    printAvailableAttr(Attr, Printer, Options);
+    printAvailableAttr(D, Attr, Printer, Options);
     Printer << ")";
     break;
   }
@@ -1464,7 +1467,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << "availability: ";
       auto numAttrs = availAttrs.size();
       if (numAttrs == 1) {
-        printAvailableAttr(availAttrs[0], Printer, Options);
+        printAvailableAttr(D, availAttrs[0], Printer, Options);
         Printer << "; ";
       } else {
         SmallVector<const DeclAttribute *, 8> tmp(availAttrs.begin(),
@@ -2223,19 +2226,21 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
 
 AvailableAttr::AvailableAttr(
     SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
-    StringRef Message, StringRef Rename, ValueDecl *RenameDecl,
+    StringRef Message, StringRef Rename,
     const llvm::VersionTuple &Introduced, SourceRange IntroducedRange,
     const llvm::VersionTuple &Deprecated, SourceRange DeprecatedRange,
     const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
     PlatformAgnosticAvailabilityKind PlatformAgnostic, bool Implicit,
     bool IsSPI, bool IsForEmbedded)
     : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
-      Message(Message), Rename(Rename), RenameDecl(RenameDecl),
+      Message(Message), Rename(Rename),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange) {
   Bits.AvailableAttr.Platform = static_cast<uint8_t>(Platform);
   Bits.AvailableAttr.PlatformAgnostic = static_cast<uint8_t>(PlatformAgnostic);
+  Bits.AvailableAttr.HasComputedRenamedDecl = false;
+  Bits.AvailableAttr.HasRenamedDecl = false;
   Bits.AvailableAttr.IsSPI = IsSPI;
 
   if (IsForEmbedded) {
@@ -2260,22 +2265,10 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
     assert(!Obsoleted.empty());
   }
   return new (C) AvailableAttr(
-    SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename, nullptr,
-    NoVersion, SourceRange(),
-    NoVersion, SourceRange(),
-    Obsoleted, SourceRange(),
-    Kind, /* isImplicit */ false, /*SPI*/false);
-}
-
-AvailableAttr *AvailableAttr::createForAlternative(
-    ASTContext &C, AbstractFunctionDecl *AsyncFunc) {
-  llvm::VersionTuple NoVersion;
-  return new (C) AvailableAttr(
-    SourceLoc(), SourceRange(), PlatformKind::none, "", "", AsyncFunc,
-    NoVersion, SourceRange(),
-    NoVersion, SourceRange(),
-    NoVersion, SourceRange(),
-    PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true, /*SPI*/false);
+      SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
+      /*Introduced=*/NoVersion, SourceRange(), /*Deprecated=*/NoVersion,
+      SourceRange(), Obsoleted, SourceRange(), Kind, /*Implicit=*/false,
+      /*SPI=*/false);
 }
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
@@ -2288,19 +2281,16 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 }
 
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
-  return new (C) AvailableAttr(implicit ? SourceLoc() : AtLoc,
-                               implicit ? SourceRange() : getRange(),
-                               getPlatform(), Message, Rename, RenameDecl,
-                               Introduced ? *Introduced : llvm::VersionTuple(),
-                               implicit ? SourceRange() : IntroducedRange,
-                               Deprecated ? *Deprecated : llvm::VersionTuple(),
-                               implicit ? SourceRange() : DeprecatedRange,
-                               Obsoleted ? *Obsoleted : llvm::VersionTuple(),
-                               implicit ? SourceRange() : ObsoletedRange,
-                               getPlatformAgnosticAvailability(),
-                               implicit,
-                               isSPI(),
-                               isForEmbedded());
+  return new (C) AvailableAttr(
+      implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
+      getPlatform(), Message, Rename,
+      Introduced ? *Introduced : llvm::VersionTuple(),
+      implicit ? SourceRange() : IntroducedRange,
+      Deprecated ? *Deprecated : llvm::VersionTuple(),
+      implicit ? SourceRange() : DeprecatedRange,
+      Obsoleted ? *Obsoleted : llvm::VersionTuple(),
+      implicit ? SourceRange() : ObsoletedRange,
+      getPlatformAgnosticAvailability(), implicit, isSPI(), isForEmbedded());
 }
 
 std::optional<OriginallyDefinedInAttr::ActiveVersion>

@@ -632,16 +632,11 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
             canonicalizePlatformVersion(*PlatformKind, Obsoleted.Version);
   }
 
-  auto Attr = new (Context)
-  AvailableAttr(AtLoc, SourceRange(AttrLoc, Tok.getLoc()),
-                PlatformKind.value(),
-                Message, Renamed, /*RenameDecl=*/nullptr,
-                Introduced.Version, Introduced.Range,
-                Deprecated.Version, Deprecated.Range,
-                Obsoleted.Version, Obsoleted.Range,
-                PlatformAgnostic,
-                /*Implicit=*/false,
-                AttrName == SPI_AVAILABLE_ATTRNAME);
+  auto Attr = new (Context) AvailableAttr(
+      AtLoc, SourceRange(AttrLoc, Tok.getLoc()), PlatformKind.value(), Message,
+      Renamed, Introduced.Version, Introduced.Range, Deprecated.Version,
+      Deprecated.Range, Obsoleted.Version, Obsoleted.Range, PlatformAgnostic,
+      /*Implicit=*/false, AttrName == SPI_AVAILABLE_ATTRNAME);
   return makeParserResult(Attr);
 
 }
@@ -927,7 +922,6 @@ bool Parser::parseAvailability(
           AtLoc, attrRange, Platform,
           /*Message=*/StringRef(),
           /*Rename=*/StringRef(),
-          /*RenameDecl=*/nullptr,
           /*Introduced=*/Version,
           /*IntroducedRange=*/VersionRange,
           /*Deprecated=*/llvm::VersionTuple(),
@@ -4384,9 +4378,9 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
       StringRef Message = "unavailable in embedded Swift", Renamed;
       auto attr = new (Context) AvailableAttr(
           AtLoc, SourceRange(AtLoc, attrLoc), PlatformKind::none, Message,
-          Renamed, /*RenameDecl=*/nullptr, llvm::VersionTuple(), SourceRange(),
-          llvm::VersionTuple(), SourceRange(), llvm::VersionTuple(),
-          SourceRange(), PlatformAgnosticAvailabilityKind::Unavailable,
+          Renamed, llvm::VersionTuple(), SourceRange(), llvm::VersionTuple(),
+          SourceRange(), llvm::VersionTuple(), SourceRange(),
+          PlatformAgnosticAvailabilityKind::Unavailable,
           /*Implicit=*/false, /*IsSPI=*/false, /*IsForEmbedded=*/true);
       Attributes.add(attr);
     }
