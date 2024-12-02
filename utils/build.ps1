@@ -1044,12 +1044,8 @@ function Build-CMakeProject {
     }
 
     if ($EnableCaching) {
-      if ($UseMSVCCompilers.Contains("C") -Or $UsePinnedCompilers.Contains("C")) {
-        TryAdd-KeyValue $Defines CMAKE_C_COMPILER_LAUNCHER sccache
-      }
-      if ($UseMSVCCompilers.Contains("CXX") -Or $UsePinnedCompilers.Contains("CXX")) {
-        TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_LAUNCHER sccache
-      }
+      TryAdd-KeyValue $Defines CMAKE_C_COMPILER_LAUNCHER sccache
+      TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_LAUNCHER sccache
     }
 
     if ($UseMSVCCompilers.Contains("C")) {
