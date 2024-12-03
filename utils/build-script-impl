@@ -486,6 +486,7 @@ function verify_host_is_supported() {
       | appletvsimulator-x86_64 \
       | appletvsimulator-arm64  \
       | appletvos-arm64         \
+      | watchsimulator-i386     \
       | watchsimulator-x86_64   \
       | watchsimulator-arm64    \
       | watchos-armv7k          \
@@ -662,6 +663,13 @@ function set_build_options_for_host() {
                     llvm_target_arch="AArch64"
 
                     SWIFT_HOST_VARIANT_SDK="TVOS"
+                    cmake_osx_deployment_target=""
+                    ;;
+                watchsimulator-i386)
+                    SWIFT_HOST_TRIPLE="i386-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}-simulator"
+                    llvm_target_arch="X86"
+
+                    SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 watchsimulator-x86_64)
