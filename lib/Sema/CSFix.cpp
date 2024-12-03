@@ -2255,6 +2255,11 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
   if (kind != ConstraintKind::UnresolvedValueMember)
     return nullptr;
 
+  // Only diagnose for UnresolvedMemberExprs.
+  // TODO: We ought to support diagnosing EnumElementPatterns too.
+  if (!isExpr<UnresolvedMemberExpr>(locator->getAnchor()))
+    return nullptr;
+
   // None or only one viable candidate, there is no ambiguity.
   if (result.ViableCandidates.size() <= 1)
     return nullptr;

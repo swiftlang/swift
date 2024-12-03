@@ -6434,10 +6434,9 @@ Type getPatternTypeOfSingleUnlabeledPackExpansionTuple(Type type);
 /// methods prefixed with `build*` i.e. `buildBlock`, `buildExpression` etc.
 bool isResultBuilderMethodReference(ASTContext &, UnresolvedDotExpr *);
 
-/// Determine the number of applications applied to the given overload.
-unsigned getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
-                            FunctionRefInfo functionRefInfo,
-                            ConstraintLocatorBuilder locator);
+/// Determine the number of applications applied for a given FunctionRefInfo.
+unsigned getNumApplications(bool hasAppliedSelf,
+                            FunctionRefInfo functionRefInfo);
 
 } // end namespace constraints
 
