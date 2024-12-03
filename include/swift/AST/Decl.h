@@ -1442,22 +1442,15 @@ public:
   std::optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticAvailableRangeAttr() const;
 
-  /// Retrieve the @available attribute that makes this declaration unavailable,
-  /// if any. If \p ignoreAppExtensions is true then attributes for app
-  /// extension platforms are ignored.
-  ///
-  /// This attribute may come from an enclosing decl since availability is
-  /// inherited. The second member of the returned pair is the decl that owns
-  /// the attribute.
-  ///
-  /// Note that this notion of unavailability is broader than that which is
-  /// checked by \c isUnavailable().
-  std::optional<std::pair<const AvailableAttr *, const Decl *>>
-  getSemanticUnavailableAttr(bool ignoreAppExtensions = false) const;
+  /// Returns true if the decl is effectively always unavailable in the current
+  /// compilation context. This query differs from \c isUnavailable() because it
+  /// takes the availability of parent declarations into account.
+  bool isSemanticallyUnavailable() const;
 
   /// Returns true if code associated with this declaration should be considerd
   /// unreachable at runtime because the declaration is unavailable in all
-  /// execution contexts in which the code may run.
+  /// execution contexts in which the code may run. This result takes the
+  /// availability of parent declarations into account.
   bool isUnreachableAtRuntime() const;
 
   /// Returns true if this declaration should be considered available during
