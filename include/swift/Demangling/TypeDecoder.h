@@ -720,7 +720,7 @@ protected:
       return decodeMangledType(genericArgs->getChild(0), depth + 1);
     }
     case NodeKind::BuiltinTypeName: {
-      auto mangling = Demangle::mangleNode(Node);
+      auto mangling = Demangle::mangleNode(Node, Builder.getManglingFlavor());
       if (!mangling.isSuccess()) {
         return MAKE_NODE_TYPE_ERROR(Node,
                                     "failed to mangle node (%d:%u)",

@@ -657,7 +657,7 @@ SILModule::lookUpDifferentiabilityWitness(StringRef name) {
 
 SILDifferentiabilityWitness *
 SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   return lookUpDifferentiabilityWitness(
       mangler.mangleSILDifferentiabilityWitness(
           key.originalFunctionName, key.kind, key.config));

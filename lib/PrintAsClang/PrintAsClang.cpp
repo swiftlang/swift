@@ -58,14 +58,14 @@ static void emitObjCConditional(raw_ostream &out,
   out << "#endif\n";
 }
 
-static void writePtrauthPrologue(raw_ostream &os) {
+static void writePtrauthPrologue(raw_ostream &os, ASTContext &ctx) {
   emitCxxConditional(os, [&]() {
-    ClangSyntaxPrinter(os).printIgnoredDiagnosticBlock(
+    ClangSyntaxPrinter(ctx, os).printIgnoredDiagnosticBlock(
         "non-modular-include-in-framework-module", [&] {
           os << "#if defined(__arm64e__) && __has_include(<ptrauth.h>)\n";
           os << "# include <ptrauth.h>\n";
           os << "#else\n";
-          ClangSyntaxPrinter(os).printIgnoredDiagnosticBlock(
+          ClangSyntaxPrinter(ctx, os).printIgnoredDiagnosticBlock(
               "reserved-macro-identifier", [&]() {
                 os << "# ifndef "
                       "__ptrauth_swift_value_witness_function_pointer\n";
@@ -131,7 +131,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <stdbool.h>\n"
                "#include <string.h>\n";
       });
-  writePtrauthPrologue(out);
+  writePtrauthPrologue(out, ctx);
   out << "\n"
          "#if !defined(SWIFT_TYPEDEFS)\n"
          "# define SWIFT_TYPEDEFS 1\n"
@@ -603,7 +603,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
       exposedModules.insert(mod.moduleName);
 
     // Include the shim header only in the C++ mode.
-    ClangSyntaxPrinter(os).printIncludeForShimHeader(
+    ClangSyntaxPrinter(M->getASTContext(), os).printIncludeForShimHeader(
         "_SwiftCxxInteroperability.h");
 
     // Explicit @expose attribute is required only when the user specifies

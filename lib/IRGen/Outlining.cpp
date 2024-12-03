@@ -398,7 +398,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
                               const OutliningMetadataCollector &collector) {
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
-    IRGenMangler().mangleOutlinedInitializeWithTakeFunction(manglingBits.first,
+    IRGenMangler(T.getASTContext()).mangleOutlinedInitializeWithTakeFunction(manglingBits.first,
         manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
@@ -419,7 +419,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
                               const OutliningMetadataCollector &collector) {
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
-    IRGenMangler().mangleOutlinedInitializeWithCopyFunction(manglingBits.first,
+    IRGenMangler(T.getASTContext()).mangleOutlinedInitializeWithCopyFunction(manglingBits.first,
         manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
@@ -440,7 +440,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
                               const OutliningMetadataCollector &collector) {
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
-    IRGenMangler().mangleOutlinedAssignWithTakeFunction(manglingBits.first,
+    IRGenMangler(T.getASTContext()).mangleOutlinedAssignWithTakeFunction(manglingBits.first,
         manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
@@ -461,7 +461,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
                               const OutliningMetadataCollector &collector) {
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
-    IRGenMangler().mangleOutlinedAssignWithCopyFunction(manglingBits.first,
+    IRGenMangler(T.getASTContext()).mangleOutlinedAssignWithCopyFunction(manglingBits.first,
         manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
@@ -557,7 +557,7 @@ void OutliningMetadataCollector::emitCallToOutlinedDestroy(
 llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
                               SILType T, const TypeInfo &ti,
                               const OutliningMetadataCollector &collector) {
-  IRGenMangler mangler;
+  IRGenMangler mangler(T.getASTContext());
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName = mangler.mangleOutlinedDestroyFunction(manglingBits.first,
                      manglingBits.second, collector.IGF.isPerformanceConstraint);
@@ -608,7 +608,7 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
                                                        llvm::Type *llvmType,
                                                        Atomicity atomicity) {
   auto *loadableTI = cast<LoadableTypeInfo>(&ti);
-  IRGenMangler mangler;
+  IRGenMangler mangler(t.getASTContext());
   auto manglingBits =
     getTypeAndGenericSignatureForManglingOutlineFunction(t);
   auto funcName = mangler.mangleOutlinedRetainFunction(manglingBits.first,
@@ -658,7 +658,7 @@ llvm::Constant *IRGenModule::getOrCreateReleaseFunction(
     const TypeInfo &ti, SILType t, llvm::Type *ptrTy, Atomicity atomicity,
     const OutliningMetadataCollector &collector) {
   auto *loadableTI = cast<LoadableTypeInfo>(&ti);
-  IRGenMangler mangler;
+  IRGenMangler mangler(t.getASTContext());
   auto manglingBits =
     getTypeAndGenericSignatureForManglingOutlineFunction(t);
   auto funcName = mangler.mangleOutlinedReleaseFunction(manglingBits.first,

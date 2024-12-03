@@ -12,6 +12,7 @@ Mangling
   mangled-name ::= '@__swiftmacro_' global // Swift mangling for filenames
   mangled-name ::= '_T0' global // Swift 4.0
   mangled-name ::= '$S' global  // Swift 4.2
+  mangled-name ::= '$e' global  // Embedded Swift (unstable)
 
 All Swift-mangled names begin with a common prefix. Since Swift 4.0, the
 compiler has used variations of the mangling described in this document, though
