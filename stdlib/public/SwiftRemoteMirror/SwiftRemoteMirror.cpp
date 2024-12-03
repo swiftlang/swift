@@ -529,6 +529,10 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
 #include "swift/AST/ReferenceStorage.def"
     }
   }
+
+  case TypeInfoKind::Array: {
+    return SWIFT_ARRAY;
+  }
   }
 
   swift_unreachable("Unhandled TypeInfoKind in switch");
