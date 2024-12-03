@@ -2002,6 +2002,10 @@ swift::getDisallowedOriginKind(const Decl *decl,
   if (SF->getASTContext().LangOpts.EnableCXXInterop && where.getDeclContext() &&
       where.getDeclContext()->getAsDecl() &&
       where.getDeclContext()->getAsDecl()->getModuleContext()->isResilient() &&
+      !where.getDeclContext()
+           ->getAsDecl()
+           ->getModuleContext()
+           ->getUnderlyingModuleIfOverlay() &&
       decl->hasClangNode() && !decl->getModuleContext()->isSwiftShimsModule() &&
       isFragileClangNode(decl->getClangNode()) &&
       !SF->getASTContext().LangOpts.hasFeature(
