@@ -713,9 +713,6 @@ ModuleDependencyScanner::resolveAllClangModuleDependencies(
     } else {
       // We need to query the Clang dependency scanner for this module's
       // unresolved imports
-      auto moduleDependencyInfo = cache.findKnownDependency(moduleID);
-
-      // Figure out which imports have already been resolved to module dependencies
       llvm::StringSet<> resolvedImportIdentifiers;
       for (const auto &resolvedDep : moduleDependencyInfo.getImportedSwiftDependencies())
         resolvedImportIdentifiers.insert(resolvedDep.ModuleName);

@@ -73,6 +73,7 @@ using FileIDArrayIDField = IdentifierIDField;
 using ContextHashIDField = IdentifierIDField;
 using ModuleCacheKeyIDField = IdentifierIDField;
 using ImportArrayIDField = IdentifierIDField;
+using LinkLibrariesArrayIDField = IdentifierIDField;
 using FlagIDArrayIDField = IdentifierIDField;
 using DependencyIDArrayIDField = IdentifierIDField;
 using AuxiliaryFilesArrayIDField = IdentifierIDField;
@@ -85,12 +86,15 @@ const unsigned GRAPH_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID;
 /// zero or more IDENTIFIER records that contain various strings seen in the graph
 /// (e.g. file names or compiler flags), followed by zero or more IDENTIFIER_ARRAY records
 /// which are arrays of identifiers seen in the graph (e.g. list of source files or list of compile flags),
+/// followed by zero or more LINK_LIBRARY_NODE records along with associated
+///
 /// followed by zero or more MODULE_NODE, *_DETAILS_NODE pairs of records.
 namespace graph_block {
 enum {
   METADATA = 1,
   MODULE_NODE,
   LINK_LIBRARY_NODE,
+  LINK_LIBRARY_ARRAY_NODE,
   SOURCE_LOCATION_NODE,
   IMPORT_STATEMENT_NODE,
   SWIFT_INTERFACE_MODULE_DETAILS_NODE,
@@ -129,6 +133,9 @@ using IdentifierNodeLayout = BCRecordLayout<IDENTIFIER_NODE, BCBlob>;
 using IdentifierArrayLayout =
     BCRecordLayout<IDENTIFIER_ARRAY_NODE, IdentifierIDArryField>;
 
+using LinkLibraryArrayLayout =
+    BCRecordLayout<LINK_LIBRARY_ARRAY_NODE, IdentifierIDArryField>;
+
 using LinkLibraryLayout =
     BCRecordLayout<LINK_LIBRARY_NODE,            // ID
                    IdentifierIDField,            // libraryName
@@ -157,12 +164,11 @@ using ImportStatementLayout =
 // - SwiftPlaceholderModuleDetails
 // - ClangModuleDetails
 using ModuleInfoLayout =
-    BCRecordLayout<MODULE_NODE,                  // ID
-                   IdentifierIDField,            // moduleName
-                   ContextHashIDField,           // contextHash
-                   ImportArrayIDField,           // moduleImports
-                   ImportArrayIDField,           // optionalModuleImports
-                   // ACTODO: LinkLibrariesArrayIDField,           // linkLibraries
+    BCRecordLayout<MODULE_NODE,                    // ID
+                   IdentifierIDField,              // moduleName
+                   ImportArrayIDField,             // moduleImports
+                   ImportArrayIDField,             // optionalModuleImports
+                   LinkLibrariesArrayIDField,      // linkLibraries
                    DependencyIDArrayIDField,       // importedSwiftModules
                    DependencyIDArrayIDField,       // importedClangModules
                    DependencyIDArrayIDField,       // crossImportOverlayModules
@@ -211,6 +217,7 @@ using SwiftBinaryModuleDetailsLayout =
                    FileIDField,                      // moduleDocPath
                    FileIDField,                      // moduleSourceInfoPath
                    FileIDField,                      // headerImport
+                   FileIDField,                      // definingInterfacePath
                    IdentifierIDField,                // headerModuleDependencies
                    FileIDArrayIDField,               // headerSourceFiles
                    IsFrameworkField,                 // isFramework
