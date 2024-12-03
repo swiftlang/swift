@@ -2055,6 +2055,36 @@ bool IRGenModule::finalize() {
   }
   emitLazyPrivateDefinitions();
 
+  if (!getSILModule().getOptions().StopOptimizationAfterSerialization) {
+    uint32_t ABIValue = 0;
+    if (ObjCInterop) {
+      ABIValue |= 1; // bit 0
+    }
+    if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+      ABIValue |= 2; // bit 1
+    }
+      
+    auto *Value = llvm::ConstantInt::get(Int32Ty, ABIValue);
+    auto *ABIMarker = new llvm::GlobalVariable(
+        Module, Int32Ty, /*isConstant=*/true, llvm::GlobalValue::WeakODRLinkage,
+        Value, "swift_abi");
+    switch (TargetInfo.OutputObjectFormat) {
+    case llvm::Triple::MachO:
+      ABIMarker->setSection("__TEXT,__swift_abi");
+      break;
+    case llvm::Triple::ELF:
+    case llvm::Triple::Wasm:
+      ABIMarker->setSection(".swift_abi");
+      break;
+    case llvm::Triple::COFF:
+      ABIMarker->setSection(".sw5abi");
+      break;
+    default:
+      llvm_unreachable("unknown object format");
+    }
+    addUsedGlobal(ABIMarker);
+  }
+
   // Finalize Swift debug info before running Clang codegen, because it may
   // delete the llvm module.
   if (DebugInfo)
