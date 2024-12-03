@@ -3798,6 +3798,15 @@ protected:
     assignment.mapValueToAddress(origValue, newAddr);
     assignment.markForDeletion(bc);
   }
+
+  void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *bc) {
+    auto builder = assignment.getBuilder(bc->getIterator());
+    auto opdAddr = assignment.getAddressForValue(bc->getOperand());
+    auto newAddr = builder.createUncheckedAddrCast(
+        bc->getLoc(), opdAddr, bc->getType().getAddressType());
+    assignment.mapValueToAddress(origValue, newAddr);
+    assignment.markForDeletion(bc);
+  }
 };
 } // namespace
 
@@ -3851,6 +3860,10 @@ protected:
   void visitKeyPathInst(KeyPathInst *kp) {
     userInstructionFallback(kp);
   }
+
+  void visitYieldInst(YieldInst *yield) { userInstructionFallback(yield); }
+
+  void visitThrowInst(ThrowInst *t) { userInstructionFallback(t); }
 
   void visitFixLifetimeInst(FixLifetimeInst *f) {
     auto addr = assignment.getAddressForValue(f->getOperand());
