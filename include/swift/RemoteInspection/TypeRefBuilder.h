@@ -929,19 +929,18 @@ public:
   }
 
   const TypeRef *createIntegerType(intptr_t value) {
-    // FIXME: implement
-    return nullptr;
+    return IntegerTypeRef::create(*this, value);
   }
 
   const TypeRef *createNegativeIntegerType(intptr_t value) {
-    // FIXME: implement
-    return nullptr;
+    return IntegerTypeRef::create(*this, value);
   }
 
   const TypeRef *createBuiltinFixedArrayType(const TypeRef *size,
                                              const TypeRef *element) {
-    // FIXME: implement
-    return nullptr;
+    auto integer = cast<IntegerTypeRef>(size);
+    return BuiltinFixedArrayTypeRef::create(*this, integer->getValue(),
+                                            element);
   }
 
   // Construct a bound generic type ref along with the parent type info

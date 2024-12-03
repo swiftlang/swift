@@ -395,6 +395,19 @@ public:
     printHeader("opaque");
     stream << ")";
   }
+
+  void visitIntegerTypeRef(const IntegerTypeRef *I) {
+    printHeader("integer");
+    printField("value", std::to_string(I->getValue()));
+    stream << ")";
+  }
+
+  void visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    printHeader("builtin_fixed_array");
+    printField("size", std::to_string(BA->getSize()));
+    printRec(BA->getElementType());
+    stream << ")";
+  }
 };
 
 struct TypeRefIsConcrete
@@ -505,6 +518,14 @@ struct TypeRefIsConcrete
 
   bool visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
     return true;
+  }
+
+  bool visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return true;
+  }
+
+  bool visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return visit(BA->getElementType());
   }
 };
 
@@ -1049,6 +1070,30 @@ public:
     
     return node;
   }
+
+  Demangle::NodePointer createInteger(intptr_t value) {
+    if (value >= 0) {
+      return Dem.createNode(Node::Kind::Integer, value);
+    } else {
+      return Dem.createNode(Node::Kind::NegativeInteger, value);
+    }
+  }
+
+  Demangle::NodePointer visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return createInteger(I->getValue());
+  }
+
+  Demangle::NodePointer visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    auto ba = Dem.createNode(Node::Kind::BuiltinFixedArray);
+
+    auto size = Dem.createNode(Node::Kind::Type);
+    size->addChild(createInteger(BA->getSize()), Dem);
+    ba->addChild(size, Dem);
+
+    ba->addChild(visit(BA->getElementType()), Dem);
+
+    return ba;
+  }
 };
 
 Demangle::NodePointer TypeRef::getDemangling(Demangle::Demangler &Dem) const {
@@ -1277,6 +1322,14 @@ public:
     return O;
   }
 
+  const TypeRef *visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return I;
+  }
+
+  const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return BuiltinFixedArrayTypeRef::create(Builder, BA->getSize(),
+                                            visit(BA->getElementType()));
+  }
 };
 
 static const TypeRef *
@@ -1530,6 +1583,15 @@ public:
     return OpaqueArchetypeTypeRef::create(Builder, O->getID(), O->getDescription(),
                                           O->getOrdinal(),
                                           newArgLists);
+  }
+
+  const TypeRef *visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return I;
+  }
+
+  const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return BuiltinFixedArrayTypeRef::create(Builder, BA->getSize(),
+                                            visit(BA->getElementType()));
   }
 };
 
