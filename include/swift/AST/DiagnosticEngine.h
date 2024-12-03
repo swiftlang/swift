@@ -67,6 +67,8 @@ namespace swift {
   /// this enumeration type that uniquely identifies it.
   enum class DiagID : uint32_t;
 
+  enum class DiagGroupID : uint16_t;
+
   /// Describes a diagnostic along with its argument types.
   ///
   /// The diagnostics header introduces instances of this type for each 
@@ -498,6 +500,7 @@ namespace swift {
 
   private:
     DiagID ID;
+    DiagGroupID GroupID;
     SmallVector<DiagnosticArgument, 3> Args;
     SmallVector<CharSourceRange, 2> Ranges;
     SmallVector<FixIt, 2> FixIts;
@@ -510,7 +513,10 @@ namespace swift {
     friend DiagnosticEngine;
     friend class InFlightDiagnostic;
 
-    Diagnostic(DiagID ID) : ID(ID) {}
+    Diagnostic(DiagID ID, DiagGroupID GroupID) : ID(ID), GroupID(GroupID) {}
+
+    /// Constructs a Diagnostic with DiagGroupID infered from DiagID.
+    Diagnostic(DiagID ID);
 
   public:
     // All constructors are intentionally implicit.
@@ -535,6 +541,7 @@ namespace swift {
     
     // Accessors.
     DiagID getID() const { return ID; }
+    DiagGroupID getGroupID() const { return GroupID; }
     ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
     ArrayRef<CharSourceRange> getRanges() const { return Ranges; }
     ArrayRef<FixIt> getFixIts() const { return FixIts; }
@@ -1434,7 +1441,8 @@ namespace swift {
 
     /// Generate DiagnosticInfo for a Diagnostic to be passed to consumers.
     std::optional<DiagnosticInfo>
-    diagnosticInfoForDiagnostic(const Diagnostic &diagnostic);
+    diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
+                                bool includeDiagnosticName);
 
     /// Send \c diag to all diagnostic consumers.
     void emitDiagnostic(const Diagnostic &diag);
@@ -1460,9 +1468,16 @@ namespace swift {
   public:
     DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
 
-    llvm::StringRef
-    diagnosticStringFor(const DiagID id,
-                        PrintDiagnosticNamesMode printDiagnosticNamesMode);
+    /// Get a localized format string for a given `DiagID`. If no localization
+    /// available returns the default string for that `DiagID`.
+    llvm::StringRef diagnosticStringFor(DiagID id);
+
+    /// Get a localized format string with an optional diagnostic name appended
+    /// to it. The diagnostic name type is defined by
+    /// `PrintDiagnosticNamesMode`.
+    llvm::StringRef diagnosticStringWithNameFor(
+        DiagID id, DiagGroupID groupID,
+        PrintDiagnosticNamesMode printDiagnosticNamesMode);
 
     static llvm::StringRef diagnosticIDStringFor(const DiagID id);
 
