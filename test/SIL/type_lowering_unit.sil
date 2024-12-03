@@ -1,8 +1,10 @@
 // RUN: %target-sil-opt -test-runner \
 // RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN:   %s -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 sil_stage raw
 
