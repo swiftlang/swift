@@ -166,14 +166,14 @@ if ($null -eq $BuildArchName) { $BuildArchName = $env:PROCESSOR_ARCHITECTURE }
 if ($PinnedBuild -eq "") {
   switch ($BuildArchName) {
     "AMD64" {
-      $PinnedBuild = "https://download.swift.org/swift-5.10.1-release/windows10/swift-5.10.1-RELEASE/swift-5.10.1-RELEASE-windows10.exe"
-      $PinnedSHA256 = "3027762138ACFA1BBE3050FF6613BBE754332E84C9EFA5C23984646009297286"
-      $PinnedVersion = "5.10.1"
+      $PinnedBuild = "https://download.swift.org/swift-6.0-release/windows10/swift-6.0-RELEASE/swift-6.0-RELEASE-windows10.exe"
+      $PinnedSHA256 = "0C6807B674B01B961DF87CD0DBE18D1ACDE93DC9A124DDE453BD6B597C1DB456"
+      $PinnedVersion = "6.0.0"
     }
     "ARM64" {
-      $PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a-windows10-arm64.exe"
-      $PinnedSHA256 = "037BDBF9D1A1A99D7156584948870A8A958FD27CC4FF5711691CC0A76F2E88F5"
-      $PinnedVersion = "0.0.0"
+      $PinnedBuild = "https://download.swift.org/swift-6.0-release/windows10-arm64/swift-6.0-RELEASE/swift-6.0-RELEASE-windows10-arm64.exe"
+      $PinnedSHA256 = "9AEEA2ADBECAE5DA3347292D3F3D0F58130250D98F5B635DB0DCAF2E4DB173F5"
+      $PinnedVersion = "6.0.0"
     }
     default { throw "Unsupported processor architecture" }
   }
