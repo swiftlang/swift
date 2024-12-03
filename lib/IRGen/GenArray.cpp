@@ -94,16 +94,21 @@ protected:
     }
     
     body(eltAddrs);
-    
+
+    // The just ran body may have generated new blocks. Get the current
+    // insertion block which will become the other incoming block to the phis
+    // we've generated.
+    predBB = IGF.Builder.GetInsertBlock();
+
     for (unsigned i : indices(addrPhis)) {
       addrPhis[i]->addIncoming(Element.indexArray(IGF, eltAddrs[i], one,
                                                   getElementSILType(IGF.IGM, T))
                                       .getAddress(),
-                               loopBB);
+                               predBB);
     }
 
     auto nextCount = IGF.Builder.CreateSub(countPhi, one);
-    countPhi->addIncoming(nextCount, loopBB);
+    countPhi->addIncoming(nextCount, predBB);
     
     auto done = IGF.Builder.CreateICmpEQ(nextCount, zero);
     IGF.Builder.CreateCondBr(done, endBB, loopBB);
