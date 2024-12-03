@@ -19,7 +19,7 @@
 #define SWIFT_SEMA_CONSTRAINT_H
 
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/FunctionRefKind.h"
+#include "swift/AST/FunctionRefInfo.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
@@ -384,7 +384,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   unsigned NumTypeVariables : 11;
 
   /// The kind of function reference, for member references.
-  unsigned TheFunctionRefKind : 2;
+  unsigned TheFunctionRefInfo : 3;
 
   /// The trailing closure matching for an applicable function constraint,
   /// if any. 0 = None, 1 = Forward, 2 = Backward.
@@ -471,14 +471,14 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   /// Construct a new member constraint.
   Constraint(ConstraintKind kind, Type first, Type second, DeclNameRef member,
-             DeclContext *useDC, FunctionRefKind functionRefKind,
+             DeclContext *useDC, FunctionRefInfo functionRefInfo,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new value witness constraint.
   Constraint(ConstraintKind kind, Type first, Type second,
              ValueDecl *requirement, DeclContext *useDC,
-             FunctionRefKind functionRefKind, ConstraintLocator *locator,
+             FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new overload-binding constraint, which might have a fix.
@@ -534,21 +534,21 @@ public:
   /// alternatives.
   static Constraint *createMemberOrOuterDisjunction(
       ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
-      DeclNameRef member, DeclContext *useDC, FunctionRefKind functionRefKind,
+      DeclNameRef member, DeclContext *useDC, FunctionRefInfo functionRefInfo,
       ArrayRef<OverloadChoice> outerAlternatives, ConstraintLocator *locator);
 
   /// Create a new member constraint.
   static Constraint *createMember(ConstraintSystem &cs, ConstraintKind kind,
                                   Type first, Type second, DeclNameRef member,
                                   DeclContext *useDC,
-                                  FunctionRefKind functionRefKind,
+                                  FunctionRefInfo functionRefInfo,
                                   ConstraintLocator *locator);
 
   /// Create a new value witness constraint.
   static Constraint *createValueWitness(
       ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
       ValueDecl *requirement, DeclContext *useDC,
-      FunctionRefKind functionRefKind, ConstraintLocator *locator);
+      FunctionRefInfo functionRefInfo, ConstraintLocator *locator);
 
   /// Create an overload-binding constraint, possibly with a fix.
   static Constraint *createBindOverload(ConstraintSystem &cs, Type type, 
@@ -798,14 +798,12 @@ public:
   }
 
   /// Determine the kind of function reference we have for a member reference.
-  FunctionRefKind getFunctionRefKind() const {
-    if (Kind == ConstraintKind::ValueMember ||
-        Kind == ConstraintKind::UnresolvedValueMember ||
-        Kind == ConstraintKind::ValueWitness)
-      return static_cast<FunctionRefKind>(TheFunctionRefKind);
+  FunctionRefInfo getFunctionRefInfo() const {
+    ASSERT(Kind == ConstraintKind::ValueMember ||
+           Kind == ConstraintKind::UnresolvedValueMember ||
+           Kind == ConstraintKind::ValueWitness);
 
-    // Conservative answer: drop all of the labels.
-    return FunctionRefKind::Compound;
+    return FunctionRefInfo::fromOpaque(TheFunctionRefInfo);
   }
 
   /// Retrieve the set of constraints in a disjunction.

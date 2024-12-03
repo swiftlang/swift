@@ -866,7 +866,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     }
 
     return buildRefExpr(ResultValues, DC, UDRE->getNameLoc(),
-                        UDRE->isImplicit(), UDRE->getFunctionRefKind());
+                        UDRE->isImplicit(), UDRE->getFunctionRefInfo());
   }
 
   ResultValues.clear();
@@ -981,29 +981,12 @@ TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
 }
 
 namespace {
-/// Update the function reference kind based on adding a direct call to a
-/// callee with this kind.
-FunctionRefKind addingDirectCall(FunctionRefKind kind) {
-  switch (kind) {
-  case FunctionRefKind::Unapplied:
-    return FunctionRefKind::SingleApply;
-
-  case FunctionRefKind::SingleApply:
-  case FunctionRefKind::DoubleApply:
-    return FunctionRefKind::DoubleApply;
-
-  case FunctionRefKind::Compound:
-    return FunctionRefKind::Compound;
-  }
-
-  llvm_unreachable("Unhandled FunctionRefKind in switch.");
-}
-
 /// Update a direct callee expression node that has a function reference kind
 /// based on seeing a call to this callee.
-template <typename E, typename = decltype(((E *)nullptr)->getFunctionRefKind())>
+template <typename E, typename = decltype(((E *)nullptr)->getFunctionRefInfo())>
 void tryUpdateDirectCalleeImpl(E *callee, int) {
-  callee->setFunctionRefKind(addingDirectCall(callee->getFunctionRefKind()));
+  callee->setFunctionRefInfo(
+      callee->getFunctionRefInfo().addingApplicationLevel());
 }
 
 /// Version of tryUpdateDirectCalleeImpl for when the callee

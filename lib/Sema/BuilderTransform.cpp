@@ -712,7 +712,8 @@ protected:
         auto arrayAppendRef = new (ctx) UnresolvedDotExpr(
             arrayVarRef, endLoc, DeclNameRef(ctx.getIdentifier("append")),
             DeclNameLoc(endLoc), /*implicit=*/true);
-        arrayAppendRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+        arrayAppendRef->setFunctionRefInfo(
+            FunctionRefInfo::singleBaseNameApply());
 
         auto *argList = ArgumentList::createImplicit(
             ctx, endLoc, {Argument::unlabeled(bodyVarRef.get())}, endLoc);
@@ -1578,7 +1579,7 @@ Expr *ResultBuilder::buildCall(SourceLoc loc, Identifier fnName,
   auto memberRef = new (ctx)
       UnresolvedDotExpr(baseExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
                         /*implicit=*/true);
-  memberRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+  memberRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
   auto openLoc = args.empty() ? loc : argExprs.front()->getStartLoc();
   auto closeLoc = args.empty() ? loc : argExprs.back()->getEndLoc();

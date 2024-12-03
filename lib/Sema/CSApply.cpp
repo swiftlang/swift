@@ -685,7 +685,7 @@ namespace {
                   ConcreteDeclRef witnessRef(witness, *subMap);
                   auto declRefExpr =  new (ctx) DeclRefExpr(witnessRef, loc,
                                                             /*Implicit=*/false);
-                  declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
+                  declRefExpr->setFunctionRefInfo(choice.getFunctionRefInfo());
                   cs.setType(declRefExpr, refType);
 
                   Expr *refExpr;
@@ -758,14 +758,16 @@ namespace {
       auto declRefExpr =
           new (ctx) DeclRefExpr(ref, loc, implicit, semantics, fullType);
       cs.cacheType(declRefExpr);
-      declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
+      declRefExpr->setFunctionRefInfo(choice.getFunctionRefInfo());
 
       Expr *result = forceUnwrapIfExpected(declRefExpr, locator);
 
       if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
         if (AnyFunctionRef(fnDecl).hasExternalPropertyWrapperParameters() &&
-            (declRefExpr->getFunctionRefKind() == FunctionRefKind::Compound ||
-             declRefExpr->getFunctionRefKind() == FunctionRefKind::Unapplied)) {
+            // FIXME(FunctionRefInfo): This should just be `isUnapplied()`, see
+            // the FIXME in `unwrapPropertyWrapperParameterTypes`.
+            (declRefExpr->getFunctionRefInfo().isCompoundName() ||
+             declRefExpr->getFunctionRefInfo().isUnappliedBaseName())) {
           // We don't need to do any further adjustment once we've built the
           // curry thunk.
           return buildSingleCurryThunk(result, fnDecl,
@@ -875,7 +877,7 @@ namespace {
       // FIXME: Walking over the ExprStack to figure out the number of argument
       // lists being applied is brittle. We should instead be checking
       // hasAppliedSelf to figure out if the self param is applied, and looking
-      // at the FunctionRefKind to see if the parameter list is applied.
+      // at the FunctionRefInfo to see if the parameter list is applied.
       unsigned e = ExprStack.size();
       unsigned argCount;
 
@@ -1644,7 +1646,7 @@ namespace {
                "Direct property access doesn't make sense for this");
         auto *dre = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
         cs.setType(dre, refTy);
-        dre->setFunctionRefKind(choice.getFunctionRefKind());
+        dre->setFunctionRefInfo(choice.getFunctionRefInfo());
         Expr *ref = cs.cacheType(new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, dre, refTy));
 
@@ -1754,7 +1756,7 @@ namespace {
         Expr *ref = new (context) DynamicMemberRefExpr(base, dotLoc, memberRef,
                                                        memberLoc);
         ref->setImplicit(Implicit);
-        // FIXME: FunctionRefKind
+        // FIXME: FunctionRefInfo
 
         // Compute the type of the reference.
         auto computeRefType = [&](Type refType) {
@@ -1868,7 +1870,7 @@ namespace {
       // Handle all other references.
       auto declRefExpr = new (context) DeclRefExpr(memberRef, memberLoc,
                                                    Implicit, semantics);
-      declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
+      declRefExpr->setFunctionRefInfo(choice.getFunctionRefInfo());
       declRefExpr->setType(refTy);
       cs.setType(declRefExpr, refTy);
       Expr *ref = declRefExpr;
@@ -4801,7 +4803,7 @@ namespace {
       }
       DeclRefExpr *fnRef = new (ctx) DeclRefExpr(undefinedDecl, DeclNameLoc(),
                                                  /*Implicit=*/true);
-      fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+      fnRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
       StringRef msg = "attempt to evaluate editor placeholder";
       Expr *argExpr = new (ctx) StringLiteralExpr(msg, E->getLoc(),

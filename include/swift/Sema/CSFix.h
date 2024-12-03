@@ -3244,7 +3244,7 @@ public:
 
   static SpecifyBaseTypeForOptionalUnresolvedMember *
   attempt(ConstraintSystem &cs, ConstraintKind kind, Type baseTy,
-          DeclNameRef memberName, FunctionRefKind functionRefKind,
+          DeclNameRef memberName, FunctionRefInfo functionRefInfo,
           MemberLookupResult result, ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
