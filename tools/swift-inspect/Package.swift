@@ -27,7 +27,8 @@ let package = Package(
             name: "SwiftInspectLinux",
             dependencies: ["LinuxSystemHeaders"],
             path: "Sources/SwiftInspectLinux",
-            exclude: ["SystemHeaders"]),
+            exclude: ["SystemHeaders"],
+            cSettings: [.define("_GNU_SOURCE", to: "1")]),
         .systemLibrary(
             name: "LinuxSystemHeaders",
             path: "Sources/SwiftInspectLinux/SystemHeaders"),
