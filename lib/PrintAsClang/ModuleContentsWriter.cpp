@@ -977,8 +977,8 @@ public:
                       const_cast<ValueDecl *>(vd));
         // Emit a specific unavailable message when we know why a decl can't be
         // exposed, or a generic message otherwise.
-        auto diagString = M.getASTContext().Diags.diagnosticStringFor(
-            diag.getID(), PrintDiagnosticNamesMode::None);
+        auto diagString =
+            M.getASTContext().Diags.diagnosticStringFor(diag.getID());
         DiagnosticEngine::formatDiagnosticText(os, diagString, diag.getArgs(),
                                                DiagnosticFormatOptions());
         os << "\");\n";

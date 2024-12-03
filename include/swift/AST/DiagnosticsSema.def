@@ -5950,7 +5950,7 @@ ERROR(async_decl_must_be_available_from_async,none,
 ERROR(async_named_decl_must_be_available_from_async,none,
         "asynchronous %kind0 must be available from asynchronous contexts",
         (const ValueDecl *))
-ERROR(async_unavailable_decl,none,
+GROUPED_ERROR(async_unavailable_decl,DeclarationUnavailableFromAsynchronousContext,none,
       "%kindbase0 is unavailable from asynchronous contexts%select{|; %1}1",
       (const ValueDecl *, StringRef))
 
