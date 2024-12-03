@@ -1287,7 +1287,14 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
       CI.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
       CI.getInvocation().getModuleScanningHash());
 
-  // ACTODO: Deserialize cache
+  // Load the dependency cache if -reuse-dependency-scan-cache
+  // is specified
+  if (opts.ReuseDependencyScannerCache) {
+    auto cachePath = opts.SerializedDependencyScannerCachePath;
+    module_dependency_cache_serialization::readInterModuleDependenciesCache(cachePath, cache);
+    if (opts.EmitDependencyScannerCacheRemarks)
+      ctx.Diags.diagnose(SourceLoc(), diag::remark_reuse_cache, cachePath);
+  }
   
   if (service->setupCachingDependencyScanningService(CI))
     return true;
@@ -1298,7 +1305,13 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
 
   // Serialize the dependency cache if -serialize-dependency-scan-cache
   // is specified
-  // ACTODO: Serialize cache
+  if (opts.SerializeDependencyScannerCache) {
+    auto savePath = opts.SerializedDependencyScannerCachePath;
+    module_dependency_cache_serialization::writeInterModuleDependenciesCache(
+          ctx.Diags, CI.getOutputBackend(), savePath, cache);
+    if (opts.EmitDependencyScannerCacheRemarks)
+      ctx.Diags.diagnose(SourceLoc(), diag::remark_save_cache, savePath);
+  }
 
   if (dependenciesOrErr.getError())
     return true;
