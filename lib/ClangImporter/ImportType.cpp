@@ -421,6 +421,22 @@ namespace {
       return Type();
     }
 
+    ImportResult VisitDynamicRangePointerType(
+        const clang::DynamicRangePointerType *type) {
+      // DynamicRangePointerType is a clang type representing a pointer with
+      // an "ended_by" type attribute for -fbounds-safety. For now, we don't
+      // import these into Swift.
+      return Type();
+    }
+
+    ImportResult VisitValueTerminatedType(
+        const clang::ValueTerminatedType *type) {
+      // ValueTerminatedType is a clang type representing a pointer with
+      // a "terminated_by" type attribute for -fbounds-safety. For now, we don't
+      // import these into Swift.
+      return Type();
+    }
+
     ImportResult VisitMemberPointerType(const clang::MemberPointerType *type) {
       return Type();
     }
