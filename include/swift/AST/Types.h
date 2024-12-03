@@ -1464,7 +1464,7 @@ public:
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
-  SWIFT_DEBUG_DUMPER(dumpPrint());
+  SWIFT_DEBUG_DUMPER(print());
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &PO) const;
