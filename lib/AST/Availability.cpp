@@ -689,47 +689,24 @@ const AvailableAttr *Decl::getUnavailableAttr(bool ignoreAppExtensions) const {
   return nullptr;
 }
 
-std::optional<AvailableAttrDeclPair>
-SemanticUnavailableAttrRequest::evaluate(Evaluator &evaluator, const Decl *decl,
-                                         bool ignoreAppExtensions) const {
-  // Directly marked unavailable.
-  if (auto attr = decl->getUnavailableAttr(ignoreAppExtensions))
-    return std::make_pair(attr, decl);
-
-  if (auto *parent =
-          AvailabilityInference::parentDeclForInferredAvailability(decl))
-    return parent->getSemanticUnavailableAttr(ignoreAppExtensions);
-
-  return std::nullopt;
-}
-
-std::optional<AvailableAttrDeclPair>
-Decl::getSemanticUnavailableAttr(bool ignoreAppExtensions) const {
-  auto &eval = getASTContext().evaluator;
-  return evaluateOrDefault(
-      eval, SemanticUnavailableAttrRequest{this, ignoreAppExtensions},
-      std::nullopt);
-}
-
-bool Decl::isUnreachableAtRuntime() const {
+static bool isDeclCompletelyUnavailable(const Decl *decl) {
   // Don't trust unavailability on declarations from clang modules.
-  if (isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext()))
+  if (isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext()))
     return false;
 
-  auto unavailableAttrAndDecl =
-      getSemanticUnavailableAttr(/*ignoreAppExtensions=*/true);
-  if (!unavailableAttrAndDecl)
+  auto *unavailableAttr =
+      decl->getUnavailableAttr(/*ignoreAppExtensions=*/true);
+  if (!unavailableAttr)
     return false;
 
-  // getSemanticUnavailableAttr() can return an @available attribute that makes
-  // its declaration unavailable conditionally due to deployment target. Only
-  // stub or skip a declaration that is unavailable regardless of deployment
-  // target.
-  auto *unavailableAttr = unavailableAttrAndDecl->first;
+  // getUnavailableAttr() can return an @available attribute that is
+  // obsoleted for certain deployment targets or language modes. These decls
+  // can still be reached by code in other modules that is compiled with
+  // a different deployment target or language mode.
   if (!unavailableAttr->isUnconditionallyUnavailable())
     return false;
 
-  // Universally unavailable declarations are always unreachable.
+  // Universally unavailable declarations are always completely unavailable.
   if (unavailableAttr->getPlatform() == PlatformKind::none)
     return true;
 
@@ -737,10 +714,45 @@ bool Decl::isUnreachableAtRuntime() const {
   // If we have a target variant (e.g. we're building a zippered macOS
   // framework) then the decl is only unreachable if it is unavailable for both
   // the primary target and the target variant.
-  if (getASTContext().LangOpts.TargetVariant.has_value())
+  if (decl->getASTContext().LangOpts.TargetVariant.has_value())
     return false;
 
   return true;
+}
+
+SemanticDeclAvailability
+SemanticDeclAvailabilityRequest::evaluate(Evaluator &evaluator,
+                                          const Decl *decl) const {
+  auto inherited = SemanticDeclAvailability::PotentiallyAvailable;
+  if (auto *parent =
+          AvailabilityInference::parentDeclForInferredAvailability(decl)) {
+    inherited = evaluateOrDefault(
+        evaluator, SemanticDeclAvailabilityRequest{parent}, inherited);
+  }
+
+  if (inherited == SemanticDeclAvailability::CompletelyUnavailable ||
+      isDeclCompletelyUnavailable(decl))
+    return SemanticDeclAvailability::CompletelyUnavailable;
+
+  if (inherited == SemanticDeclAvailability::ConditionallyUnavailable ||
+      decl->isUnavailable())
+    return SemanticDeclAvailability::ConditionallyUnavailable;
+
+  return SemanticDeclAvailability::PotentiallyAvailable;
+}
+
+bool Decl::isSemanticallyUnavailable() const {
+  auto availability = evaluateOrDefault(
+      getASTContext().evaluator, SemanticDeclAvailabilityRequest{this},
+      SemanticDeclAvailability::PotentiallyAvailable);
+  return availability != SemanticDeclAvailability::PotentiallyAvailable;
+}
+
+bool Decl::isUnreachableAtRuntime() const {
+  auto availability = evaluateOrDefault(
+      getASTContext().evaluator, SemanticDeclAvailabilityRequest{this},
+      SemanticDeclAvailability::PotentiallyAvailable);
+  return availability == SemanticDeclAvailability::CompletelyUnavailable;
 }
 
 static UnavailableDeclOptimization

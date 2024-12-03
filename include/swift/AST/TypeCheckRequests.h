@@ -4122,10 +4122,26 @@ public:
   bool isCached() const { return true; }
 };
 
-class SemanticUnavailableAttrRequest
-    : public SimpleRequest<SemanticUnavailableAttrRequest,
-                           std::optional<AvailableAttrDeclPair>(
-                               const Decl *decl, bool ignoreAppExtensions),
+enum class SemanticDeclAvailability : uint8_t {
+  /// The decl is potentially available in some contexts and/or under certain
+  /// deployment conditions.
+  PotentiallyAvailable,
+
+  /// The decl is always unavailable in the current compilation context.
+  /// However, it may still be used at runtime by other modules with different
+  /// settings. For example a decl that is obsolete in Swift 5 is still
+  /// available to other modules compiled for an earlier language mode.
+  ConditionallyUnavailable,
+
+  /// The decl is universally unavailable. For example, when compiling for macOS
+  /// a decl with `@available(macOS, unavailable)` can never be used (except in
+  /// contexts that are also completely unavailable on macOS).
+  CompletelyUnavailable,
+};
+
+class SemanticDeclAvailabilityRequest
+    : public SimpleRequest<SemanticDeclAvailabilityRequest,
+                           SemanticDeclAvailability(const Decl *decl),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4133,9 +4149,8 @@ public:
 private:
   friend SimpleRequest;
 
-  std::optional<AvailableAttrDeclPair>
-  evaluate(Evaluator &evaluator, const Decl *decl,
-           bool ignoreAppExtensions) const;
+  SemanticDeclAvailability evaluate(Evaluator &evaluator,
+                                    const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
