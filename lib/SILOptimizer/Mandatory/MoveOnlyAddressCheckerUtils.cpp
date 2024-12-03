@@ -3347,6 +3347,9 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
     bool isFinalConsume = consumes.claimConsume(destroyPair.first, bits);
 
     // Remove destroys that are not the final consuming use.
+    // TODO: for C++ types we do not want to remove destroys as the caller is
+    //       still responsible for invoking the dtor for the moved-from object.
+    //       See GH Issue #77894.
     if (!isFinalConsume) {
       destroyPair.first->eraseFromParent();
       continue;
