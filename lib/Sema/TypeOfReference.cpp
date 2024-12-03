@@ -631,16 +631,20 @@ void ConstraintSystem::recordOpenedTypes(
 /// function type when referencing the given declaration.
 static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
                                             bool isCurriedInstanceReference,
-                                            FunctionRefKind functionRefKind) {
+                                            FunctionRefInfo functionRefInfo) {
   unsigned numParameterLists = decl->getNumCurryLevels();
-  switch (functionRefKind) {
-  case FunctionRefKind::Unapplied:
-  case FunctionRefKind::Compound:
-    // Always remove argument labels from unapplied references and references
-    // that use a compound name.
+
+  // Always remove argument labels from compound references, they have already
+  // had their argument labels specified.
+  if (functionRefInfo.isCompoundName())
     return numParameterLists;
 
-  case FunctionRefKind::SingleApply:
+  switch (functionRefInfo.getApplyLevel()) {
+  case FunctionRefInfo::ApplyLevel::Unapplied:
+    // Always remove argument labels from unapplied references.
+    return numParameterLists;
+
+  case FunctionRefInfo::ApplyLevel::SingleApply:
     // If we have fewer than two parameter lists, leave the labels.
     if (numParameterLists < 2)
       return 0;
@@ -651,23 +655,23 @@ static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
     // always unlabeled, so this operation is a no-op for the actual application.
     return isCurriedInstanceReference ? numParameterLists : 1;
 
-  case FunctionRefKind::DoubleApply:
+  case FunctionRefInfo::ApplyLevel::DoubleApply:
     // Never remove argument labels from a double application.
     return 0;
   }
 
-  llvm_unreachable("Unhandled FunctionRefKind in switch.");
+  llvm_unreachable("Unhandled FunctionRefInfo in switch.");
 }
 
 /// Determine the number of applications
 unsigned constraints::getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
-                                         FunctionRefKind functionRefKind,
+                                         FunctionRefInfo functionRefInfo,
                                          ConstraintLocatorBuilder locator) {
   // FIXME: Narrow hack for rdar://139234188 - Currently we set
-  // FunctionRefKind::Compound for enum element patterns with tuple
+  // FunctionRefInfo::Compound for enum element patterns with tuple
   // sub-patterns to ensure the member has argument labels stripped. As such,
   // we need to account for the correct application level here. We ought to be
-  // setting the correct FunctionRefKind and properly handling the label
+  // setting the correct FunctionRefInfo and properly handling the label
   // matching in the solver though.
   if (auto lastElt = locator.last()) {
     if (auto matchElt = lastElt->getAs<LocatorPathElt::PatternMatch>()) {
@@ -675,30 +679,36 @@ unsigned constraints::getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
         return (EP->hasSubPattern() ? 1 : 0) + hasAppliedSelf;
     }
   }
-  switch (functionRefKind) {
-  case FunctionRefKind::Unapplied:
-  case FunctionRefKind::Compound:
+  // FIXME(FunctionRefInfo): This matches the old behavior, but is wrong.
+  if (functionRefInfo.isCompoundName())
     return 0 + hasAppliedSelf;
 
-  case FunctionRefKind::SingleApply:
+  switch (functionRefInfo.getApplyLevel()) {
+  case FunctionRefInfo::ApplyLevel::Unapplied:
+    return 0 + hasAppliedSelf;
+
+  case FunctionRefInfo::ApplyLevel::SingleApply:
     return 1 + hasAppliedSelf;
 
-  case FunctionRefKind::DoubleApply:
+  case FunctionRefInfo::ApplyLevel::DoubleApply:
     return 2;
   }
 
-  llvm_unreachable("Unhandled FunctionRefKind in switch.");
+  llvm_unreachable("Unhandled FunctionRefInfo in switch.");
 }
 
 /// Replaces property wrapper types in the parameter list of the given function type
 /// with the wrapped-value or projected-value types (depending on argument label).
 static FunctionType *
 unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *funcDecl,
-                                    FunctionRefKind functionRefKind, FunctionType *functionType,
+                                    FunctionRefInfo functionRefInfo, FunctionType *functionType,
                                     ConstraintLocatorBuilder locator) {
   // Only apply property wrappers to unapplied references to functions.
-  if (!(functionRefKind == FunctionRefKind::Compound ||
-        functionRefKind == FunctionRefKind::Unapplied)) {
+  // FIXME(FunctionRefInfo): This should just be `isUnapplied()`, which would
+  // fix https://github.com/swiftlang/swift/issues/77823, but we also need to
+  // correctly handle the wrapping in matchCallArguments.
+  if (!(functionRefInfo.isCompoundName() ||
+        functionRefInfo.isUnappliedBaseName())) {
     return functionType;
   }
 
@@ -727,7 +737,7 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
 
   for (unsigned i : indices(*paramList)) {
     Identifier argLabel;
-    if (functionRefKind == FunctionRefKind::Compound) {
+    if (functionRefInfo.isCompoundName()) {
       auto &context = cs.getASTContext();
       auto argLabelLoc = nameLoc.getArgumentLabelLoc(i);
       auto argLabelToken = Lexer::getTokenAtLocation(context.SourceMgr, argLabelLoc);
@@ -868,7 +878,7 @@ static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value, bool
 
 DeclReferenceType
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
-                                     FunctionRefKind functionRefKind,
+                                     FunctionRefInfo functionRefInfo,
                                      ConstraintLocatorBuilder locator,
                                      DeclContext *useDC) {
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
@@ -898,7 +908,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
-      unsigned numApplies = getNumApplications(value, false, functionRefKind,
+      unsigned numApplies = getNumApplications(value, false, functionRefInfo,
                                                locator);
       openedType = adjustFunctionTypeForConcurrency(
           origOpenedType, /*baseType=*/Type(), func, useDC, numApplies, false,
@@ -916,19 +926,19 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
-        funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
+        funcDecl, /*isCurriedInstanceReference=*/false, functionRefInfo);
 
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
                           ->removeArgumentLabels(numLabelsToRemove);
     openedType = unwrapPropertyWrapperParameterTypes(
-        *this, funcDecl, functionRefKind, openedType->castTo<FunctionType>(),
+        *this, funcDecl, functionRefInfo, openedType->castTo<FunctionType>(),
         locator);
 
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(
-          funcDecl, false, functionRefKind, locator);
+          funcDecl, false, functionRefInfo, locator);
       openedType = adjustFunctionTypeForConcurrency(
           origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(), funcDecl,
           useDC, numApplies, false, replacements, locator);
@@ -1436,14 +1446,14 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
 
 DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicLookup,
-    FunctionRefKind functionRefKind, ConstraintLocator *locator,
+    FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
     SmallVectorImpl<OpenedType> *replacementsPtr) {
   // Figure out the instance type used for the base.
   Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
   // If the base is a module type, just use the type of the decl.
   if (resolvedBaseTy->is<ModuleType>()) {
-    return getTypeOfReference(value, functionRefKind, locator, useDC);
+    return getTypeOfReference(value, functionRefInfo, locator, useDC);
   }
 
   // Check to see if the self parameter is applied, in which case we'll want to
@@ -1590,7 +1600,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   assert(!openedType->hasTypeParameter());
 
   unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
-      value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefKind);
+      value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefInfo);
 
   openedType = openedType->removeArgumentLabels(numRemovedArgumentLabels);
 
@@ -1651,7 +1661,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
     // Strip off the 'self' parameter
     auto *functionType = fullFunctionType->getResult()->getAs<FunctionType>();
-    functionType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
+    functionType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefInfo,
                                                        functionType, locator);
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
@@ -1671,7 +1681,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     // Don't adjust when doing witness matching, because that can cause cycles.
   } else if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
     unsigned numApplies = getNumApplications(
-        value, hasAppliedSelf, functionRefKind, locator);
+        value, hasAppliedSelf, functionRefInfo, locator);
     openedType = adjustFunctionTypeForConcurrency(
         origOpenedType->castTo<FunctionType>(), resolvedBaseTy, value, useDC,
         numApplies, isMainDispatchQueueMember(locator), replacements, locator);
@@ -1855,7 +1865,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       auto hasAppliedSelf =
           doesMemberRefApplyCurriedSelf(overload.getBaseType(), decl);
       unsigned numApplies = getNumApplications(
-          decl, hasAppliedSelf, overload.getFunctionRefKind(), locator);
+          decl, hasAppliedSelf, overload.getFunctionRefInfo(), locator);
 
       type = adjustFunctionTypeForConcurrency(
                  type->castTo<FunctionType>(), overload.getBaseType(), decl,
@@ -2014,11 +2024,11 @@ void ConstraintSystem::bindOverloadType(
                            // FIXME: Should propagate name-as-written through.
                            : DeclNameRef(choice.getName());
 
-    addValueMemberConstraint(LValueType::get(rootTy), memberName, memberTy,
-                             useDC,
-                             isSubscriptRef ? FunctionRefKind::DoubleApply
-                                            : FunctionRefKind::Unapplied,
-                             /*outerAlternatives=*/{}, keyPathLoc);
+    addValueMemberConstraint(
+        LValueType::get(rootTy), memberName, memberTy, useDC,
+        isSubscriptRef ? FunctionRefInfo::doubleBaseNameApply()
+                       : FunctionRefInfo::unappliedBaseName(),
+        /*outerAlternatives=*/{}, keyPathLoc);
 
     // In case of subscript things are more complicated comparing to "dot"
     // syntax, because we have to get "applicable function" constraint
@@ -2364,10 +2374,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       declRefType = getTypeOfMemberReference(
           baseTy, choice.getDecl(), useDC,
           (kind == OverloadChoiceKind::DeclViaDynamic),
-          choice.getFunctionRefKind(), locator, nullptr);
+          choice.getFunctionRefInfo(), locator, nullptr);
     } else {
       declRefType = getTypeOfReference(
-          choice.getDecl(), choice.getFunctionRefKind(), locator, useDC);
+          choice.getDecl(), choice.getFunctionRefInfo(), locator, useDC);
     }
 
     openedType = declRefType.openedType;
@@ -2496,7 +2506,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       // a better fix for this is to port over the #selector diagnostics from
       // CSApply to constraint fixes, and not attempt invalid disjunction
       // choices based on the selector kind on the valid code path.
-      if (choice.getFunctionRefKind() == FunctionRefKind::Unapplied &&
+      if (choice.getFunctionRefInfo().isUnappliedBaseName() &&
           !UnevaluatedRootExprs.contains(getAsExpr(anchor))) {
         increaseScore(SK_UnappliedFunction, locator);
       }

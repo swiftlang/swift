@@ -21,7 +21,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "swift/AST/Availability.h"
-#include "swift/AST/FunctionRefKind.h"
+#include "swift/AST/FunctionRefInfo.h"
 #include "swift/AST/Types.h"
 
 namespace swift {
@@ -122,20 +122,17 @@ class OverloadChoice {
   /// choice represents a key-path based dynamic lookup.
   llvm::PointerIntPair<Identifier, 1, unsigned> DynamicMember;
 
-  /// This holds the kind of function reference (Unapplied, SingleApply,
-  /// DoubleApply, Compound).
-  /// FIXME: This needs two bits. Can we pack them somewhere?
-  FunctionRefKind TheFunctionRefKind;
+  /// This holds the kind of function reference.
+  /// FIXME: This needs three bits. Can we pack them somewhere?
+  FunctionRefInfo TheFunctionRefInfo = FunctionRefInfo::unappliedBaseName();
 
 public:
-  OverloadChoice()
-    : BaseAndDeclKind(nullptr, 0), DeclOrKind(),
-      TheFunctionRefKind(FunctionRefKind::Unapplied) {}
+  OverloadChoice() : BaseAndDeclKind(nullptr, 0), DeclOrKind() {}
 
   OverloadChoice(Type base, ValueDecl *value,
-                 FunctionRefKind functionRefKind)
+                 FunctionRefInfo functionRefInfo)
     : BaseAndDeclKind(base, 0),
-      TheFunctionRefKind(functionRefKind) {
+      TheFunctionRefInfo(functionRefInfo) {
     assert(!base || !base->hasTypeParameter());
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
            "Badly aligned decl");
@@ -144,8 +141,7 @@ public:
   }
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
-      : BaseAndDeclKind(base, 0), DeclOrKind(uint32_t(kind)),
-        TheFunctionRefKind(FunctionRefKind::Unapplied) {
+      : BaseAndDeclKind(base, 0), DeclOrKind(uint32_t(kind)) {
     assert(base && "Must have a base type for overload choice");
     assert(!base->hasTypeParameter());
     assert(kind != OverloadChoiceKind::Decl &&
@@ -157,39 +153,36 @@ public:
 
   OverloadChoice(Type base, unsigned index)
       : BaseAndDeclKind(base, 0),
-        DeclOrKind(uint32_t(OverloadChoiceKind::TupleIndex)+index),
-        TheFunctionRefKind(FunctionRefKind::Unapplied) {
+        DeclOrKind(uint32_t(OverloadChoiceKind::TupleIndex) + index) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
   }
 
   bool isInvalid() const {
     return BaseAndDeclKind.getPointer().isNull() &&
-           BaseAndDeclKind.getInt() == 0 &&
-           DeclOrKind.isNull() &&
-           TheFunctionRefKind == FunctionRefKind::Unapplied;
+           BaseAndDeclKind.getInt() == 0 && DeclOrKind.isNull();
   }
 
   /// Retrieve an overload choice for a declaration that was found via
   /// dynamic lookup.
   static OverloadChoice getDeclViaDynamic(Type base, ValueDecl *value,
-                                          FunctionRefKind functionRefKind) {
+                                          FunctionRefInfo functionRefInfo) {
     OverloadChoice result;
     result.BaseAndDeclKind.setPointer(base);
     result.BaseAndDeclKind.setInt(IsDeclViaDynamic);
     result.DeclOrKind = value;
-    result.TheFunctionRefKind = functionRefKind;
+    result.TheFunctionRefInfo = functionRefInfo;
     return result;
   }
 
   /// Retrieve an overload choice for a declaration that was found via
   /// bridging to an Objective-C class.
   static OverloadChoice getDeclViaBridge(Type base, ValueDecl *value,
-                                         FunctionRefKind functionRefKind) {
+                                         FunctionRefInfo functionRefInfo) {
     OverloadChoice result;
     result.BaseAndDeclKind.setPointer(base);
     result.BaseAndDeclKind.setInt(IsDeclViaBridge);
     result.DeclOrKind = value;
-    result.TheFunctionRefKind = functionRefKind;
+    result.TheFunctionRefInfo = functionRefInfo;
     return result;
   }
 
@@ -201,14 +194,14 @@ public:
   /// match.
   static OverloadChoice
   getDeclViaUnwrappedOptional(Type base, ValueDecl *value, bool isFallback,
-                              FunctionRefKind functionRefKind) {
+                              FunctionRefInfo functionRefInfo) {
     OverloadChoice result;
     result.BaseAndDeclKind.setPointer(base);
     result.BaseAndDeclKind.setInt(isFallback
                                       ? IsFallbackDeclViaUnwrappedOptional
                                       : IsDeclViaUnwrappedOptional);
     result.DeclOrKind = value;
-    result.TheFunctionRefKind = functionRefKind;
+    result.TheFunctionRefInfo = functionRefInfo;
     return result;
   }
 
@@ -223,7 +216,7 @@ public:
     result.DeclOrKind = value;
     result.DynamicMember.setPointer(name);
     result.DynamicMember.setInt(isKeyPathBased);
-    result.TheFunctionRefKind = FunctionRefKind::SingleApply;
+    result.TheFunctionRefInfo = FunctionRefInfo::singleBaseNameApply();
     return result;
   }
 
@@ -311,9 +304,9 @@ public:
     return DeclOrKind.getOpaqueValue();
   }
 
-  FunctionRefKind getFunctionRefKind() const {
+  FunctionRefInfo getFunctionRefInfo() const {
     assert(isDecl() && "only makes sense for declaration choices");
-    return TheFunctionRefKind;
+    return TheFunctionRefInfo;
   }
 
   /// Print selected overload choice kind found for Solution in debug output.

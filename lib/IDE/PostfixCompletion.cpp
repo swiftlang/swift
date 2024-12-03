@@ -128,21 +128,19 @@ static bool isUnappliedFunctionRef(const OverloadChoice &Choice) {
   if (!Choice.isDecl()) {
     return false;
   }
-  switch (Choice.getFunctionRefKind()) {
-  case FunctionRefKind::Unapplied:
+  auto fnRefKind = Choice.getFunctionRefInfo();
+
+  if (fnRefKind.isUnapplied())
     return true;
-  case FunctionRefKind::SingleApply:
-    if (auto BaseTy = Choice.getBaseType()) {
-      // We consider curried member calls as unapplied. E.g.
-      //   MyStruct.someInstanceFunc(theInstance)#^COMPLETE^#
-      // is unapplied.
+
+  // We consider curried member calls as unapplied. E.g.
+  //   MyStruct.someInstanceFunc(theInstance)#^COMPLETE^#
+  // is unapplied.
+  if (fnRefKind.isSingleApply()) {
+    if (auto BaseTy = Choice.getBaseType())
       return BaseTy->is<MetatypeType>() && !Choice.getDeclOrNull()->isStatic();
-    } else {
-      return false;
-    }
-  default:
-    return false;
   }
+  return false;
 }
 
 void PostfixCompletionCallback::sawSolutionImpl(
