@@ -109,7 +109,7 @@ extension Span where Element: ~Copyable {
     let span = Span(_unchecked: baseAddress, count: buffer.count)
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -129,7 +129,7 @@ extension Span where Element: ~Copyable {
     let span = Span(_unsafeElements: buf)
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -153,7 +153,7 @@ extension Span where Element: ~Copyable {
     let span = Span(_unsafeElements: buf)
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'pointer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: pointer)
+    self = _overrideLifetime(span, borrowing: pointer)
   }
 }
 
@@ -177,7 +177,7 @@ extension Span {
     let span = Span(_unsafeElements: buf)
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -197,7 +197,7 @@ extension Span {
     let span = Span(_unsafeElements: buf)
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 }
 
@@ -236,7 +236,7 @@ extension Span where Element: BitwiseCopyable {
     let span = Span(_unchecked: baseAddress, count: count)
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -260,7 +260,7 @@ extension Span where Element: BitwiseCopyable {
     let span = Span(_unsafeBytes: rawBuffer)
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -288,7 +288,7 @@ extension Span where Element: BitwiseCopyable {
     let span = Span(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'pointer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: pointer)
+    self = _overrideLifetime(span, borrowing: pointer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -312,7 +312,7 @@ extension Span where Element: BitwiseCopyable {
     let span = Span(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -336,7 +336,7 @@ extension Span where Element: BitwiseCopyable {
     let span = Span(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Create a `Span` over the bytes represented by a `RawSpan`
@@ -352,7 +352,7 @@ extension Span where Element: BitwiseCopyable {
     let span = Span(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'bytes'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, dependsOn: bytes)
+    self = _overrideLifetime(span, copying: bytes)
   }
 }
 
@@ -526,7 +526,7 @@ extension Span where Element: ~Copyable {
     let newSpan = Span(_unchecked: newStart, count: bounds.count)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
-    return _unsafeLifetime(dependent: newSpan, dependsOn: self)
+    return _overrideLifetime(newSpan, copying: self)
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -752,7 +752,7 @@ extension Span where Element: ~Copyable {
     let newSpan = Span(_unchecked: newStart, count: newCount)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    return _unsafeLifetime(dependent: newSpan, dependsOn: self)
+    return _overrideLifetime(newSpan, copying: self)
   }
 
   /// Returns a span over all but the given number of initial elements.
@@ -779,6 +779,6 @@ extension Span where Element: ~Copyable {
     let newSpan = Span(_unchecked: newStart, count: count &- droppedCount)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    return _unsafeLifetime(dependent: newSpan, dependsOn: self)
+    return _overrideLifetime(newSpan, copying: self)
   }
 }

@@ -286,37 +286,36 @@ public func _copy<T>(_ value: T) -> T {
 
 /// Unsafely discard any lifetime dependency on the `dependent` argument. Return
 /// a value identical to `dependent` with a lifetime dependency on the caller's
-/// borrow scope of the `borrows` argument.
-///
-/// TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-/// should be expressed by a builtin that is hidden within the function body.
+/// borrow scope of the `source` argument.
+@unsafe
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @inline(__always)
 @lifetime(borrow source)
-internal func _unsafeLifetime<T: ~Copyable & ~Escapable,
-                              U: ~Copyable & ~Escapable>(
-  dependent: consuming T, borrows source: borrowing U
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, borrowing source: borrowing U
 ) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
   dependent
 }
 
 /// Unsafely discard any lifetime dependency on the `dependent` argument. Return
 /// a value identical to `dependent` that inherits all lifetime dependencies from
-/// the `dependsOn` argument.
-///
-/// Transferring generic lifetime dependencies from `dependsOn` requires the
-/// result to have the same type.
-///
-/// TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-/// should be expressed by a builtin that is hidden within the function body.
+/// the `source` argument.
+@unsafe
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @inline(__always)
 @lifetime(source)
-internal func _unsafeLifetime<T: ~Copyable & ~Escapable,
-                              U: ~Copyable & ~Escapable>(
-  dependent: consuming T, dependsOn source: borrowing U
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
 ) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
   dependent
 }

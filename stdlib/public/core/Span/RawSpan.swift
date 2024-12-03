@@ -101,7 +101,7 @@ extension RawSpan {
     let span = RawSpan(_unchecked: baseAddress, byteCount: buffer.count)
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -121,7 +121,7 @@ extension RawSpan {
     let span = RawSpan(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -141,7 +141,7 @@ extension RawSpan {
     let span = RawSpan(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   @_alwaysEmitIntoClient
@@ -154,7 +154,7 @@ extension RawSpan {
     let span = RawSpan(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -194,7 +194,7 @@ extension RawSpan {
     let span = RawSpan(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -214,7 +214,7 @@ extension RawSpan {
     let span = RawSpan(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -234,7 +234,7 @@ extension RawSpan {
     let span = RawSpan(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -255,7 +255,7 @@ extension RawSpan {
     let span = RawSpan(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _unsafeLifetime(dependent: span, borrows: buffer)
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -374,7 +374,7 @@ extension RawSpan {
   public func _extracting(unchecked bounds: Range<Int>) -> Self {
     let newStart = _pointer?.advanced(by: bounds.lowerBound)
     let newSpan = RawSpan(_unchecked: newStart, byteCount: bounds.count)
-    return _unsafeLifetime(dependent: newSpan, dependsOn: self)
+    return _overrideLifetime(newSpan, copying: self)
   }
 
   /// Constructs a new span over the bytes within the supplied range of
@@ -488,7 +488,7 @@ extension RawSpan {
     let newSpan = Span<T>(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
-    return _unsafeLifetime(dependent: newSpan, dependsOn: self)
+    return _overrideLifetime(newSpan, copying: self)
   }
 }
 
@@ -711,7 +711,7 @@ extension RawSpan {
     let newSpan = RawSpan(_unchecked: newStart, byteCount: newCount)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
-    return _unsafeLifetime(dependent: newSpan, dependsOn: self)
+    return _overrideLifetime(newSpan, copying: self)
   }
 
   /// Returns a span over all but the given number of initial bytes.
@@ -737,6 +737,6 @@ extension RawSpan {
     let newSpan = RawSpan(_unchecked: newStart, byteCount: byteCount &- droppedCount)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
-    return _unsafeLifetime(dependent: newSpan, dependsOn: self)
+    return _overrideLifetime(newSpan, copying: self)
   }
 }
