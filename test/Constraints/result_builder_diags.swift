@@ -629,15 +629,37 @@ _ = wrapperifyInfer(true) { x in // Ok
 
 struct DoesNotConform {}
 
+struct List<C> {
+  typealias T = C
+
+  init(@TupleBuilder _: () -> C) {}
+}
+
+extension List: P where C: P {}
+
 struct MyView {
-  @TupleBuilder var value: some P { // expected-error {{return type of property 'value' requires that 'DoesNotConform' conform to 'P'}}
-    // expected-note@-1 {{opaque return type declared here}}
-    DoesNotConform()
+  struct Conforms : P {
+    typealias T = Void
   }
 
-  @TupleBuilder func test() -> some P { // expected-error {{return type of instance method 'test()' requires that 'DoesNotConform' conform to 'P'}}
+  @TupleBuilder var value: some P {
     // expected-note@-1 {{opaque return type declared here}}
-    DoesNotConform()
+    DoesNotConform() // expected-error {{return type of property 'value' requires that 'DoesNotConform' conform to 'P'}}
+  }
+
+  @TupleBuilder var nestedFailures: some P {
+    // expected-note@-1 {{opaque return type declared here}}
+    List {
+      List {
+        DoesNotConform()
+        // expected-error@-1 {{return type of property 'nestedFailures' requires that 'DoesNotConform' conform to 'P'}}
+      }
+    }
+  }
+
+  @TupleBuilder func test() -> some P {
+    // expected-note@-1 {{opaque return type declared here}}
+    DoesNotConform() // expected-error {{return type of instance method 'test()' requires that 'DoesNotConform' conform to 'P'}}
   }
 
   @TupleBuilder var emptySwitch: some P {

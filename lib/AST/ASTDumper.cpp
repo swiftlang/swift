@@ -4094,6 +4094,18 @@ namespace {
       printFoot();
     }
 
+    void visitLocatableType(LocatableType *T, StringRef label) {
+      printCommon("locatable_type", label);
+      printFieldQuotedRaw(
+          [&](raw_ostream &OS) {
+            auto &C = T->getASTContext();
+            T->getLoc().print(OS, C.SourceMgr);
+          },
+          "loc");
+      printRec(T->getSinglyDesugaredType(), "underlying");
+      printFoot();
+    }
+
     void visitPackType(PackType *T, StringRef label) {
       printCommon("pack_type", label);
 

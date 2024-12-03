@@ -5443,6 +5443,10 @@ public:
     llvm_unreachable("error union types do not persist in the AST");
   }
 
+  void visitLocatableType(const LocatableType *) {
+    llvm_unreachable("locatable types do not persist in the AST");
+  }
+
   void visitBuiltinTypeImpl(Type ty) {
     using namespace decls_block;
     TypeAliasDecl *typeAlias =

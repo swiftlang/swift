@@ -2213,6 +2213,12 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
                                     L.File, 0, Scope);
     }
 
+    case TypeKind::Locatable: {
+      auto *Sugar = cast<LocatableType>(BaseTy);
+      auto *CanTy = Sugar->getSinglyDesugaredType();
+      return getOrCreateDesugaredType(CanTy, DbgTy);
+    }
+
     // SyntaxSugarType derivations.
     case TypeKind::Dictionary:
     case TypeKind::ArraySlice:
