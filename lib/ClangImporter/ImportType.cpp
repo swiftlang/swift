@@ -55,6 +55,13 @@
 using namespace swift;
 using namespace importer;
 
+// XXX: This is to resolve the build dependency with Clang. Remove it once these
+// types actually land in Clang.
+namespace clang {
+class DynamicRangePointerType;
+class ValueTerminatedType;
+}
+
 /// Given that a type is the result of a special typedef import, was
 /// it originally a CF pointer?
 static bool isImportedCFPointer(clang::QualType clangType, Type type) {
