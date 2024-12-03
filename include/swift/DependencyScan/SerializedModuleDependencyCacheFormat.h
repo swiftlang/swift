@@ -39,10 +39,9 @@ using llvm::BCVBR;
 
 /// Every .moddepcache file begins with these 4 bytes, for easy identification.
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR =
-    7; // isSystem
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 8;
 /// Increment this on every change.
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 1;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 0;
 
 /// Various identifiers in this format will rely on having their strings mapped
 /// using this ID.
@@ -74,6 +73,7 @@ using ContextHashIDField = IdentifierIDField;
 using ModuleCacheKeyIDField = IdentifierIDField;
 using ImportArrayIDField = IdentifierIDField;
 using LinkLibrariesArrayIDField = IdentifierIDField;
+using MacroDependenciesArrayIDField = IdentifierIDField;
 using FlagIDArrayIDField = IdentifierIDField;
 using DependencyIDArrayIDField = IdentifierIDField;
 using AuxiliaryFilesArrayIDField = IdentifierIDField;
@@ -95,6 +95,8 @@ enum {
   MODULE_NODE,
   LINK_LIBRARY_NODE,
   LINK_LIBRARY_ARRAY_NODE,
+  MACRO_DEPENDENCY_NODE,
+  MACRO_DEPENDENCY_ARRAY_NODE,
   SOURCE_LOCATION_NODE,
   IMPORT_STATEMENT_NODE,
   SWIFT_INTERFACE_MODULE_DETAILS_NODE,
@@ -133,16 +135,29 @@ using IdentifierNodeLayout = BCRecordLayout<IDENTIFIER_NODE, BCBlob>;
 using IdentifierArrayLayout =
     BCRecordLayout<IDENTIFIER_ARRAY_NODE, IdentifierIDArryField>;
 
-using LinkLibraryArrayLayout =
-    BCRecordLayout<LINK_LIBRARY_ARRAY_NODE, IdentifierIDArryField>;
-
+// ACTODO: Comment
 using LinkLibraryLayout =
     BCRecordLayout<LINK_LIBRARY_NODE,            // ID
                    IdentifierIDField,            // libraryName
                    IsFrameworkField,             // isFramework
                    IsForceLoadField              // forceLoad
                    >;
+// ACTODO: Comment
+using LinkLibraryArrayLayout =
+    BCRecordLayout<LINK_LIBRARY_ARRAY_NODE, IdentifierIDArryField>;
 
+// ACTODO: Comment
+using MacroDependencyLayout =
+    BCRecordLayout<MACRO_DEPENDENCY_NODE,        // ID
+                   IdentifierIDField,            // macroModuleName
+                   IdentifierIDField,            // libraryPath
+                   IdentifierIDField             // executablePath
+                   >;
+// ACTODO: Comment
+using MacroDependencyArrayLayout =
+    BCRecordLayout<MACRO_DEPENDENCY_ARRAY_NODE, IdentifierIDArryField>;
+
+// ACTODO: Comment
 using SourceLocationLayout =
     BCRecordLayout<LINK_LIBRARY_NODE,            // ID
                    IdentifierIDField,            // bufferIdentifier
@@ -150,6 +165,7 @@ using SourceLocationLayout =
                    ColumnNumberField             // columnNumber
                    >;
 
+// ACTODO: Comment
 using ImportStatementLayout =
     BCRecordLayout<LINK_LIBRARY_NODE,            // ID
                    IdentifierIDField,            // importIdentifier
@@ -169,13 +185,13 @@ using ModuleInfoLayout =
                    ImportArrayIDField,             // moduleImports
                    ImportArrayIDField,             // optionalModuleImports
                    LinkLibrariesArrayIDField,      // linkLibraries
+                   MacroDependenciesArrayIDField,  // macroDependencies
                    DependencyIDArrayIDField,       // importedSwiftModules
                    DependencyIDArrayIDField,       // importedClangModules
                    DependencyIDArrayIDField,       // crossImportOverlayModules
                    DependencyIDArrayIDField,       // swiftOverlayDependencies
                    ModuleCacheKeyIDField,          // moduleCacheKey
                    AuxiliaryFilesArrayIDField      // auxiliaryFiles
-                   // ACTODO: MacroDependenciesArrayIDField,           // macroDependencies
                    >;
 
 using SwiftInterfaceModuleDetailsLayout =

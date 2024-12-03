@@ -44,6 +44,9 @@ class ModuleDependenciesCacheDeserializer {
   std::vector<std::vector<uint64_t>> ArraysOfIdentifierIDs;
   std::vector<LinkLibrary> LinkLibraries;
   std::vector<std::vector<uint64_t>> ArraysOfLinkLibraryIDs;
+  std::vector<std::pair<std::string, MacroPluginDependency>> MacroDependencies;
+  std::vector<std::vector<uint64_t>> ArraysOfMacroDependenciesIDs;
+
   llvm::BitstreamCursor Cursor;
   SmallVector<uint64_t, 64> Scratch;
   StringRef BlobData;
@@ -52,12 +55,14 @@ class ModuleDependenciesCacheDeserializer {
   bool readSignature();
   bool enterGraphBlock();
   bool readMetadata();
-  bool readLinkLibraries();
   bool readGraph(ModuleDependenciesCache &cache);
 
   std::optional<std::string> getIdentifier(unsigned n);
   std::optional<std::vector<std::string>> getStringArray(unsigned n);
   std::optional<std::vector<LinkLibrary>> getLinkLibraryArray(unsigned n);
+  std::optional<std::vector<std::pair<std::string, MacroPluginDependency>>>
+  getMacroDependenciesArray(unsigned n);
+
   std::optional<std::vector<ModuleDependencyID>>
   getModuleDependencyIDArray(unsigned n);
 
@@ -179,6 +184,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
   std::vector<ModuleDependencyID> crossImportOverlayDependenciesIDs;
   std::vector<ModuleDependencyID> swiftOverlayDependenciesIDs;
   std::vector<LinkLibrary> linkLibraries;
+  std::vector<std::pair<std::string, MacroPluginDependency>> macroDependencies;
   std::vector<std::string> auxiliaryFiles;
 
   while (!Cursor.AtEndOfStream()) {
@@ -247,11 +253,41 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       break;
     }
 
+    case MACRO_DEPENDENCY_NODE: {
+      unsigned macroModuleNameID, libraryPathID, executablePathID;
+      MacroDependencyLayout::readRecord(Scratch,
+                                        macroModuleNameID,
+                                        libraryPathID, executablePathID);
+      auto macroModuleName = getIdentifier(macroModuleNameID);
+      if (!macroModuleName)
+        llvm::report_fatal_error("Bad macro dependency: no module name");
+
+      auto libraryPath = getIdentifier(libraryPathID);
+      if (!libraryPath)
+        llvm::report_fatal_error("Bad macro dependency: no library path");
+
+      auto executablePath = getIdentifier(executablePathID);
+      if (!executablePath)
+        llvm::report_fatal_error("Bad macro dependency: no executable path");
+
+      MacroDependencies.push_back({macroModuleName.value(),
+                                   MacroPluginDependency{libraryPath.value(),
+                                                         executablePath.value()}});
+      break;
+    }
+
+    case MACRO_DEPENDENCY_ARRAY_NODE: {
+      ArrayRef<uint64_t> identifierIDs;
+      MacroDependencyArrayLayout::readRecord(Scratch, identifierIDs);
+      ArraysOfMacroDependenciesIDs.push_back(identifierIDs.vec());
+      break;
+    }
+
     case MODULE_NODE: {
       hasCurrentModule = true;
       unsigned moduleNameID,
                moduleImportsArrayID, optionalModuleImportsArrayID,
-               linkLibraryArrayID,
+               linkLibraryArrayID, macroDependencyArrayID,
                importedSwiftDependenciesIDsArrayID,
                importedClangDependenciesIDsArrayID,
                crossImportOverlayDependenciesIDsArrayID,
@@ -261,7 +297,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       ModuleInfoLayout::readRecord(Scratch, moduleNameID,
                                    moduleImportsArrayID,
                                    optionalModuleImportsArrayID,
-                                   linkLibraryArrayID,
+                                   linkLibraryArrayID, macroDependencyArrayID,
                                    importedSwiftDependenciesIDsArrayID,
                                    importedClangDependenciesIDsArrayID,
                                    crossImportOverlayDependenciesIDsArrayID,
@@ -312,6 +348,12 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       if (!optionalLinkLibraries)
         llvm::report_fatal_error("Bad Link Libraries info");
       linkLibraries = *optionalLinkLibraries;
+
+      auto optionalMacroDependencies = getMacroDependenciesArray(macroDependencyArrayID);
+      if (!optionalMacroDependencies)
+        llvm::report_fatal_error("Bad Macro Dependencies info");
+      macroDependencies = *optionalMacroDependencies;
+
       break;
     }
 
@@ -428,7 +470,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       if (!bridgingModuleDeps)
         llvm::report_fatal_error("Bad bridging module dependencies");
       llvm::StringSet<> alreadyAdded;
-
       std::vector<ModuleDependencyID> bridgingModuleDepIDs;
       for (const auto &mod : bridgingModuleDeps.value())
         bridgingModuleDepIDs.push_back(ModuleDependencyID{mod, ModuleDependencyKind::Clang});
@@ -442,6 +483,13 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       if (!bridgingHeaderIncludeTree->empty())
         moduleDep.addBridgingHeaderIncludeTree(*bridgingHeaderIncludeTree);
 
+      // Add macro dependencies
+      for (const auto &md: macroDependencies)
+        moduleDep.addMacroDependency(md.first,
+                                     md.second.LibraryPath,
+                                     md.second.ExecutablePath);
+
+      moduleDep.setIsFinalized(true);
       cache.recordDependency(currentModuleName, std::move(moduleDep));
       hasCurrentModule = false;
       break;
@@ -547,6 +595,13 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       if (!bridgingHeaderIncludeTree->empty())
         moduleDep.addBridgingHeaderIncludeTree(*bridgingHeaderIncludeTree);
 
+      // Add macro dependencies
+      for (const auto &md: macroDependencies)
+        moduleDep.addMacroDependency(md.first,
+                                     md.second.LibraryPath,
+                                     md.second.ExecutablePath);
+
+      moduleDep.setIsFinalized(true);
       cache.recordDependency(currentModuleName, std::move(moduleDep));
       hasCurrentModule = false;
       break;
@@ -627,6 +682,13 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       for (const auto &depSource : *headerImportsSourceFiles)
         moduleDep.addHeaderSourceFile(depSource);
 
+      // Add macro dependencies
+      for (const auto &md: macroDependencies)
+        moduleDep.addMacroDependency(md.first,
+                                     md.second.LibraryPath,
+                                     md.second.ExecutablePath);
+
+      moduleDep.setIsFinalized(true);
       cache.recordDependency(currentModuleName, std::move(moduleDep));
       hasCurrentModule = false;
       break;
@@ -722,6 +784,13 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       // Add qualified dependencies of this module
       moduleDep.setImportedClangDependencies(importedClangDependenciesIDs);
 
+      // Add macro dependencies
+      for (const auto &md: macroDependencies)
+        moduleDep.addMacroDependency(md.first,
+                                     md.second.LibraryPath,
+                                     md.second.ExecutablePath);
+
+      moduleDep.setIsFinalized(true);
       cache.recordDependency(currentModuleName, std::move(moduleDep));
       hasCurrentModule = false;
       break;
@@ -806,6 +875,27 @@ ModuleDependenciesCacheDeserializer::getLinkLibraryArray(unsigned n) {
     return LinkLibraries[index];
   };
   std::vector<LinkLibrary> result;
+  result.reserve(llIDs.size());
+  std::transform(llIDs.begin(), llIDs.end(),
+                 std::back_inserter(result), IDtoLLMap);
+  return result;
+}
+
+std::optional<std::vector<std::pair<std::string, MacroPluginDependency>>>
+ModuleDependenciesCacheDeserializer::getMacroDependenciesArray(unsigned n) {
+  if (n == 0)
+    return std::vector<std::pair<std::string, MacroPluginDependency>>();
+
+  --n;
+  if (n >= ArraysOfMacroDependenciesIDs.size())
+    return std::nullopt;
+
+  auto &llIDs = ArraysOfMacroDependenciesIDs[n];
+
+  auto IDtoLLMap = [this](unsigned index) {
+    return MacroDependencies[index];
+  };
+  std::vector<std::pair<std::string, MacroPluginDependency>> result;
   result.reserve(llIDs.size());
   std::transform(llIDs.begin(), llIDs.end(),
                  std::back_inserter(result), IDtoLLMap);
@@ -931,6 +1021,9 @@ class ModuleDependenciesCacheSerializer {
   std::unordered_map<ModuleDependencyID,
                      unsigned>
       LinkLibraryArrayIDsMap;
+  std::unordered_map<ModuleDependencyID,
+                     unsigned>
+      MacroDependenciesArrayIDsMap;
 
   llvm::BitstreamWriter &Out;
 
@@ -953,6 +1046,7 @@ class ModuleDependenciesCacheSerializer {
   unsigned getIdentifierArrayID(ModuleDependencyID moduleID,
                                 ModuleIdentifierArrayKind arrayKind) const;
   unsigned getLinkLibrariesArrayID(ModuleDependencyID moduleID) const;
+  unsigned getMacroDependenciesArrayID(ModuleDependencyID moduleID) const;
 
   template <typename Layout>
   void registerRecordAbbr() {
@@ -978,9 +1072,12 @@ class ModuleDependenciesCacheSerializer {
   void writeArraysOfIdentifiers();
 
   void writeLinkLibraries(const ModuleDependenciesCache &cache);
-  unsigned writeLinkLibraryInfos(ModuleDependencyID moduleID,
-                                 const ModuleDependencyInfo &dependencyInfo);
+  unsigned writeLinkLibraryInfos(const ModuleDependencyInfo &dependencyInfo);
   void writeLinkLibraryInfoArray(unsigned startIndex, unsigned count);
+
+  void writeMacroDependencies(const ModuleDependenciesCache &cache);
+  unsigned writeMacroDependencies(const ModuleDependencyInfo &dependencyInfo);
+  void writeMacroDependenciesArray(unsigned startIndex, unsigned count);
 
   void writeModuleInfo(ModuleDependencyID moduleID,
                        const ModuleDependencyInfo &dependencyInfo);
@@ -1034,6 +1131,8 @@ void ModuleDependenciesCacheSerializer::writeBlockInfoBlock() {
 
   BLOCK_RECORD(graph_block, LINK_LIBRARY_NODE);
   BLOCK_RECORD(graph_block, LINK_LIBRARY_ARRAY_NODE);
+  BLOCK_RECORD(graph_block, MACRO_DEPENDENCY_NODE);
+  BLOCK_RECORD(graph_block, MACRO_DEPENDENCY_ARRAY_NODE);
   BLOCK_RECORD(graph_block, MODULE_NODE);
   BLOCK_RECORD(graph_block, SWIFT_INTERFACE_MODULE_DETAILS_NODE);
   BLOCK_RECORD(graph_block, SWIFT_SOURCE_MODULE_DETAILS_NODE);
@@ -1084,7 +1183,7 @@ void ModuleDependenciesCacheSerializer::writeLinkLibraries(const ModuleDependenc
       auto optionalDependencyInfo = cache.findDependency(moduleID);
       assert(optionalDependencyInfo.has_value() && "Expected dependency info.");
       auto dependencyInfo = optionalDependencyInfo.value();
-      unsigned numLLs = writeLinkLibraryInfos(moduleID, *dependencyInfo);
+      unsigned numLLs = writeLinkLibraryInfos(*dependencyInfo);
       moduleLLArrayMap.insert({moduleID, std::make_pair(lastLLIndex, numLLs)});
       lastLLIndex += numLLs;
     }
@@ -1106,7 +1205,6 @@ void ModuleDependenciesCacheSerializer::writeLinkLibraries(const ModuleDependenc
 }
 
 unsigned ModuleDependenciesCacheSerializer::writeLinkLibraryInfos(
-    ModuleDependencyID moduleID,
     const ModuleDependencyInfo &dependencyInfo) {
   using namespace graph_block;
   for (auto &linkLibrary : dependencyInfo.getLinkLibraries()) {
@@ -1127,6 +1225,59 @@ void ModuleDependenciesCacheSerializer::writeLinkLibraryInfoArray(
       Out, ScratchRecord, AbbrCodes[LinkLibraryArrayLayout::Code], vec);
 }
 
+void ModuleDependenciesCacheSerializer::writeMacroDependencies(const ModuleDependenciesCache &cache) {
+  unsigned lastMDIndex = 0;
+  std::map<ModuleDependencyID, std::pair<unsigned, unsigned>> moduleMacroDepArrayMap;
+  for (auto kind = ModuleDependencyKind::FirstKind;
+       kind != ModuleDependencyKind::LastKind; ++kind) {
+    auto modMap = cache.getDependenciesMap(kind);
+    for (const auto &entry : modMap) {
+      ModuleDependencyID moduleID = {entry.getKey().str(), kind};
+      auto optionalDependencyInfo = cache.findDependency(moduleID);
+      assert(optionalDependencyInfo.has_value() && "Expected dependency info.");
+      auto dependencyInfo = optionalDependencyInfo.value();
+      unsigned numMDs = writeMacroDependencies(*dependencyInfo);
+      moduleMacroDepArrayMap.insert({moduleID, std::make_pair(lastMDIndex, numMDs)});
+      lastMDIndex += numMDs;
+    }
+  }
+
+  unsigned lastMDArrayIndex = 1;
+  for (auto kind = ModuleDependencyKind::FirstKind;
+       kind != ModuleDependencyKind::LastKind; ++kind) {
+    auto modMap = cache.getDependenciesMap(kind);
+    for (const auto &entry : modMap) {
+      ModuleDependencyID moduleID = {entry.getKey().str(), kind};
+      auto entries = moduleMacroDepArrayMap.at(moduleID);
+      if (entries.second == 0)
+        continue;
+      writeMacroDependenciesArray(entries.first, entries.second);
+      MacroDependenciesArrayIDsMap.insert({moduleID, lastMDArrayIndex++});
+    }
+  }
+}
+
+unsigned ModuleDependenciesCacheSerializer::writeMacroDependencies(
+    const ModuleDependencyInfo &dependencyInfo) {
+  using namespace graph_block;
+  for (auto &macroDependency : dependencyInfo.getMacroDependencies()) {
+    MacroDependencyLayout::emitRecord(Out, ScratchRecord, AbbrCodes[MacroDependencyLayout::Code],
+                                      getIdentifier(macroDependency.first),
+                                      getIdentifier(macroDependency.second.LibraryPath),
+                                      getIdentifier(macroDependency.second.ExecutablePath));
+  }
+  return dependencyInfo.getMacroDependencies().size();
+}
+
+void ModuleDependenciesCacheSerializer::writeMacroDependenciesArray(
+    unsigned startIndex, unsigned count) {
+  using namespace graph_block;
+  std::vector<unsigned> vec(count);
+  std::iota(vec.begin(), vec.end(), startIndex);
+  MacroDependencyArrayLayout::emitRecord(
+      Out, ScratchRecord, AbbrCodes[MacroDependencyArrayLayout::Code], vec);
+}
+
 void ModuleDependenciesCacheSerializer::writeModuleInfo(
     ModuleDependencyID moduleID,
     const ModuleDependencyInfo &dependencyInfo) {
@@ -1137,7 +1288,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
       getIdentifier(moduleID.ModuleName),
       getIdentifierArrayID(moduleID, ModuleIdentifierArrayKind::DependencyImports),
       getIdentifierArrayID(moduleID, ModuleIdentifierArrayKind::OptionalDependencyImports),
-      getLinkLibrariesArrayID(moduleID),
+      getLinkLibrariesArrayID(moduleID), getMacroDependenciesArrayID(moduleID),
       getIdentifierArrayID(moduleID, ModuleIdentifierArrayKind::ImportedSwiftDependenciesIDs),
       getIdentifierArrayID(moduleID, ModuleIdentifierArrayKind::ImportedClangDependenciesIDs),
       getIdentifierArrayID(moduleID, ModuleIdentifierArrayKind::CrossImportOverlayDependenciesIDs),
@@ -1341,6 +1492,14 @@ unsigned ModuleDependenciesCacheSerializer::getLinkLibrariesArrayID(ModuleDepend
   return iter->second;
 }
 
+unsigned ModuleDependenciesCacheSerializer::getMacroDependenciesArrayID(ModuleDependencyID moduleID) const {
+  auto iter = MacroDependenciesArrayIDsMap.find(moduleID);
+  if (iter == MacroDependenciesArrayIDsMap.end())
+    return 0;
+
+  return iter->second;
+}
+
 void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
     const ModuleDependenciesCache &cache) {
   addIdentifier(cache.scannerContextHash);
@@ -1363,6 +1522,12 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
 
       for (const auto &ll : dependencyInfo->getLinkLibraries())
         addIdentifier(ll.getName().str());
+
+      for (const auto &md : dependencyInfo->getMacroDependencies()) {
+        addIdentifier(md.first);
+        addIdentifier(md.second.LibraryPath);
+        addIdentifier(md.second.ExecutablePath);
+      }
 
       // Add the module's imports
       std::vector<std::string> importIdentifiers;
@@ -1523,6 +1688,8 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
   registerRecordAbbr<IdentifierArrayLayout>();
   registerRecordAbbr<LinkLibraryLayout>();
   registerRecordAbbr<LinkLibraryArrayLayout>();
+  registerRecordAbbr<MacroDependencyLayout>();
+  registerRecordAbbr<MacroDependencyArrayLayout>();
 //  registerRecordAbbr<SourceLocationLayout>();
 //  registerRecordAbbr<ImportStatementLayout>();
   registerRecordAbbr<ModuleInfoLayout>();
@@ -1547,6 +1714,9 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
 
   // Write all the arrays of link library infos for this graph
   writeLinkLibraries(cache);
+
+  // Write all the arrays of macro dependency infos for this graph
+  writeMacroDependencies(cache);
 
   // Write the core graph
   for (auto kind = ModuleDependencyKind::FirstKind;
