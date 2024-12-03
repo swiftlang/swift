@@ -579,7 +579,7 @@ void ASTMangler::appendIndexSubset(IndexSubset *indices) {
 
 static NodePointer mangleSILDifferentiabilityWitnessAsNode(
     StringRef originalName, DifferentiabilityKind kind,
-    const AutoDiffConfig &config, Demangler &demangler) {
+    const AutoDiffConfig &config, Demangler &demangler, ASTMangler *mangler) {
   auto *diffWitnessNode = demangler.createNode(
       Node::Kind::DifferentiabilityWitness);
   auto origNode = demangler.demangleSymbol(originalName);
@@ -600,7 +600,11 @@ static NodePointer mangleSILDifferentiabilityWitnessAsNode(
           Node::Kind::IndexSubset, config.resultIndices->getString()),
       demangler);
   if (auto genSig = config.derivativeGenericSignature) {
+#if 0 // STAGING
+    ASTMangler genSigMangler(mangler->getASTContext());
+#else
     ASTMangler genSigMangler;
+#endif
     auto genSigSymbol = genSigMangler.mangleGenericSignature(genSig);
     auto demangledGenSig = demangler.demangleSymbol(genSigSymbol);
     assert(demangledGenSig);
@@ -620,8 +624,8 @@ std::string ASTMangler::mangleSILDifferentiabilityWitness(StringRef originalName
   if (isMangledName(originalName)) {
     Demangler demangler;
     auto *node = mangleSILDifferentiabilityWitnessAsNode(
-        originalName, kind, config, demangler);
-    auto mangling = mangleNode(node);
+        originalName, kind, config, demangler, this);
+    auto mangling = mangleNode(node, Flavor);
     if (!mangling.isSuccess()) {
       llvm_unreachable("unexpected mangling failure");
     }
@@ -713,8 +717,13 @@ static Type getTypeForDWARFMangling(Type t) {
 }
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, GenericSignature sig) {
-  PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),
-                                        "mangling type for debugger", Ty);
+#if 0 // STAGING
+  PrettyStackTraceType prettyStackTrace(Context, "mangling type for debugger",
+                                        Ty);
+#else
+  PrettyStackTraceType prettyStackTrace(Ty->getASTContext(), "mangling type for debugger",
+                                        Ty);
+#endif
 
   DWARFMangling = true;
   RespectOriginallyDefinedIn = false;
@@ -879,7 +888,7 @@ ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
   if (!Decl->isInvalid())
-    verify(Storage.str());
+    verify(Storage.str(), Flavor);
   return finalize();
 }
 
@@ -899,7 +908,7 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
   if (!decl->isInvalid())
-    verify(Storage.str().drop_front(USRPrefix.size()));
+    verify(Storage.str().drop_front(USRPrefix.size()), Flavor);
   return finalize();
 }
 
@@ -1323,7 +1332,11 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       // unless the type alias references a builtin type.
       auto underlyingType = aliasTy->getSinglyDesugaredType();
       TypeAliasDecl *decl = aliasTy->getDecl();
+#if 0 // STAGING
+      if (decl->getModuleContext() == Context.TheBuiltinModule) {
+#else
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
+#endif
         return appendType(underlyingType, sig, forDecl);
       }
 
@@ -2124,8 +2137,13 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     OpArgs.push_back('t');
   }
 
+#if 0 // STAGING
+  bool mangleClangType =
+      Context.LangOpts.UseClangFunctionTypes && fn->hasNonDerivableClangType();
+#else
   bool mangleClangType = fn->getASTContext().LangOpts.UseClangFunctionTypes &&
                          fn->hasNonDerivableClangType();
+#endif
 
   auto appendClangTypeToVec = [this, fn](auto &Vec) {
     llvm::raw_svector_ostream OpArgsOS(Vec);
@@ -3035,8 +3053,13 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
 
   appendFunctionSignature(fn, sig, forDecl, NoFunctionMangling, isRecursedInto);
 
+#if 0 // STAGING
+  bool mangleClangType =
+      Context.LangOpts.UseClangFunctionTypes && fn->hasNonDerivableClangType();
+#else
   bool mangleClangType = fn->getASTContext().LangOpts.UseClangFunctionTypes &&
                          fn->hasNonDerivableClangType();
+#endif
 
   // Note that we do not currently use thin representations in the AST
   // for the types of function decls.  This may need to change at some
@@ -3086,8 +3109,13 @@ void ASTMangler::appendClangType(FnType *fn, llvm::raw_svector_ostream &out) {
   auto clangType = fn->getClangTypeInfo().getType();
   SmallString<64> scratch;
   llvm::raw_svector_ostream scratchOS(scratch);
+#if 0 // STAGING
   clang::ASTContext &clangCtx =
+      Context.getClangModuleLoader()->getClangASTContext();
+#else
+   clang::ASTContext &clangCtx =
       fn->getASTContext().getClangModuleLoader()->getClangASTContext();
+#endif
   std::unique_ptr<clang::ItaniumMangleContext> mangler{
       clang::ItaniumMangleContext::create(clangCtx, clangCtx.getDiagnostics())};
   mangler->mangleCanonicalTypeName(clang::QualType(clangType, 0), scratchOS);
@@ -3113,7 +3141,11 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   if (fn->isSendable())
     appendOperator("Yb");
   if (auto thrownError = fn->getEffectiveThrownErrorType()) {
+#if 0 // STAGING
+    if ((*thrownError)->isEqual(Context.getErrorExistentialType())
+#else
     if ((*thrownError)->isEqual(fn->getASTContext().getErrorExistentialType())
+#endif
         || !AllowTypedThrows) {
       appendOperator("K");
     } else {
@@ -3812,7 +3844,11 @@ void ASTMangler::appendClosureEntity(const AbstractClosureExpr *closure) {
   // code; the type-checker currently isn't strict about producing typed
   // expression nodes when it fails. Once we enforce that, we can remove this.
   if (!type)
+#if 0 // STAGING
+    type = CanType(ErrorType::get(Context));
+#else
     type = CanType(ErrorType::get(closure->getASTContext()));
+#endif
 
   auto canType = type->getCanonicalType();
   if (canType->hasLocalArchetype())
@@ -3883,7 +3919,11 @@ CanType ASTMangler::getDeclTypeForMangling(
   genericSig = GenericSignature();
   parentGenericSig = GenericSignature();
 
+#if 0 // STAGING
+  auto &C = Context;
+#else
   auto &C = decl->getASTContext();
+#endif
 
   auto ty = decl->getInterfaceType()->getReferenceStorageReferent();
   if (ty->hasError()) {
@@ -4504,8 +4544,12 @@ void ASTMangler::appendMacroExpansionContext(
   if (loc.isInvalid())
     return appendContext(origDC, nullBase, StringRef());
 
+#if 0 // STAGING
+  SourceManager &sourceMgr = Context.SourceMgr;
+#else
   ASTContext &ctx = origDC->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
+#endif
 
   auto appendMacroExpansionLoc = [&]() {
     appendIdentifier(origDC->getParentModule()->getName().str());

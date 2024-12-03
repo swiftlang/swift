@@ -229,7 +229,7 @@ swift::swift_getMangledTypeName(const Metadata *type) {
     if (demangling == nullptr) {
       return TypeNamePair{NULL, 0};
     }
-    auto mangling = Demangle::mangleNode(demangling);
+    auto mangling = Demangle::mangleNode(demangling, Mangle::ManglingFlavor::Default);
     if (!mangling.isSuccess())
       return TypeNamePair{NULL, 0};
     std::string name = mangling.result();

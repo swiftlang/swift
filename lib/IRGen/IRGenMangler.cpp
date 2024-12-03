@@ -71,7 +71,8 @@ std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
   if (FuncName.empty()) {
     beginMangling();
   } else {
-    if (FuncName.starts_with(MANGLING_PREFIX_STR)) {
+    if (FuncName.starts_with(MANGLING_PREFIX_STR) ||
+        FuncName.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) {
       Buffer << FuncName;
     } else {
       beginMangling();

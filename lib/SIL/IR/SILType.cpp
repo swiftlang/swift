@@ -199,7 +199,7 @@ Lifetime SILType::getLifetime(const SILFunction &F) const {
 }
 
 std::string SILType::getMangledName() const {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   return mangler.mangleTypeWithoutPrefix(getRawASTType());
 }
 

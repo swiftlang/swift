@@ -1087,7 +1087,7 @@ private:
 static std::string getClonedName(SILFunction *func, SerializedKind_t serialized,
                                  const SmallBitVector &argsToConvertIndices) {
   auto kind = Demangle::SpecializationPass::MoveDiagnosticInOutToOut;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(kind, serialized,
+  Mangle::FunctionSignatureSpecializationMangler Mangler(func->getASTContext(), kind, serialized,
                                                          func);
   for (int i = argsToConvertIndices.find_first(); i != -1;
        i = argsToConvertIndices.find_next(i)) {
