@@ -51,6 +51,10 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     -cxx-interoperability-mode=default
     -Xfrontend -module-interface-preserve-types-as-written
 
+    # This flag is unnecessary when building with newer compilers that allow
+    # using C++ symbols in resilient overlays (see f4204568).
+    -enable-experimental-feature AssumeResilientCxxTypes
+
     SWIFT_COMPILE_FLAGS_LINUX
     ${SWIFT_SDK_LINUX_CXX_OVERLAY_SWIFT_COMPILE_FLAGS}
 
