@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver -O -Rpass-missed=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil %s -o /dev/null -Xfrontend -verify
+// RUN: %target-swiftc_driver -O -Rpass-analysis=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil %s -o /dev/null -Xfrontend -verify
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swiftc_driver -wmo -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil -save-optimization-record=yaml  -save-optimization-record-path %t/note.yaml %s -o /dev/null && %FileCheck --input-file=%t/note.yaml %s
@@ -12,7 +12,7 @@
 
 public class Klass {}
 
-// CHECK: --- !Missed
+// CHECK: --- !Analysis
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift',
@@ -25,7 +25,7 @@ public class Klass {}
 // CHECK-NEXT: ...
 public var global = Klass() // expected-remark {{heap allocated ref of type 'Klass'}}
 
-// CHECK: --- !Missed
+// CHECK: --- !Analysis
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
@@ -40,7 +40,7 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK-NEXT:                        Line: [[# @LINE - 14 ]], Column: 12 }
 // CHECK-NEXT: ...
 //
-// CHECK: --- !Missed
+// CHECK: --- !Analysis
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
@@ -55,7 +55,7 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK-NEXT:                        Line: [[# @LINE - 29 ]], Column: 12 }
 // CHECK-NEXT: ...
 //
-// CHECK: --- !Missed
+// CHECK: --- !Analysis
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift',
@@ -80,7 +80,7 @@ public func getGlobal() -> Klass {
                   // expected-note @-54:12 {{of 'global'}}
 }
 
-// CHECK: --- !Missed
+// CHECK: --- !Analysis
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
@@ -91,7 +91,7 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT:   - ValueType:
 // CHECK-NEXT:   - String:          ''''
 // CHECK-NEXT: ...
-// CHECK-NEXT: --- !Missed
+// CHECK-NEXT: --- !Analysis
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
@@ -105,7 +105,7 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
 // CHECK-NEXT:                        Line: [[# @LINE + 29 ]], Column: 9 }
 // CHECK-NEXT: ...
-// CHECK-NEXT: --- !Missed
+// CHECK-NEXT: --- !Analysis
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
@@ -116,7 +116,7 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT:   - ValueType:
 // CHECK-NEXT:   - String:          ''''
 // CHECK-NEXT: ...
-// CHECK-NEXT: --- !Missed
+// CHECK-NEXT: --- !Analysis
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
