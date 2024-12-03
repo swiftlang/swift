@@ -3501,6 +3501,8 @@ public:
     return !solverState || solverState->recordFixes;
   }
 
+  bool inSalvageMode() const { return solverState && solverState->recordFixes; }
+
   ArrayRef<ConstraintFix *> getFixes() const { return Fixes.getArrayRef(); }
 
   bool shouldSuppressDiagnostics() const {

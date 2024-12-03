@@ -530,6 +530,7 @@ struct ASTContext::Implementation {
 
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
     llvm::FoldingSet<TypeAliasType> TypeAliasTypes;
+    llvm::FoldingSet<LocatableType> LocatableTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
     llvm::FoldingSet<PackType> PackTypes;
     llvm::FoldingSet<PackExpansionType> PackExpansionTypes;
@@ -3272,6 +3273,7 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
 
     SIZE_AND_BYTES(ErrorTypesWithOriginal);
     SIZE(TypeAliasTypes);
+    SIZE(LocatableTypes);
     SIZE(TupleTypes);
     SIZE(PackTypes);
     SIZE(PackExpansionTypes);
@@ -3451,6 +3453,45 @@ void TypeAliasType::Profile(
   id.AddPointer(typealias);
   id.AddPointer(parent.getPointer());
   substitutions.profile(id);
+  id.AddPointer(underlying.getPointer());
+}
+
+LocatableType::LocatableType(SourceLoc loc, Type underlying,
+                             RecursiveTypeProperties properties)
+    : SugarType(TypeKind::Locatable, underlying, properties), Loc(loc) {
+  ASSERT(loc.isValid());
+}
+
+LocatableType *LocatableType::get(SourceLoc loc, Type underlying) {
+  auto properties = underlying->getRecursiveProperties();
+
+  // Figure out which arena this type will go into.
+  auto &ctx = underlying->getASTContext();
+  auto arena = getArena(properties);
+
+  // Profile the type.
+  llvm::FoldingSetNodeID id;
+  LocatableType::Profile(id, loc, underlying);
+
+  // Did we already record this type?
+  void *insertPos;
+  auto &types = ctx.getImpl().getArena(arena).LocatableTypes;
+  if (auto result = types.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Build a new type.
+  auto result = new (ctx, arena) LocatableType(loc, underlying, properties);
+  types.InsertNode(result, insertPos);
+  return result;
+}
+
+void LocatableType::Profile(llvm::FoldingSetNodeID &id) const {
+  Profile(id, Loc, Type(getSinglyDesugaredType()));
+}
+
+void LocatableType::Profile(llvm::FoldingSetNodeID &id, SourceLoc loc,
+                            Type underlying) {
+  id.AddPointer(loc.getOpaquePointerValue());
   id.AddPointer(underlying.getPointer());
 }
 

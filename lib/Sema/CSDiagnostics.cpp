@@ -611,6 +611,13 @@ void RequirementFailure::maybeEmitRequirementNote(const Decl *anchor, Type lhs,
                    req.getFirstType(), lhs, req.getSecondType(), rhs);
 }
 
+SourceLoc MissingConformanceFailure::getLoc() const {
+  if (auto *locatable = dyn_cast<LocatableType>(LHS.getPointer())) {
+    return locatable->getLoc();
+  }
+  return RequirementFailure::getLoc();
+}
+
 bool MissingConformanceFailure::diagnoseAsError() {
   auto anchor = getAnchor();
   auto nonConformingType = getLHS();

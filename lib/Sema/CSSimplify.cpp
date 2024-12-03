@@ -8427,11 +8427,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
   // We sometimes get a pack expansion type here.
   if (auto *expansionType = type->getAs<PackExpansionType>()) {
-    // FIXME: Locator
-    addConstraint(ConstraintKind::ConformsTo,
-                  expansionType->getPatternType(),
-                  protocol->getDeclaredInterfaceType(),
-                  locator);
+    addConstraint(
+        ConstraintKind::ConformsTo, expansionType->getPatternType(),
+        protocol->getDeclaredInterfaceType(),
+        locator.withPathElement(LocatorPathElt::PackExpansionPattern()));
 
     return SolutionKind::Solved;
   }
@@ -8625,17 +8624,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
 
-    // If we have something like ... -> type req # -> pack element #, we're
-    // solving a requirement of the form T : P where T is a type parameter pack
-    if (path.back().is<LocatorPathElt::PackElement>())
-      path.pop_back();
+    // Conditional conformance requirements could produce chains of
+    // `path element -> pack expansion pattern -> pack element`.
+    while (!path.empty()) {
+      // If we have something like ... -> type req # -> pack element #, we're
+      // solving a requirement of the form T : P where T is a type parameter pack
+      if (path.back().is<LocatorPathElt::PackElement>()) {
+        path.pop_back();
+        continue;
+      }
 
-    // This is similar to `PackElement` but locator points to the requirement
-    // associted with pack expansion pattern (i.e. `repeat each T: P`) where
-    // the path is something like:
-    // `... -> type req # -> pack expansion pattern`.
-    if (path.back().is<LocatorPathElt::PackExpansionPattern>())
-      path.pop_back();
+      // This is similar to `PackElement` but locator points to the requirement
+      // associated with pack expansion pattern (i.e. `repeat each T: P`) where
+      // the path is something like:
+      // `... -> type req # -> pack expansion pattern`.
+      if (path.back().is<LocatorPathElt::PackExpansionPattern>()) {
+        path.pop_back();
+        continue;
+      }
+
+      break;
+    }
 
     if (auto req = path.back().getAs<LocatorPathElt::AnyRequirement>()) {
       // If this is a requirement associated with `Self` which is bound
