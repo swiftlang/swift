@@ -187,6 +187,82 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
   std::vector<std::pair<std::string, MacroPluginDependency>> macroDependencies;
   std::vector<std::string> auxiliaryFiles;
 
+  auto addCommonDependencyInfo =
+      [&currentModuleImports,
+       &currentOptionalModuleImports,
+       &importedClangDependenciesIDs,
+       &auxiliaryFiles,
+       &macroDependencies] (ModuleDependencyInfo &moduleDep) {
+        // Add imports of this module
+        for (const auto &moduleName : currentModuleImports)
+          moduleDep.addModuleImport(moduleName.importIdentifier);
+        // Add optional imports of this module
+        for (const auto &moduleName : currentOptionalModuleImports)
+          moduleDep.addOptionalModuleImport(moduleName.importIdentifier);
+
+        // Add qualified dependencies of this module
+        moduleDep.setImportedClangDependencies(importedClangDependenciesIDs);
+
+        // Add any auxiliary files
+        moduleDep.setAuxiliaryFiles(auxiliaryFiles);
+
+        // Add macro dependencies
+        for (const auto &md: macroDependencies)
+          moduleDep.addMacroDependency(md.first,
+                                       md.second.LibraryPath,
+                                       md.second.ExecutablePath);
+
+        moduleDep.setIsFinalized(true);
+      };
+
+  auto addSwiftTextualDependencyInfo =
+      [this,
+       &importedSwiftDependenciesIDs,
+       &crossImportOverlayDependenciesIDs,
+       &swiftOverlayDependenciesIDs] (ModuleDependencyInfo &moduleDep,
+              unsigned bridgingHeaderFileID,
+              unsigned bridgingSourceFilesArrayID,
+              unsigned bridgingModuleDependenciesArrayID,
+              unsigned bridgingHeaderIncludeTreeID) {
+
+       moduleDep.setImportedSwiftDependencies(importedSwiftDependenciesIDs);
+       moduleDep.setCrossImportOverlayDependencies(crossImportOverlayDependenciesIDs);
+       moduleDep.setSwiftOverlayDependencies(swiftOverlayDependenciesIDs);
+
+       // Add bridging header file path
+       if (bridgingHeaderFileID != 0) {
+         auto bridgingHeaderFile = getIdentifier(bridgingHeaderFileID);
+         if (!bridgingHeaderFile)
+           llvm::report_fatal_error("Bad bridging header path");
+
+         moduleDep.addBridgingHeader(*bridgingHeaderFile);
+       }
+
+       // Add bridging source files
+       auto bridgingSourceFiles = getStringArray(bridgingSourceFilesArrayID);
+       if (!bridgingSourceFiles)
+         llvm::report_fatal_error("Bad bridging source files");
+       for (const auto &file : *bridgingSourceFiles)
+         moduleDep.addHeaderSourceFile(file);
+
+       // Add bridging module dependencies
+       auto bridgingModuleDeps = getStringArray(bridgingModuleDependenciesArrayID);
+       if (!bridgingModuleDeps)
+         llvm::report_fatal_error("Bad bridging module dependencies");
+       llvm::StringSet<> alreadyAdded;
+       std::vector<ModuleDependencyID> bridgingModuleDepIDs;
+       for (const auto &mod : bridgingModuleDeps.value())
+         bridgingModuleDepIDs.push_back(ModuleDependencyID{mod, ModuleDependencyKind::Clang});
+       moduleDep.setHeaderClangDependencies(bridgingModuleDepIDs);
+
+       // Add bridging header include tree
+       auto bridgingHeaderIncludeTree = getIdentifier(bridgingHeaderIncludeTreeID);
+       if (!bridgingHeaderIncludeTree)
+         llvm::report_fatal_error("Bad bridging header include tree");
+       if (!bridgingHeaderIncludeTree->empty())
+         moduleDep.addBridgingHeaderIncludeTree(*bridgingHeaderIncludeTree);
+      };
+
   while (!Cursor.AtEndOfStream()) {
     auto entry = cantFail(Cursor.advance(), "Advance bitstream cursor");
 
@@ -307,9 +383,10 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       if (!moduleName)
         llvm::report_fatal_error("Bad module name");
       currentModuleName = *moduleName;
+
+      // ACTODO: Proper import infos.
       auto importStrings = getStringArray(moduleImportsArrayID);
       auto optionalImportStrings = getStringArray(optionalModuleImportsArrayID);
-      // ACTODO: Proper import infos.
       currentModuleImports.clear();
       currentOptionalModuleImports.clear();
       if (importStrings.has_value())
@@ -420,7 +497,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       if (!userModuleVersion)
         llvm::report_fatal_error("Bad userModuleVersion");
 
-      // TODO: MacroDependencies
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forSwiftInterfaceModule(
           outputModulePath.value(), optionalSwiftInterfaceFile.value(),
@@ -428,68 +504,12 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
           *contextHash, isFramework, isStatic, *rootFileSystemID, *moduleCacheKey,
           *userModuleVersion);
 
-      // Add imports of this module
-      for (const auto &moduleName : currentModuleImports)
-        moduleDep.addModuleImport(moduleName.importIdentifier);
-      // Add optional imports of this module
-      for (const auto &moduleName : currentOptionalModuleImports)
-        moduleDep.addOptionalModuleImport(moduleName.importIdentifier);
+      addCommonDependencyInfo(moduleDep);
+      addSwiftTextualDependencyInfo(moduleDep, bridgingHeaderFileID,
+                             bridgingSourceFilesArrayID,
+                             bridgingModuleDependenciesArrayID,
+                             bridgingHeaderIncludeTreeID);
 
-      // Add qualified dependencies of this module
-      moduleDep.setImportedSwiftDependencies(importedSwiftDependenciesIDs);
-      moduleDep.setImportedClangDependencies(importedClangDependenciesIDs);
-      moduleDep.setCrossImportOverlayDependencies(crossImportOverlayDependenciesIDs);
-      moduleDep.setSwiftOverlayDependencies(swiftOverlayDependenciesIDs);
-      moduleDep.setAuxiliaryFiles(auxiliaryFiles);
-
-      // Add bridging header file path
-      if (bridgingHeaderFileID != 0) {
-        auto bridgingHeaderFile = getIdentifier(bridgingHeaderFileID);
-        if (!bridgingHeaderFile)
-          llvm::report_fatal_error("Bad bridging header path");
-
-        moduleDep.addBridgingHeader(*bridgingHeaderFile);
-      }
-
-      // Add bridging source files
-      auto bridgingSourceFiles = getStringArray(bridgingSourceFilesArrayID);
-      if (!bridgingSourceFiles)
-        llvm::report_fatal_error("Bad bridging source files");
-      for (const auto &file : *bridgingSourceFiles)
-        moduleDep.addHeaderSourceFile(file);
-
-      // Add source files
-      auto sourceFiles = getStringArray(sourceFilesArrayID);
-      if (!sourceFiles)
-        llvm::report_fatal_error("Bad bridging source files");
-      for (const auto &file : *sourceFiles)
-        moduleDep.addSourceFile(file);
-
-      // Add bridging module dependencies
-      auto bridgingModuleDeps = getStringArray(bridgingModuleDependenciesArrayID);
-      if (!bridgingModuleDeps)
-        llvm::report_fatal_error("Bad bridging module dependencies");
-      llvm::StringSet<> alreadyAdded;
-      std::vector<ModuleDependencyID> bridgingModuleDepIDs;
-      for (const auto &mod : bridgingModuleDeps.value())
-        bridgingModuleDepIDs.push_back(ModuleDependencyID{mod, ModuleDependencyKind::Clang});
-      moduleDep.setHeaderClangDependencies(bridgingModuleDepIDs);
-
-      // Add bridging header include tree
-      auto bridgingHeaderIncludeTree =
-          getIdentifier(bridgingHeaderIncludeTreeID);
-      if (!bridgingHeaderIncludeTree)
-        llvm::report_fatal_error("Bad bridging header include tree");
-      if (!bridgingHeaderIncludeTree->empty())
-        moduleDep.addBridgingHeaderIncludeTree(*bridgingHeaderIncludeTree);
-
-      // Add macro dependencies
-      for (const auto &md: macroDependencies)
-        moduleDep.addMacroDependency(md.first,
-                                     md.second.LibraryPath,
-                                     md.second.ExecutablePath);
-
-      moduleDep.setIsFinalized(true);
       cache.recordDependency(currentModuleName, std::move(moduleDep));
       hasCurrentModule = false;
       break;
@@ -540,35 +560,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
           *rootFileSystemID, buildCommandRefs, bridgingHeaderBuildCommandRefs,
           extraPCMRefs);
 
-      // Add imports of this module
-      for (const auto &moduleName : currentModuleImports)
-        moduleDep.addModuleImport(moduleName.importIdentifier);
-      // Add optional imports of this module
-      for (const auto &moduleName : currentOptionalModuleImports)
-        moduleDep.addOptionalModuleImport(moduleName.importIdentifier);
-
-      // Add qualified dependencies of this module
-      moduleDep.setImportedSwiftDependencies(importedSwiftDependenciesIDs);
-      moduleDep.setImportedClangDependencies(importedClangDependenciesIDs);
-      moduleDep.setCrossImportOverlayDependencies(crossImportOverlayDependenciesIDs);
-      moduleDep.setSwiftOverlayDependencies(swiftOverlayDependenciesIDs);
-
-      // Add bridging header file path
-      if (bridgingHeaderFileID != 0) {
-        auto bridgingHeaderFile = getIdentifier(bridgingHeaderFileID);
-        if (!bridgingHeaderFile)
-          llvm::report_fatal_error("Bad bridging header path");
-
-        moduleDep.addBridgingHeader(*bridgingHeaderFile);
-      }
-
-      // Add bridging source files
-      auto bridgingSourceFiles = getStringArray(bridgingSourceFilesArrayID);
-      if (!bridgingSourceFiles)
-        llvm::report_fatal_error("Bad bridging source files");
-      for (const auto &file : *bridgingSourceFiles)
-        moduleDep.addHeaderSourceFile(file);
-
       // Add source files
       auto sourceFiles = getStringArray(sourceFilesArrayID);
       if (!sourceFiles)
@@ -576,32 +567,12 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       for (const auto &file : *sourceFiles)
         moduleDep.addSourceFile(file);
 
-      // Add bridging module dependencies
-      auto bridgingModuleDeps = getStringArray(bridgingModuleDependenciesArrayID);
-      if (!bridgingModuleDeps)
-        llvm::report_fatal_error("Bad bridging module dependencies");
-      llvm::StringSet<> alreadyAdded;
+      addCommonDependencyInfo(moduleDep);
+      addSwiftTextualDependencyInfo(moduleDep, bridgingHeaderFileID,
+                             bridgingSourceFilesArrayID,
+                             bridgingModuleDependenciesArrayID,
+                             bridgingHeaderIncludeTreeID);
 
-      std::vector<ModuleDependencyID> headerDependencyIDs;
-      for (const auto &mod : *bridgingModuleDeps)
-        headerDependencyIDs.push_back({mod, ModuleDependencyKind::Clang});
-      moduleDep.setHeaderClangDependencies(headerDependencyIDs);
-
-      // Add bridging header include tree
-      auto bridgingHeaderIncludeTree =
-          getIdentifier(bridgingHeaderIncludeTreeID);
-      if (!bridgingHeaderIncludeTree)
-        llvm::report_fatal_error("Bad bridging header include tree");
-      if (!bridgingHeaderIncludeTree->empty())
-        moduleDep.addBridgingHeaderIncludeTree(*bridgingHeaderIncludeTree);
-
-      // Add macro dependencies
-      for (const auto &md: macroDependencies)
-        moduleDep.addMacroDependency(md.first,
-                                     md.second.LibraryPath,
-                                     md.second.ExecutablePath);
-
-      moduleDep.setIsFinalized(true);
       cache.recordDependency(currentModuleName, std::move(moduleDep));
       hasCurrentModule = false;
       break;
@@ -651,18 +622,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
            *headerImport, *definingInterfacePath, isFramework, isStatic,
            *moduleCacheKey, *userModuleVersion);
 
-      // Add imports of this module
-      for (const auto &moduleName : currentModuleImports)
-        moduleDep.addModuleImport(moduleName.importIdentifier);
-      // Add optional imports of this module
-      for (const auto &moduleName : currentOptionalModuleImports)
-        moduleDep.addOptionalModuleImport(moduleName.importIdentifier);
-
-      // Add qualified dependencies of this module
-      moduleDep.setImportedSwiftDependencies(importedSwiftDependenciesIDs);
-      moduleDep.setImportedClangDependencies(importedClangDependenciesIDs);
-      moduleDep.setCrossImportOverlayDependencies(crossImportOverlayDependenciesIDs);
-      moduleDep.setSwiftOverlayDependencies(swiftOverlayDependenciesIDs);
+      addCommonDependencyInfo(moduleDep);
 
       auto headerModuleDependencies = getStringArray(headerModuleDependenciesArrayID);
       if (!headerModuleDependencies)
@@ -682,13 +642,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       for (const auto &depSource : *headerImportsSourceFiles)
         moduleDep.addHeaderSourceFile(depSource);
 
-      // Add macro dependencies
-      for (const auto &md: macroDependencies)
-        moduleDep.addMacroDependency(md.first,
-                                     md.second.LibraryPath,
-                                     md.second.ExecutablePath);
-
-      moduleDep.setIsFinalized(true);
       cache.recordDependency(currentModuleName, std::move(moduleDep));
       hasCurrentModule = false;
       break;
@@ -716,14 +669,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forPlaceholderSwiftModuleStub(
           *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath);
-
-
-      // Add dependencies of this module
-      for (const auto &moduleName : currentModuleImports)
-        moduleDep.addModuleImport(moduleName.importIdentifier);
-      // Add optional imports of this module
-      for (const auto &moduleName : currentOptionalModuleImports)
-        moduleDep.addOptionalModuleImport(moduleName.importIdentifier);
 
       cache.recordDependency(currentModuleName, std::move(moduleDep));
       hasCurrentModule = false;
@@ -777,20 +722,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(ModuleDependenciesCache &cac
           *pcmOutputPath, *mappedPCMPath, *moduleMapPath, *contextHash,
           *commandLineArgs, *fileDependencies, *capturedPCMArgs, linkLibraries,
           *rootFileSystemID, *clangIncludeTreeRoot, *moduleCacheKey, isSystem);
+      addCommonDependencyInfo(moduleDep);
 
-      // Add imports of this module
-      for (const auto &moduleName : currentModuleImports)
-        moduleDep.addModuleImport(moduleName.importIdentifier);
-      // Add qualified dependencies of this module
-      moduleDep.setImportedClangDependencies(importedClangDependenciesIDs);
-
-      // Add macro dependencies
-      for (const auto &md: macroDependencies)
-        moduleDep.addMacroDependency(md.first,
-                                     md.second.LibraryPath,
-                                     md.second.ExecutablePath);
-
-      moduleDep.setIsFinalized(true);
       cache.recordDependency(currentModuleName, std::move(moduleDep));
       hasCurrentModule = false;
       break;
