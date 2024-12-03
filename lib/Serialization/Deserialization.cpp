@@ -3719,16 +3719,14 @@ public:
       return thrownTypeOrError.takeError();
     const auto thrownType = thrownTypeOrError.get();
 
-    auto ctor = MF.createDecl<ConstructorDecl>(name, SourceLoc(), isFailable,
-                                               /*FailabilityLoc=*/SourceLoc(),
-                                               /*Async=*/async,
-                                               /*AsyncLoc=*/SourceLoc(),
-                                               /*Throws=*/throws,
-                                               /*ThrowsLoc=*/SourceLoc(),
-                                               TypeLoc::withoutLoc(thrownType),
-                                               /*BodyParams=*/nullptr,
-                                               genericParams, parent,
-                                               nullptr);
+    auto ctor = MF.createDecl<ConstructorDecl>(
+        name, SourceLoc(), isFailable,
+        /*FailabilityLoc=*/SourceLoc(),
+        /*Async=*/async,
+        /*AsyncLoc=*/SourceLoc(),
+        /*Throws=*/throws,
+        /*ThrowsLoc=*/SourceLoc(), TypeLoc::withoutLoc(thrownType),
+        /*BodyParams=*/nullptr, genericParams, parent);
     declOrOffset = ctor;
 
     ctor->setGenericSignature(MF.getGenericSignature(genericSigID));
