@@ -410,33 +410,6 @@ namespace {
       return Type();
     }
 
-    ImportResult VisitCountAttributedType(
-        const clang::CountAttributedType *type) {
-      // CountAttributedType is a clang type representing a pointer with
-      // a "counted_by" type attribute. For now, we don't import these
-      // into Swift.
-      // In the future we could do something more clever (such as trying to
-      // import as an Array where possible) or less clever (such as importing
-      // as the desugared, underlying pointer type).
-      return Type();
-    }
-
-    ImportResult VisitDynamicRangePointerType(
-        const clang::DynamicRangePointerType *type) {
-      // DynamicRangePointerType is a clang type representing a pointer with
-      // an "ended_by" type attribute for -fbounds-safety. For now, we don't
-      // import these into Swift.
-      return Type();
-    }
-
-    ImportResult VisitValueTerminatedType(
-        const clang::ValueTerminatedType *type) {
-      // ValueTerminatedType is a clang type representing a pointer with
-      // a "terminated_by" type attribute for -fbounds-safety. For now, we don't
-      // import these into Swift.
-      return Type();
-    }
-
     ImportResult VisitMemberPointerType(const clang::MemberPointerType *type) {
       return Type();
     }
@@ -956,6 +929,12 @@ namespace {
     SUGAR_TYPE(Elaborated)
     SUGAR_TYPE(Using)
     SUGAR_TYPE(BTFTagAttributed)
+
+    // Clang types representing a pointer with a bounds annotation such as
+    // "counted_by", "ended_by" and "terminated_by". For now, we ignore them.
+    SUGAR_TYPE(CountAttributed)
+    SUGAR_TYPE(DynamicRangePointer)
+    SUGAR_TYPE(ValueTerminated)
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
