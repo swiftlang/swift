@@ -4464,8 +4464,9 @@ void ASTMangler::appendDistributedThunk(
     auto M = thunk->getModuleContext();
 
     SmallVector<ValueDecl *, 1> stubClassLookupResults;
-    C.lookupInModule(M, ("$" + P->getNameStr()).str(), stubClassLookupResults);
+    C.lookupInModule(M, llvm::Twine("$", P->getNameStr()).str(), stubClassLookupResults);
 
+    assert(stubClassLookupResults.size() <= 1 && "Found multiple distributed stub types!");
     if (stubClassLookupResults.size() > 0) {
       stubActorDecl =
           dyn_cast_or_null<NominalTypeDecl>(stubClassLookupResults.front());
