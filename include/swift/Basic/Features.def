@@ -358,6 +358,9 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// Enable returning non-escapable types from functions.
 EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 
+/// Enable LifetimeDependence diagnostics for trivial types.
+EXPERIMENTAL_FEATURE(LifetimeDependenceDiagnoseTrivial, false)
+
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
