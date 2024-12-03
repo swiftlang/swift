@@ -23,6 +23,19 @@ protocol GreeterProtocol: DistributedActor where ActorSystem: DistributedActorSy
   distributed func greet() -> String
 }
 
+protocol FruitProtocol: Codable {}
+struct Watermelon: FruitProtocol {}
+
+protocol AnimalProtocol: Codable {}
+struct Capybara: AnimalProtocol {}
+
+@Resolvable
+protocol FeederProtocol<Fruit, Animal>: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
+  associatedtype Fruit: FruitProtocol
+  associatedtype Animal: AnimalProtocol
+  distributed func give(fruit: Fruit, to animal: Animal)
+}
+
 // ==== ------------------------------------------------------------------------
 
 distributed actor DAFR: GreeterProtocol {
@@ -35,9 +48,17 @@ distributed actor DAFL: GreeterProtocol {
   distributed func greet() -> String { "\(Self.self)" }
 }
 
+distributed actor Feeder: FeederProtocol {
+  typealias ActorSystem = LocalTestingDistributedActorSystem
+  distributed func give(fruit: Watermelon, to animal: Capybara) {
+    // fake impl
+  }
+}
+
 @main struct Main {
   static func main() async throws {
     let fakeRoundtripSystem = FakeRoundtripActorSystem()
+
     let fr = DAFR(actorSystem: fakeRoundtripSystem)
     let frid = fr.id
     _ = DAFL(actorSystem: .init())
