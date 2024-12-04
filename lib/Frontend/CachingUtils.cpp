@@ -226,7 +226,8 @@ bool replayCachedCompilerOutputs(
                 OutputEntry{OutputPath->second, OutID, Kind, Input, *Proxy});
           return Error::success();
         })) {
-      Diag.diagnose(SourceLoc(), diag::error_cas, toString(std::move(Err)));
+      Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
+                    toString(std::move(Err)));
       return lookupFailed();
     }
   };
