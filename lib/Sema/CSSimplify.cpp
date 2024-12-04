@@ -10163,8 +10163,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
         auto hasAppliedSelf = decl->hasCurriedSelf() &&
                               doesMemberRefApplyCurriedSelf(baseObjTy, decl);
-        return getNumApplications(decl, hasAppliedSelf, functionRefInfo,
-                                  memberLocator) < decl->getNumCurryLevels();
+        auto numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
+        return numApplies < decl->getNumCurryLevels();
       });
     };
 
