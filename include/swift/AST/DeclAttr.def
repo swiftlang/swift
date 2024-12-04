@@ -59,7 +59,7 @@ DECL_ATTR(objc, ObjC,
 SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
   OnNominalType | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   6)
-DECL_ATTR(main, MainType,
+SIMPLE_DECL_ATTR(main, MainType,
   OnClass | OnStruct | OnEnum | OnExtension | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   7)
 SIMPLE_DECL_ATTR(_exported, Exported,
@@ -102,7 +102,7 @@ DECL_ATTR(_semantics, Semantics,
   OnAbstractFunction | OnSubscript | OnNominalType | OnVar | AllowMultipleAttributes | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   21)
 SIMPLE_DECL_ATTR(_transparent, Transparent,
-  OnFunc | OnAccessor | OnConstructor | OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor | OnConstructor | OnVar | OnDestructor | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   26)
 SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
   OnClass | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,

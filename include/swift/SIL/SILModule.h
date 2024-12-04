@@ -399,6 +399,10 @@ private:
 
   BasicBlockNameMapType basicBlockNames;
 
+  // Specialization attributes which need to be added to a function once it is created.
+  // The key of this map is the function name.
+  llvm::StringMap<std::vector<SILSpecializeAttr *>> pendingSpecializeAttrs;
+
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options,
             const IRGenOptions *irgenOptions = nullptr);
@@ -1081,6 +1085,10 @@ public:
   /// Gather prespecialized from extensions.
   void performOnceForPrespecializedImportedExtensions(
       llvm::function_ref<void(AbstractFunctionDecl *)> action);
+
+  void addPendingSpecializeAttr(StringRef functionName, SILSpecializeAttr *attr) {
+    pendingSpecializeAttrs[functionName].push_back(attr);
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){

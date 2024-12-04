@@ -186,7 +186,10 @@ public:
   ProtocolConformanceRef getProtocolConformance() const {
     assert(!isSingletonKind());
     if ((Value & KindMask) == Kind_Decl) {
-      return ProtocolConformanceRef(getAbstractProtocolConformance());
+      // FIXME: Passing an empty Type() here temporarily while staging in
+      // new representation for abstract conformances
+      return ProtocolConformanceRef::forAbstract(
+          Type(), getAbstractProtocolConformance());
     } else if ((Value & KindMask) == Kind_PackConformance) {
       return ProtocolConformanceRef(getPackProtocolConformance());
     } else {

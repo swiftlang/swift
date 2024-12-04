@@ -407,9 +407,6 @@ static StringRef getDumpString(MagicIdentifierLiteralExpr::Kind kind) {
 static StringRef getDumpString(ObjectLiteralExpr::LiteralKind kind) {
   return ObjectLiteralExpr::getLiteralKindPlainName(kind);
 }
-static StringRef getDumpString(FunctionRefKind kind) {
-  return getFunctionRefKindStr(kind);
-}
 static StringRef getDumpString(ParamSpecifier specifier) {
   return ParamDecl::getSpecifierSpelling(specifier);
 }
@@ -1170,10 +1167,6 @@ namespace {
            << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
 
       }, "opaque_interface", TypeColor);
-
-      if (auto underlyingSubs = OTD->getUniqueUnderlyingTypeSubstitutions()) {
-        printRec(*underlyingSubs);
-      }
 
       printFoot();
     }
@@ -2310,8 +2303,8 @@ public:
     printDeclRefField(E->getDeclRef(), "decl");
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       printFlag(getDumpString(E->getAccessSemantics()), AccessLevelColor);
-    printField(E->getFunctionRefKind(), "function_ref",
-               ExprModifierColor);
+    printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
+                  "function_ref", ExprModifierColor);
 
     printFoot();
   }
@@ -2342,7 +2335,8 @@ public:
 
     printFieldQuoted(E->getDecls()[0]->getBaseName(), "name", IdentifierColor);
     printField(E->getDecls().size(), "number_of_decls", ExprModifierColor);
-    printField(E->getFunctionRefKind(), "function_ref", ExprModifierColor);
+    printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
+                  "function_ref", ExprModifierColor);
 
     if (!E->isForOperator()) {
       for (auto D : E->getDecls()) {
@@ -2360,7 +2354,8 @@ public:
     printCommon(E, "unresolved_decl_ref_expr", label);
 
     printFieldQuoted(E->getName(), "name", IdentifierColor);
-    printField(E->getFunctionRefKind(), "function_ref", ExprModifierColor);
+    printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
+                  "function_ref", ExprModifierColor);
 
     printFoot();
   }
@@ -2401,7 +2396,8 @@ public:
     printCommon(E, "unresolved_member_expr", label);
 
     printFieldQuoted(E->getName(), "name", ExprModifierColor);
-    printField(E->getFunctionRefKind(), "function_ref", ExprModifierColor);
+    printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
+                  "function_ref", ExprModifierColor);
     printFoot();
   }
   void visitDotSelfExpr(DotSelfExpr *E, StringRef label) {
@@ -2524,7 +2520,8 @@ public:
     printCommon(E, "unresolved_dot_expr", label);
 
     printFieldQuoted(E->getName(), "field");
-    printField(E->getFunctionRefKind(), "function_ref", ExprModifierColor);
+    printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
+                  "function_ref", ExprModifierColor);
 
     if (E->getBase()) {
       printRec(E->getBase());
@@ -4063,6 +4060,21 @@ namespace {
       printRec(T->getElementType());
       printFoot();
     }
+    
+    void visitBuiltinUnboundGenericType(BuiltinUnboundGenericType *T,
+                                        StringRef label) {
+      printCommon("builtin_unbound_generic_type", label);
+      printField(T->getBuiltinTypeNameString(), "name");
+      printFoot();
+    }
+    
+    void visitBuiltinFixedArrayType(BuiltinFixedArrayType *T,
+                                    StringRef label) {
+      printCommon("builtin_fixed_array_type", label);
+      printRec(T->getSize());
+      printRec(T->getElementType());
+      printFoot();
+    }
 
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
       printCommon("type_alias_type", label);
@@ -4080,6 +4092,18 @@ namespace {
       for (auto arg : T->getDirectGenericArgs())
         printRec(arg);
 
+      printFoot();
+    }
+
+    void visitLocatableType(LocatableType *T, StringRef label) {
+      printCommon("locatable_type", label);
+      printFieldQuotedRaw(
+          [&](raw_ostream &OS) {
+            auto &C = T->getASTContext();
+            T->getLoc().print(OS, C.SourceMgr);
+          },
+          "loc");
+      printRec(T->getSinglyDesugaredType(), "underlying");
       printFoot();
     }
 
@@ -4121,14 +4145,6 @@ namespace {
       printField(T->getLevel(), "level");
 
       printRec(T->getPackType(), "pack");
-
-      printFoot();
-    }
-
-    void visitParenType(ParenType *T, StringRef label) {
-      printCommon("paren_type", label);
-
-      printRec(T->getUnderlyingType());
 
       printFoot();
     }

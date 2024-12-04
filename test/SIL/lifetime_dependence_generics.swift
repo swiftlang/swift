@@ -1,12 +1,11 @@
 // RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
-// RUN:   -disable-experimental-parser-round-trip \
 // RUN: | %FileCheck %s
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 protocol P {
   associatedtype E: ~Escapable

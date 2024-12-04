@@ -26,6 +26,7 @@
 #include "clang/AST/GlobalDecl.h"
 
 #include "GenDecl.h"
+#include "GenericArguments.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 
@@ -36,9 +37,23 @@ using namespace irgen;
 /// additional types of entities that the main utility cannot.
 static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
                                              LinkEntity entity) {
-  if (entity.isTypeMetadataAccessFunction())
-    return IGM.getAddrOfTypeMetadataAccessFunction(entity.getType(),
-                                                   NotForDefinition);
+  if (entity.isTypeMetadataAccessFunction()) {
+    auto type = entity.getType();
+    auto nominal = type->getAnyNominal();
+    assert(nominal);
+
+    if (nominal->isGenericContext()) {
+      GenericArguments genericArgs;
+      genericArgs.collectTypes(IGM, nominal);
+
+      return IGM.getAddrOfGenericTypeMetadataAccessFunction(nominal,
+                                                            genericArgs.Types,
+                                                            NotForDefinition);
+    } else {
+      return IGM.getAddrOfTypeMetadataAccessFunction(type,
+                                                     NotForDefinition);
+    }
+  }
   if (entity.isDispatchThunk())
     return IGM.getAddrOfDispatchThunk(entity.getSILDeclRef(), NotForDefinition);
 
@@ -94,6 +109,13 @@ public:
   }
 
   void addLinkEntity(LinkEntity entity) override {
+    // Skip property descriptors for static properties, which were only
+    // introduced with SE-0438 and are therefore not present in all libraries.
+    if (entity.isPropertyDescriptor()) {
+      if (entity.getAbstractStorageDecl()->isStatic())
+        return;
+    }
+
     if (entity.hasSILFunction()) {
       addFunction(entity.getSILFunction());
       return;
@@ -149,7 +171,7 @@ getSymbolAddrsForDecl(IRGenModule &IGM, ValueDecl *decl,
 llvm::Function *IRGenModule::emitHasSymbolFunction(ValueDecl *decl) {
 
   PrettyStackTraceDecl trace("emitting #_hasSymbol query for", decl);
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(Context);
 
   auto func = cast<llvm::Function>(getOrCreateHelperFunction(
       mangler.mangleHasSymbolQuery(decl), Int1Ty, {},

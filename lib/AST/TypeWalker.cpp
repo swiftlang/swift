@@ -50,6 +50,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
 
   }
+  bool visitLocatableType(LocatableType *ty) { return false; }
   bool visitSILTokenType(SILTokenType *ty) { return false; }
 
   bool visitPackType(PackType *ty) {
@@ -75,10 +76,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitPackElementType(PackElementType *ty) {
     return doIt(ty->getPackType());
-  }
-
-  bool visitParenType(ParenType *ty) {
-    return doIt(ty->getUnderlyingType());
   }
 
   bool visitTupleType(TupleType *ty) {
@@ -294,6 +291,16 @@ class Traversal : public TypeVisitor<Traversal, bool>
     for (Type type : ty->getSubstitutions().getReplacementTypes()) {
       if (type && doIt(type))
         return true;
+    }
+    return false;
+  }
+  
+  bool visitBuiltinFixedArrayType(BuiltinFixedArrayType *ty) {
+    if (ty->getSize() && doIt(ty->getSize()))  {
+      return true;
+    }
+    if (ty->getElementType() && doIt(ty->getElementType())) {
+      return true;
     }
     return false;
   }

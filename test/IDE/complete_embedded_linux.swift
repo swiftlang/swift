@@ -1,7 +1,7 @@
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 // REQUIRES: OS=linux-gnu
 // REQUIRES: embedded_stdlib
+// REQUIRES: swift_feature_Embedded
 // RUN: %batch-code-completion -enable-experimental-feature Embedded
 
 func test() {

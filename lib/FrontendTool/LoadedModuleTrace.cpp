@@ -17,15 +17,22 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginRegistry.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/IDE/SourceEntityWalker.h"
 
+#include "clang/AST/DeclObjC.h"
+#include "clang/AST/ObjCMethodReferenceInfo.h"
 #include "clang/Basic/Module.h"
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/FileUtilities.h"
@@ -808,5 +815,115 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                         loadedModuleTracePath, toString(std::move(err)));
     return true;
   }
+  return false;
+}
+
+class ObjcMethodReferenceCollector: public SourceEntityWalker {
+  unsigned CurrentFileID;
+  llvm::DenseMap<const clang::ObjCMethodDecl*, unsigned> results;
+  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
+                          Type T, ReferenceMetaData Data) override {
+    if (!Range.isValid())
+      return true;
+    if (auto *clangD = dyn_cast_or_null<clang::ObjCMethodDecl>(D->getClangDecl()))
+      Info.References[CurrentFileID].push_back(clangD);
+    return true;
+  }
+
+  clang::ObjCMethodReferenceInfo Info;
+
+public:
+  ObjcMethodReferenceCollector(ModuleDecl *MD) {
+    Info.ToolName = "swift-compiler-version";
+    Info.ToolVersion =
+      getSwiftInterfaceCompilerVersionForCurrentCompiler(MD->getASTContext());
+    auto &Opts = MD->getASTContext().LangOpts;
+    Info.Target = Opts.Target.str();
+    Info.TargetVariant = Opts.TargetVariant.has_value() ?
+      Opts.TargetVariant->str() : "";
+  }
+  void setFileBeforeVisiting(SourceFile *SF) {
+    assert(SF && "need to visit actual source files");
+    Info.FilePaths.push_back(SF->getFilename().str());
+    CurrentFileID = Info.FilePaths.size();
+  }
+  void serializeAsJson(llvm::raw_ostream &OS) {
+    clang::serializeObjCMethodReferencesAsJson(Info, OS);
+  }
+};
+
+static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
+  StringRef tracePath = input.getFineModuleTracePath();
+  if (tracePath.empty()) {
+    // we basically rely on the passing down of module trace file path
+    // as an indicator that this job needs to emit an ObjC message trace file.
+    // FIXME: add a separate swift-frontend flag for ObjC message trace path
+    // specifically.
+    return;
+  }
+  auto &ctx = MD->getASTContext();
+  std::vector<SourceFile*> filesToWalk;
+  for (auto *FU : MD->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(FU)) {
+      switch (SF->Kind) {
+      case swift::SourceFileKind::Library:
+      case swift::SourceFileKind::Main:
+      case swift::SourceFileKind::MacroExpansion:
+      case swift::SourceFileKind::DefaultArgument:
+        filesToWalk.push_back(SF);
+        LLVM_FALLTHROUGH;
+      case swift::SourceFileKind::SIL:
+      case swift::SourceFileKind::Interface:
+        continue;
+      }
+    }
+  }
+  // No source files to walk, abort.
+  if (filesToWalk.empty()) {
+    return;
+  }
+  // Write output via atomic append.
+  llvm::vfs::OutputConfig config;
+  config.setAppend().setAtomicWrite();
+  auto outputFile = ctx.getOutputBackend().createFile(tracePath, config);
+  if (!outputFile) {
+    ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output, tracePath,
+                       toString(outputFile.takeError()));
+    return;
+  }
+  ObjcMethodReferenceCollector collector(MD);
+  for (auto *SF: filesToWalk) {
+    collector.setFileBeforeVisiting(SF);
+    collector.walk(*SF);
+  }
+
+  // print this json line.
+  std::string stringBuffer;
+  {
+    llvm::raw_string_ostream memoryBuffer(stringBuffer);
+    collector.serializeAsJson(memoryBuffer);
+  }
+  stringBuffer += "\n";
+
+  // Write output via atomic append.
+  *outputFile << stringBuffer;
+  if (auto err = outputFile->keep()) {
+    ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                       tracePath, toString(std::move(err)));
+    return;
+  }
+}
+
+bool swift::emitFineModuleTraceIfNeeded(ModuleDecl *mainModule,
+                                        const FrontendOptions &opts) {
+  ASTContext &ctxt = mainModule->getASTContext();
+  assert(!ctxt.hadError() &&
+         "We should've already exited earlier if there was an error.");
+
+  opts.InputsAndOutputs.forEachInput([&](const InputFile &input) {
+    createFineModuleTraceFile(input, mainModule);
+    return true;
+  });
   return false;
 }

@@ -38,6 +38,7 @@
 
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -336,15 +337,15 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
     // Only constrain the availability of the typealias by the availability of
     // the associated type if the associated type is less available than its
     // protocol. This is required for source compatibility.
-    auto protoAvailability = AvailabilityInference::availableRange(proto, ctx);
+    auto protoAvailability = AvailabilityInference::availableRange(proto);
     auto assocTypeAvailability =
-        AvailabilityInference::availableRange(assocType, ctx);
+        AvailabilityInference::availableRange(assocType);
     if (protoAvailability.isSupersetOf(assocTypeAvailability)) {
       availabilitySources.push_back(assocType);
     }
 
-    AvailabilityInference::applyInferredAvailableAttrs(
-        aliasDecl, availabilitySources, ctx);
+    AvailabilityInference::applyInferredAvailableAttrs(aliasDecl,
+                                                       availabilitySources);
 
     if (nominal == dc) {
       nominal->addMember(aliasDecl);
@@ -538,7 +539,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     // clause, check those requirements now.
     if (!TypeChecker::checkContextualRequirements(
             genericDecl, dc->getSelfInterfaceType(), SourceLoc(),
-            dc->getParentModule(), dc->getGenericSignatureOfContext())) {
+            dc->getGenericSignatureOfContext())) {
       continue;
     }
 
@@ -2860,12 +2861,18 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   // Check any same-type requirements in the protocol's requirement signature.
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
 
-  auto typeInContext = dc->mapTypeIntoContext(adoptee);
+  auto typeInContext = adoptee;
+  ProtocolConformanceRef conformanceInContext(conformance);
+  if (auto *genericEnv = conformance->getGenericEnvironment()) {
+    typeInContext = genericEnv->mapTypeIntoContext(typeInContext);
+    conformanceInContext =
+      conformanceInContext.subst(conformance->getType(),
+                                 genericEnv->getForwardingSubstitutionMap());
+  }
 
   auto substitutions =
     SubstitutionMap::getProtocolSubstitutions(
-                                    proto, typeInContext,
-                                    ProtocolConformanceRef(conformance));
+      proto, typeInContext, conformanceInContext);
 
   SmallVector<Requirement, 4> sanitizedRequirements;
   auto requirements = proto->getRequirementSignature().getRequirements();

@@ -630,19 +630,6 @@ protected:
   transformCase(CaseStmt *caseStmt) {
     auto *body = caseStmt->getBody();
 
-    // Explicitly disallow `case` statements with empty bodies
-    // since that helps to diagnose other issues with switch
-    // statements by excluding invalid cases.
-    if (auto *BS = dyn_cast<BraceStmt>(body)) {
-      if (BS->getNumElements() == 0) {
-        // HACK: still allow empty bodies if typechecking for code
-        // completion. Code completion ignores diagnostics
-        // and won't get any types if we fail.
-        if (!ctx.SourceMgr.hasIDEInspectionTargetBuffer())
-          return std::nullopt;
-      }
-    }
-
     NullablePtr<Expr> caseVarRef;
     std::optional<UnsupportedElt> unsupported;
     SmallVector<ASTNode, 4> newBody;
@@ -693,18 +680,20 @@ protected:
       return failTransform(forEachStmt);
 
     SmallVector<ASTNode, 4> doBody;
+    SourceLoc startLoc = forEachStmt->getStartLoc();
     SourceLoc endLoc = forEachStmt->getEndLoc();
 
     // Build a variable that is going to hold array of results produced
-    // by each iteration of the loop.
+    // by each iteration of the loop. Note we need to give it the start loc of
+    // the for loop to ensure the implicit 'do' has a correct source range.
     //
     // Not that it's not going to be initialized here, that would happen
     // only when a solution is found.
     VarDecl *arrayVar = buildPlaceholderVar(
-        forEachStmt->getEndLoc(), doBody,
+        startLoc, doBody,
         ArraySliceType::get(PlaceholderType::get(ctx, forEachVar.get())),
-        ArrayExpr::create(ctx, /*LBrace=*/endLoc, /*Elements=*/{},
-                          /*Commas=*/{}, /*RBrace=*/endLoc));
+        ArrayExpr::create(ctx, /*LBrace=*/startLoc, /*Elements=*/{},
+                          /*Commas=*/{}, /*RBrace=*/startLoc));
 
     NullablePtr<Expr> bodyVarRef;
     std::optional<UnsupportedElt> unsupported;
@@ -723,7 +712,8 @@ protected:
         auto arrayAppendRef = new (ctx) UnresolvedDotExpr(
             arrayVarRef, endLoc, DeclNameRef(ctx.getIdentifier("append")),
             DeclNameLoc(endLoc), /*implicit=*/true);
-        arrayAppendRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+        arrayAppendRef->setFunctionRefInfo(
+            FunctionRefInfo::singleBaseNameApply());
 
         auto *argList = ArgumentList::createImplicit(
             ctx, endLoc, {Argument::unlabeled(bodyVarRef.get())}, endLoc);
@@ -1258,12 +1248,8 @@ static bool walkExplicitReturnStmts(const BraceStmt *BS,
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      if (S->isImplicit()) {
-        return Action::SkipNode(S);
-      }
-
       auto *returnStmt = dyn_cast<ReturnStmt>(S);
-      if (!returnStmt) {
+      if (!returnStmt || returnStmt->isImplicit()) {
         return Action::Continue(S);
       }
 
@@ -1319,12 +1305,8 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
     ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
 
   auto isUnavailable = [&](Decl *D) -> bool {
-    if (AvailableAttr::isUnavailable(D))
-      return true;
-
     auto loc = extractNearestSourceLoc(dc);
-    auto context = ExportContext::forFunctionBody(dc, loc);
-    return TypeChecker::checkDeclarationAvailability(D, context).has_value();
+    return getUnsatisfiedAvailabilityConstraint(D, dc, loc).has_value();
   };
 
   bool foundMatch = false;
@@ -1597,7 +1579,7 @@ Expr *ResultBuilder::buildCall(SourceLoc loc, Identifier fnName,
   auto memberRef = new (ctx)
       UnresolvedDotExpr(baseExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
                         /*implicit=*/true);
-  memberRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+  memberRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
   auto openLoc = args.empty() ? loc : argExprs.front()->getStartLoc();
   auto closeLoc = args.empty() ? loc : argExprs.back()->getEndLoc();

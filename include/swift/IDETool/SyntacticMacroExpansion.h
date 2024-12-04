@@ -45,35 +45,32 @@ class SyntacticMacroExpansionInstance {
   DiagnosticEngine Diags{SourceMgr};
   std::unique_ptr<ASTContext> Ctx;
   ModuleDecl *TheModule = nullptr;
+  SourceFile *SF = nullptr;
   llvm::StringMap<MacroDecl *> MacroDecls;
-
-  /// Create 'SourceFile' using the buffer.
-  swift::SourceFile *getSourceFile(llvm::MemoryBuffer *inputBuf);
 
   /// Synthesize 'MacroDecl' AST object to use the expansion.
   swift::MacroDecl *
   getSynthesizedMacroDecl(swift::Identifier name,
                           const MacroExpansionSpecifier &expansion);
 
-  /// Expand single 'expansion' in SF.
-  void expand(swift::SourceFile *SF,
-                    const MacroExpansionSpecifier &expansion,
-                    SourceEditConsumer &consumer);
+  /// Expand single 'expansion'.
+  void expand(const MacroExpansionSpecifier &expansion,
+              SourceEditConsumer &consumer);
 
 public:
   SyntacticMacroExpansionInstance() {}
 
-  /// Setup the instance with \p args .
+  /// Setup the instance with \p args and a given \p inputBuf.
   bool setup(StringRef SwiftExecutablePath, ArrayRef<const char *> args,
+             llvm::MemoryBuffer *inputBuf,
              std::shared_ptr<PluginRegistry> plugins, std::string &error);
 
   ASTContext &getASTContext() { return *Ctx; }
 
-  /// Expand all macros in \p inputBuf and send the edit results to \p consumer.
-  /// Expansions are specified by \p expansions .
-  void expandAll(llvm::MemoryBuffer *inputBuf,
-                     ArrayRef<MacroExpansionSpecifier> expansions,
-                     SourceEditConsumer &consumer);
+  /// Expand all macros and send the edit results to \p consumer. Expansions are
+  /// specified by \p expansions .
+  void expandAll(ArrayRef<MacroExpansionSpecifier> expansions,
+                 SourceEditConsumer &consumer);
 };
 
 /// Manager object to vend 'SyntacticMacroExpansionInstance'.
@@ -86,9 +83,11 @@ public:
                           std::shared_ptr<PluginRegistry> Plugins)
       : SwiftExecutablePath(SwiftExecutablePath), Plugins(Plugins) {}
 
-  /// Get instance configured with the specified compiler arguments.
+  /// Get instance configured with the specified compiler arguments and
+  /// input buffer.
   std::shared_ptr<SyntacticMacroExpansionInstance>
-  getInstance(ArrayRef<const char *> args, std::string &error);
+  getInstance(ArrayRef<const char *> args, llvm::MemoryBuffer *inputBuf,
+              std::string &error);
 };
 
 } // namespace ide

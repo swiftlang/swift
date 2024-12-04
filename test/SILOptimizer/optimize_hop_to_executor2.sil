@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop

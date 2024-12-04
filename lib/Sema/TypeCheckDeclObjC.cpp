@@ -535,7 +535,7 @@ static bool checkObjCClassStubAvailability(ASTContext &ctx, const Decl *decl) {
   if (deploymentTarget.isContainedIn(stubAvailability))
     return true;
 
-  auto declAvailability = AvailabilityInference::availableRange(decl, ctx);
+  auto declAvailability = AvailabilityInference::availableRange(decl);
   return declAvailability.isContainedIn(stubAvailability);
 }
 
@@ -3314,16 +3314,13 @@ private:
     if (!VD)
       return;
 
-    ASTContext &ctx = VD->getASTContext();
-
     // Also skip overrides, unless they override an unavailable decl, which
     // makes them not formally overrides anymore.
-    if (VD->getOverriddenDecl() &&
-          !VD->getOverriddenDecl()->getAttrs().isUnavailable(ctx))
+    if (VD->getOverriddenDecl() && !VD->getOverriddenDecl()->isUnavailable())
       return;
 
     // Skip alternate Swift names for other language modes.
-    if (VD->getAttrs().isUnavailable(ctx))
+    if (VD->isUnavailable())
       return;
 
     // Skip async versions of members. We'll match against the completion

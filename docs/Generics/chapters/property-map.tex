@@ -5,6 +5,21 @@
 \chapter[]{The Property Map}\label{propertymap}
 
 \ifWIP
+
+%%%%
+% Remove these
+%%%%
+\newcommand{\proto}[1]{\texttt{#1}}
+\usepackage{bm}
+\newcommand{\namesym}[1]{\mathrm{#1}}
+\newcommand{\genericparam}[1]{\bm{\mathsf{#1}}}
+\newcommand{\gensig}[2]{\langle #1\;\textit{where}\;#2\rangle}
+\newcommand{\genericsym}[2]{\bm{\uptau}_{#1,#2}}
+\DeclareMathOperator{\gpdepth}{depth}
+\DeclareMathOperator{\gpindex}{index}
+\DeclareMathOperator{\domain}{domain}
+%%%%%
+
 Until now, you've seen how to solve the \texttt{requiresProtocol()} generic signature
 query. If $T$ is a type term, then the type parameter represented by $T$ conforms to a protocol
 $\proto{P}$ if $T$ and $T.\pP$ both reduce to the same canonical form ${T}{\downarrow}$. The next
@@ -621,6 +636,6 @@ The concrete type adjustment actually comes up again in the next chapter, during
 
 \fi
 
-\section[]{Source Code Reference}
+\section[]{Source Code Reference}\label{property map sourceref}
 
 \end{document}

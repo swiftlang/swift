@@ -89,9 +89,13 @@ func defaultedParamsEnd4(newArg: Int, arg: Int = 0) async { }
 @available(macOS, deprecated: 12, renamed: "manyAttrsOld()")
 @available(*, deprecated)
 func manyAttrs(completionHandler: @escaping () -> Void) { }
+
 // expected-note@+2 {{'manyAttrsNew()' declared here}}
 @available(SwiftStdlib 5.5, *)
 func manyAttrsNew() async { }
+
+@available(SwiftStdlib 5.5, *)
+func manyAttrsNewOther() async { }
 
 @available(macOS, introduced: 12, renamed: "platformOnlyNew()")
 func platformOnly(completionHandler: @escaping () -> Void) { }

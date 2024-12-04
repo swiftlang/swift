@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name foreach %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name foreach %s | %FileCheck %s
 
 //////////////////
 // Declarations //

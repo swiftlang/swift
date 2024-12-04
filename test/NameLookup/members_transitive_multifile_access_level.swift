@@ -33,6 +33,9 @@
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -verify-additional-prefix internal-by-default-
 
+// REQUIRES: swift_feature_InternalImportsByDefault
+// REQUIRES: swift_feature_MemberImportVisibility
+
 //--- function_bodies.swift
 
 // FIXME: The access level on the fix-it for PackageUsesOnly is wrong.

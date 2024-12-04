@@ -124,13 +124,14 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
         !Opts.PackageFlags.IgnorableFlags.empty())
       ignorableFlags.push_back(Opts.PackageFlags.IgnorableFlags);
 
-    if (!ignorableFlags.empty()) {
-      out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": ";
-      llvm::interleave(
-          ignorableFlags, [&out](StringRef str) { out << str; },
-          [&out] { out << " "; });
-      out << "\n";
-    }
+    out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": ";
+
+    llvm::interleave(
+        ignorableFlags, [&out](StringRef str) { out << str; },
+        [&out] { out << " "; });
+
+    out << " -interface-compiler-version " << version::getCompilerVersion();
+    out << "\n";
   }
 }
 
@@ -455,8 +456,8 @@ class InheritedProtocolCollector {
         // attributes for the same platform; formally they'd need to be merged.
         bool alreadyHasMoreSpecificAttrForThisPlatform =
             llvm::any_of(*cache, [nextAttr](const AvailableAttr *existingAttr) {
-          return existingAttr->Platform == nextAttr->Platform;
-        });
+              return existingAttr->getPlatform() == nextAttr->getPlatform();
+            });
         if (alreadyHasMoreSpecificAttrForThisPlatform)
           continue;
         cache->push_back(nextAttr);
@@ -877,7 +878,7 @@ bool swift::emitSwiftInterface(raw_ostream &out,
       M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention,
       Opts.InterfaceContentMode,
       useExportedModuleNames,
-      Opts.AliasModuleNames, &aliasModuleNamesTargets, Opts.ABIComments);
+      Opts.AliasModuleNames, &aliasModuleNamesTargets);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;

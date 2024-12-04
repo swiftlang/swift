@@ -157,7 +157,7 @@ void ClangSyntaxPrinter::printNominalTypeReference(
                                          moduleContext);
   if (!printNestedTypeNamespaceQualifiers(typeDecl))
     os << "::";
-  ClangSyntaxPrinter(os).printBaseName(typeDecl);
+  ClangSyntaxPrinter(typeDecl->getASTContext(), os).printBaseName(typeDecl);
   if (typeDecl->isGeneric())
     printGenericSignatureParams(
         typeDecl->getGenericSignature().getCanonicalSignature());
@@ -229,7 +229,7 @@ void ClangSyntaxPrinter::printObjCBlock(
     llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
   os << "#if defined(__OBJC__)\n";
   bodyPrinter(os);
-  os << "\n#endif\n";
+  os << "\n#endif // defined(__OBJC__)\n";
 }
 
 void ClangSyntaxPrinter::printSwiftImplQualifier() const {

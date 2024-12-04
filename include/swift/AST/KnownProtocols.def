@@ -119,6 +119,7 @@ PROTOCOL(Differentiable)
 
 // Distributed Actors
 PROTOCOL(DistributedActor)
+PROTOCOL_(DistributedActorStub)
 PROTOCOL(DistributedActorSystem)
 PROTOCOL(DistributedTargetInvocationEncoder)
 PROTOCOL(DistributedTargetInvocationDecoder)
@@ -142,6 +143,8 @@ PROTOCOL(UnsafeCxxInputIterator)
 PROTOCOL(UnsafeCxxMutableInputIterator)
 PROTOCOL(UnsafeCxxRandomAccessIterator)
 PROTOCOL(UnsafeCxxMutableRandomAccessIterator)
+PROTOCOL(UnsafeCxxContiguousIterator)
+PROTOCOL(UnsafeCxxMutableContiguousIterator)
 
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)

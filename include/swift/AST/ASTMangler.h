@@ -13,8 +13,10 @@
 #ifndef SWIFT_AST_ASTMANGLER_H
 #define SWIFT_AST_ASTMANGLER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
+#include "swift/AST/SILThunkKind.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/TaggedUnion.h"
@@ -43,6 +45,9 @@ enum class DestructorKind {
 /// The mangler for AST declarations.
 class ASTMangler : public Mangler {
 protected:
+#if 0 // STAGING
+  const ASTContext &Context;
+#endif
   ModuleDecl *Mod = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
@@ -184,6 +189,7 @@ public:
     HasSymbolQuery,
   };
 
+  // STAGING: legacy constructor for LLDB
   /// lldb overrides the defaulted argument to 'true'.
   ASTMangler(bool DWARFMangling = false) {
     if (DWARFMangling) {
@@ -191,6 +197,24 @@ public:
       RespectOriginallyDefinedIn = false;
     }
   }
+
+  /// lldb overrides the defaulted argument to 'true'.
+  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false) : ASTMangler(DWARFMangling) {}
+
+#if 0
+  /// lldb overrides the defaulted argument to 'true'.
+  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false) : Context(Ctx) {
+    if (DWARFMangling) {
+      DWARFMangling = true;
+      RespectOriginallyDefinedIn = false;
+    }
+    Flavor = Ctx.LangOpts.hasFeature(Feature::Embedded)
+                 ? ManglingFlavor::Embedded
+                 : ManglingFlavor::Default;
+  }
+
+  const ASTContext &getASTContext() { return Context; }
+#endif
 
   void addTypeSubstitution(Type type, GenericSignature sig) {
     type = dropProtocolsFromAssociatedTypes(type, sig);
@@ -313,6 +337,9 @@ public:
   std::string mangleSILDifferentiabilityWitness(StringRef originalName,
                                                 DifferentiabilityKind kind,
                                                 const AutoDiffConfig &config);
+
+  std::string mangleSILThunkKind(StringRef originalName,
+                                 SILThunkKind thunkKind);
 
   /// Mangle the AutoDiff generated declaration for the given:
   /// - Generated declaration kind: linear map struct or branching trace enum.

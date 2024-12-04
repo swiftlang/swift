@@ -697,8 +697,8 @@ namespace {
     auto *lhs = args->getExpr(0);
     auto *rhs = args->getExpr(1);
 
-    auto firstArgTy = CS.getType(lhs)->getWithoutParens();
-    auto secondArgTy = CS.getType(rhs)->getWithoutParens();
+    auto firstArgTy = CS.getType(lhs);
+    auto secondArgTy = CS.getType(rhs);
 
     auto isOptionalWithMatchingObjectType = [](Type optional,
                                                Type object) -> bool {
@@ -980,8 +980,7 @@ namespace {
     }
 
     /// If the provided type is a tuple, decomposes it into a matching set of
-    /// function params. Otherwise produces a single parameter of the type,
-    /// stripping a ParenType if needed.
+    /// function params. Otherwise produces a single parameter of the type.
     void decomposeTuple(Type ty,
                         SmallVectorImpl<AnyFunctionType::Param> &result) {
       switch (ty->getKind()) {
@@ -989,11 +988,6 @@ namespace {
         auto tupleTy = cast<TupleType>(ty.getPointer());
         for (auto &elt : tupleTy->getElements())
           result.emplace_back(elt.getType(), elt.getName());
-        return;
-      }
-      case TypeKind::Paren: {
-        auto pty = cast<ParenType>(ty.getPointer());
-        result.emplace_back(pty->getUnderlyingType(), Identifier());
         return;
       }
       default:
@@ -1004,7 +998,7 @@ namespace {
     /// Add constraints for a reference to a named member of the given
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, DeclNameRef name,
-                                 FunctionRefKind functionRefKind,
+                                 FunctionRefInfo functionRefInfo,
                                  ArrayRef<ValueDecl *> outerAlternatives) {
       // The base must have a member of the given name, such that accessing
       // that member through the base returns a value convertible to the type
@@ -1025,10 +1019,10 @@ namespace {
                   options);
       SmallVector<OverloadChoice, 4> outerChoices;
       for (auto decl : outerAlternatives) {
-        outerChoices.push_back(OverloadChoice(Type(), decl, functionRefKind));
+        outerChoices.push_back(OverloadChoice(Type(), decl, functionRefInfo));
       }
       CS.addValueMemberConstraint(
-          baseTy, name, tv, CurDC, functionRefKind, outerChoices,
+          baseTy, name, tv, CurDC, functionRefInfo, outerChoices,
           CS.getConstraintLocator(expr, ConstraintLocator::Member));
       return tv;
     }
@@ -1036,7 +1030,7 @@ namespace {
     /// Add constraints for a reference to a specific member of the given
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, ValueDecl *decl,
-                                 FunctionRefKind functionRefKind) {
+                                 FunctionRefInfo functionRefInfo) {
       // If we're referring to an invalid declaration, fail.
       if (!decl)
         return nullptr;
@@ -1050,7 +1044,7 @@ namespace {
                                       TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
       OverloadChoice choice =
-          OverloadChoice(CS.getType(base), decl, functionRefKind);
+          OverloadChoice(CS.getType(base), decl, functionRefInfo);
 
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator, CurDC);
@@ -1149,16 +1143,15 @@ namespace {
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
       if (auto decl = declOrNull) {
-        OverloadChoice choice =
-            OverloadChoice(baseTy, decl, FunctionRefKind::DoubleApply);
+        OverloadChoice choice = OverloadChoice(
+            baseTy, decl, FunctionRefInfo::doubleBaseNameApply());
         CS.addBindOverloadConstraint(memberTy, choice, memberLocator,
                                      CurDC);
       } else {
         CS.addValueMemberConstraint(baseTy, DeclNameRef::createSubscript(),
                                     memberTy, CurDC,
-                                    FunctionRefKind::DoubleApply,
-                                    /*outerAlternatives=*/{},
-                                    memberLocator);
+                                    FunctionRefInfo::doubleBaseNameApply(),
+                                    /*outerAlternatives=*/{}, memberLocator);
       }
 
       SmallVector<AnyFunctionType::Param, 8> params;
@@ -1388,9 +1381,9 @@ namespace {
           return Type();
 
         auto macroIdent = ctx.getIdentifier(kind);
-        auto macros =
-            lookupMacros(Identifier(), macroIdent, FunctionRefKind::Unapplied,
-                         MacroRole::Expression);
+        auto macros = lookupMacros(Identifier(), macroIdent,
+                                   FunctionRefInfo::unappliedBaseName(),
+                                   MacroRole::Expression);
         if (!macros.empty()) {
           // Introduce an overload set for the macro reference.
           auto locator = CS.getConstraintLocator(expr);
@@ -1483,7 +1476,8 @@ namespace {
 
       CS.addValueMemberConstraint(MetatypeType::get(witnessType, ctx),
                                   DeclNameRef(constrName), memberType, CurDC,
-                                  FunctionRefKind::DoubleApply, {}, memberLoc);
+                                  FunctionRefInfo::doubleBaseNameApply(), {},
+                                  memberLoc);
 
       SmallVector<AnyFunctionType::Param, 8> params;
       getMatchingParams(expr->getArgs(), params);
@@ -1536,7 +1530,7 @@ namespace {
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
         if (!knownType)
-          knownType = CS.getVarType(VD);
+          knownType = VD->getTypeInContext();
 
         if (knownType) {
           // An out-of-scope type variable(s) could appear the type of
@@ -1605,7 +1599,7 @@ namespace {
       auto tv = CS.createTypeVariable(locator, options);
 
       OverloadChoice choice =
-          OverloadChoice(Type(), E->getDecl(), E->getFunctionRefKind());
+          OverloadChoice(Type(), E->getDecl(), E->getFunctionRefInfo());
       CS.resolveOverload(locator, tv, choice, CurDC);
       return tv;
     }
@@ -1728,7 +1722,7 @@ namespace {
           continue;
 
         OverloadChoice choice =
-            OverloadChoice(Type(), decls[i], expr->getFunctionRefKind());
+            OverloadChoice(Type(), decls[i], expr->getFunctionRefInfo());
         choices.push_back(choice);
       }
 
@@ -1752,9 +1746,9 @@ namespace {
     }
     
     Type visitMemberRefExpr(MemberRefExpr *expr) {
-      return addMemberRefConstraints(expr, expr->getBase(),
-                                     expr->getMember().getDecl(),
-                                     /*FIXME:*/FunctionRefKind::DoubleApply);
+      return addMemberRefConstraints(
+          expr, expr->getBase(), expr->getMember().getDecl(),
+          /*FIXME:*/ FunctionRefInfo::doubleBaseNameApply());
     }
     
     Type visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
@@ -1797,7 +1791,7 @@ namespace {
       auto baseMetaTy = MetatypeType::get(baseTy);
       CS.addUnresolvedValueMemberConstraint(baseMetaTy, expr->getName(),
                                             memberTy, CurDC,
-                                            expr->getFunctionRefKind(),
+                                            expr->getFunctionRefInfo(),
                                             memberLocator);
       return memberTy;
     }
@@ -1887,7 +1881,7 @@ namespace {
 
         CS.addValueMemberConstraint(
             baseTy, expr->getName(), methodTy, CurDC,
-            expr->getFunctionRefKind(),
+            expr->getFunctionRefInfo(),
             /*outerAlternatives=*/{},
             CS.getConstraintLocator(expr,
                                     ConstraintLocator::ConstructorMember));
@@ -1898,7 +1892,7 @@ namespace {
       }
 
       return addMemberRefConstraints(expr, expr->getBase(), expr->getName(),
-                                     expr->getFunctionRefKind(),
+                                     expr->getFunctionRefInfo(),
                                      expr->getOuterAlternatives());
     }
 
@@ -2063,7 +2057,7 @@ namespace {
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
-      return ParenType::get(CS.getASTContext(), CS.getType(expr->getSubExpr()));
+      return CS.getType(expr->getSubExpr());
     }
 
     Type visitTupleExpr(TupleExpr *expr) {
@@ -2393,7 +2387,7 @@ namespace {
       DeclNameRef name(
           context.getIdentifier(llvm::utostr(expr->getFieldNumber())));
       return addMemberRefConstraints(expr, expr->getBase(), name,
-                                     FunctionRefKind::Unapplied,
+                                     FunctionRefInfo::unappliedBaseName(),
                                      /*outerAlternatives=*/{});
     }
 
@@ -2426,7 +2420,7 @@ namespace {
 
           Type externalType;
           if (param->getTypeRepr()) {
-            auto declaredTy = CS.getVarType(param);
+            auto declaredTy = param->getTypeInContext();
 
             // If closure parameter couldn't be resolved, let's record
             // a fix to make sure that type resolution diagnosed the
@@ -2607,7 +2601,7 @@ namespace {
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
             bindPatternVarsOneWay);
 
-        return setType(ParenType::get(CS.getASTContext(), underlyingType));
+        return setType(underlyingType);
       }
       case PatternKind::Binding: {
         auto *subPattern = cast<BindingPattern>(pattern)->getSubPattern();
@@ -2693,6 +2687,21 @@ namespace {
             varType = TypeChecker::getOptionalType(var->getLoc(), varType);
         }
 
+        auto makeTypeLocatableIfPossible = [&var](Type type) -> Type {
+          if (auto loc = var->getLoc()) {
+            return LocatableType::get(loc, type);
+          }
+          return type;
+        };
+
+        auto useLocatableTypes = [&]() -> bool {
+          if (!CS.inSalvageMode())
+            return false;
+
+          return var->isImplicit() &&
+                 var->getNameStr().starts_with("$__builder");
+        };
+
         // When we are supposed to bind pattern variables, create a fresh
         // type variable and a one-way constraint to assign it to either the
         // deduced type or the externally-imposed type.
@@ -2717,6 +2726,9 @@ namespace {
 
           CS.addConstraint(ConstraintKind::OneWayEqual, oneWayVarType,
                            varType, locator);
+
+          if (useLocatableTypes())
+            oneWayVarType = makeTypeLocatableIfPossible(oneWayVarType);
         }
 
         // Ascribe a type to the declaration so it's always available to
@@ -2777,6 +2789,9 @@ namespace {
             CS.addConstraint(ConstraintKind::Equal, declTy, varType,
                              CS.getConstraintLocator(locator));
           }
+
+          if (useLocatableTypes())
+            declTy = makeTypeLocatableIfPossible(declTy);
 
           CS.setType(var, declTy);
         }
@@ -2913,16 +2928,20 @@ namespace {
             TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
         // Tuple splat is still allowed for patterns (with a warning in Swift 5)
-        // so we need to start here from single-apply to make sure that e.g.
+        // so we need to set a non-compound reference to make sure that e.g.
         // `case test(x: Int, y: Int)` gets the labels preserved when matched
         // with `case let .test(tuple)`.
-        FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
+        auto functionRefInfo = FunctionRefInfo::unappliedBaseName();
+        if (enumPattern->hasSubPattern())
+          functionRefInfo = functionRefInfo.addingApplicationLevel();
+
         // If sub-pattern is a tuple we'd need to mark reference as compound,
         // that would make sure that the labels are dropped in cases
         // when `case` has a single tuple argument (tuple explosion) or multiple
         // arguments (tuple-to-tuple conversion).
+        // FIXME: We ought to be preserving labels and matching in the solver.
         if (dyn_cast_or_null<TuplePattern>(enumPattern->getSubPattern()))
-          functionRefKind = FunctionRefKind::Compound;
+          functionRefInfo = FunctionRefInfo::singleCompoundNameApply();
 
         auto patternLocator =
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern));
@@ -2955,7 +2974,7 @@ namespace {
           // Perform member lookup into the parent's metatype.
           Type parentMetaType = MetatypeType::get(parentType);
           CS.addValueMemberConstraint(parentMetaType, enumPattern->getName(),
-                                      memberType, CurDC, functionRefKind, {},
+                                      memberType, CurDC, functionRefInfo, {},
                                       patternLocator);
 
           // Parent type needs to be convertible to the pattern type; this
@@ -2970,7 +2989,7 @@ namespace {
           // Use the pattern type for member lookup.
           CS.addUnresolvedValueMemberConstraint(
               MetatypeType::get(patternType), enumPattern->getName(),
-              memberType, CurDC, functionRefKind, patternLocator);
+              memberType, CurDC, functionRefInfo, patternLocator);
 
           baseType = patternType;
         }
@@ -3755,16 +3774,10 @@ namespace {
           auto lookupName = kind == KeyPathExpr::Component::Kind::UnresolvedProperty
             ? DeclNameRef(component.getUnresolvedDeclName()) // FIXME: type change needed
             : component.getDeclRef().getDecl()->createNameRef();
-          
-          auto refKind = lookupName.isSimpleName()
-            ? FunctionRefKind::Unapplied
-            : FunctionRefKind::Compound;
-          CS.addValueMemberConstraint(base, lookupName,
-                                      memberTy,
-                                      CurDC,
-                                      refKind,
-                                      /*outerAlternatives=*/{},
-                                      memberLocator);
+
+          CS.addValueMemberConstraint(base, lookupName, memberTy, CurDC,
+                                      FunctionRefInfo::unapplied(lookupName),
+                                      /*outerAlternatives=*/{}, memberLocator);
           base = memberTy;
           break;
         }
@@ -3997,13 +4010,17 @@ namespace {
     /// Lookup all macros with the given macro name.
     SmallVector<OverloadChoice, 1> lookupMacros(Identifier moduleName,
                                                 Identifier macroName,
-                                                FunctionRefKind functionRefKind,
+                                                FunctionRefInfo functionRefInfo,
                                                 MacroRoles roles) {
       SmallVector<OverloadChoice, 1> choices;
       auto results = namelookup::lookupMacros(CurDC, DeclNameRef(moduleName),
                                               DeclNameRef(macroName), roles);
       for (const auto &result : results) {
-        OverloadChoice choice = OverloadChoice(Type(), result, functionRefKind);
+        // Ignore invalid results. This matches the OverloadedDeclRefExpr
+        // logic.
+        if (result->isInvalid())
+          continue;
+        OverloadChoice choice = OverloadChoice(Type(), result, functionRefInfo);
         choices.push_back(choice);
       }
 
@@ -4025,8 +4042,8 @@ namespace {
       // Look up the macros with this name.
       auto moduleIdent = expr->getModuleName().getBaseIdentifier();
       auto macroIdent = expr->getMacroName().getBaseIdentifier();
-      FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
-      auto macros = lookupMacros(moduleIdent, macroIdent, functionRefKind,
+      FunctionRefInfo functionRefInfo = FunctionRefInfo::singleBaseNameApply();
+      auto macros = lookupMacros(moduleIdent, macroIdent, functionRefInfo,
                                  expr->getMacroRoles());
       if (macros.empty()) {
         ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
@@ -4532,7 +4549,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 
     auto *makeIteratorRef = UnresolvedDotExpr::createImplicit(
         ctx, sequenceExpr, makeIterator->getName());
-    makeIteratorRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+    makeIteratorRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
     auto *makeIteratorCall =
         CallExpr::createImplicitEmpty(ctx, makeIteratorRef);
@@ -4593,7 +4610,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
         new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
                               /*Implicit=*/true),
         nextId, labels);
-    nextRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+    nextRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
     ArgumentList *nextArgs;
     if (nextFn && nextFn->getParameters()->size() == 1) {
@@ -4905,7 +4922,7 @@ bool ConstraintSystem::generateConstraints(
 
   case SyntacticElementTarget::Kind::uninitializedVar: {
     if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
-      auto propertyType = getVarType(wrappedVar);
+      auto propertyType = wrappedVar->getTypeInContext();
       if (propertyType->hasError())
         return true;
 
@@ -4932,7 +4949,7 @@ bool ConstraintSystem::generateConstraints(
     // Cache the outer generic environment, if it exists.
     if (target.getPackElementEnv()) {
       PackElementGenericEnvironments.push_back(target.getPackElementEnv());
-      ASSERT(!isRecordingChanges() && "Need to record a change");
+      ASSERT(!solverState && "Need to record a change");
     }
 
     // For a for-each statement, generate constraints for the pattern, where
@@ -5047,6 +5064,10 @@ void ConstraintSystem::removePropertyWrapper(Expr *anchor) {
   auto &wrappers = found->second;
   ASSERT(!wrappers.empty());
   wrappers.pop_back();
+  if (wrappers.empty()) {
+    bool erased = appliedPropertyWrappers.erase(anchor);
+    ASSERT(erased);
+  }
 }
 
 ConstraintSystem::TypeMatchResult
@@ -5058,18 +5079,35 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     anchor = apply->getFn();
   }
 
-  if (argLabel.hasDollarPrefix() && (!param || !param->hasExternalPropertyWrapper())) {
+  auto recordPropertyWrapperFix = [&](ConstraintFix *fix) -> TypeMatchResult {
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
     recordAnyTypeVarAsPotentialHole(paramType);
 
-    auto *loc = getConstraintLocator(locator);
-    auto *fix = RemoveProjectedValueArgument::create(*this, wrapperType, param, loc);
     if (recordFix(fix))
       return getTypeMatchFailure(locator);
 
     return getTypeMatchSuccess();
+  };
+
+  // Incorrect use of projected value argument
+  if (argLabel.hasDollarPrefix() &&
+      (!param || !param->hasExternalPropertyWrapper())) {
+    auto *loc = getConstraintLocator(locator);
+    auto *fix =
+        RemoveProjectedValueArgument::create(*this, wrapperType, param, loc);
+    return recordPropertyWrapperFix(fix);
+  }
+
+  // Missing wrapped value initializer
+  auto wrapperInfo = param->getAttachedPropertyWrapperTypeInfo(0);
+  if (!argLabel.hasDollarPrefix() && !wrapperInfo.wrappedValueInit &&
+      param->hasExternalPropertyWrapper()) {
+    auto *loc = getConstraintLocator(locator);
+    auto *fix = UsePropertyWrapper::create(
+        *this, param, /*usingProjection=*/true, paramType, wrapperType, loc);
+    return recordPropertyWrapperFix(fix);
   }
 
   if (argLabel.hasDollarPrefix()) {
@@ -5156,9 +5194,10 @@ ResolvedMemberResult swift::resolveValueMember(DeclContext &DC, Type BaseTy,
   ConstraintSystem CS(&DC, std::nullopt);
 
   // Look up all members of BaseTy with the given Name.
-  MemberLookupResult LookupResult = CS.performMemberLookup(
-      ConstraintKind::ValueMember, DeclNameRef(Name), BaseTy,
-      FunctionRefKind::SingleApply, CS.getConstraintLocator({}), false);
+  MemberLookupResult LookupResult =
+      CS.performMemberLookup(ConstraintKind::ValueMember, DeclNameRef(Name),
+                             BaseTy, FunctionRefInfo::singleBaseNameApply(),
+                             CS.getConstraintLocator({}), false);
 
   // Keep track of all the unviable members.
   for (auto Can : LookupResult.UnviableCandidates)

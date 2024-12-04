@@ -13,7 +13,7 @@ func reqCopy2<T: Builtin.Copyable>(_ t: T) {} // expected-note {{'where T: Built
 
 protocol P {}
 
-struct DataType: P, Builtin.Escapable {} // expected-error {{type 'Escapable' requires -enable-experimental-feature NonescapableTypes}}
+struct DataType: P, Builtin.Escapable {}
 struct DataTypeNC: ~Builtin.Copyable {}
 
 func main() {

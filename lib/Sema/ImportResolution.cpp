@@ -28,7 +28,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/DocumentationCategory.h"
 #include "clang/Basic/Module.h"
@@ -36,9 +35,9 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/TargetParser/Host.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/TargetParser/Host.h"
 #include <algorithm>
 #include <system_error>
 using namespace swift;
@@ -193,6 +192,11 @@ public:
 
   void addImplicitImports();
 
+  void addImplicitImport(ModuleDecl *module) {
+    boundImports.push_back(ImportedModule(module));
+    bindPendingImports();
+  }
+
   /// Retrieve the finalized imports.
   ArrayRef<AttributedImport<ImportedModule>> getFinishedImports() const {
     return boundImports;
@@ -262,6 +266,19 @@ private:
 // MARK: performImportResolution
 //===----------------------------------------------------------------------===//
 
+void swift::performImportResolution(ModuleDecl *M) {
+  for (auto *file : M->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+
+    performImportResolution(*SF);
+    assert(SF->ASTStage >= SourceFile::ImportsResolved &&
+           "file has not had its imports resolved");
+  }
+  M->setHasResolvedImports();
+}
+
 /// performImportResolution - This walks the AST to resolve imports.
 ///
 /// Before we can type-check a source file, we need to make declarations
@@ -300,6 +317,22 @@ void swift::performImportResolution(SourceFile &SF) {
 
   SF.ASTStage = SourceFile::ImportsResolved;
   verify(SF);
+}
+
+void swift::performImportResolutionForClangMacroBuffer(
+    SourceFile &SF, ModuleDecl *clangModule
+) {
+  // If we've already performed import resolution, bail.
+  if (SF.ASTStage == SourceFile::ImportsResolved)
+    return;
+
+  ImportResolver resolver(SF);
+  resolver.addImplicitImport(clangModule);
+
+  SF.setImports(resolver.getFinishedImports());
+  SF.setImportedUnderlyingModule(resolver.getUnderlyingClangModule());
+
+  SF.ASTStage = SourceFile::ImportsResolved;
 }
 
 //===----------------------------------------------------------------------===//

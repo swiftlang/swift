@@ -204,6 +204,12 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-disable-objc-interop");
   }
 
+  if (const Arg *arg = inputArgs.getLastArg(
+        options::OPT_experimental_serialize_debug_info)) {
+    arguments.push_back(
+        inputArgs.MakeArgString(Twine("-experimental-serialize-debug-info")));
+  }
+
   if (inputArgs.hasArg(options::OPT_experimental_hermetic_seal_at_link)) {
     arguments.push_back("-enable-llvm-vfe");
     arguments.push_back("-enable-llvm-wme");
@@ -246,7 +252,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   }
 
   inputArgs.AddAllArgs(arguments, options::OPT_I);
-  inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
+  inputArgs.addAllArgs(arguments, {options::OPT_F, options::OPT_Fsystem});
   inputArgs.AddAllArgs(arguments, options::OPT_vfsoverlay);
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
@@ -264,8 +270,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_disable_dynamic_actor_isolation);
   inputArgs.AddLastArg(arguments, options::OPT_warn_concurrency);
   inputArgs.AddLastArg(arguments, options::OPT_strict_concurrency);
-  inputArgs.AddAllArgs(arguments, options::OPT_enable_experimental_feature);
-  inputArgs.AddAllArgs(arguments, options::OPT_enable_upcoming_feature);
+  inputArgs.addAllArgs(arguments, {options::OPT_enable_experimental_feature,
+                                   options::OPT_disable_experimental_feature,
+                                   options::OPT_enable_upcoming_feature,
+                                   options::OPT_disable_upcoming_feature});
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
@@ -341,14 +349,15 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_cxx_interoperability_mode);
   inputArgs.AddLastArg(arguments, options::OPT_enable_builtin_module);
   inputArgs.AddLastArg(arguments, options::OPT_compiler_assertions);
+  inputArgs.AddLastArg(arguments, options::OPT_load_pass_plugin_EQ);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
   // Pass on file paths that should be remapped in debug info.
-  inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map,
-                                  options::OPT_coverage_prefix_map,
-                                  options::OPT_file_prefix_map);
+  inputArgs.addAllArgs(arguments, {options::OPT_debug_prefix_map,
+                                   options::OPT_coverage_prefix_map,
+                                   options::OPT_file_prefix_map});
 
   std::string globalRemapping = getGlobalDebugPathRemapping();
   if (!globalRemapping.empty()) {
@@ -708,6 +717,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-silgen";
   case file_types::TY_SIL:
     return "-emit-sil";
+  case file_types::TY_LoweredSIL:
+    return "-emit-lowered-sil";
   case file_types::TY_RawSIB:
     return "-emit-sibgen";
   case file_types::TY_SIB:
@@ -753,6 +764,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_SwiftDeps:
   case file_types::TY_ExternalSwiftDeps:
   case file_types::TY_ModuleTrace:
+  case file_types::TY_FineModuleTrace:
   case file_types::TY_TBD:
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
@@ -1008,6 +1020,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_RawSIL:
     case file_types::TY_RawSIB:
     case file_types::TY_SIL:
+    case file_types::TY_LoweredSIL:
     case file_types::TY_SIB:
     case file_types::TY_PCH:
     case file_types::TY_ClangModuleFile:
@@ -1027,6 +1040,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ExternalSwiftDeps:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
+    case file_types::TY_FineModuleTrace:
     case file_types::TY_YAMLOptRecord:
     case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
@@ -1314,7 +1328,8 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   addRuntimeLibraryFlags(context.OI, FrontendArgs);
 
   context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
-  context.Args.AddAllArgs(FrontendArgs, options::OPT_framework, options::OPT_L);
+  context.Args.addAllArgs(FrontendArgs,
+                          {options::OPT_framework, options::OPT_L});
   ToolChain::addLinkedLibArgs(context.Args, FrontendArgs);
 
   if (!useLLDB) {

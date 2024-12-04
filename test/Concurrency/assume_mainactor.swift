@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -swift-version 6 -emit-silgen -enable-experimental-feature UnspecifiedMeansMainActorIsolated %s | %FileCheck %s
 // RUN: %target-swift-frontend -swift-version 6 -emit-sil -enable-experimental-feature UnspecifiedMeansMainActorIsolated %s -verify
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_UnspecifiedMeansMainActorIsolated
 
 // READ THIS! This test is meant to FileCheck the specific isolation when
 // UnspecifiedMeansMainActorIsolated is enabled. Please do not put other types
@@ -70,7 +70,7 @@ struct NonIsolatedStructContainingKlass {
 
 @globalActor
 actor CustomActor {
-  static let shared = CustomActor()
+  static nonisolated let shared = CustomActor()
 }
 
 // CHECK: // unspecifiedAsync<A>(_:)
@@ -198,4 +198,10 @@ actor MyActor2 {
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor8MyActor2C1xACyt_tcfc : $@convention(method) (@owned MyActor2) -> @owned MyActor2 {
   @CustomActor
   init(x: ()) {}
+}
+
+@CustomActor func validateThatPrintIsStillNonIsolated() {
+  // Since we are in a CustomActor, we can only call this if print is
+  // NonIsolated and not if print was inferred to be main actor.
+  print("123")
 }

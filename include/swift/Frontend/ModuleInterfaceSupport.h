@@ -22,6 +22,8 @@
 #define SWIFT_COMPILER_VERSION_KEY "swift-compiler-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
 #define SWIFT_MODULE_FLAGS_IGNORABLE_KEY "swift-module-flags-ignorable"
+#define SWIFT_MODULE_FLAGS_IGNORABLE_PRIVATE_KEY                               \
+  "swift-module-flags-ignorable-private"
 
 namespace swift {
 
@@ -41,10 +43,6 @@ struct ModuleInterfaceOptions {
   /// See \ref FrontendOptions.PrintFullConvention.
   /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;
-
-  /// Print some ABI details for public symbols as comments that can be
-  /// parsed by another tool.
-  bool ABIComments = false;
 
   struct InterfaceFlags {
     /// Copy of all the command-line flags passed at .swiftinterface

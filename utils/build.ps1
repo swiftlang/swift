@@ -194,14 +194,6 @@ $WiXVersion = "4.0.5"
 # Avoid $env:ProgramFiles in case this script is running as x86
 $UnixToolsBinDir = "$env:SystemDrive\Program Files\Git\usr\bin"
 
-$python = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Shared\Python39_64\python.exe"
-if (-not (Test-Path $python)) {
-  $python = (where.exe python) | Select-Object -First 1
-  if (-not (Test-Path $python)) {
-    throw "Python.exe not found"
-  }
-}
-
 if ($Android -and ($AndroidSDKs.Length -eq 0)) {
   # Enable all android SDKs by default.
   $AndroidSDKs = @("aarch64","armv7","i686","x86_64")
@@ -358,6 +350,10 @@ function Get-BisonExecutable {
   return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_bison.exe"
 }
 
+function Get-PythonExecutable {
+  return Join-Path -Path $BinaryCache -ChildPath "Python$($HostArch.CMakeName)-$PythonVersion\tools\python.exe"
+}
+
 function Get-InstallDir($Arch) {
   if ($Arch -eq $HostArch) {
     $ProgramFilesName = "Program Files"
@@ -454,6 +450,7 @@ enum HostComponent {
   LMDB
   SymbolKit
   DocC
+  SwiftInspect
 }
 
 function Get-HostProjectBinaryCache([HostComponent]$Project) {
@@ -746,10 +743,43 @@ function Fetch-Dependencies {
     }
   }
 
+  function Ensure-PythonModules($Python) {
+    # First ensure pip is installed, else bootstrap it
+    try {
+      Invoke-Program -OutNull $Python -m pip *> $null
+    } catch {
+      Write-Output "Installing pip ..."
+      Invoke-Program -OutNull $Python '-I' -m ensurepip -U --default-pip
+    }
+    # 'packaging' is required for building LLVM 18+
+    try {
+      Invoke-Program -OutNull $Python -c 'import packaging' *> $null
+    } catch {
+      $WheelURL = "https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl"
+      $WheelHash = "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"
+      DownloadAndVerify $WheelURL "$BinaryCache\python\packaging-24.1-py3-none-any.whl" $WheelHash
+      Write-Output "Installing 'packaging-24.1-py3-none-any.whl' ..."
+      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\packaging-24.1-py3-none-any.whl" --disable-pip-version-check
+    }
+    # 'setuptools' provides 'distutils' module for Python 3.12+, required for SWIG support
+    # https://github.com/swiftlang/llvm-project/issues/9289
+    try {
+      Invoke-Program -OutNull $Python -c 'import distutils' *> $null
+    } catch {
+      $WheelURL = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl"
+      $WheelHash = "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2"
+      DownloadAndVerify $WheelURL "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" $WheelHash
+      Write-Output "Installing 'setuptools-75.1.0-py3-none-any.whl' ..."
+      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" --disable-pip-version-check
+    }
+  }
+
   Download-Python $HostArchName
   if ($IsCrossCompiling) {
     Download-Python $BuildArchName
   }
+  # Ensure Python modules that are required as host build tools
+  Ensure-PythonModules "$(Get-PythonExecutable)"
 
   if ($Android) {
     # Only a specific NDK version is supported right now.
@@ -958,7 +988,6 @@ function Build-CMakeProject {
     }
 
     TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE Release
-    TryAdd-KeyValue $Defines CMAKE_MT "mt"
 
     $CFlags = @()
     switch ($Platform) {
@@ -1182,7 +1211,7 @@ function Build-CMakeProject {
     }
 
     if ($UseBuiltCompilers.Contains("Swift")) {
-      $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$($BuildArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
+      $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$(Get-CMarkBinaryCache $Arch)\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
       $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
@@ -1217,22 +1246,37 @@ function Build-CMakeProject {
   }
 }
 
+enum SPMBuildAction {
+  # 'swift build'
+  Build
+  # 'swift test'
+  Test
+  # 'swift test --parallel'
+  TestParallel
+}
+
 function Build-SPMProject {
   [CmdletBinding(PositionalBinding = $false)]
   param(
+    [SPMBuildAction] $Action,
     [string] $Src,
     [string] $Bin,
     [hashtable] $Arch,
-    [switch] $Test = $false,
     [Parameter(ValueFromRemainingArguments)]
     [string[]] $AdditionalArguments
   )
 
+  $ActionForOutput = switch ($Action) {
+    Build { "Building" }
+    Test { "Testing" }
+    TestParallel { "Testing" }
+  }
+
   if ($ToBatch) {
     Write-Output ""
-    Write-Output "echo Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
+    Write-Output "echo $ActionForOutput '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
   } else {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] $ActionForOutput '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
   }
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
@@ -1263,8 +1307,20 @@ function Build-SPMProject {
       $Arguments += @("-debug-info-format", "none")
     }
 
-    $Action = if ($Test) { "test" } else { "build" }
-    Invoke-Program "$($HostArch.ToolchainInstallRoot)\usr\bin\swift.exe" $Action @Arguments @AdditionalArguments
+    switch ($Action) {
+      Build {
+        $ActionName = "build"
+      }
+      Test {
+        $ActionName = "test"
+      }
+      TestParallel {
+        $ActionName = "test"
+        $Arguments += @("--parallel")
+      }
+    }
+
+    Invoke-Program "$($HostArch.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
   }
 
   if (-not $ToBatch) {
@@ -1326,12 +1382,16 @@ function Build-WiXProject() {
   Invoke-Program $msbuild @MSBuildArgs
 }
 
+function Get-CMarkBinaryCache($Arch) {
+  return "$($Arch.BinaryCache)\cmark-gfm-0.29.0.gfm.13"
+}
+
 function Build-CMark($Arch) {
   $ArchName = $Arch.LLVMName
 
   Build-CMakeProject `
     -Src $SourceCache\cmark `
-    -Bin "$($Arch.BinaryCache)\cmark-gfm-0.29.0.gfm.13" `
+    -Bin (Get-CMarkBinaryCache $Arch) `
     -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
     -Defines @{
@@ -1350,6 +1410,8 @@ function Build-BuildTools($Arch) {
     -BuildTargets llvm-tblgen,clang-tblgen,clang-pseudo-gen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
     -Defines @{
       CMAKE_CROSSCOMPILING = "NO";
+      CLANG_ENABLE_LIBXML2 = "NO";
+      LLDB_ENABLE_LIBXML2 = "NO";
       LLDB_ENABLE_PYTHON = "NO";
       LLDB_INCLUDE_TESTS = "NO";
       LLDB_ENABLE_SWIFT_SUPPORT = "NO";
@@ -1400,7 +1462,7 @@ function Build-Compilers() {
     $BuildTools = Join-Path -Path (Get-BuildProjectBinaryCache BuildTools) -ChildPath bin
 
     if ($TestClang -or $TestLLD -or $TestLLDB -or $TestLLVM -or $TestSwift) {
-      $env:Path = "$($HostArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$CompilersBinaryCache\tools\swift\libdispatch-windows-$($Arch.LLVMName)-prefix\bin;$CompilersBinaryCache\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostArch.VSName);$UnixToolsBinDir"
+      $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$CompilersBinaryCache\tools\swift\libdispatch-windows-$($Arch.LLVMName)-prefix\bin;$CompilersBinaryCache\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostArch.VSName);$UnixToolsBinDir"
       $Targets = @()
       $TestingDefines = @{
         SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "YES";
@@ -1424,6 +1486,9 @@ function Build-Compilers() {
       }
     }
 
+    $PythonRoot = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools"
+    $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
+
     # The STL in VS 17.10 requires Clang 17 or higher, but Swift toolchains prior to version 6 include older versions
     # of Clang. If bootstrapping with an older toolchain, we need to relax to relax this requirement with
     # ALLOW_COMPILER_AND_STL_VERSION_MISMATCH.
@@ -1445,7 +1510,9 @@ function Build-Compilers() {
       -Defines ($TestingDefines + @{
         CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
         CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         CMAKE_Swift_FLAGS = $SwiftFlags;
+        LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\Windows\$($Arch.LLVMName)\cmake\libxml2-2.11.5";
         LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
         LLDB_PYTHON_EXT_SUFFIX = ".pyd";
         LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
@@ -1455,10 +1522,10 @@ function Build-Compilers() {
         LLVM_NATIVE_TOOL_DIR = $BuildTools;
         LLVM_TABLEGEN = (Join-Path $BuildTools -ChildPath "llvm-tblgen.exe");
         LLVM_USE_HOST_TOOLS = "NO";
-        Python3_EXECUTABLE = "$python";
-        Python3_INCLUDE_DIR = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools\include";
-        Python3_LIBRARY = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools\libs\python39.lib";
-        Python3_ROOT_DIR = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools";
+        Python3_EXECUTABLE = (Get-PythonExecutable);
+        Python3_INCLUDE_DIR = "$PythonRoot\include";
+        Python3_LIBRARY = "$PythonRoot\libs\$PythonLibName.lib";
+        Python3_ROOT_DIR = $PythonRoot;
         SWIFT_BUILD_SWIFT_SYNTAX = "YES";
         SWIFT_CLANG_LOCATION = (Get-PinnedToolchainTool);
         SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
@@ -1467,6 +1534,7 @@ function Build-Compilers() {
         SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
+        SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS = "YES";
         SWIFT_ENABLE_SYNCHRONIZATION = "YES";
         SWIFT_ENABLE_VOLATILE = "YES";
         SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
@@ -1745,7 +1813,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
 
 
   Isolate-EnvVars {
-    $env:Path = "$($BuildArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$(Get-PinnedToolchainRuntime);${env:Path}"
+    $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$(Get-PinnedToolchainRuntime);${env:Path}"
 
     $CompilersBinaryCache = if ($IsCrossCompiling) {
       Get-BuildProjectBinaryCache Compilers
@@ -1772,6 +1840,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
         SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
+        SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS = "YES";
         SWIFT_ENABLE_SYNCHRONIZATION = "YES";
         SWIFT_ENABLE_VOLATILE = "YES";
         SWIFT_NATIVE_SWIFT_TOOLS_PATH = (Join-Path -Path $CompilersBinaryCache -ChildPath "bin");
@@ -1781,7 +1850,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
       })
   }
 
-  Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
+  Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
     -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
 }
 
@@ -1814,7 +1883,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
     Isolate-EnvVars {
       $env:SWIFTCI_USE_LOCAL_DEPS=1
       Build-SPMProject `
-        -Test `
+        -Action Test `
         -Src $SourceCache\swift-foundation `
         -Bin $OutDir `
         -Arch $HostArch
@@ -1832,7 +1901,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       $env:CURL_LIBRARY_PATH="$LibraryRoot/curl-8.9.1/usr/lib/$Platform/$ShortArch"
       $env:CURL_INCLUDE_PATH="$LibraryRoot/curl-8.9.1/usr/include"
       Build-SPMProject `
-        -Test `
+        -Action Test `
         -Src $SourceCache\swift-corelibs-foundation `
         -Bin $OutDir `
         -Arch $HostArch
@@ -1866,14 +1935,9 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -Defines (@{
           ENABLE_TESTING = "NO";
           FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
+          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
           CURL_DIR = "$LibraryRoot\curl-8.9.1\usr\lib\$Platform\$ShortArch\cmake\CURL";
-          LIBXML2_LIBRARY = if ($Platform -eq "Windows") {
-            "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2s.lib";
-          } else {
-            "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2.a";
-          };
-          LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.11.5\usr\include\libxml2";
-          LIBXML2_DEFINITIONS = "-DLIBXML_STATIC";
+          LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\cmake\libxml2-2.11.5";
           ZLIB_LIBRARY = if ($Platform -eq "Windows") {
             "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\zlibstatic.lib"
           } else {
@@ -2012,7 +2076,7 @@ function Build-Testing([Platform]$Platform, $Arch, [switch]$Test = $false) {
 
 function Write-PlatformInfoPlist($Arch) {
     $PList = Join-Path -Path $Arch.PlatformInstallRoot -ChildPath "Info.plist"
-    Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFT_TESTING_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
+    Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFT_TESTING_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
       -OutFile "$PList"
 }
 
@@ -2374,6 +2438,44 @@ function Build-Format($Arch) {
     }
 }
 
+function Test-Format {
+  $SwiftPMArguments = @(
+    # swift-syntax
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
+    "-Xswiftc", "-L$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
+    # swift-argument-parser
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache ArgumentParser)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache ArgumentParser)\lib",
+    # swift-cmark
+    "-Xswiftc", "-I$($SourceCache)\cmark\src\include",
+    "-Xswiftc", "-I$($SourceCache)\cmark\extensions\include",
+    "-Xlinker", "-I$($SourceCache)\cmark\extensions\include",
+    "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\src\cmark-gfm.lib",
+    "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\extensions\cmark-gfm-extensions.lib",
+    # swift-markdown
+    "-Xlinker", "$(Get-HostProjectBinaryCache Markdown)\lib\CAtomic.lib",
+    "-Xswiftc", "-I$($SourceCache)\swift-markdown\Sources\CAtomic\include",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Markdown)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Markdown)\lib",
+    # swift-format
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Format)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Format)\lib"
+  )
+  
+  Isolate-EnvVars {
+    $env:SWIFTFORMAT_BUILD_ONLY_TESTS=1
+    # Testing swift-format is faster in serial mode than in parallel mode, probably because parallel test execution
+    # launches a process for every test class and the process launching overhead on Windows is greater than any
+    # gains from parallel test execution.
+    Build-SPMProject `
+      -Action Test `
+      -Src "$SourceCache\swift-format" `
+      -Bin (Join-Path -Path $HostArch.BinaryCache -ChildPath swift-format) `
+      -Arch $HostArch `
+      @SwiftPMArguments
+  }
+}
+
 function Build-IndexStoreDB($Arch) {
   $SDKInstallRoot = (Get-HostSwiftSDK);
 
@@ -2412,6 +2514,81 @@ function Build-SourceKitLSP($Arch) {
       SwiftPM_DIR = (Get-HostProjectCMakeModules PackageManager);
       IndexStoreDB_DIR = (Get-HostProjectCMakeModules IndexStoreDB);
     }
+}
+
+function Test-SourceKitLSP {
+  $SwiftPMArguments = @(
+    # swift-syntax
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
+    "-Xswiftc", "-L$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
+    # swift-cmark
+    "-Xswiftc", "-I$($SourceCache)\cmark\src\include",
+    "-Xswiftc", "-I$($SourceCache)\cmark\extensions\include",
+    "-Xlinker", "-I$($SourceCache)\cmark\extensions\include",
+    "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\src\cmark-gfm.lib",
+    "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\extensions\cmark-gfm-extensions.lib",
+    # swift-system
+    "-Xswiftc", "-I$($SourceCache)\swift-system\Sources\CSystem\include",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache System)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache System)\lib",
+    # swift-tools-support-core
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache ToolsSupportCore)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache ToolsSupportCore)\lib",
+    # swift-llbuild
+    "-Xswiftc", "-I$($SourceCache)\llbuild\products\libllbuild\include",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache LLBuild)\products\llbuildSwift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache LLBuild)\lib",
+    # swift-argument-parser
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache ArgumentParser)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache ArgumentParser)\lib",
+    # swift-crypto
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Crypto)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Crypto)\lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache Crypto)\lib\CCryptoBoringSSL.lib",
+    # swift-package-manager
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache PackageManager)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache PackageManager)\lib",
+    # swift-markdown
+    "-Xswiftc", "-I$($SourceCache)\swift-markdown\Sources\CAtomic\inclde",
+    "-Xlinker", "$(Get-HostProjectBinaryCache Markdown)\lib\CAtomic.lib",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Markdown)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Markdown)\lib",
+    # swift-format
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache Format)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache Format)\lib",
+    # indexstore-db
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache IndexStoreDB)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache IndexStoreDB)\Sources\IndexStoreDB",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\CIndexStoreDB\CIndexStoreDB.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Core\Core.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Database\Database.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Index\Index.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\LLVMSupport\LLVMSupport.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Support\Support.lib",
+    # sourcekit-lsp
+    "-Xswiftc", "-I$($SourceCache)\sourcekit-lsp\Sources\CAtomics\include",
+    "-Xswiftc", "-I$($SourceCache)\sourcekit-lsp\Sources\CSourcekitd\include",
+    "-Xlinker", "$(Get-HostProjectBinaryCache SourceKitLSP)\lib\CSourcekitd.lib",
+    "-Xswiftc", "-I$(Get-HostProjectBinaryCache SourceKitLSP)\swift",
+    "-Xlinker", "-L$(Get-HostProjectBinaryCache SourceKitLSP)\lib"
+  )
+
+  Isolate-EnvVars {
+    $env:SOURCEKIT_LSP_BUILD_ONLY_TESTS=1
+
+    # CI doesn't contain any sensitive information. Log everything.
+    $env:SOURCEKIT_LSP_LOG_PRIVACY_LEVEL="sensitive"
+
+    # Log with the highest log level to simplify debugging of CI failures.
+    $env:SOURCEKIT_LSP_LOG_LEVEL="debug"
+
+    Build-SPMProject `
+      -Action TestParallel `
+      -Src "$SourceCache\sourcekit-lsp" `
+      -Bin (Join-Path -Path $HostArch.BinaryCache -ChildPath sourcekit-lsp) `
+      -Arch $HostArch `
+      @SwiftPMArguments
+  }
 }
 
 function Build-TestingMacros() {
@@ -2490,17 +2667,20 @@ function Install-HostToolchain() {
 }
 
 function Build-Inspect() {
-  $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath swift-inspect
-  $SDKInstallRoot = (Get-HostSwiftSDK) `
+  $SDKRoot = Get-HostSwiftSDK
 
-  Isolate-EnvVars {
-    $env:SWIFTCI_USE_LOCAL_DEPS=1
-    Build-SPMProject `
-      -Src $SourceCache\swift\tools\swift-inspect `
-      -Bin $OutDir `
-      -Arch $HostArch `
-      -Xcc "-I$SDKInstallRoot\usr\include\swift\SwiftRemoteMirror" -Xlinker "$SDKInstallRoot\usr\lib\swift\windows\$($HostArch.LLVMName)\swiftRemoteMirror.lib"
-  }
+  Build-CMakeProject `
+    -Src $SourceCache\swift\tools\swift-inspect `
+    -Bin (Get-HostProjectBinaryCache SwiftInspect) `
+    -InstallTo "$($HostArch.ToolchainInstallRoot)\usr" `
+    -Arch $HostArch `
+    -UseBuiltCompilers Swift `
+    -UseSwiftSwiftDriver `
+    -SwiftSDK $SDKRoot `
+    -Defines @{
+      CMAKE_Swift_FLAGS = @("-Xcc", "-I$SDKRoot\usr\include\swift\SwiftRemoteMirror");
+      ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
+    }
 }
 
 function Build-DocC() {
@@ -2509,6 +2689,7 @@ function Build-DocC() {
   Isolate-EnvVars {
     $env:SWIFTCI_USE_LOCAL_DEPS=1
     Build-SPMProject `
+      -Action Build `
       -Src $SourceCache\swift-docc `
       -Bin $OutDir `
       -Arch $HostArch `
@@ -2527,7 +2708,7 @@ function Test-PackageManager() {
   Isolate-EnvVars {
     $env:SWIFTCI_USE_LOCAL_DEPS=1
     Build-SPMProject `
-      -Test `
+      -Action Test `
       -Src $SrcDir `
       -Bin $OutDir `
       -Arch $HostArch `
@@ -2538,18 +2719,14 @@ function Test-PackageManager() {
 function Build-Installer($Arch) {
   # TODO(hjyamauchi) Re-enable the swift-inspect and swift-docc builds
   # when cross-compiling https://github.com/apple/swift/issues/71655
-  $INCLUDE_SWIFT_INSPECT = if ($IsCrossCompiling) { "false" } else { "true" }
   $INCLUDE_SWIFT_DOCC = if ($IsCrossCompiling) { "false" } else { "true" }
   $ENABLE_MIMALLOC = if ($Allocator -eq "mimalloc" -and $Arch -eq $ArchX64) { "true" } else { "false" }
 
   $Properties = @{
     BundleFlavor = "offline";
-    DEVTOOLS_ROOT = "$($Arch.ToolchainInstallRoot)\";
     TOOLCHAIN_ROOT = "$($Arch.ToolchainInstallRoot)\";
-    INCLUDE_SWIFT_INSPECT = $INCLUDE_SWIFT_INSPECT;
-    SWIFT_INSPECT_BUILD = "$($Arch.BinaryCache)\swift-inspect\release";
-    INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     ENABLE_MIMALLOC = $ENABLE_MIMALLOC;
+    INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$($Arch.BinaryCache)\swift-docc\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
   }
@@ -2601,6 +2778,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-CMark $BuildArch
   Invoke-BuildStep Build-BuildTools $BuildArch
   if ($IsCrossCompiling) {
+    Invoke-BuildStep Build-XML2 Windows $BuildArch
     Invoke-BuildStep Build-Compilers -Build $BuildArch
   }
   if ($IncludeDS2) {
@@ -2608,6 +2786,7 @@ if (-not $SkipBuild) {
   }
 
   Invoke-BuildStep Build-CMark $HostArch
+  Invoke-BuildStep Build-XML2 Windows $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
 }
 
@@ -2744,6 +2923,8 @@ if (-not $IsCrossCompiling) {
   }
   if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
   if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
+  if ($Test -contains "swift-format") { Test-Format }
+  if ($Test -contains "sourcekit-lsp") { Test-SourceKitLSP }
 }
 
 # Custom exception printing for more detailed exception information

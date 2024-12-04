@@ -256,7 +256,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     auto definingDecl = opaqueDescriptor->getChild(0);
     auto definingGlobal = Factory.createNode(Node::Kind::Global);
     definingGlobal->addChild(definingDecl, Factory);
-    auto mangling = mangleNode(definingGlobal);
+    auto mangling = mangleNode(definingGlobal, ManglingFlavor);
     if (!mangling.isSuccess())
       return Type();
     auto mangledName = mangling.result();
@@ -845,6 +845,11 @@ void ASTBuilder::pushGenericParams(ArrayRef<std::pair<unsigned, unsigned>> param
 void ASTBuilder::popGenericParams() {
   ParameterPacks = ParameterPackStack.back();
   ParameterPackStack.pop_back();
+
+  if (!ValueParametersStack.empty()) {
+    ValueParameters = ValueParametersStack.back();
+    ValueParametersStack.pop_back();
+  }
 }
 
 Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
@@ -853,6 +858,17 @@ Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
     for (auto pair : ParameterPacks) {
       if (pair.first == depth && pair.second == index) {
         return GenericTypeParamType::getPack(depth, index, Ctx);
+      }
+    }
+  }
+
+  if (!ValueParameters.empty()) {
+    for (auto tuple : ValueParameters) {
+      auto pair = std::get<std::pair<unsigned, unsigned>>(tuple);
+      auto type = std::get<Type>(tuple);
+
+      if (pair.first == depth && pair.second == index) {
+        return GenericTypeParamType::getValue(depth, index, type, Ctx);
       }
     }
   }
@@ -1037,16 +1053,17 @@ Type ASTBuilder::createDictionaryType(Type key, Type value) {
   return DictionaryType::get(key, value);
 }
 
-Type ASTBuilder::createParenType(Type base) {
-  return ParenType::get(Ctx, base);
-}
-
 Type ASTBuilder::createIntegerType(intptr_t value) {
   return IntegerType::get(std::to_string(value), /*isNegative*/ false, Ctx);
 }
 
 Type ASTBuilder::createNegativeIntegerType(intptr_t value) {
   return IntegerType::get(std::to_string(value), /*isNegative*/ true, Ctx);
+}
+
+Type ASTBuilder::createBuiltinFixedArrayType(Type size, Type element) {
+  return BuiltinFixedArrayType::get(size->getCanonicalType(),
+                                    element->getCanonicalType());
 }
 
 GenericSignature
@@ -1118,7 +1135,7 @@ ASTBuilder::getAcceptableTypeDeclCandidate(ValueDecl *decl,
 
 DeclContext *ASTBuilder::getNotionalDC() {
   if (!NotionalDC) {
-    NotionalDC = ModuleDecl::create(Ctx.getIdentifier(".RemoteAST"), Ctx);
+    NotionalDC = ModuleDecl::createEmpty(Ctx.getIdentifier(".RemoteAST"), Ctx);
     NotionalDC = new (Ctx) TopLevelCodeDecl(NotionalDC);
   }
   return NotionalDC;
@@ -1197,9 +1214,18 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
   // we introduce the parameter packs from the nominal's generic signature.
   ParameterPackStack.push_back(ParameterPacks);
   ParameterPacks.clear();
+
+  ValueParametersStack.push_back(ValueParameters);
+  ValueParameters.clear();
   for (auto *paramTy : baseGenericSig.getGenericParams()) {
     if (paramTy->isParameterPack())
       ParameterPacks.emplace_back(paramTy->getDepth(), paramTy->getIndex());
+
+    if (paramTy->isValue()) {
+      auto pair = std::make_pair(paramTy->getDepth(), paramTy->getIndex());
+      auto tuple = std::make_tuple(pair, paramTy->getValueType());
+      ValueParameters.emplace_back(tuple);
+    }
   }
   SWIFT_DEFER { popGenericParams(); };
 
@@ -1260,7 +1286,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
         return nullptr;
 
       // Look up the local type by its mangling.
-      auto mangling = Demangle::mangleNode(node);
+      auto mangling = Demangle::mangleNode(node, ManglingFlavor);
       if (!mangling.isSuccess())
         return nullptr;
       auto mangledName = mangling.result();

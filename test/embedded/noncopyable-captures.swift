@@ -2,6 +2,7 @@
 // RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -wmo -verify
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 struct MyStruct<Item> : ~Copyable {
     var member = "42"

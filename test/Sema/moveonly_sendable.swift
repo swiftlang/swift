@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -target %target-swift-5.1-abi-triple
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -16,8 +16,7 @@ enum MaybeFile: ~Copyable { // should implicitly conform
   case closed
 }
 
-struct NotSendableMO: ~Copyable { // expected-note {{consider making struct 'NotSendableMO' conform to the 'Sendable' protocol}}
-  // expected-complete-note @-1 {{consider making struct 'NotSendableMO' conform to the 'Sendable' protocol}}
+struct NotSendableMO: ~Copyable {
   var ref: Ref
 }
 
@@ -48,8 +47,8 @@ func processFiles(_ a: A, _ anotherFile: borrowing FileDescriptor) async {
   await a.takeMaybeFile(.available(anotherFile))
   _ = A(.available(anotherFile))
 
-  let ns = await a.getRef() // expected-warning {{non-sendable result type 'NotSendableMO' cannot be sent from actor-isolated context in call to instance method 'getRef()'}}
-  await takeNotSendable(ns) // expected-complete-warning {{passing argument of non-sendable type 'NotSendableMO' outside of main actor-isolated context may introduce data races}}
+  let ns = await a.getRef()
+  await takeNotSendable(ns)
 
   switch (await a.giveFileDescriptor()) {
   case let .available(fd):

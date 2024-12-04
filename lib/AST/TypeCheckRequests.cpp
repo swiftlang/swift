@@ -99,6 +99,15 @@ void swift::simple_display(llvm::raw_ostream &out, const TypeLoc source) {
   out << ")";
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           RegexLiteralPatternFeatureKind kind) {
+  out << "regex pattern feature " << kind.getRawValue();
+}
+
+SourceLoc swift::extractNearestSourceLoc(RegexLiteralPatternFeatureKind kind) {
+  return SourceLoc();
+}
+
 //----------------------------------------------------------------------------//
 // Inherited type computation.
 //----------------------------------------------------------------------------//
@@ -373,6 +382,28 @@ void DynamicallyReplacedDeclRequest::cacheResult(ValueDecl *result) const {
     return;
   }
 
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
+// OpaqueResultTypeRequest caching.
+//----------------------------------------------------------------------------//
+
+std::optional<OpaqueTypeDecl *>
+OpaqueResultTypeRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.noOpaqueResultType)
+    return std::optional(nullptr);
+
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void OpaqueResultTypeRequest::cacheResult(OpaqueTypeDecl *result) const {
+  auto *decl = std::get<0>(getStorage());
+  if (!result) {
+    decl->LazySemanticInfo.noOpaqueResultType = 1;
+    return;
+  }
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 
@@ -792,18 +823,34 @@ void RequiresOpaqueAccessorsRequest::cacheResult(bool value) const {
 // RequiresOpaqueModifyCoroutineRequest computation.
 //----------------------------------------------------------------------------//
 
-std::optional<bool>
+// NOTE: The [[clang::optnone]] annotation works around a miscompile in clang
+//       version 13.0.0 affecting at least Ubuntu 20.04, 22.04, and UBI 9.
+[[clang::optnone]] std::optional<bool>
 RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
-  if (storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed)
-    return static_cast<bool>(storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine);
+  auto isUnderscored = std::get<1>(getStorage());
+  if (isUnderscored) {
+    if (storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed)
+      return static_cast<bool>(
+          storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine);
+  } else {
+    if (storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed)
+      return static_cast<bool>(
+          storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine);
+  }
   return std::nullopt;
 }
 
 void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
   auto *storage = std::get<0>(getStorage());
-  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
-  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
+  auto isUnderscored = std::get<1>(getStorage());
+  if (isUnderscored) {
+    storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
+    storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
+  } else {
+    storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed = 1;
+    storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine = value;
+  }
 }
 
 //----------------------------------------------------------------------------//
@@ -838,9 +885,13 @@ SynthesizeAccessorRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
   auto kind = std::get<1>(getStorage());
   auto *accessor = storage->getAccessor(kind);
-  if (accessor)
-    return accessor;
-  return std::nullopt;
+  if (!accessor)
+    return std::nullopt;
+
+  if (accessor->doesAccessorHaveBody() && !accessor->hasBody())
+    return std::nullopt;
+
+  return accessor;
 }
 
 void SynthesizeAccessorRequest::cacheResult(AccessorDecl *accessor) const {
@@ -1569,6 +1620,34 @@ void ResolveRawLayoutTypeRequest::cacheResult(Type value) const {
   } else {
     attr->CachedResolvedCountType = value;
   }
+}
+
+//----------------------------------------------------------------------------//
+// RenamedDeclRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<ValueDecl *> RenamedDeclRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  auto attr = std::get<1>(getStorage());
+
+  if (attr->hasComputedRenamedDecl()) {
+    if (attr->hasCachedRenamedDecl())
+      return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+
+    return nullptr;
+  }
+
+  return std::nullopt;
+}
+
+void RenamedDeclRequest::cacheResult(ValueDecl *value) const {
+  auto decl = std::get<0>(getStorage());
+  auto attr = const_cast<AvailableAttr *>(std::get<1>(getStorage()));
+
+  attr->setComputedRenamedDecl(value != nullptr);
+  if (value)
+    decl->getASTContext().evaluator.cacheNonEmptyOutput(*this,
+                                                        std::move(value));
 }
 
 //----------------------------------------------------------------------------//

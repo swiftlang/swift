@@ -36,6 +36,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -58,7 +59,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Bridging/MacroEvaluation.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
@@ -125,13 +125,6 @@ public:
     }
     auto ipk = getInvertibleProtocolKind(*kp);
     if (ipk) {
-      // Gate the '~Escapable' type behind a specific flag for now.
-      // Uses of 'Escapable' itself are already diagnosed; return ErrorType.
-      if (*ipk == InvertibleProtocolKind::Escapable &&
-          !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        return ErrorType::get(ctx);
-      }
-
       return ProtocolCompositionType::getInverseOf(ctx, *ipk);
     }
     auto rpk = getRepressibleProtocolKind(*kp);
@@ -923,8 +916,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
           static AvailabilityRange from(const ValueDecl *VD) {
             AvailabilityRange result;
             for (auto *attr : VD->getAttrs().getAttributes<AvailableAttr>()) {
-              if (attr->PlatformAgnostic ==
-                    PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
+              if (attr->isLanguageVersionSpecific()) {
                 if (attr->Introduced)
                   result.introduced = attr->Introduced;
                 if (attr->Obsoleted)
@@ -2411,16 +2403,9 @@ public:
         } else
           inFlight.fixItInsert(ID->getStartLoc(), "internal ");
 
-#ifndef NDEBUG
-        static bool enableTreatAsError = true;
-#else
-        static bool enableTreatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
-#endif
-
         bool isImportOfUnderlying = importer->getName() == target->getName();
         auto *SF = ID->getDeclContext()->getParentSourceFile();
-        bool treatAsError = enableTreatAsError &&
-                            !isImportOfUnderlying &&
+        bool treatAsError = !isImportOfUnderlying &&
                             SF->Kind != SourceFileKind::Interface;
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
@@ -3085,8 +3070,8 @@ public:
     auto module = AT->getDeclContext()->getParentModule();
     if (!defaultType &&
         module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
-        AvailabilityInference::availableRange(proto, Ctx)
-          .isSupersetOf(AvailabilityInference::availableRange(AT, Ctx))) {
+        AvailabilityInference::availableRange(proto).isSupersetOf(
+            AvailabilityInference::availableRange(AT))) {
       AT->diagnose(
           diag::resilient_associated_type_less_available_requires_default, AT);
     }
@@ -4287,48 +4272,50 @@ void TypeChecker::checkParameterList(ParameterList *params,
     }
 
     // Opaque types cannot occur in parameter position.
-    Type interfaceType = param->getInterfaceType();
-    if (interfaceType->hasTypeParameter()) {
-      interfaceType.findIf([&](Type type) {
-        if (auto fnType = type->getAs<FunctionType>()) {
-          for (auto innerParam : fnType->getParams()) {
-            auto paramType = innerParam.getPlainType();
-            if (!paramType->hasTypeParameter())
-              continue;
+    if (!isa<ClosureExpr>(owner)) {
+      Type interfaceType = param->getInterfaceType();
+      if (interfaceType->hasTypeParameter()) {
+        interfaceType.findIf([&](Type type) {
+          if (auto fnType = type->getAs<FunctionType>()) {
+            for (auto innerParam : fnType->getParams()) {
+              auto paramType = innerParam.getPlainType();
+              if (!paramType->hasTypeParameter())
+                continue;
 
-            bool hadError = paramType.findIf([&](Type innerType) {
-              auto genericParam = innerType->getAs<GenericTypeParamType>();
-              if (!genericParam)
-                return false;
+              bool hadError = paramType.findIf([&](Type innerType) {
+                auto genericParam = innerType->getAs<GenericTypeParamType>();
+                if (!genericParam)
+                  return false;
 
-              auto genericParamDecl = genericParam->getOpaqueDecl();
-              if (!genericParamDecl)
-                return false;
+                auto genericParamDecl = genericParam->getOpaqueDecl();
+                if (!genericParamDecl)
+                  return false;
 
-              param->diagnose(
-                 diag::opaque_type_in_parameter, true, interfaceType);
-              return true;
-            });
+                param->diagnose(
+                   diag::opaque_type_in_parameter, true, interfaceType);
+                return true;
+              });
 
-            if (hadError)
-              return true;
+              if (hadError)
+                return true;
+            }
+
+            return false;
           }
 
           return false;
-        }
-
-        return false;
-      });
+        });
+      }
     }
 
     if (param->hasAttachedPropertyWrapper())
       (void) param->getPropertyWrapperInitializerInfo();
 
-    auto *SF = param->getDeclContext()->getParentSourceFile();
     if (!param->isInvalid()) {
+      auto *SF = owner->getParentSourceFile();
       param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {
         if (!isa<ParamDecl>(auxiliaryDecl))
-          DeclChecker(param->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
+          DeclChecker(SF->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
       });
     }
 

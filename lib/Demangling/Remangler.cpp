@@ -210,6 +210,7 @@ class Remangler : public RemanglerBase {
   friend void Mangle::mangleIdentifier(Mangler &M, StringRef ident);
   friend class Mangle::SubstitutionMerging;
 
+  const ManglingFlavor Flavor = ManglingFlavor::Default;
   const bool UsePunycode = true;
 
   Vector<SubstitutionWord> Words;
@@ -374,6 +375,9 @@ class Remangler : public RemanglerBase {
   ManglingError mangleKeyPathThunkHelper(Node *node, StringRef op,
                                          unsigned depth);
 
+  ManglingError mangleSILThunkIdentity(Node *node, StringRef op,
+                                       unsigned depth);
+
   ManglingError mangleAutoDiffFunctionOrSimpleThunk(Node *node, StringRef op,
                                                     unsigned depth);
 
@@ -384,8 +388,9 @@ class Remangler : public RemanglerBase {
 #include "swift/Demangling/DemangleNodes.def"
 
 public:
-  Remangler(SymbolicResolver Resolver, NodeFactory &Factory)
-       : RemanglerBase(Factory), Resolver(Resolver) { }
+  Remangler(SymbolicResolver Resolver, NodeFactory &Factory,
+            ManglingFlavor Flavor)
+      : RemanglerBase(Factory), Flavor(Flavor), Resolver(Resolver) {}
 
   ManglingError mangle(Node *node, unsigned depth) {
     if (depth > Remangler::MaxDepth) {
@@ -891,6 +896,12 @@ ManglingError Remangler::mangleBoundGenericFunction(Node *node,
   RETURN_IF_ERROR(mangleGenericArgs(node, Separator, depth + 1));
   Buffer << 'G';
   addSubstitution(entry);
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBuiltinFixedArray(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "BV";
   return ManglingError::Success;
 }
 
@@ -1784,7 +1795,18 @@ ManglingError Remangler::mangleGetter(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
+#if 0 // STAGING: To be switched over to soon.
+  switch (Flavor) {
+  case ManglingFlavor::Default:
+    Buffer << MANGLING_PREFIX_STR;
+    break;
+  case ManglingFlavor::Embedded:
+    Buffer << MANGLING_PREFIX_EMBEDDED_STR;
+    break;
+  }
+#else
   Buffer << MANGLING_PREFIX_STR;
+#endif
   bool mangleInReverseOrder = false;
   for (auto Iter = node->begin(), End = node->end(); Iter != End; ++Iter) {
     Node *Child = *Iter;
@@ -3371,6 +3393,22 @@ ManglingError Remangler::mangleCurryThunk(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleSILThunkIdentity(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1)); // type
+  // TT is for a thunk that is for a thunk inst... I is for identity.
+  Buffer << "TT"
+         << "I";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleSILThunkHopToMainActorIfNeeded(Node *node,
+                                                              unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1)); // type
+  Buffer << "TT"
+         << "H";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDispatchThunk(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Tj";
@@ -3971,22 +4009,25 @@ mangleNonUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
 }
 
 ManglingError Remangler::mangleInteger(Node *node, unsigned int depth) {
-  Buffer << "$" << node->getIndex();
+  Buffer << "$";
+  mangleIndex(node->getIndex());
 
   return ManglingError::Success;
 }
 
 ManglingError Remangler::mangleNegativeInteger(Node *node, unsigned int depth) {
-  Buffer << "$n" << -node->getIndex();
+  Buffer << "$n";
+  mangleIndex(-node->getIndex());
 
   return ManglingError::Success;
 }
 
 ManglingError Remangler::mangleDependentGenericParamValueMarker(Node *node,
                                                                unsigned depth) {
-  DEMANGLER_ASSERT(node->getNumChildren() == 1, node);
-  DEMANGLER_ASSERT(node->getChild(0)->getKind() == Node::Kind::Type, node);
-  RETURN_IF_ERROR(mangleType(node->getChild(0)->getChild(1), depth + 1));
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
+  DEMANGLER_ASSERT(node->getChild(0)->getChild(0)->getKind() == Node::Kind::DependentGenericParamType, node);
+  DEMANGLER_ASSERT(node->getChild(1)->getKind() == Node::Kind::Type, node);
+  RETURN_IF_ERROR(mangleType(node->getChild(1), depth + 1));
   Buffer << "RV";
   mangleDependentGenericParamIndex(node->getChild(0)->getChild(0));
   return ManglingError::Success;
@@ -3995,20 +4036,22 @@ ManglingError Remangler::mangleDependentGenericParamValueMarker(Node *node,
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
-ManglingErrorOr<std::string> Demangle::mangleNode(NodePointer node) {
+ManglingErrorOr<std::string> Demangle::mangleNode(NodePointer node,
+                                                  ManglingFlavor Flavor) {
   return mangleNode(node, [](SymbolicReferenceKind, const void *) -> NodePointer {
                             return nullptr;
-                          });
+                          }, Flavor);
   //  unreachable("should not try to mangle a symbolic reference; "
   //              "resolve it to a non-symbolic demangling tree instead");
 }
 
-ManglingErrorOr<std::string>
-Demangle::mangleNode(NodePointer node, SymbolicResolver resolver) {
+ManglingErrorOr<std::string> Demangle::mangleNode(NodePointer node,
+                                                  SymbolicResolver resolver,
+                                                  ManglingFlavor Flavor) {
   if (!node) return std::string();
 
   NodeFactory Factory;
-  Remangler remangler(resolver, Factory);
+  Remangler remangler(resolver, Factory, Flavor);
   ManglingError err = remangler.mangle(node, 0);
   if (!err.isSuccess())
     return err;
@@ -4016,13 +4059,14 @@ Demangle::mangleNode(NodePointer node, SymbolicResolver resolver) {
   return remangler.str();
 }
 
-ManglingErrorOr<llvm::StringRef>
-Demangle::mangleNode(NodePointer node, SymbolicResolver resolver,
-                     NodeFactory &Factory) {
+ManglingErrorOr<llvm::StringRef> Demangle::mangleNode(NodePointer node,
+                                                      SymbolicResolver resolver,
+                                                      NodeFactory &Factory,
+                                                      ManglingFlavor Flavor) {
   if (!node)
     return StringRef();
 
-  Remangler remangler(resolver, Factory);
+  Remangler remangler(resolver, Factory, Flavor);
   ManglingError err = remangler.mangle(node, 0);
   if (!err.isSuccess())
     return err;

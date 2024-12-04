@@ -673,12 +673,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   AllocatorMetatype = emitConstructorMetatypeArg(*this, ctor);
 
   // Make sure we've hopped to the right global actor, if any.
-  if (ctor->hasAsync()) {
-    auto isolation = getActorIsolation(ctor);
-    SILLocation prologueLoc(selfDecl);
-    prologueLoc.markAsPrologue();
-    emitConstructorPrologActorHop(prologueLoc, isolation);
-  }
+  emitConstructorExpectedExecutorProlog();
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
@@ -1134,12 +1129,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     selfClassDecl->isDistributedActor() && !isDelegating;
 
   // Make sure we've hopped to the right global actor, if any.
-  if (ctor->hasAsync()) {
-    auto isolation = getActorIsolation(ctor);
-    SILLocation prologueLoc(selfDecl);
-    prologueLoc.markAsPrologue();
-    emitConstructorPrologActorHop(prologueLoc, isolation);
-  }
+  emitConstructorExpectedExecutorProlog();
 
   if (!NeedsBoxForSelf) {
     SILLocation PrologueLoc(selfDecl);

@@ -16,7 +16,9 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Version.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -131,6 +133,7 @@ class ExtendedValidationInfo {
   StringRef ExportAsName;
   StringRef PublicModuleName;
   CXXStdlibKind CXXStdlib;
+  version::Version SwiftInterfaceCompilerVersion;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
@@ -250,6 +253,15 @@ public:
 
   CXXStdlibKind getCXXStdlibKind() const { return CXXStdlib; }
   void setCXXStdlibKind(CXXStdlibKind kind) { CXXStdlib = kind; }
+
+  version::Version getSwiftInterfaceCompilerVersion() const {
+    return SwiftInterfaceCompilerVersion;
+  }
+  void setSwiftInterfaceCompilerVersion(StringRef version) {
+    if (auto genericVersion = VersionParser::parseVersionString(
+            version, SourceLoc(), /*Diags=*/nullptr))
+      SwiftInterfaceCompilerVersion = genericVersion.value();
+  }
 };
 
 struct SearchPath {

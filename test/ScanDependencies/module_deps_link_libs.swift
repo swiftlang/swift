@@ -12,15 +12,14 @@ import SubE
 
 // CHECK: "mainModuleName": "deps"
 
-// CHECK:       "linkLibraries": [
-// CHECK-DAG:           "linkName": "objc",
+// CHECK:           "linkName": "objc",
 // CHECK-NEXT:          "isFramework": false,
 // CHECK-NEXT:          "shouldForceLoad": false
 
-// CHECK-DAG:           "linkName": "swiftyLibE",
-// CHECK-NEXT:          "isFramework": false,
-// CHECK-NEXT:          "shouldForceLoad": true
-
-// CHECK-DAG:           "linkName": "nonSwiftyLibC",
+// CHECK:           "linkName": "nonSwiftyLibC",
 // CHECK-NEXT:          "isFramework": true,
 // CHECK-NEXT:          "shouldForceLoad": false
+
+// CHECK:           "linkName": "swiftyLibE",
+// CHECK-NEXT:          "isFramework": false,
+// CHECK-NEXT:          "shouldForceLoad": true

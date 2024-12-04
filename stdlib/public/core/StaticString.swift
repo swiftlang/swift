@@ -296,7 +296,6 @@ extension StaticString: ExpressibleByStringLiteral {
   }
 }
 
-@_unavailableInEmbedded
 extension StaticString: CustomStringConvertible {
 
   /// A textual representation of the static string.
@@ -305,7 +304,6 @@ extension StaticString: CustomStringConvertible {
   }
 }
 
-@_unavailableInEmbedded
 extension StaticString: CustomDebugStringConvertible {
 
   /// A textual representation of the static string, suitable for debugging.

@@ -33,16 +33,10 @@
 
 using namespace swift;
 
-ProtocolConformanceRef::ProtocolConformanceRef(ProtocolDecl *protocol,
-                                               ProtocolConformance *conf) {
-  assert(protocol != nullptr &&
-         "cannot construct ProtocolConformanceRef with null protocol");
-  if (conf) {
-    assert(protocol == conf->getProtocol() && "protocol conformance mismatch");
-    Union = conf;
-  } else {
-    Union = protocol;
-  }
+ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
+    Type subjectType, ProtocolDecl *proto) {
+  // Temporary implementation:
+  return ProtocolConformanceRef(proto);
 }
 
 bool ProtocolConformanceRef::isInvalid() const {
@@ -341,7 +335,7 @@ bool ProtocolConformanceRef::hasUnavailableConformance() const {
   auto concrete = getConcrete();
   auto *dc = concrete->getRootConformance()->getDeclContext();
   auto ext = dyn_cast<ExtensionDecl>(dc);
-  if (ext && AvailableAttr::isUnavailable(ext))
+  if (ext && ext->isUnavailable())
     return true;
 
   // Check the conformances in the substitution map.

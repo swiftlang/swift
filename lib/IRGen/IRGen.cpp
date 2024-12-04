@@ -69,6 +69,7 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -200,11 +201,59 @@ static void align(llvm::Module *Module) {
     }
 }
 
+static void populatePGOOptions(std::optional<PGOOptions> &Out,
+                               const IRGenOptions &Opts) {
+  if (!Opts.UseSampleProfile.empty()) {
+    Out = PGOOptions(
+      /*ProfileFile=*/ Opts.UseSampleProfile,
+      /*CSProfileGenFile=*/ "",
+      /*ProfileRemappingFile=*/ "",
+      /*MemoryProfile=*/ "",
+      /*FS=*/ llvm::vfs::getRealFileSystem(), // TODO: is this fine?
+      /*Action=*/ PGOOptions::SampleUse,
+      /*CSPGOAction=*/ PGOOptions::NoCSAction,
+      /*ColdType=*/ PGOOptions::ColdFuncOpt::Default,
+      /*DebugInfoForProfiling=*/ Opts.DebugInfoForProfiling
+    );
+    return;
+  }
+
+  if (Opts.DebugInfoForProfiling) {
+    Out = PGOOptions(
+        /*ProfileFile=*/ "",
+        /*CSProfileGenFile=*/ "",
+        /*ProfileRemappingFile=*/ "",
+        /*MemoryProfile=*/ "",
+        /*FS=*/ nullptr,
+        /*Action=*/ PGOOptions::NoAction,
+        /*CSPGOAction=*/ PGOOptions::NoCSAction,
+        /*ColdType=*/ PGOOptions::ColdFuncOpt::Default,
+        /*DebugInfoForProfiling=*/ true
+    );
+    return;
+  }
+}
+
+template <typename... ArgTypes>
+void diagnoseSync(
+    DiagnosticEngine &Diags, llvm::sys::Mutex *DiagMutex, SourceLoc Loc,
+    Diag<ArgTypes...> ID,
+    typename swift::detail::PassArgument<ArgTypes>::type... Args) {
+  std::optional<llvm::sys::ScopedLock> Lock;
+  if (DiagMutex)
+    Lock.emplace(*DiagMutex);
+
+  Diags.diagnose(Loc, ID, std::move(Args)...);
+}
+
 void swift::performLLVMOptimizations(const IRGenOptions &Opts,
+                                     DiagnosticEngine &Diags,
+                                     llvm::sys::Mutex *DiagMutex,
                                      llvm::Module *Module,
                                      llvm::TargetMachine *TargetMachine,
                                      llvm::raw_pwrite_stream *out) {
   std::optional<PGOOptions> PGOOpt;
+  populatePGOOptions(PGOOpt, Opts);
 
   PipelineTuningOptions PTO;
 
@@ -244,6 +293,18 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   SI.registerCallbacks(PIC, &MAM);
 
   PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC);
+
+  // Attempt to load pass plugins and register their callbacks with PB.
+  for (const auto &PluginFile : Opts.LLVMPassPlugins) {
+    Expected<PassPlugin> PassPlugin = PassPlugin::Load(PluginFile);
+    if (PassPlugin) {
+      PassPlugin->registerPassBuilderCallbacks(PB);
+    } else {
+      diagnoseSync(Diags, DiagMutex, SourceLoc(),
+                   diag::unable_to_load_pass_plugin, PluginFile,
+                   toString(PassPlugin.takeError()));
+    }
+  }
 
   // Register the AA manager first so that our version is the one used.
   FAM.registerPass([&] {
@@ -338,7 +399,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     options.Atomic = bool(Opts.Sanitizers & SanitizerKind::Thread);
     PB.registerPipelineStartEPCallback(
         [options](ModulePassManager &MPM, OptimizationLevel level) {
-          MPM.addPass(InstrProfiling(options, false));
+           MPM.addPass(InstrProfilingLoweringPass(options, false));
         });
   }
   if (Opts.shouldOptimize()) {
@@ -531,20 +592,6 @@ static void countStatsPostIRGen(UnifiedStatsReporter &Stats,
   }
 }
 
-template<typename ...ArgTypes>
-void
-diagnoseSync(DiagnosticEngine &Diags, llvm::sys::Mutex *DiagMutex,
-             SourceLoc Loc, Diag<ArgTypes...> ID,
-             typename swift::detail::PassArgument<ArgTypes>::type... Args) {
-  if (DiagMutex)
-    DiagMutex->lock();
-
-  Diags.diagnose(Loc, ID, std::move(Args)...);
-
-  if (DiagMutex)
-    DiagMutex->unlock();
-}
-
 /// Run the LLVM passes. In multi-threaded compilation this will be done for
 /// multiple LLVM modules in parallel.
 bool swift::performLLVM(const IRGenOptions &Opts,
@@ -613,7 +660,7 @@ bool swift::performLLVM(const IRGenOptions &Opts,
     assert(Opts.OutputKind == IRGenOutputKind::Module && "no output specified");
   }
 
-  performLLVMOptimizations(Opts, Module, TargetMachine,
+  performLLVMOptimizations(Opts, Diags, DiagMutex, Module, TargetMachine,
                            OutputFile ? &OutputFile->getOS() : nullptr);
 
   if (Stats) {
@@ -670,8 +717,8 @@ bool swift::compileAndWriteLLVM(
     legacy::PassManager EmitPasses;
     CodeGenFileType FileType;
     FileType =
-        (opts.OutputKind == IRGenOutputKind::NativeAssembly ? CGFT_AssemblyFile
-                                                            : CGFT_ObjectFile);
+        (opts.OutputKind == IRGenOutputKind::NativeAssembly ? CodeGenFileType::AssemblyFile
+                                                            : CodeGenFileType::ObjectFile);
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         targetMachine->getTargetIRAnalysis()));
 
@@ -874,9 +921,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
 
 std::unique_ptr<llvm::TargetMachine>
 swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
-  CodeGenOpt::Level OptLevel = Opts.shouldOptimize()
-                                   ? CodeGenOpt::Default // -Os
-                                   : CodeGenOpt::None;
+  CodeGenOptLevel OptLevel = Opts.shouldOptimize()
+                                   ? CodeGenOptLevel::Default // -Os
+                                   : CodeGenOptLevel::None;
 
   // Set up TargetOptions and create the target features string.
   TargetOptions TargetOpts;
@@ -1745,7 +1792,7 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
   if (!irMod)
     return irMod;
 
-  performLLVMOptimizations(desc.Opts, irMod.getModule(),
+  performLLVMOptimizations(desc.Opts, ctx.Diags, nullptr, irMod.getModule(),
                            irMod.getTargetMachine(), desc.out);
   return irMod;
 }

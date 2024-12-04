@@ -1,11 +1,9 @@
-// RUN: %target-swift-frontend %s -emit-sil \
-// RUN: -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip \
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil \
+// RUN: -enable-experimental-feature LifetimeDependence \
 // RUN: | %FileCheck %s
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct NCContainer : ~Copyable {
   let ptr: UnsafeRawBufferPointer
@@ -32,7 +30,9 @@ struct View : ~Escapable {
     self.ptr = k.ptr
     self.c = k.c
   }
-  init(_ k: consuming View) {
+  // This overload requires a separate label because overloading
+  // on borrowing/consuming attributes is not allowed
+  init(consumingView k: consuming View) {
     self.ptr = k.ptr
     self.c = k.c
   }
@@ -65,7 +65,7 @@ func consume(_ o : consuming MutableView) {}
 
 @lifetime(x)
 func getConsumingView(_ x: consuming View) -> View {
-  return View(x)
+  return View(consumingView: x)
 }
 
 @lifetime(borrow x)
@@ -156,11 +156,12 @@ func test6(_ a: Array<Int>) {
 
 // CHECK-LABEL: sil hidden @$s31lifetime_dependence_scope_fixup5test7yySWF : $@convention(thin) (UnsafeRawBufferPointer) -> () {
 // CHECK:   [[CONT:%.*]] = alloc_stack [var_decl] $View
+// function_ref View.init(_:_:)
+// CHECK:   [[VIEW1:%.*]] = apply %{{.*}}(%0, %{{.*}}, %{{.*}}) : $@convention(method) (UnsafeRawBufferPointer, Int, @thin View.Type) -> @lifetime(borrow 0) @owned View // users: %14, %9, %12, %8
 // CHECK:   [[BA:%.*]] = begin_access [read] [static] [[CONT]] : $*View
-// CHECK:   [[LD:%.*]] = load [[BA]] : $*View
 // CHECK:   [[FUNC:%.*]] = function_ref @$s31lifetime_dependence_scope_fixup16getBorrowingViewyAA0G0VADF : $@convention(thin) (@guaranteed View) -> @lifetime(borrow 0) @owned View
-// CHECK:   [[VIEW:%.*]] = apply [[FUNC]]([[LD]]) : $@convention(thin) (@guaranteed View) -> @lifetime(borrow 0) @owned View
-// CHECK:   [[MDI:%.*]] = mark_dependence [nonescaping] [[VIEW]] : $View on [[BA]] : $*View
+// CHECK:   [[VIEW2:%.*]] = apply [[FUNC]]([[VIEW1]]) : $@convention(thin) (@guaranteed View) -> @lifetime(borrow 0) @owned View
+// CHECK:   [[MDI:%.*]] = mark_dependence [nonescaping] [[VIEW2]] : $View on [[BA]] : $*View
 // CHECK:   [[USE:%.*]] = function_ref @$s31lifetime_dependence_scope_fixup3useyyAA4ViewVF : $@convention(thin) (@guaranteed View) -> ()
 // CHECK:   apply [[USE]]([[MDI]]) : $@convention(thin) (@guaranteed View) -> ()
 // CHECK:   release_value [[MDI]] : $View

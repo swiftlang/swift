@@ -97,7 +97,8 @@ _$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Sw
 _$S3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$S3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
 _$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
 _$sTA.123 ---> {T:} partial apply forwarder with unmangled suffix ".123"
-$s4main3fooyySiFyyXEfU_TA.1 ---> {T:} closure #1 () -> () in main.foo(Swift.Int) -> ()partial apply forwarder with unmangled suffix ".1"
+$s4main3fooyySiFyyXEfU_TA.1 ---> {T:} partial apply forwarder for closure #1 () -> () in main.foo(Swift.Int) -> () with unmangled suffix ".1"
+$s4main8MyStructV3fooyyFAA1XV_Tg5.foo ---> generic specialization <main.X> of main.MyStruct.foo() -> () with unmangled suffix ".foo"
 _TTDFC3foo3bar3basfT3zimCS_3zim_T_ ---> dynamic foo.bar.bas(zim: foo.zim) -> ()
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas(zim: foo.zim) -> ()
 _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix(foo.bar, foo.bas) -> foo.zim
@@ -477,3 +478,8 @@ $sxq_IyXd_D ---> @callee_unowned (@in_cxx A) -> (@unowned B)
 $s2hi1SV1iSivx ---> hi.S.i.modify2 : Swift.Int
 $s2hi1SV1iSivy ---> hi.S.i.read2 : Swift.Int
 $s2hi1SVIetMIy_TC  ---> coroutine continuation prototype for @escaping @convention(thin) @convention(method) @yield_once_2 (@unowned hi.S) -> ()
+$s4mainAAyyycAA1CCFTTI ---> identity thunk of main.main(main.C) -> () -> ()
+$s4mainAAyyycAA1CCFTTH ---> hop to main actor thunk of main.main(main.C) -> () -> ()
+
+$s4main6VectorVy$1_SiG ---> main.Vector<2, Swift.Int>
+$s$n3_SSBV ---> Builtin.FixedArray<-4, Swift.String>

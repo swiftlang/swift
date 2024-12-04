@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialize %s | %FileCheck %s -check-prefix=REMOVECLOSURES
-// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialize-eliminate-dead-closures=0 -closure-specialize %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -closure-specialize %s | %FileCheck %s -check-prefix=REMOVECLOSURES
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -closure-specialize-eliminate-dead-closures=0 -closure-specialize %s | %FileCheck %s
 
 import Builtin
 import Swift

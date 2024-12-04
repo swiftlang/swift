@@ -605,7 +605,6 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
 
 bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
                                               Type parentTy, SourceLoc loc,
-                                              ModuleDecl *module,
                                               GenericSignature contextSig) {
   assert(parentTy && "expected a parent type");
   if (parentTy->hasUnboundGenericType() || parentTy->hasTypeVariable()) {
@@ -657,14 +656,14 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
   };
 
   const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
-      module, genericSig.getRequirements(), substitutions);
+      genericSig.getRequirements(), substitutions);
   switch (result.getKind()) {
   case CheckRequirementsResult::RequirementFailure:
     if (loc.isValid()) {
       TypeChecker::diagnoseRequirementFailure(
           result.getRequirementFailureInfo(), loc, noteLoc,
           decl->getDeclaredInterfaceType(), genericSig.getGenericParams(),
-          substitutions, module);
+          substitutions);
     }
 
     return false;
@@ -834,8 +833,7 @@ static Type applyGenericArguments(Type type,
     }
 
     if (TypeChecker::checkContextualRequirements(
-            decl, parentTy, loc, dc->getParentModule(),
-            resolution.getGenericSignature()))
+            decl, parentTy, loc, resolution.getGenericSignature()))
       return type;
 
     return ErrorType::get(resolution.getASTContext());
@@ -906,6 +904,45 @@ static Type applyGenericArguments(Type type,
     }
 
     return parameterized;
+  }
+  
+  // Builtins have special handling.
+  if (auto bug = type->getAs<BuiltinUnboundGenericType>()) {
+    // We don't have any variadic builtins yet, but we do have value arguments.
+    auto argOptions = options.withoutContext()
+      .withContext(TypeResolverContext::ValueGenericArgument);
+    auto genericResolution = resolution.withOptions(argOptions);
+
+    // Resolve the types of the generic arguments.
+    SmallVector<Type, 2> args;
+    for (auto tyR : genericArgs) {
+      // Propagate failure.
+      Type substTy = genericResolution.resolveType(tyR, silContext);
+      if (!substTy || substTy->hasError())
+        return ErrorType::get(ctx);
+
+      args.push_back(substTy);
+    }
+    
+    // Try to form a substitution map.
+    auto subs = SubstitutionMap::get(bug->getGenericSignature(),
+                                     args,
+                                     [&](CanType dependentType,
+                                         Type conformingReplacementType,
+                                         ProtocolDecl *conformedProtocol)
+                                     -> ProtocolConformanceRef {
+                                       // no generic builtins have conformance
+                                       // requirements yet.
+                                       llvm_unreachable("not implemented yet");
+                                     });
+                                     
+    auto bound = bug->getBound(subs);
+    
+    if (bound->hasError()) {
+      diags.diagnose(loc, diag::invalid_generic_builtin_type, type);
+      return ErrorType::get(ctx);
+    }
+    return bound;
   }
 
   // We must either have an unbound generic type, or a generic type alias.
@@ -1204,8 +1241,6 @@ Type TypeResolution::applyUnboundGenericArguments(
 
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
-  auto *module = getDeclContext()->getParentModule();
-
   if (!skipRequirementsCheck && getStage() == TypeResolutionStage::Interface) {
     // Check the generic arguments against the requirements of the declaration's
     // generic signature.
@@ -1235,14 +1270,14 @@ Type TypeResolution::applyUnboundGenericArguments(
     };
 
     const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
-        module, genericSig.getRequirements(), substitutions);
+        genericSig.getRequirements(), substitutions);
     switch (result.getKind()) {
     case CheckRequirementsResult::RequirementFailure:
       if (loc.isValid()) {
         TypeChecker::diagnoseRequirementFailure(
             result.getRequirementFailureInfo(), loc, noteLoc,
             UnboundGenericType::get(decl, parentTy, getASTContext()),
-            genericSig.getGenericParams(), substitutions, module);
+            genericSig.getGenericParams(), substitutions);
       }
 
       LLVM_FALLTHROUGH;
@@ -1680,6 +1715,32 @@ static void diagnoseGenericArgumentsOnSelf(const TypeResolution &resolution,
   }
 }
 
+/// Diagnose when this is one of the Span types, which currently requires
+/// an experimental feature to use.
+static void diagnoseSpanType(TypeDecl *typeDecl, SourceLoc loc,
+                             const DeclContext *dc) {
+  if (loc.isInvalid())
+    return;
+
+  if (!typeDecl->isStdlibDecl())
+    return;
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::Span))
+    return;
+
+  auto nameString = typeDecl->getName().str();
+  if (nameString != "Span" && nameString != "RawSpan")
+    return;
+
+  // Don't require this in the standard library or _Concurrency library.
+  auto module = dc->getParentModule();
+  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
+    return;
+
+  ctx.Diags.diagnose(loc, diag::span_requires_feature_flag, nameString);
+}
+
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 /// \param silContext Used to look up generic parameters in SIL mode.
@@ -1815,6 +1876,9 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
+
+    diagnoseSpanType(currentDecl, repr->getLoc(), DC);
+
     repr->setValue(currentDecl, currentDC);
     return current;
   }
@@ -2035,6 +2099,8 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
     member = memberTypes.back().Member;
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
+
+    diagnoseSpanType(member, repr->getLoc(), DC);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);
@@ -3316,7 +3382,7 @@ Type TypeResolver::resolveGlobalActor(SourceLoc loc, TypeResolutionOptions optio
   if (!result->hasError() && !attr->isInvalid() &&
       getASTContext().LangOpts.isConcurrencyModelTaskToThread()) {
     if (Decl *decl = getDeclContext()->getAsDecl()) {
-      if (!AvailableAttr::isUnavailable(decl))
+      if (!decl->isUnavailable())
         diagnose(attr->getLocation(),
                  diag::concurrency_task_to_thread_model_global_actor_annotation,
                  attr->getTypeRepr(), "task-to-thread concurrency model");
@@ -4893,22 +4959,6 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     auto *dc = getDeclContext();
     auto &ctx = getASTContext();
 
-    // Gate the 'Escapable' type behind a specific flag for now.
-    //
-    // NOTE: we do not return an ErrorType, though! We're just artificially
-    // preventing people from referring to the type without the feature.
-    if (auto proto = result->getAs<ProtocolType>()) {
-      if (auto known = proto->getKnownProtocol()) {
-        if (*known == KnownProtocolKind::Escapable
-            && !isSILSourceFile()
-            && !isInterfaceFile()
-            && !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-          diagnoseInvalid(repr, repr->getLoc(),
-                          diag::escapable_requires_feature_flag);
-        }
-      }
-    }
-
     if (ctx.LangOpts.hasFeature(Feature::ImplicitSome) &&
         options.isConstraintImplicitExistential()) {
       // Check whether this type is an implicit opaque result type.
@@ -5610,7 +5660,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   if (options.contains(TypeResolutionFlags::SILType)) {
     if (repr->isParenType())
-      return ParenType::get(ctx, elements[0].getType());
+      return elements[0].getType();
   } else {
     // Single-element labeled tuples are not permitted outside of declarations
     // or SIL, either.
@@ -5626,7 +5676,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
     if (elements.size() == 1 && !elements[0].hasName() &&
         !elements[0].getType()->is<PackExpansionType>())
-      return ParenType::get(ctx, elements[0].getType());
+      return elements[0].getType();
   }
   
   if (moveOnlyElementIndex.has_value()) {
@@ -5898,14 +5948,17 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
                                                TypeResolutionOptions options) {
   auto subOptions = options.withoutContext(true)
       .withContext(TypeResolverContext::Inverted);
-  auto ty = resolveType(repr->getConstraint(), subOptions);
+  auto *constraintRepr = repr->getConstraint();
+  auto ty = resolveType(constraintRepr, subOptions);
   if (ty->hasError())
     return ErrorType::get(getASTContext());
 
   // If the inverted type is an existential metatype, unwrap the existential
   // metatype so we can look at the instance type. We'll re-wrap at the end.
-  ExistentialMetatypeType *existentialTy =
-      dyn_cast<ExistentialMetatypeType>(ty.get().getPointer());
+  // Note we don't look through parens.
+  ExistentialMetatypeType *existentialTy = nullptr;
+  if (!constraintRepr->isParenType())
+    existentialTy = dyn_cast<ExistentialMetatypeType>(ty.get().getPointer());
   if (existentialTy) {
     ty = existentialTy->getInstanceType();
   }
@@ -5922,14 +5975,6 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
 
   if (auto kp = ty->getKnownProtocol()) {
     if (auto kind = getInvertibleProtocolKind(*kp)) {
-
-      // Gate the '~Escapable' type behind a specific flag for now.
-      // Uses of 'Escapable' itself are already diagnosed; return ErrorType.
-      if (*kind == InvertibleProtocolKind::Escapable &&
-          !getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        return wrapInExistential(ErrorType::get(getASTContext()));
-      }
-
       return wrapInExistential(
           ProtocolCompositionType::getInverseOf(getASTContext(), *kind));
     }
@@ -6070,13 +6115,16 @@ class ExistentialTypeSyntaxChecker : public ASTWalker {
   ASTContext &Ctx;
   bool checkStatements;
   bool hitTopStmt;
+  bool warnUntilSwift7;
 
   unsigned exprCount = 0;
   llvm::SmallVector<TypeRepr *, 4> reprStack;
     
 public:
-  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements)
-      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) {}
+  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements,
+                               bool warnUntilSwift7 = false)
+      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false),
+        warnUntilSwift7(warnUntilSwift7) {}
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::ArgumentsAndExpansion;
@@ -6290,6 +6338,7 @@ private:
           inverse && isAnyOrSomeMissing()) {
         auto diag = Ctx.Diags.diagnose(inverse->getTildeLoc(),
                                        diag::inverse_requires_any);
+        diag.warnUntilSwiftVersionIf(warnUntilSwift7, 7);
         emitInsertAnyFixit(diag, T);
         return;
       }
@@ -6307,6 +6356,7 @@ private:
                                proto->getDeclaredInterfaceType(),
                                proto->getDeclaredExistentialType(),
                                /*isAlias=*/false);
+        diag.warnUntilSwiftVersionIf(warnUntilSwift7, 7);
         emitInsertAnyFixit(diag, T);
       }
     } else if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
@@ -6337,6 +6387,7 @@ private:
               alias->getDeclaredInterfaceType(),
               ExistentialType::get(alias->getDeclaredInterfaceType()),
               /*isAlias=*/true);
+          diag.warnUntilSwiftVersionIf(warnUntilSwift7, 7);
           emitInsertAnyFixit(diag, T);
         }
       }
@@ -6416,7 +6467,14 @@ void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt,
   if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
     return;
 
-  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true);
+  // Previously we missed this diagnostic on 'catch' statements, downgrade
+  // to a warning until Swift 7.
+  auto downgradeUntilSwift7 = false;
+  if (auto *CS = dyn_cast<CaseStmt>(stmt))
+    downgradeUntilSwift7 = CS->getParentKind() == CaseParentKind::DoCatch;
+
+  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true,
+                                       downgradeUntilSwift7);
   stmt->walk(checker);
 }
 

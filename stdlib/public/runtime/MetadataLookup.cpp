@@ -164,7 +164,7 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
       break;
         
     default:
-      if (auto typeContext = dyn_cast<TypeContextDescriptor>(descriptor)) {
+      if (isa<TypeContextDescriptor>(descriptor)) {
         nodeKind = Node::Kind::TypeSymbolicReference;
         isType = true;
         break;
@@ -1016,7 +1016,7 @@ _findContextDescriptor(Demangle::NodePointer node,
     return nullptr;
 
   auto mangling =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem, Mangle::ManglingFlavor::Default);
 
   if (!mangling.isSuccess())
     return nullptr;
@@ -1195,7 +1195,7 @@ _findProtocolDescriptor(NodePointer node,
   }
 
   auto mangling =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem, Mangle::ManglingFlavor::Default);
 
   if (!mangling.isSuccess())
     return nullptr;
@@ -1829,6 +1829,9 @@ public:
         .getType();
   }
 
+  Mangle::ManglingFlavor getManglingFlavor() { 
+    return Mangle::ManglingFlavor::Default;
+  }
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
   TypeLookupErrorOr<BuiltType>
@@ -2453,6 +2456,13 @@ public:
 
   TypeLookupErrorOr<BuiltType> createNegativeIntegerType(intptr_t value) {
     return BuiltType(value);
+  }
+
+  TypeLookupErrorOr<BuiltType> createBuiltinFixedArrayType(BuiltType size,
+                                                           BuiltType element) {
+    return BuiltType(swift_getFixedArrayTypeMetadata(MetadataState::Abstract,
+                                                     size.getValue(),
+                                                     element.getMetadata()));
   }
 };
 

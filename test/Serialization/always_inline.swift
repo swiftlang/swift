@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_always_inline.swift
 // RUN: llvm-bcanalyzer %t/def_always_inline.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sib -I %t %s -o %t/always_inline.sib
-// RUN: %target-sil-opt -performance-linker %t/always_inline.sib -I %t -emit-sorted-sil | %FileCheck %s -check-prefix=SIL
+// RUN: %target-sil-opt -sil-print-types -performance-linker %t/always_inline.sib -I %t -emit-sorted-sil | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 

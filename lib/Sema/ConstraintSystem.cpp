@@ -52,16 +52,11 @@ using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
 
-ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS)
-    : ExpressionTimer(
-          Anchor, CS,
-          CS.getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold) {}
-
 ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
-                                 unsigned thresholdInMillis)
+                                 unsigned thresholdInSecs)
     : Anchor(Anchor), Context(CS.getASTContext()),
       StartTime(llvm::TimeRecord::getCurrentTime()),
-      ThresholdInMillis(thresholdInMillis),
+      ThresholdInSecs(thresholdInSecs),
       PrintDebugTiming(CS.getASTContext().TypeCheckerOpts.DebugTimeExpressions),
       PrintWarning(true) {}
 
@@ -117,8 +112,10 @@ ExpressionTimer::~ExpressionTimer() {
 }
 
 ConstraintSystem::ConstraintSystem(DeclContext *dc,
-                                   ConstraintSystemOptions options)
+                                   ConstraintSystemOptions options,
+                                   DiagnosticTransaction *diagnosticTransaction)
   : Context(dc->getASTContext()), DC(dc), Options(options),
+    diagnosticTransaction(diagnosticTransaction),
     Arena(dc->getASTContext(), Allocator),
     CG(*new ConstraintGraph(*this))
 {
@@ -137,9 +134,18 @@ ConstraintSystem::~ConstraintSystem() {
   delete &CG;
 }
 
+void ConstraintSystem::startExpressionTimer(ExpressionTimer::AnchorType anchor) {
+  ASSERT(!Timer);
+
+  unsigned timeout = getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold;
+  if (timeout == 0)
+    return;
+
+  Timer.emplace(anchor, *this, timeout);
+}
+
 void ConstraintSystem::incrementScopeCounter() {
-  ++CountScopes;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
+  ++NumSolverScopes;
   if (auto *Stats = getASTContext().Stats)
     ++Stats->getFrontendCounters().NumConstraintScopes;
 }
@@ -160,7 +166,7 @@ void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
   TypeVariables.insert(typeVar);
 
   // Notify the constraint graph.
-  (void)CG[typeVar];
+  CG.addTypeVariable(typeVar);
 }
 
 void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
@@ -171,9 +177,13 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   assert(typeVar2 == getRepresentative(typeVar2) &&
          "typeVar2 is not the representative");
   assert(typeVar1 != typeVar2 && "cannot merge type with itself");
-  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
 
-  // Merge nodes in the constraint graph.
+  // Always merge 'up' the constraint stack, because it is simpler.
+  if (typeVar1->getImpl().getID() > typeVar2->getImpl().getID())
+    std::swap(typeVar1, typeVar2);
+
+  CG.mergeNodesPre(typeVar2);
+  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
   CG.mergeNodes(typeVar1, typeVar2);
 
   if (updateWorkList) {
@@ -203,6 +213,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   assert(!type->hasError() &&
          "Should not be assigning a type involving ErrorType!");
 
+  CG.retractFromInference(typeVar, type);
   typeVar->getImpl().assignFixedType(type, getTrail());
 
   if (!updateState)
@@ -1092,8 +1103,8 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
     return nullptr;
 
   auto &CG = getConstraintGraph();
-  auto result = CG.lookupNode(typeVar);
-  auto equivalence = result.first.getEquivalenceClass();
+  auto &result = CG[typeVar];
+  auto equivalence = result.getEquivalenceClass();
   auto member = llvm::find_if(equivalence, [=](TypeVariableType *eq) {
     auto *loc = eq->getImpl().getLocator();
     if (!loc)
@@ -1189,8 +1200,8 @@ void ConstraintSystem::addOverloadSet(Type boundType,
   }
 
   SmallVector<Constraint *, 4> candidates;
-  generateConstraints(candidates, boundType, choices, useDC, locator,
-                      favoredIndex);
+  generateOverloadConstraints(candidates, boundType, choices, useDC, locator,
+                              favoredIndex);
   // For an overload set (disjunction) from newly generated candidates.
   addOverloadSet(candidates, locator);
 }
@@ -1799,8 +1810,15 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
     // variable representing the argument to retrieve protocol requirements from
     // it. Look for a ArgumentConversion constraint that allows us to retrieve
     // the argument type var.
-    for (auto argConstraint :
-         CS.getConstraintGraph()[typeVar].getConstraints()) {
+    auto &cg = CS.getConstraintGraph();
+
+    // FIXME: The type variable is not going to be part of the constraint graph
+    // at this point unless it was created at the outermost decision level;
+    // otherwise it has already been rolled back! Work around this by creating
+    // an empty node if one doesn't exist.
+    cg.addTypeVariable(typeVar);
+
+    for (auto argConstraint : cg[typeVar].getConstraints()) {
       if (argConstraint->getKind() == ConstraintKind::ArgumentConversion &&
           argConstraint->getFirstType()->getRValueType()->isEqual(typeVar)) {
         if (auto argTV =
@@ -1861,7 +1879,11 @@ static inline size_t size_in_bytes(const T &x) {
 }
 
 size_t Solution::getTotalMemory() const {
-  return sizeof(*this) + typeBindings.getMemorySize() +
+  if (TotalMemory)
+    return *TotalMemory;
+
+  const_cast<Solution *>(this)->TotalMemory
+       = sizeof(*this) + size_in_bytes(typeBindings) +
          overloadChoices.getMemorySize() +
          ConstraintRestrictions.getMemorySize() +
          (Fixes.size() * sizeof(void *)) + DisjunctionChoices.getMemorySize() +
@@ -1885,6 +1907,8 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(argumentLists) +
          size_in_bytes(ImplicitCallAsFunctionRoots) +
          size_in_bytes(SynthesizedConformances);
+
+  return *TotalMemory;
 }
 
 DeclContext *Solution::getDC() const { return constraintSystem->DC; }
@@ -1928,16 +1952,20 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
   if (!decl->getInterfaceType()->is<AnyFunctionType>())
     return IUOReferenceKind::Value;
 
-  auto refKind = getFunctionRefKind();
-  assert(!forSecondApplication || refKind == FunctionRefKind::DoubleApply);
+  auto refKind = getFunctionRefInfo();
+  assert(!forSecondApplication || refKind.isDoubleApply());
 
-  switch (refKind) {
-  case FunctionRefKind::Unapplied:
-  case FunctionRefKind::Compound:
+  // Compound references currently never produce IUOs.
+  // FIXME(FunctionRefInfo): They should.
+  if (refKind.isCompoundName())
+    return std::nullopt;
+
+  switch (refKind.getApplyLevel()) {
+  case FunctionRefInfo::ApplyLevel::Unapplied:
     // Such references never produce IUOs.
     return std::nullopt;
-  case FunctionRefKind::SingleApply:
-  case FunctionRefKind::DoubleApply: {
+  case FunctionRefInfo::ApplyLevel::SingleApply:
+  case FunctionRefInfo::ApplyLevel::DoubleApply:
     // Check whether this is a curried function reference e.g
     // (Self) -> (Args...) -> Ret. Such a function reference can only produce
     // an IUO on the second application.
@@ -1945,7 +1973,6 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
     if (forSecondApplication != isCurried)
       return std::nullopt;
     break;
-  }
   }
   return IUOReferenceKind::ReturnValue;
 }
@@ -3815,7 +3842,7 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   return conformance.getTypeWitnessByName(type, cs.getASTContext().Id_RawValue);
 }
 
-void ConstraintSystem::generateConstraints(
+void ConstraintSystem::generateOverloadConstraints(
     SmallVectorImpl<Constraint *> &constraints, Type type,
     ArrayRef<OverloadChoice> choices, DeclContext *useDC,
     ConstraintLocator *locator, std::optional<unsigned> favoredIndex,
@@ -3831,10 +3858,8 @@ void ConstraintSystem::generateConstraints(
     if (requiresFix && !fix)
       return;
 
-    auto *choice = fix ? Constraint::createFixedChoice(*this, type, overload,
-                                                       useDC, fix, locator)
-                       : Constraint::createBindOverload(*this, type, overload,
-                                                        useDC, locator);
+    auto *choice = Constraint::createBindOverload(*this, type, overload,
+                                                  useDC, fix, locator);
 
     if (isFavored)
       choice->setFavored();
@@ -4347,7 +4372,8 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
       // direct-to-storage in order for the conversion to be non-ephemeral.
       auto access = asd->getAccessStrategy(
           AccessSemantics::Ordinary, AccessKind::ReadWrite,
-          DC->getParentModule(), DC->getResilienceExpansion());
+          DC->getParentModule(), DC->getResilienceExpansion(),
+          /*useOldABI=*/false);
       return access.getKind() == AccessStrategy::Storage;
     };
 
@@ -4678,20 +4704,13 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
 
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
                                          ConstraintLocator *locator) const {
-  // First check whether this declaration is universally unavailable.
-  if (D->getAttrs().isUnavailable(getASTContext()))
-    return true;
+  SourceLoc loc;
+  if (locator) {
+    if (auto anchor = locator->getAnchor())
+      loc = getLoc(anchor);
+  }
 
-  return TypeChecker::isDeclarationUnavailable(D, DC, [&] {
-    SourceLoc loc;
-
-    if (locator) {
-      if (auto anchor = locator->getAnchor())
-        loc = getLoc(anchor);
-    }
-
-    return TypeChecker::overApproximateAvailabilityAtLocation(loc, DC);
-  });
+  return getUnsatisfiedAvailabilityConstraint(D, DC, loc).has_value();
 }
 
 bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conformance,
@@ -4719,7 +4738,8 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
   // diagnostics already emitted or waiting to be emitted. Because they are
   // a better indication of the problem.
   ASTContext &ctx = getASTContext();
-  if (ctx.hadError())
+  if (ctx.hadError() ||
+      (diagnosticTransaction && diagnosticTransaction->hasErrors()))
     return;
 
   ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
@@ -4862,24 +4882,6 @@ void ConstraintSystem::removeFixedRequirement(GenericTypeParamType *GP,
   ASSERT(erased);
 }
 
-// Replace any error types encountered with placeholders.
-Type ConstraintSystem::getVarType(const VarDecl *var) {
-  auto type = var->getTypeInContext();
-
-  // If this declaration is used as part of a code completion
-  // expression, solver needs to glance over the fact that
-  // it might be invalid to avoid failing constraint generation
-  // and produce completion results.
-  if (!isForCodeCompletion())
-    return type;
-
-  return type.transformRec([&](Type type) -> std::optional<Type> {
-    if (!type->is<ErrorType>())
-      return std::nullopt;
-    return Type(PlaceholderType::get(Context, const_cast<VarDecl *>(var)));
-  });
-}
-
 bool ConstraintSystem::isReadOnlyKeyPathComponent(
     const AbstractStorageDecl *storage, SourceLoc referenceLoc) {
   // See whether key paths can store to this component. (Key paths don't
@@ -4906,12 +4908,12 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-    ExportContext where = ExportContext::forFunctionBody(DC, referenceLoc);
-    auto maybeUnavail =
-        TypeChecker::checkDeclarationAvailability(setter, where);
-    if (maybeUnavail.has_value()) {
+    // FIXME: Fully unavailable setters should cause the key path to be
+    // readonly too.
+    auto constraint =
+        getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc);
+    if (constraint && constraint->isConditionallySatisfiable())
       return true;
-    }
   }
 
   return false;

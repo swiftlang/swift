@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t/ImportPath)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// RUN: %target-swift-frontend -disable-availability-checking -emit-module %t/Lib.swift -o %t/ImportPath/Lib.swiftmodule -emit-module-interface-path %t/ImportPath/Lib.swiftinterface
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-module %t/Lib.swift -o %t/ImportPath/Lib.swiftmodule -emit-module-interface-path %t/ImportPath/Lib.swiftinterface
 
 // BEGIN Lib.swift
 

@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix typechecker-only- -DTYPECHECKER_ONLY %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 
 ////////////////////////
 // MARK: Declarations //
@@ -1763,7 +1763,7 @@ extension MyActor {
         _ = sc
 
         Task { // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-          // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument risks causing races in between local and caller code}}
+          // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(priority:operation:)' risks causing races in between local and caller code}}
           _ = sc
         }
 
@@ -1886,5 +1886,23 @@ func nonSendableAllocBoxConsumingVar() async throws {
     }
 
     try await group.waitForAll()
+  }
+}
+
+func offByOneWithImplicitPartialApply() {
+  class A {
+      var description = ""
+  }
+
+  class B {
+      let a = A()
+
+      func b() {
+          let asdf = ""
+          Task { @MainActor in
+            a.description = asdf // expected-tns-warning {{sending 'self' risks causing data races}}
+            // expected-tns-note @-1 {{task-isolated 'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+          }
+      }
   }
 }

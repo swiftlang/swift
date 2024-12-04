@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -primary-file %s -O -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -primary-file %s -O -module-name=test -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 
 import SwiftShims
 

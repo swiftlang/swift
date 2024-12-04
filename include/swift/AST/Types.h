@@ -62,6 +62,7 @@ class ArgumentList;
 class AssociatedTypeDecl;
 class ASTContext;
 enum BufferPointerTypeKind : unsigned;
+struct BuiltinNameStringLiteral;
 class BuiltinTupleDecl;
 class ClassDecl;
 class ClangModuleLoader;
@@ -83,6 +84,7 @@ enum class ReferenceCounting : uint8_t;
 enum class ResilienceExpansion : unsigned;
 class SILModule;
 class SILType;
+class SourceLoc;
 class TypeAliasDecl;
 class TypeDecl;
 class NominalTypeDecl;
@@ -425,8 +427,6 @@ protected:
     HasCachedType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(ParenType, SugarType);
-
   SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
@@ -686,9 +686,6 @@ public:
 
   /// Returns true if this contextual type is (Escapable && !isNoEscape).
   bool mayEscape() { return !isNoEscape() && isEscapable(); }
-
-  /// Does the type have outer parenthesis?
-  bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
 
   /// Are values of this type essentially just class references,
   /// possibly with some sort of additional information?
@@ -1287,9 +1284,6 @@ public:
   /// argument labels removed.
   Type removeArgumentLabels(unsigned numArgumentLabels);
 
-  /// Retrieve the type without any parentheses around it.
-  Type getWithoutParens();
-
   /// Replace the base type of the result type of the given function
   /// type with a new result type, as per a DynamicSelf or other
   /// covariant return transformation.  The optionality of the
@@ -1508,6 +1502,9 @@ public:
   /// return `None`.
   std::optional<TangentSpace>
   getAutoDiffTangentSpace(LookupConformanceFn lookupConformance);
+
+  /// Return the kind of generic parameter that this type can be matched to.
+  GenericTypeParamKind getMatchingParamKind();
 };
 
 /// AnyGenericType - This abstract class helps types ensure that fields
@@ -1648,8 +1645,9 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnresolvedType, Type)
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {
 protected:
-  BuiltinType(TypeKind kind, const ASTContext &canTypeCtx)
-  : TypeBase(kind, &canTypeCtx, RecursiveTypeProperties()) {}
+  BuiltinType(TypeKind kind, const ASTContext &canTypeCtx,
+              RecursiveTypeProperties properties = {})
+  : TypeBase(kind, &canTypeCtx, properties) {}
 public:
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_BuiltinType &&
@@ -1671,6 +1669,113 @@ public:
   bool isBitwiseCopyable() const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinType, Type)
+
+/// BuiltinUnboundGenericType - the base declaration of a generic builtin type
+/// that has not yet had generic parameters applied.
+///
+/// Referring to an unbound generic type by itself is invalid, but this
+/// representation is used as an intermediate during type resolution when
+/// resolving a type reference such as `Builtin.Int<31>`. Applying
+/// the generic parameters produces the actual builtin type based on the
+/// kind of the base.
+class BuiltinUnboundGenericType : public BuiltinType {
+  friend class ASTContext;
+  TypeKind BoundGenericTypeKind;
+  
+  BuiltinUnboundGenericType(const ASTContext &C,
+                            TypeKind genericTypeKind)
+    : BuiltinType(TypeKind::BuiltinUnboundGeneric, C),
+      BoundGenericTypeKind(genericTypeKind)
+  {}
+    
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinUnboundGeneric;
+  }
+  
+  /// Produce the unqualified name of the type.
+  BuiltinNameStringLiteral getBuiltinTypeName() const;
+  StringRef getBuiltinTypeNameString() const;
+  
+  static BuiltinUnboundGenericType *get(TypeKind genericTypeKind,
+                                        const ASTContext &C);
+
+  /// Get the generic signature with which to substitute this type.
+  GenericSignature getGenericSignature() const;
+
+  /// Get the type that results from binding the generic parameters of this
+  /// builtin to the given substitutions.
+  ///
+  /// Produces an ErrorType if the substitution is invalid.
+  Type getBound(SubstitutionMap subs) const;
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnboundGenericType, BuiltinType)
+
+/// BuiltinFixedArrayType - The builtin type representing N values stored
+/// inline contiguously.
+///
+/// All elements of a value of this type must be fully initialized any time the
+/// value may be copied, moved, or destroyed.
+class BuiltinFixedArrayType : public BuiltinType, public llvm::FoldingSetNode {
+  friend class ASTContext;
+  
+  CanType Size;
+  CanType ElementType;
+  
+  static RecursiveTypeProperties
+  getRecursiveTypeProperties(CanType Size, CanType Element) {
+    RecursiveTypeProperties properties;
+    properties |= Size->getRecursiveProperties();
+    properties |= Element->getRecursiveProperties();
+    return properties;
+  }
+  
+  BuiltinFixedArrayType(CanType Size,
+                        CanType ElementType)
+    : BuiltinType(TypeKind::BuiltinFixedArray, ElementType->getASTContext(),
+                  getRecursiveTypeProperties(Size, ElementType)),
+        Size(Size),
+        ElementType(ElementType)
+  {}
+  
+public:
+  /// Arrays with more elements than this are always treated as in-memory values.
+  ///
+  /// (4096 is the hardcoded limit above which we refuse to import C arrays
+  /// as tuples. From first principles, a much lower threshold would probably
+  /// make sense, but we don't want to break the type lowering of C types
+  /// as they appear in existing Swift code.)
+  static constexpr const uint64_t MaximumLoadableSize = 4096;
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinFixedArray;
+  }
+  
+  static BuiltinFixedArrayType *get(CanType Size,
+                                    CanType ElementType);
+                       
+  /// Get the integer generic parameter representing the number of elements.
+  CanType getSize() const { return Size; }
+  
+  /// Get the fixed integer number of elements if known and zero or greater.
+  std::optional<uint64_t> getFixedInhabitedSize() const;
+  
+  /// True if the type is statically negative-sized (and therefore uninhabited).
+  bool isFixedNegativeSize() const;
+  
+  /// Get the element type.
+  CanType getElementType() const { return ElementType; }
+  
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, getSize(), getElementType());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      CanType Size, CanType ElementType) {
+    ID.AddPointer(Size.getPointer());
+    ID.AddPointer(ElementType.getPointer());
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFixedArrayType, BuiltinType)
 
 /// BuiltinRawPointerType - The builtin raw (and dangling) pointer type.  This
 /// pointer is completely unmanaged and is equivalent to i8* in LLVM IR.
@@ -2218,6 +2323,28 @@ public:
   }
 };
 
+/// A type has been introduced at some fixed location in the AST.
+class LocatableType final : public SugarType, public llvm::FoldingSetNode {
+  SourceLoc Loc;
+
+  LocatableType(SourceLoc loc, Type underlying,
+                RecursiveTypeProperties properties);
+
+public:
+  SourceLoc getLoc() const { return Loc; }
+
+  static LocatableType *get(SourceLoc loc, Type underlying);
+
+  void Profile(llvm::FoldingSetNodeID &id) const;
+
+  static void Profile(llvm::FoldingSetNodeID &id, SourceLoc loc,
+                      Type underlying);
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Locatable;
+  }
+};
+
 /// The various spellings of ownership modifier that can be used in source.
 enum class ParamSpecifier : uint8_t {
   /// No explicit ownership specifier was provided. The parameter will use the
@@ -2475,21 +2602,6 @@ public:
   }
 
   uint8_t toRaw() const { return value.toRaw(); }
-};
-
-/// ParenType - A paren type is a type that's been written in parentheses.
-class ParenType : public SugarType {
-  ParenType(Type UnderlyingType, RecursiveTypeProperties properties);
-
-public:
-  static ParenType *get(const ASTContext &C, Type underlying);
-
-  Type getUnderlyingType() const { return getSinglyDesugaredType(); }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Paren;
-  }
 };
 
 /// TupleTypeElt - This represents a single element of a tuple.
@@ -4304,6 +4416,10 @@ public:
     Sending = 0x2,
 
     /// Set if the given parameter is isolated.
+    ///
+    /// This means that the value provides the functions isolation. This implies
+    /// that the parameter must be an Optional actor or something that conforms
+    /// to AnyActor.
     Isolated = 0x4,
   };
 
@@ -5253,6 +5369,18 @@ public:
   /// a method.
   SILParameterInfo getSelfParameter() const {
     return getParameters().back();
+  }
+
+  /// Return SILParameterInfo for the isolated parameter in this SILFunctionType
+  /// if one exists. Returns None otherwise.
+  std::optional<SILParameterInfo> maybeGetIsolatedParameter() const {
+    for (auto param : getParameters()) {
+      if (param.hasOption(SILParameterInfo::Isolated)) {
+        return param;
+      }
+    }
+
+    return {};
   }
 
   struct IndirectMutatingParameterFilter {

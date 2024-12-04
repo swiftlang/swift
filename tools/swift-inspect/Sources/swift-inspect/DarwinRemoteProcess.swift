@@ -125,7 +125,17 @@ internal final class DarwinRemoteProcess: RemoteProcess {
       return nil
     }
 
-    if forkCorpse {
+    // Consult with VMUProcInfo to determine if we should force forkCorpse.
+    let forceForkCorpse: Bool
+    if let procInfoClass = getVMUProcInfoClass() {
+      let procInfo = procInfoClass.init(task: task)
+      forceForkCorpse = procInfo.shouldAnalyzeWithCorpse
+    } else {
+      // Default to not forcing forkCorpse.
+      forceForkCorpse = false
+    }
+
+    if forkCorpse || forceForkCorpse {
       var corpse = task_t()
       let maxRetry = 6
       for retry in 0..<maxRetry {

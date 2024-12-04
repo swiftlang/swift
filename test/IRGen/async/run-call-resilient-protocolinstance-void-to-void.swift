@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(PrintShims)
-// RUN: %target-build-swift-dylib(%t/%target-library-name(ResilientProtocol)) %S/Inputs/protocol-1instance-void_to_void.swift  -Xfrontend -disable-availability-checking -g -module-name ResilientProtocol -emit-module -emit-module-path %t/ResilientProtocol.swiftmodule
+// RUN: %target-build-swift-dylib(%t/%target-library-name(ResilientProtocol)) %S/Inputs/protocol-1instance-void_to_void.swift  -target %target-swift-5.1-abi-triple -g -module-name ResilientProtocol -emit-module -emit-module-path %t/ResilientProtocol.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(ResilientProtocol)
-// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -g %s -emit-ir -I %t -L %t -lPrintShim -lResilientProtocol -parse-as-library -module-name main | %FileCheck %s --check-prefix=CHECK-LL
-// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -g %s -parse-as-library -module-name main -o %t/main -I %t -L %t -lPrintShims -lResilientProtocol %target-rpath(%t) 
+// RUN: %target-build-swift  -target %target-swift-5.1-abi-triple -g %s -emit-ir -I %t -L %t -lPrintShim -lResilientProtocol -parse-as-library -module-name main | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift  -target %target-swift-5.1-abi-triple -g %s -parse-as-library -module-name main -o %t/main -I %t -L %t -lPrintShims -lResilientProtocol %target-rpath(%t) 
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(PrintShims) %t/%target-library-name(ResilientProtocol) | %FileCheck %s
 

@@ -617,7 +617,7 @@ private:
 
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     // Do not handle unavailable decls from other modules.
-    if (IsModuleFile && AvailableAttr::isUnavailable(D))
+    if (IsModuleFile && D->isUnavailable())
       return false;
 
     if (!handleCustomAttrInitRefs(D))
@@ -676,6 +676,35 @@ private:
       }
     }
     return true;
+  }
+
+  /// Indexes refs to initializers of collections when initialized from a short
+  /// hand version of the collection's type.
+  ///
+  /// For example, emits refs for `[Int](repeating:count:)`.
+  void handleCollectionShortHandTypeInitRefs(Expr *E) {
+    auto *ctorRef = dyn_cast<ConstructorRefCallExpr>(E);
+    if (!ctorRef)
+      return;
+    auto TE = dyn_cast<TypeExpr>(ctorRef->getBase());
+    if (!TE || TE->isImplicit())
+      return;
+    auto TR = TE->getTypeRepr();
+    if (TR && !isa<ArrayTypeRepr>(TR) && !isa<DictionaryTypeRepr>(TR))
+      return;
+    auto DRE = dyn_cast<DeclRefExpr>(ctorRef->getFn());
+    if (!DRE)
+      return;
+
+    auto decl = DRE->getDecl();
+    if (!shouldIndex(decl, /*IsRef=*/true))
+      return;
+    IndexSymbol Info;
+    if (initIndexSymbol(decl, ctorRef->getSourceRange().Start, /*IsRef=*/true,
+                        Info))
+      return;
+    if (startEntity(decl, Info, /*IsRef=*/true))
+      finishCurrentEntity();
   }
 
   void handleMemberwiseInitRefs(Expr *E) {
@@ -744,6 +773,7 @@ private:
     ExprStack.push_back(E);
     Containers.activateContainersFor(E);
     handleMemberwiseInitRefs(E);
+    handleCollectionShortHandTypeInitRefs(E);
     return true;
   }
 
@@ -850,12 +880,12 @@ private:
     if (Loc.isInvalid() || isSuppressed(Loc))
       return true;
 
+    IndexSymbol Info;
+
     // Dig back to the original captured variable
     if (auto *VD = dyn_cast<VarDecl>(D)) {
-      D = firstDecl(D);
+      Info.originalDecl = firstDecl(D);
     }
-
-    IndexSymbol Info;
 
     if (Data.isImplicit)
       Info.roles |= (unsigned)SymbolRole::Implicit;
@@ -1085,7 +1115,8 @@ private:
       D = cast<VarDecl>(D)->getCanonicalVarDecl();
     }
 
-    if (D->isImplicit() && !shouldIndexImplicitDecl(D, IsRef))
+    if (!D->isSynthesized() && D->isImplicit() &&
+        !shouldIndexImplicitDecl(D, IsRef))
       return false;
 
     // Do not handle non-public imported decls.
@@ -1580,13 +1611,17 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
     if (!reportRef(shadowedDecl, loc, info, AccessKind::Read))
       return false;
 
-    // Suppress the reference if there is any (it is implicit and hence
-    // already skipped in the shorthand if let case, but explicit in the
-    // captured case).
-    suppressRefAtLoc(loc);
+    // Keep the refs and definition for the real decl when indexing locals,
+    // so the references to the shadowing variable are distinct.
+    if (!IdxConsumer.indexLocals()) {
+      // Suppress the reference if there is any (it is implicit and hence
+      // already skipped in the shorthand if let case, but explicit in the
+      // captured case).
+      suppressRefAtLoc(loc);
 
-    // Skip the definition of a shadowed decl
-    return true;
+      // Skip the definition of a shadowed decl
+      return true;
+    }
   }
 
   if (startEntityDecl(D)) {

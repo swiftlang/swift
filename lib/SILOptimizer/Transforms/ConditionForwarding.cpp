@@ -117,7 +117,7 @@ private:
       }
     }
     if (Changed) {
-      updateBorrowedFrom(getPassManager(), F);
+      updateAllGuaranteedPhis(getPassManager(), F);
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
   }
@@ -237,7 +237,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   if (getFunction()->hasOwnership()) {
     // TODO: Currently disabled because this case may need lifetime extension
     // Disabling this conservatively for now.
-    assert(Condition->getNumOperands() == 1);
+    assert(Condition->getNumRealOperands() == 1);
     BorrowedValue conditionOp(Condition->getOperand(0));
     if (conditionOp && conditionOp.isLocalScope()) {
       return false;

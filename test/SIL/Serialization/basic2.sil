@@ -1,8 +1,10 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name basic2 -enable-experimental-feature ValueGenerics
-// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name basic2 -enable-experimental-feature ValueGenerics
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name basic2 -emit-sorted-sil -enable-experimental-feature ValueGenerics | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name basic2 -enable-experimental-feature ValueGenerics
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.2.sib -module-name basic2 -enable-experimental-feature ValueGenerics
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -module-name basic2 -emit-sorted-sil -enable-experimental-feature ValueGenerics | %FileCheck %s
+
+// REQUIRES: swift_feature_ValueGenerics
 
 import Builtin
 import Swift
@@ -12,6 +14,20 @@ class Klass {}
 
 sil @getC : $@convention(thin) () -> (@owned C)
 sil @getKlass : $@convention(thin) () -> (@owned Klass)
+
+// CHECK-LABEL: sil [ossa] @merge_isolation_region : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: merge_isolation_region %0 : $Klass, %1 : $*C
+// CHECK: merge_isolation_region %1 : $*C, %0 : $Klass, %0 : $Klass
+// CHECK: } // end sil function 'merge_isolation_region'
+sil [ossa] @merge_isolation_region : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = alloc_stack $C
+  merge_isolation_region %0 : $Klass, %1 : $*C
+  merge_isolation_region %1 : $*C, %0 : $Klass, %0 : $Klass
+  dealloc_stack %1 : $*C
+  %9999 = tuple ()
+  return %9999 : $()
+}
 
 // CHECK-LABEL: sil [ossa] @test_allocbox_moveable_value_debuginfo_flag : $@convention(thin) () -> () {
 // CHECK: alloc_box [moveable_value_debuginfo] ${ var Builtin.NativeObject }

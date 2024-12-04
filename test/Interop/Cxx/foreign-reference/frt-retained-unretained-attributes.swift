@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -diagnostic-style llvm %s -validate-tbd-against-ir=none -Xcc -fignore-exceptions | %FileCheck %s
+// RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -disable-availability-checking -diagnostic-style llvm %s -validate-tbd-against-ir=none -Xcc -fignore-exceptions | %FileCheck %s
 
 import FunctionsAndMethodsReturningFRT
 
@@ -167,12 +167,6 @@ func testFreeFunctionsReturningNonFRT() {
     let frtLocalVar1 = global_function_returning_non_FRT()
     // CHECK: function_ref @{{.*}}global_function_returning_non_FRT{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
 
-    let frtLocalVar2 = global_function_returning_non_FRT_with_attr_returns_retained()
-    // CHECK: function_ref @{{.*}}global_function_returning_non_FRT_with_attr_returns_retained{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
-
-    let frtLocalVar3 = global_function_returning_non_FRT_with_attr_returns_unretained()
-    // CHECK: function_ref @{{.*}}global_function_returning_non_FRT_with_attr_returns_unretained{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
-
     let frtLocalVar4 = global_function_returning_non_FRT_create()
     // CHECK: function_ref @{{.*}}global_function_returning_non_FRT_create{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
 
@@ -184,12 +178,6 @@ func testStaticMethodsReturningNonFRT() {
     let frtLocalVar1 = StructWithStaticMethodsReturningNonFRT.StaticMethodReturningNonFRT()
     // CHECK: function_ref @{{.*}}StaticMethodReturningNonFRT{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
 
-    let frtLocalVar2 = StructWithStaticMethodsReturningNonFRT.StaticMethodReturningNonFRTWithAttrReturnsRetained()
-    // CHECK: function_ref @{{.*}}StaticMethodReturningNonFRTWithAttrReturnsRetained{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
-
-    let frtLocalVar3 = StructWithStaticMethodsReturningNonFRT.StaticMethodReturningNonFRTWithAttrReturnsUnretained()
-    // CHECK: function_ref @{{.*}}StaticMethodReturningNonFRTWithAttrReturnsUnretained{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
-
     let frtLocalVar4 = StructWithStaticMethodsReturningNonFRT.StaticMethodReturningNonFRT_create()
     // CHECK: function_ref @{{.*}}StaticMethodReturningNonFRT_create{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
 
@@ -197,7 +185,7 @@ func testStaticMethodsReturningNonFRT() {
     // CHECK: function_ref @{{.*}}StaticMethodReturningNonFRT_copy{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
 }
 
-func testtFreeFunctionsTemplated() {
+func testtFreeFunctionsTemplated(frt : FRTStruct) {
     let frtLocalVar1 : Int = 1;
     
     let frtLocalVar2 = global_templated_function_returning_FRT(frtLocalVar1)
@@ -233,4 +221,28 @@ func testtFreeFunctionsTemplated() {
     let frtLocalVar12 = global_templated_function_returning_FRT_create_with_attr_returns_unretained(frtLocalVar1)
     // CHECK: function_ref @{{.*}}global_templated_function_returning_FRT_create_with_attr_returns_unretained{{.*}} : $@convention(c) (Int) -> FRTStruct
 
+    let frtLocalVar13 = global_function_returning_templated_retrun_frt(frt)
+    // CHECK: function_ref @{{.*}}global_function_returning_templated_retrun_frt{{.*}} : $@convention(c) (FRTStruct) -> FRTStruct
+
+    let frtLocalVar14 = global_function_returning_templated_retrun_frt_owned(frt)
+    // CHECK: function_ref @{{.*}}global_function_returning_templated_retrun_frt_owned{{.*}} : $@convention(c) (FRTStruct) -> @owned FRTStruct
+
 }
+
+func testVirtualMethods(base: Base, derived: Derived) {
+    var mutableBase = base
+    var mutableDerived = derived
+
+    var frt1 = mutableBase.VirtualMethodReturningFRTUnowned()
+    // CHECK: function_ref @{{.*}}VirtualMethodReturningFRTUnowned{{.*}} : $@convention(cxx_method) (@inout Base) -> FRTStruct
+    
+    var frt2 = mutableDerived.VirtualMethodReturningFRTUnowned()
+    // CHECK: function_ref @{{.*}}VirtualMethodReturningFRTUnowned{{.*}} : $@convention(cxx_method) (@inout Derived) -> FRTStruct
+    
+    var frt3 = mutableBase.VirtualMethodReturningFRTOwned()
+    // CHECK: function_ref @{{.*}}VirtualMethodReturningFRTOwned{{.*}} : $@convention(cxx_method) (@inout Base) ->  @owned FRTStruct
+    
+    var frt4 = mutableDerived.VirtualMethodReturningFRTOwned()
+    // CHECK: function_ref @{{.*}}VirtualMethodReturningFRTOwned{{.*}} : $@convention(cxx_method) (@inout Derived) -> @owned FRTStruct
+}
+

@@ -296,6 +296,7 @@ private:
     case Node::Kind::BoundGenericFunction:
     case Node::Kind::BuiltinTypeName:
     case Node::Kind::BuiltinTupleType:
+    case Node::Kind::BuiltinFixedArray:
     case Node::Kind::Class:
     case Node::Kind::DependentGenericType:
     case Node::Kind::DependentMemberType:
@@ -367,6 +368,8 @@ private:
     case Node::Kind::Constructor:
     case Node::Kind::CoroutineContinuationPrototype:
     case Node::Kind::CurryThunk:
+    case Node::Kind::SILThunkIdentity:
+    case Node::Kind::SILThunkHopToMainActorIfNeeded:
     case Node::Kind::DispatchThunk:
     case Node::Kind::Deallocator:
     case Node::Kind::IsolatedDeallocator:
@@ -1063,7 +1066,8 @@ private:
       auto child = Node->getChild(firstRequirement);
       if (child->getKind() == Node::Kind::Type)
         child = child->getChild(0);
-      if (child->getKind() != Node::Kind::DependentGenericParamPackMarker) {
+      if (child->getKind() != Node::Kind::DependentGenericParamPackMarker &&
+          child->getKind() != Node::Kind::DependentGenericParamValueMarker) {
         break;
       }
     }
@@ -1423,6 +1427,14 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::CurryThunk:
     Printer << "curry thunk of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::SILThunkIdentity:
+    Printer << "identity thunk of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::SILThunkHopToMainActorIfNeeded:
+    Printer << "hop to main actor thunk of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::DispatchThunk:
@@ -1973,6 +1985,13 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::BuiltinTupleType:
     Printer << "Builtin.TheTupleType";
+    return nullptr;
+  case Node::Kind::BuiltinFixedArray:
+    Printer << "Builtin.FixedArray<";
+    print(Node->getChild(0), depth + 1);
+    Printer << ", ";
+    print(Node->getChild(1), depth + 1);
+    Printer << ">";
     return nullptr;
   case Node::Kind::Number:
     Printer << Node->getIndex();

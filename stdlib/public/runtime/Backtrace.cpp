@@ -43,6 +43,17 @@
 #endif
 
 #if TARGET_OS_OSX || TARGET_OS_MACCATALYST
+#if __has_include(<sys/codesign.h>)
+#include <sys/codesign.h>
+#else
+// SPI
+#define CS_OPS_STATUS 0
+#define CS_GET_TASK_ALLOW  0x00000004
+#define CS_RUNTIME         0x00010000
+#define CS_PLATFORM_BINARY 0x04000000
+#define CS_PLATFORM_PATH   0x08000000
+extern "C" int csops(int, unsigned int, void *, size_t);
+#endif
 #include <spawn.h>
 #endif
 #include <unistd.h>
@@ -144,11 +155,6 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 BacktraceInitializer backtraceInitializer;
 
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
-
-#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
-posix_spawnattr_t backtraceSpawnAttrs;
-posix_spawn_file_actions_t backtraceFileActions;
-#endif
 
 #if SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 
@@ -253,6 +259,23 @@ const char *presetToString(Preset preset) {
 #ifdef __linux__
 bool isPrivileged() {
   return getauxval(AT_SECURE);
+}
+#elif TARGET_OS_OSX || TARGET_OS_MACCATALYST
+bool isPrivileged() {
+  if (issetugid())
+    return true;
+
+  uint32_t flags = 0;
+  if (csops(getpid(),
+            CS_OPS_STATUS,
+            &flags,
+            sizeof(flags)) != 0)
+    return true;
+
+  if (flags & (CS_PLATFORM_BINARY | CS_PLATFORM_PATH | CS_RUNTIME))
+    return true;
+
+  return !(flags & CS_GET_TASK_ALLOW);
 }
 #elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 bool isPrivileged() {
@@ -451,17 +474,6 @@ BacktraceInitializer::BacktraceInitializer() {
   }
 
   if (_swift_backtraceSettings.enabled == OnOffTty::On) {
-#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
-    // Make sure that all fds are closed except for stdin/stdout/stderr.
-    posix_spawnattr_init(&backtraceSpawnAttrs);
-    posix_spawnattr_setflags(&backtraceSpawnAttrs, POSIX_SPAWN_CLOEXEC_DEFAULT);
-
-    posix_spawn_file_actions_init(&backtraceFileActions);
-    posix_spawn_file_actions_addinherit_np(&backtraceFileActions, STDIN_FILENO);
-    posix_spawn_file_actions_addinherit_np(&backtraceFileActions, STDOUT_FILENO);
-    posix_spawn_file_actions_addinherit_np(&backtraceFileActions, STDERR_FILENO);
-#endif
-
     ErrorCode err = _swift_installCrashHandler();
     if (err != 0) {
       swift::warning(0,
@@ -993,7 +1005,7 @@ _swift_spawnBacktracer(const ArgChar * const *argv)
                        const_cast<char * const *>(env));
 #else
   int ret = posix_spawn(&child, swiftBacktracePath,
-                        &backtraceFileActions, &backtraceSpawnAttrs,
+                        nullptr, nullptr,
                         const_cast<char * const *>(argv),
                         const_cast<char * const *>(env));
 #endif

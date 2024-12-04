@@ -223,6 +223,7 @@ let _: ImplicitMembers = .implicit[funcOptional: ()]()!.another
 let _: ImplicitMembers? = .implicit[funcOptional: ()]()?.another
 let _: ImplicitMembers = .implicit[optionalFunc: ()]!().another
 let _: ImplicitMembers? = .implicit[optionalFunc: ()]?().another
+let _: ImplicitMembers = .implicit.self
 
 func implicit(_ i: inout ImplicitMembers) {
     if i == .implicit {}
@@ -372,4 +373,12 @@ func rdar68094328() {
     foo(C.bar, .init(string: str).value) // Ok
     foo(C.bar, .init(string: str).baz(str: "")) // Ok
   }
+}
+
+// Ensure postfix operator is not a part of implicit member chain.
+postfix operator ^
+postfix func ^ (_ lhs: ImplicitMembers) -> Int { 0 }
+func acceptInt(_ x: Int) {}
+func postfixOpIsNotAMemberChain() {
+  acceptInt(.implicit.another^)
 }

@@ -9,7 +9,6 @@ add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   DiagnosticsBridge.swift
   Exprs.swift
   Generics.swift
-  LegacyParse.swift
   Literals.swift
   ParameterClause.swift
   Patterns.swift

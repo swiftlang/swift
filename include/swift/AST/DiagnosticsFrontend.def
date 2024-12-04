@@ -36,7 +36,7 @@ ERROR(error_unsupported_target_os, none,
 ERROR(error_unsupported_target_arch, none,
       "unsupported target architecture: '%0'", (StringRef))
 
-ERROR(error_upcoming_feature_on_by_default, none,
+WARNING(warning_upcoming_feature_on_by_default, none,
       "upcoming feature '%0' is already enabled as of Swift version %1",
       (StringRef, unsigned))
 
@@ -127,9 +127,9 @@ ERROR(error_no_source_location_scope_map,none,
 ERROR(error_load_plugin_executable,none,
       "invalid value '%0' in '-load-plugin-executable'; "
       "make sure to use format '<plugin path>#<module names>'", (StringRef))
-ERROR(error_load_plugin,none,
-      "invalid value '%0' in '-load-plugin'; "
-      "make sure to use format '<library path>#<server path>#<module names>'", (StringRef))
+ERROR(error_load_resolved_plugin,none,
+      "invalid value '%0' in '-load-resolved-plugin'; "
+      "make sure to use format '<library path>#<plugin path>#<module names>' where library and plugin path can't both be empty", (StringRef))
 
 NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))

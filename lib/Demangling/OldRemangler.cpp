@@ -1530,6 +1530,10 @@ static bool stripPrefix(StringRef &string, const char (&data)[N]) {
   return true;
 }
 
+ManglingError Remangler::mangleBuiltinFixedArray(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnexpectedBuiltinType, node);
+}
+
 ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
   Buffer << 'B';
   StringRef text = node->getText();
@@ -2522,6 +2526,17 @@ ManglingError Remangler::mangleGenericTypeParamDecl(Node *node,
 ManglingError Remangler::mangleCurryThunk(Node *node, unsigned depth) {
   // ###TODO: Are these errors?!
   Buffer << "<curry-thunk>";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleSILThunkIdentity(Node *node, unsigned depth) {
+  Buffer << "<sil-identity-thunk>";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleSILThunkHopToMainActorIfNeeded(Node *node,
+                                                              unsigned depth) {
+  Buffer << "<sil-hop-to-main-actor-if-needed-thunk>";
   return ManglingError::Success;
 }
 

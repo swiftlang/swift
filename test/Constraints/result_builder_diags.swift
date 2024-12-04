@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 
 enum Either<T,U> {
   case first(T)
@@ -629,15 +629,37 @@ _ = wrapperifyInfer(true) { x in // Ok
 
 struct DoesNotConform {}
 
+struct List<C> {
+  typealias T = C
+
+  init(@TupleBuilder _: () -> C) {}
+}
+
+extension List: P where C: P {}
+
 struct MyView {
-  @TupleBuilder var value: some P { // expected-error {{return type of property 'value' requires that 'DoesNotConform' conform to 'P'}}
-    // expected-note@-1 {{opaque return type declared here}}
-    DoesNotConform()
+  struct Conforms : P {
+    typealias T = Void
   }
 
-  @TupleBuilder func test() -> some P { // expected-error {{return type of instance method 'test()' requires that 'DoesNotConform' conform to 'P'}}
+  @TupleBuilder var value: some P {
     // expected-note@-1 {{opaque return type declared here}}
-    DoesNotConform()
+    DoesNotConform() // expected-error {{return type of property 'value' requires that 'DoesNotConform' conform to 'P'}}
+  }
+
+  @TupleBuilder var nestedFailures: some P {
+    // expected-note@-1 {{opaque return type declared here}}
+    List {
+      List {
+        DoesNotConform()
+        // expected-error@-1 {{return type of property 'nestedFailures' requires that 'DoesNotConform' conform to 'P'}}
+      }
+    }
+  }
+
+  @TupleBuilder func test() -> some P {
+    // expected-note@-1 {{opaque return type declared here}}
+    DoesNotConform() // expected-error {{return type of instance method 'test()' requires that 'DoesNotConform' conform to 'P'}}
   }
 
   @TupleBuilder var emptySwitch: some P {
@@ -1028,4 +1050,32 @@ func testMissingElementInEmptyBuilder() {
   @SingleElementBuilder
   func test2() -> Int {}
   // expected-error@-1 {{expected expression of type 'Int' in result builder 'SingleElementBuilder'}} {{24-24=<#T##Int#>}}
+}
+
+// https://github.com/swiftlang/swift/issues/77453
+func testNoDuplicateStmtDiags() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ components: T...) -> T {
+      components.first!
+    }
+    static func buildEither<T>(first component: T) -> T {
+      component
+    }
+    static func buildEither<T>(second component: T) -> T {
+      component
+    }
+  }
+
+  func takesClosure(_ fn: () -> Void) -> Int? { nil }
+
+  @Builder
+  func foo() -> Int {
+    if let x = takesClosure {} {
+      // expected-warning@-1 {{trailing closure in this context is confusable with the body of the statement}}
+      x
+    } else {
+      1
+    }
+  }
 }

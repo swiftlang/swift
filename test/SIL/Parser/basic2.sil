@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt %s -enable-experimental-feature ValueGenerics | %target-sil-opt -enable-experimental-feature ValueGenerics | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -enable-experimental-feature ValueGenerics | %target-sil-opt -sil-print-types -enable-experimental-feature ValueGenerics | %FileCheck %s
+
+// REQUIRES: swift_feature_ValueGenerics
 
 import Builtin
 import Swift
@@ -451,6 +453,20 @@ bb0:
   %0 = function_ref @generic_func : $@convention(thin) <T> (@in T) -> ()
   %1 = thunk [identity] %0<Klass>() : $@convention(thin) <T> (@in T) -> ()
   destroy_value %1 : $@callee_guaranteed (@in Klass) -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @merge_isolation_region : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: merge_isolation_region %0 : $Klass, %1 : $*MoveOnlyPair
+// CHECK: merge_isolation_region %1 : $*MoveOnlyPair, %0 : $Klass, %0 : $Klass
+// CHECK: } // end sil function 'merge_isolation_region'
+sil [ossa] @merge_isolation_region : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = alloc_stack $MoveOnlyPair
+  merge_isolation_region %0 : $Klass, %1 : $*MoveOnlyPair
+  merge_isolation_region %1 : $*MoveOnlyPair, %0 : $Klass, %0 : $Klass
+  dealloc_stack %1 : $*MoveOnlyPair
   %9999 = tuple ()
   return %9999 : $()
 }

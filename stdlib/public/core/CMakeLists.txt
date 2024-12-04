@@ -71,16 +71,16 @@ split_embedded_sources(
   EMBEDDED DictionaryCasting.swift
   EMBEDDED DictionaryStorage.swift
   EMBEDDED DictionaryVariant.swift
-    NORMAL DiscontiguousSlice.swift
-    NORMAL DropWhile.swift
+  EMBEDDED DiscontiguousSlice.swift
+  EMBEDDED DropWhile.swift
     NORMAL Dump.swift
   EMBEDDED EmptyCollection.swift
   EMBEDDED Equatable.swift
   EMBEDDED ErrorType.swift
   EMBEDDED ExistentialCollection.swift
-    NORMAL Filter.swift
-    NORMAL FlatMap.swift
-    NORMAL Flatten.swift
+  EMBEDDED Filter.swift
+  EMBEDDED FlatMap.swift
+  EMBEDDED Flatten.swift
   EMBEDDED FloatingPoint.swift
   EMBEDDED Hashable.swift
   # WORKAROUND: This file name is not sorted alphabetically in the list because
@@ -93,9 +93,9 @@ split_embedded_sources(
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
   EMBEDDED InputStream.swift
-    NORMAL IntegerParsing.swift
+  EMBEDDED IntegerParsing.swift
   EMBEDDED Integers.swift
-    NORMAL Join.swift
+  EMBEDDED Join.swift
   EMBEDDED KeyPath.swift
   EMBEDDED KeyValuePairs.swift
   EMBEDDED LazyCollection.swift
@@ -104,7 +104,7 @@ split_embedded_sources(
   EMBEDDED LifetimeManager.swift
     NORMAL Macros.swift
   EMBEDDED ManagedBuffer.swift
-    NORMAL Map.swift
+  EMBEDDED Map.swift
   EMBEDDED MemoryLayout.swift
   EMBEDDED UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
     NORMAL Mirrors.swift
@@ -121,7 +121,7 @@ split_embedded_sources(
   EMBEDDED OutputStream.swift
   EMBEDDED Pointer.swift
   EMBEDDED Policy.swift
-    NORMAL PrefixWhile.swift
+  EMBEDDED PrefixWhile.swift
     NORMAL Prespecialize.swift
     NORMAL Print.swift
   EMBEDDED PtrAuth.swift
@@ -154,6 +154,8 @@ split_embedded_sources(
   EMBEDDED Slice.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift
+  EMBEDDED Span/RawSpan.swift
+  EMBEDDED Span/Span.swift
   EMBEDDED StaticString.swift
   EMBEDDED StaticPrint.swift
   EMBEDDED Stride.swift
@@ -218,9 +220,9 @@ split_embedded_sources(
     ### "NON-ESSENTIAL" SOURCES, LAYERED ON TOP OF THE "ESSENTIAL" ONES
     ### -- PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   EMBEDDED Availability.swift
-    NORMAL CollectionDifference.swift
+  EMBEDDED CollectionDifference.swift
   EMBEDDED CollectionOfOne.swift
-    NORMAL Diffing.swift
+  EMBEDDED Diffing.swift
   EMBEDDED Duration.swift
   EMBEDDED DurationProtocol.swift
   EMBEDDED FloatingPointRandom.swift
@@ -230,9 +232,9 @@ split_embedded_sources(
     NORMAL PlaygroundDisplay.swift
     NORMAL CommandLine.swift
   EMBEDDED SliceBuffer.swift
-    NORMAL StaticBigInt.swift
+  EMBEDDED StaticBigInt.swift
   EMBEDDED UInt128.swift
-    NORMAL UnfoldSequence.swift
+  EMBEDDED UnfoldSequence.swift
   EMBEDDED UnsafeBufferPointerSlice.swift
     NORMAL VarArgs.swift
   EMBEDDED Zip.swift
@@ -259,6 +261,11 @@ if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
 
   list(APPEND SWIFTLIB_EMBEDDED_SOURCES SIMDVector.swift)
   list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
+endif()
+
+if (SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
+  list(APPEND SWIFTLIB_SOURCES PointerBounds.swift)
+  list(APPEND SWIFTLIB_EMBEDDED_SOURCES PointerBounds.swift)
 endif()
 
 # Freestanding and Linux/Android builds both have failures to resolve.
@@ -396,12 +403,18 @@ if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
                     BOOTSTRAPPING 1)
 endif()
 
+set(tooling_stdlib_deps)
+if(TARGET libSwiftScan)
+  list(APPEND tooling_stdlib_deps libSwiftScan)
+endif()
+
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
                   ${swiftCore_common_options}
                   ${compile_flags_for_final_build}
                   FILE_DEPENDS
                     ${swiftCore_common_dependencies}
+                  DEPENDS ${tooling_stdlib_deps}
                   INSTALL_IN_COMPONENT
                     stdlib
                   MACCATALYST_BUILD_FLAVOR
@@ -444,6 +457,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       SDK "embedded"
       ARCHITECTURE "${arch}"
       FILE_DEPENDS ${swiftCore_common_dependencies}
+      DEPENDS ${tooling_stdlib_deps}
       INSTALL_IN_COMPONENT stdlib
       )
     add_dependencies(embedded-stdlib embedded-stdlib-${mod})

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 sil_stage canonical
 
@@ -16,6 +16,11 @@ enum Numerals {
   case Four
 }
 
+protocol P {
+  mutating func foo()
+}
+
+sil @createit : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
 sil @external_func: $@convention(thin) () -> ()
 
 //CHECK-LABEL: eliminate_sw_enum_addr
@@ -661,5 +666,40 @@ bb0(%0 : $S):
   dealloc_stack %1 : $*MP
   %11 = tuple ()
   return %11 : $()
+}
+
+// CHECK-LABEL: sil @dont_promote_existential_type_from_non_dominating_block :
+//   Just check that this doesn't crash
+// CHECK:       } // end sil function 'dont_promote_existential_type_from_non_dominating_block'
+sil @dont_promote_existential_type_from_non_dominating_block : $@convention(thin) (@thick any P.Type) -> () {
+bb0(%0 : $@thick any P.Type):
+  %1 = alloc_stack $Optional<any P>
+  cond_br undef, bb1, bb2
+
+bb1:
+  inject_enum_addr %1 : $*Optional<any P>, #Optional.none!enumelt
+  br bb3
+
+bb2:
+  %5 = init_enum_data_addr %1 : $*Optional<any P>, #Optional.some!enumelt
+  %6 = open_existential_metatype %0 : $@thick any P.Type to $@thick (@opened("B0100688-9C78-11EF-8A3C-4EA2A866E4C4", any P) Self).Type
+  %7 = init_existential_addr %5 : $*any P, $@opened("B0100688-9C78-11EF-8A3C-4EA2A866E4C4", any P) Self
+  %f = function_ref @createit : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
+  %a = apply %f<@opened("B0100688-9C78-11EF-8A3C-4EA2A866E4C4", any P) Self>(%7, %6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
+  inject_enum_addr %1 : $*Optional<any P>, #Optional.some!enumelt
+  br bb3
+
+bb3:
+  %9 = unchecked_take_enum_data_addr %1 : $*Optional<any P>, #Optional.some!enumelt
+  dealloc_stack %1 : $*Optional<any P>
+  %11 = alloc_stack [lexical] [var_decl] $any P, var, name "comp"
+  copy_addr [take] %9 to [init] %11 : $*any P
+  %13 = open_existential_addr mutable_access %11 : $*any P to $*@opened("36EE10D8-9C78-11EF-8A3C-4EA2A866E4C4", any P) Self
+  %14 = witness_method $@opened("36EE10D8-9C78-11EF-8A3C-4EA2A866E4C4", any P) Self, #P.foo : <Self where Self : P> (inout Self) -> () -> (), %13 : $*@opened("36EE10D8-9C78-11EF-8A3C-4EA2A866E4C4", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
+  %15 = apply %14<@opened("36EE10D8-9C78-11EF-8A3C-4EA2A866E4C4", any P) Self>(%13) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
+  destroy_addr %11 : $*any P
+  dealloc_stack %11 : $*any P
+  %18 = tuple ()
+  return %18 : $()
 }
 

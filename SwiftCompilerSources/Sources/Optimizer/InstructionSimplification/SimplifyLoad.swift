@@ -234,8 +234,30 @@ private func getGlobalInitValue(address: Value, _ context: SimplifyContext) -> V
     }
   case let bai as BeginAccessInst:
     return getGlobalInitValue(address: bai.address, context)
+  case let rta as RefTailAddrInst:
+    return getGlobalTailElement(of: rta, index: 0)
+  case let ia as IndexAddrInst:
+    if let rta = ia.base as? RefTailAddrInst,
+       let literal = ia.index as? IntegerLiteralInst,
+       let index = literal.value
+    {
+      return getGlobalTailElement(of: rta, index: index)
+    }
+  case let rea as RefElementAddrInst:
+    if let object = rea.instance.immutableGlobalObjectRoot {
+      return object.baseOperands[rea.fieldIndex].value
+    }
   default:
     break
+  }
+  return nil
+}
+
+private func getGlobalTailElement(of refTailAddr: RefTailAddrInst, index: Int) -> Value? {
+  if let object = refTailAddr.instance.immutableGlobalObjectRoot,
+     index >= 0 && index < object.tailOperands.count
+  {
+    return object.tailOperands[index].value
   }
   return nil
 }
@@ -273,7 +295,9 @@ private func transitivelyErase(load: LoadInst, _ context: SimplifyContext) {
       context.erase(instruction: inst)
       return
     }
-    let operandInst = inst.operands[0].value as! SingleValueInstruction
+    guard let operandInst = inst.operands[0].value as? SingleValueInstruction else {
+      return
+    }
     context.erase(instruction: inst)
     inst = operandInst
   }
@@ -320,6 +344,19 @@ private extension Value {
       return (baseAddress: indexAddr.base, offset: indexValue)
     }
     return (baseAddress: self, offset: 0)
+  }
+
+  // If the reference-root of self references a global object, returns the `object` instruction of the
+  // global's initializer. But only if the global is a let-global.
+  var immutableGlobalObjectRoot: ObjectInst? {
+    if let gv = self.referenceRoot as? GlobalValueInst,
+       gv.global.isLet,
+       let initval = gv.global.staticInitValue,
+       let object = initval as? ObjectInst
+    {
+      return object
+    }
+    return nil
   }
 }
 

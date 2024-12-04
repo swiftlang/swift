@@ -7,7 +7,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t-scratch)
 
-// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -plugin-path %swift-plugin-dir -I %t -dump-macro-expansions %s -dump-macro-expansions 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -I %t -dump-macro-expansions %s -dump-macro-expansions 2>&1 | %FileCheck %s
 
 import Distributed
 
@@ -22,7 +22,7 @@ protocol Greeter: DistributedActor where ActorSystem: DistributedActorSystem<any
 // CHECK-NEXT: Distributed._DistributedActorStub
 // CHECK-NEXT: where ActorSystem: DistributedActorSystem<any Codable>
 // CHECK-NEXT: {
-// CHECK-NEXT: }
+// CHECK: }
 
 // CHECK: extension Greeter where Self: Distributed._DistributedActorStub {
 // CHECK-NEXT:   distributed func greet(name: String) -> String {

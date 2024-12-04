@@ -3,13 +3,13 @@
 
 /// Build the library A
 // RUN: %target-swift-frontend -emit-module %t/src/A.swift \
-// RUN: -disable-availability-checking -verify \
+// RUN: -target %target-swift-5.1-abi-triple -verify \
 // RUN: -module-name A -swift-version 6 \
 // RUN: -emit-module-path %t/A.swiftmodule
 
 // Build the client
 // RUN: %target-swift-frontend -emit-module %t/src/Client.swift \
-// RUN: -disable-availability-checking -verify \
+// RUN: -target %target-swift-5.1-abi-triple -verify \
 // RUN: -module-name Client -I %t -swift-version 6 \
 // RUN: -emit-module-path %t/Client.swiftmodule
 

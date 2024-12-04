@@ -296,6 +296,16 @@ SolverTrail::Change::RecordedKeyPath(KeyPathExpr *expr) {
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::RetiredConstraint(ConstraintList::iterator where,
+                                       Constraint *constraint) {
+  Change result;
+  result.Kind = ChangeKind::RetiredConstraint;
+  result.Retiree.Where = where;
+  result.Retiree.Constraint = constraint;
+  return result;
+}
+
 SyntacticElementTargetKey
 SolverTrail::Change::getSyntacticElementTargetKey() const {
   ASSERT(Kind == ChangeKind::RecordedTarget);
@@ -481,7 +491,8 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   }
 
   case ChangeKind::RetiredConstraint:
-    cs.InactiveConstraints.push_back(TheConstraint.Constraint);
+    cs.InactiveConstraints.insert(Retiree.Where,
+                                  Retiree.Constraint);
     break;
   }
 }
@@ -674,6 +685,13 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     simple_display(out, KeyPath.Expr);
     out << ")\n";
     break;
+
+  case ChangeKind::RetiredConstraint:
+    out << "(RetiredConstraint ";
+    Retiree.Constraint->print(out, &cs.getASTContext().SourceMgr,
+                              indent + 2);
+    out << ")\n";
+    break;
   }
 }
 
@@ -712,21 +730,10 @@ void SolverTrail::undo(unsigned toIndex) {
   ASSERT(!UndoActive);
   UndoActive = true;
 
-  // FIXME: Undo all changes in the correct order!
   for (unsigned i = Changes.size(); i > toIndex; i--) {
     auto change = Changes[i - 1];
-    if (change.Kind == ChangeKind::UpdatedTypeVariable) {
-      LLVM_DEBUG(llvm::dbgs() << "- "; change.dump(llvm::dbgs(), CS, 0));
-      change.undo(CS);
-    }
-  }
-
-  for (unsigned i = Changes.size(); i > toIndex; i--) {
-    auto change = Changes[i - 1];
-    if (change.Kind != ChangeKind::UpdatedTypeVariable) {
-      LLVM_DEBUG(llvm::dbgs() << "- "; change.dump(llvm::dbgs(), CS, 0));
-      change.undo(CS);
-    }
+    LLVM_DEBUG(llvm::dbgs() << "- "; change.dump(llvm::dbgs(), CS, 0));
+    change.undo(CS);
   }
 
   Changes.resize(toIndex);

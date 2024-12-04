@@ -101,7 +101,7 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
                                        SourceLoc(), std::nullopt, false);
   llvm::SmallVector<ValueDecl *, 2> fDecls = {genericFnDecl, concreteFnDecl};
   auto *fDRE = new (Context) OverloadedDeclRefExpr(
-      fDecls, DeclNameLoc(), FunctionRefKind::SingleApply, false);
+      fDecls, DeclNameLoc(), FunctionRefInfo::singleBaseNameApply(), false);
   auto *callExpr = CallExpr::create(Context, fDRE, argList, false);
 
   ConstraintSystem cs(DC, ConstraintSystemOptions());

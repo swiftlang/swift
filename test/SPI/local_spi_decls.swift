@@ -14,13 +14,13 @@
 @_spi() public func emptyParensSPI() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
 @_spi(set) public func keywordSPI() {} // expected-error {{expected an SPI identifier as subject of the '@_spi' attribute}}
 
-@_spi(S) public class SPIClass { // expected-note 6 {{type declared here}}
+@_spi(S) public class SPIClass { // expected-note 6 {{class declared here}}
   public init() {}
 }
 class InternalClass {} // expected-note 2 {{type declared here}}
 private class PrivateClass {} // expected-note 2 {{type declared here}}
 
-@_spi(S) public protocol SPIProtocol {} // expected-note {{type declared here}}
+@_spi(S) public protocol SPIProtocol {} // expected-note {{protocol declared here}}
 
 @_spi(S) public func useOfSPITypeOk(_ p0: SPIProtocol, p1: SPIClass) -> SPIClass { fatalError() } // OK
 public func useOfSPITypeInvalid() -> SPIClass { fatalError() } // expected-error {{cannot use class 'SPIClass' here; it is SPI}}
@@ -42,7 +42,7 @@ func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' cannot be us
 }
 
 @_spi(S) public struct SPIStruct {
-// expected-note@-1 {{type declared here}}
+// expected-note@-1 {{struct declared here}}
   public init() {}
 }
 

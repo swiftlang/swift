@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only > %t/cpp-parser.ast.raw
+// RUN: %target-swift-frontend %s -dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
+// RUN: %target-swift-frontend %s -dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only > %t/cpp-parser.ast.raw
 
 // Filter out any addresses in the dump, since they can differ.
 // RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
@@ -9,13 +9,12 @@
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ParserASTGen
 
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
 // rdar://116686158
 // UNSUPPORTED: asan
 
@@ -67,6 +66,8 @@ struct TestStruct {
     _ = self.method(arg:_:).self
     _ = Ty.`Self` ==  Ty.`self`
   }
+
+  var optSelf: Self? { self }
 }
 
 func testSequence(arg1: Int, arg2: () -> Int, arg3: Any) {
@@ -95,6 +96,7 @@ func testRepeatEach<each T>(_ t: repeat each T) -> (repeat each T) {
 func acceptClosures(x: () -> Void) {}
 func acceptClosures(x: () -> Void, y: () -> Int) {}
 func acceptClosures(x: () -> Void, y: () -> Int, _ z: () -> Void) {}
+func acceptClosures(x: (Int, String) -> Void) {}
 func testTrailingClsure() {
   acceptClosures {}
   acceptClosures() {}
@@ -102,6 +104,10 @@ func testTrailingClsure() {
   acceptClosures(x: {}) { 12 } _: {}
   acceptClosures {} y: { 42 }
   acceptClosures(x: {}, y: { 12 }) {}
+
+  acceptClosures { (x, y: String) -> Void in  }
+  acceptClosures { x, y in  }
+  acceptClosures { @Sendable x, y in  }
 }
 
 func testInOut() {
@@ -177,4 +183,21 @@ struct Generic<T: Comparable> {}
 func testSpecializeExpr() {
   _ = Generic<Int>.self
   _ = Generic<Int>()
+}
+
+func testOptionalChain(value: TestStruct) {
+  let _: TestStruct? = value.optSelf?.optSelf!
+  let _: TestStruct = value.optSelf!
+  let _: TestStruct = value.optSelf.self!
+
+  var value: Int? = 1
+  value? += 1
+}
+
+func testSwitchExpr(value: Int) {
+  let _ = switch value {
+    case 0: "foo"
+    case ...100: "bar"
+    default: "baz"
+  }
 }

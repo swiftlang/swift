@@ -1473,10 +1473,6 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift distributed actors.')
 
-    option('--enable-experimental-nonescapable-types', toggle_true,
-           default=False,
-           help='Enable experimental NonescapableTypes.')
-
     option('--enable-experimental-string-processing', toggle_true,
            default=True,
            help='Enable experimental Swift string processing.')
@@ -1494,8 +1490,12 @@ def create_argument_parser():
            help='Enable Volatile module.')
 
     option('--enable-experimental-parser-validation', toggle_true,
-           default=False,
+           default=True,
            help='Enable experimental Swift Parser validation by default.')
+
+    option('--enable-experimental-pointer-bounds', toggle_true,
+           default=False,
+           help='Enable experimental bounds safe C interop.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

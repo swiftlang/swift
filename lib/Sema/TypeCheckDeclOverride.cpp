@@ -242,7 +242,7 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
 
 static bool isUnavailableInAllVersions(ValueDecl *decl) {
   ASTContext &ctx = decl->getASTContext();
-  auto *attr = decl->getAttrs().getUnavailable(ctx);
+  auto *attr = decl->getUnavailableAttr();
 
   if (!attr)
     return false;
@@ -377,8 +377,10 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
       return;
 
     // Allow silencing this warning using parens.
-    if (paramTy->hasParenSugar())
-      return;
+    if (auto *TTR = dyn_cast<TupleTypeRepr>(repr)) {
+      if (TTR->isParenType())
+        return;
+    }
 
     diags
         .diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
@@ -442,8 +444,10 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
       return;
 
     // Allow silencing this warning using parens.
-    if (resultTy->hasParenSugar())
-      return;
+    if (auto *TTR = dyn_cast<TupleTypeRepr>(TR)) {
+      if (TTR->isParenType())
+        return;
+    }
 
     diags.diagnose(resultTL.getSourceRange().Start,
                    diag::override_unnecessary_result_IUO,
@@ -1800,14 +1804,12 @@ OverrideRequiresKeyword swift::overrideRequiresKeyword(ValueDecl *overridden) {
 /// makes it a safe override, given the availability of the base declaration.
 static bool isAvailabilitySafeForOverride(ValueDecl *override,
                                           ValueDecl *base) {
-  ASTContext &ctx = override->getASTContext();
-
   // API availability ranges are contravariant: make sure the version range
   // of an overridden declaration is fully contained in the range of the
   // overriding declaration.
   AvailabilityRange overrideInfo =
-      AvailabilityInference::availableRange(override, ctx);
-  AvailabilityRange baseInfo = AvailabilityInference::availableRange(base, ctx);
+      AvailabilityInference::availableRange(override);
+  AvailabilityRange baseInfo = AvailabilityInference::availableRange(base);
 
   if (baseInfo.isContainedIn(overrideInfo))
     return true;
@@ -1815,7 +1817,7 @@ static bool isAvailabilitySafeForOverride(ValueDecl *override,
   // Allow overrides that are not as available as the base decl as long as the
   // override is as available as its context.
   auto overrideTypeAvailability = AvailabilityInference::availableRange(
-      override->getDeclContext()->getSelfNominalTypeDecl(), ctx);
+      override->getDeclContext()->getSelfNominalTypeDecl());
 
   return overrideTypeAvailability.isContainedIn(overrideInfo);
 }
@@ -1922,7 +1924,7 @@ checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
   if (auto *overrideParent = override->getDeclContext()->getAsDecl()) {
     // If the parent of the override is unavailable, then the unavailability of
     // the override decl is irrelevant.
-    if (overrideParent->getSemanticUnavailableAttr())
+    if (overrideParent->isSemanticallyUnavailable())
       return {OverrideUnavailabilityStatus::Ignored, nullptr};
   }
 
@@ -1944,9 +1946,8 @@ checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
     }
   }
 
-  auto &ctx = override->getASTContext();
-  auto *baseUnavailableAttr = base->getAttrs().getUnavailable(ctx);
-  auto *overrideUnavailableAttr = override->getAttrs().getUnavailable(ctx);
+  auto *baseUnavailableAttr = base->getUnavailableAttr();
+  auto *overrideUnavailableAttr = override->getUnavailableAttr();
 
   if (baseUnavailableAttr && !overrideUnavailableAttr)
     return {OverrideUnavailabilityStatus::BaseUnavailable, baseUnavailableAttr};

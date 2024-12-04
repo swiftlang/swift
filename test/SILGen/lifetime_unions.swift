@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-as-library %s | %FileCheck %s
 
 enum TrivialUnion {
   case Foo

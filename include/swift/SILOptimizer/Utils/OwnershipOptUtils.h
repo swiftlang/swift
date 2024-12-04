@@ -357,9 +357,12 @@ bool extendStoreBorrow(StoreBorrowInst *sbi,
                        DeadEndBlocks *deadEndBlocks,
                        InstModCallbacks callbacks = InstModCallbacks());
 
-void updateBorrowedFrom(SILPassManager *pm, SILFunction *f);
+/// Updates the reborrow flags and the borrowed-from instructions for all
+/// guaranteed phis in function `f`.
+void updateAllGuaranteedPhis(SILPassManager *pm, SILFunction *f);
 
-void updateBorrowedFromPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
+/// Updates the reborrow flags and the borrowed-from instructions for all `phis`.
+void updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
 
 } // namespace swift
 

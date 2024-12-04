@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-emit-module-interface(%t/FeatureTest.swiftinterface) %s -module-name FeatureTest -disable-availability-checking
-// RUN: %target-swift-typecheck-module-from-interface(%t/FeatureTest.swiftinterface) -module-name FeatureTest -disable-availability-checking
+// RUN: %target-swift-emit-module-interface(%t/FeatureTest.swiftinterface) %s -module-name FeatureTest -target %target-swift-5.1-abi-triple
+// RUN: %target-swift-typecheck-module-from-interface(%t/FeatureTest.swiftinterface) -module-name FeatureTest -target %target-swift-5.1-abi-triple
 // RUN: %FileCheck %s \
 // RUN:   --implicit-check-not "\$AsyncAwait" \
 // RUN:   --implicit-check-not "\$Actors" \

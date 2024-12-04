@@ -1378,15 +1378,60 @@ public:
   /// @_originalDefinedIn attribute, this function returns this module name.
   StringRef getAlternateModuleName() const;
 
-  // Is this Decl an SPI? It can be directly marked with @_spi or is defined in
-  // an @_spi context.
+  /// Is this Decl an SPI? It can be directly marked with @_spi or is defined in
+  /// an @_spi context.
   bool isSPI() const;
 
+  /// Returns true if the attribute providing the platform availability
+  /// introduction for this decl is an `@_spi_available` attribute.
   bool isAvailableAsSPI() const;
 
   /// Determine whether this Decl has either Private or FilePrivate access,
   /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
+
+  /// Returns the active platform-specific `@available` attribute for this decl.
+  /// There may be multiple `@available` attributes that are relevant to the
+  /// current platform, but the returned one has the highest priority.
+  const AvailableAttr *getActiveAvailableAttrForCurrentPlatform(
+      bool ignoreAppExtensions = false) const;
+
+  /// Returns true if the declaration is deprecated at the current deployment
+  /// target.
+  bool isDeprecated() const { return getDeprecatedAttr() != nullptr; }
+
+  /// Returns the first `@available` attribute that indicates that this decl
+  /// is deprecated on current deployment target, or `nullptr` otherwise.
+  const AvailableAttr *getDeprecatedAttr() const;
+
+  /// Returns the first `@available` attribute that indicates that this decl
+  /// will be deprecated in the future, or `nullptr` otherwise.
+  const AvailableAttr *getSoftDeprecatedAttr() const;
+
+  /// Returns the first @available attribute that indicates this decl is
+  /// unavailable from asynchronous contexts, or `nullptr` otherwise.
+  const AvailableAttr *getNoAsyncAttr() const;
+
+  /// Returns true if the decl has been marked unavailable in the Swift language
+  /// version that is currently active.
+  bool isUnavailableInCurrentSwiftVersion() const;
+
+  /// Returns true if the decl is always unavailable in the current compilation
+  /// context. For example, the decl could be marked explicitly unavailable on
+  /// either the current platform or in the current language mode. Returns false
+  /// for declarations that are only _potentially_ unavailable because of a
+  /// condition that could be satisfied at runtime (like requiring an operating
+  /// system version that is higher than the current deployment target).
+  ///
+  /// Note that this query only considers the attributes that are attached
+  /// directly to this decl (or the extension it is declared in, if applicable).
+  bool isUnavailable() const { return getUnavailableAttr() != nullptr; }
+
+  /// If the decl is always unavailable in the current compilation
+  /// context, returns the attribute attached to the decl (or its parent
+  /// extension) that makes it unavailable.
+  const AvailableAttr *
+  getUnavailableAttr(bool ignoreAppExtensions = false) const;
 
   /// Retrieve the @available attribute that provides the OS version range that
   /// this declaration is available in.
@@ -1397,22 +1442,15 @@ public:
   std::optional<std::pair<const AvailableAttr *, const Decl *>>
   getSemanticAvailableRangeAttr() const;
 
-  /// Retrieve the @available attribute that makes this declaration unavailable,
-  /// if any. If \p ignoreAppExtensions is true then attributes for app
-  /// extension platforms are ignored.
-  ///
-  /// This attribute may come from an enclosing decl since availability is
-  /// inherited. The second member of the returned pair is the decl that owns
-  /// the attribute.
-  ///
-  /// Note that this notion of unavailability is broader than that which is
-  /// checked by \c AvailableAttr::isUnavailable.
-  std::optional<std::pair<const AvailableAttr *, const Decl *>>
-  getSemanticUnavailableAttr(bool ignoreAppExtensions = false) const;
+  /// Returns true if the decl is effectively always unavailable in the current
+  /// compilation context. This query differs from \c isUnavailable() because it
+  /// takes the availability of parent declarations into account.
+  bool isSemanticallyUnavailable() const;
 
   /// Returns true if code associated with this declaration should be considerd
   /// unreachable at runtime because the declaration is unavailable in all
-  /// execution contexts in which the code may run.
+  /// execution contexts in which the code may run. This result takes the
+  /// availability of parent declarations into account.
   bool isUnreachableAtRuntime() const;
 
   /// Returns true if this declaration should be considered available during
@@ -2758,6 +2796,10 @@ private:
     /// output a null pointer.
     unsigned noDynamicallyReplacedDecl : 1;
 
+    /// Whether the OpaqueResultTypeRequest request was evaluated and produced
+    /// a null pointer.
+    unsigned noOpaqueResultType : 1;
+
     /// Whether the "isFinal" bit has been computed yet.
     unsigned isFinalComputed : 1;
 
@@ -2785,7 +2827,7 @@ private:
   friend class InterfaceTypeRequest;
   friend class CheckRedeclarationRequest;
   friend class ActorIsolationRequest;
-  friend class DynamicallyReplacedDeclRequest;
+  friend class OpaqueResultTypeRequest;
   friend class ApplyAccessNoteRequest;
 
   friend class Decl;
@@ -2844,6 +2886,15 @@ public:
     return Bits.ValueDecl.IsUserAccessible;
   }
 
+  /// Whether this decl has been synthesized by the compiler for use by the
+  /// user.
+  ///
+  /// This is a refinement of isImplicit; all synthesized decls are implicit,
+  /// but not all implicit decls are synthesized. The difference comes down to
+  /// whether or not the decl is user-facing, e.g the implicit memberwise
+  /// initializer is considered synthesized. Decls that are only meant for the
+  /// compiler, e.g the implicit FuncDecl for a DeferStmt, are not considered
+  /// synthesized.
   bool isSynthesized() const {
     return Bits.ValueDecl.Synthesized;
   }
@@ -2908,14 +2959,6 @@ public:
   /// Returns \c true if this value decl is inlinable with attributes
   /// \c \@usableFromInline, \c \@inlinalbe, and \c \@_alwaysEmitIntoClient
   bool isUsableFromInline() const;
-
-  /// Treat as public and allow skipping access checks if the following conditions
-  /// are met:
-  /// - This decl has a package access level,
-  /// - Has a @usableFromInline (or other inlinable) attribute,
-  /// - And is defined in a module built from a public or private
-  ///   interface that does not contain package-name.
-  bool isInterfacePackageEffectivelyPublic() const;
 
   /// Returns \c true if this declaration is *not* intended to be used directly
   /// by application developers despite the visibility.
@@ -3257,6 +3300,15 @@ public:
   /// @_dynamicReplacement(for: ...), compute the original declaration
   /// that this declaration dynamically replaces.
   ValueDecl *getDynamicallyReplacedDecl() const;
+
+  /// Performs a request to look up the decl that this decl has been renamed to
+  /// if `attr` indicates that it has been renamed.
+  ValueDecl *getRenamedDecl(const AvailableAttr *attr) const;
+
+  /// Directly sets the renamed decl corresponding to `attr`. This should only
+  /// be used when synthesizing an `AvailableAttr`, before calling
+  /// `getRenamedDecl()`.
+  void setRenamedDecl(const AvailableAttr *attr, ValueDecl *renameDecl) const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -5765,6 +5817,8 @@ private:
     unsigned RequiresOpaqueAccessors : 1;
     unsigned RequiresOpaqueModifyCoroutineComputed : 1;
     unsigned RequiresOpaqueModifyCoroutine : 1;
+    unsigned RequiresOpaqueModify2CoroutineComputed : 1;
+    unsigned RequiresOpaqueModify2Coroutine : 1;
   } LazySemanticInfo = { };
 
   /// The implementation info for the accessors.
@@ -6029,16 +6083,27 @@ public:
     return getOpaqueReadOwnership() != OpaqueReadOwnership::Borrowed;
   }
 
+  /// Does this storage require a '_read' accessor in its opaque-accessors set?
+  bool requiresOpaqueReadCoroutine() const;
+
   /// Does this storage require a 'read' accessor in its opaque-accessors set?
-  bool requiresOpaqueReadCoroutine() const {
-    return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
-  }
+  bool requiresOpaqueRead2Coroutine() const;
 
   /// Does this storage require a 'set' accessor in its opaque-accessors set?
   bool requiresOpaqueSetter() const { return supportsMutation(); }
 
-  /// Does this storage require a 'modify' accessor in its opaque-accessors set?
+  /// Does this storage require a '_modify' accessor in its opaque-accessors
+  /// set?
   bool requiresOpaqueModifyCoroutine() const;
+
+  /// Does this storage require a 'modify' accessor in its opaque-accessors
+  /// set?
+  bool requiresOpaqueModify2Coroutine() const;
+
+  /// Given that CoroutineAccessors is enabled, is _read/_modify required for
+  /// ABI stability?
+  bool requiresCorrespondingUnderscoredCoroutineAccessor(
+      AccessorKind kind, AccessorDecl const *decl = nullptr) const;
 
   /// Does this storage have any explicit observers (willSet or didSet) attached
   /// to it?
@@ -6095,9 +6160,9 @@ public:
 
   /// Determine how this storage declaration should actually be accessed.
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
-                                   AccessKind accessKind,
-                                   ModuleDecl *module,
-                                   ResilienceExpansion expansion) const;
+                                   AccessKind accessKind, ModuleDecl *module,
+                                   ResilienceExpansion expansion,
+                                   bool useOldABI) const;
 
   /// Do we need to use resilient access patterns outside of this
   /// property's resilience domain?
@@ -8432,6 +8497,10 @@ public:
   /// accessed by it.
   ArrayRef<VarDecl *> getAccessedProperties() const;
 
+  /// Whether this accessor should have a body.  Note that this will be true
+  /// even when it does not have one _yet_.
+  bool doesAccessorHaveBody() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Accessor;
   }
@@ -8546,6 +8615,10 @@ public:
   /// Retrieve the payload type for the enum element, which is a tuple of the
   /// associated values, or null if there are no associated values.
   Type getPayloadInterfaceType() const;
+
+  /// Retrieve the parameters of the implicit case constructor for the enum
+  /// element.
+  ArrayRef<AnyFunctionType::Param> getCaseConstructorParams() const;
 
   void setParameterList(ParameterList *params);
   ParameterList *getParameterList() const { return Params; }
@@ -9679,8 +9752,11 @@ const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 /// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const DeclContext *source, unsigned index);
 
-StringRef getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article);
-StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind, bool article);
+StringRef
+getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article,
+                             std::optional<bool> underscored = std::nullopt);
+StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind, bool article,
+                                       bool underscored);
 
 void simple_display(llvm::raw_ostream &out,
                     OptionSet<NominalTypeDecl::LookupDirectFlags> options);

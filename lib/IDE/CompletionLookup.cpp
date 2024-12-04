@@ -292,8 +292,7 @@ void CompletionLookup::addSubModuleNames(
   for (auto &Pair : SubModuleNameVisibilityPairs) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Declaration, SemanticContextKind::None);
-    auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
-    MD->setFailedToLoad();
+    auto *MD = ModuleDecl::createEmpty(Ctx.getIdentifier(Pair.first), Ctx);
     Builder.setAssociatedDecl(MD);
     Builder.addBaseName(MD->getNameStr());
     Builder.addTypeAnnotation("Module");
@@ -367,8 +366,7 @@ void CompletionLookup::addImportModuleNames() {
     if (ModuleName == mainModuleName || isHiddenModuleName(ModuleName))
       continue;
 
-    auto MD = ModuleDecl::create(ModuleName, Ctx);
-    MD->setFailedToLoad();
+    auto *MD = ModuleDecl::createEmpty(ModuleName, Ctx);
 
     std::optional<ContextualNotRecommendedReason> Reason = std::nullopt;
 
@@ -643,8 +641,7 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
 
     // If the keyPath result type has type parameters, that might affect the
     // subscript result type.
-    auto keyPathResultTy =
-        getResultTypeOfKeypathDynamicMember(SD)->mapTypeOutOfContext();
+    auto keyPathResultTy = getResultTypeOfKeypathDynamicMember(SD);
     if (keyPathResultTy->hasTypeParameter()) {
       auto keyPathRootTy = getRootTypeOfKeypathDynamicMember(SD).subst(
           QueryTypeSubstitutionMap{subs},
@@ -716,8 +713,8 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
         return T;
 
       // If we are doing implicit member lookup on a protocol and we have found
-      // a declaration in an extension, use the extension's `Self` type for the
-      // generic substitution.
+      // a declaration in a constrained extension, use the extension's `Self`
+      // type for the generic substitution.
       // Eg in the following, the `Self` type returned by `qux` is
       // `MyGeneric<Int>`, not `MyProto` because of the `Self` type restriction.
       // ```
@@ -733,9 +730,11 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
       // ```
       if (MaybeNominalType->isExistentialType()) {
         Type SelfType;
-        if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
-          SelfType = ED->getGenericSignature()->getConcreteType(
-              ED->getSelfInterfaceType());
+        if (auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+          if (ED->getSelfProtocolDecl() && ED->isConstrainedExtension()) {
+            auto Sig = ED->getGenericSignature();
+            SelfType = Sig->getConcreteType(ED->getSelfInterfaceType());
+          }
         }
         if (SelfType) {
           MaybeNominalType = SelfType;
@@ -2965,6 +2964,22 @@ void CompletionLookup::getTypeCompletions(Type BaseType) {
   }
 }
 
+void CompletionLookup::getInvertedTypeCompletions() {
+  Kind = LookupKind::Type;
+
+  auto addCompletion = [&](InvertibleProtocolKind invertableKind) {
+    auto *P = Ctx.getProtocol(getKnownProtocolKind(invertableKind));
+    if (!P)
+      return;
+
+    addNominalTypeRef(P, DeclVisibilityKind::VisibleAtTopLevel,
+                      DynamicLookupInfo());
+  };
+#define INVERTIBLE_PROTOCOL(Name, Bit)         \
+  addCompletion(InvertibleProtocolKind::Name);
+#include "swift/ABI/InvertibleProtocols.def"
+}
+
 void CompletionLookup::getGenericRequirementCompletions(
     DeclContext *DC, SourceLoc CodeCompletionLoc) {
   auto genericSig = DC->getGenericSignatureOfContext();
@@ -3490,10 +3505,4 @@ void CompletionLookup::getOptionalBindingCompletions(SourceLoc Loc) {
 
   lookupVisibleDecls(FilteringConsumer, Loc, CurrDeclContext,
                      /*IncludeTopLevel=*/false);
-}
-
-void CompletionLookup::addWithoutConstraintTypes() {
-  auto *CopyableDecl = Ctx.getProtocol(KnownProtocolKind::Copyable);
-  addNominalTypeRef(CopyableDecl, DeclVisibilityKind::VisibleAtTopLevel,
-                    DynamicLookupInfo());
 }

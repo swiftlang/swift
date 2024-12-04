@@ -1,7 +1,7 @@
-// RUN: %target-swift-emit-silgen -target %target-swift-abi-5.8-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_8
-// RUN: %target-swift-emit-silgen -target %target-swift-abi-5.8-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -application-extension | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_8
-// RUN: %target-swift-emit-silgen -target %target-swift-abi-5.9-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_9
-// RUN: %target-swift-emit-silgen -target %target-swift-abi-5.9-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -application-extension | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_9
+// RUN: %target-swift-emit-silgen -target %target-swift-5.8-abi-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_8
+// RUN: %target-swift-emit-silgen -target %target-swift-5.8-abi-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -application-extension | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_8
+// RUN: %target-swift-emit-silgen -target %target-swift-5.9-abi-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_9
+// RUN: %target-swift-emit-silgen -target %target-swift-5.9-abi-triple -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -application-extension | %FileCheck %s --check-prefixes=CHECK,CHECK-SWIFT5_9
 
 // REQUIRES: OS=macosx
 

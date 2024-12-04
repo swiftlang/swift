@@ -563,36 +563,29 @@ namespace {
     const clang::RecordDecl *ClangDecl;
 
     const clang::CXXConstructorDecl *findCopyConstructor() const {
-      const clang::CXXRecordDecl *cxxRecordDecl =
-          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      for (auto method : cxxRecordDecl->methods()) {
-        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isCopyConstructor() &&
-              ctor->getAccess() == clang::AS_public &&
-              // rdar://106964356
-              // ctor->doesThisDeclarationHaveABody() &&
-              !ctor->isDeleted())
-            return ctor;
-        }
+      for (auto ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isCopyConstructor() &&
+            ctor->getAccess() == clang::AS_public &&
+            // rdar://106964356
+            // ctor->doesThisDeclarationHaveABody() &&
+            !ctor->isDeleted())
+          return ctor;
       }
       return nullptr;
     }
 
     const clang::CXXConstructorDecl *findMoveConstructor() const {
-      const clang::CXXRecordDecl *cxxRecordDecl =
-          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      for (auto method : cxxRecordDecl->methods()) {
-        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isMoveConstructor() &&
-              ctor->getAccess() == clang::AS_public &&
-              ctor->doesThisDeclarationHaveABody() &&
-              !ctor->isDeleted())
-            return ctor;
-        }
+      for (auto ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isMoveConstructor() &&
+            ctor->getAccess() == clang::AS_public &&
+            ctor->doesThisDeclarationHaveABody() && !ctor->isDeleted())
+          return ctor;
       }
       return nullptr;
     }
@@ -1423,7 +1416,8 @@ private:
     auto sfi = swiftProperties.begin(), sfe = swiftProperties.end();
     // When collecting fields from the base subobjects, we do not have corresponding swift
     // stored properties.
-    if (decl != ClangDecl)
+    bool isBaseSubobject = decl != ClangDecl;
+    if (isBaseSubobject)
       sfi = swiftProperties.end();
 
     while (cfi != cfe) {
@@ -1475,10 +1469,14 @@ private:
 
     assert(sfi == sfe && "more Swift fields than there were Clang fields?");
 
-    Size objectTotalStride = Size(layout.getSize().getQuantity());
-    // We never take advantage of tail padding, because that would prevent
-    // us from passing the address of the object off to C, which is a pretty
-    // likely scenario for imported C types.
+    auto objectSize = isBaseSubobject ? layout.getDataSize() : layout.getSize();
+    Size objectTotalStride = Size(objectSize.getQuantity());
+    // Unless this is a base subobject of a C++ type, we do not take advantage
+    // of tail padding, because that would prevent us from passing the address
+    // of the object off to C, which is a pretty likely scenario for imported C
+    // types.
+    // In C++, fields of a derived class might get placed into tail padding of a
+    // base class, in which case we should not add extra padding here.
     assert(NextOffset <= SubobjectAdjustment + objectTotalStride);
     assert(SpareBits.size() <= SubobjectAdjustment.getValueInBits() +
                                    objectTotalStride.getValueInBits());

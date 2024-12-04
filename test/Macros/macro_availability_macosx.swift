@@ -17,6 +17,9 @@ struct X { }
 
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 
+@attached(member, names: named(synthesizedMember))
+macro MemberThatCallsCode(_ codeString: String) = #externalMacro(module: "MacroDefinition", type: "MemberThatCallsCodeMacro")
+
 @available(macOS 12.0, *)
 func onlyInMacOS12() { }
 
@@ -26,4 +29,12 @@ func test() {
         onlyInMacOS12()
       }
     })
+}
+
+@MemberThatCallsCode("""
+  if #available(macOS 12.0, *) {
+    onlyInMacOS12()
+  }
+  """)
+struct HasMembers {
 }

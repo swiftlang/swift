@@ -67,7 +67,7 @@ static ManglingErrorOr<std::string> mangleSimpleClass(StringRef moduleName,
   typeNode->addChild(classNode, Dem);
   typeManglingNode->addChild(typeNode, Dem);
   globalNode->addChild(typeManglingNode, Dem);
-  return mangleNode(globalNode);
+  return mangleNode(globalNode, Mangle::ManglingFlavor::Default);
 }
 
 void SwiftLangSupport::mangleSimpleClassNames(

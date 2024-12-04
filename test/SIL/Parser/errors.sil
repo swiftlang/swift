@@ -46,11 +46,6 @@ bb0:
 
 sil_stage nonsense // expected-error {{expected 'raw' or 'canonical' after 'sil_stage'}}
 
-sil [ossa] @missing_type : $@convention(thin) (Int) -> () {
-bb0(%0 : $Int):
-  br bb3(%0) // expected-error {{expected ':' before type in SIL value reference}}
-}
-
 sil @test_formal_substituted_type : $@convention(thin) <X> (@owned Array<@substituted <Z> (Z) -> (Z) for <X>>) -> () {
 // expected-error@-1 {{substitutions cannot be provided on a formal function type}}
 entry(%0 : $Array<X>):

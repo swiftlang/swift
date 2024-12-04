@@ -15,19 +15,20 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckAccess.h"
-#include "TypeChecker.h"
-#include "TypeCheckAvailability.h"
 #include "TypeAccessScopeChecker.h"
+#include "TypeCheckAvailability.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Import.h"
-#include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 
 using namespace swift;
@@ -1883,6 +1884,11 @@ bool isFragileClangNode(const ClangNode &node) {
     return isFragileClangType(pd->getType());
   if (auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl))
     return isFragileClangType(typedefDecl->getUnderlyingType());
+  if (auto *rd = dyn_cast<clang::RecordDecl>(decl)) {
+    if (!isa<clang::CXXRecordDecl>(rd))
+      return false;
+    return !rd->getDeclContext()->isExternCContext();
+  }
   return true;
 }
 
@@ -1996,6 +2002,10 @@ swift::getDisallowedOriginKind(const Decl *decl,
   if (SF->getASTContext().LangOpts.EnableCXXInterop && where.getDeclContext() &&
       where.getDeclContext()->getAsDecl() &&
       where.getDeclContext()->getAsDecl()->getModuleContext()->isResilient() &&
+      !where.getDeclContext()
+           ->getAsDecl()
+           ->getModuleContext()
+           ->getUnderlyingModuleIfOverlay() &&
       decl->hasClangNode() && !decl->getModuleContext()->isSwiftShimsModule() &&
       isFragileClangNode(decl->getClangNode()) &&
       !SF->getASTContext().LangOpts.hasFeature(
@@ -2027,7 +2037,7 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     
     // If the decl which references this type is unavailable on the current
     // platform, don't diagnose the availability of the type.
-    if (AvailableAttr::isUnavailable(context))
+    if (Where.getAvailability().isUnavailable())
       return;
 
     diagnoseTypeAvailability(typeRepr, type, context->getLoc(),
@@ -2511,8 +2521,11 @@ void swift::recordRequiredImportAccessLevelForDecl(
   if (auto attributedImport = sf->getImportAccessLevel(definingModule)) {
     auto importedModule = attributedImport->module.importedModule;
 
-    // If the defining module is transitively imported, mark the responsible
-    // module as requiring the minimum access level too.
+    // Ignore submodules, same behavior from `getModuleContext` above.
+    importedModule = importedModule->getTopLevelModule();
+
+    // If the defining module is transitively imported, mark the locally
+    // imported  module as requiring the minimum access level too.
     if (importedModule != definingModule)
       sf->registerRequiredAccessLevelForModule(importedModule, accessLevel);
 

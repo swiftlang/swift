@@ -50,6 +50,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <deque>
+
 #define DEBUG_TYPE "namelookup"
 
 using namespace swift;
@@ -362,8 +364,8 @@ enum class ConstructorComparison {
 static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
                                                  ConstructorDecl *ctor2,
                                                  const swift::ASTContext &ctx) {
-  bool available1 = !ctor1->getAttrs().isUnavailable(ctx);
-  bool available2 = !ctor2->getAttrs().isUnavailable(ctx);
+  bool available1 = !ctor1->isUnavailable();
+  bool available2 = !ctor2->isUnavailable();
 
   // An unavailable initializer is always worse than an available initializer.
   if (available1 < available2)
@@ -558,15 +560,14 @@ static void recordShadowedDeclsAfterTypeMatch(
 
       // If one declaration is available and the other is not, prefer the
       // available one.
-      if (firstDecl->getAttrs().isUnavailable(ctx) !=
-            secondDecl->getAttrs().isUnavailable(ctx)) {
-       if (firstDecl->getAttrs().isUnavailable(ctx)) {
-         shadowed.insert(firstDecl);
-         break;
-       } else {
-         shadowed.insert(secondDecl);
-         continue;
-       }
+      if (firstDecl->isUnavailable() != secondDecl->isUnavailable()) {
+        if (firstDecl->isUnavailable()) {
+          shadowed.insert(firstDecl);
+          break;
+        } else {
+          shadowed.insert(secondDecl);
+          continue;
+        }
       }
 
       // Don't apply module-shadowing rules to members of protocol types.
@@ -1696,7 +1697,7 @@ SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
                                                      DeclNameRef macroName,
                                                      MacroRoles roles) {
   SmallVector<MacroDecl *, 1> choices;
-  auto moduleScopeDC = dc->getModuleScopeContext();
+  auto moduleScopeDC = getModuleScopeLookupContext(dc);
   ASTContext &ctx = moduleScopeDC->getASTContext();
 
   auto addChoiceIfApplicable = [&](ValueDecl *decl) {
@@ -3810,7 +3811,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
         directReferencesForTypeRepr(evaluator, ctx, typeRepr, dc,
                                     defaultDirectlyReferencedTypeLookupOptions);
   } else if (Type type = attr->getType()) {
-    decls = directReferencesForType(type);
+    return type->getAnyNominal();
   }
 
   // Dig out the nominal type declarations.

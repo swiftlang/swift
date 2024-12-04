@@ -214,9 +214,9 @@ public:
     std::string SearchPath;
     std::string ServerPath;
   };
-  struct LoadPlugin {
+  struct ResolvedPluginConfig {
     std::string LibraryPath;
-    std::string ServerPath;
+    std::string ExecutablePath;
     std::vector<std::string> ModuleNames;
   };
 
@@ -225,12 +225,13 @@ public:
     LoadPluginExecutable,
     PluginPath,
     ExternalPluginPath,
-    LoadPlugin,
+    ResolvedPluginConfig,
   };
 
 private:
-  using Members = ExternalUnionMembers<LoadPluginLibrary, LoadPluginExecutable,
-                                       PluginPath, ExternalPluginPath, LoadPlugin>;
+  using Members =
+      ExternalUnionMembers<LoadPluginLibrary, LoadPluginExecutable, PluginPath,
+                           ExternalPluginPath, ResolvedPluginConfig>;
   static Members::Index getIndexForKind(Kind kind) {
     switch (kind) {
     case Kind::LoadPluginLibrary:
@@ -241,8 +242,8 @@ private:
       return Members::indexOf<PluginPath>();
     case Kind::ExternalPluginPath:
       return Members::indexOf<ExternalPluginPath>();
-    case Kind::LoadPlugin:
-      return Members::indexOf<LoadPlugin>();
+    case Kind::ResolvedPluginConfig:
+      return Members::indexOf<ResolvedPluginConfig>();
     }
   };
   using Storage = ExternalUnion<Kind, Members, getIndexForKind>;
@@ -266,8 +267,9 @@ public:
       : kind(Kind::ExternalPluginPath) {
     storage.emplace<ExternalPluginPath>(kind, v);
   }
-  PluginSearchOption(const LoadPlugin &v) : kind(Kind::LoadPlugin) {
-    storage.emplace<LoadPlugin>(kind, v);
+  PluginSearchOption(const ResolvedPluginConfig &v)
+      : kind(Kind::ResolvedPluginConfig) {
+    storage.emplace<ResolvedPluginConfig>(kind, v);
   }
   PluginSearchOption(const PluginSearchOption &o) : kind(o.kind) {
     storage.copyConstruct(o.kind, o.storage);
@@ -564,6 +566,15 @@ public:
   /// New scanner search behavior. Validate up-to-date existing Swift module
   /// dependencies in the scanner itself.
   bool ScannerModuleValidation = false;
+
+  /// Whether this compilation should attempt to resolve in-package
+  /// imports of its module dependencies.
+  ///
+  /// Source compilation and 'package' textual interface compilation both
+  /// require that package-only imports of module dependencies be resolved.
+  /// Otherwise, compilation of non-package textual interfaces, even if
+  /// "in-package", must not require package-only module dependencies.
+  bool ResolveInPackageModuleDependencies = false;
 
   /// Return all module search paths that (non-recursively) contain a file whose
   /// name is in \p Filenames.

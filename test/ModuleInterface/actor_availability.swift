@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interfaces(%t/Library.swiftinterface, %t/Library.private.swiftinterface) %s -module-name Library -target %target-swift-abi-5.3-triple
+// RUN: %target-swift-emit-module-interfaces(%t/Library.swiftinterface, %t/Library.private.swiftinterface) %s -module-name Library -target %target-swift-5.3-abi-triple
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.private.swiftinterface) -module-name Library
 // RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-PUBLIC < %t/Library.swiftinterface

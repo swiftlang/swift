@@ -1,14 +1,10 @@
 // RUN: %empty-directory(%t)
 
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
-
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
-// RUN:     -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature LifetimeDependence \
 // RUN:     -o %t/lifetime_dependence.swiftmodule \
 // RUN:     -emit-module-interface-path %t/lifetime_dependence.swiftinterface \
-// RUN:     -disable-experimental-parser-round-trip \
 // RUN:     %S/Inputs/lifetime_dependence.swift
-// REQUIRES: asserts
 
 // Check the interfaces
 
@@ -17,13 +13,13 @@
 // See if we can compile a module through just the interface and typecheck using it.
 
 // RUN: %target-swift-frontend -compile-module-from-interface \
-// RUN:    -enable-experimental-feature NonescapableTypes \
-// RUN:    -disable-experimental-parser-round-trip \
+// RUN:    -enable-experimental-feature LifetimeDependence \
 // RUN:    %t/lifetime_dependence.swiftinterface -o %t/lifetime_dependence.swiftmodule
 
 // RUN: %target-swift-frontend -typecheck -I %t %s \
-// RUN:    -disable-experimental-parser-round-trip \
-// RUN:    -enable-experimental-feature NonescapableTypes
+// RUN:    -enable-experimental-feature LifetimeDependence
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 import lifetime_dependence
 // CHECK: @lifetime(borrow a)

@@ -3,7 +3,6 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/bug.swiftinterface) -I %t
 
 //--- bug.swiftinterface
-
 // swift-interface-format-version: 1.0
 // swift-compiler-version: Apple Swift version 6.0 effective-5.10 (swiftlang-6.0.0.4.52 clang-1600.0.21.1.3)
 // swift-module-flags: -enable-objc-interop -enable-library-evolution -module-name bug

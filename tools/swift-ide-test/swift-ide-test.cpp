@@ -1767,12 +1767,15 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   // implicit stdlib import.
   ImplicitImportInfo importInfo;
   importInfo.StdlibKind = ImplicitStdlibKind::Stdlib;
-  auto *M = ModuleDecl::create(ctx.getIdentifier(Invocation.getModuleName()),
-                               ctx, importInfo);
-  auto bufferID = ctx.SourceMgr.addMemBufferCopy("// nothing\n");
-  auto *SF =
-      new (ctx) SourceFile(*M, SourceFileKind::Main, bufferID);
-  M->addFile(*SF);
+
+  auto *M = ModuleDecl::create(
+      ctx.getIdentifier(Invocation.getModuleName()), ctx, importInfo,
+      [&](ModuleDecl *M, auto addFile) {
+    auto bufferID = ctx.SourceMgr.addMemBufferCopy("// nothing\n");
+    addFile(new (ctx) SourceFile(*M, SourceFileKind::Main, bufferID));
+  });
+
+  auto *SF = &M->getMainSourceFile();
   performImportResolution(*SF);
 
   REPLCompletions REPLCompl;
@@ -2005,10 +2008,8 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
     SourceManager SM;
     unsigned BufferID = SM.addNewSourceBuffer(std::move(FileBuf));
 
-    ParserUnit Parser(
-        SM, SourceFileKind::Main, BufferID, Invocation.getLangOptions(),
-        Invocation.getTypeCheckerOptions(), Invocation.getSILOptions(),
-        Invocation.getModuleName());
+    ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
+                      Invocation.getLangOptions(), Invocation.getModuleName());
 
     registerTypeCheckerRequestFunctions(Parser.getParser().Context.evaluator);
     registerClangImporterRequestFunctions(Parser.getParser().Context.evaluator);
@@ -2234,9 +2235,7 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   unsigned BufferID = SM.addNewSourceBuffer(std::move(FileBuf));
 
   ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
-                    Invocation.getLangOptions(),
-                    Invocation.getTypeCheckerOptions(),
-                    Invocation.getSILOptions(), Invocation.getModuleName());
+                    Invocation.getLangOptions(), Invocation.getModuleName());
 
   registerTypeCheckerRequestFunctions(
       Parser.getParser().Context.evaluator);
@@ -2517,15 +2516,17 @@ static int doSemanticAnnotation(const CompilerInvocation &InitInvok,
   return 0;
 }
 
-static int doInputCompletenessTest(StringRef SourceFilename) {
+static int doInputCompletenessTest(const CompilerInvocation &InitInvok,
+                                   StringRef SourceFilename) {
   std::unique_ptr<llvm::MemoryBuffer> FileBuf;
   if (setBufferForFile(SourceFilename, FileBuf))
     return 1;
 
   llvm::raw_ostream &OS = llvm::outs();
   OS << SourceFilename << ": ";
-  if (isSourceInputComplete(std::move(FileBuf),
-                            SourceFileKind::Main).IsComplete) {
+  if (isSourceInputComplete(std::move(FileBuf), SourceFileKind::Main,
+                            InitInvok.getLangOptions())
+          .IsComplete) {
     OS << "IS_COMPLETE\n";
   } else {
     OS << "IS_INCOMPLETE\n";
@@ -2705,7 +2706,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
     // Simulate already having mangled names
     for (auto LTD : LocalTypeDecls) {
-      Mangle::ASTMangler Mangler;
+      Mangle::ASTMangler Mangler(M->getASTContext());
       std::string MangledName = Mangler.mangleTypeForDebugger(
           LTD->getDeclaredInterfaceType(),
           LTD->getInnermostDeclContext()->getGenericSignatureOfContext());
@@ -2760,7 +2761,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       while (node->getKind() != NodeKind::LocalDeclName)
         node = node->getChild(1); // local decl name
 
-      auto mangling = Demangle::mangleNode(typeNode);
+      auto mangling = Demangle::mangleNode(typeNode, Mangle::ManglingFlavor::Default);
       if (!mangling.isSuccess()) {
         llvm::errs() << "Couldn't remangle type (failed at Node "
                      << mangling.error().node << " with error "
@@ -3911,7 +3912,7 @@ public:
 
 private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
-    Mangle::ASTMangler Mangler;
+    Mangle::ASTMangler Mangler(Ctx);
     auto sig = DC->getGenericSignatureOfContext();
     std::string mangledName(Mangler.mangleTypeForDebugger(T, sig));
     Type ReconstructedType = DC->mapTypeIntoContext(
@@ -4771,7 +4772,7 @@ int main(int argc, char *argv[]) {
     break;
 
   case ActionType::TestInputCompleteness:
-    ExitCode = doInputCompletenessTest(options::SourceFilename);
+    ExitCode = doInputCompletenessTest(InitInvok, options::SourceFilename);
     break;
 
   case ActionType::PrintASTNotTypeChecked:

@@ -137,10 +137,10 @@ private:
   /// same module.
   mutable Identifier PrivateDiscriminator;
 
-  /// The root TypeRefinementContext for this SourceFile.
+  /// The root AvailabilityScope for this SourceFile.
   ///
   /// This is set during type checking.
-  TypeRefinementContext *TRC = nullptr;
+  AvailabilityScope *RootAvailabilityScope = nullptr;
 
   /// Either the class marked \@NS/UIApplicationMain or the synthesized FuncDecl
   /// that calls main on the type marked @main.
@@ -595,6 +595,8 @@ public:
     return BufferID;
   }
 
+  const GeneratedSourceInfo *getGeneratedSourceFileInfo() const;
+
   /// For source files created to hold the source code created by expanding
   /// a macro, this is the AST node that describes the macro expansion.
   ///
@@ -640,6 +642,9 @@ public:
   /// If this buffer corresponds to a file on disk, returns the path.
   /// Otherwise, return an empty string.
   StringRef getFilename() const;
+
+  /// Retrieve the source text buffer.
+  StringRef getBuffer() const;
 
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
@@ -737,14 +742,14 @@ public:
     return ImportedUnderlyingModule->findUnderlyingClangModule();
   }
 
-  /// Get the root refinement context for the file. The root context may be
-  /// null if the context hierarchy has not been built yet. Use
-  /// TypeChecker::getOrBuildTypeRefinementContext() to get a built
-  /// root of the hierarchy.
-  TypeRefinementContext *getTypeRefinementContext() const;
+  /// Get the root availability scope for the file. The root scope may be
+  /// null if the scope tree has not been built yet. Use
+  /// TypeChecker::getOrBuildAvailabilityScope() to get a built
+  /// root of the tree.
+  AvailabilityScope *getAvailabilityScope() const;
 
-  /// Set the root refinement context for the file.
-  void setTypeRefinementContext(TypeRefinementContext *TRC);
+  /// Set the root availability scope for the file.
+  void setAvailabilityScope(AvailabilityScope *scope);
 
   /// Whether this file can compute an interface hash.
   bool hasInterfaceHash() const {
@@ -818,8 +823,8 @@ inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
 }
 
 inline SourceFile &ModuleDecl::getMainSourceFile() const {
-  assert(!Files.empty() && "No files added yet");
-  return *cast<SourceFile>(Files.front());
+  assert(!getFiles().empty() && "No files in module");
+  return *cast<SourceFile>(getFiles().front());
 }
 
 inline FileUnit *ModuleDecl::EntryPointInfoTy::getEntryPointFile() const {

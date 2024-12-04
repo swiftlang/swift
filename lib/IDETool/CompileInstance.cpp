@@ -128,15 +128,16 @@ getModifiedFunctionDeclList(const SourceFile &SF, SourceManager &tmpSM,
   SILOptions silOpts = ctx.SILOpts;
   CASOptions casOpts = ctx.CASOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts = ctx.SymbolGraphOpts;
+  SerializationOptions serializationOpts = ctx.SerializationOpts;
 
   DiagnosticEngine tmpDiags(tmpSM);
   auto &tmpCtx =
       *ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
-                       symbolOpts, casOpts, tmpSM, tmpDiags);
+                       symbolOpts, casOpts, serializationOpts, tmpSM, tmpDiags);
   registerParseRequestFunctions(tmpCtx.evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx.evaluator);
 
-  ModuleDecl *tmpM = ModuleDecl::create(Identifier(), tmpCtx);
+  ModuleDecl *tmpM = ModuleDecl::createEmpty(Identifier(), tmpCtx);
   auto tmpBufferID = tmpSM.addNewSourceBuffer(std::move(*tmpBuffer));
   SourceFile *tmpSF = new (tmpCtx)
       SourceFile(*tmpM, SF.Kind, tmpBufferID, SF.getParsingOptions());

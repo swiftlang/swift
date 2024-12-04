@@ -34,6 +34,8 @@
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -Rmodule-api-import -verify
 
+// REQUIRES: swift_feature_InternalImportsByDefault
+
 //--- module.modulemap
 module FarClangDep {
     header "FarClangDep.h"

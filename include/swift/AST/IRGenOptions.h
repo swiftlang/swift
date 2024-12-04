@@ -492,11 +492,20 @@ public:
   // (LLVM's 'frame-pointer=all').
   unsigned AsyncFramePointerAll : 1;
 
+  unsigned UseProfilingMarkerThunks : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
+
+  /// Path to the data file to be used for sampling-based PGO,
+  /// or the empty string.
+  std::string UseSampleProfile = "";
+
+  /// Controls whether DWARF discriminators are added to the IR.
+  unsigned DebugInfoForProfiling : 1;
 
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
@@ -542,6 +551,9 @@ public:
   /// Emit a .casid file next to the object file if CAS Backend is used.
   bool EmitCASIDFile;
 
+  /// Paths to the pass plugins registered via -load-pass-plugin.
+  std::vector<std::string> LLVMPassPlugins;
+
   IRGenOptions()
       : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
         Verify(true), OptMode(OptimizationMode::NotSet),
@@ -581,8 +593,9 @@ public:
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
-        EmitAsyncFramePushPopMetadata(false), EmitYieldOnce2AsYieldOnce(true),
-        AsyncFramePointerAll(false), CmdArgs(),
+        EmitAsyncFramePushPopMetadata(true), EmitYieldOnce2AsYieldOnce(true),
+        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
+        DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),

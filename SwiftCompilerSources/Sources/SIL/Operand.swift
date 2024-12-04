@@ -192,6 +192,19 @@ extension Operand {
   }
 }
 
+extension Operand {
+  /// A scope ending use is a consuming use for normal borrow scopes, but it also applies to intructions that end the
+  /// scope of an address (end_access) or a token (end_apply, abort_apply),
+  public var isScopeEndingUse: Bool {
+    switch instruction {
+    case is EndBorrowInst, is EndAccessInst, is EndApplyInst, is AbortApplyInst:
+      return true
+    default:
+      return false
+    }
+  }
+}
+
 extension OptionalBridgedOperand {
   init(bridged: BridgedOperand?) {
     self = OptionalBridgedOperand(op: bridged?.op)

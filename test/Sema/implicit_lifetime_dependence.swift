@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature LifetimeDependence
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct BufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeRawBufferPointer?

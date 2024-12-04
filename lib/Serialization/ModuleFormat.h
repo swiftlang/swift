@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 897; // Add PluginSearchOptionKind::LoadPlugin
+const uint16_t SWIFTMODULE_VERSION_MINOR = 904; // @available renamed decl ID removed
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -694,7 +694,7 @@ enum class PluginSearchOptionKind : uint8_t {
   ExternalPluginPath,
   LoadPluginLibrary,
   LoadPluginExecutable,
-  LoadPlugin,
+  ResolvedPluginConfig,
 };
 using PluginSearchOptionKindField = BCFixed<3>;
 
@@ -967,6 +967,7 @@ namespace options_block {
     SERIALIZE_PACKAGE_ENABLED,
     CXX_STDLIB_KIND,
     PUBLIC_MODULE_NAME,
+    SWIFT_INTERFACE_COMPILER_VERSION,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1066,6 +1067,11 @@ namespace options_block {
   using PublicModuleNameLayout = BCRecordLayout<
     PUBLIC_MODULE_NAME,
     BCBlob
+  >;
+
+    using SwiftInterfaceCompilerVersionLayout = BCRecordLayout<
+    SWIFT_INTERFACE_COMPILER_VERSION,
+    BCBlob // version tuple
   >;
 }
 
@@ -1231,6 +1237,12 @@ namespace decls_block {
     TypeIDField  // canonical type (a fallback)
   );
 
+  TYPE_LAYOUT(BuiltinFixedArrayTypeLayout,
+    BUILTIN_FIXED_ARRAY_TYPE,
+    TypeIDField, // count
+    TypeIDField  // element type
+  );
+
   TYPE_LAYOUT(TypeAliasTypeLayout,
     NAME_ALIAS_TYPE,
     DeclIDField,           // typealias decl
@@ -1259,11 +1271,6 @@ namespace decls_block {
     NOMINAL_TYPE,
     DeclIDField, // decl
     TypeIDField  // parent
-  );
-
-  TYPE_LAYOUT(ParenTypeLayout,
-    PAREN_TYPE,
-    TypeIDField // inner type
   );
 
   TYPE_LAYOUT(TupleTypeLayout,
@@ -2340,11 +2347,11 @@ namespace decls_block {
     BCFixed<1>, // is unavailable from async?
     BCFixed<1>, // is this PackageDescription version-specific kind?
     BCFixed<1>, // is SPI?
+    BCFixed<1>, // is for Embedded
     BC_AVAIL_TUPLE, // Introduced
     BC_AVAIL_TUPLE, // Deprecated
     BC_AVAIL_TUPLE, // Obsoleted
     BCVBR<5>,    // platform
-    DeclIDField, // rename declaration (if any)
     BCVBR<5>,    // number of bytes in message string
     BCVBR<5>,    // number of bytes in rename string
     BCBlob       // message, followed by rename

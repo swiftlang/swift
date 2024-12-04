@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -verify %s | %FileCheck %s
 
 // Check that dynamic calls resolve to the right `dynamicallyCall` method in SIL.
 

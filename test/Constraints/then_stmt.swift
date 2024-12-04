@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ThenStatements
 
-// Required for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ThenStatements
 
 enum E {
   case e

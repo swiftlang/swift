@@ -454,7 +454,7 @@ public:
      : ctx(ctx),
        fs(*ctx.SourceMgr.getFileSystem()),
        requiresOSSAModules(requiresOSSAModules) {}
-  
+
   // Check if all the provided file dependencies are up-to-date compared to
   // what's currently on disk.
   bool dependenciesAreUpToDate(StringRef modulePath,
@@ -524,7 +524,7 @@ public:
     moduleBuffer = std::move(*OutBuf);
     return serializedASTBufferIsUpToDate(modulePath, *moduleBuffer, rebuildInfo, AllDeps);
   }
-  
+
   enum class DependencyStatus {
     UpToDate,
     OutOfDate,
@@ -1513,7 +1513,8 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
 static bool readSwiftInterfaceVersionAndArgs(
     SourceManager &SM, DiagnosticEngine &Diags, llvm::StringSaver &ArgSaver,
     SwiftInterfaceInfo &interfaceInfo, StringRef interfacePath,
-    SourceLoc diagnosticLoc, llvm::Triple preferredTarget) {
+    SourceLoc diagnosticLoc, llvm::Triple preferredTarget,
+    std::optional<llvm::Triple> preferredTargetVariant) {
   llvm::vfs::FileSystem &fs = *SM.getFileSystem();
   auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
   if (!FileOrError) {
@@ -1537,7 +1538,8 @@ static bool readSwiftInterfaceVersionAndArgs(
 
   if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver,
                                         interfaceInfo.Arguments,
-                                        preferredTarget)) {
+                                        preferredTarget,
+                                        preferredTargetVariant)) {
     InterfaceSubContextDelegateImpl::diagnose(
         interfacePath, diagnosticLoc, SM, &Diags,
         diag::error_extracting_version_from_module_interface);
@@ -1592,7 +1594,7 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
     StringRef outputPath, bool ShouldSerializeDeps,
     ArrayRef<std::string> CompiledCandidates,
     DependencyTracker *tracker) {
-  
+
   if (!Instance.getInvocation().getIRGenOptions().AlwaysCompile) {
     // First, check if the expected output already exists and possibly
     // up-to-date w.r.t. all of the dependencies it was built with. If so, early
@@ -1613,7 +1615,7 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
       return false;
     }
   }
-  
+
   // Read out the compiler version.
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver ArgSaver(alloc);
@@ -1621,7 +1623,8 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
   readSwiftInterfaceVersionAndArgs(
       Instance.getSourceMgr(), Instance.getDiags(), ArgSaver, InterfaceInfo,
       interfacePath, SourceLoc(),
-      Instance.getInvocation().getLangOptions().Target);
+      Instance.getInvocation().getLangOptions().Target,
+      Instance.getInvocation().getLangOptions().TargetVariant);
 
   auto Builder = ExplicitModuleInterfaceBuilder(
       Instance, &Instance.getDiags(), Instance.getSourceMgr(),
@@ -1670,6 +1673,15 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(triple);
   }
 
+  if (LangOpts.TargetVariant.has_value()) {
+    genericSubInvocation.getLangOptions().TargetVariant = LangOpts.TargetVariant;
+    auto variantTriple = ArgSaver.save(genericSubInvocation.getLangOptions().TargetVariant->str());
+    if (!variantTriple.empty()) {
+      GenericArgs.push_back("-target-variant");
+      GenericArgs.push_back(variantTriple);
+    }
+  }
+
   // Inherit the target SDK name and version
   if (!LangOpts.SDKName.empty()) {
     genericSubInvocation.getLangOptions().SDKName = LangOpts.SDKName;
@@ -1711,47 +1723,9 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.setPlatformAvailabilityInheritanceMapPath(*SearchPathOpts.PlatformAvailabilityInheritanceMapPath);
   }
 
-  for (auto &entry : SearchPathOpts.PluginSearchOpts) {
-    switch (entry.getKind()) {
-    case PluginSearchOption::Kind::LoadPluginLibrary: {
-      auto &val = entry.get<PluginSearchOption::LoadPluginLibrary>();
-      GenericArgs.push_back("-load-plugin-library");
-      GenericArgs.push_back(ArgSaver.save(val.LibraryPath));
-      break;
-    }
-    case PluginSearchOption::Kind::LoadPluginExecutable: {
-      auto &val = entry.get<PluginSearchOption::LoadPluginExecutable>();
-      for (auto &moduleName : val.ModuleNames) {
-        GenericArgs.push_back("-load-plugin-executable");
-        GenericArgs.push_back(
-            ArgSaver.save(val.ExecutablePath + "#" + moduleName));
-      }
-      break;
-    }
-    case PluginSearchOption::Kind::LoadPlugin: {
-      auto &val = entry.get<PluginSearchOption::LoadPlugin>();
-      for (auto &moduleName : val.ModuleNames) {
-        GenericArgs.push_back("-load-plugin");
-        GenericArgs.push_back(
-            ArgSaver.save(val.LibraryPath + "#" + val.ServerPath + "#" + moduleName));
-      }
-      break;
-    }
-    case PluginSearchOption::Kind::PluginPath: {
-      auto &val = entry.get<PluginSearchOption::PluginPath>();
-      GenericArgs.push_back("-plugin-path");
-      GenericArgs.push_back(ArgSaver.save(val.SearchPath));
-      break;
-    }
-    case PluginSearchOption::Kind::ExternalPluginPath: {
-      auto &val = entry.get<PluginSearchOption::ExternalPluginPath>();
-      GenericArgs.push_back("-external-plugin-path");
-      GenericArgs.push_back(
-          ArgSaver.save(val.SearchPath + "#" + val.ServerPath));
-      break;
-    }
-    }
-  }
+  // Inherit the plugin search opts but do not inherit the arguments.
+  genericSubInvocation.getSearchPathOptions().PluginSearchOpts =
+      SearchPathOpts.PluginSearchOpts;
 
   genericSubInvocation.getFrontendOptions().InputMode
       = FrontendOptions::ParseInputMode::SwiftModuleInterface;
@@ -1782,8 +1756,11 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   GenericArgs.push_back("-disable-objc-attr-requires-foundation-module");
 
   // If we are supposed to use RequireOSSAModules, do so.
-  genericSubInvocation.getSILOptions().EnableOSSAModules =
-      bool(RequireOSSAModules);
+  if (RequireOSSAModules) {
+    genericSubInvocation.getSILOptions().EnableOSSAModules = true;
+    GenericArgs.push_back("-enable-ossa-modules");
+  }
+
   if (LangOpts.DisableAvailabilityChecking) {
     genericSubInvocation.getLangOptions().DisableAvailabilityChecking = true;
     GenericArgs.push_back("-disable-availability-checking");
@@ -1844,7 +1821,8 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
     StringRef interfacePath, SourceLoc diagnosticLoc) {
   if (readSwiftInterfaceVersionAndArgs(SM, *Diags, ArgSaver, interfaceInfo,
                                        interfacePath, diagnosticLoc,
-                                       subInvocation.getLangOptions().Target))
+                                       subInvocation.getLangOptions().Target,
+                                       subInvocation.getLangOptions().TargetVariant))
     return true;
 
   // Prior to Swift 5.9, swiftinterfaces were always built (accidentally) with

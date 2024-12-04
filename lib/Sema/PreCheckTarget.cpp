@@ -331,6 +331,10 @@ static Expr *getMemberChainSubExpr(Expr *expr) {
     return FVE->getSubExpr();
   } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
     return SE->getBase();
+  } else if (auto *DSE = dyn_cast<DotSelfExpr>(expr)) {
+    return DSE->getSubExpr();
+  } else if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
+    return USE->getSubExpr();
   } else if (auto *CCE = dyn_cast<CodeCompletionExpr>(expr)) {
     return CCE->getBase();
   } else {
@@ -343,6 +347,16 @@ UnresolvedMemberExpr *TypeChecker::getUnresolvedMemberChainBase(Expr *expr) {
     return getUnresolvedMemberChainBase(subExpr);
   else
     return dyn_cast<UnresolvedMemberExpr>(expr);
+}
+
+static bool isBindOptionalMemberChain(Expr *expr) {
+  if (isa<BindOptionalExpr>(expr)) {
+    return true;
+  } else if (auto *base = getMemberChainSubExpr(expr)) {
+    return isBindOptionalMemberChain(base);
+  } else {
+    return false;
+  }
 }
 
 /// Whether this expression sits at the end of a chain of member accesses.
@@ -852,7 +866,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     }
 
     return buildRefExpr(ResultValues, DC, UDRE->getNameLoc(),
-                        UDRE->isImplicit(), UDRE->getFunctionRefKind());
+                        UDRE->isImplicit(), UDRE->getFunctionRefInfo());
   }
 
   ResultValues.clear();
@@ -967,29 +981,12 @@ TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
 }
 
 namespace {
-/// Update the function reference kind based on adding a direct call to a
-/// callee with this kind.
-FunctionRefKind addingDirectCall(FunctionRefKind kind) {
-  switch (kind) {
-  case FunctionRefKind::Unapplied:
-    return FunctionRefKind::SingleApply;
-
-  case FunctionRefKind::SingleApply:
-  case FunctionRefKind::DoubleApply:
-    return FunctionRefKind::DoubleApply;
-
-  case FunctionRefKind::Compound:
-    return FunctionRefKind::Compound;
-  }
-
-  llvm_unreachable("Unhandled FunctionRefKind in switch.");
-}
-
 /// Update a direct callee expression node that has a function reference kind
 /// based on seeing a call to this callee.
-template <typename E, typename = decltype(((E *)nullptr)->getFunctionRefKind())>
+template <typename E, typename = decltype(((E *)nullptr)->getFunctionRefInfo())>
 void tryUpdateDirectCalleeImpl(E *callee, int) {
-  callee->setFunctionRefKind(addingDirectCall(callee->getFunctionRefKind()));
+  callee->setFunctionRefInfo(
+      callee->getFunctionRefInfo().addingApplicationLevel());
 }
 
 /// Version of tryUpdateDirectCalleeImpl for when the callee
@@ -1089,6 +1086,9 @@ class PreCheckTarget final : public ASTWalker {
   /// \returns Either a transformed expression, or `ErrorExpr` upon type
   /// resolution failure, or `nullptr` if transformation is not applicable.
   Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
+
+  /// Pull some operator expressions into the optional chain.
+  OptionalEvaluationExpr *hoistOptionalEvaluationExprIfNeeded(Expr *E);
 
   /// Whether the given expression "looks like" a (possibly sugared) type. For
   /// example, `(foo, bar)` "looks like" a type, but `foo + bar` does not.
@@ -1416,22 +1416,6 @@ public:
       return Action::Continue(expr);
     }
 
-    // Double check if there are any BindOptionalExpr remaining in the
-    // tree (see comment below for more details), if there are no BOE
-    // expressions remaining remove OptionalEvaluationExpr from the tree.
-    if (auto OEE = dyn_cast<OptionalEvaluationExpr>(expr)) {
-      bool hasBindOptional = false;
-      OEE->forEachChildExpr([&](Expr *expr) -> Expr * {
-        if (isa<BindOptionalExpr>(expr))
-          hasBindOptional = true;
-        // If at least a single BOE was found, no reason
-        // to walk any further in the tree.
-        return hasBindOptional ? nullptr : expr;
-      });
-
-      return Action::Continue(hasBindOptional ? OEE : OEE->getSubExpr());
-    }
-
     // Check if there are any BindOptionalExpr in the tree which
     // wrap DiscardAssignmentExpr, such situation corresponds to syntax
     // like - `_? = <value>`, since it doesn't really make
@@ -1471,16 +1455,27 @@ public:
       return Action::Continue(result);
     }
 
-    // If we find an unresolved member chain, wrap it in an
-    // UnresolvedMemberChainResultExpr (unless this has already been done).
+    if (auto *OEE = hoistOptionalEvaluationExprIfNeeded(expr)) {
+      return Action::Continue(OEE);
+    }
+
     auto *parent = Parent.getAsExpr();
     if (isMemberChainTail(expr, parent)) {
+      Expr *wrapped = expr;
+      // If we find an unresolved member chain, wrap it in an
+      // UnresolvedMemberChainResultExpr (unless this has already been done).
       if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr)) {
         if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
-          auto *chain = new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
-          return Action::Continue(chain);
+          wrapped = new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
         }
       }
+      // Wrap optional chain in an OptionalEvaluationExpr.
+      if (isBindOptionalMemberChain(expr)) {
+        if (!parent || !isa<OptionalEvaluationExpr>(parent)) {
+          wrapped = new (ctx) OptionalEvaluationExpr(wrapped);
+        }
+      }
+      expr = wrapped;
     }
     return Action::Continue(expr);
   }
@@ -2622,6 +2617,45 @@ Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
                                           call->getSourceRange(),
                                           typeExpr->getTypeRepr())
              : nullptr;
+}
+
+/// Pull some operator expressions into the optional chain if needed.
+///
+///   foo? = newFoo // LHS of the assignment operator
+///   foo?.bar += value // LHS of 'assignment: true' precedence group operators.
+///   for?.bar++ // Postfix operator.
+///
+/// In such cases, the operand is constructed to be an 'OperatorEvaluationExpr'
+/// wrapping the actual operand. This function hoist it and wraps the entire
+/// expression with it. Returns the result 'OperatorEvaluationExpr', or nullptr
+/// if 'expr' didn't match the condition.
+OptionalEvaluationExpr *
+PreCheckTarget::hoistOptionalEvaluationExprIfNeeded(Expr *expr) {
+  if (auto *assignE = dyn_cast<AssignExpr>(expr)) {
+    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(assignE->getDest())) {
+      assignE->setDest(OEE->getSubExpr());
+      OEE->setSubExpr(assignE);
+      return OEE;
+    }
+  } else if (auto *binaryE = dyn_cast<BinaryExpr>(expr)) {
+    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(binaryE->getLHS())) {
+      if (auto *precedence = TypeChecker::lookupPrecedenceGroupForInfixOperator(
+              DC, binaryE, /*diagnose=*/false)) {
+        if (precedence->isAssignment()) {
+          binaryE->getArgs()->setExpr(0, OEE->getSubExpr());
+          OEE->setSubExpr(binaryE);
+          return OEE;
+        }
+      }
+    }
+  } else if (auto *postfixE = dyn_cast<PostfixUnaryExpr>(expr)) {
+    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(postfixE->getOperand())) {
+      postfixE->setOperand(OEE->getSubExpr());
+      OEE->setSubExpr(postfixE);
+      return OEE;
+    }
+  }
+  return nullptr;
 }
 
 bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {

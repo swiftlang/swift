@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -parse-as-library %s -verify -swift-version 5 -disable-availability-checking
+// RUN: %target-swift-frontend -typecheck -parse-as-library %s -verify -swift-version 5 -target %target-swift-5.1-abi-triple
 
 // Default initialization of variables.
 

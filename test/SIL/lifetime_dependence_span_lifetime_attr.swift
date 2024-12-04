@@ -1,9 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip | %FileCheck %s
+// RUN:   -enable-experimental-feature LifetimeDependence | %FileCheck %s
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
 
 // TODO: Use real Range
 public struct FakeRange<Bound> {

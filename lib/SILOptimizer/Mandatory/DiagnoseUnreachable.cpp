@@ -775,6 +775,14 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
     if (isa<EndBorrowInst>(currInst))
       return false;
 
+    // destroy_value [dead_end] instructions are inserted at the availability
+    // boundary by lifetime completion.  Such instructions correctly mark the
+    // lifetime boundary of the destroyed value and never arise from dead user
+    // code.
+    auto *dvi = dyn_cast<DestroyValueInst>(currInst);
+    if (dvi && dvi->isDeadEnd())
+      return false;
+
     // If no-return instruction is not something we can point in code or
     // it's an explicit cast, skip it.
     if (!noReturnCall->getLoc().is<RegularLocation>() ||
@@ -903,14 +911,13 @@ static bool eliminateSwitchDispatchOnUnavailableElements(
   if (!ED->hasCasesUnavailableDuringLowering())
     return false;
 
-  ASTContext &ctx = BB.getModule().getASTContext();
   SILLocation Loc = SWI->getLoc();
   bool DidRemoveUnavailableCase = false;
 
   SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4> NewCaseBBs;
   for (unsigned i : range(SWI.getNumCases())) {
     auto CaseBB = SWI.getCase(i);
-    auto availableAtr = CaseBB.first->getAttrs().getUnavailable(ctx);
+    auto availableAtr = CaseBB.first->getUnavailableAttr();
 
     if (availableAtr && availableAtr->isUnconditionallyUnavailable()) {
       // Mark the basic block as potentially unreachable.
