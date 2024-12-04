@@ -1502,9 +1502,11 @@ extension BinaryInteger {
   @inline(__always)
   public func advanced(by n: Int) -> Self {
     if Self.isSigned {
-      return self.bitWidth < n.bitWidth
-        ? Self(Int(truncatingIfNeeded: self) + n)
-        : self + Self(truncatingIfNeeded: n)
+      if self.bitWidth < n.bitWidth {
+        return self + Self(n)
+      } else {
+        return self + Self(truncatingIfNeeded: n)
+      }
     } else {
       return n < (0 as Int)
         ? self - Self(UInt(bitPattern: ~n &+ 1))
