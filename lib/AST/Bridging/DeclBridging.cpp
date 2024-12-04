@@ -123,6 +123,13 @@ void BridgedDecl_setAttrs(BridgedDecl decl, BridgedDeclAttributes attrs) {
   decl.unbridged()->getAttrs() = attrs.unbridged();
 }
 
+// FIXME: We should do this systematically for downcasting BridgedDecl to all
+//        subclasses.
+BridgedNullablePatternBindingDecl BridgedDecl_getAsPatternBindingDecl(
+    BridgedDecl decl) {
+  return dyn_cast<PatternBindingDecl>(decl.unbridged());
+}
+
 BridgedAccessorDecl BridgedAccessorDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedAccessorKind cKind, BridgedAbstractStorageDecl cStorage,
@@ -165,6 +172,17 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
       // FIXME: 'class' spelling kind.
       isStatic ? StaticSpellingKind::KeywordStatic : StaticSpellingKind::None,
       cBindingKeywordLoc.unbridged(), entries, declContext);
+}
+
+SwiftInt BridgedPatternBindingDecl_getNumPatternEntries(
+    BridgedPatternBindingDecl cPBD) {
+  return cPBD.unbridged()->getNumPatternEntries();
+}
+
+BridgedPattern BridgedPatternBindingDecl_getPattern(
+    BridgedPatternBindingDecl cPBD, SwiftInt i) {
+  ASSERT(i >= 0 && i < cPBD.unbridged()->getNumPatternEntries());
+  return cPBD.unbridged()->getPattern(i);
 }
 
 BridgedParamDecl BridgedParamDecl_createParsed(

@@ -62,13 +62,13 @@
 
 #ifndef DECL_ATTR
 #define SIMPLE_DECL_ATTR(...)
-#define DECL_ATTR(_, Id, ...) AST_BRIDGING_WRAPPER_NONNULL(Id##Attr)
+#define DECL_ATTR(_, Id, ...) AST_BRIDGING_WRAPPER_NULLABLE(Id##Attr)
 #endif
 #include "swift/AST/DeclAttr.def"
 
 // Some of the base classes need to be nullable to allow them to be used as
 // optional parameters.
-AST_BRIDGING_WRAPPER_NONNULL(Decl)
+AST_BRIDGING_WRAPPER_NULLABLE(Decl)
 AST_BRIDGING_WRAPPER_NONNULL(DeclContext)
 AST_BRIDGING_WRAPPER_NONNULL(SourceFile)
 AST_BRIDGING_WRAPPER_NULLABLE(Stmt)

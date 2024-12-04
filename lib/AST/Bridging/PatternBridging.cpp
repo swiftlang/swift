@@ -37,6 +37,21 @@ BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern) {
   return cPattern.unbridged()->getSingleVar();
 }
 
+SwiftInt BridgedPattern_unsafeFetchVarDecls(BridgedPattern cPattern,
+                                            BridgedVarDecl *varDeclArrayOut,
+                                            SwiftInt capacity) {
+  SmallVector<VarDecl *, 32> vars;
+  cPattern.unbridged()->collectVariables(vars);
+
+  if (varDeclArrayOut && vars.size() <= (size_t)capacity) {
+    for (auto i : indices(vars)) {
+      varDeclArrayOut[i] = vars[i];
+    }
+  }
+
+  return vars.size();
+}
+
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cLoc) {
   return new (cContext.unbridged()) AnyPattern(cLoc.unbridged());

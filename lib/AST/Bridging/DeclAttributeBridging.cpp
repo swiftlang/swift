@@ -93,6 +93,42 @@ static std::optional<AccessLevel> unbridge(BridgedAccessLevel level) {
   llvm_unreachable("unhandled BridgedAccessLevel");
 }
 
+BridgedNullableDeclAttribute BridgedDeclAttributes_getAttrAfter(
+    BridgedDeclAttributes cAttrs, BridgedNullableDeclAttribute cPriorAttr) {
+  auto attrs = cAttrs.unbridged();
+  auto priorAttr = cPriorAttr.unbridged();
+
+  auto i = priorAttr ? std::next(DeclAttributes::iterator(priorAttr))
+                     : attrs.begin();
+  return *i;
+}
+
+BridgedNullableABIAttr BridgedDeclAttribute_asABIAttr(
+    BridgedDeclAttribute cAttr) {
+  return dyn_cast<ABIAttr>(cAttr.unbridged());
+}
+
+BridgedABIAttr BridgedABIAttr_createParsed(BridgedASTContext cContext,
+                                           BridgedSourceLoc atLoc,
+                                           BridgedSourceRange range,
+                                           BridgedNullableDecl abiDecl) {
+  return new (cContext.unbridged()) ABIAttr(abiDecl.unbridged(),
+                                            atLoc.unbridged(),
+                                            range.unbridged(),
+                                            /*isInverse=*/false,
+                                            /*isImplicit=*/false);
+}
+
+BridgedABIAttr BridgedABIAttr_createImplicitInverse(BridgedASTContext cContext){
+  return new (cContext.unbridged()) ABIAttr(nullptr,
+                                            /*isInverse=*/true,
+                                            /*isImplicit=*/true);
+}
+
+void BridgedABIAttr_connectToInverse(BridgedABIAttr cAttr, BridgedDecl cOwner) {
+  return cAttr.unbridged()->connectToInverse(cOwner.unbridged());
+}
+
 BridgedAccessControlAttr
 BridgedAccessControlAttr_createParsed(BridgedASTContext cContext,
                                       BridgedSourceRange cRange,
