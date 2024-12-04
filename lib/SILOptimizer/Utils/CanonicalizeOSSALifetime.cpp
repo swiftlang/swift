@@ -1161,16 +1161,7 @@ void CanonicalizeOSSALifetime::rewriteCopies(
   assert(getCurrentDef()->getOwnershipKind() == OwnershipKind::Owned);
 
   // Shadow discoveredDefs in order to constrain its uses.
-  auto &discoveredDefs = this->discoveredDefs;
-
-  SmallVector<unsigned, 8> indexWorklist;
-  ValueSet visitedDefs(getCurrentDef()->getFunction());
-  auto addDefToWorklist = [&](Def def) {
-    if (!visitedDefs.insert(def.getValue()))
-      return;
-    discoveredDefs.push_back(def);
-    indexWorklist.push_back(discoveredDefs.size() - 1);
-  };
+  const auto &discoveredDefs = this->discoveredDefs;
 
   InstructionSetVector instsToDelete(getCurrentDef()->getFunction());
 
@@ -1180,11 +1171,6 @@ void CanonicalizeOSSALifetime::rewriteCopies(
   // it requires a copy.
   auto visitUse = [&](Operand *use) {
     auto *user = use->getUser();
-    // Recurse through copies.
-    if (auto *copy = dyn_cast<CopyValueInst>(user)) {
-      addDefToWorklist(Def::copy(copy));
-      return true;
-    }
     if (destroys.contains(user)) {
       auto *destroy = cast<DestroyValueInst>(user);
       // If this destroy was marked as a final destroy, ignore it; otherwise,
@@ -1217,13 +1203,8 @@ void CanonicalizeOSSALifetime::rewriteCopies(
     return true;
   };
 
-  discoveredDefs.clear();
-  addDefToWorklist(Def::root(getCurrentDef()));
   // Perform a def-use traversal, visiting each use operand.
-
-  while (!indexWorklist.empty()) {
-    auto index = indexWorklist.pop_back_val();
-    auto def = discoveredDefs[index];
+  for (auto def : discoveredDefs) {
     switch (def) {
     case Def::Kind::BorrowedFrom:
     case Def::Kind::Reborrow:
