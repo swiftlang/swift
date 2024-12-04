@@ -137,10 +137,10 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   auto addDefToWorklist = [&](Def def) {
     if (!visitedDefs.insert(def.getValue()))
       return;
-    defUseWorklist.push_back(def);
-    indexWorklist.push_back(defUseWorklist.size() - 1);
+    discoveredDefs.push_back(def);
+    indexWorklist.push_back(discoveredDefs.size() - 1);
   };
-  defUseWorklist.clear();
+  discoveredDefs.clear();
   addDefToWorklist(Def::root(getCurrentDef()));
   // Only the first level of reborrows need to be consider. All nested inner
   // adjacent reborrows and phis are encapsulated within their lifetimes.
@@ -153,7 +153,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   }
   while (!indexWorklist.empty()) {
     auto index = indexWorklist.pop_back_val();
-    auto def = defUseWorklist[index];
+    auto def = discoveredDefs[index];
     auto value = def.getValue();
     LLVM_DEBUG(llvm::dbgs() << "  Uses of value:\n";
                value->print(llvm::dbgs()));
@@ -1160,16 +1160,16 @@ void CanonicalizeOSSALifetime::rewriteCopies(
     SmallVectorImpl<DestroyValueInst *> const &newDestroys) {
   assert(getCurrentDef()->getOwnershipKind() == OwnershipKind::Owned);
 
-  // Shadow defUseWorklist in order to constrain its uses.
-  auto &defUseWorklist = this->defUseWorklist;
+  // Shadow discoveredDefs in order to constrain its uses.
+  auto &discoveredDefs = this->discoveredDefs;
 
   SmallVector<unsigned, 8> indexWorklist;
   ValueSet visitedDefs(getCurrentDef()->getFunction());
   auto addDefToWorklist = [&](Def def) {
     if (!visitedDefs.insert(def.getValue()))
       return;
-    defUseWorklist.push_back(def);
-    indexWorklist.push_back(defUseWorklist.size() - 1);
+    discoveredDefs.push_back(def);
+    indexWorklist.push_back(discoveredDefs.size() - 1);
   };
 
   InstructionSetVector instsToDelete(getCurrentDef()->getFunction());
@@ -1217,13 +1217,13 @@ void CanonicalizeOSSALifetime::rewriteCopies(
     return true;
   };
 
-  defUseWorklist.clear();
+  discoveredDefs.clear();
   addDefToWorklist(Def::root(getCurrentDef()));
   // Perform a def-use traversal, visiting each use operand.
 
   while (!indexWorklist.empty()) {
     auto index = indexWorklist.pop_back_val();
-    auto def = defUseWorklist[index];
+    auto def = discoveredDefs[index];
     switch (def) {
     case Def::Kind::BorrowedFrom:
     case Def::Kind::Reborrow:

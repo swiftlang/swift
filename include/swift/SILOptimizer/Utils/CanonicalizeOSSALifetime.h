@@ -342,8 +342,8 @@ private:
   };
   friend llvm::DenseMapInfo<Def>;
 
-  /// Visited set for general def-use traversal that prevents revisiting values.
-  SmallVector<Def, 8> defUseWorklist;
+  /// The defs derived from currentDef whose uses are added to liveness.
+  SmallVector<Def, 8> discoveredDefs;
 
   /// The blocks that were discovered by PrunedLiveness.
   SmallVector<SILBasicBlock *, 32> discoveredBlocks;
