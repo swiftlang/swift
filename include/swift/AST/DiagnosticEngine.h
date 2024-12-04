@@ -890,6 +890,9 @@ namespace swift {
     /// fatal error
     bool showDiagnosticsAfterFatalError = false;
 
+    /// Whether to immediately exit on encountering an error.
+    bool exitOnFirstError = false;
+
     /// Don't emit any warnings
     bool suppressWarnings = false;
     
@@ -928,6 +931,13 @@ namespace swift {
     }
     bool getShowDiagnosticsAfterFatalError() {
       return showDiagnosticsAfterFatalError;
+    }
+
+    bool getExitOnFirstError() const {
+      return exitOnFirstError;
+    }
+    void setExitOnFirstError(bool val = true) {
+      exitOnFirstError = val;
     }
 
     /// Whether to skip emitting warnings
@@ -1151,6 +1161,13 @@ namespace swift {
     }
     bool getShowDiagnosticsAfterFatalError() {
       return state.getShowDiagnosticsAfterFatalError();
+    }
+
+    bool getExitOnFirstError() const {
+      return state.getExitOnFirstError();
+    }
+    void setExitOnFirstError(bool val = true) {
+      state.setExitOnFirstError(val);
     }
 
     void flushConsumers() {

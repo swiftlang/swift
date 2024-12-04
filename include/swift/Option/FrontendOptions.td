@@ -161,7 +161,10 @@ def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
-  
+
+def exit_on_first_error : Flag<["-"], "exit-on-first-error">,
+  HelpText<"Tells the compiler to immediately exit when encountering an error">;
+
 def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
   HelpText<"Automatically import declared cross-import overlays.">;
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,

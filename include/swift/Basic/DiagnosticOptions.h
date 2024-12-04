@@ -51,6 +51,9 @@ public:
   /// Keep emitting subsequent diagnostics after a fatal error.
   bool ShowDiagnosticsAfterFatalError = false;
 
+  /// Whether to immediately exit on encountering an error.
+  bool ExitOnFirstError = false;
+
   /// When emitting fixits as code edits, apply all fixits from diagnostics
   /// without any filtering.
   bool FixitCodeForAllDiagnostics = false;
