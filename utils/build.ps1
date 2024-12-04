@@ -1091,11 +1091,6 @@ function Build-CMakeProject {
       }
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER_TARGET $Arch.LLVMTarget
 
-      if (-not (Test-CMakeAtLeast -Major 3 -Minor 26 -Patch 3) -and $Platform -eq [Platform]::Windows) {
-        # Workaround for https://github.com/ninja-build/ninja/issues/2280
-        TryAdd-KeyValue $Defines CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: "
-      }
-
       if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
         Append-FlagsDefine $Defines CMAKE_C_FLAGS "-gdwarf"
       }
@@ -1109,11 +1104,6 @@ function Build-CMakeProject {
         TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER (Get-PinnedToolchainTool $Driver)
       }
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_TARGET $Arch.LLVMTarget
-
-      if (-not (Test-CMakeAtLeast -Major 3 -Minor 26 -Patch 3) -and $Platform -eq [Platform]::Windows) {
-        # Workaround for https://github.com/ninja-build/ninja/issues/2280
-        TryAdd-KeyValue $Defines CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: "
-      }
 
       if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
         Append-FlagsDefine $Defines CMAKE_CXX_FLAGS "-gdwarf"
