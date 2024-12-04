@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o
-// RUN: %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -Xfrontend -disable-access-control -o %t/String
+// RUN: %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -Xfrontend -disable-access-control -Xfrontend -disable-availability-checking -o %t/String
 
 // RUN: %target-codesign %t/String
 // RUN: %target-run %t/String
@@ -61,6 +61,9 @@ extension String {
 
   var byteWidth: Int {
     return _classify()._isASCII ? 1 : 2
+  }
+  var isKnownNFC: Bool {
+    return _classify()._isNFC
   }
 }
 
@@ -1206,6 +1209,43 @@ StringTests.test("growth") {
 
 StringTests.test("Construction") {
   expectEqual("abc", String(["a", "b", "c"] as [Character]))
+}
+
+StringTests.test("Construction/FromUnicodeScalars") {
+
+  // Smol strings do not have an isNFC bit, so at least the NFC forms
+  // must to be large enough that they require an allocated StringStorage.
+
+  let testData: [(source: [Unicode.Scalar], nfc: [Unicode.Scalar], nfkc: [Unicode.Scalar])] = [
+    (
+      source: ["\u{1D160}", "c", "a", "f", "e", "\u{0301}", "\u{1D160}"],
+      nfc:    ["\u{1D158}", "\u{1D165}", "\u{1D16E}", "c", "a", "f", "\u{00E9}", "\u{1D158}", "\u{1D165}", "\u{1D16E}"],
+      nfkc:   ["\u{1D158}", "\u{1D165}", "\u{1D16E}", "c", "a", "f", "\u{00E9}", "\u{1D158}", "\u{1D165}", "\u{1D16E}"]
+    ),
+    (
+      source: ["\u{1D160}", "a", "\u{FB00}", "e", "\u{1D160}"],
+      nfc:    ["\u{1D158}", "\u{1D165}", "\u{1D16E}", "a", "\u{FB00}", "e", "\u{1D158}", "\u{1D165}", "\u{1D16E}"],
+      nfkc:   ["\u{1D158}", "\u{1D165}", "\u{1D16E}", "a", "f", "f", "e", "\u{1D158}", "\u{1D165}", "\u{1D16E}"]
+    ),
+  ]
+  for (source, expectedNFC, expectedNFKC) in testData {
+
+    // String.init(_: some Sequence<Unicode.Scalar>)
+    expectEqualSequence(source, String(AnySequence(source.lazy.map { $0 })).unicodeScalars)
+
+    // String.init(_: some RandomAccessCollection<Unicode.Scalar>)
+    expectEqualSequence(source, String(source).unicodeScalars)
+
+    // String.init(_: Unicode.NormalizedScalars<some Sequence<Unicode.Scalar>>.NFC)
+    let nfcString = String(source.normalized.nfc)
+    expectEqualSequence(expectedNFC, nfcString.unicodeScalars)
+    expectTrue(nfcString.isKnownNFC)
+
+    // String.init(_: Unicode.NormalizedScalars<some Sequence<Unicode.Scalar>>.NFKC)
+    let nfkcString = String(source.normalized.nfkc)
+    expectEqualSequence(expectedNFKC, nfkcString.unicodeScalars)
+    expectTrue(nfkcString.isKnownNFC)
+  }
 }
 
 StringTests.test("Conversions") {

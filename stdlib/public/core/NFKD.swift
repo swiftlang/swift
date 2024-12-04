@@ -12,21 +12,21 @@
 
 extension Unicode.NormalizedScalars where Source: Sequence<Unicode.Scalar> {
 
-  /// The contents of the source sequence, in Normalization Form D.
+  /// The contents of the source sequence, in Normalization Form KD.
   ///
-  /// Normalization to NFD preserves canonical equivalence.
+  /// Normalization to NFKD does _not_ preserve canonical equivalence.
   ///
   @inlinable
-  public var nfd: NFD {
-    Unicode.NormalizedScalars.NFD(source)
+  public var nfkd: NFKD {
+    Unicode.NormalizedScalars.NFKD(source)
   }
 
-  /// The contents of the source sequence, in Normalization Form D.
+  /// The contents of the source sequence, in Normalization Form KD.
   ///
-  /// Normalization to NFD preserves canonical equivalence.
+  /// Normalization to NFKD does _not_ preserve canonical equivalence.
   ///
   @frozen
-  public struct NFD {
+  public struct NFKD {
 
     @usableFromInline
     internal let source: Source
@@ -38,7 +38,7 @@ extension Unicode.NormalizedScalars where Source: Sequence<Unicode.Scalar> {
   }
 }
 
-extension Unicode.NormalizedScalars.NFD: Sequence {
+extension Unicode.NormalizedScalars.NFKD: Sequence {
 
   @inlinable
   public consuming func makeIterator() -> Iterator {
@@ -51,12 +51,12 @@ extension Unicode.NormalizedScalars.NFD: Sequence {
     public var source: Source.Iterator
 
     @usableFromInline
-    internal var normalizer: Unicode.NFDNormalizer
+    internal var normalizer: Unicode.NFKDNormalizer
 
     @inlinable
     internal init(source: Source.Iterator) {
       self.source = source
-      self.normalizer = Unicode.NFDNormalizer()
+      self.normalizer = Unicode.NFKDNormalizer()
     }
 
     @inlinable
@@ -66,8 +66,8 @@ extension Unicode.NormalizedScalars.NFD: Sequence {
   }
 }
 
-extension Unicode.NormalizedScalars.NFD: Sendable where Source: Sendable {}
-extension Unicode.NormalizedScalars.NFD.Iterator: Sendable where Source.Iterator: Sendable {}
+extension Unicode.NormalizedScalars.NFKD: Sendable where Source: Sendable {}
+extension Unicode.NormalizedScalars.NFKD.Iterator: Sendable where Source.Iterator: Sendable {}
 
 extension Unicode {
 
@@ -81,7 +81,7 @@ extension Unicode {
   /// it returns `nil`, indicating that the source was exhausted.
   ///
   /// ```swift
-  /// var normalizer = Unicode.NFDNormalizer()
+  /// var normalizer = Unicode.NFKDNormalizer()
   ///
   /// var input: some IteratorProtocol<Unicode.Scalar> = ...
   /// while let scalar = normalizer.resume(consuming: &input) {
@@ -106,7 +106,7 @@ extension Unicode {
   /// boundary. The normalizer state has value semantics, so it is possible
   /// to copy and store and is inherently thread-safe.
   ///
-  public struct NFDNormalizer: Sendable {
+  public struct NFKDNormalizer: Sendable {
 
     internal enum State {
       case emittingSegment
@@ -116,17 +116,17 @@ extension Unicode {
 
     internal var state = State.consuming
 
-    internal var buffer = Unicode._CanonicalNormalizationBuffer()
-    internal var pendingStarter = Optional<ScalarAndNormData>.none
+    internal var buffer = Unicode._CompatibilityNormalizationBuffer()
+    internal var pendingStarter = Optional<ScalarAndCompatNormData>.none
     internal var bufferIsSorted = false
 
     /// Creates a new normalizer.
     ///
     public init() { }
 
-    internal mutating func reset(maximumCapcity: Int = 64) {
+    public mutating func reset(maximumCapacity: Int = 64) {
       state = .consuming
-      buffer.reset(maximumCapacity: maximumCapcity)
+      buffer.reset(maximumCapacity: maximumCapacity)
       pendingStarter = .none
       bufferIsSorted = false
     }
@@ -148,7 +148,7 @@ extension Unicode {
     /// Typical usage looks like the following:
     ///
     /// ```swift
-    /// var normalizer = Unicode.NFDNormalizer()
+    /// var normalizer = Unicode.NFKDNormalizer()
     ///
     /// var input: some IteratorProtocol<Unicode.Scalar> = ...
     /// while let scalar = normalizer.resume(consuming: &input) {
@@ -221,12 +221,12 @@ extension Unicode {
   }
 }
 
-extension Unicode.NFDNormalizer {
+extension Unicode.NFKDNormalizer {
 
   @inline(never)
   internal mutating func _resume(
     consuming nextFromSource: () -> Unicode.Scalar?
-  ) -> ScalarAndNormData? {
+  ) -> ScalarAndCompatNormData? {
 
     switch state {
     case .emittingSegment:
@@ -261,9 +261,9 @@ extension Unicode.NFDNormalizer {
           return buffer.next()
         }
 
-        // If this scalar is NFD_QC, it does not need to be decomposed.
+        // If this scalar is NFKD_QC, it does not need to be decomposed.
 
-        if normData.isNFDQC {
+        if normData.isNFKDQC {
 
           // If the scalar is a starter its CCC is 0,
           // so it does not need to be sorted and can be emitted directly.
@@ -277,7 +277,7 @@ extension Unicode.NFDNormalizer {
 
         // Otherwise, append the scalar's decomposition to the buffer.
 
-        decomposeNonNFDQC((scalar, normData))
+        decomposeNonNFKDQC((scalar, normData))
       }
 
       // Source is exhausted.
@@ -288,7 +288,7 @@ extension Unicode.NFDNormalizer {
     }
   }
 
-  internal mutating func _flush() -> ScalarAndNormData? {
+  internal mutating func _flush() -> ScalarAndCompatNormData? {
 
     state = .terminated
 
@@ -306,19 +306,19 @@ extension Unicode.NFDNormalizer {
   @inline(__always)
   private mutating func takePendingOrConsume(
     _ nextFromSource: () -> Unicode.Scalar?
-  ) -> ScalarAndNormData? {
+  ) -> ScalarAndCompatNormData? {
 
     if let pendingStarter = pendingStarter.take() {
       return pendingStarter
     } else if let nextScalar = nextFromSource() {
-      return (nextScalar, Unicode._CanonicalNormData(nextScalar))
+      return (nextScalar, Unicode._CompatibilityNormData(nextScalar))
     } else {
       return nil
     }
   }
 
-  private mutating func decomposeNonNFDQC(
-    _ scalarInfo: ScalarAndNormData
+  private mutating func decomposeNonNFKDQC(
+    _ scalarInfo: ScalarAndCompatNormData
   ) {
     // Handle Hangul decomposition algorithmically.
     // S.base = 0xAC00
@@ -366,10 +366,10 @@ extension Unicode.NFDNormalizer {
 
   @inline(never)
   private mutating func decomposeSlow(
-    _ original: ScalarAndNormData
+    _ original: ScalarAndCompatNormData
   ) {
 
-    guard let decomp = Unicode._CanonicalDecomposition(original.scalar) else {
+    guard let decomp = Unicode._CompatibilityDecomposition(original.scalar) else {
       buffer.append(original)
       return
     }
@@ -379,9 +379,9 @@ extension Unicode.NFDNormalizer {
       let (scalar, len) = _decodeScalar(utf8, startingAt: 0)
       utf8 = UnsafeBufferPointer(rebasing: utf8[len...])
 
-      // Fast path: Because this will be emitted into the completed NFD buffer,
-      // we don't need to look at NFD_QC anymore.
-      let normData = Unicode._CanonicalNormData(onlyCCCAndNFCQC: scalar)
+      // FIXME: This could be a _CanonicalNormData lookup.
+      // We'd only need CCC for sorting, and NFC_QC is useful for composition.
+      let normData = Unicode._CompatibilityNormData(scalar)
       buffer.append((scalar, normData))
     }
   }

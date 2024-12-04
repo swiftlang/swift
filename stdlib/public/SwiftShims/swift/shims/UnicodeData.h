@@ -45,10 +45,19 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint16_t _swift_stdlib_getNormData(__swift_uint32_t scalar);
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_uint16_t _swift_stdlib_getCompatibilityNormData(__swift_uint32_t scalar);
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
 const __swift_uint8_t * const _swift_stdlib_nfd_decompositions;
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint32_t _swift_stdlib_getDecompositionEntry(__swift_uint32_t scalar);
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const __swift_uint8_t * const _swift_stdlib_nfkd_decompositions;
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_uint32_t _swift_stdlib_getCompatibilityDecompositionEntry(__swift_uint32_t scalar);
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint32_t _swift_stdlib_getComposition(__swift_uint32_t x,
