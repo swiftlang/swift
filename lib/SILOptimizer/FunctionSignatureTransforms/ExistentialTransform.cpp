@@ -221,10 +221,6 @@ void ExistentialSpecializerCloner::cloneArguments(
             NewFBuilder.emitLoadValueOperation(InsertLoc, NewArg, qual);
       }
 
-      if (NewFBuilder.hasOwnership() &&
-          NewArg->getOwnershipKind() == OwnershipKind::Unowned) {
-        NewArgValue = NewFBuilder.emitCopyValueOperation(InsertLoc, NewArg);
-      }
       ///  Simple case: Create an init_existential.
       /// %5 = init_existential_ref %0 : $T : $T, $P
       SILValue InitRef = NewFBuilder.createInitExistentialRef(
@@ -232,10 +228,6 @@ void ExistentialSpecializerCloner::cloneArguments(
           NewArg->getType().getASTType(),
           NewArgValue, Conformances);
 
-      if (NewFBuilder.hasOwnership() &&
-          NewArg->getOwnershipKind() == OwnershipKind::Unowned) {
-        CleanupValues.push_back(InitRef);
-      }
       // If we don't have an object and we are in ossa, the store will consume
       // the InitRef.
       if (!NewArg->getType().isObject()) {
