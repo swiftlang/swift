@@ -1898,18 +1898,7 @@ public:
                        bool implicit)
     : Expr(ExprKind::UnresolvedMember, implicit), DotLoc(dotLoc),
       NameLoc(nameLoc), Name(name) {
-    // FIXME(FunctionRefInfo): Really, we should be passing `nameLoc` directly,
-    // allowing the FunctionRefInfo to be treated as compound. This would
-    // require us to enable IUOs for compound names, e.g:
-    // ```
-    // struct S {
-    //   static func makeS(_: Int) -> S! { S() }
-    // }
-    //
-    // let s: S = .makeS(_:)(0)
-    // ```
-    setFunctionRefInfo(
-        FunctionRefInfo::unapplied(DeclNameLoc(nameLoc.getBaseNameLoc())));
+    setFunctionRefInfo(FunctionRefInfo::unapplied(nameLoc));
   }
 
   DeclNameRef getName() const { return Name; }
