@@ -1180,7 +1180,7 @@ public:
 
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   /// Enqueue a job onto the actor.
-  void enqueue(Job *job, JobPriority priority);
+  void enqueue(Job *job, JobPriority priority, SynchronousWaitJob *waitingForJob);
 
   /// Enqueue a stealer for the given task since it has been escalated to the
   /// new priority
@@ -1218,6 +1218,7 @@ public:
 #pragma clang diagnostic pop
   }
 #endif /* !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */
+
 
 private:
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
@@ -1360,7 +1361,15 @@ void DefaultActorImpl::scheduleActorProcessJob(
   swift_task_enqueueGlobal(job);
 }
 
-void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
+static void defaultActorDrain(
+    DefaultActorImpl *actor, SynchronousWaitJob *waitingForJob
+);
+
+void DefaultActorImpl::enqueue(Job *job, JobPriority priority, SynchronousWaitJob *waitingForJob) {
+  // If we've been told that we are waiting for a job, it has to be the
+  // job we're enqueing.
+  assert(!waitingForJob || waitingForJob == job);
+
   // We can do relaxed loads here, we are just using the current head in the
   // atomic state and linking that into the new job we are inserting, we don't
   // need acquires
@@ -1428,6 +1437,15 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
       if (!oldState.isScheduled() && newState.isScheduled()) {
         // We took responsibility to schedule the actor for the first time. See
         // also ownership rule (1)
+
+        // When there is a synchronous wait job, drain the queue now to
+        // complete the synchronous wait job rather than scheduling an actor
+        // processing job. This thread can't do any other work until the
+        // synchronous wait job completes anyway.
+        if (waitingForJob) {
+          return defaultActorDrain(this, waitingForJob);
+        }
+
         return scheduleActorProcessJob(newState.getMaxPriority(), taskExecutor);
       }
 
@@ -1637,7 +1655,15 @@ Job *DefaultActorImpl::drainOne() {
 // At the point of return from the job execution, we may not be holding the lock
 // of the same actor that we had started off with, so we need to reevaluate what
 // the current actor is
-static void defaultActorDrain(DefaultActorImpl *actor) {
+//
+// When this operation encounters a synchronous wait job, it will compare
+// that job's address against the given waitingForJob. If they are the
+// same, this thread is responsible for completing the synchronously waiting
+// job: once it has been executed, this function will unlock the actor and
+// return.
+static void defaultActorDrain(
+    DefaultActorImpl *actor, SynchronousWaitJob *waitingForJob
+) {
   SWIFT_TASK_DEBUG_LOG("Draining default actor %p", actor);
   DefaultActorImpl *currentActor = actor;
 
@@ -1659,12 +1685,21 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
       /*taskExecutor, will be replaced per each job. */
       TaskExecutorRef::undefined());
 
+  // If we are waiting for a specific job, prevent switching off of this
+  // actor to a new one. In other words, we want the thread to follow the
+  // actor (to this job) and not the task (which we normally do).
+  if (waitingForJob)
+    trackingInfo.disallowSwitching();
+
   while (true) {
     Job *job = currentActor->drainOne();
     if (job == NULL) {
       // No work left to do, try unlocking the actor. This may fail if there is
       // work concurrently enqueued in which case, we'd try again in the loop
-      if (currentActor->unlock(false)) {
+      //
+      // If we're waiting for a job, then force the unlock so we are guaranteed
+      // to exit.
+      if (currentActor->unlock(waitingForJob != nullptr)) {
         break;
       }
     } else {
@@ -1673,9 +1708,27 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
         trackingInfo.setTaskExecutor(taskExecutor);
       }
 
+      // Keep track of whether this was a synchronous wait job. If so, it
+      // won't get deallocated until after we've signaled it.
+      auto waitJob = dyn_cast<SynchronousWaitJob>(job);
+
       // This thread is now going to follow the task on this actor. It may hop off
       // the actor
       runJobInEstablishedExecutorContext(job);
+
+      // If the job we just finished was a synchronous wait job, signal it.
+      if (waitJob) {
+#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+        waitJob->signalFinished();
+#endif
+
+        // If we just finished up the synchronous wait job for this thread,
+        // we're done. Unlock the actor.
+        if (waitJob == waitingForJob) {
+          currentActor->unlock(true);
+          break;
+        }
+      }
 
       // We could have come back from the job on a generic executor and not as
       // part of a default actor. If so, there is no more work left for us to do
@@ -1711,7 +1764,7 @@ void ProcessOutOfLineJob::process(Job *job) {
   DefaultActorImpl *actor = self->Actor;
 
   swift_cxx_deleteObject(self);
-  return defaultActorDrain(actor); // 'return' forces tail call
+  return defaultActorDrain(actor, nullptr); // 'return' forces tail call
 }
 
 #endif /* !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */
@@ -2084,7 +2137,7 @@ void swift::swift_defaultActor_enqueue(Job *job, DefaultActor *_actor) {
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
   assert(false && "Should not enqueue onto default actor in actor as locks model");
 #else
-  asImpl(_actor)->enqueue(job, job->getPriority());
+  asImpl(_actor)->enqueue(job, job->getPriority(), /*waitingForJob=*/nullptr);
 #endif
 }
 
@@ -2344,6 +2397,53 @@ public:
   }
 };
 } // namespace
+
+void SynchronousWaitJob::process(Job *_job) {
+  auto *job = cast<SynchronousWaitJob>(_job);
+
+  auto *closure = job->closure;
+  auto *closureContext = job->closureContext;
+
+  closure(closureContext);
+}
+
+void SynchronousWaitJob::waitUntilFinished() {
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+  assert(false && "Not used when actors are locks");
+#else
+  SWIFT_TASK_DEBUG_LOG("Waiting until synchronous job %p is finished", this);
+
+  // This lock really protects nothing but we need to hold it
+  // while calling the condition wait.
+  cond.lock();
+
+  // Condition variables can have spurious wakeups so we need to check this in
+  // a do-while loop.
+  while (true) {
+    bool isFinished = finished.load(std::memory_order_relaxed);
+    if (isFinished)
+      break;
+
+    cond.wait();
+  }
+
+  cond.unlock();
+#endif
+}
+
+void SynchronousWaitJob::signalFinished() {
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+  assert(false && "Not used when actors are locks");
+#else
+  SWIFT_TASK_DEBUG_LOG("Signaling completion of synchronous job %p", this);
+
+  cond.withLock([&] {
+    finished.store(true, std::memory_order_relaxed);
+    cond.signal();
+  });
+#endif
+}
+
 #endif
 
 SWIFT_CC(swift)
@@ -2573,4 +2673,33 @@ bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
 
 bool DefaultActorImpl::isDistributedRemote() {
   return this->isDistributedRemoteActor;
+}
+
+void swift::swift_actor_synchronous_wait(
+    HeapObject *actor,
+    JobPriority priority,
+    SwiftNullaryClosure *closure,
+    void *closureContext
+) SWIFT_CC(swift) {
+  // We only permit this operation on default actors.
+  auto metadata = cast<ClassMetadata>(actor->metadata);
+  if (!isDefaultActorClass(metadata)) {
+    swift_Concurrency_fatalError(0, "cannot synchronously wait on a non-default actor\n");
+  }
+
+  auto *defaultActor = static_cast<DefaultActor*>(actor);
+
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+  (void)defaultActor->tryLock(false);
+  closure(closureContext);
+  (void)defaultActor->unlock(false);
+#else
+  SynchronousWaitJob job(priority, closure, closureContext);
+
+  // Enqueue the job on the actor.
+  asImpl(defaultActor)->enqueue(&job, job.getPriority(), &job);
+
+  // Wait until it finishes.
+  job.waitUntilFinished();
+#endif
 }

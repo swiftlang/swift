@@ -2586,6 +2586,10 @@ enum class JobKind : size_t {
   DefaultActorOverride,
   NullaryContinuation,
   IsolatedDeinit,
+
+  /// A job that represents synchronous code that is waiting to run on the
+  /// actor.
+  SynchronousWait,
 };
 
 /// The priority of a job.  Higher priorities are larger values.
