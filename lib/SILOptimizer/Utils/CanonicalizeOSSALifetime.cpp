@@ -65,8 +65,8 @@
 
 #define DEBUG_TYPE "copy-propagation"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OSSALifetimeCompletion.h"
@@ -132,18 +132,29 @@ static bool isDestroyOfCopyOf(SILInstruction *instruction, SILValue def) {
 bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   LLVM_DEBUG(llvm::dbgs() << "Computing canonical liveness from:\n";
              getCurrentDef()->print(llvm::dbgs()));
-  defUseWorklist.initialize(Def::root(getCurrentDef()));
+  SmallVector<unsigned, 8> indexWorklist;
+  ValueSet visitedDefs(getCurrentDef()->getFunction());
+  auto addDefToWorklist = [&](Def def) {
+    if (!visitedDefs.insert(def.getValue()))
+      return;
+    defUseWorklist.push_back(def);
+    indexWorklist.push_back(defUseWorklist.size() - 1);
+  };
+  defUseWorklist.clear();
+  addDefToWorklist(Def::root(getCurrentDef()));
   // Only the first level of reborrows need to be consider. All nested inner
   // adjacent reborrows and phis are encapsulated within their lifetimes.
   SILPhiArgument *arg;
   if ((arg = dyn_cast<SILPhiArgument>(getCurrentDef())) && arg->isPhi()) {
     visitInnerAdjacentPhis(arg, [&](SILArgument *reborrow) {
-      defUseWorklist.insert(Def::reborrow(reborrow));
+      addDefToWorklist(Def::reborrow(reborrow));
       return true;
     });
   }
-  while (auto def = defUseWorklist.pop()) {
-    auto value = def->getValue();
+  while (!indexWorklist.empty()) {
+    auto index = indexWorklist.pop_back_val();
+    auto def = defUseWorklist[index];
+    auto value = def.getValue();
     LLVM_DEBUG(llvm::dbgs() << "  Uses of value:\n";
                value->print(llvm::dbgs()));
 
@@ -154,11 +165,11 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       auto *user = use->getUser();
       // Recurse through copies.
       if (auto *copy = dyn_cast<CopyValueInst>(user)) {
-        defUseWorklist.insert(Def::copy(copy));
+        addDefToWorklist(Def::copy(copy));
         continue;
       }
       if (auto *bfi = dyn_cast<BorrowedFromInst>(user)) {
-        defUseWorklist.insert(Def::borrowedFrom(bfi));
+        addDefToWorklist(Def::borrowedFrom(bfi));
         continue;
       }
       // Handle debug_value instructions separately.
@@ -245,7 +256,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         // This branch reborrows a guaranteed phi whose lifetime is dependent on
         // currentDef.  Uses of the reborrowing phi extend liveness.
         auto *reborrow = PhiOperand(use).getValue();
-        defUseWorklist.insert(Def::reborrow(reborrow));
+        addDefToWorklist(Def::reborrow(reborrow));
         break;
       }
     }
@@ -1152,6 +1163,15 @@ void CanonicalizeOSSALifetime::rewriteCopies(
   // Shadow defUseWorklist in order to constrain its uses.
   auto &defUseWorklist = this->defUseWorklist;
 
+  SmallVector<unsigned, 8> indexWorklist;
+  ValueSet visitedDefs(getCurrentDef()->getFunction());
+  auto addDefToWorklist = [&](Def def) {
+    if (!visitedDefs.insert(def.getValue()))
+      return;
+    defUseWorklist.push_back(def);
+    indexWorklist.push_back(defUseWorklist.size() - 1);
+  };
+
   InstructionSetVector instsToDelete(getCurrentDef()->getFunction());
 
   // Visit each operand in the def-use chain.
@@ -1162,7 +1182,7 @@ void CanonicalizeOSSALifetime::rewriteCopies(
     auto *user = use->getUser();
     // Recurse through copies.
     if (auto *copy = dyn_cast<CopyValueInst>(user)) {
-      defUseWorklist.insert(Def::copy(copy));
+      addDefToWorklist(Def::copy(copy));
       return true;
     }
     if (destroys.contains(user)) {
@@ -1197,10 +1217,14 @@ void CanonicalizeOSSALifetime::rewriteCopies(
     return true;
   };
 
-  defUseWorklist.initialize(Def::root(getCurrentDef()));
+  defUseWorklist.clear();
+  addDefToWorklist(Def::root(getCurrentDef()));
   // Perform a def-use traversal, visiting each use operand.
-  while (auto def = defUseWorklist.pop()) {
-    switch (*def) {
+
+  while (!indexWorklist.empty()) {
+    auto index = indexWorklist.pop_back_val();
+    auto def = defUseWorklist[index];
+    switch (def) {
     case Def::Kind::BorrowedFrom:
     case Def::Kind::Reborrow:
       // Direct uses of these defs never need to be rewritten.  Being guaranteed
@@ -1208,7 +1232,7 @@ void CanonicalizeOSSALifetime::rewriteCopies(
       assert(def.getValue()->getOwnershipKind() == OwnershipKind::Guaranteed);
       break;
     case Def::Kind::Root: {
-      SILValue value = def->getValue();
+      SILValue value = def.getValue();
       for (auto useIter = value->use_begin(), endIter = value->use_end();
            useIter != endIter;) {
         Operand *use = *useIter++;
@@ -1219,7 +1243,7 @@ void CanonicalizeOSSALifetime::rewriteCopies(
       break;
     }
     case Def::Kind::Copy: {
-      SILValue value = def->getValue();
+      SILValue value = def.getValue();
       CopyValueInst *srcCopy = cast<CopyValueInst>(value);
       // Recurse through copies while replacing their uses.
       Operand *reusedCopyOp = nullptr;
