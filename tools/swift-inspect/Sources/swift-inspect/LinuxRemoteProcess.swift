@@ -78,8 +78,8 @@
         let process: LinuxRemoteProcess = LinuxRemoteProcess.fromOpaque(context!)
 
         // copy the string from the remote proces to get its length
-        guard let string = try? process.process.readString(address: address),
-          let len = UInt64(exactly: string.count)
+        guard let bytes = try? process.process.readRawString(address: address),
+          let len = UInt64(exactly: bytes.count)
         else { return 0 }
         return len
       }

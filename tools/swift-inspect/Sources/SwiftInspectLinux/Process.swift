@@ -35,25 +35,32 @@ public class Process {
   }
 
   // read a null-terminated string from the target process
-  public func readString(address: UInt64) throws -> String {
-    var accumulatedBytes = [UInt8]()
+  public func readString(address: UInt64, encoding: String.Encoding = .utf8) throws -> String {
+    let rawBytes = try readRawString(address: address)
+    guard let result = String(bytes: rawBytes, encoding: encoding) else {
+      throw Error.InvalidString(address: address)
+    }
+
+    return result
+  }
+
+  // read bytes from the remote process until a zero-byte is encountered; the
+  // zero-byte is not included in the result
+  public func readRawString(address: UInt64) throws -> [UInt8] {
     var readAddress: UInt64 = address
     let chunkSize: UInt = 64
+    var result: [UInt8] = []
 
     while true {
       let chunk: [UInt8] = try readArray(address: readAddress, upToCount: chunkSize)
 
       if let nullIndex = chunk.firstIndex(of: 0) {
-        accumulatedBytes.append(contentsOf: chunk.prefix(nullIndex))
+        result.append(contentsOf: chunk.prefix(nullIndex))
         break
       }
 
-      accumulatedBytes.append(contentsOf: chunk)
+      result.append(contentsOf: chunk)
       readAddress += UInt64(chunkSize)
-    }
-
-    guard let result = String(bytes: accumulatedBytes, encoding: .utf8) else {
-      throw Error.InvalidString(address: address)
     }
 
     return result
