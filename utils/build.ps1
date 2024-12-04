@@ -926,7 +926,7 @@ function Build-CMakeProject {
     [string] $Src,
     [string] $Bin,
     [string] $InstallTo = "",
-    [Platform] $Platform = "Windows",
+    [Platform] $Platform = [Platform]::Windows,
     [hashtable] $Arch,
     [string] $Generator = "Ninja",
     [string] $CacheScript = "",
@@ -952,7 +952,7 @@ function Build-CMakeProject {
   # Enter the developer command shell early so we can resolve cmake.exe
   # for version checks.
   Isolate-EnvVars {
-    if ($Platform -eq "Windows") {
+    if ($Platform -eq [Platform]::Windows) {
       Invoke-VsDevShell $Arch
     }
 
@@ -973,7 +973,7 @@ function Build-CMakeProject {
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
 
-    if (($Platform -ne "Windows") -or ($Arch.CMakeName -ne $BuildArch.CMakeName)) {
+    if (($Platform -ne [Platform]::Windows) -or ($Arch.CMakeName -ne $BuildArch.CMakeName)) {
       TryAdd-KeyValue $Defines CMAKE_SYSTEM_NAME $Platform
       TryAdd-KeyValue $Defines CMAKE_SYSTEM_PROCESSOR $Arch.CMakeName
     }
@@ -1021,14 +1021,14 @@ function Build-CMakeProject {
     }
 
     $CXXFlags = @()
-    if ($Platform -eq "Windows") {
+    if ($Platform -eq [Platform]::Windows) {
       $CXXFlags += $CFlags.Clone() + @("/Zc:__cplusplus")
     }
 
     if ($UseMSVCCompilers.Contains("C") -Or $UseMSVCCompilers.Contains("CXX") -Or
         $UseBuiltCompilers.Contains("C") -Or $UseBuiltCompilers.Contains("CXX") -Or
         $UsePinnedCompilers.Contains("C") -Or $UsePinnedCompilers.Contains("CXX")) {
-      if ($DebugInfo -and $Platform -eq "Windows") {
+      if ($DebugInfo -and $Platform -eq [Platform]::Windows) {
         Append-FlagsDefine $Defines CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded
         Append-FlagsDefine $Defines CMAKE_POLICY_CMP0141 NEW
         # Add additional linker flags for generating the debug info.
@@ -1066,7 +1066,7 @@ function Build-CMakeProject {
         TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER (Get-PinnedToolchainTool $Driver)
       }
       Append-FlagsDefine $Defines CMAKE_ASM_FLAGS "--target=$($Arch.LLVMTarget)"
-      if ($Platform -eq "Windows") {
+      if ($Platform -eq [Platform]::Windows) {
         TryAdd-KeyValue $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
       }
     }
@@ -1079,7 +1079,7 @@ function Build-CMakeProject {
       }
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER_TARGET $Arch.LLVMTarget
 
-      if (-not (Test-CMakeAtLeast -Major 3 -Minor 26 -Patch 3) -and $Platform -eq "Windows") {
+      if (-not (Test-CMakeAtLeast -Major 3 -Minor 26 -Patch 3) -and $Platform -eq [Platform]::Windows) {
         # Workaround for https://github.com/ninja-build/ninja/issues/2280
         TryAdd-KeyValue $Defines CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: "
       }
@@ -1098,7 +1098,7 @@ function Build-CMakeProject {
       }
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_TARGET $Arch.LLVMTarget
 
-      if (-not (Test-CMakeAtLeast -Major 3 -Minor 26 -Patch 3) -and $Platform -eq "Windows") {
+      if (-not (Test-CMakeAtLeast -Major 3 -Minor 26 -Patch 3) -and $Platform -eq [Platform]::Windows) {
         # Workaround for https://github.com/ninja-build/ninja/issues/2280
         TryAdd-KeyValue $Defines CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: "
       }
@@ -1118,7 +1118,7 @@ function Build-CMakeProject {
       } else {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER (Get-PinnedToolchainTool "swiftc.exe")
       }
-      if (-not ($Platform -eq "Windows")) {
+      if ($Platform -ne [Platform]::Windows) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_WORKS = "YES"
       }
       TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET $Arch.LLVMTarget.Replace("$AndroidAPILevel", "")
@@ -1167,7 +1167,7 @@ function Build-CMakeProject {
 
       # Debug Information
       if ($DebugInfo) {
-        if ($Platform -eq "Windows") {
+        if ($Platform -eq [Platform]::Windows) {
           if ($SwiftDebugFormat -eq "dwarf") {
             $SwiftArgs += @("-g", "-Xlinker", "/DEBUG:DWARF", "-use-ld=lld-link")
           } else {
@@ -1180,7 +1180,7 @@ function Build-CMakeProject {
         $SwiftArgs += "-gnone"
       }
 
-      if ($Platform -eq "Windows") {
+      if ($Platform -eq [Platform]::Windows) {
         $SwiftArgs += @("-Xlinker", "/INCREMENTAL:NO")
         # Swift requires COMDAT folding and de-duplication
         $SwiftArgs += @("-Xlinker", "/OPT:REF")
@@ -1781,9 +1781,9 @@ function Build-CURL([Platform]$Platform, $Arch) {
       CURL_USE_LIBSSH2 = "NO";
       CURL_USE_MBEDTLS = "NO";
       CURL_USE_OPENSSL = "NO";
-      CURL_USE_SCHANNEL = if ($Platform -eq "Windows") { "YES" } else { "NO" };
+      CURL_USE_SCHANNEL = if ($Platform -eq [Platform]::Windows) { "YES" } else { "NO" };
       CURL_USE_WOLFSSL = "NO";
-      CURL_WINDOWS_SSPI = if ($Platform -eq "Windows") { "YES" } else { "NO" };
+      CURL_WINDOWS_SSPI = if ($Platform -eq [Platform]::Windows) { "YES" } else { "NO" };
       CURL_ZLIB = "YES";
       CURL_ZSTD = "NO";
       ENABLE_ARES = "NO";
@@ -1804,8 +1804,8 @@ function Build-CURL([Platform]$Platform, $Arch) {
       USE_NGTCP2 = "NO";
       USE_QUICHE = "NO";
       USE_OPENSSL_QUIC = "NO";
-      USE_WIN32_IDN = if ($Platform -eq "Windows") { "YES" } else { "NO" };
-      USE_WIN32_LARGE_FILES = if ($Platform -eq "Windows") { "YES" } else { "NO" };
+      USE_WIN32_IDN = if ($Platform -eq [Platform]::Windows) { "YES" } else { "NO" };
+      USE_WIN32_LARGE_FILES = if ($Platform -eq [Platform]::Windows) { "YES" } else { "NO" };
       USE_WIN32_LDAP = "NO";
       ZLIB_ROOT = "$LibraryRoot\zlib-1.3.1\usr";
       ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ArchName\zlibstatic.lib";
@@ -1852,7 +1852,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
         SWIFT_NATIVE_SWIFT_TOOLS_PATH = (Join-Path -Path $CompilersBinaryCache -ChildPath "bin");
         SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
         SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
-        CMAKE_SHARED_LINKER_FLAGS = if ($Platform -eq "Windows") { @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF") } else { @() };
+        CMAKE_SHARED_LINKER_FLAGS = if ($Platform -eq [Platform]::Windows) { @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF") } else { @() };
       })
   }
 
@@ -1918,13 +1918,13 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
     $ShortArch = $Arch.LLVMName
 
     Isolate-EnvVars {
-      $SDKRoot = if ($Platform -eq "Windows") {
+      $SDKRoot = if ($Platform -eq [Platform]::Windows) {
         ""
       } else {
         (Get-Variable "${Platform}$($Arch.ShortName)" -ValueOnly).SDKInstallRoot
       }
 
-      $SDKRoot = if ($Platform -eq "Windows") {
+      $SDKRoot = if ($Platform -eq [Platform]::Windows) {
         ""
       } else {
         (Get-Variable "${Platform}$($Arch.ShortName)" -ValueOnly).SDKInstallRoot
@@ -1940,16 +1940,16 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -SwiftSDK:$SDKRoot `
         -Defines (@{
           ENABLE_TESTING = "NO";
-          FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
+          FOUNDATION_BUILD_TOOLS = if ($Platform -eq [Platform]::Windows) { "YES" } else { "NO" };
           CURL_DIR = "$LibraryRoot\curl-8.9.1\usr\lib\$Platform\$ShortArch\cmake\CURL";
-          LIBXML2_LIBRARY = if ($Platform -eq "Windows") {
+          LIBXML2_LIBRARY = if ($Platform -eq [Platform]::Windows) {
             "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2s.lib";
           } else {
             "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2.a";
           };
           LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.11.5\usr\include\libxml2";
           LIBXML2_DEFINITIONS = "-DLIBXML_STATIC";
-          ZLIB_LIBRARY = if ($Platform -eq "Windows") {
+          ZLIB_LIBRARY = if ($Platform -eq [Platform]::Windows) {
             "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\zlibstatic.lib"
           } else {
             "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\libz.a"
