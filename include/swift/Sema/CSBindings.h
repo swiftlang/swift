@@ -567,23 +567,19 @@ public:
   ///
   /// \param inferredBindings The set of all bindings inferred for type
   /// variables in the workset.
-  void inferTransitiveBindings(
-      const llvm::SmallDenseMap<TypeVariableType *, BindingSet>
-          &inferredBindings);
+  void inferTransitiveBindings();
 
   /// Detect subtype, conversion or equivalence relationship
   /// between two type variables and attempt to propagate protocol
   /// requirements down the subtype or equivalence chain.
-  void inferTransitiveProtocolRequirements(
-      llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
+  void inferTransitiveProtocolRequirements();
 
   /// Finalize binding computation for this type variable by
   /// inferring bindings from context e.g. transitive bindings.
   ///
   /// \returns true if finalization successful (which makes binding set viable),
   /// and false otherwise.
-  bool finalize(
-      llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
+  bool finalize(bool transitive);
 
   static BindingScore formBindingScore(const BindingSet &b);
 
