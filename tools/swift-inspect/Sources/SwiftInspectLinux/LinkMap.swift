@@ -28,7 +28,7 @@ class LinkMap {
   public let entries: [Entry]
 
   public init(for process: Process) throws {
-    guard let auxVec = AuxVec.load(for: process) else {
+    guard let auxVec = Self.loadAuxVec(for: process) else {
       throw Error.MissingAuxVecEntry("failed reading auxvec for \(process)")
     }
 
@@ -42,28 +42,24 @@ class LinkMap {
       throw Error.MissingAuxVecEntry("missing AT_PHNUM")
     }
 
-    let isElf64 = process.elfFile.isElf64
-    guard phdrSize == (isElf64 ? Elf64_Phdr.symbolSize : Elf32_Phdr.symbolSize) else {
+    guard phdrSize == MemoryLayout<Elf64_Phdr>.size else {
       throw Error.MalformedElf("AT_PHENT invalid size: \(phdrSize)")
     }
 
     // determine the base load address for the executable file and locate the
     // dynamic segment
-    var dynamicSegment: ElfPhdr? = nil
-    var baseLoadSegment: ElfPhdr? = nil
+    var dynamicSegment: Elf64_Phdr? = nil
+    var baseLoadSegment: Elf64_Phdr? = nil
     for i in 0...phdrCount {
       let address: UInt64 = phdrAddr + i * phdrSize
-      let phdr: ElfPhdr =
-        isElf64
-        ? try process.readStruct(address: address) as Elf64_Phdr
-        : try process.readStruct(address: address) as Elf32_Phdr
+      let phdr: Elf64_Phdr = try process.readStruct(address: address)
 
-      switch phdr.type {
+      switch phdr.p_type {
       case UInt32(PT_LOAD):
         // chose the PT_LOAD segment with the lowest p_vaddr value, which will
         // typically be zero
         if let loadSegment = baseLoadSegment {
-          if phdr.vaddr < loadSegment.vaddr { baseLoadSegment = phdr }
+          if phdr.p_vaddr < loadSegment.p_vaddr { baseLoadSegment = phdr }
         } else {
           baseLoadSegment = phdr
         }
@@ -86,23 +82,19 @@ class LinkMap {
       throw Error.MalformedElf("PT_LOAD segment not found")
     }
 
-    let ehdrSize = isElf64 ? Elf64_Ehdr.symbolSize : Elf32_Ehdr.symbolSize
+    let ehdrSize = MemoryLayout<Elf64_Ehdr>.size
     let loadAddr: UInt64 = phdrAddr - UInt64(ehdrSize)
-    let baseAddr: UInt64 = loadAddr - baseLoadSegment.vaddr
-    let dynamicSegmentAddr: UInt64 = baseAddr + dynamicSegment.vaddr
+    let baseAddr: UInt64 = loadAddr - baseLoadSegment.p_vaddr
+    let dynamicSegmentAddr: UInt64 = baseAddr + dynamicSegment.p_vaddr
 
     // parse through the dynamic segment to find the location of the .debug section
-    var rDebugEntry: ElfDyn? = nil
-    let entrySize = isElf64 ? Elf64_Dyn.symbolSize : Elf32_Dyn.symbolSize
-    let dynamicEntryCount = UInt(dynamicSegment.memsz / UInt64(entrySize))
+    var rDebugEntry: Elf64_Dyn? = nil
+    let entrySize = MemoryLayout<Elf64_Dyn>.size
+    let dynamicEntryCount = UInt(dynamicSegment.p_memsz / UInt64(entrySize))
     for i in 0...dynamicEntryCount {
       let address: UInt64 = dynamicSegmentAddr + UInt64(i) * UInt64(entrySize)
-      let dyn: ElfDyn =
-        isElf64
-        ? try process.readStruct(address: address) as Elf64_Dyn
-        : try process.readStruct(address: address) as Elf32_Dyn
-
-      if dyn.tag == DT_DEBUG {
+      let dyn: Elf64_Dyn = try process.readStruct(address: address)
+      if dyn.d_tag == DT_DEBUG {
         rDebugEntry = dyn
         break
       }
@@ -112,13 +104,7 @@ class LinkMap {
       throw Error.MalformedElf("DT_DEBUG not found in dynamic segment")
     }
 
-    // TODO(andrurogerz): only 64-bit processes are supported. Support for
-    // 32-bit processes requires distinc 32- and 64-bit definitions for the
-    // r_debug and link_map structs, which are not provided by the system
-    // headers.
-    guard isElf64 else { throw Error.MalformedElf("target process is not Elf64") }
-
-    let rDebugAddr: UInt64 = rDebugEntry.val
+    let rDebugAddr: UInt64 = rDebugEntry.d_un.d_val
     let rDebug: r_debug = try process.readStruct(address: rDebugAddr)
 
     var entries: [Entry] = []
@@ -133,5 +119,24 @@ class LinkMap {
     }
 
     self.entries = entries
+  }
+
+  // loads the auxiliary vector for a 64-bit process
+  static func loadAuxVec(for process: Process) -> [Int32 : UInt64]? {
+    guard let data = ProcFS.loadFile(for: process.pid, "auxv") else { return nil }
+    return data.withUnsafeBytes {
+      // in a 64-bit process, aux vector is an array of 8-byte pairs
+      let count = $0.count / MemoryLayout<(UInt64, UInt64)>.stride
+      let auxVec = Array($0.bindMemory(to: (UInt64, UInt64).self)[..<count])
+
+      var entries: [Int32: UInt64] = [:]
+      for (rawTag, value) in auxVec {
+        // the AT_ constants defined in linux/auxv.h are imported as Int32
+        guard let tag = Int32(exactly: rawTag) else { continue }
+        entries[tag] = UInt64(value)
+      }
+
+      return entries
+    }
   }
 }

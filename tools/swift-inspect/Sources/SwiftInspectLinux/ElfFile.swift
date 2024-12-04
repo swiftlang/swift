@@ -13,170 +13,146 @@
 import Foundation
 import LinuxSystemHeaders
 
+// TODO: replace this implementation with general purpose ELF parsing support
+// currently private to swift/stdlib/public/Backtrace.
 class ElfFile {
-  public enum Error: Swift.Error {
-    case FileOpenFailure(_ filePath: String)
-    case FileReadFailure(_ filePath: String, offset: UInt64, size: UInt64)
-    case FileNotElfFormat(_ filePath: String)
-    case MalformedElfFile(_ filePath: String, description: String = "")
+  public enum ELFError: Error {
+    case readFailure(_ filePath: String, offset: UInt64, size: UInt64)
+    case notELF64(_ filePath: String, _ description: String = "")
+    case malformedFile(_ filePath: String, _ description: String = "")
   }
 
   public typealias SymbolMap = [String: (start: UInt64, end: UInt64)]
 
   let filePath: String
   let file: FileHandle
-  let ehdr: ElfEhdr
-  let isElf64: Bool
+  let ehdr: Elf64_Ehdr
 
   public init(filePath: String) throws {
     self.filePath = filePath
 
-    guard let file = try? FileHandle(forReadingFrom: URL(fileURLWithPath: filePath)) else {
-      throw Error.FileOpenFailure(filePath)
-    }
+    let file = try FileHandle(forReadingFrom: URL(fileURLWithPath: filePath))
     self.file = file
 
     let identLen = Int(EI_NIDENT)
     file.seek(toFileOffset: 0)
     guard let identData = try file.read(upToCount: identLen), identData.count == identLen else {
       file.closeFile()
-      throw Error.FileReadFailure(filePath, offset: 0, size: UInt64(identLen))
+      throw ELFError.readFailure(filePath, offset: 0, size: UInt64(identLen))
     }
 
     let identMagic = String(bytes: identData.prefix(Int(SELFMAG)), encoding: .utf8)
     guard identMagic == ELFMAG else {
       file.closeFile()
-      throw Error.FileNotElfFormat(filePath)
+      throw ELFError.notELF64(filePath)
     }
 
     let identClass = identData[Int(EI_CLASS)]
-    let isElf64 = identClass == ELFCLASS64
-    guard isElf64 || identClass == ELFCLASS32 else {
-      file.closeFile()
-      throw Error.MalformedElfFile(filePath, description: "unsupported ELFCLASS: \(identClass)")
+    guard identClass == ELFCLASS64 else {
+      throw ELFError.notELF64(filePath, "\(identClass) != ELFCLASS64")
     }
-    self.isElf64 = isElf64
 
-    let ehdrSize = isElf64 ? Elf64_Ehdr.symbolSize : Elf32_Ehdr.symbolSize
+    let ehdrSize = MemoryLayout<Elf64_Ehdr>.size
     file.seek(toFileOffset: 0)
     guard let ehdrData = try file.read(upToCount: ehdrSize), ehdrData.count == ehdrSize else {
       file.closeFile()
-      throw Error.FileReadFailure(filePath, offset: 0, size: UInt64(ehdrSize))
+      throw ELFError.readFailure(filePath, offset: 0, size: UInt64(ehdrSize))
     }
 
-    if isElf64 {
-      self.ehdr = ehdrData.withUnsafeBytes { $0.load(as: Elf64_Ehdr.self) as ElfEhdr }
-    } else {
-      self.ehdr = ehdrData.withUnsafeBytes { $0.load(as: Elf32_Ehdr.self) as ElfEhdr }
-    }
+    self.ehdr = ehdrData.withUnsafeBytes { $0.load(as: Elf64_Ehdr.self) }
   }
 
-  deinit { file.closeFile() }
+  deinit { self.file.closeFile() }
 
   // returns a map of symbol names to their offset range in file (+ baseAddress)
   public func loadSymbols(baseAddress: UInt64 = 0) throws -> SymbolMap {
-    guard let sectionCount = UInt(exactly: self.ehdr.shnum) else {
-      throw Error.MalformedElfFile(
-        self.filePath, description: "invalid ElfEhdr.e_shnum: \(self.ehdr.shnum)")
+    guard let sectionCount = UInt(exactly: self.ehdr.e_shnum) else {
+      throw ELFError.malformedFile(
+        self.filePath, "invalid Elf64_Ehdr.e_shnum: \(self.ehdr.e_shnum)")
     }
 
     var symbols: SymbolMap = [:]
     for sectionIndex in 0..<sectionCount {
-      let shdr: ElfShdr =
-        isElf64
-        ? try self.readShdr(index: sectionIndex) as Elf64_Shdr
-        : try self.readShdr(index: sectionIndex) as Elf32_Shdr
+      let shdr: Elf64_Shdr = try self.readShdr(index: sectionIndex)
+      guard shdr.sh_type == SHT_SYMTAB || shdr.sh_type == SHT_DYNSYM else { continue }
 
-      guard shdr.type == SHT_SYMTAB || shdr.type == SHT_DYNSYM else { continue }
+      let sectionData: Data = try self.readSection(shdr)
+      let symTable: [Elf64_Sym] = sectionData.withUnsafeBytes { Array($0.bindMemory(to: Elf64_Sym.self)) }
 
-      let sectionData: Data = try self.readSection(shdr: shdr)
-      let symTable: [ElfSym] =
-        self.isElf64
-        ? sectionData.withUnsafeBytes { Array($0.bindMemory(to: Elf64_Sym.self)) }
-        : sectionData.withUnsafeBytes { Array($0.bindMemory(to: Elf32_Sym.self)) }
-
-      guard shdr.entsize == (self.isElf64 ? Elf64_Sym.symbolSize : Elf32_Sym.symbolSize) else {
-        throw Error.MalformedElfFile(self.filePath, description: "invalid ElfShdr.sh_entsize")
+      guard shdr.sh_entsize == MemoryLayout<Elf64_Sym>.size else {
+        throw ELFError.malformedFile(self.filePath, "invalid Elf64_Shdr.sh_entsize")
       }
 
       // the link field in the section header for a symbol table section refers
       // to the index of the string table section containing the symbol names
-      guard let linkIndex = UInt(exactly: shdr.link) else {
-        throw Error.MalformedElfFile(
-            self.filePath, description: "invalid ElfShdr.sh_link: \(shdr.link)")
+      guard let linkIndex = UInt(exactly: shdr.sh_link) else {
+        throw ELFError.malformedFile(self.filePath, "invalid Elf64_Shdr.sh_link: \(shdr.sh_link)")
       }
 
-      let shdrLink: ElfShdr =
-        isElf64
-        ? try self.readShdr(index: UInt(linkIndex)) as Elf64_Shdr
-        : try self.readShdr(index: UInt(linkIndex)) as Elf32_Shdr
-
-      guard shdrLink.type == SHT_STRTAB else {
-        throw Error.MalformedElfFile(self.filePath, description: "linked section not SHT_STRTAB")
+      let shdrLink: Elf64_Shdr = try self.readShdr(index: UInt(linkIndex))
+      guard shdrLink.sh_type == SHT_STRTAB else {
+        throw ELFError.malformedFile(self.filePath, "linked section not SHT_STRTAB")
       }
 
       // load the entire contents of the string table into memory
-      let strTable: Data = try self.readSection(shdr: shdrLink)
+      let strTable: Data = try self.readSection(shdrLink)
 
-      let symCount = Int(shdr.size / shdr.entsize)
+      let symCount = Int(shdr.sh_size / shdr.sh_entsize)
       for symIndex in 0..<symCount {
         let sym = symTable[symIndex]
-        guard sym.shndx != SHN_UNDEF, sym.value != 0, sym.size != 0 else { continue }
+        guard sym.st_shndx != SHN_UNDEF, sym.st_value != 0, sym.st_size != 0 else { continue }
 
-        // sym.name is a byte offset into the string table
-        guard let strStart = Int(exactly: sym.name), strStart < strTable.count else {
-          throw Error.MalformedElfFile(
-            self.filePath, description: "invalid string table offset: \(sym.name)")
+        // sym.st_name is a byte offset into the string table
+        guard let strStart = Int(exactly: sym.st_name), strStart < strTable.count else {
+          throw ELFError.malformedFile(self.filePath, "invalid string table offset: \(sym.st_name)")
         }
 
         guard let strEnd = strTable[strStart...].firstIndex(of: 0),
           let symName = String(data: strTable[strStart..<strEnd], encoding: .utf8)
         else {
-          throw Error.MalformedElfFile(
-            self.filePath, description: "invalid string @ offset \(strStart)")
+          throw ELFError.malformedFile(self.filePath, "invalid string @ offset \(strStart)")
         }
 
         // rebase the symbol value on the base address provided by the caller
-        let symStart = sym.value + baseAddress
-        symbols[symName] = (start: symStart, end: symStart + sym.size)
+        let symStart = sym.st_value + baseAddress
+        symbols[symName] = (start: symStart, end: symStart + sym.st_size)
       }
     }
 
     return symbols
   }
 
-  // reads and returns the Elf32_Shdr or Elf64_Shdr at the specified index
-  internal func readShdr<T: ElfShdr>(index: UInt) throws -> T {
-    guard index < self.ehdr.shnum else {
-      throw Error.MalformedElfFile(
-        self.filePath, description: "section index \(index) >= ElfEhdr.e_shnum \(self.ehdr.shnum))")
+  // reads and returns the Elf64_Shdr at the specified index
+  internal func readShdr(index: UInt) throws -> Elf64_Shdr {
+    guard index < self.ehdr.e_shnum else {
+      throw ELFError.malformedFile(
+        self.filePath, "section index \(index) >= Elf64_Ehdr.e_shnum \(self.ehdr.e_shnum))")
     }
 
-    let shdrSize = T.symbolSize
-    guard shdrSize == self.ehdr.shentsize else {
-      throw Error.MalformedElfFile(self.filePath, description: "ElfEhdr.e_shentsize != \(shdrSize)")
+    let shdrSize = MemoryLayout<Elf64_Shdr>.size
+    guard shdrSize == self.ehdr.e_shentsize else {
+      throw ELFError.malformedFile(self.filePath, "Elf64_Ehdr.e_shentsize != \(shdrSize)")
     }
 
-    let shdrOffset: UInt64 = self.ehdr.shoff + UInt64(index) * UInt64(shdrSize)
+    let shdrOffset: UInt64 = self.ehdr.e_shoff + UInt64(index) * UInt64(shdrSize)
     self.file.seek(toFileOffset: shdrOffset)
     guard let shdrData = try self.file.read(upToCount: shdrSize), shdrData.count == shdrSize else {
-      throw Error.FileReadFailure(self.filePath, offset: shdrOffset, size: UInt64(shdrSize))
+      throw ELFError.readFailure(self.filePath, offset: shdrOffset, size: UInt64(shdrSize))
     }
 
-    return shdrData.withUnsafeBytes { $0.load(as: T.self) as T }
+    return shdrData.withUnsafeBytes { $0.load(as: Elf64_Shdr.self) }
   }
 
   // reads and returns all data in the specified section
-  internal func readSection(shdr: ElfShdr) throws -> Data {
-    guard let sectionSize = Int(exactly: shdr.size) else {
-      throw Error.MalformedElfFile(
-        self.filePath, description: "ElfShdr.sh_size too large \(shdr.size)")
+  internal func readSection(_ shdr: Elf64_Shdr) throws -> Data {
+    guard let sectionSize = Int(exactly: shdr.sh_size) else {
+      throw ELFError.malformedFile(self.filePath, "Elf64_Shdr.sh_size too large \(shdr.sh_size)")
     }
 
-    let fileOffset = shdr.offset
+    let fileOffset = shdr.sh_offset
     self.file.seek(toFileOffset: fileOffset)
     guard let data = try self.file.read(upToCount: sectionSize), data.count == sectionSize else {
-      throw Error.FileReadFailure(self.filePath, offset: fileOffset, size: UInt64(sectionSize))
+      throw ELFError.readFailure(self.filePath, offset: fileOffset, size: UInt64(sectionSize))
     }
 
     return data
