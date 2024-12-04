@@ -13,8 +13,8 @@
 import Foundation
 
 public class MemoryMap {
-  public enum Error: Swift.Error {
-    case InvalidProcMapsFile
+  public enum MemoryMapError: Error {
+    case failedLoadingMapsFile(for: pid_t)
   }
 
   public struct Entry {
@@ -31,7 +31,7 @@ public class MemoryMap {
 
   public init(for pid: pid_t) throws {
     guard let content = ProcFS.loadFileAsString(for: pid, "maps") else {
-      throw Error.InvalidProcMapsFile
+      throw MemoryMapError.failedLoadingMapsFile(for: pid)
     }
 
     var entries: [Entry] = []

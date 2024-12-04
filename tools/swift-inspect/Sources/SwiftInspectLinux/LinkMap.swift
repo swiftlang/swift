@@ -14,10 +14,10 @@ import Foundation
 import LinuxSystemHeaders
 
 class LinkMap {
-  public enum Error: Swift.Error {
-    case MalformedElf(_ description: String)
-    case MissingAuxVecEntry(_ description: String)
-    case ProcessReadMemoryFailure(address: UInt, _ description: String = "")
+  public enum LinkMapError: Error {
+    case failedLoadingAuxVec(for: pid_t)
+    case missingAuxVecEntry(for: pid_t, _ tag: Int32)
+    case malformedELF(for: pid_t, _ description: String)
   }
 
   public struct Entry {
@@ -28,22 +28,21 @@ class LinkMap {
   public let entries: [Entry]
 
   public init(for process: Process) throws {
-    guard let auxVec = Self.loadAuxVec(for: process) else {
-      throw Error.MissingAuxVecEntry("failed reading auxvec for \(process)")
+    let auxVec = try Self.loadAuxVec(for: process.pid)
+    guard let phdrAddr = auxVec[AT_PHDR] else {
+      throw LinkMapError.missingAuxVecEntry(for: process.pid, AT_PHDR)
     }
 
-    guard let phdrAddr = auxVec[AT_PHDR] else { throw Error.MissingAuxVecEntry("missing AT_PHDR") }
-
     guard let phdrSize = auxVec[AT_PHENT] else {
-      throw Error.MissingAuxVecEntry("missing AT_PHENT")
+      throw LinkMapError.missingAuxVecEntry(for: process.pid, AT_PHENT)
     }
 
     guard let phdrCount = auxVec[AT_PHNUM] else {
-      throw Error.MissingAuxVecEntry("missing AT_PHNUM")
+      throw LinkMapError.missingAuxVecEntry(for: process.pid, AT_PHNUM)
     }
 
     guard phdrSize == MemoryLayout<Elf64_Phdr>.size else {
-      throw Error.MalformedElf("AT_PHENT invalid size: \(phdrSize)")
+      throw LinkMapError.malformedELF(for: process.pid, "AT_PHENT invalid size: \(phdrSize)")
     }
 
     // determine the base load address for the executable file and locate the
@@ -66,7 +65,7 @@ class LinkMap {
 
       case UInt32(PT_DYNAMIC):
         guard dynamicSegment == nil else {
-          throw Error.MalformedElf("multiple PT_DYNAMIC segments found")
+          throw LinkMapError.malformedELF(for: process.pid, "multiple PT_DYNAMIC segments found")
         }
         dynamicSegment = phdr
 
@@ -75,11 +74,11 @@ class LinkMap {
     }
 
     guard let dynamicSegment = dynamicSegment else {
-      throw Error.MalformedElf("PT_DYNAMIC segment not found")
+      throw LinkMapError.malformedELF(for: process.pid, "PT_DYNAMIC segment not found")
     }
 
     guard let baseLoadSegment = baseLoadSegment else {
-      throw Error.MalformedElf("PT_LOAD segment not found")
+      throw LinkMapError.malformedELF(for: process.pid, "PT_LOAD segment not found")
     }
 
     let ehdrSize = MemoryLayout<Elf64_Ehdr>.size
@@ -101,7 +100,7 @@ class LinkMap {
     }
 
     guard let rDebugEntry = rDebugEntry else {
-      throw Error.MalformedElf("DT_DEBUG not found in dynamic segment")
+      throw LinkMapError.malformedELF(for: process.pid, "DT_DEBUG not found in dynamic segment")
     }
 
     let rDebugAddr: UInt64 = rDebugEntry.d_un.d_val
@@ -122,8 +121,11 @@ class LinkMap {
   }
 
   // loads the auxiliary vector for a 64-bit process
-  static func loadAuxVec(for process: Process) -> [Int32 : UInt64]? {
-    guard let data = ProcFS.loadFile(for: process.pid, "auxv") else { return nil }
+  static func loadAuxVec(for pid: pid_t) throws -> [Int32 : UInt64] {
+    guard let data = ProcFS.loadFile(for: pid, "auxv") else {
+      throw LinkMapError.failedLoadingAuxVec(for: pid)
+    }
+
     return data.withUnsafeBytes {
       // in a 64-bit process, aux vector is an array of 8-byte pairs
       let count = $0.count / MemoryLayout<(UInt64, UInt64)>.stride

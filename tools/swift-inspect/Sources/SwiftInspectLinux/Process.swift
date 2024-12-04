@@ -14,9 +14,9 @@ import Foundation
 import LinuxSystemHeaders
 
 public class Process {
-  public enum Error: Swift.Error {
-    case ProcessVmReadFailure(pid: pid_t, address: UInt64, size: UInt64)
-    case InvalidString(address: UInt64)
+  public enum ProcessError: Error {
+    case processVmReadFailure(pid: pid_t, address: UInt64, size: UInt64)
+    case malformedString(address: UInt64)
   }
 
   let pid: pid_t
@@ -38,7 +38,7 @@ public class Process {
   public func readString(address: UInt64, encoding: String.Encoding = .utf8) throws -> String {
     let rawBytes = try readRawString(address: address)
     guard let result = String(bytes: rawBytes, encoding: encoding) else {
-      throw Error.InvalidString(address: address)
+      throw ProcessError.malformedString(address: address)
     }
 
     return result
@@ -79,7 +79,7 @@ public class Process {
     }
 
     guard array.count > 0 else {
-      throw Error.ProcessVmReadFailure(pid: self.pid, address: address, size: UInt64(maxSize))
+      throw ProcessError.processVmReadFailure(pid: self.pid, address: address, size: UInt64(maxSize))
     }
 
     return array
