@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt %s | %target-sil-opt -sil-print-no-uses | %FileCheck %s
 
+// REQUIRES: PTRSIZE=64
+
 sil_stage canonical
 
 import Builtin
