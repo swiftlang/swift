@@ -382,7 +382,7 @@ static void determineBestChoicesInContext(
 
       SmallVector<std::pair<Type, bool>, 2> types;
       if (auto *typeVar = argType->getAs<TypeVariableType>()) {
-        auto bindingSet = cs.getBindingsFor(typeVar, /*finalize=*/true);
+        auto bindingSet = cs.getBindingsFor(typeVar);
 
         for (const auto &binding : bindingSet.Bindings) {
           types.push_back({binding.BindingType, /*fromLiteral=*/false});
@@ -421,7 +421,7 @@ static void determineBestChoicesInContext(
 
     auto resultType = cs.simplifyType(argFuncType->getResult());
     if (auto *typeVar = resultType->getAs<TypeVariableType>()) {
-      auto bindingSet = cs.getBindingsFor(typeVar, /*finalize=*/true);
+      auto bindingSet = cs.getBindingsFor(typeVar);
 
       for (const auto &binding : bindingSet.Bindings) {
         resultTypes.push_back(binding.BindingType);
