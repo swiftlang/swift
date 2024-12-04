@@ -64,8 +64,8 @@ public class SymbolCache {
       } else if entry.end <= address {
         lowerBound = currentIndex + 1
       } else {
-        assert(address >= entry.start)
-        assert(address < entry.end)
+        precondition(address >= entry.start)
+        precondition(address < entry.end)
         return entry
       }
     }

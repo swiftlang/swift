@@ -66,8 +66,8 @@ public class MemoryMap {
       } else if entry.endAddr <= addr {
         lowerBound = currentIndex + 1
       } else {
-        assert(addr >= entry.startAddr)
-        assert(addr < entry.endAddr)
+        precondition(addr >= entry.startAddr)
+        precondition(addr < entry.endAddr)
         return entry
       }
     }
