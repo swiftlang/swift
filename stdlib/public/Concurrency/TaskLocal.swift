@@ -158,7 +158,7 @@ public macro TaskLocal() =
 ///       }
 ///     }
 ///
-/// - SeeAlso: ``TaskLocal-macro``
+/// - SeeAlso: ``TaskLocal()-macro``
 @available(SwiftStdlib 5.1, *)
 public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible {
   let defaultValue: Value
