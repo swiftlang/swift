@@ -55,7 +55,7 @@
 /docs/Windows*                            @compnerd
 
 # include
-/include/swift-c/DependencyScan/                   @artemcm
+/include/swift-c/DependencyScan/                   @artemcm @cachemeifyoucan
 /include/swift/*Demangl*/                          @rjmccall
 /include/swift/AST/                                @hborla @slavapestov @xedin
 /include/swift/AST/*Availability*                  @tshortli
@@ -71,7 +71,7 @@
 /include/swift/Basic/                              @DougGregor
 /include/swift/Basic/Features.def                  @DougGregor @hborla
 /include/swift/ClangImporter                       @zoecarver @hyp @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun
-/include/swift/DependencyScan                      @artemcm
+/include/swift/DependencyScan                      @artemcm @cachemeifyoucan
 /include/swift/Driver*/                            @artemcm
 /include/swift/Frontend*/                          @artemcm @tshortli
 /include/swift/IDE/                                @ahoppen @bnbarham @hamishknight @rintaro
@@ -118,7 +118,7 @@
 /lib/Basic/Windows                                  @compnerd
 /lib/ClangImporter                                  @zoecarver @hyp @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun
 /lib/ClangImporter/DWARFImporter*                   @adrian-prantl
-/lib/DependencyScan                                 @artemcm
+/lib/DependencyScan                                 @artemcm @cachemeifyoucan
 /lib/Driver*/                                       @artemcm
 /lib/DriverTool/autolink_extract_main.cpp           @MaxDesiatov @etcwilde
 /lib/DriverTool/sil*                                @jckarter
@@ -247,7 +247,7 @@
 /unittests/*Demangl*/                     @rjmccall
 /unittests/AST/                           @hborla @slavapestov @xedin
 /unittests/AST/*Evaluator*                @CodaFi @slavapestov
-/unittests/DependencyScan/                @artemcm
+/unittests/DependencyScan/                @artemcm @cachemeifyoucan
 /unittests/FrontendTool/                  @artemcm @tshortli
 /unittests/Parse/                         @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
 /unittests/Reflection/                    @slavapestov
