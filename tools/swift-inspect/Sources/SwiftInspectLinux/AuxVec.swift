@@ -16,11 +16,7 @@ import LinuxSystemHeaders
 internal class AuxVec {
   // loads the auxiliary vector for a process
   public static func load(for process: Process) -> [Int32 : UInt64]? {
-    let filePath = "/proc/\(process.pid)/auxv"
-    guard let fileHandle = FileHandle(forReadingAtPath: filePath) else { return nil }
-    defer { fileHandle.closeFile() }
-
-    guard let data = try? fileHandle.readToEnd(), data.count > 0 else { return nil }
+    guard let data = ProcFS.loadFile(for: process.pid, "auxv") else { return nil }
 
     func fromData<T: UnsignedInteger>(_ data: Data) -> [(T, T)] {
       return data.withUnsafeBytes {

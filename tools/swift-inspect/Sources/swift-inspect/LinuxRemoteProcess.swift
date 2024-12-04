@@ -102,9 +102,12 @@
 
     init?(processId: ProcessIdentifier) {
       self.processIdentifier = processId
+
+      if let processName = SwiftInspectLinux.ProcFS.loadFileAsString(for: processId, "cmdline") {
+        self.processName = processName
+      }
+
       do {
-        let path = "/proc/\(processId)/cmdline"
-        self.processName = try String(contentsOfFile: path, encoding: .ascii)
         self.process = try SwiftInspectLinux.Process(processId)
         self.symbolCache = try SwiftInspectLinux.SymbolCache(for: process)
         self.memoryMap = try SwiftInspectLinux.MemoryMap(for: processId)
