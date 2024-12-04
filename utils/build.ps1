@@ -759,7 +759,7 @@ function Fetch-Dependencies {
     Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
       $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
       $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
-    Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
+      Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
     }
   }
 
@@ -790,14 +790,13 @@ function Fetch-Dependencies {
 
   # Ensure pip is installed, else bootstrap it
   try {
-    Invoke-Program -OutNull $Python -m pip *> $null
+    Invoke-Program -OutNull $(Get-PythonExecutable) -m pip *> $null
   } catch {
     Write-Output "Installing pip ..."
-    Invoke-Program -OutNull $Python '-I' -m ensurepip -U --default-pip
+    Invoke-Program -OutNull $(Get-PythonExecutable) '-I' -m ensurepip -U --default-pip
   }
 
   function Ensure-PythonModule($Name) {
-    $Python = $(Get-PythonExecutable)
     $Info = $Components[$Name]
     if ($Info -eq $null) {
       throw "Unknown component requested"
@@ -805,11 +804,11 @@ function Fetch-Dependencies {
     $CanonicalName = [IO.Path]::GetFileNameWithoutExtension($Info.URL)
     
     try {
-      Invoke-Program -OutNull $Python -c 'import $name' *> $null
+      Invoke-Program -OutNull $(Get-PythonExecutable) -c 'import $name' *> $null
     } catch {
       DownloadAndVerify $Name "$BinaryCache\python\$CanonicalName.whl"
       Write-Output "Installing '$CanonicalName.whl' ..."
-      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\$CanonicalName.whl" --disable-pip-version-check
+      Invoke-Program -OutNull $(Get-PythonExecutable) '-I' -m pip install "$BinaryCache\python\$CanonicalName.whl" --disable-pip-version-check
     }
   }
 
