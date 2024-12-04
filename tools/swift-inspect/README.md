@@ -18,7 +18,7 @@ swift build -Xcc -I%SDKROOT%\usr\include\swift\SwiftRemoteMirror -Xlinker %SDKRO
 
 #### Linux
 
-In order to build on Linux, some additional parameters must be passed to the build tool to loace the necessary includes and libraries
+In order to build on Linux, some additional parameters must be passed to the build tool to locate the necessary includes and libraries.
 
 ~~~
 swift build -Xswiftc -I$(git rev-parse --show-toplevel)/include/swift/SwiftRemoteMirror -Xlinker -lswiftRemoteMirror
