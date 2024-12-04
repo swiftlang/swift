@@ -212,10 +212,6 @@ $Components = @{
     URL = "https://github.com/lexxmark/winflexbison/releases/download/v$WinFlexBisonVersion/win_flex_bison-$WinFlexBisonVersion.zip"
     Hash = "8D324B62BE33604B2C45AD1DD34AB93D722534448F55A16CA7292DE32B6AC135"
   }
-  GnuWin32Make = @{
-    URL = "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip"
-    Hash = "fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7"
-  }
   packaging = @{
     URL = "https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl"
     Hash = "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"
@@ -225,14 +221,6 @@ $Components = @{
     # https://github.com/swiftlang/llvm-project/issues/9289
     URL = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl"
     Hash = "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2"
-  }
-  psutil = @{
-    URL = "https://files.pythonhosted.org/packages/11/91/87fa6f060e649b1e1a7b19a4f5869709fbf750b7c8c262ee776ec32f3028/psutil-6.1.0-cp37-abi3-win_amd64.whl"
-    Hash = "a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be"
-  }
-  unittest2 = @{
-    URL = "https://files.pythonhosted.org/packages/72/20/7f0f433060a962200b7272b8c12ba90ef5b903e218174301d0abfd523813/unittest2-1.1.0-py2.py3-none-any.whl"
-    Hash = "13f77d0875db6d9b435e1d4f41e74ad4cc2eb6e1d5c824996092b3430f088bb8"
   }
 }
 
@@ -771,7 +759,7 @@ function Fetch-Dependencies {
     Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
       $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
       $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
-    Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
+      Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
     }
   }
 
@@ -795,37 +783,38 @@ function Fetch-Dependencies {
     }
   }
 
-  function Ensure-PythonModules($Python) {
-    # First ensure pip is installed, else bootstrap it
-    try {
-      Invoke-Program -OutNull $Python -m pip *> $null
-    } catch {
-      Write-Output "Installing pip ..."
-      Invoke-Program -OutNull $Python '-I' -m ensurepip -U --default-pip
-    }
-    # 'packaging' is required for building LLVM 18+
-    try {
-      Invoke-Program -OutNull $Python -c 'import packaging' *> $null
-    } catch {
-      DownloadAndVerify "packaging" "$BinaryCache\python\packaging-24.1-py3-none-any.whl"
-      Write-Output "Installing 'packaging-24.1-py3-none-any.whl' ..."
-      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\packaging-24.1-py3-none-any.whl" --disable-pip-version-check
-    }
-    try {
-      Invoke-Program -OutNull $Python -c 'import distutils' *> $null
-    } catch {
-      DownloadAndVerify "distutils" "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl"
-      Write-Output "Installing 'setuptools-75.1.0-py3-none-any.whl' ..."
-      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" --disable-pip-version-check
-    }
-  }
-
   Download-Python $HostArchName
   if ($IsCrossCompiling) {
     Download-Python $BuildArchName
   }
+
+  # Ensure pip is installed, else bootstrap it
+  try {
+    Invoke-Program -OutNull $(Get-PythonExecutable) -m pip *> $null
+  } catch {
+    Write-Output "Installing pip ..."
+    Invoke-Program -OutNull $(Get-PythonExecutable) '-I' -m ensurepip -U --default-pip
+  }
+
+  function Ensure-PythonModule($Name) {
+    $Info = $Components[$Name]
+    if ($Info -eq $null) {
+      throw "Unknown component requested"
+    }
+    $CanonicalName = [IO.Path]::GetFileNameWithoutExtension($Info.URL)
+    
+    try {
+      Invoke-Program -OutNull $(Get-PythonExecutable) -c 'import $name' *> $null
+    } catch {
+      DownloadAndVerify $Name "$BinaryCache\python\$CanonicalName.whl"
+      Write-Output "Installing '$CanonicalName.whl' ..."
+      Invoke-Program -OutNull $(Get-PythonExecutable) '-I' -m pip install "$BinaryCache\python\$CanonicalName.whl" --disable-pip-version-check
+    }
+  }
+
   # Ensure Python modules that are required as host build tools
-  Ensure-PythonModules "$(Get-PythonExecutable)"
+  Ensure-PythonModule "packaging"
+  Ensure-PythonModule "distutils"
 
   if ($Android) {
     # Only a specific NDK version is supported right now.
