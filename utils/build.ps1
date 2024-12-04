@@ -988,7 +988,6 @@ function Build-CMakeProject {
     }
 
     TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE Release
-    TryAdd-KeyValue $Defines CMAKE_MT "mt"
 
     $CFlags = @()
     switch ($Platform) {
@@ -1411,6 +1410,8 @@ function Build-BuildTools($Arch) {
     -BuildTargets llvm-tblgen,clang-tblgen,clang-pseudo-gen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
     -Defines @{
       CMAKE_CROSSCOMPILING = "NO";
+      CLANG_ENABLE_LIBXML2 = "NO";
+      LLDB_ENABLE_LIBXML2 = "NO";
       LLDB_ENABLE_PYTHON = "NO";
       LLDB_INCLUDE_TESTS = "NO";
       LLDB_ENABLE_SWIFT_SUPPORT = "NO";
@@ -1509,7 +1510,9 @@ function Build-Compilers() {
       -Defines ($TestingDefines + @{
         CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
         CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         CMAKE_Swift_FLAGS = $SwiftFlags;
+        LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\Windows\$($Arch.LLVMName)\cmake\libxml2-2.11.5";
         LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
         LLDB_PYTHON_EXT_SUFFIX = ".pyd";
         LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
@@ -1932,14 +1935,9 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -Defines (@{
           ENABLE_TESTING = "NO";
           FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
+          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
           CURL_DIR = "$LibraryRoot\curl-8.9.1\usr\lib\$Platform\$ShortArch\cmake\CURL";
-          LIBXML2_LIBRARY = if ($Platform -eq "Windows") {
-            "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2s.lib";
-          } else {
-            "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2.a";
-          };
-          LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.11.5\usr\include\libxml2";
-          LIBXML2_DEFINITIONS = "-DLIBXML_STATIC";
+          LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\cmake\libxml2-2.11.5";
           ZLIB_LIBRARY = if ($Platform -eq "Windows") {
             "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\zlibstatic.lib"
           } else {
@@ -2780,6 +2778,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-CMark $BuildArch
   Invoke-BuildStep Build-BuildTools $BuildArch
   if ($IsCrossCompiling) {
+    Invoke-BuildStep Build-XML2 Windows $BuildArch
     Invoke-BuildStep Build-Compilers -Build $BuildArch
   }
   if ($IncludeDS2) {
@@ -2787,6 +2786,7 @@ if (-not $SkipBuild) {
   }
 
   Invoke-BuildStep Build-CMark $HostArch
+  Invoke-BuildStep Build-XML2 Windows $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
 }
 
