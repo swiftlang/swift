@@ -8476,15 +8476,15 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
               break;
 
             for (auto attr : decl->getAttrs()) {
-              if (auto customAttr = dyn_cast<CustomAttr>(attr)) {
-                if (customAttr->getArgs() != nullptr) {
-                  hasNonclonableAttribute = true;
-                  break;
-                }
+              if (!attr->canClone()) {
+                hasNonclonableAttribute = true;
+                break;
               }
             }
           }
 
+          // We cannot clone one of the attributes. Go back and build a new
+          // source file without caching it.
           if (hasNonclonableAttribute) {
             cached = false;
             continue;
@@ -8492,10 +8492,13 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         }
 
         // Collect the attributes from the synthesized top-level declaration in
-        // the source file.
+        // the source file. If we're using a cached copy, clone the attribute.
         for (auto decl : topLevelDecls) {
-          for (auto attr : decl->getAttrs()) {
-            MappedDecl->getAttrs().add(attr->clone(SwiftContext));
+          SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
+                                                decl->getAttrs().end());
+          for (auto attr : attrs) {
+            MappedDecl->getAttrs().add(cached ? attr->clone(SwiftContext)
+                                              : attr);
           }
         }
 
