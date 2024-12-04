@@ -61,6 +61,7 @@ public class Process {
 
   // read an array of type T elements from the target process
   public func readArray<T>(address: UInt64, upToCount: UInt) throws -> [T] {
+    guard upToCount > 0 else { return [] }
     let maxSize = upToCount * UInt(MemoryLayout<T>.stride)
     let array: [T] = Array(unsafeUninitializedCapacity: Int(upToCount)) { buffer, initCount in
       var local = iovec(iov_base: buffer.baseAddress!, iov_len: Int(maxSize))
