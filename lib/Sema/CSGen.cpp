@@ -2928,19 +2928,20 @@ namespace {
             TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
         // Tuple splat is still allowed for patterns (with a warning in Swift 5)
-        // so we need to start here from single-apply to make sure that e.g.
+        // so we need to set a non-compound reference to make sure that e.g.
         // `case test(x: Int, y: Int)` gets the labels preserved when matched
         // with `case let .test(tuple)`.
-        FunctionRefInfo functionRefInfo =
-            FunctionRefInfo::singleBaseNameApply();
+        auto functionRefInfo = FunctionRefInfo::unappliedBaseName();
+        if (enumPattern->hasSubPattern())
+          functionRefInfo = functionRefInfo.addingApplicationLevel();
+
         // If sub-pattern is a tuple we'd need to mark reference as compound,
         // that would make sure that the labels are dropped in cases
         // when `case` has a single tuple argument (tuple explosion) or multiple
         // arguments (tuple-to-tuple conversion).
-        // FIXME(FunctionRefInfo): This should be using single compound apply,
-        // at least until label matching is implemented in the solver.
+        // FIXME: We ought to be preserving labels and matching in the solver.
         if (dyn_cast_or_null<TuplePattern>(enumPattern->getSubPattern()))
-          functionRefInfo = FunctionRefInfo::unappliedCompoundName();
+          functionRefInfo = FunctionRefInfo::singleCompoundNameApply();
 
         auto patternLocator =
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern));
