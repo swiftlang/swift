@@ -4223,6 +4223,11 @@ public:
   Type openOpaqueType(OpaqueTypeArchetypeType *type,
                       ConstraintLocatorBuilder locator);
 
+  /// Recurse over the given type and open any opaque archetype types.
+  Type openOpaqueType(Type type, ContextualTypePurpose context,
+                      ConstraintLocatorBuilder locator,
+                      Decl *ownerDecl);
+
   /// "Open" a pack expansion type by replacing it with a type variable,
   /// opening its pattern and shape types and connecting them to the
   /// aforementioned variable via special constraints.
@@ -4239,10 +4244,6 @@ public:
     bool erased = OpenedPackExpansionTypes.erase(expansion);
     ASSERT(erased);
   }
-
-  /// Recurse over the given type and open any opaque archetype types.
-  Type openOpaqueType(Type type, ContextualTypePurpose context,
-                      ConstraintLocatorBuilder locator);
 
   /// "Open" the given function type.
   ///
