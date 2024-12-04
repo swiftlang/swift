@@ -398,6 +398,10 @@ void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
     // case please update the switch with your flavor of arch. Otherwise assume
     // every arch supports at least word atomics.
 
+    if (triple.isArch16Bit()) {
+      setMaxAtomicBitWidth(16);
+    }
+
     if (triple.isArch32Bit()) {
       setMaxAtomicBitWidth(32);
     }
