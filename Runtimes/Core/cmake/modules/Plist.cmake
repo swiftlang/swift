@@ -1,8 +1,5 @@
 function(generate_plist project_name project_version target)
-  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    return()
-  endif()
-  set(PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
+  set(PLIST_INFO_PLIST "Info.plist")
   set(PLIST_INFO_NAME "${project_name}")
 
   # Underscores aren't permitted in the bundle identifier.
@@ -13,9 +10,12 @@ function(generate_plist project_name project_version target)
   set(PLIST_INFO_PLIST_OUT "${PLIST_INFO_PLIST}")
   set(PLIST_INFO_PLIST_IN "${PROJECT_SOURCE_DIR}/${PLIST_INFO_PLIST}.in")
 
-  target_link_options(${target} PRIVATE
-    "SHELL:-Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker ${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}"
-  )
+  if(APPLE)
+    target_link_options(${target} PRIVATE
+      "SHELL:-Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker ${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}"
+    )
+  endif()
+
   configure_file(
       "${PLIST_INFO_PLIST_IN}"
       "${PLIST_INFO_PLIST_OUT}"
