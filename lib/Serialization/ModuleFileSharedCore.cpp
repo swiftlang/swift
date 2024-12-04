@@ -1862,8 +1862,8 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     return ModuleLoadingBehavior::Required;
   }
 
-  bool moduleIsResilient = getResilienceStrategy() ==
-                             ResilienceStrategy::Resilient;
+  ResilienceStrategy strategy = getResilienceStrategy();
+
   if (dependency.isImplementationOnly()) {
     // Implementation-only dependencies are not usually loaded from
     // transitive imports.
@@ -1883,7 +1883,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     // Non-public imports are similar to implementation-only, the module
     // loading behavior differs on loading those dependencies
     // on testable imports.
-    if (forTestable || !moduleIsResilient) {
+    if (forTestable || strategy == ResilienceStrategy::Default) {
       return ModuleLoadingBehavior::Required;
     } else if (importNonPublicDependencies) {
       return ModuleLoadingBehavior::Optional;
@@ -1899,8 +1899,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     // Package dependencies are usually loaded only for import from the same
     // package.
     if ((!packageName.empty() && packageName == getModulePackageName()) ||
-        forTestable ||
-        !moduleIsResilient) {
+        forTestable || strategy == ResilienceStrategy::Default) {
       return ModuleLoadingBehavior::Required;
     } else if (importNonPublicDependencies) {
       return ModuleLoadingBehavior::Optional;

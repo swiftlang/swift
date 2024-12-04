@@ -520,6 +520,10 @@ def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Build the module to allow binary-compatible library evolution">;
 
+def non_resilient_hide_internal_dependencies : Flag<["-"], "non-resilient-hide-internal-dependencies">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Build the module to allow hiding dependencies without module evolution">;
+
 def require_explicit_availability : Flag<["-"], "require-explicit-availability">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Warn on public declarations without an availability attribute">;
