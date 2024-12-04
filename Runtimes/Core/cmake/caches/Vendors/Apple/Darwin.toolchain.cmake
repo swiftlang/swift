@@ -7,13 +7,11 @@ set(CMAKE_CXX_COMPILER_WORKS YES)
 find_program(XCRUN_EXECUTABLE NAMES "xcrun" REQUIRED)
 
 if(NOT CMAKE_OSX_SYSROOT)
-  if(DEFINED ENV{SDKROOT})
-    set(sdk_name $ENV{SDKROOT})
-  else()
-    message(FATAL_ERROR "SDKROOT environment variable not set")
+  if(NOT DEFINED ENV{SDKROOT})
+    message(FATAL_ERROR "The 'SDKROOT' environment variable is not set")
   endif()
 
-  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --show-sdk-path -sdk ${sdk_name}
+  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --show-sdk-path -sdk $ENV{SDKROOT}
     OUTPUT_VARIABLE SDKROOT
     ERROR_QUIET
     OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -24,14 +22,6 @@ if(NOT CMAKE_OSX_SYSROOT)
 
   message(STATUS "Using SDKROOT: ${SDKROOT}")
   set(CMAKE_OSX_SYSROOT "${SDKROOT}" CACHE FILEPATH "")
-endif()
-
-if(NOT CMAKE_MAKE_PROGRAM)
-  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --sdk ${CMAKE_OSX_SYSROOT} --find ninja
-    OUTPUT_VARIABLE CMAKE_MAKE_PROGRAM
-    ERROR_QUIET
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  message(STATUS "Using Ninja ${CMAKE_MAKE_PROGRAM}")
 endif()
 
 if(NOT CMAKE_C_COMPILER)
