@@ -340,6 +340,9 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Swift.swiftmodule"
 emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)
 
+# Configure plist creation for Darwin platforms.
+generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftCore)
+
 # TODO: Embedded SwiftCore builds
 # FIXME: Embedded builds should be separate CMake invocations because they are
 #        building for a different environment. I'm not sure how CMake will

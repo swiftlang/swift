@@ -68,6 +68,7 @@ include(DefaultSettings)
 include(EmitSwiftInterface)
 include(PlatformInfo)
 include(gyb)
+include(Plist)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
