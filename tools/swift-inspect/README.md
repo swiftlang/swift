@@ -21,7 +21,7 @@ swift build -Xcc -I%SDKROOT%\usr\include\swift\SwiftRemoteMirror -Xlinker %SDKRO
 In order to build on Linux, some additional parameters must be passed to the build tool to loace the necessary includes and libraries
 
 ~~~
-swift build -Xswiftc -I$(git rev-parse --show-toplevel)/include/swift/SwiftRemoteMirror -Xswiftc -lswiftRemoteMirror
+swift build -Xswiftc -I$(git rev-parse --show-toplevel)/include/swift/SwiftRemoteMirror -Xlinker -lswiftRemoteMirror
 ~~~
 
 #### CMake
