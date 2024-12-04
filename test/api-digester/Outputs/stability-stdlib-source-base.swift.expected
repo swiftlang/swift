@@ -393,11 +393,10 @@ Func Sequence.forEach(_:) has generic signature change from <Self where Self : S
 Func Sequence.forEach(_:) is now without @rethrows
 
 // Adoption of typed throws for Sequence.reduce(_:_:)
-Func Sequence.reduce(_:_:) has generic signature change from <Self, Result where Self : Swift.Sequence> to <Self, Result, E where Self : Swift.Sequence, E : Swift.Error, Result : ~Copyable>
-Func Sequence.reduce(_:_:) has parameter 0 changing from Default to Owned
+Func Sequence.reduce(_:_:) has generic signature change from <Self, Result where Self : Swift.Sequence> to <Self, Result, E where Self : Swift.Sequence, E : Swift.Error>
 Func Sequence.reduce(_:_:) is now without @rethrows
 
 // Adoption of typed throws for Sequence.reduce(into:_:)
-Func Sequence.reduce(into:_:) has generic signature change from <Self, Result where Self : Swift.Sequence> to <Self, Result, E where Self : Swift.Sequence, E : Swift.Error, Result : ~Copyable>
+Func Sequence.reduce(into:_:) has generic signature change from <Self, Result where Self : Swift.Sequence> to <Self, Result, E where Self : Swift.Sequence, E : Swift.Error>
 Func Sequence.reduce(into:_:) has parameter 1 type change from (inout Result, Self.Element) throws -> () to (inout Result, Self.Element) throws(E) -> ()
 Func Sequence.reduce(into:_:) is now without @rethrows

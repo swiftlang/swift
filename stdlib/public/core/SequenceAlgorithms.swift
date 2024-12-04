@@ -665,9 +665,9 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_alwaysEmitIntoClient
-  public func reduce<Result: ~Copyable, E: Error>(
-    _ initialResult: consuming Result,
-    _ nextPartialResult: (borrowing Result, Element) throws(E) -> Result
+  public func reduce<Result, E: Error>(
+    _ initialResult: Result,
+    _ nextPartialResult: (Result, Element) throws(E) -> Result
   ) throws(E) -> Result {
     var accumulator = initialResult
     for element in self {
@@ -721,8 +721,8 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_alwaysEmitIntoClient
-  public func reduce<Result: ~Copyable, E: Error>(
-    into initialResult: consuming Result,
+  public func reduce<Result, E: Error>(
+    into initialResult: __owned Result,
     _ updateAccumulatingResult: (inout Result, Element) throws(E) -> ()
   ) throws(E) -> Result {
     var accumulator = initialResult
