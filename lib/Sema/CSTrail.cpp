@@ -880,3 +880,11 @@ void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
   out.indent(indent);
   out << ")\n";
 }
+
+void SolverTrail::dump() const { dump(llvm::errs()); }
+
+void SolverTrail::dump(raw_ostream &OS, unsigned fromIndex,
+                       unsigned indent) const {
+  for (unsigned i = fromIndex; i < Changes.size(); ++i)
+    Changes[i].dump(OS, CS, indent);
+}
