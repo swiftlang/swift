@@ -127,7 +127,6 @@ param(
   [string] $PinnedBuild = "",
   [string] $PinnedSHA256 = "",
   [string] $PinnedVersion = "",
-  [string] $PythonVersion = "3.9.10",
   [string] $AndroidNDKVersion = "r26b",
   [string] $WinSDKVersion = "",
   [switch] $Android = $false,
@@ -163,22 +162,6 @@ $env:SDKROOT = ""
 $BuildArchName = $env:PROCESSOR_ARCHITEW6432
 if ($null -eq $BuildArchName) { $BuildArchName = $env:PROCESSOR_ARCHITECTURE }
 
-if ($PinnedBuild -eq "") {
-  switch ($BuildArchName) {
-    "AMD64" {
-      $PinnedBuild = "https://download.swift.org/swift-5.10.1-release/windows10/swift-5.10.1-RELEASE/swift-5.10.1-RELEASE-windows10.exe"
-      $PinnedSHA256 = "3027762138ACFA1BBE3050FF6613BBE754332E84C9EFA5C23984646009297286"
-      $PinnedVersion = "5.10.1"
-    }
-    "ARM64" {
-      $PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a-windows10-arm64.exe"
-      $PinnedSHA256 = "037BDBF9D1A1A99D7156584948870A8A958FD27CC4FF5711691CC0A76F2E88F5"
-      $PinnedVersion = "0.0.0"
-    }
-    default { throw "Unsupported processor architecture" }
-  }
-}
-
 # Store the revision zero variant of the Windows SDK version (no-op if unspecified)
 $WindowsSDKMajorMinorBuildMatch = [Regex]::Match($WinSDKVersion, "^\d+\.\d+\.\d+")
 $WinSDKVersionRevisionZero = if ($WindowsSDKMajorMinorBuildMatch.Success) { $WindowsSDKMajorMinorBuildMatch.Value + ".0" } else { "" }
@@ -188,8 +171,82 @@ $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.e
 $VSInstallRoot = & $vswhere -nologo -latest -products "*" -all -prerelease -property installationPath
 $msbuild = "$VSInstallRoot\MSBuild\Current\Bin\$BuildArchName\MSBuild.exe"
 
-# Hoist to global scope as this is used in two sites.
+# Update package hashes when changing versions
 $WiXVersion = "4.0.5"
+$PythonVersion = "3.9.10"
+$WinFlexBisonVersion = "2.5.25"
+
+$Components = @{
+  WiX = @{
+    URL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
+    Hash = "DF9BDB347183716F82EFE2CECB8C54BB3554AA907A69F47A41741D6FA4D0A754"
+  }
+  PythonAMD64 = @{
+    URL = "https://www.nuget.org/api/v2/package/python/$PythonVersion"
+    Hash = "ac43b491e9488ac926ed31c5594f0c9409a21ecbaf99dc7a93f8c7b24cf85867"
+  }
+  PythonARM64 = @{
+    URL = "https://www.nuget.org/api/v2/package/pythonarm64/$PythonVersion"
+    Hash = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69"
+  }
+  PinnedSwiftAMD64 = @{
+    URL = "https://download.swift.org/swift-5.10.1-release/windows10/swift-5.10.1-RELEASE/swift-5.10.1-RELEASE-windows10.exe"
+    Hash = "3027762138ACFA1BBE3050FF6613BBE754332E84C9EFA5C23984646009297286"
+    Version = "5.10.1"
+  }
+  PinnedSwiftARM64 = @{
+    URL = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a-windows10-arm64.exe"
+    Hash = "037BDBF9D1A1A99D7156584948870A8A958FD27CC4FF5711691CC0A76F2E88F5"
+    Version = "0.0.0"
+  }
+  PinnedSwiftCustom = @{
+    URL = $PinnedBuild
+    Hash = $PinnedSHA256
+    Version = $PinnedVersion
+  }
+  NDK = @{
+    URL = "https://dl.google.com/android/repository/android-ndk-r26b-windows.zip"
+    Hash = "A478D43D4A45D0D345CDA6BE50D79642B92FB175868D9DC0DFC86181D80F691E"
+  }
+  WinFlexBison = @{
+    URL = "https://github.com/lexxmark/winflexbison/releases/download/v$WinFlexBisonVersion/win_flex_bison-$WinFlexBisonVersion.zip"
+    Hash = "8D324B62BE33604B2C45AD1DD34AB93D722534448F55A16CA7292DE32B6AC135"
+  }
+  GnuWin32Make = @{
+    URL = "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip"
+    Hash = "fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7"
+  }
+  packaging = @{
+    URL = "https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl"
+    Hash = "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"
+  }
+  distutils = @{
+    # 'setuptools' provides 'distutils' module for Python 3.12+, required for SWIG support
+    # https://github.com/swiftlang/llvm-project/issues/9289
+    URL = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl"
+    Hash = "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2"
+  }
+  psutil = @{
+    URL = "https://files.pythonhosted.org/packages/11/91/87fa6f060e649b1e1a7b19a4f5869709fbf750b7c8c262ee776ec32f3028/psutil-6.1.0-cp37-abi3-win_amd64.whl"
+    Hash = "a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be"
+  }
+  unittest2 = @{
+    URL = "https://files.pythonhosted.org/packages/72/20/7f0f433060a962200b7272b8c12ba90ef5b903e218174301d0abfd523813/unittest2-1.1.0-py2.py3-none-any.whl"
+    Hash = "13f77d0875db6d9b435e1d4f41e74ad4cc2eb6e1d5c824996092b3430f088bb8"
+  }
+}
+
+if ($PinnedBuild -eq "") {
+  $PinnedSwift = "PinnedSwift$BuildArchName"
+  if ($Components[$PinnedSwift] -eq $null) {
+    throw "Unsupported processor architecture"
+  }
+} else {
+  $PinnedSwift = "PinnedSwiftCustom"
+  if ($Components[$PinnedSwift].Version -eq "") {
+    throw "PinnedVersion must be set"
+  }
+}
 
 # Avoid $env:ProgramFiles in case this script is running as x86
 $UnixToolsBinDir = "$env:SystemDrive\Program Files\Git\usr\bin"
@@ -375,7 +432,7 @@ function Get-HostSwiftSDK() {
 }
 
 $NugetRoot = "$BinaryCache\nuget"
-$PinnedToolchain = [IO.Path]::GetFileNameWithoutExtension($PinnedBuild)
+$PinnedToolchain = [IO.Path]::GetFileNameWithoutExtension($Components[$PinnedSwift].URL)
 
 $LibraryRoot = "$ImageRoot\Library"
 
@@ -630,22 +687,26 @@ function Fetch-Dependencies {
 
   $WebClient = New-Object Net.WebClient
 
-  function DownloadAndVerify($URL, $Destination, $Hash) {
+  function DownloadAndVerify($Component, $Destination) {
     if (Test-Path $Destination) {
       return
+    }
+    $Comp = $Components[$Component]
+    if ($Comp -eq $null) {
+      throw "Unknown component requested"
     }
 
     Write-Output "$Destination not found. Downloading ..."
     if ($ToBatch) {
       Write-Output "md `"$(Split-Path -Path $Destination -Parent)`""
-      Write-Output "curl.exe -sL $URL -o $Destination"
-      Write-Output "(certutil -HashFile $Destination SHA256) == $Hash || (exit /b)"
+      Write-Output "curl.exe -sL $($Comp.URL) -o $Destination"
+      Write-Output "(certutil -HashFile $Destination SHA256) == $($Comp.Hash) || (exit /b)"
     } else {
       New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
-      $WebClient.DownloadFile($URL, $Destination)
+      $WebClient.DownloadFile($Comp.URL, $Destination)
       $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
-      if ($SHA256.Hash -ne $Hash) {
-        throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
+      if ($SHA256.Hash -ne $Comp.Hash) {
+        throw "SHA256 mismatch ($($SHA256.Hash) vs $($Comp.Hash))"
       }
     }
   }
@@ -716,28 +777,19 @@ function Fetch-Dependencies {
 
   if ($SkipBuild -and $SkipPackaging) { return }
 
-  $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
-  $WiXHash = "DF9BDB347183716F82EFE2CECB8C54BB3554AA907A69F47A41741D6FA4D0A754"
-  DownloadAndVerify $WixURL "$BinaryCache\WiX-$WiXVersion.zip" $WiXHash
+  DownloadAndVerify "WiX" "$BinaryCache\WiX-$WiXVersion.zip"
   Extract-ZipFile WiX-$WiXVersion.zip $BinaryCache WiX-$WiXVersion
 
   if ($SkipBuild) { return }
 
-  DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
+  DownloadAndVerify $PinnedSwift "$BinaryCache\$PinnedToolchain.exe"
 
   # TODO(compnerd) stamp/validate that we need to re-extract
   New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
   Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain
 
   function Download-Python($ArchName) {
-    $PythonAMD64URL = "https://www.nuget.org/api/v2/package/python/$PythonVersion"
-    $PythonAMD64Hash = "ac43b491e9488ac926ed31c5594f0c9409a21ecbaf99dc7a93f8c7b24cf85867"
-
-    $PythonARM64URL = "https://www.nuget.org/api/v2/package/pythonarm64/$PythonVersion"
-    $PythonARM64Hash = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69"
-
-    DownloadAndVerify (Get-Variable -Name "Python${ArchName}URL").Value $BinaryCache\Python$ArchName-$PythonVersion.zip (Get-Variable -Name "Python${ArchName}Hash").Value
-
+    DownloadAndVerify "Python$ArchName" "$BinaryCache\Python$ArchName-$PythonVersion.zip"
     if (-not $ToBatch) {
       Extract-ZipFile Python$ArchName-$PythonVersion.zip $BinaryCache Python$ArchName-$PythonVersion
     }
@@ -755,20 +807,14 @@ function Fetch-Dependencies {
     try {
       Invoke-Program -OutNull $Python -c 'import packaging' *> $null
     } catch {
-      $WheelURL = "https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl"
-      $WheelHash = "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"
-      DownloadAndVerify $WheelURL "$BinaryCache\python\packaging-24.1-py3-none-any.whl" $WheelHash
+      DownloadAndVerify "packaging" "$BinaryCache\python\packaging-24.1-py3-none-any.whl"
       Write-Output "Installing 'packaging-24.1-py3-none-any.whl' ..."
       Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\packaging-24.1-py3-none-any.whl" --disable-pip-version-check
     }
-    # 'setuptools' provides 'distutils' module for Python 3.12+, required for SWIG support
-    # https://github.com/swiftlang/llvm-project/issues/9289
     try {
       Invoke-Program -OutNull $Python -c 'import distutils' *> $null
     } catch {
-      $WheelURL = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl"
-      $WheelHash = "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2"
-      DownloadAndVerify $WheelURL "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" $WheelHash
+      DownloadAndVerify "distutils" "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl"
       Write-Output "Installing 'setuptools-75.1.0-py3-none-any.whl' ..."
       Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" --disable-pip-version-check
     }
@@ -786,19 +832,12 @@ function Fetch-Dependencies {
     if ($AndroidNDKVersion -ne "r26b") {
       throw "Unsupported Android NDK version"
     }
-    $NDKURL = "https://dl.google.com/android/repository/android-ndk-r26b-windows.zip"
-    $NDKHash = "A478D43D4A45D0D345CDA6BE50D79642B92FB175868D9DC0DFC86181D80F691E"
-    DownloadAndVerify $NDKURL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDKHash
-
+    DownloadAndVerify "NDK" "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip"
     Extract-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
   }
 
   if ($IncludeDS2) {
-    $WinFlexBisonVersion = "2.5.25"
-    $WinFlexBisonURL = "https://github.com/lexxmark/winflexbison/releases/download/v$WinFlexBisonVersion/win_flex_bison-$WinFlexBisonVersion.zip"
-    $WinFlexBisonHash = "8D324B62BE33604B2C45AD1DD34AB93D722534448F55A16CA7292DE32B6AC135"
-    DownloadAndVerify $WinFlexBisonURL "$BinaryCache\win_flex_bison-$WinFlexBisonVersion.zip" $WinFlexBisonHash
-
+    DownloadAndVerify "WinFlexBison" "$BinaryCache\win_flex_bison-$WinFlexBisonVersion.zip"
     Extract-ZipFile -ZipFileName "win_flex_bison-$WinFlexBisonVersion.zip" -BinaryCache $BinaryCache -ExtractPath "win_flex_bison"
   }
 
@@ -856,10 +895,7 @@ function Get-PinnedToolchainRuntime() {
 }
 
 function Get-PinnedToolchainVersion() {
-  if (Test-Path variable:PinnedVersion) {
-    return $PinnedVersion
-  }
-  throw "PinnedVersion must be set"
+  $Components[$PinnedSwift].Version
 }
 
 $CompilersBinaryCache = if ($IsCrossCompiling) {
