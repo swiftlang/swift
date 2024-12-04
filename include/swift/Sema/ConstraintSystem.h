@@ -3260,6 +3260,10 @@ public:
   std::pair<Type, OpenedArchetypeType *>
   openAnyExistentialType(Type type, ConstraintLocator *locator);
 
+  /// Returns the opened archetype tied to the given locator.
+  OpenedArchetypeType *
+  getOpenedExistentialType(ConstraintLocator *locator) const;
+
   /// Update OpenedExistentials and record a change in the trail.
   void recordOpenedExistentialType(ConstraintLocator *locator,
                                    OpenedArchetypeType *opened);

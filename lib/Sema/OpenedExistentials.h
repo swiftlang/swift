@@ -132,19 +132,10 @@ enum class ExistentialMemberAccessLimitation : uint8_t {
 ExistentialMemberAccessLimitation
 isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member);
 
-/// Flags that should be applied to the existential argument type after
-/// opening.
-enum class OpenedExistentialAdjustmentFlags {
-  /// The argument should be made inout after opening.
-  InOut = 0x01,
-  LValue = 0x02,
-};
-
-using OpenedExistentialAdjustments =
-  OptionSet<OpenedExistentialAdjustmentFlags>;
-
-/// Determine whether we should open up the existential argument to the
-/// given parameters.
+/// Determine whether opening an existential argument for a function parameter
+/// is supported.
+/// A necessary condition for this is that the parameter interface type contains
+/// a generic parameter type to which the opened argument can bind.
 ///
 /// \param callee The function or subscript being called.
 /// \param paramIdx The index specifying which function parameter is being
@@ -153,29 +144,32 @@ using OpenedExistentialAdjustments =
 /// system.
 /// \param argTy The type of the argument.
 ///
-/// \returns If the argument type is existential and opening it can bind a
-/// generic parameter in the callee, returns the type variable (from the opened
-/// parameter type) the existential type that needs to be opened (from the
-/// argument type), and the adjustments that need to be applied to the
-/// existential type after it is opened.
-std::optional<
-    std::tuple<TypeVariableType *, Type, OpenedExistentialAdjustments>>
+/// \returns If opening is supported, returns the type variable representing the
+/// generic parameter type, and the unopened type it binds to.
+std::optional<std::pair<TypeVariableType *, Type>>
 canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                Type paramTy, Type argTy);
 
-/// Given a type that includes an existential type that has been opened to
-/// the given type variable, replace the opened type variable and its member
-/// types with their upper bounds.
-Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
-                                         TypeVariableType *openedTypeVar,
-                                         TypePosition outermostPosition);
-
-
-/// Given a type that includes opened existential archetypes derived from
-/// the given generic environment, replace the archetypes with their upper
-/// bounds.
+/// Type-erases occurrences of an opened archetype from the given generic
+/// environment within the given type and returns the transformed type.
+///
+/// \param type The type to transform.
+/// \param env The generic environment whose opened archetypes are type-erased.
+///
+/// \returns The transformed type.
 Type typeEraseOpenedArchetypesFromEnvironment(Type type,
                                               GenericEnvironment *env);
+
+/// Type-erases _covariant_ occurrences of an opened archetype from the given
+/// generic environment within the given type and returns the transformed type.
+///
+/// \param type The type to transform.
+/// \param env The generic environment whose opened archetypes are type-erased.
+/// \param initialPosition The type position to assume for `type`.
+///
+/// \returns The transformed type.
+Type typeEraseCovariantOpenedArchetypesFromEnvironment(
+    Type type, GenericEnvironment *env, TypePosition initialPosition);
 
 } // end namespace swift
 

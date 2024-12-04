@@ -590,8 +590,7 @@ swift::isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member) {
   return result;
 }
 
-std::optional<
-    std::tuple<TypeVariableType *, Type, OpenedExistentialAdjustments>>
+std::optional<std::pair<TypeVariableType *, Type>>
 swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                       Type paramTy, Type argTy) {
   if (!callee)
@@ -623,24 +622,6 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (!paramTy->hasTypeVariable())
     return std::nullopt;
 
-  OpenedExistentialAdjustments adjustments;
-
-  // The argument may be a "var" instead of a "let".
-  if (auto lv = argTy->getAs<LValueType>()) {
-    argTy = lv->getObjectType();
-    adjustments |= OpenedExistentialAdjustmentFlags::LValue;
-  }
-
-  // If the argument is inout, strip it off and we can add it back.
-  if (auto inOutArg = argTy->getAs<InOutType>()) {
-    argTy = inOutArg->getObjectType();
-    adjustments |= OpenedExistentialAdjustmentFlags::InOut;
-  }
-
-  // The argument type needs to be an existential type or metatype thereof.
-  if (!argTy->isAnyExistentialType())
-    return std::nullopt;
-
   auto param = getParameterAt(callee, paramIdx);
   if (!param)
     return std::nullopt;
@@ -649,26 +630,40 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (param->isVariadic())
     return std::nullopt;
 
-  // Look through an inout and an optional type on the parameter types.
-  auto formalParamTy = param->getInterfaceType()->getInOutObjectType()
-      ->lookThroughSingleOptionalType();
-  // Look through an inout and optional types on the parameter.
-  paramTy = paramTy->getInOutObjectType()->lookThroughSingleOptionalType();
-
-  // If the argument is of an existential metatype, look through the
-  // metatype on the parameter.
-  if (argTy->is<AnyMetatypeType>()) {
-    formalParamTy = formalParamTy->getMetatypeInstanceType();
-    paramTy = paramTy->getMetatypeInstanceType();
-  }
-
-  // The parameter type must be a type variable.
-  auto paramTypeVar = paramTy->getAs<TypeVariableType>();
-  if (!paramTypeVar)
+  // The rvalue argument type needs to be an existential type or metatype
+  // thereof.
+  const auto rValueArgTy = argTy->getWithoutSpecifierType();
+  if (!rValueArgTy->isAnyExistentialType())
     return std::nullopt;
 
-  auto genericParam = formalParamTy->getAs<GenericTypeParamType>();
-  if (!genericParam)
+  GenericTypeParamType *genericParam;
+  TypeVariableType *typeVar;
+  Type bindingTy;
+
+  std::tie(genericParam, typeVar, bindingTy) = [=] {
+    // Look through an inout and optional type.
+    Type genericParam = param->getInterfaceType()
+                            ->getInOutObjectType()
+                            ->lookThroughSingleOptionalType();
+    Type typeVar =
+        paramTy->getInOutObjectType()->lookThroughSingleOptionalType();
+
+    Type bindingTy = rValueArgTy;
+
+    // Look through a metatype.
+    if (genericParam->is<AnyMetatypeType>()) {
+      genericParam = genericParam->getMetatypeInstanceType();
+      typeVar = typeVar->getMetatypeInstanceType();
+      bindingTy = bindingTy->getMetatypeInstanceType();
+    }
+
+    return std::tuple(genericParam->getAs<GenericTypeParamType>(),
+                      typeVar->getAs<TypeVariableType>(), bindingTy);
+  }();
+
+  // The should have reached a type variable and corresponding generic
+  // parameter.
+  if (!typeVar || !genericParam)
     return std::nullopt;
 
   // Only allow opening the innermost generic parameters.
@@ -681,14 +676,11 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (genericParam->getDepth() < genericSig->getMaxDepth())
     return std::nullopt;
 
-  Type existentialTy;
-  if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
-    existentialTy = existentialMetaTy->getInstanceType();
-  else
-    existentialTy = argTy;
-
-  ASSERT(existentialTy->isAnyExistentialType());
-
+  // The binding could be an existential metatype. Get the instance type for
+  // conformance checks and to build an opened existential signature. If the
+  // instance type is not an existential type, i.e., the metatype is nested,
+  // bail out.
+  const Type existentialTy = bindingTy->getMetatypeInstanceType();
   if (!existentialTy->isExistentialType())
     return std::nullopt;
 
@@ -703,8 +695,7 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (!ctx.LangOpts.hasFeature(Feature::ImplicitOpenExistentials)) {
     bool containsNonSelfConformance = false;
     for (auto proto : genericSig->getRequiredProtocols(genericParam)) {
-      auto conformance = lookupExistentialConformance(
-          existentialTy, proto);
+      auto conformance = lookupExistentialConformance(existentialTy, proto);
       if (conformance.isInvalid()) {
         containsNonSelfConformance = true;
         break;
@@ -726,32 +717,48 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (referenceInfo.hasNonCovariantRef())
     return std::nullopt;
 
-  return std::make_tuple(paramTypeVar, argTy, adjustments);
+  return std::pair(typeVar, bindingTy);
 }
 
-/// For each occurrence of a type **type** in `refTy` that satisfies
-/// `predicateFn` in covariant position, **type** is erased to an
-/// existential using `eraseFn`.
-static Type typeEraseExistentialSelfReferences(
-    Type refTy, TypePosition outermostPosition,
-    llvm::function_ref<bool(Type)> containsFn,
-    llvm::function_ref<bool(Type)> predicateFn,
-    llvm::function_ref<Type(Type, TypePosition)> eraseFn) {
-  if (!containsFn(refTy))
-    return refTy;
+/// Type-erases occurrences of an opened archetype from the given generic
+/// environment within the given type and returns the transformed type.
+///
+/// \param type The type to transform.
+/// \param env The generic environment whose opened archetypes are type-erased.
+/// \param initialPosition The type position to assume for `type`.
+/// \param covariantOnly Whether to only type-erase covariant occurrences.
+///
+/// \returns The transformed type.
+static Type
+typeEraseOpenedArchetypesFromEnvironment(Type type, GenericEnvironment *env,
+                                         TypePosition initialPosition,
+                                         bool covariantOnly) {
+  ASSERT(env->getKind() == GenericEnvironment::Kind::OpenedExistential);
 
-  return refTy.transformWithPosition(
-      outermostPosition,
+  if (!type->hasOpenedExistential())
+    return type;
+
+  const auto getAsOpenedArchetypeFromEnvironment = [](Type t,
+                                                      GenericEnvironment *env) {
+    auto *openedTy = dyn_cast<OpenedArchetypeType>(t);
+    if (openedTy && openedTy->getGenericEnvironment() == env) {
+      return openedTy;
+    }
+
+    return (OpenedArchetypeType *)nullptr;
+  };
+
+  return type.transformWithPosition(
+      initialPosition,
       [&](TypeBase *t, TypePosition currPos) -> std::optional<Type> {
-        if (!containsFn(t)) {
+        if (!type->hasOpenedExistential()) {
           return Type(t);
         }
 
         if (t->is<MetatypeType>()) {
           const auto instanceTy = t->getMetatypeInstanceType();
-          auto erasedTy = typeEraseExistentialSelfReferences(
-              instanceTy, currPos,
-              containsFn, predicateFn, eraseFn);
+          auto erasedTy = ::typeEraseOpenedArchetypesFromEnvironment(
+              instanceTy, env, currPos, covariantOnly);
           if (instanceTy.getPointer() == erasedTy.getPointer()) {
             return Type(t);
           }
@@ -778,9 +785,10 @@ static Type typeEraseExistentialSelfReferences(
         if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(t)) {
           for (auto replacementType :
                opaque->getSubstitutions().getReplacementTypes()) {
-            auto erasedReplacementType = typeEraseExistentialSelfReferences(
-                replacementType, TypePosition::Covariant,
-                containsFn, predicateFn, eraseFn);
+            auto erasedReplacementType =
+                ::typeEraseOpenedArchetypesFromEnvironment(
+                    replacementType, env, TypePosition::Covariant,
+                    covariantOnly);
             if (erasedReplacementType.getPointer() !=
                 replacementType.getPointer())
               return opaque->getExistentialType();
@@ -791,133 +799,50 @@ static Type typeEraseExistentialSelfReferences(
         // parameter are erased to the base type.
         if (auto parameterized = dyn_cast<ParameterizedProtocolType>(t)) {
           for (auto argType : parameterized->getArgs()) {
-            auto erasedArgType = typeEraseExistentialSelfReferences(
-                argType, TypePosition::Covariant,
-                containsFn, predicateFn, eraseFn);
+            auto erasedArgType = ::typeEraseOpenedArchetypesFromEnvironment(
+                argType, env, TypePosition::Covariant, covariantOnly);
             if (erasedArgType.getPointer() != argType.getPointer())
               return parameterized->getBaseType();
           }
         }
 
-        if (!predicateFn(t)) {
+        auto *openedTy = getAsOpenedArchetypeFromEnvironment(t, env);
+        if (!openedTy) {
           // Recurse.
           return std::nullopt;
         }
 
-        auto erasedTy = eraseFn(t, currPos);
-        if (!erasedTy)
-          return Type(t);
+        if (covariantOnly) {
+          switch (currPos) {
+          case TypePosition::Covariant:
+            break;
 
-        return erasedTy;
-      });
-}
-
-Type swift::typeEraseOpenedExistentialReference(
-    Type type, Type existentialBaseType, TypeVariableType *openedTypeVar,
-    TypePosition outermostPosition) {
-  auto existentialSig =
-    type->getASTContext().getOpenedExistentialSignature(
-      existentialBaseType);
-
-  auto applyOuterSubstitutions = [&](Type t) -> Type {
-    if (t->hasTypeParameter()) {
-      auto outerSubs = existentialSig.Generalization;
-      unsigned depth = existentialSig.OpenedSig->getMaxDepth();
-      OuterSubstitutions replacer{outerSubs, depth};
-      return t.subst(replacer, replacer);
-    }
-
-    return t;
-  };
-
-  auto erase = [&](Type paramTy, TypePosition currPos) -> Type {
-    switch (currPos) {
-    case TypePosition::Covariant:
-      break;
-
-    case TypePosition::Contravariant:
-    case TypePosition::Invariant:
-    case TypePosition::Shape:
-      return Type();
-    }
-
-    // The upper bounds of 'Self' is the existential base type.
-    if (paramTy->is<GenericTypeParamType>())
-      return existentialBaseType;
-
-    return applyOuterSubstitutions(
-        existentialSig.OpenedSig->getExistentialType(paramTy));
-  };
-
-  return typeEraseExistentialSelfReferences(
-      type,
-      outermostPosition,
-      /*containsFn=*/[](Type t) {
-        return t->hasTypeVariable();
-      },
-      /*predicateFn=*/[](Type t) {
-        return t->isTypeVariableOrMember();
-      },
-      /*eraseFn=*/[&](Type t, TypePosition currPos) -> Type {
-        bool found = false;
-        auto paramTy = t.transformRec([&](Type t) -> std::optional<Type> {
-          if (t.getPointer() == openedTypeVar) {
-            found = true;
-            return existentialSig.SelfType;
-          }
-          return std::nullopt;
-        });
-
-        if (!found)
-          return Type();
-
-        assert(paramTy->isTypeParameter());
-
-        // This can happen with invalid code.
-        if (!existentialSig.OpenedSig->isValidTypeParameter(paramTy)) {
-          return Type(t);
-        }
-
-        // Check if this existential fixes this `Self`-rooted type to something
-        // in the existential's outer generic signature.
-        Type reducedTy = existentialSig.OpenedSig.getReducedType(paramTy);
-        if (!reducedTy->isEqual(paramTy)) {
-          reducedTy = applyOuterSubstitutions(reducedTy);
-
-          auto erasedTy = typeEraseExistentialSelfReferences(
-              reducedTy, currPos,
-              [&](Type t) { return t->hasTypeParameter(); },
-              [&](Type t) { return t->isTypeParameter(); },
-              [&](Type t, TypePosition currPos) { return erase(t, currPos); });
-          if (erasedTy.getPointer() == reducedTy.getPointer()) {
+          case TypePosition::Contravariant:
+            // Recurse. Variance can still flip.
+            return std::nullopt;
+          case TypePosition::Invariant:
+          case TypePosition::Shape:
+            // Skip children. Nothing can be covariant inside these.
             return Type(t);
           }
-
-          return erasedTy;
         }
 
-        return erase(paramTy, currPos);
+        return openedTy->getExistentialType();
       });
 }
 
-Type swift::typeEraseOpenedArchetypesFromEnvironment(
-    Type type, GenericEnvironment *env) {
-  assert(env->getKind() == GenericEnvironment::Kind::OpenedExistential);
+Type swift::typeEraseOpenedArchetypesFromEnvironment(Type type,
+                                                     GenericEnvironment *env) {
+  return ::typeEraseOpenedArchetypesFromEnvironment(
+      type, env,
+      /*initialPosition=*/TypePosition::Covariant,
+      /*covariantOnly=*/false);
+}
 
-  return typeEraseExistentialSelfReferences(
-      type,
-      TypePosition::Covariant,
-      /*containsFn=*/[](Type t) {
-        return t->hasOpenedExistential();
-      },
-      /*predicateFn=*/[](Type t) {
-        return t->is<OpenedArchetypeType>();
-      },
-      /*eraseFn=*/[&](Type t, TypePosition currPos) {
-        auto *openedTy = t->castTo<OpenedArchetypeType>();
-        if (openedTy->getGenericEnvironment() == env)
-          return openedTy->getExistentialType();
-
-        return Type();
-      });
+Type swift::typeEraseCovariantOpenedArchetypesFromEnvironment(
+    Type type, GenericEnvironment *env, TypePosition initialPosition) {
+  return ::typeEraseOpenedArchetypesFromEnvironment(
+      type, env,
+      /*initialPosition=*/initialPosition,
+      /*covariantOnly=*/true);
 }
