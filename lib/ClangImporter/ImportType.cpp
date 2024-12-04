@@ -55,6 +55,13 @@
 using namespace swift;
 using namespace importer;
 
+// XXX: This is to resolve the build dependency with Clang. Remove it once these
+// types actually land in Clang.
+namespace clang {
+class DynamicRangePointerType;
+class ValueTerminatedType;
+}
+
 /// Given that a type is the result of a special typedef import, was
 /// it originally a CF pointer?
 static bool isImportedCFPointer(clang::QualType clangType, Type type) {
@@ -418,6 +425,22 @@ namespace {
       // In the future we could do something more clever (such as trying to
       // import as an Array where possible) or less clever (such as importing
       // as the desugared, underlying pointer type).
+      return Type();
+    }
+
+    ImportResult VisitDynamicRangePointerType(
+        const clang::DynamicRangePointerType *type) {
+      // DynamicRangePointerType is a clang type representing a pointer with
+      // an "ended_by" type attribute for -fbounds-safety. For now, we don't
+      // import these into Swift.
+      return Type();
+    }
+
+    ImportResult VisitValueTerminatedType(
+        const clang::ValueTerminatedType *type) {
+      // ValueTerminatedType is a clang type representing a pointer with
+      // a "terminated_by" type attribute for -fbounds-safety. For now, we don't
+      // import these into Swift.
       return Type();
     }
 

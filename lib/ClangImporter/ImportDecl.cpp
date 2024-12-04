@@ -3333,8 +3333,15 @@ namespace {
         return property->getParsedAccessor(AccessorKind::Set);
       }
 
-      // Emit diagnostics for incorrect usage of "returns_unretained" and
-      // "returns_unretained" attributes
+      checkBridgingAttrs(decl);
+
+      return importFunctionDecl(decl, importedName, correctSwiftName,
+                                std::nullopt);
+    }
+
+    /// Emit diagnostics for incorrect usage of SWIFT_RETURNS_RETAINED and
+    /// SWIFT_RETURNS_UNRETAINED
+    void checkBridgingAttrs(const clang::FunctionDecl *decl) {
       bool returnsRetainedAttrIsPresent = false;
       bool returnsUnretainedAttrIsPresent = false;
       if (decl->hasAttrs()) {
@@ -3356,8 +3363,41 @@ namespace {
                         decl);
         } else if (!returnsRetainedAttrIsPresent &&
                    !returnsUnretainedAttrIsPresent) {
-          Impl.diagnose(loc, diag::no_returns_retained_returns_unretained,
-                        decl);
+          bool unannotatedCxxAPIWarningNeeded = false;
+          if (!isa<clang::CXXDeductionGuideDecl>(decl)) {
+            if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
+              // FIXME: In the future we should support SWIFT_RETURNS_RETAINED
+              // and SWIFT_RETURNS_UNRETAINED for overloaded C++ operators
+              // returning SWIFT_SHARED_REFERENCE types
+              if (!isa<clang::CXXConstructorDecl>(methodDecl) &&
+                  !isa<clang::CXXDestructorDecl>(methodDecl) &&
+                  !methodDecl->isOverloadedOperator() &&
+                  methodDecl->isUserProvided()) {
+                // normal c++ member method
+                unannotatedCxxAPIWarningNeeded = true;
+              }
+            } else {
+              // global or top-level function
+              unannotatedCxxAPIWarningNeeded = true;
+            }
+          }
+
+          if (unannotatedCxxAPIWarningNeeded) {
+            HeaderLoc loc(decl->getLocation());
+            Impl.diagnose(loc, diag::no_returns_retained_returns_unretained,
+                          decl);
+          }
+        } else if (const auto *methodDecl =
+                       dyn_cast<clang::CXXMethodDecl>(decl)) {
+          // Warning for annotated overloaded C++ operators as they currently
+          // follow Swift method's convention and always return owned.
+          if (methodDecl->isOverloadedOperator()) {
+            Impl.diagnose(
+                loc,
+                diag::
+                    returns_retained_returns_unretained_on_overloaded_operator,
+                decl);
+          }
         }
       } else {
         if (returnsRetainedAttrIsPresent || returnsUnretainedAttrIsPresent) {
@@ -3368,9 +3408,6 @@ namespace {
               decl);
         }
       }
-
-      return importFunctionDecl(decl, importedName, correctSwiftName,
-                                std::nullopt);
     }
 
     /// Handles special functions such as subscripts and dereference operators.
