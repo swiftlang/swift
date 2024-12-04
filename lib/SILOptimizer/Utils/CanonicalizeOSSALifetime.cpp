@@ -1150,7 +1150,6 @@ void CanonicalizeOSSALifetime::rewriteCopies(
   assert(getCurrentDef()->getOwnershipKind() == OwnershipKind::Owned);
 
   InstructionSetVector instsToDelete(getCurrentDef()->getFunction());
-  defUseWorklist.clear();
 
   // Visit each operand in the def-use chain.
   //
@@ -1195,39 +1194,56 @@ void CanonicalizeOSSALifetime::rewriteCopies(
     return true;
   };
 
+  defUseWorklist.initialize(Def::root(getCurrentDef()));
   // Perform a def-use traversal, visiting each use operand.
-  for (auto useIter = getCurrentDef()->use_begin(),
-         endIter = getCurrentDef()->use_end(); useIter != endIter;) {
-    Operand *use = *useIter++;
-    if (!visitUse(use)) {
-      copyLiveUse(use, getCallbacks());
-    }
-  }
   while (auto def = defUseWorklist.pop()) {
-    SILValue value = def->getValue();
-    CopyValueInst *srcCopy = cast<CopyValueInst>(value);
-    // Recurse through copies while replacing their uses.
-    Operand *reusedCopyOp = nullptr;
-    for (auto useIter = srcCopy->use_begin(); useIter != srcCopy->use_end();) {
-      Operand *use = *useIter++;
-      if (!visitUse(use)) {
-        if (!reusedCopyOp && srcCopy->getParent() == use->getParentBlock()) {
-          reusedCopyOp = use;
-        } else {
+    switch (*def) {
+    case Def::Kind::BorrowedFrom:
+    case Def::Kind::Reborrow:
+      // Direct uses of these defs never need to be rewritten.  Being guaranteed
+      // values, none of their direct uses consume an owned value.
+      assert(def.getValue()->getOwnershipKind() == OwnershipKind::Guaranteed);
+      break;
+    case Def::Kind::Root: {
+      SILValue value = def->getValue();
+      for (auto useIter = value->use_begin(), endIter = value->use_end();
+           useIter != endIter;) {
+        Operand *use = *useIter++;
+        if (!visitUse(use)) {
           copyLiveUse(use, getCallbacks());
         }
       }
+      break;
     }
-    if (!(reusedCopyOp && srcCopy->hasOneUse())) {
-      getCallbacks().replaceValueUsesWith(srcCopy, srcCopy->getOperand());
-      if (reusedCopyOp) {
-        reusedCopyOp->set(srcCopy);
-      } else {
-        if (instsToDelete.insert(srcCopy)) {
-          LLVM_DEBUG(llvm::dbgs() << "  Removing " << *srcCopy);
-          ++NumCopiesAndMovesEliminated;
+    case Def::Kind::Copy: {
+      SILValue value = def->getValue();
+      CopyValueInst *srcCopy = cast<CopyValueInst>(value);
+      // Recurse through copies while replacing their uses.
+      Operand *reusedCopyOp = nullptr;
+      for (auto useIter = srcCopy->use_begin();
+           useIter != srcCopy->use_end();) {
+        Operand *use = *useIter++;
+        if (!visitUse(use)) {
+          if (!reusedCopyOp && srcCopy->getParent() == use->getParentBlock()) {
+            reusedCopyOp = use;
+          } else {
+            copyLiveUse(use, getCallbacks());
+          }
         }
       }
+      if (!(reusedCopyOp && srcCopy->hasOneUse())) {
+        getCallbacks().replaceValueUsesWith(srcCopy, srcCopy->getOperand());
+        if (reusedCopyOp) {
+          reusedCopyOp->set(srcCopy);
+        } else {
+          if (instsToDelete.insert(srcCopy)) {
+            LLVM_DEBUG(llvm::dbgs() << "  Removing " << *srcCopy);
+            ++NumCopiesAndMovesEliminated;
+          }
+        }
+      }
+      break;
+    }
     }
   }
   assert(!consumes.hasUnclaimedConsumes());
