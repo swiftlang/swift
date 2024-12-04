@@ -46,7 +46,7 @@ public class SymbolCache {
     self.symbolLookup = symbolLookup
   }
 
-  // find the address range for the requetsed symbol
+  // find the address range for the requested symbol
   public func address(of symbol: String) -> SymbolRange? {
     for (_, symbols) in symbolLookup { if let range = symbols[symbol] { return range } }
     return nil
