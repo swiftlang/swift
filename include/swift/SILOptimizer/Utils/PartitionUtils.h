@@ -462,6 +462,14 @@ enum class PartitionOpKind : uint8_t {
   ///
   /// Takes one parameter, the inout parameter that we need to check.
   InOutSendingAtFunctionExit,
+
+  /// This is the result of an isolation crossing apply site. We need to emit a
+  /// special error since we never allow this.
+  ///
+  /// DISCUSSION: This is actually just a form of "send". Sadly, we can not use
+  /// "send" directly since "send" expects a SILOperand and these are values. So
+  /// to work around the API issue, we have to use a different, specific entry.
+  NonSendableIsolationCrossingResult,
 };
 
 /// PartitionOp represents a primitive operation that can be performed on
@@ -571,6 +579,12 @@ public:
   static PartitionOp InOutSendingAtFunctionExit(Element elt,
                                                 SILInstruction *sourceInst) {
     return PartitionOp(PartitionOpKind::InOutSendingAtFunctionExit, elt,
+                       sourceInst);
+  }
+
+  static PartitionOp
+  NonSendableIsolationCrossingResult(Element elt, SILInstruction *sourceInst) {
+    return PartitionOp(PartitionOpKind::NonSendableIsolationCrossingResult, elt,
                        sourceInst);
   }
 
@@ -1053,6 +1067,22 @@ public:
     }
   };
 
+  struct NonSendableIsolationCrossingResultError {
+    const PartitionOp *op;
+
+    Element returnValueElement;
+
+    NonSendableIsolationCrossingResultError(const PartitionOp &op,
+                                            Element returnValue)
+        : op(&op), returnValueElement(returnValue) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
 #define PARTITION_OP_ERROR(NAME)                                               \
   static_assert(std::is_copy_constructible_v<NAME##Error>,                     \
                 #NAME " must be copy constructable");
@@ -1482,8 +1512,15 @@ public:
 
       // Then emit an unknown code pattern error.
       return handleError(UnknownCodePatternError(op));
-    }
+    case PartitionOpKind::NonSendableIsolationCrossingResult:
+      // Grab the dynamic dataflow isolation information for our element's
+      // region.
+      Region region = p.getRegion(op.getOpArgs()[0]);
 
+      // Then emit the error.
+      return handleError(
+          NonSendableIsolationCrossingResultError(op, op.getOpArgs()[0]));
+    }
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
