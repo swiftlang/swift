@@ -94,14 +94,22 @@ void PartitionOpError::InOutSendingNotDisconnectedAtExitError::print(
   os << '\n';
 }
 
+void PartitionOpError::NonSendableIsolationCrossingResultError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: NonSendableIsolationCrossingResultError\n"
+        "        Inst: "
+     << *op->getSourceInst() << "        Result ID: %%" << returnValueElement
+     << '\n';
+}
+
 //===----------------------------------------------------------------------===//
 //                             MARK: PartitionOp
 //===----------------------------------------------------------------------===//
 
 void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
+  constexpr static char extraSpaceLiteral[10] = "     ";
   switch (opKind) {
   case PartitionOpKind::Assign: {
-    constexpr static char extraSpaceLiteral[10] = "      ";
     os << "assign ";
     if (extraSpace)
       os << extraSpaceLiteral;
@@ -112,7 +120,6 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
     os << "assign_fresh %%" << opArgs[0];
     break;
   case PartitionOpKind::Send: {
-    constexpr static char extraSpaceLiteral[10] = "    ";
     os << "send ";
     if (extraSpace)
       os << extraSpaceLiteral;
@@ -120,7 +127,6 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
     break;
   }
   case PartitionOpKind::UndoSend: {
-    constexpr static char extraSpaceLiteral[10] = "    ";
     os << "undo_send ";
     if (extraSpace)
       os << extraSpaceLiteral;
@@ -128,7 +134,6 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
     break;
   }
   case PartitionOpKind::Merge: {
-    constexpr static char extraSpaceLiteral[10] = "       ";
     os << "merge ";
     if (extraSpace)
       os << extraSpaceLiteral;
@@ -136,7 +141,6 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
     break;
   }
   case PartitionOpKind::Require: {
-    constexpr static char extraSpaceLiteral[10] = "     ";
     os << "require ";
     if (extraSpace)
       os << extraSpaceLiteral;
@@ -148,8 +152,13 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
     os << "%%" << opArgs[0];
     break;
   case PartitionOpKind::InOutSendingAtFunctionExit:
-    constexpr static char extraSpaceLiteral[10] = "     ";
     os << "inout_sending_at_function_exit ";
+    if (extraSpace)
+      os << extraSpaceLiteral;
+    os << "%%" << opArgs[0];
+    break;
+  case PartitionOpKind::NonSendableIsolationCrossingResult:
+    os << "nonsendable_isolationcrossing_result ";
     if (extraSpace)
       os << extraSpaceLiteral;
     os << "%%" << opArgs[0];

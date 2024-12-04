@@ -1526,6 +1526,12 @@ struct PartitionOpBuilder {
         PartitionOp::UnknownPatternError(lookupValueID(value), currentInst));
   }
 
+  void addNonSendableIsolationCrossingResultError(SILValue value) {
+    currentInstPartitionOps.emplace_back(
+        PartitionOp::NonSendableIsolationCrossingResult(lookupValueID(value),
+                                                        currentInst));
+  }
+
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
   void print(llvm::raw_ostream &os) const;
@@ -2394,14 +2400,58 @@ public:
       handleSILOperands(applySite.getOperandsWithoutIndirectResults());
     }
 
-    // non-sendable results can't be returned from cross-isolation calls without
-    // a diagnostic emitted elsewhere. Here, give them a fresh value for better
-    // diagnostics hereafter
+    // Create a new assign fresh for each one of our values and unless our
+    // return value is sending, emit an extra error bit on the results that are
+    // non-Sendable.
     SmallVector<SILValue, 8> applyResults;
     getApplyResults(*applySite, applyResults);
-    for (auto result : applyResults)
-      if (auto value = tryToTrackValue(result))
+
+    auto substCalleeType = applySite.getSubstCalleeType();
+
+    // Today, all values in result info are sending or none are. So this is a
+    // safe to check that we have a sending result. In the future if we allow
+    // for sending to vary, then this code will need to be updated to vary with
+    // each result.
+    auto results = substCalleeType->getResults();
+    auto *applyExpr = applySite->getLoc().getAsASTNode<ApplyExpr>();
+
+    // We only emit the error if we do not have a sending result and if our
+    // callee isn't nonisolated.
+    //
+    // DISCUSSION: If our callee is non-isolated, we know that the value must
+    // have been returned as a non-sent disconnected value. The reason why this
+    // is different from a sending result is that the result may be part of the
+    // region of the operands while the sending result will not be. In either
+    // case though, we do not want to emit the error.
+    bool emitIsolationCrossingResultError =
+        (results.empty() || !results[0].hasOption(SILResultInfo::IsSending)) &&
+        // We have to check if we actually have an apply expr since we may not
+        // have one if we are processing a SIL test case since SIL does not have
+        // locations (which is how we grab our AST information).
+        !(applyExpr && applyExpr->getIsolationCrossing()
+                           ->getCalleeIsolation()
+                           .isNonisolated());
+
+    for (auto result : applyResults) {
+      if (auto value = tryToTrackValue(result)) {
         builder.addAssignFresh(value->getRepresentative().getValue());
+        if (emitIsolationCrossingResultError)
+          builder.addNonSendableIsolationCrossingResultError(
+              value->getRepresentative().getValue());
+      }
+    }
+
+    // If we are supposed to emit isolation crossing errors, go through our
+    // parameters and add the error on any indirect results that are
+    // non-Sendable.
+    if (emitIsolationCrossingResultError) {
+      for (auto result : applySite.getIndirectSILResults()) {
+        if (auto value = tryToTrackValue(result)) {
+          builder.addNonSendableIsolationCrossingResultError(
+              value->getRepresentative().getValue());
+        }
+      }
+    }
   }
 
   template <typename DestValues>
