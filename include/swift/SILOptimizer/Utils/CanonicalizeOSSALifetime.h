@@ -98,6 +98,7 @@
 
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
@@ -279,8 +280,74 @@ private:
   /// outside the pruned liveness at the time it is discovered.
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
+  class Def {
+    struct Root {
+      SILValue value;
+    };
+    struct Copy {
+      CopyValueInst *cvi;
+    };
+    struct BorrowedFrom {
+      BorrowedFromInst *bfi;
+    };
+    struct Reborrow {
+      SILArgument *argument;
+    };
+    using Payload = TaggedUnion<Root, Copy, BorrowedFrom, Reborrow>;
+    Payload payload;
+    Def(Payload payload) : payload(payload) {}
+
+  public:
+    enum class Kind {
+      Root,
+      Copy,
+      BorrowedFrom,
+      Reborrow,
+    };
+    Kind getKind() const {
+      if (payload.isa<Root>()) {
+        return Kind::Root;
+      }
+      if (payload.isa<Copy>()) {
+        return Kind::Copy;
+      }
+      if (payload.isa<BorrowedFrom>()) {
+        return Kind::BorrowedFrom;
+      }
+      assert(payload.isa<Reborrow>());
+      return Kind::Reborrow;
+    }
+    operator Kind() const { return getKind(); }
+    bool operator==(Def rhs) const {
+      return getKind() == rhs.getKind() && getValue() == rhs.getValue();
+    }
+    static Def root(SILValue value) { return {Root{value}}; }
+    static Def copy(CopyValueInst *cvi) { return {Copy{cvi}}; }
+    static Def borrowedFrom(BorrowedFromInst *bfi) {
+      return {BorrowedFrom{bfi}};
+    }
+    static Def reborrow(SILArgument *argument) { return {Reborrow{argument}}; }
+    SILValue getValue() const {
+      switch (*this) {
+      case Kind::Root:
+        return payload.get<Root>().value;
+      case Kind::Copy:
+        return payload.get<Copy>().cvi;
+      case Kind::BorrowedFrom:
+        return payload.get<BorrowedFrom>().bfi;
+      case Kind::Reborrow:
+        return payload.get<Reborrow>().argument;
+      }
+      llvm_unreachable("covered switch");
+    }
+  };
+  friend llvm::DenseMapInfo<Def>;
+  friend llvm::PointerLikeTypeTraits<Def>;
+  friend llvm::PointerLikeTypeTraits<
+      std::optional<swift::CanonicalizeOSSALifetime::Def>>;
+
   /// Visited set for general def-use traversal that prevents revisiting values.
-  GraphNodeWorklist<SILValue, 8> defUseWorklist;
+  GraphNodeWorklist<std::optional<Def>, 8> defUseWorklist;
 
   /// The blocks that were discovered by PrunedLiveness.
   SmallVector<SILBasicBlock *, 32> discoveredBlocks;
@@ -495,5 +562,95 @@ private:
 };
 
 } // end namespace swift
+
+namespace llvm {
+template <>
+struct DenseMapInfo<swift::CanonicalizeOSSALifetime::Def> {
+  static swift::CanonicalizeOSSALifetime::Def getEmptyKey() {
+    return swift::CanonicalizeOSSALifetime::Def::root(
+        DenseMapInfo<swift::SILValue>::getEmptyKey());
+  }
+  static swift::CanonicalizeOSSALifetime::Def getTombstoneKey() {
+    return swift::CanonicalizeOSSALifetime::Def::root(
+        DenseMapInfo<swift::SILValue>::getTombstoneKey());
+  }
+  static unsigned getHashValue(swift::CanonicalizeOSSALifetime::Def def) {
+    return detail::combineHashValue(
+        DenseMapInfo<swift::CanonicalizeOSSALifetime::Def::Kind>::getHashValue(
+            def.getKind()),
+        DenseMapInfo<swift::SILValue>::getHashValue(def.getValue()));
+  }
+  static bool isEqual(swift::CanonicalizeOSSALifetime::Def LHS,
+                      swift::CanonicalizeOSSALifetime::Def RHS) {
+    return LHS == RHS;
+  }
+};
+template <>
+struct PointerLikeTypeTraits<swift::CanonicalizeOSSALifetime::Def> {
+private:
+  using Def = swift::CanonicalizeOSSALifetime::Def;
+
+public:
+  static void *getAsVoidPointer(Def def) {
+    return reinterpret_cast<void *>(
+        reinterpret_cast<uintptr_t>(def.getValue().getOpaqueValue()) |
+        ((uintptr_t)def.getKind()) << NumLowBitsAvailable);
+  }
+  static Def getFromVoidPointer(void *p) {
+    auto kind = (Def::Kind)((reinterpret_cast<uintptr_t>(p) & 0b110) >>
+                            NumLowBitsAvailable);
+    auto opaque =
+        reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(p) & ~0b111);
+    auto value = swift::SILValue::getFromOpaqueValue(opaque);
+    switch (kind) {
+    case Def::Kind::Root:
+      return Def::root(value);
+    case Def::Kind::Copy:
+      return Def::copy(cast<swift::CopyValueInst>(value));
+    case Def::Kind::Reborrow:
+      return Def::reborrow(cast<swift::SILArgument>(value));
+    case Def::Kind::BorrowedFrom:
+      return Def::borrowedFrom(cast<swift::BorrowedFromInst>(value));
+    }
+  }
+
+  enum {
+    NumLowBitsAvailable =
+        llvm::PointerLikeTypeTraits<swift::SILValue>::NumLowBitsAvailable - 2
+  };
+};
+template <>
+struct PointerLikeTypeTraits<
+    std::optional<swift::CanonicalizeOSSALifetime::Def>> {
+private:
+  using Def = swift::CanonicalizeOSSALifetime::Def;
+  using Payload = std::optional<Def>;
+
+public:
+  static void *getAsVoidPointer(Payload payload) {
+    if (!payload)
+      return 0x0;
+    return reinterpret_cast<void *>(
+        reinterpret_cast<uintptr_t>(
+            PointerLikeTypeTraits<swift::CanonicalizeOSSALifetime::Def>::
+                getAsVoidPointer(*payload)) |
+        0b1);
+  }
+  static Payload getFromVoidPointer(void *p) {
+    auto none = reinterpret_cast<uintptr_t>(p) & 0b1;
+    if (none)
+      return std::nullopt;
+    auto opaque =
+        reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(p) & ~0b1);
+    return {PointerLikeTypeTraits<
+        swift::CanonicalizeOSSALifetime::Def>::getFromVoidPointer(opaque)};
+  }
+
+  enum {
+    NumLowBitsAvailable =
+        llvm::PointerLikeTypeTraits<Def>::NumLowBitsAvailable - 1
+  };
+};
+} // end namespace llvm
 
 #endif

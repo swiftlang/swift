@@ -132,17 +132,18 @@ static bool isDestroyOfCopyOf(SILInstruction *instruction, SILValue def) {
 bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   LLVM_DEBUG(llvm::dbgs() << "Computing canonical liveness from:\n";
              getCurrentDef()->print(llvm::dbgs()));
-  defUseWorklist.initialize(getCurrentDef());
+  defUseWorklist.initialize(Def::root(getCurrentDef()));
   // Only the first level of reborrows need to be consider. All nested inner
   // adjacent reborrows and phis are encapsulated within their lifetimes.
   SILPhiArgument *arg;
   if ((arg = dyn_cast<SILPhiArgument>(getCurrentDef())) && arg->isPhi()) {
     visitInnerAdjacentPhis(arg, [&](SILArgument *reborrow) {
-      defUseWorklist.insert(reborrow);
+      defUseWorklist.insert(Def::reborrow(reborrow));
       return true;
     });
   }
-  while (SILValue value = defUseWorklist.pop()) {
+  while (auto def = defUseWorklist.pop()) {
+    auto value = def->getValue();
     LLVM_DEBUG(llvm::dbgs() << "  Uses of value:\n";
                value->print(llvm::dbgs()));
 
@@ -153,11 +154,11 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       auto *user = use->getUser();
       // Recurse through copies.
       if (auto *copy = dyn_cast<CopyValueInst>(user)) {
-        defUseWorklist.insert(copy);
+        defUseWorklist.insert(Def::copy(copy));
         continue;
       }
       if (auto *bfi = dyn_cast<BorrowedFromInst>(user)) {
-        defUseWorklist.insert(bfi);
+        defUseWorklist.insert(Def::borrowedFrom(bfi));
         continue;
       }
       // Handle debug_value instructions separately.
@@ -244,7 +245,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         // This branch reborrows a guaranteed phi whose lifetime is dependent on
         // currentDef.  Uses of the reborrowing phi extend liveness.
         auto *reborrow = PhiOperand(use).getValue();
-        defUseWorklist.insert(reborrow);
+        defUseWorklist.insert(Def::reborrow(reborrow));
         break;
       }
     }
@@ -1159,7 +1160,7 @@ void CanonicalizeOSSALifetime::rewriteCopies(
     auto *user = use->getUser();
     // Recurse through copies.
     if (auto *copy = dyn_cast<CopyValueInst>(user)) {
-      defUseWorklist.insert(copy);
+      defUseWorklist.insert(Def::copy(copy));
       return true;
     }
     if (destroys.contains(user)) {
@@ -1202,7 +1203,8 @@ void CanonicalizeOSSALifetime::rewriteCopies(
       copyLiveUse(use, getCallbacks());
     }
   }
-  while (SILValue value = defUseWorklist.pop()) {
+  while (auto def = defUseWorklist.pop()) {
+    SILValue value = def->getValue();
     CopyValueInst *srcCopy = cast<CopyValueInst>(value);
     // Recurse through copies while replacing their uses.
     Operand *reusedCopyOp = nullptr;
