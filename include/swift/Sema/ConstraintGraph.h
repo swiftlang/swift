@@ -146,15 +146,6 @@ private:
 
   /// Binding Inference {
 
-  /// Infer bindings from the given constraint and notify referenced variables
-  /// about its arrival (if requested). This happens every time a new constraint
-  /// gets added to a constraint graph node.
-  void introduceToInference(Constraint *constraint);
-
-  /// Forget about the given constraint. This happens every time a constraint
-  /// gets removed for a constraint graph.
-  void retractFromInference(Constraint *constraint);
-
   /// Perform graph updates that must be undone after we bind a fixed type
   /// to a type variable.
   void retractFromInference(Type fixedType);
