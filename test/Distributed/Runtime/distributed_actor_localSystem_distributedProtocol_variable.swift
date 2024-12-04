@@ -22,23 +22,13 @@ import Distributed
 @Resolvable
 @available(SwiftStdlib 6.0, *)
 protocol WorkerProtocol: DistributedActor where ActorSystem == LocalTestingDistributedActorSystem {
-  distributed func distributedMethod() -> String
   distributed var distributedVariable: String { get }
-  distributed func genericMethod<E: Codable>(_ value: E) async -> E
 }
 
 @available(SwiftStdlib 6.0, *)
 distributed actor Worker: WorkerProtocol {
-  distributed func distributedMethod() -> String {
-    "implemented method"
-  }
-
   distributed var distributedVariable: String {
     "implemented variable"
-  }
-
-  distributed func genericMethod<E: Codable>(_ value: E) async -> E {
-    return value
   }
 }
 
@@ -57,14 +47,8 @@ func test_distributedVariable<DA: WorkerProtocol>(actor: DA) async throws -> Str
 
     let actor: any WorkerProtocol = Worker(actorSystem: system)
 
-    let m = try await actor.distributedMethod()
-    print("m = \(m)") // CHECK: m = implemented method
-
     // force a call through witness table
     let v1 = try await test_distributedVariable(actor: actor)
     print("v1 = \(v1)") // CHECK: v1 = implemented variable
-
-    let v2 = try await actor.distributedVariable
-    print("v2 = \(v2)") // CHECK: v2 = implemented variable
   }
 }

@@ -130,7 +130,7 @@ extension DistributedResolvableMacro {
       return []
     }
 
-    var isGenericStub = false
+    var isGenericOverActorSystem = false
     var specificActorSystemRequirement: TypeSyntax?
 
     let accessModifiers = proto.accessControlModifiers
@@ -140,7 +140,7 @@ extension DistributedResolvableMacro {
       case .conformanceRequirement(let conformanceReq)
            where conformanceReq.leftType.isActorSystem:
         specificActorSystemRequirement = conformanceReq.rightType.trimmed
-        isGenericStub = true
+        isGenericOverActorSystem = true
 
       case .sameTypeRequirement(let sameTypeReq):
         switch sameTypeReq.leftType {
@@ -148,7 +148,7 @@ extension DistributedResolvableMacro {
           switch sameTypeReq.rightType.trimmed {
           case .type(let rightType):
             specificActorSystemRequirement = rightType
-            isGenericStub = false
+            isGenericOverActorSystem = false
 
           case .expr:
             throw DiagnosticsError(
@@ -167,41 +167,78 @@ extension DistributedResolvableMacro {
       }
     }
 
-    if isGenericStub, let specificActorSystemRequirement {
-      return [
-        """
-        \(proto.modifiers) distributed actor $\(proto.name.trimmed)<ActorSystem>: \(proto.name.trimmed), 
-          Distributed._DistributedActorStub
-          where ActorSystem: \(specificActorSystemRequirement) 
-        { }
-        """
-      ]
-    } else if let specificActorSystemRequirement {
-      return [
-        """
-        \(proto.modifiers) distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
-          Distributed._DistributedActorStub
-        { 
-          \(typealiasActorSystem(access: accessModifiers, proto, specificActorSystemRequirement)) 
-        }
-        """
-      ]
+    var primaryAssociatedTypes: [PrimaryAssociatedTypeSyntax] = []
+    if let primaryTypes = proto.primaryAssociatedTypeClause?.primaryAssociatedTypes {
+      primaryAssociatedTypes.append(contentsOf: primaryTypes)
+    }
+
+    // The $Stub is always generic over the actor system: $Stub<ActorSystem>
+    var primaryTypeParams: [String] = primaryAssociatedTypes.map {
+      $0.as(PrimaryAssociatedTypeSyntax.self)!.name.trimmed.text
+    }
+
+    // Don't duplicate the ActorSystem type parameter if it already was declared
+    // on the protocol as a primary associated type;
+    // otherwise, add it as first primary associated type.
+    let actorSystemTypeParam: [String]
+    if primaryTypeParams.contains("ActorSystem") {
+      actorSystemTypeParam = []
+    } else if isGenericOverActorSystem {
+      actorSystemTypeParam = ["ActorSystem"]
     } else {
+      actorSystemTypeParam = []
+    }
+
+    // Prepend the actor system type parameter, as we want it to be the first one
+    primaryTypeParams = actorSystemTypeParam + primaryTypeParams
+    let typeParamsClause =
+      primaryTypeParams.isEmpty ? "" : "<" + primaryTypeParams.joined(separator: ", ") + ">"
+
+    var whereClause: String = ""
+    do {
+      let associatedTypeDecls = proto.associatedTypeDecls
+      var typeParamConstraints: [String] = []
+      for typeParamName in primaryTypeParams {
+        if let decl = associatedTypeDecls[typeParamName] {
+          if let inheritanceClause = decl.inheritanceClause {
+            typeParamConstraints.append("\(typeParamName)\(inheritanceClause)")
+          }
+        }
+      }
+
+      if isGenericOverActorSystem, let specificActorSystemRequirement {
+        typeParamConstraints = ["ActorSystem: \(specificActorSystemRequirement)"] + typeParamConstraints
+      }
+      
+      if !typeParamConstraints.isEmpty {
+        whereClause += "\n  where " + typeParamConstraints.joined(separator: ",\n  ")
+      }
+    }
+
+    let stubActorBody: String
+    if isGenericOverActorSystem {
       // there may be no `where` clause specifying an actor system,
       // but perhaps there is a typealias (or extension with a typealias),
       // specifying a concrete actor system so we let this synthesize
       // an empty `$Greeter` -- this may fail, or succeed depending on
       // surrounding code using a default distributed actor system,
       // or extensions providing it.
-      return [
-        """
-        \(proto.modifiers) distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
-          Distributed._DistributedActorStub
-        {
-        }
-        """
-      ]
+      stubActorBody = ""
+    } else if let specificActorSystemRequirement {
+      stubActorBody = "\(typealiasActorSystem(access: accessModifiers, proto, specificActorSystemRequirement))"
+    } else {
+      stubActorBody = ""
     }
+
+    return [
+      """
+      \(proto.modifiers) distributed actor $\(proto.name.trimmed)\(raw: typeParamsClause): \(proto.name.trimmed), 
+        Distributed._DistributedActorStub \(raw: whereClause)
+      {
+        \(raw: stubActorBody)
+      }
+      """
+    ]
   }
 
   private static func typealiasActorSystem(access: DeclModifierListSyntax,
@@ -249,6 +286,23 @@ extension DeclModifierSyntax {
       return true
     default:
       return false
+    }
+  }
+}
+
+extension ProtocolDeclSyntax {
+  var associatedTypeDecls: [String: AssociatedTypeDeclSyntax] {
+    let visitor = AssociatedTypeDeclVisitor(viewMode: .all)
+    visitor.walk(self)
+    return visitor.associatedTypeDecls
+  }
+
+  final class AssociatedTypeDeclVisitor: SyntaxVisitor {
+    var associatedTypeDecls: [String: AssociatedTypeDeclSyntax] = [:]
+
+    override func visit(_ node: AssociatedTypeDeclSyntax) -> SyntaxVisitorContinueKind {
+      associatedTypeDecls[node.name.text] = node
+      return .skipChildren
     }
   }
 }
