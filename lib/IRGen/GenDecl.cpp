@@ -1224,10 +1224,12 @@ void IRGenerator::emitGlobalTopLevel(
     }
   }
   
-  // Emit property descriptors.
-  for (auto &prop : PrimaryIGM->getSILModule().getPropertyList()) {
-    CurrentIGMPtr IGM = getGenModule(prop.getDecl()->getInnermostDeclContext());
-    IGM->emitSILProperty(&prop);
+  if (!SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    // Emit property descriptors.
+    for (auto &prop : PrimaryIGM->getSILModule().getPropertyList()) {
+      CurrentIGMPtr IGM = getGenModule(prop.getDecl()->getInnermostDeclContext());
+      IGM->emitSILProperty(&prop);
+    }
   }
 
   // Emit differentiability witnesses.
