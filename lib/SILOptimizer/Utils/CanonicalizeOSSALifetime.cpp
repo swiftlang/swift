@@ -1149,6 +1149,9 @@ void CanonicalizeOSSALifetime::rewriteCopies(
     SmallVectorImpl<DestroyValueInst *> const &newDestroys) {
   assert(getCurrentDef()->getOwnershipKind() == OwnershipKind::Owned);
 
+  // Shadow defUseWorklist in order to constrain its uses.
+  auto &defUseWorklist = this->defUseWorklist;
+
   InstructionSetVector instsToDelete(getCurrentDef()->getFunction());
 
   // Visit each operand in the def-use chain.
