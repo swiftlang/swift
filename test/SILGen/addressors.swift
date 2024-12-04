@@ -55,11 +55,12 @@ func test0() {
 // CHECK: store [[AVAL]] to [[A]]
   var a = A()
 
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [static] [[A]] : $*A
 // CHECK: [[T0:%.*]] = function_ref @$s10addressors1AVys5Int32VAEcilu :
 // CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[AVAL]])
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK: [[MD:%.*]] = mark_dependence [[T3]] : $*Int32 on [[AVAL]] : $A
+// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[T3]] : $*Int32 on [[ACCESS]] : $*A
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unsafe] [[MD]] : $*Int32
 // CHECK: [[Z:%.*]] = load [[ACCESS]] : $*Int32
   let z = a[10]
@@ -96,7 +97,7 @@ func test1() -> Int32 {
 // CHECK: [[PTR:%.*]] = apply [[ACCESSOR]]({{%.*}}, [[A]]) : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
 // CHECK: [[T0:%.*]] = struct_extract [[PTR]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
 // CHECK: [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK: [[MD:%.*]] = mark_dependence [[T1]] : $*Int32 on [[A]] : $A
+// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[T1]] : $*Int32 on [[A]] : $A
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unsafe] [[MD]] : $*Int32
 // CHECK: [[T2:%.*]] = load [[ACCESS]] : $*Int32
 // CHECK: return [[T2]] : $Int32
@@ -192,7 +193,7 @@ func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T2:%.*]] = apply [[T1]]<(Int32) -> Int32>({{%.*}}, [[T0]])
 // CHECK:   [[T3:%.*]] = struct_extract [[T2]] : $UnsafePointer<(Int32) -> Int32>, #UnsafePointer._rawValue
 // CHECK:   [[T4:%.*]] = pointer_to_address [[T3]] : $Builtin.RawPointer to [strict] $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int32, Int32>
-// CHECK:   [[MD:%.*]] = mark_dependence [[T4]] : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1>
+// CHECK:   [[MD:%.*]] = mark_dependence [nonescaping] [[T4]] : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1>
 // (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int32, Int32> on [[T0]] : $CArray<(Int32) -> Int32>
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[MD]]
 // CHECK:   [[T5:%.*]] = load [[ACCESS]]
@@ -283,7 +284,7 @@ struct E {
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[E]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]]
 // CHECK:   [[T3:%.*]] = pointer_to_address [[T2]]
-// CHECK:   [[MD:%.*]] = mark_dependence [[T3]] : $*Int32 on %0 : $E
+// CHECK:   [[MD:%.*]] = mark_dependence [nonescaping] [[T3]] : $*Int32 on %0 : $E
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]] : $*Int32
 // CHECK:   store {{%.*}} to [[ACCESS]] : $*Int32
 func test_e(_ e: E) {
