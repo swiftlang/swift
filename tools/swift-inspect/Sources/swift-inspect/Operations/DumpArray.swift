@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(Windows)
+#if !os(Linux)
 
 import ArgumentParser
 import SwiftRemoteMirror

@@ -28,14 +28,17 @@ class LinkMap {
   public let entries: [Entry]
 
   public init(for process: Process) throws {
-    let auxVec = try AuxVec.load(for: process)
-    guard let phdrAddr = auxVec[.AT_PHDR] else { throw Error.MissingAuxVecEntry("missing AT_PHDR") }
+    guard let auxVec = AuxVec.load(for: process) else {
+      throw Error.MissingAuxVecEntry("failed reading auxvec for \(process)")
+    }
 
-    guard let phdrSize = auxVec[.AT_PHENT] else {
+    guard let phdrAddr = auxVec[AT_PHDR] else { throw Error.MissingAuxVecEntry("missing AT_PHDR") }
+
+    guard let phdrSize = auxVec[AT_PHENT] else {
       throw Error.MissingAuxVecEntry("missing AT_PHENT")
     }
 
-    guard let phdrCount = auxVec[.AT_PHNUM] else {
+    guard let phdrCount = auxVec[AT_PHNUM] else {
       throw Error.MissingAuxVecEntry("missing AT_PHNUM")
     }
 

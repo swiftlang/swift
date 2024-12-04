@@ -77,7 +77,7 @@ class ElfFile {
   public func loadSymbols(baseAddress: UInt64 = 0) throws -> SymbolMap {
     guard let sectionCount = UInt(exactly: self.ehdr.shnum) else {
       throw Error.MalformedElfFile(
-        self.filePath, description: "invalid ehdr.shnum: \(self.ehdr.shnum)")
+        self.filePath, description: "invalid ElfEhdr.e_shnum: \(self.ehdr.shnum)")
     }
 
     var symbols: SymbolMap = [:]
