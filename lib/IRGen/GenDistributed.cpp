@@ -379,8 +379,8 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
   IRGenMangler mangler(Context);
 
   addAccessibleFunction(AccessibleFunction::forDistributed(
-      mangler.mangleDistributedThunkRecord(targetDecl),
-      mangler.mangleDistributedThunk(targetDecl),
+      /*recordName=*/mangler.mangleDistributedThunkRecord(targetDecl),
+      /*accessorName=*/mangler.mangleDistributedThunk(targetDecl),
       accessor.getTargetType(),
       getAddrOfAsyncFunctionPointer(accessorRef)));
 }
