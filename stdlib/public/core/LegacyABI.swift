@@ -153,6 +153,7 @@ extension Dictionary._Variant {
   }
 }
 
+#if _runtime(_ObjC)
 extension __CocoaDictionary {
   @usableFromInline
   @_silgen_name("$ss17__CocoaDictionaryV9mapValuesys07_NativeB0Vyxq0_Gq0_q_KXEKSHRzr1_lF")
@@ -168,6 +169,7 @@ extension __CocoaDictionary {
     return result
   }
 }
+#endif
 
 extension _NativeDictionary {
   @usableFromInline
