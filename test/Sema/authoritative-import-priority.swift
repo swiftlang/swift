@@ -17,8 +17,18 @@
 /// Client testing order of preference for more levels of imports.
 // RUN: %target-swift-frontend -typecheck -I %t \
 // RUN:   %t/ExportedClient_FileExported.swift %t/ExportedClient_FileA.swift \
-// RUN:   %t/ExportedClient_FileB.swift %t/ExportedClient_FileC.swift %t/ExportedClient_FileD.swift \
+// RUN:   %t/ExportedClient_FileB.swift %t/ExportedClient_FileC.swift \
+// RUN:   %t/ExportedClient_FileD_via_underlying.swift \
 // RUN:   -import-underlying-module -module-name ExportedClient \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault \
+// RUN:   -Rmodule-api-import -verify
+
+// Same without the underlying clang module.
+// RUN: %target-swift-frontend -typecheck -I %t \
+// RUN:   %t/ExportedClient_FileExported.swift %t/ExportedClient_FileA.swift \
+// RUN:   %t/ExportedClient_FileB.swift %t/ExportedClient_FileC.swift \
+// RUN:   %t/ExportedClient_FileD_via_exported.swift \
+// RUN:   -module-name ExportedClient \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -Rmodule-api-import -verify
 
@@ -156,10 +166,15 @@ public import NotLib
 public func useTypesC(a: ExportedType) {}
 // expected-remark @-1 {{struct 'ExportedType' is imported via 'NotLib', which reexports definition from 'LibCore'}}
 
-//--- ExportedClient_FileD.swift
-/// Last used the module-wide @_exported import.
+//--- ExportedClient_FileD_via_underlying.swift
+/// Then use the import of the underling clang module.
 public func useTypesD(a: ExportedType) {}
 // expected-remark @-1 {{struct 'ExportedType' is imported via 'ExportedClient', which reexports definition from 'LibCore'}}
+
+//--- ExportedClient_FileD_via_exported.swift
+/// Finally use the @_exported import from the local module.
+public func useTypesD(a: ExportedType) {}
+// It would be nice to have a remark even without an import to point to.
 
 
 //--- SwiftLibClient_FileA.swift
