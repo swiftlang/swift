@@ -2,4 +2,4 @@
 
 import PredefinedMacros
 
-swift3ReadyToGo()
+swiftReadyToGo()
