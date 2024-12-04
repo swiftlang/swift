@@ -984,7 +984,7 @@ function Build-CMakeProject {
       # ensure that it can be accessed from the cmake cache file.
       $env:NDKPATH = Get-AndroidNDKPath
     }
-    if ($Platform -eq "Android") {
+    if ($Platform -eq [Platform]::Android) {
       $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
       $VSInstallPath = & $vswhere -nologo -latest -products * -property installationPath
       if (Test-Path "${VSInstallPath}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin") {
@@ -1033,7 +1033,7 @@ function Build-CMakeProject {
         # Add additional linker flags for generating the debug info.
         Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "/debug"
         Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "/debug"
-      } elseif ($Platform -eq "Android") {
+      } elseif ($Platform -eq [Platform]::Android) {
         # Use a built lld linker as the Android's NDK linker might be too
         # old and not support all required relocations needed by the Swift
         # runtime.
@@ -1709,7 +1709,7 @@ function Build-CURL([Platform]$Platform, $Arch) {
   $ArchName = $Arch.LLVMName
 
   $PlatformDefines = @{}
-  if ($Platform -eq "Android") {
+  if ($Platform -eq [Platform]::Android) {
     $PlatformDefines += @{
       HAVE_FSEEKO = "0";
     }
@@ -1817,7 +1817,7 @@ function Build-CURL([Platform]$Platform, $Arch) {
 
 function Build-Runtime([Platform]$Platform, $Arch) {
   $PlatformDefines = @{}
-  if ($Platform -eq "Android") {
+  if ($Platform -eq [Platform]::Android) {
     $PlatformDefines += @{
       LLVM_ENABLE_LIBCXX = "YES";
       SWIFT_USE_LINKER = "lld";
