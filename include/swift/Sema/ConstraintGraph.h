@@ -84,9 +84,24 @@ public:
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClass() const;
 
-  inference::PotentialBindings &getCurrentBindings() {
-    assert(forRepresentativeVar());
-    return Bindings;
+  inference::PotentialBindings &getPotentialBindings() {
+    DEBUG_ASSERT(forRepresentativeVar());
+    return Potential;
+  }
+
+  void initBindingSet();
+
+  inference::BindingSet &getBindingSet() {
+    ASSERT(hasBindingSet());
+    return *Set;
+  }
+
+  bool hasBindingSet() const {
+    return Set.has_value();
+  }
+
+  void resetBindingSet() {
+    Set.reset();
   }
 
 private:
@@ -182,8 +197,13 @@ private:
   /// The type variable this node represents.
   TypeVariableType *TypeVar;
 
-  /// The set of bindings associated with this type variable.
-  inference::PotentialBindings Bindings;
+  /// The potential bindings for this type variable, updated incrementally by
+  /// the constraint graph.
+  inference::PotentialBindings Potential;
+
+  /// The binding set for this type variable, computed by
+  /// determineBestBindings().
+  std::optional<inference::BindingSet> Set;
 
   /// The vector of constraints that mention this type variable, in a stable
   /// order for iteration.
