@@ -8646,7 +8646,7 @@ public:
       out << "sizedBy";
     else
       out << "countedBy";
-    out << "(pointer: " << pointerIndex << ", ";
+    out << "(pointer: " << pointerIndex + 1 << ", ";
     if (isSizedBy)
       out << "size";
     else
@@ -8673,13 +8673,11 @@ void ClangImporter::Implementation::importBoundsAttributes(
   {
     llvm::raw_svector_ostream out(MacroString);
 
-    size_t parameterIndex = 1;
     PointerParamInfoPrinter printer(getClangASTContext(), out);
-    for (auto param : ClangDecl->parameters()) {
+    for (auto [index, param] : llvm::enumerate(ClangDecl->parameters())) {
       if (auto CAT = param->getType()->getAs<clang::CountAttributedType>()) {
-        printer.printCountedBy(CAT, parameterIndex);
+        printer.printCountedBy(CAT, index);
       }
-      parameterIndex++;
     }
   }
 
