@@ -1367,13 +1367,6 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   // This is relevant for Swift macros inferred from Clang attributes,
   // since they don't have a source representation.
   SourceLoc attrLoc = attr->AtLoc;
-  if (attrLoc.isInvalid() &&
-      isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
-    attrLoc = evaluateOrDefault(ctx.evaluator,
-                                PrettyPrintCustomAttrRequest{attr, attachedTo},
-                                SourceLoc());
-    assert(attrLoc);
-  }
 
   auto attrSourceFile = moduleDecl->getSourceFileContainingLocation(attrLoc);
   if (!attrSourceFile)
