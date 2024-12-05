@@ -798,11 +798,10 @@ typeEraseOpenedArchetypesFromEnvironment(Type type, GenericEnvironment *env,
         // Parameterized protocol types whose arguments involve this type
         // parameter are erased to the base type.
         if (auto parameterized = dyn_cast<ParameterizedProtocolType>(t)) {
-          for (auto argType : parameterized->getArgs()) {
-            auto erasedArgType = ::typeEraseOpenedArchetypesFromEnvironment(
-                argType, env, TypePosition::Covariant, covariantOnly);
-            if (erasedArgType.getPointer() != argType.getPointer())
-              return parameterized->getBaseType();
+          if (Type(parameterized).findIf([&](Type t) {
+                return getAsOpenedArchetypeFromEnvironment(t, env);
+              })) {
+            return parameterized->getBaseType();
           }
         }
 
