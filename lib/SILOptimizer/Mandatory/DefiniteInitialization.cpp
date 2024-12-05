@@ -2741,6 +2741,12 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     if (Pointer->getType().isAddress())
       Pointer = B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Take);
 
+    // Cast back down from an upcast.
+    if (auto *UI = dyn_cast<UpcastInst>(Pointer)) {
+      Pointer =
+          B.createUncheckedRefCast(Loc, Pointer, UI->getOperand()->getType());
+    }
+
     auto MetatypeTy = CanMetatypeType::get(TheMemory.getASTType(),
                                            MetatypeRepresentation::Thick);
     auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
@@ -2761,12 +2767,6 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
       if (classDecl && classDecl->isRootDefaultActor()) {
           emitDefaultActorDestroy(B, Loc, Pointer);
       }
-    }
-
-    // Cast back down from an upcast.
-    if (auto *UI = dyn_cast<UpcastInst>(Pointer)) {
-      Pointer =
-          B.createUncheckedRefCast(Loc, Pointer, UI->getOperand()->getType());
     }
 
     // We've already destroyed any instance variables initialized by this
