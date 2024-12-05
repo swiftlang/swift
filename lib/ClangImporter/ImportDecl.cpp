@@ -8663,7 +8663,7 @@ public:
 
 void ClangImporter::Implementation::importBoundsAttributes(
     FuncDecl *MappedDecl) {
-  assert(SwiftContext.LangOpts.EnableBoundsSafetyInterop);
+  assert(SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers));
   auto ClangDecl =
       dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
   // any function with safe pointer imports should have a clang decl
@@ -8682,7 +8682,6 @@ void ClangImporter::Implementation::importBoundsAttributes(
       }
     }
   }
-
 
   // Dig out a source file we can use for parsing.
   auto &sourceFile = getClangSwiftAttrSourceFile(

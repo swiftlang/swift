@@ -325,10 +325,6 @@ namespace swift {
     /// disabled because it is not complete.
     bool EnableCXXInterop = false;
 
-    /// Enable C interop importing bounds safety and lifetime attributes to
-    /// generate Swift wrappers with safe pointer types (experimental).
-    bool EnableBoundsSafetyInterop = false;
-
     /// The C++ interoperability source compatibility version. Defaults
     /// to the Swift language version.
     version::Version cxxInteropCompatVersion;

@@ -578,7 +578,7 @@ void importer::getNormalInvocationArguments(
     }
   }
 
-  if (LangOpts.EnableBoundsSafetyInterop)
+  if (LangOpts.hasFeature(Feature::SafeInteropWrappers))
     invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
 
   // Set C language options.
