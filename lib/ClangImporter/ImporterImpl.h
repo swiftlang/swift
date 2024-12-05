@@ -1060,6 +1060,10 @@ public:
   SourceFile &getClangSwiftAttrSourceFile(
       ModuleDecl &module, StringRef attributeText, bool cached);
 
+  /// Create attribute with given text and attach it to decl, creating or
+  /// retrieving a chached source file as needed.
+  void importNontrivialAttribute(Decl *MappedDecl, StringRef attributeText);
+
   /// Utility function to import Clang attributes from a source Swift decl to
   /// synthesized Swift decl.
   ///

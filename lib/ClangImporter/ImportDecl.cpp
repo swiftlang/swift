@@ -8353,6 +8353,53 @@ static bool importAsUnsafe(ClangImporter::Implementation &impl,
   return false;
 }
 
+void ClangImporter::Implementation::importNontrivialAttribute(
+    Decl *MappedDecl, llvm::StringRef AttrString) {
+  bool cached = true;
+  while (true) {
+    // Dig out a source file we can use for parsing.
+    auto &sourceFile = getClangSwiftAttrSourceFile(
+        *MappedDecl->getDeclContext()->getParentModule(), AttrString, cached);
+
+    auto topLevelDecls = sourceFile.getTopLevelDecls();
+
+    // If we're using the cached version, check whether we can correctly
+    // clone the attribute.
+    if (cached) {
+      bool hasNonclonableAttribute = false;
+      for (auto decl : topLevelDecls) {
+        if (hasNonclonableAttribute)
+          break;
+
+        for (auto attr : decl->getAttrs()) {
+          if (!attr->canClone()) {
+            hasNonclonableAttribute = true;
+            break;
+          }
+        }
+      }
+
+      // We cannot clone one of the attributes. Go back and build a new
+      // source file without caching it.
+      if (hasNonclonableAttribute) {
+        cached = false;
+        continue;
+      }
+    }
+
+    // Collect the attributes from the synthesized top-level declaration in
+    // the source file. If we're using a cached copy, clone the attribute.
+    for (auto decl : topLevelDecls) {
+      SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
+                                            decl->getAttrs().end());
+      for (auto attr : attrs) {
+        MappedDecl->getAttrs().add(cached ? attr->clone(SwiftContext) : attr);
+      }
+    }
+    break;
+  }
+}
+
 void
 ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
   auto ClangDecl =
@@ -8490,53 +8537,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
-      bool cached = true;
-      while (true) {
-        // Dig out a source file we can use for parsing.
-        auto &sourceFile = getClangSwiftAttrSourceFile(
-            *MappedDecl->getDeclContext()->getParentModule(),
-            swiftAttr->getAttribute(),
-            cached);
-
-        auto topLevelDecls = sourceFile.getTopLevelDecls();
-
-        // If we're using the cached version, check whether we can correctly
-        // clone the attribute.
-        if (cached) {
-          bool hasNonclonableAttribute = false;
-          for (auto decl : topLevelDecls) {
-            if (hasNonclonableAttribute)
-              break;
-
-            for (auto attr : decl->getAttrs()) {
-              if (!attr->canClone()) {
-                hasNonclonableAttribute = true;
-                break;
-              }
-            }
-          }
-
-          // We cannot clone one of the attributes. Go back and build a new
-          // source file without caching it.
-          if (hasNonclonableAttribute) {
-            cached = false;
-            continue;
-          }
-        }
-
-        // Collect the attributes from the synthesized top-level declaration in
-        // the source file. If we're using a cached copy, clone the attribute.
-        for (auto decl : topLevelDecls) {
-          SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
-                                                decl->getAttrs().end());
-          for (auto attr : attrs) {
-            MappedDecl->getAttrs().add(cached ? attr->clone(SwiftContext)
-                                              : attr);
-          }
-        }
-
-        break;
-      }
+      importNontrivialAttribute(MappedDecl, swiftAttr->getAttribute());
     }
 
     if (seenUnsafe || importAsUnsafe(*this, ClangDecl, MappedDecl)) {
@@ -8683,17 +8684,7 @@ void ClangImporter::Implementation::importBoundsAttributes(
     }
   }
 
-  // Dig out a source file we can use for parsing.
-  auto &sourceFile = getClangSwiftAttrSourceFile(
-      *MappedDecl->getDeclContext()->getParentModule(), MacroString);
-
-  // Collect the attributes from the synthesized top-level declaration in
-  // the source file.
-  auto topLevelDecls = sourceFile.getTopLevelDecls();
-  for (auto decl : topLevelDecls) {
-    for (auto attr : decl->getAttrs())
-      MappedDecl->getAttrs().add(attr->clone(SwiftContext));
-  }
+  importNontrivialAttribute(MappedDecl, MacroString);
 }
 
 static bool isUsingMacroName(clang::SourceManager &SM,
