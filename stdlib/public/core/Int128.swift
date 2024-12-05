@@ -314,6 +314,9 @@ extension Int128 {
     if _slowPath(other == .zero) {
       return (self, true)
     }
+    // This case is interesting because the remainder does not overflow; the
+    // analogous division does. Counting it as overflowing is consistent with
+    // documented behavior.
     if _slowPath(self == .min && other == (-1 as Self)) {
       return (0, true)
     }
@@ -395,6 +398,9 @@ extension Int128 {
     if _slowPath(b == .zero) {
       _preconditionFailure("Division by zero in remainder operation")
     }
+    // This case is interesting because the remainder does not overflow; the
+    // analogous division does. Counting it as overflowing is consistent with
+    // documented behavior.
     if _slowPath(a == .min && b == (-1 as Self)) {
       _preconditionFailure("Division results in an overflow in remainder operation")
     }
