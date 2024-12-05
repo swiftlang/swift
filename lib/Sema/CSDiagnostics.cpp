@@ -43,6 +43,7 @@
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/Attr.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
@@ -4026,6 +4027,93 @@ bool SubscriptMisuseFailure::diagnoseAsNote() {
   return false;
 }
 
+// TODO: remove these functions copied from ClangImporter
+static clang::TypeDecl *
+lookupNestedClangTypeDecl(const clang::CXXRecordDecl *clangDecl,
+                          StringRef name) {
+  clang::IdentifierInfo *nestedDeclName =
+      &clangDecl->getASTContext().Idents.get(name);
+  auto nestedDecls = clangDecl->lookup(nestedDeclName);
+  // If this is a templated typedef, Clang might have instantiated several
+  // equivalent typedef decls. If they aren't equivalent, Clang has already
+  // complained about this. Let's assume that they are equivalent. (see
+  // filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
+  if (nestedDecls.empty())
+    return nullptr;
+  auto nestedDecl = nestedDecls.front();
+  return dyn_cast_or_null<clang::TypeDecl>(nestedDecl);
+}
+
+static clang::TypeDecl *
+getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
+  return lookupNestedClangTypeDecl(clangDecl, "iterator_category");
+}
+
+static bool isIterator(const clang::CXXRecordDecl *clangDecl) {
+  return getIteratorCategoryDecl(clangDecl);
+}
+
+static void findSwiftAttributes(
+    clang::QualType type,
+    llvm::function_ref<void(const clang::SwiftAttrAttr *)> callback) {
+  std::function<clang::QualType(clang::QualType)> skipUnrelatedSugar =
+      [&](clang::QualType type) -> clang::QualType {
+    if (auto *MQT = dyn_cast<clang::MacroQualifiedType>(type))
+      return MQT->isSugared() ? skipUnrelatedSugar(MQT->desugar()) : type;
+
+    if (auto *ET = dyn_cast<clang::ElaboratedType>(type))
+      return ET->isSugared() ? skipUnrelatedSugar(ET->desugar()) : type;
+
+    return type;
+  };
+
+  type = skipUnrelatedSugar(type);
+
+  // Consider only immediate attributes, don't look through the typerefs
+  // because they are imported separately.
+  while (const auto *AT = dyn_cast<clang::AttributedType>(type)) {
+    if (auto swiftAttr =
+            dyn_cast_or_null<clang::SwiftAttrAttr>(AT->getAttr())) {
+      callback(swiftAttr);
+    }
+    type = skipUnrelatedSugar(AT->getEquivalentType());
+  }
+}
+
+static bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
+  if (decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [&](auto *A) {
+        if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(A))
+          return swiftAttr->getAttribute() == attr;
+        return false;
+      }))
+    return true;
+
+  if (auto *P = dyn_cast<clang::ParmVarDecl>(decl)) {
+    bool found = false;
+    findSwiftAttributes(P->getOriginalType(),
+                        [&](const clang::SwiftAttrAttr *swiftAttr) {
+                          found |= swiftAttr->getAttribute() == attr;
+                        });
+    return found;
+  }
+
+  return false;
+}
+
+static bool hasIteratorAPIAttr(const clang::Decl *decl) {
+  return hasSwiftAttribute(decl, "import_iterator");
+}
+
+static bool recordIsAnIterator(const clang::RecordDecl *decl, ASTContext &ctx) {
+  if (auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+    if (hasIteratorAPIAttr(cxxDecl) || isIterator(cxxDecl)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
                                                    ASTNode anchor,
                                                    Type baseType,
@@ -4165,9 +4253,10 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
     } else if (cxxMethod->getReturnType()->isRecordType()) {
       if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(
               cxxMethod->getReturnType()->getAsRecordDecl())) {
-        auto methodSemantics = evaluateOrDefault(
-            ctx.evaluator, CxxRecordSemantics({cxxRecord, ctx}), {});
-        if (methodSemantics == CxxRecordSemanticsKind::Iterator) {
+        // DOUBT: How can I call evaluateOrDefault with CxxRecordSemanticsKind
+        // without having ClangImporter::Implementation &importerImpl in
+        // Swift::ClassDecl
+        if (recordIsAnIterator(cxxRecord, ctx)) {
           ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
                              name.getBaseIdentifier().str());
           ctx.Diags.diagnose(loc, diag::iterator_potentially_unsafe);

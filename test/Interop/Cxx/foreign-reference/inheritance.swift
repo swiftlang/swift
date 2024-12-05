@@ -16,18 +16,29 @@ var TemplatingTestSuite = TestSuite("Foreign references work with templates")
 
 TemplatingTestSuite.test("SubT") {
     let s: SubT = SubT.getSubT()
-    assert(!s.isBase)
+    expectTrue(!s.isBase)
     let sc: BaseT = cast(s)
-    assert(!sc.isBase)
+    expectTrue(!sc.isBase)
     let sx: BaseT = cxxCast(s)      // should instantiate I to SubT and O to BaseT
-    assert(!sc.isBase)
+    expectTrue(!sx.isBase)
 }
 
 TemplatingTestSuite.test("BaseT") {
     let b: BaseT = BaseT.getBaseT()
-    assert(b.isBase)
+    expectTrue(b.isBase)
     let bc: BaseT = cxxCast(b)      // should instantiate I and O both to BaseT
-    assert(bc.isBase)
+    expectTrue(bc.isBase)
+}
+
+var FrtInheritanceTestSuite = TestSuite("Foreign references in C++ inheritance")
+
+FrtInheritanceTestSuite.test("ParentChild") {
+  var x = returnValueType()
+  var y = returnRefType()
+  var z = returnDerivedFromRefType()
+  expectTrue(!(type(of: x) is AnyObject.Type), "Expected x to be a value type, but it’s a reference type")
+  expectTrue(type(of: y) is AnyObject.Type, "Expected y to be a reference type, but it’s a value type")
+  expectTrue(type(of: z) is AnyObject.Type, "Expected z to be a reference type, but it’s a value type")
 }
 
 runAllTests()

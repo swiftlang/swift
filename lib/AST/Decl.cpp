@@ -6321,10 +6321,17 @@ bool ClassDecl::isForeignReferenceType() const {
   if (!clangRecordDecl)
     return false;
 
-  CxxRecordSemanticsKind kind = evaluateOrDefault(
-      getASTContext().evaluator,
-      CxxRecordSemantics({clangRecordDecl, getASTContext()}), {});
-  return kind == CxxRecordSemanticsKind::Reference;
+  // DOUBT: How can I call evaluateOrDefault with CxxRecordSemanticsKind without
+  // having ClangImporter::Implementation &importerImpl in Swift::ClassDecl
+  return clangRecordDecl->hasAttrs() &&
+         llvm::any_of(clangRecordDecl->getAttrs(), [](auto *attr) {
+           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+             return swiftAttr->getAttribute() == "import_reference" ||
+                    // TODO: Remove this once libSwift hosttools no longer
+                    // requires it.
+                    swiftAttr->getAttribute() == "import_as_ref";
+           return false;
+         });
 }
 
 bool ClassDecl::hasRefCountingAnnotations() const {

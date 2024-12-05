@@ -325,11 +325,11 @@ enum class CxxRecordSemanticsKind {
 
 struct CxxRecordSemanticsDescriptor final {
   const clang::RecordDecl *decl;
-  ASTContext &ctx;
+  ClangImporter::Implementation &importerImpl;
 
   CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl,
-                               ASTContext &ctx)
-      : decl(decl), ctx(ctx) {}
+                               ClangImporter::Implementation &importerImpl)
+      : decl(decl), importerImpl(importerImpl) {}
 
   friend llvm::hash_code hash_value(const CxxRecordSemanticsDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
@@ -360,9 +360,12 @@ SourceLoc extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc);
 class CxxRecordSemantics
     : public SimpleRequest<CxxRecordSemantics,
                            CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor),
-                           RequestFlags::Uncached> {
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
+
+  // Caching
+  bool isCached() const { return true; }
 
   // Source location
   SourceLoc getNearestLoc() const { return SourceLoc(); };
