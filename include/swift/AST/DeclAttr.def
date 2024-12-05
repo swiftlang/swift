@@ -523,7 +523,11 @@ DECL_ATTR(safe, Safe,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   163)
 
-LAST_DECL_ATTR(Safe)
+DECL_ATTR(abi, ABI,
+  OnAbstractFunction | OnVar /* will eventually add types */ | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  164)
+
+LAST_DECL_ATTR(ABI)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

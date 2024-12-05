@@ -967,9 +967,10 @@ namespace {
     }
 
     /// Print an unnamed field containing a node's name, read from a declaration.
-    void printDeclName(const ValueDecl *D, bool leadingSpace = true) {
-      if (D->getName()) {
-        printName(D->getName(), leadingSpace);
+    void printDeclName(const Decl *D, bool leadingSpace = true) {
+      auto VD = dyn_cast<ValueDecl>(D);
+      if (VD && VD->getName()) {
+        printName(VD->getName(), leadingSpace);
       } else {
         if (leadingSpace)
           OS << ' ';
@@ -979,7 +980,7 @@ namespace {
     }
 
     /// Print a field containing a node's name, read from a declaration.
-    void printDeclNameField(const ValueDecl *D, StringRef name) {
+    void printDeclNameField(const Decl *D, StringRef name) {
       printFieldRaw([&](raw_ostream &os) {
         printDeclName(D, /*leadingSpace=*/false);
       }, name);
@@ -3862,6 +3863,11 @@ public:
 
 #undef TRIVIAL_ATTR_PRINTER
 
+  void visitABIAttr(ABIAttr *Attr, StringRef label) {
+    printCommon(Attr, "abi_attr", label);
+    printRec(Attr->abiDecl, "decl");
+    printFoot();
+  }
   void visitAccessControlAttr(AccessControlAttr *Attr, StringRef label) {
     printCommon(Attr, "access_control_attr", label);
     printField(Attr->getAccess(), "access_level");

@@ -2776,6 +2776,24 @@ BraceStmt *PreCheckClosureBodyRequest::evaluate(Evaluator &evaluator,
   return body;
 }
 
+
+/// Determine whether the given declaration should not have a definition.
+static bool requiresNoDefinition(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    // Function with @_extern should not have a body.
+    if (func->getAttrs().hasAttribute<ExternAttr>())
+      return true;
+  }
+  // FIXME: Should be able to write this more nicely
+  auto abiAttr = decl->getAttrs().getAttribute<ABIAttr>();
+  if (abiAttr && abiAttr->isInverse())
+    // Decls which merely define the ABI of another decl should not have a
+    // body.
+    return true;
+  // Everything else can have a definition.
+  return false;
+}
+
 /// Determine whether the given declaration requires a definition.
 ///
 /// Only valid for declarations that can have definitions, i.e.,
@@ -2793,7 +2811,6 @@ static bool requiresDefinition(Decl *decl) {
   // Functions can have _silgen_name, semantics, and NSManaged attributes.
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     if (func->getAttrs().hasAttribute<SILGenNameAttr>() ||
-        func->getAttrs().hasAttribute<ExternAttr>() ||
         func->getAttrs().hasAttribute<SemanticsAttr>() ||
         func->getAttrs().hasAttribute<NSManagedAttr>())
       return false;
@@ -2820,18 +2837,13 @@ static bool requiresDefinition(Decl *decl) {
     if (fileUnit->getKind() == FileUnitKind::SerializedAST)
       return false;
 
+  // Declarations that cannot possibly have a definition definitely don't
+  // require one.
+  if (requiresNoDefinition(decl))
+    return false;
+
   // Everything else requires a definition.
   return true;
-}
-
-/// Determine whether the given declaration should not have a definition.
-static bool requiresNoDefinition(Decl *decl) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    // Function with @_extern should not have a body.
-    return func->getAttrs().hasAttribute<ExternAttr>();
-  }
-  // Everything else can have a definition.
-  return false;
 }
 
 BraceStmt *

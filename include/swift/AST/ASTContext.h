@@ -67,6 +67,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class ABIAttr;
   class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
@@ -413,6 +414,19 @@ public:
       std::tuple<Decl *, IndexSubset *, AutoDiffDerivativeFunctionKind>,
       llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
+
+  /// For each ABI-only declaration (created with the `@abi` attribute), points
+  /// to its API-only counterpart. That is, this table maps each
+  /// `ABIAttr::abiDecl` to the declaration the `ABIAttr` is attached to.
+  ///
+  /// \seeAlso \c recordABIAttr()
+  llvm::DenseMap<Decl *, Decl *> ABIDeclCounterparts;
+
+  /// Register \c this->abiDecl 's  relationship with \p owner in
+  /// `ABIDeclCounterparts` . This is necessary for
+  /// \c ABIRoleInfo::ABIRoleInfo() to determine that \c this->abiDecl
+  /// is ABI-only and locate its API counterpart.
+  void recordABIAttr(ABIAttr *attr, Decl *owner);
 
   /// The Swift module currently being compiled.
   ModuleDecl *MainModule = nullptr;

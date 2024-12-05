@@ -190,6 +190,10 @@ public:
   IGNORED_ATTR(PreInverseGenerics)
 #undef IGNORED_ATTR
 
+  void visitABIAttr(ABIAttr *attr) {
+    // TODO: Validate more
+  }
+
   void visitAlignmentAttr(AlignmentAttr *attr) {
     // Alignment must be a power of two.
     auto value = attr->getValue();

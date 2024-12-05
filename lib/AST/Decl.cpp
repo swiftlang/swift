@@ -414,6 +414,8 @@ void Decl::attachParsedAttrs(DeclAttributes attrs) {
     attr->setOriginalDeclaration(this);
   for (auto *attr : attrs.getAttributes<DerivativeAttr>())
     attr->setOriginalDeclaration(this);
+  for (auto attr : attrs.getAttributes<ABIAttr, /*AllowInvalid=*/true>())
+    this->getASTContext().recordABIAttr(attr, this);
 
   getAttrs() = attrs;
 }
@@ -4266,6 +4268,43 @@ void ValueDecl::setRenamedDecl(const AvailableAttr *attr,
   assert(hasClangNode());
   getASTContext().evaluator.cacheNonEmptyOutput(RenamedDeclRequest{this, attr},
                                                 std::move(renameDecl));
+}
+
+VarDecl *PatternBindingDecl::
+getVarAtSimilarStructuralPosition(VarDecl *otherVar) {
+  auto otherPBD = otherVar->getParentPatternBinding();
+
+  if (!otherPBD)
+    return getSingleVar();
+  if (otherPBD == this)
+    return otherVar;
+
+  // Find the entry index and sibling index for `otherVar` within its PBD.
+  auto entryIndex = otherPBD->getPatternEntryIndexForVarDecl(otherVar);
+  
+  SmallVector<VarDecl *, 16> otherSiblings;
+  otherPBD->getPattern(entryIndex)->collectVariables(otherSiblings);
+  size_t siblingIndex =
+      llvm::find(otherSiblings, otherVar) - otherSiblings.begin();
+
+  ASSERT(siblingIndex != otherSiblings.size()
+            && "otherVar not in its own pattern?");
+
+  // Look up the same entry index and sibling index in this PBD, returning null
+  // if that index doesn't exist.
+
+  // Corresponding PBD has more patterns in it
+  if (entryIndex >= getNumPatternEntries())
+    return nullptr;
+
+  SmallVector<VarDecl *, 16> siblings;
+  getPattern(entryIndex)->collectVariables(siblings);
+
+  // Corresponding pattern has more vars in it
+  if (siblingIndex >= siblings.size())
+    return nullptr;
+
+  return siblings[siblingIndex];
 }
 
 SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {

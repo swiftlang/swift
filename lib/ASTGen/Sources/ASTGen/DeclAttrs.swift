@@ -111,6 +111,8 @@ extension ASTGenVisitor {
       let attrName = identTy.name.rawText
       let attrKind = BridgedDeclAttrKind(from: attrName.bridged)
       switch attrKind {
+      case .ABI:
+        return self.generateABIAttr(attribute: node)?.asDeclAttribute
       case .alignment:
         return handle(self.generateAlignmentAttr(attribute: node)?.asDeclAttribute)
       case .allowFeatureSuppression:
@@ -326,6 +328,15 @@ extension ASTGenVisitor {
     }
 
     return handle(self.generateCustomAttr(attribute: node)?.asDeclAttribute)
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @abi(func fn())
+  ///   ```
+  func generateABIAttr(attribute node: AttributeSyntax) -> BridgedABIAttr? {
+    #warning("TODO: implement generateABIAttr")
+    fatalError("TODO: implement generateABIAttr")
   }
 
   /// E.g.:

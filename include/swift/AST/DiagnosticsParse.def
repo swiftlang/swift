@@ -228,6 +228,9 @@ ERROR(let_cannot_be_addressed_property,none,
 ERROR(disallowed_var_multiple_getset,none,
       "'var' declarations with multiple variables cannot have explicit"
       " getters/setters", ())
+ERROR(stub_decl_cannot_have_body,none,
+      "stub %0 cannot have body",
+      (DescriptiveDeclKind))
 
 ERROR(disallowed_init,none,
       "initial value is not allowed here", ())

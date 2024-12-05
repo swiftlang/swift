@@ -1744,6 +1744,10 @@ namespace  {
     UNINTERESTING_ATTR(Safe)
 #undef UNINTERESTING_ATTR
 
+    void visitABIAttr(ABIAttr *attr) {
+      // TODO: Match or infer
+    }
+
     void visitAvailableAttr(AvailableAttr *attr) {
       // FIXME: Check that this declaration is at least as available as the
       // one it overrides.
