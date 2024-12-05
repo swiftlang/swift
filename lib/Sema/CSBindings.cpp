@@ -960,6 +960,56 @@ void BindingSet::addLiteralRequirement(Constraint *constraint) {
   Literals.insert({protocol, std::move(literal)});
 }
 
+bool BindingSet::operator==(const BindingSet &other) {
+  if (AdjacentVars != other.AdjacentVars)
+    return false;
+
+  if (Bindings.size() != other.Bindings.size())
+    return false;
+
+  for (auto i : indices(Bindings)) {
+    const auto &x = Bindings[i];
+    const auto &y = other.Bindings[i];
+
+    if (x.BindingType.getPointer() != y.BindingType.getPointer() ||
+        x.Kind != y.Kind)
+      return false;
+  }
+
+  if (Literals.size() != other.Literals.size())
+    return false;
+
+  for (auto pair : Literals) {
+    auto found = other.Literals.find(pair.first);
+    if (found == other.Literals.end())
+      return false;
+
+    const auto &x = pair.second;
+    const auto &y = found->second;
+
+    if (x.Source != y.Source ||
+        x.DefaultType.getPointer() != y.DefaultType.getPointer() ||
+        x.IsDirectRequirement != y.IsDirectRequirement) {
+      return false;
+    }
+  }
+
+  if (Defaults.size() != other.Defaults.size())
+    return false;
+
+  for (auto pair : Defaults) {
+    auto found = other.Defaults.find(pair.first);
+    if (found == other.Defaults.end() ||
+        pair.second != found->second)
+      return false;
+  }
+
+  if (TransitiveProtocols != other.TransitiveProtocols)
+    return false;
+
+  return true;
+}
+
 BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
   // If there are no bindings available but this type
   // variable represents a closure - let's consider it
@@ -978,6 +1028,43 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
                          b.involvesTypeVariables(),
                          static_cast<unsigned char>(b.getLiteralForScore()),
                          -numNonDefaultableBindings);
+}
+
+bool BindingSet::operator<(const BindingSet &other) {
+  auto xScore = formBindingScore(*this);
+  auto yScore = formBindingScore(other);
+
+  if (xScore < yScore)
+    return true;
+
+  if (yScore < xScore)
+    return false;
+
+  auto xDefaults = getNumViableDefaultableBindings();
+  auto yDefaults = other.getNumViableDefaultableBindings();
+
+  // If there is a difference in number of default types,
+  // prioritize bindings with fewer of them.
+  if (xDefaults != yDefaults)
+    return xDefaults < yDefaults;
+
+  // If neither type variable is a "hole" let's check whether
+  // there is a subtype relationship between them and prefer
+  // type variable which represents superclass first in order
+  // for "subtype" type variable to attempt more bindings later.
+  // This is required because algorithm can't currently infer
+  // bindings for subtype transitively through superclass ones.
+  if (!(std::get<0>(xScore) && std::get<0>(yScore))) {
+    if (Info.isSubtypeOf(other.getTypeVariable()))
+      return false;
+
+    if (other.Info.isSubtypeOf(getTypeVariable()))
+      return true;
+  }
+
+  // As a last resort, let's check if the bindings are
+  // potentially incomplete, and if so, let's de-prioritize them.
+  return isPotentiallyIncomplete() < other.isPotentiallyIncomplete();
 }
 
 std::optional<BindingSet> ConstraintSystem::determineBestBindings(
