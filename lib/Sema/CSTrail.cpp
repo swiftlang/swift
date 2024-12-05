@@ -743,12 +743,148 @@ void SolverTrail::undo(unsigned toIndex) {
 void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
                                          unsigned fromIndex,
                                          unsigned indent) const {
-  out.indent(indent);
-  out << "(changes:\n";
+  if (Changes.empty())
+    return;
 
-  for (unsigned i = fromIndex; i < Changes.size(); ++i)
-    Changes[i].dump(out, CS, indent + 2);
+  // Collect Changes for printing.
+  std::vector<TypeVariableType *> addedTypeVars;
+  std::set<TypeVariableType *> updatedTypeVars;
+  std::set<Constraint *> addedConstraints;
+  std::set<Constraint *> removedConstraints;
+  for (unsigned int i = fromIndex; i < Changes.size(); i++) {
+    auto change = Changes[i];
+    switch (change.Kind) {
+    case ChangeKind::AddedTypeVariable:
+      addedTypeVars.push_back(change.TypeVar);
+      break;
+    case ChangeKind::UpdatedTypeVariable:
+      updatedTypeVars.insert(change.Update.TypeVar);
+      break;
+    case ChangeKind::AddedConstraint:
+      addedConstraints.insert(change.TheConstraint.Constraint);
+      break;
+    case ChangeKind::RemovedConstraint:
+      removedConstraints.insert(change.TheConstraint.Constraint);
+      break;
+    default:
+      // Don't consider changes that don't affect the graph.
+      break;
+    }
+  }
+
+  // If there are any constraints that were both added and removed in this set
+  // of Changes, remove them from both.
+  std::set<Constraint *> intersects;
+  set_intersection(addedConstraints.begin(), addedConstraints.end(),
+                   removedConstraints.begin(), removedConstraints.end(),
+                   std::inserter(intersects, intersects.begin()));
+  llvm::set_subtract(addedConstraints, intersects);
+  llvm::set_subtract(removedConstraints, intersects);
+
+  // Print out Changes.
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  out.indent(indent);
+  out << "(Changes:\n";
+  if (!addedTypeVars.empty()) {
+    out.indent(indent + 2);
+    auto heading = (addedTypeVars.size() > 1) ? "(New Type Variables: \n"
+                                              : "(New Type Variable: \n";
+    out << heading;
+    for (const auto &typeVar : addedTypeVars) {
+      out.indent(indent + 4);
+      out << "> $T" << typeVar->getImpl().getID();
+      out << '\n';
+    }
+    out.indent(indent + 2);
+    out << ")\n";
+  }
+  if (!updatedTypeVars.empty()) {
+    std::vector<TypeVariableType *> assignments;
+    std::vector<std::pair<TypeVariableType *, TypeVariableType *>> equivalences;
+
+    for (auto *typeVar : updatedTypeVars) {
+      if (auto *parentVar =
+              typeVar->getImpl().getRepresentative(/*trail=*/nullptr)) {
+        if (parentVar != typeVar) {
+          equivalences.push_back(std::make_pair(parentVar, typeVar));
+          continue;
+        }
+      }
+
+      if (typeVar->getImpl().ParentOrFixed.is<TypeBase *>())
+        assignments.push_back(typeVar);
+    }
+
+    if (!assignments.empty()) {
+      out.indent(indent + 2);
+      auto heading = (assignments.size() > 1) ? "(Bound Type Variables: \n"
+                                              : "(Bound Type Variable: \n";
+      out << heading;
+
+      for (auto *typeVar : assignments) {
+        out.indent(indent + 4);
+        out << "> $T" << typeVar->getImpl().getID() << " := ";
+        typeVar->getImpl().ParentOrFixed.get<TypeBase *>()->print(out, PO);
+        out << '\n';
+      }
+      out.indent(indent + 2);
+      out << ")\n";
+    }
+
+    if (!equivalences.empty()) {
+      out.indent(indent + 2);
+      auto heading = (equivalences.size() > 1) ? "(New Equivalences: \n"
+                                               : "(New Equivalence: \n";
+      out << heading;
+      for (const auto &eq : equivalences) {
+        out.indent(indent + 4);
+        out << "> $T" << eq.first->getImpl().getID();
+        out << " == ";
+        out << "$T" << eq.second->getImpl().getID();
+        out << '\n';
+      }
+      out.indent(indent + 2);
+      out << ")\n";
+    }
+  }
+  if (!addedConstraints.empty()) {
+    out.indent(indent + 2);
+    auto heading = (addedConstraints.size() > 1) ? "(Added Constraints: \n"
+                                                 : "(Added Constraint: \n";
+    out << heading;
+    for (const auto &constraint : addedConstraints) {
+      out.indent(indent + 4);
+      out << "> ";
+      constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
+      out << '\n';
+    }
+    out.indent(indent + 2);
+    out << ")\n";
+  }
+  if (!removedConstraints.empty()) {
+    out.indent(indent + 2);
+    auto heading = (removedConstraints.size() > 1) ? "(Removed Constraints: \n"
+                                                   : "(Removed Constraint: \n";
+    out << heading;
+    for (const auto &constraint : removedConstraints) {
+      out.indent(indent + 4);
+      out << "> ";
+      constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
+      out << '\n';
+    }
+    out.indent(indent + 2);
+    out << ")\n";
+  }
 
   out.indent(indent);
   out << ")\n";
+}
+
+void SolverTrail::dump() const { dump(llvm::errs()); }
+
+void SolverTrail::dump(raw_ostream &OS, unsigned fromIndex,
+                       unsigned indent) const {
+  for (unsigned i = fromIndex; i < Changes.size(); ++i)
+    Changes[i].dump(OS, CS, indent);
 }
