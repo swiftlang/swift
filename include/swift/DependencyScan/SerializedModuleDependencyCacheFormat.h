@@ -58,6 +58,8 @@ using IsSystemField = BCFixed<1>;
 using IsStaticField = BCFixed<1>;
 /// A bit taht indicates whether or not a link library is a force-load one
 using IsForceLoadField = BCFixed<1>;
+/// A bit taht indicates whether or not an import statement is optional
+using IsOptionalImport = BCFixed<1>;
 
 /// Source location fields
 using LineNumberField = BCFixed<32>;
@@ -97,8 +99,9 @@ enum {
   LINK_LIBRARY_ARRAY_NODE,
   MACRO_DEPENDENCY_NODE,
   MACRO_DEPENDENCY_ARRAY_NODE,
-  SOURCE_LOCATION_NODE,
   IMPORT_STATEMENT_NODE,
+  IMPORT_STATEMENT_ARRAY_NODE,
+  OPTIONAL_IMPORT_STATEMENT_ARRAY_NODE,
   SWIFT_INTERFACE_MODULE_DETAILS_NODE,
   SWIFT_SOURCE_MODULE_DETAILS_NODE,
   SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE,
@@ -158,19 +161,19 @@ using MacroDependencyArrayLayout =
     BCRecordLayout<MACRO_DEPENDENCY_ARRAY_NODE, IdentifierIDArryField>;
 
 // ACTODO: Comment
-using SourceLocationLayout =
-    BCRecordLayout<LINK_LIBRARY_NODE,            // ID
+using ImportStatementLayout =
+    BCRecordLayout<IMPORT_STATEMENT_NODE,        // ID
+                   IdentifierIDField,            // importIdentifier
                    IdentifierIDField,            // bufferIdentifier
                    LineNumberField,              // lineNumber
-                   ColumnNumberField             // columnNumber
+                   ColumnNumberField,            // columnNumber
+                   IsOptionalImport              // isOptional
                    >;
-
 // ACTODO: Comment
-using ImportStatementLayout =
-    BCRecordLayout<LINK_LIBRARY_NODE,            // ID
-                   IdentifierIDField,            // importIdentifier
-                   SourceLocationIDArrayIDField  // importLocations
-                   >;
+using ImportStatementArrayLayout =
+    BCRecordLayout<IMPORT_STATEMENT_ARRAY_NODE, IdentifierIDArryField>;
+using OptionalImportStatementArrayLayout =
+    BCRecordLayout<OPTIONAL_IMPORT_STATEMENT_ARRAY_NODE, IdentifierIDArryField>;
 
 // After the array records, we have a sequence of Module info
 // records, each of which is followed by one of:
@@ -182,8 +185,8 @@ using ImportStatementLayout =
 using ModuleInfoLayout =
     BCRecordLayout<MODULE_NODE,                    // ID
                    IdentifierIDField,              // moduleName
-                   ImportArrayIDField,             // moduleImports
-                   ImportArrayIDField,             // optionalModuleImports
+                   ImportArrayIDField,             // imports
+                   ImportArrayIDField,             // optionalImports
                    LinkLibrariesArrayIDField,      // linkLibraries
                    MacroDependenciesArrayIDField,  // macroDependencies
                    DependencyIDArrayIDField,       // importedSwiftModules

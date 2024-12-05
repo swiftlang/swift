@@ -355,7 +355,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   });
 
   auto mainDependencies = ModuleDependencyInfo::forSwiftSourceModule(
-      {}, buildCommands, {}, ExtraPCMArgs);
+       {}, buildCommands, {}, {}, {}, ExtraPCMArgs);
 
   if (ScanASTContext.CASOpts.EnableCaching) {
     std::vector<std::string> clangDependencyFiles;
@@ -1166,7 +1166,7 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
   auto actualMainID = ModuleDependencyID{mainModuleName.str(),
                                          ModuleDependencyKind::SwiftSource};
   auto dummyMainDependencies =
-      ModuleDependencyInfo::forSwiftSourceModule({}, {}, {}, {});
+     ModuleDependencyInfo::forSwiftSourceModule({}, {}, {}, {}, {}, {});
   std::for_each(newOverlays.begin(), newOverlays.end(),
                 [&](Identifier modName) {
                   dummyMainDependencies.addModuleImport(modName.str());
