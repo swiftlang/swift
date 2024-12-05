@@ -294,11 +294,6 @@ elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WINDOWS")
   list(APPEND swift_core_private_link_libraries shell32;DbgHelp;Synchronization)
 endif()
 
-# There is a race condition with building the 'tools' CMake build of the compiler,
-# which produces libSwiftScan that the compiler building the standard library may attempt to use. 
-# Since the current build system makes establishing this dependency relationship exceedingly difficult,
-# we attempt to work around it by disabling use of 'libSwiftScan' here.
-list(APPEND swift_stdlib_compile_flags "-nonlib-dependency-scanner")
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
@@ -403,12 +398,18 @@ if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
                     BOOTSTRAPPING 1)
 endif()
 
+set(tooling_stdlib_deps)
+if(TARGET libSwiftScan)
+  list(APPEND tooling_stdlib_deps libSwiftScan)
+endif()
+
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
                   ${swiftCore_common_options}
                   ${compile_flags_for_final_build}
                   FILE_DEPENDS
                     ${swiftCore_common_dependencies}
+                  DEPENDS ${tooling_stdlib_deps}
                   INSTALL_IN_COMPONENT
                     stdlib
                   MACCATALYST_BUILD_FLAVOR
@@ -444,11 +445,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS
         ${swift_stdlib_compile_flags} -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
-        -Xfrontend -enable-ossa-modules -nonlib-dependency-scanner
+        -Xfrontend -enable-ossa-modules
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"
       FILE_DEPENDS ${swiftCore_common_dependencies}
+      DEPENDS ${tooling_stdlib_deps}
       INSTALL_IN_COMPONENT stdlib
       )
     add_dependencies(embedded-stdlib embedded-stdlib-${mod})
