@@ -219,6 +219,10 @@ protected:
 
       NumFeatures : 31
     );
+
+    SWIFT_INLINE_BITFIELD(ABIAttr, DeclAttribute, 1,
+      isInverse : 1
+    );
   } Bits;
   // clang-format on
 
@@ -2901,6 +2905,41 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(AllowFeatureSuppressionAttr)
+};
+
+/// Defines the @abi attribute.
+class ABIAttr : public DeclAttribute {
+public:
+  ABIAttr(Decl *abiDecl, SourceLoc AtLoc, SourceRange Range,
+          bool IsInverse, bool Implicit)
+      : DeclAttribute(DeclAttrKind::ABI, AtLoc, Range, Implicit),
+        abiDecl(abiDecl)
+  {
+    Bits.ABIAttr.isInverse = IsInverse;
+  }
+
+  ABIAttr(Decl *abiDecl, bool IsInverse, bool Implicit)
+      : ABIAttr(abiDecl, SourceLoc(), SourceRange(), IsInverse, Implicit) {}
+
+  /// The declaration which will be used to compute a mangled name.
+  ///
+  /// \note For a \c VarDecl with a parent \c PatternBindingDecl , this should
+  /// point to the parent \c PatternBindingDecl . (That accommodates the way
+  /// sibling \c VarDecl s share attributes.)
+  Decl *abiDecl;
+
+  /// Is this attribute attached to the ABI declaration and pointing back to
+  /// the original? Inverse \c ABIAttr s are always implicit and result in an
+  /// \c ABIRole with \c providesAPI() but not \c providesABI() .
+  bool isInverse() const { return Bits.ABIAttr.isInverse; }
+
+  void connectToInverse(Decl *owner) const;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::ABI;
+  }
+
+  UNIMPLEMENTED_CLONE(ABIAttr)
 };
 
 /// Attributes that may be applied to declarations.
