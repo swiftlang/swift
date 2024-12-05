@@ -165,7 +165,16 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       auto *user = use->getUser();
       // Recurse through copies.
       if (auto *copy = dyn_cast<CopyValueInst>(user)) {
-        addDefToWorklist(Def::copy(copy));
+        // Don't recurse through copies of borrowed-froms or reborrows.
+        switch (def) {
+        case Def::Kind::Root:
+        case Def::Kind::Copy:
+          addDefToWorklist(Def::copy(copy));
+          break;
+        case Def::Kind::Reborrow:
+        case Def::Kind::BorrowedFrom:
+          break;
+        }
         continue;
       }
       if (auto *bfi = dyn_cast<BorrowedFromInst>(user)) {

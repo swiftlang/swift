@@ -789,3 +789,71 @@ entry(%c : @owned $C):
   specify_test "canonicalize_ossa_lifetime true false true %c"
   unreachable
 }
+
+// CHECK-LABEL: begin running test {{.*}} on consume_copy_of_borrowed_from
+// CHECK-LABEL: sil [ossa] @consume_copy_of_borrowed_from : {{.*}} {
+// The copy can't be eliminated because it's a copy of a borrowed-from.  Such
+// copies are not rewritten.
+// CHECK:         copy_value
+// CHECK-LABEL: } // end sil function 'consume_copy_of_borrowed_from'
+// CHECK-LABEL: end running test {{.*}} on consume_copy_of_borrowed_from
+sil [ossa] @consume_copy_of_borrowed_from : $@convention(thin) (@owned C) -> () {
+bb0(%instance : @owned $C):
+  %borrow = begin_borrow %instance : $C
+  br bb1(%instance : $C, %borrow : $C)
+
+bb1(%instance2 : @owned $C, %reborrowed : @reborrow $C):
+  specify_test "canonicalize_ossa_lifetime true false true %instance2"
+  %reborrow = borrowed %reborrowed : $C from (%instance2 : $C)
+  cond_br undef, bb2, bb3
+
+bb2:
+  end_borrow %reborrow : $C
+  destroy_value %instance2 : $C
+  %retval = tuple ()
+  return %retval : $()
+
+bb3:
+  %copy = copy_value %reborrow : $C
+  %takeC = function_ref @takeC : $@convention(thin) (@owned C) -> ()
+  apply %takeC(%copy) : $@convention(thin) (@owned C) -> ()
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on consume_copy_of_borrowed_from_2
+// CHECK-LABEL: sil [ossa] @consume_copy_of_borrowed_from_2 : {{.*}} {
+// The copy can't be eliminated because it's a copy of a borrowed-from.  Such
+// copies are not rewritten.
+// CHECK:         copy_value
+// CHECK-LABEL: } // end sil function 'consume_copy_of_borrowed_from_2'
+// CHECK-LABEL: end running test {{.*}} on consume_copy_of_borrowed_from_2
+sil [ossa] @consume_copy_of_borrowed_from_2 : $@convention(thin) (@owned C) -> () {
+bb0(%instance : @owned $C):
+  %borrow = begin_borrow %instance : $C
+  br bb1(%instance : $C, %borrow : $C)
+
+bb1(%instance2 : @owned $C, %reborrowed : @reborrow $C):
+  specify_test "canonicalize_ossa_lifetime true false true %instance2"
+  %reborrow = borrowed %reborrowed : $C from (%instance2 : $C)
+  cond_br undef, bb2, bb3
+
+bb2:
+  end_borrow %reborrow : $C
+  destroy_value %instance2 : $C
+  br exit
+
+bb3:
+  %copy = copy_value %reborrow : $C
+  end_borrow %reborrow : $C
+  destroy_value %instance2 : $C
+  br bb4
+
+bb4:
+  %takeC = function_ref @takeC : $@convention(thin) (@owned C) -> ()
+  apply %takeC(%copy) : $@convention(thin) (@owned C) -> ()
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
