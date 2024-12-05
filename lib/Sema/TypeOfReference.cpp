@@ -686,13 +686,8 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
                                     FunctionRefInfo functionRefInfo, FunctionType *functionType,
                                     ConstraintLocatorBuilder locator) {
   // Only apply property wrappers to unapplied references to functions.
-  // FIXME(FunctionRefInfo): This should just be `isUnapplied()`, which would
-  // fix https://github.com/swiftlang/swift/issues/77823, but we also need to
-  // correctly handle the wrapping in matchCallArguments.
-  if (!(functionRefInfo.isCompoundName() ||
-        functionRefInfo.isUnappliedBaseName())) {
+  if (!functionRefInfo.isUnapplied())
     return functionType;
-  }
 
   // This transform is not applicable to pattern matching context.
   //
