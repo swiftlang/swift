@@ -297,8 +297,6 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     if (HasEnumArg) {
       // The successor block has a new argument (which we created above) where
       // we have to pass the Enum.
-      assert(!getFunction()->hasOwnership() ||
-             EI->getType().isTrivial(*getFunction()));
       BranchArgs.push_back(EI);
     }
     B.createBranch(BI->getLoc(), SEDest, BranchArgs);
