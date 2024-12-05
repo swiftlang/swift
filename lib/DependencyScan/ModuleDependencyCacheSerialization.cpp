@@ -1783,6 +1783,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
         addIdentifier(swiftTextDeps->textualModuleDetails
                           .CASBridgingHeaderIncludeTreeRootID);
         addIdentifier(swiftTextDeps->moduleCacheKey);
+        addIdentifier(swiftTextDeps->userModuleVersion);
         break;
       }
       case swift::ModuleDependencyKind::SwiftBinary: {

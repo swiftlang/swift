@@ -1529,17 +1529,12 @@ swift::dependencies::performModuleScan(
 
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
-  auto mainModuleDepInfo =
-      scanner.getMainModuleDependencyInfo(instance.getMainModule());
   auto mainModuleName = instance.getMainModule()->getNameStr();
   auto mainModuleID = ModuleDependencyID{mainModuleName.str(),
                                          ModuleDependencyKind::SwiftSource};
-  // We may be re-using an instance of the cache which already contains
-  // an entry for this module.
-  if (cache.findDependency(mainModuleID))
-    cache.updateDependency(mainModuleID, std::move(*mainModuleDepInfo));
-  else
-    cache.recordDependency(mainModuleName, std::move(*mainModuleDepInfo));
+  if (!cache.hasDependency(mainModuleID))
+    cache.recordDependency(mainModuleName,
+                           *scanner.getMainModuleDependencyInfo(instance.getMainModule()));
 
   // Perform the full module scan starting at the main module.
   auto allModules = scanner.performDependencyScan(mainModuleID, cache);
@@ -1552,6 +1547,10 @@ swift::dependencies::performModuleScan(
                                         topologicallySortedModuleList);
   resolveImplicitLinkLibraries(instance, cache);
   updateDependencyTracker(instance, cache, allModules);
+
+  if (instance.getInvocation().getFrontendOptions().EmitDependencyScannerCacheRemarks)
+    instance.getASTContext().Diags.diagnose(SourceLoc(), diag::remark_scanner_uncached_lookups, scanner.getNumLookups());
+
   return generateFullDependencyGraph(instance, diagnosticCollector, cache,
                                      topologicallySortedModuleList);
 }
