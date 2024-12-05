@@ -694,13 +694,8 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
                                     FunctionRefInfo functionRefInfo, FunctionType *functionType,
                                     ConstraintLocatorBuilder locator) {
   // Only apply property wrappers to unapplied references to functions.
-  // FIXME(FunctionRefInfo): This should just be `isUnapplied()`, which would
-  // fix https://github.com/swiftlang/swift/issues/77823, but we also need to
-  // correctly handle the wrapping in matchCallArguments.
-  if (!(functionRefInfo.isCompoundName() ||
-        functionRefInfo.isUnappliedBaseName())) {
+  if (!functionRefInfo.isUnapplied())
     return functionType;
-  }
 
   // This transform is not applicable to pattern matching context.
   //
@@ -714,16 +709,8 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
   SmallVector<AnyFunctionType::Param, 4> adjustedParamTypes;
 
   DeclNameLoc nameLoc;
-  auto *ref = getAsExpr(locator.getAnchor());
-  if (auto *declRef = dyn_cast<DeclRefExpr>(ref)) {
-    nameLoc = declRef->getNameLoc();
-  } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(ref)) {
-    nameLoc = dotExpr->getNameLoc();
-  } else if (auto *overloadedRef = dyn_cast<OverloadedDeclRefExpr>(ref)) {
-    nameLoc = overloadedRef->getNameLoc();
-  } else if (auto *memberExpr = dyn_cast<UnresolvedMemberExpr>(ref)) {
-    nameLoc = memberExpr->getNameLoc();
-  }
+  if (auto *ref = getAsExpr(locator.getAnchor()))
+    nameLoc = ref->getNameLoc();
 
   for (unsigned i : indices(*paramList)) {
     Identifier argLabel;

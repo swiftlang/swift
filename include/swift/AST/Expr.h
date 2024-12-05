@@ -552,6 +552,10 @@ public:
   /// \c nullptr.
   ArgumentList *getArgs() const;
 
+  /// If the expression has a DeclNameLoc, returns it. Otherwise, returns
+  /// an nullp DeclNameLoc.
+  DeclNameLoc getNameLoc() const;
+
   /// Produce a mapping from each subexpression to its parent
   /// expression, with the provided expression serving as the root of
   /// the parent map.

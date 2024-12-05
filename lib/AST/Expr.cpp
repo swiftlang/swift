@@ -859,6 +859,25 @@ ArgumentList *Expr::getArgs() const {
   return nullptr;
 }
 
+DeclNameLoc Expr::getNameLoc() const {
+  if (auto *DRE = dyn_cast<DeclRefExpr>(this))
+    return DRE->getNameLoc();
+  if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(this))
+    return UDRE->getNameLoc();
+  if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(this))
+    return ODRE->getNameLoc();
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(this))
+    return UDE->getNameLoc();
+  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(this))
+    return UME->getNameLoc();
+  if (auto *MRE = dyn_cast<MemberRefExpr>(this))
+    return MRE->getNameLoc();
+  if (auto *DRME = dyn_cast<DynamicMemberRefExpr>(this))
+    return DRME->getNameLoc();
+
+  return DeclNameLoc();
+}
+
 llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
   class RecordingTraversal : public ASTWalker {
   public:
