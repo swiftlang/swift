@@ -323,6 +323,11 @@ static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<UnsafeAttr>();
 }
 
+static bool usesFeatureABIAttribute(Decl *decl) {
+  auto abiAttr = decl->getAttrs().getAttribute<ABIAttr>();
+  return abiAttr && !abiAttr->isInverse();
+}
+
 UNINTERESTING_FEATURE(WarnUnsafe)
 UNINTERESTING_FEATURE(SafeInterop)
 UNINTERESTING_FEATURE(SafeInteropWrappers)

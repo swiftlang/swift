@@ -1022,6 +1022,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     break;
   }
+
   default:
     break;
   }
@@ -1584,6 +1585,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::ABI: {
+    auto *attr = cast<ABIAttr>(this);
+    Printer << "@abi(";
+    if (attr->abiDecl)
+      attr->abiDecl->print(Printer, Options);
+    Printer << ")";
+
+    break;
+  }
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
@@ -1629,6 +1640,8 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::CLASS:                                                    \
     return #NAME;
 #include "swift/AST/DeclAttr.def"
+  case DeclAttrKind::ABI:
+    return "abi";
   case DeclAttrKind::SILGenName:
     return "_silgen_name";
   case DeclAttrKind::Alignment:
@@ -2830,6 +2843,30 @@ LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
                                    SourceRange baseRange, bool implicit,
                                    LifetimeEntry *entry) {
   return new (context) LifetimeAttr(atLoc, baseRange, implicit, entry);
+}
+
+void ASTContext::recordABIAttr(ABIAttr *attr, Decl *owner) {
+  // The ABIAttr on a VarDecl ought to point to its PBD.
+  if (auto VD = dyn_cast<VarDecl>(owner)) {
+    if (auto PBD = VD->getParentPatternBinding()) {
+      owner = PBD;
+    }
+  }
+
+  auto recordABIDecl = [&](Decl *decl) {
+    ABIDeclCounterparts.insert({ decl, owner });
+  };
+
+  if (auto abiPBD = dyn_cast<PatternBindingDecl>(attr->abiDecl)) {
+    // Add to *every* VarDecl in the ABI PBD, even ones that don't properly
+    // match anything in the API PBD.
+    for (auto i : range(abiPBD->getNumPatternEntries())) {
+      abiPBD->getPattern(i)->forEachVariable(recordABIDecl);
+    }
+    return;
+  }
+
+  recordABIDecl(attr->abiDecl);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
