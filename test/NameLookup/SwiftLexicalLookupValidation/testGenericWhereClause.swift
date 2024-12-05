@@ -1,3 +1,5 @@
+// REQUIRES: UnqualifiedLookupValidation
+//
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature UnqualifiedLookupValidation
 
 protocol P1 {
