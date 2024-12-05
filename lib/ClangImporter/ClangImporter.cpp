@@ -578,6 +578,9 @@ void importer::getNormalInvocationArguments(
     }
   }
 
+  if (LangOpts.hasFeature(Feature::SafeInteropWrappers))
+    invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
+
   // Set C language options.
   if (triple.isOSDarwin()) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
