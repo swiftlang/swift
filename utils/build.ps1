@@ -1129,7 +1129,7 @@ function Build-CMakeProject {
     }
     if ($UseCXXCompiler -in @([Compiler]::Pinned, [Compiler]::Built)) {
       $Driver = (Get-ClangDriverName $Platform -Lang "CXX")
-      TryAdd-KeyValue $Defines CMAKE_C_COMPILER (Get-ToolchainTool -Compiler $UseCXXCompiler -Name $Driver)
+      TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER (Get-ToolchainTool -Compiler $UseCXXCompiler -Name $Driver)
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_TARGET $Arch.LLVMTarget
 
       if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
