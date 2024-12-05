@@ -2774,7 +2774,9 @@ if (-not $SkipBuild) {
 
   $InstallTo = "$($HostArch.ToolchainInstallRoot)\usr"
   foreach ($Arch in $WindowsSDKArchs) {
-    Invoke-BuildStep Build-Sanitizers Windows $Arch $InstallTo
+    if ($Arch.ShortName = "x64") {
+      Invoke-BuildStep Build-Sanitizers Windows $Arch $InstallTo
+    }
   }
 }
 
