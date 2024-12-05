@@ -156,9 +156,21 @@ bool ClangImporter::Implementation::recordHasReferenceSemantics(
   if (!isa<clang::CXXRecordDecl>(decl) && !ctx.LangOpts.CForeignReferenceTypes)
     return false;
 
-  auto semanticsKind =
-      evaluateOrDefault(ctx.evaluator,
-                        CxxRecordSemantics({decl, ctx}), {});
+  // At this point decl might not be fully imported into Swift yet, which
+  // means we might not have asked Clang to generate its implicit members, such
+  // as copy or move constructors. This would cause CxxRecordSemanticsRequest to
+  // return MissingLifetimeOperation if the type is not a foreign reference
+  // type. Note that this doesn't affect the correctness of this function, since
+  // those implicit members aren't required for foreign reference types.
+
+  // To avoid emitting spurious diagnostics, let's disable them here. Types with
+  // missing lifetime operations would get diagnosed later, once their members
+  // are fully instantiated.
+  auto semanticsKind = evaluateOrDefault(
+      ctx.evaluator,
+      CxxRecordSemantics(
+          {decl, ctx, /* shouldDiagnoseLifetimeOperations */ false}),
+      {});
   return semanticsKind == CxxRecordSemanticsKind::Reference;
 }
 
