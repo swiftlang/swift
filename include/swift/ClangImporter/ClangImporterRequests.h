@@ -126,7 +126,6 @@ public:
 private:
   friend SimpleRequest;
 
-  // Evaluation.
   TinyPtrVector<ValueDecl *>
   evaluate(Evaluator &evaluator, CXXNamespaceMemberLookupDescriptor desc) const;
 };
@@ -143,14 +142,17 @@ struct ClangRecordMemberLookupDescriptor final {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
   }
 
+public:
+  friend class ClangRecordMemberLookup;
+
   friend llvm::hash_code
   hash_value(const ClangRecordMemberLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.name, desc.recordDecl);
+    return llvm::hash_combine(desc.name, desc.recordDecl, desc.inheritance);
   }
 
   friend bool operator==(const ClangRecordMemberLookupDescriptor &lhs,
                          const ClangRecordMemberLookupDescriptor &rhs) {
-    return lhs.name == rhs.name && lhs.recordDecl == rhs.recordDecl;
+    return lhs.name == rhs.name && lhs.recordDecl == rhs.recordDecl && lhs.inheritance == rhs.inheritance;
   }
 
   friend bool operator!=(const ClangRecordMemberLookupDescriptor &lhs,

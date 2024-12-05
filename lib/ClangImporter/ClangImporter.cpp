@@ -6099,9 +6099,19 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           // as that would cause an ambiguous lookup.
           if (foundNameArities.count(getArity(foundInBase)))
             continue;
-          if (auto newDecl = clangModuleLoader->importBaseMemberDecl(
-                  foundInBase, recordDecl)) {
-            result.push_back(newDecl);
+
+          if (inheritance == clang::AS_none) {
+            // importBaseMemberDecl() clones the base member to recordDecl,
+            // which should only happen if the ClangRecordMemberLookup
+            // originated from recordDecl. (Using the recordDecl of a base
+            // class confuses the cache maintained by importBaseMemberDecl()).
+            if (auto newDecl = clangModuleLoader->importBaseMemberDecl(foundInBase, recordDecl))
+              result.push_back(newDecl);
+          } else {
+            // Otherwise, this member was found part of the way through
+            // a recursive ClangRecordMemberLookup, due to nested inheritance.
+            // Propagate it back to the caller unmodified.
+            result.push_back(foundInBase);
           }
         }
       }
