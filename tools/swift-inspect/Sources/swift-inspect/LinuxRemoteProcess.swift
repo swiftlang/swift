@@ -52,7 +52,7 @@
       }
     }
 
-    static var Free: FreeFunction {
+    static var Free: FreeFunction? {
       return { (_, bytes, _) in free(UnsafeMutableRawPointer(mutating: bytes)) }
     }
 
