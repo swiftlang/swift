@@ -3492,7 +3492,7 @@ public:
   ///
   /// This is more complex than just checking `getNamingDecl` because the
   /// function could also be the getter of a storage declaration.
-  bool isOpaqueReturnTypeOfFunction(const AbstractFunctionDecl *func) const;
+  bool isOpaqueReturnTypeOf(const Decl *owner) const;
 
   /// Get the ordinal of the anonymous opaque parameter of this decl with type
   /// repr `repr`, as introduce implicitly by an occurrence of "some" in return

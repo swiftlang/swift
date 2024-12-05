@@ -359,23 +359,31 @@ Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
 }
 
 Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
-                                      ConstraintLocatorBuilder locator) {
+                                      ConstraintLocatorBuilder locator,
+                                      Decl *ownerDecl) {
+  // FIXME: Require non-null ownerDecl and fix remaining callers
+  // ASSERT(ownerDecl);
+
   // Early return if `type` is `NULL` or if there are no opaque archetypes (in
   // which case there is certainly nothing for us to do).
   if (!type || !type->hasOpaqueArchetype())
     return type;
 
-  if (!(context == CTP_Initialization || context == CTP_ReturnStmt))
+  if (context != CTP_Initialization && context != CTP_ReturnStmt)
     return type;
 
   auto shouldOpen = [&](OpaqueTypeArchetypeType *opaqueType) {
-    if (context != CTP_ReturnStmt)
+    if (context == CTP_Initialization) {
+      if (!ownerDecl)
+        return true;
+
+      return opaqueType->getDecl()->isOpaqueReturnTypeOf(ownerDecl);
+    } else {
+      if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
+        return opaqueType->getDecl()->isOpaqueReturnTypeOf(func);
+
       return true;
-
-    if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
-      return opaqueType->getDecl()->isOpaqueReturnTypeOfFunction(func);
-
-    return true;
+    }
   };
 
   return type.transformRec([&](Type type) -> std::optional<Type> {
