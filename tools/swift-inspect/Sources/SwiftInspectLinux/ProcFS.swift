@@ -13,7 +13,8 @@
 import Foundation
 import LinuxSystemHeaders
 
-public class ProcFS {
+// utility for reading files under /proc
+public enum ProcFS {
   public static func loadFile(for pid: pid_t, _ fileName: String) -> Data? {
     let filePath = "/proc/\(pid)/\(fileName)"
     // Loading contents of files under /proc may not work correctly using
