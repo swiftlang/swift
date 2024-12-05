@@ -176,17 +176,12 @@ void TypeBase::getTypeParameterPacks(
   });
 }
 
-bool TypeBase::isParameterPack() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->isRootParameterPack();
+bool TypeBase::isParameterPack() const {
+  return getDependentMemberRoot()->isRootParameterPack();
 }
 
-bool TypeBase::isRootParameterPack() {
-  Type t(this);
+bool TypeBase::isRootParameterPack() const {
+  Type t(const_cast<TypeBase *>(this));
 
   return t->is<GenericTypeParamType>() &&
          t->castTo<GenericTypeParamType>()->isParameterPack();

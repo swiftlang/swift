@@ -592,6 +592,27 @@ void TypeBase::getTypeVariables(
          "Did not find type variables!");
 }
 
+Type TypeBase::getDependentMemberRoot() const {
+  Type t(const_cast<TypeBase *>(this));
+
+  while (auto *dmt = t->getAs<DependentMemberType>())
+    t = dmt->getBase();
+
+  return t;
+}
+
+bool TypeBase::isTypeVariableOrMember() const {
+  return getDependentMemberRoot()->is<TypeVariableType>();
+}
+
+bool TypeBase::isTypeParameter() const {
+  return getDependentMemberRoot()->is<GenericTypeParamType>();
+}
+
+GenericTypeParamType *TypeBase::getRootGenericParam() const {
+  return getDependentMemberRoot()->castTo<GenericTypeParamType>();
+}
+
 static bool isLegalSILType(CanType type);
 
 static bool isLegalSILTypeOrPackExpansion(CanType type) {
