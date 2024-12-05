@@ -223,7 +223,7 @@ namespace {
     Bridgeability Bridging;
     const clang::FunctionType *CompletionHandlerType;
     std::optional<unsigned> CompletionHandlerErrorParamIndex;
-    bool isSafePointer = false;
+    bool isBoundsAnnotated = false;
 
   public:
     SwiftTypeConverter(ClangImporter::Implementation &impl,
@@ -246,7 +246,7 @@ namespace {
       return IR;
     }
 
-    bool hasSafePointer() { return isSafePointer; }
+    bool hasBoundsAnnotation() { return isBoundsAnnotated; }
 
     ImportResult VisitType(const Type*) = delete;
 
@@ -422,7 +422,7 @@ namespace {
 
     ImportResult VisitCountAttributedType(
         const clang::CountAttributedType *type) {
-      isSafePointer = true;
+      isBoundsAnnotated = true;
       return Visit(type->desugar());
     }
 
@@ -493,7 +493,7 @@ namespace {
           pointeeQualType, ImportTypeKind::Value, addImportDiagnostic,
           AllowNSUIntegerAsInt, Bridgeability::None, ImportTypeAttrs(),
           OTK_ImplicitlyUnwrappedOptional, /*resugarNSErrorPointer=*/true,
-          &isSafePointer);
+          &isBoundsAnnotated);
 
       // If this is imported as a reference type, ignore the innermost pointer.
       // (`T *` becomes `T`, but `T **` becomes `UnsafeMutablePointer<T>`.)
@@ -1723,7 +1723,7 @@ ImportedType ClangImporter::Implementation::importType(
     bool allowNSUIntegerAsInt, Bridgeability bridging, ImportTypeAttrs attrs,
     OptionalTypeKind optionality, bool resugarNSErrorPointer,
     std::optional<unsigned> completionHandlerErrorParamIndex,
-    bool *isSafePointer) {
+    bool *isBoundsAnnotated) {
   if (type.isNull())
     return {Type(), false};
 
@@ -1785,8 +1785,8 @@ ImportedType ClangImporter::Implementation::importType(
       *this, addImportDiagnosticFn, allowNSUIntegerAsInt, bridging,
       completionHandlerType, completionHandlerErrorParamIndex);
   auto importResult = converter.Visit(type);
-  if (isSafePointer)
-    *isSafePointer |= converter.hasSafePointer();
+  if (isBoundsAnnotated)
+    *isBoundsAnnotated |= converter.hasBoundsAnnotation();
 
   // Now fix up the type based on how we're concretely using it.
   auto adjustedType = adjustTypeForConcreteImport(
@@ -1802,11 +1802,12 @@ Type ClangImporter::Implementation::importTypeIgnoreIUO(
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
     bool allowNSUIntegerAsInt, Bridgeability bridging, ImportTypeAttrs attrs,
     OptionalTypeKind optionality, bool resugarNSErrorPointer,
-    bool *isSafePointer) {
+    bool *isBoundsAnnotated) {
 
-  auto importedType = importType(
-      type, importKind, addImportDiagnosticFn, allowNSUIntegerAsInt, bridging,
-      attrs, optionality, resugarNSErrorPointer, std::nullopt, isSafePointer);
+  auto importedType =
+      importType(type, importKind, addImportDiagnosticFn, allowNSUIntegerAsInt,
+                 bridging, attrs, optionality, resugarNSErrorPointer,
+                 std::nullopt, isBoundsAnnotated);
 
   return importedType.getType();
 }
@@ -2191,7 +2192,7 @@ applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
 
 ImportedType ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
-    bool allowNSUIntegerAsInt, bool *isSafePointer) {
+    bool allowNSUIntegerAsInt, bool *isBoundsAnnotated) {
 
   // Hardcode handling of certain result types for builtins.
   if (auto builtinID = clangDecl->getBuiltinID()) {
@@ -2306,7 +2307,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
                        : ImportTypeKind::Result),
       ImportDiagnosticAdder(*this, clangDecl, clangDecl->getLocation()),
       allowNSUIntegerAsInt, Bridgeability::Full, getImportTypeAttrs(clangDecl),
-      OptionalityOfReturn, isSafePointer);
+      OptionalityOfReturn, isBoundsAnnotated);
 }
 
 static Type
@@ -2341,7 +2342,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
     bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
-    ArrayRef<GenericTypeParamDecl *> genericParams, bool *hasSafePointer) {
+    ArrayRef<GenericTypeParamDecl *> genericParams, bool *hasBoundsAnnotation) {
 
   bool allowNSUIntegerAsInt =
       shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
@@ -2399,7 +2400,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
     // was supposed to be used (instead of the typedef type).
     if (!importedType) {
       importedType = importFunctionReturnType(
-          dc, clangDecl, allowNSUIntegerAsInt, hasSafePointer);
+          dc, clangDecl, allowNSUIntegerAsInt, hasBoundsAnnotation);
       if (!importedType) {
         addDiag(Diagnostic(diag::return_type_not_imported));
         return {Type(), false};
@@ -2411,7 +2412,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   ArrayRef<Identifier> argNames = name.getArgumentNames();
   parameterList = importFunctionParameterList(
       dc, clangDecl, params, isVariadic, allowNSUIntegerAsInt, argNames,
-      genericParams, swiftResultTy, hasSafePointer);
+      genericParams, swiftResultTy, hasBoundsAnnotation);
   if (!parameterList)
     return {Type(), false};
 
@@ -2548,7 +2549,7 @@ ClangImporter::Implementation::importParameterType(
     }
   }
 
-  bool isSafePointer = false;
+  bool isBoundsAnnotated = false;
   if (!swiftParamTy) {
     // If this is the throws error parameter, we don't need to convert any
     // NSError** arguments to the sugared NSErrorPointer typealias form,
@@ -2562,7 +2563,7 @@ ClangImporter::Implementation::importParameterType(
         paramTy, importKind, addImportDiagnosticFn, allowNSUIntegerAsInt,
         Bridgeability::Full, attrs, optionalityOfParam,
         /*resugarNSErrorPointer=*/!paramIsError,
-        completionHandlerErrorParamIndex, &isSafePointer);
+        completionHandlerErrorParamIndex, &isBoundsAnnotated);
     if (!importedType)
       return std::nullopt;
 
@@ -2580,7 +2581,7 @@ ClangImporter::Implementation::importParameterType(
     isInOut = false;
 
   return ImportParameterTypeResult{swiftParamTy, isInOut, isConsuming,
-                                   isParamTypeImplicitlyUnwrapped, isSafePointer};
+                                   isParamTypeImplicitlyUnwrapped, isBoundsAnnotated};
 }
 
 bool ClangImporter::Implementation::isDefaultArgSafeToImport(
@@ -2694,7 +2695,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
     bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
     ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType,
-    bool *hasSafePointerParam) {
+    bool *hasBoundsAnnotatedParam) {
   // Import the parameters.
   SmallVector<ParamDecl *, 4> parameters;
   unsigned index = 0;
@@ -2735,8 +2736,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     bool isConsuming = swiftParamTyOpt->isConsuming;
     bool isParamTypeImplicitlyUnwrapped =
         swiftParamTyOpt->isParamTypeImplicitlyUnwrapped;
-    if (swiftParamTyOpt->isSafePointer && hasSafePointerParam)
-      *hasSafePointerParam = true;
+    if (swiftParamTyOpt->isBoundsAnnotated && hasBoundsAnnotatedParam)
+      *hasBoundsAnnotatedParam = true;
 
     // Retrieve the argument name.
     Identifier name;

@@ -1359,7 +1359,7 @@ public:
       OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
       bool resugarNSErrorPointer = true,
       std::optional<unsigned> completionHandlerErrorParamIndex = std::nullopt,
-      bool *isSafePointer = nullptr);
+      bool *isBoundsAnnotated = nullptr);
 
   /// Import the given Clang type into Swift.
   ///
@@ -1376,7 +1376,7 @@ public:
       bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
       ImportTypeAttrs attrs,
       OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
-      bool resugarNSErrorPointer = true, bool *isSafePointer = nullptr);
+      bool resugarNSErrorPointer = true, bool *isBoundsAnnotated = nullptr);
 
   /// Import the given Clang type into Swift, returning the
   /// Swift parameters and result type and whether we should treat it
@@ -1410,7 +1410,7 @@ public:
       ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
       bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
       ArrayRef<GenericTypeParamDecl *> genericParams,
-      bool *hasSafePointerParam);
+      bool *hasBoundsAnnotatedParam);
 
   /// Import the given function return type.
   ///
@@ -1425,7 +1425,7 @@ public:
   ImportedType importFunctionReturnType(DeclContext *dc,
                                         const clang::FunctionDecl *clangDecl,
                                         bool allowNSUIntegerAsInt,
-                                        bool *isSafePointer = nullptr);
+                                        bool *isBoundsAnnotated = nullptr);
 
   /// Import the parameter list for a function
   ///
@@ -1443,7 +1443,7 @@ public:
       ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
       bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
       ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType,
-      bool *hasSafePointerParam);
+      bool *hasBoundsAnnotatedParam);
 
   struct ImportParameterTypeResult {
     /// The imported parameter Swift type.
@@ -1455,7 +1455,7 @@ public:
     /// If the parameter is implicitly unwrapped or not.
     bool isParamTypeImplicitlyUnwrapped;
     /// If the parameter has (potentially nested) safe pointer types
-    bool isSafePointer;
+    bool isBoundsAnnotated;
   };
 
   /// Import a parameter type

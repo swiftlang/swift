@@ -109,7 +109,7 @@ createFuncOrAccessor(ClangImporter::Implementation &impl, SourceLoc funcLoc,
                      SourceLoc nameLoc, GenericParamList *genericParams,
                      ParameterList *bodyParams, Type resultTy, bool async,
                      bool throws, DeclContext *dc, ClangNode clangNode,
-                     bool hasSafePointer) {
+                     bool hasBoundsAnnotation) {
   FuncDecl *decl;
   if (accessorInfo) {
     decl = AccessorDecl::create(
@@ -125,7 +125,7 @@ createFuncOrAccessor(ClangImporter::Implementation &impl, SourceLoc funcLoc,
                                     genericParams, dc, clangNode);
   }
   impl.importSwiftAttrAttributes(decl);
-  if (hasSafePointer)
+  if (hasBoundsAnnotation)
     impl.importBoundsAttributes(decl);
 
   return decl;
@@ -3277,7 +3277,7 @@ namespace {
       return Impl.importFunctionParameterList(
           dc, decl, nonSelfParams, decl->isVariadic(), allowNSUIntegerAsInt,
           argNames, genericParams, /*resultType=*/nullptr,
-          /*hasSafePointerParam=*/nullptr);
+          /*hasBoundsAnnotatedParam=*/nullptr);
     }
 
     Decl *
@@ -3695,7 +3695,7 @@ namespace {
 
       bool importFuncWithoutSignature =
           isa<clang::CXXMethodDecl>(decl) && Impl.importSymbolicCXXDecls;
-      bool hasSafePointer = false;
+      bool hasBoundsAnnotation = false;
       if (!dc->isModuleScopeContext() && !isa<clang::CXXMethodDecl>(decl)) {
         // Handle initializers.
         if (name.getBaseName().isConstructor()) {
@@ -3792,7 +3792,7 @@ namespace {
           importedType = Impl.importFunctionParamsAndReturnType(
               dc, decl, {decl->param_begin(), decl->param_size()},
               decl->isVariadic(), isInSystemModule(dc), name, bodyParams,
-              templateParams, &hasSafePointer);
+              templateParams, &hasBoundsAnnotation);
         }
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
@@ -3858,10 +3858,11 @@ namespace {
       } else {
         auto resultTy = importedType.getType();
 
-        FuncDecl *func = createFuncOrAccessor(
-            Impl, loc, accessorInfo, name, nameLoc, genericParams, bodyParams,
-            resultTy,
-            /*async=*/false, /*throws=*/false, dc, clangNode, hasSafePointer);
+        FuncDecl *func =
+            createFuncOrAccessor(Impl, loc, accessorInfo, name, nameLoc,
+                                 genericParams, bodyParams, resultTy,
+                                 /*async=*/false, /*throws=*/false, dc,
+                                 clangNode, hasBoundsAnnotation);
         result = func;
 
         if (!dc->isModuleScopeContext()) {
@@ -4904,13 +4905,14 @@ namespace {
         }
       }
 
-      bool hasSafePointer = false; // currently only implemented for functions
+      bool hasBoundsAnnotation =
+          false; // currently only implemented for functions
       auto result = createFuncOrAccessor(
           Impl,
           /*funcLoc*/ SourceLoc(), accessorInfo, importedName.getDeclName(),
           /*nameLoc*/ SourceLoc(),
           /*genericParams=*/nullptr, bodyParams, resultTy, async, throws, dc,
-          decl, hasSafePointer);
+          decl, hasBoundsAnnotation);
 
       result->setAccess(decl->isDirectMethod() ? AccessLevel::Public
                                                : getOverridableAccessLevel(dc));
@@ -6551,7 +6553,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
     parameterList = Impl.importFunctionParameterList(
         dc, decl, {decl->param_begin(), decl->param_end()}, decl->isVariadic(),
         allowNSUIntegerAsInt, argNames, /*genericParams=*/{},
-        /*resultType=*/nullptr, /*hasSafePointerParam=*/nullptr);
+        /*resultType=*/nullptr, /*hasBoundsAnnotatedParam=*/nullptr);
   }
   if (!parameterList)
     return nullptr;
