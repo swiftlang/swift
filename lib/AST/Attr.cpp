@@ -802,6 +802,11 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     if (Options.excludeAttr(DA))
       continue;
 
+    // Skip inverse ABIAttrs--these are an implementation detail.
+    if (auto abiAttr = dyn_cast<ABIAttr>(DA))
+      if (abiAttr->isInverse())
+        continue;
+
     // In the public interfaces of -library-level=api modules, skip attributes
     // that reference SPI platforms.
     if (Options.printPublicInterface() && libraryLevelAPI &&
@@ -1022,6 +1027,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     break;
   }
+
+  case DeclAttrKind::ABI:
+    // Inverse attributes should never be printed.
+    if (cast<ABIAttr>(this)->isInverse())
+      return false;
+    break;
+
   default:
     break;
   }
@@ -1584,6 +1596,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::ABI: {
+    auto *attr = cast<ABIAttr>(this);
+    Printer << "@abi(";
+    ASSERT(!attr->isInverse() && "should be skipped above");
+    if (attr->abiDecl)
+      attr->abiDecl->print(Printer, Options);
+    Printer << ")";
+
+    break;
+  }
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
@@ -1629,6 +1652,8 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::CLASS:                                                    \
     return #NAME;
 #include "swift/AST/DeclAttr.def"
+  case DeclAttrKind::ABI:
+    return "abi";
   case DeclAttrKind::SILGenName:
     return "_silgen_name";
   case DeclAttrKind::Alignment:
@@ -2830,6 +2855,40 @@ LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
                                    SourceRange baseRange, bool implicit,
                                    LifetimeEntry *entry) {
   return new (context) LifetimeAttr(atLoc, baseRange, implicit, entry);
+}
+
+void ABIAttr::createInverse(Decl *owner) {
+  ASSERT(!isInverse() && "shouldn't create inverses of inverse");
+
+  // The ABIAttr on a VarDecl ought to point to its PBD.
+  if (auto VD = dyn_cast<VarDecl>(owner)) {
+    if (auto PBD = VD->getParentPatternBinding()) {
+      owner = PBD;
+    }
+  }
+
+  ABIAttr *inverseAttr = nullptr;
+  auto addAttrToDecl = [&](Decl *decl) {
+    if (decl->getAttrs().hasAttribute<ABIAttr>())
+      return;
+    if (!inverseAttr)
+      inverseAttr = new (owner->getASTContext()) ABIAttr(owner, SourceLoc(),
+                                                         SourceRange(),
+                                                         /*isInverse=*/true,
+                                                         /*isImplicit=*/true);
+    decl->getAttrs().add(inverseAttr);
+  };
+
+  if (auto abiPBD = dyn_cast<PatternBindingDecl>(abiDecl)) {
+    // Add to *every* VarDecl in the ABI PBD, even ones that don't properly
+    // match anything in the API PBD.
+    for (auto i : range(abiPBD->getNumPatternEntries())) {
+      abiPBD->getPattern(i)->forEachVariable(addAttrToDecl);
+    }
+    return;
+  }
+
+  addAttrToDecl(abiDecl);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
