@@ -248,6 +248,7 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
 template <typename Function, typename... Args>
 auto ModuleDependencyScanner::withDependencyScanningWorker(Function &&F,
                                                            Args &&...ArgList) {
+  NumLookups++;
   auto getWorker = [this]() -> std::unique_ptr<ModuleDependencyScanningWorker> {
     std::lock_guard<std::mutex> guard(WorkersLock);
     // If we have run out of workers, something has gone wrong as we must never
