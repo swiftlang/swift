@@ -179,6 +179,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
       "arm64e   arm64e-apple-none-macho   arm64e-apple-none-macho"
+      "arm64    arm64-apple-ios           arm64-apple-ios18"
+      "arm64e   arm64e-apple-ios          arm64e-apple-ios18"
     )
   endif()
 

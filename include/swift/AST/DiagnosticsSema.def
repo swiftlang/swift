@@ -1834,6 +1834,10 @@ ERROR(attr_implementation_category_goes_on_objc_attr,none,
       "'@implementation'",
       ())
 
+ERROR(attr_not_allowed_in_c_functions,none,
+      "attribute %0 is not allowed in C function conventions",
+      (StringRef))
+
 WARNING(objc_implementation_will_become_objc,none,
         "%kind0 will become implicitly '@objc' after adopting '@objc "
         "@implementation'; add '%select{@nonobjc|final}1' to keep the current "
@@ -5950,7 +5954,7 @@ ERROR(async_decl_must_be_available_from_async,none,
 ERROR(async_named_decl_must_be_available_from_async,none,
         "asynchronous %kind0 must be available from asynchronous contexts",
         (const ValueDecl *))
-ERROR(async_unavailable_decl,none,
+GROUPED_ERROR(async_unavailable_decl,DeclarationUnavailableFromAsynchronousContext,none,
       "%kindbase0 is unavailable from asynchronous contexts%select{|; %1}1",
       (const ValueDecl *, StringRef))
 

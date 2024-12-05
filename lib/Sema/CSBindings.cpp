@@ -1265,8 +1265,7 @@ static bool hasConversions(Type type) {
   }
 
   return !(type->is<StructType>() || type->is<EnumType>() ||
-           type->is<BuiltinType>() || type->is<ArchetypeType>() ||
-           type->isVoid());
+           type->is<BuiltinType>() || type->is<ArchetypeType>());
 }
 
 bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
@@ -1282,16 +1281,9 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
 
         return !hasConversions(binding.BindingType);
       })) {
-    bool isApplicationResultType = TypeVar->getImpl().isApplicationResultType();
-    if (llvm::none_of(Info.DelayedBy, [&isApplicationResultType](
-                                          const Constraint *constraint) {
-          // Let's not attempt to bind result type before application
-          // happens. For example because it could be discardable or
-          // l-value (subscript applications).
-          if (isApplicationResultType &&
-              constraint->getKind() == ConstraintKind::ApplicableFunction)
-            return true;
-
+    // Result type of subscript could be l-value so we can't bind it early.
+    if (!TypeVar->getImpl().isSubscriptResultType() &&
+        llvm::none_of(Info.DelayedBy, [](const Constraint *constraint) {
           return constraint->getKind() == ConstraintKind::Disjunction ||
                  constraint->getKind() == ConstraintKind::ValueMember;
         }))

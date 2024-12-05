@@ -98,6 +98,7 @@ TYPE("swiftoverlay",        SwiftOverlayFile,          "swiftoverlay",    "")
 
 // Misc types
 TYPE("pcm",                 ClangModuleFile,           "pcm",             "")
+TYPE("symbol-graph",        SymbolGraphFile,           "symbols.json",    "")
 TYPE("pch",                 PCH,                       "pch",             "")
 TYPE("none",                Nothing,                   "",                "")
 

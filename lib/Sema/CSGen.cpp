@@ -2129,8 +2129,9 @@ namespace {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
+        // FIXME: This is the wrong place to be opening the opaque type.
         contextualType = CS.openOpaqueType(
-            contextualType, contextualPurpose, locator);
+            contextualType, contextualPurpose, locator, /*ownerDecl=*/nullptr);
         Type arrayElementType = contextualType->isArrayType();
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredInterfaceType(),
@@ -2242,8 +2243,10 @@ namespace {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
+        // FIXME: This is the wrong place to be opening the opaque type.
         auto openedType =
-            CS.openOpaqueType(contextualType, contextualPurpose, locator);
+            CS.openOpaqueType(contextualType, contextualPurpose, locator,
+                              /*ownerDecl=*/nullptr);
         auto dictionaryKeyValue =
             ConstraintSystem::isDictionaryType(openedType);
         Type contextualDictionaryKeyType;
@@ -2814,7 +2817,8 @@ namespace {
 
         Type replacedType = CS.replaceInferableTypesWithTypeVars(type, locator);
         Type openedType =
-            CS.openOpaqueType(replacedType, CTP_Initialization, locator);
+            CS.openOpaqueType(replacedType, CTP_Initialization, locator,
+                              patternBinding);
         assert(openedType);
 
         auto *subPattern = cast<TypedPattern>(pattern)->getSubPattern();
@@ -2928,19 +2932,20 @@ namespace {
             TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
         // Tuple splat is still allowed for patterns (with a warning in Swift 5)
-        // so we need to start here from single-apply to make sure that e.g.
+        // so we need to set a non-compound reference to make sure that e.g.
         // `case test(x: Int, y: Int)` gets the labels preserved when matched
         // with `case let .test(tuple)`.
-        FunctionRefInfo functionRefInfo =
-            FunctionRefInfo::singleBaseNameApply();
+        auto functionRefInfo = FunctionRefInfo::unappliedBaseName();
+        if (enumPattern->hasSubPattern())
+          functionRefInfo = functionRefInfo.addingApplicationLevel();
+
         // If sub-pattern is a tuple we'd need to mark reference as compound,
         // that would make sure that the labels are dropped in cases
         // when `case` has a single tuple argument (tuple explosion) or multiple
         // arguments (tuple-to-tuple conversion).
-        // FIXME(FunctionRefInfo): This should be using single compound apply,
-        // at least until label matching is implemented in the solver.
+        // FIXME: We ought to be preserving labels and matching in the solver.
         if (dyn_cast_or_null<TuplePattern>(enumPattern->getSubPattern()))
-          functionRefInfo = FunctionRefInfo::unappliedCompoundName();
+          functionRefInfo = FunctionRefInfo::singleCompoundNameApply();
 
         auto patternLocator =
             locator.withPathElement(LocatorPathElt::PatternMatch(pattern));

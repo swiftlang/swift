@@ -359,23 +359,31 @@ Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
 }
 
 Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
-                                      ConstraintLocatorBuilder locator) {
+                                      ConstraintLocatorBuilder locator,
+                                      Decl *ownerDecl) {
+  // FIXME: Require non-null ownerDecl and fix remaining callers
+  // ASSERT(ownerDecl);
+
   // Early return if `type` is `NULL` or if there are no opaque archetypes (in
   // which case there is certainly nothing for us to do).
   if (!type || !type->hasOpaqueArchetype())
     return type;
 
-  if (!(context == CTP_Initialization || context == CTP_ReturnStmt))
+  if (context != CTP_Initialization && context != CTP_ReturnStmt)
     return type;
 
   auto shouldOpen = [&](OpaqueTypeArchetypeType *opaqueType) {
-    if (context != CTP_ReturnStmt)
+    if (context == CTP_Initialization) {
+      if (!ownerDecl)
+        return true;
+
+      return opaqueType->getDecl()->isOpaqueReturnTypeOf(ownerDecl);
+    } else {
+      if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
+        return opaqueType->getDecl()->isOpaqueReturnTypeOf(func);
+
       return true;
-
-    if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
-      return opaqueType->getDecl()->isOpaqueReturnTypeOfFunction(func);
-
-    return true;
+    }
   };
 
   return type.transformRec([&](Type type) -> std::optional<Type> {
@@ -663,26 +671,8 @@ static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
   llvm_unreachable("Unhandled FunctionRefInfo in switch.");
 }
 
-/// Determine the number of applications
-unsigned constraints::getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
-                                         FunctionRefInfo functionRefInfo,
-                                         ConstraintLocatorBuilder locator) {
-  // FIXME: Narrow hack for rdar://139234188 - Currently we set
-  // FunctionRefInfo::Compound for enum element patterns with tuple
-  // sub-patterns to ensure the member has argument labels stripped. As such,
-  // we need to account for the correct application level here. We ought to be
-  // setting the correct FunctionRefInfo and properly handling the label
-  // matching in the solver though.
-  if (auto lastElt = locator.last()) {
-    if (auto matchElt = lastElt->getAs<LocatorPathElt::PatternMatch>()) {
-      if (auto *EP = dyn_cast<EnumElementPattern>(matchElt->getPattern()))
-        return (EP->hasSubPattern() ? 1 : 0) + hasAppliedSelf;
-    }
-  }
-  // FIXME(FunctionRefInfo): This matches the old behavior, but is wrong.
-  if (functionRefInfo.isCompoundName())
-    return 0 + hasAppliedSelf;
-
+unsigned constraints::getNumApplications(bool hasAppliedSelf,
+                                         FunctionRefInfo functionRefInfo) {
   switch (functionRefInfo.getApplyLevel()) {
   case FunctionRefInfo::ApplyLevel::Unapplied:
     return 0 + hasAppliedSelf;
@@ -908,8 +898,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
-      unsigned numApplies = getNumApplications(value, false, functionRefInfo,
-                                               locator);
+      unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
+                                               functionRefInfo);
       openedType = adjustFunctionTypeForConcurrency(
           origOpenedType, /*baseType=*/Type(), func, useDC, numApplies, false,
           replacements, locator);
@@ -937,8 +927,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
-      unsigned numApplies = getNumApplications(
-          funcDecl, false, functionRefInfo, locator);
+      unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
+                                               functionRefInfo);
       openedType = adjustFunctionTypeForConcurrency(
           origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(), funcDecl,
           useDC, numApplies, false, replacements, locator);
@@ -1680,8 +1670,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   if (isRequirementOrWitness(locator)) {
     // Don't adjust when doing witness matching, because that can cause cycles.
   } else if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
-    unsigned numApplies = getNumApplications(
-        value, hasAppliedSelf, functionRefInfo, locator);
+    unsigned numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
     openedType = adjustFunctionTypeForConcurrency(
         origOpenedType->castTo<FunctionType>(), resolvedBaseTy, value, useDC,
         numApplies, isMainDispatchQueueMember(locator), replacements, locator);
@@ -1864,8 +1853,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
 
       auto hasAppliedSelf =
           doesMemberRefApplyCurriedSelf(overload.getBaseType(), decl);
-      unsigned numApplies = getNumApplications(
-          decl, hasAppliedSelf, overload.getFunctionRefInfo(), locator);
+      unsigned numApplies = getNumApplications(hasAppliedSelf,
+                                               overload.getFunctionRefInfo());
 
       type = adjustFunctionTypeForConcurrency(
                  type->castTo<FunctionType>(), overload.getBaseType(), decl,

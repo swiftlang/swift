@@ -508,13 +508,17 @@ public:
 
   /// Create a copy of this attribute.
   DeclAttribute *clone(ASTContext &ctx) const;
+
+  /// Determine whether we can clone this attribute.
+  bool canClone() const;
 };
 
 #define UNIMPLEMENTED_CLONE(AttrType)    \
 AttrType *clone(ASTContext &ctx) const { \
     llvm_unreachable("unimplemented");   \
     return nullptr;                      \
-  }
+  }                                      \
+bool canClone() const { return false; }
 
 /// Describes a "simple" declaration attribute that carries no data.
 template<DeclAttrKind Kind>
@@ -1916,8 +1920,12 @@ public:
 
   /// Create a copy of this attribute.
   CustomAttr *clone(ASTContext &ctx) const {
+    assert(argList == nullptr &&
+           "Cannot clone custom attribute with an argument list");
     return create(ctx, AtLoc, getTypeExpr(), initContext, argList, isImplicit());
   }
+
+  bool canClone() const { return argList == nullptr; }
 
 private:
   friend class CustomAttrNominalRequest;

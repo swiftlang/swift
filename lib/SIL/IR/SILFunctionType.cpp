@@ -1720,6 +1720,12 @@ private:
              ParameterTypeFlags origFlags) {
     assert(!isa<InOutType>(substType));
 
+    // If the parameter is marked addressable, lower it with maximal
+    // abstraction.
+    if (origFlags.isAddressable()) {
+      origType = AbstractionPattern::getOpaque();
+    }
+
     // Tuples get expanded unless they're inout.
     if (origType.isTuple() && ownership != ValueOwnership::InOut) {
       expandTuple(ownership, forSelf, origType, substType, origFlags);

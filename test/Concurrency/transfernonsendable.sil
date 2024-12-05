@@ -21,7 +21,7 @@ import _Concurrency
 
 class Klass {}
 
-class NonSendableKlass {
+class NonSendableKlass { // expected-note 2{{}}
   var klass: Klass
 
   func asyncCall() async
@@ -121,10 +121,6 @@ bb0(%0 : $*{ var NonSendableKlass }):
   return %9999 : $()
 }
 
-// This doesn't error since the @out parameter is not transferred when it is initialized.
-//
-// DISCUSSION: The frontend prevents us from using such a value. But we
-// shouldn't crash on such values.
 sil [ossa] @transfer_does_not_transfer_out_parameters_1 : $@convention(thin) @async () -> () {
 bb0:
   %0 = alloc_stack $NonSendableKlass
@@ -133,7 +129,7 @@ bb0:
 
   %1 = alloc_stack $NonSendableKlass
   %f = function_ref @transferIndirectWithOutResult : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%1, %0) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%1, %0) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0 // expected-warning {{}}
 
   %useIndirect = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %useIndirect<NonSendableKlass>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -155,7 +151,7 @@ bb0:
 
   %1 = alloc_stack $NonSendableKlass
   %f = function_ref @transferIndirectWithOutResult : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%1, %0) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<NonSendableKlass>(%1, %0) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0 // expected-warning {{}}
 
   %f2 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f2<NonSendableKlass>(%1) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()

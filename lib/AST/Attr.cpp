@@ -370,6 +370,17 @@ DeclAttribute *DeclAttribute::clone(ASTContext &ctx) const {
   }
 }
 
+bool DeclAttribute::canClone() const {
+  switch (getKind()) {
+#define DECL_ATTR(_,CLASS, ...)                                \
+  case DeclAttrKind::CLASS:                                    \
+    if (&CLASS##Attr::canClone == &DeclAttribute::canClone)    \
+      return true;                                             \
+    return static_cast<const CLASS##Attr *>(this)->canClone();
+#include "swift/AST/DeclAttr.def"
+  }
+}
+
 const BackDeployedAttr *
 DeclAttributes::getBackDeployed(const ASTContext &ctx,
                                 bool forTargetVariant) const {

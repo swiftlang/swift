@@ -1098,6 +1098,28 @@ NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
       "returning %1 %0 risks causing data races since the caller assumes that %0 can be safely sent to other isolation domains",
       (Identifier, StringRef))
 
+//===
+// non-Sendable Results
+
+// Example: returning main-actor isolated result to a custom-actor isolated context risks causing data races
+ERROR(rbi_isolation_crossing_result, none,
+      "non-Sendable %0-typed result can not be returned from %1 %kind2 to %3 context",
+      (Type, ActorIsolation, const ValueDecl *, ActorIsolation))
+ERROR(rbi_isolation_crossing_result_no_decl, none,
+      "non-Sendable %0-typed result can not be returned from %1 function to %2 context",
+      (Type, ActorIsolation, ActorIsolation))
+NOTE(rbi_non_sendable_nominal,none,
+     "%kind0 does not conform to the 'Sendable' protocol",
+      (const ValueDecl *))
+NOTE(rbi_nonsendable_function_type,none,
+     "a function type must be marked '@Sendable' to conform to 'Sendable'", ())
+NOTE(rbi_add_nominal_sendable_conformance,none,
+     "consider making %kind0 conform to the 'Sendable' protocol",
+     (const ValueDecl *))
+NOTE(rbi_add_generic_parameter_sendable_conformance,none,
+     "consider making generic parameter %0 conform to the 'Sendable' protocol",
+     (Type))
+
 //===----------------------------------------------------------------------===//
 //                           MARK: Misc Diagnostics
 //===----------------------------------------------------------------------===//

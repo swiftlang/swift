@@ -260,6 +260,10 @@ public:
 
   void undo(unsigned toIndex);
 
+  SWIFT_DEBUG_DUMP;
+  void dump(raw_ostream &OS, unsigned fromIndex = 0,
+            unsigned indent = 0) const LLVM_ATTRIBUTE_USED;
+
 private:
   ConstraintSystem &CS;
 
