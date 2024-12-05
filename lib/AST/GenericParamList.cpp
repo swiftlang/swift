@@ -17,6 +17,7 @@
 #include "swift/AST/GenericParamList.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
 
@@ -78,6 +79,12 @@ GenericParamList::clone(DeclContext *dc) const {
         dc, param->getName(), GenericTypeParamDecl::InvalidDepth,
         param->getIndex(), param->getParamKind(), param->getOpaqueTypeRepr());
     newParam->setInherited(param->getInherited().getEntries());
+
+    // Cache the value type computed from the previous param to the new one.
+    ctx.evaluator.cacheOutput(
+        GenericTypeParamDeclGetValueTypeRequest{newParam},
+        param->getValueType());
+
     params.push_back(newParam);
   }
 

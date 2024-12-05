@@ -1085,7 +1085,7 @@ namespace {
           baseObjTy = baseObjTy->getWithoutSpecifierType();
         }
 
-        if (baseObjTy->isArrayType()) {
+        if (auto elementTy = baseObjTy->isArrayType()) {
 
           if (auto arraySliceTy = 
                 dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
@@ -1095,7 +1095,7 @@ namespace {
           if (argList->isUnlabeledUnary() &&
               isa<IntegerLiteralExpr>(argList->getExpr(0))) {
 
-            outputTy = baseObjTy->getAs<BoundGenericType>()->getGenericArgs()[0];
+            outputTy = elementTy;
             
             if (isLValueBase)
               outputTy = LValueType::get(outputTy);

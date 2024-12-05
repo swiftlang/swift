@@ -1272,6 +1272,7 @@ namespace {
         break;
       case GenericTypeParamKind::Value:
         printField((StringRef)"value", "param_kind");
+        printRec(decl->getValueType(), "value_type");
         break;
       }
       printAttributes(decl);

@@ -1523,10 +1523,14 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     for (auto Arg : GenericArgs) {
       DebugTypeInfo ParamDebugType;
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
-        // For the DwarfTypes level don't generate just a forward declaration
-        // for the generic type parameters.
-        ParamDebugType = DebugTypeInfo::getFromTypeInfo(
-            Arg, IGM.getTypeInfoForUnlowered(Arg), IGM);
+        if (Arg->is<IntegerType>()) {
+          ParamDebugType = DebugTypeInfo(Arg);
+        } else {
+          // For the DwarfTypes level don't generate just a forward declaration
+          // for the generic type parameters.
+          ParamDebugType = DebugTypeInfo::getFromTypeInfo(
+              Arg, IGM.getTypeInfoForUnlowered(Arg), IGM);
+        }
       else
         ParamDebugType = DebugTypeInfo::getForwardDecl(Arg);
 
