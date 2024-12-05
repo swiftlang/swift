@@ -2542,24 +2542,23 @@ namespace {
     void validateForeignReferenceType(const clang::CXXRecordDecl *decl,
                                       ClassDecl *classDecl) {
 
-      enum class RetainReleaseOperatonKind {
+      enum class RetainReleaseOperationKind {
         notAfunction,
-        doesntReturnVoid,
+        doesntReturnVoidOrSelf,
         invalidParameters,
         valid
       };
 
       auto getOperationValidity =
-          [&](ValueDecl *operation) -> RetainReleaseOperatonKind {
+          [&](ValueDecl *operation,
+              CustomRefCountingOperationKind operationKind)
+          -> RetainReleaseOperationKind {
         auto operationFn = dyn_cast<FuncDecl>(operation);
         if (!operationFn)
-          return RetainReleaseOperatonKind::notAfunction;
-
-        if (!operationFn->getResultInterfaceType()->isVoid())
-          return RetainReleaseOperatonKind::doesntReturnVoid;
+          return RetainReleaseOperationKind::notAfunction;
 
         if (operationFn->getParameters()->size() != 1)
-          return RetainReleaseOperatonKind::invalidParameters;
+          return RetainReleaseOperationKind::invalidParameters;
 
         Type paramType =
             operationFn->getParameters()->get(0)->getInterfaceType();
@@ -2569,6 +2568,16 @@ namespace {
         }
 
         swift::NominalTypeDecl *paramDecl = paramType->getAnyNominal();
+
+        // The return type should be void (for release functions), or void
+        // or the parameter type (for retain functions).
+        auto resultInterfaceType = operationFn->getResultInterfaceType();
+        if (!resultInterfaceType->isVoid()) {
+          if (operationKind == CustomRefCountingOperationKind::release ||
+              !resultInterfaceType->lookThroughSingleOptionalType()->isEqual(paramType))
+            return RetainReleaseOperationKind::doesntReturnVoidOrSelf;
+        }
+
         // The parameter of the retain/release function should be pointer to the
         // same FRT or a base FRT.
         if (paramDecl != classDecl) {
@@ -2576,13 +2585,14 @@ namespace {
             if (const auto *paramTypeDecl =
                     dyn_cast<clang::CXXRecordDecl>(paramClangDecl)) {
               if (decl->isDerivedFrom(paramTypeDecl)) {
-                return RetainReleaseOperatonKind::valid;
+                return RetainReleaseOperationKind::valid;
               }
             }
           }
-          return RetainReleaseOperatonKind::invalidParameters;
+          return RetainReleaseOperationKind::invalidParameters;
         }
-        return RetainReleaseOperatonKind::valid;
+
+        return RetainReleaseOperationKind::valid;
       };
 
       auto retainOperation = evaluateOrDefault(
@@ -2619,28 +2629,29 @@ namespace {
                       false, retainOperation.name, decl->getNameAsString());
       } else if (retainOperation.kind ==
                  CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperatonKind operationKind =
-            getOperationValidity(retainOperation.operation);
+        RetainReleaseOperationKind operationKind =
+            getOperationValidity(retainOperation.operation,
+                                 CustomRefCountingOperationKind::retain);
         HeaderLoc loc(decl->getLocation());
         switch (operationKind) {
-        case RetainReleaseOperatonKind::notAfunction:
+        case RetainReleaseOperationKind::notAfunction:
           Impl.diagnose(
               loc,
               diag::foreign_reference_types_retain_release_not_a_function_decl,
               false, retainOperation.name);
           break;
-        case RetainReleaseOperatonKind::doesntReturnVoid:
+        case RetainReleaseOperationKind::doesntReturnVoidOrSelf:
           Impl.diagnose(
               loc,
-              diag::foreign_reference_types_retain_release_non_void_return_type,
-              false, retainOperation.name);
+              diag::foreign_reference_types_retain_non_void_or_self_return_type,
+              retainOperation.name);
           break;
-        case RetainReleaseOperatonKind::invalidParameters:
+        case RetainReleaseOperationKind::invalidParameters:
           Impl.diagnose(loc,
                         diag::foreign_reference_types_invalid_retain_release,
                         false, retainOperation.name, classDecl->getNameStr());
           break;
-        case RetainReleaseOperatonKind::valid:
+        case RetainReleaseOperationKind::valid:
           break;
         }
       } else {
@@ -2683,28 +2694,29 @@ namespace {
                       true, releaseOperation.name, decl->getNameAsString());
       } else if (releaseOperation.kind ==
                  CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperatonKind operationKind =
-            getOperationValidity(releaseOperation.operation);
+        RetainReleaseOperationKind operationKind =
+            getOperationValidity(releaseOperation.operation,
+                                 CustomRefCountingOperationKind::release);
         HeaderLoc loc(decl->getLocation());
         switch (operationKind) {
-        case RetainReleaseOperatonKind::notAfunction:
+        case RetainReleaseOperationKind::notAfunction:
           Impl.diagnose(
               loc,
               diag::foreign_reference_types_retain_release_not_a_function_decl,
               true, releaseOperation.name);
           break;
-        case RetainReleaseOperatonKind::doesntReturnVoid:
+        case RetainReleaseOperationKind::doesntReturnVoidOrSelf:
           Impl.diagnose(
               loc,
-              diag::foreign_reference_types_retain_release_non_void_return_type,
-              true, releaseOperation.name);
+              diag::foreign_reference_types_release_non_void_return_type,
+              releaseOperation.name);
           break;
-        case RetainReleaseOperatonKind::invalidParameters:
+        case RetainReleaseOperationKind::invalidParameters:
           Impl.diagnose(loc,
                         diag::foreign_reference_types_invalid_retain_release,
                         true, releaseOperation.name, classDecl->getNameStr());
           break;
-        case RetainReleaseOperatonKind::valid:
+        case RetainReleaseOperationKind::valid:
           break;
         }
       } else {

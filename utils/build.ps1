@@ -2884,7 +2884,7 @@ if (-not $SkipBuild -and $Allocator -eq "mimalloc") {
   Invoke-BuildStep Build-Mimalloc $HostArch
 }
 
-if (-not $SkipBuild -and -not $IsCrossCompiling) {
+if (-not $SkipBuild) {
   Invoke-BuildStep Build-Inspect $HostArch
   Invoke-BuildStep Build-DocC $HostArch
 }
