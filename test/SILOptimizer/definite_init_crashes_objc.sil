@@ -37,8 +37,8 @@ class Sub : Super {
 // CHECK:         switch_enum
 // CHECK-SAME:        case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
 // CHECK:       [[NONE]]:
-// CHECK:         [[SUB_META_1:%[^,]+]] = metatype $@thick Sub.Type
 // CHECK:         [[SUB_1:%[^,]+]] = unchecked_ref_cast [[SUPER_1]] : $Super to $Sub
+// CHECK:         [[SUB_META_1:%[^,]+]] = metatype $@thick Sub.Type
 // CHECK:         dealloc_partial_ref
 // CHECK-SAME:        [[SUB_1]]
 // CHECK-SAME:        [[SUB_META_1]]

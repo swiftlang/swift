@@ -2129,8 +2129,9 @@ namespace {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
+        // FIXME: This is the wrong place to be opening the opaque type.
         contextualType = CS.openOpaqueType(
-            contextualType, contextualPurpose, locator);
+            contextualType, contextualPurpose, locator, /*ownerDecl=*/nullptr);
         Type arrayElementType = contextualType->isArrayType();
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredInterfaceType(),
@@ -2242,8 +2243,10 @@ namespace {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
+        // FIXME: This is the wrong place to be opening the opaque type.
         auto openedType =
-            CS.openOpaqueType(contextualType, contextualPurpose, locator);
+            CS.openOpaqueType(contextualType, contextualPurpose, locator,
+                              /*ownerDecl=*/nullptr);
         auto dictionaryKeyValue =
             ConstraintSystem::isDictionaryType(openedType);
         Type contextualDictionaryKeyType;
@@ -2814,7 +2817,8 @@ namespace {
 
         Type replacedType = CS.replaceInferableTypesWithTypeVars(type, locator);
         Type openedType =
-            CS.openOpaqueType(replacedType, CTP_Initialization, locator);
+            CS.openOpaqueType(replacedType, CTP_Initialization, locator,
+                              patternBinding);
         assert(openedType);
 
         auto *subPattern = cast<TypedPattern>(pattern)->getSubPattern();

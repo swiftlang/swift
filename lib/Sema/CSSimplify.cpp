@@ -15927,7 +15927,9 @@ void ConstraintSystem::addContextualConversionConstraint(
   }
 
   // Add the constraint.
-  auto openedType = openOpaqueType(conversionType, purpose, locator);
+  // FIXME: This is the wrong place to be opening the opaque type.
+  auto openedType = openOpaqueType(conversionType, purpose, locator,
+                                   /*ownerDecl=*/nullptr);
   addConstraint(constraintKind, getType(expr), openedType, locator,
                 /*isFavored*/ true);
 }
