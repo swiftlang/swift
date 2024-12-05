@@ -894,7 +894,7 @@ $CompilersBinaryCache = if ($IsCrossCompiling) {
 }
 
 function Get-BuiltToolchainTool([string] $Name) {
-  return if ($Name) { "$CompilersBinaryCache\bin\$Name" } else { "$CompilersBinaryCache\bin" }
+  if ($Name) { "$CompilersBinaryCache\bin\$Name" } else { "$CompilersBinaryCache\bin" }
 }
 
 function Get-ClangDriverName([Platform] $Platform, [string] $Lang) {
