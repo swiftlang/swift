@@ -20,6 +20,10 @@ import macro_library
 func testAll(x: Double, y: Double, computer: SlowComputer) async {
   let _: Double = await async_divide(1.0, 2.0)
   let _: Double = await computer.divide(x, y)
+
+  f1(3.14159)
+  f2(3.14159)
+  f3(3.14159)
 }
 
 // CHECK: define{{.*}}@"$sSC12async_divideyS2d_SdtYaF"
