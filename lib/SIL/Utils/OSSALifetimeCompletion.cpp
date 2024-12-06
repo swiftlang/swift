@@ -419,6 +419,11 @@ static bool endLifetimeAtAvailabilityBoundary(SILValue value,
   return changed;
 }
 
+static bool endLifetimeAtBoundary(SILValue value,
+                                  SSAPrunedLiveness const &liveness,
+                                  OSSALifetimeCompletion::Boundary boundary,
+                                  DeadEndBlocks &deadEndBlocks);
+
 /// End the lifetime of \p value at unreachable instructions.
 ///
 /// Returns true if any new instructions were created to complete the lifetime.
@@ -431,23 +436,29 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
   };
   InteriorLiveness liveness(value);
   liveness.compute(domInfo, handleInnerScope);
-
-  bool changed = false;
-  switch (boundary) {
-  case Boundary::Liveness:
-    changed |= endLifetimeAtLivenessBoundary(value, liveness.getLiveness(),
-                                             deadEndBlocks);
-    break;
-  case Boundary::Availability:
-    changed |= endLifetimeAtAvailabilityBoundary(value, liveness.getLiveness(),
-                                                 deadEndBlocks);
-    break;
-  }
   // TODO: Rebuild outer adjacent phis on demand (SILGen does not currently
   // produce guaranteed phis). See FindEnclosingDefs &
   // findSuccessorDefsFromPredDefs. If no enclosing phi is found, we can create
   // it here and use updateSSA to recursively populate phis.
   assert(liveness.getUnenclosedPhis().empty());
+  return endLifetimeAtBoundary(value, liveness.getLiveness(), boundary,
+                               deadEndBlocks);
+}
+
+static bool endLifetimeAtBoundary(SILValue value,
+                                  SSAPrunedLiveness const &liveness,
+                                  OSSALifetimeCompletion::Boundary boundary,
+                                  DeadEndBlocks &deadEndBlocks) {
+  bool changed = false;
+  switch (boundary) {
+  case OSSALifetimeCompletion::Boundary::Liveness:
+    changed |= endLifetimeAtLivenessBoundary(value, liveness, deadEndBlocks);
+    break;
+  case OSSALifetimeCompletion::Boundary::Availability:
+    changed |=
+        endLifetimeAtAvailabilityBoundary(value, liveness, deadEndBlocks);
+    break;
+  }
   return changed;
 }
 
