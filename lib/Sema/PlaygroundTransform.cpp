@@ -322,6 +322,10 @@ public:
       for (Decl *Member : NTD->getMembers()) {
         transformDecl(Member);
       }
+    } else if (auto *VD = dyn_cast<AbstractStorageDecl>(D)) {
+      VD->visitParsedAccessors([&](AccessorDecl * ACC) {
+        transformDecl(ACC);
+      });
     }
 
     return D;

@@ -55,6 +55,7 @@ extension ASTGenVisitor {
     }
 
     // '@' attributes.
+    // FIXME: Factor out this and share it with 'generate(accessorDecl:)'.
     var initContext: BridgedPatternBindingInitializer? = nil
     visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
       switch element {
@@ -106,6 +107,8 @@ extension ASTGenVisitor {
       switch attrKind {
       case .alignment:
         return self.generateAlignmentAttr(attribute: node)?.asDeclAttribute
+      case .allowFeatureSuppression:
+        return self.generateAllowFeatureSuppressionAttr(attribute: node, attrName: attrName)?.asDeclAttribute
       case .available:
         // FIXME: handle multiple results.
         return self.generateAvailableAttr(attribute: node).first?.asDeclAttribute
@@ -120,7 +123,7 @@ extension ASTGenVisitor {
       case .dynamicReplacement:
         return self.generateDynamicReplacementAttr(attribute: node)?.asDeclAttribute
       case .documentation:
-        fatalError("unimplemented")
+        return self.generateDocumentationAttr(attribute: node)?.asDeclAttribute
       case .effects:
         return self.generateEffectsAttr(attribute: node)?.asDeclAttribute
       case .exclusivity:
@@ -133,12 +136,14 @@ extension ASTGenVisitor {
         return self.generateImplementsAttr(attribute: node)?.asDeclAttribute
       case .inline:
         return self.generateInlineAttr(attribute: node)?.asDeclAttribute
+      case .lifetime:
+        fatalError("unimplemented")
       case .macroRole:
         return self.generateMacroRoleAttr(attribute: node, attrName: attrName)?.asDeclAttribute
       case .nonSendable:
         return self.generateNonSendableAttr(attribute: node)?.asDeclAttribute
       case .nonisolated:
-        fatalError("unimplemented")
+        return self.generateNonisolatedAttr(attribute: node)?.asDeclAttribute
       case .objC:
         return self.generateObjCAttr(attribute: node)?.asDeclAttribute
       case .objCImplementation:
@@ -163,11 +168,11 @@ extension ASTGenVisitor {
       case .silGenName:
         return self.generateSILGenNameAttr(attribute: node)?.asDeclAttribute
       case .specialize:
-        fatalError("unimplemented")
+        return self.generateSpecializeAttr(attribute: node)?.asDeclAttribute
       case .spiAccessControl:
         return self.generateSPIAccessControlAttr(attribute: node)?.asDeclAttribute
       case .storageRestrictions:
-        fatalError("unimplemented")
+        return self.generateStorageRestrictionAttr(attribute: node)?.asDeclAttribute
       case .swiftNativeObjCRuntimeBase:
         return self.generateSwiftNativeObjCRuntimeBaseAttr(attribute: node)?.asDeclAttribute
       case .transpose:
@@ -175,11 +180,7 @@ extension ASTGenVisitor {
       case .typeEraser:
         fatalError("unimplemented")
       case .unavailableFromAsync:
-        fatalError("unimplemented")
-      case .allowFeatureSuppression:
-        return self.generateAllowFeatureSuppressionAttr(attribute: node)?.asDeclAttribute
-      case .lifetime:
-        fatalError("unimplemented")
+        return self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute
 
       // Simple attributes.
       case .alwaysEmitConformanceMetadata,
@@ -318,6 +319,10 @@ extension ASTGenVisitor {
     return self.generateCustomAttr(attribute: node, initContext: &initContext)?.asDeclAttribute
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @_alignment(8)
+  ///   ```
   func generateAlignmentAttr(attribute node: AttributeSyntax) -> BridgedAlignmentAttr? {
     guard
       let arg = node.arguments?.as(TokenSyntax.self)
@@ -327,7 +332,7 @@ extension ASTGenVisitor {
       return nil
     }
     let value: Int? = Int(String(syntaxText: arg.rawText))
-    guard let value else {
+    guard let value, value > 0 else {
       // TODO: Diagnose.
       return nil
     }
@@ -339,7 +344,11 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateAllowFeatureSuppressionAttr(attribute node: AttributeSyntax) -> BridgedAllowFeatureSuppressionAttr? {
+  /// E.g.:
+  ///   ```
+  ///   @_allowFeatureSuppression(IsolatedAny)
+  ///   ```
+  func generateAllowFeatureSuppressionAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedAllowFeatureSuppressionAttr? {
     guard case .argumentList(let args) = node.arguments
     else {
       // TODO: Diagnose.
@@ -347,7 +356,7 @@ extension ASTGenVisitor {
     }
 
     let inverted: Bool
-    switch node.attributeName {
+    switch attrName {
     case "_allowFeatureSuppression":
       inverted = false
     case "_disallowFeatureSuppression":
@@ -376,6 +385,10 @@ extension ASTGenVisitor {
       features: features)
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @_cdecl("c_function_name")
+  ///   ```
   func generateCDeclAttr(attribute node: AttributeSyntax) -> BridgedCDeclAttr? {
     guard
       // `@_cdecl` attribute has `.string(StringLiteralExprSyntax)` arguments.
@@ -398,6 +411,11 @@ extension ASTGenVisitor {
     )
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @available(macOS 10.12, iOS: 13, *)
+  ///   @available(macOS, introduced: 10.12)
+  ///   ```
   func generateAvailableAttr(attribute node: AttributeSyntax) -> [BridgedAvailableAttr] {
     guard
       // `@available` has special argument list syntax.
@@ -411,6 +429,10 @@ extension ASTGenVisitor {
     fatalError("unimplemented")
   }
 
+  /// E.g:
+  ///   ```
+  ///   @_dynamicReplacement(for: member)
+  ///   ```
   func generateDynamicReplacementAttr(attribute node: AttributeSyntax) -> BridgedDynamicReplacementAttr? {
     guard
       // `@_dynamicReplacement` has special argument list syntax
@@ -432,6 +454,81 @@ extension ASTGenVisitor {
     )
   }
 
+  /// E.g.:
+  ///  ```
+  ///  @_documentation(visibility: internal)
+  ///  @_documentation(metadata: foobar)
+  ///  @_documentation(metadata: "longer string")
+  ///  ```
+  func generateDocumentationAttr(attribute node: AttributeSyntax) -> BridgedDocumentationAttr? {
+    guard var args = node.arguments?.as(DocumentationAttributeArgumentListSyntax.self)?[...] else {
+      // TODO: Diagnose
+      return nil
+    }
+
+    var visibility: BridgedAccessLevel = .none
+    var metadata: BridgedStringRef? = nil
+
+    while let arg = args.popFirst() {
+      switch arg.label.rawText {
+      case "visibility":
+        guard visibility == .none else {
+          // TODO: Diagnose duplicated 'visibility" arguments
+          continue
+        }
+        guard case .token(let token) = arg.value else {
+          // TODO: Diagnose
+          continue
+        }
+        switch token.keywordKind {
+        case .open: visibility = .open
+        case .public: visibility = .public
+        case .package: visibility = .package
+        case .internal: visibility = .internal
+        case .private: visibility = .private
+        case .fileprivate: visibility = .filePrivate
+        default:
+          // TODO: Diagnose
+          continue
+        }
+      case "metadata":
+        guard metadata == nil else {
+          // TODO: Diagnose duplicated 'metadata" arguments
+          continue
+        }
+        switch arg.value {
+        case .string(let str):
+          guard let text = self.generateStringLiteralTextIfNotInterpolated(expr: str) else {
+            // TODO: Diagnose
+            continue
+          }
+          metadata = text
+        case .token(let tok) where tok.rawTokenKind == .identifier:
+          metadata = tok.rawText.bridged
+        default:
+          // TODO: Diagnose
+          continue
+        }
+      default:
+        // TODO: Diagnose invalid argument
+        continue;
+      }
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      metadata: metadata ?? "",
+      accessLevel: visibility
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @effects(readonly)
+  ///   @effects(customKind foo.bar)
+  ///   ```
   func generateEffectsAttr(attribute node: AttributeSyntax) -> BridgedEffectsAttr? {
     guard
       let arguments = node.arguments?.as(EffectsAttributeArgumentListSyntax.self),
@@ -472,6 +569,11 @@ extension ASTGenVisitor {
     }
   }
 
+  /// E.g.
+  ///   ```
+  ///   @exclusivity(unchecked)
+  ///   @exclusivity(checked)
+  ///   ```
   func generateExclusivityAttr(attribute node: AttributeSyntax) -> BridgedExclusivityAttr? {
     let mode: BridgedExclusivityAttrMode? = self.generateSingleAttrOption(
       attribute: node,
@@ -494,7 +596,14 @@ extension ASTGenVisitor {
     )
   }
 
+  /// E.g.
+  ///   ```
+  ///   @_expose(Cxx)
+  ///   @_expose(Cxx, "cxx_name")
+  ///   @_expose(Wasm, "wasm_name")
+  ///   ```
   func generateExposeAttr(attribute node: AttributeSyntax) -> BridgedExposeAttr? {
+    // FIXME: SwiftParser should parse the argument as LabeledExprListArguments
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
       // Exposure kind.
       let kind: BridgedExposureKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
@@ -524,10 +633,14 @@ extension ASTGenVisitor {
     }
   }
 
+  /// E.g.
+  ///   ```
+  ///   @_extern(c)
+  ///   @_extern(c, "c_name")
+  ///   @_extern(wasm, module: "x", name: "y")
+  ///   ```
   func generateExternAttr(attribute node: AttributeSyntax) -> BridgedExternAttr? {
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
-      // @_extern(wasm, module: "x", name: "y")
-      // @_extern(c[, "x"])
       let kind: BridgedExternKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
         switch $0.rawText {
         case "c":
@@ -574,6 +687,10 @@ extension ASTGenVisitor {
     }
   }
 
+  /// E.g.
+  ///   ```
+  ///   @_section("__TEXT,__mysection")
+  ///   ```
   func generateSectionAttr(attribute node: AttributeSyntax) -> BridgedSectionAttr? {
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
       guard let name = self.generateConsumingSimpleStringLiteralAttrOption(args: &args) else {
@@ -589,6 +706,10 @@ extension ASTGenVisitor {
     }
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @_implements(ProtocolName, member())
+  ///   ```
   func generateImplementsAttr(attribute node: AttributeSyntax) -> BridgedImplementsAttr? {
     guard
       // `@_dynamicReplacement` has special argument list syntax
@@ -611,6 +732,11 @@ extension ASTGenVisitor {
     )
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @inline(never)
+  ///   @inline(__always)
+  ///   ```
   func generateInlineAttr(attribute node: AttributeSyntax) -> BridgedInlineAttr? {
     let kind: BridgedInlineKind? = self.generateSingleAttrOption(
       attribute: node,
@@ -712,6 +838,11 @@ extension ASTGenVisitor {
     return BridgedMacroIntroducedDeclName(kind: kind, name: name)
   }
 
+  /// E.g.
+  ///   ```
+  ///   @freestanding(declaration, names: named(foo())
+  ///   @attached(peer, conformances: ProtocolName)
+  ///   ```
   func generateMacroRoleAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedMacroRoleAttr? {
     // '@freestanding' or '@attached'.
     assert(attrName == "freestanding" || attrName == "attached")
@@ -739,54 +870,48 @@ extension ASTGenVisitor {
       var names: [BridgedMacroIntroducedDeclName] = []
       var conformances: [BridgedExpr] = []
 
-      enum ArgState {
-        case inNames
-        case inConformances
-        case inInvalid
+      enum Argument: UInt8 {
+        case names
+        case conformances
+        case invalid
       }
       // Assume we're in 'names:' arguments.
-      var argState: ArgState = .inNames
-      // Seen at 'names:' argument label.
-      var seenNames = false
-      // Seen at 'conformances:' argument label.
-      var seenConformances = false
+      var argState = AttrArgumentState<Argument, UInt8>(.names)
 
       LOOP: while let arg = args.popFirst() {
         // Argument state.
         if let label = arg.label {
           switch label.tokenKind {
           case .identifier("names"):
-            argState = .inNames
-            if seenNames {
+            if argState.hasSeen(.names) {
               // TODO: Diagnose duplicated 'names:'.
             }
-            seenNames = true
+            argState.current = .names
           case .identifier("conformances"):
-            argState = .inConformances
-            if seenConformances {
+            if argState.hasSeen(.conformances) {
               // TODO: Diagnose duplicated 'conformances:'.
             }
-            seenConformances = true
+            argState.current = .conformances
           default:
             // Invalid label.
             // TODO: Diagnose `no argument with label '\(label)'`.
-            argState = .inInvalid
+            argState.current = .invalid
           }
-        } else if argState == .inNames && !seenNames {
+        } else if argState.current == .names && !argState.hasSeen(.names) {
           // E.g. `@attached(member, named(foo))` this is missing 'names:'
           // TODO: Diagnose to insert 'names:'
-          seenNames = true
+          argState.current = .names
         }
 
         // Argument values.
-        switch argState {
-        case .inNames:
+        switch argState.current {
+        case .names:
           if let name = self.generateMacroIntroducedDeclName(expr: arg.expression) {
             names.append(name)
           }
-        case .inConformances:
+        case .conformances:
           conformances.append(self.generate(expr: arg.expression))
-        case .inInvalid:
+        case .invalid:
           // Ignore the value.
           break
         }
@@ -806,12 +931,17 @@ extension ASTGenVisitor {
     }
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @_nonSendable
+  ///   @_nonSendable(_assumed)
+  ///   ```
   func generateNonSendableAttr(attribute node: AttributeSyntax) -> BridgedNonSendableAttr? {
     let kind: BridgedNonSendableKind? = self.generateSingleAttrOption(
       attribute: node,
       {
         switch $0.rawText {
-        case "assumed": return .assumed
+        case "_assumed": return .assumed
         default: return nil
         }
       },
@@ -828,23 +958,63 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateObjCAttr(attribute node: AttributeSyntax) -> BridgedObjCAttr? {
-    guard
-      // `@objc` has special argument list syntax
-      let selectorPieces = node.arguments?.as(ObjCSelectorPieceListSyntax.self)
-    else {
-      // TODO: Diagnose
+  // FIXME: This is a decl modifier
+  func generateNonisolatedAttr(attribute node: AttributeSyntax) -> BridgedNonisolatedAttr? {
+    let isUnsafe = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "unsafe":
+          return true
+        default:
+          // FIXME: Diagnose.
+          return nil
+        }
+      },
+      valueIfOmitted: false
+    )
+    guard let isUnsafe else {
       return nil
     }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      isUnsafe: isUnsafe
+    )
+  }
 
-    if selectorPieces.isEmpty {
-      // TODO: Diagnose.
+  /// E.g.:
+  ///   ```
+  ///   @objc
+  ///   @objc(name)
+  ///   @objc(nameWith:params:)
+  ///   ```
+  func generateObjCAttr(attribute node: AttributeSyntax) -> BridgedObjCAttr? {
+    guard let arguments = node.arguments else {
+      // '@objc'
       return .createParsedUnnamed(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
         attrNameLoc: self.generateSourceLoc(node.attributeName)
       )
-    } else if selectorPieces.count == 1 && selectorPieces.first!.colon == nil {
+    }
+
+    guard
+      let selectorPieces = arguments.as(ObjCSelectorPieceListSyntax.self),
+      !selectorPieces.isEmpty
+    else {
+      // '@objc()' - invalid. Recover as '@objc'
+      // TODO: Diagnose "error: expected name within parentheses of @objc attribute"
+      return .createParsedUnnamed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        attrNameLoc: self.generateSourceLoc(node.attributeName)
+      )
+    }
+
+    if selectorPieces.count == 1 && selectorPieces.first!.colon == nil {
+      // '@objc(name)'
       let name = selectorPieces.first!.name
       return .createParsedNullary(
         self.ctx,
@@ -856,6 +1026,7 @@ extension ASTGenVisitor {
         rParenLoc: self.generateSourceLoc(node.rightParen)
       )
     } else {
+      // '@objc(nameWith:params:)'
       return .createParsedSelector(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
@@ -868,6 +1039,13 @@ extension ASTGenVisitor {
     }
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @implementation
+  ///   @implementation(CategoryName) // error in Sema.
+  ///   @_objcImplementation
+  ///   @_objcImplementation(CategoryName)
+  ///   ```
   func generateObjCImplementationAttr(attribute node: AttributeSyntax) -> BridgedObjCImplementationAttr? {
     let name: BridgedIdentifier? = self.generateSingleAttrOption(
       attribute: node,
@@ -891,6 +1069,10 @@ extension ASTGenVisitor {
     )
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @_objcRuntimeName(RenamedClass)
+  ///   ```
   func generateObjCRuntimeNameAttr(attribute node: AttributeSyntax) -> BridgedObjCRuntimeNameAttr? {
     let name: BridgedIdentifier? = self.generateSingleAttrOption(attribute: node) {
       self.generateIdentifier($0)
@@ -921,6 +1103,7 @@ extension ASTGenVisitor {
       }
     )
     guard let mode else {
+      // TODO: Diagnose
       return nil
     }
     return .createParsed(
@@ -968,6 +1151,10 @@ extension ASTGenVisitor {
     )
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @_projectedValueProperty($value)
+  ///   ```
   func generateProjectedValuePropertyAttr(attribute node: AttributeSyntax) -> BridgedProjectedValuePropertyAttr? {
     // `@_dynamicReplacement` has special argument list syntax
     let name = self.generateSingleAttrOption(attribute: node, { self.generateIdentifier($0) }, valueIfOmitted: BridgedIdentifier())
@@ -984,6 +1171,7 @@ extension ASTGenVisitor {
     )
   }
 
+  // FIXME: This is a decl modifier
   func generateReferenceOwnershipAttr(attribute node: AttributeSyntax, attrName: SyntaxText)
     -> BridgedReferenceOwnershipAttr?
   {
@@ -1015,9 +1203,11 @@ extension ASTGenVisitor {
     )
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @semantics("semantics_name")
   func generateSemanticsAttr(attribute node: AttributeSyntax) -> BridgedSemanticsAttr? {
     guard
-      // `@_semantics` attribute has `.string(StringLiteralExprSyntax)` arguments.
       let arg = node.arguments?.as(StringLiteralExprSyntax.self)
     else {
       // TODO: Diagnose.
@@ -1032,11 +1222,15 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       value: value
     )
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @_silgen_name("external_func")
+  ///   ```
   func generateSILGenNameAttr(attribute node: AttributeSyntax) -> BridgedSILGenNameAttr? {
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
       guard let arg = args.popFirst() else {
@@ -1072,6 +1266,102 @@ extension ASTGenVisitor {
     }
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @_specialize(exporeted: true, T == Int)
+  ///   ```
+  func generateSpecializeAttr(attribute node: AttributeSyntax) -> BridgedSpecializeAttr? {
+    guard
+      var args = node.arguments?.as(SpecializeAttributeArgumentListSyntax.self)?[...]
+    else {
+      // TODO: Diagnose
+      return nil
+    }
+
+    var exported: Bool?
+    var kind: BridgedSpecializationKind? = nil
+    var whereClause: BridgedTrailingWhereClause? = nil
+    var targetFunction: BridgedDeclNameRef? = nil
+    var spiGroups: [BridgedIdentifier] = []
+    var availableAttrs: [BridgedAvailableAttr] = []
+
+    while let arg = args.popFirst() {
+      switch arg {
+      case .genericWhereClause(let arg):
+        whereClause =  self.generate(genericWhereClause: arg)
+      case .specializeTargetFunctionArgument(let arg):
+        if targetFunction != nil {
+          // TODO: Diangose.
+        }
+        targetFunction = self.generateDeclNameRef(declReferenceExpr: arg.declName).name
+      case .specializeAvailabilityArgument(let arg):
+        // TODO: Implement
+        _ = arg
+        _ = availableAttrs = availableAttrs
+        fatalError("unimplemented")
+      case .labeledSpecializeArgument(let arg):
+        // FIXME: Can be 'LabeledExprSyntax'.
+        switch arg.label.rawText {
+        case "kind":
+          if kind != nil {
+            // TODO: Diagnose.
+          }
+          switch arg.value.rawText {
+          case "partial":
+            kind = .partial
+          case "full":
+            kind = .full
+          default:
+            // TODO: Diagnose.
+            break
+          }
+
+        case "exported":
+          if exported != nil {
+            // TODO: Diagnose.
+          }
+          switch arg.value.rawText {
+          case "true":
+            exported = true
+          case "false":
+            exported = false
+          default:
+            // TODO: Diagnose
+            break
+          }
+
+        case "spi":
+          guard arg.value.rawTokenKind == .identifier || arg.value.rawTokenKind == .wildcard else {
+            // TODO: Diagnose
+            break
+          }
+          spiGroups.append(self.generateIdentifier(arg.value))
+
+        default:
+          // TODO: Diagnose
+          break
+        }
+
+      }
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      whereClause: whereClause.asNullable,
+      exported: exported ?? false,
+      kind: kind ?? .full,
+      taretFunction: targetFunction ?? BridgedDeclNameRef(),
+      spiGroups: spiGroups.lazy.bridgedArray(in: self),
+      availableAttrs: availableAttrs.lazy.bridgedArray(in: self)
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @_spi(GroupName)
+  ///   ```
   func generateSPIAccessControlAttr(attribute node: AttributeSyntax) -> BridgedSPIAccessControlAttr? {
     let spiName: BridgedIdentifier? = self.generateSingleAttrOption(attribute: node) {
       self.generateIdentifier($0)
@@ -1087,6 +1377,92 @@ extension ASTGenVisitor {
     )
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @storageRestrictions(initializes: y, full, accesses: x)
+  ///   ```
+  func generateStorageRestrictionAttr(attribute node: AttributeSyntax) -> BridgedStorageRestrictionsAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args -> _? in
+
+      // @storageRestrictions(initializes: <ident>...[, accesses: <ident>...])
+
+      guard !args.isEmpty else {
+        // TODO: Diagnostics requires arguments
+        return nil
+      }
+
+      enum Argument: UInt8 {
+        case initializes
+        case accesses
+        case invalid
+      }
+      var argState = AttrArgumentState<Argument, UInt8>(.invalid)
+      var initializesProperties: [BridgedIdentifier] = []
+      var accessesProperties: [BridgedIdentifier] = []
+
+      while let arg = args.popFirst() {
+        // Label.
+        switch arg.label?.rawText {
+        case "initializes":
+          if argState.hasSeen(.initializes) {
+            // TODO: Diagnose duplicated label.
+          }
+          argState.current = .initializes
+        case "accesses":
+          if argState.hasSeen(.accesses) {
+            // TODO: Diagnose duplicated label.
+          }
+          argState.current = .accesses
+        case nil where argState.current == .invalid:
+          break
+        default:
+          if argState.hasSeen(.invalid) {
+            // TODO: Diagnose invalid or missing label.
+          }
+          argState.current = .invalid
+        }
+
+        // Value.
+        func generatePropertyName(expr node: ExprSyntax) -> BridgedIdentifier? {
+          guard
+            let node = node.as(DeclReferenceExprSyntax.self),
+            node.argumentNames == nil
+          else {
+            // TODO: Diagnose.
+            return nil
+          }
+          return self.generateIdentifier(node.baseName)
+        }
+
+        switch argState.current {
+        case .initializes:
+          if let name = generatePropertyName(expr: arg.expression) {
+            initializesProperties.append(name)
+          }
+        case .accesses:
+          if let name = generatePropertyName(expr: arg.expression) {
+            accessesProperties.append(name)
+          }
+        case .invalid:
+          // Ignore the value.
+          break
+        }
+      }
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        initializes: initializesProperties.lazy.bridgedArray(in: self),
+        accesses: accessesProperties.lazy.bridgedArray(in: self)
+      )
+    }
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @_swift_native_objc_runtime_base(FooBase)
+  ///   ```
   func generateSwiftNativeObjCRuntimeBaseAttr(attribute node: AttributeSyntax) -> BridgedSwiftNativeObjCRuntimeBaseAttr? {
     let name: BridgedIdentifier? = self.generateSingleAttrOption(attribute: node) {
       self.generateIdentifier($0)
@@ -1099,6 +1475,30 @@ extension ASTGenVisitor {
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
       name: name
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @_unavailableFromAsync
+  ///   @_unavailableFromAsync(message: "use fooBar(_:) instead")
+  ///   ```
+  func generateUnavailableFromAsyncAttr(attribute node: AttributeSyntax) -> BridgedUnavailableFromAsyncAttr? {
+    var message: BridgedStringRef? = nil
+    if node.arguments != nil {
+      // FIXME: Should be normal LabeledExprListSyntax arguments.
+
+      guard let args = node.arguments?.as(UnavailableFromAsyncAttributeArgumentsSyntax.self) else {
+        // TODO: Diagnose.
+        return nil
+      }
+      message = self.generateStringLiteralTextIfNotInterpolated(expr: args.message)
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      message: self.ctx.allocateCopy(string: message ?? "")
     )
   }
 
@@ -1163,6 +1563,7 @@ extension ASTGenVisitor {
     {
       return extractRawText(segments).bridged
     }
+    // TODO: Diagnose.
     return nil
   }
 
@@ -1364,5 +1765,26 @@ extension ASTGenVisitor {
       atLoc: nil,
       nameLoc: self.generateSourceLoc(node.name)
     )
+  }
+}
+
+/// Simpler helper for handling attribute arguments in "generate" functions.
+private struct AttrArgumentState<Flag: RawRepresentable, SeenStorage: FixedWidthInteger> where Flag.RawValue: FixedWidthInteger {
+  private var seen: SeenStorage = 0
+
+  var current: Flag {
+    didSet {
+      let flagBitIndex = current.rawValue
+      precondition(flagBitIndex < SeenStorage.bitWidth)
+      seen |= 1 << flagBitIndex
+    }
+  }
+
+  init(_ initial: Flag) {
+    self.current = initial
+  }
+
+  func hasSeen(_ flag: Flag) -> Bool {
+    return (seen & (1 << flag.rawValue)) != 0
   }
 }

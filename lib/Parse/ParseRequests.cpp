@@ -219,14 +219,14 @@ bool shouldParseViaASTGen(SourceFile &SF) {
     return false;
 
   switch (SF.Kind) {
-  case SourceFileKind::SIL:
-    return false;
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-  case SourceFileKind::Interface:
-  case SourceFileKind::MacroExpansion:
-  case SourceFileKind::DefaultArgument:
-    break;
+    case SourceFileKind::SIL:
+      return false;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::Interface:
+    case SourceFileKind::MacroExpansion:
+    case SourceFileKind::DefaultArgument:
+      break;
   }
 
   // TODO: Migrate SourceKit features to Syntax based.
@@ -240,6 +240,13 @@ bool shouldParseViaASTGen(SourceFile &SF) {
   // TODO: IDE inspection (code completion) support in ASTGen.
   if (ctx.SourceMgr.getIDEInspectionTargetBufferID() == SF.getBufferID())
     return false;
+
+  if (auto *generatedInfo = SF.getGeneratedSourceFileInfo()) {
+    // TODO: Handle generated.
+    if (generatedInfo->kind == GeneratedSourceInfo::Kind::AttributeFromClang) {
+      return false;
+    }
+  }
 
   return true;
 }
