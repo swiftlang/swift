@@ -1594,6 +1594,7 @@ namespace {
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD, StringRef label) {
       printCommon(PBD, "pattern_binding_decl", label);
+      printAttributes(PBD);
 
       for (auto idx : range(PBD->getNumPatternEntries())) {
         printRec(PBD->getPattern(idx));

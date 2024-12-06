@@ -476,26 +476,37 @@ extension ASTGenVisitor {
     let baseNameLoc = self.generateSourceLoc(node.baseName)
 
     if let argumentClause = node.argumentNames {
-      let labels = argumentClause.arguments.lazy.map {
-        self.generateIdentifier($0.name)
-      }
-      let labelLocs = argumentClause.arguments.lazy.map {
-        self.generateSourceLoc($0.name)
-      }
-      return (
-        name: .createParsed(
-          self.ctx,
-          baseName: baseName,
-          argumentLabels: labels.bridgedArray(in: self)
-        ),
-        loc: .createParsed(
-          self.ctx,
-          baseNameLoc: baseNameLoc,
-          lParenLoc: self.generateSourceLoc(argumentClause.leftParen),
-          argumentLabelLocs: labelLocs.bridgedArray(in: self),
-          rParenLoc: self.generateSourceLoc(argumentClause.rightParen)
+      if argumentClause.arguments.isEmpty {
+        return (
+          name: .createParsed(
+            self.ctx,
+            baseName: baseName,
+            argumentLabels: BridgedArrayRef()
+          ),
+          loc: .createParsed(baseNameLoc)
         )
-      )
+      } else {
+        let labels = argumentClause.arguments.lazy.map {
+          self.generateIdentifier($0.name)
+        }
+        let labelLocs = argumentClause.arguments.lazy.map {
+          self.generateSourceLoc($0.name)
+        }
+        return (
+          name: .createParsed(
+            self.ctx,
+            baseName: baseName,
+            argumentLabels: labels.bridgedArray(in: self)
+          ),
+          loc: .createParsed(
+            self.ctx,
+            baseNameLoc: baseNameLoc,
+            lParenLoc: self.generateSourceLoc(argumentClause.leftParen),
+            argumentLabelLocs: labelLocs.bridgedArray(in: self),
+            rParenLoc: self.generateSourceLoc(argumentClause.rightParen)
+          )
+        )
+      }
     } else {
       return (
         name: .createParsed(baseName),

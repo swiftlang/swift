@@ -1564,7 +1564,6 @@ public:
          TrailingWhereClause *clause, bool exported, SpecializationKind kind,
          DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
          ArrayRef<AvailableAttr *> availabilityAttrs,
-         size_t typeErasedParamsCount,
          GenericSignature specializedSignature = nullptr);
 
   static SpecializeAttr *create(ASTContext &ctx, bool exported,

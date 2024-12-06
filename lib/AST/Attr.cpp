@@ -2260,11 +2260,27 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        DeclNameRef targetFunctionName,
                                        ArrayRef<Identifier> spiGroups,
                                        ArrayRef<AvailableAttr *> availableAttrs,
-                                       size_t typeErasedParamsCount,
                                        GenericSignature specializedSignature) {
+  size_t typeErasedParamsCount = 0;
+  if (Ctx.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
+    if (clause != nullptr) {
+      for (auto &req : clause->getRequirements()) {
+        if (req.getKind() == RequirementReprKind::LayoutConstraint) {
+          if (auto *attributedTy =
+                  dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
+            if (attributedTy->has(TypeAttrKind::NoMetadata)) {
+              typeErasedParamsCount += 1;
+            }
+          }
+        }
+      }
+    }
+  }
+
   unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *, Type>(
       spiGroups.size(), availableAttrs.size(), typeErasedParamsCount);
   void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
+
   return new (mem)
       SpecializeAttr(atLoc, range, clause, exported, kind, specializedSignature,
                      targetFunctionName, spiGroups, availableAttrs, typeErasedParamsCount);

@@ -38,6 +38,11 @@ swift::Identifier BridgedIdentifier::unbridged() const {
   return swift::Identifier::getFromOpaquePointer(Raw);
 }
 
+SWIFT_NAME("getter:BridgedIdentifier.isOperator(self:)")
+bool BridgedIdentifier_isOperator(const BridgedIdentifier ident) {
+  return ident.unbridged().isOperator();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedDeclBaseName
 //===----------------------------------------------------------------------===//
