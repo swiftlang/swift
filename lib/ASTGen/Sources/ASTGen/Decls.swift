@@ -472,7 +472,7 @@ extension ASTGenVisitor {
       // ensures that property initializers are correctly treated as being in a
       // local context).
       if !self.declContext.isLocalContext {
-        initContext = attrs.initContext ?? .create(declContext: self.declContext)
+        initContext = .create(declContext: self.declContext)
       }
       initExpr = withDeclContext(initContext?.asDeclContext ?? self.declContext) {
         generate(expr: initializer.value)
