@@ -227,6 +227,24 @@ clang::QualType ClangTypeConverter::convertMemberType(NominalTypeDecl *DC,
   return convert(memberType);
 }
 
+clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
+  auto importedType = reverseImportedTypeMapping(type);
+  if (!importedType.isNull())
+    return importedType;
+
+  // We might be looking at a builtin
+  auto builtinType = reverseBuiltinTypeMapping(type);
+  if (!builtinType.isNull())
+    return builtinType;
+
+  if (type->isPotentiallyBridgedValueType())
+    if (auto t = Context.getBridgedToObjC(type->getDecl(), type))
+      return convert(t);
+
+  // Out of ideas, there must've been some error. :(
+  return clang::QualType();
+}
+
 // TODO: It is unfortunate that we parse the name of a public library type
 // in order to break it down into a vector component and length that in theory
 // we could recover in some other way.
@@ -244,7 +262,8 @@ static clang::QualType getClangVectorType(const clang::ASTContext &ctx,
   return ctx.getVectorType(eltTy, numElts, vecKind);
 }
 
-clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
+clang::QualType
+ClangTypeConverter::reverseImportedTypeMapping(StructType *type) {
   auto &ctx = ClangASTContext;
 
   auto swiftDecl = type->getDecl();
@@ -281,17 +300,7 @@ clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
   }
 #include "swift/ClangImporter/SIMDMappedTypes.def"
 
-  // We might be looking at a builtin
-  auto ret = reverseBuiltinTypeMapping(type);
-  if (!ret.isNull())
-    return ret;
-
-  if (type->isPotentiallyBridgedValueType()) {
-    if (auto t = Context.getBridgedToObjC(type->getDecl(), type))
-      return convert(t);
-  }
-
-  // Out of ideas, there must've been some error. :(
+  // This is not an imported type (according to the name)
   return clang::QualType();
 }
 
@@ -834,30 +843,16 @@ clang::QualType ClangTypeConverter::convert(Type type) {
   if (it != Cache.end())
     return it->second;
 
-  // Try to do this without making cache entries for obvious cases.
   if (auto existential = type->getAs<ExistentialType>())
     type = existential->getConstraintType();
 
+  // Try to do this without making cache entries for obvious cases.
   if (auto nominal = type->getAs<NominalType>()) {
     auto decl = nominal->getDecl();
     if (auto clangDecl = decl->getClangDecl()) {
-      auto &ctx = ClangASTContext;
-      if (auto clangTypeDecl = dyn_cast<clang::TypeDecl>(clangDecl)) {
-        auto qualType = ctx.getTypeDeclType(clangTypeDecl);
-        if (type->isForeignReferenceType()) {
-          qualType = ctx.getPointerType(qualType);
-        }
-        return qualType.getUnqualifiedType();
-      } else if (auto ifaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
-        auto clangType  = ctx.getObjCInterfaceType(ifaceDecl);
-        return ctx.getObjCObjectPointerType(clangType);
-      } else if (auto protoDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)){
-        auto clangType = ctx.getObjCObjectType(
-                            ctx.ObjCBuiltinIdTy,
-                            const_cast<clang::ObjCProtocolDecl **>(&protoDecl),
-                            1);
-        return ctx.getObjCObjectPointerType(clangType);
-      }
+      auto qualType = convertClangDecl(type, clangDecl);
+      if (!qualType.isNull())
+        return qualType;
     }
   }
 
@@ -865,6 +860,34 @@ clang::QualType ClangTypeConverter::convert(Type type) {
   clang::QualType result = visit(type);
   Cache.insert({type, result});
   return result;
+}
+
+clang::QualType
+ClangTypeConverter::convertClangDecl(Type type, const clang::Decl *clangDecl) {
+  auto &ctx = ClangASTContext;
+
+  if (auto clangTypeDecl = dyn_cast<clang::TypeDecl>(clangDecl)) {
+    auto qualType = ctx.getTypeDeclType(clangTypeDecl);
+    if (type->isForeignReferenceType())
+      qualType = ctx.getPointerType(qualType);
+
+    return qualType.getUnqualifiedType();
+  }
+
+  if (auto ifaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
+    auto clangType = ctx.getObjCInterfaceType(ifaceDecl);
+    return ctx.getObjCObjectPointerType(clangType);
+  }
+
+  if (auto protoDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)) {
+    auto clangType = ctx.getObjCObjectType(
+        ctx.ObjCBuiltinIdTy, const_cast<clang::ObjCProtocolDecl **>(&protoDecl),
+        1);
+    return ctx.getObjCObjectPointerType(clangType);
+  }
+
+  // Unable to convert this ClangDecl; give up
+  return clang::QualType();
 }
 
 void ClangTypeConverter::registerExportedClangDecl(Decl *swiftDecl,
@@ -881,6 +904,46 @@ Decl *ClangTypeConverter::getSwiftDeclForExportedClangDecl(
   // declarations are never redeclarations.
   auto it = ReversedExportMap.find(decl);
   return (it != ReversedExportMap.end() ? it->second : nullptr);
+}
+
+clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
+  // C++ function templates can only be instantiated with Clang types and
+  // a handful of Swift builtin types. These are enumerated here rather than
+  // delegated to ClangTypeConverter::convert() (which is more general).
+
+  if (auto nominal = type->getAs<NominalType>())
+    if (auto clangDecl = nominal->getDecl()->getClangDecl())
+      return convertClangDecl(type, clangDecl);
+
+  if (auto pointerType = type->getAs<BuiltinRawPointerType>())
+    return visitBuiltinRawPointerType(pointerType);
+
+  if (auto integerType = type->getAs<BuiltinIntegerType>())
+    return visitBuiltinIntegerType(integerType);
+
+  if (auto floatType = type->getAs<BuiltinFloatType>())
+    return visitBuiltinFloatType(floatType);
+
+  if (auto structType = type->getAs<StructType>()) {
+    // Swift structs are not supported in general, but some foreign types are
+    // imported as Swift structs. We reverse that mapping here.
+    auto decl = structType->getDecl();
+
+    // Ban ObjCBool type from being substituted into C++ templates (#74790)
+    if (decl->getName().is("ObjCBool") &&
+        decl->getModuleContext()->getName() ==
+            decl->getASTContext().Id_ObjectiveC)
+      return clang::QualType();
+
+    auto importedType = reverseImportedTypeMapping(structType);
+    if (!importedType.isNull())
+      return importedType;
+
+    return reverseBuiltinTypeMapping(structType);
+  }
+
+  // Most types cannot be used to instantiate C++ function templates; give up.
+  return clang::QualType();
 }
 
 std::unique_ptr<TemplateInstantiationError>
@@ -906,25 +969,12 @@ ClangTypeConverter::getClangTemplateArguments(
 
     auto replacement = genericArgs[templateParam->getIndex()];
 
-    // Ban ObjCBool type from being substituted into C++ templates.
-    if (auto nominal = replacement->getAs<NominalType>()) {
-      if (auto nominalDecl = nominal->getDecl()) {
-        if (nominalDecl->getName().is("ObjCBool") &&
-            nominalDecl->getModuleContext()->getName() ==
-                nominalDecl->getASTContext().Id_ObjectiveC) {
-          failedTypes.push_back(replacement);
-          continue;
-        }
-      }
-    }
+    auto qualType = convertTemplateArgument(replacement);
 
-    auto qualType = convert(replacement);
-    if (qualType.isNull()) {
+    if (qualType.isNull())
       failedTypes.push_back(replacement);
-      // Find all the types we can't convert.
-      continue;
-    }
-    templateArgs.push_back(clang::TemplateArgument(qualType));
+    else
+      templateArgs.push_back(clang::TemplateArgument(qualType));
   }
   if (failedTypes.empty())
     return nullptr;
