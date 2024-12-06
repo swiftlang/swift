@@ -809,6 +809,12 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
 
   case DeclContextKind::GenericTypeDecl:
     if (auto nomTy = dyn_cast<NominalTypeDecl>(parent)) {
+      if (nomTy->getDeclContext()->getParentModule() != getSwiftModule() &&
+          fromAnonymousContext) {
+        // Can't emit a direct reference.
+        auto entity = LinkEntity::forNominalTypeDescriptor(nomTy);
+        return getAddrOfLLVMVariableOrGOTEquivalent(entity);
+      }
       return {getAddrOfTypeContextDescriptor(nomTy, DontRequireMetadata),
               ConstantReference::Direct};
     }
