@@ -1441,8 +1441,8 @@ public:
   }
 };
 
-static std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
-                                Type, OpenedExistentialAdjustments>>
+static std::optional<
+    std::tuple<TypeVariableType *, Type, OpenedExistentialAdjustments>>
 shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                   Type paramTy, Type argTy, Expr *argExpr,
                                   ConstraintSystem &cs) {
@@ -1819,12 +1819,10 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       if (auto existentialArg = shouldOpenExistentialCallArgument(
               callee, paramIdx, paramTy, argTy, argExpr, cs)) {
         // My kingdom for a decent "if let" in C++.
-        GenericTypeParamType *openedGenericParam;
         TypeVariableType *openedTypeVar;
         Type existentialType;
         OpenedExistentialAdjustments adjustments;
-        std::tie(openedGenericParam, openedTypeVar, existentialType,
-                 adjustments) = *existentialArg;
+        std::tie(openedTypeVar, existentialType, adjustments) = *existentialArg;
 
         OpenedArchetypeType *opened;
         std::tie(argTy, opened) = cs.openExistentialType(

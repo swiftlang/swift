@@ -154,12 +154,12 @@ using OpenedExistentialAdjustments =
 /// \param argTy The type of the argument.
 ///
 /// \returns If the argument type is existential and opening it can bind a
-/// generic parameter in the callee, returns the generic parameter, type
-/// variable (from the opened parameter type) the existential type that needs
-/// to be opened (from the argument type), and the adjustments that need to be
-/// applied to the existential type after it is opened.
-std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
-                                Type, OpenedExistentialAdjustments>>
+/// generic parameter in the callee, returns the type variable (from the opened
+/// parameter type) the existential type that needs to be opened (from the
+/// argument type), and the adjustments that need to be applied to the
+/// existential type after it is opened.
+std::optional<
+    std::tuple<TypeVariableType *, Type, OpenedExistentialAdjustments>>
 canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                Type paramTy, Type argTy);
 

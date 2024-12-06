@@ -590,10 +590,10 @@ swift::isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member) {
   return result;
 }
 
-std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
-                                Type, OpenedExistentialAdjustments>>
+std::optional<
+    std::tuple<TypeVariableType *, Type, OpenedExistentialAdjustments>>
 swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
-	                                  Type paramTy, Type argTy) {
+                                      Type paramTy, Type argTy) {
   if (!callee)
     return std::nullopt;
 
@@ -728,7 +728,7 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (referenceInfo.hasNonCovariantRef())
     return std::nullopt;
 
-  return std::make_tuple(genericParam, paramTypeVar, argTy, adjustments);
+  return std::make_tuple(paramTypeVar, argTy, adjustments);
 }
 
 /// For each occurrence of a type **type** in `refTy` that satisfies
