@@ -138,11 +138,19 @@ macro AccidentalCodeItem() = #externalMacro(module: "MacroDefinition", type: "Fa
 func invalidDeclarationMacro() {
   #accidentalCodeItem
   // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
-  // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX{{.*}}_18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX138_2_18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
 
   @AccidentalCodeItem struct S {}
   // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
-  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF1SL_18AccidentalCodeItemfMp_.swift:1:1: error: expected macro expansion to produce a declaration
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF5S_$l0L_18AccidentalCodeItemfMp_.swift:1:1: error: expected macro expansion to produce a declaration
+
+  struct LocalThing1 {
+    func f() {
+      #accidentalCodeItem
+      // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
+      // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF5S_$l0L_18AccidentalCodeItemfMp_.swift
+    }
+  }
 }
 #endif
 

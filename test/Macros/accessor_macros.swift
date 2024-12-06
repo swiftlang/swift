@@ -174,3 +174,36 @@ struct S {
   // expected-warning@-1 {{cannot expand accessor macro on variable declared with 'let'; this is an error in the Swift 6 language mode}}
 }
 #endif
+
+func acceptAutoclosure(_ success: @autoclosure () -> Bool, message: @autoclosure () -> String) {
+}
+
+@attached(accessor)
+macro BigEndianAccessorMacro() = #externalMacro(module: "MacroDefinition", type: "BigEndianAccessorMacro")
+
+func testLocalWithAutoclosure(x: Int, y: Int) {
+  struct Local {
+    var __value: Int = 0
+
+    // CHECK-DUMP: @__swiftmacro_15accessor_macros9value_$l022BigEndianAccessorMacrofMa_.swift
+    @BigEndianAccessorMacro
+    var value: Int
+  }
+
+  acceptAutoclosure(x == y, message: "they better be the same")
+
+  let local = Local(__value: 5)
+  acceptAutoclosure(x + 1 == local.__value, message: "they better be the same")
+
+  if x == y {
+    struct Nested {
+      struct Local {
+        var __value: Int = 0
+
+        // CHECK-DUMP: @__swiftmacro_15accessor_macros9value_$l122BigEndianAccessorMacrofMa_.swift
+        @BigEndianAccessorMacro
+        var value: Int
+      }
+    }
+  }
+}

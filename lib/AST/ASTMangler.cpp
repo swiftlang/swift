@@ -4071,12 +4071,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   }
 
   if (auto expansion = dyn_cast<MacroExpansionDecl>(decl)) {
-    appendMacroExpansionContext(
-        expansion->getLoc(), expansion->getDeclContext());
-    appendMacroExpansionOperator(
-        expansion->getMacroName().getBaseName().userFacingName(),
-        MacroRole::Declaration,
-        expansion->getDiscriminator());
+    appendMacroExpansion(expansion);
     return;
   }
 
@@ -4516,14 +4511,51 @@ std::string ASTMangler::mangleDistributedThunk(const AbstractFunctionDecl *thunk
   return finalize();
 }
 
+/// Retrieve the outermost local context, or return NULL if there is no such
+/// local context.
+static const DeclContext *getOutermostLocalContext(const DeclContext *dc) {
+  // If the parent has an outermost local context, it's ours as well.
+  if (auto parentDC = dc->getParent()) {
+    if (auto outermost = getOutermostLocalContext(parentDC))
+      return outermost;
+  }
+
+  return dc->isLocalContext() ? dc : nullptr;
+}
+
+/// Enable a precheck discriminator into the identifier name. These mangled
+/// names are not ABI and are not stable.
+static Identifier encodeLocalPrecheckedDiscriminator(
+    ASTContext &ctx, Identifier name, unsigned discriminator) {
+  llvm::SmallString<16> discriminatedName;
+  {
+    llvm::raw_svector_ostream out(discriminatedName);
+    out << name.str() << "_$l" << discriminator;
+  }
+
+  return ctx.getIdentifier(discriminatedName);
+}
+
 void ASTMangler::appendMacroExpansionContext(
-    SourceLoc loc, DeclContext *origDC
+    SourceLoc loc, DeclContext *origDC,
+    const FreestandingMacroExpansion *expansion
 ) {
   origDC = MacroDiscriminatorContext::getInnermostMacroContext(origDC);
   BaseEntitySignature nullBase(nullptr);
 
-  if (loc.isInvalid())
-    return appendContext(origDC, nullBase, StringRef());
+  if (loc.isInvalid()) {
+    if (auto outermostLocalDC = getOutermostLocalContext(origDC)) {
+      auto innermostNonlocalDC = outermostLocalDC->getParent();
+      appendContext(innermostNonlocalDC, nullBase, StringRef());
+      Identifier name = expansion->getMacroName().getBaseIdentifier();
+      ASTContext &ctx = origDC->getASTContext();
+      unsigned discriminator = expansion->getDiscriminator();
+      name = encodeLocalPrecheckedDiscriminator(ctx, name, discriminator);
+      appendIdentifier(name.str());
+    } else {
+      return appendContext(origDC, nullBase, StringRef());
+    }
+  }
 
   SourceManager &sourceMgr = Context.SourceMgr;
 
@@ -4622,7 +4654,7 @@ void ASTMangler::appendMacroExpansionContext(
     return appendMacroExpansionLoc();
 
   // Append our own context and discriminator.
-  appendMacroExpansionContext(outerExpansionLoc, origDC);
+  appendMacroExpansionContext(outerExpansionLoc, origDC, expansion);
   appendMacroExpansionOperator(
       baseName.userFacingName(), role, discriminator);
 }
@@ -4686,11 +4718,11 @@ static StringRef getPrivateDiscriminatorIfNecessary(
   }
 }
 
-std::string
-ASTMangler::mangleMacroExpansion(const FreestandingMacroExpansion *expansion) {
-  beginMangling();
+void
+ASTMangler::appendMacroExpansion(const FreestandingMacroExpansion *expansion) {
   appendMacroExpansionContext(expansion->getPoundLoc(),
-                              expansion->getDeclContext());
+                              expansion->getDeclContext(),
+                              expansion);
   auto privateDiscriminator = getPrivateDiscriminatorIfNecessary(expansion);
   if (!privateDiscriminator.empty()) {
     appendIdentifier(privateDiscriminator);
@@ -4700,7 +4732,61 @@ ASTMangler::mangleMacroExpansion(const FreestandingMacroExpansion *expansion) {
       expansion->getMacroName().getBaseName().userFacingName(),
       MacroRole::Declaration,
       expansion->getDiscriminator());
+}
+
+std::string
+ASTMangler::mangleMacroExpansion(const FreestandingMacroExpansion *expansion) {
+  beginMangling();
+  appendMacroExpansion(expansion);
   return finalize();
+}
+
+namespace {
+
+/// Stores either a declaration or its enclosing context, for use in mangling
+/// of macro expansion contexts.
+struct DeclOrEnclosingContext: llvm::PointerUnion<const Decl *, const DeclContext *> {
+  using PointerUnion::PointerUnion;
+
+  const DeclContext *getEnclosingContext() const {
+    if (auto decl = dyn_cast<const Decl *>()) {
+      return decl->getDeclContext();
+    }
+
+    return get<const DeclContext *>();
+  }
+};
+
+}
+
+/// Given a declaration, find the declaration or enclosing context that is
+/// the innermost context that is not a local context, along with a
+/// discriminator that identifies this given specific declaration (along
+/// with its `name`) within that enclosing context. This is used to
+/// mangle entities within local contexts before they are fully type-checked,
+/// as is needed for macro expansions.
+static std::pair<DeclOrEnclosingContext, std::optional<unsigned>>
+getPrecheckedLocalContextDiscriminator(const Decl *decl, Identifier name) {
+  auto outermostLocal = getOutermostLocalContext(decl->getDeclContext());
+  if (!outermostLocal) {
+    return std::make_pair(
+        DeclOrEnclosingContext(decl),
+        std::optional<unsigned>()
+    );
+  }
+  DeclOrEnclosingContext declOrEnclosingContext;
+  if (decl->getDeclContext() == outermostLocal)
+    declOrEnclosingContext = decl;
+  else if (const Decl *fromDecl = outermostLocal->getAsDecl())
+    declOrEnclosingContext = fromDecl;
+  else
+    declOrEnclosingContext = outermostLocal->getParent();
+
+  DeclContext *enclosingDC = const_cast<DeclContext *>(
+      declOrEnclosingContext.getEnclosingContext());
+  ASTContext &ctx = enclosingDC->getASTContext();
+  auto discriminator = ctx.getNextMacroDiscriminator(enclosingDC, name);
+  return std::make_pair(declOrEnclosingContext, discriminator);
 }
 
 std::string ASTMangler::mangleAttachedMacroExpansion(
@@ -4710,15 +4796,42 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
 
   beginMangling();
 
+  auto appendDeclWithName = [&](const Decl *decl, Identifier name) {
+    // Mangle the context.
+    auto precheckedMangleContext =
+        getPrecheckedLocalContextDiscriminator(decl, name);
+    if (auto mangleDecl = dyn_cast_or_null<ValueDecl>(
+            precheckedMangleContext.first.dyn_cast<const Decl *>())) {
+      appendContextOf(mangleDecl, nullBase);
+    } else {
+      appendContext(
+          precheckedMangleContext.first.getEnclosingContext(), nullBase,
+          StringRef());
+    }
+
+    // If we needed a local discriminator, stuff that into the name itself.
+    // This is hack, but these names aren't stable anyway.
+    if (auto discriminator = precheckedMangleContext.second) {
+      name = encodeLocalPrecheckedDiscriminator(
+          decl->getASTContext(), name, *discriminator);
+    }
+
+    if (auto valueDecl = dyn_cast<ValueDecl>(decl))
+      appendDeclName(valueDecl, name);
+    else if (!name.empty())
+      appendIdentifier(name.str());
+    else
+      appendIdentifier("_");
+  };
+
   // Append the context and name of the declaration.
   // We don't mangle the declaration itself because doing so requires semantic
   // information (e.g., its interface type), which introduces cyclic
   // dependencies.
   const Decl *attachedTo = decl;
-  DeclBaseName attachedToName;
+  Identifier attachedToName;
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     auto storage = accessor->getStorage();
-    appendContextOf(storage, nullBase);
 
     // Introduce an identifier mangling that includes var/subscript, accessor
     // kind, and static.
@@ -4744,7 +4857,7 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
       attachedToName = decl->getASTContext().getIdentifier(name);
     }
 
-    appendDeclName(storage, attachedToName);
+    appendDeclWithName(storage, attachedToName);
 
     // For member attribute macros, the attribute is attached to the enclosing
     // declaration.
@@ -4752,15 +4865,16 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
       attachedTo = storage->getDeclContext()->getAsDecl();
     }
   } else if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
-    appendContextOf(valueDecl, nullBase);
-
     // Mangle the name, replacing special names with their user-facing names.
-    attachedToName = valueDecl->getName().getBaseName();
-    if (attachedToName.isSpecial()) {
+    auto name = valueDecl->getName().getBaseName();
+    if (name.isSpecial()) {
       attachedToName =
-          decl->getASTContext().getIdentifier(attachedToName.userFacingName());
+          decl->getASTContext().getIdentifier(name.userFacingName());
+    } else {
+      attachedToName = name.getIdentifier();
     }
-    appendDeclName(valueDecl, attachedToName);
+
+    appendDeclWithName(valueDecl, attachedToName);
 
     // For member attribute macros, the attribute is attached to the enclosing
     // declaration.
