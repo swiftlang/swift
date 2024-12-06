@@ -2014,12 +2014,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     GenericArgs.push_back(blocklist);
   }
 
-  // For now, we only inherit the C++ interoperability mode in
-  // Explicit Module Builds.
-  if (langOpts.EnableCXXInterop &&
-      (frontendOpts.DisableImplicitModules ||
-       LoaderOpts.requestedAction ==
-           FrontendOptions::ActionType::ScanDependencies)) {
+  // Inherit the C++ interoperability mode.
+  if (langOpts.EnableCXXInterop) {
     // Modelled after a reverse of validateCxxInteropCompatibilityMode
     genericSubInvocation.getLangOptions().EnableCXXInterop = true;
     genericSubInvocation.getLangOptions().cxxInteropCompatVersion =
@@ -2207,6 +2203,19 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInvocation.setModuleName(moduleName);
   BuildArgs.push_back("-module-name");
   BuildArgs.push_back(moduleName);
+
+  // FIXME: Hack for Darwin.swiftmodule, which cannot be rebuilt with C++
+  // interop enabled by the Swift CI because it uses an old host SDK.
+  if (moduleName == "Darwin") {
+    subInvocation.getLangOptions().EnableCXXInterop = false;
+    subInvocation.getLangOptions().cxxInteropCompatVersion = {};
+    BuildArgs.erase(llvm::remove_if(BuildArgs,
+                                    [](StringRef arg) -> bool {
+                                      return arg.starts_with(
+                                          "-cxx-interoperability-mode=");
+                                    }),
+                    BuildArgs.end());
+  }
 
   // Calculate output path of the module.
   llvm::SmallString<256> buffer;
