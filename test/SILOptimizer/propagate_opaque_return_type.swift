@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all) | %FileCheck %s
 
+// REQUIRES: executable_test
+
 protocol P {}
 extension P {
   func foo() -> some Sequence<Int> {
