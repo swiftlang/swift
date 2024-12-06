@@ -63,7 +63,7 @@ extension ASTGenVisitor {
         return .underlying(attribute)
       }
     } body: { attribute in
-      addAttribute(self.generateDeclAttribute(attribute: attribute))
+      self.generateDeclAttribute(attribute: attribute, handler: addAttribute(_:))
     }
 
     func genStatic(node: DeclModifierSyntax, spelling: BridgedStaticSpelling) {
@@ -97,87 +97,90 @@ extension ASTGenVisitor {
 
 // MARK: - Decl attributes
 extension ASTGenVisitor {
-  func generateDeclAttribute(attribute node: AttributeSyntax) -> BridgedDeclAttribute? {
+  func generateDeclAttribute(attribute node: AttributeSyntax, handler: (BridgedDeclAttribute) -> Void) {
+    func handle(_ attr: BridgedDeclAttribute?) {
+      if let attr {
+        handler(attr)
+      }
+    }
+
     if let identTy = node.attributeName.as(IdentifierTypeSyntax.self) {
       let attrName = identTy.name.rawText
       let attrKind = BridgedDeclAttrKind(from: attrName.bridged)
       switch attrKind {
       case .alignment:
-        return self.generateAlignmentAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateAlignmentAttr(attribute: node)?.asDeclAttribute)
       case .allowFeatureSuppression:
-        return self.generateAllowFeatureSuppressionAttr(attribute: node, attrName: attrName)?.asDeclAttribute
+        return handle(self.generateAllowFeatureSuppressionAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
       case .available:
-        // FIXME: handle multiple results.
-        return self.generateAvailableAttr(attribute: node).first?.asDeclAttribute
+        return self.generateAvailableAttr(attribute: node).forEach { handle($0.asDeclAttribute) }
       case .backDeployed:
         fatalError("unimplemented")
       case .cDecl:
-        return self.generateCDeclAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateCDeclAttr(attribute: node)?.asDeclAttribute)
       case .derivative:
         fatalError("unimplemented")
       case .differentiable:
         fatalError("unimplemented")
       case .dynamicReplacement:
-        return self.generateDynamicReplacementAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateDynamicReplacementAttr(attribute: node)?.asDeclAttribute)
       case .documentation:
-        return self.generateDocumentationAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateDocumentationAttr(attribute: node)?.asDeclAttribute)
       case .effects:
-        return self.generateEffectsAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateEffectsAttr(attribute: node)?.asDeclAttribute)
       case .exclusivity:
-        return self.generateExclusivityAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateExclusivityAttr(attribute: node)?.asDeclAttribute)
       case .expose:
-        return self.generateExposeAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateExposeAttr(attribute: node)?.asDeclAttribute)
       case .extern:
-        return self.generateExternAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateExternAttr(attribute: node)?.asDeclAttribute)
       case .implements:
-        return self.generateImplementsAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateImplementsAttr(attribute: node)?.asDeclAttribute)
       case .inline:
-        return self.generateInlineAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateInlineAttr(attribute: node)?.asDeclAttribute)
       case .lifetime:
         fatalError("unimplemented")
       case .macroRole:
-        return self.generateMacroRoleAttr(attribute: node, attrName: attrName)?.asDeclAttribute
+        return handle(self.generateMacroRoleAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
       case .nonSendable:
-        return self.generateNonSendableAttr(attribute: node)?.asDeclAttribute
-      case .nonisolated:
-        return self.generateNonisolatedAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateNonSendableAttr(attribute: node)?.asDeclAttribute)
       case .objC:
-        return self.generateObjCAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateObjCAttr(attribute: node)?.asDeclAttribute)
       case .objCImplementation:
-        return self.generateObjCImplementationAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateObjCImplementationAttr(attribute: node)?.asDeclAttribute)
       case .objCRuntimeName:
-        return self.generateObjCRuntimeNameAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateObjCRuntimeNameAttr(attribute: node)?.asDeclAttribute)
       case .optimize:
-        return self.generateOptimizeAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateOptimizeAttr(attribute: node)?.asDeclAttribute)
       case .originallyDefinedIn:
         // FIXME: handle multiple results.
-        return self.generateOriginallyDefinedInAttr(attribute: node).first?.asDeclAttribute
+        return handle(self.generateOriginallyDefinedInAttr(attribute: node).first?.asDeclAttribute)
       case .privateImport:
-        return self.generatePrivateImportAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generatePrivateImportAttr(attribute: node)?.asDeclAttribute)
       case .projectedValueProperty:
-        return self.generateProjectedValuePropertyAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateProjectedValuePropertyAttr(attribute: node)?.asDeclAttribute)
       case .rawLayout:
         fatalError("unimplemented")
       case .section:
-        return self.generateSectionAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateSectionAttr(attribute: node)?.asDeclAttribute)
       case .semantics:
-        return self.generateSemanticsAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateSemanticsAttr(attribute: node)?.asDeclAttribute)
       case .silGenName:
-        return self.generateSILGenNameAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateSILGenNameAttr(attribute: node)?.asDeclAttribute)
       case .specialize:
-        return self.generateSpecializeAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateSpecializeAttr(attribute: node)?.asDeclAttribute)
       case .spiAccessControl:
-        return self.generateSPIAccessControlAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateSPIAccessControlAttr(attribute: node)?.asDeclAttribute)
       case .storageRestrictions:
-        return self.generateStorageRestrictionAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateStorageRestrictionAttr(attribute: node)?.asDeclAttribute)
       case .swiftNativeObjCRuntimeBase:
-        return self.generateSwiftNativeObjCRuntimeBaseAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateSwiftNativeObjCRuntimeBaseAttr(attribute: node)?.asDeclAttribute)
       case .transpose:
         fatalError("unimplemented")
       case .typeEraser:
         fatalError("unimplemented")
       case .unavailableFromAsync:
-        return self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute
+        return handle(self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute)
 
       // Simple attributes.
       case .alwaysEmitConformanceMetadata,
@@ -258,15 +261,18 @@ extension ASTGenVisitor {
         .warnUnqualifiedAccess,
         .weakLinked:
 
-        return self.generateSimpleDeclAttr(attribute: node, kind: attrKind)
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: attrKind))
 
       // Modifers.
       case .accessControl:
         // TODO: Diagnose and generateAccessControl().
         fatalError("unimplemented")
+      case .nonisolated:
+        // TODO: Diagnose.
+        return handle(self.generateNonisolatedAttr(attribute: node)?.asDeclAttribute)
       case .referenceOwnership:
         // TODO: Diagnose.
-        return self.generateReferenceOwnershipAttr(attribute: node, attrName: attrName)?.asDeclAttribute
+        return handle(self.generateReferenceOwnershipAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
       case .async,
         .consuming,
         .borrowing,
@@ -290,7 +296,7 @@ extension ASTGenVisitor {
         .compileTimeConst:
 
         // generateSimpleDeclAttr will diagnose and fix-it to change it to modifiers.
-        return self.generateSimpleDeclAttr(attribute: node, kind: attrKind)
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: attrKind))
 
       // 'RejectByParser', these attribute kind should not be parsed as built-in attributes.
       case .rawDocComment,
@@ -305,7 +311,7 @@ extension ASTGenVisitor {
         .rethrows,
         .reasync:
         // TODO: Diagnose or fallback to custom attributes?
-        return nil
+        return
 
       case .none:
         // Fall back to CustomAttr.
@@ -313,7 +319,7 @@ extension ASTGenVisitor {
       }
     }
 
-    return self.generateCustomAttr(attribute: node)?.asDeclAttribute
+    return handle(self.generateCustomAttr(attribute: node)?.asDeclAttribute)
   }
 
   /// E.g.:

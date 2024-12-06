@@ -232,7 +232,7 @@ extension ASTGenVisitor {
         return .underlying(attribute)
       }
     } body: { node in
-      if let attr = self.generateDeclAttribute(attribute: node) {
+      self.generateDeclAttribute(attribute: node) { attr in
         result.attributes.add(attr)
       }
     }
