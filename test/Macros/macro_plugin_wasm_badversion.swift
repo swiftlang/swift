@@ -11,7 +11,7 @@
 // RUN: %target-swift-frontend \
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 \
-// RUN:   -load-plugin %t/Plugin.wasm#%swift-plugin-server#MacroDefinition \
+// RUN:   -load-resolved-plugin %t/Plugin.wasm#%swift-plugin-server#MacroDefinition \
 // RUN:   -module-name MyApp \
 // RUN:   %t/test.swift
 
