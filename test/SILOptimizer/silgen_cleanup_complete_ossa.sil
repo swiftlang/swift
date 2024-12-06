@@ -32,7 +32,7 @@ protocol P : AnyObject {}
 
 sil @unreachableHandler : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil [ossa] @testCompleteOSSALifetimes : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
+// CHECK-LABEL: sil [ossa] @testCompleteOSSALifetimes : {{.*}} {
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var FakeOptional<Klass> }, var, name "c"
 // CHECK:   [[BORROW:%.,*]] = begin_borrow [lexical] [[BOX]] : ${ var FakeOptional<Klass> }
 // CHECK: bb2:
@@ -40,6 +40,7 @@ sil @unreachableHandler : $@convention(thin) () -> ()
 // CHECK:   end_borrow [[BORROW]] : ${ var FakeOptional<Klass> }
 // CHECK:   dealloc_box [dead_end] [[BOX]] : ${ var FakeOptional<Klass> }
 // CHECK:   unreachable
+// CHECK-LABEL: } // end sil function 'testCompleteOSSALifetimes'
 sil [ossa] @testCompleteOSSALifetimes : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
 bb0(%0 : @owned $FakeOptional<Klass>):
   %box = alloc_box ${ var FakeOptional<Klass> }, var, name "c"
@@ -73,8 +74,9 @@ bb5:
   return %36 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @testExistentialLifetime : $@convention(thin) (@owned any P) -> @owned AnyObject {
+// CHECK-LABEL: sil [ossa] @testExistentialLifetime : {{.*}} {
 // CHECK-NOT: destroy
+// CHECK-LABEL: } // end sil function 'testExistentialLifetime'
 sil [ossa] @testExistentialLifetime : $@convention(thin) (@owned any P) -> @owned AnyObject {
 bb0(%0 : @owned $any P):
   %1 = open_existential_ref %0 : $any P to $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self
