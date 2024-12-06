@@ -2109,6 +2109,18 @@ static Decl *getEnclosingDeclForDecl(Decl *D) {
   return D->getDeclContext()->getInnermostDeclarationDeclContext();
 }
 
+static std::optional<std::pair<const AvailableAttr *, const Decl *>>
+getSemanticAvailableRangeDeclAndAttr(const Decl *decl) {
+  if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(decl))
+    return std::make_pair(attr, decl);
+
+  if (auto *parent =
+          AvailabilityInference::parentDeclForInferredAvailability(decl))
+    return getSemanticAvailableRangeDeclAndAttr(parent);
+
+  return std::nullopt;
+}
+
 void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
@@ -2214,7 +2226,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
 
   if (auto *parent = getEnclosingDeclForDecl(D)) {
     if (auto enclosingAvailable =
-                   parent->getSemanticAvailableRangeAttr()) {
+            getSemanticAvailableRangeDeclAndAttr(parent)) {
       const AvailableAttr *enclosingAttr = enclosingAvailable.value().first;
       const Decl *enclosingDecl = enclosingAvailable.value().second;
       EnclosingAnnotatedRange.emplace(
@@ -4833,7 +4845,8 @@ void AttributeChecker::checkBackDeployedAttrs(
     // Verify that the decl is available before the back deployment boundary.
     // If it's not, the attribute doesn't make sense since the back deployment
     // fallback could never be executed at runtime.
-    if (auto availableRangeAttrPair = VD->getSemanticAvailableRangeAttr()) {
+    if (auto availableRangeAttrPair =
+            getSemanticAvailableRangeDeclAndAttr(VD)) {
       auto beforePlatformString = prettyPlatformString(Attr->Platform);
       auto beforeVersion = Attr->Version;
       auto availableAttr = availableRangeAttrPair.value().first;

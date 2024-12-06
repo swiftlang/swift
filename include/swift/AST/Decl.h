@@ -1433,15 +1433,6 @@ public:
   const AvailableAttr *
   getUnavailableAttr(bool ignoreAppExtensions = false) const;
 
-  /// Retrieve the @available attribute that provides the OS version range that
-  /// this declaration is available in.
-  ///
-  /// This attribute may come from an enclosing decl since availability is
-  /// inherited. The second member of the returned pair is the decl that owns
-  /// the attribute.
-  std::optional<std::pair<const AvailableAttr *, const Decl *>>
-  getSemanticAvailableRangeAttr() const;
-
   /// Returns true if the decl is effectively always unavailable in the current
   /// compilation context. This query differs from \c isUnavailable() because it
   /// takes the availability of parent declarations into account.

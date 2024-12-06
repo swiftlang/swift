@@ -568,10 +568,7 @@ namespace {
         return nullptr;
       for (auto ctor : cxxRecordDecl->ctors()) {
         if (ctor->isCopyConstructor() &&
-            ctor->getAccess() == clang::AS_public &&
-            // rdar://106964356
-            // ctor->doesThisDeclarationHaveABody() &&
-            !ctor->isDeleted())
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
           return ctor;
       }
       return nullptr;
@@ -583,8 +580,7 @@ namespace {
         return nullptr;
       for (auto ctor : cxxRecordDecl->ctors()) {
         if (ctor->isMoveConstructor() &&
-            ctor->getAccess() == clang::AS_public &&
-            ctor->doesThisDeclarationHaveABody() && !ctor->isDeleted())
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
           return ctor;
       }
       return nullptr;
