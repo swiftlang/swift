@@ -42,6 +42,16 @@
                    DECL_ATTR_ALIAS(SPELLING, CLASS)
 #endif
 
+// Diagnose any use of the attribute CLASS without FEATURE_NAME enabled,
+// and also enable other special behavior. If you use this for an experimental
+// feature, please add test cases to:
+// 
+// * test/attr/feature_requirement.swift
+// * test/IDE/complete_decl_attribute_feature_requirement.swift
+#ifndef DECL_ATTR_FEATURE_REQUIREMENT
+#define DECL_ATTR_FEATURE_REQUIREMENT(CLASS, FEATURE_NAME)
+#endif
+
 #ifndef LAST_DECL_ATTR
 #define LAST_DECL_ATTR(CLASS)
 #endif
@@ -513,7 +523,12 @@ DECL_ATTR(lifetime, Lifetime,
   OnAccessor | OnConstructor | OnFunc | OnSubscript | LongAttribute | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | AllowMultipleAttributes,
   161)
 
-LAST_DECL_ATTR(Lifetime)
+DECL_ATTR(abi, ABI,
+  OnAbstractFunction | OnVar /* will eventually add types */ | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  162)
+DECL_ATTR_FEATURE_REQUIREMENT(ABI, ABIAttribute)
+
+LAST_DECL_ATTR(ABI)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
@@ -521,4 +536,5 @@ LAST_DECL_ATTR(Lifetime)
 #undef CONTEXTUAL_SIMPLE_DECL_ATTR
 #undef DECL_ATTR
 #undef CONTEXTUAL_DECL_ATTR
+#undef DECL_ATTR_FEATURE_REQUIREMENT
 #undef LAST_DECL_ATTR

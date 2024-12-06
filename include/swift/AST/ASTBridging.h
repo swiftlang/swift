@@ -567,10 +567,33 @@ SWIFT_NAME("BridgedDeclAttributes.add(self:_:)")
 void BridgedDeclAttributes_add(BridgedDeclAttributes *_Nonnull attrs,
                                BridgedDeclAttribute add);
 
+/// Retrieve the attribute from \p cAttrs that comes after \p cPriorAttr .
+/// If \c cPriorAttr is null, retrieves the first attribute. If there are no 
+/// more attributes, returns null.
+SWIFT_NAME("BridgedDeclAttributes.attr(self:after:)")
+BridgedNullableDeclAttribute BridgedDeclAttributes_getAttrAfter(
+    BridgedDeclAttributes cAttrs, BridgedNullableDeclAttribute cPriorAttr);
+
 SWIFT_NAME("BridgedDeclAttribute.createSimple(_:kind:atLoc:nameLoc:)")
 BridgedDeclAttribute BridgedDeclAttribute_createSimple(
     BridgedASTContext cContext, BridgedDeclAttrKind cKind,
     BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc);
+
+SWIFT_NAME("getter:BridgedDeclAttribute.asABIAttr(self:)")
+BridgedNullableABIAttr BridgedDeclAttribute_asABIAttr(
+    BridgedDeclAttribute cAttr);
+
+SWIFT_NAME("BridgedABIAttr.createParsed(_:atLoc:range:abiDecl:)")
+BridgedABIAttr BridgedABIAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc atLoc,
+    BridgedSourceRange range, BridgedNullableDecl abiDecl);
+
+SWIFT_NAME("BridgedABIAttr.createImplicitInverse(_:)")
+BridgedABIAttr BridgedABIAttr_createImplicitInverse(
+    BridgedASTContext cContext);
+
+SWIFT_NAME("BridgedABIAttr.connectToInverse(self:attachedTo:)")
+void BridgedABIAttr_connectToInverse(BridgedABIAttr cAttr, BridgedDecl cOwner);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAccessLevel {
   BridgedAccessLevelPrivate,
@@ -907,8 +930,15 @@ BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
 // MARK: Decls
 //===----------------------------------------------------------------------===//
 
-SWIFT_NAME("BridgedDecl.setAttrs(self:_:)")
+SWIFT_NAME("getter:BridgedDecl.attrs(self:)")
+BridgedDeclAttributes BridgedDecl_getAttrs(BridgedDecl decl);
+
+SWIFT_NAME("setter:BridgedDecl.attrs(self:newValue:)")
 void BridgedDecl_setAttrs(BridgedDecl decl, BridgedDeclAttributes attrs);
+
+SWIFT_NAME("getter:BridgedDecl.asPatternBindingDecl(self:)")
+BridgedNullablePatternBindingDecl BridgedDecl_getAsPatternBindingDecl(
+    BridgedDecl decl);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedStaticSpelling {
   BridgedStaticSpellingNone,
@@ -944,6 +974,14 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries, BridgedDeclAttributes cAttrs,
                                                                  bool isStatic, bool isLet);
+
+SWIFT_NAME("getter:BridgedPatternBindingDecl.patternCount(self:)")
+SwiftInt BridgedPatternBindingDecl_getNumPatternEntries(
+    BridgedPatternBindingDecl cPBD);
+
+SWIFT_NAME("BridgedPatternBindingDecl.pattern(self:at:)")
+BridgedPattern BridgedPatternBindingDecl_getPattern(
+    BridgedPatternBindingDecl cPBD, SwiftInt i);
 
 SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:argName:"
            "argNameLoc:paramName:paramNameLoc:type:defaultValue:)")
@@ -2101,6 +2139,21 @@ void BridgedTypeRepr_dump(BridgedTypeRepr type);
 
 SWIFT_NAME("getter:BridgedPattern.singleVar(self:)")
 BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern);
+
+/// Iterates over the pattern, collecting and returning all of the BridgedVarDecls
+/// referenced by its subpatterns.
+///
+/// The exact semantics of this are as follows:
+///
+/// \li This method always returns the current count of BridgedVarDecls in the
+///     pattern.
+/// \li If \p capacity is greater than or equal to the current count \em and
+///     \p varDeclArrayOut is non-null, this method also writes the
+///     BridgedVarDecls into the buffer starting at \p varDeclArrayOut .
+SWIFT_NAME("BridgedPattern.unsafeFetchVarDecls(self:into:capacity:)")
+SwiftInt BridgedPattern_unsafeFetchVarDecls(
+    BridgedPattern cPattern, BridgedVarDecl * _Nullable varDeclArrayOut,
+    SwiftInt capacity);
 
 SWIFT_NAME("BridgedAnyPattern.createParsed(_:loc:)")
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,

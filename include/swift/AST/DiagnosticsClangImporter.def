@@ -322,5 +322,15 @@ ERROR(unknown_template_parameter,none,
 ERROR(type_template_parameter_expected,none,
   "template parameter '%0' expected to be a type parameter", (StringRef))
 
+NOTE(bridged_type_not_found_in_module,none,
+     "could not find type '%0' for bridging; module '%1' may be broken",
+     (StringRef, StringRef))
+
+NOTE(bridged_pointer_type_not_found,none,
+     "could not find type '%select{UnsafeMutableRawPointer|UnsafeRawPointer|"
+     "UnsafeMutablePointer|UnsafePointer|AutoreleasingUnsafeMutablePointer}0' "
+     "for bridging; module 'Swift' may be broken",
+     (unsigned))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
