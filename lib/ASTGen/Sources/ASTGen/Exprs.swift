@@ -232,7 +232,7 @@ extension ASTGenVisitor {
         return .underlying(attribute)
       }
     } body: { node in
-      var initCtx: BridgedPatternBindingInitializer?
+      var initCtx: BridgedCustomAttributeInitializer?
       if let attr = self.generateDeclAttribute(attribute: node, initContext: &initCtx) {
         result.attributes.add(attr)
       }

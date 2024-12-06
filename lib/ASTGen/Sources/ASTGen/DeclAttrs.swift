@@ -22,7 +22,7 @@ extension ASTGenVisitor {
     var attributes: BridgedDeclAttributes
     var staticSpelling: BridgedStaticSpelling
     var staticLoc: BridgedSourceLoc
-    var initContext: BridgedPatternBindingInitializer?
+    var initContext: BridgedCustomAttributeInitializer?
   }
 
   func generateDeclAttributes(_ node: some WithAttributesSyntax & WithModifiersSyntax, allowStatic: Bool) -> DeclAttributesResult {
@@ -56,7 +56,7 @@ extension ASTGenVisitor {
 
     // '@' attributes.
     // FIXME: Factor out this and share it with 'generate(accessorDecl:)'.
-    var initContext: BridgedPatternBindingInitializer? = nil
+    var initContext: BridgedCustomAttributeInitializer? = nil
     visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
       switch element {
       case .ifConfigDecl(let ifConfigDecl):
@@ -100,7 +100,7 @@ extension ASTGenVisitor {
 
 // MARK: - Decl attributes
 extension ASTGenVisitor {
-  func generateDeclAttribute(attribute node: AttributeSyntax, initContext: inout BridgedPatternBindingInitializer?) -> BridgedDeclAttribute? {
+  func generateDeclAttribute(attribute node: AttributeSyntax, initContext: inout BridgedCustomAttributeInitializer?) -> BridgedDeclAttribute? {
     if let identTy = node.attributeName.as(IdentifierTypeSyntax.self) {
       let attrName = identTy.name.rawText
       let attrKind = BridgedDeclAttrKind(from: attrName.bridged)
@@ -1513,7 +1513,7 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateCustomAttr(attribute node: AttributeSyntax, initContext: inout BridgedPatternBindingInitializer?) -> BridgedCustomAttr? {
+  func generateCustomAttr(attribute node: AttributeSyntax, initContext: inout BridgedCustomAttributeInitializer?) -> BridgedCustomAttr? {
     let type = self.generate(type: node.attributeName)
 
     let argList: BridgedArgumentList?
@@ -1524,7 +1524,7 @@ extension ASTGenVisitor {
       }
 
       if !self.declContext.isLocalContext && initContext == nil {
-        initContext = BridgedPatternBindingInitializer.create(declContext: self.declContext)
+        initContext = BridgedCustomAttributeInitializer.create(declContext: self.declContext)
       }
       argList = withDeclContext(initContext?.asDeclContext ?? self.declContext) {
         self.generateArgumentList(

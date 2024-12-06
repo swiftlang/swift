@@ -4071,18 +4071,6 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
   return false;
 }
 
-/// Check whether the attributes have already established an initializer
-/// context within the given set of attributes.
-static PatternBindingInitializer *findAttributeInitContent(
-    DeclAttributes &Attributes) {
-  for (auto custom : Attributes.getAttributes<CustomAttr>()) {
-    if (auto initContext = custom->getInitContext())
-      return initContext;
-  }
-
-  return nullptr;
-}
-
 bool Parser::isCustomAttributeArgument() {
   BacktrackingScope backtrack(*this);
   if (skipSingle().hasCodeCompletion())
@@ -4110,7 +4098,7 @@ bool Parser::canParseCustomAttribute() {
 }
 
 ParserResult<CustomAttr> Parser::parseCustomAttribute(
-    SourceLoc atLoc, PatternBindingInitializer *&initContext) {
+    SourceLoc atLoc, CustomAttributeInitializer *&initContext) {
   assert(Tok.is(tok::identifier));
 
   // Parse a custom attribute.
@@ -4129,13 +4117,11 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
   ArgumentList *argList = nullptr;
   if (Tok.isFollowingLParen() && isCustomAttributeArgument()) {
     // If we have no local context to parse the initial value into, create
-    // one for the PBD we'll eventually create.  This allows us to have
-    // reasonable DeclContexts for any closures that may live inside of
-    // initializers.
+    // one for the attribute.
     std::optional<ParseFunctionBody> initParser;
     if (!CurDeclContext->isLocalContext()) {
       if (!initContext)
-        initContext = PatternBindingInitializer::create(CurDeclContext);
+        initContext = CustomAttributeInitializer::create(CurDeclContext);
 
       initParser.emplace(*this, initContext);
     }
@@ -4187,7 +4173,7 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
 ///
 ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
                                         SourceLoc AtLoc, SourceLoc AtEndLoc,
-                                        PatternBindingInitializer *&initContext,
+                                        CustomAttributeInitializer *&initContext,
                                         bool isFromClangAttribute) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
@@ -4402,7 +4388,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
 bool Parser::canParseTypeAttribute() {
   TypeOrCustomAttr result; // ignored
-  PatternBindingInitializer *initContext = nullptr;
+  CustomAttributeInitializer *initContext = nullptr;
   return !parseTypeAttribute(result, /*atLoc=*/SourceLoc(),
                              /*atEndLoc=*/SourceLoc(),
                              ParseTypeReason::Unspecified, initContext,
@@ -4607,7 +4593,7 @@ bool Parser::parseUUIDString(UUID &uuid, Diag<> diagnostic, bool justChecking) {
 ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                         SourceLoc AtLoc, SourceLoc AtEndLoc,
                                         ParseTypeReason reason,
-                                        PatternBindingInitializer *&initContext,
+                                        CustomAttributeInitializer *&initContext,
                                         bool justChecking) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
@@ -5074,9 +5060,16 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   return ParserResult<LifetimeEntry>(lifetimeEntry);
 }
 
+/// \verbatim
+///   attribute-list:
+///     /*empty*/
+///     attribute-list-clause attribute-list
+///   attribute-list-clause:
+///     '@' attribute
+/// \endverbatim
 ParserStatus Parser::parseDeclAttributeList(
     DeclAttributes &Attributes, bool ifConfigsAreDeclAttrs,
-    PatternBindingInitializer *initContext) {
+    CustomAttributeInitializer *&initContext) {
   ParserStatus Status;
   while (Tok.isAny(tok::at_sign, tok::pound_if)) {
     if (Tok.is(tok::at_sign)) {
@@ -5094,19 +5087,12 @@ ParserStatus Parser::parseDeclAttributeList(
   return Status;
 }
 
-/// \verbatim
-///   attribute-list:
-///     /*empty*/
-///     attribute-list-clause attribute-list
-///   attribute-list-clause:
-///     '@' attribute
-/// \endverbatim
 ParserStatus Parser::parseDeclAttributeList(
     DeclAttributes &Attributes, bool IfConfigsAreDeclAttrs) {
   if (Tok.isNot(tok::at_sign, tok::pound_if))
     return makeParserSuccess();
 
-  PatternBindingInitializer *initContext = nullptr;
+  CustomAttributeInitializer *initContext = nullptr;
   return parseDeclAttributeList(Attributes, IfConfigsAreDeclAttrs, initContext);
 }
 
@@ -5120,7 +5106,7 @@ ParserStatus Parser::parseClosureDeclAttributeList(DeclAttributes &Attributes) {
   if (Tok.isNot(tok::at_sign, tok::pound_if) && !parsingNonisolated())
     return makeParserSuccess();
 
-  PatternBindingInitializer *initContext = nullptr;
+  CustomAttributeInitializer *initContext = nullptr;
   constexpr bool ifConfigsAreDeclAttrs = false;
   ParserStatus Status;
   while (Tok.isAny(tok::at_sign, tok::pound_if) || parsingNonisolated()) {
@@ -5136,7 +5122,7 @@ ParserStatus Parser::parseClosureDeclAttributeList(DeclAttributes &Attributes) {
         break;
       }
       Status |= parseIfConfigAttributes(Attributes, ifConfigsAreDeclAttrs,
-                                            initContext);
+                                        initContext);
     }
   }
   return Status;
@@ -5327,7 +5313,7 @@ ParserStatus Parser::parseDeclModifierList(DeclAttributes &Attributes,
 /// \endverbatim
 ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
   ParserStatus status;
-  PatternBindingInitializer *initContext = nullptr;
+  CustomAttributeInitializer *initContext = nullptr;
   auto &Tok = P.Tok;
   while (P.isParameterSpecifier()) {
     if (Tok.isContextualKeyword("isolated")) {
@@ -6112,8 +6098,9 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
   DeclAttributes Attributes;
   if (Tok.hasComment())
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
+  CustomAttributeInitializer *attrInitContext = nullptr;
   ParserStatus AttrStatus = parseDeclAttributeList(
-      Attributes, IfConfigsAreDeclAttrs);
+      Attributes, IfConfigsAreDeclAttrs, attrInitContext);
 
   // Parse modifiers.
   // Keep track of where and whether we see a contextual keyword on the decl.
@@ -8602,13 +8589,9 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       }
     });
 
-    // Check whether we have already established an initializer context for
-    // the first binding entry (subsequent entries need a separate context).
-    PatternBindingInitializer *initContext =
-      PBDEntries.empty() ? findAttributeInitContent(Attributes) : nullptr;
-
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
     // Initializer will be added later when/if it is parsed.
+    PatternBindingInitializer *initContext = nullptr;
     PBDEntries.push_back({pattern, /*EqualLoc*/ SourceLoc(), /*Init*/ nullptr,
                           initContext});
 
@@ -8623,8 +8606,14 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // If we have no local context to parse the initial value into, create one
       // for the PBD we'll eventually create.  This allows us to have reasonable
       // DeclContexts for any closures that may live inside of initializers.
-      if (!CurDeclContext->isLocalContext() && !topLevelDecl && !initContext)
+      if (!CurDeclContext->isLocalContext() && !topLevelDecl) {
+        assert(!initContext && "There cannot be an init context yet");
         initContext = PatternBindingInitializer::create(CurDeclContext);
+
+        if (auto attributeInit = Attributes.findCustomAttributeInitializer()) {
+          attributeInit->setEnclosingInitializer(initContext);
+        }
+      }
 
       // If we're using a local context (either a TopLevelCodeDecl or a
       // PatternBindingContext) install it now so that CurDeclContext is set

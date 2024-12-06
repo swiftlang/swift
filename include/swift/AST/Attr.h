@@ -60,6 +60,7 @@ class AbstractFunctionDecl;
 class FuncDecl;
 class ClassDecl;
 class AccessorDecl;
+class CustomAttributeInitializer;
 class GenericFunctionType;
 class LazyConformanceLoader;
 class LazyMemberLoader;
@@ -1861,13 +1862,13 @@ public:
 class CustomAttr final : public DeclAttribute {
   TypeExpr *typeExpr;
   ArgumentList *argList;
-  PatternBindingInitializer *initContext;
+  CustomAttributeInitializer *initContext;
   Expr *semanticInit = nullptr;
 
   mutable unsigned isArgUnsafeBit : 1;
 
   CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
-             PatternBindingInitializer *initContext, ArgumentList *argList,
+             CustomAttributeInitializer *initContext, ArgumentList *argList,
              bool implicit);
 
 public:
@@ -1878,7 +1879,7 @@ public:
   }
 
   static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
-                            PatternBindingInitializer *initContext,
+                            CustomAttributeInitializer *initContext,
                             ArgumentList *argList, bool implicit = false);
 
   TypeExpr *getTypeExpr() const { return typeExpr; }
@@ -1911,7 +1912,7 @@ public:
   Expr *getSemanticInit() const { return semanticInit; }
   void setSemanticInit(Expr *expr) { semanticInit = expr; }
 
-  PatternBindingInitializer *getInitContext() const { return initContext; }
+  CustomAttributeInitializer *getInitContext() const { return initContext; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Custom;
@@ -3040,6 +3041,10 @@ public:
     return const_cast<DeclAttribute *>(
          const_cast<const DeclAttributes *>(this)->getEffectiveSendableAttr());
   }
+
+  /// Try to find the custom attribute initializer within the list of
+  /// attributes.
+  CustomAttributeInitializer *findCustomAttributeInitializer() const;
 
 public:
   template <typename ATTR, bool AllowInvalid>

@@ -992,7 +992,7 @@ ParserStatus Parser::parseIfConfig(
 
 ParserStatus Parser::parseIfConfigAttributes(
     DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
-    PatternBindingInitializer *initContext) {
+    CustomAttributeInitializer *&initContext) {
   ParserStatus status = makeParserSuccess();
   return parseIfConfigRaw<ParserStatus>(
       IfConfigContext::DeclAttrs,
@@ -1003,7 +1003,7 @@ ParserStatus Parser::parseIfConfigAttributes(
               attributes, ifConfigsAreDeclAttrs, initContext);
         } else if (role != IfConfigElementsRole::Skipped) {
           DeclAttributes skippedAttributes;
-          PatternBindingInitializer *skippedInitContext = nullptr;
+          CustomAttributeInitializer *skippedInitContext = nullptr;
           status |= parseDeclAttributeList(
               skippedAttributes, ifConfigsAreDeclAttrs, skippedInitContext);
         }

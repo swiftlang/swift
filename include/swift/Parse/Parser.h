@@ -999,7 +999,7 @@ public:
   /// Parse an #if ... #endif containing only attributes.
   ParserStatus parseIfConfigAttributes(
     DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
-    PatternBindingInitializer *initContext);
+    CustomAttributeInitializer *&initContext);
 
   /// Parse a #error or #warning diagnostic.
   ParserResult<PoundDiagnosticDecl> parseDeclPoundDiagnostic();
@@ -1027,7 +1027,7 @@ public:
   /// This is the inner loop, which can be called recursively.
   ParserStatus parseDeclAttributeList(DeclAttributes &Attributes,
                                       bool IfConfigsAreDeclAttrs,
-                                      PatternBindingInitializer *initContext);
+                                      CustomAttributeInitializer *&initContext);
 
   /// Parse the optional attributes before a closure declaration.
   ParserStatus parseClosureDeclAttributeList(DeclAttributes &Attributes);
@@ -1162,7 +1162,7 @@ public:
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   SourceLoc AtEndLoc,
-                                  PatternBindingInitializer *&initContext,
+                                  CustomAttributeInitializer *&initContext,
                                   bool isFromClangAttribute = false);
 
   bool isCustomAttributeArgument();
@@ -1177,7 +1177,7 @@ public:
   /// will get filled in by this function. The same variable should be provided
   /// for every custom attribute within the same attribute list.
   ParserResult<CustomAttr> parseCustomAttribute(
-      SourceLoc atLoc, PatternBindingInitializer *&initContext);
+      SourceLoc atLoc, CustomAttributeInitializer *&initContext);
 
   ParserStatus parseNewDeclAttribute(DeclAttributes &Attributes,
                                      SourceLoc AtLoc, DeclAttrKind DK,
@@ -1479,7 +1479,7 @@ public:
 
   ParserStatus parseTypeAttribute(TypeOrCustomAttr &result, SourceLoc AtLoc,
                                   SourceLoc AtEndLoc, ParseTypeReason reason,
-                                  PatternBindingInitializer *&initContext,
+                                  CustomAttributeInitializer *&initContext,
                                   bool justChecking = false);
 
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
