@@ -69,3 +69,9 @@ module StdFunction {
   requires cplusplus
   export *
 }
+
+module NoCXXStdlib {
+  header "no-cxx-stdlib.h"
+  requires cplusplus
+  export *
+}

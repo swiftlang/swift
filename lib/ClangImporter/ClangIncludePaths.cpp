@@ -288,6 +288,12 @@ static void getLibStdCxxFileMapping(
                                               stdlibArgStrings);
   auto parsedStdlibArgs = parseClangDriverArgs(clangDriver, stdlibArgStrings);
 
+  // If we were explicitly asked to not bring in the C++ stdlib, bail.
+  if (parsedStdlibArgs.hasArg(clang::driver::options::OPT_nostdinc,
+                              clang::driver::options::OPT_nostdincxx,
+                              clang::driver::options::OPT_nostdlibinc))
+    return;
+
   Path cxxStdlibDir;
   if (auto dir = findFirstIncludeDir(parsedStdlibArgs,
                                      {"cstdlib", "string", "vector"}, vfs)) {
