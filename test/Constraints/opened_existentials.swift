@@ -483,3 +483,18 @@ do {
   // CHECK-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   nestedMetatypeCallee(t)
 }
+
+do {
+  protocol P {}
+
+  func foo<T: P>(_ m: inout T.Type) {}
+
+  // expected-note@+1 {{change 'let' to 'var' to make it mutable}}
+  let rValueP: P.Type
+  var lValueP: P.Type
+
+  // expected-error@+1 {{cannot pass immutable value as inout argument: 'rValueP' is a 'let' constant}}
+  foo(&rValueP)
+  // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+  foo(&lValueP)
+}
