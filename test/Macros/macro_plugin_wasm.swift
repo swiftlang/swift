@@ -11,7 +11,7 @@
 // RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %target-swift-frontend \
 // RUN:   -typecheck \
 // RUN:   -swift-version 5 \
-// RUN:   -load-plugin %t/Plugin.wasm#%swift-plugin-server#MacroDefinition \
+// RUN:   -load-resolved-plugin %t/Plugin.wasm#%swift-plugin-server#MacroDefinition \
 // RUN:   -Rmacro-loading \
 // RUN:   -module-name MyApp \
 // RUN:   %t/test.swift \
