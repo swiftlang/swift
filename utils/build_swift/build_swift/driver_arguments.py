@@ -637,6 +637,12 @@ def create_argument_parser():
            default=defaults.llvm_install_components(),
            help='A semi-colon split list of llvm components to install')
 
+    option('--minimal-cxx-bootstrap', toggle_true, default=False,
+           help='Build a minimal Swift compiler from only C++ sources '
+                '(that does not require a host Swift compiler). The resulting '
+                'toolchain is only suitable for bootstrapping Swift on a new '
+                'host.')
+
     option('--bootstrapping', store('bootstrapping_mode'),
            choices=['hosttools', 'bootstrapping', 'bootstrapping-with-hostlibs'],
            help='The bootstrapping build mode for swift compiler modules. '
