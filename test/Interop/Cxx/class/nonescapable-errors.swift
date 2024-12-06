@@ -13,6 +13,7 @@ module Test {
 
 //--- Inputs/nonescapable.h
 #include "swift/bridging"
+#include <vector>
 
 struct SWIFT_NONESCAPABLE View {
     View() : member(nullptr) {}
@@ -84,54 +85,65 @@ MyTuple<View> k1();
 MyTuple<Owner, View> k2();
 MyTuple<Owner, Owner> k3();
 
+using ViewVector = std::vector<View>;
+using OwnerVector = std::vector<Owner>;
+
+ViewVector l1();
+OwnerVector l2();
+
 //--- test.swift
 import Test
+import CxxStdlib
 
 // CHECK: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-// CHECK-NO-LIFETIMES: test.swift:5:32: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: test.swift:6:32: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
 public func noAnnotations() -> View {
-    // CHECK: nonescapable.h:15:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
+    // CHECK: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
     f(nil)
-    // CHECK: nonescapable.h:19:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
+    // CHECK: nonescapable.h:20:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
     // No duplicate warning for f2:
-    // CHECK-NOT: nonescapable.h:19
+    // CHECK-NOT: nonescapable.h:20
     f2(nil, nil)
-    // CHECK: nonescapable.h:23:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated
-    // CHECK: nonescapable.h:23:6: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-    // CHECK-NO-LIFETIMES: nonescapable.h:23:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK: nonescapable.h:24:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated
+    // CHECK: nonescapable.h:24:6: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
+    // CHECK-NO-LIFETIMES: nonescapable.h:24:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
     g(nil)
     h1(nil)
-    // CHECK: nonescapable.h:33:21: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-    // CHECK-NO-LIFETIMES: nonescapable.h:33:21: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-    h2(nil)
     // CHECK: nonescapable.h:34:21: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
     // CHECK-NO-LIFETIMES: nonescapable.h:34:21: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    h2(nil)
+    // CHECK: nonescapable.h:35:21: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
+    // CHECK-NO-LIFETIMES: nonescapable.h:35:21: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
     h3(nil)
     i1()
-    // CHECK: nonescapable.h:38:39: error: template parameter 'Missing' does not exist
-    // CHECK-NO-LIFETIMES: nonescapable.h:38:39: error: template parameter 'Missing' does not exist
+    // CHECK: nonescapable.h:39:39: error: template parameter 'Missing' does not exist
+    // CHECK-NO-LIFETIMES: nonescapable.h:39:39: error: template parameter 'Missing' does not exist
     i2()
-    // CHECK: nonescapable.h:44:33: error: template parameter 'S' expected to be a type parameter
-    // CHECK-NO-LIFETIMES: nonescapable.h:44:33: error: template parameter 'S' expected to be a type parameter
+    // CHECK: nonescapable.h:45:33: error: template parameter 'S' expected to be a type parameter
+    // CHECK-NO-LIFETIMES: nonescapable.h:45:33: error: template parameter 'S' expected to be a type parameter
     j1()
-    // CHECK: nonescapable.h:62:41: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-    // CHECK-NO-LIFETIMES: nonescapable.h:62:41: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-    j2()
     // CHECK: nonescapable.h:63:41: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
     // CHECK-NO-LIFETIMES: nonescapable.h:63:41: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    j2()
+    // CHECK: nonescapable.h:64:41: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
+    // CHECK-NO-LIFETIMES: nonescapable.h:64:41: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
     j3()
     k1();
-    // CHECK: nonescapable.h:69:15: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-    // CHECK-NO-LIFETIMES: nonescapable.h:69:15: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK: nonescapable.h:70:15: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
+    // CHECK-NO-LIFETIMES: nonescapable.h:70:15: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
     k2();
-    // CHECK: nonescapable.h:70:22: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
-    // CHECK-NO-LIFETIMES: nonescapable.h:70:22: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK: nonescapable.h:71:22: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
+    // CHECK-NO-LIFETIMES: nonescapable.h:71:22: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
     k3();
+    l1();
+    // CHECK: nonescapable.h:77:12: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
+    // CHECK-NO-LIFETIMES: nonescapable.h:77:12: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    l2();
     // CHECK-NOT: error
     // CHECK-NOT: warning
     return View()
-    // CHECK-NO-LIFETIMES: nonescapable.h:4:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
     // CHECK-NO-LIFETIMES: nonescapable.h:5:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:6:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
     // CHECK-NO-LIFETIMES-NOT: error
     // CHECK-NO-LIFETIMES-NOT: warning
 }

@@ -2045,9 +2045,6 @@ bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 
 bool hasEscapableAttr(const clang::RecordDecl *decl);
 
-std::set<StringRef>
-getConditionalEscapableAttrParams(const clang::RecordDecl *decl);
-
 bool isViewType(const clang::CXXRecordDecl *decl);
 
 } // end namespace importer
