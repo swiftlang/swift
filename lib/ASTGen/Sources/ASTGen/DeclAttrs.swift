@@ -54,17 +54,7 @@ extension ASTGenVisitor {
     }
 
     // '@' attributes.
-    // FIXME: Factor out this and share it with 'generate(accessorDecl:)'.
-    visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
-      switch element {
-      case .ifConfigDecl(let ifConfigDecl):
-        return .ifConfigDecl(ifConfigDecl)
-      case .attribute(let attribute):
-        return .underlying(attribute)
-      }
-    } body: { attribute in
-      self.generateDeclAttribute(attribute: attribute, handler: addAttribute(_:))
-    }
+    self.generateDeclAttributes(attributeList: node.attributes, handler: addAttribute(_:))
 
     func genStatic(node: DeclModifierSyntax, spelling: BridgedStaticSpelling) {
       // TODO: Diagnose duplicated attrs.
@@ -92,6 +82,19 @@ extension ASTGenVisitor {
       staticSpelling: staticSpelling,
       staticLoc: staticLoc
     )
+  }
+
+  func generateDeclAttributes(attributeList node: AttributeListSyntax, handler: (BridgedDeclAttribute) -> Void) {
+    visitIfConfigElements(node, of: AttributeSyntax.self) { element in
+      switch element {
+      case .ifConfigDecl(let ifConfigDecl):
+        return .ifConfigDecl(ifConfigDecl)
+      case .attribute(let attribute):
+        return .underlying(attribute)
+      }
+    } body: { attribute in
+      self.generateDeclAttribute(attribute: attribute, handler: handler)
+    }
   }
 }
 
