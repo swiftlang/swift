@@ -84,6 +84,58 @@ bb3:
   return %23 : $Int32
 }
 
+// CHECK-LABEL: sil [ossa] @dont_rotate_multi_exit_loop :
+// CHECK:       bb1({{.*}}):
+// CHECK:         cond_br %{{.*}}, bb4, bb2
+// CHECK:       bb2:
+// CHECK:         cond_br undef, bb3, bb5
+// CHECK:       bb6:
+// CHECK:         return
+// CHECK-NOT:   bb7
+// CHECK:       } // end sil function 'dont_rotate_multi_exit_loop'
+sil [ossa] @dont_rotate_multi_exit_loop : $@convention(thin) (Int32, @owned Bar) -> Int32 {
+bb0(%0 : $Int32, %25: @owned $Bar):
+  %1 = struct_extract %0 : $Int32, #Int32._value
+  %2 = integer_literal $Builtin.Int32, 0
+  %30 = alloc_box $<τ_0_0> { var τ_0_0 } <Bool>
+  %30a = project_box %30 : $<τ_0_0> { var τ_0_0 } <Bool>, 0
+  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30 : $<τ_0_0> { var τ_0_0 } <Bool>)
+
+bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: @owned $Bar, %31 : @owned $<τ_0_0> { var τ_0_0 } <Bool>):
+  %24 = class_method %26 : $Bar, #Bar.foo : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %6
+  %27 = apply %24(%26) : $@convention(method) (@guaranteed Bar) -> ()
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb4, bb2
+
+bb2:
+  %10 = integer_literal $Builtin.Int32, 1
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Int32, %10 : $Builtin.Int32, %12 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
+  %15 = enum $Optional<Int32>, #Optional.some!enumelt, %6 : $Int32
+  %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.some!enumelt
+  %17 = struct_extract %16 : $Int32, #Int32._value
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
+  cond_br undef, bb3, bb5
+bb3:
+  br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32, %26: $Bar, %31 : $<τ_0_0> { var τ_0_0 } <Bool>)
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  destroy_value %26 : $Bar
+  destroy_value %31 : $<τ_0_0> { var τ_0_0 } <Bool>
+  %23 = struct $Int32 (%4 : $Builtin.Int32)
+  return %23 : $Int32
+}
+
 // CHECK-LABEL: sil [ossa] @dont_duplicate_large_block :
 // CHECK: bb0(%0 : $Int32, %1 : @owned $Bar):
 // CHECK-NOT:   class_method
