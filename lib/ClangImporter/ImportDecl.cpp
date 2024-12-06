@@ -156,9 +156,21 @@ bool ClangImporter::Implementation::recordHasReferenceSemantics(
   if (!isa<clang::CXXRecordDecl>(decl) && !ctx.LangOpts.CForeignReferenceTypes)
     return false;
 
-  auto semanticsKind =
-      evaluateOrDefault(ctx.evaluator,
-                        CxxRecordSemantics({decl, ctx}), {});
+  // At this point decl might not be fully imported into Swift yet, which
+  // means we might not have asked Clang to generate its implicit members, such
+  // as copy or move constructors. This would cause CxxRecordSemanticsRequest to
+  // return MissingLifetimeOperation if the type is not a foreign reference
+  // type. Note that this doesn't affect the correctness of this function, since
+  // those implicit members aren't required for foreign reference types.
+
+  // To avoid emitting spurious diagnostics, let's disable them here. Types with
+  // missing lifetime operations would get diagnosed later, once their members
+  // are fully instantiated.
+  auto semanticsKind = evaluateOrDefault(
+      ctx.evaluator,
+      CxxRecordSemantics(
+          {decl, ctx, /* shouldDiagnoseLifetimeOperations */ false}),
+      {});
   return semanticsKind == CxxRecordSemanticsKind::Reference;
 }
 
@@ -2530,24 +2542,23 @@ namespace {
     void validateForeignReferenceType(const clang::CXXRecordDecl *decl,
                                       ClassDecl *classDecl) {
 
-      enum class RetainReleaseOperatonKind {
+      enum class RetainReleaseOperationKind {
         notAfunction,
-        doesntReturnVoid,
+        doesntReturnVoidOrSelf,
         invalidParameters,
         valid
       };
 
       auto getOperationValidity =
-          [&](ValueDecl *operation) -> RetainReleaseOperatonKind {
+          [&](ValueDecl *operation,
+              CustomRefCountingOperationKind operationKind)
+          -> RetainReleaseOperationKind {
         auto operationFn = dyn_cast<FuncDecl>(operation);
         if (!operationFn)
-          return RetainReleaseOperatonKind::notAfunction;
-
-        if (!operationFn->getResultInterfaceType()->isVoid())
-          return RetainReleaseOperatonKind::doesntReturnVoid;
+          return RetainReleaseOperationKind::notAfunction;
 
         if (operationFn->getParameters()->size() != 1)
-          return RetainReleaseOperatonKind::invalidParameters;
+          return RetainReleaseOperationKind::invalidParameters;
 
         Type paramType =
             operationFn->getParameters()->get(0)->getInterfaceType();
@@ -2557,6 +2568,16 @@ namespace {
         }
 
         swift::NominalTypeDecl *paramDecl = paramType->getAnyNominal();
+
+        // The return type should be void (for release functions), or void
+        // or the parameter type (for retain functions).
+        auto resultInterfaceType = operationFn->getResultInterfaceType();
+        if (!resultInterfaceType->isVoid()) {
+          if (operationKind == CustomRefCountingOperationKind::release ||
+              !resultInterfaceType->lookThroughSingleOptionalType()->isEqual(paramType))
+            return RetainReleaseOperationKind::doesntReturnVoidOrSelf;
+        }
+
         // The parameter of the retain/release function should be pointer to the
         // same FRT or a base FRT.
         if (paramDecl != classDecl) {
@@ -2564,13 +2585,14 @@ namespace {
             if (const auto *paramTypeDecl =
                     dyn_cast<clang::CXXRecordDecl>(paramClangDecl)) {
               if (decl->isDerivedFrom(paramTypeDecl)) {
-                return RetainReleaseOperatonKind::valid;
+                return RetainReleaseOperationKind::valid;
               }
             }
           }
-          return RetainReleaseOperatonKind::invalidParameters;
+          return RetainReleaseOperationKind::invalidParameters;
         }
-        return RetainReleaseOperatonKind::valid;
+
+        return RetainReleaseOperationKind::valid;
       };
 
       auto retainOperation = evaluateOrDefault(
@@ -2607,28 +2629,29 @@ namespace {
                       false, retainOperation.name, decl->getNameAsString());
       } else if (retainOperation.kind ==
                  CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperatonKind operationKind =
-            getOperationValidity(retainOperation.operation);
+        RetainReleaseOperationKind operationKind =
+            getOperationValidity(retainOperation.operation,
+                                 CustomRefCountingOperationKind::retain);
         HeaderLoc loc(decl->getLocation());
         switch (operationKind) {
-        case RetainReleaseOperatonKind::notAfunction:
+        case RetainReleaseOperationKind::notAfunction:
           Impl.diagnose(
               loc,
               diag::foreign_reference_types_retain_release_not_a_function_decl,
               false, retainOperation.name);
           break;
-        case RetainReleaseOperatonKind::doesntReturnVoid:
+        case RetainReleaseOperationKind::doesntReturnVoidOrSelf:
           Impl.diagnose(
               loc,
-              diag::foreign_reference_types_retain_release_non_void_return_type,
-              false, retainOperation.name);
+              diag::foreign_reference_types_retain_non_void_or_self_return_type,
+              retainOperation.name);
           break;
-        case RetainReleaseOperatonKind::invalidParameters:
+        case RetainReleaseOperationKind::invalidParameters:
           Impl.diagnose(loc,
                         diag::foreign_reference_types_invalid_retain_release,
                         false, retainOperation.name, classDecl->getNameStr());
           break;
-        case RetainReleaseOperatonKind::valid:
+        case RetainReleaseOperationKind::valid:
           break;
         }
       } else {
@@ -2671,28 +2694,29 @@ namespace {
                       true, releaseOperation.name, decl->getNameAsString());
       } else if (releaseOperation.kind ==
                  CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperatonKind operationKind =
-            getOperationValidity(releaseOperation.operation);
+        RetainReleaseOperationKind operationKind =
+            getOperationValidity(releaseOperation.operation,
+                                 CustomRefCountingOperationKind::release);
         HeaderLoc loc(decl->getLocation());
         switch (operationKind) {
-        case RetainReleaseOperatonKind::notAfunction:
+        case RetainReleaseOperationKind::notAfunction:
           Impl.diagnose(
               loc,
               diag::foreign_reference_types_retain_release_not_a_function_decl,
               true, releaseOperation.name);
           break;
-        case RetainReleaseOperatonKind::doesntReturnVoid:
+        case RetainReleaseOperationKind::doesntReturnVoidOrSelf:
           Impl.diagnose(
               loc,
-              diag::foreign_reference_types_retain_release_non_void_return_type,
-              true, releaseOperation.name);
+              diag::foreign_reference_types_release_non_void_return_type,
+              releaseOperation.name);
           break;
-        case RetainReleaseOperatonKind::invalidParameters:
+        case RetainReleaseOperationKind::invalidParameters:
           Impl.diagnose(loc,
                         diag::foreign_reference_types_invalid_retain_release,
                         true, releaseOperation.name, classDecl->getNameStr());
           break;
-        case RetainReleaseOperatonKind::valid:
+        case RetainReleaseOperationKind::valid:
           break;
         }
       } else {
@@ -8244,14 +8268,17 @@ bool importer::hasSameUnderlyingType(const clang::Type *a,
 
 SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
     ModuleDecl &module,
-    StringRef attributeText
+    StringRef attributeText,
+    bool cached
 ) {
-  auto &sourceFiles = ClangSwiftAttrSourceFiles[attributeText];
+  if (cached) {
+    auto &sourceFiles = ClangSwiftAttrSourceFiles[attributeText];
 
-  // Check whether we've already created a source file.
-  for (auto sourceFile : sourceFiles) {
-    if (sourceFile->getParentModule() == &module)
-      return *sourceFile;
+    // Check whether we've already created a source file.
+    for (auto sourceFile : sourceFiles) {
+      if (sourceFile->getParentModule() == &module)
+        return *sourceFile;
+    }
   }
 
   // Create a new buffer with a copy of the attribute text,
@@ -8273,7 +8300,11 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   // Create the source file.
   auto sourceFile = new (SwiftContext)
       SourceFile(module, SourceFileKind::Library, bufferID);
-  sourceFiles.push_back(sourceFile);
+
+  if (cached) {
+    auto &sourceFiles = ClangSwiftAttrSourceFiles[attributeText];
+    sourceFiles.push_back(sourceFile);
+  }
 
   return *sourceFile;
 }
@@ -8450,17 +8481,52 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
-      // Dig out a source file we can use for parsing.
-      auto &sourceFile = getClangSwiftAttrSourceFile(
-          *MappedDecl->getDeclContext()->getParentModule(),
-          swiftAttr->getAttribute());
+      bool cached = true;
+      while (true) {
+        // Dig out a source file we can use for parsing.
+        auto &sourceFile = getClangSwiftAttrSourceFile(
+            *MappedDecl->getDeclContext()->getParentModule(),
+            swiftAttr->getAttribute(),
+            cached);
 
-      // Collect the attributes from the synthesized top-level declaration in
-      // the source file.
-      auto topLevelDecls = sourceFile.getTopLevelDecls();
-      for (auto decl : topLevelDecls) {
-        for (auto attr : decl->getAttrs())
-          MappedDecl->getAttrs().add(attr->clone(SwiftContext));
+        auto topLevelDecls = sourceFile.getTopLevelDecls();
+
+        // If we're using the cached version, check whether we can correctly
+        // clone the attribute.
+        if (cached) {
+          bool hasNonclonableAttribute = false;
+          for (auto decl : topLevelDecls) {
+            if (hasNonclonableAttribute)
+              break;
+
+            for (auto attr : decl->getAttrs()) {
+              if (!attr->canClone()) {
+                hasNonclonableAttribute = true;
+                break;
+              }
+            }
+          }
+
+          // We cannot clone one of the attributes. Go back and build a new
+          // source file without caching it.
+          if (hasNonclonableAttribute) {
+            cached = false;
+            continue;
+          }
+        }
+
+        // Collect the attributes from the synthesized top-level declaration in
+        // the source file. If we're using a cached copy, clone the attribute.
+        for (auto decl : topLevelDecls) {
+          SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
+                                                decl->getAttrs().end());
+          for (auto attr : attrs) {
+            MappedDecl->getAttrs().add(cached ? attr->clone(SwiftContext)
+                                              : attr);
+          }
+        }
+
+        break;
       }
     }
 

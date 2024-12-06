@@ -54,14 +54,13 @@ using namespace llvm::vfs;
 
 namespace swift {
 
-llvm::IntrusiveRefCntPtr<SwiftCASOutputBackend>
-createSwiftCachingOutputBackend(
+llvm::IntrusiveRefCntPtr<SwiftCASOutputBackend> createSwiftCachingOutputBackend(
     llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
     llvm::cas::ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
-    FrontendOptions::ActionType Action) {
-  return makeIntrusiveRefCnt<SwiftCASOutputBackend>(CAS, Cache, BaseKey,
-                                                    InputsAndOutputs, Action);
+    const FrontendOptions &Opts, FrontendOptions::ActionType Action) {
+  return makeIntrusiveRefCnt<SwiftCASOutputBackend>(
+      CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action);
 }
 
 Error cas::CachedResultLoader::replay(CallbackTy Callback) {
@@ -197,12 +196,38 @@ bool replayCachedCompilerOutputs(
             assert(!DiagnosticsOutput && "more than 1 diagnotics found");
             DiagnosticsOutput.emplace(
                 OutputEntry{OutputPath->second, OutID, Kind, Input, *Proxy});
+          } else if (Kind == file_types::ID::TY_SymbolGraphFile &&
+                     !Opts.SymbolGraphOutputDir.empty()) {
+            auto Err = Proxy->forEachReference([&](ObjectRef Ref) -> Error {
+              auto Proxy = CAS.getProxy(Ref);
+              if (!Proxy)
+                return Proxy.takeError();
+              auto PathRef = Proxy->getReference(0);
+              auto ContentRef = Proxy->getReference(1);
+              auto Path = CAS.getProxy(PathRef);
+              auto Content = CAS.getProxy(ContentRef);
+              if (!Path)
+                return Path.takeError();
+              if (!Content)
+                return Content.takeError();
+
+              SmallString<128> OutputPath(Opts.SymbolGraphOutputDir);
+              llvm::sys::path::append(OutputPath, Path->getData());
+
+              OutputProxies.emplace_back(OutputEntry{
+                  std::string(OutputPath), OutID, Kind, Input, *Content});
+
+              return Error::success();
+            });
+            if (Err)
+              return Err;
           } else
             OutputProxies.emplace_back(
                 OutputEntry{OutputPath->second, OutID, Kind, Input, *Proxy});
           return Error::success();
         })) {
-      Diag.diagnose(SourceLoc(), diag::error_cas, toString(std::move(Err)));
+      Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
+                    toString(std::move(Err)));
       return lookupFailed();
     }
   };
@@ -233,6 +258,9 @@ bool replayCachedCompilerOutputs(
     // Add cached diagnostic entry for lookup. Output path doesn't matter here.
     Outputs.try_emplace(file_types::ID::TY_CachedDiagnostics,
                         "<cached-diagnostics>");
+
+    // Add symbol graph entry for lookup. Output path doesn't matter here.
+    Outputs.try_emplace(file_types::ID::TY_SymbolGraphFile, "<symbol-graph>");
 
     return replayOutputsForInputFile(Input, InputPath, InputIndex, Outputs);
   };

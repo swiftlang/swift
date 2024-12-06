@@ -252,3 +252,16 @@ public func reabstractAsyncVoidThrowsNever() async {
 struct LoadableGeneric<E>: Error {}
 
 func throwsLoadableGeneric<E>(_: E) throws(LoadableGeneric<E>) {}
+
+@inline(never)
+func throwError() throws(SmallError) -> Never {
+  throw SmallError(x: 1)
+}
+
+func conditionallyCallsThrowError(b: Bool) throws(SmallError) -> Int {
+  if b {
+    try throwError()
+  } else {
+    return 0
+  }
+}

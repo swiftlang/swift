@@ -2520,10 +2520,11 @@ public:
     PrintOptions QualifiedSILTypeOptions =
         PrintOptions::printQualifiedSILType();
     QualifiedSILTypeOptions.CurrentModule = WMI->getModule().getSwiftModule();
-    *this << "$" << WMI->getLookupType() << ", " << WMI->getMember() << " : ";
+    auto lookupType = WMI->getLookupType();
+    *this << "$" << lookupType << ", " << WMI->getMember() << " : ";
     WMI->getMember().getDecl()->getInterfaceType().print(
         PrintState.OS, QualifiedSILTypeOptions);
-    if (!WMI->getTypeDependentOperands().empty()) {
+    if ((getLocalArchetypeOf(lookupType) || lookupType->hasDynamicSelfType()) && !WMI->getTypeDependentOperands().empty()) {
       *this << ", ";
       *this << getIDAndForcedPrintedType(WMI->getTypeDependentOperands()[0].get());
     }

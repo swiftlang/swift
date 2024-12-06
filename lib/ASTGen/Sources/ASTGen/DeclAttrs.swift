@@ -334,7 +334,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       value: value
     )
   }
@@ -371,7 +371,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       inverted: inverted,
       features: features)
   }
@@ -393,7 +393,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       name: name
     )
   }
@@ -458,14 +458,14 @@ extension ASTGenVisitor {
       return .createParsed(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
-        range: self.generateSourceRange(node),
+        range: self.generateAttrSourceRange(node),
         effectKind: effectKind
       )
     } else {
       return .createParsed(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
-        range: self.generateSourceRange(node),
+        range: self.generateAttrSourceRange(node),
         customString: self.extractRawText(arguments).bridged,
         customStringLoc: self.generateSourceLoc(arguments)
       )
@@ -489,7 +489,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       mode: mode
     )
   }
@@ -517,7 +517,7 @@ extension ASTGenVisitor {
       return .createParsed(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
-        range: self.generateSourceRange(node),
+        range: self.generateAttrSourceRange(node),
         name: name,
         kind: kind
       )
@@ -564,7 +564,7 @@ extension ASTGenVisitor {
       return .createParsed(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
-        range: self.generateSourceRange(node),
+        range: self.generateAttrSourceRange(node),
         lParenLoc: self.generateSourceLoc(node.leftParen),
         rParenLoc: self.generateSourceLoc(node.rightParen),
         kind: kind,
@@ -583,7 +583,7 @@ extension ASTGenVisitor {
       return .createParsed(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
-        range: self.generateSourceRange(node),
+        range: self.generateAttrSourceRange(node),
         name: name
       )
     }
@@ -604,7 +604,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       protocolType: type,
       memberName: member.name,
       memberNameLoc: member.loc
@@ -628,7 +628,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       kind: kind
     )
   }
@@ -795,7 +795,7 @@ extension ASTGenVisitor {
       return .createParsed(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
-        range: self.generateSourceRange(node),
+        range: self.generateAttrSourceRange(node),
         syntax: syntax,
         lParenLoc: self.generateSourceLoc(node.leftParen),
         role: role,
@@ -823,7 +823,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       kind: kind
     )
   }
@@ -885,7 +885,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       name: name,
       isEarlyAdopter: isEarlyAdopter
     )
@@ -903,7 +903,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       name: name
     )
   }
@@ -926,7 +926,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       mode: mode
     )
   }
@@ -979,7 +979,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       name: name
     )
   }
@@ -1010,7 +1010,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       kind: kind
     )
   }
@@ -1065,7 +1065,7 @@ extension ASTGenVisitor {
       return .createParsed(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
-        range: self.generateSourceRange(node),
+        range: self.generateAttrSourceRange(node),
         name: name,
         isRaw: isRaw
       )
@@ -1082,7 +1082,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       spiGroupName: spiName
     )
   }
@@ -1097,7 +1097,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateSourceRange(node),
+      range: self.generateAttrSourceRange(node),
       name: name
     )
   }
@@ -1146,6 +1146,13 @@ extension ASTGenVisitor {
       initContext: initContext.asNullable,
       argumentList: argList.asNullable
     )
+  }
+
+  func generateAttrSourceRange(_ node: AttributeSyntax) -> BridgedSourceRange {
+    guard let firstNameTok = node.attributeName.firstToken(viewMode: .sourceAccurate) else {
+      return BridgedSourceRange()
+    }
+    return self.generateSourceRange(start: firstNameTok, end: node.lastToken(viewMode: .sourceAccurate)!)
   }
 
   func generateStringLiteralTextIfNotInterpolated(expr node: some ExprSyntaxProtocol) -> BridgedStringRef? {

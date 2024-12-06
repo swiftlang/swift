@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -print-diagnostic-groups
 
 // REQUIRES: concurrency
 
@@ -27,16 +27,16 @@ actor IOActor {
 
 @available(SwiftStdlib 5.5, *)
 func asyncFunc() async {
-    // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}
+    // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode [DeclarationUnavailableFromAsynchronousContext]}}
     basicNoAsync()
 
-    // expected-warning@+1{{global function 'messageNoAsync' is unavailable from asynchronous contexts; a message from the author}}
+    // expected-warning@+1{{global function 'messageNoAsync' is unavailable from asynchronous contexts; a message from the author; this is an error in the Swift 6 language mode [DeclarationUnavailableFromAsynchronousContext]}}
     messageNoAsync()
 
-    // expected-warning@+1{{global function 'renamedNoAsync' is unavailable from asynchronous contexts}}{{5-19=asyncReplacement}}
+    // expected-warning@+1{{global function 'renamedNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode [DeclarationUnavailableFromAsynchronousContext]}}{{5-19=asyncReplacement}}
     renamedNoAsync() { _ in }
 
-    // expected-warning@+1{{global function 'readStringFromIO' is unavailable from asynchronous contexts}}{{13-29=IOActor.readString}}
+    // expected-warning@+1{{global function 'readStringFromIO' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode [DeclarationUnavailableFromAsynchronousContext]}}{{13-29=IOActor.readString}}
     let _ = readStringFromIO()
 }
 
@@ -76,7 +76,7 @@ func test_defers_sync() {
     }
 
     func local_async_func() async {
-        // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}
+        // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode [DeclarationUnavailableFromAsynchronousContext]}}
         defer { basicNoAsync() }
         _ = ()
     }
@@ -89,7 +89,7 @@ func test_defers_sync() {
 
     // local async closure
     let local_async_closure = { () async -> Void in
-        // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}
+        // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode [DeclarationUnavailableFromAsynchronousContext]}}
         defer { basicNoAsync() }
         _ = ()
     }
@@ -102,7 +102,7 @@ func test_defers_sync() {
 
     var local_async_var: Void {
         get async {
-            // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}
+            // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode [DeclarationUnavailableFromAsynchronousContext]}}
             defer { basicNoAsync() }
             return ()
         }
@@ -112,9 +112,9 @@ func test_defers_sync() {
 @available(SwiftStdlib 5.5, *)
 func test_defer_async() async {
     defer {
-        // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}
+        // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode [DeclarationUnavailableFromAsynchronousContext]}}
         defer { basicNoAsync() }
-        // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}
+        // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode [DeclarationUnavailableFromAsynchronousContext]}}
         basicNoAsync()
     }
 
@@ -124,7 +124,7 @@ func test_defer_async() async {
     }
 
     func local_async_func() async {
-        // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}
+        // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode [DeclarationUnavailableFromAsynchronousContext]}}
         defer { basicNoAsync() }
         _ = ()
     }
@@ -136,7 +136,7 @@ func test_defer_async() async {
     _ = local_sync_closure
 
     let local_async_closure = { () async -> Void in
-        // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}
+        // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode [DeclarationUnavailableFromAsynchronousContext]}}
         defer { basicNoAsync() }
         _ = ()
     }
@@ -149,7 +149,7 @@ func test_defer_async() async {
 
     var local_async_var: Void {
         get async {
-            // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}
+            // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode [DeclarationUnavailableFromAsynchronousContext]}}
             defer { basicNoAsync() }
             return ()
         }

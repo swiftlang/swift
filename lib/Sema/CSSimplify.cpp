@@ -1725,6 +1725,17 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       continue;
     }
 
+    // See if we have a parameter label specified in the function's DeclNameLoc.
+    Identifier compoundParamLabel;
+    if (auto *E = getAsExpr(calleeLocator->getAnchor())) {
+      auto nameLoc = E->getNameLoc();
+      if (auto labelLoc = nameLoc.getArgumentLabelLoc(paramIdx)) {
+        auto &ctx = cs.getASTContext();
+        auto labelTok = Lexer::getTokenAtLocation(ctx.SourceMgr, labelLoc);
+        compoundParamLabel = ctx.getIdentifier(labelTok.getText());
+      }
+    }
+
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::ApplyArgToParam(
@@ -1813,14 +1824,17 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         openedExistentials.push_back({openedTypeVar, opened});
       }
 
-      auto argLabel = argument.getLabel();
+      // If we have a compound function reference (e.g `fn($x:)`), respect
+      // the parameter label given. Otherwise look at the argument label.
+      auto wrapperArgLabel = compoundParamLabel.empty() ? argument.getLabel()
+                                                        : compoundParamLabel;
       if (paramInfo.hasExternalPropertyWrapper(paramIdx) ||
-          argLabel.hasDollarPrefix()) {
+          wrapperArgLabel.hasDollarPrefix()) {
         auto *param = getParameterAt(callee, paramIdx);
         assert(param);
         if (cs.applyPropertyWrapperToParameter(paramTy, argTy,
                                                const_cast<ParamDecl *>(param),
-                                               argLabel, subKind, loc)
+                                               wrapperArgLabel, subKind, loc)
                 .isFailure()) {
           return cs.getTypeMatchFailure(loc);
         }
@@ -15927,7 +15941,9 @@ void ConstraintSystem::addContextualConversionConstraint(
   }
 
   // Add the constraint.
-  auto openedType = openOpaqueType(conversionType, purpose, locator);
+  // FIXME: This is the wrong place to be opening the opaque type.
+  auto openedType = openOpaqueType(conversionType, purpose, locator,
+                                   /*ownerDecl=*/nullptr);
   addConstraint(constraintKind, getType(expr), openedType, locator,
                 /*isFavored*/ true);
 }

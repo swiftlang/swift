@@ -1433,15 +1433,6 @@ public:
   const AvailableAttr *
   getUnavailableAttr(bool ignoreAppExtensions = false) const;
 
-  /// Retrieve the @available attribute that provides the OS version range that
-  /// this declaration is available in.
-  ///
-  /// This attribute may come from an enclosing decl since availability is
-  /// inherited. The second member of the returned pair is the decl that owns
-  /// the attribute.
-  std::optional<std::pair<const AvailableAttr *, const Decl *>>
-  getSemanticAvailableRangeAttr() const;
-
   /// Returns true if the decl is effectively always unavailable in the current
   /// compilation context. This query differs from \c isUnavailable() because it
   /// takes the availability of parent declarations into account.
@@ -3492,7 +3483,7 @@ public:
   ///
   /// This is more complex than just checking `getNamingDecl` because the
   /// function could also be the getter of a storage declaration.
-  bool isOpaqueReturnTypeOfFunction(const AbstractFunctionDecl *func) const;
+  bool isOpaqueReturnTypeOf(const Decl *owner) const;
 
   /// Get the ordinal of the anonymous opaque parameter of this decl with type
   /// repr `repr`, as introduce implicitly by an occurrence of "some" in return
@@ -6817,6 +6808,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
+    
+    /// Whether this parameter is `@_addressable`.
+    IsAddressable = 1 << 3,
 
     /// Whether or not this parameter is 'sending'.
     IsSending = 1 << 4,
@@ -7105,6 +7099,18 @@ public:
       addFlag(Flag::IsSending);
     else
       removeFlag(Flag::IsSending);
+  }
+
+  /// Whether or not this parameter is marked with '@_addressable'.
+  bool isAddressable() const {
+    return getOptions().contains(Flag::IsAddressable);
+  }
+  
+  void setAddressable(bool value = true) {
+    if (value)
+      addFlag(Flag::IsAddressable);
+    else
+      removeFlag(Flag::IsAddressable);
   }
 
   /// Whether or not this parameter is marked with '_const'.

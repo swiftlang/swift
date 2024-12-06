@@ -7827,15 +7827,17 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
 
   if (!hasDestroyTypeOperations(cxxDecl) ||
       (!hasCopyTypeOperations(cxxDecl) && !hasMoveTypeOperations(cxxDecl))) {
-    if (hasUnsafeAPIAttr(cxxDecl))
-      desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
-                              "import_unsafe", decl->getNameAsString());
-    if (hasOwnedValueAttr(cxxDecl))
-      desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
-                              "import_owned", decl->getNameAsString());
-    if (hasIteratorAPIAttr(cxxDecl))
-      desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
-                              "import_iterator", decl->getNameAsString());
+    if (desc.shouldDiagnoseLifetimeOperations) {
+      if (hasUnsafeAPIAttr(cxxDecl))
+        desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
+                                "import_unsafe", decl->getNameAsString());
+      if (hasOwnedValueAttr(cxxDecl))
+        desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
+                                "import_owned", decl->getNameAsString());
+      if (hasIteratorAPIAttr(cxxDecl))
+        desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
+                                "import_iterator", decl->getNameAsString());
+    }
 
     return CxxRecordSemanticsKind::MissingLifetimeOperation;
   }

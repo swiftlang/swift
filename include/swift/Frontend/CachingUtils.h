@@ -36,7 +36,7 @@ createSwiftCachingOutputBackend(
     llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
     llvm::cas::ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
-    FrontendOptions::ActionType Action);
+    const FrontendOptions &Opts, FrontendOptions::ActionType Action);
 
 /// Replay the output of the compilation from cache.
 /// Return true if outputs are replayed, false otherwise.

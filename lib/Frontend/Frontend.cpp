@@ -486,6 +486,7 @@ void CompilerInstance::setupOutputBackend() {
     auto &InAndOuts = Invocation.getFrontendOptions().InputsAndOutputs;
     CASOutputBackend = createSwiftCachingOutputBackend(
         *CAS, *ResultCache, *CompileJobBaseKey, InAndOuts,
+        Invocation.getFrontendOptions(),
         Invocation.getFrontendOptions().RequestedAction);
 
     if (Invocation.getIRGenOptions().UseCASBackend) {
