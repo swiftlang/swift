@@ -90,12 +90,14 @@ public:
   ///
   /// Returns true if any new instructions were created to complete the
   /// lifetime.
-  ///
-  /// TODO: We also need to complete scoped addresses (e.g. store_borrow)!
   LifetimeCompletion completeOSSALifetime(SILValue value, Boundary boundary) {
     switch (value->getOwnershipKind()) {
-    case OwnershipKind::None:
-      return LifetimeCompletion::NoLifetime;
+    case OwnershipKind::None: {
+      auto scopedAddress = ScopedAddressValue(value);
+      if (!scopedAddress)
+        return LifetimeCompletion::NoLifetime;
+      break;
+    }
     case OwnershipKind::Owned:
       break;
     case OwnershipKind::Any:

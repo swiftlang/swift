@@ -76,6 +76,9 @@ static SILInstruction *endOSSALifetime(SILValue value,
     }
     return builder.createDestroyValue(loc, value, DontPoisonRefs, isDeadEnd);
   }
+  if (auto scopedAddress = ScopedAddressValue(value)) {
+    return scopedAddress.createScopeEnd(builder.getInsertionPoint(), loc);
+  }
   return builder.createEndBorrow(loc, lookThroughBorrowedFromUser(value));
 }
 
@@ -441,6 +444,13 @@ static bool endLifetimeAtBoundary(SILValue value,
 /// Returns true if any new instructions were created to complete the lifetime.
 bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
                                                       Boundary boundary) {
+  if (auto scopedAddress = ScopedAddressValue(value)) {
+    SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+    SSAPrunedLiveness liveness(value->getFunction(), &discoveredBlocks);
+    scopedAddress.computeTransitiveLiveness(liveness);
+    return endLifetimeAtBoundary(value, liveness, boundary, deadEndBlocks);
+  }
+
   // Called for inner borrows, inner adjacent reborrows, inner reborrows, and
   // scoped addresses.
   auto handleInnerScope = [this, boundary](SILValue innerBorrowedValue) {
