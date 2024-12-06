@@ -66,6 +66,7 @@ namespace swift {
   class AccessorDecl;
   class ApplyExpr;
   class AvailabilityRange;
+  class AvailabilityDomain;
   class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
@@ -1389,6 +1390,10 @@ public:
   /// Determine whether this Decl has either Private or FilePrivate access,
   /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
+
+  /// Returns the availability domain associated with the given `AvailableAttr`
+  /// that is attached to this decl.
+  AvailabilityDomain getDomainForAvailableAttr(const AvailableAttr *attr) const;
 
   /// Returns the active platform-specific `@available` attribute for this decl.
   /// There may be multiple `@available` attributes that are relevant to the

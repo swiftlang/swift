@@ -17,6 +17,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -487,7 +488,8 @@ static bool isShortFormAvailabilityImpliedByOther(const AvailableAttr *Attr,
 ///   @available(iOS, introduced: 8.0)
 /// this will print:
 ///   @available(OSX 10.10, iOS 8.0, *)
-static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
+static void printShortFormAvailable(const Decl *D,
+                                    ArrayRef<const DeclAttribute *> Attrs,
                                     ASTPrinter &Printer,
                                     const PrintOptions &Options,
                                     bool forAtSpecialize = false) {
@@ -495,28 +497,23 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   if (!forAtSpecialize)
     Printer << "@available(";
   auto FirstAvail = cast<AvailableAttr>(Attrs.front());
-  if (Attrs.size() == 1 &&
-      FirstAvail->getPlatformAgnosticAvailability() !=
-      PlatformAgnosticAvailabilityKind::None) {
+  auto FirstAvailDomain = D->getDomainForAvailableAttr(FirstAvail);
+  if (Attrs.size() == 1 && !FirstAvailDomain.isPlatform()) {
     assert(FirstAvail->Introduced.has_value());
-    if (FirstAvail->isLanguageVersionSpecific()) {
-      Printer << "swift ";
-    } else {
-      assert(FirstAvail->isPackageDescriptionVersionSpecific());
-      Printer << "_PackageDescription ";
-    }
+    Printer << FirstAvailDomain.getNameForAttributePrinting() << " ";
     Printer << FirstAvail->Introduced.value().getAsString();
     if (!forAtSpecialize)
       Printer << ")";
   } else {
     for (auto *DA : Attrs) {
       auto *AvailAttr = cast<AvailableAttr>(DA);
+      auto AvailAttrDomain = D->getDomainForAvailableAttr(AvailAttr);
       assert(AvailAttr->Introduced.has_value());
       // Avoid omitting available attribute when we are printing module interface.
       if (!Options.IsForSwiftInterface &&
           isShortFormAvailabilityImpliedByOther(AvailAttr, Attrs))
         continue;
-      Printer << platformString(AvailAttr->getPlatform()) << " "
+      Printer << AvailAttrDomain.getNameForAttributePrinting() << " "
               << AvailAttr->Introduced.value().getAsString() << ", ";
     }
     Printer << "*";
@@ -848,11 +845,11 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   if (swiftVersionAvailableAttribute)
-    printShortFormAvailable(swiftVersionAvailableAttribute, Printer, Options);
+    printShortFormAvailable(D, swiftVersionAvailableAttribute, Printer, Options);
   if (packageDescriptionVersionAvailableAttribute)
-    printShortFormAvailable(packageDescriptionVersionAvailableAttribute, Printer, Options);
+    printShortFormAvailable(D, packageDescriptionVersionAvailableAttribute, Printer, Options);
   if (!shortAvailableAttributes.empty())
-    printShortFormAvailable(shortAvailableAttributes, Printer, Options);
+    printShortFormAvailable(D, shortAvailableAttributes, Printer, Options);
   if (!backDeployedAttributes.empty())
     printShortFormBackDeployed(backDeployedAttributes, Printer, Options);
 
@@ -901,12 +898,16 @@ ParsedDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
 static void printAvailableAttr(const Decl *D, const AvailableAttr *Attr,
                                ASTPrinter &Printer,
                                const PrintOptions &Options) {
-  if (Attr->isLanguageVersionSpecific())
-    Printer << "swift";
-  else if (Attr->isPackageDescriptionVersionSpecific())
-    Printer << "_PackageDescription";
+  auto Domain = D->getDomainForAvailableAttr(Attr);
+
+  // The parser rejects `@available(swift, unavailable)`, so when printing
+  // attributes that are universally unavailable in Swift, we must print them
+  // as universally unavailable instead.
+  // FIXME: Reconsider this, it's a weird special case.
+  if (Domain.isSwiftLanguage() && Attr->isUnconditionallyUnavailable())
+    Printer << "*";
   else
-    Printer << Attr->platformString();
+    Printer << Domain.getNameForAttributePrinting();
 
   if (Attr->isUnconditionallyUnavailable())
     Printer << ", unavailable";
@@ -945,8 +946,7 @@ static void printAvailableAttr(const Decl *D, const AvailableAttr *Attr,
   if (!Attr->Message.empty()) {
     Printer << ", message: ";
     Printer.printEscapedStringLiteral(Attr->Message);
-  } else if (Attr->getPlatformAgnosticAvailability() ==
-             PlatformAgnosticAvailabilityKind::UnavailableInSwift)
+  } else if (Domain.isSwiftLanguage() && Attr->isUnconditionallyUnavailable())
     Printer << ", message: \"Not available in Swift\"";
 }
 
@@ -1257,7 +1257,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       } else {
         SmallVector<const DeclAttribute *, 8> tmp(availAttrs.begin(),
                                                   availAttrs.end());
-        printShortFormAvailable(tmp, Printer, Options,
+        printShortFormAvailable(D, tmp, Printer, Options,
                                 true /*forAtSpecialize*/);
         Printer << "; ";
       }
