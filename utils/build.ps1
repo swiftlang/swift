@@ -1848,21 +1848,6 @@ function Build-CURL([Platform]$Platform, $Arch) {
     })
 }
 
-function Build-Sanitizers([Platform]$Platform, $Arch, $InstallTo) {
-  Isolate-EnvVars {
-    # Use configured compilers
-    Build-CMakeProject `
-      -Src $SourceCache\llvm-project\runtimes `
-      -Bin "$(Get-HostProjectBinaryCache Compilers)\runtimes\runtimes-$($Arch.LLVMTarget)-bins" `
-      -InstallTo $InstallTo `
-      -Arch $Arch `
-      -Platform $Platform `
-      -Defines (@{
-        COMPILER_RT_BUILD_SANITIZERS = "YES"
-      })
-  }
-}
-
 function Build-Runtime([Platform]$Platform, $Arch) {
   $PlatformDefines = @{}
   if ($Platform -eq [Platform]::Android) {
@@ -2873,11 +2858,6 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-CMark $HostArch
   Invoke-BuildStep Build-XML2 Windows $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
-
-  $InstallTo = "$($HostArch.ToolchainInstallRoot)\usr"
-  foreach ($Arch in $WindowsSDKArchs) {
-    Invoke-BuildStep Build-Sanitizers Windows $Arch $InstallTo
-  }
 }
 
 if ($Clean) {
