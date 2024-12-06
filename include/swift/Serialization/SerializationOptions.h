@@ -162,6 +162,7 @@ public:
   bool SkipNonExportableDecls = false;
   bool ExplicitModuleBuild = false;
   bool EnableSerializationRemarks = false;
+  bool IsInterfaceSDKRelative = false;
 };
 
 } // end namespace swift
