@@ -390,7 +390,7 @@ extension ASTGenVisitor {
         return .underlying(attribute)
       }
     } body: { node in
-      if let attr = self.generateDeclAttribute(attribute: node, initContext: &initContext) {
+      if let attr = self.generateDeclAttribute(attribute: node) {
         attrs.add(attr)
       }
     }

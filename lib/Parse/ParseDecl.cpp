@@ -4097,8 +4097,7 @@ bool Parser::canParseCustomAttribute() {
   return true;
 }
 
-ParserResult<CustomAttr> Parser::parseCustomAttribute(
-    SourceLoc atLoc, CustomAttributeInitializer *&initContext) {
+ParserResult<CustomAttr> Parser::parseCustomAttribute(SourceLoc atLoc) {
   assert(Tok.is(tok::identifier));
 
   // Parse a custom attribute.
@@ -4115,14 +4114,14 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
   // and global variables in libraries.
   ParserStatus status;
   ArgumentList *argList = nullptr;
+  CustomAttributeInitializer *initContext = nullptr;
   if (Tok.isFollowingLParen() && isCustomAttributeArgument()) {
     // If we have no local context to parse the initial value into, create
     // one for the attribute.
     std::optional<ParseFunctionBody> initParser;
     if (!CurDeclContext->isLocalContext()) {
-      if (!initContext)
-        initContext = CustomAttributeInitializer::create(CurDeclContext);
-
+      assert(!initContext);
+      initContext = CustomAttributeInitializer::create(CurDeclContext);
       initParser.emplace(*this, initContext);
     }
     if (getEndOfPreviousLoc() != Tok.getLoc()) {
@@ -4173,7 +4172,6 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
 ///
 ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
                                         SourceLoc AtLoc, SourceLoc AtEndLoc,
-                                        CustomAttributeInitializer *&initContext,
                                         bool isFromClangAttribute) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
@@ -4371,7 +4369,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
     diagnose(Tok, diag::unknown_attribute, "unknown");
   } else {
     // Change the context to create a custom attribute syntax.
-    auto customAttr = parseCustomAttribute(AtLoc, initContext);
+    auto customAttr = parseCustomAttribute(AtLoc);
     if (auto attr = customAttr.getPtrOrNull())
       Attributes.add(attr);
 
@@ -4388,10 +4386,9 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
 bool Parser::canParseTypeAttribute() {
   TypeOrCustomAttr result; // ignored
-  CustomAttributeInitializer *initContext = nullptr;
   return !parseTypeAttribute(result, /*atLoc=*/SourceLoc(),
                              /*atEndLoc=*/SourceLoc(),
-                             ParseTypeReason::Unspecified, initContext,
+                             ParseTypeReason::Unspecified,
                              /*justChecking*/ true)
               .isError();
 }
@@ -4593,7 +4590,6 @@ bool Parser::parseUUIDString(UUID &uuid, Diag<> diagnostic, bool justChecking) {
 ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                         SourceLoc AtLoc, SourceLoc AtEndLoc,
                                         ParseTypeReason reason,
-                                        CustomAttributeInitializer *&initContext,
                                         bool justChecking) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
@@ -4701,7 +4697,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                        : makeParserError();
 
     // Parse as a custom attribute.
-    auto customAttrResult = parseCustomAttribute(AtLoc, initContext);
+    auto customAttrResult = parseCustomAttribute(AtLoc);
     if (customAttrResult.isParseErrorOrHasCompletion())
       return customAttrResult;
 
@@ -5068,32 +5064,21 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
 ///     '@' attribute
 /// \endverbatim
 ParserStatus Parser::parseDeclAttributeList(
-    DeclAttributes &Attributes, bool ifConfigsAreDeclAttrs,
-    CustomAttributeInitializer *&initContext) {
+    DeclAttributes &Attributes, bool ifConfigsAreDeclAttrs) {
   ParserStatus Status;
   while (Tok.isAny(tok::at_sign, tok::pound_if)) {
     if (Tok.is(tok::at_sign)) {
         SourceLoc AtEndLoc = Tok.getRange().getEnd();
         SourceLoc AtLoc = consumeToken();
-        Status |= parseDeclAttribute(Attributes, AtLoc, AtEndLoc, initContext);
+        Status |= parseDeclAttribute(Attributes, AtLoc, AtEndLoc);
     } else {
       if (!ifConfigsAreDeclAttrs && !ifConfigContainsOnlyAttributes())
         break;
 
-      Status |= parseIfConfigAttributes(
-          Attributes, ifConfigsAreDeclAttrs, initContext);
+      Status |= parseIfConfigAttributes(Attributes, ifConfigsAreDeclAttrs);
     }
   }
   return Status;
-}
-
-ParserStatus Parser::parseDeclAttributeList(
-    DeclAttributes &Attributes, bool IfConfigsAreDeclAttrs) {
-  if (Tok.isNot(tok::at_sign, tok::pound_if))
-    return makeParserSuccess();
-
-  CustomAttributeInitializer *initContext = nullptr;
-  return parseDeclAttributeList(Attributes, IfConfigsAreDeclAttrs, initContext);
 }
 
 // effectively parseDeclAttributeList but with selective modifier handling
@@ -5106,14 +5091,13 @@ ParserStatus Parser::parseClosureDeclAttributeList(DeclAttributes &Attributes) {
   if (Tok.isNot(tok::at_sign, tok::pound_if) && !parsingNonisolated())
     return makeParserSuccess();
 
-  CustomAttributeInitializer *initContext = nullptr;
   constexpr bool ifConfigsAreDeclAttrs = false;
   ParserStatus Status;
   while (Tok.isAny(tok::at_sign, tok::pound_if) || parsingNonisolated()) {
     if (Tok.is(tok::at_sign)) {
       SourceLoc AtEndLoc = Tok.getRange().getEnd();
       SourceLoc AtLoc = consumeToken();
-      Status |= parseDeclAttribute(Attributes, AtLoc, AtEndLoc, initContext);
+      Status |= parseDeclAttribute(Attributes, AtLoc, AtEndLoc);
     } else if (parsingNonisolated()) {
       Status |=
           parseNewDeclAttribute(Attributes, {}, DeclAttrKind::Nonisolated);
@@ -5121,8 +5105,7 @@ ParserStatus Parser::parseClosureDeclAttributeList(DeclAttributes &Attributes) {
       if (!ifConfigsAreDeclAttrs && !ifConfigContainsOnlyAttributes()) {
         break;
       }
-      Status |= parseIfConfigAttributes(Attributes, ifConfigsAreDeclAttrs,
-                                        initContext);
+      Status |= parseIfConfigAttributes(Attributes, ifConfigsAreDeclAttrs);
     }
   }
   return Status;
@@ -5313,7 +5296,6 @@ ParserStatus Parser::parseDeclModifierList(DeclAttributes &Attributes,
 /// \endverbatim
 ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
   ParserStatus status;
-  CustomAttributeInitializer *initContext = nullptr;
   auto &Tok = P.Tok;
   while (P.isParameterSpecifier()) {
     if (Tok.isContextualKeyword("isolated")) {
@@ -5413,7 +5395,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     SourceLoc AtEndLoc = Tok.getRange().getEnd();
     SourceLoc AtLoc = P.consumeToken();
     status |=
-        P.parseTypeAttribute(result, AtLoc, AtEndLoc, ParseReason, initContext);
+        P.parseTypeAttribute(result, AtLoc, AtEndLoc, ParseReason);
     if (status.isError())
       return status;
     if (result)
@@ -6098,9 +6080,8 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
   DeclAttributes Attributes;
   if (Tok.hasComment())
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
-  CustomAttributeInitializer *attrInitContext = nullptr;
   ParserStatus AttrStatus = parseDeclAttributeList(
-      Attributes, IfConfigsAreDeclAttrs, attrInitContext);
+      Attributes, IfConfigsAreDeclAttrs);
 
   // Parse modifiers.
   // Keep track of where and whether we see a contextual keyword on the decl.
@@ -8624,7 +8605,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
         topLevelParser.emplace(*this, topLevelDecl);
       if (initContext)
         initParser.emplace(*this, initContext);
-
       
       SourceLoc EqualLoc = consumeToken(tok::equal);
       PBDEntries.back().setEqualLoc(EqualLoc);
