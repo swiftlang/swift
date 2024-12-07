@@ -524,14 +524,14 @@ protected:
     GenericArgCount : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+1,
+  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+1+30,
     : NumPadBits,
 
     /// Whether we have a parent type.
     HasParent : 1,
 
-    /// Whether we have a substitution map.
-    HasSubstitutionMap : 1
+    /// The number of generic arguments.
+    GenericArgCount : 31
   );
 
   SWIFT_INLINE_BITFIELD_FULL(IntegerType, TypeBase, 1,
@@ -2253,7 +2253,7 @@ public:
 /// set of substitutions to apply to make the type concrete.
 class TypeAliasType final
   : public SugarType, public llvm::FoldingSetNode,
-    llvm::TrailingObjects<TypeAliasType, Type, SubstitutionMap>
+    llvm::TrailingObjects<TypeAliasType, Type>
 {
   TypeAliasDecl *typealias;
 
@@ -2261,29 +2261,25 @@ class TypeAliasType final
   friend TrailingObjects;
 
   TypeAliasType(TypeAliasDecl *typealias, Type parent,
-                SubstitutionMap substitutions, Type underlying,
+                ArrayRef<Type> genericArgs, Type underlying,
                 RecursiveTypeProperties properties);
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return Bits.TypeAliasType.HasParent ? 1 : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const {
-    return Bits.TypeAliasType.HasSubstitutionMap ? 1 : 0;
+    return (Bits.TypeAliasType.HasParent ? 1 : 0) +
+           Bits.TypeAliasType.GenericArgCount;
   }
 
 public:
   /// Retrieve the generic signature used for substitutions.
-  GenericSignature getGenericSignature() const {
-    return getSubstitutionMap().getGenericSignature();
-  }
+  GenericSignature getGenericSignature() const;
 
-  static TypeAliasType *get(TypeAliasDecl *typealias, Type parent,
-                            SubstitutionMap substitutions, Type underlying);
+  static TypeAliasType *get(TypeAliasDecl *typealias,
+                            Type parent,
+                            ArrayRef<Type> genericArgs,
+                            Type underlying);
 
   /// Returns the declaration that declares this type.
   TypeAliasDecl *getDecl() const {
-    // Avoid requiring the definition of TypeAliasDecl.
     return typealias;
   }
 
@@ -2296,17 +2292,17 @@ public:
 
   /// Retrieve the substitution map applied to the declaration's underlying
   /// to produce the described type.
-  SubstitutionMap getSubstitutionMap() const {
-    if (!Bits.TypeAliasType.HasSubstitutionMap)
-      return SubstitutionMap();
-
-    return *getTrailingObjects<SubstitutionMap>();
-  }
+  SubstitutionMap getSubstitutionMap() const;
 
   /// Get the direct generic arguments, which correspond to the generic
   /// arguments that are directly applied to the typealias declaration
   /// this type references.
-  ArrayRef<Type> getDirectGenericArgs() const;
+  ArrayRef<Type> getDirectGenericArgs() const {
+    return ArrayRef<Type>(
+        getTrailingObjects<Type>() +
+        (Bits.TypeAliasType.HasParent ? 1 : 0),
+        Bits.TypeAliasType.GenericArgCount);
+  }
 
   SmallVector<Type, 2> getExpandedGenericArgs();
 
@@ -2314,7 +2310,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) const;
 
   static void Profile(llvm::FoldingSetNodeID &id, TypeAliasDecl *typealias,
-                      Type parent, SubstitutionMap substitutions,
+                      Type parent, ArrayRef<Type> genericArgs,
                       Type underlying);
 
   // Implement isa/cast/dyncast/etc.

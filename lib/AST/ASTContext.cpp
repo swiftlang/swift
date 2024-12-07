@@ -3380,7 +3380,7 @@ StringRef swift::getSwiftName(KnownFoundationEntity kind) {
 //===----------------------------------------------------------------------===//
 
 TypeAliasType::TypeAliasType(TypeAliasDecl *typealias, Type parent,
-                             SubstitutionMap substitutions,
+                             ArrayRef<Type> genericArgs,
                              Type underlying,
                              RecursiveTypeProperties properties)
     : SugarType(TypeKind::TypeAlias, underlying, properties),
@@ -3393,27 +3393,33 @@ TypeAliasType::TypeAliasType(TypeAliasDecl *typealias, Type parent,
     Bits.TypeAliasType.HasParent = false;
   }
 
-  // Record the substitutions.
-  if (substitutions) {
-    assert(typealias->getGenericSignature()->isEqual(
-        substitutions.getGenericSignature()));
-    Bits.TypeAliasType.HasSubstitutionMap = true;
-    *getTrailingObjects<SubstitutionMap>() = substitutions;
+  auto *params = typealias->getGenericParams();
+  unsigned count = genericArgs.size();
+
+  // Record the generic arguments.
+  if (count > 0) {
+    ASSERT(params->size() == count);
+    Bits.TypeAliasType.GenericArgCount = count;
+    std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
+                            getTrailingObjects<Type>() +
+                            (parent ? 1 : 0));
   } else {
-    assert(!typealias->isGenericContext());
-    Bits.TypeAliasType.HasSubstitutionMap = false;
+    ASSERT(params == nullptr);
+    Bits.TypeAliasType.GenericArgCount = 0;
   }
 }
 
 TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
-                                  SubstitutionMap substitutions,
+                                  ArrayRef<Type> genericArgs,
                                   Type underlying) {
   // Compute the recursive properties.
   //
   auto properties = underlying->getRecursiveProperties();
   if (parent)
     properties |= parent->getRecursiveProperties();
-  properties |= substitutions.getRecursiveProperties();
+
+  for (auto arg : genericArgs)
+    properties |= arg->getRecursiveProperties();
 
   // Figure out which arena this type will go into.
   auto &ctx = underlying->getASTContext();
@@ -3421,7 +3427,7 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
 
   // Profile the type.
   llvm::FoldingSetNodeID id;
-  TypeAliasType::Profile(id, typealias, parent, substitutions, underlying);
+  TypeAliasType::Profile(id, typealias, parent, genericArgs, underlying);
 
   // Did we already record this type?
   void *insertPos;
@@ -3430,29 +3436,29 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
     return result;
 
   // Build a new type.
-  auto genericSig = substitutions.getGenericSignature();
-  auto size = totalSizeToAlloc<Type, SubstitutionMap>(parent ? 1 : 0,
-                                                      genericSig ? 1 : 0);
+  auto size = totalSizeToAlloc<Type>((parent ? 1 : 0) + genericArgs.size());
   auto mem = ctx.Allocate(size, alignof(TypeAliasType), arena);
-  auto result = new (mem) TypeAliasType(typealias, parent, substitutions,
+  auto result = new (mem) TypeAliasType(typealias, parent, genericArgs,
                                         underlying, properties);
   types.InsertNode(result, insertPos);
   return result;
 }
 
 void TypeAliasType::Profile(llvm::FoldingSetNodeID &id) const {
-  Profile(id, getDecl(), getParent(), getSubstitutionMap(),
+  Profile(id, getDecl(), getParent(), getDirectGenericArgs(),
           Type(getSinglyDesugaredType()));
 }
 
 void TypeAliasType::Profile(
                            llvm::FoldingSetNodeID &id,
                            TypeAliasDecl *typealias,
-                           Type parent, SubstitutionMap substitutions,
+                           Type parent, ArrayRef<Type> genericArgs,
                            Type underlying) {
   id.AddPointer(typealias);
   id.AddPointer(parent.getPointer());
-  substitutions.profile(id);
+  id.AddInteger(genericArgs.size());
+  for (auto arg : genericArgs)
+    id.AddPointer(arg.getPointer());
   id.AddPointer(underlying.getPointer());
 }
 
