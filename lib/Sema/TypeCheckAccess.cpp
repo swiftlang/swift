@@ -1885,9 +1885,11 @@ bool isFragileClangNode(const ClangNode &node) {
   if (auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl))
     return isFragileClangType(typedefDecl->getUnderlyingType());
   if (auto *rd = dyn_cast<clang::RecordDecl>(decl)) {
-    if (!isa<clang::CXXRecordDecl>(rd))
+    auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(rd);
+    if (!cxxRecordDecl)
       return false;
-    return !rd->getDeclContext()->isExternCContext();
+    return !cxxRecordDecl->isCLike() &&
+           !cxxRecordDecl->getDeclContext()->isExternCContext();
   }
   return true;
 }
