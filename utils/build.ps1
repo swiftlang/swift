@@ -190,14 +190,14 @@ $Components = @{
     Hash = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69"
   }
   PinnedSwiftAMD64 = @{
-    URL = "https://download.swift.org/swift-5.10.1-release/windows10/swift-5.10.1-RELEASE/swift-5.10.1-RELEASE-windows10.exe"
-    Hash = "3027762138ACFA1BBE3050FF6613BBE754332E84C9EFA5C23984646009297286"
-    Version = "5.10.1"
+    URL = "https://download.swift.org/swift-6.0-branch/windows10/swift-6.0-DEVELOPMENT-SNAPSHOT-2024-12-03-a/swift-6.0-DEVELOPMENT-SNAPSHOT-2024-12-03-a-windows10.exe"
+    Hash = "2058299F63C2A032D7EF582B8469D28832C9EA44D5FDCB54F17FEC00B184E7D2"
+    Version = "6.0.0"
   }
   PinnedSwiftARM64 = @{
-    URL = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a-windows10-arm64.exe"
-    Hash = "037BDBF9D1A1A99D7156584948870A8A958FD27CC4FF5711691CC0A76F2E88F5"
-    Version = "0.0.0"
+    URL = "https://download.swift.org/swift-6.0-branch/windows10-arm64/swift-6.0-DEVELOPMENT-SNAPSHOT-2024-12-03-a/swift-6.0-DEVELOPMENT-SNAPSHOT-2024-12-03-a-windows10-arm64.exe"
+    Hash = "239C3B2D9D470AD9D4519AE8DC556A331CE6DA46895F0908A97DF6528CFA740A"
+    Version = "6.0.0"
   }
   PinnedSwiftCustom = @{
     URL = $PinnedBuild
