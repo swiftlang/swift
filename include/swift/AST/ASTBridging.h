@@ -536,6 +536,14 @@ SWIFT_NAME("getter:BridgedPatternBindingInitializer.asDeclContext(self:)")
 BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
     BridgedPatternBindingInitializer cInit);
 
+SWIFT_NAME("BridgedCustomAttributeInitializer.create(declContext:)")
+BridgedCustomAttributeInitializer
+BridgedCustomAttributeInitializer_create(BridgedDeclContext cDeclContext);
+
+SWIFT_NAME("getter:BridgedCustomAttributeInitializer.asDeclContext(self:)")
+BridgedDeclContext BridgedCustomAttributeInitializer_asDeclContext(
+    BridgedCustomAttributeInitializer cInit);
+
 SWIFT_NAME("getter:BridgedClosureExpr.asDeclContext(self:)")
 BridgedDeclContext
 BridgedClosureExpr_asDeclContext(BridgedClosureExpr cClosure);
@@ -613,7 +621,7 @@ SWIFT_NAME(
     "BridgedCustomAttr.createParsed(_:atLoc:type:initContext:argumentList:)")
 BridgedCustomAttr BridgedCustomAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc, BridgedTypeRepr cType,
-    BridgedNullablePatternBindingInitializer cInitContext,
+    BridgedNullableCustomAttributeInitializer cInitContext,
     BridgedNullableArgumentList cArgumentList);
 
 SWIFT_NAME("BridgedDocumentationAttr.createParsed(_:atLoc:range:metadata:"

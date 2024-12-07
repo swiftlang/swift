@@ -1911,17 +1911,7 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::Initializer:
-    switch (cast<Initializer>(dc)->getInitializerKind()) {
-    case InitializerKind::PatternBinding:
-      os << "pattern binding initializer";
-      break;
-    case InitializerKind::DefaultArgument:
-      os << "default argument initializer";
-      break;
-    case InitializerKind::PropertyWrapper:
-      os << "property wrapper initializer";
-      break;
-    }
+    simple_display(os, cast<Initializer>(dc));
     break;
 
   case DeclContextKind::TopLevelCodeDecl:
