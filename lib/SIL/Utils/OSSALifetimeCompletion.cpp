@@ -422,7 +422,19 @@ static bool endLifetimeAtAvailabilityBoundary(SILValue value,
 static bool endLifetimeAtBoundary(SILValue value,
                                   SSAPrunedLiveness const &liveness,
                                   OSSALifetimeCompletion::Boundary boundary,
-                                  DeadEndBlocks &deadEndBlocks);
+                                  DeadEndBlocks &deadEndBlocks) {
+  bool changed = false;
+  switch (boundary) {
+  case OSSALifetimeCompletion::Boundary::Liveness:
+    changed |= endLifetimeAtLivenessBoundary(value, liveness, deadEndBlocks);
+    break;
+  case OSSALifetimeCompletion::Boundary::Availability:
+    changed |=
+        endLifetimeAtAvailabilityBoundary(value, liveness, deadEndBlocks);
+    break;
+  }
+  return changed;
+}
 
 /// End the lifetime of \p value at unreachable instructions.
 ///
@@ -443,23 +455,6 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
   assert(liveness.getUnenclosedPhis().empty());
   return endLifetimeAtBoundary(value, liveness.getLiveness(), boundary,
                                deadEndBlocks);
-}
-
-static bool endLifetimeAtBoundary(SILValue value,
-                                  SSAPrunedLiveness const &liveness,
-                                  OSSALifetimeCompletion::Boundary boundary,
-                                  DeadEndBlocks &deadEndBlocks) {
-  bool changed = false;
-  switch (boundary) {
-  case OSSALifetimeCompletion::Boundary::Liveness:
-    changed |= endLifetimeAtLivenessBoundary(value, liveness, deadEndBlocks);
-    break;
-  case OSSALifetimeCompletion::Boundary::Availability:
-    changed |=
-        endLifetimeAtAvailabilityBoundary(value, liveness, deadEndBlocks);
-    break;
-  }
-  return changed;
 }
 
 namespace swift::test {
