@@ -36,6 +36,19 @@ Decl::getDomainForAvailableAttr(const AvailableAttr *attr) const {
   }
 }
 
+llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
+  switch (kind) {
+  case Kind::Universal:
+    return "";
+  case Kind::Platform:
+    return swift::prettyPlatformString(getPlatformKind());
+  case Kind::SwiftLanguage:
+    return "Swift";
+  case Kind::PackageDescription:
+    return "PackageDescription";
+  }
+}
+
 llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
   switch (kind) {
   case Kind::Universal:
