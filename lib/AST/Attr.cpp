@@ -2632,7 +2632,7 @@ ProtocolDecl *ImplementsAttr::getProtocol(DeclContext *dc) const {
 }
 
 CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
-                       PatternBindingInitializer *initContext,
+                       CustomAttributeInitializer *initContext,
                        ArgumentList *argList, bool implicit)
     : DeclAttribute(DeclAttrKind::Custom, atLoc, range, implicit),
       typeExpr(type), argList(argList), initContext(initContext) {
@@ -2641,7 +2641,7 @@ CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
 }
 
 CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
-                               PatternBindingInitializer *initContext,
+                               CustomAttributeInitializer *initContext,
                                ArgumentList *argList, bool implicit) {
   assert(type);
   SourceRange range(atLoc, type->getSourceRange().End);
