@@ -72,6 +72,8 @@ public:
     return AvailabilityDomain(Kind::PackageDescription);
   }
 
+  Kind getKind() const { return kind; }
+
   bool isUniversal() const { return kind == Kind::Universal; }
 
   bool isPlatform() const { return kind == Kind::Platform; }
@@ -85,6 +87,10 @@ public:
     assert(kind == Kind::Platform);
     return platform;
   }
+
+  /// Returns the string to use in diagnostics to identify the domain. May
+  /// return an empty string.
+  llvm::StringRef getNameForDiagnostics() const;
 
   /// Returns the string to use when printing an `@available` attribute.
   llvm::StringRef getNameForAttributePrinting() const;
