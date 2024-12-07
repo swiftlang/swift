@@ -203,6 +203,7 @@ KNOWN_SETTINGS=(
     llvm-ninja-targets-for-cross-compile-hosts    ""                "list of ninja targets to build for LLVM for hosts that are cross-compiled"
 
     ## Swift Options
+    swift-source-dirname                          ""                "The name of the Swift source directory"
     swift-analyze-code-coverage                   "not-merged"      "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
     swift-enable-assertions                       "1"               "enable assertions in Swift"
     swift-enable-ast-verifier                     "1"               "If enabled, and the assertions are enabled, the built Swift compiler will run the AST verifier every time it is invoked"
@@ -1233,7 +1234,7 @@ function host_has_darwin_symbols() {
 # Calculate source directories for each product.
 #
 NINJA_SOURCE_DIR="${WORKSPACE}/ninja"
-SWIFT_SOURCE_DIR="${WORKSPACE}/swift"
+SWIFT_SOURCE_DIR="${WORKSPACE}/${SWIFT_SOURCE_DIRNAME}"
 LLVM_SOURCE_DIR="${WORKSPACE}/llvm-project/llvm"
 CMARK_SOURCE_DIR="${WORKSPACE}/cmark"
 LLDB_SOURCE_DIR="${WORKSPACE}/llvm-project/lldb"
