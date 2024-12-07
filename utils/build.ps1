@@ -1546,46 +1546,51 @@ function Build-Mimalloc() {
     [hashtable]$Arch
   )
 
-  if ($Arch -eq $ArchX64) {
-    $Args = @()
-    Isolate-EnvVars {
-      Invoke-VsDevShell $Arch
-      # Avoid hard-coding the VC tools version number
-      $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostArch.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
-      if ($VCRedistDir) {
-        $Args += "-p:VCRedistDir=$VCRedistDir\"
-      }
-    }
-    $Args += "$SourceCache\mimalloc\ide\vs2022\mimalloc.sln"
-    $Args += "-p:Configuration=Release"
-    $Args += "-p:ProductArchitecture=$($Arch.VSName)"
-    Invoke-Program $msbuild @Args
-    $Dest = "$($Arch.ToolchainInstallRoot)\usr\bin"
-    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\mimalloc-override.dll" `
-      -Destination "$Dest"
-    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\mimalloc-redirect.dll" `
-      -Destination "$Dest"
-    $MimallocExecutables = @("swift.exe","swiftc.exe","swift-driver.exe","swift-frontend.exe")
-    $MimallocExecutables += @("clang.exe","clang++.exe","clang-cl.exe")
-    $MimallocExecutables += @("lld.exe","lld-link.exe","ld.lld.exe","ld64.lld.exe")
-    foreach ($Exe in $MimallocExecutables) {
-      $ExePath = [IO.Path]::Combine($Dest, $Exe)
-      # Binary-patch in place
-      $Args = @()
-      $Args += "-f"
-      $Args += "-i"
-      $Args += "-v"
-      $Args += $ExePath
-      Invoke-Program "$SourceCache\mimalloc\bin\minject" @Args
-      # Log the import table
-      $Args = @()
-      $Args += "-l"
-      $Args += $ExePath
-      Invoke-Program "$SourceCache\mimalloc\bin\minject" @Args
-      dir "$ExePath"
-    }
-  } else {
+  if ($Arch -ne $ArchX64) {
     throw "mimalloc is currently supported for X64 only"
+  }
+
+  $MSBuildArgs = @("$SourceCache\mimalloc\ide\vs2022\mimalloc.sln")
+  $MSBuildArgs += "-noLogo"
+  $MSBuildArgs += "-maxCpuCount"
+  $MSBuildArgs += "-p:Configuration=Release"
+  $MSBuildArgs += "-p:ProductArchitecture=$($Arch.VSName)"
+
+  Isolate-EnvVars {
+    Invoke-VsDevShell $Arch
+    # Avoid hard-coding the VC tools version number
+    $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostArch.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
+    if ($VCRedistDir) {
+      $MSBuildArgs += "-p:VCRedistDir=$VCRedistDir\"
+    }
+  }
+
+  Invoke-Program $msbuild @MSBuildArgs
+
+  $Products = @( "mimalloc-override.dll", "mimalloc-redirect.dll" )
+  foreach ($Product in $Products) {
+    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\$Product" -Destination "$(Arch.ToolchainInstallRoot)\usr\bin"
+  }
+
+  $Tools = @(
+    "swift.exe",
+    "swiftc.exe",
+    "swift-driver.exe",
+    "swift-frontend.exe",
+    "clang.exe",
+    "clang++.exe",
+    "clang-cl.exe",
+    "lld.exe",
+    "lld-link.exe",
+    "ld.lld.exe",
+    "ld64.lld.exe"
+  )
+  foreach ($Tool in $Tools) {
+    $Binary = [IO.Path]::Combine($Dest, $Tool)
+    # Binary-patch in place
+    Invoke-Program "$SourceCache\mimalloc\bin\minject" @("-f", "-i", "-v", $Binary)
+    # Log the import table
+    Invoke-Program "$SourceCache\mimalloc\bin\minject" @("-l", $Binary)
   }
 }
 
