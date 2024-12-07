@@ -18,6 +18,7 @@ from . import product
 from . import staticswiftlinux
 from ..cmake import CMakeOptions
 
+from build_swift.build_swift.constants import SWIFT_REPO_NAME
 
 class Swift(product.Product):
 
@@ -98,6 +99,14 @@ class Swift(product.Product):
             self._enable_experimental_parser_validation)
 
         self._handle_swift_debuginfo_non_lto_args()
+
+    @classmethod
+    def product_source_name(cls):
+        """product_source_name() -> str
+
+        The name of the source code directory of this product.
+        """
+        return SWIFT_REPO_NAME
 
     @classmethod
     def is_build_script_impl_product(cls):
