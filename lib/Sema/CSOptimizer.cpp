@@ -780,6 +780,14 @@ static void determineBestChoicesInContext(
             favorExactMatchesOnly = true;
           }
 
+          // This is important for SIMD operators in particular because
+          // a lot of their overloads have same-type requires to a concrete
+          // type:  `<Scalar == (U)Int*>(_: SIMD*<Scalar>, ...) -> ...`.
+          if (genericSig) {
+            overloadType = overloadType->getReducedType(genericSig)
+                               ->castTo<FunctionType>();
+          }
+
           double score = 0.0;
           unsigned numDefaulted = 0;
           for (unsigned paramIdx = 0, n = overloadType->getNumParams();
