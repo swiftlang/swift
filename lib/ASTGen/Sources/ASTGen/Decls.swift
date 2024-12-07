@@ -381,17 +381,8 @@ extension ASTGenVisitor {
     var attrs = BridgedDeclAttributes()
 
     // '@' attributes.
-    visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
-      switch element {
-      case .ifConfigDecl(let ifConfigDecl):
-        return .ifConfigDecl(ifConfigDecl)
-      case .attribute(let attribute):
-        return .underlying(attribute)
-      }
-    } body: { node in
-      if let attr = self.generateDeclAttribute(attribute: node) {
-        attrs.add(attr)
-      }
+    self.generateDeclAttributes(attributeList: node.attributes) { attr in
+      attrs.add(attr)
     }
 
     // The modifier
