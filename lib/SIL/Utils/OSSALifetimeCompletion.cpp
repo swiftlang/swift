@@ -454,6 +454,7 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
 namespace swift::test {
 // Arguments:
 // - SILValue: value
+// - string: either "liveness" or "availability"
 // Dumps:
 // - function
 static FunctionTest OSSALifetimeCompletionTest(
