@@ -2881,13 +2881,3 @@ bool swift::hasAttribute(const LangOptions &langOpts,
 
   return false;
 }
-
-CustomAttributeInitializer *
-DeclAttributes::findCustomAttributeInitializer() const {
-  for (auto custom : getAttributes<CustomAttr>()) {
-    if (auto initContext = custom->getInitContext())
-      return initContext;
-  }
-
-  return nullptr;
-}

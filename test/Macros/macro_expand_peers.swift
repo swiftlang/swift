@@ -299,3 +299,13 @@ struct Trait {
 
 @trait(Trait {})
 func closureInPeerMacroCrash() {}
+
+@trait(Trait {})
+@trait(Trait {})
+@trait(Trait {})
+func closuresInPeerMacroCrash() {}
+
+@trait(Trait {})
+@trait(Trait {})
+@trait(Trait {})
+var closuresInPeerMacroOnVariableCrash: Int = 0

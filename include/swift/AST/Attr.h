@@ -3042,10 +3042,6 @@ public:
          const_cast<const DeclAttributes *>(this)->getEffectiveSendableAttr());
   }
 
-  /// Try to find the custom attribute initializer within the list of
-  /// attributes.
-  CustomAttributeInitializer *findCustomAttributeInitializer() const;
-
 public:
   template <typename ATTR, bool AllowInvalid>
   using AttributeKindRange =
