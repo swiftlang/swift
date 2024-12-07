@@ -381,7 +381,6 @@ extension ASTGenVisitor {
     var attrs = BridgedDeclAttributes()
 
     // '@' attributes.
-    var initContext: BridgedPatternBindingInitializer? = nil
     visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
       switch element {
       case .ifConfigDecl(let ifConfigDecl):
