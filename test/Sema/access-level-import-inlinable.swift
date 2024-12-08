@@ -83,6 +83,7 @@ internal import InternalLib
 // expected-note@-2 4 {{protocol 'InternalImportProto' imported as 'internal' from 'InternalLib' here}}
 // expected-note@-3 2 {{global function 'InternalFunc()' imported as 'internal' from 'InternalLib' here}}
 // expected-note@-4 2 {{struct 'InternalImportFrozenType' imported as 'internal' from 'InternalLib' here}}
+// expected-note@-5 2 {{module 'InternalLib' imported as 'internal' here}}
 
 fileprivate import FileprivateLib
 // expected-note@-1 2 {{generic struct 'FileprivateImportWrapper' imported as 'fileprivate' from 'FileprivateLib' here}}
