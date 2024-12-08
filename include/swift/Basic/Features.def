@@ -301,6 +301,10 @@ EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 /// Swift parser.
 EXPERIMENTAL_FEATURE(ParserValidation, false)
 
+/// Whether to perform validation of the unqualified lookup produced by
+/// ASTScope and SwiftLexicalLookup
+EXPERIMENTAL_FEATURE(UnqualifiedLookupValidation, false)
+
 /// Enables implicit some while also enabling existential `any`
 EXPERIMENTAL_FEATURE(ImplicitSome, false)
 
