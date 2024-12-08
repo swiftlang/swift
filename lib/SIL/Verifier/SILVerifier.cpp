@@ -4177,7 +4177,7 @@ public:
               "Must have a type dependent operand for the opened archetype");
       verifyLocalArchetype(AMI, lookupType);
     } else {
-      require(AMI->getTypeDependentOperands().empty(),
+      require(AMI->getTypeDependentOperands().empty() || lookupType->hasLocalArchetype(),
               "Should not have an operand for the opened existential");
     }
     if (!isa<ArchetypeType>(lookupType) && !isa<DynamicSelfType>(lookupType)) {
