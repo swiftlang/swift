@@ -356,31 +356,6 @@ DependencyScanningTool::getDependencies(
   return BatchScanResults;
 }
 
-void DependencyScanningTool::serializeCache(llvm::StringRef path) {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  SourceManager SM;
-  DiagnosticEngine Diags(SM);
-  Diags.addConsumer(CDC);
-  llvm::vfs::OnDiskOutputBackend Backend;
-  module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Diags, Backend, path, *ScanningService);
-}
-
-bool DependencyScanningTool::loadCache(llvm::StringRef path) {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  SourceManager SM;
-  DiagnosticEngine Diags(SM);
-  Diags.addConsumer(CDC);
-  ScanningService = std::make_unique<SwiftDependencyScanningService>();
-  bool readFailed =
-      module_dependency_cache_serialization::readInterModuleDependenciesCache(
-          path, *ScanningService);
-  if (readFailed) {
-    Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed, path);
-  }
-  return readFailed;
-}
-
 void DependencyScanningTool::resetCache() {
   llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
   ScanningService.reset(new SwiftDependencyScanningService());

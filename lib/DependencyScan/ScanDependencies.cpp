@@ -1268,24 +1268,24 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
 } // namespace
 
 static void serializeDependencyCache(CompilerInstance &instance,
-                                     const SwiftDependencyScanningService &service) {
+                                     const ModuleDependenciesCache &cache) {
   const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   ASTContext &Context = instance.getASTContext();
   auto savePath = opts.SerializedDependencyScannerCachePath;
   module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Context.Diags, instance.getOutputBackend(), savePath, service);
+      Context.Diags, instance.getOutputBackend(), savePath, cache);
   if (opts.EmitDependencyScannerCacheRemarks) {
     Context.Diags.diagnose(SourceLoc(), diag::remark_save_cache, savePath);
   }
 }
 
 static void deserializeDependencyCache(CompilerInstance &instance,
-                                       SwiftDependencyScanningService &service) {
+                                       ModuleDependenciesCache &cache) {
   const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   ASTContext &Context = instance.getASTContext();
   auto loadPath = opts.SerializedDependencyScannerCachePath;
   if (module_dependency_cache_serialization::readInterModuleDependenciesCache(
-          loadPath, service)) {
+          loadPath, cache)) {
     Context.Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed,
                            loadPath);
   } else if (opts.EmitDependencyScannerCacheRemarks) {
@@ -1300,16 +1300,18 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
   SwiftDependencyScanningService *service = Context.Allocate<SwiftDependencyScanningService>();
-  if (opts.ReuseDependencyScannerCache)
-    deserializeDependencyCache(instance, *service);
-
-  if (service->setupCachingDependencyScanningService(instance))
-    return true;
-
   ModuleDependenciesCache cache(
       *service, instance.getMainModule()->getNameStr().str(),
       instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
       instance.getInvocation().getModuleScanningHash());
+  
+  if (opts.ReuseDependencyScannerCache)
+    deserializeDependencyCache(instance, cache);
+
+  if (service->setupCachingDependencyScanningService(instance))
+    return true;
+
+
 
   // Execute scan
   llvm::ErrorOr<swiftscan_dependency_graph_t> dependenciesOrErr =
@@ -1318,7 +1320,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   // Serialize the dependency cache if -serialize-dependency-scan-cache
   // is specified
   if (opts.SerializeDependencyScannerCache)
-    serializeDependencyCache(instance, *service);
+    serializeDependencyCache(instance, cache);
 
   if (dependenciesOrErr.getError())
     return true;

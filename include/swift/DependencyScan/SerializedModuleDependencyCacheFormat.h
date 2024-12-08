@@ -209,24 +209,24 @@ using ClangModuleDetailsLayout =
 /// Tries to read the dependency graph from the given buffer.
 /// Returns \c true if there was an error.
 bool readInterModuleDependenciesCache(llvm::MemoryBuffer &buffer,
-                                      SwiftDependencyScanningService &cache);
+                                      ModuleDependenciesCache &cache);
 
 /// Tries to read the dependency graph from the given path name.
 /// Returns true if there was an error.
 bool readInterModuleDependenciesCache(llvm::StringRef path,
-                                      SwiftDependencyScanningService &cache);
+                                      ModuleDependenciesCache &cache);
 
 /// Tries to write the dependency graph to the given path name.
 /// Returns true if there was an error.
 bool writeInterModuleDependenciesCache(DiagnosticEngine &diags,
                                        llvm::vfs::OutputBackend &backend,
                                        llvm::StringRef path,
-                                       const SwiftDependencyScanningService &cache);
+                                       const ModuleDependenciesCache &cache);
 
 /// Tries to write out the given dependency cache with the given
 /// bitstream writer.
 void writeInterModuleDependenciesCache(llvm::BitstreamWriter &Out,
-                                       const SwiftDependencyScanningService &cache);
+                                       const ModuleDependenciesCache &cache);
 
 } // end namespace module_dependency_cache_serialization
 } // end namespace dependencies
