@@ -137,6 +137,8 @@ SourceLoc SILLocation::getStartSourceLoc() const {
     return SourceLoc();
   if (isSILFile())
     return storage.sourceLoc;
+  if (getStorageKind() == FilenameAndLocationKind)
+    return SourceLoc();
   return getStartSourceLoc(getPrimaryASTNode());
 }
 
@@ -158,6 +160,8 @@ SourceLoc SILLocation::getEndSourceLoc() const {
     return SourceLoc();
   if (isSILFile())
     return storage.sourceLoc;
+  if (getStorageKind() == FilenameAndLocationKind)
+    return SourceLoc();
   return getEndSourceLoc(getPrimaryASTNode());
 }
 
