@@ -4,10 +4,10 @@
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
 
-// CHECK: sil @$s4main1XC3fooxyFSi_Tg5 : $@convention(method) (@guaranteed X<Int>) -> Int {
+// CHECK: sil @$e4main1XC3fooxyFSi_Tg5 : $@convention(method) (@guaranteed X<Int>) -> Int {
 
 // CHECK-LABEL: sil_vtable $X<Int>
-// CHECK:         #X.foo: <T> (X<T>) -> () -> T : @$s4main1XC3fooxyFSi_Tg5
+// CHECK:         #X.foo: <T> (X<T>) -> () -> T : @$e4main1XC3fooxyFSi_Tg5
 // CHECK:       }
 
 open class X<T> {

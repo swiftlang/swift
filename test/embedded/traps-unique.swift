@@ -12,7 +12,7 @@ public func foobar(i: Int) {
   if i == 2 { _assertionFailure("prefix", "message 2", file: "", line: 0, flags: 0) }
 }
 
-// CHECK: define {{.*}}@"$s4main6foobar1iySi_tF"{{.*}} {
+// CHECK: define {{.*}}@"$e4main6foobar1iySi_tF"{{.*}} {
 // CHECK: entry:
 // CHECK:   switch i64 %0, label %3 [
 // CHECK:     i64 1, label %1
@@ -32,4 +32,5 @@ public func foobar(i: Int) {
 
 // We should not see a call to _asssertionFailure in IR because that means such basic block can be merged with another
 // and break the expectations that each trap point is unique.
+// CHECK-NOT: @"$es17_assertionFailure__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF"
 // CHECK-NOT: @"$ss17_assertionFailure__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF"

@@ -44,4 +44,4 @@ public func main() {
   MyModuleC.foo()
 }
 
-// CHECK: @"$s9MyModuleA6globalSivp" = {{.*}}global %TSi zeroinitializer
+// CHECK: @"$e9MyModuleA6globalSivp" = {{.*}}global %TSi zeroinitializer
