@@ -917,6 +917,10 @@ static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
 
 bool swift::emitFineModuleTraceIfNeeded(ModuleDecl *mainModule,
                                         const FrontendOptions &opts) {
+  // When lazy type checking is enabled, we may end up with a partial AST.
+  // Walking on these partial AST completely may expose latent bugs.
+  if (mainModule->getASTContext().TypeCheckerOpts.EnableLazyTypecheck)
+    return false;
   ASTContext &ctxt = mainModule->getASTContext();
   assert(!ctxt.hadError() &&
          "We should've already exited earlier if there was an error.");
