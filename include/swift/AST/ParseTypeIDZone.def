@@ -34,3 +34,6 @@ SWIFT_REQUEST(Parse, ExportedSourceFileRequest,
 SWIFT_REQUEST(Parse, EvaluateIfConditionRequest,
               (std::pair<bool, bool>)(SourceFile *, SourceRange, bool), Uncached,
               NoLocationInfo)
+SWIFT_REQUEST(Parse, AvailabilityMacroArgumentsRequest,
+              (AvailabilityMacroMap)(ASTContext *), Cached,
+              NoLocationInfo)
