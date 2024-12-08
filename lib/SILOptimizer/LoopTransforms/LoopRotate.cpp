@@ -301,6 +301,14 @@ static bool isSingleBlockLoop(SILLoop *L) {
   return true;
 }
 
+static bool isLoopExiting(SILBasicBlock *block, SILLoop *loop) {
+  for (SILBasicBlock *succ : block->getSuccessors()) {
+    if (!loop->contains(succ) && !isa<UnreachableInst>(succ->getTerminator()))
+      return true;
+  }
+  return false;
+}
+
 /// We rotated a loop if it has the following properties.
 ///
 /// * It has an exiting header with a conditional branch.
@@ -380,6 +388,9 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   if (!newHeader->getSinglePredecessorBlock() && header != latch)
     return false;
 
+  if (isLoopExiting(newHeader, loop)) {
+    return false;
+  }
   // Now that we know we can perform the rotation - move the instructions that
   // need moving.
   for (auto *inst : moveToPreheader)
