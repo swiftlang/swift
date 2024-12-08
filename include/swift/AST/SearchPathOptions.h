@@ -405,9 +405,13 @@ public:
     SmallString<128> systemFrameworksScratch(NewSDKPath);
     llvm::sys::path::append(systemFrameworksScratch, "System", "Library",
                             "Frameworks");
+    SmallString<128> systemSubFrameworksScratch(NewSDKPath);
+    llvm::sys::path::append(systemSubFrameworksScratch, "System", "Library",
+                            "SubFrameworks");
     SmallString<128> frameworksScratch(NewSDKPath);
     llvm::sys::path::append(frameworksScratch, "Library", "Frameworks");
     DarwinImplicitFrameworkSearchPaths = {systemFrameworksScratch.str().str(),
+                                          systemSubFrameworksScratch.str().str(),
                                           frameworksScratch.str().str()};
 
     Lookup.searchPathsDidChange();
