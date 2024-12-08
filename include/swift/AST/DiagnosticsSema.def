@@ -309,6 +309,11 @@ ERROR(incorrect_explicit_closure_result_vs_return_type,none,
       "declared closure result %0 is incompatible with return type %1",
       (Type, Type))
 
+ERROR(addressable_not_enabled,none,
+      "@_addressable is an experimental feature", ())
+ERROR(addressableSelf_not_on_method,none,
+      "@_addressableSelf cannot be applied to non-member declarations", ())
+
 ERROR(unsupported_closure_attr,none,
       "%select{attribute |}0 '%1' is not supported on a closure",
       (bool, StringRef))

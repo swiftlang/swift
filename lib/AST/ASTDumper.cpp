@@ -3735,6 +3735,7 @@ public:
   }
 
   TRIVIAL_ATTR_PRINTER(Actor, actor)
+  TRIVIAL_ATTR_PRINTER(AddressableSelf, _addressableSelf)
   TRIVIAL_ATTR_PRINTER(AlwaysEmitConformanceMetadata,
                        always_emit_conformance_metadata)
   TRIVIAL_ATTR_PRINTER(AlwaysEmitIntoClient, always_emit_into_client)

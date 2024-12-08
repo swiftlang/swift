@@ -513,7 +513,11 @@ DECL_ATTR(lifetime, Lifetime,
   OnAccessor | OnConstructor | OnFunc | OnSubscript | LongAttribute | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | AllowMultipleAttributes,
   161)
 
-LAST_DECL_ATTR(Lifetime)
+SIMPLE_DECL_ATTR(_addressableSelf, AddressableSelf,
+  OnAccessor | OnConstructor | OnFunc | OnSubscript | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | UserInaccessible,
+  162)
+
+LAST_DECL_ATTR(AddressableSelf)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

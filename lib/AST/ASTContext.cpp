@@ -4057,6 +4057,10 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // The default flagless state.
     break;
   }
+  
+  if (AFD->getAttrs().hasAttribute<AddressableSelfAttr>()) {
+    flags = flags.withAddressable(true);
+  }
 
   return AnyFunctionType::Param(selfTy, Identifier(), flags);
 }
