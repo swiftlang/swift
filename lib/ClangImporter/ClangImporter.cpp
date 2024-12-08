@@ -4357,8 +4357,7 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     // the overlay for it so far, it is a split libc++ module (e.g. std_vector).
     // Load the CxxStdlib overlay explicitly, if building with the
     // platform-default C++ stdlib.
-    if (!overlay && importer::isCxxStdModule(clangModule) &&
-        Ctx.LangOpts.isUsingPlatformDefaultCXXStdlib()) {
+    if (!overlay && importer::isCxxStdModule(clangModule)) {
       ImportPath::Module::Builder builder(Ctx.Id_CxxStdlib);
       overlay = owner.loadModule(SourceLoc(), std::move(builder).get());
     }
