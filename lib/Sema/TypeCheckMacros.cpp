@@ -1020,21 +1020,21 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
   // Create a new source buffer with the contents of the expanded macro.
   unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(buffer));
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
-  GeneratedSourceInfo sourceInfo{generatedSourceKind,
-                                 generatedOriginalSourceRange,
-                                 macroBufferRange,
-                                 target.getOpaqueValue(),
-                                 dc,
-                                 attr,
-                                 macroName.c_str()
-  };
-  sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
+  auto macroContext = dc;
 
   // Create a source file to hold the macro buffer. This is automatically
   // registered with the enclosing module.
   auto macroSourceFile = new (ctx) SourceFile(
       *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
+  if (isa<FileUnit>(macroContext) && !isa<SourceFile>(macroContext))
+    macroContext = macroSourceFile;
+  GeneratedSourceInfo sourceInfo{
+      generatedSourceKind, generatedOriginalSourceRange,
+      macroBufferRange,    target.getOpaqueValue(),
+      macroContext,        attr,
+      macroName.c_str()};
+  sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
   if (auto parentSourceFile = dc->getParentSourceFile())
     macroSourceFile->setImports(parentSourceFile->getImports());
   else if (auto clangModuleUnit =
@@ -1362,8 +1362,13 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
 
   auto moduleDecl = dc->getParentModule();
 
-  auto attrSourceFile =
-    moduleDecl->getSourceFileContainingLocation(attr->AtLoc);
+  // If the attribute has no source location and is attached to a declaration
+  // from a Clang module, pretty-print the attribute and use that location.
+  // This is relevant for Swift macros inferred from Clang attributes,
+  // since they don't have a source representation.
+  SourceLoc attrLoc = attr->AtLoc;
+
+  auto attrSourceFile = moduleDecl->getSourceFileContainingLocation(attrLoc);
   if (!attrSourceFile)
     return nullptr;
 
@@ -1527,7 +1532,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     swift_Macros_expandAttachedMacro(
         &ctx.Diags, externalDef.get(), discriminator->c_str(),
         extendedType.c_str(), conformanceList.c_str(), getRawMacroRole(role),
-        astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
+        astGenAttrSourceFile, attrLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, startLoc.getOpaquePointerValue(),
         astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceOut);
     if (!evaluatedSourceOut.unbridged().data())

@@ -350,6 +350,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_enable_builtin_module);
   inputArgs.AddLastArg(arguments, options::OPT_compiler_assertions);
   inputArgs.AddLastArg(arguments, options::OPT_load_pass_plugin_EQ);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_enable_experimental_bounds_safety_interop);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);

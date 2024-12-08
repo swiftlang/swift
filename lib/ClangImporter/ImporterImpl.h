@@ -1060,6 +1060,10 @@ public:
   SourceFile &getClangSwiftAttrSourceFile(
       ModuleDecl &module, StringRef attributeText, bool cached);
 
+  /// Create attribute with given text and attach it to decl, creating or
+  /// retrieving a chached source file as needed.
+  void importNontrivialAttribute(Decl *MappedDecl, StringRef attributeText);
+
   /// Utility function to import Clang attributes from a source Swift decl to
   /// synthesized Swift decl.
   ///
@@ -1358,7 +1362,8 @@ public:
       ImportTypeAttrs attrs,
       OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
       bool resugarNSErrorPointer = true,
-      std::optional<unsigned> completionHandlerErrorParamIndex = std::nullopt);
+      std::optional<unsigned> completionHandlerErrorParamIndex = std::nullopt,
+      bool *isBoundsAnnotated = nullptr);
 
   /// Import the given Clang type into Swift.
   ///
@@ -1375,7 +1380,7 @@ public:
       bool allowNSUIntegerAsInt, Bridgeability topLevelBridgeability,
       ImportTypeAttrs attrs,
       OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
-      bool resugarNSErrorPointer = true);
+      bool resugarNSErrorPointer = true, bool *isBoundsAnnotated = nullptr);
 
   /// Import the given Clang type into Swift, returning the
   /// Swift parameters and result type and whether we should treat it
@@ -1408,7 +1413,8 @@ public:
       DeclContext *dc, const clang::FunctionDecl *clangDecl,
       ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
       bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
-      ArrayRef<GenericTypeParamDecl *> genericParams);
+      ArrayRef<GenericTypeParamDecl *> genericParams,
+      bool *hasBoundsAnnotatedParam);
 
   /// Import the given function return type.
   ///
@@ -1422,7 +1428,8 @@ public:
   /// imported.
   ImportedType importFunctionReturnType(DeclContext *dc,
                                         const clang::FunctionDecl *clangDecl,
-                                        bool allowNSUIntegerAsInt);
+                                        bool allowNSUIntegerAsInt,
+                                        bool *isBoundsAnnotated = nullptr);
 
   /// Import the parameter list for a function
   ///
@@ -1439,7 +1446,8 @@ public:
       DeclContext *dc, const clang::FunctionDecl *clangDecl,
       ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
       bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
-      ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType);
+      ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType,
+      bool *hasBoundsAnnotatedParam);
 
   struct ImportParameterTypeResult {
     /// The imported parameter Swift type.
@@ -1450,6 +1458,8 @@ public:
     bool isConsuming;
     /// If the parameter is implicitly unwrapped or not.
     bool isParamTypeImplicitlyUnwrapped;
+    /// If the parameter has (potentially nested) safe pointer types
+    bool isBoundsAnnotated;
   };
 
   /// Import a parameter type
@@ -1735,6 +1745,7 @@ public:
   }
 
   void importSwiftAttrAttributes(Decl *decl);
+  void importBoundsAttributes(FuncDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///
