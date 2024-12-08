@@ -338,6 +338,19 @@ bool swift::isIncidentalUse(SILInstruction *user) {
          isa<IgnoredUseInst>(user);
 }
 
+bool swift::isMoveOnlyWrapperUse(SILInstruction *user) {
+  switch (user->getKind()) {
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
 bool swift::onlyAffectsRefCount(SILInstruction *user) {
   switch (user->getKind()) {
   default:

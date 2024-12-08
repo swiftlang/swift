@@ -129,6 +129,11 @@ bool isEndOfScopeMarker(SILInstruction *user);
 /// only used in recognizable patterns without otherwise "escaping".
 bool isIncidentalUse(SILInstruction *user);
 
+/// Returns true if this is a move only wrapper use.
+///
+/// E.x.: moveonlywrapper_to_copyable_addr, copyable_to_moveonlywrapper_value
+bool isMoveOnlyWrapperUse(SILInstruction *user);
+
 /// Return true if the given `user` instruction modifies the value's refcount
 /// without propagating the value or having any other effect aside from
 /// potentially destroying the value itself (and executing associated cleanups).
