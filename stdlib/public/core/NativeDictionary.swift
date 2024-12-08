@@ -746,10 +746,10 @@ extension _NativeDictionary { // Deletion
 }
 
 extension _NativeDictionary { // High-level operations
-  @inlinable
-  internal func mapValues<T>(
-    _ transform: (Value) throws -> T
-  ) rethrows -> _NativeDictionary<Key, T> {
+  @_alwaysEmitIntoClient
+  internal func mapValues<T, E: Error>(
+    _ transform: (Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
     let resultStorage = _DictionaryStorage<Key, T>.copy(original: _storage)
     _internalInvariant(resultStorage._seed == _storage._seed)
     let result = _NativeDictionary<Key, T>(resultStorage)
