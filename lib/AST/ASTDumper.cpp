@@ -32,6 +32,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/StringExtras.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallString.h"
@@ -181,7 +182,7 @@ public:
 
 private:
   virtual void write_impl(const char *Ptr, size_t Size) override {
-    base_os.write_escaped(StringRef(Ptr, Size), /*UseHexEscapes=*/true);
+    writeEscaped(StringRef(Ptr, Size), base_os);
   }
 
   virtual uint64_t current_pos() const override {
