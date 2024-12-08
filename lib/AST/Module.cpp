@@ -2957,6 +2957,16 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
       restrictiveImport = import;
     }
   }
+
+  // Reexports from the local module take precedence over non-public imports
+  // and lift all access-level restrictions. We still prioritize file local
+  // public imports as diagnostics will have an import to point to and
+  // they are recommended over indirect imports.
+  if ((!restrictiveImport.has_value() ||
+       restrictiveImport->accessLevel < AccessLevel::Public) &&
+     imports.isImportedBy(targetModule, getParentModule()))
+    return std::nullopt;
+
   return restrictiveImport;
 }
 
