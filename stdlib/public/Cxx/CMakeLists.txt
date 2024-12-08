@@ -21,6 +21,8 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -cxx-interoperability-mode=default
+    -enable-experimental-feature Span
+    -enable-experimental-feature BuiltinModule
     # This module should not pull in the C++ standard library, so we disable it explicitly.
     # For functionality that depends on the C++ stdlib, use C++ stdlib overlay (`swiftstd` module).
     -Xcc -nostdinc++
