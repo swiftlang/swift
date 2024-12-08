@@ -2736,7 +2736,7 @@ function Build-Installer($Arch) {
   }
 
   foreach ($SDK in $WindowsSDKArchs) {
-    $Properties["INCLUDE_$($SDK.VSName.ToUpperInvariant())_SDK"] = "true"
+    $Properties["INCLUDE_WINDOWS_$($SDK.VSName.ToUpperInvariant())_SDK"] = "true"
     $Properties["PLATFORM_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.PlatformInstallRoot)\"
     $Properties["SDK_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.SDKInstallRoot)\"
   }
@@ -2747,11 +2747,9 @@ function Build-Installer($Arch) {
 function Stage-BuildArtifacts($Arch) {
   Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\*.cab" "$Stage\"
   Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\*.msi" "$Stage\"
-  Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\rtl.cab" "$Stage\"
-  Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\rtl.msi" "$Stage\"
   foreach ($SDK in $WindowsSDKArchs) {
-    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.$($SDK.VSName).cab" "$Stage\"
-    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.$($SDK.VSName).msi" "$Stage\"
+    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.windows.$($SDK.VSName).cab" "$Stage\"
+    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.windows.$($SDK.VSName).msi" "$Stage\"
     Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\rtl.$($SDK.VSName).msm" "$Stage\"
   }
   Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\installer.exe" "$Stage\"
