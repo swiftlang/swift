@@ -16,6 +16,14 @@ In order to build on Windows, some additional parameters must be passed to the b
 swift build -Xcc -I%SDKROOT%\usr\include\swift\SwiftRemoteMirror -Xlinker %SDKROOT%\usr\lib\swift\windows\x86_64\swiftRemoteMirror.lib
 ~~~
 
+#### Linux
+
+In order to build on Linux, some additional parameters must be passed to the build tool to locate the necessary includes and libraries.
+
+~~~
+swift build -Xswiftc -I$(git rev-parse --show-toplevel)/include/swift/SwiftRemoteMirror -Xlinker -lswiftRemoteMirror
+~~~
+
 #### CMake
 
 In order to build on Windows with CMake, some additional parameters must be passed to the build tool to locate the necessary Swift modules.
@@ -30,9 +38,6 @@ The following inspection operations are available currently.
 
 ##### All Platforms
 
-dump-arrays &lt;name-or-pid&gt;
-: Print information about array objects in the target
-
 dump-cache-nodes &lt;name-or-pid&gt;
 : Print the metadata cache nodes.
 
@@ -44,6 +49,11 @@ dump-generic-metadata &lt;name-or-pid&gt; [--backtrace] [--backtrace-long]
 
 dump-raw-metadata &lt;name-or-pid&gt; [--backtrace] [--backtrace-long]
 : Print metadata allocations.
+
+#### Darwin and Windows Only
+
+dump-arrays &lt;name-or-pid&gt;
+: Print information about array objects in the target
 
 ##### Darwin Only
 
