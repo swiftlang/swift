@@ -14,3 +14,18 @@ public func localTypeAliasTest(horse: Horse) {
   let info = UnsafeMutablePointer<A>.allocate(capacity: 1)
   _ = info
 }
+
+public func localTypeAliasTest() -> Horse {
+  typealias A = Int
+
+  let info = UnsafeMutablePointer<A>.allocate(capacity: 1)
+  _ = info
+  return Horse()
+}
+
+public func localTypeAliasTestGeneric<T: Cow>(cow: T) {
+  typealias A = Int
+
+  let info = UnsafeMutablePointer<A>.allocate(capacity: 1)
+  _ = info
+}
