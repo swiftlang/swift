@@ -792,3 +792,52 @@ bb3:
   return %0 : $C
 }
 
+// CHECK-LABEL: begin running test {{.*}} on store_borrow: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @store_borrow : {{.*}} {
+// CHECK:         [[TOKEN:%[^,]+]] = store_borrow
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_borrow [[TOKEN]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'store_borrow'
+// CHECK-LABEL: end running test {{.*}} on store_borrow: ossa_lifetime_completion
+sil [ossa] @store_borrow : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @guaranteed $C):
+  specify_test "ossa_lifetime_completion %token availability"
+  %addr = alloc_stack $C
+  %token = store_borrow %instance to %addr : $*C
+  cond_br undef, exit, die
+
+exit:
+  end_borrow %token : $*C
+  dealloc_stack %addr : $*C
+  %retval = tuple ()
+  return %retval : $()
+die:
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on begin_access: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @begin_access : {{.*}} {
+// CHECK:         [[TOKEN:%[^,]+]] = begin_access
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_access [[TOKEN]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'begin_access'
+// CHECK-LABEL: end running test {{.*}} on begin_access: ossa_lifetime_completion
+sil [ossa] @begin_access : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @guaranteed $C):
+  specify_test "ossa_lifetime_completion %access availability"
+  %addr = alloc_stack $C
+  %access = begin_access [static] [read] %addr : $*C
+  cond_br undef, exit, die
+
+exit:
+  end_access %access : $*C
+  dealloc_stack %addr : $*C
+  %retval = tuple ()
+  return %retval : $()
+die:
+  unreachable
+}
