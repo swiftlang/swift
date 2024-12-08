@@ -66,3 +66,21 @@ do {
       }
   }
 }
+
+// https://github.com/swiftlang/swift/issues/60619
+do {
+  protocol P {
+    associatedtype A
+  }
+  struct S {
+    subscript<T: P>(_: T) -> T {
+      get {} set {}
+    }
+  }
+
+  var s: S
+  let p: any P
+
+  let _ = s[p]
+  s[p] = p // expected-error {{cannot assign through subscript: 's' is immutable}}
+}
