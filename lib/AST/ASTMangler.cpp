@@ -2540,6 +2540,12 @@ void ASTMangler::appendContext(const DeclContext *ctx,
       }
       return;
     }
+
+    case InitializerKind::CustomAttribute: {
+      BaseEntitySignature nullBase(nullptr);
+      appendContext(ctx->getParent(), nullBase, useModuleName);
+      return;
+    }
     }
     llvm_unreachable("bad initializer kind");
     }

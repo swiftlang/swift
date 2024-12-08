@@ -22,7 +22,6 @@ extension ASTGenVisitor {
     var attributes: BridgedDeclAttributes
     var staticSpelling: BridgedStaticSpelling
     var staticLoc: BridgedSourceLoc
-    var initContext: BridgedPatternBindingInitializer?
   }
 
   func generateDeclAttributes(_ node: some WithAttributesSyntax & WithModifiersSyntax, allowStatic: Bool) -> DeclAttributesResult {
@@ -55,7 +54,7 @@ extension ASTGenVisitor {
     }
 
     // '@' attributes.
-    var initContext: BridgedPatternBindingInitializer? = nil
+    var initContext: BridgedCustomAttributeInitializer? = nil
     visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
       switch element {
       case .ifConfigDecl(let ifConfigDecl):
@@ -64,7 +63,7 @@ extension ASTGenVisitor {
         return .underlying(attribute)
       }
     } body: { attribute in
-      addAttribute(self.generateDeclAttribute(attribute: attribute, initContext: &initContext))
+      addAttribute(self.generateDeclAttribute(attribute: attribute))
     }
 
     func genStatic(node: DeclModifierSyntax, spelling: BridgedStaticSpelling) {
@@ -91,15 +90,14 @@ extension ASTGenVisitor {
     return DeclAttributesResult(
       attributes: attrs,
       staticSpelling: staticSpelling,
-      staticLoc: staticLoc,
-      initContext: initContext
+      staticLoc: staticLoc
     )
   }
 }
 
 // MARK: - Decl attributes
 extension ASTGenVisitor {
-  func generateDeclAttribute(attribute node: AttributeSyntax, initContext: inout BridgedPatternBindingInitializer?) -> BridgedDeclAttribute? {
+  func generateDeclAttribute(attribute node: AttributeSyntax) -> BridgedDeclAttribute? {
     if let identTy = node.attributeName.as(IdentifierTypeSyntax.self) {
       let attrName = identTy.name.rawText
       let attrKind = BridgedDeclAttrKind(from: attrName.bridged)
@@ -321,7 +319,7 @@ extension ASTGenVisitor {
       }
     }
 
-    return self.generateCustomAttr(attribute: node, initContext: &initContext)?.asDeclAttribute
+    return self.generateCustomAttr(attribute: node)?.asDeclAttribute
   }
 
   func generateAlignmentAttr(attribute node: AttributeSyntax) -> BridgedAlignmentAttr? {
@@ -1119,18 +1117,21 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateCustomAttr(attribute node: AttributeSyntax, initContext: inout BridgedPatternBindingInitializer?) -> BridgedCustomAttr? {
+  func generateCustomAttr(attribute node: AttributeSyntax) -> BridgedCustomAttr? {
     let type = self.generate(type: node.attributeName)
 
     let argList: BridgedArgumentList?
+    let initContext: BridgedCustomAttributeInitializer?
     if let args = node.arguments {
       guard let args = args.as(LabeledExprListSyntax.self) else {
         // TODO: Diagnose?
         return nil
       }
 
-      if !self.declContext.isLocalContext && initContext == nil {
-        initContext = BridgedPatternBindingInitializer.create(declContext: self.declContext)
+      if !self.declContext.isLocalContext {
+        initContext = BridgedCustomAttributeInitializer.create(declContext: self.declContext)
+      } else {
+        initContext = nil
       }
       argList = withDeclContext(initContext?.asDeclContext ?? self.declContext) {
         self.generateArgumentList(
@@ -1143,6 +1144,7 @@ extension ASTGenVisitor {
       }
     } else {
       argList = nil
+      initContext = nil
     }
 
     return .createParsed(
