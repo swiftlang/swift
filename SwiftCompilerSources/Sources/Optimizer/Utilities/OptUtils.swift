@@ -45,6 +45,40 @@ extension Value {
     }
   }
 
+  func isInLexicalLiverange(_ context: some Context) -> Bool {
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+
+    worklist.pushIfNotVisited(self)
+    while let v = worklist.pop() {
+      if v.ownership == .none {
+        continue
+      }
+      if v.isLexical {
+        return true
+      }
+      switch v {
+      case let fw as ForwardingInstruction:
+        worklist.pushIfNotVisited(contentsOf: fw.definedOperands.lazy.map { $0.value })
+      case let bf as BorrowedFromInst:
+        worklist.pushIfNotVisited(bf.borrowedValue)
+      case let bb as BeginBorrowInst:
+        worklist.pushIfNotVisited(bb.borrowedValue)
+      case let arg as Argument:
+        if let phi = Phi(arg) {
+          worklist.pushIfNotVisited(contentsOf: phi.incomingValues)
+        } else if let termResult = TerminatorResult(arg),
+               let fw = termResult.terminator as? ForwardingInstruction
+        {
+          worklist.pushIfNotVisited(contentsOf: fw.definedOperands.lazy.map { $0.value })
+        }
+      default:
+        continue
+      }
+    }
+    return false
+  }
+
   /// Walks over all fields of an aggregate and checks if a reference count
   /// operation for this value is required. This differs from a simple `Type.isTrivial`
   /// check, because it treats a value_to_bridge_object instruction as "trivial".
