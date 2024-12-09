@@ -1597,7 +1597,7 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
             P.consumeToken();
             IsNegative = true;
           }
-          int64_t Val;
+          uint64_t Val;
           if (parseInteger(Val, diag::sil_invalid_constant))
             return true;
           if (IsNegative)
