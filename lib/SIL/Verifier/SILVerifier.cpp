@@ -1277,11 +1277,6 @@ public:
     CurArgument = arg;
     checkLegalType(arg->getFunction(), arg, nullptr);
 
-    // Ensure flags on the argument are not stale.
-    require(!arg->getFunction()->hasOwnership() ||
-                computeIsReborrow(arg) == arg->isReborrow(),
-            "Stale reborrow flag");
-
     if (checkLinearLifetime) {
       checkValueBaseOwnership(arg);
     }
@@ -4182,7 +4177,7 @@ public:
               "Must have a type dependent operand for the opened archetype");
       verifyLocalArchetype(AMI, lookupType);
     } else {
-      require(AMI->getTypeDependentOperands().empty(),
+      require(AMI->getTypeDependentOperands().empty() || lookupType->hasLocalArchetype(),
               "Should not have an operand for the opened existential");
     }
     if (!isa<ArchetypeType>(lookupType) && !isa<DynamicSelfType>(lookupType)) {

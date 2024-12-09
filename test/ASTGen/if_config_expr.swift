@@ -41,6 +41,7 @@ func testInvalidContent(baseExpr: MyStruct, otherExpr: Int) {
   baseExpr      // expected-warning {{expression of type 'MyStruct' is unused}}
 #if CONDITION_1
     { print(1) } // expected-error {{closure expression is unused}}
+                 // unexpected-note@-1 {{did you mean to use a 'do' statement?}}
 #endif
 
   baseExpr      // expected-warning {{expression of type 'MyStruct' is unused}}

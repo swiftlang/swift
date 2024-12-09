@@ -1,5 +1,5 @@
 // We run this through sil-opt twice to test parsing -> printing -> parsing -> printing
-// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s | %target-sil-opt -sil-print-types | %FileCheck %s
 
 import Builtin
 

@@ -52,11 +52,6 @@ using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
 
-ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS)
-    : ExpressionTimer(
-          Anchor, CS,
-          CS.getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold) {}
-
 ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
                                  unsigned thresholdInSecs)
     : Anchor(Anchor), Context(CS.getASTContext()),
@@ -139,9 +134,18 @@ ConstraintSystem::~ConstraintSystem() {
   delete &CG;
 }
 
+void ConstraintSystem::startExpressionTimer(ExpressionTimer::AnchorType anchor) {
+  ASSERT(!Timer);
+
+  unsigned timeout = getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold;
+  if (timeout == 0)
+    return;
+
+  Timer.emplace(anchor, *this, timeout);
+}
+
 void ConstraintSystem::incrementScopeCounter() {
-  ++CountScopes;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
+  ++NumSolverScopes;
   if (auto *Stats = getASTContext().Stats)
     ++Stats->getFrontendCounters().NumConstraintScopes;
 }
@@ -162,7 +166,7 @@ void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
   TypeVariables.insert(typeVar);
 
   // Notify the constraint graph.
-  (void)CG[typeVar];
+  CG.addTypeVariable(typeVar);
 }
 
 void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
@@ -173,9 +177,13 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   assert(typeVar2 == getRepresentative(typeVar2) &&
          "typeVar2 is not the representative");
   assert(typeVar1 != typeVar2 && "cannot merge type with itself");
-  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
 
-  // Merge nodes in the constraint graph.
+  // Always merge 'up' the constraint stack, because it is simpler.
+  if (typeVar1->getImpl().getID() > typeVar2->getImpl().getID())
+    std::swap(typeVar1, typeVar2);
+
+  CG.mergeNodesPre(typeVar2);
+  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
   CG.mergeNodes(typeVar1, typeVar2);
 
   if (updateWorkList) {
@@ -205,6 +213,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   assert(!type->hasError() &&
          "Should not be assigning a type involving ErrorType!");
 
+  CG.retractFromInference(typeVar, type);
   typeVar->getImpl().assignFixedType(type, getTrail());
 
   if (!updateState)
@@ -1094,8 +1103,8 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
     return nullptr;
 
   auto &CG = getConstraintGraph();
-  auto result = CG.lookupNode(typeVar);
-  auto equivalence = result.first.getEquivalenceClass();
+  auto &result = CG[typeVar];
+  auto equivalence = result.getEquivalenceClass();
   auto member = llvm::find_if(equivalence, [=](TypeVariableType *eq) {
     auto *loc = eq->getImpl().getLocator();
     if (!loc)
@@ -1801,8 +1810,15 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
     // variable representing the argument to retrieve protocol requirements from
     // it. Look for a ArgumentConversion constraint that allows us to retrieve
     // the argument type var.
-    for (auto argConstraint :
-         CS.getConstraintGraph()[typeVar].getConstraints()) {
+    auto &cg = CS.getConstraintGraph();
+
+    // FIXME: The type variable is not going to be part of the constraint graph
+    // at this point unless it was created at the outermost decision level;
+    // otherwise it has already been rolled back! Work around this by creating
+    // an empty node if one doesn't exist.
+    cg.addTypeVariable(typeVar);
+
+    for (auto argConstraint : cg[typeVar].getConstraints()) {
       if (argConstraint->getKind() == ConstraintKind::ArgumentConversion &&
           argConstraint->getFirstType()->getRValueType()->isEqual(typeVar)) {
         if (auto argTV =
@@ -1863,7 +1879,11 @@ static inline size_t size_in_bytes(const T &x) {
 }
 
 size_t Solution::getTotalMemory() const {
-  return sizeof(*this) + typeBindings.getMemorySize() +
+  if (TotalMemory)
+    return *TotalMemory;
+
+  const_cast<Solution *>(this)->TotalMemory
+       = sizeof(*this) + size_in_bytes(typeBindings) +
          overloadChoices.getMemorySize() +
          ConstraintRestrictions.getMemorySize() +
          (Fixes.size() * sizeof(void *)) + DisjunctionChoices.getMemorySize() +
@@ -1887,6 +1907,8 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(argumentLists) +
          size_in_bytes(ImplicitCallAsFunctionRoots) +
          size_in_bytes(SynthesizedConformances);
+
+  return *TotalMemory;
 }
 
 DeclContext *Solution::getDC() const { return constraintSystem->DC; }
@@ -1930,16 +1952,15 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
   if (!decl->getInterfaceType()->is<AnyFunctionType>())
     return IUOReferenceKind::Value;
 
-  auto refKind = getFunctionRefKind();
-  assert(!forSecondApplication || refKind == FunctionRefKind::DoubleApply);
+  auto refKind = getFunctionRefInfo();
+  assert(!forSecondApplication || refKind.isDoubleApply());
 
-  switch (refKind) {
-  case FunctionRefKind::Unapplied:
-  case FunctionRefKind::Compound:
+  switch (refKind.getApplyLevel()) {
+  case FunctionRefInfo::ApplyLevel::Unapplied:
     // Such references never produce IUOs.
     return std::nullopt;
-  case FunctionRefKind::SingleApply:
-  case FunctionRefKind::DoubleApply: {
+  case FunctionRefInfo::ApplyLevel::SingleApply:
+  case FunctionRefInfo::ApplyLevel::DoubleApply:
     // Check whether this is a curried function reference e.g
     // (Self) -> (Args...) -> Ret. Such a function reference can only produce
     // an IUO on the second application.
@@ -1947,7 +1968,6 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
     if (forSecondApplication != isCurried)
       return std::nullopt;
     break;
-  }
   }
   return IUOReferenceKind::ReturnValue;
 }

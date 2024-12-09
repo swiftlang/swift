@@ -1,10 +1,10 @@
-// RUN: %target-swift-emit-silgen                           \
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types                           \
 // RUN:     %s                                              \
 // RUN:     -enable-library-evolution                       \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-NOUNWIND
 
-// RUN: %target-swift-emit-silgen                                              \
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types                                              \
 // RUN:     %s                                                                 \
 // RUN:     -enable-library-evolution                                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors                    \
@@ -234,4 +234,14 @@ class OverridableReader : GettableTitle {
       yield _title
     }
   }
+}
+
+// CHECK-LABEL: sil_default_witness_table ReadableField {
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    method #ReadableField.field!read2 
+// CHECK-SAME:        : @$s19coroutine_accessors13ReadableFieldP5fieldSivy
+// CHECK-NEXT:  }
+public protocol ReadableField {
+  @_borrowed
+  var field: Int { get }
 }

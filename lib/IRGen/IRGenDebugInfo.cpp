@@ -296,9 +296,12 @@ public:
     if (!ForceGeneratedSourceToDisk) {
       auto BufferID = SM.findBufferContainingLoc(SL);
       if (auto generatedInfo = SM.getGeneratedSourceInfo(BufferID)) {
-        // We only care about macros, so skip everything else.
+        // We only care about macro expansion buffers,
+        // so skip everything else.
         if (generatedInfo->kind != GeneratedSourceInfo::ReplacedFunctionBody &&
-            generatedInfo->kind != GeneratedSourceInfo::PrettyPrinted)
+            generatedInfo->kind != GeneratedSourceInfo::PrettyPrinted &&
+            generatedInfo->kind != GeneratedSourceInfo::DefaultArgument &&
+            generatedInfo->kind != GeneratedSourceInfo::AttributeFromClang)
           if (auto *MemBuf = SM.getLLVMSourceMgr().getMemoryBuffer(BufferID)) {
             Source = MemBuf->getBuffer();
             // This is copying the buffer twice, but Xcode depends on this
@@ -341,6 +344,15 @@ public:
   IRGenDebugInfoFormat getDebugInfoFormat() { return Opts.DebugInfoFormat; }
 
 private:
+  /// Convert a SILLocation into the corresponding LLVM Loc.
+  FileAndLocation computeLLVMLoc(const SILDebugScope *DS, SILLocation Loc);
+
+  /// Compute the LLVM DebugLoc when targeting CodeView. In CodeView, zero is
+  /// not an artificial line location; attempt to avoid those line locations near
+  /// user code to reduce the number of breaks in the linetables.
+  FileAndLocation computeLLVMLocCodeView(const SILDebugScope *DS,
+                                         SILLocation Loc);
+
   static StringRef getFilenameFromDC(const DeclContext *DC) {
     if (auto *LF = dyn_cast<LoadedFile>(DC))
       return LF->getFilename();
@@ -1011,7 +1023,7 @@ private:
     Ty = Ty->replaceSubstitutedSILFunctionTypesWithUnsubstituted(
         IGM.getSILModule());
 
-    Mangle::ASTMangler Mangler;
+    Mangle::ASTMangler Mangler(IGM.Context);
     std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
 
     // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
@@ -1084,7 +1096,8 @@ private:
              "no mangled name and no human readable name given");
     else
       assert((UniqueID.starts_with("_T") ||
-              UniqueID.starts_with(MANGLING_PREFIX_STR)) &&
+              UniqueID.starts_with(MANGLING_PREFIX_STR) ||
+              UniqueID.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) &&
              "UID is not a mangled name");
 #endif
 
@@ -1184,7 +1197,7 @@ private:
 
     auto DbgTy = DebugTypeInfo::getFromTypeInfo(
         UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
-    Mangle::ASTMangler Mangler;
+    Mangle::ASTMangler Mangler(IGM.Context);
     std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
         UnsubstitutedTy->mapTypeOutOfContext(), {});
     if (DeclTypeMangledName == MangledName) {
@@ -1242,7 +1255,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
 
   auto DbgTy = DebugTypeInfo::getFromTypeInfo(
       UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(IGM.Context);
   std::string DeclTypeMangledName =
       Mangler.mangleTypeForDebugger(UnsubstitutedTy->mapTypeOutOfContext(), {});
   if (DeclTypeMangledName == MangledName) {
@@ -2201,6 +2214,12 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
                                     L.File, 0, Scope);
     }
 
+    case TypeKind::Locatable: {
+      auto *Sugar = cast<LocatableType>(BaseTy);
+      auto *CanTy = Sugar->getSinglyDesugaredType();
+      return getOrCreateDesugaredType(CanTy, DbgTy);
+    }
+
     // SyntaxSugarType derivations.
     case TypeKind::Dictionary:
     case TypeKind::ArraySlice:
@@ -2611,6 +2630,40 @@ bool IRGenDebugInfoImpl::lineEntryIsSane(FileAndLocation DL,
 }
 #endif
 
+IRGenDebugInfoImpl::FileAndLocation
+IRGenDebugInfoImpl::computeLLVMLocCodeView(const SILDebugScope *DS,
+                                           SILLocation Loc) {
+  // If the scope has not changed and the line number is either zero or
+  // artificial, we want to keep the most recent debug location.
+  if (DS == LastScope && (Loc.is<ArtificialUnreachableLocation>() ||
+                          Loc.isLineZero(SM) || Loc.isHiddenFromDebugInfo()))
+    return LastFileAndLocation;
+
+  // Decode the location.
+  return decodeFileAndLocation(Loc);
+}
+
+IRGenDebugInfoImpl::FileAndLocation
+IRGenDebugInfoImpl::computeLLVMLoc(const SILDebugScope *DS, SILLocation Loc) {
+  SILFunction *Fn = DS->getInlinedFunction();
+  if (Fn && (Fn->isThunk() || Fn->isTransparent()))
+    return {0, 0, CompilerGeneratedFile};
+
+  if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
+    return computeLLVMLocCodeView(DS, Loc);
+
+  FileAndLocation L =
+      Loc.isInPrologue() ? FileAndLocation() : decodeFileAndLocation(Loc);
+
+  // Otherwise use a line 0 artificial location, but the file from the location.
+  if (Loc.isHiddenFromDebugInfo()) {
+    L.Line = 0;
+    L.Column = 0;
+  }
+
+  return L;
+}
+
 void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
                                        const SILDebugScope *DS,
                                        SILLocation Loc) {
@@ -2619,38 +2672,7 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
   if (!Scope)
     return;
 
-  // NOTE: In CodeView, zero is not an artificial line location. We try to
-  //       avoid those line locations near user code to reduce the number
-  //       of breaks in the linetables.
-  FileAndLocation L;
-  SILFunction *Fn = DS->getInlinedFunction();
-  if (Fn && (Fn->isThunk() || Fn->isTransparent())) {
-    L = {0, 0, CompilerGeneratedFile};
-  } else if (DS == LastScope && Loc.isHiddenFromDebugInfo()) {
-    // Reuse the last source location if we are still in the same
-    // scope to get a more contiguous line table.
-    L = LastFileAndLocation;
-  } else if (DS == LastScope &&
-             (Loc.is<ArtificialUnreachableLocation>() || Loc.isLineZero(SM)) &&
-             Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView) {
-    // If the scope has not changed and the line number is either zero or
-    // artificial, we want to keep the most recent debug location.
-    L = LastFileAndLocation;
-  } else {
-    // Decode the location.
-    if (!Loc.isInPrologue() ||
-        Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
-      L = decodeFileAndLocation(Loc);
-
-    // Otherwise use a line 0 artificial location, but the file from the
-    // location. If we are emitting CodeView, we do not want to use line zero
-    // since it does not represent an artificial line location.
-    if (Loc.isHiddenFromDebugInfo() &&
-        Opts.DebugInfoFormat != IRGenDebugInfoFormat::CodeView) {
-      L.Line = 0;
-      L.Column = 0;
-    }
-  }
+  FileAndLocation L = computeLLVMLoc(DS, Loc);
 
   if (L.getFilename() != Scope->getFilename()) {
     // We changed files in the middle of a scope. This happens, for

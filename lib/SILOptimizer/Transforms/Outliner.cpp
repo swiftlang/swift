@@ -66,13 +66,13 @@ public:
   /// Create an mangler for an outlined bridged method.
   OutlinerMangler(SILDeclRef Method, llvm::BitVector *ParameterBridged,
                   llvm::BitVector *IsParameterGuaranteed, bool ReturnBridged)
-      : IsParameterBridged(ParameterBridged),
+      : ASTMangler(Method.getASTContext()), IsParameterBridged(ParameterBridged),
         IsParameterGuaranteed(IsParameterGuaranteed), MethodDecl(Method),
         Kind(BridgedMethod), IsReturnBridged(ReturnBridged) {}
 
   /// Create an mangler for an outlined bridged property.
   OutlinerMangler(SILDeclRef Method, bool IsAddress, bool ConsumesValue)
-      : IsParameterBridged(nullptr), IsParameterGuaranteed(nullptr),
+      : ASTMangler(Method.getASTContext()), IsParameterBridged(nullptr), IsParameterGuaranteed(nullptr),
         MethodDecl(Method),
         Kind(IsAddress ? BridgedPropertyAddress
                        : (ConsumesValue ? BridgedProperty_Consuming

@@ -24,6 +24,7 @@
 #include "Dependencies.h"
 #include "TBD.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
@@ -34,7 +35,6 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TBDGenRequests.h"
-#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Edit.h"
@@ -1001,7 +1001,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
         Instance.getMainModule(), Instance.getDependencyTracker(), opts);
 
     dumpAPIIfNeeded(Instance);
-    swift::emitObjCMessageSendTraceIfNeeded(Instance.getMainModule(), opts);
+    swift::emitFineModuleTraceIfNeeded(Instance.getMainModule(), opts);
   }
 
   // Contains the hadError checks internally, we still want to output the
@@ -1235,10 +1235,10 @@ static bool performAction(CompilerInstance &Instance,
           return dumpAndPrintScopeMap(Instance,
                                       getPrimaryOrMainSourceFile(Instance));
         }, /*runDespiteErrors=*/true);
-  case FrontendOptions::ActionType::DumpTypeRefinementContexts:
+  case FrontendOptions::ActionType::DumpAvailabilityScopes:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance).getTypeRefinementContext()->dump(
+          getPrimaryOrMainSourceFile(Instance).getAvailabilityScope()->dump(
               llvm::errs(), Instance.getASTContext().SourceMgr);
           return Instance.getASTContext().hadError();
         }, /*runDespiteErrors=*/true);

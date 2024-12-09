@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend %s \
 // RUN: -emit-sil  -target %target-swift-5.1-abi-triple \
-// RUN: -enable-experimental-feature NonescapableTypes \
+// RUN: -enable-experimental-feature LifetimeDependence \
 // RUN: | %FileCheck %s
 
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
@@ -196,9 +196,8 @@ public struct OuterNE: ~Escapable {
     self.inner1 = InnerNE(owner: owner)
   }
 
-  // Infer a dependence from 'self' on 'value'. We might revoke this rule once we have syntax.
-  //
   // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7OuterNEV8setInner5valueyAC0gE0V_tF : $@convention(method) (@guaranteed OuterNE.InnerNE, @lifetime(copy 0) @inout OuterNE) -> () {
+  @lifetime(self: value)
   mutating func setInner(value: InnerNE) {
     self.inner1 = value
   }

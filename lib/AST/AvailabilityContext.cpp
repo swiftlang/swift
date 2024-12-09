@@ -52,19 +52,17 @@ bool AvailabilityContext::PlatformInfo::constrainWith(
 
 bool AvailabilityContext::PlatformInfo::constrainWith(const Decl *decl) {
   bool isConstrained = false;
-  auto &ctx = decl->getASTContext();
 
   if (auto range = AvailabilityInference::annotatedAvailableRange(decl))
     isConstrained |= constrainRange(Range, *range);
 
-  if (auto *attr = decl->getAttrs().getUnavailable(ctx)) {
-    isConstrained |= constrainUnavailability(attr->Platform);
+  if (auto *attr = decl->getUnavailableAttr()) {
+    isConstrained |= constrainUnavailability(attr->getPlatform());
     isConstrained |=
         CONSTRAIN_BOOL(IsUnavailableInEmbedded, attr->isForEmbedded());
   }
 
-  isConstrained |=
-      CONSTRAIN_BOOL(IsDeprecated, decl->getAttrs().isDeprecated(ctx));
+  isConstrained |= CONSTRAIN_BOOL(IsDeprecated, decl->isDeprecated());
 
   return isConstrained;
 }
@@ -124,13 +122,24 @@ void AvailabilityContext::Storage::Profile(llvm::FoldingSetNodeID &id) const {
   Platform.Profile(id);
 }
 
-AvailabilityContext AvailabilityContext::getDefault(ASTContext &ctx) {
-  PlatformInfo platformInfo{AvailabilityRange::forInliningTarget(ctx),
-                            PlatformKind::none,
+AvailabilityContext
+AvailabilityContext::forPlatformRange(const AvailabilityRange &range,
+                                      ASTContext &ctx) {
+  PlatformInfo platformInfo{range, PlatformKind::none,
                             /*IsUnavailable*/ false,
                             /*IsUnavailableInEmbedded*/ false,
                             /*IsDeprecated*/ false};
   return AvailabilityContext(Storage::get(platformInfo, ctx));
+}
+
+AvailabilityContext AvailabilityContext::forInliningTarget(ASTContext &ctx) {
+  return AvailabilityContext::forPlatformRange(
+      AvailabilityRange::forInliningTarget(ctx), ctx);
+}
+
+AvailabilityContext AvailabilityContext::forDeploymentTarget(ASTContext &ctx) {
+  return AvailabilityContext::forPlatformRange(
+      AvailabilityRange::forDeploymentTarget(ctx), ctx);
 }
 
 AvailabilityContext

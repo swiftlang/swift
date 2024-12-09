@@ -249,7 +249,7 @@ bool IsDefaultActorRequest::evaluate(
   if (foundExecutorPropertyImpl) {
     if (!isDefaultActor &&
         classDecl->getASTContext().LangOpts.isConcurrencyModelTaskToThread() &&
-        !AvailableAttr::isUnavailable(classDecl)) {
+        !classDecl->isUnavailable()) {
       classDecl->diagnose(
           diag::concurrency_task_to_thread_model_custom_executor,
           "task-to-thread concurrency model");
@@ -3865,54 +3865,8 @@ namespace {
             unsatisfiedIsolation, setThrows, usesDistributedThunk);
       }
 
-      // Sendable checking for arguments is deferred to region isolation.
-
-      // FIXME: Defer sendable checking for result types to region isolation
-      // always.
-      //
-      // Check for sendability of the result type if we do not have a
-      // sending result.
-      if ((!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation) ||
-           !fnType->hasSendingResult())) {
-        assert(ctx.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
-               "SendingArgsAndResults should be enabled if RegionIsolation is "
-               "enabled");
-        // See if we are a autoclosure that has a direct callee that has the
-        // same non-transferred type value returned. If so, do not emit an
-        // error... we are going to emit an error on the call expr and do not
-        // want to emit the error twice.
-        auto willDoubleError = [&]() -> bool {
-          auto *autoclosure = dyn_cast<AutoClosureExpr>(apply->getFn());
-          if (!autoclosure)
-            return false;
-          auto *await =
-              dyn_cast<AwaitExpr>(autoclosure->getSingleExpressionBody());
-          if (!await)
-            return false;
-          auto *subCallExpr = dyn_cast<CallExpr>(await->getSubExpr());
-          if (!subCallExpr)
-            return false;
-          return subCallExpr->getType().getPointer() ==
-                 fnType->getResult().getPointer();
-        };
-
-        if (!willDoubleError()) {
-          if (calleeDecl) {
-            return diagnoseNonSendableTypes(fnType->getResult(), getDeclContext(),
-                /*inDerivedConformance*/ Type(),
-                apply->getLoc(),
-                diag::non_sendable_result_into_actor,
-                calleeDecl,
-                *unsatisfiedIsolation);
-          }
-
-          return diagnoseNonSendableTypes(fnType->getResult(), getDeclContext(),
-              /*inDerivedConformance*/ Type(),
-              apply->getLoc(),
-              diag::non_sendable_call_result_type,
-              *unsatisfiedIsolation);
-        }
-      }
+      // Sendable checking for arguments and results are deferred to region
+      // isolation.
 
       return false;
     }
@@ -4458,9 +4412,9 @@ namespace {
     }
 
     // Attempt to resolve the global actor type of a closure.
-    Type resolveGlobalActorType(ClosureExpr *closure) {
+    Type resolveGlobalActorType(AbstractClosureExpr *ACE) {
       // Check whether the closure's type has a global actor already.
-      if (Type closureType = getType(closure)) {
+      if (Type closureType = getType(ACE)) {
         if (auto closureFnType = closureType->getAs<FunctionType>()) {
           if (Type globalActor = closureFnType->getGlobalActor())
             return globalActor;
@@ -4468,7 +4422,11 @@ namespace {
       }
 
       // Look for an explicit attribute.
-      return getExplicitGlobalActor(closure);
+      if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+        if (auto globalActor = getExplicitGlobalActor(CE))
+          return globalActor;
+      }
+      return Type();
     }
 
   public:
@@ -4480,14 +4438,16 @@ namespace {
         AbstractClosureExpr *closure) {
       bool preconcurrency = false;
 
-      if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+      if (auto explicitClosure = dyn_cast<ClosureExpr>(closure))
         preconcurrency = explicitClosure->isIsolatedByPreconcurrency();
 
-        // If the closure specifies a global actor, use it.
-        if (Type globalActor = resolveGlobalActorType(explicitClosure))
-          return ActorIsolation::forGlobalActor(globalActor)
-              .withPreconcurrency(preconcurrency);
+      // If the closure specifies a global actor, use it.
+      if (Type globalActor = resolveGlobalActorType(closure)) {
+        return ActorIsolation::forGlobalActor(globalActor)
+          .withPreconcurrency(preconcurrency);
+      }
 
+      if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
         if (auto *attr =
                 explicitClosure->getAttrs().getAttribute<NonisolatedAttr>();
             attr && ctx.LangOpts.hasFeature(Feature::ClosureIsolation)) {
@@ -4943,7 +4903,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
         // Substitute into the global actor type.
         auto conformance = std::get<0>(isolated);
         auto requirementSubs = SubstitutionMap::getProtocolSubstitutions(
-            conformance->getProtocol(), dc->getSelfTypeInContext(),
+            conformance->getProtocol(), dc->getSelfInterfaceType(),
             ProtocolConformanceRef(conformance));
         Type globalActor = isolation.getGlobalActor().subst(requirementSubs);
         if (!globalActorTypes.insert(globalActor->getCanonicalType()).second)
@@ -5627,9 +5587,10 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
   IsolationSource defaultIsolationSource;
 
-  // If we are supposed to infer main actor isolation by default, make our
-  // default isolation main actor.
-  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated)) {
+  // If we are supposed to infer main actor isolation by default for entities
+  // within our module, make our default isolation main actor.
+  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated) &&
+      value->getModuleContext() == ctx.MainModule) {
     defaultIsolation = ActorIsolation::forMainActor(ctx);
   }
 
@@ -6472,7 +6433,7 @@ bool swift::checkSendableConformance(
   // superclass conformance to find an unavailable attribute.
   if (auto ext = dyn_cast<ExtensionDecl>(
           conformance->getRootConformance()->getDeclContext())) {
-    if (AvailableAttr::isUnavailable(ext))
+    if (ext->isUnavailable())
       return false;
   }
 
@@ -6627,20 +6588,17 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
            : nullptr) {
     bool anyPlatformSpecificAttrs = false;
     for (auto available: enclosing->getAttrs().getAttributes<AvailableAttr>()) {
-      if (available->Platform == PlatformKind::none)
+      if (available->getPlatform() == PlatformKind::none)
         continue;
 
       auto attr = new (ctx) AvailableAttr(
-          SourceLoc(), SourceRange(),
-          available->Platform,
+          SourceLoc(), SourceRange(), available->getPlatform(),
           available->Message,
-          "", nullptr,
-          available->Introduced.value_or(noVersion), SourceRange(),
-          available->Deprecated.value_or(noVersion), SourceRange(),
-          available->Obsoleted.value_or(noVersion), SourceRange(),
-          PlatformAgnosticAvailabilityKind::Unavailable,
-          /*implicit=*/true,
-          available->isSPI());
+          /*Rename=*/"", available->Introduced.value_or(noVersion),
+          SourceRange(), available->Deprecated.value_or(noVersion),
+          SourceRange(), available->Obsoleted.value_or(noVersion),
+          SourceRange(), PlatformAgnosticAvailabilityKind::Unavailable,
+          /*Implicit=*/true, available->isSPI());
       ext->getAttrs().add(attr);
       anyPlatformSpecificAttrs = true;
     }
@@ -6652,14 +6610,12 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
 
   // Add the blanket "unavailable".
 
-  auto attr = new (ctx) AvailableAttr(SourceLoc(), SourceRange(),
-                                      PlatformKind::none, "", "", nullptr,
-                                      noVersion, SourceRange(),
-                                      noVersion, SourceRange(),
-                                      noVersion, SourceRange(),
-                                      PlatformAgnosticAvailabilityKind::Unavailable,
-                                      false,
-                                      false);
+  auto attr = new (ctx) AvailableAttr(
+      SourceLoc(), SourceRange(), PlatformKind::none, /*Message*/ "",
+      /*Rename=*/"", /*Introduced=*/noVersion, SourceRange(),
+      /*Deprecated=*/noVersion, SourceRange(), /*Obsoleted=*/noVersion,
+      SourceRange(), PlatformAgnosticAvailabilityKind::Unavailable,
+      /*Implicit=*/false, /*SPI=*/false);
   ext->getAttrs().add(attr);
 }
 

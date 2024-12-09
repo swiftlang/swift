@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %S/Inputs/def_structA.swift
 
 // This uses '-primary-file' to ensure we're conservative with lazy SIL emission.
-// RUN: %target-swift-emit-silgen -primary-file %s -I %t | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -primary-file %s -I %t | %FileCheck %s
 
 import def_structA
 
@@ -536,4 +536,46 @@ func testCaptures(@ClassWrapper ref: Int, @Wrapper value: Int) {
 
   // closure #2 in closure #2 in implicit closure #2 in testCaptures(ref:value:)
   // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter12testCaptures3ref5valueySi_AA7WrapperVySiGtFyAA010ProjectionH0VySiGcfu0_yAJcfU1_AJycfU0_ : $@convention(thin) (ProjectionWrapper<Int>) -> ProjectionWrapper<Int>
+}
+
+do {
+  @propertyWrapper
+  struct Binding<Value> {
+    var wrappedValue: Value {
+      get { fatalError() }
+      nonmutating set { }
+    }
+
+    var projectedValue: Self { self }
+
+    init(projectedValue: Self) { self = projectedValue }
+  }
+
+  final class Value {
+    enum Kind {
+    }
+
+    var kind: Binding<Kind> {
+      fatalError()
+    }
+  }
+
+  struct Test {
+    var value: Value
+
+    // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter4TestL_V4test5otheryAA7BindingL_VyAA5ValueL_C4KindOG_tF : $@convention(method) (Binding<Value.Kind>, @guaranteed Test) -> ()
+    // CHECK: [[CHECK_PROJECTED_VALUE_INIT_1:%.*]] = function_ref @$s26property_wrapper_parameter4TestL_V9checkKind4kindyAA7BindingL_VyAA5ValueL_C0F0OG_tFAEL_AKvpfW
+    // CHECK-NEXT: {{.*}} = apply [[CHECK_PROJECTED_VALUE_INIT_1]]({{.*}}) : $@convention(thin) (Binding<Value.Kind>) -> Binding<Value.Kind>
+    // CHECK: [[CHECK_PROJECTED_VALUE_INIT_A:%.*]] = function_ref @$s26property_wrapper_parameter4TestL_V15doubleCheckKind1a1byAA7BindingL_VyAA5ValueL_C0G0OG_AMtFAEL_ALvpfW
+    // CHECK-NEXT: {{.*}} = apply [[CHECK_PROJECTED_VALUE_INIT_A]]({{.*}}) : $@convention(thin) (Binding<Value.Kind>) -> Binding<Value.Kind>
+    // CHECK: [[CHECK_PROJECTED_VALUE_INIT_B:%.*]] = function_ref @$s26property_wrapper_parameter4TestL_V15doubleCheckKind1a1byAA7BindingL_VyAA5ValueL_C0G0OG_AMtFAFL_ALvpfW
+    // CHECK-NEXT: {{.*}} = apply [[CHECK_PROJECTED_VALUE_INIT_B]]({{.*}}) : $@convention(thin) (Binding<Value.Kind>) -> Binding<Value.Kind>
+    func test(other: Binding<Value.Kind>) {
+      checkKind($kind: value.kind) // Ok
+      doubleCheckKind($a: value.kind, $b: other) // Ok
+    }
+
+    func checkKind(@Binding kind: Value.Kind) {}
+    func doubleCheckKind(@Binding a: Value.Kind, @Binding b: Value.Kind) {}
+  }
 }

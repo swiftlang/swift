@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ValueGenerics -enable-experimental-feature NonescapableTypes -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ValueGenerics  -disable-availability-checking
 
-// REQUIRES: swift_feature_NonescapableTypes
 // REQUIRES: swift_feature_ValueGenerics
 
 protocol P {}

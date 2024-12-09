@@ -288,6 +288,34 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
     return task
   }
 
+  func showCaveatsIfNeeded() {
+    guard log.logLevel <= .note else { return }
+
+    var notes: [String] = []
+    if projectOpts.useBuildableFolders {
+      notes.append("""
+        - Buildable folders are enabled by default, which requires Xcode 16. You
+          can pass '--no-buildable-folders' to disable this. See the '--help'
+          entry for more info.
+        """)
+    }
+
+    if !projectOpts.addStdlibSwift {
+      notes.append("""
+        - Swift standard library targets are disabled by default since they require
+          using a development snapshot of Swift with Xcode. You can pass '--stdlib-swift'
+          to enable. See the '--help' entry for more info.
+        """)
+    }
+    guard !notes.isEmpty else { return }
+    log.note("Caveats:")
+    for note in notes {
+      for line in note.components(separatedBy: .newlines) {
+        log.note(line)
+      }
+    }
+  }
+
   func generate() async throws {
     let buildDirPath = buildDir.absoluteInWorkingDir.resolvingSymlinks
     log.info("Generating project for '\(buildDirPath)'...")
@@ -342,6 +370,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
         try lldbLLVMWorkspace.write("LLDB+LLVM", into: outputDir)
       }
     }
+    showCaveatsIfNeeded()
   }
 
   func run() async {

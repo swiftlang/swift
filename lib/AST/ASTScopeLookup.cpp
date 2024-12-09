@@ -30,6 +30,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/Compiler.h"
 
@@ -262,6 +263,20 @@ bool ASTScopeImpl::lookInGenericParametersOf(
 
 bool ASTScopeImpl::lookupLocalsOrMembers(DeclConsumer) const {
   return false; // many kinds of scopes have none
+}
+
+bool AbstractFunctionDeclScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
+  // Special case: if we're within a function inside a type context, but the
+  // parent context is within a Clang module unit, we need to make sure to
+  // look for members in it.
+  auto dc = decl->getDeclContext();
+  if (!dc->isTypeContext())
+    return false;
+
+  if (!isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+    return false;
+
+  return consumer.lookInMembers(cast<GenericContext>(dc->getAsDecl()));
 }
 
 bool GenericTypeOrExtensionScope::lookupLocalsOrMembers(

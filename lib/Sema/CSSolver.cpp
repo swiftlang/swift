@@ -103,8 +103,10 @@ Solution ConstraintSystem::finalize() {
     // This type variable has no binding. Allowed only
     // when `FreeTypeVariableBinding::Allow` is set,
     // which is checked above.
-    if (!getFixedType(tv))
+    if (!getFixedType(tv)) {
+      solution.typeBindings[tv] = Type();
       continue;
+    }
 
     solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
   }
@@ -274,10 +276,15 @@ void ConstraintSystem::replaySolution(const Solution &solution,
   if (shouldIncreaseScore)
     replayScore(solution.getFixedScore());
 
-  // Assign fixed types to the type variables solved by this solution.
   for (auto binding : solution.typeBindings) {
     // If we haven't seen this type variable before, record it now.
     addTypeVariable(binding.first);
+  }
+
+  // Assign fixed types to the type variables solved by this solution.
+  for (auto binding : solution.typeBindings) {
+    if (!binding.second)
+      continue;
 
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
@@ -682,7 +689,7 @@ ConstraintSystem::SolverState::~SolverState() {
   // Update the "largest" statistics if this system is larger than the
   // previous one.  
   // FIXME: This is not at all thread-safe.
-  if (NumStatesExplored > LargestNumStatesExplored.getValue()) {
+  if (NumSolverScopes > LargestNumSolverScopes.getValue()) {
     LargestSolutionAttemptNumber = SolutionAttempt-1;
     ++LargestSolutionAttemptNumber;
     #define CS_STATISTIC(Name, Description) \
@@ -695,8 +702,8 @@ ConstraintSystem::SolverState::~SolverState() {
 
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   : cs(cs),
-    numTypeVariables(cs.TypeVariables.size()),
-    numTrailChanges(cs.solverState->Trail.size()),
+    startTypeVariables(cs.TypeVariables.size()),
+    startTrailSteps(cs.solverState->Trail.size()),
     scopeNumber(cs.solverState->beginScope()),
     moved(0) {
   ASSERT(!cs.failedConstraint && "Unexpected failed constraint!");
@@ -704,8 +711,8 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
 ConstraintSystem::SolverScope::SolverScope(SolverScope &&other)
   : cs(other.cs),
-    numTypeVariables(other.numTypeVariables),
-    numTrailChanges(other.numTrailChanges),
+    startTypeVariables(other.startTypeVariables),
+    startTrailSteps(other.startTrailSteps),
     scopeNumber(other.scopeNumber),
     moved(0) {
   other.moved = 1;
@@ -720,7 +727,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
     return;
 
   // Roll back introduced type variables.
-  truncate(cs.TypeVariables, numTypeVariables);
+  truncate(cs.TypeVariables, startTypeVariables);
 
   // Move any remaining active constraints into the inactive list.
   if (!cs.ActiveConstraints.empty()) {
@@ -731,14 +738,41 @@ ConstraintSystem::SolverScope::~SolverScope() {
                                   cs.ActiveConstraints);
   }
 
+  uint64_t endTrailSteps = cs.solverState->Trail.size();
+
   // Roll back changes to the constraint system.
-  cs.solverState->Trail.undo(numTrailChanges);
+  cs.solverState->Trail.undo(startTrailSteps);
 
   // Update statistics.
-  cs.solverState->endScope(scopeNumber);
+  cs.solverState->endScope(scopeNumber,
+                           startTrailSteps,
+                           endTrailSteps);
 
   // Clear out other "failed" state.
   cs.failedConstraint = nullptr;
+}
+
+unsigned ConstraintSystem::SolverState::beginScope() {
+  ++depth;
+  maxDepth = std::max(maxDepth, depth);
+
+  CS.incrementScopeCounter();
+
+  return NumSolverScopes++;
+}
+
+/// Update statistics when a scope ends.
+void ConstraintSystem::SolverState::endScope(unsigned scopeNumber,
+                                             uint64_t startTrailSteps,
+                                             uint64_t endTrailSteps) {
+  ASSERT(depth > 0);
+  --depth;
+
+  NumTrailSteps += (endTrailSteps - startTrailSteps);
+
+  unsigned countSolverScopes = NumSolverScopes - scopeNumber;
+  if (countSolverScopes == 1)
+    CS.incrementLeafScopes();
 }
 
 /// Solve the system of constraints.
@@ -795,7 +829,7 @@ bool ConstraintSystem::Candidate::solve(
   ConstraintSystem cs(DC, std::nullopt);
 
   // Set up expression type checker timer for the candidate.
-  cs.Timer.emplace(E, cs);
+  cs.startExpressionTimer(E);
 
   // Generate constraints for the new system.
   if (auto generatedExpr = cs.generateConstraints(E, DC)) {
@@ -1494,7 +1528,7 @@ ConstraintSystem::solveImpl(SyntacticElementTarget &target,
 
   // Set up the expression type checker timer.
   if (Expr *expr = target.getAsExpr())
-    Timer.emplace(expr, *this);
+    startExpressionTimer(expr);
 
   if (generateConstraints(target, allowFreeTypeVariables))
     return SolutionResult::forError();
@@ -1529,7 +1563,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   if (isDebugMode()) {
     auto &log = llvm::errs();
     log << "\n---Solver statistics---\n";
-    log << "Total number of scopes explored: " << solverState->NumStatesExplored << "\n";
+    log << "Total number of scopes explored: " << solverState->NumSolverScopes << "\n";
+    log << "Total number of trail steps: " << solverState->NumTrailSteps << "\n";
     log << "Maximum depth reached while exploring solutions: " << solverState->maxDepth << "\n";
     if (Timer) {
       auto timeInMillis =
@@ -1679,7 +1714,7 @@ bool ConstraintSystem::solveForCodeCompletion(
     setContextualInfo(expr, target.getExprContextualTypeInfo());
 
     // Set up the expression type checker timer.
-    Timer.emplace(expr, *this);
+    startExpressionTimer(expr);
 
     shrink(expr);
   }

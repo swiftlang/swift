@@ -56,3 +56,13 @@ public macro declareVarValuePeerShadowed() = #externalMacro(module: "MacroDefini
 
 @attached(peer, names: overloaded)
 public macro AddAsync() = #externalMacro(module: "MacroDefinition", type: "AddAsyncMacro")
+
+@attached(peer, names: overloaded)
+public macro AddAsyncFinal() = #externalMacro(module: "MacroDefinition", type: "AddAsyncMacro")
+
+public enum Something {
+case something
+}
+
+@attached(peer, names: overloaded)
+public macro AcceptedDotted(_: Something) = #externalMacro(module: "MacroDefinition", type: "EmptyPeerMacro")

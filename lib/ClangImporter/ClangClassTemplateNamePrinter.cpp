@@ -35,36 +35,24 @@ struct TemplateInstantiationNamePrinter
   }
 
   std::string VisitBuiltinType(const clang::BuiltinType *type) {
-    Type swiftType = nullptr;
     switch (type->getKind()) {
     case clang::BuiltinType::Void:
-      swiftType =
-          swiftCtx.getNamedSwiftType(swiftCtx.getStdlibModule(), "Void");
-      break;
+      return "Void";
+    case clang::BuiltinType::NullPtr:
+      return "nil";
+
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)                  \
-      case clang::BuiltinType::CLANG_BUILTIN_KIND:                             \
-        swiftType = swiftCtx.getNamedSwiftType(swiftCtx.getStdlibModule(),     \
-                                               #SWIFT_TYPE_NAME);              \
-        break;
-#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)            \
-      case clang::BuiltinType::CLANG_BUILTIN_KIND:                             \
-        swiftType = swiftCtx.getNamedSwiftType(swiftCtx.getStdlibModule(),     \
-                                               #SWIFT_TYPE_NAME);              \
-        break;
+    case clang::BuiltinType::CLANG_BUILTIN_KIND:                               \
+      return #SWIFT_TYPE_NAME;
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
     default:
       break;
     }
 
-    if (swiftType) {
-      if (swiftType->is<NominalType>() || swiftType->isVoid()) {
-        return swiftType->getStringAsComponent();
-      }
-    }
-    return "_";
+    return VisitType(type);
   }
 
-  std::string VisitRecordType(const clang::RecordType *type) {
+  std::string VisitTagType(const clang::TagType *type) {
     auto tagDecl = type->getAsTagDecl();
     if (auto namedArg = dyn_cast_or_null<clang::NamedDecl>(tagDecl)) {
       if (auto typeDefDecl = tagDecl->getTypedefNameForAnonDecl())

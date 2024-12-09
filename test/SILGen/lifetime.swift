@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name lifetime -Xllvm -sil-full-demangle -parse-as-library -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name lifetime -Xllvm -sil-full-demangle -parse-as-library -primary-file %s | %FileCheck %s
 
 struct Buh<T> {
   var x: Int {

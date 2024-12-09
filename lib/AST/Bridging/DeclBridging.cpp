@@ -134,8 +134,7 @@ BridgedAccessorDecl BridgedAccessorDecl_createParsed(
 
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries,
-    bool isStatic, bool isLet) {
+    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries, BridgedDeclAttributes cAttrs, bool isStatic, bool isLet) {
   ASTContext &context = cContext.unbridged();
   DeclContext *declContext = cDeclContext.unbridged();
 
@@ -147,6 +146,7 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
 
     // Configure all vars.
     pattern->forEachVariable([&](VarDecl *VD) {
+      VD->getAttrs() = cAttrs.unbridged();
       VD->setStatic(isStatic);
       VD->setIntroducer(introducer);
     });
@@ -302,6 +302,22 @@ BridgedDestructorDecl_createParsed(BridgedASTContext cContext,
       DestructorDecl(cDeinitKeywordLoc.unbridged(), cDeclContext.unbridged());
 
   return decl;
+}
+
+BridgedMacroDecl BridgedMacroDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cMacroLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList cGenericParams,
+    BridgedParameterList cParams, BridgedSourceLoc cArrowLoc,
+    BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition) {
+  ASTContext &context = cContext.unbridged();
+  auto *params = cParams.unbridged();
+  DeclName fullName = DeclName(context, cName.unbridged(), params);
+  return new (context)
+      MacroDecl(cMacroLoc.unbridged(), fullName, cNameLoc.unbridged(),
+                cGenericParams.unbridged(), params, cArrowLoc.unbridged(),
+                cResultType.unbridged(), cDefinition.unbridged(),
+                cDeclContext.unbridged());
 }
 
 BridgedTypeAliasDecl BridgedTypeAliasDecl_createParsed(

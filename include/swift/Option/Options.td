@@ -794,12 +794,12 @@ def enable_experimental_concise_pound_file : Flag<["-"],
 
 def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
-  Flags<[NoDriverOption, FrontendOption, HelpHidden, ModuleInterfaceOption]>,
+  Flags<[NoDriverOption, FrontendOption, HelpHidden]>,
   HelpText<"Enable experimental C++ interop code generation and config directives">;
 
 def cxx_interoperability_mode :
   Joined<["-"], "cxx-interoperability-mode=">,
-  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
          SwiftSynthesizeInterfaceOption]>,
   HelpText<"Enables C++ interoperability; pass 'default' to enable or 'off' to disable">;
 
@@ -925,9 +925,19 @@ def enable_experimental_feature :
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable an experimental feature">;
 
+def disable_experimental_feature :
+  Separate<["-"], "disable-experimental-feature">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Disable an experimental feature">;
+
 def enable_upcoming_feature : Separate<["-"], "enable-upcoming-feature">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable a feature that will be introduced in an upcoming language "
+           "version">;
+
+def disable_upcoming_feature : Separate<["-"], "disable-upcoming-feature">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Disable a feature that will be introduced in an upcoming language "
            "version">;
 
 def Rpass_EQ : Joined<["-"], "Rpass=">,
@@ -1336,9 +1346,9 @@ def dump_scope_maps : Separate<["-"], "dump-scope-maps">,
   MetaVarName<"<expanded-or-list-of-line:column>">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def dump_type_refinement_contexts :
-  Flag<["-"], "dump-type-refinement-contexts">,
-  HelpText<"Type-check input file(s) and dump type refinement contexts(s)">,
+def dump_availability_scopes :
+  Flag<["-"], "dump-availability-scopes">,
+  HelpText<"Type-check input file(s) and dump availability scopes">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_type_info : Flag<["-"], "dump-type-info">,
@@ -1407,7 +1417,7 @@ def Xcc : Separate<["-"], "Xcc">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;
 
 def Xclang_linker : Separate<["-"], "Xclang-linker">, Flags<[HelpHidden]>,
-  MetaVarName<"<arg>">, HelpText<"Pass <arg> to Clang when it is use for linking.">;
+  MetaVarName<"<arg>">, HelpText<"Pass <arg> to Clang when it is used for linking.">;
 
 def Xllvm : Separate<["-"], "Xllvm">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -1670,6 +1680,15 @@ def omit_extension_block_symbols: Flag<["-"], "omit-extension-block-symbols">,
         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Directly associate members and conformances with the extended nominal when generating symbol graphs instead of emitting 'swift.extension' symbols for extensions to external types">;
 
+// swift-synthesize-interface-only options
+def include_submodules : Flag<["-"], "include-submodules">,
+  Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Also print the declarations synthesized for any Clang submodules">;
+
+def print_fully_qualified_types : Flag<["-"], "print-fully-qualified-types">,
+  Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Always print fully qualified type names">;
+
 // swift-symbolgraph-extract-only options
 def output_dir : Separate<["-"], "output-dir">,
   Flags<[NoDriverOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
@@ -1869,6 +1888,11 @@ def use_interface_for_module: Separate<["-", "--"], "use-interface-for-module">,
   HelpText<"Prefer loading these modules via interface">,
   MetaVarName<"<name>">;
 
+def load_pass_plugin_EQ : Joined<["-"], "load-pass-plugin=">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Load LLVM pass plugin from a dynamic shared object file.">,
+  MetaVarName<"<path>">;
+
 // ONLY SUPPORTED IN NEW DRIVER
 
 // These flags only exist here so that the old driver doesn't fail with unknown
@@ -1897,6 +1921,11 @@ def driver_scan_dependencies_non_lib:
   Flags<[HelpHidden, NewDriverOnlyOption]>,
   HelpText<"Use calls to `swift-frontend -scan-dependencies` instead of "
            "dedicated dependency scanning library">;
+
+def always_rebuild_module_dependencies:
+  Flag<["-"], "always-rebuild-module-dependencies">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Always rebuild module dependencies">;
 
 def driver_warn_unused_options:
   Flag<["-"], "driver-warn-unused-options">,

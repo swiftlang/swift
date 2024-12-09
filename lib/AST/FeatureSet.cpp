@@ -197,6 +197,7 @@ UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
 UNINTERESTING_FEATURE(GenerateForceToMainActorThunks)
+UNINTERESTING_FEATURE(Span)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
@@ -248,6 +249,19 @@ static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureLifetimeDependence(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<LifetimeAttr>()) {
+    return true;
+  }
+  auto *afd = dyn_cast<AbstractFunctionDecl>(decl);
+  if (!afd) {
+    return false;
+  }
+  return afd->getInterfaceType()
+      ->getAs<AnyFunctionType>()
+      ->hasLifetimeDependencies();
+}
+
 UNINTERESTING_FEATURE(DynamicActorIsolation)
 UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)
@@ -274,6 +288,20 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
     }
     return false;
   });
+}
+
+static bool usesFeatureAddressableParameters(Decl *d) {
+  auto fd = dyn_cast<AbstractFunctionDecl>(d);
+  if (!fd) {
+    return false;
+  }
+  
+  for (auto pd : *fd->getParameters()) {
+    if (pd->isAddressable()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 UNINTERESTING_FEATURE(IsolatedAny2)

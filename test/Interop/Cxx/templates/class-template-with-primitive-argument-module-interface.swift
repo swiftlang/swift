@@ -17,6 +17,7 @@
 // CHECK: typealias WrappedMagicLongArr = MagicWrapper<[CLong]>
 // CHECK: typealias WrappedMagicIntFixedSizeArr1 = MagicWrapper<Vector<CInt, 123>>
 // CHECK: typealias WrappedMagicIntFixedSizeArr2 = MagicWrapper<Vector<CInt, 124>>
+// CHECK: typealias WrappedMagicNullPtr = MagicWrapper<nil>
 
 // CHECK: typealias DoubleWrappedInt = DoubleWrapper<MagicWrapper<CInt>>
 // CHECK: typealias DoubleWrappedIntConst = DoubleWrapper<MagicWrapper<CInt_const>>
@@ -27,3 +28,4 @@
 // CHECK: typealias DoubleWrappedMagicLongArr = DoubleWrapper<MagicWrapper<[CLong]>>
 // CHECK: typealias DoubleWrappedMagicIntFixedSizeArr1 = DoubleWrapper<MagicWrapper<Vector<CInt, 42>>>
 // CHECK: typealias DoubleWrappedMagicIntFixedSizeArr2 = DoubleWrapper<MagicWrapper<Vector<CInt, 43>>>
+// CHECK: typealias DoubleWrappedMagicNullPtr = DoubleWrapper<MagicWrapper<nil>>

@@ -772,6 +772,9 @@ public:
       auto createIntrinsic =
           throws ? SGF.SGM.getCreateCheckedThrowingContinuation()
                  : SGF.SGM.getCreateCheckedContinuation();
+    auto conformances =
+        collectExistentialConformances(calleeTypeInfo.substResultType,
+                                       ctx.TheAnyType);
       auto subs =
           SubstitutionMap::get(createIntrinsic->getGenericSignature(),
                                {calleeTypeInfo.substResultType}, conformances);
@@ -782,6 +785,7 @@ public:
       SGF.emitApplyOfLibraryIntrinsic(loc, createIntrinsic, subs,
                                       {continuationMV}, SGFContext())
           .forwardInto(SGF, loc, underlyingInit.get());
+      SGF.enterDestroyCleanup(underlyingContinuationAddr);
     } else {
       SGF.B.createStore(loc, wrappedContinuation, underlyingContinuationAddr,
                         StoreOwnershipQualifier::Trivial);

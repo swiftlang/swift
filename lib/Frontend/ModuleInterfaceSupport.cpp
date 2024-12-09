@@ -456,8 +456,8 @@ class InheritedProtocolCollector {
         // attributes for the same platform; formally they'd need to be merged.
         bool alreadyHasMoreSpecificAttrForThisPlatform =
             llvm::any_of(*cache, [nextAttr](const AvailableAttr *existingAttr) {
-          return existingAttr->Platform == nextAttr->Platform;
-        });
+              return existingAttr->getPlatform() == nextAttr->getPlatform();
+            });
         if (alreadyHasMoreSpecificAttrForThisPlatform)
           continue;
         cache->push_back(nextAttr);
@@ -878,7 +878,7 @@ bool swift::emitSwiftInterface(raw_ostream &out,
       M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention,
       Opts.InterfaceContentMode,
       useExportedModuleNames,
-      Opts.AliasModuleNames, &aliasModuleNamesTargets, Opts.ABIComments);
+      Opts.AliasModuleNames, &aliasModuleNamesTargets);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;

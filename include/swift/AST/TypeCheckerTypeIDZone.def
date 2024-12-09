@@ -469,11 +469,8 @@ SWIFT_REQUEST(TypeChecker, ImplicitKnownProtocolConformanceRequest,
 SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
               ValueDecl *(const ValueDecl *, const AvailableAttr *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SemanticAvailableRangeAttrRequest,
-              Optional<AvailableAttrDeclPair>(const Decl *),
-              Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SemanticUnavailableAttrRequest,
-              Optional<AvailableAttrDeclPair>(const Decl *),
+SWIFT_REQUEST(TypeChecker, SemanticDeclAvailabilityRequest,
+              SemanticDeclAvailability(const Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
               FunctionType::ExtInfo(ClosureExpr *),
@@ -557,8 +554,8 @@ SWIFT_REQUEST(TypeChecker, InitAccessorReferencedVariablesRequest,
               ArrayRef<VarDecl *>(DeclAttribute *, AccessorDecl *,
                                   ArrayRef<Identifier>),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, ExpandChildTypeRefinementContextsRequest,
-              std::vector<TypeRefinementContext *>(TypeRefinementContext *),
+SWIFT_REQUEST(TypeChecker, ExpandChildAvailabilityScopesRequest,
+              std::vector<AvailabilityScope *>(AvailabilityScope *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SerializeAttrGenericSignatureRequest,
               GenericSignature(Decl *, SpecializeAttr *),

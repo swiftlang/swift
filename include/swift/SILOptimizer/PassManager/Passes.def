@@ -120,8 +120,6 @@ IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",
            "SIL alloc_stack Hoisting")
 PASS(ArrayCountPropagation, "array-count-propagation",
      "Array Count Propagation")
-PASS(ArrayElementPropagation, "array-element-propagation",
-     "Array Element Propagation")
 SWIFT_FUNCTION_PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
      "Assume Single-Threaded Environment")
 SWIFT_MODULE_PASS(AsyncDemotion, "async-demotion",
@@ -531,6 +529,7 @@ SWIFT_SILCOMBINE_PASS(DestroyValueInst)
 SWIFT_SILCOMBINE_PASS(DestructureStructInst)
 SWIFT_SILCOMBINE_PASS(DestructureTupleInst)
 SWIFT_SILCOMBINE_PASS(TypeValueInst)
+SWIFT_SILCOMBINE_PASS(UncheckedEnumDataInst)
 
 #undef IRGEN_PASS
 #undef SWIFT_MODULE_PASS

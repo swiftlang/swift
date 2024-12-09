@@ -1230,7 +1230,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
     case options::OPT_print_ast:
-    case options::OPT_dump_type_refinement_contexts:
+    case options::OPT_dump_availability_scopes:
     case options::OPT_dump_scope_maps:
     case options::OPT_dump_interface_hash:
     case options::OPT_dump_type_info:
@@ -1691,6 +1691,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_PCH:
       case file_types::TY_ImportedModules:
       case file_types::TY_ModuleTrace:
+      case file_types::TY_FineModuleTrace:
       case file_types::TY_YAMLOptRecord:
       case file_types::TY_BitstreamOptRecord:
       case file_types::TY_SwiftModuleInterfaceFile:
@@ -1707,6 +1708,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_SwiftFixIt:
       case file_types::TY_ModuleSemanticInfo:
       case file_types::TY_CachedDiagnostics:
+      case file_types::TY_SymbolGraphFile:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,

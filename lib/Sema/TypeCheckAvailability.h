@@ -211,12 +211,8 @@ bool isExported(const Decl *D);
 void diagnoseExprAvailability(const Expr *E, DeclContext *DC);
 
 /// Diagnose uses of unavailable declarations in statements (via patterns, etc)
-/// but not expressions, unless \p walkRecursively was specified.
-///
-/// \param walkRecursively Whether nested statements and expressions should
-/// be visited, too.
-void diagnoseStmtAvailability(const Stmt *S, DeclContext *DC,
-                              bool walkRecursively=false);
+/// but not expressions.
+void diagnoseStmtAvailability(const Stmt *S, DeclContext *DC);
 
 /// Checks both a TypeRepr and a Type, but avoids emitting duplicate
 /// diagnostics by only checking the Type if the TypeRepr succeeded.
@@ -251,7 +247,6 @@ void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 /// Returns `std::nullopt` if the declaration is available.
 std::optional<AvailabilityConstraint>
 getUnsatisfiedAvailabilityConstraint(const Decl *decl,
-                                     const DeclContext *declContext,
                                      AvailabilityContext availabilityContext);
 
 /// Checks whether a declaration should be considered unavailable when referred

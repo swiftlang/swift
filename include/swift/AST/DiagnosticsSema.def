@@ -1834,6 +1834,10 @@ ERROR(attr_implementation_category_goes_on_objc_attr,none,
       "'@implementation'",
       ())
 
+ERROR(attr_not_allowed_in_c_functions,none,
+      "attribute %0 is not allowed in C function conventions",
+      (StringRef))
+
 WARNING(objc_implementation_will_become_objc,none,
         "%kind0 will become implicitly '@objc' after adopting '@objc "
         "@implementation'; add '%select{@nonobjc|final}1' to keep the current "
@@ -5105,7 +5109,8 @@ ERROR(unknown_case_must_be_last,none,
       "'@unknown' can only be applied to the last case in a switch", ())
 
 WARNING(where_on_one_item, none,
-        "'where' only applies to the second pattern match in this case", ())
+        "'where' only applies to the second pattern match in this "
+        "'%select{case|catch}0'", (bool))
 
 NOTE(add_where_newline, none,
      "disambiguate by adding a line break between them if this is desired", ())
@@ -5949,7 +5954,7 @@ ERROR(async_decl_must_be_available_from_async,none,
 ERROR(async_named_decl_must_be_available_from_async,none,
         "asynchronous %kind0 must be available from asynchronous contexts",
         (const ValueDecl *))
-ERROR(async_unavailable_decl,none,
+GROUPED_ERROR(async_unavailable_decl,DeclarationUnavailableFromAsynchronousContext,none,
       "%kindbase0 is unavailable from asynchronous contexts%select{|; %1}1",
       (const ValueDecl *, StringRef))
 
@@ -7783,9 +7788,6 @@ NOTE(note_inverse_preventing_conformance,none,
 NOTE(note_inverse_preventing_conformance_explicit,none,
      "%kind0 has '~%1' constraint preventing '%1' conformance",
      (const ValueDecl *, StringRef))
-ERROR(escapable_requires_feature_flag,none,
-      "type 'Escapable' requires -enable-experimental-feature NonescapableTypes",
-      ())
 ERROR(non_bitwise_copyable_type_class,none,
       "class cannot conform to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_type_indirect_enum,none,
@@ -7909,8 +7911,9 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
 
-ERROR(nonescapable_types_attr_disabled,none,
-      "attribute requires '-enable-experimental-feature NonescapableTypes'", ())
+ERROR(span_requires_feature_flag,none,
+      "'%0' requires -enable-experimental-feature Span",
+      (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors
@@ -8026,6 +8029,10 @@ ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
 ERROR(lifetime_dependence_duplicate_target, none,
       "invalid duplicate target lifetime dependencies on function", ())
 
+ERROR(lifetime_dependence_feature_required, none,
+      "returning ~Escapable type requires '-enable-experimental-feature "
+      "LifetimeDependence'", ())
+
 //===----------------------------------------------------------------------===//
 //                             MARK: Sending
 //===----------------------------------------------------------------------===//
@@ -8053,24 +8060,24 @@ NOTE(sending_function_result_with_sending_param_note, none,
 //------------------------------------------------------------------------------
 ERROR(unsafe_attr_disabled,none,
       "attribute requires '-enable-experimental-feature AllowUnsafeAttribute'", ())
-WARNING(override_safe_withunsafe,none,
+GROUPED_WARNING(override_safe_withunsafe,Unsafe,none,
       "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
-WARNING(witness_unsafe,none,
+GROUPED_WARNING(witness_unsafe,Unsafe,none,
      "unsafe %0 %1 cannot satisfy safe requirement",
       (DescriptiveDeclKind, DeclName))
-WARNING(type_witness_unsafe,none,
+GROUPED_WARNING(type_witness_unsafe,Unsafe,none,
       "unsafe type %0 cannot satisfy safe associated type %1",
       (Type, DeclName))
-WARNING(unchecked_conformance_is_unsafe,none,
+GROUPED_WARNING(unchecked_conformance_is_unsafe,Unsafe,none,
       "@unchecked conformance involves unsafe code", ())
-WARNING(unowned_unsafe_is_unsafe,none,
+GROUPED_WARNING(unowned_unsafe_is_unsafe,Unsafe,none,
       "unowned(unsafe) involves unsafe code", ())
-WARNING(nonisolated_unsafe_is_unsafe,none,
+GROUPED_WARNING(nonisolated_unsafe_is_unsafe,Unsafe,none,
       "nonisolated(unsafe) involves unsafe code", ())
-WARNING(reference_to_unsafe_decl,none,
+GROUPED_WARNING(reference_to_unsafe_decl,Unsafe,none,
       "%select{reference|call}0 to unsafe %kindbase1",
       (bool, const ValueDecl *))
-WARNING(reference_to_unsafe_typed_decl,none,
+GROUPED_WARNING(reference_to_unsafe_typed_decl,Unsafe,none,
       "%select{reference|call}0 to %kindbase1 involves unsafe type %2",
       (bool, const ValueDecl *, Type))
 NOTE(unsafe_decl_here,none,

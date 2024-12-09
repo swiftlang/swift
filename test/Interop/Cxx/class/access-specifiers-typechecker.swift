@@ -26,7 +26,7 @@ var publicFlagEnumVar: PublicPrivate.PublicFlagEnum
 
 // Cannot access any private members and types.
 
-v.PrivateMemberVar = 1 // expected-error {{value of type 'PublicPrivate' has no member 'PrivateMemberVar'}}
+v.PrivateMemberVar = 1 // expected-error {{'PrivateMemberVar' is inaccessible due to 'private' protection level}}
 PublicPrivate.PrivateStaticMemberVar = 1 // expected-error {{'PublicPrivate' has no member 'PrivateStaticMemberVar'}}
 v.privateMemberFunc() // expected-error {{value of type 'PublicPrivate' has no member 'privateMemberFunc'}}
 

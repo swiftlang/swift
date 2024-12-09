@@ -22,12 +22,14 @@
  * statements).
  */
 
+config.existing_swift_features = set()
 def language_feature(feature_name, enabled):
+    config.existing_swift_features.add(feature_name)
     if enabled or "asserts" in config.available_features:
-        config.available_features.add(feature_name)
+        config.available_features.add("swift_feature_" + feature_name)
 
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version) language_feature("swift_feature_" # FeatureName, True)
-#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) language_feature("swift_feature_" # FeatureName, #AvailableInProd == "true")
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description) language_feature("swift_feature_" # FeatureName, True)
+#define UPCOMING_FEATURE(FeatureName, SENumber, Version) language_feature(#FeatureName, True)
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) language_feature(#FeatureName, #AvailableInProd == "true")
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description) language_feature(#FeatureName, True)
 
 #include <swift/Basic/Features.def>

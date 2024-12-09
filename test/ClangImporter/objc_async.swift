@@ -298,7 +298,6 @@ class BarFrame: PictureFrame {
 @available(SwiftStdlib 5.5, *)
 @SomeGlobalActor
 class BazFrame: NotIsolatedPictureFrame {
-// expected-note@-1 2 {{class 'BazFrame' does not conform to the 'Sendable' protocol}}
   init() {
     super.init(size: 0)
   }
@@ -322,12 +321,10 @@ func check() async {
   _ = await BarFrame()
   _ = await FooFrame()
   _ = await BazFrame()
-  // expected-warning@-1 {{non-sendable result type 'BazFrame' cannot be sent from global actor 'SomeGlobalActor'-isolated context in call to initializer 'init()'; this is an error in the Swift 6 language mode}}
 
   _ = await BarFrame(size: 0)
   _ = await FooFrame(size: 0)
   _ = await BazFrame(size: 0)
-  // expected-warning@-1 {{non-sendable result type 'BazFrame' cannot be sent from global actor 'SomeGlobalActor'-isolated context in call to initializer 'init(size:)'; this is an error in the Swift 6 language mode}}
 }
 
 @available(SwiftStdlib 5.5, *)

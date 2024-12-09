@@ -17,6 +17,9 @@
 
 // REQUIRES: swift_in_compiler
 
+// Temporarily disabling on armv7k:
+// rdar://140330692 (🟠 OSS Swift CI: oss-swift_tools-RA_stdlib-DA_test-device-non_executable failed...
+// UNSUPPORTED: CPU=armv7k
 
 //--- main.swift
 

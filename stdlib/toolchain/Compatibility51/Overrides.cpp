@@ -29,12 +29,15 @@ struct OverrideSection {
   Override_ ## name name;
 #include "CompatibilityOverride.def"
 };
-  
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-designated-field-initializers"
 OverrideSection Swift51Overrides
 __attribute__((used, section("__DATA,__swift51_hooks"))) = {
   .version = 0,
   .conformsToSwiftProtocol = swift51override_conformsToSwiftProtocol,
 };
+#pragma clang diagnostic pop
 
 // Allow this library to get force-loaded by autolinking
 __attribute__((weak, visibility("hidden")))

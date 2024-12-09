@@ -911,14 +911,13 @@ static bool eliminateSwitchDispatchOnUnavailableElements(
   if (!ED->hasCasesUnavailableDuringLowering())
     return false;
 
-  ASTContext &ctx = BB.getModule().getASTContext();
   SILLocation Loc = SWI->getLoc();
   bool DidRemoveUnavailableCase = false;
 
   SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4> NewCaseBBs;
   for (unsigned i : range(SWI.getNumCases())) {
     auto CaseBB = SWI.getCase(i);
-    auto availableAtr = CaseBB.first->getAttrs().getUnavailable(ctx);
+    auto availableAtr = CaseBB.first->getUnavailableAttr();
 
     if (availableAtr && availableAtr->isUnconditionallyUnavailable()) {
       // Mark the basic block as potentially unreachable.

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -module-name test %s -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -module-name test %s -O -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
@@ -27,7 +27,6 @@ public func testLetField(_ c: C, f: () -> ()) ->  (Int, Int) {
 let globalLetArray = [1, 2, 3, 4]
 
 // CHECK-LABEL: sil @$s4test5test15indexS2i_tF :
-// CHECK:           load
 // CHECK:           [[L:%.*]] = load
 // CHECK-NOT:       load
 // CHECK:           builtin "sadd_with_overflow{{.*}}"([[L]] : {{.*}}, [[L]] :

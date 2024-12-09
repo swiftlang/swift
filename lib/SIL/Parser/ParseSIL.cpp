@@ -65,11 +65,6 @@ static llvm::cl::opt<bool>
 ParseIncompleteOSSA("parse-incomplete-ossa",
                     llvm::cl::desc("Parse OSSA with incomplete lifetimes"));
 
-static llvm::cl::opt<bool> DisablePopulateOwnershipFlags(
-    "disable-populate-ownership-flags",
-    llvm::cl::desc("Disable populating ownership flags"),
-    llvm::cl::init(false));
-
 //===----------------------------------------------------------------------===//
 // SILParserState implementation
 //===----------------------------------------------------------------------===//
@@ -1296,7 +1291,9 @@ static std::optional<AccessorKind> getAccessorKind(StringRef ident) {
       .Case("addressor", AccessorKind::Address)
       .Case("mutableAddressor", AccessorKind::MutableAddress)
       .Case("read", AccessorKind::Read)
+      .Case("read2", AccessorKind::Read2)
       .Case("modify", AccessorKind::Modify)
+      .Case("modify2", AccessorKind::Modify2)
       .Default(std::nullopt);
 }
 
@@ -1507,14 +1504,23 @@ bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc,
   Loc = P.Tok.getLoc();
 
   UnresolvedValueName Name;
-  SILType Ty;
-  if (parseValueName(Name) ||
-      P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
-      parseSILType(Ty))
+  if (parseValueName(Name))
     return true;
-  
-  Result = getLocalValue(Name, Ty, RegularLocation(Loc), B);
-  return false;
+
+  if (P.consumeIf(tok::colon)) {
+    SILType Ty;
+    parseSILType(Ty);
+    Result = getLocalValue(Name, Ty, RegularLocation(Loc), B);
+    return false;
+  } else {
+    ValueBase *&Entry = LocalValues[Name.Name];
+    if (!Entry) {
+      P.diagnose(Name.NameLoc, diag::sil_forward_ref_value_needs_type, Name.Name);
+      return true;
+    }
+    Result = SILValue(Entry);
+    return false;
+  }
 }
 
 /// Look up whether the given string corresponds to a SIL opcode.
@@ -1878,7 +1884,8 @@ SubstitutionMap getApplySubstitutionsFromParsed(
                       proto->getDeclaredInterfaceType());
         failed = true;
 
-        return ProtocolConformanceRef(proto);
+        // FIXME: Passing an empty Type() here temporarily.
+        return ProtocolConformanceRef::forAbstract(Type(), proto);
       });
 
   return failed ? SubstitutionMap() : subMap;
@@ -7180,9 +7187,14 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
 
         // If SILOwnership is enabled and we are not assuming that we are
         // parsing unqualified SIL, look for printed value ownership kinds.
-        if (F->hasOwnership() &&
-            parseSILOwnership(OwnershipKind))
-          return true;
+        if (F->hasOwnership()) {
+          if (P.Tok.is(tok::at_sign)) {
+            if (parseSILOwnership(OwnershipKind))
+              return true;
+          } else if (foundReborrow) {
+            OwnershipKind = OwnershipKind::Guaranteed;
+          }
+        }
 
         if (parseSILType(Ty))
           return true;
@@ -7235,16 +7247,6 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   } while (isStartOfSILInstruction());
 
   return false;
-}
-
-static void populateOwnershipFlags(SILFunction *func) {
-  for (auto &bb : *func) {
-    for (auto &arg : bb.getArguments()) {
-      if (computeIsReborrow(arg)) {
-        arg->setReborrow(true);
-      }
-    }
-  }
 }
 
 ///   decl-sil:   [[only in SIL mode]]
@@ -7426,13 +7428,6 @@ bool SILParserState::parseDeclSIL(Parser &P) {
             return true;
         } while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof));
 
-        // OSSA uses flags to represent "reborrow", "escaping" etc.
-        // These flags are populated here as a shortcut to rewriting all
-        // existing OSSA tests with flags.
-        if (!DisablePopulateOwnershipFlags) {
-          populateOwnershipFlags(FunctionState.F);
-        }
-
         SourceLoc RBraceLoc;
         P.parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                              LBraceLoc);
@@ -7446,6 +7441,15 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     }
 
     FunctionState.F->setLinkage(resolveSILLinkage(FnLinkage, isDefinition));
+    switch (FunctionState.F->getLinkage()) {
+    case SILLinkage::PublicExternal:
+    case SILLinkage::PackageExternal:
+      if (!FunctionState.F->isExternalDeclaration() && !FunctionState.F->isAnySerialized())
+        FunctionState.F->getModule().setParsedAsSerializedSIL();
+      break;
+    default:
+      break;
+    }
   }
 
   if (FunctionState.diagnoseProblems())
@@ -8177,7 +8181,8 @@ static bool parseSILWitnessTableEntry(
         P.parseToken(tok::colon, diag::expected_sil_witness_colon))
       return true;
 
-    ProtocolConformanceRef conformance(proto);
+    // FIXME: Passing an empty Type() here temporarily.
+    auto conformance = ProtocolConformanceRef::forAbstract(Type(), proto);
     if (P.Tok.getText() != "dependent") {
       auto concrete =
         witnessState.parseProtocolConformance();

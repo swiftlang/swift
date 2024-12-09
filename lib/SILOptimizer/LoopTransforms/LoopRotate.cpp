@@ -46,7 +46,7 @@ static llvm::cl::opt<bool> RotateSingleBlockLoop("looprotate-single-block-loop",
 
 static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
                        SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
-                       SILBasicBlock *upToBB, bool shouldVerify);
+                       SILBasicBlock *upToBB);
 
 /// Check whether all operands are loop invariant.
 static bool
@@ -252,8 +252,7 @@ static void updateDomTree(DominanceInfo *domInfo, SILBasicBlock *preheader,
 }
 
 static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
-                                      SILLoopInfo *loopInfo,
-                                      bool ShouldVerify) {
+                                      SILLoopInfo *loopInfo) {
   auto *latch = loop->getLoopLatch();
   if (!latch) {
     LLVM_DEBUG(llvm::dbgs()
@@ -263,11 +262,11 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
 
   bool didRotate = rotateLoop(
       loop, domInfo, loopInfo,
-      RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch, ShouldVerify);
+      RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch);
 
   // Keep rotating at most until we hit the original latch.
   if (didRotate)
-    while (rotateLoop(loop, domInfo, loopInfo, false, latch, ShouldVerify)) {
+    while (rotateLoop(loop, domInfo, loopInfo, false, latch)) {
     }
 
   return didRotate;
@@ -316,7 +315,7 @@ static bool isSingleBlockLoop(SILLoop *L) {
 /// loop for termination.
 static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
                        SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
-                       SILBasicBlock *upToBB, bool shouldVerify) {
+                       SILBasicBlock *upToBB) {
   assert(loop != nullptr && domInfo != nullptr && loopInfo != nullptr
          && "Missing loop information");
 
@@ -465,12 +464,6 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   splitCriticalEdgesFrom(preheader, domInfo, loopInfo);
   splitCriticalEdgesFrom(newHeader, domInfo, loopInfo);
 
-  if (shouldVerify) {
-    domInfo->verify();
-    loopInfo->verify();
-    latch->getParent()->verify();
-  }
-
   LLVM_DEBUG(llvm::dbgs() << "  to " << *loop);
   LLVM_DEBUG(loop->getHeader()->getParent()->dump());
   return true;
@@ -492,7 +485,6 @@ class LoopRotation : public SILFunctionTransform {
       return;
     }
     LLVM_DEBUG(llvm::dbgs() << "Rotating loops in " << f->getName() << "\n");
-    bool shouldVerify = getOptions().VerifyAll;
 
     bool changed = false;
     for (auto *LoopIt : *loopInfo) {
@@ -509,12 +501,12 @@ class LoopRotation : public SILFunctionTransform {
         SILLoop *loop = worklist.pop_back_val();
         changed |= canonicalizeLoop(loop, domInfo, loopInfo);
         changed |=
-            rotateLoopAtMostUpToLatch(loop, domInfo, loopInfo, shouldVerify);
+            rotateLoopAtMostUpToLatch(loop, domInfo, loopInfo);
       }
     }
 
     if (changed) {
-      updateBorrowedFrom(PM, f);
+      updateAllGuaranteedPhis(PM, f);
       // We preserve loop info and the dominator tree.
       domAnalysis->lockInvalidation();
       loopAnalysis->lockInvalidation();

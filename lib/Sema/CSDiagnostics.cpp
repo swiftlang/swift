@@ -611,6 +611,13 @@ void RequirementFailure::maybeEmitRequirementNote(const Decl *anchor, Type lhs,
                    req.getFirstType(), lhs, req.getSecondType(), rhs);
 }
 
+SourceLoc MissingConformanceFailure::getLoc() const {
+  if (auto *locatable = dyn_cast<LocatableType>(LHS.getPointer())) {
+    return locatable->getLoc();
+  }
+  return RequirementFailure::getLoc();
+}
+
 bool MissingConformanceFailure::diagnoseAsError() {
   auto anchor = getAnchor();
   auto nonConformingType = getLHS();
@@ -2349,7 +2356,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
               dyn_cast_or_null<SubscriptDecl>(declRef.getDecl())) {
         if (isImmutable(subscript))
           return {expr, OverloadChoice(getType(SE->getBase()), subscript,
-                                       FunctionRefKind::DoubleApply)};
+                                       FunctionRefInfo::doubleBaseNameApply())};
       }
     }
 
@@ -2405,7 +2412,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     if (auto member = dyn_cast<AbstractStorageDecl>(MRE->getMember().getDecl()))
       if (isImmutable(member))
         return {expr, OverloadChoice(getType(MRE->getBase()), member,
-                                     FunctionRefKind::SingleApply)};
+                                     FunctionRefInfo::singleBaseNameApply())};
 
     // If we weren't able to resolve a member or if it is mutable, then the
     // problem must be with the base, recurse.
@@ -2425,8 +2432,8 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
-    return {expr,
-            OverloadChoice(Type(), DRE->getDecl(), FunctionRefKind::Unapplied)};
+    return {expr, OverloadChoice(Type(), DRE->getDecl(),
+                                 FunctionRefInfo::unappliedBaseName())};
 
   // Look through x!
   if (auto *FVE = dyn_cast<ForceValueExpr>(expr))
@@ -4243,11 +4250,10 @@ findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
     WORSE(== nullptr);
 
     assert((a && b) && "neither should be null here");
-    ASTContext &ctx = a->getASTContext();
 
     // Is one more available than the other?
-    WORSE(->getAttrs().isUnavailable(ctx));
-    WORSE(->getAttrs().isDeprecated(ctx));
+    WORSE(->isUnavailable());
+    WORSE(->isDeprecated());
 
     // Does one have a shorter name (so the non-matching prefix is shorter)?
     WORSE(->getName().getBaseName().userFacingName().size());
@@ -4387,7 +4393,7 @@ bool MissingMemberFailure::diagnoseAsError() {
 
       auto result = cs.performMemberLookup(
           ConstraintKind::ValueMember, getName().withoutArgumentLabels(),
-          metatypeTy, FunctionRefKind::DoubleApply, getLocator(),
+          metatypeTy, FunctionRefInfo::doubleBaseNameApply(), getLocator(),
           /*includeInaccessibleMembers=*/true);
 
       // If there are no `init` members at all produce a tailored

@@ -1885,9 +1885,11 @@ bool isFragileClangNode(const ClangNode &node) {
   if (auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl))
     return isFragileClangType(typedefDecl->getUnderlyingType());
   if (auto *rd = dyn_cast<clang::RecordDecl>(decl)) {
-    if (!isa<clang::CXXRecordDecl>(rd))
+    auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(rd);
+    if (!cxxRecordDecl)
       return false;
-    return !rd->getDeclContext()->isExternCContext();
+    return !cxxRecordDecl->isCLike() &&
+           !cxxRecordDecl->getDeclContext()->isExternCContext();
   }
   return true;
 }
@@ -2002,6 +2004,10 @@ swift::getDisallowedOriginKind(const Decl *decl,
   if (SF->getASTContext().LangOpts.EnableCXXInterop && where.getDeclContext() &&
       where.getDeclContext()->getAsDecl() &&
       where.getDeclContext()->getAsDecl()->getModuleContext()->isResilient() &&
+      !where.getDeclContext()
+           ->getAsDecl()
+           ->getModuleContext()
+           ->getUnderlyingModuleIfOverlay() &&
       decl->hasClangNode() && !decl->getModuleContext()->isSwiftShimsModule() &&
       isFragileClangNode(decl->getClangNode()) &&
       !SF->getASTContext().LangOpts.hasFeature(
@@ -2517,8 +2523,11 @@ void swift::recordRequiredImportAccessLevelForDecl(
   if (auto attributedImport = sf->getImportAccessLevel(definingModule)) {
     auto importedModule = attributedImport->module.importedModule;
 
-    // If the defining module is transitively imported, mark the responsible
-    // module as requiring the minimum access level too.
+    // Ignore submodules, same behavior from `getModuleContext` above.
+    importedModule = importedModule->getTopLevelModule();
+
+    // If the defining module is transitively imported, mark the locally
+    // imported  module as requiring the minimum access level too.
     if (importedModule != definingModule)
       sf->registerRequiredAccessLevelForModule(importedModule, accessLevel);
 

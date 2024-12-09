@@ -4,12 +4,10 @@
 // RUN: %target-swift-frontend                               \
 // RUN:     %t/Downstream.swift                              \
 // RUN:     -typecheck -verify                               \
-// RUN:     -enable-experimental-feature NonescapableTypes   \
 // RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names                          \
 // RUN:     -import-objc-header %t/Library.h
 
-// REQUIRES: swift_feature_NonescapableTypes
 
 //--- Library.h
 

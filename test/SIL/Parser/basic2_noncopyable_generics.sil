@@ -1,15 +1,15 @@
 // RUN: %target-sil-opt                                      \
 // RUN:     %s                                               \
-// RUN:     -enable-experimental-feature NonescapableTypes   \
+// RUN:     -enable-experimental-feature LifetimeDependence   \
 // RUN: |                                                    \
 // RUN: %target-sil-opt                                      \
-// RUN:     -enable-experimental-feature NonescapableTypes   \
+// RUN:     -enable-experimental-feature LifetimeDependence   \
 // RUN: |                                                    \
 // RUN: %FileCheck %s
 
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
-// For -enable-experimental-feature NonescapableTypes
+// For -enable-experimental-feature LifetimeDependence
 
 // TODO: Once NoncopyableGenerics/NonescapableTypes is no longer behind a feature flag, merge this into basic2.
 

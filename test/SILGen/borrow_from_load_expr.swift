@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend                           \
 // RUN:     %s                                           \
-// RUN:     -emit-silgen                                 \
+// RUN:     -Xllvm -sil-print-types -emit-silgen                                 \
 // RUN:     -debug-diagnostic-names                      \
 // RUN:     -I %t                                        \
 // RUN: |                                                \

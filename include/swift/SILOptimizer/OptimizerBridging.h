@@ -130,12 +130,12 @@ struct BridgedPostDomTree {
 
 struct BridgedUtilities {
   typedef void (* _Nonnull VerifyFunctionFn)(BridgedPassContext, BridgedFunction);
-  typedef void (* _Nonnull UpdateBorrowedFromFn)(BridgedPassContext, BridgedFunction);
-  typedef void (* _Nonnull UpdateBorrowedFromPhisFn)(BridgedPassContext, BridgedArrayRef);
+  typedef void (* _Nonnull UpdateFunctionFn)(BridgedPassContext, BridgedFunction);
+  typedef void (* _Nonnull UpdatePhisFn)(BridgedPassContext, BridgedArrayRef);
 
   static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
-  static void registerBorrowedFromUpdater(UpdateBorrowedFromFn updateBorrowedFromFn,
-                                          UpdateBorrowedFromPhisFn updateBorrowedFromPhisFn);
+  static void registerGuaranteedPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
+                                           UpdatePhisFn updateBorrowedFromPhisFn);
 };
 
 struct BridgedBasicBlockSet {
@@ -255,7 +255,7 @@ struct BridgedPassContext {
                                                                BridgedFunction applySiteCallee) const;
 
   SWIFT_IMPORT_UNSAFE BridgedGlobalVar createGlobalVariable(BridgedStringRef name, BridgedType type,
-                                                            bool isPrivate) const;
+                                                            BridgedLinkage linkage, bool isLet) const;
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;
   BRIDGED_INLINE bool optimizeMemoryAccesses(BridgedFunction f) const;

@@ -184,7 +184,7 @@ class ValidateIfConfigCondition :
     if (!UDE)
       return getDeclRefStr(E, DeclRefKind::Ordinary).has_value();
 
-    return UDE->getFunctionRefKind() == FunctionRefKind::Unapplied &&
+    return UDE->getFunctionRefInfo().isUnappliedBaseName() &&
            isModulePath(UDE->getBase());
   }
 
@@ -991,21 +991,18 @@ ParserStatus Parser::parseIfConfig(
 }
 
 ParserStatus Parser::parseIfConfigAttributes(
-    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
-    PatternBindingInitializer *initContext) {
+    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs) {
   ParserStatus status = makeParserSuccess();
   return parseIfConfigRaw<ParserStatus>(
       IfConfigContext::DeclAttrs,
       [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
           IfConfigElementsRole role) {
         if (isActive) {
-          status |= parseDeclAttributeList(
-              attributes, ifConfigsAreDeclAttrs, initContext);
+          status |= parseDeclAttributeList(attributes, ifConfigsAreDeclAttrs);
         } else if (role != IfConfigElementsRole::Skipped) {
           DeclAttributes skippedAttributes;
-          PatternBindingInitializer *skippedInitContext = nullptr;
           status |= parseDeclAttributeList(
-              skippedAttributes, ifConfigsAreDeclAttrs, skippedInitContext);
+              skippedAttributes, ifConfigsAreDeclAttrs);
         }
       },
       [&](SourceLoc endLoc, bool hadMissingEnd) {

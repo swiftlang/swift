@@ -114,11 +114,23 @@ ParseAbstractFunctionBodyRequest::evaluate(Evaluator &evaluator,
 
   case BodyKind::Unparsed: {
     // FIXME: How do we configure code completion?
-    SourceFile &sf = *afd->getDeclContext()->getParentSourceFile();
-    SourceManager &sourceMgr = sf.getASTContext().SourceMgr;
+    SourceManager &sourceMgr = afd->getASTContext().SourceMgr;
     unsigned bufferID =
         sourceMgr.findBufferContainingLoc(afd->getBodySourceRange().Start);
-    Parser parser(bufferID, sf, /*SIL*/ nullptr);
+    SourceFile *sf = afd->getDeclContext()->getParentSourceFile();
+    if (!sf) {
+      auto sourceFiles = sourceMgr.getSourceFilesForBufferID(bufferID);
+      auto expectedModule = afd->getParentModule();
+      for (auto checkSF: sourceFiles) {
+        if (checkSF->getParentModule() == expectedModule) {
+          sf = checkSF;
+          break;
+        }
+      }
+      assert(sf && "Could not find source file containing parsed body");
+    }
+
+    Parser parser(bufferID, *sf, /*SIL*/ nullptr);
     auto result = parser.parseAbstractFunctionBodyDelayed(afd);
     afd->setBodyKind(BodyKind::Parsed);
     return result;
@@ -150,6 +162,8 @@ getBridgedGeneratedSourceFileKind(const GeneratedSourceInfo *genInfo) {
     return BridgedGeneratedSourceFileKindPrettyPrinted;
   case GeneratedSourceInfo::Kind::DefaultArgument:
     return BridgedGeneratedSourceFileKindDefaultArgument;
+  case GeneratedSourceInfo::AttributeFromClang:
+    return BridgedGeneratedSourceFileKindAttribute;
   }
 }
 
@@ -205,14 +219,14 @@ bool shouldParseViaASTGen(SourceFile &SF) {
     return false;
 
   switch (SF.Kind) {
-  case SourceFileKind::SIL:
-    return false;
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-  case SourceFileKind::Interface:
-  case SourceFileKind::MacroExpansion:
-  case SourceFileKind::DefaultArgument:
-    break;
+    case SourceFileKind::SIL:
+      return false;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::Interface:
+    case SourceFileKind::MacroExpansion:
+    case SourceFileKind::DefaultArgument:
+      break;
   }
 
   // TODO: Migrate SourceKit features to Syntax based.
@@ -227,6 +241,13 @@ bool shouldParseViaASTGen(SourceFile &SF) {
   if (ctx.SourceMgr.getIDEInspectionTargetBufferID() == SF.getBufferID())
     return false;
 
+  if (auto *generatedInfo = SF.getGeneratedSourceFileInfo()) {
+    // TODO: Handle generated.
+    if (generatedInfo->kind == GeneratedSourceInfo::Kind::AttributeFromClang) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -236,12 +257,9 @@ void appendToVector(BridgedASTNode cNode, void *vecPtr) {
 }
 
 SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
-  Parser legacyParser(SF.getBufferID(), SF, /*SIL=*/nullptr,
-                      /*PersistentState=*/nullptr);
-  legacyParser.IsForASTGen = true;
-
   ASTContext &Ctx = SF.getASTContext();
   DiagnosticEngine &Diags = Ctx.Diags;
+  SourceManager &SM = Ctx.SourceMgr;
   const LangOptions &langOpts = Ctx.LangOpts;
   const GeneratedSourceInfo *genInfo = SF.getGeneratedSourceFileInfo();
 
@@ -254,6 +272,24 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   auto *exportedSourceFile = SF.getExportedSourceFile();
   assert(exportedSourceFile && "Couldn't parse via SyntaxParser");
 
+  // Collect virtual files.
+  // FIXME: Avoid side effects in the request.
+  // FIXME: Do this lazily in SourceManager::getVirtualFile().
+  BridgedVirtualFile *virtualFiles = nullptr;
+  size_t numVirtualFiles =
+      swift_ASTGen_virtualFiles(exportedSourceFile, &virtualFiles);
+  SourceLoc bufferStart = SM.getLocForBufferStart(SF.getBufferID());
+  for (size_t i = 0; i != numVirtualFiles; ++i) {
+    auto &VF = virtualFiles[i];
+    Ctx.SourceMgr.createVirtualFile(
+        bufferStart.getAdvancedLoc(VF.StartPosition), VF.Name.unbridged(),
+        VF.LineOffset, VF.EndPosition - VF.StartPosition);
+    StringRef name = Ctx.AllocateCopy(VF.Name.unbridged());
+    SF.VirtualFilePaths.emplace_back(
+        name, bufferStart.getAdvancedLoc(VF.NamePosition));
+  }
+  swift_ASTGen_freeBridgedVirtualFiles(virtualFiles, numVirtualFiles);
+
   // Emit parser diagnostics.
   (void)swift_ASTGen_emitParserDiagnostics(
       Ctx, &Diags, exportedSourceFile, /*emitOnlyErrors=*/false,
@@ -263,7 +299,7 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   // Generate AST nodes.
   SmallVector<ASTNode, 128> items;
   swift_ASTGen_buildTopLevelASTNodes(
-      &Diags, exportedSourceFile, declContext, Ctx, legacyParser,
+      &Diags, exportedSourceFile, declContext, Ctx,
       static_cast<SmallVectorImpl<ASTNode> *>(&items), appendToVector);
 
   return SourceFileParsingResult{/*TopLevelItems=*/Ctx.AllocateCopy(items),
@@ -364,10 +400,13 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
       break;
     }
 
-    case GeneratedSourceInfo::MemberAttributeMacroExpansion: {
-      parser.parseExpandedAttributeList(items);
+    case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+      parser.parseExpandedAttributeList(items, /*isFromClangAttribute=*/false);
       break;
-    }
+
+    case GeneratedSourceInfo::AttributeFromClang:
+      parser.parseExpandedAttributeList(items, /*isFromClangAttribute=*/true);
+      break;
 
     case GeneratedSourceInfo::PeerMacroExpansion: {
       if (parser.CurDeclContext->isTypeContext()) {

@@ -29,6 +29,18 @@ public struct Builder {
   private let notificationHandler: BridgedChangeNotificationHandler
   private let notifyNewInstruction: (Instruction) -> ()
 
+  /// Return 'nil' when inserting at the start of a function or in a global initializer.
+  public var insertionBlock: BasicBlock? {
+    switch insertAt {
+    case let .before(inst):
+      return inst.parentBlock
+    case let .atEndOf(block):
+      return block
+    case .atStartOf, .staticInitializer:
+      return nil
+    }
+  }
+
   public var bridged: BridgedBuilder {
     switch insertAt {
     case .before(let inst):
@@ -480,6 +492,18 @@ public struct Builder {
   public func createEndAccess(beginAccess: BeginAccessInst) -> EndAccessInst {
       let endAccess = bridged.createEndAccess(beginAccess.bridged)
       return notifyNew(endAccess.getAs(EndAccessInst.self))
+  }
+
+  @discardableResult
+  public func createEndApply(beginApply: BeginApplyInst) -> EndApplyInst {
+    let endApply = bridged.createEndApply(beginApply.token.bridged)
+    return notifyNew(endApply.getAs(EndApplyInst.self))
+  }
+
+  @discardableResult
+  public func createAbortApply(beginApply: BeginApplyInst) -> AbortApplyInst {
+    let endApply = bridged.createAbortApply(beginApply.token.bridged)
+    return notifyNew(endApply.getAs(AbortApplyInst.self))
   }
 
   public func createConvertFunction(originalFunction: Value, resultType: Type, withoutActuallyEscaping: Bool) -> ConvertFunctionInst {

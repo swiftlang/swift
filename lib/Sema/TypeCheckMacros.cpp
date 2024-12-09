@@ -40,12 +40,13 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Bridging/MacroEvaluation.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "llvm/Config/config.h"
@@ -441,6 +442,9 @@ static std::string adjustMacroExpansionBufferName(StringRef name) {
   if (name.starts_with(MANGLING_PREFIX_STR)) {
     result += MACRO_EXPANSION_BUFFER_MANGLING_PREFIX;
     name = name.drop_front(StringRef(MANGLING_PREFIX_STR).size());
+  } else if (name.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) {
+    result += MACRO_EXPANSION_BUFFER_MANGLING_PREFIX;
+    name = name.drop_front(StringRef(MANGLING_PREFIX_EMBEDDED_STR).size());
   }
 
   result += name;
@@ -1033,8 +1037,11 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
   if (auto parentSourceFile = dc->getParentSourceFile())
     macroSourceFile->setImports(parentSourceFile->getImports());
-  else if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
-    macroSourceFile->setImports({});
+  else if (auto clangModuleUnit =
+               dyn_cast<ClangModuleUnit>(dc->getModuleScopeContext())) {
+    auto clangModule = clangModuleUnit->getParentModule();
+    performImportResolutionForClangMacroBuffer(*macroSourceFile, clangModule);
+  }
   return macroSourceFile;
 }
 
@@ -1092,7 +1099,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     if (!discriminatorStr.empty())
       return discriminatorStr.str();
 #if SWIFT_BUILD_SWIFT_SYNTAX
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(macro->getASTContext());
     return mangler.mangleMacroExpansion(expansion);
 #else
     return "";
@@ -1403,7 +1410,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     if (!discriminatorStr.empty())
       return discriminatorStr.str();
 #if SWIFT_BUILD_SWIFT_SYNTAX
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(attachedTo->getASTContext());
     return mangler.mangleAttachedMacroExpansion(attachedTo, attr, role);
 #else
     return "";
@@ -2088,7 +2095,19 @@ ResolveMacroConformances::evaluate(Evaluator &evaluator,
   auto &ctx = dc->getASTContext();
 
   SmallVector<Type, 2> protocols;
-  for (auto *typeExpr : attr->getConformances()) {
+  for (Expr *&expr : const_cast<MacroRoleAttr *>(attr)->getConformances()) {
+    using namespace constraints;
+    auto target = SyntacticElementTarget(expr, dc, CTP_Unused, Type(),
+                                         /*isDiscarded=*/true);
+    if (ConstraintSystem::preCheckTarget(target))
+      continue;
+    auto *typeExpr = dyn_cast<TypeExpr>(target.getAsExpr());
+    if (!typeExpr) {
+      ctx.Diags.diagnose(expr->getStartLoc(), diag::expected_type);
+      continue;
+    }
+    expr = typeExpr;
+
     if (auto *typeRepr = typeExpr->getTypeRepr()) {
       auto resolved =
           TypeResolution::forInterface(

@@ -1133,7 +1133,8 @@ ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID) {
     if (!maybeProtocol)
       return maybeProtocol.takeError();
     auto proto = cast<ProtocolDecl>(maybeProtocol.get());
-    return ProtocolConformanceRef(proto);
+    // FIXME: Passing an empty Type() here temporarily.
+    return ProtocolConformanceRef::forAbstract(Type(), proto);
   }
 
   case SerializedProtocolConformanceKind::Concrete: {
@@ -5614,7 +5615,6 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   DEF_VER_TUPLE_PIECES(Introduced);
   DEF_VER_TUPLE_PIECES(Deprecated);
   DEF_VER_TUPLE_PIECES(Obsoleted);
-  DeclID renameDeclID;
   unsigned rawPlatform, messageSize, renameSize;
 
   // Decode the record, pulling the version tuple information.
@@ -5622,7 +5622,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
       scratch, isImplicit, isUnavailable, isDeprecated, isNoAsync,
       isPackageDescriptionVersionSpecific, isSPI, isForEmbedded,
       LIST_VER_TUPLE_PIECES(Introduced), LIST_VER_TUPLE_PIECES(Deprecated),
-      LIST_VER_TUPLE_PIECES(Obsoleted), rawPlatform, renameDeclID, messageSize,
+      LIST_VER_TUPLE_PIECES(Obsoleted), rawPlatform, messageSize,
       renameSize);
 
   auto maybePlatform = platformFromUnsigned(rawPlatform);
@@ -5630,11 +5630,6 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     return llvm::make_error<InvalidEnumValueError>(rawPlatform, "PlatformKind");
 
   PlatformKind platform = maybePlatform.value();
-
-  ValueDecl *renameDecl = nullptr;
-  if (renameDeclID) {
-    renameDecl = cast<ValueDecl>(MF.getDecl(renameDeclID));
-  }
 
   StringRef message = blobData.substr(0, messageSize);
   blobData = blobData.substr(messageSize);
@@ -5662,9 +5657,9 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     platformAgnostic = PlatformAgnosticAvailabilityKind::None;
 
   auto attr = new (ctx) AvailableAttr(
-      SourceLoc(), SourceRange(), platform, message, rename, renameDecl,
-      Introduced, SourceRange(), Deprecated, SourceRange(), Obsoleted,
-      SourceRange(), platformAgnostic, isImplicit, isSPI, isForEmbedded);
+      SourceLoc(), SourceRange(), platform, message, rename, Introduced,
+      SourceRange(), Deprecated, SourceRange(), Obsoleted, SourceRange(),
+      platformAgnostic, isImplicit, isSPI, isForEmbedded);
   return attr;
 }
 
@@ -5929,14 +5924,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           Attr = ObjCAttr::create(ctx, ObjCSelector(ctx, numArgs-1, pieces),
                                   isImplicitName);
         Attr->setImplicit(isImplicit);
-        break;
-      }
-
-      case decls_block::MainType_DECL_ATTR: {
-        bool isImplicit;
-        serialization::decls_block::MainTypeDeclAttrLayout::readRecord(
-            scratch, isImplicit);
-        Attr = new (ctx) MainTypeAttr(isImplicit);
         break;
       }
 
@@ -6360,7 +6347,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         }
 
         introducedDeclNames = introducedDeclNames.slice(numNames);
-        SmallVector<TypeExpr *, 1> conformances;
+        SmallVector<Expr *, 1> conformances;
         for (TypeID conformanceID : introducedDeclNames) {
           auto conformance = MF.getTypeChecked(conformanceID);
           if (!conformance) {
@@ -6826,8 +6813,7 @@ DESERIALIZE_TYPE(BUILTIN_ALIAS_TYPE)(
   }
 
   // Look through compatibility aliases that are now unavailable.
-  if (alias->getAttrs().isUnavailable(MF.getContext()) &&
-      alias->isCompatibilityAlias()) {
+  if (alias->isUnavailable() && alias->isCompatibilityAlias()) {
     return alias->getUnderlyingType();
   }
 
@@ -6866,10 +6852,11 @@ Expected<Type> DESERIALIZE_TYPE(NAME_ALIAS_TYPE)(
   TypeID parentTypeID;
   TypeID underlyingTypeID;
   TypeID substitutedTypeID;
-  SubstitutionMapID substitutionsID;
+  ArrayRef<uint64_t> rawArgumentIDs;
+
   decls_block::TypeAliasTypeLayout::readRecord(
-      scratch, typealiasID, parentTypeID, underlyingTypeID, substitutedTypeID,
-      substitutionsID);
+      scratch, typealiasID, underlyingTypeID, substitutedTypeID,
+      parentTypeID, rawArgumentIDs);
 
   TypeAliasDecl *alias = nullptr;
   Type underlyingType;
@@ -6912,24 +6899,29 @@ Expected<Type> DESERIALIZE_TYPE(NAME_ALIAS_TYPE)(
 
   auto substitutedType = substitutedTypeOrError.get();
 
-  // Read the substitutions.
-  auto subMapOrError = MF.getSubstitutionMapChecked(substitutionsID);
-  if (!subMapOrError)
-    return subMapOrError.takeError();
+  // Read generic arguments.
+  SmallVector<Type, 8> genericArgs;
+  for (TypeID ID : rawArgumentIDs) {
+    auto argTy = MF.getTypeChecked(ID);
+    if (!argTy)
+      return substitutedType;
+
+    genericArgs.push_back(argTy.get());
+  }
 
   auto parentTypeOrError = MF.getTypeChecked(parentTypeID);
   if (!parentTypeOrError)
-    return underlyingType;
+    return substitutedType;
 
   // Look through compatibility aliases that are now unavailable.
-  if (alias && alias->getAttrs().isUnavailable(MF.getContext()) &&
-      alias->isCompatibilityAlias()) {
-    return alias->getUnderlyingType().subst(subMapOrError.get());
+  if (alias && alias->isUnavailable() && alias->isCompatibilityAlias()) {
+    if (!alias->isGenericContext())
+      return alias->getUnderlyingType();
+    return substitutedType;
   }
 
   auto parentType = parentTypeOrError.get();
-  return TypeAliasType::get(alias, parentType, subMapOrError.get(),
-                            substitutedType);
+  return TypeAliasType::get(alias, parentType, genericArgs, substitutedType);
 }
 
 Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
@@ -7115,12 +7107,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     TypeID typeID;
     bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
         isCompileTimeConst;
-    bool isNoDerivative, isSending;
+    bool isNoDerivative, isSending, isAddressable;
     unsigned rawOwnership;
     decls_block::FunctionParamLayout::readRecord(
         scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
-        isCompileTimeConst, isSending);
+        isCompileTimeConst, isSending, isAddressable);
 
     auto ownership = getActualParamDeclSpecifier(
       (serialization::ParamDeclSpecifier)rawOwnership);
@@ -7135,7 +7127,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                         ParameterTypeFlags(isVariadic, isAutoClosure,
                                            isNonEphemeral, *ownership,
                                            isIsolated, isNoDerivative,
-                                           isCompileTimeConst, isSending),
+                                           isCompileTimeConst, isSending,
+                                           isAddressable),
                         MF.getIdentifier(internalLabelID));
   }
 
@@ -8591,7 +8584,10 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
         // conformance to an Objective-C protocol for anything important.
         // There are no associated types and we don't emit a Swift conformance
         // record.
-        reqConformances.push_back(ProtocolConformanceRef(proto));
+        //
+        // FIXME: Passing an empty Type() here temporarily.
+        reqConformances.push_back(ProtocolConformanceRef::forAbstract(
+            Type(), proto));
       }
     }
   } else {
@@ -8702,7 +8698,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
     assert(allowCompilerErrors() || !req || isOpaque || witness ||
            req->getAttrs().hasAttribute<OptionalAttr>() ||
-           req->getAttrs().isUnavailable(getContext()));
+           req->isUnavailable());
     if (!witness && !isOpaque) {
       trySetWitness(Witness());
       continue;

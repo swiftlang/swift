@@ -112,7 +112,7 @@ public:
 
   /// The Swift compiler version number that would be used to synthesize
   /// swiftinterface files and subsequently their swiftmodules.
-  llvm::VersionTuple SwiftInterfaceCompilerVersion;
+  version::Version SwiftInterfaceCompilerVersion;
 
   /// A set of modules allowed to import this module.
   std::set<std::string> AllowableClients;
@@ -160,8 +160,8 @@ public:
     /// Parse and dump scope map.
     DumpScopeMaps,
 
-    /// Parse, type-check, and dump type refinement context hierarchy
-    DumpTypeRefinementContexts,
+    /// Parse, type-check, and dump availability scopes
+    DumpAvailabilityScopes,
 
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH,             ///< Emit PCH of imported bridging header

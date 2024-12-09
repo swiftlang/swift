@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -loadable-address %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -loadable-address %s | %FileCheck %s
 
 sil_stage canonical
 

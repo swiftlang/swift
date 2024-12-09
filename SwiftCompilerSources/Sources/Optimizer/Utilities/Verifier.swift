@@ -57,18 +57,32 @@ private extension Instruction {
 private extension Argument {
   func verify(_ context: FunctionPassContext) {
     if let phi = Phi(self), phi.value.ownership == .guaranteed {
-      var forwardingBorrowedFromFound = false
-      for use in phi.value.uses {
-        require(use.instruction is BorrowedFromInst,
-                     "guaranteed phi: \(self)\n has non borrowed-from use: \(use)")
-        if use.index == 0 {
-          require(!forwardingBorrowedFromFound, "phi \(self) has multiple forwarding borrowed-from uses")
-          forwardingBorrowedFromFound = true
-        }
-      }
-      require (forwardingBorrowedFromFound,
-                   "missing forwarding borrowed-from user of guaranteed phi \(phi)")
+
+      phi.verifyBorrowedFromUse()
+
+      require(phi.isReborrow == phi.hasBorrowEndingUse ||
+              // In a dead-end block an end_borrow might have been deleted.
+              // TODO: this check is not needed anymore once we have complete OSSA lifetimes.
+              (isReborrow && context.deadEndBlocks.isDeadEnd(parentBlock)),
+              "\(self) has stale reborrow flag");
     }
+  }
+
+}
+
+private extension Phi {
+  func verifyBorrowedFromUse() {
+    var forwardingBorrowedFromFound = false
+    for use in value.uses {
+      require(use.instruction is BorrowedFromInst,
+              "guaranteed phi: \(self)\n has non borrowed-from use: \(use)")
+      if use.index == 0 {
+        require(!forwardingBorrowedFromFound, "phi \(self) has multiple forwarding borrowed-from uses")
+        forwardingBorrowedFromFound = true
+      }
+    }
+    require(forwardingBorrowedFromFound,
+            "missing forwarding borrowed-from user of guaranteed phi \(self)")
   }
 }
 

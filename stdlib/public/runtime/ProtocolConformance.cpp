@@ -134,7 +134,7 @@ template<> void ProtocolConformanceDescriptor::dump() const {
     return "<unknown addr>";
   };
 
-  switch (auto kind = getTypeKind()) {
+  switch (getTypeKind()) {
   case TypeReferenceKind::DirectObjCClassName:
     printf("direct Objective-C class name %s", getDirectObjCClassName());
     break;

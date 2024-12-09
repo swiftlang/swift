@@ -30,7 +30,6 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/Sema/CSBindings.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/CSTrail.h"
 #include "swift/Sema/Constraint.h"
@@ -250,9 +249,6 @@ private:
   bool PrintWarning;
 
 public:
-  /// This constructor sets a default threshold defined for all expressions
-  /// via compiler flag `solver-expression-time-threshold`.
-  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS);
   ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
                   unsigned thresholdInSecs);
 
@@ -486,10 +482,6 @@ public:
   /// Determine whether this type variable represents a subscript result type.
   bool isSubscriptResultType() const;
 
-  /// Determine whether this type variable represents a result type of an
-  /// application i.e. a call, an operator, or a subscript.
-  bool isApplicationResultType() const;
-
   /// Determine whether this type variable represents an opened
   /// type parameter pack.
   bool isParameterPack() const;
@@ -555,12 +547,7 @@ public:
   /// \param trail The record of state changes.
   void mergeEquivalenceClasses(TypeVariableType *other,
                                constraints::SolverTrail *trail) {
-    // Merge the equivalence classes corresponding to these two type
-    // variables. Always merge 'up' the constraint stack, because it is simpler.
-    if (getID() > other->getImpl().getID()) {
-      other->getImpl().mergeEquivalenceClasses(getTypeVariable(), trail);
-      return;
-    }
+    ASSERT(getID() < other->getImpl().getID());
 
     auto otherRep = other->getImpl().getRepresentative(trail);
     if (trail)
@@ -1198,9 +1185,6 @@ struct Score {
 /// variable.
 using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
 
-using OpenedTypeMap =
-    llvm::DenseMap<GenericTypeParamType *, TypeVariableType *>;
-
 /// Describes the information about a case label item that needs to be tracked
 /// within the constraint system.
 struct CaseLabelItemInfo {
@@ -1482,6 +1466,9 @@ class Solution {
   /// The fixed score for this solution.
   Score FixedScore;
 
+  /// The total memory used by this solution.
+  std::optional<size_t> TotalMemory;
+
 public:
   /// Create a solution for the given constraint system.
   Solution(ConstraintSystem &cs, const Score &score)
@@ -1502,7 +1489,7 @@ public:
   DeclContext *getDC() const;
 
   /// The set of type bindings.
-  llvm::DenseMap<TypeVariableType *, Type> typeBindings;
+  llvm::MapVector<TypeVariableType *, Type> typeBindings;
   
   /// The set of overload choices along with their types.
   llvm::DenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
@@ -1625,7 +1612,7 @@ public:
 
   /// The set of conformances synthesized during solving (i.e. for
   /// ad-hoc distributed `SerializationRequirement` conformances).
-  llvm::DenseMap<ConstraintLocator *, ProtocolConformanceRef>
+  llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
 
   /// Record a new argument matching choice for given locator that maps a
@@ -2175,13 +2162,20 @@ private:
   /// Counter for type variables introduced.
   unsigned TypeCounter = 0;
 
+  /// The number of changes recorded in the trail so far during the
+  /// solution of this constraint system.
+  ///
+  /// This is a rough proxy for how much work the solver did.
+  unsigned NumTrailSteps = 0;
+
   /// The number of scopes created so far during the solution
   /// of this constraint system.
   ///
-  /// This is a measure of complexity of the solution space. A new
-  /// scope is created every time we attempt a type variable binding
-  /// or explore an option in a disjunction.
-  unsigned CountScopes = 0;
+  /// A new scope is created every time we attempt a type variable
+  /// binding or explore an option in a disjunction.
+  ///
+  /// This is a measure of complexity of the solution space.
+  unsigned NumSolverScopes = 0;
 
   /// High-water mark of measured memory usage in any sub-scope we
   /// explored.
@@ -2426,7 +2420,7 @@ public:
 
   /// The set of conformances synthesized during solving (i.e. for
   /// ad-hoc distributed `SerializationRequirement` conformances).
-  llvm::DenseMap<ConstraintLocator *, ProtocolConformanceRef>
+  llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
 
 private:
@@ -2544,24 +2538,12 @@ private:
     }
 
     /// Update statistics when a scope begins.
-    unsigned beginScope() {
-      ++depth;
-      maxDepth = std::max(maxDepth, depth);
-
-      CS.incrementScopeCounter();
-
-      return NumStatesExplored++;
-    }
+    unsigned beginScope();
 
     /// Update statistics when a scope ends.
-    void endScope(unsigned scopeNumber) {
-      ASSERT(depth > 0);
-      --depth;
-
-      unsigned countScopesExplored = NumStatesExplored - scopeNumber;
-      if (countScopesExplored == 1)
-        CS.incrementLeafScopes();
-    }
+    void endScope(unsigned scopeNumber,
+                  uint64_t startTrailSteps,
+                  uint64_t endTrailSteps);
 
     /// Check whether constraint system is allowed to form solutions
     /// even with unbound type variables present.
@@ -2702,10 +2684,6 @@ public:
   /// we're exploring.
   SolverState *solverState = nullptr;
 
-  bool isRecordingChanges() const {
-    return solverState && !solverState->Trail.isUndoActive();
-  }
-
   void recordChange(SolverTrail::Change change) {
     solverState->Trail.recordChange(change);
   }
@@ -2765,11 +2743,11 @@ public:
   struct SolverScope {
     ConstraintSystem &cs;
 
-    /// The length of \c TypeVariables.
-    unsigned numTypeVariables;
+    /// The length of \c TypeVariables at the start of the scope.
+    unsigned startTypeVariables;
 
-    /// The length of \c Trail.
-    unsigned numTrailChanges;
+    /// The length of \c Trail at the start of the scope.
+    uint64_t startTrailSteps;
 
     /// The scope number of this scope. Set when the scope is registered.
     unsigned scopeNumber : 31;
@@ -3519,6 +3497,8 @@ public:
     return !solverState || solverState->recordFixes;
   }
 
+  bool inSalvageMode() const { return solverState && solverState->recordFixes; }
+
   ArrayRef<ConstraintFix *> getFixes() const { return Fixes.getArrayRef(); }
 
   bool shouldSuppressDiagnostics() const {
@@ -3735,7 +3715,7 @@ public:
   /// Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclNameRef name, Type memberTy,
                                 DeclContext *useDC,
-                                FunctionRefKind functionRefKind,
+                                FunctionRefInfo functionRefInfo,
                                 ArrayRef<OverloadChoice> outerAlternatives,
                                 ConstraintLocatorBuilder locator) {
     assert(baseTy);
@@ -3744,7 +3724,7 @@ public:
     assert(useDC);
     switch (simplifyMemberConstraint(
         ConstraintKind::ValueMember, baseTy, name, memberTy, useDC,
-        functionRefKind, outerAlternatives, TMF_GenerateConstraints, locator)) {
+        functionRefInfo, outerAlternatives, TMF_GenerateConstraints, locator)) {
     case SolutionKind::Unsolved:
       llvm_unreachable("Unsolved result when generating constraints!");
 
@@ -3755,7 +3735,7 @@ public:
       if (shouldRecordFailedConstraint()) {
         recordFailedConstraint(Constraint::createMemberOrOuterDisjunction(
             *this, ConstraintKind::ValueMember, baseTy, memberTy, name, useDC,
-            functionRefKind, outerAlternatives, getConstraintLocator(locator)));
+            functionRefInfo, outerAlternatives, getConstraintLocator(locator)));
       }
       break;
     }
@@ -3765,7 +3745,7 @@ public:
   /// to the constraint system.
   void addUnresolvedValueMemberConstraint(Type baseTy, DeclNameRef name,
                                           Type memberTy, DeclContext *useDC,
-                                          FunctionRefKind functionRefKind,
+                                          FunctionRefInfo functionRefInfo,
                                           ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
@@ -3773,7 +3753,7 @@ public:
     assert(useDC);
     switch (simplifyMemberConstraint(ConstraintKind::UnresolvedValueMember,
                                      baseTy, name, memberTy,
-                                     useDC, functionRefKind,
+                                     useDC, functionRefInfo,
                                      /*outerAlternatives=*/{},
                                      TMF_GenerateConstraints, locator)) {
     case SolutionKind::Unsolved:
@@ -3787,7 +3767,7 @@ public:
         recordFailedConstraint(
           Constraint::createMember(*this, ConstraintKind::UnresolvedValueMember,
                                    baseTy, memberTy, name,
-                                   useDC, functionRefKind,
+                                   useDC, functionRefInfo,
                                    getConstraintLocator(locator)));
       }
       break;
@@ -3797,14 +3777,14 @@ public:
   /// Add a value witness constraint to the constraint system.
   void addValueWitnessConstraint(
       Type baseTy, ValueDecl *requirement, Type memberTy, DeclContext *useDC,
-      FunctionRefKind functionRefKind, ConstraintLocatorBuilder locator) {
+      FunctionRefInfo functionRefInfo, ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
     assert(requirement);
     assert(useDC);
     switch (simplifyValueWitnessConstraint(
         ConstraintKind::ValueWitness, baseTy, requirement, memberTy, useDC,
-        functionRefKind, TMF_GenerateConstraints, locator)) {
+        functionRefInfo, TMF_GenerateConstraints, locator)) {
     case SolutionKind::Unsolved:
       llvm_unreachable("Unsolved result when generating constraints!");
 
@@ -4236,18 +4216,23 @@ public:
   ///                     corresponding opened type variables.
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openType(Type type, OpenedTypeMap &replacements,
+  Type openType(Type type, ArrayRef<OpenedType> replacements,
                 ConstraintLocatorBuilder locator);
 
   /// "Open" an opaque archetype type, similar to \c openType.
   Type openOpaqueType(OpaqueTypeArchetypeType *type,
                       ConstraintLocatorBuilder locator);
 
+  /// Recurse over the given type and open any opaque archetype types.
+  Type openOpaqueType(Type type, ContextualTypePurpose context,
+                      ConstraintLocatorBuilder locator,
+                      Decl *ownerDecl);
+
   /// "Open" a pack expansion type by replacing it with a type variable,
   /// opening its pattern and shape types and connecting them to the
   /// aforementioned variable via special constraints.
   Type openPackExpansionType(PackExpansionType *expansion,
-                             OpenedTypeMap &replacements,
+                             ArrayRef<OpenedType> replacements,
                              ConstraintLocatorBuilder locator);
 
   /// Update OpenedPackExpansionTypes and record a change in the trail.
@@ -4259,10 +4244,6 @@ public:
     bool erased = OpenedPackExpansionTypes.erase(expansion);
     ASSERT(erased);
   }
-
-  /// Recurse over the given type and open any opaque archetype types.
-  Type openOpaqueType(Type type, ContextualTypePurpose context,
-                      ConstraintLocatorBuilder locator);
 
   /// "Open" the given function type.
   ///
@@ -4280,7 +4261,7 @@ public:
   /// \returns The opened type, or \c type if there are no archetypes in it.
   FunctionType *openFunctionType(AnyFunctionType *funcType,
                                  ConstraintLocatorBuilder locator,
-                                 OpenedTypeMap &replacements,
+                                 SmallVectorImpl<OpenedType> &replacements,
                                  DeclContext *outerDC);
 
   /// Open the generic parameter list and its requirements,
@@ -4288,20 +4269,18 @@ public:
   void openGeneric(DeclContext *outerDC,
                    GenericSignature signature,
                    ConstraintLocatorBuilder locator,
-                   OpenedTypeMap &replacements);
+                   SmallVectorImpl<OpenedType> &replacements);
 
   /// Open the generic parameter list creating type variables for each of the
   /// type parameters.
   void openGenericParameters(DeclContext *outerDC,
                              GenericSignature signature,
-                             OpenedTypeMap &replacements,
+                             SmallVectorImpl<OpenedType> &replacements,
                              ConstraintLocatorBuilder locator);
 
   /// Open a generic parameter into a type variable and record
   /// it in \c replacements.
-  TypeVariableType *openGenericParameter(DeclContext *outerDC,
-                                         GenericTypeParamType *parameter,
-                                         OpenedTypeMap &replacements,
+  TypeVariableType *openGenericParameter(GenericTypeParamType *parameter,
                                          ConstraintLocatorBuilder locator);
 
   /// Given generic signature open its generic requirements,
@@ -4328,7 +4307,7 @@ public:
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
-         const OpenedTypeMap &replacements,
+         SmallVectorImpl<OpenedType> &replacements,
          bool fixmeAllowDuplicates=false);
 
   /// Check whether the given type conforms to the given protocol and if
@@ -4340,7 +4319,7 @@ public:
   FunctionType *adjustFunctionTypeForConcurrency(
       FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
       unsigned numApplies, bool isMainDispatchQueue,
-      OpenedTypeMap &replacements, ConstraintLocatorBuilder locator);
+      ArrayRef<OpenedType> replacements, ConstraintLocatorBuilder locator);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///
@@ -4353,7 +4332,7 @@ public:
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfReference(
                           ValueDecl *decl,
-                          FunctionRefKind functionRefKind,
+                          FunctionRefInfo functionRefInfo,
                           ConstraintLocatorBuilder locator,
                           DeclContext *useDC);
 
@@ -4380,7 +4359,7 @@ public:
   Type getMemberReferenceTypeFromOpenedType(
       Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
       ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
-      OpenedTypeMap &replacements);
+      ArrayRef<OpenedType> replacements);
 
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
@@ -4395,8 +4374,8 @@ public:
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfMemberReference(
       Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
-      FunctionRefKind functionRefKind, ConstraintLocator *locator,
-      OpenedTypeMap *replacements = nullptr);
+      FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
+      SmallVectorImpl<OpenedType> *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
@@ -4849,7 +4828,7 @@ public:
   /// referenced.
   MemberLookupResult performMemberLookup(ConstraintKind constraintKind,
                                          DeclNameRef memberName, Type baseTy,
-                                         FunctionRefKind functionRefKind,
+                                         FunctionRefInfo functionRefInfo,
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
@@ -4923,7 +4902,7 @@ private:
                                               FunctionType *fnType,
                                               TypeMatchOptions flags,
                                               DeclContext *DC,
-                                              FunctionRefKind functionRefKind,
+                                              FunctionRefInfo functionRefInfo,
                                               ConstraintLocator *locator);
 
   /// Attempt to simplify the given superclass constraint.
@@ -4948,7 +4927,7 @@ private:
                                             TypeMatchOptions flags);
 
   void recordSynthesizedConformance(ConstraintLocator *locator,
-                                    ProtocolConformanceRef conformance);
+                                    ProtocolDecl *conformance);
 
   /// Attempt to simplify the given conformance constraint.
   ///
@@ -4979,14 +4958,14 @@ private:
   /// Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(
       ConstraintKind kind, Type baseType, DeclNameRef member, Type memberType,
-      DeclContext *useDC, FunctionRefKind functionRefKind,
+      DeclContext *useDC, FunctionRefInfo functionRefInfo,
       ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the given value witness constraint.
   SolutionKind simplifyValueWitnessConstraint(
       ConstraintKind kind, Type baseType, ValueDecl *member, Type memberType,
-      DeclContext *useDC, FunctionRefKind functionRefKind,
+      DeclContext *useDC, FunctionRefInfo functionRefInfo,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the optional object constraint.
@@ -5506,7 +5485,9 @@ public:
   /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
   void optimizeConstraints(Expr *e);
-  
+
+  void startExpressionTimer(ExpressionTimer::AnchorType anchor);
+
   /// Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   std::pair<bool, SourceRange> isAlreadyTooComplex = {false, SourceRange()};
@@ -5545,9 +5526,16 @@ public:
       return true;
     }
 
-    // Bail out once we've looked at a really large number of
-    // choices.
-    if (CountScopes > getASTContext().TypeCheckerOpts.SolverBindingThreshold) {
+    auto &opts = getASTContext().TypeCheckerOpts;
+
+    // Bail out once we've looked at a really large number of choices.
+    if (opts.SolverScopeThreshold && NumSolverScopes > opts.SolverScopeThreshold) {
+      isAlreadyTooComplex.first = true;
+      return true;
+    }
+
+    // Bail out once we've taken a really large number of steps.
+    if (opts.SolverTrailThreshold && NumTrailSteps > opts.SolverTrailThreshold) {
       isAlreadyTooComplex.first = true;
       return true;
     }
@@ -6443,9 +6431,9 @@ Type getPatternTypeOfSingleUnlabeledPackExpansionTuple(Type type);
 /// methods prefixed with `build*` i.e. `buildBlock`, `buildExpression` etc.
 bool isResultBuilderMethodReference(ASTContext &, UnresolvedDotExpr *);
 
-/// Determine the number of applications applied to the given overload.
-unsigned getNumApplications(ValueDecl *decl, bool hasAppliedSelf,
-                            FunctionRefKind functionRefKind);
+/// Determine the number of applications applied for a given FunctionRefInfo.
+unsigned getNumApplications(bool hasAppliedSelf,
+                            FunctionRefInfo functionRefInfo);
 
 } // end namespace constraints
 

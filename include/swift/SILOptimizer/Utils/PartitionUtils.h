@@ -88,6 +88,7 @@ namespace swift {
 
 class Partition;
 class SendingOperandToStateMap;
+class RegionAnalysisValueMap;
 
 /// The representative value of the equivalence class that makes up a tracked
 /// value.
@@ -380,6 +381,7 @@ public:
   IsolationHistory get() { return IsolationHistory(this); }
 };
 
+/// A struct that represents a specific "sending" operand of an ApplySite.
 struct SendingOperandState {
   /// The dynamic isolation info of the region of value when we sent.
   ///
@@ -460,6 +462,14 @@ enum class PartitionOpKind : uint8_t {
   ///
   /// Takes one parameter, the inout parameter that we need to check.
   InOutSendingAtFunctionExit,
+
+  /// This is the result of an isolation crossing apply site. We need to emit a
+  /// special error since we never allow this.
+  ///
+  /// DISCUSSION: This is actually just a form of "send". Sadly, we can not use
+  /// "send" directly since "send" expects a SILOperand and these are values. So
+  /// to work around the API issue, we have to use a different, specific entry.
+  NonSendableIsolationCrossingResult,
 };
 
 /// PartitionOp represents a primitive operation that can be performed on
@@ -569,6 +579,12 @@ public:
   static PartitionOp InOutSendingAtFunctionExit(Element elt,
                                                 SILInstruction *sourceInst) {
     return PartitionOp(PartitionOpKind::InOutSendingAtFunctionExit, elt,
+                       sourceInst);
+  }
+
+  static PartitionOp
+  NonSendableIsolationCrossingResult(Element elt, SILInstruction *sourceInst) {
+    return PartitionOp(PartitionOpKind::NonSendableIsolationCrossingResult, elt,
                        sourceInst);
   }
 
@@ -954,6 +970,12 @@ public:
     const PartitionOp *op;
 
     UnknownCodePatternError(const PartitionOp &op) : op(&op) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
   };
 
   struct LocalUseAfterSendError {
@@ -964,6 +986,12 @@ public:
     LocalUseAfterSendError(const PartitionOp &op, Element elt,
                            Operand *sendingOp)
         : op(&op), sentElement(elt), sendingOp(sendingOp) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
   };
 
   struct SentNeverSendableError {
@@ -975,6 +1003,12 @@ public:
                            SILDynamicMergedIsolationInfo isolationRegionInfo)
         : op(&op), sentElement(sentElement),
           isolationRegionInfo(isolationRegionInfo) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
   };
 
   struct AssignNeverSendableIntoSendingResultError {
@@ -992,6 +1026,12 @@ public:
         : op(&op), destElement(destElement), destValue(destValue),
           srcElement(srcElement), srcValue(srcValue),
           srcIsolationRegionInfo(srcIsolationRegionInfo) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
   };
 
   struct InOutSendingNotInitializedAtExitError {
@@ -1002,6 +1042,12 @@ public:
     InOutSendingNotInitializedAtExitError(const PartitionOp &op, Element elt,
                                           Operand *sendingOp)
         : op(&op), sentElement(elt), sendingOp(sendingOp) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
   };
 
   struct InOutSendingNotDisconnectedAtExitError {
@@ -1013,6 +1059,28 @@ public:
         const PartitionOp &op, Element elt,
         SILDynamicMergedIsolationInfo isolation)
         : op(&op), inoutSendingElement(elt), isolationInfo(isolation) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
+  struct NonSendableIsolationCrossingResultError {
+    const PartitionOp *op;
+
+    Element returnValueElement;
+
+    NonSendableIsolationCrossingResultError(const PartitionOp &op,
+                                            Element returnValue)
+        : op(&op), returnValueElement(returnValue) {}
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
   };
 
 #define PARTITION_OP_ERROR(NAME)                                               \
@@ -1066,6 +1134,20 @@ public:
   }
 
   Kind getKind() const { return kind; }
+
+  void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+    switch (getKind()) {
+#define PARTITION_OP_ERROR(NAME)                                               \
+  case NAME:                                                                   \
+    return get##NAME##Error().print(os, valueMap);
+#include "PartitionOpError.def"
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+    return print(llvm::dbgs(), valueMap);
+  }
 
 #define PARTITION_OP_ERROR(NAME)                                               \
   NAME##Error get##NAME##Error() const {                                       \
@@ -1430,8 +1512,15 @@ public:
 
       // Then emit an unknown code pattern error.
       return handleError(UnknownCodePatternError(op));
-    }
+    case PartitionOpKind::NonSendableIsolationCrossingResult:
+      // Grab the dynamic dataflow isolation information for our element's
+      // region.
+      Region region = p.getRegion(op.getOpArgs()[0]);
 
+      // Then emit the error.
+      return handleError(
+          NonSendableIsolationCrossingResultError(op, op.getOpArgs()[0]));
+    }
     llvm_unreachable("Covered switch isn't covered?!");
   }
 

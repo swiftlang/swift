@@ -7791,7 +7791,13 @@ diagnoseMetadataDependencyCycle(llvm::ArrayRef<MetadataDependency> links) {
       .errorType = "type-metadata-cycle",
       .currentStackDescription = "fetching metadata", // TODO?
       .framesToSkip = 1, // skip out to the check function
-      .memoryAddress = links.front().Value
+      .memoryAddress = links.front().Value,
+      .numExtraThreads = 0,
+      .threads = nullptr,
+      .numFixIts = 0,
+      .fixIts = nullptr,
+      .numNotes = 0,
+      .notes = nullptr,
       // TODO: describe the cycle using notes instead of one huge message?
     };
 #pragma GCC diagnostic pop
@@ -8197,7 +8203,7 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   if (referencesAnonymousContext(node))
     return;
 
-  auto mangling = Demangle::mangleNode(node);
+  auto mangling = Demangle::mangleNode(node, Mangle::ManglingFlavor::Default);
   if (!mangling.isSuccess()) {
     swift::warning(RuntimeErrorFlagNone,
                    "Metadata mangled name failed to roundtrip: %p couldn't be mangled\n",

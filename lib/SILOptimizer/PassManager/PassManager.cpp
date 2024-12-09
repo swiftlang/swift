@@ -1793,6 +1793,7 @@ bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, b
 namespace  {
 class GlobalVariableMangler : public Mangle::ASTMangler {
 public:
+  GlobalVariableMangler(ASTContext &Ctx) : ASTMangler(Ctx) {}
   std::string mangleOutlinedVariable(SILFunction *F, int &uniqueIdx) {
     std::string GlobName;
     do {
@@ -1812,7 +1813,7 @@ BridgedOwnedString BridgedPassContext::mangleOutlinedVariable(BridgedFunction fu
   SILFunction *f = function.getFunction();
   SILModule &mod = f->getModule();
   while (true) {
-    GlobalVariableMangler mangler;
+    GlobalVariableMangler mangler(f->getASTContext());
     std::string name = mangler.mangleOutlinedVariable(f, idx);
     if (!mod.lookUpGlobalVariable(name))
       return BridgedOwnedString(name);
@@ -1826,7 +1827,7 @@ BridgedOwnedString BridgedPassContext::mangleAsyncRemoved(BridgedFunction functi
   // FIXME: hard assumption on what pass is requesting this.
   auto P = Demangle::SpecializationPass::AsyncDemotion;
 
-  Mangle::FunctionSignatureSpecializationMangler Mangler(
+  Mangle::FunctionSignatureSpecializationMangler Mangler(F->getASTContext(),
       P, F->getSerializedKind(), F);
   Mangler.setRemovedEffect(EffectKind::Async);
   return BridgedOwnedString(Mangler.mangle());
@@ -1836,7 +1837,7 @@ BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(const SwiftInt * _Null
                                                           SwiftInt numDeadArgs,
                                                           BridgedFunction function) const {
   SILFunction *f = function.getFunction();
-  Mangle::FunctionSignatureSpecializationMangler Mangler(
+  Mangle::FunctionSignatureSpecializationMangler Mangler(f->getASTContext(),
       Demangle::SpecializationPass::FunctionSignatureOpts,
       f->getSerializedKind(), f);
   for (SwiftInt idx = 0; idx < numDeadArgs; idx++) {
@@ -1852,7 +1853,7 @@ BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
 ) const {
   auto pass = Demangle::SpecializationPass::ClosureSpecializer;
   auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
-  Mangle::FunctionSignatureSpecializationMangler mangler(
+  Mangle::FunctionSignatureSpecializationMangler mangler(applySiteCallee.getFunction()->getASTContext(),
       pass, serializedKind, applySiteCallee.getFunction());
 
   llvm::SmallVector<swift::SILValue, 16> closureArgsStorage;
@@ -1879,11 +1880,14 @@ BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
-BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, bool isPrivate) const {
-  return {SILGlobalVariable::create(
+BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, BridgedLinkage linkage, bool isLet) const {
+  auto *global = SILGlobalVariable::create(
       *invocation->getPassManager()->getModule(),
-      isPrivate ? SILLinkage::Private : SILLinkage::Public, IsNotSerialized,
-      name.unbridged(), type.unbridged())};
+      (swift::SILLinkage)linkage, IsNotSerialized,
+      name.unbridged(), type.unbridged());
+  if (isLet)
+    global->setLet(true);
+  return {global};
 }
 
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {

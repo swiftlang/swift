@@ -13,5 +13,4 @@
 import CompletionHandlerGlobals
 
 // CHECK: class Computer
-// FIXME: The "open" is odd here. We want this to be "final", but can't yet.
-// CHECK: open func multiply(_ x: Double, by y: Double) async -> Double
+// CHECK: @_alwaysEmitIntoClient public final func multiply(_ x: Double, by y: Double) async -> Double

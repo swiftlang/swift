@@ -13,6 +13,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/AST/Expr.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILGlobalVariable.h"
 
@@ -680,6 +681,17 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
   if (value != original)
     createEndBorrow(loc, value);
 }
+
+EndBorrowInst *SILBuilder::createEndBorrow(SILLocation loc, SILValue borrowedValue) {
+  ASSERT(!SILArgument::isTerminatorResult(borrowedValue) &&
+             "terminator results do not have end_borrow");
+  ASSERT(!isa<SILFunctionArgument>(borrowedValue) &&
+         "Function arguments should never have an end_borrow");
+  updateReborrowFlags(borrowedValue);
+  return insert(new (getModule())
+                    EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
+}
+
 
 SILPhiArgument *SILBuilder::createSwitchOptional(
                                 SILLocation loc, SILValue operand,

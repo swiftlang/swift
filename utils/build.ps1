@@ -194,14 +194,6 @@ $WiXVersion = "4.0.5"
 # Avoid $env:ProgramFiles in case this script is running as x86
 $UnixToolsBinDir = "$env:SystemDrive\Program Files\Git\usr\bin"
 
-$python = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Shared\Python39_64\python.exe"
-if (-not (Test-Path $python)) {
-  $python = (where.exe python) | Select-Object -First 1
-  if (-not (Test-Path $python)) {
-    throw "Python.exe not found"
-  }
-}
-
 if ($Android -and ($AndroidSDKs.Length -eq 0)) {
   # Enable all android SDKs by default.
   $AndroidSDKs = @("aarch64","armv7","i686","x86_64")
@@ -358,6 +350,10 @@ function Get-BisonExecutable {
   return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_bison.exe"
 }
 
+function Get-PythonExecutable {
+  return Join-Path -Path $BinaryCache -ChildPath "Python$($BuildArch.CMakeName)-$PythonVersion\tools\python.exe"
+}
+
 function Get-InstallDir($Arch) {
   if ($Arch -eq $HostArch) {
     $ProgramFilesName = "Program Files"
@@ -454,6 +450,7 @@ enum HostComponent {
   LMDB
   SymbolKit
   DocC
+  SwiftInspect
 }
 
 function Get-HostProjectBinaryCache([HostComponent]$Project) {
@@ -746,10 +743,43 @@ function Fetch-Dependencies {
     }
   }
 
+  function Ensure-PythonModules($Python) {
+    # First ensure pip is installed, else bootstrap it
+    try {
+      Invoke-Program -OutNull $Python -m pip *> $null
+    } catch {
+      Write-Output "Installing pip ..."
+      Invoke-Program -OutNull $Python '-I' -m ensurepip -U --default-pip
+    }
+    # 'packaging' is required for building LLVM 18+
+    try {
+      Invoke-Program -OutNull $Python -c 'import packaging' *> $null
+    } catch {
+      $WheelURL = "https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl"
+      $WheelHash = "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"
+      DownloadAndVerify $WheelURL "$BinaryCache\python\packaging-24.1-py3-none-any.whl" $WheelHash
+      Write-Output "Installing 'packaging-24.1-py3-none-any.whl' ..."
+      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\packaging-24.1-py3-none-any.whl" --disable-pip-version-check
+    }
+    # 'setuptools' provides 'distutils' module for Python 3.12+, required for SWIG support
+    # https://github.com/swiftlang/llvm-project/issues/9289
+    try {
+      Invoke-Program -OutNull $Python -c 'import distutils' *> $null
+    } catch {
+      $WheelURL = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl"
+      $WheelHash = "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2"
+      DownloadAndVerify $WheelURL "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" $WheelHash
+      Write-Output "Installing 'setuptools-75.1.0-py3-none-any.whl' ..."
+      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" --disable-pip-version-check
+    }
+  }
+
   Download-Python $HostArchName
   if ($IsCrossCompiling) {
     Download-Python $BuildArchName
   }
+  # Ensure Python modules that are required as host build tools
+  Ensure-PythonModules "$(Get-PythonExecutable)"
 
   if ($Android) {
     # Only a specific NDK version is supported right now.
@@ -841,12 +871,12 @@ function Append-FlagsDefine([hashtable]$Defines, [string]$Name, [string[]]$Value
   }
 }
 
-function Test-CMakeAtLeast([int]$Major, [int]$Minor, [int]$Patch = 0) {
+function Test-SCCacheAtLeast([int]$Major, [int]$Minor, [int]$Patch = 0) {
   if ($ToBatch) { return $false }
 
-  $CMakeVersionString = @(& cmake.exe --version)[0]
-  if (-not ($CMakeVersionString -match "^cmake version (\d+)\.(\d+)(?:\.(\d+))?")) {
-    throw "Unexpected CMake version string format"
+  $SCCacheVersionString = @(& sccache.exe --version)[0]
+  if (-not ($SCCacheVersionString -match "sccache (\d+)\.(\d+)(?:\.(\d+))?")) {
+    throw "Unexpected SCCache version string format"
   }
 
   if ([int]$Matches.1 -ne $Major) { return [int]$Matches.1 -gt $Major }
@@ -958,7 +988,6 @@ function Build-CMakeProject {
     }
 
     TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE Release
-    TryAdd-KeyValue $Defines CMAKE_MT "mt"
 
     $CFlags = @()
     switch ($Platform) {
@@ -1029,11 +1058,6 @@ function Build-CMakeProject {
       }
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER_TARGET $Arch.LLVMTarget
 
-      if (-not (Test-CMakeAtLeast -Major 3 -Minor 26 -Patch 3) -and $Platform -eq "Windows") {
-        # Workaround for https://github.com/ninja-build/ninja/issues/2280
-        TryAdd-KeyValue $Defines CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: "
-      }
-
       if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
         Append-FlagsDefine $Defines CMAKE_C_FLAGS "-gdwarf"
       }
@@ -1047,11 +1071,6 @@ function Build-CMakeProject {
         TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath $Driver)
       }
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_TARGET $Arch.LLVMTarget
-
-      if (-not (Test-CMakeAtLeast -Major 3 -Minor 26 -Patch 3) -and $Platform -eq "Windows") {
-        # Workaround for https://github.com/ninja-build/ninja/issues/2280
-        TryAdd-KeyValue $Defines CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: "
-      }
 
       if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
         Append-FlagsDefine $Defines CMAKE_CXX_FLAGS "-gdwarf"
@@ -1237,11 +1256,17 @@ function Build-SPMProject {
     [string[]] $AdditionalArguments
   )
 
+  $ActionForOutput = switch ($Action) {
+    Build { "Building" }
+    Test { "Testing" }
+    TestParallel { "Testing" }
+  }
+
   if ($ToBatch) {
     Write-Output ""
-    Write-Output "echo Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
+    Write-Output "echo $ActionForOutput '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
   } else {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] $ActionForOutput '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
   }
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
@@ -1375,6 +1400,8 @@ function Build-BuildTools($Arch) {
     -BuildTargets llvm-tblgen,clang-tblgen,clang-pseudo-gen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
     -Defines @{
       CMAKE_CROSSCOMPILING = "NO";
+      CLANG_ENABLE_LIBXML2 = "NO";
+      LLDB_ENABLE_LIBXML2 = "NO";
       LLDB_ENABLE_PYTHON = "NO";
       LLDB_INCLUDE_TESTS = "NO";
       LLDB_ENABLE_SWIFT_SUPPORT = "NO";
@@ -1449,6 +1476,9 @@ function Build-Compilers() {
       }
     }
 
+    $PythonRoot = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools"
+    $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
+
     # The STL in VS 17.10 requires Clang 17 or higher, but Swift toolchains prior to version 6 include older versions
     # of Clang. If bootstrapping with an older toolchain, we need to relax to relax this requirement with
     # ALLOW_COMPILER_AND_STL_VERSION_MISMATCH.
@@ -1470,7 +1500,9 @@ function Build-Compilers() {
       -Defines ($TestingDefines + @{
         CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
         CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
         CMAKE_Swift_FLAGS = $SwiftFlags;
+        LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\Windows\$($Arch.LLVMName)\cmake\libxml2-2.11.5";
         LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
         LLDB_PYTHON_EXT_SUFFIX = ".pyd";
         LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
@@ -1480,10 +1512,10 @@ function Build-Compilers() {
         LLVM_NATIVE_TOOL_DIR = $BuildTools;
         LLVM_TABLEGEN = (Join-Path $BuildTools -ChildPath "llvm-tblgen.exe");
         LLVM_USE_HOST_TOOLS = "NO";
-        Python3_EXECUTABLE = "$python";
-        Python3_INCLUDE_DIR = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools\include";
-        Python3_LIBRARY = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools\libs\python39.lib";
-        Python3_ROOT_DIR = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools";
+        Python3_EXECUTABLE = (Get-PythonExecutable);
+        Python3_INCLUDE_DIR = "$PythonRoot\include";
+        Python3_LIBRARY = "$PythonRoot\libs\$PythonLibName.lib";
+        Python3_ROOT_DIR = $PythonRoot;
         SWIFT_BUILD_SWIFT_SYNTAX = "YES";
         SWIFT_CLANG_LOCATION = (Get-PinnedToolchainTool);
         SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
@@ -1514,46 +1546,51 @@ function Build-Mimalloc() {
     [hashtable]$Arch
   )
 
-  if ($Arch -eq $ArchX64) {
-    $Args = @()
-    Isolate-EnvVars {
-      Invoke-VsDevShell $Arch
-      # Avoid hard-coding the VC tools version number
-      $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostArch.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
-      if ($VCRedistDir) {
-        $Args += "-p:VCRedistDir=$VCRedistDir\"
-      }
-    }
-    $Args += "$SourceCache\mimalloc\ide\vs2022\mimalloc.sln"
-    $Args += "-p:Configuration=Release"
-    $Args += "-p:ProductArchitecture=$($Arch.VSName)"
-    Invoke-Program $msbuild @Args
-    $Dest = "$($Arch.ToolchainInstallRoot)\usr\bin"
-    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\mimalloc-override.dll" `
-      -Destination "$Dest"
-    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\mimalloc-redirect.dll" `
-      -Destination "$Dest"
-    $MimallocExecutables = @("swift.exe","swiftc.exe","swift-driver.exe","swift-frontend.exe")
-    $MimallocExecutables += @("clang.exe","clang++.exe","clang-cl.exe")
-    $MimallocExecutables += @("lld.exe","lld-link.exe","ld.lld.exe","ld64.lld.exe")
-    foreach ($Exe in $MimallocExecutables) {
-      $ExePath = [IO.Path]::Combine($Dest, $Exe)
-      # Binary-patch in place
-      $Args = @()
-      $Args += "-f"
-      $Args += "-i"
-      $Args += "-v"
-      $Args += $ExePath
-      Invoke-Program "$SourceCache\mimalloc\bin\minject" @Args
-      # Log the import table
-      $Args = @()
-      $Args += "-l"
-      $Args += $ExePath
-      Invoke-Program "$SourceCache\mimalloc\bin\minject" @Args
-      dir "$ExePath"
-    }
-  } else {
+  if ($Arch -ne $ArchX64) {
     throw "mimalloc is currently supported for X64 only"
+  }
+
+  $MSBuildArgs = @("$SourceCache\mimalloc\ide\vs2022\mimalloc.sln")
+  $MSBuildArgs += "-noLogo"
+  $MSBuildArgs += "-maxCpuCount"
+  $MSBuildArgs += "-p:Configuration=Release"
+  $MSBuildArgs += "-p:ProductArchitecture=$($Arch.VSName)"
+
+  Isolate-EnvVars {
+    Invoke-VsDevShell $Arch
+    # Avoid hard-coding the VC tools version number
+    $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostArch.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
+    if ($VCRedistDir) {
+      $MSBuildArgs += "-p:VCRedistDir=$VCRedistDir\"
+    }
+  }
+
+  Invoke-Program $msbuild @MSBuildArgs
+
+  $Products = @( "mimalloc-override.dll", "mimalloc-redirect.dll" )
+  foreach ($Product in $Products) {
+    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\$Product" -Destination "$(Arch.ToolchainInstallRoot)\usr\bin"
+  }
+
+  $Tools = @(
+    "swift.exe",
+    "swiftc.exe",
+    "swift-driver.exe",
+    "swift-frontend.exe",
+    "clang.exe",
+    "clang++.exe",
+    "clang-cl.exe",
+    "lld.exe",
+    "lld-link.exe",
+    "ld.lld.exe",
+    "ld64.lld.exe"
+  )
+  foreach ($Tool in $Tools) {
+    $Binary = [IO.Path]::Combine($Dest, $Tool)
+    # Binary-patch in place
+    Invoke-Program "$SourceCache\mimalloc\bin\minject" @("-f", "-i", "-v", $Binary)
+    # Log the import table
+    Invoke-Program "$SourceCache\mimalloc\bin\minject" @("-l", $Binary)
   }
 }
 
@@ -1808,7 +1845,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
       })
   }
 
-  Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
+  Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
     -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
 }
 
@@ -1893,14 +1930,9 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -Defines (@{
           ENABLE_TESTING = "NO";
           FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
+          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
           CURL_DIR = "$LibraryRoot\curl-8.9.1\usr\lib\$Platform\$ShortArch\cmake\CURL";
-          LIBXML2_LIBRARY = if ($Platform -eq "Windows") {
-            "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2s.lib";
-          } else {
-            "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\libxml2.a";
-          };
-          LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.11.5\usr\include\libxml2";
-          LIBXML2_DEFINITIONS = "-DLIBXML_STATIC";
+          LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\cmake\libxml2-2.11.5";
           ZLIB_LIBRARY = if ($Platform -eq "Windows") {
             "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\zlibstatic.lib"
           } else {
@@ -2039,7 +2071,7 @@ function Build-Testing([Platform]$Platform, $Arch, [switch]$Test = $false) {
 
 function Write-PlatformInfoPlist($Arch) {
     $PList = Join-Path -Path $Arch.PlatformInstallRoot -ChildPath "Info.plist"
-    Invoke-Program $python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFT_TESTING_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
+    Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFT_TESTING_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
       -OutFile "$PList"
 }
 
@@ -2630,18 +2662,20 @@ function Install-HostToolchain() {
 }
 
 function Build-Inspect() {
-  $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath swift-inspect
-  $SDKInstallRoot = (Get-HostSwiftSDK) `
+  $SDKRoot = Get-HostSwiftSDK
 
-  Isolate-EnvVars {
-    $env:SWIFTCI_USE_LOCAL_DEPS=1
-    Build-SPMProject `
-      -Action Build `
-      -Src $SourceCache\swift\tools\swift-inspect `
-      -Bin $OutDir `
-      -Arch $HostArch `
-      -Xcc "-I$SDKInstallRoot\usr\include\swift\SwiftRemoteMirror" -Xlinker "$SDKInstallRoot\usr\lib\swift\windows\$($HostArch.LLVMName)\swiftRemoteMirror.lib"
-  }
+  Build-CMakeProject `
+    -Src $SourceCache\swift\tools\swift-inspect `
+    -Bin (Get-HostProjectBinaryCache SwiftInspect) `
+    -InstallTo "$($HostArch.ToolchainInstallRoot)\usr" `
+    -Arch $HostArch `
+    -UseBuiltCompilers Swift `
+    -UseSwiftSwiftDriver `
+    -SwiftSDK $SDKRoot `
+    -Defines @{
+      CMAKE_Swift_FLAGS = @("-Xcc", "-I$SDKRoot\usr\include\swift\SwiftRemoteMirror");
+      ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
+    }
 }
 
 function Build-DocC() {
@@ -2680,18 +2714,14 @@ function Test-PackageManager() {
 function Build-Installer($Arch) {
   # TODO(hjyamauchi) Re-enable the swift-inspect and swift-docc builds
   # when cross-compiling https://github.com/apple/swift/issues/71655
-  $INCLUDE_SWIFT_INSPECT = if ($IsCrossCompiling) { "false" } else { "true" }
   $INCLUDE_SWIFT_DOCC = if ($IsCrossCompiling) { "false" } else { "true" }
   $ENABLE_MIMALLOC = if ($Allocator -eq "mimalloc" -and $Arch -eq $ArchX64) { "true" } else { "false" }
 
   $Properties = @{
     BundleFlavor = "offline";
-    DEVTOOLS_ROOT = "$($Arch.ToolchainInstallRoot)\";
     TOOLCHAIN_ROOT = "$($Arch.ToolchainInstallRoot)\";
-    INCLUDE_SWIFT_INSPECT = $INCLUDE_SWIFT_INSPECT;
-    SWIFT_INSPECT_BUILD = "$($Arch.BinaryCache)\swift-inspect\release";
-    INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     ENABLE_MIMALLOC = $ENABLE_MIMALLOC;
+    INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$($Arch.BinaryCache)\swift-docc\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
   }
@@ -2740,9 +2770,14 @@ try {
 Fetch-Dependencies
 
 if (-not $SkipBuild) {
+  if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
+    throw "Minimum required sccache version is 0.7.4"
+  }
+
   Invoke-BuildStep Build-CMark $BuildArch
   Invoke-BuildStep Build-BuildTools $BuildArch
   if ($IsCrossCompiling) {
+    Invoke-BuildStep Build-XML2 Windows $BuildArch
     Invoke-BuildStep Build-Compilers -Build $BuildArch
   }
   if ($IncludeDS2) {
@@ -2750,6 +2785,7 @@ if (-not $SkipBuild) {
   }
 
   Invoke-BuildStep Build-CMark $HostArch
+  Invoke-BuildStep Build-XML2 Windows $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
 }
 

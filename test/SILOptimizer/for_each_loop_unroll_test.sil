@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -for-each-loop-unroll -enable-sil-verify-all %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -for-each-loop-unroll -enable-sil-verify-all %s 2>&1 | %FileCheck %s
 
 // SIL tests for the ForEachLoopUnroll mandatory optimization pass that unrolls
 // Sequence.forEach calls over array literals.

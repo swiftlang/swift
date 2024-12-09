@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -emit-sil -target %target-swift-5.1-abi-triple -parse-as-library %s | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -Xllvm -sil-print-types -emit-sil -target %target-swift-5.1-abi-triple -parse-as-library %s | %FileCheck %s --check-prefix=CHECK-SIL
 // RUN: %target-build-swift -enable-experimental-feature SymbolLinkageMarkers -target %target-swift-5.1-abi-triple -Xfrontend -parse-as-library %s -o %t_binary
 // RUN: %target-codesign %t_binary
 // RUN: %target-run %t_binary | %FileCheck %s --check-prefix=CHECK-EXEC

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -swift-version 4 | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -swift-version 4 | %FileCheck %s
 
 final class Final<T> {
     var x: T

@@ -27,6 +27,7 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Version.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSFix.h"
@@ -1300,11 +1301,11 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
     // are built with 6.1+ compilers, libraries produced by earlier
     // compilers don't have required symbols.
     if (auto *module = member->getDeclContext()->getParentModule()) {
-      if (module->isBuiltFromInterface() &&
-          module->getSwiftInterfaceCompilerVersion() <
-              llvm::VersionTuple(6, 1)) {
-        return AllowInvalidRefInKeyPath::create(
-            cs, baseType, RefKind::UnsupportedStaticMember, member, locator);
+      if (module->isBuiltFromInterface()) {
+        auto compilerVersion = module->getSwiftInterfaceCompilerVersion();
+        if (!compilerVersion.isVersionAtLeast(6, 1))
+          return AllowInvalidRefInKeyPath::create(
+              cs, baseType, RefKind::UnsupportedStaticMember, member, locator);
       }
     }
 
@@ -2248,10 +2249,15 @@ bool SpecifyBaseTypeForOptionalUnresolvedMember::diagnose(
 SpecifyBaseTypeForOptionalUnresolvedMember *
 SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
     ConstraintSystem &cs, ConstraintKind kind, Type baseTy,
-    DeclNameRef memberName, FunctionRefKind functionRefKind,
+    DeclNameRef memberName, FunctionRefInfo functionRefInfo,
     MemberLookupResult result, ConstraintLocator *locator) {
 
   if (kind != ConstraintKind::UnresolvedValueMember)
+    return nullptr;
+
+  // Only diagnose for UnresolvedMemberExprs.
+  // TODO: We ought to support diagnosing EnumElementPatterns too.
+  if (!isExpr<UnresolvedMemberExpr>(locator->getAnchor()))
     return nullptr;
 
   // None or only one viable candidate, there is no ambiguity.
@@ -2263,7 +2269,7 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
     return nullptr;
 
   // Don't diagnose for function members e.g. Foo? = .none(0).
-  if (functionRefKind != FunctionRefKind::Unapplied)
+  if (!functionRefInfo.isUnappliedBaseName())
     return nullptr;
 
   Type underlyingBaseType = baseTy->getMetatypeInstanceType();
@@ -2343,7 +2349,7 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
 
   MemberLookupResult unwrappedResult =
       cs.performMemberLookup(kind, memberName, MetatypeType::get(unwrappedType),
-                             functionRefKind, locator,
+                             functionRefInfo, locator,
                              /*includeInaccessibleMembers*/ false);
   SmallVector<OverloadChoice, 4> unwrappedViableCandidates;
   filterViableCandidates(unwrappedResult.ViableCandidates,

@@ -55,6 +55,13 @@
 using namespace swift;
 using namespace importer;
 
+// XXX: This is to resolve the build dependency with Clang. Remove it once these
+// types actually land in Clang.
+namespace clang {
+class DynamicRangePointerType;
+class ValueTerminatedType;
+}
+
 /// Given that a type is the result of a special typedef import, was
 /// it originally a CF pointer?
 static bool isImportedCFPointer(clang::QualType clangType, Type type) {
@@ -418,6 +425,22 @@ namespace {
       // In the future we could do something more clever (such as trying to
       // import as an Array where possible) or less clever (such as importing
       // as the desugared, underlying pointer type).
+      return Type();
+    }
+
+    ImportResult VisitDynamicRangePointerType(
+        const clang::DynamicRangePointerType *type) {
+      // DynamicRangePointerType is a clang type representing a pointer with
+      // an "ended_by" type attribute for -fbounds-safety. For now, we don't
+      // import these into Swift.
+      return Type();
+    }
+
+    ImportResult VisitValueTerminatedType(
+        const clang::ValueTerminatedType *type) {
+      // ValueTerminatedType is a clang type representing a pointer with
+      // a "terminated_by" type attribute for -fbounds-safety. For now, we don't
+      // import these into Swift.
       return Type();
     }
 
@@ -907,7 +930,7 @@ namespace {
 #endif
 
       // If the imported typealias is unavailable, return the underlying type.
-      if (decl->getAttrs().isUnavailable(Impl.SwiftContext))
+      if (decl->isUnavailable())
         return underlyingResult;
 
       return { mappedType, underlyingResult.Hint };
@@ -1059,6 +1082,16 @@ namespace {
         // If the objc type has any generic args, convert them and bind them to
         // the imported class type.
         if (imported->getGenericParams()) {
+          auto *dc = imported->getDeclContext();
+          Type parentTy;
+          // Check if this is a nested type and if so,
+          // fetch the parent type.
+          if (dc->isTypeContext()) {
+            parentTy = dc->getDeclaredInterfaceType();
+            if (parentTy->is<ErrorType>())
+              return Type();
+          }
+
           unsigned typeParamCount = imported->getGenericParams()->size();
           auto typeArgs = type->getObjectType()->getTypeArgs();
           assert(typeArgs.empty() || typeArgs.size() == typeParamCount);
@@ -1084,7 +1117,7 @@ namespace {
           }
           assert(importedTypeArgs.size() == typeParamCount);
           importedType = BoundGenericClassType::get(
-            imported, nullptr, importedTypeArgs);
+            imported, parentTy, importedTypeArgs);
         } else {
           importedType = imported->getDeclaredInterfaceType();
         }
@@ -2405,6 +2438,7 @@ ClangImporter::Implementation::importParameterType(
   auto attrs = getImportTypeAttrs(param, /*isParam=*/true);
   Type swiftParamTy;
   bool isInOut = false;
+  bool isConsuming = false;
   bool isParamTypeImplicitlyUnwrapped = false;
 
   // Sometimes we import unavailable typedefs as enums. If that's the case,
@@ -2438,7 +2472,7 @@ ClangImporter::Implementation::importParameterType(
       return std::nullopt;
   } else if (isa<clang::ReferenceType>(paramTy) &&
              isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
-    // We don't support rvalue reference / universal perfect ref, bail.
+    // We don't support universal reference, bail.
     if (paramTy->isRValueReferenceType()) {
       addImportDiagnosticFn(Diagnostic(diag::rvalue_ref_params_not_imported));
       return std::nullopt;
@@ -2459,26 +2493,25 @@ ClangImporter::Implementation::importParameterType(
   if (!swiftParamTy) {
     // C++ reference types are brought in as direct
     // types most commonly.
-    auto refPointeeType =
-        importer::getCxxReferencePointeeTypeOrNone(paramTy.getTypePtr());
-    if (refPointeeType) {
+    if (auto refPointeeType =
+            getCxxReferencePointeeTypeOrNone(paramTy.getTypePtr())) {
       // We don't support reference type to a dependent type, just bail.
       if ((*refPointeeType)->isDependentType()) {
         return std::nullopt;
       }
 
-      // We don't support rvalue reference types, just bail.
-      if (paramTy->isRValueReferenceType()) {
-        addImportDiagnosticFn(Diagnostic(diag::rvalue_ref_params_not_imported));
-        return std::nullopt;
-      }
-
+      bool isRvalueRef = paramTy->isRValueReferenceType();
       // A C++ parameter of type `const <type> &` or `<type> &` becomes `<type>`
-      // or `inout <type>` in Swift. Note that SILGen will use the indirect
-      // parameter convention for such a type.
+      // or `inout <type>`. Moreover, `const <type> &&` or `<type> &&`
+      // becomes `<type>` or `consuming <type>`. Note that SILGen will use the
+      // indirect parameter convention for such a type.
       paramTy = *refPointeeType;
-      if (!paramTy.isConstQualified())
-        isInOut = true;
+      if (!paramTy.isConstQualified()) {
+        if (isRvalueRef)
+          isConsuming = true;
+        else
+          isInOut = true;
+      }
     }
   }
 
@@ -2542,7 +2575,7 @@ ClangImporter::Implementation::importParameterType(
   if (isInOut && isDirectUseOfForeignReferenceType(paramTy, swiftParamTy))
     isInOut = false;
 
-  return ImportParameterTypeResult{swiftParamTy, isInOut,
+  return ImportParameterTypeResult{swiftParamTy, isInOut, isConsuming,
                                    isParamTypeImplicitlyUnwrapped};
 }
 
@@ -2596,7 +2629,7 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
                                    const clang::ParmVarDecl *param,
                                    const Identifier &name,
                                    const swift::Type &swiftParamTy,
-                                   const bool isInOut,
+                                   const bool isInOut, const bool isConsuming,
                                    const bool isParamTypeImplicitlyUnwrapped) {
   // Figure out the name for this parameter.
   Identifier bodyName = impl->importFullName(param, impl->CurrentVersion)
@@ -2622,10 +2655,12 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
 
   // Foreign references are already references so they don't need to be passed
   // as inout.
-  paramInfo->setSpecifier(isInOut ? ParamSpecifier::InOut
-                                  : (param->getAttr<clang::LifetimeBoundAttr>()
-                                         ? ParamSpecifier::Borrowing
-                                         : ParamSpecifier::Default));
+  paramInfo->setSpecifier(
+      isConsuming ? ParamSpecifier::Consuming
+                  : (isInOut ? ParamSpecifier::InOut
+                             : (param->getAttr<clang::LifetimeBoundAttr>()
+                                    ? ParamSpecifier::Borrowing
+                                    : ParamSpecifier::Default)));
   paramInfo->setInterfaceType(swiftParamTy);
   impl->recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
 
@@ -2633,9 +2668,11 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // Swift doesn't support default values of inout parameters.
   // TODO: support default arguments of constructors
   // (https://github.com/apple/swift/issues/70124)
+  // TODO: support params with template parameters
   if (param->hasDefaultArg() && !isInOut &&
       !isa<clang::CXXConstructorDecl>(param->getDeclContext()) &&
-      impl->isDefaultArgSafeToImport(param)) {
+      impl->isDefaultArgSafeToImport(param) &&
+      !param->isTemplated()) {
     SwiftDeclSynthesizer synthesizer(*impl);
     if (CallExpr *defaultArgExpr = synthesizer.makeDefaultArgument(
             param, swiftParamTy, paramInfo->getParameterNameLoc())) {
@@ -2690,6 +2727,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     }
     auto swiftParamTy = swiftParamTyOpt->swiftTy;
     bool isInOut = swiftParamTyOpt->isInOut;
+    bool isConsuming = swiftParamTyOpt->isConsuming;
     bool isParamTypeImplicitlyUnwrapped =
         swiftParamTyOpt->isParamTypeImplicitlyUnwrapped;
 
@@ -2698,8 +2736,9 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     if (index < argNames.size())
       name = argNames[index];
 
-    auto paramInfo = getParameterInfo(this, param, name, swiftParamTy, isInOut,
-                                      isParamTypeImplicitlyUnwrapped);
+    auto paramInfo =
+        getParameterInfo(this, param, name, swiftParamTy, isInOut, isConsuming,
+                         isParamTypeImplicitlyUnwrapped);
     parameters.push_back(paramInfo);
     ++index;
   }
@@ -3284,6 +3323,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     }
     auto swiftParamTy = swiftParamTyOpt->swiftTy;
     bool isInOut = swiftParamTyOpt->isInOut;
+    bool isConsuming = swiftParamTyOpt->isConsuming;
     bool isParamTypeImplicitlyUnwrapped =
         swiftParamTyOpt->isParamTypeImplicitlyUnwrapped;
 
@@ -3333,8 +3373,9 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     ++nameIndex;
 
     // Set up the parameter info
-    auto paramInfo = getParameterInfo(this, param, name, swiftParamTy, isInOut,
-                                      isParamTypeImplicitlyUnwrapped);
+    auto paramInfo =
+        getParameterInfo(this, param, name, swiftParamTy, isInOut, isConsuming,
+                         isParamTypeImplicitlyUnwrapped);
 
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||

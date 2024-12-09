@@ -37,8 +37,8 @@ bool SILInliner::canInlineBeginApply(BeginApplyInst *BA) {
   // handle this in general, we'd need to separately clone the resume/unwind
   // paths into each end/abort.
   bool hasEndApply = false, hasAbortApply = false;
-  for (auto tokenUse : BA->getTokenResult()->getUses()) {
-    auto user = tokenUse->getUser();
+  for (auto *use : BA->getEndApplyUses()) {
+    auto *user = use->getUser();
     if (isa<EndApplyInst>(user)) {
       if (hasEndApply) return false;
       hasEndApply = true;

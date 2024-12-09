@@ -169,10 +169,6 @@ public:
   bool InSwiftKeyPath = false;
   bool InFreestandingMacroArgument = false;
 
-  /// This Parser is a fallback parser for ASTGen.
-  // Note: This doesn't affect anything in non-SWIFT_BUILD_SWIFT_SYNTAX envs.
-  bool IsForASTGen = false;
-
   /// Whether we should delay parsing nominal type, extension, and function
   /// bodies.
   bool isDelayedParsingEnabled() const;
@@ -957,8 +953,7 @@ public:
 
   ParserStatus parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
                          bool IfConfigsAreDeclAttrs,
-                         llvm::function_ref<void(Decl *)> Handler,
-                         bool fromASTGen = false);
+                         llvm::function_ref<void(Decl *)> Handler);
 
   std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
@@ -1003,8 +998,7 @@ public:
 
   /// Parse an #if ... #endif containing only attributes.
   ParserStatus parseIfConfigAttributes(
-    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
-    PatternBindingInitializer *initContext);
+    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs);
 
   /// Parse a #error or #warning diagnostic.
   ParserResult<PoundDiagnosticDecl> parseDeclPoundDiagnostic();
@@ -1026,13 +1020,6 @@ public:
   /// Parse the optional attributes before a declaration.
   ParserStatus parseDeclAttributeList(DeclAttributes &Attributes,
                                       bool IfConfigsAreDeclAttrs = false);
-
-  /// Parse the optional attributes before a declaration.
-  ///
-  /// This is the inner loop, which can be called recursively.
-  ParserStatus parseDeclAttributeList(DeclAttributes &Attributes,
-                                      bool IfConfigsAreDeclAttrs,
-                                      PatternBindingInitializer *initContext);
 
   /// Parse the optional attributes before a closure declaration.
   ParserStatus parseClosureDeclAttributeList(DeclAttributes &Attributes);
@@ -1088,7 +1075,6 @@ public:
       AvailabilityRange *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
       SmallVectorImpl<AvailableAttr *> &availableAttrs,
-      size_t &typeErasedParamsCount,
       llvm::function_ref<bool(Parser &)> parseSILTargetName,
       llvm::function_ref<bool(Parser &)> parseSILSIPModule);
 
@@ -1168,7 +1154,6 @@ public:
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   SourceLoc AtEndLoc,
-                                  PatternBindingInitializer *&initContext,
                                   bool isFromClangAttribute = false);
 
   bool isCustomAttributeArgument();
@@ -1177,13 +1162,7 @@ public:
   /// Parse a custom attribute after the initial '@'.
   ///
   /// \param atLoc The location of the already-parsed '@'.
-  ///
-  /// \param initContext A reference to the initializer context used
-  /// for the set of custom attributes. This should start as nullptr, and
-  /// will get filled in by this function. The same variable should be provided
-  /// for every custom attribute within the same attribute list.
-  ParserResult<CustomAttr> parseCustomAttribute(
-      SourceLoc atLoc, PatternBindingInitializer *&initContext);
+  ParserResult<CustomAttr> parseCustomAttribute(SourceLoc atLoc);
 
   ParserStatus parseNewDeclAttribute(DeclAttributes &Attributes,
                                      SourceLoc AtLoc, DeclAttrKind DK,
@@ -1196,7 +1175,7 @@ public:
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
-    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+    if (Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
         isSILLifetimeDependenceToken())
       return true;
     if (!canHaveParameterSpecifierContextualKeyword()) return false;
@@ -1322,7 +1301,11 @@ public:
   ///
   /// Parsing a floating attribute list will produce a `MissingDecl` with
   /// the attribute list attached.
-  void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items);
+  ///
+  /// If isFromClangAttribute, we also parse modifiers and suppress any
+  /// diagnostics about bad modifiers.
+  void parseExpandedAttributeList(SmallVectorImpl<ASTNode> &items,
+                                  bool isFromClangAttribute);
 
   /// Parse the result of member macro expansion, which is a floating
   /// member list.
@@ -1396,8 +1379,7 @@ public:
   ParserResult<TypeRepr> parseType();
   ParserResult<TypeRepr>
   parseType(Diag<> MessageID,
-            ParseTypeReason reason = ParseTypeReason::Unspecified,
-            bool fromASTGen = false);
+            ParseTypeReason reason = ParseTypeReason::Unspecified);
 
   /// Parse a type optionally prefixed by a list of named opaque parameters. If
   /// no params present, return 'type'. Otherwise, return 'type-named-opaque'.
@@ -1413,9 +1395,9 @@ public:
       Diag<> MessageID, ParseTypeReason reason);
 
   ParserResult<TypeRepr> parseTypeOrValue();
-  ParserResult<TypeRepr> parseTypeOrValue(Diag<> MessageID,
-                          ParseTypeReason reason = ParseTypeReason::Unspecified,
-                          bool fromASTGen = false);
+  ParserResult<TypeRepr>
+  parseTypeOrValue(Diag<> MessageID,
+                   ParseTypeReason reason = ParseTypeReason::Unspecified);
 
   /// Parse layout constraint.
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
@@ -1482,7 +1464,6 @@ public:
 
   ParserStatus parseTypeAttribute(TypeOrCustomAttr &result, SourceLoc AtLoc,
                                   SourceLoc AtEndLoc, ParseTypeReason reason,
-                                  PatternBindingInitializer *&initContext,
                                   bool justChecking = false);
 
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
@@ -1975,7 +1956,7 @@ public:
 
   bool isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                         ArrayRef<ASTNode> ParsedDecls);
-  ParserResult<Stmt> parseStmt(bool fromASTGen = false);
+  ParserResult<Stmt> parseStmt();
   ParserStatus parseExprOrStmt(ASTNode &Result);
   ParserResult<Stmt> parseStmtBreak();
   ParserResult<Stmt> parseStmtContinue();
@@ -2044,7 +2025,7 @@ public:
   };
 
   /// Parse a comma-separated list of availability specifications. Try to
-  /// expand availability macros when /p Source is not a command line macro.
+  /// expand availability macros when \p Source is not a command line macro.
   ParserStatus
   parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
                             AvailabilitySpecSource Source);
@@ -2102,20 +2083,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Code completion second pass.
 
-  void performIDEInspectionSecondPassImpl(
-      IDEInspectionDelayedDeclState &info);
-
-  //===--------------------------------------------------------------------===//
-  // ASTGen support.
-
-  /// Parse a TypeRepr from the syntax tree. i.e. SF->getExportedSourceFile()
-  ParserResult<TypeRepr> parseTypeReprFromSyntaxTree();
-  /// Parse a Stmt from the syntax tree. i.e. SF->getExportedSourceFile()
-  ParserResult<Stmt> parseStmtFromSyntaxTree();
-  /// Parse a Decl from the syntax tree. i.e. SF->getExportedSourceFile()
-  ParserResult<Decl> parseDeclFromSyntaxTree();
-  /// Parse an Expr from the syntax tree. i.e. SF->getExportedSourceFile()
-  ParserResult<Expr> parseExprFromSyntaxTree();
+  void performIDEInspectionSecondPassImpl(IDEInspectionDelayedDeclState &info);
 };
 
 /// To assist debugging parser crashes, tell us the location of the

@@ -3462,7 +3462,7 @@ static FunctionPointer getProfilingFuncFor(IRGenFunction &IGF,
       os << replacementTypes.size();
       os << "__";
       for (auto replTy : replacementTypes) {
-        IRGenMangler mangler;
+        IRGenMangler mangler(IGF.IGM.Context);
         os << mangler.mangleTypeMetadataFull(replTy->getCanonicalType());
         os << "___";
       }
@@ -4564,7 +4564,7 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
   }
 
   // If the regular result type is void, there is nothing to explode
-  if (!resultType.isVoid()) {
+  if (!nativeSchema.empty()) {
     Explosion resultExplosion;
     if (auto *structTy =
             dyn_cast<llvm::StructType>(nativeSchema.getExpandedType(IGF.IGM))) {

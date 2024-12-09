@@ -52,9 +52,11 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"
@@ -2143,7 +2145,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // Mark the imported Swift function as unavailable.
     // That will ensure that the function will not be
     // usable from Swift, even though it is imported.
-    if (!decl->getAttrs().isUnavailable(ctx)) {
+    if (!decl->isUnavailable()) {
       StringRef unavailabilityMsgRef = "return type is unavailable in Swift";
       auto ua =
           AvailableAttr::createPlatformAgnostic(ctx, unavailabilityMsgRef);
@@ -2430,16 +2432,18 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
 
-    auto genericSig = typeAlias->getGenericSignature();
-    SubstitutionMap subs;
-    if (genericSig)
-      subs = genericSig->getIdentitySubstitutionMap();
+    SmallVector<Type, 2> genericArgs;
+    if (auto *params = typeAlias->getGenericParams()) {
+      for (auto *param : *params) {
+        genericArgs.push_back(param->getDeclaredInterfaceType());
+      }
+    }
 
     Type parent;
     auto parentDC = typeAlias->getDeclContext();
     if (parentDC->isTypeContext())
       parent = parentDC->getSelfInterfaceType();
-    auto sugaredType = TypeAliasType::get(typeAlias, parent, subs,
+    auto sugaredType = TypeAliasType::get(typeAlias, parent, genericArgs,
                                           typeAlias->getUnderlyingType());
     return MetatypeType::get(sugaredType, Context);
   }
@@ -2451,7 +2455,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::BuiltinTuple: {
     auto nominal = cast<NominalTypeDecl>(D);
     Type declaredInterfaceTy = nominal->getDeclaredInterfaceType();
-    // FIXME: For a protocol, this returns a MetatypeType wrapping a ProtocolType, but should be a MetatypeType wrapping an ExistentialType ('(any P).Type', not 'P.Type').
+    // FIXME: For a protocol, this returns a MetatypeType wrapping a
+    // ProtocolType, but should be a MetatypeType wrapping an
+    // ExistentialType ('(any P).Type', not 'P.Type').
     return MetatypeType::get(declaredInterfaceTy, Context);
   }
 

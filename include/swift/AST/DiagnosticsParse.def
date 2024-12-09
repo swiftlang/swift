@@ -552,6 +552,8 @@ ERROR(sil_value_def_type_mismatch,none,
       "value '%0' used with mismatching type %1 (expected %2)", (StringRef, Type, Type))
 ERROR(sil_use_of_undefined_value,none,
       "use of undefined value '%0'", (StringRef))
+ERROR(sil_forward_ref_value_needs_type,none,
+      "forward-referenced value '%0' needs a type annotation", (StringRef))
 NOTE(sil_prior_reference,none,
      "prior reference was here", ())
 

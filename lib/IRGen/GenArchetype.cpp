@@ -306,8 +306,10 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
     assert(rootWTable && "root witness table not bound in local context!");
   }
 
+  auto conformance = ProtocolConformanceRef::forAbstract(
+      rootArchetype, rootProtocol);
   wtable = path.followFromWitnessTable(IGF, rootArchetype,
-                                       ProtocolConformanceRef(rootProtocol),
+                                       conformance,
                                        MetadataResponse::forComplete(rootWTable),
                                        /*request*/ MetadataState::Complete,
                                        nullptr).getMetadata();

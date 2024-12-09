@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-silgen \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature LifetimeDependence
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 
 public struct Span<Element> : ~Escapable {

@@ -94,7 +94,7 @@ struct LibParseExecutor {
     if (!opts.contains(ExecuteOptionFlag::SkipBodies))
       parseOpts |= SourceFile::ParsingFlags::DisableDelayedBodies;
 
-    ModuleDecl *M = ModuleDecl::create(Identifier(), *ctx);
+    ModuleDecl *M = ModuleDecl::createEmpty(Identifier(), *ctx);
     SourceFile *SF =
         new (*ctx) SourceFile(*M, SourceFileKind::Library, bufferID, parseOpts);
 
@@ -170,7 +170,7 @@ struct ASTGenExecutor {
     if (!opts.contains(ExecuteOptionFlag::SkipBodies))
       parseOpts |= SourceFile::ParsingFlags::DisableDelayedBodies;
 
-    ModuleDecl *M = ModuleDecl::create(Identifier(), *ctx);
+    ModuleDecl *M = ModuleDecl::createEmpty(Identifier(), *ctx);
     SourceFile *SF =
         new (*ctx) SourceFile(*M, SourceFileKind::Library, bufferID, parseOpts);
 

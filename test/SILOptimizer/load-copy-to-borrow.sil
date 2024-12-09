@@ -52,6 +52,17 @@ final class Klass {
 
 class C {}
 
+class Base {
+  @_hasStorage var c: C
+}
+
+class Derived : Base {
+}
+
+class Container {
+  @_hasStorage var b: Base
+}
+
 struct OptionalAndClass {
   var o: FakeOptional<C>
   var c: C
@@ -78,6 +89,9 @@ sil @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
 sil @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
 sil @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
 sil @closure : $@convention(thin) (@inout_aliasable Klass) -> ()
+sil @useC : $@convention(thin) (@guaranteed C) -> () {
+[global:]
+}
 
 struct MyInt {
   var value: Builtin.Int32
@@ -2006,5 +2020,23 @@ bb5:
   destroy_value %1 : $Klass
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @blocked_by_end_borrow :
+// CHECK:         %7 = load [copy] %6
+// CHECK:       } // end sil function 'blocked_by_end_borrow'
+sil [ossa] @blocked_by_end_borrow : $@convention(thin) (@guaranteed Container) -> () {
+bb0(%0 : @guaranteed $Container):
+  %1 = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
+  %2 = ref_element_addr [immutable] %0 : $Container, #Container.b
+  %3 = load_borrow %2 : $*Base
+  %4 = unconditional_checked_cast %3 : $Base to Derived
+  %5 = upcast %4 : $Derived to $Base
+  %6 = ref_element_addr [immutable] %5 : $Base, #Base.c
+  %7 = load [copy] %6 : $*C
+  end_borrow %3 : $Base
+  %9 = apply %1(%7) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %7 : $C
+  return %9 : $()
 }
 

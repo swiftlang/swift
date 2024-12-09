@@ -471,6 +471,16 @@ bool SILPerformanceInliner::isProfitableToInline(
   int BaseBenefit = isa<BeginApplyInst>(AI) ? RemovedCoroutineCallBenefit
                                             : RemovedCallBenefit;
 
+  // If function has more than 5 parameters / results, then increase base
+  // benefit for each additional parameter. We assume that for each extra
+  // parameter or result we'd eliminate extra pair of loads and stores used to
+  // pass / return value via stack.
+  unsigned numParameters = AI->getNumRealOperands(), numResults = AI->getNumResults();
+  if (numParameters > 5)
+    BaseBenefit += (RemovedLoadBenefit + RemovedStoreBenefit) * (numParameters - 5);
+  if (numResults > 5)
+    BaseBenefit += (RemovedLoadBenefit + RemovedStoreBenefit) * (numResults - 5);
+
   // Osize heuristic.
   //
   // As a hack, don't apply this at all to coroutine inlining; avoiding
@@ -1286,7 +1296,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (invalidatedStackNesting) {
     StackNesting::fixNesting(Caller);
   }
-  updateBorrowedFrom(pm, Caller);
+  updateAllGuaranteedPhis(pm, Caller);
 
   // If we were asked to verify our caller after inlining all callees we could
   // find into it, do so now. This makes it easier to catch verification bugs in

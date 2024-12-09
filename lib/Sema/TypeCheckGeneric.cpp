@@ -914,7 +914,7 @@ void TypeChecker::diagnoseRequirementFailure(
     const CheckGenericArgumentsResult::RequirementFailureInfo &reqFailureInfo,
     SourceLoc errorLoc, SourceLoc noteLoc, Type targetTy,
     ArrayRef<GenericTypeParamType *> genericParams,
-    TypeSubstitutionFn substitutions, ModuleDecl *module) {
+    TypeSubstitutionFn substitutions) {
   assert(errorLoc.isValid() && noteLoc.isValid());
 
   const auto &req = reqFailureInfo.Req;
@@ -939,7 +939,7 @@ void TypeChecker::diagnoseRequirementFailure(
 
   case RequirementKind::Conformance: {
     diagnoseConformanceFailure(substReq.getFirstType(),
-                               substReq.getProtocolDecl(), module, errorLoc);
+                               substReq.getProtocolDecl(), nullptr, errorLoc);
 
     if (reqFailureInfo.ReqPath.empty())
       return;
@@ -965,7 +965,7 @@ void TypeChecker::diagnoseRequirementFailure(
     break;
   }
 
-  ASTContext &ctx = module->getASTContext();
+  ASTContext &ctx = targetTy->getASTContext();
   // FIXME: Poor source-location information.
   ctx.Diags.diagnose(errorLoc, diagnostic, targetTy, substReq.getFirstType(),
                      substSecondTy);
@@ -981,7 +981,7 @@ void TypeChecker::diagnoseRequirementFailure(
 }
 
 CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
-    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions) {
   using ParentConditionalConformances =
       SmallVector<ParentConditionalConformance, 2>;
@@ -1147,13 +1147,16 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
   if (parentDC->getSelfProtocolDecl())
     return result;
 
-  auto genericSig = typeAlias->getGenericSignature();
-  SubstitutionMap subs;
-  if (genericSig)
-    subs = genericSig->getIdentitySubstitutionMap();
-
   Type parent;
   if (parentDC->isTypeContext())
     parent = parentDC->getSelfInterfaceType();
-  return TypeAliasType::get(typeAlias, parent, subs, result);
+
+  SmallVector<Type, 2> genericArgs;
+  if (auto *params = typeAlias->getGenericParams()) {
+    for (auto *param : *params) {
+      genericArgs.push_back(param->getDeclaredInterfaceType());
+    }
+  }
+
+  return TypeAliasType::get(typeAlias, parent, genericArgs, result);
 }

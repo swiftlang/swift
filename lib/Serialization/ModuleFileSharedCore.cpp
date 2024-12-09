@@ -1615,6 +1615,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           break;
         }
         case input_block::MODULE_INTERFACE_PATH: {
+          input_block::ModuleInterfaceLayout::readRecord(
+              scratch, IsModuleInterfaceSDKRelative);
           ModuleInterfacePath = blobData;
           break;
         }
@@ -1837,10 +1839,12 @@ bool ModuleFileSharedCore::hasSourceInfo() const {
 std::string ModuleFileSharedCore::resolveModuleDefiningFilePath(const StringRef SDKPath) const {
   if (!ModuleInterfacePath.empty()) {
     std::string interfacePath = ModuleInterfacePath.str();
-    if (llvm::sys::path::is_relative(interfacePath) && !ModuleInterfacePath.starts_with(SDKPath)) {
-      SmallString<128> absoluteInterfacePath(SDKPath);
-      llvm::sys::path::append(absoluteInterfacePath, interfacePath);
-      return absoluteInterfacePath.str().str();
+    if (IsModuleInterfaceSDKRelative &&
+        !ModuleInterfacePath.starts_with(SDKPath) &&
+        llvm::sys::path::is_relative(interfacePath)) {
+      SmallString<128> resolvedPath(SDKPath);
+      llvm::sys::path::append(resolvedPath, interfacePath);
+      return resolvedPath.str().str();
     } else
       return interfacePath;
   } else
@@ -1853,6 +1857,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
                                           bool importNonPublicDependencies,
                                           bool isPartialModule,
                                           StringRef packageName,
+                                          bool resolveInPackageModuleDependencies,
                                           bool forTestable) const {
   if (isPartialModule) {
     // Keep the merge-module behavior for legacy support. In that case
@@ -1892,6 +1897,9 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
   }
 
   if (dependency.isPackageOnly()) {
+    if (!resolveInPackageModuleDependencies)
+      return ModuleLoadingBehavior::Ignored;
+
     // Package dependencies are usually loaded only for import from the same
     // package.
     if ((!packageName.empty() && packageName == getModulePackageName()) ||

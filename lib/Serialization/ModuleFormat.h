@@ -1158,7 +1158,8 @@ namespace input_block {
 
   using ModuleInterfaceLayout = BCRecordLayout<
     MODULE_INTERFACE_PATH,
-    BCBlob // file path
+    BCFixed<1>, // SDK-relative?
+    BCBlob      // file path
   >;
 
 }
@@ -1246,10 +1247,10 @@ namespace decls_block {
   TYPE_LAYOUT(TypeAliasTypeLayout,
     NAME_ALIAS_TYPE,
     DeclIDField,           // typealias decl
+    TypeIDField,           // original underlying type
+    TypeIDField,           // substituted underlying type
     TypeIDField,           // parent type
-    TypeIDField,           // underlying type
-    TypeIDField,           // substituted type
-    SubstitutionMapIDField // substitution map
+    BCArray<TypeIDField>   // generic arguments
   );
 
   TYPE_LAYOUT(GenericTypeParamTypeLayout,
@@ -1312,7 +1313,8 @@ namespace decls_block {
                      BCFixed<1>,              // isolated
                      BCFixed<1>,              // noDerivative?
                      BCFixed<1>,              // compileTimeConst
-                     BCFixed<1>               // sending
+                     BCFixed<1>,              // sending
+                     BCFixed<1>               // addressable
                      >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
@@ -2352,7 +2354,6 @@ namespace decls_block {
     BC_AVAIL_TUPLE, // Deprecated
     BC_AVAIL_TUPLE, // Obsoleted
     BCVBR<5>,    // platform
-    DeclIDField, // rename declaration (if any)
     BCVBR<5>,    // number of bytes in message string
     BCVBR<5>,    // number of bytes in rename string
     BCBlob       // message, followed by rename

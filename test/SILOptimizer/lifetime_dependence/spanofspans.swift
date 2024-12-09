@@ -2,13 +2,11 @@
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
-// RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -module-name test
 
 // REQUIRES: swift_in_compiler
 
 // REQUIRES: rdar132874319
-// REQUIRES: swift_feature_NonescapableTypes
 // ([nonescapable] improve diagnostics for spanofspans.swift; prefer an exclusivity violation to a lifetime error)
 
 // TODO: uncomment the @lifetime annotations when we have component lifetimes.

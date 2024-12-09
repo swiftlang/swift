@@ -5438,7 +5438,10 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     SubstitutionMap &interfaceSubs,
     CanType &dynamicSelfType,
     bool withoutActuallyEscaping) {
-  return buildSILFunctionThunkType(&F, sourceType, expectedType, inputSubstType, outputSubstType, genericEnv, interfaceSubs, dynamicSelfType, withoutActuallyEscaping);
+  return buildSILFunctionThunkType(
+      &F, sourceType, expectedType, inputSubstType, outputSubstType,
+      genericEnv, interfaceSubs, dynamicSelfType,
+      withoutActuallyEscaping);
 }
 
 static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
@@ -5905,7 +5908,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   // Get the thunk name.
   auto fromInterfaceType = fromType->mapTypeOutOfContext()->getCanonicalType();
   auto toInterfaceType = toType->mapTypeOutOfContext()->getCanonicalType();
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   std::string name;
   // If `self` is being reordered, it is an AD-specific self-reordering
   // reabstraction thunk.
@@ -6269,7 +6272,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       LookUpConformanceInModule(), derivativeCanGenSig);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   auto name = getASTContext()
       .getIdentifier(
           mangler.mangleAutoDiffDerivativeFunction(originalAFD, kind, config))
@@ -7227,8 +7230,7 @@ void SILGenFunction::emitProtocolWitness(
     auto deallocCleanup = std::get<3>(tokenAndCleanups);
 
     YieldInfo witnessYieldInfo(SGM, witness, witnessFTy, witnessSubs);
-    YieldInfo reqtYieldInfo(SGM, requirement, thunkTy,
-                            reqtSubs.subst(getForwardingSubstitutionMap()));
+    YieldInfo reqtYieldInfo(SGM, requirement, thunkTy, reqtSubs);
 
     translateYields(*this, loc, witnessYields, witnessYieldInfo, reqtYieldInfo);
 

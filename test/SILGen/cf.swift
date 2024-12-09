@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name cf -enable-objc-interop -import-cf-types -sdk %S/Inputs %s -o - | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name cf -enable-objc-interop -import-cf-types -sdk %S/Inputs %s -o - | %FileCheck %s
 
 import CoreCooling
 

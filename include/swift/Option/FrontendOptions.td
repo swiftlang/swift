@@ -827,6 +827,10 @@ def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
 
+def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">;
+
+def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">;
+
 def solver_disable_shrink :
   Flag<["-"], "solver-disable-shrink">,
   HelpText<"Disable the shrink phase of expression type checking">;
@@ -1050,9 +1054,6 @@ def disable_alias_module_names_in_module_interface :
   Flag<["-"], "disable-alias-module-names-in-module-interface">,
   HelpText<"When emitting a module interface, disable disambiguating modules "
            "using distinct alias names">;
-def abi_comments_in_module_interface :
-  Flag<["-"], "abi-comments-in-module-interface">,
-  HelpText<"When emitting a module interface, emit comments with ABI details">;
 
 def experimental_spi_imports :
   Flag<["-"], "experimental-spi-imports">,

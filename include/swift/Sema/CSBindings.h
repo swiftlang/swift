@@ -218,11 +218,6 @@ private:
 };
 
 struct PotentialBindings {
-  /// The constraint system this type variable and its bindings belong to.
-  ConstraintSystem &CS;
-
-  TypeVariableType *TypeVar;
-
   /// The set of all constraints that have been added via infer().
   llvm::SmallPtrSet<Constraint *, 2> Constraints;
 
@@ -265,18 +260,13 @@ struct PotentialBindings {
   llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
   llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
 
-  PotentialBindings(ConstraintSystem &cs, TypeVariableType *typeVar)
-      : CS(cs), TypeVar(typeVar) {}
-
   void addDefault(Constraint *constraint);
 
   void addLiteral(Constraint *constraint);
 
   /// Add a potential binding to the list of bindings,
   /// coalescing supertype bounds when we are able to compute the meet.
-  void addPotentialBinding(PotentialBinding binding);
-
-  bool isGenericParameter() const;
+  void addPotentialBinding(TypeVariableType *typeVar, PotentialBinding binding);
 
   bool isSubtypeOf(TypeVariableType *typeVar) const {
     return llvm::any_of(
@@ -291,17 +281,26 @@ private:
   /// Attempt to infer a new binding and other useful information
   /// (i.e. whether bindings should be delayed) from the given
   /// relational constraint.
-  std::optional<PotentialBinding> inferFromRelational(Constraint *constraint);
+  std::optional<PotentialBinding> inferFromRelational(
+      ConstraintSystem &CS,
+      TypeVariableType *TypeVar,
+      Constraint *constraint);
 
 public:
-  void infer(Constraint *constraint);
+  void infer(ConstraintSystem &CS,
+             TypeVariableType *TypeVar,
+             Constraint *constraint);
 
   /// Retract all bindings and other information related to a given
   /// constraint from this binding set.
   ///
   /// This would happen when constraint is simplified or solver backtracks
   /// (either from overload choice or (some) type variable binding).
-  void retract(Constraint *constraint);
+  void retract(ConstraintSystem &CS,
+               TypeVariableType *TypeVar,
+               Constraint *constraint);
+
+  void reset();
 };
 
 
@@ -388,8 +387,9 @@ public:
   /// subtype/conversion/equivalence relations with other type variables.
   std::optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
 
-  BindingSet(const PotentialBindings &info)
-      : CS(info.CS), TypeVar(info.TypeVar), Info(info) {
+  BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
+             const PotentialBindings &info)
+      : CS(CS), TypeVar(TypeVar), Info(info) {
     for (const auto &binding : info.Bindings)
       addBinding(binding, /*isTransitive=*/false);
 
@@ -405,7 +405,7 @@ public:
 
   ConstraintSystem &getConstraintSystem() const { return CS; }
 
-  TypeVariableType *getTypeVariable() const { return Info.TypeVar; }
+  TypeVariableType *getTypeVariable() const { return TypeVar; }
 
   /// Check whether this binding set belongs to a type variable
   /// that represents a result type of a closure.

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target %target-future-triple -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-future-triple -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 // RUN: %target-swift-frontend -target %target-future-triple -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s -check-prefix=CHECK-LLVM
 
 // Also do an end-to-end test to check all components, including IRGen.

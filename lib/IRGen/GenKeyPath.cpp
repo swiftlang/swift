@@ -784,8 +784,10 @@ emitKeyPathComponent(IRGenModule &IGM,
               substType = substType
                               .transformRec([](Type t) -> std::optional<Type> {
                                 if (auto *openedExistential =
-                                        t->getAs<OpenedArchetypeType>())
-                                  return openedExistential->getInterfaceType();
+                                        t->getAs<OpenedArchetypeType>()) {
+                                  auto &ctx = openedExistential->getASTContext();
+                                  return GenericTypeParamType::getType(0, 0, ctx);
+                                }
                                 return std::nullopt;
                               })
                               ->getCanonicalType();

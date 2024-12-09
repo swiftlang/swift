@@ -316,6 +316,14 @@ bool SILDeclRef::hasUserWrittenCode() const {
       // Never has user-written code, is just a forwarding initializer.
       return false;
     default:
+      if (auto decl = getDecl()) {
+        // Declarations synthesized by ClangImporter by definition don't have
+        // user written code, but despite that they aren't always marked
+        // implicit.
+        auto moduleContext = decl->getDeclContext()->getModuleScopeContext();
+        if (isa<ClangModuleUnit>(moduleContext))
+          return false;
+      }
       // TODO: This checking is currently conservative, we ought to
       // exhaustively handle all the cases here, and use emitOrDelayFunction
       // in more cases to take advantage of it.
@@ -1190,7 +1198,7 @@ static std::string mangleClangDecl(Decl *decl, bool isForeign) {
 
 std::string SILDeclRef::mangle(ManglingKind MKind) const {
   using namespace Mangle;
-  ASTMangler mangler;
+  ASTMangler mangler(getASTContext());
 
   if (auto *derivativeFunctionIdentifier = getDerivativeFunctionIdentifier()) {
     std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
@@ -1231,7 +1239,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     auto *funcDecl = cast<AbstractFunctionDecl>(getDecl());
     auto genericSig = funcDecl->getGenericSignature();
     return GenericSpecializationMangler::manglePrespecialization(
-        mangledNonSpecializedString, genericSig, getSpecializedSignature());
+        getASTContext(), mangledNonSpecializedString, genericSig, getSpecializedSignature());
   }
 
   ASTMangler::SymbolKind SKind = ASTMangler::SymbolKind::Default;

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -opt-mode=none -silgen-cleanup -enable-ossa-complete-lifetimes -parse-incomplete-ossa -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-sil-opt -sil-print-types -opt-mode=none -silgen-cleanup -enable-ossa-complete-lifetimes -parse-incomplete-ossa -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK
 
 import Builtin
 

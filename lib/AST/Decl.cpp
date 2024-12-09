@@ -1,3 +1,4 @@
+
 //===--- Decl.cpp - Swift Language Decl ASTs ------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -557,7 +558,7 @@ std::optional<llvm::VersionTuple>
 Decl::getIntroducedOSVersion(PlatformKind Kind) const {
   for (auto *attr: getAttrs()) {
     if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-      if (ava->Platform == Kind && ava->Introduced) {
+      if (ava->getPlatform() == Kind && ava->Introduced) {
         return ava->Introduced;
       }
     }
@@ -1299,8 +1300,7 @@ bool Decl::isAlwaysWeakImported() const {
 
   // FIXME: Weak linking on Windows is not yet supported
   // https://github.com/apple/swift/issues/53303
-  if (getSemanticUnavailableAttr() &&
-      !getASTContext().LangOpts.Target.isOSWindows())
+  if (isUnavailable() && !getASTContext().LangOpts.Target.isOSWindows())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
@@ -2061,8 +2061,17 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
     // FIXME: We ought to reconsider this since it won't recontextualize any
     // closures/decls present in the initialization expr. This currently should
     // only affect implicit code though.
-    if (!initContext && !Parent->isLocalContext())
+    if (!initContext && !Parent->isLocalContext()) {
       initContext = PatternBindingInitializer::create(Parent);
+    }
+
+    // Set up the custom attribute contexts for each variable in this pattern.
+    PBD->getPattern(idx)->forEachVariable([&](VarDecl *var) {
+      for (auto custom : var->getAttrs().getAttributes<CustomAttr>()) {
+        if (auto attributeInit = custom->getInitContext())
+          attributeInit->setEnclosingInitializer(initContext);
+      }
+    });
 
     // We need to call setPattern to ensure the VarDecls in the pattern have
     // the PatternBindingDecl set as their parent. We also need to call
@@ -4231,6 +4240,19 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
   return false;
 }
 
+ValueDecl *ValueDecl::getRenamedDecl(const AvailableAttr *attr) const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           RenamedDeclRequest{this, attr}, nullptr);
+}
+
+void ValueDecl::setRenamedDecl(const AvailableAttr *attr,
+                               ValueDecl *renameDecl) const {
+  // This is only designed to be used with decls synthesized by ClangImporter.
+  assert(hasClangNode());
+  getASTContext().evaluator.cacheNonEmptyOutput(RenamedDeclRequest{this, attr},
+                                                std::move(renameDecl));
+}
+
 SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   // Some decls have a parent/child split where the introducer keyword is on the
   // parent, but the attributes are on the children. If this is a child in such
@@ -4364,7 +4386,7 @@ bool ValueDecl::shouldHideFromEditor() const {
       getAttrs().hasAttribute<ShowInInterfaceAttr>())
     return true;
 
-  if (AvailableAttr::isUnavailable(this))
+  if (isUnavailable())
     return true;
 
   // Hide 'swift_private' clang decls. They are imported with '__' prefix.
@@ -6186,7 +6208,7 @@ ClassDecl::MetaclassKind ClassDecl::getMetaclassKind() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
-    Mangle::ASTMangler Mangler;
+    Mangle::ASTMangler Mangler(nominal->getASTContext());
     std::string MangledName = Mangler.mangleObjCRuntimeName(nominal);
 
     buffer.clear();
@@ -6863,7 +6885,7 @@ bool ProtocolDecl::hasCircularInheritedProtocols() const {
 
 /// Returns a descriptive name for the given accessor/addressor kind.
 StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
-                                              bool article) {
+                                              bool article, bool underscored) {
   switch (accessorKind) {
   case AccessorKind::Get:
     return article ? "a getter" : "getter";
@@ -6876,9 +6898,17 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::MutableAddress:
     return article ? "a mutable addressor" : "mutable addressor";
   case AccessorKind::Read:
+    if (underscored)
+      return article ? "a '_read' accessor" : "'_read' accessor";
+    // Fall through to the non-underscored spelling.
+    LLVM_FALLTHROUGH;
   case AccessorKind::Read2:
     return article ? "a 'read' accessor" : "'read' accessor";
   case AccessorKind::Modify:
+    if (underscored)
+      return article ? "a '_modify' accessor" : "'_modify' accessor";
+    // Fall through to the non-underscored spelling.
+    LLVM_FALLTHROUGH;
   case AccessorKind::Modify2:
     return article ? "a 'modify' accessor" : "'modify' accessor";
   case AccessorKind::WillSet:
@@ -6892,9 +6922,12 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
 }
 
 StringRef swift::getAccessorNameForDiagnostic(AccessorDecl *accessor,
-                                              bool article) {
-  return getAccessorNameForDiagnostic(accessor->getAccessorKind(),
-                                      article);
+                                              bool article,
+                                              std::optional<bool> underscored) {
+  return getAccessorNameForDiagnostic(
+      accessor->getAccessorKind(), article,
+      underscored.value_or(accessor->getASTContext().LangOpts.hasFeature(
+          Feature::CoroutineAccessors)));
 }
 
 bool AbstractStorageDecl::hasStorage() const {
@@ -8552,7 +8585,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
-      isSending());
+      isSending(), isAddressable());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
@@ -9229,29 +9262,26 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
   if (hasAsync())
     return nullptr;
 
-  const AvailableAttr *avAttr = nullptr;
+  // Prefer the first availability attribute with no platform and a valid
+  // rename target, falling back to the first with a rename. Note that
+  // `getAttrs` is in reverse source order, so the last attribute is the
+  // first in source.
+  AbstractFunctionDecl *alternative = nullptr;
   for (const auto *attr : getAttrs().getAttributes<AvailableAttr>()) {
-    // If there's an attribute with an already-resolved rename decl, use it
-    if (attr->RenameDecl) {
-      avAttr = attr;
-      break;
-    }
+    if (attr->isNoAsync())
+      continue;
 
-    // Otherwise prefer the first availability attribute with no platform and
-    // rename parameter, falling back to the first with a rename. Note that
-    // `getAttrs` is in reverse source order, so the last attribute is the
-    // first in source
-    if (!attr->Rename.empty() &&
-        (attr->Platform == PlatformKind::none || !avAttr) && !attr->isNoAsync()) {
-      avAttr = attr;
+    if (attr->getPlatform() != PlatformKind::none && alternative != nullptr)
+      continue;
+
+    if (auto *renamedDecl = getRenamedDecl(attr)) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(renamedDecl)) {
+        if (afd->hasAsync())
+          alternative = afd;
+      }
     }
   }
 
-  auto *renamedDecl = evaluateOrDefault(
-      getASTContext().evaluator, RenamedDeclRequest{this, avAttr}, nullptr);
-  auto *alternative = dyn_cast_or_null<AbstractFunctionDecl>(renamedDecl);
-  if (!alternative || !alternative->hasAsync())
-    return nullptr;
   return alternative;
 }
 
@@ -9969,16 +9999,17 @@ OpaqueTypeDecl *OpaqueTypeDecl::get(
       OpaqueReturnTypeReprs);
 }
 
-bool OpaqueTypeDecl::isOpaqueReturnTypeOfFunction(
-                                       const AbstractFunctionDecl *func) const {
-  // Either the function is declared with its own opaque return type...
-  if (getNamingDecl() == func)
+bool OpaqueTypeDecl::isOpaqueReturnTypeOf(const Decl *ownerDecl) const {
+  if (getNamingDecl() == ownerDecl)
     return true;
 
-  // ...or the function is a getter for a property or subscript with an
-  // opaque return type.
-  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+  if (auto accessor = dyn_cast<AccessorDecl>(ownerDecl)) {
     return accessor->isGetter() && getNamingDecl() == accessor->getStorage();
+  }
+
+  if (auto patternBinding = dyn_cast<PatternBindingDecl>(ownerDecl)) {
+    if (auto *varDecl = dyn_cast<VarDecl>(getNamingDecl()))
+      return varDecl->getParentPatternBinding() == patternBinding;
   }
 
   return false;
@@ -10046,7 +10077,7 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
   SmallString<64> mangleBuf;
   {
     llvm::raw_svector_ostream os(mangleBuf);
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(getASTContext());
     os << mangler.mangleOpaqueTypeDecl(this);
   }
 
@@ -12064,6 +12095,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     return origDC;
   }
 }

@@ -820,7 +820,7 @@ namespace {
       if (!IGM.IRGen.Opts.EnableAnonymousContextMangledNames)
         return;
 
-      IRGenMangler mangler;
+      IRGenMangler mangler(IGM.Context);
       auto mangledName = mangler.mangleAnonymousDescriptorName(Name);
       auto mangledNameConstant =
         IGM.getAddrOfGlobalString(mangledName,
@@ -2675,7 +2675,7 @@ namespace {
             OpaqueParamIndex(opaqueParamIndex) {}
 
       std::string getSymbol() const override {
-        IRGenMangler mangler;
+        IRGenMangler mangler(IGM.Context);
         return mangler.mangleSymbolNameForUnderlyingTypeAccessorString(
             O, OpaqueParamIndex);
       }
@@ -2713,7 +2713,7 @@ namespace {
           : AbstractMetadataAccessor(IGM, O), R(requirement), P(P) {}
 
       std::string getSymbol() const override {
-        IRGenMangler mangler;
+        IRGenMangler mangler(IGM.Context);
         return mangler.mangleSymbolNameForUnderlyingWitnessTableAccessorString(
             O, R, P);
       }
@@ -2929,7 +2929,7 @@ IRGenModule::getAddrOfSharedContextDescriptor(LinkEntity entity,
       // with the same context mangling (a clang module and its overlay,
       // equivalent extensions, etc.). These can share a context descriptor
       // at runtime.
-      auto mangledName = entity.mangleAsString();
+      auto mangledName = entity.mangleAsString(Context);
       if (auto otherDefinition = Module.getGlobalVariable(mangledName)) {
         if (!otherDefinition->isDeclaration() ||
             !entity.isAlwaysSharedLinkage()) {
@@ -2959,18 +2959,16 @@ IRGenModule::getAddrOfModuleContextDescriptor(ModuleDecl *D,
 llvm::Constant *
 IRGenModule::getAddrOfObjCModuleContextDescriptor() {
   if (!ObjCModule)
-    ObjCModule = ModuleDecl::create(
-      Context.getIdentifier(MANGLING_MODULE_OBJC),
-      Context);
+    ObjCModule = ModuleDecl::createEmpty(
+        Context.getIdentifier(MANGLING_MODULE_OBJC), Context);
   return getAddrOfModuleContextDescriptor(ObjCModule);
 }
 
 llvm::Constant *
 IRGenModule::getAddrOfClangImporterModuleContextDescriptor() {
   if (!ClangImporterModule)
-    ClangImporterModule = ModuleDecl::create(
-      Context.getIdentifier(MANGLING_MODULE_CLANG_IMPORTER),
-      Context);
+    ClangImporterModule = ModuleDecl::createEmpty(
+        Context.getIdentifier(MANGLING_MODULE_CLANG_IMPORTER), Context);
   return getAddrOfModuleContextDescriptor(ClangImporterModule);
 }
 
@@ -2993,9 +2991,9 @@ IRGenModule::getAddrOfAnonymousContextDescriptor(
 
 llvm::Constant *
 IRGenModule::getAddrOfOriginalModuleContextDescriptor(StringRef Name) {
-  return getAddrOfModuleContextDescriptor(OriginalModules.insert({Name,
-    ModuleDecl::create(Context.getIdentifier(Name), Context)})
-                                          .first->getValue());
+  auto *M = ModuleDecl::createEmpty(Context.getIdentifier(Name), Context);
+  return getAddrOfModuleContextDescriptor(
+      OriginalModules.insert({Name, M}).first->getValue());
 }
 
 void IRGenFunction::
@@ -6958,6 +6956,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Identifiable:
   case KnownProtocolKind::Actor:
   case KnownProtocolKind::DistributedActor:
+  case KnownProtocolKind::DistributedActorStub:
   case KnownProtocolKind::DistributedActorSystem:
   case KnownProtocolKind::DistributedTargetInvocationEncoder:
   case KnownProtocolKind::DistributedTargetInvocationDecoder:

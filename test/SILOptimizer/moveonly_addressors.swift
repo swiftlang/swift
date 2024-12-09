@@ -1,10 +1,9 @@
-// RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DADDRESS_ONLY -emit-sil -verify %s
-// RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DLOADABLE -emit-sil -verify %s
-// RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DTRIVIAL -emit-sil -verify %s
-// RUN: %target-swift-frontend -enable-experimental-feature NonescapableTypes -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DEMPTY -emit-sil -verify %s
+// RUN: %target-swift-frontend  -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DADDRESS_ONLY -emit-sil -verify %s
+// RUN: %target-swift-frontend  -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DLOADABLE -emit-sil -verify %s
+// RUN: %target-swift-frontend  -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DTRIVIAL -emit-sil -verify %s
+// RUN: %target-swift-frontend  -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DEMPTY -emit-sil -verify %s
 
 // REQUIRES: swift_feature_BuiltinModule
-// REQUIRES: swift_feature_NonescapableTypes
 
 // TODO: Use the real stdlib types once `UnsafePointer` supports noncopyable
 // types.

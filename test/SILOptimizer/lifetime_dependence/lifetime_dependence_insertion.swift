@@ -1,12 +1,12 @@
-// RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -Xllvm -sil-print-after=lifetime-dependence-insertion \
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil \
+// RUN:   -Xllvm -sil-print-types -Xllvm -sil-print-after=lifetime-dependence-insertion \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer

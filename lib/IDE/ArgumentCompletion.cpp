@@ -374,12 +374,15 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
       }
       if (Result.FuncTy) {
         if (auto FuncTy = Result.FuncTy) {
+          // Only show call pattern completions if the function isn't
+          // overridden.
           if (ShadowedDecls.count(Result.FuncD) == 0) {
-            // Don't show call pattern completions if the function is
-            // overridden.
             if (Result.IsSubscript) {
-              assert(SemanticContext != SemanticContextKind::None);
+              // The subscript decl may not be preset for e.g the implicit
+              // `keyPath:` subscript. Such a subscript is allowed on any
+              // non-nominal type, so the semantic context may be none.
               auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
+              assert(!SD || SemanticContext != SemanticContextKind::None);
               Lookup.addSubscriptCallPattern(FuncTy, SD, SemanticContext);
             } else {
               auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(Result.FuncD);

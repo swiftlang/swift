@@ -1561,7 +1561,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   if (!var)  // Ignore subscripts
     return;
 
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     VarDecl *Var;
     const AccessorDecl *Accessor;
@@ -1575,12 +1575,6 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
       return DRE && DRE->isImplicit() && isa<VarDecl>(DRE->getDecl()) &&
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
-    }
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -2221,7 +2215,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return nullptr;
       }
 
-      return parentContext->getInnermostClosureForSelfCapture();
+      return parentContext->getInnermostClosureForCaptures();
     }
 
     bool shouldRecordClosure(const AbstractClosureExpr *E) {
@@ -4425,61 +4419,57 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
   }
 }
 
-// Perform MiscDiagnostics on Switch Statements.
-static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt,
-                        DeclContext *DC) {
-  // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
-  // clause only applies to the second case, and this is surprising.
-  for (auto cs : stmt->getCases()) {
-    TypeChecker::checkExistentialTypes(ctx, cs, DC);
+static void diagnoseCaseStmtAmbiguousWhereClause(const CaseStmt *CS,
+                                                 ASTContext &ctx) {
+  // The case statement can have multiple case items, each can have a where.
+  // If we find a "where", and there is a preceding item without a where, and
+  // if they are on the same source line, e.g
+  // "case .Foo, .Bar where 1 != 100:" then warn since it may be unexpected.
+  auto items = CS->getCaseLabelItems();
 
-    // The case statement can have multiple case items, each can have a where.
-    // If we find a "where", and there is a preceding item without a where, and
-    // if they are on the same source line, then warn.
-    auto items = cs->getCaseLabelItems();
-    
-    // Don't do any work for the vastly most common case.
-    if (items.size() == 1) continue;
-    
-    // Ignore the first item, since it can't have preceding ones.
-    for (unsigned i = 1, e = items.size(); i != e; ++i) {
-      // Must have a where clause.
-      auto where = items[i].getGuardExpr();
-      if (!where)
-        continue;
-      
-      // Preceding item must not.
-      if (items[i-1].getGuardExpr())
-        continue;
-      
-      // Must be on the same source line.
-      auto prevLoc = items[i-1].getStartLoc();
-      auto thisLoc = items[i].getStartLoc();
-      if (prevLoc.isInvalid() || thisLoc.isInvalid())
-        continue;
-      
-      auto &SM = ctx.SourceMgr;
-      auto prevLineCol = SM.getLineAndColumnInBuffer(prevLoc);
-      if (SM.getLineAndColumnInBuffer(thisLoc).first != prevLineCol.first)
-        continue;
+  // Don't do any work for the vastly most common case.
+  if (items.size() == 1)
+    return;
 
-      ctx.Diags.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
+  // Ignore the first item, since it can't have preceding ones.
+  for (unsigned i = 1, e = items.size(); i != e; ++i) {
+    // Must have a where clause.
+    auto where = items[i].getGuardExpr();
+    if (!where)
+      continue;
+
+    // Preceding item must not.
+    if (items[i - 1].getGuardExpr())
+      continue;
+
+    // Must be on the same source line.
+    auto prevLoc = items[i - 1].getStartLoc();
+    auto thisLoc = items[i].getStartLoc();
+    if (prevLoc.isInvalid() || thisLoc.isInvalid())
+      continue;
+
+    auto &SM = ctx.SourceMgr;
+    auto prevLineCol = SM.getLineAndColumnInBuffer(prevLoc);
+    if (SM.getLineAndColumnInBuffer(thisLoc).first != prevLineCol.first)
+      continue;
+
+    ctx.Diags
+        .diagnose(items[i].getWhereLoc(), diag::where_on_one_item,
+                  CS->getParentKind() == CaseParentKind::DoCatch)
         .highlight(items[i].getPattern()->getSourceRange())
         .highlight(where->getSourceRange());
-      
-      // Whitespace it out to the same column as the previous item.
-      std::string whitespace(prevLineCol.second-1, ' ');
-      ctx.Diags.diagnose(thisLoc, diag::add_where_newline)
-        .fixItInsert(thisLoc, "\n"+whitespace);
 
-      auto whereRange = SourceRange(items[i].getWhereLoc(),
-                                    where->getEndLoc());
-      auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, whereRange);
-      auto whereText = SM.extractText(charRange);
-      ctx.Diags.diagnose(prevLoc, diag::duplicate_where)
-        .fixItInsertAfter(items[i-1].getEndLoc(), " " + whereText.str())
-        .highlight(items[i-1].getSourceRange());
-    }
+    // Whitespace it out to the same column as the previous item.
+    std::string whitespace(prevLineCol.second - 1, ' ');
+    ctx.Diags.diagnose(thisLoc, diag::add_where_newline)
+        .fixItInsert(thisLoc, "\n" + whitespace);
+
+    auto whereRange = SourceRange(items[i].getWhereLoc(), where->getEndLoc());
+    auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, whereRange);
+    auto whereText = SM.extractText(charRange);
+    ctx.Diags.diagnose(prevLoc, diag::duplicate_where)
+        .fixItInsertAfter(items[i - 1].getEndLoc(), " " + whereText.str())
+        .highlight(items[i - 1].getSourceRange());
   }
 }
 
@@ -4527,7 +4517,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   if (E == nullptr || isa<ErrorExpr>(E)) return;
 
   // Walk into expressions which might have invalid trailing closures
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
 
     void diagnoseIt(const CallExpr *E) {
@@ -4572,12 +4562,6 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
 
   public:
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
 
     PreWalkResult<ArgumentList *>
     walkToArgumentListPre(ArgumentList *args) override {
@@ -4648,7 +4632,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
 
 namespace {
 
-class ObjCSelectorWalker : public ASTWalker {
+class ObjCSelectorWalker : public BaseDiagnosticWalker {
   ASTContext &Ctx;
   const DeclContext *DC;
   Type SelectorTy;
@@ -4697,12 +4681,6 @@ class ObjCSelectorWalker : public ASTWalker {
 public:
   ObjCSelectorWalker(const DeclContext *dc, Type selectorTy)
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    // Macro expansions will be walked when they're type-checked, not as
-    // part of the surrounding code.
-    return MacroWalking::None;
-  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
@@ -5208,7 +5186,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class UnintendedOptionalBehaviorWalker : public ASTWalker {
+  class UnintendedOptionalBehaviorWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     SmallPtrSet<Expr *, 16> IgnoredExprs;
 
@@ -5560,12 +5538,6 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5601,7 +5573,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class DeprecatedWritableKeyPathWalker : public ASTWalker {
+  class DeprecatedWritableKeyPathWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     const DeclContext *DC;
 
@@ -5635,12 +5607,6 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5664,7 +5630,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
 static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
                                                      const DeclContext *DC) {
-  class KVOObserveCallWalker : public ASTWalker {
+  class KVOObserveCallWalker : public BaseDiagnosticWalker {
     const ASTContext &C;
 
   public:
@@ -5722,12 +5688,6 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5748,7 +5708,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
 static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
                                                      const DeclContext *DC) {
 
-  class ExplicitLazyVarStorageAccessFinder : public ASTWalker {
+  class ExplicitLazyVarStorageAccessFinder : public BaseDiagnosticWalker {
     const ASTContext &C;
 
   public:
@@ -5775,12 +5735,6 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5799,7 +5753,7 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
 }
 
 static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
-  class ComparisonWithNaNFinder : public ASTWalker {
+  class ComparisonWithNaNFinder : public BaseDiagnosticWalker {
     const ASTContext &C;
 
   public:
@@ -5908,12 +5862,6 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5936,18 +5884,12 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     const DeclContext *DC;
 
   public:
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -6001,7 +5943,7 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
 static void
 diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
                                              const DeclContext *DC) {
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
 
   private:
@@ -6099,12 +6041,6 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
     }
   public:
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      // Macro expansions will be walked when they're type-checked, not as
-      // part of the surrounding code.
-      return MacroWalking::None;
-    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       const auto *DLE = dyn_cast_or_null<DictionaryExpr>(E);
@@ -6254,8 +6190,8 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
 
   TypeChecker::checkExistentialTypes(ctx, const_cast<Stmt *>(S), DC);
 
-  if (auto switchStmt = dyn_cast<SwitchStmt>(S))
-    checkSwitch(ctx, switchStmt, DC);
+  if (auto *CS = dyn_cast<CaseStmt>(S))
+    diagnoseCaseStmtAmbiguousWhereClause(CS, ctx);
 
   checkStmtConditionTrailingClosure(ctx, S);
 

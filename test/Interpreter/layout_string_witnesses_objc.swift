@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
-// RUN: %target-swift-frontend -I %S/Inputs/CTypes -prespecialize-generic-metadata -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-type-layout -enable-autolinking-runtime-compatibility-bytecode-layouts -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -I %S/Inputs/CTypes -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-swift-frontend -target %target-future-triple -I %S/Inputs/CTypes -prespecialize-generic-metadata -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-type-layout -enable-autolinking-runtime-compatibility-bytecode-layouts -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -target %target-future-triple -I %S/Inputs/CTypes -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
 // RUN: %target-codesign %t/%target-library-name(layout_string_witnesses_types)
-// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -parse-stdlib -module-name layout_string_witnesses_dynamic -llayout_string_witnesses_types -L%t -I %S/Inputs/ObjCClasses/ %t/ObjCClasses.o -I %t -o %t/main %s %target-rpath(%t)
+// RUN: %target-build-swift -target %target-future-triple -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -parse-stdlib -module-name layout_string_witnesses_dynamic -llayout_string_witnesses_types -L%t -I %S/Inputs/ObjCClasses/ %t/ObjCClasses.o -I %t -o %t/main %s %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(layout_string_witnesses_types) | %FileCheck %s --check-prefix=CHECK
 
@@ -190,3 +190,151 @@ func testMultiPayloadBlock() {
 }
 
 testMultiPayloadBlock()
+
+class GenericOuterClassNSObject<T: NSObject> {
+    enum InnerEnum {
+        case x(T.Type)
+        case y(T)
+    }
+}
+
+func testNestedGenericEnumNSObject() {
+    let ptr = UnsafeMutablePointer<GenericOuterClassNSObject<ObjCPrintOnDealloc>.InnerEnum>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let x = GenericOuterClassNSObject<ObjCPrintOnDealloc>.InnerEnum.y(ObjCPrintOnDealloc())
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let y = GenericOuterClassNSObject<ObjCPrintOnDealloc>.InnerEnum.y(ObjCPrintOnDealloc())
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = GenericOuterClassNSObject<ObjCPrintOnDealloc>.InnerEnum.y(ObjCPrintOnDealloc())
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: ObjCPrintOnDealloc deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testNestedGenericEnumNSObject()
+
+class GenericOuterClassSwiftObjC<T: SwiftObjC> {
+    enum InnerEnum {
+        case x(T.Type)
+        case y(T)
+    }
+}
+
+func testNestedGenericEnumSwiftObjC() {
+    let ptr = UnsafeMutablePointer<GenericOuterClassSwiftObjC<SwiftObjC>.InnerEnum>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let x = GenericOuterClassSwiftObjC<SwiftObjC>.InnerEnum.y(SwiftObjC())
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let y = GenericOuterClassSwiftObjC<SwiftObjC>.InnerEnum.y(SwiftObjC())
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SwiftObjC deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = GenericOuterClassSwiftObjC<SwiftObjC>.InnerEnum.y(SwiftObjC())
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SwiftObjC deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SwiftObjC deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testNestedGenericEnumSwiftObjC()
+
+struct SwiftObjCAndWeakObjC {
+    let x: SwiftObjC
+    weak var y: NSObject?
+}
+
+func testSwiftObjCAndWeakObjC() {
+    let ptr = UnsafeMutablePointer<SwiftObjCAndWeakObjC>.allocate(capacity: 1)
+
+    // initWithCopy
+    do {
+        let x = SwiftObjCAndWeakObjC(x: SwiftObjC(), y: nil)
+        testInit(ptr, to: x)
+    }
+
+    // assignWithTake
+    do {
+        let y = SwiftObjCAndWeakObjC(x: SwiftObjC(), y: nil)
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SwiftObjC deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = SwiftObjCAndWeakObjC(x: SwiftObjC(), y: nil)
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SwiftObjC deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SwiftObjC deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testSwiftObjCAndWeakObjC()

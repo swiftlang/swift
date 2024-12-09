@@ -687,7 +687,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
     builder->createBranch(loc, contBB, {noneValue});
     builder->setInsertionPoint(contBB->begin());
 
-    updateBorrowedFromPhis(pm, { phi });
+    updateGuaranteedPhis(pm, { phi });
 
     return {lookThroughBorrowedFromUser(phi), true};
   }
@@ -904,30 +904,34 @@ swift::findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *utedai) {
   if (!asi)
     return nullptr;
 
-  SILInstruction *singleUser = nullptr;
+  InjectEnumAddrInst *singleInject = nullptr;
+  InitEnumDataAddrInst *singleInit = nullptr;
   for (auto use : asi->getUses()) {
     auto *user = use->getUser();
     if (user == utedai)
       continue;
 
-    // As long as there's only one UncheckedTakeEnumDataAddrInst and one
-    // InitEnumDataAddrInst, we don't care how many InjectEnumAddr and
-    // DeallocStack users there are.
-    if (isa<InjectEnumAddrInst>(user) || isa<DeallocStackInst>(user))
+    // If there is a single init_enum_data_addr and a single inject_enum_addr,
+    // those instructions must dominate the unchecked_take_enum_data_addr.
+    // Otherwise the enum wouldn't be initialized on all control flow paths.
+    if (auto *inj = dyn_cast<InjectEnumAddrInst>(user)) {
+      if (singleInject)
+        return nullptr;
+      singleInject = inj;
       continue;
+    }
 
-    if (singleUser)
-      return nullptr;
+    if (auto *init = dyn_cast<InitEnumDataAddrInst>(user)) {
+      if (singleInit)
+        return nullptr;
+      singleInit = init;
+      continue;
+    }
 
-    singleUser = user;
+    if (isa<DeallocStackInst>(user) || isa<DebugValueInst>(user))
+      continue;
   }
-  if (!singleUser)
-    return nullptr;
-
-  // Assume, without checking, that the returned InitEnumDataAddr dominates the
-  // given UncheckedTakeEnumDataAddrInst, because that's how SIL is defined. I
-  // don't know where this is actually verified.
-  return dyn_cast<InitEnumDataAddrInst>(singleUser);
+  return singleInit;
 }
 
 //===----------------------------------------------------------------------===//

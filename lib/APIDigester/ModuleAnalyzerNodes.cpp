@@ -1116,7 +1116,7 @@ static StringRef calculateMangledName(SDKContext &Ctx, ValueDecl *VD) {
   if (auto *attr = VD->getAttrs().getAttribute<SILGenNameAttr>()) {
     return Ctx.buffer(attr->Name);
   }
-  Mangle::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler(VD->getASTContext());
   return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true,
                                     /*bool respectOriginallyDefinedIn*/true));
 }
@@ -1341,9 +1341,9 @@ static bool isABIPlaceHolder(Decl *D) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
   for (auto *ATT: D->getAttrs()) {
     if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->Platform != PlatformKind::none && AVA->Introduced &&
+      if (AVA->getPlatform() != PlatformKind::none && AVA->Introduced &&
           AVA->Introduced->getMajor() == 9999) {
-        Platforms.insert(AVA->Platform);
+        Platforms.insert(AVA->getPlatform());
       }
     }
   }
@@ -1363,7 +1363,7 @@ StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
     return StringRef();
   for (auto *ATT: D->getAttrs()) {
     if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->Platform == Kind && AVA->Introduced) {
+      if (AVA->getPlatform() == Kind && AVA->Introduced) {
         return buffer(AVA->Introduced->getAsString());
       }
     }
@@ -1473,7 +1473,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       ObjCName(Ctx.getObjcName(D)),
       InitKind(Ctx.getInitKind(D)),
       IsImplicit(D->isImplicit()),
-      IsDeprecated(D->getAttrs().isDeprecated(D->getASTContext())),
+      IsDeprecated(D->isDeprecated()),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)),
       IsFromExtension(isDeclaredInExtension(D)),
       DeclAttrs(collectDeclAttributes(D)) {
@@ -1767,8 +1767,8 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     if (D->isPrivateSystemDecl(false))
       return true;
   }
-  if (AvailableAttr::isUnavailable(D))
-     return true;
+  if (D->isUnavailable())
+    return true;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     switch (getAccessLevel(VD)) {
     case AccessLevel::Internal:
@@ -1976,7 +1976,8 @@ SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
   if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
     for (auto *inherited : PD->getAllInheritedProtocols()) {
       if (!Ctx.shouldIgnore(inherited)) {
-        ProtocolConformanceRef Conf(inherited);
+        auto Conf = ProtocolConformanceRef::forAbstract(
+          PD->getSelfInterfaceType(), inherited);
         auto ConfNode = SDKNodeInitInfo(Ctx, Conf)
             .createSDKNode(SDKNodeKind::Conformance);
         Root->addConformance(ConfNode);

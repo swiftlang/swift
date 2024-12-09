@@ -58,7 +58,6 @@ class SwiftTestCase(unittest.TestCase):
             enable_experimental_cxx_interop=False,
             enable_cxx_interop_swift_bridging_header=False,
             enable_experimental_distributed=False,
-            enable_experimental_nonescapable_types=False,
             enable_experimental_observation=False,
             enable_experimental_parser_validation=False,
             enable_experimental_pointer_bounds=False,

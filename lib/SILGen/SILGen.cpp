@@ -731,6 +731,25 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   return false;
 }
 
+static ActorIsolation getActorIsolationForFunction(SILFunction &fn) {
+  if (auto constant = fn.getDeclRef()) {
+    if (constant.kind == SILDeclRef::Kind::Deallocator) {
+      // Deallocating destructor is always nonisolated. Isolation of the deinit
+      // applies only to isolated deallocator and destroyer.
+      return ActorIsolation::forNonisolated(false);
+    }
+
+    // If we have actor isolation for our constant, put the isolation onto the
+    // function. If the isolation is unspecified, we do not return it.
+    if (auto isolation =
+            getActorIsolationOfContext(constant.getInnermostDeclContext()))
+      return isolation;
+  }
+
+  // Otherwise, return for unspecified.
+  return ActorIsolation::forUnspecified();
+}
+
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                        ForDefinition_t forDefinition) {
   // If we already emitted the function, return it.
@@ -756,16 +775,8 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
         return IGM.getFunction(constant, NotForDefinition);
       });
 
-  if (constant.kind == SILDeclRef::Kind::Deallocator) {
-    // Deallocating destructor is always nonisolated.
-    // Isolation of the deinit applies only to isolated deallocator and
-    // destroyer.
-    F->setActorIsolation(ActorIsolation::forNonisolated(false));
-  } else {
-    // If we have global actor isolation for our constant, put the isolation onto
-    // the function.
-    F->setActorIsolation(getActorIsolationOfContext(constant.getInnermostDeclContext()));
-  }
+  F->setDeclRef(constant);
+  F->setActorIsolation(getActorIsolationForFunction(*F));
 
   assert(F && "SILFunction should have been defined");
 
@@ -1254,22 +1265,14 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
     F->setGenericEnvironment(genericEnv, capturedEnvs, forwardingSubs);
   }
 
-  if (constant.kind == SILDeclRef::Kind::Deallocator) {
-    // Deallocating destructor is always nonisolated.
-    // Isolation of the deinit applies only to isolated deallocator and
-    // destroyer.
-    F->setActorIsolation(ActorIsolation::forNonisolated(false));
-  } else {
-    // If we have global actor isolation for our constant, put the isolation
-    // onto the function.
-    F->setActorIsolation(getActorIsolationOfContext(constant.getInnermostDeclContext()));
-  }
-
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
 
   // Initialize F with the constant we created for it.
   F->setDeclRef(constant);
+
+  // Set our actor isolation.
+  F->setActorIsolation(getActorIsolationForFunction(*F));
 
   LLVM_DEBUG(llvm::dbgs() << "lowering ";
              F->printName(llvm::dbgs());

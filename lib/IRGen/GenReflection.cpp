@@ -275,7 +275,7 @@ static std::pair<llvm::Constant *, unsigned>
 getTypeRefByFunction(IRGenModule &IGM,
                      CanGenericSignature sig,
                      CanType t) {
-  IRGenMangler mangler;
+  IRGenMangler mangler(IGM.Context);
   std::string symbolName =
     mangler.mangleSymbolNameForMangledMetadataAccessorString(
                                                    "get_type_metadata", sig, t);
@@ -498,7 +498,7 @@ getTypeRefImpl(IRGenModule &IGM,
     break;
   }
 
-  IRGenMangler Mangler;
+  IRGenMangler Mangler(IGM.Context);
   auto SymbolicName =
     useFlatUnique ? Mangler.mangleTypeForFlatUniqueTypeRef(sig, type)
                   : Mangler.mangleTypeForReflection(IGM, sig, type);
@@ -552,7 +552,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
               [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   auto *genericEnv = genericSig.getGenericEnvironment();
 
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   std::string symbolName =
     mangler.mangleSymbolNameForMangledConformanceAccessorString(
       "get_witness_table", genericSig, type, conformance);
@@ -611,7 +611,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
                                   const NormalProtocolConformance *conformance,
                                   const AssociatedConformance &requirement) {
   // Figure out the name of the symbol to be used for the conformance.
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   auto symbolName =
     mangler.mangleSymbolNameForAssociatedConformanceWitness(
       conformance, requirement.getAssociation(),
@@ -742,7 +742,7 @@ protected:
                      MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
     if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-      IRGenMangler mangler;
+      IRGenMangler mangler(nominal->getASTContext());
       SymbolicMangling mangledStr;
       mangledStr.String = mangler.mangleBareProtocol(proto);
       auto mangledName =

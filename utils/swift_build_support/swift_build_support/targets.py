@@ -296,7 +296,7 @@ class StdlibDeploymentTarget(object):
         'x86_64',
         'aarch64'])
 
-    OpenBSD = OpenBSDPlatform("openbsd", archs=["amd64"])
+    OpenBSD = OpenBSDPlatform("openbsd", archs=["x86_64", "aarch64"])
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
 
@@ -403,7 +403,9 @@ class StdlibDeploymentTarget(object):
 
         elif system == 'OpenBSD':
             if machine == 'amd64':
-                return StdlibDeploymentTarget.OpenBSD.amd64
+                return StdlibDeploymentTarget.OpenBSD.x86_64
+            elif machine == 'arm64':
+                return StdlibDeploymentTarget.OpenBSD.aarch64
 
         elif system == 'CYGWIN_NT-10.0':
             if machine == 'x86_64':

@@ -134,7 +134,7 @@ struct AliasAnalysis {
         if let apply = inst as? FullApplySite {
           // Workaround for quadratic complexity in ARCSequenceOpts.
           // We need to use an ever lower budget to not get into noticeable compile time troubles.
-          let effect = aa.getOwnershipEffect(of: apply, for: obj, path: path)
+          let effect = aa.getOwnershipEffect(of: apply, for: obj, path: path, complexityBudget: budget / 10)
           return effect.destroy
         }
         return obj.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: false),
@@ -421,10 +421,10 @@ struct AliasAnalysis {
   }
 
   private func getOwnershipEffect(of apply: FullApplySite, for value: Value,
-                                  path: SmallProjectionPath) -> SideEffects.Ownership {
+                                  path: SmallProjectionPath,
+                                  complexityBudget: Int) -> SideEffects.Ownership {
     let visitor = FullApplyEffectsVisitor(apply: apply, calleeAnalysis: context.calleeAnalysis, isAddress: false)
-    let budget = getComplexityBudget(for: apply.parentFunction)
-    if let result = value.at(path).visit(using: visitor, complexityBudget: budget, context) {
+    if let result = value.at(path).visit(using: visitor, complexityBudget: complexityBudget, context) {
       // The resulting effects are the argument effects to which `value` escapes to.
       return result.ownership
     } else {
@@ -696,11 +696,23 @@ private struct FindBeginBorrowWalker : ValueUseDefWalker {
     if value == beginBorrow {
       return .abortWalk
     }
+    if value.ownership != .guaranteed {
+      // If value is owned then it cannot be the borrowed value.
+      return .continueWalk
+    }
     return walkUpDefault(value: value, path: path)
   }
 
   mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
-    return .continueWalk
+    switch value {
+    case is FunctionArgument,
+         // Loading a value from memory cannot be the borrowed value.
+         // Note that we exclude the "regular" `load` by checking for guaranteed ownership in `walkUp`.
+         is LoadBorrowInst:
+      return .continueWalk
+    default:
+      return .abortWalk
+    }
   }
 }
 
@@ -729,6 +741,12 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
       return .ignore
     }
     if user == apply {
+      if apply.isCallee(operand: operand) {
+        // If the address "escapes" to the callee of the apply it means that the address was captured
+        // by an inout_aliasable operand of an partial_apply.
+        // Therefore assume that the called function will both, read and write, to the address.
+        return .abort
+      }
       let e = calleeAnalysis.getSideEffects(of: apply, operand: operand, path: path.projectionPath)
       result.merge(with: e)
     }

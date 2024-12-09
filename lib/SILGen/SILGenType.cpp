@@ -160,7 +160,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
   // Generate the thunk name.
   std::string name;
   {
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(getASTContext());
     if (isa<FuncDecl>(baseDecl)) {
       name = mangler.mangleVTableThunk(
         cast<FuncDecl>(baseDecl),
@@ -752,13 +752,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
     reqtOrigTy->substGenericArgs(reqtSubMap)
       ->getReducedType(genericSig));
 
-  // Generic signatures where all parameters are concrete are lowered away
-  // at the SILFunctionType level.
-  if (genericSig && genericSig->areAllParamsConcrete()) {
-    genericSig = nullptr;
-    genericEnv = nullptr;
-  }
-
   // Rewrite the conformance in terms of the requirement environment's Self
   // type, which might have a different generic signature than the type
   // itself.
@@ -772,6 +765,16 @@ SILFunction *SILGenModule::emitProtocolWitness(
     auto self = requirement->getSelfInterfaceType()->getCanonicalType();
 
     conformance = reqtSubMap.lookupConformance(self, requirement);
+
+    if (genericEnv)
+      reqtSubMap = reqtSubMap.subst(genericEnv->getForwardingSubstitutionMap());
+  }
+
+  // Generic signatures where all parameters are concrete are lowered away
+  // at the SILFunctionType level.
+  if (genericSig && genericSig->areAllParamsConcrete()) {
+    genericSig = nullptr;
+    genericEnv = nullptr;
   }
 
   reqtSubstTy =
@@ -794,6 +797,15 @@ SILFunction *SILGenModule::emitProtocolWitness(
     }
   }
 
+  ProtocolConformance *manglingConformance = nullptr;
+  if (conformance.isConcrete()) {
+    manglingConformance = conformance.getConcrete();
+    if (auto *inherited = dyn_cast<InheritedProtocolConformance>(manglingConformance)) {
+      manglingConformance = inherited->getInheritedConformance();
+      conformance = ProtocolConformanceRef(manglingConformance);
+    }
+  }
+
   // Lower the witness thunk type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(
       M.Types, TypeExpansionContext::minimal(), AbstractionPattern(reqtOrigTy),
@@ -801,9 +813,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
       witnessRef, witnessSubsForTypeLowering, conformance);
 
   // Mangle the name of the witness thunk.
-  Mangle::ASTMangler NewMangler;
-  auto manglingConformance =
-      conformance.isConcrete() ? conformance.getConcrete() : nullptr;
+  Mangle::ASTMangler NewMangler(M.getASTContext());
   std::string nameBuffer =
       NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
   // TODO(TF-685): Proper mangling for derivative witness thunks.
@@ -905,11 +915,12 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
   // Open the protocol type.
   auto openedType = OpenedArchetypeType::get(
       protocol->getDeclaredExistentialType()->getCanonicalType());
+  auto openedConf = ProtocolConformanceRef::forAbstract(openedType, protocol);
 
   // Form the substitutions for calling the witness.
   auto witnessSubs = SubstitutionMap::getProtocolSubstitutions(protocol,
                                           openedType,
-                                          ProtocolConformanceRef(protocol));
+                                          openedConf);
 
   // Substitute to get the formal substituted type of the thunk.
   auto reqtSubstTy =
@@ -921,7 +932,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   // Mangle the name of the witness thunk.
   std::string name = [&] {
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(requirement.getASTContext());
     return mangler.mangleWitnessThunk(conformance, requirement.getDecl());
   }();
 
@@ -1063,8 +1074,11 @@ public:
       addMissingDefault();
       return;
     }
+
+    auto Conf = ProtocolConformanceRef::forAbstract(
+        Proto->getSelfInterfaceType()->getCanonicalType(), Proto);
     SILFunction *witnessFn = SGM.emitProtocolWitness(
-        ProtocolConformanceRef(Proto), SILLinkage::Private, IsNotSerialized,
+        Conf, SILLinkage::Private, IsNotSerialized,
         requirementRef, witnessRef, isFree, witness);
     auto entry = SILWitnessTable::MethodWitness{requirementRef, witnessFn};
     DefaultWitnesses.push_back(entry);
