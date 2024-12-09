@@ -25,6 +25,14 @@ public class MemoryMap {
     public let device: String
     public let inode: UInt64
     public let pathname: String?
+
+    public func isHeapRegion() -> Bool {
+      guard let name = self.pathname else { return false }
+      if name == "[anon:libc_malloc]" { return true }
+      if name.hasPrefix("[anon:scudo:") { return true }
+      if name.hasPrefix("[anon:GWP-ASan") { return true }
+      return false;
+    }
   }
 
   public let entries: [Entry]

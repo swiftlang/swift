@@ -10,24 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <string.h>
+
 #include "heap.h"
 
-#if defined(__aarch64__) || defined(__ARM64__) || defined(_M_ARM64)
-#define DEBUG_BREAK() asm("brk #0x0; nop")
-#elif defined(_M_X64) || defined(__amd64__) || defined(__x86_64__) || defined(_M_AMD64)
-#define DEBUG_BREAK() asm("int3; nop")
-#else
-#error("only aarch64 and x86_64 are supported")
-#endif
-
-/* We allocate a buffer in the remote process that it populates with metadata
- * describing each heap entry it enumerates. We then read the contents of the
- * buffer, and individual heap entry contents, with process_vm_readv.
- *
- * The buffer is interpreted as an array of 8-byte pairs. The first pair
- * contains metadata describing the buffer itself: max valid index (e.g. size of
- * the buffer) and next index (e.g. write cursor/position). Each subsequent pair
- * describes the address and length of a heap entry in the remote process.
+/* The heap metadata buffer is interpreted as an array of 8-byte pairs. The
+ * first pair contains metadata describing the buffer itself: max valid index
+ * (e.g. size of the buffer) and next index (e.g. write cursor/position). Each
+ * subsequent pair describes the address and length of a heap entry in the
+ * remote process. A 4KiB page provides sufficient space for the header and
+ * 255 (address, length) pairs.
  *
  * ------------
  * | uint64_t | max valid index (e.g. sizeof(buffer) / sizeof(uint64_t))
@@ -52,26 +44,71 @@
  * ------------
  */
 
-// NOTE: this function cannot call any other functions and must only use
-// relative branches. We could inline assembly instead, but C is more reabable
-// and maintainable.
-static void remote_callback_start(unsigned long base, unsigned long size, void *arg) {
+#define MAX_VALID_IDX 0
+#define NEXT_FREE_IDX 1
+#define HEADER_SIZE 2
+#define ENTRY_SIZE  2
+
+#if defined(__aarch64__) || defined(__ARM64__) || defined(_M_ARM64)
+#define DEBUG_BREAK() asm("brk #0x0")
+#elif defined(_M_X64) || defined(__amd64__) || defined(__x86_64__) || defined(_M_AMD64)
+#define DEBUG_BREAK() asm("int3; nop")
+#else
+#error("only aarch64 and x86_64 are supported")
+#endif
+
+// Callback for heap_iterate. Because this function is meant to be copied to
+// a different process for execution, it must not make any function calls. It
+// could be written as asm, but simple C is more readable/maintainable and
+// should consistently compile to movable, position-independent code.
+static void heap_iterate_callback(unsigned long base, unsigned long size, void *arg) {
   volatile uint64_t *data = (uint64_t*)arg;
-  while (data[HEAP_ITERATE_DATA_NEXT_FREE_IDX] >= data[HEAP_ITERATE_DATA_MAX_VALID_IDX]) {
+  while (data[NEXT_FREE_IDX] >= data[MAX_VALID_IDX]) {
+    // SIGTRAP indicates the buffer is full and needs to be drained before more
+    // entries can be written.
     DEBUG_BREAK();
   }
-  data[data[HEAP_ITERATE_DATA_NEXT_FREE_IDX]++] = base;
-  data[data[HEAP_ITERATE_DATA_NEXT_FREE_IDX]++] = size;
+  data[data[NEXT_FREE_IDX]++] = base;
+  data[data[NEXT_FREE_IDX]++] = size;
 }
 
-// NOTE: this function is here to mark the end of remote_callback_start and is never
-// called.
-static void remote_callback_end() {}
+// Placeholer function to mark the end of the remote callback code.
+static void heap_iterate_callback_end() {}
 
-void* heap_callback_start() {
-  return (void*)remote_callback_start;
+void* heap_iterate_callback_start() {
+  return (void*)heap_iterate_callback;
 }
 
-size_t heap_callback_len() {
-  return (size_t)(remote_callback_end - remote_callback_start);
+size_t heap_iterate_callback_len() {
+  return (size_t)(heap_iterate_callback_end - heap_iterate_callback);
+}
+
+bool heap_iterate_metadata_init(void* data, size_t len) {
+  uint64_t *metadata = data;
+  const uint64_t max_entries = len / sizeof(uint64_t);
+  if (max_entries < HEADER_SIZE + ENTRY_SIZE)
+    return false;
+
+  memset(data, 0, len);
+  metadata[MAX_VALID_IDX] = max_entries;
+  metadata[NEXT_FREE_IDX] = HEADER_SIZE;
+  return true;
+}
+
+bool heap_iterate_metadata_process(
+  void* data, size_t len, void* callback_context, heap_iterate_entry_callback_t callback) {
+  uint64_t *metadata = data;
+  const uint64_t max_entries = len / sizeof(uint64_t);
+
+  if (metadata[MAX_VALID_IDX] != max_entries ||
+      metadata[NEXT_FREE_IDX] > max_entries)
+    return false;
+
+  for (size_t i = HEADER_SIZE; i < metadata[NEXT_FREE_IDX]; i += ENTRY_SIZE) {
+    const uint64_t base = metadata[i];
+    const uint64_t size = metadata[i + 1];
+    callback(callback_context, base, size);
+  }
+
+  return true;
 }

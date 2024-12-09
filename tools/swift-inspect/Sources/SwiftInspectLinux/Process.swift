@@ -86,6 +86,7 @@ public class Process {
   public func readArray<T>(address: UInt64, upToCount: UInt) throws -> [T] {
     guard upToCount > 0 else { return [] }
 
+    // TODO: impement using readMem
     let maxSize = upToCount * UInt(MemoryLayout<T>.stride)
     let array: [T] = Array(unsafeUninitializedCapacity: Int(upToCount)) { buffer, initCount in
       var local = iovec(iov_base: buffer.baseAddress!, iov_len: maxSize)
@@ -100,6 +101,16 @@ public class Process {
     }
 
     return array
+  }
+
+  public func readMem(remoteAddr: UInt64, localAddr: UnsafeRawPointer, len: UInt) throws {
+    var local = iovec(iov_base: UnsafeMutableRawPointer(mutating: localAddr), iov_len: len)
+    var remote = iovec(iov_base: UnsafeMutableRawPointer(bitPattern: UInt(remoteAddr)), iov_len: len)
+
+    let bytesRead = process_vm_readv(self.pid, &local, 1, &remote, 1, 0)
+    guard bytesRead == len else {
+      throw ProcessError.processVmReadFailure(pid: self.pid, address: remoteAddr, size: UInt64(len))
+    }
   }
 
   public func writeMem(remoteAddr: UInt64, localAddr: UnsafeRawPointer, len: UInt) throws {

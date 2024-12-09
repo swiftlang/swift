@@ -36,7 +36,8 @@ let package = Package(
         .target(
             name: "AndroidCLib",
             path: "Sources/AndroidCLib",
-            publicHeadersPath: "include"),
+            publicHeadersPath: "include",
+            cSettings: [.unsafeFlags(["-fPIC"])]),
         .systemLibrary(
             name: "SwiftInspectClientInterface"),
         .testTarget(
