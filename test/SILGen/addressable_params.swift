@@ -8,7 +8,8 @@ func withUP<T>(to: borrowing @_addressable T, _ body: (UnsafePointer<T>) -> Void
 // Forwarding an addressable parameter binding as an argument to another
 // addressable parameter with matching ownership forwards the address without
 // copying or moving the value.
-// CHECK-LABEL: sil {{.*}}@$s{{.*}}14testForwarding{{.*}} : $@convention(thin) (@in_guaranteed String) -> ()
+// CHECK-LABEL: sil {{.*}}@$s{{.*}}14testForwarding{{.*}} :
+// CHECK-SAME:    $@convention(thin) (@in_guaranteed String) -> ()
 func testForwarding(x: borrowing @_addressable String) {
     // CHECK: [[MO:%.*]] = copyable_to_moveonlywrapper_addr %0
     // CHECK: [[MOR:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[MO]]
@@ -28,4 +29,20 @@ func testUseAsNormalArgument(x: borrowing @_addressable String) {
     normalBorrowingArgument(x)
     normalConsumingArgument(copy x)
     normalGenericArgument(x)
+}
+
+struct Foo {
+    var x: String
+
+    // CHECK-LABEL: sil {{.*}}@$s{{.*}}18testForwardingSelf{{.*}} :
+    // CHECK-SAME:    $@convention(method) (@in_guaranteed Foo) -> ()
+    @_addressableSelf borrowing func testForwardingSelf() {
+        // CHECK: [[MO:%.*]] = copyable_to_moveonlywrapper_addr %0
+        // CHECK: [[MOR:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[MO]]
+        // CHECK: [[MORC:%.*]] = moveonlywrapper_to_copyable_addr [[MOR]]
+        // CHECK: apply {{.*}}([[MORC]],
+        withUP(to: self) {
+            _ = $0
+        }
+    }
 }
