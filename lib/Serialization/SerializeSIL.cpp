@@ -486,7 +486,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   // If we have a body, we might have a generic environment.
   GenericSignatureID genericSigID = 0;
-  if (!NoBody || OnlyReferencedByDebugInfo)
+  // Generic environment information is needed while serializing debug scopes.
+  // Otherwise, the generic specializer fails to remap references to functions
+  // in debug scopes to their specialized versions which breaks IRGen.
+  // TODO: add an assertion in IRGen when the specializer fails to remap.
+  if (!NoBody || SerializeDebugInfoSIL)
     if (auto *genericEnv = F.getGenericEnvironment())
       genericSigID = S.addGenericSignatureRef(genericEnv->getGenericSignature());
 
