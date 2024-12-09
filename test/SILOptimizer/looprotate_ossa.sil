@@ -577,20 +577,26 @@ bb4:
   return %1 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: sil [ossa] @looprotate_copy :
+// CHECK-LABEL: sil [ossa] @looprotate_copy_move_borrow :
 // CHECK: bb0(%0 : $Int32, %1 : @guaranteed $Bar):
 // CHECK: copy_value
+// CHECK: move_value
+// CHECK: begin_borrow
 // CHECK: cond_br {{.*}}, bb2, bb1
 // CHECK: copy_value
-// CHECK-LABEL: } // end sil function 'looprotate_copy'
-sil [ossa] @looprotate_copy : $@convention(thin) (Int32, @guaranteed Bar) -> Int32 {
+// CHECK: move_value
+// CHECK: begin_borrow
+// CHECK-LABEL: } // end sil function 'looprotate_copy_move_borrow'
+sil [ossa] @looprotate_copy_move_borrow : $@convention(thin) (Int32, @guaranteed Bar) -> Int32 {
 bb0(%0 : $Int32, %1 : @guaranteed $Bar):
   %2 = struct_extract %0 : $Int32, #Int32._value
   %3 = integer_literal $Builtin.Int32, 0
   br bb1(%2 : $Builtin.Int32, %3 : $Builtin.Int32)
 
 bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32):
-  %7 = copy_value %1 : $Bar
+  %c = copy_value %1 : $Bar
+  %m = move_value %c : $Bar
+  %7 = begin_borrow %m : $Bar
   %8 = class_method %7 : $Bar, #Bar.foo : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
   %9 = apply %8(%7) : $@convention(method) (@guaranteed Bar) -> ()
   %10 = struct $Int32 (%6 : $Builtin.Int32)
@@ -598,7 +604,8 @@ bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32):
   cond_br %11, bb3, bb2
 
 bb2:
-  destroy_value %7 : $Bar
+  end_borrow %7 : $Bar
+  destroy_value %m : $Bar
   %14 = integer_literal $Builtin.Int32, 1
   %15 = integer_literal $Builtin.Int1, -1
   %16 = builtin "sadd_with_overflow_Word"(%6 : $Builtin.Int32, %14 : $Builtin.Int32, %15 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -612,7 +619,8 @@ bb2:
   br bb1(%23 : $Builtin.Int32, %17 : $Builtin.Int32)
 
 bb3:
-  destroy_value %7 : $Bar
+  end_borrow %7 : $Bar
+  destroy_value %m : $Bar
   %26 = struct $Int32 (%5 : $Builtin.Int32)
   return %26 : $Int32
 }
