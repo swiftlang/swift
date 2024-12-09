@@ -24,8 +24,8 @@
 /// The version constants for the SwiftDependencyScan C API.
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
-#define SWIFTSCAN_VERSION_MAJOR 0
-#define SWIFTSCAN_VERSION_MINOR 10
+#define SWIFTSCAN_VERSION_MAJOR 1
+#define SWIFTSCAN_VERSION_MINOR 0
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -480,17 +480,6 @@ swiftscan_source_location_get_column_number(swiftscan_source_location_t source_l
 // scanner: its module dependencies cache. This is done in order
 // to allow clients to perform incremental dependency scans by having the
 // scanner's state be serializable and re-usable.
-
-/// For the specified \c scanner instance, serialize its state to the specified file-system \c path .
-SWIFTSCAN_PUBLIC void
-swiftscan_scanner_cache_serialize(swiftscan_scanner_t scanner,
-                                  const char * path);
-
-/// For the specified \c scanner instance, load in scanner state from a file at
-/// the specified file-system \c path .
-SWIFTSCAN_PUBLIC bool
-swiftscan_scanner_cache_load(swiftscan_scanner_t scanner,
-                             const char * path);
 
 /// For the specified \c scanner instance, reset its internal state, ensuring subsequent
 /// scanning queries are done "from-scratch".
