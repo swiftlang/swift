@@ -9947,6 +9947,9 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
   *selfDecl = new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
                                   getLoc(), ctx.Id_self, this);
   (*selfDecl)->setImplicit();
+  if (getAttrs().hasAttribute<AddressableSelfAttr>()) {
+    (*selfDecl)->setAddressable(true);
+  }
   return *selfDecl;
 }
 

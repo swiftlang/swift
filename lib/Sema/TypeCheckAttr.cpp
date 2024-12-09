@@ -388,6 +388,7 @@ public:
   void visitSILGenNameAttr(SILGenNameAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
   void visitLifetimeAttr(LifetimeAttr *attr);
+  void visitAddressableSelfAttr(AddressableSelfAttr *attr);
 };
 
 } // end anonymous namespace
@@ -7766,6 +7767,16 @@ void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
 }
 
 void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {}
+
+void AttributeChecker::visitAddressableSelfAttr(AddressableSelfAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::AddressableParameters)) {
+    Ctx.Diags.diagnose(attr->getLocation(), diag::addressable_not_enabled);
+  }
+  
+  if (!D->getDeclContext()->isTypeContext()) {
+    Ctx.Diags.diagnose(attr->getLocation(), diag::addressableSelf_not_on_method);
+  }
+}
 
 namespace {
 
