@@ -451,6 +451,11 @@ private:
   }
 
   void pruneUnusedVFSOverlay() {
+    // Pruning of unused VFS overlay options for Clang dependencies is performed
+    // by the Clang dependency scanner.
+    if (moduleID.Kind == ModuleDependencyKind::Clang)
+      return;
+
     std::vector<std::string> resolvedCommandLine;
     size_t skip = 0;
     for (auto it = commandline.begin(), end = commandline.end();
