@@ -28,6 +28,7 @@ add_swift_host_library(swiftAST STATIC
   AutoDiff.cpp
   Availability.cpp
   AvailabilityContext.cpp
+  AvailabilityDomain.cpp
   AvailabilityScope.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
