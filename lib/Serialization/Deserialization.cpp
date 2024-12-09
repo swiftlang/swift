@@ -6852,10 +6852,11 @@ Expected<Type> DESERIALIZE_TYPE(NAME_ALIAS_TYPE)(
   TypeID parentTypeID;
   TypeID underlyingTypeID;
   TypeID substitutedTypeID;
-  SubstitutionMapID substitutionsID;
+  ArrayRef<uint64_t> rawArgumentIDs;
+
   decls_block::TypeAliasTypeLayout::readRecord(
-      scratch, typealiasID, parentTypeID, underlyingTypeID, substitutedTypeID,
-      substitutionsID);
+      scratch, typealiasID, underlyingTypeID, substitutedTypeID,
+      parentTypeID, rawArgumentIDs);
 
   TypeAliasDecl *alias = nullptr;
   Type underlyingType;
@@ -6898,23 +6899,29 @@ Expected<Type> DESERIALIZE_TYPE(NAME_ALIAS_TYPE)(
 
   auto substitutedType = substitutedTypeOrError.get();
 
-  // Read the substitutions.
-  auto subMapOrError = MF.getSubstitutionMapChecked(substitutionsID);
-  if (!subMapOrError)
-    return subMapOrError.takeError();
+  // Read generic arguments.
+  SmallVector<Type, 8> genericArgs;
+  for (TypeID ID : rawArgumentIDs) {
+    auto argTy = MF.getTypeChecked(ID);
+    if (!argTy)
+      return substitutedType;
+
+    genericArgs.push_back(argTy.get());
+  }
 
   auto parentTypeOrError = MF.getTypeChecked(parentTypeID);
   if (!parentTypeOrError)
-    return underlyingType;
+    return substitutedType;
 
   // Look through compatibility aliases that are now unavailable.
   if (alias && alias->isUnavailable() && alias->isCompatibilityAlias()) {
-    return alias->getUnderlyingType().subst(subMapOrError.get());
+    if (!alias->isGenericContext())
+      return alias->getUnderlyingType();
+    return substitutedType;
   }
 
   auto parentType = parentTypeOrError.get();
-  return TypeAliasType::get(alias, parentType, subMapOrError.get(),
-                            substitutedType);
+  return TypeAliasType::get(alias, parentType, genericArgs, substitutedType);
 }
 
 Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(

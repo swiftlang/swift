@@ -134,7 +134,7 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
 
 BridgedCustomAttr BridgedCustomAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc, BridgedTypeRepr cType,
-    BridgedNullablePatternBindingInitializer cInitContext,
+    BridgedNullableCustomAttributeInitializer cInitContext,
     BridgedNullableArgumentList cArgumentList) {
   ASTContext &context = cContext.unbridged();
   return CustomAttr::create(

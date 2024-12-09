@@ -381,18 +381,8 @@ extension ASTGenVisitor {
     var attrs = BridgedDeclAttributes()
 
     // '@' attributes.
-    var initContext: BridgedPatternBindingInitializer? = nil
-    visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
-      switch element {
-      case .ifConfigDecl(let ifConfigDecl):
-        return .ifConfigDecl(ifConfigDecl)
-      case .attribute(let attribute):
-        return .underlying(attribute)
-      }
-    } body: { node in
-      if let attr = self.generateDeclAttribute(attribute: node, initContext: &initContext) {
-        attrs.add(attr)
-      }
+    self.generateDeclAttributes(attributeList: node.attributes) { attr in
+      attrs.add(attr)
     }
 
     // The modifier
@@ -487,7 +477,7 @@ extension ASTGenVisitor {
       // ensures that property initializers are correctly treated as being in a
       // local context).
       if !self.declContext.isLocalContext {
-        initContext = attrs.initContext ?? .create(declContext: self.declContext)
+        initContext = .create(declContext: self.declContext)
       }
       initExpr = withDeclContext(initContext?.asDeclContext ?? self.declContext) {
         generate(expr: initializer.value)

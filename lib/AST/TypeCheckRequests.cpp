@@ -1470,6 +1470,9 @@ void swift::simple_display(llvm::raw_ostream &out, Initializer *init) {
   case InitializerKind::PropertyWrapper:
     out << "property wrapper initializer";
     break;
+  case InitializerKind::CustomAttribute:
+    out << "custom attribute initializer";
+    break;
   }
 }
 

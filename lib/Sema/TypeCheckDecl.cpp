@@ -2432,16 +2432,18 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
 
-    auto genericSig = typeAlias->getGenericSignature();
-    SubstitutionMap subs;
-    if (genericSig)
-      subs = genericSig->getIdentitySubstitutionMap();
+    SmallVector<Type, 2> genericArgs;
+    if (auto *params = typeAlias->getGenericParams()) {
+      for (auto *param : *params) {
+        genericArgs.push_back(param->getDeclaredInterfaceType());
+      }
+    }
 
     Type parent;
     auto parentDC = typeAlias->getDeclContext();
     if (parentDC->isTypeContext())
       parent = parentDC->getSelfInterfaceType();
-    auto sugaredType = TypeAliasType::get(typeAlias, parent, subs,
+    auto sugaredType = TypeAliasType::get(typeAlias, parent, genericArgs,
                                           typeAlias->getUnderlyingType());
     return MetatypeType::get(sugaredType, Context);
   }
@@ -2453,7 +2455,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::BuiltinTuple: {
     auto nominal = cast<NominalTypeDecl>(D);
     Type declaredInterfaceTy = nominal->getDeclaredInterfaceType();
-    // FIXME: For a protocol, this returns a MetatypeType wrapping a ProtocolType, but should be a MetatypeType wrapping an ExistentialType ('(any P).Type', not 'P.Type').
+    // FIXME: For a protocol, this returns a MetatypeType wrapping a
+    // ProtocolType, but should be a MetatypeType wrapping an
+    // ExistentialType ('(any P).Type', not 'P.Type').
     return MetatypeType::get(declaredInterfaceTy, Context);
   }
 

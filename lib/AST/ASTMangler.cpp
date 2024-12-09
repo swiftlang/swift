@@ -1165,7 +1165,7 @@ static bool shouldMangleAsGeneric(Type type) {
     return false;
 
   if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
-    return !typeAlias->getSubstitutionMap().empty();
+    return typeAlias->getDecl()->isGenericContext();
 
   return type->isSpecialized();
 }
@@ -1327,13 +1327,28 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
         return appendType(underlyingType, sig, forDecl);
       }
 
+      // If the type alias is in a generic local context, we don't have enough
+      // information to build a proper substitution map because the outer
+      // substitutions are not recorded anywhere. In this case, just mangle the
+      // type alias's underlying type.
+      auto *dc = decl->getDeclContext();
+      while (dc->isTypeContext())
+        dc = dc->getParent();
+      if (dc->isLocalContext() && dc->isGenericContext()) {
+        return appendType(underlyingType, sig, forDecl);
+      }
+
+      // If the substitution map is incorrect for some other reason, also skip
+      // mangling.
+      //
+      // FIXME: This shouldn't happen.
       if (decl->getDeclaredInterfaceType()
             .subst(aliasTy->getSubstitutionMap()).getPointer()
             != aliasTy) {
         return appendType(underlyingType, sig, forDecl);
       }
 
-      if (aliasTy->getSubstitutionMap()) {
+      if (aliasTy->getDecl()->isGenericContext()) {
         // Try to mangle the entire name as a substitution.
         if (tryMangleTypeSubstitution(tybase, sig))
           return;
@@ -2539,6 +2554,12 @@ void ASTMangler::appendContext(const DeclContext *ctx,
         appendInitFromProjectedValueEntity(wrapperInit->getWrappedVar());
         break;
       }
+      return;
+    }
+
+    case InitializerKind::CustomAttribute: {
+      BaseEntitySignature nullBase(nullptr);
+      appendContext(ctx->getParent(), nullBase, useModuleName);
       return;
     }
     }

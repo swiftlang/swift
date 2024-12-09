@@ -27,22 +27,24 @@ set(LLVM_APPEND_VC_REV NO CACHE BOOL "")
 set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR YES CACHE BOOL "")
 set(LLVM_ENABLE_PYTHON YES CACHE BOOL "")
 
-set(default_targets
+set(DEFAULT_BUILTIN_TARGETS
       x86_64-unknown-windows-msvc
-      aarch64-unknown-windows-msvc
-      i686-unknown-windows-msvc)
-set(LLVM_RUNTIME_TARGETS ${default_targets} CACHE STRING "")
-
+      aarch64-unknown-windows-msvc)
 # Build the android builtins if NDK path is provided.
 if(NOT "$ENV{NDKPATH}" STREQUAL "")
-  list(APPEND default_targets
+  list(APPEND DEFAULT_BUILTIN_TARGETS
        aarch64-unknown-linux-android
-       x86_64-unknown-linux-android
-       i686-unknown-linux-android
-       armv7-unknown-linux-androideabi)
+       x86_64-unknown-linux-android)
 endif()
 
-set(LLVM_BUILTIN_TARGETS ${default_targets} CACHE STRING "")
+# The builtin targets are used to build the compiler-rt builtins.
+set(LLVM_BUILTIN_TARGETS ${DEFAULT_BUILTIN_TARGETS} CACHE STRING "")
+
+# The runtime targets are used to build the compiler-rt profile library.
+set(LLVM_RUNTIME_TARGETS
+      x86_64-unknown-windows-msvc
+      aarch64-unknown-windows-msvc
+    CACHE STRING "")
 
 foreach(target ${LLVM_RUNTIME_TARGETS})
   set(RUNTIMES_${target}_LLVM_ENABLE_RUNTIMES
@@ -51,15 +53,13 @@ foreach(target ${LLVM_RUNTIME_TARGETS})
   set(RUNTIMES_${target}_CMAKE_MT mt CACHE STRING "")
   set(RUNTIMES_${target}_CMAKE_SYSTEM_NAME Windows CACHE STRING "")
   set(RUNTIMES_${target}_CMAKE_BUILD_TYPE Release CACHE STRING "")
-  set(RUNTIMES_${target}_COMPILER_RT_BUILD_BUILTINS YES CACHE BOOL "")
+  set(RUNTIMES_${target}_COMPILER_RT_BUILD_BUILTINS NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_CRT NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_LIBFUZZER NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_ORC NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_PROFILE YES CACHE BOOL "")
-  set(RUNTIMES_${target}_COMPILER_RT_BUILD_XRAY NO CACHE BOOL "")
-  # Sanitizers will be configured, but not built. We have separate build
-  # steps for that, because we need a different shell for each target.
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_SANITIZERS NO CACHE BOOL "")
+  set(RUNTIMES_${target}_COMPILER_RT_BUILD_XRAY NO CACHE BOOL "")
 endforeach()
 
 foreach(target ${LLVM_BUILTIN_TARGETS})
@@ -72,10 +72,6 @@ foreach(target ${LLVM_BUILTIN_TARGETS})
     set(BUILTINS_${target}_CMAKE_SYSTEM_NAME Android CACHE STRING "")
     if(${target} MATCHES aarch64)
       set(BUILTINS_${target}_CMAKE_ANDROID_ARCH_ABI arm64-v8a CACHE STRING "")
-    elseif(${target} MATCHES armv7)
-      set(BUILTINS_${target}_CMAKE_ANDROID_ARCH_ABI armeabi-v7a CACHE STRING "")
-    elseif(${target} MATCHES i686)
-      set(BUILTINS_${target}_CMAKE_ANDROID_ARCH_ABI x86 CACHE STRING "")
     else()
       set(BUILTINS_${target}_CMAKE_ANDROID_ARCH_ABI x86_64 CACHE STRING "")
     endif()

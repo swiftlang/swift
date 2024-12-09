@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 906; // IsModuleInterfaceSDKRelative
+const uint16_t SWIFTMODULE_VERSION_MINOR = 907; // TypeAliasType change
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1247,10 +1247,10 @@ namespace decls_block {
   TYPE_LAYOUT(TypeAliasTypeLayout,
     NAME_ALIAS_TYPE,
     DeclIDField,           // typealias decl
+    TypeIDField,           // original underlying type
+    TypeIDField,           // substituted underlying type
     TypeIDField,           // parent type
-    TypeIDField,           // underlying type
-    TypeIDField,           // substituted type
-    SubstitutionMapIDField // substitution map
+    BCArray<TypeIDField>   // generic arguments
   );
 
   TYPE_LAYOUT(GenericTypeParamTypeLayout,
