@@ -15,6 +15,7 @@ swift_compiler_sources(Optimizer
   ClosureSpecialization.swift
   ComputeEscapeEffects.swift
   ComputeSideEffects.swift
+  CopyToBorrowOptimization.swift
   DeadStoreElimination.swift
   DeinitDevirtualizer.swift
   InitializeStaticGlobals.swift
@@ -22,7 +23,6 @@ swift_compiler_sources(Optimizer
   LifetimeDependenceDiagnostics.swift
   LifetimeDependenceInsertion.swift
   LifetimeDependenceScopeFixup.swift
-  LoadCopyToBorrowOptimization.swift
   ObjectOutliner.swift
   ObjCBridgingOptimization.swift
   MergeCondFails.swift
