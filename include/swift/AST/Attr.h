@@ -2875,6 +2875,12 @@ template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
       return cast<ATTR>(Attr);
     return std::nullopt;
   }
+
+  std::optional<ATTR *> operator()(DeclAttribute *Attr) {
+    if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
+      return cast<ATTR>(Attr);
+    return std::nullopt;
+  }
 };
 
 /// The @_allowFeatureSuppression(Foo, Bar) attribute.  The feature
@@ -3047,17 +3053,25 @@ public:
   }
 
 public:
-  template <typename ATTR, bool AllowInvalid>
+  template <typename ATTR, typename Iterator, bool AllowInvalid>
   using AttributeKindRange =
-      OptionalTransformRange<iterator_range<const_iterator>,
+      OptionalTransformRange<iterator_range<Iterator>,
                              ToAttributeKind<ATTR, AllowInvalid>,
-                             const_iterator>;
+                             Iterator>;
 
   /// Return a range with all attributes in DeclAttributes with AttrKind
   /// ATTR.
   template <typename ATTR, bool AllowInvalid = false>
-  AttributeKindRange<ATTR, AllowInvalid> getAttributes() const {
-    return AttributeKindRange<ATTR, AllowInvalid>(
+  AttributeKindRange<ATTR, const_iterator, AllowInvalid> getAttributes() const {
+    return AttributeKindRange<ATTR, const_iterator, AllowInvalid>(
+        make_range(begin(), end()), ToAttributeKind<ATTR, AllowInvalid>());
+  }
+
+  /// Return a range with all attributes in DeclAttributes with AttrKind
+  /// ATTR.
+  template <typename ATTR, bool AllowInvalid = false>
+  AttributeKindRange<ATTR, iterator, AllowInvalid> getAttributes() {
+    return AttributeKindRange<ATTR, iterator, AllowInvalid>(
         make_range(begin(), end()), ToAttributeKind<ATTR, AllowInvalid>());
   }
 
