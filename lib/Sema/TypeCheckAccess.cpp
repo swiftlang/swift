@@ -1844,6 +1844,8 @@ bool isFragileClangType(clang::QualType type) {
   // Pointers to non-fragile types are non-fragile.
   if (underlyingTypePtr->isPointerType())
     return isFragileClangType(underlyingTypePtr->getPointeeType());
+  if (auto tagDecl = underlyingTypePtr->getAsTagDecl())
+    return isFragileClangDecl(tagDecl);
   return true;
 }
 
@@ -1892,6 +1894,11 @@ bool isFragileClangDecl(const clang::Decl *decl) {
     return !cxxRecordDecl->isCLike() &&
            !cxxRecordDecl->getDeclContext()->isExternCContext();
   }
+  if (auto *varDecl = dyn_cast<clang::VarDecl>(decl))
+    return isFragileClangType(varDecl->getType());
+  if (auto *fieldDecl = dyn_cast<clang::FieldDecl>(decl))
+    return isFragileClangType(fieldDecl->getType()) ||
+           isFragileClangDecl(fieldDecl->getParent());
   return true;
 }
 
