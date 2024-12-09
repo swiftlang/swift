@@ -698,7 +698,7 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
   unsigned abbrCode = SILAbbrCodes[SILBasicBlockLayout::Code];
   SILBasicBlockLayout::emitRecord(Out, ScratchRecord, abbrCode, Args);
 
-  const SILDebugScope *Prev = BB.getParent()->getDebugScope();
+  const SILDebugScope *Prev = nullptr;
   auto &SM = BB.getParent()->getModule().getSourceManager();
   for (const SILInstruction &SI : BB) {
     if (SerializeDebugInfoSIL) {
