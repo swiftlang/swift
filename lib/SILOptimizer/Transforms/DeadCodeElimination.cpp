@@ -23,6 +23,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -126,6 +127,8 @@ class DCE {
   BasicBlockSet LiveBlocks;
   llvm::SmallVector<SILInstruction *, 64> Worklist;
   PostDominanceInfo *PDT;
+  DominanceInfo *DT;
+  DeadEndBlocks *deadEndBlocks;
   llvm::DenseMap<SILBasicBlock *, ControllingInfo> ControllingInfoMap;
 
   // Maps instructions which produce a failing condition (like overflow
@@ -194,8 +197,10 @@ class DCE {
   void endLifetimeOfLiveValue(Operand *op, SILInstruction *insertPt);
 
 public:
-  DCE(SILFunction *F, PostDominanceInfo *PDT)
-    : F(F), LiveArguments(F), LiveInstructions(F), LiveBlocks(F), PDT(PDT) {}
+  DCE(SILFunction *F, PostDominanceInfo *PDT, DominanceInfo *DT,
+      DeadEndBlocks *deadEndBlocks)
+      : F(F), LiveArguments(F), LiveInstructions(F), LiveBlocks(F), PDT(PDT),
+        DT(DT), deadEndBlocks(deadEndBlocks) {}
 
   /// The entry point to the transformation.
   bool run() {
@@ -977,8 +982,11 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "*** DCE on function: " << F->getName()
                             << " ***\n");
 
-    auto *DA = PM->getAnalysis<PostDominanceAnalysis>();
-    PostDominanceInfo *PDT = DA->get(F);
+    auto *PDA = PM->getAnalysis<PostDominanceAnalysis>();
+    PostDominanceInfo *PDT = PDA->get(F);
+
+    auto *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *DEA = getAnalysis<DeadEndBlocksAnalysis>();
 
     // If we have a function that consists of nothing but a
     // structurally infinite loop like:
@@ -987,7 +995,7 @@ public:
     if (!PDT->getRootNode())
       return;
 
-    DCE dce(F, PDT);
+    DCE dce(F, PDT, DA->get(F), DEA->get(F));
     if (dce.run()) {
       using InvalidationKind = SILAnalysis::InvalidationKind;
       unsigned Inv = InvalidationKind::Instructions;
