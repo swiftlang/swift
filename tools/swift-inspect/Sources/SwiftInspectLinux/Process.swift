@@ -16,8 +16,8 @@ import LinuxSystemHeaders
 // The Android version of iovec defineds iov_len as __kernel_size_t, while the
 // standard Linux definition is size_t. This extension makes the difference
 // easier to deal with.
-public extension iovec {
-  init<T: BinaryInteger>(iov_base: UnsafeMutableRawPointer?, iov_len: T) {
+extension iovec {
+  public init<T: BinaryInteger>(iov_base: UnsafeMutableRawPointer?, iov_len: T) {
     self.init()
     self.iov_base = iov_base
     #if os(Android)
@@ -86,7 +86,6 @@ public class Process {
   public func readArray<T>(address: UInt64, upToCount: UInt) throws -> [T] {
     guard upToCount > 0 else { return [] }
 
-    // TODO: impement using readMem
     let maxSize = upToCount * UInt(MemoryLayout<T>.stride)
     let array: [T] = Array(unsafeUninitializedCapacity: Int(upToCount)) { buffer, initCount in
       var local = iovec(iov_base: buffer.baseAddress!, iov_len: maxSize)
@@ -97,15 +96,18 @@ public class Process {
     }
 
     guard array.count > 0 else {
-      throw ProcessError.processVmReadFailure(pid: self.pid, address: address, size: UInt64(maxSize))
+      throw ProcessError.processVmReadFailure(
+        pid: self.pid, address: address, size: UInt64(maxSize))
     }
 
     return array
   }
 
+  // simple wrapper around process_vm_readv
   public func readMem(remoteAddr: UInt64, localAddr: UnsafeRawPointer, len: UInt) throws {
     var local = iovec(iov_base: UnsafeMutableRawPointer(mutating: localAddr), iov_len: len)
-    var remote = iovec(iov_base: UnsafeMutableRawPointer(bitPattern: UInt(remoteAddr)), iov_len: len)
+    var remote = iovec(
+      iov_base: UnsafeMutableRawPointer(bitPattern: UInt(remoteAddr)), iov_len: len)
 
     let bytesRead = process_vm_readv(self.pid, &local, 1, &remote, 1, 0)
     guard bytesRead == len else {
@@ -113,13 +115,16 @@ public class Process {
     }
   }
 
+  // simple wrapper around process_vm_writev
   public func writeMem(remoteAddr: UInt64, localAddr: UnsafeRawPointer, len: UInt) throws {
     var local = iovec(iov_base: UnsafeMutableRawPointer(mutating: localAddr), iov_len: len)
-    var remote = iovec(iov_base: UnsafeMutableRawPointer(bitPattern: UInt(remoteAddr)), iov_len: len)
+    var remote = iovec(
+      iov_base: UnsafeMutableRawPointer(bitPattern: UInt(remoteAddr)), iov_len: len)
 
     let bytesWritten = process_vm_writev(self.pid, &local, 1, &remote, 1, 0)
     guard bytesWritten == len else {
-      throw ProcessError.processVmWriteFailure(pid: self.pid, address: remoteAddr, size: UInt64(len))
+      throw ProcessError.processVmWriteFailure(
+        pid: self.pid, address: remoteAddr, size: UInt64(len))
     }
   }
 }

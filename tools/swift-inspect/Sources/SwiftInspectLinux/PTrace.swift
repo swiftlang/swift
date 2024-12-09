@@ -2,49 +2,55 @@ import Foundation
 import LinuxSystemHeaders
 
 public class PTrace {
-  enum Error: Swift.Error {
-    case PTraceFailure(_ command: Int32, pid: pid_t, errno: Int32 = get_errno())
-    case WaitFailure(pid: pid_t, errno: Int32 = get_errno())
-    case IllegalArgument(description: String)
-    case UnexpectedWaitStatus(pid: pid_t, status: Int32, sigInfo: siginfo_t? = nil)
+  enum PTraceError: Error {
+    case ptraceFailure(_ command: Int32, pid: pid_t, errno: Int32 = get_errno())
+    case waitFailure(pid: pid_t, errno: Int32 = get_errno())
+    case unexpectedWaitStatus(pid: pid_t, status: Int32, sigInfo: siginfo_t? = nil)
   }
 
   let pid: pid_t
 
   public init(process pid: pid_t) throws {
-    if ptrace_attach(pid) == -1 { throw Error.PTraceFailure(PTRACE_ATTACH, pid: pid) }
+    guard ptrace_attach(pid) != -1 else {
+      throw PTraceError.ptraceFailure(PTRACE_ATTACH, pid: pid)
+    }
 
     while true {
       var status: Int32 = 0
       let result = waitpid(pid, &status, 0)
-      if result == -1 {
+      guard result != -1 else {
         if get_errno() == EINTR { continue }
-        throw Error.WaitFailure(pid: pid)
+        throw PTraceError.waitFailure(pid: pid)
       }
 
-      if result == pid && wIfStopped(status) { break }
+      precondition(pid == result, "waitpid returned unexpected value \(result)")
+
+      if wIfStopped(status) { break }
     }
 
     self.pid = pid
   }
 
-  deinit { ptrace_detach(self.pid) }
+  deinit { _ = ptrace_detach(self.pid) }
 
   public func cont() throws {
-    if ptrace_continue(self.pid) == -1 { throw Error.PTraceFailure(PTRACE_CONT, pid: self.pid) }
+    guard ptrace_continue(self.pid) != -1 else {
+      throw PTraceError.ptraceFailure(PTRACE_CONT, pid: self.pid)
+    }
   }
 
   public func getSigInfo() throws -> siginfo_t {
     var sigInfo = siginfo_t()
-    if ptrace_getsiginfo(self.pid, &sigInfo) == -1 {
-      throw Error.PTraceFailure(PTRACE_GETSIGINFO, pid: self.pid)
+    guard ptrace_getsiginfo(self.pid, &sigInfo) != -1 else {
+      throw PTraceError.ptraceFailure(PTRACE_GETSIGINFO, pid: self.pid)
     }
+
     return sigInfo
   }
 
   public func pokeData(addr: UInt64, value: UInt64) throws {
-    if ptrace_pokedata(self.pid, UInt(addr), UInt(value)) == -1 {
-      throw Error.PTraceFailure(PTRACE_POKEDATA, pid: self.pid)
+    guard ptrace_pokedata(self.pid, UInt(addr), UInt(value)) != -1 else {
+      throw PTraceError.ptraceFailure(PTRACE_POKEDATA, pid: self.pid)
     }
   }
 
@@ -52,8 +58,8 @@ public class PTrace {
     var regSet = RegisterSet()
     try withUnsafeMutableBytes(of: &regSet) {
       var vec = iovec(iov_base: $0.baseAddress!, iov_len: MemoryLayout<RegisterSet>.size)
-      if ptrace_getregset(self.pid, NT_PRSTATUS, &vec) == -1 {
-        throw Error.PTraceFailure(PTRACE_GETREGSET, pid: self.pid)
+      guard ptrace_getregset(self.pid, NT_PRSTATUS, &vec) != -1 else {
+        throw PTraceError.ptraceFailure(PTRACE_GETREGSET, pid: self.pid)
       }
     }
     return regSet
@@ -63,8 +69,8 @@ public class PTrace {
     var regSetCopy = regSet
     try withUnsafeMutableBytes(of: &regSetCopy) {
       var vec = iovec(iov_base: $0.baseAddress!, iov_len: MemoryLayout<RegisterSet>.size)
-      if ptrace_setregset(self.pid, NT_PRSTATUS, &vec) == -1 {
-        throw Error.PTraceFailure(PTRACE_SETREGSET, pid: self.pid)
+      guard ptrace_setregset(self.pid, NT_PRSTATUS, &vec) != -1 else {
+        throw PTraceError.ptraceFailure(PTRACE_SETREGSET, pid: self.pid)
       }
     }
   }
@@ -72,10 +78,7 @@ public class PTrace {
   public func callRemoteFunction(
     at address: UInt64, with args: [UInt64] = [], onTrap callback: (() throws -> Void)? = nil
   ) throws -> UInt64 {
-
-    guard args.count <= 6 else {
-      throw Error.IllegalArgument(description: "max of 6 arguments allowed")
-    }
+    precondition(args.count <= 6, "callRemoteFunction supports max of 6 arguments")
 
     let origRegs = try self.getRegSet()
     defer { try? self.setRegSet(regSet: origRegs) }
@@ -93,31 +96,29 @@ public class PTrace {
     var status: Int32 = 0
     while true {
       let result = waitpid(self.pid, &status, 0)
-      if result == -1 {
+      guard result != -1 else {
         if get_errno() == EINTR { continue }
-        throw Error.WaitFailure(pid: self.pid)
+        throw PTraceError.waitFailure(pid: self.pid)
       }
 
-      if wIfExited(status) || wIfSignaled(status) {
-        throw Error.UnexpectedWaitStatus(pid: self.pid, status: status)
+      precondition(self.pid == result, "waitpid returned unexpected value \(result)")
+
+      guard wIfStopped(status) && !wIfExited(status) && !wIfSignaled(status) else {
+        throw PTraceError.unexpectedWaitStatus(pid: self.pid, status: status)
       }
 
-      if wIfStopped(status) {
-        guard wStopSig(status) == SIGTRAP, let callback = callback else { break }
+      guard wStopSig(status) == SIGTRAP, let callback = callback else { break }
 
-        // give the caller the opportunity to handle SIGTRAP
-        try callback()
-        try self.cont()
-        continue
-      }
+      // give the caller the opportunity to handle SIGTRAP
+      try callback()
+      try self.cont()
     }
 
     let sigInfo = try self.getSigInfo()
     newRegs = try self.getRegSet()
 
     guard wStopSig(status) == SIGSEGV, siginfo_si_addr(sigInfo) == nil else {
-      print("WSTOPSIG(status):\(wStopSig(status)), si_addr:\(siginfo_si_addr(sigInfo)!)")
-      throw Error.UnexpectedWaitStatus(pid: self.pid, status: status, sigInfo: sigInfo)
+      throw PTraceError.unexpectedWaitStatus(pid: self.pid, status: status, sigInfo: sigInfo)
     }
 
     return UInt64(newRegs.returnValue())

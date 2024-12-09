@@ -127,7 +127,7 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
       // Immediately read and process the heap metadata from the remote process,
       // skip past the trap/break instruction and resume the remote process.
       try self.process.readMem(remoteAddr: remoteDataAddr, localAddr: buffer, len: UInt(dataLen))
-      allocations.append(contentsOf: try self.processHeapAllocations(buffer: buffer, len: dataLen))
+      allocations.append(contentsOf: try self.processHeapMetadata(buffer: buffer, len: dataLen))
 
       guard heap_iterate_metadata_init(buffer, dataLen) else {
         throw RemoteProcessError.heapIterationFailed
@@ -141,12 +141,12 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
     }
 
     try self.process.readMem(remoteAddr: remoteDataAddr, localAddr: buffer, len: UInt(dataLen))
-    allocations.append(contentsOf: try self.processHeapAllocations(buffer: buffer, len: dataLen))
+    allocations.append(contentsOf: try self.processHeapMetadata(buffer: buffer, len: dataLen))
 
     return allocations
   }
 
-  internal func processHeapAllocations(buffer: UnsafeMutableRawPointer, len: Int) throws -> [(
+  internal func processHeapMetadata(buffer: UnsafeMutableRawPointer, len: Int) throws -> [(
     base: UInt64, len: UInt64
   )] {
     let callback: @convention(c) (UnsafeMutableRawPointer?, UInt64, UInt64) -> Void = {

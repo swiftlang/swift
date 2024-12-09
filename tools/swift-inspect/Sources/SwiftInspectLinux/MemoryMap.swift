@@ -31,7 +31,7 @@ public class MemoryMap {
       if name == "[anon:libc_malloc]" { return true }
       if name.hasPrefix("[anon:scudo:") { return true }
       if name.hasPrefix("[anon:GWP-ASan") { return true }
-      return false;
+      return false
     }
   }
 
