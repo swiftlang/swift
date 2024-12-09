@@ -824,13 +824,13 @@ func test_keypath_with_method_refs() {
     static func bar() -> Int { return 0 }
   }
 
-  let _: KeyPath<S, Int> = \.foo // expected-error {{key path cannot refer to instance method 'foo()'}}
+  let _: KeyPath<S, Int> = \.foo
   // expected-error@-1 {{cannot assign value of type 'KeyPath<S, () -> Int>' to type 'KeyPath<S, Int>'}}
   // expected-note@-2 {{arguments to generic parameter 'Value' ('() -> Int' and 'Int') are expected to be equal}}
-  let _: KeyPath<S, Int> = \.bar // expected-error {{key path cannot refer to static method 'bar()'}}
+  let _: KeyPath<S, Int> = \.bar // expected-error {{static member 'bar()' cannot be used on instance of type 'S'}}
   // expected-error@-1 {{cannot assign value of type 'KeyPath<S, () -> Int>' to type 'KeyPath<S, Int>'}}
   // expected-note@-2 {{arguments to generic parameter 'Value' ('() -> Int' and 'Int') are expected to be equal}}
-  let _ = \S.Type.bar // expected-error {{key path cannot refer to static method 'bar()'}}
+  let _ = \S.Type.bar
 
   struct A {
     func foo() -> B { return B() }
@@ -841,10 +841,10 @@ func test_keypath_with_method_refs() {
     var bar: Int = 42
   }
 
-  let _: KeyPath<A, Int> = \.foo.bar // expected-error {{key path cannot refer to instance method 'foo()'}}
-  let _: KeyPath<A, Int> = \.faz.bar // expected-error {{key path cannot refer to static method 'faz()'}}
-  let _ = \A.foo.bar // expected-error {{key path cannot refer to instance method 'foo()'}}
-  let _ = \A.Type.faz.bar // expected-error {{key path cannot refer to static method 'faz()'}}
+  let _: KeyPath<A, Int> = \.foo.bar // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _: KeyPath<A, Int> = \.faz.bar // expected-error {{static member 'faz()' cannot be used on instance of type 'A'}}
+  let _ = \A.foo.bar // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _ = \A.Type.faz.bar // expected-error {{type of expression is ambiguous without a type annotation}}
 }
 
 // https://github.com/apple/swift/issues/54961
@@ -856,7 +856,7 @@ protocol Zonk {
 typealias Blatz = (gloop: String, zoop: Zonk?)
 
 func f_54961(fleep: [Blatz]) {
-  fleep.compactMap(\.zoop?.wargle) // expected-error {{key path cannot refer to instance method 'wargle()'}}
+  let _ = fleep.compactMap(\.zoop?.wargle)
 }
 
 // https://github.com/apple/swift/issues/52867
@@ -1091,8 +1091,8 @@ func testSyntaxErrors() {
 
 // https://github.com/apple/swift/issues/56996
 func f_56996() {
-  _ = \Int.byteSwapped.signum() // expected-error {{invalid component of Swift key path}}
-  _ = \Int.byteSwapped.init() // expected-error {{invalid component of Swift key path}}
+  _ = \Int.byteSwapped.signum()
+  _ = \Int.byteSwapped.init() // expected-error {{static member 'init()' cannot be used on instance of type 'Int'}}
   _ = \Int // expected-error {{key path must have at least one component}}
   _ = \Int? // expected-error {{key path must have at least one component}}
   _ = \Int. // expected-error {{invalid component of Swift key path}}
