@@ -1056,7 +1056,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
 
   GenericEnvironment *genericEnv = nullptr;
   // Generic signatures are stored for declarations as well in a debug context.
-  if (!declarationOnly || onlyReferencedByDebugInfo)
+  if (!declarationOnly || onlyReferencedByDebugInfo || genericSigID)
     genericEnv = MF->getGenericSignature(genericSigID).getGenericEnvironment();
 
   // If the next entry is the end of the block, then this function has
@@ -1066,8 +1066,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     return maybeEntry.takeError();
   entry = maybeEntry.get();
   bool isEmptyFunction = (entry.Kind == llvm::BitstreamEntry::EndBlock);
-  assert((!isEmptyFunction || !genericEnv || onlyReferencedByDebugInfo) &&
-         "generic environment without body?!");
+  assert((!isEmptyFunction || !genericEnv || onlyReferencedByDebugInfo ||
+        genericSigID) && "generic environment without body?!");
 
   // Remember this in our cache in case it's a recursive function.
   // Increase the reference count to keep it alive.
