@@ -374,6 +374,12 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   assert(loop->contains(newHeader) && !loop->contains(exit)
          && "Could not find loop header and exit block");
 
+  // It does not make sense to rotate the loop if the new header is loop
+  // exiting as well.
+  if (loop->isLoopExiting(newHeader)) {
+    return false;
+  }
+
   // We don't want to rotate such that we merge two headers of separate loops
   // into one. This can be turned into an assert again once we have guaranteed
   // preheader insertions.
