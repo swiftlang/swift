@@ -668,8 +668,8 @@ func test_chain_of_recursive_lookups(_ lens: Lens<Lens<Lens<Point>>>) {
   _ = \Lens<Lens<Point>>.obj.x
 }
 
-// KeyPath Dynamic Member Lookup can't refer to methods, mutating setters and static members
-// because of the KeyPath limitations
+// KeyPath Dynamic Member Lookup can't refer mutating setters because of the
+// KeyPath limitations
 func invalid_refs_through_dynamic_lookup() {
   struct S {
     static var foo: Int = 42
@@ -683,9 +683,9 @@ func invalid_refs_through_dynamic_lookup() {
 
   func test(_ lens: A<S>) {
     _ = lens.foo           // expected-error {{static member 'foo' cannot be used on instance of type 'S'}}
-    _ = lens.bar()         // expected-error {{dynamic key path member lookup cannot refer to instance method 'bar()'}}
-    _ = lens.bar().faz + 1 // expected-error {{dynamic key path member lookup cannot refer to instance method 'bar()'}}
-    _ = lens.baz("hello")  // expected-error {{dynamic key path member lookup cannot refer to static method 'baz'}}
+    _ = lens.bar()
+    _ = lens.bar().faz + 1 
+    _ = lens.baz("hello")  // expected-error {{static member 'baz' cannot be used on instance of type 'S'}}
   }
 }
 
