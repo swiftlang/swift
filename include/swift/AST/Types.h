@@ -6976,8 +6976,6 @@ class OpenedArchetypeType final : public LocalArchetypeType,
   friend ArchetypeType;
   friend GenericEnvironment;
 
-  UUID ID;
-
   /// Create a new opened archetype in the given environment representing
   /// the interface type.
   ///
@@ -6993,10 +6991,7 @@ public:
   /// of an existential value.
   ///
   /// \param existential The existential type to open.
-  /// \param knownID When non-empty, the known ID of the archetype. When empty,
-  /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType>
-  get(CanType existential, std::optional<UUID> knownID = std::nullopt);
+  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
@@ -7070,8 +7065,6 @@ class ElementArchetypeType final : public LocalArchetypeType,
   friend TrailingObjects;
   friend ArchetypeType;
   friend GenericEnvironment;
-
-  UUID ID;
 
   /// Create a new element archetype in the given environment representing
   /// the interface type.
