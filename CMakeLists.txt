@@ -816,6 +816,7 @@ option(SWIFT_BUILD_SWIFT_SYNTAX
 option(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
     "Build the Swift regex parser as part of the compiler."
     TRUE)
+
 if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER AND NOT SWIFT_BUILD_SWIFT_SYNTAX)
   message(WARNING "Force setting SWIFT_BUILD_REGEX_PARSER_IN_COMPILER=OFF because Swift parser integration is disabled")
   set(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER OFF)
@@ -948,6 +949,26 @@ set(SWIFT_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 
 if (NOT BOOTSTRAPPING_MODE)
   message(FATAL_ERROR "turning off bootstrapping is not supported anymore")
+endif()
+
+option(SWIFT_MINIMAL_CXX_BOOTSTRAP
+    "Build a minimal Swift compiler from only C++ sources. This compiler is only suitable for bootstrapping a Swift toolchain in an environment where one isn't already available."
+    FALSE)
+
+if(SWIFT_MINIMAL_CXX_BOOTSTRAP)
+    message(WARNING "Building minimal Swift compiler from only C++ sources. This compiler is only suitable for bootstrapping a full Swift compiler.")
+
+  # Disable swift-syntax integration
+  set(SWIFT_BUILD_SWIFT_SYNTAX OFF)
+
+  # Disable regular expression support.
+  set(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER OFF)
+
+  # Disable string processing library
+  set(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING OFF)
+
+  # Disable bootstrapping
+  set(BOOTSTRAPPING_MODE OFF)
 endif()
 
 # As a temporary workaround, disable SwiftCompilerSources on
