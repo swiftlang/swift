@@ -4,6 +4,10 @@ public protocol PublicProto {
   associatedtype Assoc
 }
 
+public struct PublicType {
+    public init() { }
+}
+
 public func publicFunc() { print("publicFunc") }
 
 func internalFunc() {}
@@ -94,3 +98,6 @@ public enum PublicEnum {
   case publicCase
   @_spi(HelperSPI) case spiCase
 }
+
+@_spi(HelperSPI) public func -(_ s1: PublicType, _ s2: PublicType) -> PublicType { s1 }
+@_spi(HelperSPI) public func +(_ s1: PublicType, _ s2: PublicType) -> PublicType { s1 }
