@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 
 // FRT or SWIFT_SHARED_REFERENCE type
 struct FRTStruct {
@@ -280,3 +281,48 @@ template <typename T>
 FRTStruct
     *_Nonnull global_templated_function_returning_FRT_create_with_attr_returns_unretained(
         T a) __attribute__((swift_attr("returns_unretained")));
+
+template <typename T>
+T global_function_returning_templated_retrun_frt(T);
+
+template <typename T>
+T global_function_returning_templated_retrun_frt_owned(T)
+    __attribute__((swift_attr("returns_retained")));
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:retain_FRTOverloadedOperators")))
+__attribute__((swift_attr(
+    "release:release_FRTOverloadedOperators"))) FRTOverloadedOperators {
+
+public:
+  FRTOverloadedOperators *_Nonnull
+  operator+(const FRTOverloadedOperators &other)
+      __attribute__((swift_attr("returns_unretained")));
+  FRTOverloadedOperators *_Nonnull
+  operator-(const FRTOverloadedOperators &other);
+};
+
+FRTOverloadedOperators *_Nonnull returnFRTOverloadedOperators();
+
+void retain_FRTOverloadedOperators(FRTOverloadedOperators *_Nonnull v);
+void release_FRTOverloadedOperators(FRTOverloadedOperators *_Nonnull v);
+
+using FunctionVoidToFRTStruct =
+    std::function<FRTStruct *_Nonnull(void)> __attribute__((
+        swift_attr("returns_retained")));
+
+struct Base {
+public:
+  virtual FRTStruct *_Nonnull VirtualMethodReturningFRTOwned()
+      __attribute__((swift_attr("returns_retained")));
+  virtual FRTStruct *_Nonnull VirtualMethodReturningFRTUnowned()
+      __attribute__((swift_attr("returns_unretained")));
+};
+
+struct Derived : Base {
+public:
+  FRTStruct *_Nonnull VirtualMethodReturningFRTOwned() override
+      __attribute__((swift_attr("returns_retained")));
+  FRTStruct *_Nonnull VirtualMethodReturningFRTUnowned() override
+      __attribute__((swift_attr("returns_unretained")));
+};
