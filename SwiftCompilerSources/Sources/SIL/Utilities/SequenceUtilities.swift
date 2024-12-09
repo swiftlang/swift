@@ -71,7 +71,7 @@ extension FormattedLikeArray {
 public protocol CollectionLikeSequence : FormattedLikeArray {
 }
 
-public extension CollectionLikeSequence {
+public extension Sequence {
   var isEmpty: Bool { !contains(where: { _ in true }) }
 
   var singleElement: Element? {
