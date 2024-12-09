@@ -6987,21 +6987,25 @@ class OpenedArchetypeType final : public LocalArchetypeType,
          LayoutConstraint layout);
 
 public:
-  /// Get or create an archetype that represents the opened type
-  /// of an existential value.
+  /// Open the given existential type to a newly created archetype and
+  /// return it.
   ///
   /// \param existential The existential type to open.
   static CanTypeWrapper<OpenedArchetypeType> get(CanType existential);
 
-  /// Create a new archetype that represents the opened type
-  /// of an existential value.
+  /// Open the given existential type or existential metatype.
   ///
   /// Use this function when you are unsure of whether the
-  /// \c existential type is a metatype or an instance type. This function
-  /// will unwrap any existential metatype containers.
+  /// \c existential is a metatype or an instance type. An existential metatype
+  /// will be rebuilt appropriately.
   ///
   /// \param existential The existential type or existential metatype to open.
-  static Type openAnyExistentialType(Type existential);
+  /// \param opened When not null, the opened archetype that will be used. This
+  /// archetype must be a root, and the existential that was opened with it must
+  /// be canonically equal to the one contained in `opened`. When null, a fresh
+  /// archetype and generic environment will be created.
+  static Type openAnyExistentialType(Type existential,
+                                     OpenedArchetypeType *opened = nullptr);
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpenedArchetype;
