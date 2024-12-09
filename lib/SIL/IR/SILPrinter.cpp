@@ -726,7 +726,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
       separator = " ";
     }
     if (!i.IsReborrow && i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
-      *this << separator << "@" << i.OwnershipKind.value() << " ";
+      *this << separator << "@" << i.OwnershipKind.value();
       separator = " ";
     }
     if (i.needPrintType) {
