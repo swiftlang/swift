@@ -1828,6 +1828,8 @@ public:
   }
 };
 
+bool isFragileClangDecl(const clang::Decl *decl);
+
 bool isFragileClangType(clang::QualType type) {
   if (type.isNull())
     return true;
@@ -1845,10 +1847,7 @@ bool isFragileClangType(clang::QualType type) {
   return true;
 }
 
-bool isFragileClangNode(const ClangNode &node) {
-  auto *decl = node.getAsDecl();
-  if (!decl)
-    return false;
+bool isFragileClangDecl(const clang::Decl *decl) {
   // Namespaces by themselves don't impact ABI.
   if (isa<clang::NamespaceDecl>(decl))
     return false;
@@ -1856,6 +1855,8 @@ bool isFragileClangNode(const ClangNode &node) {
   if (isa<clang::ObjCContainerDecl>(decl))
     return false;
   if (auto *fd = dyn_cast<clang::FunctionDecl>(decl)) {
+    if (auto *ctorDecl = dyn_cast<clang::CXXConstructorDecl>(fd))
+      return isFragileClangDecl(ctorDecl->getParent());
     if (!isa<clang::CXXMethodDecl>(decl) &&
         !isFragileClangType(fd->getDeclaredReturnType())) {
       for (const auto *param : fd->parameters()) {
@@ -1892,6 +1893,13 @@ bool isFragileClangNode(const ClangNode &node) {
            !cxxRecordDecl->getDeclContext()->isExternCContext();
   }
   return true;
+}
+
+bool isFragileClangNode(const ClangNode &node) {
+  auto *decl = node.getAsDecl();
+  if (!decl)
+    return false;
+  return isFragileClangDecl(decl);
 }
 
 } // end anonymous namespace
