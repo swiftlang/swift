@@ -506,14 +506,6 @@ private extension AllocRefInstBase {
   }
 }
 
-private extension FunctionPassContext {
-  func erase(instructions: [Instruction]) {
-    for inst in instructions {
-      erase(instruction: inst)
-    }
-  }
-}
-
 private func optimizeFindStringCall(stringArray: GlobalValueInst, _ context: FunctionPassContext) {
   if stringArray.numArrayElements > 16,
      let findStringCall = findFindStringCall(stringArray: stringArray),
