@@ -18,6 +18,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -6083,7 +6084,7 @@ namespace {
     }
 
     void printAnyFunctionTypeCommonRec(AnyFunctionType *T, Label label,
-                                    StringRef name) {
+                                       StringRef name) {
       printCommon(name, label);
 
       if (T->hasExtInfo()) {
@@ -6098,6 +6099,24 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
+        if (T->isDifferentiable()) {
+          switch (T->getDifferentiabilityKind()) {
+          default:
+            llvm_unreachable("unexpected differentiability kind");
+          case DifferentiabilityKind::Reverse:
+            printFlag("@differentiable(reverse)");
+            break;
+          case DifferentiabilityKind::Forward:
+            printFlag("@differentiable(_forward)");
+            break;
+          case DifferentiabilityKind::Linear:
+            printFlag("@differentiable(_linear)");
+            break;
+          case DifferentiabilityKind::Normal:
+            printFlag("@differentiable");
+            break;
+          }
+        }
       }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), Label::always("global_actor"));
