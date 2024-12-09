@@ -118,6 +118,8 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
         !isa<TermInst>(inst) &&
         !isa<AllocationInst>(inst) && /* not marked mayhavesideeffects */
         !isa<CopyValueInst>(inst) &&
+        !isa<MoveValueInst>(inst) &&
+        !isa<BeginBorrowInst>(inst) &&
         hasLoopInvariantOperands(inst, loop, invariants)) {
       moves.push_back(inst);
       invariants.insert(inst);
