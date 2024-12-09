@@ -84,6 +84,14 @@ int symbolgraphgen::emitSymbolGraphForModule(
         ExportedClangModules.insert(ClangExport.getPointer());
       }
     }
+
+    if (ExportedClangModules.empty() && WildcardExportClangModules.empty() && !std::holds_alternative<std::monostate>(ClangModule->Umbrella)) {
+      // HACK: Some SDK modules use an 'umbrella header' in place of an 'export *' declaration.
+      // This is not the same thing, and the submodules are not actually being exported from the
+      // umbrella header, but we're not doing complete dependency tracking here. To provide a proper
+      // view into the symbols of this module, treat this umbrella declaration as an 'export *'.
+      WildcardExportClangModules.insert(ClangModule);
+    }
   }
 
   auto importFilter = [&Options, &WildcardExportClangModules,

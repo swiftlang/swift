@@ -45,6 +45,39 @@ bool areModulesEqual(const ModuleDecl *lhs, const ModuleDecl *rhs, bool isClangE
   return true;
 }
 
+bool clangModuleExports(const clang::Module *ClangParent, const clang::Module *CM) {
+  if (!ClangParent || !CM) return false;
+  if (ClangParent == CM) return true;
+
+  for (auto ClangExport : ClangParent->Exports) {
+    auto *ExportedModule = ClangExport.getPointer();
+    if (ClangExport.getInt()) {
+      if (!ExportedModule && CM->isSubModuleOf(ClangParent)) {
+        return true;
+      } else if (ExportedModule && CM->isSubModuleOf(ExportedModule)) {
+        return true;
+      }
+    }
+    if (ExportedModule && clangModuleExports(ExportedModule, CM)) {
+      return true;
+    }
+  }
+
+  if (ClangParent->Exports.empty() && !std::holds_alternative<std::monostate>(ClangParent->Umbrella) && CM->isSubModuleOf(ClangParent)) {
+    // HACK: Some SDK modules use an 'umbrella header' in place of an 'export *' declaration.
+    // This is not the same thing, and the submodules are not actually being exported from the
+    // umbrella header, but we're not doing complete dependency tracking here. To provide a proper
+    // view into the symbols of this module, treat this umbrella declaration as an 'export *'.
+    return true;
+  }
+
+  return false;
+}
+
+bool underlyingClangModuleExports(const ModuleDecl *ParentModule, const ModuleDecl *M) {
+  return clangModuleExports(ParentModule->findUnderlyingClangModule(), M->findUnderlyingClangModule());
+}
+
 } // anonymous namespace
 
 SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
@@ -94,26 +127,42 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
     }
   }
 
-  if (areModulesEqual(&this->M, M)) {
-    return &MainGraph;
-  } else if (MainGraph.DeclaringModule.has_value() &&
-             areModulesEqual(MainGraph.DeclaringModule.value(), M)) {
-    // Cross-import overlay modules already appear as "extensions" of their declaring module; we
-    // should put actual extensions of that module into the main graph
-    return &MainGraph;
-  }
+  auto moduleIsMainGraph = [&](const ModuleDecl *M) {
+    if (areModulesEqual(&this->M, M)) {
+      return true;
+    } else if (MainGraph.DeclaringModule.has_value() &&
+               areModulesEqual(MainGraph.DeclaringModule.value(), M)) {
+      // Cross-import overlay modules already appear as "extensions" of their declaring module; we
+      // should put actual extensions of that module into the main graph
+      return true;
+    }
 
-  // Check the module and decl separately since the extension could be from a different module
-  // than the decl itself.
-  if (isExportedImportedModule(M) || isQualifiedExportedImport(D)) {
+    // Check the module and decl separately since the extension could be from a different module
+    // than the decl itself.
+    if (isExportedImportedModule(M)) {
+      return true;
+    }
+
+    return false;
+  };
+
+  if (moduleIsMainGraph(M) || isQualifiedExportedImport(D))
     return &MainGraph;
-  }
 
   // If this type is the child of a type which was re-exported in a qualified export, use the main graph.
   if (llvm::any_of(ParentTypes, [&](const NominalTypeDecl *NTD){ return isQualifiedExportedImport(NTD); })) {
     return &MainGraph;
   }
-  
+
+  // As a shorthand when dealing with Clang submodules, use their top-level module's graph if the
+  // submodule is ultimately exported from its top-level module.
+  auto *TopLevelModule = M->getTopLevelModule();
+  if (TopLevelModule != M && underlyingClangModuleExports(TopLevelModule, M))
+    M = TopLevelModule;
+
+  if (moduleIsMainGraph(M))
+    return &MainGraph;
+
   auto Found = ExtendedModuleGraphs.find(M->getNameStr());
   if (Found != ExtendedModuleGraphs.end()) {
     return Found->getValue();
