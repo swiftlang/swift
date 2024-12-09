@@ -108,7 +108,14 @@ function(_add_host_variant_swift_sanitizer_flags target)
       message(SEND_ERROR "unsupported value for LLVM_USE_SANITIZER: ${LLVM_USE_SANITIZER}")
     endif()
 
-    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:${_Swift_SANITIZER_FLAGS}>)
+    # Sanitize options are not (yet) supported on Windows
+    if (SWIFT_HOST_VARIANT_SDK STREQUAL "WINDOWS")
+      message("_Swift_SANITIZER_FLAGS before: ${_Swift_SANITIZER_FLAGS}")
+      list(FILTER _Swift_SANITIZER_FLAGS EXCLUDE REGEX "^\\-sanitize=")
+      message("_Swift_SANITIZER_FLAGS after: ${_Swift_SANITIZER_FLAGS}")
+    endif()
+
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:SHELL:${_Swift_SANITIZER_FLAGS}>)
   endif()
 endfunction()
 
