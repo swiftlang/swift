@@ -4,7 +4,7 @@
 // RUN: %FileCheck %s < %t/UseCxxTy.h
 
 // REQUIRES: OS=macosx
-
+// REQUIRES: rdar141124318
 import Foundation
 import MyCxxModule
 
