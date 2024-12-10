@@ -3621,6 +3621,75 @@ static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
   return allMatch;
 }
 
+/// Allow `any Sendable` to match `Any` constraint while matching
+/// generic arguments i.e. `[any Sendable]` -> `[Any]` when `any Sendable`
+/// type comes from context that involves `@preconcurrency` declarations
+/// in non-strict concurrency compiler mode.
+///
+/// Note that it's currently impossible to figure out precisely
+/// where `any Sendable` type came from.
+static bool matchSendableExistentialToAnyInGenericArgumentPosition(
+    ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
+  auto &ctx = cs.getASTContext();
+  if (ctx.isSwiftVersionAtLeast(6) ||
+      ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)
+    return false;
+
+  auto last = locator.last();
+  if (!last || !last->is<LocatorPathElt::GenericArgument>())
+    return false;
+
+  std::function<bool(ConstraintLocator *)> isPreconcurrencyContext =
+      [&](ConstraintLocator *locator) {
+        if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
+          return isPreconcurrencyContext(
+              cs.getConstraintLocator(simplifyLocatorToAnchor(locator)));
+
+        auto *calleeLoc = cs.getCalleeLocator(locator);
+        if (!calleeLoc)
+          return false;
+
+        auto selectedOverload = cs.findSelectedOverloadFor(calleeLoc);
+        if (!(selectedOverload && selectedOverload->choice.isDecl()))
+          return false;
+
+        if (!selectedOverload->choice.getDecl()->preconcurrency()) {
+          // If the member is not preconcurrency, its base could be.
+          if (auto *UDE =
+                  getAsExpr<UnresolvedDotExpr>(calleeLoc->getAnchor())) {
+            return isPreconcurrencyContext(
+                cs.getConstraintLocator(UDE->getBase()));
+          }
+          return false;
+        }
+
+        return true;
+      };
+
+  SmallVector<LocatorPathElt> path;
+  auto anchor = locator.getLocatorParts(path);
+
+  // Drop all of the generic type and argument elements
+  // from the locator first.
+  while (!path.empty()) {
+    auto last = path.back();
+    if (last.is<LocatorPathElt::GenericArgument>() ||
+        last.is<LocatorPathElt::GenericType>()) {
+      path.pop_back();
+      continue;
+    }
+    break;
+  }
+
+  if (!isPreconcurrencyContext(cs.getConstraintLocator(anchor, path)))
+    return false;
+
+  // Increase the score to make sure that if there is an overload that
+  // uses `any Sendable` it would be preferred.
+  cs.increaseScore(SK_EmptyExistentialConversion, locator);
+  return true;
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
                                          ConstraintLocatorBuilder locator) {
@@ -3671,11 +3740,19 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   if (auto *existential1 = type1->getAs<ExistentialType>()) {
     auto existential2 = type2->castTo<ExistentialType>();
 
-    auto result = matchTypes(existential1->getConstraintType(),
-                             existential2->getConstraintType(),
-                             ConstraintKind::Bind, subflags,
-                             locator.withPathElement(
-                               ConstraintLocator::ExistentialConstraintType));
+    auto constraintTy1 = existential1->getConstraintType();
+    auto constraintTy2 = existential2->getConstraintType();
+
+    if (constraintTy1->getKnownProtocol() == KnownProtocolKind::Sendable &&
+        constraintTy2->isAny()) {
+      if (matchSendableExistentialToAnyInGenericArgumentPosition(*this,
+                                                                 locator))
+        return getTypeMatchSuccess();
+    }
+
+    auto result = matchTypes(
+        constraintTy1, constraintTy2, ConstraintKind::Bind, subflags,
+        locator.withPathElement(ConstraintLocator::ExistentialConstraintType));
 
     if (result.isFailure())
       return result;
