@@ -11,6 +11,8 @@ class Klass {
 }
 class SubKlass : Klass {}
 
+class C {}
+
 enum FakeOptional<T> {
 case none
 case some(T)
@@ -32,7 +34,7 @@ protocol P : AnyObject {}
 
 sil @unreachableHandler : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil [ossa] @testCompleteOSSALifetimes : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
+// CHECK-LABEL: sil [ossa] @testCompleteOSSALifetimes : {{.*}} {
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var FakeOptional<Klass> }, var, name "c"
 // CHECK:   [[BORROW:%.,*]] = begin_borrow [lexical] [[BOX]] : ${ var FakeOptional<Klass> }
 // CHECK: bb2:
@@ -40,6 +42,7 @@ sil @unreachableHandler : $@convention(thin) () -> ()
 // CHECK:   end_borrow [[BORROW]] : ${ var FakeOptional<Klass> }
 // CHECK:   dealloc_box [dead_end] [[BOX]] : ${ var FakeOptional<Klass> }
 // CHECK:   unreachable
+// CHECK-LABEL: } // end sil function 'testCompleteOSSALifetimes'
 sil [ossa] @testCompleteOSSALifetimes : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
 bb0(%0 : @owned $FakeOptional<Klass>):
   %box = alloc_box ${ var FakeOptional<Klass> }, var, name "c"
@@ -73,11 +76,68 @@ bb5:
   return %36 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @testExistentialLifetime : $@convention(thin) (@owned any P) -> @owned AnyObject {
+// CHECK-LABEL: sil [ossa] @testExistentialLifetime : {{.*}} {
 // CHECK-NOT: destroy
+// CHECK-LABEL: } // end sil function 'testExistentialLifetime'
 sil [ossa] @testExistentialLifetime : $@convention(thin) (@owned any P) -> @owned AnyObject {
 bb0(%0 : @owned $any P):
   %1 = open_existential_ref %0 : $any P to $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self
   %2 = init_existential_ref %1 : $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self : $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self, $AnyObject
   return %2 : $AnyObject
+}
+
+// CHECK-LABEL: sil [ossa] @store_borrow : {{.*}} {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] :
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
+// CHECK:         [[TOKEN:%[^,]+]] = store_borrow [[INSTANCE]] to [[ADDR]]
+// CHECK:         [[LOAD:%[^,]+]] = load_borrow [[TOKEN]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         end_borrow [[LOAD]]
+// CHECK:         end_borrow [[TOKEN]]
+// CHECK:         destroy_value [dead_end] [[INSTANCE]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'store_borrow'
+sil [ossa] @store_borrow : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %addr = alloc_stack $C
+  %token = store_borrow %instance to %addr : $*C
+  %load = load_borrow %token : $*C
+  cond_br undef, exit, die
+exit:
+  end_borrow %load : $C
+  end_borrow %token : $*C
+  dealloc_stack %addr : $*C
+  apply undef(%instance) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+die:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @begin_access : {{.*}} {
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
+// CHECK:         [[ACCESS:%[^,]+]] = begin_access [modify] [static] [[ADDR]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         end_access [[ACCESS]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'begin_access'
+sil [ossa] @begin_access : $@convention(thin) () -> () {
+entry:
+  %addr2 = alloc_stack $C
+  %access = begin_access [static] [modify] %addr2 : $*C
+  apply undef(%access) : $@convention(thin) () -> (@out C)
+  destroy_addr %access : $*C
+  cond_br undef, exit, die
+
+exit:
+  end_access %access : $*C
+  dealloc_stack %addr2 : $*C
+  %retval = tuple ()
+  return %retval : $()
+
+die:
+  unreachable
 }
