@@ -26,6 +26,9 @@ skip lldb-api :: tools/lldb-server/TestGdbRemote_qThreadStopInfo.py
 # https://github.com/swiftlang/llvm-project/issues/9705
 skip lldb-api :: python_api/section/TestSectionAPI.py
 
+# Untriaged
+skip lldb-shell :: Commands/command-expr-diagnostics.test
+
 ### Tests that pass occasionally ###
 
 # Fixed upstream: https://github.com/llvm/llvm-project/commit/ec009994a06338995dfb6431c943b299f9327fd2
@@ -145,6 +148,7 @@ xfail lldb-shell :: Swift/expression-diagnostics.test
 # https://github.com/swiftlang/llvm-project/issues/9540
 xfail lldb-shell :: SymbolFile/NativePDB/local-variables.cpp
 xfail lldb-shell :: SymbolFile/NativePDB/stack_unwinding01.cpp
+xfail lldb-shell :: Unwind/windows-unaligned-x86_64.test
 xfail lldb-api :: lang/c/local_variables/TestLocalVariables.py
 
 # https://github.com/swiftlang/llvm-project/issues/9637
