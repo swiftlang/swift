@@ -60,6 +60,7 @@ class AbstractFunctionDecl;
 class FuncDecl;
 class ClassDecl;
 class AccessorDecl;
+class CustomAttributeInitializer;
 class GenericFunctionType;
 class LazyConformanceLoader;
 class LazyMemberLoader;
@@ -508,13 +509,17 @@ public:
 
   /// Create a copy of this attribute.
   DeclAttribute *clone(ASTContext &ctx) const;
+
+  /// Determine whether we can clone this attribute.
+  bool canClone() const;
 };
 
 #define UNIMPLEMENTED_CLONE(AttrType)    \
 AttrType *clone(ASTContext &ctx) const { \
     llvm_unreachable("unimplemented");   \
     return nullptr;                      \
-  }
+  }                                      \
+bool canClone() const { return false; }
 
 /// Describes a "simple" declaration attribute that carries no data.
 template<DeclAttrKind Kind>
@@ -1560,7 +1565,6 @@ public:
          TrailingWhereClause *clause, bool exported, SpecializationKind kind,
          DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
          ArrayRef<AvailableAttr *> availabilityAttrs,
-         size_t typeErasedParamsCount,
          GenericSignature specializedSignature = nullptr);
 
   static SpecializeAttr *create(ASTContext &ctx, bool exported,
@@ -1858,13 +1862,13 @@ public:
 class CustomAttr final : public DeclAttribute {
   TypeExpr *typeExpr;
   ArgumentList *argList;
-  PatternBindingInitializer *initContext;
+  CustomAttributeInitializer *initContext;
   Expr *semanticInit = nullptr;
 
   mutable unsigned isArgUnsafeBit : 1;
 
   CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
-             PatternBindingInitializer *initContext, ArgumentList *argList,
+             CustomAttributeInitializer *initContext, ArgumentList *argList,
              bool implicit);
 
 public:
@@ -1875,7 +1879,7 @@ public:
   }
 
   static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
-                            PatternBindingInitializer *initContext,
+                            CustomAttributeInitializer *initContext,
                             ArgumentList *argList, bool implicit = false);
 
   TypeExpr *getTypeExpr() const { return typeExpr; }
@@ -1908,7 +1912,7 @@ public:
   Expr *getSemanticInit() const { return semanticInit; }
   void setSemanticInit(Expr *expr) { semanticInit = expr; }
 
-  PatternBindingInitializer *getInitContext() const { return initContext; }
+  CustomAttributeInitializer *getInitContext() const { return initContext; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Custom;
@@ -1916,8 +1920,12 @@ public:
 
   /// Create a copy of this attribute.
   CustomAttr *clone(ASTContext &ctx) const {
+    assert(argList == nullptr &&
+           "Cannot clone custom attribute with an argument list");
     return create(ctx, AtLoc, getTypeExpr(), initContext, argList, isImplicit());
   }
+
+  bool canClone() const { return argList == nullptr; }
 
 private:
   friend class CustomAttrNominalRequest;

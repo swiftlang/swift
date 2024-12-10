@@ -242,7 +242,7 @@ bb(%0 : @owned $T):
 // CHECK-ONONE-NEXT:  [[CP:%.*]] = copy_value [[INSTANCE]] : $T
 // CHECK-NEXT:  // function_ref takeMultipleOwned
 // CHECK-NEXT:  function_ref @takeMultipleOwned : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
-// CHECK-NEXT:  apply %{{.*}}<T>([[INSTANCE]], [[CP]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
+// CHECK-NEXT:  apply %{{.*}}<T>([[CP]], [[INSTANCE]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
 // CHECK-ONONE-NEXT:  destroy_value
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return

@@ -25,6 +25,7 @@ GROUP(no_group, "")
 GROUP(DeprecatedDeclaration, "DeprecatedDeclaration.md")
 GROUP(Unsafe, "Unsafe.md")
 GROUP(UnknownWarningGroup, "UnknownWarningGroup.md")
+GROUP(DeclarationUnavailableFromAsynchronousContext, "DeclarationUnavailableFromAsynchronousContext.md")
 
 #define UNDEFINE_DIAGNOSTIC_GROUPS_MACROS
 #include "swift/AST/DefineDiagnosticGroupsMacros.h"

@@ -495,6 +495,7 @@ extension DropFirstSequence: Sequence {
   public typealias SubSequence = AnySequence<Element>
   
   @inlinable
+  @inline(__always)
   public __consuming func makeIterator() -> Iterator {
     var it = _base.makeIterator()
     var dropped = 0

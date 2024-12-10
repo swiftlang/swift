@@ -548,14 +548,15 @@ unsigned TypeChecker::getCallEditDistance(DeclNameRef writtenName,
     return 0;
   }
 
-  StringRef writtenBase = writtenName.getBaseName().userFacingName();
-  StringRef correctedBase = correctedName.getBaseName().userFacingName();
-
   // Don't typo-correct to a name with a leading underscore unless the typed
   // name also begins with an underscore.
-  if (correctedBase.starts_with("_") && !writtenBase.starts_with("_")) {
+  if (correctedName.getBaseIdentifier().hasUnderscoredNaming() &&
+      !writtenName.getBaseIdentifier().hasUnderscoredNaming()) {
     return UnreasonableCallEditDistance;
   }
+
+  StringRef writtenBase = writtenName.getBaseName().userFacingName();
+  StringRef correctedBase = correctedName.getBaseName().userFacingName();
 
   unsigned distance = writtenBase.edit_distance(correctedBase, maxEditDistance);
 

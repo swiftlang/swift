@@ -290,6 +290,24 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
   });
 }
 
+static bool usesFeatureAddressableParameters(Decl *d) {
+  if (d->getAttrs().hasAttribute<AddressableSelfAttr>()) {
+    return true;
+  }
+
+  auto fd = dyn_cast<AbstractFunctionDecl>(d);
+  if (!fd) {
+    return false;
+  }
+  
+  for (auto pd : *fd->getParameters()) {
+    if (pd->isAddressable()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)

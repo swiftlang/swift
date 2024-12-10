@@ -453,26 +453,6 @@ AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D) {
   return bestAvailAttr;
 }
 
-std::optional<AvailableAttrDeclPair>
-SemanticAvailableRangeAttrRequest::evaluate(Evaluator &evaluator,
-                                            const Decl *decl) const {
-  if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(decl))
-    return std::make_pair(attr, decl);
-
-  if (auto *parent =
-          AvailabilityInference::parentDeclForInferredAvailability(decl))
-    return parent->getSemanticAvailableRangeAttr();
-
-  return std::nullopt;
-}
-
-std::optional<AvailableAttrDeclPair>
-Decl::getSemanticAvailableRangeAttr() const {
-  auto &eval = getASTContext().evaluator;
-  return evaluateOrDefault(eval, SemanticAvailableRangeAttrRequest{this},
-                           std::nullopt);
-}
-
 std::optional<AvailabilityRange>
 AvailabilityInference::annotatedAvailableRange(const Decl *D) {
   auto bestAvailAttr = attrForAnnotatedAvailableRange(D);

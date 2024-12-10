@@ -871,12 +871,12 @@ function Append-FlagsDefine([hashtable]$Defines, [string]$Name, [string[]]$Value
   }
 }
 
-function Test-CMakeAtLeast([int]$Major, [int]$Minor, [int]$Patch = 0) {
+function Test-SCCacheAtLeast([int]$Major, [int]$Minor, [int]$Patch = 0) {
   if ($ToBatch) { return $false }
 
-  $CMakeVersionString = @(& cmake.exe --version)[0]
-  if (-not ($CMakeVersionString -match "^cmake version (\d+)\.(\d+)(?:\.(\d+))?")) {
-    throw "Unexpected CMake version string format"
+  $SCCacheVersionString = @(& sccache.exe --version)[0]
+  if (-not ($SCCacheVersionString -match "sccache (\d+)\.(\d+)(?:\.(\d+))?")) {
+    throw "Unexpected SCCache version string format"
   }
 
   if ([int]$Matches.1 -ne $Major) { return [int]$Matches.1 -gt $Major }
@@ -1058,11 +1058,6 @@ function Build-CMakeProject {
       }
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER_TARGET $Arch.LLVMTarget
 
-      if (-not (Test-CMakeAtLeast -Major 3 -Minor 26 -Patch 3) -and $Platform -eq "Windows") {
-        # Workaround for https://github.com/ninja-build/ninja/issues/2280
-        TryAdd-KeyValue $Defines CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: "
-      }
-
       if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
         Append-FlagsDefine $Defines CMAKE_C_FLAGS "-gdwarf"
       }
@@ -1076,11 +1071,6 @@ function Build-CMakeProject {
         TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath $Driver)
       }
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_TARGET $Arch.LLVMTarget
-
-      if (-not (Test-CMakeAtLeast -Major 3 -Minor 26 -Patch 3) -and $Platform -eq "Windows") {
-        # Workaround for https://github.com/ninja-build/ninja/issues/2280
-        TryAdd-KeyValue $Defines CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: "
-      }
 
       if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
         Append-FlagsDefine $Defines CMAKE_CXX_FLAGS "-gdwarf"
@@ -1556,46 +1546,51 @@ function Build-Mimalloc() {
     [hashtable]$Arch
   )
 
-  if ($Arch -eq $ArchX64) {
-    $Args = @()
-    Isolate-EnvVars {
-      Invoke-VsDevShell $Arch
-      # Avoid hard-coding the VC tools version number
-      $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostArch.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
-      if ($VCRedistDir) {
-        $Args += "-p:VCRedistDir=$VCRedistDir\"
-      }
-    }
-    $Args += "$SourceCache\mimalloc\ide\vs2022\mimalloc.sln"
-    $Args += "-p:Configuration=Release"
-    $Args += "-p:ProductArchitecture=$($Arch.VSName)"
-    Invoke-Program $msbuild @Args
-    $Dest = "$($Arch.ToolchainInstallRoot)\usr\bin"
-    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\mimalloc-override.dll" `
-      -Destination "$Dest"
-    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\mimalloc-redirect.dll" `
-      -Destination "$Dest"
-    $MimallocExecutables = @("swift.exe","swiftc.exe","swift-driver.exe","swift-frontend.exe")
-    $MimallocExecutables += @("clang.exe","clang++.exe","clang-cl.exe")
-    $MimallocExecutables += @("lld.exe","lld-link.exe","ld.lld.exe","ld64.lld.exe")
-    foreach ($Exe in $MimallocExecutables) {
-      $ExePath = [IO.Path]::Combine($Dest, $Exe)
-      # Binary-patch in place
-      $Args = @()
-      $Args += "-f"
-      $Args += "-i"
-      $Args += "-v"
-      $Args += $ExePath
-      Invoke-Program "$SourceCache\mimalloc\bin\minject" @Args
-      # Log the import table
-      $Args = @()
-      $Args += "-l"
-      $Args += $ExePath
-      Invoke-Program "$SourceCache\mimalloc\bin\minject" @Args
-      dir "$ExePath"
-    }
-  } else {
+  if ($Arch -ne $ArchX64) {
     throw "mimalloc is currently supported for X64 only"
+  }
+
+  $MSBuildArgs = @("$SourceCache\mimalloc\ide\vs2022\mimalloc.sln")
+  $MSBuildArgs += "-noLogo"
+  $MSBuildArgs += "-maxCpuCount"
+  $MSBuildArgs += "-p:Configuration=Release"
+  $MSBuildArgs += "-p:ProductArchitecture=$($Arch.VSName)"
+
+  Isolate-EnvVars {
+    Invoke-VsDevShell $Arch
+    # Avoid hard-coding the VC tools version number
+    $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostArch.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
+    if ($VCRedistDir) {
+      $MSBuildArgs += "-p:VCRedistDir=$VCRedistDir\"
+    }
+  }
+
+  Invoke-Program $msbuild @MSBuildArgs
+
+  $Products = @( "mimalloc-override.dll", "mimalloc-redirect.dll" )
+  foreach ($Product in $Products) {
+    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\$Product" -Destination "$(Arch.ToolchainInstallRoot)\usr\bin"
+  }
+
+  $Tools = @(
+    "swift.exe",
+    "swiftc.exe",
+    "swift-driver.exe",
+    "swift-frontend.exe",
+    "clang.exe",
+    "clang++.exe",
+    "clang-cl.exe",
+    "lld.exe",
+    "lld-link.exe",
+    "ld.lld.exe",
+    "ld64.lld.exe"
+  )
+  foreach ($Tool in $Tools) {
+    $Binary = [IO.Path]::Combine($Dest, $Tool)
+    # Binary-patch in place
+    Invoke-Program "$SourceCache\mimalloc\bin\minject" @("-f", "-i", "-v", $Binary)
+    # Log the import table
+    Invoke-Program "$SourceCache\mimalloc\bin\minject" @("-l", $Binary)
   }
 }
 
@@ -2674,8 +2669,7 @@ function Build-Inspect() {
     -Bin (Get-HostProjectBinaryCache SwiftInspect) `
     -InstallTo "$($HostArch.ToolchainInstallRoot)\usr" `
     -Arch $HostArch `
-    -UseBuiltCompilers Swift `
-    -UseSwiftSwiftDriver `
+    -UseBuiltCompilers C,CXX,Swift `
     -SwiftSDK $SDKRoot `
     -Defines @{
       CMAKE_Swift_FLAGS = @("-Xcc", "-I$SDKRoot\usr\include\swift\SwiftRemoteMirror");
@@ -2741,7 +2735,7 @@ function Build-Installer($Arch) {
   }
 
   foreach ($SDK in $WindowsSDKArchs) {
-    $Properties["INCLUDE_$($SDK.VSName.ToUpperInvariant())_SDK"] = "true"
+    $Properties["INCLUDE_WINDOWS_$($SDK.VSName.ToUpperInvariant())_SDK"] = "true"
     $Properties["PLATFORM_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.PlatformInstallRoot)\"
     $Properties["SDK_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.SDKInstallRoot)\"
   }
@@ -2752,11 +2746,9 @@ function Build-Installer($Arch) {
 function Stage-BuildArtifacts($Arch) {
   Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\*.cab" "$Stage\"
   Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\*.msi" "$Stage\"
-  Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\rtl.cab" "$Stage\"
-  Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\rtl.msi" "$Stage\"
   foreach ($SDK in $WindowsSDKArchs) {
-    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.$($SDK.VSName).cab" "$Stage\"
-    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.$($SDK.VSName).msi" "$Stage\"
+    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.windows.$($SDK.VSName).cab" "$Stage\"
+    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.windows.$($SDK.VSName).msi" "$Stage\"
     Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\rtl.$($SDK.VSName).msm" "$Stage\"
   }
   Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\installer.exe" "$Stage\"
@@ -2775,6 +2767,10 @@ try {
 Fetch-Dependencies
 
 if (-not $SkipBuild) {
+  if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
+    throw "Minimum required sccache version is 0.7.4"
+  }
+
   Invoke-BuildStep Build-CMark $BuildArch
   Invoke-BuildStep Build-BuildTools $BuildArch
   if ($IsCrossCompiling) {
@@ -2876,6 +2872,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Format $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
+  Invoke-BuildStep Build-Inspect $HostArch
 }
 
 Install-HostToolchain
@@ -2885,7 +2882,6 @@ if (-not $SkipBuild -and $Allocator -eq "mimalloc") {
 }
 
 if (-not $SkipBuild -and -not $IsCrossCompiling) {
-  Invoke-BuildStep Build-Inspect $HostArch
   Invoke-BuildStep Build-DocC $HostArch
 }
 

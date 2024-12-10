@@ -794,12 +794,12 @@ def enable_experimental_concise_pound_file : Flag<["-"],
 
 def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
-  Flags<[NoDriverOption, FrontendOption, HelpHidden, ModuleInterfaceOption]>,
+  Flags<[NoDriverOption, FrontendOption, HelpHidden]>,
   HelpText<"Enable experimental C++ interop code generation and config directives">;
 
 def cxx_interoperability_mode :
   Joined<["-"], "cxx-interoperability-mode=">,
-  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
          SwiftSynthesizeInterfaceOption]>,
   HelpText<"Enables C++ interoperability; pass 'default' to enable or 'off' to disable">;
 

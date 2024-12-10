@@ -51,6 +51,7 @@ extension ASTGenVisitor {
       switch attrKind {
       // Simple type attributes.
       case .autoclosure,
+        .addressable,
         .escaping,
         .noEscape,
         .noDerivative,

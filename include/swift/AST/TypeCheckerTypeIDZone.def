@@ -469,9 +469,6 @@ SWIFT_REQUEST(TypeChecker, ImplicitKnownProtocolConformanceRequest,
 SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
               ValueDecl *(const ValueDecl *, const AvailableAttr *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SemanticAvailableRangeAttrRequest,
-              Optional<AvailableAttrDeclPair>(const Decl *),
-              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SemanticDeclAvailabilityRequest,
               SemanticDeclAvailability(const Decl *),
               Cached, NoLocationInfo)

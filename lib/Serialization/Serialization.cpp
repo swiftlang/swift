@@ -1352,7 +1352,8 @@ void Serializer::writeInputBlock() {
   }
 
   if (!Options.ModuleInterface.empty())
-    ModuleInterface.emit(ScratchRecord, Options.ModuleInterface);
+    ModuleInterface.emit(ScratchRecord, Options.IsInterfaceSDKRelative,
+                         Options.ModuleInterface);
 
   SmallVector<ExternalMacroPlugin> macros;
   M->getExternalMacros(macros);
@@ -5479,17 +5480,21 @@ public:
 
   void visitTypeAliasType(const TypeAliasType *alias) {
     using namespace decls_block;
+
     const TypeAliasDecl *typeAlias = alias->getDecl();
-    auto underlyingType = typeAlias->getUnderlyingType();
+    SmallVector<TypeID, 8> genericArgIDs;
+
+    for (auto next : alias->getDirectGenericArgs())
+      genericArgIDs.push_back(S.addTypeRef(next));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[TypeAliasTypeLayout::Code];
     TypeAliasTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
         S.addDeclRef(typeAlias, /*allowTypeAliasXRef*/true),
-        S.addTypeRef(alias->getParent()),
-        S.addTypeRef(underlyingType),
+        S.addTypeRef(typeAlias->getUnderlyingType()),
         S.addTypeRef(alias->getSinglyDesugaredType()),
-        S.addSubstitutionMapRef(alias->getSubstitutionMap()));
+        S.addTypeRef(alias->getParent()),
+        genericArgIDs);
   }
 
   template <typename Layout>
@@ -5703,7 +5708,8 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeConst(), paramFlags.isSending());
+          paramFlags.isCompileTimeConst(), paramFlags.isSending(),
+          paramFlags.isAddressable());
     }
   }
 

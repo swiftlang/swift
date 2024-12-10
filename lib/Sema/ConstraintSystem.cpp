@@ -1955,11 +1955,6 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
   auto refKind = getFunctionRefInfo();
   assert(!forSecondApplication || refKind.isDoubleApply());
 
-  // Compound references currently never produce IUOs.
-  // FIXME(FunctionRefInfo): They should.
-  if (refKind.isCompoundName())
-    return std::nullopt;
-
   switch (refKind.getApplyLevel()) {
   case FunctionRefInfo::ApplyLevel::Unapplied:
     // Such references never produce IUOs.
