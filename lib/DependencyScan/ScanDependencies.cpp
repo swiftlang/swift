@@ -1507,7 +1507,7 @@ static void resolveImplicitLinkLibraries(const CompilerInstance &instance,
     addLinkLibrary({"objc", LibraryKind::Library});
 
   if (langOpts.EnableCXXInterop) {
-    auto OptionalCxxDep = cache.findDependency("Cxx");
+    auto OptionalCxxDep = cache.findDependency(CXX_MODULE_NAME);
     auto OptionalCxxStdLibDep = cache.findDependency("CxxStdlib");
     bool hasStaticCxx =
         OptionalCxxDep.has_value() && OptionalCxxDep.value()->isStaticLibrary();

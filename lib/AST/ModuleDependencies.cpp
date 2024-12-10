@@ -22,6 +22,7 @@
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Strings.h"
 #include "clang/CAS/IncludeTree.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
@@ -500,7 +501,7 @@ swift::dependencies::registerCxxInteropLibraries(
     RegistrationCallback(LinkLibrary("stdc++", LibraryKind::Library));
 
   // Do not try to link Cxx with itself.
-  if (mainModuleName != "Cxx") {
+  if (mainModuleName != CXX_MODULE_NAME) {
     RegistrationCallback(LinkLibrary(Target.isOSWindows() && hasStaticCxx
                                         ? "libswiftCxx"
                                         : "swiftCxx",
@@ -509,7 +510,7 @@ swift::dependencies::registerCxxInteropLibraries(
 
   // Do not try to link CxxStdlib with the C++ standard library, Cxx or
   // itself.
-  if (llvm::none_of(llvm::ArrayRef{"Cxx", "CxxStdlib", "std"},
+  if (llvm::none_of(llvm::ArrayRef<StringRef>{CXX_MODULE_NAME, "CxxStdlib", "std"},
                     [mainModuleName](StringRef Name) {
                       return mainModuleName == Name;
                     })) {
