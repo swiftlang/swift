@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -debug-info-for-profiling -o - | %FileCheck %s
+// RUN: %target-swiftc_driver %s -emit-ir -g -debug-info-for-profiling -o - | %FileCheck %s
 
 // CHECK: distinct !DICompileUnit(language: DW_LANG_Swift
 // CHECK-SAME: debugInfoForProfiling: true
