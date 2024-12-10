@@ -77,7 +77,9 @@ class ElfFile {
       guard shdr.sh_type == SHT_SYMTAB || shdr.sh_type == SHT_DYNSYM else { continue }
 
       let sectionData: Data = try self.readSection(shdr)
-      let symTable: [Elf64_Sym] = sectionData.withUnsafeBytes { Array($0.bindMemory(to: Elf64_Sym.self)) }
+      let symTable: [Elf64_Sym] = sectionData.withUnsafeBytes {
+        Array($0.bindMemory(to: Elf64_Sym.self))
+      }
 
       guard shdr.sh_entsize == MemoryLayout<Elf64_Sym>.size else {
         throw ELFError.malformedFile(self.filePath, "invalid Elf64_Shdr.sh_entsize")

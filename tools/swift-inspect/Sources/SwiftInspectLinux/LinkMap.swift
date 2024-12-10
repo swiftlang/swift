@@ -121,7 +121,7 @@ class LinkMap {
   }
 
   // loads the auxiliary vector for a 64-bit process
-  static func loadAuxVec(for pid: pid_t) throws -> [Int32 : UInt64] {
+  static func loadAuxVec(for pid: pid_t) throws -> [Int32: UInt64] {
     guard let data = ProcFS.loadFile(for: pid, "auxv") else {
       throw LinkMapError.failedLoadingAuxVec(for: pid)
     }
