@@ -1497,7 +1497,7 @@ def profile_coverage_mapping : Flag<["-"], "profile-coverage-mapping">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate coverage data for use with profiled execution counts">;
 
-def profile_sample_use : CommaJoined<["-"], "profile-sample-use=">,
+def profile_sample_use : Joined<["-"], "profile-sample-use=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
   MetaVarName<"<profile data>">,
   HelpText<"Supply sampling-based profiling data from llvm-profdata to enable profile-guided optimization">;
