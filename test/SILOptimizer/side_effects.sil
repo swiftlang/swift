@@ -57,6 +57,9 @@ struct Ptr {
   var p: Int32
 }
 
+enum SomeErr : Error {
+    case err
+}
 
 sil_global public @global_var : $Int32
 
@@ -1242,4 +1245,15 @@ bb0(%0 : $SP):
 sil @test_consuming_in_with_unreachable : $@convention(thin) (@in X) -> () {
 bb0(%0 : $*X):
   unreachable
+}
+
+// CHECK-LABEL: sil @test_willThrow_builtin
+// CHECK: [%0: read v**.c*.v**, copy v**.c*.v**]
+// CHECK: [global: read,copy,deinit_barrier]
+
+sil @test_willThrow_builtin : $@convention(thin) (@guaranteed any Error) -> () {
+bb0(%0: $any Error):
+  %1 = builtin "willThrow"(%0 : $any Error) : $()
+  %r = tuple ()
+  return %r : $()
 }
