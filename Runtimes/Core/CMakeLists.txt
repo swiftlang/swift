@@ -89,6 +89,7 @@ defaulted_option(SwiftCore_ENABLE_STATIC_PRINT "Disable full print")
 defaulted_option(SwiftCore_ENABLE_UNICODE_DATA "Embed Unicode info in Swift Core")
 defaulted_option(SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS "Resolve absolute function pointer as identity")
 defaulted_option(SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment")
+defaulted_option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime. Assumes the presence of os_log(3) and the os_signpost(3) API.")
 option(SwiftCore_ENABLE_UNICODE_DATA "Include unicode data in Swift runtimes" ON)
 
 defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support")
