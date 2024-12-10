@@ -4311,6 +4311,20 @@ ConstraintSystem::matchTypesBindTypeVar(
     type = type->getRValueType();
   }
 
+  // Prevent generic arguments from being assigned `any Sendable`
+  // directly, that should only happen through inference. This is
+  // required because we allow `any Sendable` -> `Any` conversion
+  // in modes without strict concurrency enabled to maintain source
+  // compatibility and let the developers annotate existing APIs
+  // with `any Sendable` and other concurrency attributes.
+  if (typeVar->getImpl().getGenericParameter() &&
+      !flags.contains(TMF_BindingTypeVariable) &&
+      type->isMarkerExistential()) {
+    auto constraintTy = type->castTo<ExistentialType>()->getConstraintType();
+    if (constraintTy->getKnownProtocol() == KnownProtocolKind::Sendable)
+      return formUnsolvedResult();
+  }
+
   // Attempt to fix situations where type variable can't be bound
   // to a particular type e.g. `l-value` or `inout`.
   auto fixReferenceMismatch = [&](TypeVariableType *typeVar,
