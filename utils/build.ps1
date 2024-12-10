@@ -2669,8 +2669,7 @@ function Build-Inspect() {
     -Bin (Get-HostProjectBinaryCache SwiftInspect) `
     -InstallTo "$($HostArch.ToolchainInstallRoot)\usr" `
     -Arch $HostArch `
-    -UseBuiltCompilers Swift `
-    -UseSwiftSwiftDriver `
+    -UseBuiltCompilers C,CXX,Swift `
     -SwiftSDK $SDKRoot `
     -Defines @{
       CMAKE_Swift_FLAGS = @("-Xcc", "-I$SDKRoot\usr\include\swift\SwiftRemoteMirror");
@@ -2873,6 +2872,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Format $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
+  Invoke-BuildStep Build-Inspect $HostArch
 }
 
 Install-HostToolchain
@@ -2882,7 +2882,6 @@ if (-not $SkipBuild -and $Allocator -eq "mimalloc") {
 }
 
 if (-not $SkipBuild -and -not $IsCrossCompiling) {
-  Invoke-BuildStep Build-Inspect $HostArch
   Invoke-BuildStep Build-DocC $HostArch
 }
 
