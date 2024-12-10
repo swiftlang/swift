@@ -50,6 +50,8 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
   }
 
   override internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
+    var regionCount = 0
+    var allocCount = 0
     for entry in self.memoryMap.entries {
       // Limiting malloc_iterate calls to only memory regions that are known
       // to contain heap allocations is not strictly necessary but it does
@@ -61,13 +63,26 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
       do {
         allocations = try self.iterateHeapRegion(
           startAddr: entry.startAddr, endAddr: entry.endAddr)
+        regionCount += 1
       } catch {
         print("failed iterating remote heap: \(error)")
         return
       }
 
+      allocCount += allocations.count
+
       // process all of the collected allocations
       for alloc in allocations { body(alloc.base, alloc.len) }
+    }
+
+    if allocCount == 0 {
+      // This condition most likely indicates the MemoryMap.Entry.isHeapRegion
+      // filtering is needs to be modified to support a new heap region naming
+      // convention in a newer Android version.
+      print("WARNING: no heap regions found")
+      print("swift-inspect may need to be updated for a newer Android version")
+    } else if allocCount == 0 {
+      print("WARNING: no heap items enumerated")
     }
   }
 
@@ -103,7 +118,6 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
 
     // Allocate a page-sized buffer in the remote process that malloc_iterate
     // will populaate with metadata describing each heap entry it enumerates.
-    //let dataLen = 32
     let dataLen = sysconf(Int32(_SC_PAGESIZE))
     var mmapArgs = [0, UInt64(dataLen), UInt64(PROT_READ | PROT_WRITE), UInt64(MAP_ANON | MAP_PRIVATE)]
     let remoteDataAddr: UInt64 = try self.ptrace.callRemoteFunction(at: mmapAddr, with: mmapArgs)
