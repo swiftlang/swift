@@ -11,8 +11,13 @@ struct S {
   @_hasStorage let b: Int
 }
 
+struct TrivialS {
+  @_hasStorage let a: Int
+  @_hasStorage let b: Int
+}
+
 // CHECK-LABEL: sil [ossa] @forward_owned :
-// CHECK-NOT:     destructure_tuple
+// CHECK-NOT:     destructure_struct
 // CHECK:         fix_lifetime %1
 // CHECK:         return %0
 // CHECK:       } // end sil function 'forward_owned'
@@ -139,5 +144,17 @@ bb2:
   fix_lifetime %5 : $Int
   destroy_value %2 : $S
   return %4 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @to_struct_extract :
+// CHECK:         %1 = struct_extract %0 : $TrivialS, #TrivialS.a
+// CHECK:         %2 = struct_extract %0 : $TrivialS, #TrivialS.b
+// CHECK:         %3 = tuple (%1 : $Int, %2 : $Int)
+// CHECK:       } // end sil function 'to_struct_extract'
+sil [ossa] @to_struct_extract : $@convention(thin) (TrivialS) -> (Int, Int) {
+bb0(%0 : $TrivialS):
+  (%1, %2) = destructure_struct %0
+  %3 = tuple (%1, %2)
+  return %3
 }
 

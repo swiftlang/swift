@@ -118,6 +118,8 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
         !isa<TermInst>(inst) &&
         !isa<AllocationInst>(inst) && /* not marked mayhavesideeffects */
         !isa<CopyValueInst>(inst) &&
+        !isa<MoveValueInst>(inst) &&
+        !isa<BeginBorrowInst>(inst) &&
         hasLoopInvariantOperands(inst, loop, invariants)) {
       moves.push_back(inst);
       invariants.insert(inst);
@@ -373,6 +375,12 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
     std::swap(newHeader, exit);
   assert(loop->contains(newHeader) && !loop->contains(exit)
          && "Could not find loop header and exit block");
+
+  // It does not make sense to rotate the loop if the new header is loop
+  // exiting as well.
+  if (loop->isLoopExiting(newHeader)) {
+    return false;
+  }
 
   // We don't want to rotate such that we merge two headers of separate loops
   // into one. This can be turned into an assert again once we have guaranteed
