@@ -127,7 +127,9 @@ public:
   enum { NumMarkDependenceKindBits = 2 };
 
   enum { numCustomBits = 20 };
-  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() >> numCustomBits };
+
+  constexpr static const size_t maxBitfieldID =
+      std::numeric_limits<uint64_t>::max() >> numCustomBits;
 
 protected:
   friend class SILInstruction;
