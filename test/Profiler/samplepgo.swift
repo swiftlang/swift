@@ -5,8 +5,21 @@
 // Test the -profile-sample-use= flag using bogus data, to ensure it's actually
 // reaching LLVM in the expected way.
 
-// RUN: %target-swift-frontend %t/program.swift -module-name test -emit-ir \
-// RUN:                  -O -profile-sample-use=%t/profile.txt -o %t/has-data.ll
+// RUN: %target-swiftc_driver -v %t/program.swift -module-name test -emit-ir \
+// RUN:                -O -profile-sample-use=%t/profile.txt -o %t/has-data.ll \
+// RUN:                > %t/verbose-output.txt
+
+// ----------------------------------------
+// Check that we pass the expected flags to swift-frontend from swiftc
+
+// RUN: %FileCheck --check-prefix CHECK-FLAGS %s < %t/verbose-output.txt
+
+// CHECK-FLAGS:       -profile-sample-use={{.*}}profile.txt
+// CHECK-FLAGS-SAME:  -Xllvm -sample-profile-use-profi
+
+
+// ----------------------------------------
+// Look for the expected LLVM IR metadata that indicate the profile was used.
 
 // RUN: %FileCheck %s < %t/has-data.ll
 
