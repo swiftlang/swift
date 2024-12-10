@@ -3,7 +3,7 @@
 // A smoketest for REPL code completion in Cocoa.
 
 // REQUIRES: objc_interop
-
+// REQUIRES: rdar141124373
 // FIXME: iOS has no Cocoa.framework
 // REQUIRES: OS=macosx
 

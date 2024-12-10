@@ -7,7 +7,7 @@
 // RUN: %batch-code-completion -sdk %t/sdk %xcode-extra-platform-search-paths
 
 // REQUIRES: OS=macosx
-
+// REQUIRES: rdar141124373
 // rdar://131854240 - Make sure modules found in the platform dir are treated
 // as system.
 
