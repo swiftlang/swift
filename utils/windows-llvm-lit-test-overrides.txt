@@ -26,6 +26,11 @@ skip lldb-api :: tools/lldb-server/TestGdbRemote_qThreadStopInfo.py
 # https://github.com/swiftlang/llvm-project/issues/9705
 skip lldb-api :: python_api/section/TestSectionAPI.py
 
+# Untriaged
+skip lldb-api :: lang/BoundsSafety/array_of_ptrs/TestArrayOfBoundsSafetyPointers.py
+skip lldb-api :: lang/BoundsSafety/out_of_bounds_pointer/TestOutOfBoundsPointer.py
+skip lldb-shell :: Commands/command-expr-diagnostics.test
+
 ### Tests that pass occasionally ###
 
 # Fixed upstream: https://github.com/llvm/llvm-project/commit/ec009994a06338995dfb6431c943b299f9327fd2
