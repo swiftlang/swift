@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
@@ -62,18 +63,63 @@ int symbolgraphgen::emitSymbolGraphForModule(
     ModuleDecl *M, const SymbolGraphOptions &Options) {
   ModuleDecl::ImportCollector importCollector(Options.MinimumAccessLevel);
 
-  auto importFilter = [&Options](const ModuleDecl *module) {
-      if (!module)
-        return false;
+  SmallPtrSet<const clang::Module *, 2> ExportedClangModules = {};
+  SmallPtrSet<const clang::Module *, 2> WildcardExportClangModules = {};
+  if (const auto *ClangModule = M->findUnderlyingClangModule()) {
+    // Scan through the Clang module's exports and collect them for later
+    // handling
+    for (auto ClangExport : ClangModule->Exports) {
+      if (ClangExport.getInt()) {
+        // Blanket exports are represented as a true boolean tag
+        if (const auto *ExportParent = ClangExport.getPointer()) {
+          // If a pointer is present, this is a scoped blanket export, like
+          // `export Submodule.*`
+          WildcardExportClangModules.insert(ExportParent);
+        } else {
+          // Otherwise it represents a full blanket `export *`
+          WildcardExportClangModules.insert(ClangModule);
+        }
+      } else if (!ClangExport.getInt() && ClangExport.getPointer()) {
+        // This is an explicit `export Submodule`
+        ExportedClangModules.insert(ClangExport.getPointer());
+      }
+    }
 
+    if (ExportedClangModules.empty() && WildcardExportClangModules.empty() && !std::holds_alternative<std::monostate>(ClangModule->Umbrella)) {
+      // HACK: Some SDK modules use an 'umbrella header' in place of an 'export *' declaration.
+      // This is not the same thing, and the submodules are not actually being exported from the
+      // umbrella header, but we're not doing complete dependency tracking here. To provide a proper
+      // view into the symbols of this module, treat this umbrella declaration as an 'export *'.
+      WildcardExportClangModules.insert(ClangModule);
+    }
+  }
+
+  auto importFilter = [&Options, &WildcardExportClangModules,
+                       &ExportedClangModules](const ModuleDecl *module) {
+    if (!module)
+      return false;
+
+    if (const auto *ClangModule = module->findUnderlyingClangModule()) {
+      if (ExportedClangModules.contains(ClangModule)) {
+        return true;
+      }
+
+      for (const auto *ClangParent : WildcardExportClangModules) {
+        if (ClangModule->isSubModuleOf(ClangParent))
+          return true;
+      }
+    }
+
+    if (Options.AllowedReexportedModules.has_value())
       for (const auto &allowedModuleName : *Options.AllowedReexportedModules)
         if (allowedModuleName == module->getNameStr())
           return true;
 
-       return false;
-    };
+    return false;
+  };
 
-  if (Options.AllowedReexportedModules.has_value())
+  if (Options.AllowedReexportedModules.has_value() ||
+      !WildcardExportClangModules.empty() || !ExportedClangModules.empty())
     importCollector.importFilter = std::move(importFilter);
 
   SmallVector<Decl *, 64> ModuleDecls;
