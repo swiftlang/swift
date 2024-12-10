@@ -19,6 +19,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -229,17 +230,18 @@ SILValue SILSSAUpdater::getValueInMiddleOfBlock(SILBasicBlock *block) {
   if (predVals.empty())
     return SILUndef::get(block->getParent(), type);
 
-  if (singularValue)
-    return singularValue;
-
   // Check if we already have an equivalent phi.
   if (!block->getArguments().empty()) {
     llvm::SmallDenseMap<SILBasicBlock *, SILValue, 8> valueMap(predVals.begin(),
                                                                predVals.end());
-    for (auto *arg : block->getSILPhiArguments())
-      if (isEquivalentPHI(arg, valueMap))
+    for (auto *arg : block->getSILPhiArguments()) {
+      if (arg->isPhi() && isEquivalentPHI(arg, valueMap))
         return arg;
+    }
   }
+
+  if (singularValue)
+    return singularValue;
 
   // Create a new phi node.
   SILPhiArgument *phiArg = block->createPhiArgument(type, ownershipKind);
@@ -567,3 +569,30 @@ SILValue swift::replaceBBArgWithCast(SILPhiArgument *arg) {
     return replaceBBArgWithStruct(arg, argValues);
   return nullptr;
 }
+
+namespace swift::test {
+// Arguments:
+// * the first arguments are values, which are added as "available values" to the SSA-updater
+// * the next arguments are operands, which are set to the computed values at that place
+static FunctionTest SSAUpdaterTest("update_ssa", [](auto &function,
+                                                    auto &arguments,
+                                                    auto &test) {
+  SILSSAUpdater updater;
+  SILValue firstVal = arguments.takeValue();
+  updater.initialize(&function, firstVal->getType(), firstVal->getOwnershipKind());
+  updater.addAvailableValue(firstVal->getParentBlock(), firstVal);
+
+  while (arguments.hasUntaken()) {
+    auto &arg = arguments.takeArgument();
+    if (isa<ValueArgument>(arg)) {
+      SILValue val = cast<ValueArgument>(arg).getValue();
+      updater.addAvailableValue(val->getParentBlock(), val);
+    } else if (isa<OperandArgument>(arg)) {
+      Operand *op = cast<OperandArgument>(arg).getValue();
+      SILValue newValue = updater.getValueInMiddleOfBlock(op->getUser()->getParent());
+      op->set(newValue);
+    }
+  }
+});
+} // end namespace swift::test
+
