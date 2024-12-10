@@ -59,6 +59,11 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
     self.inExclusiveRange.insert(beginInst)
   }
 
+  init<S: Sequence>(begin beginInst: Instruction, ends: S, _ context: some Context) where S.Element: Instruction {
+    self = InstructionRange(begin: beginInst, context)
+    insert(contentsOf: ends)
+  }
+
   init(for value: Value, _ context: some Context) {
     self = InstructionRange(begin: InstructionRange.beginningInstruction(for: value), context)
   }

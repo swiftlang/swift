@@ -153,6 +153,12 @@ extension MutatingContext {
     erase(instruction: inst)
   }
 
+  func erase<S: Sequence>(instructions: S) where S.Element: Instruction {
+    for inst in instructions {
+      erase(instruction: inst)
+    }
+  }
+
   func erase(instructionIncludingDebugUses inst: Instruction) {
     precondition(inst.results.allSatisfy { $0.uses.ignoreDebugUses.isEmpty })
     erase(instructionIncludingAllUsers: inst)
