@@ -89,8 +89,8 @@ func never_available_func(
   never() // expected-error {{'never()' is unavailable}}
   osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
   // expected-note@-1 {{add 'if #available' version check}}
-  osx() // expected-error {{'osx()' is unavailable}}
-  osx_ios() // expected-error {{'osx_ios()' is unavailable}}
+  osx()
+  osx_ios()
   osx_extension()
 }
 
@@ -160,8 +160,8 @@ var never_var: (
   always(),
   never(), // expected-error {{'never()' is unavailable}}
   osx_future(), // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-  osx(), // expected-error {{'osx()' is unavailable}}
-  osx_ios(), // expected-error {{'osx_ios()' is unavailable}}
+  osx(),
+  osx_ios(),
   osx_extension()
 )
 
@@ -219,8 +219,8 @@ struct NeverAvailableContainer { // expected-note 2 {{'NeverAvailableContainer' 
   let always_var: AlwaysAvailabile = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
   let osx_future_var: OSXFutureAvailable = osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
-  let osx_var: OSXUnavailable = osx() // expected-error {{'osx()' is unavailable}}
-  let osx_ios_var: MultiPlatformUnavailable = osx_ios() // expected-error {{'osx_ios()' is unavailable}}
+  let osx_var: OSXUnavailable = osx()
+  let osx_ios_var: MultiPlatformUnavailable = osx_ios()
   let osx_extension_var: OSXAppExtensionsUnavailable = osx_extension()
 }
 
@@ -303,8 +303,8 @@ extension ExtendMe {
     never() // expected-error {{'never()' is unavailable}}
     osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
-    osx() // expected-error {{'osx()' is unavailable}}
-    osx_ios() // expected-error {{'osx_ios()' is unavailable}}
+    osx()
+    osx_ios()
     osx_extension()
   }
 
@@ -321,8 +321,8 @@ extension ExtendMe {
     never() // expected-error {{'never()' is unavailable}}
     osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
-    osx() // expected-error {{'osx()' is unavailable}}
-    osx_ios() // expected-error {{'osx_ios()' is unavailable}}
+    osx()
+    osx_ios()
     osx_extension()
   }
 
@@ -339,8 +339,8 @@ extension ExtendMe {
     never() // expected-error {{'never()' is unavailable}}
     osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
-    osx() // expected-error {{'osx()' is unavailable}}
-    osx_ios() // expected-error {{'osx_ios()' is unavailable}}
+    osx()
+    osx_ios()
     osx_extension()
   }
 
@@ -357,8 +357,8 @@ extension ExtendMe {
     never() // expected-error {{'never()' is unavailable}}
     osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
-    osx() // expected-error {{'osx()' is unavailable}}
-    osx_ios() // expected-error {{'osx_ios()' is unavailable}}
+    osx()
+    osx_ios()
     osx_extension()
   }
 }
@@ -400,8 +400,8 @@ extension ExtendMe {
     never() // expected-error {{'never()' is unavailable}}
     osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
-    osx() // expected-error {{'osx()' is unavailable}}
-    osx_ios() // expected-error {{'osx_ios()' is unavailable}}
+    osx()
+    osx_ios()
     osx_extension()
   }
 
@@ -479,8 +479,8 @@ extension ExtendMe { // expected-note * {{add @available attribute to enclosing 
     never() // expected-error {{'never()' is unavailable}}
     osx_future() // expected-error {{'osx_future()' is only available in macOS 99 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
-    osx() // expected-error {{'osx()' is unavailable}}
-    osx_ios() // expected-error {{'osx_ios()' is unavailable}}
+    osx()
+    osx_ios()
     osx_extension()
   }
 
