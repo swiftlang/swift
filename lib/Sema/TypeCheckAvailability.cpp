@@ -345,8 +345,8 @@ static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
 static bool isInsideCompatibleUnavailableDeclaration(
     const Decl *D, AvailabilityContext availabilityContext,
     const AvailableAttr *attr) {
-  auto referencedPlatform = availabilityContext.getUnavailablePlatformKind();
-  if (!referencedPlatform)
+  auto contextPlatform = availabilityContext.getUnavailablePlatformKind();
+  if (!contextPlatform)
     return false;
 
   if (!attr->isUnconditionallyUnavailable())
@@ -354,8 +354,8 @@ static bool isInsideCompatibleUnavailableDeclaration(
 
   // Refuse calling universally unavailable functions from unavailable code,
   // but allow the use of types.
-  PlatformKind platform = attr->Platform;
-  if (platform == PlatformKind::none && !attr->isForEmbedded() &&
+  PlatformKind declPlatform = attr->Platform;
+  if (declPlatform == PlatformKind::none && !attr->isForEmbedded() &&
       !isa<TypeDecl>(D) && !isa<ExtensionDecl>(D))
     return false;
 
@@ -364,8 +364,9 @@ static bool isInsideCompatibleUnavailableDeclaration(
   if (attr->isForEmbedded())
     return availabilityContext.isUnavailableInEmbedded();
 
-  return (*referencedPlatform == platform ||
-          inheritsAvailabilityFromPlatform(platform, *referencedPlatform));
+  return (*contextPlatform == PlatformKind::none ||
+          *contextPlatform == declPlatform ||
+          inheritsAvailabilityFromPlatform(declPlatform, *contextPlatform));
 }
 
 const AvailableAttr *
