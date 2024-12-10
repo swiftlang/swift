@@ -18,8 +18,24 @@ public func getMyCStruct() -> MyCStruct {
   return MyCStruct()
 }
 
+extension MyCStruct {
+  @inlinable public var y: CInt {
+    get {
+      return self.x
+    }
+  }
+
+  @inlinable public var anotherInstanceOfSelf: MyCStruct {
+    get {
+      return MyCStruct(x: self.x + 1)
+    }
+  }
+}
+
 //--- main.swift
 
 import UsesCLibrary
 
 let _ = getMyCStruct()
+let _ = getMyCStruct().y
+let _ = getMyCStruct().anotherInstanceOfSelf

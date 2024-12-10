@@ -1828,6 +1828,8 @@ public:
   }
 };
 
+bool isFragileClangDecl(const clang::Decl *decl);
+
 bool isFragileClangType(clang::QualType type) {
   if (type.isNull())
     return true;
@@ -1842,13 +1844,12 @@ bool isFragileClangType(clang::QualType type) {
   // Pointers to non-fragile types are non-fragile.
   if (underlyingTypePtr->isPointerType())
     return isFragileClangType(underlyingTypePtr->getPointeeType());
+  if (auto tagDecl = underlyingTypePtr->getAsTagDecl())
+    return isFragileClangDecl(tagDecl);
   return true;
 }
 
-bool isFragileClangNode(const ClangNode &node) {
-  auto *decl = node.getAsDecl();
-  if (!decl)
-    return false;
+bool isFragileClangDecl(const clang::Decl *decl) {
   // Namespaces by themselves don't impact ABI.
   if (isa<clang::NamespaceDecl>(decl))
     return false;
@@ -1856,6 +1857,8 @@ bool isFragileClangNode(const ClangNode &node) {
   if (isa<clang::ObjCContainerDecl>(decl))
     return false;
   if (auto *fd = dyn_cast<clang::FunctionDecl>(decl)) {
+    if (auto *ctorDecl = dyn_cast<clang::CXXConstructorDecl>(fd))
+      return isFragileClangDecl(ctorDecl->getParent());
     if (!isa<clang::CXXMethodDecl>(decl) &&
         !isFragileClangType(fd->getDeclaredReturnType())) {
       for (const auto *param : fd->parameters()) {
@@ -1891,7 +1894,19 @@ bool isFragileClangNode(const ClangNode &node) {
     return !cxxRecordDecl->isCLike() &&
            !cxxRecordDecl->getDeclContext()->isExternCContext();
   }
+  if (auto *varDecl = dyn_cast<clang::VarDecl>(decl))
+    return isFragileClangType(varDecl->getType());
+  if (auto *fieldDecl = dyn_cast<clang::FieldDecl>(decl))
+    return isFragileClangType(fieldDecl->getType()) ||
+           isFragileClangDecl(fieldDecl->getParent());
   return true;
+}
+
+bool isFragileClangNode(const ClangNode &node) {
+  auto *decl = node.getAsDecl();
+  if (!decl)
+    return false;
+  return isFragileClangDecl(decl);
 }
 
 } // end anonymous namespace
