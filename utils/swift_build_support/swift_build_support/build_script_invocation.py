@@ -275,6 +275,16 @@ class BuildScriptInvocation(object):
             args.extra_cmake_options.append(
                 '-DSWIFT_EARLY_SWIFT_DRIVER_BUILD={}'.format(swift_driver_build))
 
+        if args.minimal_cxx_bootstrap:
+            if args.build_early_swift_driver:
+                exit_rejecting_arguments(
+                    'cannot combine --minimal-cxx-bootstrap with the early '
+                    'Swift driver. Please remove --minimal-cxx-bootstrap or '
+                    'add --skip-early-swift-driver')
+
+            args.extra_cmake_options.append(
+                '-DSWIFT_MINIMAL_CXX_BOOTSTRAP:BOOL=TRUE')
+
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
         # them.
