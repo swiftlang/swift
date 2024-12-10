@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginRegistry.h"
@@ -892,6 +893,10 @@ static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
                        toString(outputFile.takeError()));
     return;
   }
+  // Using SourceEntityWalker to collect objc message sends could
+  // trigger additional diagnostics. These additional diagnostics shouldn't
+  // be considered as fatal for completing the build process.
+  DiagnosticSuppression SuppressedDiags(ctx.Diags);
   ObjcMethodReferenceCollector collector(MD);
   for (auto *SF: filesToWalk) {
     collector.setFileBeforeVisiting(SF);
