@@ -1,15 +1,13 @@
-// RUN: %target-sil-opt -module-name Swift -load-copy-to-borrow-optimization %s | %FileCheck %s
+// RUN: %target-sil-opt -copy-to-borrow-optimization %s | %FileCheck %s
 
 sil_stage canonical
 
 import Builtin
+import Swift
 
 //////////////////
 // Declarations //
 //////////////////
-
-typealias AnyObject = Builtin.AnyObject
-protocol Error {}
 
 enum MyNever {}
 enum FakeOptional<T> {
@@ -2038,5 +2036,73 @@ bb0(%0 : @guaranteed $Container):
   %9 = apply %1(%7) : $@convention(thin) (@guaranteed C) -> ()
   destroy_value %7 : $C
   return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_copy_of_guaranteed_arg :
+// CHECK:         %1 = destructure_struct %0
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'remove_copy_of_guaranteed_arg'
+sil [ossa] @remove_copy_of_guaranteed_arg : $@convention(thin) (@guaranteed NonTrivialStruct) -> @owned Klass {
+bb0(%0 : @guaranteed $NonTrivialStruct):
+  %1 = copy_value %0
+  %2 = destructure_struct %1
+  %3 = begin_borrow %2
+  %4 = ref_element_addr %3, #Klass.base
+  %5 = load [copy] %4 : $*Klass
+  end_borrow %3
+  destroy_value %2
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @remove_copy_of_borrow :
+// CHECK:         %3 = apply %2(%1)
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'remove_copy_of_borrow'
+sil [ossa] @remove_copy_of_borrow : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0
+  %2 = copy_value %1
+  %3 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %2
+  end_borrow %1
+  return %0
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_copy_of_borrow :
+// CHECK:         %2 = copy_value %1
+// CHECK:       } // end sil function 'dont_remove_copy_of_borrow'
+sil [ossa] @dont_remove_copy_of_borrow : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0
+  %2 = copy_value %1
+  %3 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %1
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %2
+  return %0
+}
+
+// CHECK-LABEL: sil [ossa] @remove_copy_of_forwarded_borrow :
+// CHECK:         [[DS:%.*]] = destructure_struct
+// CHECK-NOT:     copy_value
+// CHECK:         apply {{%[0-9]+}}([[DS]])
+// CHECK:       } // end sil function 'remove_copy_of_forwarded_borrow'
+sil [ossa] @remove_copy_of_forwarded_borrow : $@convention(thin) (@owned Optional<NonTrivialStruct>) -> @owned Optional<NonTrivialStruct> {
+bb0(%0 : @owned $Optional<NonTrivialStruct>):
+  %1 = begin_borrow %0
+  switch_enum %1, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%3 : @guaranteed $NonTrivialStruct):
+  %4 = destructure_struct %3
+  %5 = copy_value %4
+  %6 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5
+  br bb3
+bb2:
+  br bb3
+bb3:
+  end_borrow %1
+  return %0
 }
 
