@@ -16,16 +16,6 @@
 
 import Swift
 
-// #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-// internal import Darwin
-// #elseif os(Windows)
-// internal import ucrt
-// #elseif canImport(Glibc)
-// internal import Glibc
-// #elseif canImport(Musl)
-// internal import Musl
-// #endif
-
 /// Holds a backtrace.
 public struct Backtrace: CustomStringConvertible, Sendable {
   /// The type of an address.
@@ -287,13 +277,13 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     // N.B. We use offset+1 here to skip this frame, rather than inlining
     //      this code into the client.
     return try HostContext.withCurrentContext { ctx in
-      try capture(from: ctx,
-                  using: UnsafeLocalMemoryReader(),
-                  images: theImages,
-                  algorithm: algorithm,
-                  limit: limit,
-                  offset: offset + 1,
-                  top: top)
+      capture(from: ctx,
+              using: UnsafeLocalMemoryReader(),
+              images: theImages,
+              algorithm: algorithm,
+              limit: limit,
+              offset: offset + 1,
+              top: top)
     }
   }
 
@@ -379,6 +369,18 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     self.representation = Array(CompactBacktraceFormat.Encoder(frames))
     self.images = images
   }
+
+  /// Initialise a Backtrace from a sequence of bytes in CBF format.
+  /// This will only consume the input sequence up to the end of the CBF
+  /// data, thus you can use it to parse a stream of CBF format records.
+  @_spi(Internal)
+  public init(architecture: String,
+              compactBacktraceData: some Sequence<UInt8>,
+              images: ImageMap?) {
+    self.architecture = architecture
+    self.representation = Array(CompactBacktraceFormat.Accumulator(compactBacktraceData))
+    self.images = images
+  }
 }
 
 // -- Capture Implementation -------------------------------------------------
@@ -404,11 +406,11 @@ extension Backtrace {
     limit: Int? = 64,
     offset: Int = 0,
     top: Int = 16
-  ) throws -> Backtrace {
+  ) -> Backtrace {
     switch algorithm {
       // All of them, for now, use the frame pointer unwinder.  In the long
       // run, we should be using DWARF EH frame data for .precise.
-      case .auto, .fast, .precise:
+      default:
         let unwinder =
           FramePointerUnwinder(context: context,
                                images: images,
@@ -420,12 +422,12 @@ extension Backtrace {
                                       offset: offset,
                                       top: top)
 
-          return Backtrace(architecture: context.architecture,
+          return Backtrace(architecture: Ctx.architecture,
                            frames: limited,
                            images: images)
         }
 
-        return Backtrace(architecture: context.architecture,
+        return Backtrace(architecture: Ctx.architecture,
                          frames: unwinder.dropFirst(offset),
                          images: images)
     }
