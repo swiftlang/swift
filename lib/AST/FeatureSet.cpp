@@ -120,6 +120,7 @@ UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
+UNINTERESTING_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
