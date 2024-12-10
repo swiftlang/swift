@@ -18,6 +18,18 @@ import LinuxSystemHeaders
 import SwiftInspectLinux
 import SwiftRemoteMirror
 
+extension MemoryMap.Entry {
+  public func isHeapRegion() -> Bool {
+    guard let name = self.pathname else { return false }
+    // The heap region naming convention is found in AOSP's libmemunreachable at
+    // android/platform/system/memory/libmemunreachable/MemUnreachable.cpp.
+    if name == "[anon:libc_malloc]" { return true }
+    if name.hasPrefix("[anon:scudo:") { return true }
+    if name.hasPrefix("[anon:GWP-ASan") { return true }
+    return false
+  }
+}
+
 internal final class AndroidRemoteProcess: LinuxRemoteProcess {
   enum RemoteProcessError: Error {
     case missingSymbol(_ name: String)
@@ -39,6 +51,9 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
 
   override internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
     for entry in self.memoryMap.entries {
+      // Limiting malloc_iterate calls to only memory regions that are known
+      // to contain heap allocations is not strictly necessary but it does
+      // significantly improves the speed of heap iteration.
       guard entry.isHeapRegion() else { continue }
 
       // collect all of the allocations in this heap region
