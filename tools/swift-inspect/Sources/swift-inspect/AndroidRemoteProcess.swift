@@ -12,8 +12,8 @@
 
 #if os(Android)
 
-import Foundation
 import AndroidCLib
+import Foundation
 import LinuxSystemHeaders
 import SwiftInspectLinux
 import SwiftRemoteMirror
@@ -49,20 +49,24 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
     super.init(processId: processId)
   }
 
+  // Linux and Android have no supported method to enumerate allocations in the
+  // heap of a remote process. Android does, however, support the malloc_iterate
+  // API, which enumerates allocations in the current process. We leverage this
+  // API by invoking it in the remote process with ptrace and using simple IPC
+  // (SIGTRAP and process_vm_readv and process_vm_writev) to fetch the results.
   override internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
     var regionCount = 0
     var allocCount = 0
     for entry in self.memoryMap.entries {
       // Limiting malloc_iterate calls to only memory regions that are known
       // to contain heap allocations is not strictly necessary but it does
-      // significantly improves the speed of heap iteration.
+      // significantly improve the speed of heap iteration.
       guard entry.isHeapRegion() else { continue }
 
       // collect all of the allocations in this heap region
       let allocations: [(base: swift_addr_t, len: UInt64)]
       do {
-        allocations = try self.iterateHeapRegion(
-          startAddr: entry.startAddr, endAddr: entry.endAddr)
+        allocations = try self.iterateHeapRegion(region: entry)
         regionCount += 1
       } catch {
         print("failed iterating remote heap: \(error)")
@@ -75,7 +79,7 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
       for alloc in allocations { body(alloc.base, alloc.len) }
     }
 
-    if allocCount == 0 {
+    if regionCount == 0 {
       // This condition most likely indicates the MemoryMap.Entry.isHeapRegion
       // filtering is needs to be modified to support a new heap region naming
       // convention in a newer Android version.
@@ -86,12 +90,7 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
     }
   }
 
-  // Linux and Android have no supported method to enumerate allocations in the
-  // heap of a remote process. Android does, however, support the malloc_iterate
-  // API, which enumerates allocations in the current process. We leverage this
-  // API by invoking it in the remote process using ptrace and using simple IPC
-  // (SIGTRAP and process_vm_readv and process_vm_writev).
-  internal func iterateHeapRegion(startAddr: UInt64, endAddr: UInt64) throws -> [(
+  internal func iterateHeapRegion(region: MemoryMap.Entry) throws -> [(
     base: swift_addr_t, len: UInt64
   )] {
     // We call mmap/munmap in the remote process to alloc/free memory for our
@@ -119,7 +118,9 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
     // Allocate a page-sized buffer in the remote process that malloc_iterate
     // will populaate with metadata describing each heap entry it enumerates.
     let dataLen = sysconf(Int32(_SC_PAGESIZE))
-    var mmapArgs = [0, UInt64(dataLen), UInt64(PROT_READ | PROT_WRITE), UInt64(MAP_ANON | MAP_PRIVATE)]
+    var mmapArgs = [
+      0, UInt64(dataLen), UInt64(PROT_READ | PROT_WRITE), UInt64(MAP_ANON | MAP_PRIVATE),
+    ]
     let remoteDataAddr: UInt64 = try self.ptrace.callRemoteFunction(at: mmapAddr, with: mmapArgs)
     defer {
       let munmapArgs: [UInt64] = [remoteDataAddr, UInt64(dataLen)]
@@ -128,7 +129,8 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
 
     // Allocate and inialize a local buffer that will be used to copy metadata
     // to/from the target process.
-    let buffer = UnsafeMutableRawPointer.allocate(byteCount: dataLen, alignment: MemoryLayout<UInt64>.alignment)
+    let buffer = UnsafeMutableRawPointer.allocate(
+      byteCount: dataLen, alignment: MemoryLayout<UInt64>.alignment)
     defer { buffer.deallocate() }
     guard heap_iterate_metadata_init(buffer, dataLen) else {
       throw RemoteProcessError.heapIterationFailed
@@ -160,8 +162,8 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
     }
 
     var allocations: [(base: swift_addr_t, len: UInt64)] = []
-    let regionLen = endAddr - startAddr
-    let args = [startAddr, regionLen, remoteCodeAddr, remoteDataAddr]
+    let regionLen = region.endAddr - region.startAddr
+    let args = [region.startAddr, regionLen, remoteCodeAddr, remoteDataAddr]
     _ = try self.ptrace.callRemoteFunction(at: mallocIterateAddr, with: args) {
       // This callback is invoked when a SIGTRAP is encountered in the remote
       // process. In this context, this signal indicates there is no more room
@@ -180,6 +182,7 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
       regs.step(RegisterSet.trapInstructionSize)
 
       try self.ptrace.setRegSet(regSet: regs)
+      try self.ptrace.cont()
     }
 
     try self.process.readMem(remoteAddr: remoteDataAddr, localAddr: buffer, len: UInt(dataLen))

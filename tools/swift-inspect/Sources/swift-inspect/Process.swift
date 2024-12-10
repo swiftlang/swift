@@ -178,9 +178,9 @@ internal func process(matching: String) -> ProcessIdentifier? {
     return nil
   }
 
-  let procfs_path = "/proc/\(processId)"
+  let procfsPath = "/proc/\(processId)"
   var isDirectory: Bool = false
-  guard FileManager.default.fileExists(atPath: procfs_path, isDirectory: &isDirectory)
+  guard FileManager.default.fileExists(atPath: procfsPath, isDirectory: &isDirectory)
         && isDirectory else {
     return nil
   }

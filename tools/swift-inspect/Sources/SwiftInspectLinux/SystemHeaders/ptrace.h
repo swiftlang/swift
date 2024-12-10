@@ -38,8 +38,13 @@ int ptrace_detach(pid_t pid) {
 }
 
 static inline
-int ptrace_continue(pid_t pid) {
+int ptrace_cont(pid_t pid) {
   return ptrace_retry(PTRACE_CONT, pid, 0, 0);
+}
+
+static inline
+int ptrace_interrupt(pid_t pid) {
+  return ptrace_retry(PTRACE_INTERRUPT, pid, 0, 0);
 }
 
 static inline

@@ -57,7 +57,7 @@
 #error("only aarch64 and x86_64 are supported")
 #endif
 
-// Callback for heap_iterate. Because this function is meant to be copied to
+// Callback for malloc_iterate. Because this function is meant to be copied to
 // a different process for execution, it must not make any function calls. It
 // could be written as asm, but simple C is more readable/maintainable and
 // should consistently compile to movable, position-independent code.

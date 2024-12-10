@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 import Foundation
 import LinuxSystemHeaders
 
@@ -10,6 +22,9 @@ public class PTrace {
 
   let pid: pid_t
 
+  // Initializing a PTrace instance attaches to the target process, waits for
+  // it to stop, and leaves it in a stopped state. The caller may resume the
+  // process by calling cont().
   public init(process pid: pid_t) throws {
     guard ptrace_attach(pid) != -1 else {
       throw PTraceError.ptraceFailure(PTRACE_ATTACH, pid: pid)
@@ -34,8 +49,14 @@ public class PTrace {
   deinit { _ = ptrace_detach(self.pid) }
 
   public func cont() throws {
-    guard ptrace_continue(self.pid) != -1 else {
+    guard ptrace_cont(self.pid) != -1 else {
       throw PTraceError.ptraceFailure(PTRACE_CONT, pid: self.pid)
+    }
+  }
+
+  public func interrupt() throws {
+    guard ptrace_interrupt(self.pid) != -1 else {
+      throw PTraceError.ptraceFailure(PTRACE_INTERRUPT, pid: self.pid)
     }
   }
 
@@ -62,6 +83,7 @@ public class PTrace {
         throw PTraceError.ptraceFailure(PTRACE_GETREGSET, pid: self.pid)
       }
     }
+
     return regSet
   }
 
@@ -75,6 +97,10 @@ public class PTrace {
     }
   }
 
+  // Call the function at the specified address in the attached process. Caller
+  // may pass up to six 8-byte arguments. The optional callback is invoked when
+  // the process is stopped with a SIGTRAP signal. In this case, the caller is
+  // responsible for taking action on the signal.
   public func callRemoteFunction(
     at address: UInt64, with args: [UInt64] = [], onTrap callback: (() throws -> Void)? = nil
   ) throws -> UInt64 {
@@ -111,7 +137,6 @@ public class PTrace {
 
       // give the caller the opportunity to handle SIGTRAP
       try callback()
-      try self.cont()
     }
 
     let sigInfo = try self.getSigInfo()
