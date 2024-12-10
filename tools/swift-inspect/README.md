@@ -40,7 +40,7 @@ To cross-compile swift-inspect for Android, some additional parameters must be p
 set ANDROID_ARCH=aarch64
 set ANDROID_API_LEVEL=29
 set ANDROID_NDK_ROOT=C:\Android\android-sdk\ndk\26.3.11579264
-set SWIFT_ANDROID_SDK_ROOT=C:\Users\Andrew\AppData\Local\Programs\Swift\Platforms\0.0.0\Android.platform\Developer\SDKs\Android.sdk
+set SWIFT_ANDROID_SDK_ROOT=%LOCALAPPDATA%\Programs\Swift\Platforms\0.0.0\Android.platform\Developer\SDKs\Android.sdk
 swift build --triple %ANDROID_ARCH%-unknown-linux-android%ANDROID_API_LEVEL% `
     --sdk %ANDROID_NDK_ROOT%\toolchains\llvm\prebuilt\windows-x86_64\sysroot `
     -Xswiftc -sdk -Xswiftc %SWIFT_ANDROID_SDK_ROOT% `
