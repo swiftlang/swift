@@ -356,11 +356,6 @@ DependencyScanningTool::getDependencies(
   return BatchScanResults;
 }
 
-void DependencyScanningTool::resetCache() {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  ScanningService.reset(new SwiftDependencyScanningService());
-}
-
 std::vector<
     DependencyScanDiagnosticCollector::ScannerDiagnosticInfo>
 DependencyScanningTool::getDiagnostics() {

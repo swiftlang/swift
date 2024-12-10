@@ -95,6 +95,9 @@ public:
   getNamedSwiftModuleDependencyInfo(StringRef moduleName,
                                     ModuleDependenciesCache &cache);
 
+  /// How many filesystem lookups were performed by the scanner
+  unsigned getNumLookups() { return NumLookups; }
+
 private:
   /// Main routine that computes imported module dependency transitive
   /// closure for the given module.
@@ -166,6 +169,8 @@ private:
   llvm::StdThreadPool ScanningThreadPool;
   /// Protect worker access.
   std::mutex WorkersLock;
+  /// Count of filesystem queries performed
+  std::atomic<unsigned> NumLookups = 0;
 };
 
 } // namespace swift
