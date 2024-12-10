@@ -198,6 +198,8 @@ public class SingleValueInstruction : Instruction, Value {
   public static func ==(lhs: SingleValueInstruction, rhs: SingleValueInstruction) -> Bool {
     lhs === rhs
   }
+
+  public var isLexical: Bool { false }
 }
 
 public final class MultipleValueInstructionResult : Value, Hashable {
@@ -208,6 +210,8 @@ public final class MultipleValueInstructionResult : Value, Hashable {
   public var definingInstruction: Instruction? { parentInstruction }
 
   public var parentBlock: BasicBlock { parentInstruction.parentBlock }
+
+  public var isLexical: Bool { false }
 
   public var index: Int { bridged.getIndex() }
 
@@ -1028,7 +1032,7 @@ final public class UncheckedOwnershipConversionInst : SingleValueInstruction {}
 final public class MoveValueInst : SingleValueInstruction, UnaryInstruction {
   public var fromValue: Value { operand.value }
 
-  public var isLexical: Bool { bridged.MoveValue_isLexical() }
+  public override var isLexical: Bool { bridged.MoveValue_isLexical() }
   public var hasPointerEscape: Bool { bridged.MoveValue_hasPointerEscape() }
   public var isFromVarDecl: Bool { bridged.MoveValue_isFromVarDecl() }
 }
@@ -1253,7 +1257,7 @@ extension BorrowIntroducingInstruction {
 final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BorrowIntroducingInstruction {
   public var borrowedValue: Value { operand.value }
 
-  public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
+  public override var isLexical: Bool { bridged.BeginBorrow_isLexical() }
   public var hasPointerEscape: Bool { bridged.BeginBorrow_hasPointerEscape() }
   public var isFromVarDecl: Bool { bridged.BeginBorrow_isFromVarDecl() }
 

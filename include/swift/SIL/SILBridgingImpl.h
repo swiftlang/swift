@@ -676,6 +676,10 @@ void BridgedArgument::setReborrow(bool reborrow) const {
   getArgument()->setReborrow(reborrow);
 }
 
+bool BridgedArgument::FunctionArgument_isLexical() const {
+  return llvm::cast<swift::SILFunctionArgument>(getArgument())->getLifetime().isLexical();
+}
+
 OptionalBridgedDeclObj BridgedArgument::getVarDecl() const {
   return {llvm::dyn_cast_or_null<swift::VarDecl>(getArgument()->getDecl())};
 }
