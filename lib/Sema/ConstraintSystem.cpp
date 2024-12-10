@@ -862,6 +862,12 @@ std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
   return {result, opened};
 }
 
+OpenedArchetypeType *
+ConstraintSystem::getOpenedExistentialType(ConstraintLocator *locator) const {
+  const auto it = OpenedExistentialTypes.find(locator);
+  return (it == OpenedExistentialTypes.end()) ? nullptr : it->second;
+}
+
 void ConstraintSystem::recordOpenedExistentialType(
     ConstraintLocator *locator, OpenedArchetypeType *opened) {
   bool inserted = OpenedExistentialTypes.insert({locator, opened}).second;

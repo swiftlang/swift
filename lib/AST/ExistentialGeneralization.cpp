@@ -79,22 +79,20 @@ public:
   }
 
 private:
-  Type visitProtocolType(CanProtocolType type) {
-    // Simple protocol types have no sub-structure.
-    return type;
-  }
-
   Type visitParameterizedProtocolType(CanParameterizedProtocolType origType) {
-    // Generalize the argument types of parameterized protocols,
-    // but don't generalize the base type.
+    // Generalize the argument types of parameterized protocols and recurse
+    // into the base type.
     auto origArgs = origType.getArgs();
     SmallVector<Type, 4> newArgs;
     newArgs.reserve(origArgs.size());
     for (auto origArg: origArgs) {
       newArgs.push_back(generalizeComponentType(origArg));
     }
-    return ParameterizedProtocolType::get(ctx, origType->getBaseType(),
-                                          newArgs);
+
+    auto *newBase = cast<ProtocolType>(
+        generalizeStructure(origType.getBaseType()).getPointer());
+
+    return ParameterizedProtocolType::get(ctx, newBase, newArgs);
   }
 
   Type visitProtocolCompositionType(CanProtocolCompositionType origType) {
@@ -113,11 +111,22 @@ private:
   }
 
   // Generalize the type arguments of nominal types.
-  Type visitBoundGenericType(CanBoundGenericType origType) {
-    return generalizeGenericArguments(origType->getDecl(), origType);
-  }
-  Type visitNominalType(CanNominalType origType) {
+  Type visitNominalOrBoundGenericNominalType(
+      CanNominalOrBoundGenericNominalType origType) {
     auto decl = origType->getDecl();
+
+    // A protocol is technically generic, but a protocol type is unbound and
+    // querying a substitution map from it is an error. Recurse into its parent
+    // type.
+    if (auto protocolTy = dyn_cast<ProtocolType>(origType)) {
+      if (auto parent = origType.getParent()) {
+        auto newParent = generalizeStructure(parent);
+        return ProtocolType::get(protocolTy->getDecl(), newParent, ctx);
+      } else {
+        return origType;
+      }
+    }
+
     if (decl->isGenericContext())
       return generalizeGenericArguments(decl, origType);
     return origType;
