@@ -229,17 +229,17 @@ SILValue SILSSAUpdater::getValueInMiddleOfBlock(SILBasicBlock *block) {
   if (predVals.empty())
     return SILUndef::get(block->getParent(), type);
 
-  if (singularValue)
-    return singularValue;
-
   // Check if we already have an equivalent phi.
   if (!block->getArguments().empty()) {
     llvm::SmallDenseMap<SILBasicBlock *, SILValue, 8> valueMap(predVals.begin(),
                                                                predVals.end());
     for (auto *arg : block->getSILPhiArguments())
-      if (isEquivalentPHI(arg, valueMap))
+      if (arg->isPhi() && isEquivalentPHI(arg, valueMap))
         return arg;
   }
+
+  if (singularValue)
+    return singularValue;
 
   // Create a new phi node.
   SILPhiArgument *phiArg = block->createPhiArgument(type, ownershipKind);
