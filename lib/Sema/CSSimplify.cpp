@@ -2381,40 +2381,30 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
   auto pattern1 = expansion1->getPatternType();
   auto pattern2 = expansion2->getPatternType();
 
+  auto *const pack1 = pattern1->getAs<PackType>();
+  auto *const pack2 = pattern2->getAs<PackType>();
+
   // If both sides are expanded or neither side is, just match them
   // directly.
-  if (pattern1->is<PackType>() == pattern2->is<PackType>()) {
+  if ((bool)pack1 == (bool)pack2) {
     return matchTypes(pattern1, pattern2, kind, flags, locator);
-
-  // If the right hand side is expanded, we have something like
-  // Foo<$T0>... vs Pack{Foo<Int>, Foo<String>}...; We're going to
-  // bind $T0 to Pack{Int, String}.
-  } else if (!pattern1->is<PackType>() && pattern2->is<PackType>()) {
-    if (auto *pack2 = pattern2->getAs<PackType>()) {
-      if (auto *pack1 = replaceTypeVariablesWithFreshPacks(
-             *this, pattern1, pack2, locator)) {
-        addConstraint(kind, pack1, pack2, locator);
-        return getTypeMatchSuccess();
-      }
-    }
-
-    return getTypeMatchFailure(locator);
-
-  // If the left hand side is expanded, we have something like
-  // Pack{Foo<Int>, Foo<String>}... vs Foo<$T0>...; We're going to
-  // bind $T0 to Pack{Int, String}.
-  } else {
-    assert(pattern1->is<PackType>() && !pattern2->is<PackType>());
-    if (auto *pack1 = pattern1->getAs<PackType>()) {
-      if (auto *pack2 = replaceTypeVariablesWithFreshPacks(
-              *this, pattern2, pack1, locator)) {
-        addConstraint(kind, pack1, pack2, locator);
-        return getTypeMatchSuccess();
-      }
-    }
-
-    return getTypeMatchFailure(locator);
   }
+
+  // We have something like `Foo<$T0>` vs `Pack{Foo<Int>, Foo<String>}` or vice
+  // versa. We're going to bind $T0 to Pack{Int, String}.
+  if (pack1) {
+    pack2 = replaceTypeVariablesWithFreshPacks(*this, pattern2, pack1, locator);
+  } else {
+    pack1 = replaceTypeVariablesWithFreshPacks(*this, pattern1, pack2, locator);
+  }
+
+  if (pack1 && pack2) {
+    addConstraint(kind, pack1, pack2, locator);
+
+    return getTypeMatchSuccess();
+  }
+
+  return getTypeMatchFailure(locator);
 }
 
 /// Check where a representation is a subtype of another.
