@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
@@ -1372,6 +1373,7 @@ public:
     // can further optimize this function before attempting to inline
     // in it again.
     if (Inliner.inlineCallsIntoFunction(getFunction())) {
+      removeUnreachableBlocks(*getFunction());
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
       restartPassPipeline();
     }

@@ -9,7 +9,6 @@ import SwiftShims
 
 //CHECK-LABEL: sil @caller_function
 //CHECK-NOT: try_apply
-//CHECK: throw {{.*}} : $any Error
 sil @caller_function : $@convention(thin) () -> @error Error {
 bb0:
   // function_ref main.inner () throws -> ()
