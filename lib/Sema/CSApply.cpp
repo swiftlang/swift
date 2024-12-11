@@ -7066,6 +7066,18 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         }
       }
 
+      if (!(ctx.isSwiftVersionAtLeast(6) ||
+            ctx.LangOpts.StrictConcurrencyLevel ==
+                StrictConcurrency::Complete)) {
+        auto erasedFromType = fromType->stripConcurrency(
+            /*recursive=*/true, /*dropGlobalActor=*/false);
+        auto erasedToType = toType->stripConcurrency(
+            /*recursive=*/true, /*dropGlobalActor=*/false);
+
+        if (erasedFromType->isEqual(erasedToType))
+          return cs.cacheType(new (ctx) UnsafeCastExpr(expr, toType));
+      }
+
       auto &err = llvm::errs();
       err << "fromType->getCanonicalType() = ";
       fromType->getCanonicalType()->dump(err);
