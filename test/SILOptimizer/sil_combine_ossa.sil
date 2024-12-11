@@ -90,6 +90,8 @@ sil @use_anyobject_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
 sil @use_generic_obj_guaranteed : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
 sil [ossa] @unknown : $@convention(thin) () -> ()
 sil [ossa] @get_myint : $@convention(thin) () -> (MyInt)
+sil [ossa] @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+sil [ossa] @useC : $@convention(thin) (@guaranteed C) -> ()
 
 enum KlassNativeObjEither {
 case lhs(Klass)
@@ -5414,3 +5416,40 @@ bb1(%10 : @owned $Optional<@callee_guaranteed () -> ()>, %11 : @guaranteed $Opti
   %12 = tuple ()
   return %12 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @remove_borrow_of_thin_function :
+// CHECK:         [[F:%.*]] = function_ref @unknown
+// CHECK:         [[T:%.*]] = thin_to_thick_function [[F]]
+// CHECK-NOT:     begin_borrow
+// CHECK:         apply %{{[0-9]+}}([[T]])
+// CHECK:         apply %0()
+// CHECK-LABEL: } // end sil function 'remove_borrow_of_thin_function'
+sil [ossa] @remove_borrow_of_thin_function : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @unknown : $@convention(thin) () -> ()
+  %1 = thin_to_thick_function %0 to $@callee_guaranteed () -> ()
+  %2 = begin_borrow %1
+  %3 = function_ref @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %5 = apply %2(): $@callee_guaranteed () -> ()
+  end_borrow %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @remove_borrow_of_owned :
+// CHECK-NOT:     begin_borrow
+// CHECK:         apply %1(%0)
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'remove_borrow_of_owned'
+sil [ossa] @remove_borrow_of_owned : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  %2 = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  destroy_value %0: $C
+  %6 = tuple ()
+  return %6 : $()
+}
+
