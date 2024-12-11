@@ -33,6 +33,7 @@
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
@@ -620,6 +621,7 @@ class SILCombine : public SILFunctionTransform {
     bool Changed = Combiner.runOnFunction(*getFunction());
 
     if (Changed) {
+      removeUnreachableBlocks(*getFunction());
       updateAllGuaranteedPhis(getPassManager(), getFunction());
       // Invalidate everything.
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
