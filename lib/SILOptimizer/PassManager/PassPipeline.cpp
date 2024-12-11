@@ -888,7 +888,10 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 
   // Verify AccessStorage once again after optimizing and lowering OSSA.
 #ifndef NDEBUG
-  P.addAccessPathVerification();
+  // Temporarily disabled because it triggers a false alarm when building
+  // SwiftDocC on linux: rdar://141270464
+  // TODO: re-enable when the problem is fixed.
+  // P.addAccessPathVerification();
 #endif
 
   // Only has an effect if the -assume-single-thread option is specified.
