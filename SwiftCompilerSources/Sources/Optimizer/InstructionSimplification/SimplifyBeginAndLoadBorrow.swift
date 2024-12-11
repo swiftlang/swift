@@ -1,4 +1,4 @@
-//===--- SimplifyBeginBorrow.swift ----------------------------------------===//
+//===--- SimplifyBeginAndLoadBorrow.swift ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BeginBorrowInst : OnoneSimplifyable {
+extension BeginBorrowInst : OnoneSimplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
     if borrowedValue.ownership == .owned,
        // We need to keep lexical lifetimes in place.
@@ -21,7 +21,52 @@ extension BeginBorrowInst : OnoneSimplifyable {
        !findPointerEscapingUse(of: borrowedValue)
     {
       tryReplaceBorrowWithOwnedOperand(beginBorrow: self, context)
+
+    } else if let thin2thickFn = borrowedValue as? ThinToThickFunctionInst,
+              uses.filterUsers(ofType: BranchInst.self).isEmpty
+    {
+      uses.ignoreUsers(ofType: EndBorrowInst.self).replaceAll(with: thin2thickFn, context)
+      context.erase(instructionIncludingAllUsers: self)
     }
+  }
+}
+
+extension LoadBorrowInst : Simplifyable, SILCombineSimplifyable {
+  func simplify(_ context: SimplifyContext) {
+    if uses.ignoreDebugUses.ignoreUsers(ofType: EndBorrowInst.self).isEmpty {
+      context.erase(instructionIncludingAllUsers: self)
+      return
+    }
+
+    // If the load_borrow is followed by a copy_value, combine both into a `load [copy]`:
+    // ```
+    //   %1 = load_borrow %0
+    //   %2 = some_forwarding_instruction %1 // zero or more forwarding instructions
+    //   %3 = copy_value %2
+    //   end_borrow %1
+    // ```
+    // ->
+    // ```
+    //   %1 = load [copy] %0
+    //   %3 = some_forwarding_instruction %1 // zero or more forwarding instructions
+    // ```
+    //
+    tryCombineWithCopy(context)
+  }
+
+  private func tryCombineWithCopy(_ context: SimplifyContext) {
+    let forwardedValue = lookThroughSingleForwardingUses()
+    guard let singleUser = forwardedValue.uses.ignoreUsers(ofType: EndBorrowInst.self).singleUse?.instruction,
+          let copy = singleUser as? CopyValueInst,
+          copy.parentBlock == self.parentBlock else {
+      return
+    }
+    let builder = Builder(before: self, context)
+    let loadCopy = builder.createLoad(fromAddress: address, ownership: .copy)
+    let forwardedOwnedValue = replace(guaranteedValue: self, withOwnedValue: loadCopy, context)
+    copy.uses.replaceAll(with: forwardedOwnedValue, context)
+    context.erase(instruction: copy)
+    context.erase(instructionIncludingAllUsers: self)
   }
 }
 
@@ -156,7 +201,7 @@ private extension ForwardingInstruction {
 }
 
 /// Replaces a guaranteed value with an owned value.
-/// 
+///
 /// If the `guaranteedValue`'s use is a ForwardingInstruction (or forwarding instruction chain),
 /// it is converted to an owned version of the forwarding instruction (or instruction chain).
 ///
