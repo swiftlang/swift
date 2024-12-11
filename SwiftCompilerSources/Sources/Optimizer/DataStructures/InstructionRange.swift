@@ -40,9 +40,6 @@ import SIL
 /// destruct this data structure, e.g. in a `defer {}` block.
 struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   
-  /// The dominating begin instruction.
-  let begin: Instruction
-  
   /// The underlying block range.
   private(set) var blockRange: BasicBlockRange
 
@@ -52,10 +49,7 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   private var inExclusiveRange: InstructionSet
 
   init(begin beginInst: Instruction, _ context: some Context) {
-    self.begin = beginInst
-    self.blockRange = BasicBlockRange(begin: beginInst.parentBlock, context)
-    self.insertedInsts = InstructionSet(context)
-    self.inExclusiveRange = InstructionSet(context)
+    self = InstructionRange(beginBlock: beginInst.parentBlock, context)
     self.inExclusiveRange.insert(beginInst)
   }
 
@@ -65,15 +59,19 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   init(for value: Value, _ context: some Context) {
-    self = InstructionRange(begin: InstructionRange.beginningInstruction(for: value), context)
+    if let inst = value.definingInstruction {
+      self = InstructionRange(begin: inst, context)
+    } else if let arg = value as? Argument {
+      self = InstructionRange(beginBlock: arg.parentBlock, context)
+    } else {
+      fatalError("cannot build an instruction range for \(value)")
+    }
   }
 
-  static func beginningInstruction(for value: Value) -> Instruction {
-    if let def = value.definingInstructionOrTerminator {
-      return def
-    }
-    assert(Phi(value) != nil || value is FunctionArgument)
-    return value.parentBlock.instructions.first!
+  private init(beginBlock: BasicBlock, _ context: some Context) {
+    self.blockRange = BasicBlockRange(begin: beginBlock, context)
+    self.insertedInsts = InstructionSet(context)
+    self.inExclusiveRange = InstructionSet(context)
   }
 
   /// Insert a potential end instruction.
@@ -81,12 +79,12 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
     insertedInsts.insert(inst)
     insertIntoRange(instructions: ReverseInstructionList(first: inst.previous))
     blockRange.insert(inst.parentBlock)
-    if inst.parentBlock != begin.parentBlock {
+    if inst.parentBlock != blockRange.begin {
       // The first time an instruction is inserted in another block than the begin-block we need to insert
       // instructions from the begin instruction to the end of the begin block.
       // For subsequent insertions this is a no-op: `insertIntoRange` will return immediately because those
       // instruction are already inserted.
-      insertIntoRange(instructions: begin.parentBlock.instructions.reversed())
+      insertIntoRange(instructions: blockRange.begin.instructions.reversed())
     }
   }
 
@@ -103,20 +101,12 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
       return true
     }
     let block = inst.parentBlock
-    return block != begin.parentBlock && blockRange.contains(block)
+    return block != blockRange.begin && blockRange.contains(block)
   }
 
   /// Returns true if the inclusive range contains `inst`.
   func inclusiveRangeContains (_ inst: Instruction) -> Bool {
     contains(inst) || insertedInsts.contains(inst)
-  }
-
-  /// Returns true if the range is valid and that's iff the begin instruction
-  /// dominates all instructions of the range.
-  var isValid: Bool {
-    blockRange.isValid &&
-    // Check if there are any inserted instructions before the begin instruction in its block.
-    !ReverseInstructionList(first: begin).dropFirst().contains { insertedInsts.contains($0) }
   }
 
   /// Returns the end instructions.
@@ -160,6 +150,10 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
     }
   }
 
+  var begin: Instruction? {
+    blockRange.begin.instructions.first(where: inExclusiveRange.contains)
+  }
+
   private mutating func insertIntoRange(instructions: ReverseInstructionList) {
     for inst in instructions {
       if !inExclusiveRange.insert(inst) {
@@ -169,9 +163,9 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   var description: String {
-    return (isValid ? "" : "<invalid>\n") +
+    return (blockRange.isValid ? "" : "<invalid>\n") +
       """
-      begin:    \(begin)
+      begin:    \(begin?.description ?? blockRange.begin.name)
       ends:     \(ends.map { $0.description }.joined(separator: "\n          "))
       exits:    \(exits.map { $0.description }.joined(separator: "\n          "))
       interiors:\(interiors.map { $0.description }.joined(separator: "\n          "))

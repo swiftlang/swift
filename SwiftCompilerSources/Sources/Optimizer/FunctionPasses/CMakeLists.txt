@@ -18,6 +18,7 @@ swift_compiler_sources(Optimizer
   CopyToBorrowOptimization.swift
   DeadStoreElimination.swift
   DeinitDevirtualizer.swift
+  DestroyHoisting.swift
   InitializeStaticGlobals.swift
   LetPropertyLowering.swift
   LifetimeDependenceDiagnostics.swift

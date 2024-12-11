@@ -32,6 +32,8 @@ public class Argument : Value, Hashable {
 
   public var isReborrow: Bool { bridged.isReborrow() }
 
+  public var isLexical: Bool { false }
+
   public var varDecl: VarDecl? { bridged.getVarDecl().getAs(VarDecl.self) }
 
   public var sourceLoc: SourceLoc? { varDecl?.nameLoc }
@@ -48,6 +50,10 @@ public class Argument : Value, Hashable {
 final public class FunctionArgument : Argument {
   public var convention: ArgumentConvention {
     parentFunction.argumentConventions[index]
+  }
+
+  public override var isLexical: Bool {
+    bridged.FunctionArgument_isLexical()
   }
 
   public var isSelf: Bool {
