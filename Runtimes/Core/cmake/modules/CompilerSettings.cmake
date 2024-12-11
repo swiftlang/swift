@@ -44,13 +44,3 @@ HAVE_SWIFT_ASYNC_CALL)
 if(NOT HAVE_SWIFT_ASYNC_CALL)
   message(SEND_ERROR "CXX Compiler must support Swift async calling conventions")
 endif()
-
-check_compiler_flag(Swift "-color-diagnostics" HAVE_SWIFT_COLOR_DIAGNOSTICS)
-if(HAVE_SWIFT_COLOR_DIAGNOSTICS)
-  add_compile_options($<$<COMPILE_LANGUAGE:Swift>:-color-diagnostics>)
-endif()
-
-check_compiler_flag(Swift "-diagnostic-style swift" HAVE_SWIFT_DIAGNOSTIC_STYLE)
-if(HAVE_SWIFT_DIAGNOSTIC_STYLE)
-  add_compile_options($<$<COMPILE_LANGUAGE:Swift>:-diagnostic-style$<SEMICOLON>swift>)
-endif()
