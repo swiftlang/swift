@@ -7877,9 +7877,12 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
       if (hasUnsafeAPIAttr(cxxDecl))
         desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
                                 "import_unsafe", decl->getNameAsString());
-      if (hasOwnedValueAttr(cxxDecl))
+      if (hasOwnedValueAttr(cxxDecl)) {
         desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
                                 "import_owned", decl->getNameAsString());
+        decl->dump();
+        llvm_unreachable("For testing.");
+      }
       if (hasIteratorAPIAttr(cxxDecl))
         desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
                                 "import_iterator", decl->getNameAsString());
