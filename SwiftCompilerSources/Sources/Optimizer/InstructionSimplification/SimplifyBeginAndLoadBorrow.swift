@@ -21,6 +21,8 @@ extension BeginBorrowInst : OnoneSimplifyable {
        !findPointerEscapingUse(of: borrowedValue)
     {
       tryReplaceBorrowWithOwnedOperand(beginBorrow: self, context)
+    } else {
+      removeBorrowOfThinFunction(beginBorrow: self, context)
     }
   }
 }
@@ -75,6 +77,19 @@ private func tryReplaceBorrowWithOwnedOperand(beginBorrow: BeginBorrowInst, _ co
       convertAllUsesToOwned(of: beginBorrow, context)
     }
   }
+}
+
+private func removeBorrowOfThinFunction(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
+  guard let thin2thickFn = beginBorrow.borrowedValue as? ThinToThickFunctionInst,
+        // For simplicity don't go into the trouble of removing reborrow phi arguments.
+        beginBorrow.uses.filterUsers(ofType: BranchInst.self).isEmpty else
+  {
+    return
+  }
+  // `thin_to_thick_function` has "none" ownership and is compatible with guaranteed values.
+  // Therefore the `begin_borrow` is not needed.
+  beginBorrow.uses.ignoreUsers(ofType: EndBorrowInst.self).replaceAll(with: thin2thickFn, context)
+  context.erase(instructionIncludingAllUsers: beginBorrow)
 }
 
 /// Replace
