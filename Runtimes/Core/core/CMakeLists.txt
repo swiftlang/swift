@@ -265,6 +265,12 @@ if(SwiftCore_ENABLE_VECTOR_TYPES)
     "${CMAKE_CURRENT_BINARY_DIR}/SIMDVectorTypes.swift")
 endif()
 
+if(APPLE AND BUILD_SHARED_LIBS)
+  target_link_options(swiftCore PRIVATE
+    "SHELL:-Xlinker -headerpad_max_install_names"
+  )
+endif()
+
 target_compile_options(swiftCore PRIVATE
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
