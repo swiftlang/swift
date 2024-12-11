@@ -1516,6 +1516,9 @@ namespace {
                                       /*genericparams*/nullptr, DC);
 
       Result->setUnderlyingType(SwiftType);
+      if (SwiftType->isUnsafe())
+        Result->getAttrs().add(new (Impl.SwiftContext)
+                                   UnsafeAttr(/*implicit=*/true));
 
       // Make Objective-C's 'id' unavailable.
       if (Impl.SwiftContext.LangOpts.EnableObjCInterop && isObjCId(Decl)) {
