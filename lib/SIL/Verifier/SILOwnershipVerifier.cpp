@@ -802,15 +802,24 @@ bool SILValueOwnershipChecker::checkUses() {
   return true;
 }
 
+bool disableOwnershipVerification(const SILModule &mod) {
+  if (DisableOwnershipVerification)
+    return true;
+  if (mod.getASTContext().blockListConfig.hasBlockListAction(
+          mod.getSwiftModule()->getRealName().str(),
+          BlockListKeyKind::ModuleName,
+          BlockListAction::ShouldDisableOwnershipVerification)) {
+    return true;
+  }
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
 void SILInstruction::verifyOperandOwnership(
     SILModuleConventions *silConv) const {
-  if (DisableOwnershipVerification)
-    return;
-
   if (isStaticInitializerInst())
     return;
 
@@ -831,11 +840,13 @@ void SILInstruction::verifyOperandOwnership(
       !getFunction()->shouldVerifyOwnership())
     return;
 
+  if (disableOwnershipVerification(getModule()))
+    return;
+
   // If we are testing the verifier, bail so we only print errors once when
   // performing a full verification, instead of additionally in the SILBuilder.
   if (IsSILOwnershipVerifierTestingEnabled)
     return;
-
   // If this is a terminator instruction, do not verify in SILBuilder. This is
   // because when building a new function, one must create the destination block
   // first which is an unnatural pattern and pretty brittle.
@@ -903,9 +914,6 @@ verifySILValueHelper(const SILFunction *f, SILValue value,
 }
 
 void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
-  if (DisableOwnershipVerification)
-    return;
-
   // Do not validate SILUndef values.
   if (isa<SILUndef>(*this))
     return;
@@ -931,17 +939,20 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
     }
   }
 
+  // Since we do not have SILUndef, we now know that getFunction() should return
+  // a real function. Assert in case this assumption is no longer true.
+  auto *f = (*this)->getFunction();
+  assert(f && "Instructions and arguments should have a function");
+
+  if (disableOwnershipVerification(f->getModule()))
+    return;
+
   // If we are testing the verifier, bail so we only print errors once when
   // performing a full verification a function at a time by the
   // OwnershipVerifierStateDumper pass, instead of additionally in the
   // SILBuilder and in the actual SIL verifier that may be run by sil-opt.
   if (IsSILOwnershipVerifierTestingEnabled)
     return;
-
-  // Since we do not have SILUndef, we now know that getFunction() should return
-  // a real function. Assert in case this assumption is no longer true.
-  auto *f = (*this)->getFunction();
-  assert(f && "Instructions and arguments should have a function");
 
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
   LinearLifetimeChecker::ErrorBuilder errorBuilder(
@@ -952,7 +963,7 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
 }
 
 void SILModule::verifyOwnership() const {
-  if (DisableOwnershipVerification)
+  if (disableOwnershipVerification(*this))
     return;
 
 #ifdef NDEBUG
@@ -973,8 +984,6 @@ void SILModule::verifyOwnership() const {
 }
 
 void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
-  if (DisableOwnershipVerification)
-    return;
   if (!getModule().getOptions().VerifySILOwnership)
     return;
 
@@ -994,6 +1003,9 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   // If the given function has unqualified ownership or we have been asked by
   // the user not to verify this function, there is nothing to verify.
   if (!hasOwnership() || !shouldVerifyOwnership())
+    return;
+
+  if (disableOwnershipVerification(getModule()))
     return;
 
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
