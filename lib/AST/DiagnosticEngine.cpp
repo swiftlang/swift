@@ -1251,8 +1251,8 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
     anyErrorOccurred = true;
   }
 
-  assert((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
-  assert((!AssertOnWarning || (lvl != DiagnosticBehavior::Warning)) &&
+  ASSERT((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
+  ASSERT((!AssertOnWarning || (lvl != DiagnosticBehavior::Warning)) &&
          "We emitted a warning?!");
 
   previousBehavior = lvl;
