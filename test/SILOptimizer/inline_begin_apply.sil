@@ -505,14 +505,6 @@ entry:
 // CHECK-NEXT:   [[MARKER:%.*]] = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK-NEXT:   apply [[MARKER]]([[T0]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK-NEXT:   unreachable
-// CHECK:      bb1:
-// CHECK-NEXT:   // function_ref
-// CHECK-NEXT:   [[USE:%.*]] = function_ref @use : $@convention(thin) (@in Builtin.Int8) -> ()
-// CHECK-NEXT:   apply [[USE]](undef) : $@convention(thin) (@in Builtin.Int8) -> ()
-// CHECK-NEXT:   unreachable
-// CHECK:      bb2:
-// CHECK-NEXT:   [[T0:%.*]] = tuple ()
-// CHECK-NEXT:   return [[T0]] : $()
 // CHECK:      }
 sil [ossa] @test_simple_call_no_yields : $() -> () {
 entry:
@@ -618,11 +610,8 @@ bb0:
 // CHECK:   [[A16:%.*]] = alloc_stack $Builtin.Int16
 // CHECK:   [[A32:%.*]] = alloc_stack $Builtin.Int32
 // CHECK: bb1:
-// CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32
 // CHECK:   unreachable
 // CHECK: bb2:
-// CHECK:   unreachable
-// CHECK: bb3:
 // CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32
 // CHECK:   dealloc_stack [[A16]] : $*Builtin.Int16
 // CHECK:   return

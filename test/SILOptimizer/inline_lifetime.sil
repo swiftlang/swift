@@ -684,10 +684,6 @@ bb0(%instance : @owned $C):
 // CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK:       bb1:
-// CHECK:         destroy_addr [[ADDR]]
-// CHECK:         dealloc_stack [[ADDR]]
-// CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_coro_guaranteed'
 sil [ossa] @caller_owned_callee_coro_guaranteed : $@convention(thin) (@owned C) -> () {
 bb0(%instance : @owned $C):
@@ -724,10 +720,6 @@ bb0(%instance : @guaranteed $C):
 // CHECK-NOT:     end_borrow
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK:       bb1:
-// CHECK:         destroy_addr [[ADDR]]
-// CHECK:         dealloc_stack [[ADDR]]
-// CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_coro_guaranteed'
 sil [ossa] @caller_guaranteed_callee_coro_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 bb0(%instance : @guaranteed $C):
@@ -746,9 +738,6 @@ bb0(%instance : @guaranteed $C):
 // CHECK:         [[REGISTER_4:%[^,]+]] = tuple ()
 // CHECK:         [[REGISTER_5:%[^,]+]] = tuple ()
 // CHECK:         return [[REGISTER_5]] : $()
-// CHECK:       {{bb[0-9]+}}:
-// CHECK:         dealloc_stack [[REGISTER_1]] : $*S
-// CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_trivial_callee_coro_trivial'
 sil hidden [ossa] @caller_trivial_callee_coro_trivial : $@convention(thin) (S) -> () {
 bb0(%instance : $S):
@@ -764,8 +753,6 @@ bb0(%instance : $S):
 // CHECK:         {{%[^,]+}} = tuple ()
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK:       {{bb[^,]+}}:
-// CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_in_callee_coro_in'
 sil hidden [ossa] @caller_in_callee_coro_in : $@convention(thin) (@in S) -> () {
 bb0(%instance : $*S):
