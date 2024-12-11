@@ -1697,3 +1697,17 @@ bb0(%0 : ${ var Int64 }):
   end_access %access : $*Int64
   return %val : $Int64
 }
+
+// CHECK-LABEL: sil @willThrow : $@convention(thin) (RefElemNoConflictClass, @guaranteed any Error) -> () {
+// CHECK:  begin_access [modify] [dynamic] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'willThrow'
+
+sil @willThrow : $@convention(thin) (RefElemNoConflictClass, @guaranteed any Error) -> () {
+bb0(%0 : $RefElemNoConflictClass, %1 : $any Error):
+  %x = ref_element_addr %0 : $RefElemNoConflictClass, #RefElemNoConflictClass.x
+  %b3 = begin_access [modify] [dynamic] %x : $*Int32
+  %w = builtin "willThrow"(%1 : $any Error) : $()
+  end_access %b3 : $*Int32
+  %10 = tuple ()
+  return %10 : $()
+}

@@ -997,6 +997,8 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
       return BI->getArguments().size() > 0
         ? MemoryBehavior::MayWrite
         : MemoryBehavior::None;
+    } else if (BInfo.ID == BuiltinValueKind::WillThrow) {
+      return MemoryBehavior::MayRead;
     }
     if (BInfo.ID != BuiltinValueKind::None)
       return BInfo.isReadNone() ? MemoryBehavior::None
@@ -1188,6 +1190,7 @@ bool SILInstruction::mayRelease() const {
     if (auto Kind = BI->getBuiltinKind()) {
       switch (Kind.value()) {
         case BuiltinValueKind::CopyArray:
+        case BuiltinValueKind::WillThrow:
           return false;
         default:
           break;
@@ -1497,6 +1500,14 @@ bool SILInstruction::isTriviallyDuplicatable() const {
 }
 
 bool SILInstruction::mayTrap() const {
+  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
+    if (auto Kind = BI->getBuiltinKind()) {
+      if (Kind.value() == BuiltinValueKind::WillThrow) {
+        // We don't want willThrow instructions to be removed.
+        return true;
+      }
+    }
+  }
   switch(getKind()) {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
