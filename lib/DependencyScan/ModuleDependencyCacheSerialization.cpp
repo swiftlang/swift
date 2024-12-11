@@ -57,7 +57,7 @@ class ModuleDependenciesCacheDeserializer {
   // These return true if there was an error.
   bool readSignature();
   bool enterGraphBlock();
-  bool readMetadata();
+  bool readMetadata(StringRef scannerContextHash);
   bool readGraph(ModuleDependenciesCache &cache);
 
   std::optional<std::string> getIdentifier(unsigned n);
@@ -143,7 +143,7 @@ bool ModuleDependenciesCacheDeserializer::enterGraphBlock() {
 
 /// Read in the serialized file's format version, error/exit if not matching
 /// current version.
-bool ModuleDependenciesCacheDeserializer::readMetadata() {
+bool ModuleDependenciesCacheDeserializer::readMetadata(StringRef scannerContextHash) {
   using namespace graph_block;
 
   auto entry = Cursor.advance();
@@ -165,12 +165,14 @@ bool ModuleDependenciesCacheDeserializer::readMetadata() {
     return true;
 
   unsigned majorVersion, minorVersion;
-
   MetadataLayout::readRecord(Scratch, majorVersion, minorVersion);
   if (majorVersion != MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR ||
-      minorVersion != MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR) {
+      minorVersion != MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR)
     return true;
-  }
+  
+  std::string readScannerContextHash = BlobData.str();
+  if (readScannerContextHash != scannerContextHash)
+    return true;
 
   return false;
 }
@@ -815,7 +817,7 @@ bool ModuleDependenciesCacheDeserializer::readInterModuleDependenciesCache(
   if (enterGraphBlock())
     return true;
 
-  if (readMetadata())
+  if (readMetadata(cache.scannerContextHash))
     return true;
 
   if (readGraph(cache))
@@ -1123,7 +1125,7 @@ class ModuleDependenciesCacheSerializer {
   void writeSignature();
   void writeBlockInfoBlock();
 
-  void writeMetadata();
+  void writeMetadata(StringRef scanningContextHash);
   void writeIdentifiers();
   void writeArraysOfIdentifiers();
 
@@ -1210,14 +1212,13 @@ void ModuleDependenciesCacheSerializer::writeSignature() {
     Out.Emit((unsigned)c, 8);
 }
 
-void ModuleDependenciesCacheSerializer::writeMetadata() {
+void ModuleDependenciesCacheSerializer::writeMetadata(StringRef scanningContextHash) {
   using namespace graph_block;
-
   MetadataLayout::emitRecord(Out, ScratchRecord,
                              AbbrCodes[MetadataLayout::Code],
                              MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR,
                              MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR,
-                             version::getSwiftFullVersion());
+                             scanningContextHash);
 }
 
 void ModuleDependenciesCacheSerializer::writeIdentifiers() {
@@ -1896,7 +1897,7 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
   collectStringsAndArrays(cache);
 
   // Write the version information
-  writeMetadata();
+  writeMetadata(cache.scannerContextHash);
 
   // Write the strings
   writeIdentifiers();
