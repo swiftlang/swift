@@ -123,7 +123,6 @@ void Mangler::beginManglingWithoutPrefix() {
 void Mangler::beginMangling() {
   beginManglingWithoutPrefix();
 
-#if 0 // STAGING: To be switched over to soon.
   switch (Flavor) {
   case ManglingFlavor::Default:
     Buffer << MANGLING_PREFIX_STR;
@@ -132,9 +131,6 @@ void Mangler::beginMangling() {
     Buffer << MANGLING_PREFIX_EMBEDDED_STR;
     break;
   }
-#else
-  Buffer << MANGLING_PREFIX_STR;
-#endif
 }
 
 /// Finish the mangling of the symbol and return the mangled name.
@@ -144,7 +140,6 @@ std::string Mangler::finalize() {
   Storage.clear();
 
 #ifndef NDEBUG
-#if 0 // STAGING: To be switched over to soon.
   switch (Flavor) {
   case ManglingFlavor::Default:
     if (StringRef(result).starts_with(MANGLING_PREFIX_STR))
@@ -155,10 +150,6 @@ std::string Mangler::finalize() {
       verify(result, Flavor);
     break;
   }
-#else
-  if (StringRef(result).starts_with(MANGLING_PREFIX_STR))
-    verify(result, Flavor);
-#endif
 #endif
 
   return result;
@@ -193,7 +184,6 @@ void Mangler::verify(StringRef nameStr, ManglingFlavor Flavor) {
     // It should be kept in sync.
     assert(StringRef(MANGLING_PREFIX_STR) != "_S" && "redundant check");
 
-#if 0 // STAGING: To be switched over to soon.
     switch (Flavor) {
     case ManglingFlavor::Default:
       buffer += MANGLING_PREFIX_STR;
@@ -202,9 +192,6 @@ void Mangler::verify(StringRef nameStr, ManglingFlavor Flavor) {
       buffer += MANGLING_PREFIX_EMBEDDED_STR;
       break;
     }
-#else
-    buffer += MANGLING_PREFIX_STR;
-#endif
 
     buffer += nameStr;
     nameStr = buffer.str();

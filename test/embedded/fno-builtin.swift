@@ -13,4 +13,4 @@ public func foo() -> [Int] {
 	return b
 }
 
-// CHECK: define {{.*}}@"$s4main3fooSaySiGyF"()
+// CHECK: define {{.*}}@"$e4main3fooSaySiGyF"()
