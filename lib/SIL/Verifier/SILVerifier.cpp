@@ -7169,6 +7169,8 @@ public:
   }
 
   void visitSILBasicBlock(SILBasicBlock *BB) {
+    require(Dominance->isReachableFromEntry(BB),
+            "Found block unreachable from entry");
     SILInstructionVisitor::visitSILBasicBlock(BB);
     verifyDebugScopeHoles(BB);
   }
