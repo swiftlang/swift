@@ -394,6 +394,44 @@ SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
   return maybeKind;
 }
 
+std::optional<SILLocation> SILDeserializer::readLoc(unsigned kind,
+                                     SmallVectorImpl<uint64_t> &scratch) {
+  unsigned LocationKind, Implicit = 0;
+  SILLocation::FilenameAndLocation *FNameLoc = nullptr;
+  // Each SourceLoc opaque pointer is serialized once. Successive appearences
+  // are serialized as references to earlier serializations, with LocID as the
+  // indexing key
+  if (kind == SIL_SOURCE_LOC_REF) {
+    ValueID LocID;
+    SourceLocRefLayout::readRecord(scratch, LocID, LocationKind, Implicit);
+    if (LocID == 0)
+      return std::optional<SILLocation>();
+    FNameLoc = ParsedLocs[LocID - 1];
+  } else {
+    ValueID Row = 0, Col = 0, FNameID = 0;
+    SourceLocLayout::readRecord(scratch, Row, Col, FNameID, LocationKind, Implicit);
+
+
+    FNameLoc = SILLocation::FilenameAndLocation::alloc(
+        Row, Col, MF->getIdentifierText(FNameID), SILMod);
+
+    ParsedLocs.push_back(FNameLoc);
+  }
+
+  switch(LocationKind) {
+    case SILLocation::ReturnKind:
+      return ReturnLocation(FNameLoc, Implicit);
+    case SILLocation::ImplicitReturnKind:
+      return ImplicitReturnLocation(FNameLoc, Implicit);
+    case SILLocation::InlinedKind:
+    case SILLocation::MandatoryInlinedKind:
+    case SILLocation::CleanupKind:
+    case SILLocation::ArtificialUnreachableKind:
+    case SILLocation::RegularKind:
+      return RegularLocation(FNameLoc, Implicit);
+  }
+}
+
 llvm::Expected<const SILDebugScope *>
 SILDeserializer::readDebugScopes(SILFunction *F,
                                  SmallVectorImpl<uint64_t> &scratch,
@@ -1066,6 +1104,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   BlocksByID.clear();
   UndefinedBlocks.clear();
   ParsedScopes.clear();
+  ParsedLocs.clear();
 
   // The first two IDs are reserved for SILUndef.
   LastValueID = 1;
@@ -1095,6 +1134,9 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
         isFirstScope = false;
       }
       Builder.setCurrentDebugScope(Scope);
+    } else if (kind == SIL_SOURCE_LOC || kind == SIL_SOURCE_LOC_REF) {
+      auto Loc = readLoc(kind, scratch);
+      Builder.applyDebugLocOverride(Loc);
     } else {
       // If CurrentBB is empty, just return fn. The code in readSILInstruction
       // assumes that such a situation means that fn is a declaration. Thus it
