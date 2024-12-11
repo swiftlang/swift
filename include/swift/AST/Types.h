@@ -709,7 +709,7 @@ public:
 
   /// Determine where this type is a type variable or a dependent
   /// member root in a type variable.
-  bool isTypeVariableOrMember();
+  bool isTypeVariableOrMember() const;
 
   /// Determine whether this type involves a UnresolvedType.
   bool hasUnresolvedType() const {
@@ -818,6 +818,10 @@ public:
   /// type variables referenced by this type.
   void getTypeVariables(SmallPtrSetImpl<TypeVariableType *> &typeVariables);
 
+  /// If the receiver is a `DependentMemberType`, returns its root. Otherwise,
+  /// returns the receiver.
+  Type getDependentMemberRoot() const;
+
   /// Determine whether this type is a type parameter, which is either a
   /// GenericTypeParamType or a DependentMemberType.
   ///
@@ -825,18 +829,18 @@ public:
   /// parameters in nested positions, e.g, \c T is a type parameter but
   /// \c X<T> is not a type parameter. Use \c hasTypeParameter to determine
   /// whether a type parameter exists at any position.
-  bool isTypeParameter();
+  bool isTypeParameter() const;
 
   /// Determine whether this type is a type parameter pack, which is
   /// either a GenericTypeParamType or a DependentMemberType.
   ///
   /// Like \c isTypeParameter, this routine will return \c false for types that
   /// include type parameters in nested positions e.g. \c X<T...>.
-  bool isParameterPack();
+  bool isParameterPack() const;
 
   /// Determine whether this type is directly a type parameter pack, which
   /// can only be a GenericTypeParamType.
-  bool isRootParameterPack();
+  bool isRootParameterPack() const;
 
   /// Determine whether this type is a value parameter 'let N: Int', which is a
   /// GenericTypeParamType.
@@ -863,7 +867,7 @@ public:
   DependentMemberType *findUnresolvedDependentMemberType();
 
   /// Return the root generic parameter of this type parameter type.
-  GenericTypeParamType *getRootGenericParam();
+  GenericTypeParamType *getRootGenericParam() const;
 
   /// Given that this type is the result of substituting a pack parameter,
   /// return it as a the pack type.  We want to have a representational
@@ -6967,8 +6971,6 @@ class OpenedArchetypeType final : public LocalArchetypeType,
   friend ArchetypeType;
   friend GenericEnvironment;
 
-  UUID ID;
-
   /// Create a new opened archetype in the given environment representing
   /// the interface type.
   ///
@@ -6980,24 +6982,24 @@ class OpenedArchetypeType final : public LocalArchetypeType,
          LayoutConstraint layout);
 
 public:
-  /// Get or create an archetype that represents the opened type
-  /// of an existential value.
+  /// Open the given existential type to a newly created archetype and
+  /// return it.
   ///
   /// \param existential The existential type to open.
-  /// \param knownID When non-empty, the known ID of the archetype. When empty,
-  /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType>
-  get(CanType existential, std::optional<UUID> knownID = std::nullopt);
+  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential);
 
-  /// Create a new archetype that represents the opened type
-  /// of an existential value.
+  /// Open the given existential type or existential metatype.
   ///
   /// Use this function when you are unsure of whether the
-  /// \c existential type is a metatype or an instance type. This function
-  /// will unwrap any existential metatype containers.
+  /// \c existential is a metatype or an instance type. An existential metatype
+  /// will be rebuilt appropriately.
   ///
   /// \param existential The existential type or existential metatype to open.
-  static Type getAny(Type existential);
+  /// \param opened When not null, the opened archetype that will be used. This
+  /// archetype must be a root, and the existential that was opened with it must
+  /// be canonically equal to the one contained in `opened`. When null, a fresh
+  /// archetype and generic environment will be created.
+  static Type getAny(Type existential, OpenedArchetypeType *opened = nullptr);
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpenedArchetype;
@@ -7061,8 +7063,6 @@ class ElementArchetypeType final : public LocalArchetypeType,
   friend TrailingObjects;
   friend ArchetypeType;
   friend GenericEnvironment;
-
-  UUID ID;
 
   /// Create a new element archetype in the given environment representing
   /// the interface type.
@@ -7859,36 +7859,9 @@ inline ASTContext &TypeBase::getASTContext() const {
   return *const_cast<ASTContext*>(getCanonicalType()->Context);
 }
 
-inline bool TypeBase::isTypeVariableOrMember() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->is<TypeVariableType>();
-}
-
-inline bool TypeBase::isTypeParameter() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->is<GenericTypeParamType>();
-}
-
 // TODO: This will become redundant once InOutType is removed.
 inline bool TypeBase::isMaterializable() {
   return !(hasLValueType() || is<InOutType>());
-}
-
-inline GenericTypeParamType *TypeBase::getRootGenericParam() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->castTo<GenericTypeParamType>();
 }
 
 inline bool TypeBase::isConstraintType() const {
