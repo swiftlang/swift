@@ -1001,7 +1001,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
         Instance.getMainModule(), Instance.getDependencyTracker(), opts);
 
     dumpAPIIfNeeded(Instance);
-    swift::emitFineModuleTraceIfNeeded(Instance.getMainModule(), opts);
+    swift::emitFineModuleTraceIfNeeded(Instance, opts);
   }
 
   // Contains the hadError checks internally, we still want to output the
