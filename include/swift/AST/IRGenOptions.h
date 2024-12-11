@@ -265,13 +265,13 @@ public:
   std::string ForceLoadSymbolName;
 
   /// The kind of compilation we should do.
-  IRGenOutputKind OutputKind : 3;
+  IRGenOutputKind OutputKind : 3 = IRGenOutputKind::LLVMAssemblyAfterOptimization;
 
   /// Should we spend time verifying that the IR we produce is
   /// well-formed?
-  unsigned Verify : 1;
+  unsigned Verify : 1 = true;
 
-  OptimizationMode OptMode;
+  OptimizationMode OptMode = OptimizationMode::NotSet;
 
   /// Which sanitizer is turned on.
   OptionSet<SanitizerKind> Sanitizers;
@@ -280,9 +280,9 @@ public:
   OptionSet<SanitizerKind> SanitizersWithRecoveryInstrumentation;
 
   /// Whether to enable ODR indicators when building with ASan.
-  unsigned SanitizeAddressUseODRIndicator : 1;
+  unsigned SanitizeAddressUseODRIndicator : 1 = false;
 
-  unsigned SanitizerUseStableABI : 1;
+  unsigned SanitizerUseStableABI : 1 = false;
 
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebugPrefixMap;
@@ -296,34 +296,34 @@ public:
   PathRemapper FilePrefixMap;
 
   /// What level of debug info to generate.
-  IRGenDebugInfoLevel DebugInfoLevel : 2;
+  IRGenDebugInfoLevel DebugInfoLevel : 2 = IRGenDebugInfoLevel::None;
 
   /// What type of debug info to generate.
-  IRGenDebugInfoFormat DebugInfoFormat : 2;
+  IRGenDebugInfoFormat DebugInfoFormat : 2 = IRGenDebugInfoFormat::None;
 
   /// Whether to leave DWARF breadcrumbs pointing to imported Clang modules.
-  unsigned DisableClangModuleSkeletonCUs : 1;
+  unsigned DisableClangModuleSkeletonCUs : 1 = false;
 
   /// Whether we're generating IR for the JIT.
-  unsigned UseJIT : 1;
-  
+  unsigned UseJIT : 1 = false;
+
   /// Whether we should run LLVM optimizations after IRGen.
-  unsigned DisableLLVMOptzns : 1;
+  unsigned DisableLLVMOptzns : 1 = false;
 
   /// Whether we should run swift specific LLVM optimizations after IRGen.
-  unsigned DisableSwiftSpecificLLVMOptzns : 1;
+  unsigned DisableSwiftSpecificLLVMOptzns : 1 = false;
 
   /// Special codegen for playgrounds.
-  unsigned Playground : 1;
+  unsigned Playground : 1 = false;
 
   /// Emit runtime calls to check the end of the lifetime of stack promoted
   /// objects.
-  unsigned EmitStackPromotionChecks : 1;
+  unsigned EmitStackPromotionChecks : 1 = false;
 
-  unsigned UseSingleModuleLLVMEmission : 1;
+  unsigned UseSingleModuleLLVMEmission : 1 = false;
 
   /// Emit functions to separate sections.
-  unsigned FunctionSections : 1;
+  unsigned FunctionSections : 1 = false;
 
   /// The maximum number of bytes used on a stack frame for stack promotion
   /// (includes alloc_stack allocations).
@@ -349,54 +349,54 @@ public:
   unsigned DisableForceLoadSymbols : 1;
 
   /// Print the LLVM inline tree at the end of the LLVM pass pipeline.
-  unsigned PrintInlineTree : 1;
+  unsigned PrintInlineTree : 1 = false;
 
   /// Always recompile the output even if the module hash might match.
-  unsigned AlwaysCompile : 1;
+  unsigned AlwaysCompile : 1 = false;
 
   /// Whether we should embed the bitcode file.
-  IRGenEmbedMode EmbedMode : 2;
+  IRGenEmbedMode EmbedMode : 2 = IRGenEmbedMode::None;
 
-  IRGenLLVMLTOKind LLVMLTOKind : 2;
+  IRGenLLVMLTOKind LLVMLTOKind : 2 = IRGenLLVMLTOKind::None;
 
-  SwiftAsyncFramePointerKind SwiftAsyncFramePointer : 2;
+  SwiftAsyncFramePointerKind SwiftAsyncFramePointer : 2 = SwiftAsyncFramePointerKind::Auto;
 
   /// Add names to LLVM values.
-  unsigned HasValueNamesSetting : 1;
-  unsigned ValueNames : 1;
+  unsigned HasValueNamesSetting : 1 = false;
+  unsigned ValueNames : 1 = false;
 
   /// Emit nominal type field metadata.
-  ReflectionMetadataMode ReflectionMetadata : 2;
+  ReflectionMetadataMode ReflectionMetadata : 2 = ReflectionMetadataMode::Runtime;
 
   /// Emit names of struct stored properties and enum cases.
-  unsigned EnableReflectionNames : 1;
+  unsigned EnableReflectionNames : 1 = true;
 
   /// Emit mangled names of anonymous context descriptors.
-  unsigned EnableAnonymousContextMangledNames : 1;
+  unsigned EnableAnonymousContextMangledNames : 1 = false;
 
   /// Force public linkage for private symbols. Used only by the LLDB
   /// expression evaluator.
-  unsigned ForcePublicLinkage : 1;
-  
+  unsigned ForcePublicLinkage : 1 = false;
+
   /// Force lazy initialization of class metadata
   /// Used on Windows to avoid cross-module references.
-  unsigned LazyInitializeClassMetadata : 1;
-  unsigned LazyInitializeProtocolConformances : 1;
-  unsigned IndirectAsyncFunctionPointer : 1;
+  unsigned LazyInitializeClassMetadata : 1 = false;
+  unsigned LazyInitializeProtocolConformances : 1 = false;
+  unsigned IndirectAsyncFunctionPointer : 1 = false;
 
   /// Use absolute function references instead of relative ones.
   /// Mainly used on WebAssembly, that doesn't support relative references
   /// to code from data.
-  unsigned CompactAbsoluteFunctionPointer : 1;
+  unsigned CompactAbsoluteFunctionPointer : 1 = false;
 
   /// Normally if the -read-legacy-type-info flag is not specified, we look for
   /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
   /// Passing this flag completely disables this behavior.
-  unsigned DisableLegacyTypeInfo : 1;
+  unsigned DisableLegacyTypeInfo : 1 = false;
 
   /// Create metadata specializations for generic types at statically known type
   /// arguments.
-  unsigned PrespecializeGenericMetadata : 1;
+  unsigned PrespecializeGenericMetadata : 1 = false;
 
   /// The path to load legacy type layouts from.
   StringRef ReadLegacyTypeInfoPath;
@@ -406,93 +406,98 @@ public:
   ///
   /// This is a debugging option meant to make it easier to perform compile time
   /// measurements on a non-clean build directory.
-  unsigned UseIncrementalLLVMCodeGen : 1;
+  unsigned UseIncrementalLLVMCodeGen : 1 = true;
 
   /// Enable the use of type layouts for value witness functions and use
   /// vw functions instead of outlined copy/destroy functions.
-  unsigned UseTypeLayoutValueHandling : 1;
+  unsigned UseTypeLayoutValueHandling : 1 = true;
 
   /// Also force structs to be lowered to aligned group TypeLayouts rather than
   /// using TypeInfo entries.
-  unsigned ForceStructTypeLayouts : 1;
+  unsigned ForceStructTypeLayouts : 1 = false;
 
   /// Run a reg2Mem pass after large loadable type lowering.
-  unsigned EnableLargeLoadableTypesReg2Mem : 1;
+  unsigned EnableLargeLoadableTypesReg2Mem : 1 = true;
 
   /// Enable generation and use of layout string based value witnesses
-  unsigned EnableLayoutStringValueWitnesses : 1;
+  unsigned EnableLayoutStringValueWitnesses : 1 = false;
 
   /// Enable runtime instantiation of value witness strings for generic types
-  unsigned EnableLayoutStringValueWitnessesInstantiation : 1;
+  unsigned EnableLayoutStringValueWitnessesInstantiation : 1 = false;
 
-  unsigned EnableObjectiveCProtocolSymbolicReferences : 1;
+  unsigned EnableObjectiveCProtocolSymbolicReferences : 1 = true;
 
   /// Instrument code to generate profiling information.
-  unsigned GenerateProfile : 1;
+  unsigned GenerateProfile : 1 = false;
 
   /// Enable chaining of dynamic replacements.
-  unsigned EnableDynamicReplacementChaining : 1;
+  unsigned EnableDynamicReplacementChaining : 1 = false;
 
   /// Disable round-trip verification of mangled debug types.
-  unsigned DisableRoundTripDebugTypes : 1;
+  unsigned DisableRoundTripDebugTypes : 1 =
+#ifndef NDEBUG
+    false;
+#else
+    true;
+#endif
 
   /// Whether to disable shadow copies for local variables on the stack. This is
   /// only used for testing.
-  unsigned DisableDebuggerShadowCopies : 1;
-  
+  unsigned DisableDebuggerShadowCopies : 1 = false;
+
   /// Whether to disable using mangled names for accessing concrete type metadata.
-  unsigned DisableConcreteTypeMetadataMangledNameAccessors : 1;
+  unsigned DisableConcreteTypeMetadataMangledNameAccessors : 1 = false;
 
   /// Whether to disable referencing stdlib symbols via mangled names in
   /// reflection mangling.
-  unsigned DisableStandardSubstitutionsInReflectionMangling : 1;
+  unsigned DisableStandardSubstitutionsInReflectionMangling : 1 = false;
 
-  unsigned EnableGlobalISel : 1;
+  unsigned EnableGlobalISel : 1 = false;
 
-  unsigned VirtualFunctionElimination : 1;
+  unsigned VirtualFunctionElimination : 1 = false;
 
-  unsigned WitnessMethodElimination : 1;
+  unsigned WitnessMethodElimination : 1 = false;
 
-  unsigned ConditionalRuntimeRecords : 1;
+  unsigned ConditionalRuntimeRecords : 1 = false;
 
-  unsigned InternalizeAtLink : 1;
+  unsigned InternalizeAtLink : 1 = false;
 
   /// Internalize symbols (static library) - do not export any public symbols.
-  unsigned InternalizeSymbols : 1;
+  unsigned InternalizeSymbols : 1 = false;
 
   /// Emit a section with references to class_ro_t* in generic class patterns.
-  unsigned EmitGenericRODatas : 1;
+  unsigned EmitGenericRODatas : 1 = true;
 
   /// Whether to avoid emitting zerofill globals as preallocated type metadata
   /// and protocol conformance caches.
-  unsigned NoPreallocatedInstantiationCaches : 1;
+  unsigned NoPreallocatedInstantiationCaches : 1 = false;
 
-  unsigned DisableReadonlyStaticObjects : 1;
+  unsigned DisableReadonlyStaticObjects : 1 = false;
 
   /// Collocate metadata functions in their own section.
-  unsigned CollocatedMetadataFunctions : 1;
+  unsigned CollocatedMetadataFunctions : 1 = false;
 
   /// Colocate type descriptors in their own section.
-  unsigned ColocateTypeDescriptors : 1;
+  unsigned ColocateTypeDescriptors : 1 = true;
 
   /// Use relative (and constant) protocol witness tables.
-  unsigned UseRelativeProtocolWitnessTables : 1;
+  unsigned UseRelativeProtocolWitnessTables : 1 = false;
 
-  unsigned UseFragileResilientProtocolWitnesses : 1;
+  unsigned UseFragileResilientProtocolWitnesses : 1 = false;
 
   // Whether to run the HotColdSplitting pass when optimizing.
-  unsigned EnableHotColdSplit : 1;
+  unsigned EnableHotColdSplit : 1 = false;
 
-  unsigned EmitAsyncFramePushPopMetadata : 1;
+  unsigned EmitAsyncFramePushPopMetadata : 1 = true;
 
   // Whether to use the yield_once ABI when emitting yield_once_2 coroutines.
-  unsigned EmitYieldOnce2AsYieldOnce : 1;
+  unsigned EmitYieldOnce2AsYieldOnce : 1 = true;
 
   // Whether to force emission of a frame for all async functions
   // (LLVM's 'frame-pointer=all').
-  unsigned AsyncFramePointerAll : 1;
+  unsigned AsyncFramePointerAll : 1 = false;
 
-  unsigned UseProfilingMarkerThunks : 1;
+  unsigned UseProfilingMarkerThunks : 1 = false;
 
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
@@ -505,7 +510,7 @@ public:
   std::string UseSampleProfile = "";
 
   /// Controls whether DWARF discriminators are added to the IR.
-  unsigned DebugInfoForProfiling : 1;
+  unsigned DebugInfoForProfiling : 1 = false;
 
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
@@ -523,8 +528,8 @@ public:
     Fragile
   };
 
-  TypeInfoDumpFilter TypeInfoFilter;
-  
+  TypeInfoDumpFilter TypeInfoFilter = TypeInfoDumpFilter::All;
+
   /// Pull in runtime compatibility shim libraries by autolinking.
   std::optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
   std::optional<llvm::VersionTuple>
@@ -540,13 +545,13 @@ public:
   std::string TrapFuncName = "";
 
   /// The calling convention used to perform non-swift calls.
-  llvm::CallingConv::ID PlatformCCallingConvention;
+  llvm::CallingConv::ID PlatformCCallingConvention = llvm::CallingConv::C;
 
   /// Use CAS based object format as the output.
-  bool UseCASBackend;
+  bool UseCASBackend = false;
 
   /// The output mode for the CAS Backend.
-  llvm::CASBackendMode CASObjMode;
+  llvm::CASBackendMode CASObjMode = llvm::CASBackendMode::Native;
 
   /// Emit a .casid file next to the object file if CAS Backend is used.
   bool EmitCASIDFile;
@@ -555,56 +560,9 @@ public:
   std::vector<std::string> LLVMPassPlugins;
 
   IRGenOptions()
-      : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
-        Verify(true), OptMode(OptimizationMode::NotSet),
-        Sanitizers(OptionSet<SanitizerKind>()),
+      : Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
-        SanitizeAddressUseODRIndicator(false), SanitizerUseStableABI(false),
-        DebugInfoLevel(IRGenDebugInfoLevel::None),
-        DebugInfoFormat(IRGenDebugInfoFormat::None),
-        DisableClangModuleSkeletonCUs(false), UseJIT(false),
-        DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
-        Playground(false), EmitStackPromotionChecks(false),
-        UseSingleModuleLLVMEmission(false), FunctionSections(false),
-        PrintInlineTree(false), AlwaysCompile(false),
-        EmbedMode(IRGenEmbedMode::None), LLVMLTOKind(IRGenLLVMLTOKind::None),
-        SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
-        HasValueNamesSetting(false), ValueNames(false),
-        ReflectionMetadata(ReflectionMetadataMode::Runtime),
-        EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
-        ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
-        LazyInitializeProtocolConformances(false),
-        IndirectAsyncFunctionPointer(false),
-        CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
-        PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
-        UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
-        EnableLargeLoadableTypesReg2Mem(true),
-        EnableLayoutStringValueWitnesses(false),
-        EnableLayoutStringValueWitnessesInstantiation(false),
-        EnableObjectiveCProtocolSymbolicReferences(true),
-        GenerateProfile(false), EnableDynamicReplacementChaining(false),
-        DisableDebuggerShadowCopies(false),
-        DisableConcreteTypeMetadataMangledNameAccessors(false),
-        DisableStandardSubstitutionsInReflectionMangling(false),
-        EnableGlobalISel(false), VirtualFunctionElimination(false),
-        WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
-        InternalizeAtLink(false), InternalizeSymbols(false),
-        EmitGenericRODatas(true), NoPreallocatedInstantiationCaches(false),
-        DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
-        ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
-        UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
-        EmitAsyncFramePushPopMetadata(true), EmitYieldOnce2AsYieldOnce(true),
-        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
-        DebugInfoForProfiling(false), CmdArgs(),
-        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
-        TypeInfoFilter(TypeInfoDumpFilter::All),
-        PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
-        CASObjMode(llvm::CASBackendMode::Native) {
-#ifndef NDEBUG
-    DisableRoundTripDebugTypes = false;
-#else
-    DisableRoundTripDebugTypes = true;
-#endif
+        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()) {
   }
 
   /// Appends to \p os an arbitrary string representing all options which
