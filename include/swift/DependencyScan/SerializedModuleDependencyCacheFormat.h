@@ -116,7 +116,7 @@ using MetadataLayout = BCRecordLayout<
     METADATA,    // ID
     BCFixed<16>, // Inter-Module Dependency graph format major version
     BCFixed<16>, // Inter-Module Dependency graph format minor version
-    BCBlob       // Compiler version string
+    BCBlob       // Scanner Invocation Context Hash
     >;
 
 // After the metadata record, we have zero or more identifier records,
