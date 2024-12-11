@@ -1,6 +1,6 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-5.9 | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -access-filter-public -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-5.9 | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -access-filter-public -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -access-filter-public -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
 
 // CHECK: struct LoadableIntWrapper {
 // CHECK:   func successor() -> LoadableIntWrapper
@@ -243,7 +243,6 @@
 // CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
-// CHECK-NEXT:   var value: Int32
 // CHECK-NEXT: }
 
 // CHECK: struct AmbiguousOperatorStar2 {
@@ -255,7 +254,6 @@
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
-// CHECK-NEXT:   var value: Int32
 // CHECK-NEXT: }
 
 // CHECK: struct DerivedFromConstIterator {
@@ -263,6 +261,10 @@
 // TODO:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
 // TODO: `var pointee` should be printed here
+// CHECK-NEXT: }
+
+// CHECK: struct DerivedFromConstIteratorPrivately {
+// CHECK-NEXT:   init()
 // CHECK-NEXT: }
 
 // CHECK: struct DerivedFromConstIteratorPrivatelyWithUsingDecl {
