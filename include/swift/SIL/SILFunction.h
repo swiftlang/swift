@@ -1565,6 +1565,17 @@ public:
     }
   }
 
+  /// Populate \p output with every block terminated by an unreachable
+  /// instruction.
+  void findUnreachableTerminatedBlocks(
+      llvm::SmallVectorImpl<SILBasicBlock *> &output) const {
+    for (auto &block : const_cast<SILFunction &>(*this)) {
+      if (isa<UnreachableInst>(block.getTerminator())) {
+        output.push_back(&block);
+      }
+    }
+  }
+
   //===--------------------------------------------------------------------===//
   // Argument Helper Methods
   //===--------------------------------------------------------------------===//
