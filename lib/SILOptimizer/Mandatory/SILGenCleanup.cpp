@@ -110,6 +110,9 @@ bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
   if (!getModule()->getOptions().OSSACompleteLifetimes)
     return false;
 
+  LLVM_DEBUG(llvm::dbgs() << "Completing lifetimes in " << function->getName()
+                          << "\n");
+
   bool changed = false;
 
   // Lifetimes must be completed inside out (bottom-up in the CFG).
@@ -118,20 +121,26 @@ bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
   DeadEndBlocks *deb = getAnalysis<DeadEndBlocksAnalysis>()->get(function);
   OSSALifetimeCompletion completion(function, /*DomInfo*/ nullptr, *deb);
   for (auto *block : postOrder->getPostOrder()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Completing lifetimes in bb" << block->getDebugID() << "\n");
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {
+        LLVM_DEBUG(llvm::dbgs() << "completing " << result << "\n");
         if (completion.completeOSSALifetime(
                 result, OSSALifetimeCompletion::Boundary::Availability) ==
             LifetimeCompletion::WasCompleted) {
+          LLVM_DEBUG(llvm::dbgs() << "\tcompleted!\n");
           changed = true;
         }
       }
     }
     for (SILArgument *arg : block->getArguments()) {
+      LLVM_DEBUG(llvm::dbgs() << "completing " << *arg << "\n");
       assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
       if (completion.completeOSSALifetime(
               arg, OSSALifetimeCompletion::Boundary::Availability) ==
           LifetimeCompletion::WasCompleted) {
+        LLVM_DEBUG(llvm::dbgs() << "\tcompleted!\n");
         changed = true;
       }
     }
