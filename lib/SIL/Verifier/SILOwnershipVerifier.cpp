@@ -910,19 +910,6 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   if (isa<SILUndef>(*this))
     return;
 
-#ifdef NDEBUG
-  // When compiling without asserts enabled, only verify ownership if
-  // -sil-verify-all is set.
-  //
-  // NOTE: We purposely return if we do can not look up a module here to ensure
-  // that if we run into something that we do not understand, we do not assert
-  // in user code even though we aren't going to actually verify (the default
-  // behavior when -sil-verify-all is disabled).
-  auto *mod = Value->getModule();
-  if (!mod || !mod->getOptions().VerifyAll)
-    return;
-#endif
-
   // Make sure that we are not a value of an instruction in a SILGlobalVariable
   // block.
   if (auto *definingInst = getDefiningInstruction()) {
@@ -955,13 +942,6 @@ void SILModule::verifyOwnership() const {
   if (DisableOwnershipVerification)
     return;
 
-#ifdef NDEBUG
-  // When compiling without asserts enabled, only verify ownership if
-  // -sil-verify-all is set.
-  if (!getOptions().VerifyAll)
-    return;
-#endif
-
   for (const SILFunction &function : *this) {
     std::unique_ptr<DeadEndBlocks> deBlocks;
     if (!getOptions().OSSAVerifyComplete) {
@@ -977,19 +957,6 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
     return;
   if (!getModule().getOptions().VerifySILOwnership)
     return;
-
-#ifdef NDEBUG
-  // When compiling without asserts enabled, only verify ownership if
-  // -sil-verify-all is set.
-  //
-  // NOTE: We purposely return if we do can not look up a module here to ensure
-  // that if we run into something that we do not understand, we do not assert
-  // in user code even though we aren't going to actually verify (the default
-  // behavior when -sil-verify-all is disabled).
-  auto *mod = &getModule();
-  if (!mod || !mod->getOptions().VerifyAll)
-    return;
-#endif
 
   // If the given function has unqualified ownership or we have been asked by
   // the user not to verify this function, there is nothing to verify.
