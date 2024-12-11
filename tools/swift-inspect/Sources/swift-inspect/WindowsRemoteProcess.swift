@@ -470,13 +470,13 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       return false
     }
 
-    var dwExitCode: DWORD = 1
+    var dwExitCode: DWORD = 0
     guard GetExitCodeThread(hThread, &dwExitCode) else {
       print("GetExitCodeThread for unload failed \(GetLastError())")
       return false
     }
 
-    guard dwExitCode == 0 else {
+    guard dwExitCode != 0 else {
       print("FreeLibrary failed \(dwExitCode)")
       return false
     }
