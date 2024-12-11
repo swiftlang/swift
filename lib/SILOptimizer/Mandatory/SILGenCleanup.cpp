@@ -110,28 +110,54 @@ bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
   if (!getModule()->getOptions().OSSACompleteLifetimes)
     return false;
 
+  LLVM_DEBUG(llvm::dbgs() << "Completing lifetimes in " << function->getName()
+                          << "\n");
+
   bool changed = false;
 
   // Lifetimes must be completed inside out (bottom-up in the CFG).
-  PostOrderFunctionInfo *postOrder =
-      getAnalysis<PostOrderAnalysis>()->get(function);
+  //
+  // However:
+  // (1) Only defs backwards-reachable from `unreachable` instructions need to
+  //     be completed (it is never valid to underconsume a value on a
+  //     function-exiting path, even with incomplete lifetimes).
+  // (2) Defs in blocks that aren't reachable from function exit may _still_
+  //     need to be completed.
+  //
+  // So, find all blocks backwards-reachable from unreachable instructions.  And
+  // visit them in post-order.
+  SmallVector<SILBasicBlock *> roots;
+  function->findUnreachableTerminatedBlocks(roots);
+  struct FunctionRegion {
+    bool isInRegion(SILBasicBlock *) { return true; }
+  } region;
+  SILCFGBackwardDFS<FunctionRegion> dfs(region, roots);
   DeadEndBlocks *deb = getAnalysis<DeadEndBlocksAnalysis>()->get(function);
   OSSALifetimeCompletion completion(function, /*DomInfo*/ nullptr, *deb);
-  for (auto *block : postOrder->getPostOrder()) {
+  // The depth-first-search was backwards from the unreachable-terminated
+  // blocks: its post-order is top-down in the CFG.  To visit defs inside-out
+  // that order must be reversed.
+  for (auto *block : llvm::reverse(dfs.postOrder())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Completing lifetimes in " << block->getDebugID() << "\n");
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {
+        LLVM_DEBUG(llvm::dbgs() << "completing " << result << "\n");
         if (completion.completeOSSALifetime(
                 result, OSSALifetimeCompletion::Boundary::Availability) ==
             LifetimeCompletion::WasCompleted) {
+          LLVM_DEBUG(llvm::dbgs() << "\tcompleted!\n");
           changed = true;
         }
       }
     }
     for (SILArgument *arg : block->getArguments()) {
+      LLVM_DEBUG(llvm::dbgs() << "completing " << *arg << "\n");
       assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
       if (completion.completeOSSALifetime(
               arg, OSSALifetimeCompletion::Boundary::Availability) ==
           LifetimeCompletion::WasCompleted) {
+        LLVM_DEBUG(llvm::dbgs() << "\tcompleted!\n");
         changed = true;
       }
     }

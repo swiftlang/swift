@@ -141,3 +141,27 @@ exit:
 die:
   unreachable
 }
+
+// CHECK-LABEL: sil [ossa] @unreachable_def : {{.*}} {
+// CHECK:       bb2:
+// CHECK-NEXT:    [[DEF:%[^,]+]] = apply
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_value [dead_end] [[DEF]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_def'
+sil [ossa] @unreachable_def : $@convention(thin) () -> () {
+entry:
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+
+nowhere:
+  %def = apply undef() : $@convention(thin) () -> (@owned C)
+  br die
+
+die:
+  unreachable
+}
