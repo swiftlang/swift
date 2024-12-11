@@ -23,6 +23,7 @@ class DependencyTracker;
 class FrontendOptions;
 class InputFile;
 class ModuleDecl;
+class CompilerInstance;
 
 /// Emit the names of the modules imported by \c mainModule.
 bool emitImportedModules(ModuleDecl *mainModule, const FrontendOptions &opts,
@@ -32,7 +33,7 @@ bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                                    const FrontendOptions &opts,
                                    const InputFile &input);
 
-bool emitFineModuleTraceIfNeeded(ModuleDecl *mainModule,
+bool emitFineModuleTraceIfNeeded(CompilerInstance &Instance,
                                  const FrontendOptions &opts);
 
 } // end namespace swift

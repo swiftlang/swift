@@ -22,6 +22,7 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -853,7 +854,8 @@ public:
   }
 };
 
-static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
+static void createFineModuleTraceFile(CompilerInstance &instance,
+                                      const InputFile &input) {
   StringRef tracePath = input.getFineModuleTracePath();
   if (tracePath.empty()) {
     // we basically rely on the passing down of module trace file path
@@ -862,27 +864,8 @@ static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
     // specifically.
     return;
   }
+  ModuleDecl *MD = instance.getMainModule();
   auto &ctx = MD->getASTContext();
-  std::vector<SourceFile*> filesToWalk;
-  for (auto *FU : MD->getFiles()) {
-    if (auto *SF = dyn_cast<SourceFile>(FU)) {
-      switch (SF->Kind) {
-      case swift::SourceFileKind::Library:
-      case swift::SourceFileKind::Main:
-      case swift::SourceFileKind::MacroExpansion:
-      case swift::SourceFileKind::DefaultArgument:
-        filesToWalk.push_back(SF);
-        LLVM_FALLTHROUGH;
-      case swift::SourceFileKind::SIL:
-      case swift::SourceFileKind::Interface:
-        continue;
-      }
-    }
-  }
-  // No source files to walk, abort.
-  if (filesToWalk.empty()) {
-    return;
-  }
   // Write output via atomic append.
   llvm::vfs::OutputConfig config;
   config.setAppend().setAtomicWrite();
@@ -893,10 +876,11 @@ static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
     return;
   }
   ObjcMethodReferenceCollector collector(MD);
-  for (auto *SF: filesToWalk) {
-    collector.setFileBeforeVisiting(SF);
-    collector.walk(*SF);
-  }
+  instance.forEachFileToTypeCheck([&](SourceFile& SF) {
+    collector.setFileBeforeVisiting(&SF);
+    collector.walk(SF);
+    return false;
+  });
 
   // print this json line.
   std::string stringBuffer;
@@ -915,8 +899,9 @@ static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
   }
 }
 
-bool swift::emitFineModuleTraceIfNeeded(ModuleDecl *mainModule,
+bool swift::emitFineModuleTraceIfNeeded(CompilerInstance &Instance,
                                         const FrontendOptions &opts) {
+  ModuleDecl *mainModule = Instance.getMainModule();
   // When lazy type checking is enabled, we may end up with a partial AST.
   // Walking on these partial AST completely may expose latent bugs.
   if (mainModule->getASTContext().TypeCheckerOpts.EnableLazyTypecheck)
@@ -926,7 +911,7 @@ bool swift::emitFineModuleTraceIfNeeded(ModuleDecl *mainModule,
          "We should've already exited earlier if there was an error.");
 
   opts.InputsAndOutputs.forEachInput([&](const InputFile &input) {
-    createFineModuleTraceFile(input, mainModule);
+    createFineModuleTraceFile(Instance, input);
     return true;
   });
   return false;
