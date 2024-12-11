@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
-
+// REQUIRES: rdar141262107
 import SwiftUI
 
 var foo = doesntExist // expected-error {{cannot find 'doesntExist' in scope}}
