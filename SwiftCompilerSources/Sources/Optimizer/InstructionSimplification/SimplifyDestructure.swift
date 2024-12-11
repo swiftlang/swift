@@ -15,6 +15,21 @@ import SIL
 extension DestructureTupleInst : OnoneSimplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
 
+    // If the tuple is trivial, replace
+    // ```
+    //   (%1, %2) = destructure_tuple %t
+    // ```
+    // ->
+    // ```
+    //   %1 = tuple_extract %t, 0
+    //   %2 = tuple_extract %t, 1
+    // ```
+    // This canonicalization helps other optimizations to e.g. CSE tuple_extracts.
+    //
+    if replaceWithTupleExtract(context) {
+      return
+    }
+
     // Eliminate the redundant instruction pair
     // ```
     //   %t = tuple (%0, %1, %2)
@@ -26,10 +41,38 @@ extension DestructureTupleInst : OnoneSimplifyable, SILCombineSimplifyable {
       tryReplaceConstructDestructPair(construct: tuple, destruct: self, context)
     }
   }
+
+  private func replaceWithTupleExtract(_ context: SimplifyContext) -> Bool {
+    guard self.tuple.type.isTrivial(in: parentFunction) else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    for (elementIdx, result) in results.enumerated() {
+      let elementValue = builder.createTupleExtract(tuple: self.tuple, elementIndex: elementIdx)
+      result.uses.replaceAll(with: elementValue, context)
+    }
+    context.erase(instruction: self)
+    return true
+  }
 }
 
 extension DestructureStructInst : OnoneSimplifyable, SILCombineSimplifyable {
   func simplify(_ context: SimplifyContext) {
+
+    // If the struct is trivial, replace
+    // ```
+    //   (%1, %2) = destructure_struct %s
+    // ```
+    // ->
+    // ```
+    //   %1 = struct_extract %s, #S.field0
+    //   %2 = struct_extract %s, #S.field1
+    // ```
+    // This canonicalization helps other optimizations to e.g. CSE tuple_extracts.
+    //
+    if replaceWithStructExtract(context) {
+      return
+    }
 
     switch self.struct {
     case let str as StructInst:
@@ -81,6 +124,19 @@ extension DestructureStructInst : OnoneSimplifyable, SILCombineSimplifyable {
     default:
       break
     }
+  }
+
+  private func replaceWithStructExtract(_ context: SimplifyContext) -> Bool {
+    guard self.struct.type.isTrivial(in: parentFunction) else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    for (fieldIdx, result) in results.enumerated() {
+      let fieldValue = builder.createStructExtract(struct: self.struct, fieldIndex: fieldIdx)
+      result.uses.replaceAll(with: fieldValue, context)
+    }
+    context.erase(instruction: self)
+    return true
   }
 }
 

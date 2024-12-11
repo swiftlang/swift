@@ -31,6 +31,8 @@ sil @takeC : $@convention(thin) (@guaranteed C) -> ()
 sil @takeOwnedC : $@convention(thin) (@owned C) -> ()
 sil @takeS1 : $@convention(thin) (@guaranteed S1) -> ()
 sil @takeS2 : $@convention(thin) (@guaranteed S2) -> ()
+sil @simple_func : $@convention(thin) () -> ()
+sil @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
 
 // CHECK-LABEL: sil [ossa] @replace_simple :
 // CHECK-NOT:     begin_borrow
@@ -438,3 +440,43 @@ bb3:
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: sil [ossa] @remove_borrow_of_thin_function :
+// CHECK:         %1 = thin_to_thick_function
+// CHECK-NOT:     begin_borrow
+// CHECK:         %3 = apply %2(%1)
+// CHECK:         %4 = apply %1()
+// CHECK-LABEL: } // end sil function 'remove_borrow_of_thin_function'
+sil [ossa] @remove_borrow_of_thin_function : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @simple_func : $@convention(thin) () -> ()
+  %1 = thin_to_thick_function %0 to $@callee_guaranteed () -> ()
+  %2 = begin_borrow %1
+  %3 = function_ref @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %5 = apply %2(): $@callee_guaranteed () -> ()
+  end_borrow %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_borrow_of_thin_function :
+// CHECK:         thin_to_thick_function
+// CHECK-NEXT:    begin_borrow
+// CHECK-LABEL: } // end sil function 'dont_remove_borrow_of_thin_function'
+sil [ossa] @dont_remove_borrow_of_thin_function : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @simple_func : $@convention(thin) () -> ()
+  %1 = thin_to_thick_function %0 to $@callee_guaranteed () -> ()
+  %2 = begin_borrow %1
+  %3 = function_ref @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %5 = apply %2(): $@callee_guaranteed () -> ()
+  br bb1(%2)
+bb1(%7 : @reborrow $@callee_guaranteed () -> ()):
+  %8 = borrowed %7 from ()
+  end_borrow %8
+  %r = tuple ()
+  return %r
+}
+

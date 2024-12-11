@@ -14,6 +14,10 @@ class Storage {
   init()
 }
 
+struct NonCopyable : ~Copyable {
+  var x: Int
+}
+
 // globalArray
 sil_global @globalArray : $Storage
 
@@ -218,7 +222,7 @@ bb2:
   return %52 : $()
 }
 
-public protocol P : class {
+public protocol P : AnyObject {
   func foo() -> Int32
   func boo() -> Int32
 }
@@ -1527,4 +1531,78 @@ bb2:
   return %r1 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_non_trivial_load :
+// CHECK:       bb1:
+// CHECK-NEXT:   load [copy]
+// CHECK:       } // end sil function 'dont_hoist_non_trivial_load'
+sil [ossa] @dont_hoist_non_trivial_load : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  br bb1
+bb1:
+  %2 = load [copy] %0
+  fix_lifetime %2
+  destroy_value %2
+  cond_br undef, bb2, bb3
+bb2:
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_trivial_load :
+// CHECK:         load [trivial]
+// CHECK-NEXT:  br bb1  
+// CHECK:       } // end sil function 'hoist_trivial_load'
+sil [ossa] @hoist_trivial_load : $@convention(thin) (@inout Int) -> () {
+bb0(%0 : $*Int):
+  br bb1
+bb1:
+  %2 = load [trivial] %0
+  fix_lifetime %2
+  cond_br undef, bb2, bb3
+bb2:
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_load_borrow :
+// CHECK:       bb1:
+// CHECK-NEXT:    load_borrow
+// CHECK:       } // end sil function 'dont_hoist_load_borrow'
+sil [ossa] @dont_hoist_load_borrow : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  br bb1
+bb1:
+  %2 = load_borrow %0
+  fix_lifetime %2
+  end_borrow %2
+  cond_br undef, bb2, bb3
+bb2:
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_struct :
+// CHECK:       bb1:
+// CHECK-NEXT:    struct $NonCopyable
+// CHECK:       } // end sil function 'dont_hoist_struct'
+sil [ossa] @dont_hoist_struct : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  br bb1
+bb1:
+  %2 = struct $NonCopyable (%0)
+  fix_lifetime %2
+  destroy_value %2
+  cond_br undef, bb2, bb3
+bb2:
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
 

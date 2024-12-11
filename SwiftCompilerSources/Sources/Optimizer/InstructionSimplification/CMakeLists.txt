@@ -9,7 +9,7 @@
 swift_compiler_sources(Optimizer
   SimplifyAllocRefDynamic.swift
   SimplifyApply.swift
-  SimplifyBeginBorrow.swift
+  SimplifyBeginAndLoadBorrow.swift
   SimplifyBeginCOWMutation.swift
   SimplifyBranch.swift
   SimplifyBuiltin.swift
