@@ -83,6 +83,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "silgen-poly"
+#include "ArgumentSource.h"
 #include "ExecutorBreadcrumb.h"
 #include "FunctionInputGenerator.h"
 #include "Initialization.h"
@@ -293,6 +294,90 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
                      return manageOpaqueValue(input, loc, C);
                    });
 }
+
+ManagedValue
+SILGenFunction::emitTangentVectorToOptionalTangentVector(SILLocation loc,
+                                                         ManagedValue input,
+                                                         CanType inputType,
+                                                         CanType outputType,
+                                                         SGFContext ctxt) {
+  auto *optionalTanDecl = outputType.getNominalOrBoundGenericNominal();
+  // Look up the `Optional<T>.TangentVector.init` declaration.
+  auto initLookup =
+    optionalTanDecl->lookupDirect(DeclBaseName::createConstructor());
+  ConstructorDecl *constructorDecl = nullptr;
+  for (auto *candidate : initLookup) {
+    auto candidateModule = candidate->getModuleContext();
+    if (candidateModule->getName() ==
+        getASTContext().Id_Differentiation ||
+        candidateModule->isStdlibModule()) {
+      assert(!constructorDecl && "Multiple `Optional.TangentVector.init`s");
+      constructorDecl = cast<ConstructorDecl>(candidate);
+#ifdef NDEBUG
+      break;
+#endif
+    }
+  }
+  assert(constructorDecl && "No `Optional.TangentVector.init`");
+
+  // `Optional<T.TangentVector>`
+  CanType optionalOfWrappedTanType = inputType.wrapInOptionalType();
+
+  const TypeLowering &optTL = getTypeLowering(optionalOfWrappedTanType);
+  auto optVal = emitInjectOptional(loc, optTL, ctxt,
+                                   [&](SGFContext objectCtxt) {
+                                     return input;
+                                   });
+  auto *diffProto = getASTContext().getProtocol(KnownProtocolKind::Differentiable);
+  auto diffConf = lookupConformance(inputType, diffProto);
+  assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
+  ConcreteDeclRef initDecl(constructorDecl,
+                           SubstitutionMap::get(constructorDecl->getGenericSignature(),
+                                                {inputType}, {diffConf}));
+  PreparedArguments args({AnyFunctionType::Param(optionalOfWrappedTanType)});
+  args.add(loc, RValue(*this, {optVal}, optionalOfWrappedTanType));
+
+  auto result = emitApplyAllocatingInitializer(loc, initDecl,
+                                               std::move(args), outputType, ctxt);
+  if (result.isInContext())
+    return ManagedValue::forInContext();
+  return std::move(result).getAsSingleValue(*this, loc);
+}
+
+ManagedValue
+SILGenFunction::emitOptionalTangentVectorToTangentVector(SILLocation loc,
+                                                         ManagedValue input,
+                                                         CanType inputType,
+                                                         CanType outputType,
+                                                         SGFContext ctxt) {
+  // Optional<T>.TangentVector should be a struct with a single
+  // Optional<T.TangentVector> property. This is an implementation detail of
+  // OptionalDifferentiation.swift
+  // TODO: Maybe it would be better to have getters / setters here that we
+  // can call and hide this implementation detail?
+  StructDecl *optStructDecl = inputType.getStructOrBoundGenericStruct();
+  VarDecl *wrappedValueVar = nullptr;
+  if (optStructDecl) {
+    ArrayRef<VarDecl *> properties = optStructDecl->getStoredProperties();
+    wrappedValueVar = properties.size() == 1 ? properties[0] : nullptr;
+  }
+
+  EnumDecl *optDecl = wrappedValueVar ?
+    wrappedValueVar->getTypeInContext()->getEnumOrBoundGenericEnum() :
+    nullptr;
+
+  if (!optStructDecl || optDecl != getASTContext().getOptionalDecl())
+    llvm_unreachable("Unexpected type of Optional.TangentVector");
+
+  FormalEvaluationScope scope(*this);
+  auto wrappedVal = B.createStructExtract(loc, input, wrappedValueVar);
+  return emitCheckedGetOptionalValueFrom(loc, wrappedVal,
+                                         /*isImplicitUnwrap*/ true,
+                                         getTypeLowering(wrappedVal.getType()),
+                                         ctxt);
+}
+
+
 
 /// Apply this transformation to an arbitrary value.
 RValue Transform::transform(RValue &&input,
@@ -673,6 +758,41 @@ ManagedValue Transform::transform(ManagedValue v,
     if (result.isInContext())
       return ManagedValue::forInContext();
     return std::move(result).getAsSingleValue(SGF, Loc);
+  }
+
+  // - T.TangentVector to Optional<T>.TangentVector
+  // Optional<T>.TangentVector is a struct wrapping Optional<T.TangentVector>
+  // So we just need to call appropriate .init on it.
+  // However, we might have T.TangentVector == T, so we need to calculate all
+  // required types first.
+  if (CanType optionalTy = outputSubstType.getNominalParent(); // `Optional<T>`
+      optionalTy && (bool)optionalTy.getOptionalObjectType()) {
+    // `T`
+    CanType wrappedType = optionalTy.getOptionalObjectType();
+    // Check that T.TangentVector is indeed inputSubstType (this also handles
+    // case when T == T.TangentVector)
+    auto inputTanSpace =
+      wrappedType->getAutoDiffTangentSpace(LookUpConformanceInModule());
+    if (inputTanSpace &&
+        inputTanSpace->getCanonicalType() == inputSubstType)
+      return SGF.emitTangentVectorToOptionalTangentVector(Loc, v,
+                                                          inputSubstType, outputSubstType,
+                                                          ctxt);
+  }
+
+  // - Optional<T>.TangentVector to T.TangentVector.
+  if (CanType optionalTy = inputSubstType.getNominalParent(); // `Optional<T>`
+      optionalTy && (bool)optionalTy.getOptionalObjectType()) {
+    CanType wrappedType = optionalTy.getOptionalObjectType(); // `T`
+    // Check that T.TangentVector is indeed outputSubstType (this also handles
+    // case when T == T.TangentVector)
+    auto outputTanSpace =
+      wrappedType->getAutoDiffTangentSpace(LookUpConformanceInModule());
+    if (outputTanSpace &&
+        outputTanSpace->getCanonicalType() == outputSubstType)
+      return SGF.emitOptionalTangentVectorToTangentVector(Loc, v,
+                                                          inputSubstType, outputSubstType,
+                                                          ctxt);
   }
 
   // Should have handled the conversion in one of the cases above.
