@@ -433,7 +433,7 @@ bb0(%0 : $*D, %1 : @guaranteed $D):
 
 // CHECK-LABEL: begin running test 2 of 2 on testInteriorDropDeinit: interior_liveness_swift with: %0
 // CHECK: Interior liveness: %0 = argument of bb0 : $NCInt
-// CHECK-NEXT: begin:      [[DD:%.*]] = drop_deinit %0 : $NCInt
+// CHECK-NEXT: begin:      bb0
 // CHECK-NEXT: ends:       [[DD]] = drop_deinit %0 : $NCInt
 // CHECK-NEXT: exits:
 // CHECK-NEXT: interiors:
@@ -1122,7 +1122,7 @@ bb4(%inner4 : @guaranteed $D):
 
 // CHECK-LABEL: testInnerNonAdjacentReborrow: interior_liveness_swift with: %outer3
 // CHECK: Interior liveness: %{{.*}} = argument of bb3 : $D
-// CHECK-NEXT: begin:      {{.*}} borrowed {{.*}} from
+// CHECK-NEXT: begin:      bb3
 // CHECK-NEXT: ends:
 // CHECK-NEXT: exits:
 // CHECK-NEXT: interiors:

@@ -195,6 +195,8 @@ PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
 PASS(DestroyAddrHoisting, "destroy-addr-hoisting",
      "Hoist destroy_addr for uniquely identified values")
+SWIFT_FUNCTION_PASS(DestroyHoisting, "destroy-hoisting",
+     "Hoist destroy_value instructions")
 PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
