@@ -108,7 +108,8 @@ createFuncOrAccessor(ClangImporter::Implementation &impl, SourceLoc funcLoc,
                      std::optional<AccessorInfo> accessorInfo, DeclName name,
                      SourceLoc nameLoc, GenericParamList *genericParams,
                      ParameterList *bodyParams, Type resultTy, bool async,
-                     bool throws, DeclContext *dc, ClangNode clangNode) {
+                     bool throws, DeclContext *dc, ClangNode clangNode,
+                     bool hasBoundsAnnotation) {
   FuncDecl *decl;
   if (accessorInfo) {
     decl = AccessorDecl::create(
@@ -124,6 +125,9 @@ createFuncOrAccessor(ClangImporter::Implementation &impl, SourceLoc funcLoc,
                                     genericParams, dc, clangNode);
   }
   impl.importSwiftAttrAttributes(decl);
+  if (hasBoundsAnnotation)
+    impl.importBoundsAttributes(decl);
+
   return decl;
 }
 
@@ -3272,7 +3276,8 @@ namespace {
       }
       return Impl.importFunctionParameterList(
           dc, decl, nonSelfParams, decl->isVariadic(), allowNSUIntegerAsInt,
-          argNames, genericParams, /*resultType=*/nullptr);
+          argNames, genericParams, /*resultType=*/nullptr,
+          /*hasBoundsAnnotatedParam=*/nullptr);
     }
 
     Decl *
@@ -3690,6 +3695,7 @@ namespace {
 
       bool importFuncWithoutSignature =
           isa<clang::CXXMethodDecl>(decl) && Impl.importSymbolicCXXDecls;
+      bool hasBoundsAnnotation = false;
       if (!dc->isModuleScopeContext() && !isa<clang::CXXMethodDecl>(decl)) {
         // Handle initializers.
         if (name.getBaseName().isConstructor()) {
@@ -3786,7 +3792,7 @@ namespace {
           importedType = Impl.importFunctionParamsAndReturnType(
               dc, decl, {decl->param_begin(), decl->param_size()},
               decl->isVariadic(), isInSystemModule(dc), name, bodyParams,
-              templateParams);
+              templateParams, &hasBoundsAnnotation);
         }
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
@@ -3853,10 +3859,10 @@ namespace {
         auto resultTy = importedType.getType();
 
         FuncDecl *func =
-            createFuncOrAccessor(Impl, loc, accessorInfo, name,
-                                 nameLoc, genericParams, bodyParams, resultTy,
+            createFuncOrAccessor(Impl, loc, accessorInfo, name, nameLoc,
+                                 genericParams, bodyParams, resultTy,
                                  /*async=*/false, /*throws=*/false, dc,
-                                 clangNode);
+                                 clangNode, hasBoundsAnnotation);
         result = func;
 
         if (!dc->isModuleScopeContext()) {
@@ -4899,12 +4905,14 @@ namespace {
         }
       }
 
-      auto result = createFuncOrAccessor(Impl,
-                                         /*funcLoc*/ SourceLoc(), accessorInfo,
-                                         importedName.getDeclName(),
-                                         /*nameLoc*/ SourceLoc(),
-                                         /*genericParams=*/nullptr, bodyParams,
-                                         resultTy, async, throws, dc, decl);
+      bool hasBoundsAnnotation =
+          false; // currently only implemented for functions
+      auto result = createFuncOrAccessor(
+          Impl,
+          /*funcLoc*/ SourceLoc(), accessorInfo, importedName.getDeclName(),
+          /*nameLoc*/ SourceLoc(),
+          /*genericParams=*/nullptr, bodyParams, resultTy, async, throws, dc,
+          decl, hasBoundsAnnotation);
 
       result->setAccess(decl->isDirectMethod() ? AccessLevel::Public
                                                : getOverridableAccessLevel(dc));
@@ -6544,7 +6552,8 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   } else {
     parameterList = Impl.importFunctionParameterList(
         dc, decl, {decl->param_begin(), decl->param_end()}, decl->isVariadic(),
-        allowNSUIntegerAsInt, argNames, /*genericParams=*/{}, /*resultType=*/nullptr);
+        allowNSUIntegerAsInt, argNames, /*genericParams=*/{},
+        /*resultType=*/nullptr, /*hasBoundsAnnotatedParam=*/nullptr);
   }
   if (!parameterList)
     return nullptr;
@@ -8344,6 +8353,53 @@ static bool importAsUnsafe(ClangImporter::Implementation &impl,
   return false;
 }
 
+void ClangImporter::Implementation::importNontrivialAttribute(
+    Decl *MappedDecl, llvm::StringRef AttrString) {
+  bool cached = true;
+  while (true) {
+    // Dig out a source file we can use for parsing.
+    auto &sourceFile = getClangSwiftAttrSourceFile(
+        *MappedDecl->getDeclContext()->getParentModule(), AttrString, cached);
+
+    auto topLevelDecls = sourceFile.getTopLevelDecls();
+
+    // If we're using the cached version, check whether we can correctly
+    // clone the attribute.
+    if (cached) {
+      bool hasNonclonableAttribute = false;
+      for (auto decl : topLevelDecls) {
+        if (hasNonclonableAttribute)
+          break;
+
+        for (auto attr : decl->getAttrs()) {
+          if (!attr->canClone()) {
+            hasNonclonableAttribute = true;
+            break;
+          }
+        }
+      }
+
+      // We cannot clone one of the attributes. Go back and build a new
+      // source file without caching it.
+      if (hasNonclonableAttribute) {
+        cached = false;
+        continue;
+      }
+    }
+
+    // Collect the attributes from the synthesized top-level declaration in
+    // the source file. If we're using a cached copy, clone the attribute.
+    for (auto decl : topLevelDecls) {
+      SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
+                                            decl->getAttrs().end());
+      for (auto attr : attrs) {
+        MappedDecl->getAttrs().add(cached ? attr->clone(SwiftContext) : attr);
+      }
+    }
+    break;
+  }
+}
+
 void
 ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
   auto ClangDecl =
@@ -8481,53 +8537,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
-      bool cached = true;
-      while (true) {
-        // Dig out a source file we can use for parsing.
-        auto &sourceFile = getClangSwiftAttrSourceFile(
-            *MappedDecl->getDeclContext()->getParentModule(),
-            swiftAttr->getAttribute(),
-            cached);
-
-        auto topLevelDecls = sourceFile.getTopLevelDecls();
-
-        // If we're using the cached version, check whether we can correctly
-        // clone the attribute.
-        if (cached) {
-          bool hasNonclonableAttribute = false;
-          for (auto decl : topLevelDecls) {
-            if (hasNonclonableAttribute)
-              break;
-
-            for (auto attr : decl->getAttrs()) {
-              if (!attr->canClone()) {
-                hasNonclonableAttribute = true;
-                break;
-              }
-            }
-          }
-
-          // We cannot clone one of the attributes. Go back and build a new
-          // source file without caching it.
-          if (hasNonclonableAttribute) {
-            cached = false;
-            continue;
-          }
-        }
-
-        // Collect the attributes from the synthesized top-level declaration in
-        // the source file. If we're using a cached copy, clone the attribute.
-        for (auto decl : topLevelDecls) {
-          SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
-                                                decl->getAttrs().end());
-          for (auto attr : attrs) {
-            MappedDecl->getAttrs().add(cached ? attr->clone(SwiftContext)
-                                              : attr);
-          }
-        }
-
-        break;
-      }
+      importNontrivialAttribute(MappedDecl, swiftAttr->getAttribute());
     }
 
     if (seenUnsafe || importAsUnsafe(*this, ClangDecl, MappedDecl)) {
@@ -8611,6 +8621,70 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       }
     }
   }
+}
+
+namespace {
+class PointerParamInfoPrinter {
+public:
+  clang::ASTContext &ctx;
+  llvm::raw_ostream &out;
+  bool firstParam = true;
+  PointerParamInfoPrinter(clang::ASTContext &ctx, llvm::raw_ostream &out)
+      : ctx(ctx), out(out) {
+    out << "@PointerBounds(";
+  }
+  ~PointerParamInfoPrinter() { out << ")"; }
+
+  void printCountedBy(const clang::CountAttributedType *CAT,
+                      size_t pointerIndex) {
+    if (!firstParam) {
+      out << ", ";
+    } else {
+      firstParam = false;
+    }
+    clang::Expr *countExpr = CAT->getCountExpr();
+    bool isSizedBy = CAT->isCountInBytes();
+    out << ".";
+    if (isSizedBy)
+      out << "sizedBy";
+    else
+      out << "countedBy";
+    out << "(pointer: " << pointerIndex + 1 << ", ";
+    if (isSizedBy)
+      out << "size";
+    else
+      out << "count";
+    out << ": \"";
+    countExpr->printPretty(
+        out, {}, {ctx.getLangOpts()}); // TODO: map clang::Expr to Swift Expr
+    out << "\")";
+  }
+};
+} // namespace
+
+void ClangImporter::Implementation::importBoundsAttributes(
+    FuncDecl *MappedDecl) {
+  assert(SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers));
+  auto ClangDecl =
+      dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
+  // any function with safe pointer imports should have a clang decl
+  assert(ClangDecl);
+  if (!ClangDecl)
+    return;
+
+  llvm::SmallString<128> MacroString;
+  {
+    llvm::raw_svector_ostream out(MacroString);
+
+    PointerParamInfoPrinter printer(getClangASTContext(), out);
+    for (auto [index, param] : llvm::enumerate(ClangDecl->parameters())) {
+      if (auto CAT = param->getType()->getAs<clang::CountAttributedType>()) {
+        printer.printCountedBy(CAT, index);
+      }
+    }
+  }
+
+  importNontrivialAttribute(MappedDecl, MacroString);
 }
 
 static bool isUsingMacroName(clang::SourceManager &SM,
