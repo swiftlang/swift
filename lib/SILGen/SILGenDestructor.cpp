@@ -373,8 +373,11 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
 
     // Get deinitOnExecutor
     FuncDecl *swiftDeinitOnExecutorDecl = SGM.getDeinitOnExecutor();
-    assert(swiftDeinitOnExecutorDecl &&
-           "Failed to find swift_task_deinitOnExecutor function decl");
+    if (!swiftDeinitOnExecutorDecl) {
+      llvm::report_fatal_error(
+          "Failed to find swift_task_deinitOnExecutor function decl! "
+          "This is likely due to an outdated/incompatible SDK.");
+    }
     SILFunction *swiftDeinitOnExecutorSILFunc = SGM.getFunction(
         SILDeclRef(swiftDeinitOnExecutorDecl, SILDeclRef::Kind::Func),
         NotForDefinition);
