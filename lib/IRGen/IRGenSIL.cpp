@@ -2564,7 +2564,7 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
     return;
 
   // Type metadata for foreign references is not yet supported on Windows. Bug #76168.
-  if (Context.LangOpts.EnableCXXInterop &&
+  if (Context.LangOpts.EnableCXXInterop && !Context.LangOpts.hasFeature(Feature::Embedded) &&
       f->getLinkage() == SILLinkage::Public &&
       !Context.LangOpts.Target.isOSWindows())
     noteUseOfMetadataByCXXInterop(IRGen, f, TypeExpansionContext(*f));
