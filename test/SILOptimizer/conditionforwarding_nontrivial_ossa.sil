@@ -363,3 +363,36 @@ bb6:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @nontrivialenumarg :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'nontrivialenumarg'
+sil [ossa] @nontrivialenumarg : $@convention(thin) (@guaranteed Klass) -> @owned Optional<Klass> {
+bb0(%0 : @guaranteed  $Klass):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = enum $Optional<Klass>, #Optional.some!enumelt, %0 : $Klass
+  br bb3(%2 : $Optional<Klass>)
+
+bb2:
+  %4 = enum $Optional<Klass>, #Optional.some!enumelt, %0 : $Klass
+  br bb3(%4 : $Optional<Klass>)
+
+bb3(%6 : @guaranteed  $Optional<Klass>):
+  %7 = borrowed %6 : $Optional<Klass> from (%0 : $Klass)
+  switch_enum %7 : $Optional<Klass>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
+
+bb4(%9 : @guaranteed  $Klass):
+  %10 = apply undef(%7) : $@convention(thin) (@guaranteed Optional<Klass>) -> ()
+  %11 = enum $Optional<Klass>, #Optional.some!enumelt, %9 : $Klass
+  br bb6(%11 : $Optional<Klass>)
+
+bb5:
+  %13 = enum $Optional<Klass>, #Optional.none!enumelt
+  br bb6(%13 : $Optional<Klass>)
+
+bb6(%15 : @guaranteed  $Optional<Klass>):
+  %16 = borrowed %15 : $Optional<Klass> from (%0 : $Klass)
+  %17 = copy_value %16 : $Optional<Klass>
+  return %17 : $Optional<Klass>
+}
