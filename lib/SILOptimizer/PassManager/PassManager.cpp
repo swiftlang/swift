@@ -760,6 +760,9 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses(F);
     runSwiftFunctionVerification(F);
+  } else if (getOptions().VerifyOwnershipAll &&
+             (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
+    F->verifyOwnership();
   } else {
     if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
                                                   SILVerifyAfterPass.end(),

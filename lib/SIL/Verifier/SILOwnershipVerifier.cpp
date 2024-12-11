@@ -972,6 +972,12 @@ void SILModule::verifyOwnership() const {
   }
 }
 
+void SILFunction::verifyOwnership() const {
+  auto deBlocks =
+      std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(this));
+  verifyOwnership(deBlocks.get());
+}
+
 void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   if (DisableOwnershipVerification)
     return;
