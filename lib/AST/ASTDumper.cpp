@@ -2834,6 +2834,12 @@ public:
     printFoot();
   }
 
+  void visitUnsafeCastExpr(UnsafeCastExpr *E, StringRef label) {
+    printCommon(E, "unsafe_cast_expr", label);
+    printRec(E->getSubExpr());
+    printFoot();
+  }
+
   void visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
                                          StringRef label) {
     printCommon(E, "extract_function_isolation", label);
