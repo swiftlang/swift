@@ -518,6 +518,7 @@ PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AliasInfoDumper, PruneVTables)
 
+SWIFT_SILCOMBINE_PASS(BeginBorrowInst)
 SWIFT_SILCOMBINE_PASS(BeginCOWMutationInst)
 SWIFT_SILCOMBINE_PASS(ClassifyBridgeObjectInst)
 SWIFT_SILCOMBINE_PASS(GlobalValueInst)
