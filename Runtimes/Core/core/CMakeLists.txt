@@ -266,9 +266,7 @@ if(SwiftCore_ENABLE_VECTOR_TYPES)
 endif()
 
 if(APPLE AND BUILD_SHARED_LIBS)
-  target_link_options(swiftCore PRIVATE
-    "SHELL:-Xlinker -headerpad_max_install_names"
-  )
+  target_link_options(swiftCore PRIVATE "SHELL:-Xlinker -headerpad_max_install_names")
 endif()
 
 target_compile_options(swiftCore PRIVATE
