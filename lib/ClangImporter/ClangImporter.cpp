@@ -6145,7 +6145,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
   NominalTypeDecl *recordDecl = desc.recordDecl;
   DeclName name = desc.name;
-  clang::AccessSpecifier inheritance = desc.inheritance;
+  bool inherited = desc.inherited;
 
   auto &ctx = recordDecl->getASTContext();
   auto allResults = evaluateOrDefault(
@@ -6182,8 +6182,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       foundNameArities.insert(getArity(valueDecl));
 
     for (auto base : cxxRecord->bases()) {
-      clang::AccessSpecifier baseAccess = base.getAccessSpecifier();
-      if (baseAccess != clang::AccessSpecifier::AS_public)
+      if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
         continue;
 
       clang::QualType baseType = base.getType();
@@ -6200,11 +6199,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           continue;
 
         // Add Clang members that are imported lazily.
-        auto baseResults = evaluateOrDefault(
-            ctx.evaluator,
-            ClangRecordMemberLookup(
-                {cast<NominalTypeDecl>(import), name, baseAccess}),
-            {});
+        auto baseResults =
+            evaluateOrDefault(ctx.evaluator,
+                              ClangRecordMemberLookup(
+                                  {cast<NominalTypeDecl>(import), name, true}),
+                              {});
         // Add members that are synthesized eagerly, such as subscripts.
         for (auto member :
              cast<NominalTypeDecl>(import)->getCurrentMembersWithoutLoading()) {
@@ -6233,7 +6232,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           //
           // Instead, we simply pass on the imported decl (foundInBase) as is,
           // so that only the top-most request calls importBaseMemberDecl().
-          if (inheritance != clang::AS_none) {
+          if (inherited) {
             result.push_back(foundInBase);
             continue;
           }

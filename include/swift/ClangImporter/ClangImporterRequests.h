@@ -136,21 +136,12 @@ private:
 struct ClangRecordMemberLookupDescriptor final {
   NominalTypeDecl *recordDecl;
   DeclName name;
-  clang::AccessSpecifier inheritance;
+  bool inherited;
 
-  // Base case lookup on (most) derived class
-  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
-      : recordDecl(recordDecl), name(name), inheritance(clang::AS_none) {
-    assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
-  }
-
-  // Recursive lookup on inherited classes
   ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name,
-                                    clang::AccessSpecifier inheritance)
-      : recordDecl(recordDecl), name(name), inheritance(inheritance) {
+                                    bool inherited = false)
+      : recordDecl(recordDecl), name(name), inherited(inherited) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
-    assert(inheritance != clang::AS_none &&
-           "class inheritance should be specified");
   }
 
   friend llvm::hash_code
