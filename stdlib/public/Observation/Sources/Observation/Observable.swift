@@ -28,18 +28,18 @@ public protocol Observable { }
 /// to the ``Observation/Observable`` protocol. For example, the following code
 /// applies the `Observable` macro to the type `Car` making it observable:
 ///
-///     @Observable 
+///     @Observable
 ///     class Car {
 ///        var name: String = ""
 ///        var needsRepairs: Bool = false
-///        
+///
 ///        init(name: String, needsRepairs: Bool = false) {
 ///            self.name = name
 ///            self.needsRepairs = needsRepairs
 ///        }
 ///     }
 @available(SwiftStdlib 5.9, *)
-@attached(member, names: named(_$observationRegistrar), named(access), named(withMutation))
+@attached(member, names: named(_$observationRegistrar), named(access), named(withMutation), named(observationComparison), named(_$ObservationCachedKeyPaths))
 @attached(memberAttribute)
 @attached(extension, conformances: Observable)
 public macro Observable() =

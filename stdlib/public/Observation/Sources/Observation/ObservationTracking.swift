@@ -10,7 +10,6 @@
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.9, *)
-@_spi(SwiftUI)
 public struct ObservationTracking: Sendable {
   enum Id {
     case willSet(Int)
@@ -67,6 +66,13 @@ public struct ObservationTracking: Sendable {
         existing.union(entry)
       }
     }
+    
+    func contains(_ keyPath: AnyKeyPath) -> Bool {
+      for entry in entries.values {
+        if entry.properties.contains(keyPath) { return true }
+      }
+      return false
+    }
   }
 
   @_spi(SwiftUI)
@@ -75,7 +81,7 @@ public struct ObservationTracking: Sendable {
     willSet: (@Sendable (ObservationTracking) -> Void)? = nil,
     didSet: (@Sendable (ObservationTracking) -> Void)? = nil
   ) {
-    let values = tracking.list.entries.mapValues { 
+    let values = tracking.list.entries.mapValues {
       switch (willSet, didSet) {
       case (.some(let willSetObserver), .some(let didSetObserver)):
         return Id.full($0.addWillSetObserver { keyPath in
@@ -97,7 +103,7 @@ public struct ObservationTracking: Sendable {
         })
       case (.none, .none):
         fatalError()
-      }  
+      }
     }
     
     tracking.install(values)
@@ -136,6 +142,99 @@ public struct ObservationTracking: Sendable {
       }
     }
   }
+  
+  /// A representation of a tracked key path that avoids the potential of
+  /// allowing un-privledged access to subscripting of objects
+  @available(SwiftStdlib 9999, *)
+  public struct Path {
+    var keyPath: AnyKeyPath
+    public var rootType: Any.Type {
+      type(of: keyPath).rootType
+    }
+    
+    public var valueType: Any.Type {
+      type(of: keyPath).valueType
+    }
+    
+    public static func ==(_ lhs: Path, _ rhs: AnyKeyPath) -> Bool {
+      lhs.keyPath == rhs
+    }
+    
+    public static func !=(_ lhs: Path, _ rhs: AnyKeyPath) -> Bool {
+      lhs.keyPath != rhs
+    }
+    
+    public static func ==(_ lhs: AnyKeyPath, _ rhs: Path) -> Bool {
+      lhs == rhs.keyPath
+    }
+    
+    public static func !=(_ lhs: AnyKeyPath, _ rhs: Path) -> Bool {
+      lhs != rhs.keyPath
+    }
+  }
+  
+  @available(SwiftStdlib 9999, *)
+  public struct Options: ExpressibleByArrayLiteral {
+    enum Value {
+      case exclusive
+      case cancelOnFirstChange
+      case filter(@Sendable (Path) -> Bool)
+    }
+    
+    var expanded: (exclusive: Bool, cancelOnFirstChange: Bool, filters: [@Sendable (Path) -> Bool]) {
+      var result: (exclusive: Bool, cancelOnFirstChange: Bool, filters: [@Sendable (Path) -> Bool]) = (false, false, [])
+      for value in values {
+        switch value {
+        case .exclusive:
+          result.exclusive = true
+        case .cancelOnFirstChange:
+          result.cancelOnFirstChange = true
+        case .filter(let filter):
+          result.filters.append(filter)
+        }
+      }
+      return result
+    }
+    
+    var values: [Value]
+    
+    init(_ value: Value) {
+      self.values = [value]
+    }
+    
+    public init(arrayLiteral elements: Options...) {
+      values = elements.flatMap { $0.values }
+    }
+    /// Nested observation will exclude this tracking set from change
+    /// notification to its parent
+    public static var exclusive: Options {
+      Options(.exclusive)
+    }
+    /// This tracking will cancel upon the first change observed
+    public static var cancelOnFirstChange: Options {
+      Options(.cancelOnFirstChange)
+    }
+    /// Filter the accesses in application of `withObservationTracking` by the
+    /// result of the `predicate` parameter. 
+    public static func filtering(
+      _ predicate: @Sendable @escaping (Path) -> Bool
+    ) -> Options {
+      Options(.filter(predicate))
+    }
+  }
+
+  @available(SwiftStdlib 9999, *)
+  /// Verification that a given property is tracked
+  public func contains<Object, Member>(
+    _ keyPath: KeyPath<Object, Member>
+  ) -> Bool {
+    list.contains(keyPath)
+  }
+  
+  @available(SwiftStdlib 9999, *)
+  public var changedPath: Path? {
+    changed.map { Path(keyPath: $0) }
+  }
 
   public func cancel() {
     let values = state.withCriticalRegion {
@@ -164,15 +263,17 @@ public struct ObservationTracking: Sendable {
 }
 
 @available(SwiftStdlib 5.9, *)
-fileprivate func generateAccessList<T>(_ apply: () -> T) -> (T, ObservationTracking._AccessList?) {
+fileprivate func generateAccessList<T>(exclusive: Bool = false, _ apply: () -> T) -> (T, ObservationTracking._AccessList?) {
   var accessList: ObservationTracking._AccessList?
-  let result = withUnsafeMutablePointer(to: &accessList) { ptr in
+  let result = withUnsafeMutablePointer(to: &accessList) { ptr -> T in
     let previous = _ThreadLocal.value
     _ThreadLocal.value = UnsafeMutableRawPointer(ptr)
     defer {
       if let scoped = ptr.pointee, let previous {
         if var prevList = previous.assumingMemoryBound(to: ObservationTracking._AccessList?.self).pointee {
-          prevList.merge(scoped)
+          if !exclusive {
+            prevList.merge(scoped)
+          }
           previous.assumingMemoryBound(to: ObservationTracking._AccessList?.self).pointee = prevList
         } else {
           previous.assumingMemoryBound(to: ObservationTracking._AccessList?.self).pointee = scoped
@@ -192,7 +293,7 @@ fileprivate func generateAccessList<T>(_ apply: () -> T) -> (T, ObservationTrack
 /// of the `onChange` closure. For example, the following code tracks changes
 /// to the name of cars, but it doesn't track changes to any other property of
 /// `Car`:
-/// 
+///
 ///     func render() {
 ///         withObservationTracking {
 ///             for car in cars {
@@ -222,6 +323,7 @@ public func withObservationTracking<T>(
 }
 
 @available(SwiftStdlib 5.9, *)
+@_disfavoredOverload
 @_spi(SwiftUI)
 public func withObservationTracking<T>(
   _ apply: () -> T,
@@ -234,6 +336,7 @@ public func withObservationTracking<T>(
 }
 
 @available(SwiftStdlib 5.9, *)
+@_disfavoredOverload
 @_spi(SwiftUI)
 public func withObservationTracking<T>(
   _ apply: () -> T,
@@ -245,6 +348,7 @@ public func withObservationTracking<T>(
 }
 
 @available(SwiftStdlib 5.9, *)
+@_disfavoredOverload
 @_spi(SwiftUI)
 public func withObservationTracking<T>(
   _ apply: () -> T,
@@ -253,4 +357,113 @@ public func withObservationTracking<T>(
   let (result, accessList) = generateAccessList(apply)
   ObservationTracking._installTracking(ObservationTracking(accessList), willSet: nil, didSet: didSet)
   return result
+}
+
+@available(SwiftStdlib 9999, *)
+fileprivate func _withObservationTracking<T>(
+   options: ObservationTracking.Options,
+   _ apply: () -> T,
+   willSet: (@Sendable (ObservationTracking) -> Void)?,
+   didSet: (@Sendable (ObservationTracking) -> Void)?
+) -> (T, ObservationTracking) {
+  let (exclusive, cancelsOnFirstChange, filters) = options.expanded
+  let (result, accessList) = generateAccessList(exclusive: exclusive, apply)
+  let tracking = ObservationTracking(accessList)
+  switch (cancelsOnFirstChange, filters.isEmpty) {
+  case (true, true):
+    ObservationTracking._installTracking(tracking, willSet: willSet, didSet: { tracking in
+      didSet?(tracking)
+      tracking.cancel()
+    })
+  case (false, true):
+    ObservationTracking._installTracking(tracking, willSet: willSet, didSet: didSet)
+  case (true, false):
+    if let willSet {
+      ObservationTracking._installTracking(tracking, willSet: { tracking in
+        for filter in filters {
+          if !filter(tracking.changedPath!) {
+            return
+          }
+        }
+        willSet(tracking)
+      }, didSet: { tracking in
+        for filter in filters {
+          if !filter(tracking.changedPath!) {
+            return
+          }
+        }
+        didSet?(tracking)
+        tracking.cancel()
+      })
+    } else {
+      ObservationTracking._installTracking(tracking, willSet: nil, didSet: { tracking in
+        for filter in filters {
+          if !filter(tracking.changedPath!) {
+            return
+          }
+        }
+        didSet?(tracking)
+        tracking.cancel()
+      })
+    }
+    
+  case (false, false):
+    if let willSet {
+      ObservationTracking._installTracking(tracking, willSet: { tracking in
+        for filter in filters {
+          if !filter(tracking.changedPath!) {
+            return
+          }
+        }
+        willSet(tracking)
+      }, didSet: { tracking in
+        for filter in filters {
+          if !filter(tracking.changedPath!) {
+            return
+          }
+        }
+        didSet?(tracking)
+      })
+    } else {
+      ObservationTracking._installTracking(tracking, willSet: nil, didSet: { tracking in
+        for filter in filters {
+          if !filter(tracking.changedPath!) {
+            return
+          }
+        }
+        didSet?(tracking)
+      })
+    }
+  }
+  return (result, tracking)
+}
+
+@available(SwiftStdlib 9999, *)
+public func withObservationTracking<T>(
+   options: ObservationTracking.Options = [],
+   _ apply: () -> T,
+   willSet: @escaping @Sendable (ObservationTracking) -> Void,
+   didSet: @escaping @Sendable (ObservationTracking) -> Void
+) -> (T, ObservationTracking) {
+  _withObservationTracking(options: options, apply, willSet: willSet, didSet: didSet)
+}
+
+// Overload to make the willSet optional when the didSet is specified
+@available(SwiftStdlib 9999, *)
+public func withObservationTracking<T>(
+  options: ObservationTracking.Options = [],
+  _ apply: () -> T,
+  didSet: @escaping @Sendable (ObservationTracking) -> Void
+) -> (T, ObservationTracking) {
+  _withObservationTracking(options: options, apply, willSet: nil, didSet: didSet)
+}
+
+// Overload to make the didSet optional when the willSet is specified
+@available(SwiftStdlib 9999, *)
+public func withObservationTracking<T>(
+  options: ObservationTracking.Options = [],
+  _ apply: () -> T,
+  willSet: @escaping @Sendable (ObservationTracking) -> Void
+) -> (T, ObservationTracking) {
+  _withObservationTracking(options: options, apply, willSet: willSet, didSet: nil)
 }

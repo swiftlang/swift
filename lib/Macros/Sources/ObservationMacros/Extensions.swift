@@ -108,6 +108,12 @@ extension VariableDeclSyntax {
   }
 }
 
+extension StructDeclSyntax {
+  func isEquivalent(to other: StructDeclSyntax) -> Bool {
+    return name == other.name
+  }
+}
+
 extension TypeSyntax {
   var identifier: String? {
     for token in tokens(viewMode: .all) {
@@ -233,6 +239,17 @@ extension DeclGroupSyntax {
     return false
   }
   
+  func hasMemberType(equivalentTo other: StructDeclSyntax) -> Bool {
+    for member in memberBlock.members {
+      if let type = member.decl.as(StructDeclSyntax.self) {
+        if type.isEquivalent(to: other) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+  
   var definedVariables: [VariableDeclSyntax] {
     memberBlock.members.compactMap { member in
       if let variableDecl = member.decl.as(VariableDeclSyntax.self) {
@@ -250,6 +267,10 @@ extension DeclGroupSyntax {
       }
     } else if let property = decl.as(VariableDeclSyntax.self) {
       if !hasMemberProperty(equivalentTo: property) {
+        declarations.append(decl)
+      }
+    } else if let type = decl.as(StructDeclSyntax.self) {
+      if !hasMemberType(equivalentTo: type) {
         declarations.append(decl)
       }
     }
