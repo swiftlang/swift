@@ -2145,7 +2145,7 @@ RValue RValueEmitter::visitUnsafeCastExpr(UnsafeCastExpr *E, SGFContext C) {
     ASSERT(resultType.isAddress());
     result = SGF.B.createUncheckedAddrCast(E, original, resultType);
   } else {
-    result = SGF.B.createUncheckedBitCast(E, original, resultType);
+    result = SGF.B.createUncheckedForwardingCast(E, original, resultType);
   }
 
   return RValue(SGF, E, result);
