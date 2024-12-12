@@ -3235,6 +3235,7 @@ public:
 
   Range::iterator begin() const { return attrRange.begin(); }
   Range::iterator end() const { return attrRange.end(); }
+  bool empty() const { return attrRange.empty(); }
 };
 
 class alignas(1 << AttrAlignInBits) TypeAttribute
