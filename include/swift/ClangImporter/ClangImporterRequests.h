@@ -24,7 +24,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/Type.h"
-#include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
