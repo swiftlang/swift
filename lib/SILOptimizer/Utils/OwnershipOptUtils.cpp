@@ -1917,9 +1917,9 @@ static BridgedUtilities::UpdateFunctionFn updateAllGuaranteedPhisFunction;
 static BridgedUtilities::UpdatePhisFn updateGuaranteedPhisFunction;
 static BridgedUtilities::UpdatePhisFn replacePhisWithIncomingValuesFunction;
 
-void BridgedUtilities::registerGuaranteedPhiUpdater(UpdateFunctionFn updateAllGuaranteedPhisFn,
-                                                    UpdatePhisFn updateGuaranteedPhisFn,
-                                                    UpdatePhisFn replacePhisWithIncomingValuesFn) {
+void BridgedUtilities::registerPhiUpdater(UpdateFunctionFn updateAllGuaranteedPhisFn,
+                                          UpdatePhisFn updateGuaranteedPhisFn,
+                                          UpdatePhisFn replacePhisWithIncomingValuesFn) {
   updateAllGuaranteedPhisFunction = updateAllGuaranteedPhisFn;
   updateGuaranteedPhisFunction = updateGuaranteedPhisFn;
   replacePhisWithIncomingValuesFunction = replacePhisWithIncomingValuesFn;

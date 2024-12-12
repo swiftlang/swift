@@ -140,5 +140,5 @@ private func registerSwiftAnalyses() {
 
 private func registerUtilities() {
   registerVerifier()
-  registerGuaranteedPhiUpdater()
+  registerPhiUpdater()
 }

@@ -1,4 +1,4 @@
-//===--- GuaranteedPhiUpdater.swift ---------------------------------------===//
+//===--- PhiUpdater.swift -------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -237,8 +237,8 @@ func replacePhisWithIncomingValues(phis: [Phi], _ context: some MutatingContext)
   }
 }
 
-func registerGuaranteedPhiUpdater() {
-  BridgedUtilities.registerGuaranteedPhiUpdater(
+func registerPhiUpdater() {
+  BridgedUtilities.registerPhiUpdater(
     // updateAllGuaranteedPhis
     { (bridgedCtxt: BridgedPassContext, bridgedFunction: BridgedFunction) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
