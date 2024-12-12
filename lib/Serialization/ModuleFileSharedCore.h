@@ -74,6 +74,9 @@ class ModuleFileSharedCore {
   /// Empty if this module didn't come from an interface file.
   StringRef ModuleInterfacePath;
 
+  /// true if this module interface was serialized relative to the SDK path.
+  bool IsModuleInterfaceSDKRelative = false;
+
   /// The module interface path if this module is adjacent to such an interface
   /// or it was itself compiled from an interface. Empty otherwise.
   StringRef CorrespondingInterfacePath;

@@ -157,7 +157,7 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %inguaranteed_arg_mark
 // CHECK-NEXT: Initialized: %3 = argument of bb0 : $*D
 // CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %3 : $*D
-// CHECK-NEXT: begin:      %{{.*}} = move_value %{{.*}} : $D
+// CHECK-NEXT: begin:      bb0
 // CHECK-NEXT: ends:     
 // CHECK: dependence_scope: lifetime_dependence_scope with: %inguaranteed_arg_mark
   

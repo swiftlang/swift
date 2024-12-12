@@ -3947,7 +3947,10 @@ namespace {
 
     Type visitTapExpr(TapExpr *expr) {
       DeclContext *varDC = expr->getVar()->getDeclContext();
-      assert(varDC == CS.DC || (varDC && isa<AbstractClosureExpr>(varDC)) &&
+      ASSERT(varDC != nullptr);
+      ASSERT((varDC == CS.DC ||
+              isa<AbstractClosureExpr>(varDC) ||
+              varDC->isChildContextOf(CS.DC)) &&
              "TapExpr var should be in the same DeclContext we're checking it in!");
       
       auto locator = CS.getConstraintLocator(expr);

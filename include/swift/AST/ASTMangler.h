@@ -401,7 +401,9 @@ public:
   std::string mangleAttachedMacroExpansion(
       const Decl *decl, CustomAttr *attr, MacroRole role);
 
-  void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC);
+  void appendMacroExpansion(const FreestandingMacroExpansion *expansion);
+  void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC,
+                                   const FreestandingMacroExpansion *expansion);
   void appendMacroExpansionOperator(
       StringRef macroName, MacroRole role, unsigned discriminator);
 

@@ -25,6 +25,6 @@ final class SwiftPluginServer {
         )
       )
     )
-    listener.main()
+    try listener.main()
   }
 }

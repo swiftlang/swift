@@ -134,8 +134,7 @@ BridgedAccessorDecl BridgedAccessorDecl_createParsed(
 
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries,
-    bool isStatic, bool isLet) {
+    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries, BridgedDeclAttributes cAttrs, bool isStatic, bool isLet) {
   ASTContext &context = cContext.unbridged();
   DeclContext *declContext = cDeclContext.unbridged();
 
@@ -147,6 +146,7 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
 
     // Configure all vars.
     pattern->forEachVariable([&](VarDecl *VD) {
+      VD->getAttrs() = cAttrs.unbridged();
       VD->setStatic(isStatic);
       VD->setIntroducer(introducer);
     });

@@ -30,6 +30,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
@@ -1677,7 +1678,7 @@ void IRGenModule::addLinkLibraries() {
   if (Context.LangOpts.EnableCXXInterop) {
     bool hasStaticCxx = false;
     bool hasStaticCxxStdlib = false;
-    if (const auto *M = Context.getModuleByName("Cxx"))
+    if (const auto *M = Context.getModuleByName(CXX_MODULE_NAME))
       hasStaticCxx = M->isStaticLibrary();
     if (Context.LangOpts.Target.getOS() == llvm::Triple::Win32)
       if (const auto *M = Context.getModuleByName("CxxStdlib"))

@@ -309,6 +309,11 @@ ERROR(incorrect_explicit_closure_result_vs_return_type,none,
       "declared closure result %0 is incompatible with return type %1",
       (Type, Type))
 
+ERROR(addressable_not_enabled,none,
+      "@_addressable is an experimental feature", ())
+ERROR(addressableSelf_not_on_method,none,
+      "@_addressableSelf cannot be applied to non-member declarations", ())
+
 ERROR(unsupported_closure_attr,none,
       "%select{attribute |}0 '%1' is not supported on a closure",
       (bool, StringRef))
@@ -7095,6 +7100,10 @@ WARNING(variable_never_mutated, none,
         "variable %0 was never mutated; "
         "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
         (Identifier, bool))
+WARNING(variable_tuple_elt_never_mutated, none,
+        "variable %0 was never mutated; "
+        "consider changing the pattern to 'case (..., let %1, ...)'",
+        (Identifier, StringRef))
 WARNING(variable_never_read, none,
         "variable %0 was written to, but never read",
         (Identifier))

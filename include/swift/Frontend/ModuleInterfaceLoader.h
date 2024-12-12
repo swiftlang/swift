@@ -414,6 +414,7 @@ private:
     if (moduleName.empty())
       return true;
 
+    bool didInsert;
     if (swiftModulePath.has_value()) {
       assert((clangModuleMapPath.empty() &&
               clangModulePath.empty()) &&
@@ -425,7 +426,7 @@ private:
                                          isFramework,
                                          isSystem,
                                          swiftModuleCacheKey);
-      swiftModuleMap.try_emplace(moduleName, std::move(entry));
+      didInsert = swiftModuleMap.try_emplace(moduleName, std::move(entry)).second;
     } else {
       assert((!clangModuleMapPath.empty() ||
               !clangModulePath.empty()) &&
@@ -436,10 +437,10 @@ private:
                                          isSystem,
                                          isBridgingHeaderDependency,
                                          clangModuleCacheKey);
-      clangModuleMap.try_emplace(moduleName, std::move(entry));
+      didInsert = clangModuleMap.try_emplace(moduleName, std::move(entry)).second;
     }
-
-    return false;
+    // Prevent duplicate module names.
+    return !didInsert;
   }
 
   llvm::StringSaver Saver;

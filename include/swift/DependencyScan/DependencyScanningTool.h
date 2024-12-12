@@ -108,11 +108,6 @@ public:
                   const llvm::StringSet<> &PlaceholderModules,
                   StringRef WorkingDirectory);
 
-  /// Writes the current `SharedCache` instance to a specified FileSystem path.
-  void serializeCache(llvm::StringRef path);
-  /// Loads an instance of a `SwiftDependencyScanningService` to serve as the `SharedCache`
-  /// from a specified FileSystem path.
-  bool loadCache(llvm::StringRef path);
   /// Discard the tool's current `SharedCache` and start anew.
   void resetCache();
   /// Query diagnostics consumed so far.

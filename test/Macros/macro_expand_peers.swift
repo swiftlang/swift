@@ -289,3 +289,23 @@ struct Test {
     )
     var doesNotWork: Thing
 }
+
+// Ensure that we don't crash when using closures within attached macros.
+struct Trait {
+  init(_: () -> Void) {}
+}
+
+@attached(peer) macro trait(_ trait: Trait) = #externalMacro(module: "MacroDefinition", type: "EmptyPeerMacro")
+
+@trait(Trait {})
+func closureInPeerMacroCrash() {}
+
+@trait(Trait {})
+@trait(Trait {})
+@trait(Trait {})
+func closuresInPeerMacroCrash() {}
+
+@trait(Trait {})
+@trait(Trait {})
+@trait(Trait {})
+var closuresInPeerMacroOnVariableCrash: Int = 0

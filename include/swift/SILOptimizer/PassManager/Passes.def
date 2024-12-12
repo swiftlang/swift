@@ -171,8 +171,8 @@ PASS(CopyPropagation, "copy-propagation",
      "Copy propagation to Remove Redundant SSA Copies, pruning debug info")
 PASS(MandatoryCopyPropagation, "mandatory-copy-propagation",
      "Copy propagation to Remove Redundant SSA Copies, preserving debug info")
-SWIFT_FUNCTION_PASS(LoadCopyToBorrowOptimization, "load-copy-to-borrow-optimization",
-     "Convert load [copy] instructions to load_borrow")
+SWIFT_FUNCTION_PASS(CopyToBorrowOptimization, "copy-to-borrow-optimization",
+     "Convert load [copy] instructions to load_borrow and remove copies of borrowed values")
 PASS(COWOpts, "cow-opts",
      "Optimize COW operations")
 PASS(Differentiation, "differentiation",
@@ -195,6 +195,8 @@ PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
 PASS(DestroyAddrHoisting, "destroy-addr-hoisting",
      "Hoist destroy_addr for uniquely identified values")
+SWIFT_FUNCTION_PASS(DestroyHoisting, "destroy-hoisting",
+     "Hoist destroy_value instructions")
 PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
@@ -516,6 +518,7 @@ PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AliasInfoDumper, PruneVTables)
 
+SWIFT_SILCOMBINE_PASS(BeginBorrowInst)
 SWIFT_SILCOMBINE_PASS(BeginCOWMutationInst)
 SWIFT_SILCOMBINE_PASS(ClassifyBridgeObjectInst)
 SWIFT_SILCOMBINE_PASS(GlobalValueInst)
@@ -524,6 +527,7 @@ SWIFT_SILCOMBINE_PASS(StrongReleaseInst)
 SWIFT_SILCOMBINE_PASS(RetainValueInst)
 SWIFT_SILCOMBINE_PASS(ReleaseValueInst)
 SWIFT_SILCOMBINE_PASS(LoadInst)
+SWIFT_SILCOMBINE_PASS(LoadBorrowInst)
 SWIFT_SILCOMBINE_PASS(CopyValueInst)
 SWIFT_SILCOMBINE_PASS(DestroyValueInst)
 SWIFT_SILCOMBINE_PASS(DestructureStructInst)

@@ -297,8 +297,12 @@ extension Int128 {
   public func dividedReportingOverflow(
     by other: Self
   ) -> (partialValue: Self, overflow: Bool) {
-    _precondition(other != .zero, "Division by zero")
-    if self == .min && other == -1 { return (.min, true) }
+    if _slowPath(other == .zero) {
+      return (self, true)
+    }
+    if _slowPath(self == .min && other == (-1 as Self)) {
+      return (.min, true)
+    }
     return (Self(Builtin.sdiv_Int128(self._value, other._value)), false)
   }
 
@@ -307,8 +311,15 @@ extension Int128 {
   public func remainderReportingOverflow(
     dividingBy other: Self
   ) -> (partialValue: Self, overflow: Bool) {
-    _precondition(other != .zero, "Division by zero in remainder operation")
-    if self == .min && other == -1 { return (0, true) }
+    if _slowPath(other == .zero) {
+      return (self, true)
+    }
+    // This case is interesting because the remainder does not overflow; the
+    // analogous division does. Counting it as overflowing is consistent with
+    // documented behavior.
+    if _slowPath(self == .min && other == (-1 as Self)) {
+      return (0, true)
+    }
     return (Self(Builtin.srem_Int128(self._value, other._value)), false)
   }
 }
@@ -366,7 +377,13 @@ extension Int128 {
   @available(SwiftStdlib 6.0, *)
   @_transparent
   public static func /(a: Self, b: Self) -> Self {
-    a.dividedReportingOverflow(by: b).partialValue
+    if _slowPath(b == .zero) {
+      _preconditionFailure("Division by zero")
+    }
+    if _slowPath(a == .min && b == (-1 as Self)) {
+      _preconditionFailure("Division results in an overflow")
+    }
+    return Self(Builtin.sdiv_Int128(a._value, b._value))
   }
 
   @available(SwiftStdlib 6.0, *)
@@ -378,7 +395,16 @@ extension Int128 {
   @available(SwiftStdlib 6.0, *)
   @_transparent
   public static func %(a: Self, b: Self) -> Self {
-    a.remainderReportingOverflow(dividingBy: b).partialValue
+    if _slowPath(b == .zero) {
+      _preconditionFailure("Division by zero in remainder operation")
+    }
+    // This case is interesting because the remainder does not overflow; the
+    // analogous division does. Counting it as overflowing is consistent with
+    // documented behavior.
+    if _slowPath(a == .min && b == (-1 as Self)) {
+      _preconditionFailure("Division results in an overflow in remainder operation")
+    }
+    return Self(Builtin.srem_Int128(a._value, b._value))
   }
 
   @available(SwiftStdlib 6.0, *)
