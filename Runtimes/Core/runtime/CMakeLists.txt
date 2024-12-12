@@ -90,6 +90,7 @@ target_include_directories(swiftRuntime PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}")
 
 target_link_libraries(swiftRuntime PRIVATE
+  $<$<PLATFORM_ID:Windows>:User32>
   swiftShims)
 
 # FIXME: Refactor so that we're not pulling sources from the compiler files
