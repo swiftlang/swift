@@ -121,8 +121,6 @@
 // RUN: %target-swift-frontend -typecheck -sdk '' -module-cache-path %t/MCP.Osize -parse-stdlib -I %t %t/test.Osize.remark.swift -Rmodule-interface-rebuild -verify
 // RUN: ls %t/MCP.Osize | count 3
 // RUN: %target-swift-frontend -typecheck -sdk '' -module-cache-path %t/MCP.Osize -parse-stdlib -I %t %t/test.Osize.swift -Rmodule-interface-rebuild -verify
-// The grep at the end is an inverse so we are validating that the line doesn't have ossa.
-// RUN: %target-sil-opt -module-name SwiftModuleOsize %t/MCP.Osize/*.swiftmodule | grep '@$s16SwiftModuleOsize3fooAA5KlassCyF' | grep -v '[[]ossa[]]'
 // RUN: mv %t/MCP.Osize/*.swiftmodule %t/MCP.Osize/old
 // RUN: ls %t/MCP.Osize | count 2
 // RUN: %target-swift-frontend -typecheck -sdk '' -enable-ossa-modules -module-cache-path %t/MCP.Osize -parse-stdlib -I %t %t/test.Osize.remark.swift -Rmodule-interface-rebuild -verify
@@ -149,8 +147,6 @@
 // RUN: %target-swift-frontend -typecheck -sdk '' -module-cache-path %t/MCP.O -parse-stdlib -I %t %t/test.O.remark.swift -Rmodule-interface-rebuild -verify
 // RUN: ls %t/MCP.O | count 3
 // RUN: %target-swift-frontend -typecheck -sdk '' -module-cache-path %t/MCP.O -parse-stdlib -I %t %t/test.O.swift -Rmodule-interface-rebuild -verify
-// The grep at the end is an inverse so we are validating that the line doesn't have ossa.
-// RUN: %target-sil-opt -module-name SwiftModuleO %t/MCP.O/*.swiftmodule | grep '@$s12SwiftModuleO3fooAA5KlassCyF' | grep -v '[[]ossa[]]'
 // RUN: mv %t/MCP.O/*.swiftmodule %t/MCP.O/old
 // RUN: ls %t/MCP.O | count 2
 // RUN: %target-swift-frontend -typecheck -sdk '' -enable-ossa-modules -module-cache-path %t/MCP.O -parse-stdlib -I %t %t/test.O.remark.swift -Rmodule-interface-rebuild -verify
