@@ -1395,6 +1395,12 @@ public:
   /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
 
+  /// Returns an iterable list of the valid `AvailableAttr` and
+  /// `AvailabilityDomain` pairs. Unless \p includeInactive is true, attributes
+  /// that are considered inactive for the compilation context are filtered out.
+  SemanticAvailableAttributes
+  getSemanticAvailableAttrs(bool includeInactive = true) const;
+
   /// Returns the availability domain associated with the given `AvailableAttr`
   /// that is attached to this decl.
   AvailabilityDomain getDomainForAvailableAttr(const AvailableAttr *attr) const;

@@ -1688,7 +1688,9 @@ public:
       hasPrintedAnything = true;
     };
 
-    for (auto AvAttr : D->getAttrs().getAttributes<AvailableAttr>()) {
+    for (auto semanticAttr : D->getSemanticAvailableAttrs()) {
+      auto AvAttr = semanticAttr.getParsedAttr();
+
       if (AvAttr->getPlatform() == PlatformKind::none) {
         if (AvAttr->getPlatformAgnosticAvailability() ==
             PlatformAgnosticAvailabilityKind::Unavailable) {

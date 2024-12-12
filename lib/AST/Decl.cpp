@@ -9278,7 +9278,9 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
   // `getAttrs` is in reverse source order, so the last attribute is the
   // first in source.
   AbstractFunctionDecl *alternative = nullptr;
-  for (const auto *attr : getAttrs().getAttributes<AvailableAttr>()) {
+  for (auto semanticAttr : getSemanticAvailableAttrs()) {
+    auto attr = semanticAttr.getParsedAttr();
+
     if (attr->isNoAsync())
       continue;
 

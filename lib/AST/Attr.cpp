@@ -909,6 +909,23 @@ ParsedDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
   return Attr;
 }
 
+std::optional<SemanticAvailableAttr>
+SemanticAvailableAttributes::Filter::operator()(
+    const DeclAttribute *attr) const {
+  auto availableAttr = dyn_cast<AvailableAttr>(attr);
+  if (!availableAttr)
+    return std::nullopt;
+
+  if (availableAttr->isInvalid())
+    return std::nullopt;
+
+  auto domain = decl->getDomainForAvailableAttr(availableAttr);
+  if (!includeInactive && !domain.isActive(decl->getASTContext()))
+    return std::nullopt;
+
+  return SemanticAvailableAttr(availableAttr, domain);
+}
+
 static void printAvailableAttr(const Decl *D, const AvailableAttr *Attr,
                                ASTPrinter &Printer,
                                const PrintOptions &Options) {

@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -432,22 +433,19 @@ bool AvailabilityInference::updateBeforePlatformForFallback(
 
 const AvailableAttr *
 AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D) {
-  ASTContext &Ctx = D->getASTContext();
   const AvailableAttr *bestAvailAttr = nullptr;
 
   D = abstractSyntaxDeclForAvailableAttribute(D);
 
-  for (auto Attr : D->getAttrs()) {
-    auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
-    if (AvailAttr == nullptr || !AvailAttr->Introduced.has_value() ||
-        !AvailAttr->isActivePlatform(Ctx) ||
-        AvailAttr->isLanguageVersionSpecific() ||
-        AvailAttr->isPackageDescriptionVersionSpecific()) {
-      continue;
-    }
+  for (auto semanticAttr :
+       D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto *attr = semanticAttr.getParsedAttr();
 
-    if (isBetterThan(AvailAttr, bestAvailAttr))
-      bestAvailAttr = AvailAttr;
+    if (!attr->hasPlatform() || !attr->Introduced.has_value())
+      continue;
+
+    if (isBetterThan(attr, bestAvailAttr))
+      bestAvailAttr = attr;
   }
 
   return bestAvailAttr;
@@ -468,12 +466,13 @@ bool Decl::isAvailableAsSPI() const {
 
 const AvailableAttr *
 Decl::getActiveAvailableAttrForCurrentPlatform(bool ignoreAppExtensions) const {
-  auto &ctx = getASTContext();
   const AvailableAttr *bestAttr = nullptr;
 
-  for (auto attr :
-       getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
-    if (!attr->hasPlatform() || !attr->isActivePlatform(ctx))
+  for (auto semanticAttr :
+       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto attr = semanticAttr.getParsedAttr();
+
+    if (!attr->hasPlatform())
       continue;
 
     if (ignoreAppExtensions &&
@@ -493,17 +492,14 @@ Decl::getActiveAvailableAttrForCurrentPlatform(bool ignoreAppExtensions) const {
 
 const AvailableAttr *Decl::getDeprecatedAttr() const {
   auto &ctx = getASTContext();
-  auto attrs = getAttrs();
   const AvailableAttr *result = nullptr;
   const AvailableAttr *bestActive = getActiveAvailableAttrForCurrentPlatform();
 
-  for (auto attr :
-       attrs.getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
-    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
-      continue;
+  for (auto semanticAttr :
+       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto attr = semanticAttr.getParsedAttr();
 
-    if (!attr->isActivePlatform(ctx) && !attr->isLanguageVersionSpecific() &&
-        !attr->isPackageDescriptionVersionSpecific())
+    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
       continue;
 
     // Unconditional deprecated.
@@ -534,17 +530,14 @@ const AvailableAttr *Decl::getDeprecatedAttr() const {
 
 const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
   auto &ctx = getASTContext();
-  auto attrs = getAttrs();
   const AvailableAttr *result = nullptr;
   const AvailableAttr *bestActive = getActiveAvailableAttrForCurrentPlatform();
 
-  for (auto attr :
-       attrs.getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
-    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
-      continue;
+  for (auto semanticAttr :
+       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto attr = semanticAttr.getParsedAttr();
 
-    if (!attr->isActivePlatform(ctx) && !attr->isLanguageVersionSpecific() &&
-        !attr->isPackageDescriptionVersionSpecific())
+    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
       continue;
 
     std::optional<llvm::VersionTuple> deprecatedVersion = attr->Deprecated;
@@ -560,17 +553,14 @@ const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
 }
 
 const AvailableAttr *Decl::getNoAsyncAttr() const {
-  auto &ctx = getASTContext();
   const AvailableAttr *bestAttr = nullptr;
 
-  for (auto attr :
-       getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
+  for (auto semanticAttr :
+       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto attr = semanticAttr.getParsedAttr();
 
     if (attr->getPlatformAgnosticAvailability() !=
         PlatformAgnosticAvailabilityKind::NoAsync)
-      continue;
-
-    if (attr->hasPlatform() && !attr->isActivePlatform(ctx))
       continue;
 
     if (!bestAttr) {
@@ -597,9 +587,12 @@ const AvailableAttr *Decl::getNoAsyncAttr() const {
 
 bool Decl::isUnavailableInCurrentSwiftVersion() const {
   llvm::VersionTuple vers = getASTContext().LangOpts.EffectiveLanguageVersion;
-  for (auto attr :
-       getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
-    if (attr->isLanguageVersionSpecific()) {
+  for (auto semanticAttr :
+       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto attr = semanticAttr.getParsedAttr();
+    auto domain = semanticAttr.getDomain();
+
+    if (domain.isSwiftLanguage()) {
       if (attr->Introduced.has_value() && attr->Introduced.value() > vers)
         return true;
       if (attr->Obsoleted.has_value() && attr->Obsoleted.value() <= vers)
@@ -617,16 +610,13 @@ getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
   const AvailableAttr *bestActive =
       D->getActiveAvailableAttrForCurrentPlatform(ignoreAppExtensions);
 
-  for (auto attr :
-       D->getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
+  for (auto semanticAttr :
+       D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto attr = semanticAttr.getParsedAttr();
+
     // If this is a platform-specific attribute and it isn't the most
     // specific attribute for the current platform, we're done.
     if (attr->hasPlatform() && (!bestActive || attr != bestActive))
-      continue;
-
-    // If this attribute doesn't apply to the active platform, we're done.
-    if (!attr->isActivePlatform(ctx) && !attr->isLanguageVersionSpecific() &&
-        !attr->isPackageDescriptionVersionSpecific())
       continue;
 
     if (ignoreAppExtensions &&
