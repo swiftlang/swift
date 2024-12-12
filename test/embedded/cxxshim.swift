@@ -3,9 +3,12 @@
 
 // RUN: %target-swift-frontend -I %t %t/Main.swift -enable-experimental-feature Embedded -cxx-interoperability-mode=default -c -o %t/a.o -Rmodule-loading
 
+// REQUIRES: swift_in_compiler
+// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
+
 // BEGIN header.h
 
-// C++
 struct Base { int field; };
 struct Derived : Base {};
 
