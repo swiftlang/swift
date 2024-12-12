@@ -131,12 +131,10 @@ struct StableHasher {
 
   @inline(__always)
   mutating func combine(_ value: UInt) {
-#if _pointerBitWidth(_64)
-    combine(UInt64(truncatingIfNeeded: value))
-#elseif _pointerBitWidth(_32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) // FIXME: Adopt _pointerBitWidth(_:).
     combine(UInt32(truncatingIfNeeded: value))
 #else
-#error("Unknown platform")
+    combine(UInt64(truncatingIfNeeded: value))
 #endif
   }
 
