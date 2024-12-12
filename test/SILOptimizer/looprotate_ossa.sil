@@ -582,3 +582,134 @@ bb3:
   return %26 : $Int32
 }
 
+// Make sure that no unnecessary phis are inserted which would cause an ownership error.
+// CHECK-LABEL: sil [ossa] @test_ssa_updater_owned :
+// CHECK:         begin_borrow
+// CHECK-NOT:   bb({{.*@owned.*}}):
+// CHECK:         end_borrow
+// CHECK-LABEL: } // end sil function 'test_ssa_updater_owned'
+sil [ossa] @test_ssa_updater_owned : $@convention(thin) (@owned String, @guaranteed String) -> () {
+bb0(%0 : @owned $String, %1 : @guaranteed $String):
+  %2 = integer_literal $Builtin.Int64, 0
+  br bb1(%0, %2)
+
+bb1(%4 : @owned $String, %5 : $Builtin.Int64):
+  cond_br undef, bb14, bb2
+
+bb2:
+  %7 = integer_literal $Builtin.Int64, 1
+  %8 = begin_borrow %4
+  cond_br undef, bb4, bb3
+
+bb3:
+  br bb5
+
+bb4:
+  cond_br undef, bb7, bb8
+
+bb5:
+  cond_br undef, bb10, bb6
+
+bb6:
+  br bb9
+
+bb7:
+  br bb9
+
+bb8:
+  br bb12
+
+bb9:
+  br bb11
+
+bb10:
+  br bb11
+
+bb11:
+  end_borrow %8
+  destroy_value %4
+  br bb13
+
+bb12:
+  end_borrow %8
+  destroy_value [dead_end] %4
+  unreachable 
+
+bb13:
+  %24 = copy_value %1
+  br bb1(%24, %7)
+
+bb14:
+  destroy_value %4
+  %27 = tuple ()
+  return %27
+}
+
+// Make sure that no unnecessary phis are inserted which would cause an ownership error.
+// CHECK-LABEL: sil [ossa] @test_ssa_updater_guaranteed :
+// CHECK:         begin_borrow
+// CHECK:         begin_borrow
+// CHECK-NOT:   bb({{.*@reborrow.*}}):
+// CHECK:         end_borrow
+// CHECK-LABEL: } // end sil function 'test_ssa_updater_guaranteed'
+sil [ossa] @test_ssa_updater_guaranteed : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = begin_borrow %0
+  br bb1(%3, %2)
+
+bb1(%4 : @reborrow $String, %5 : $Builtin.Int64):
+  %6 = borrowed %4 from (%0)
+  cond_br undef, bb14, bb2
+
+bb2:
+  %7 = integer_literal $Builtin.Int64, 1
+  %8 = begin_borrow %6
+  cond_br undef, bb4, bb3
+
+bb3:
+  br bb5
+
+bb4:
+  cond_br undef, bb7, bb8
+
+bb5:
+  cond_br undef, bb10, bb6
+
+bb6:
+  br bb9
+
+bb7:
+  br bb9
+
+bb8:
+  br bb12
+
+bb9:
+  br bb11
+
+bb10:
+  br bb11
+
+bb11:
+  end_borrow %8
+  end_borrow %6
+  br bb13
+
+bb12:
+  end_borrow %8
+  end_borrow %6
+  destroy_value [dead_end] %0
+  unreachable 
+
+bb13:
+  %24 = begin_borrow %0
+  br bb1(%24, %7)
+
+bb14:
+  end_borrow %6
+  destroy_value %0
+  %27 = tuple ()
+  return %27
+}
+
