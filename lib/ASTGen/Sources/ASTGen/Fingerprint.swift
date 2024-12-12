@@ -13,6 +13,7 @@
 @_spi(RawSyntax)
 import SwiftSyntax
 import SwiftIfConfig
+import ASTBridging
 
 struct Fingerprint: Equatable {
   typealias Core = (UInt64, UInt64)
@@ -75,5 +76,25 @@ final class FingerprintVisitor: SyntaxVisitor {
       self.walk(active)
     }
     return .skipChildren
+  }
+}
+
+@_cdecl("swift_ASTGen_getSourceFileFingerprint")
+func getSourceFileFingerprint(
+  sourceFilePtr: UnsafeMutableRawPointer,
+  ctx: BridgedASTContext
+) -> BridgedFingerprint {
+  let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
+  let configuredRegions = sourceFile.pointee.configuredRegions(astContext: ctx)
+  let visitor = FingerprintVisitor(configuredRegions: configuredRegions)
+  visitor.walk(sourceFile.pointee.syntax)
+  return visitor.finalize().bridged
+}
+
+extension ASTGenVisitor {
+  func generateFingerprint(declGroup node: some DeclGroupSyntax) -> Fingerprint {
+    let visitor = FingerprintVisitor(configuredRegions: self.configuredRegions)
+    visitor.walk(node.memberBlock)
+    return visitor.finalize()
   }
 }
