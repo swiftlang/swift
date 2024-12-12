@@ -476,7 +476,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       return false
     }
 
-    guard dwExitCode != 0 else {
+    if dwExitCode != 0 {
       print("FreeLibrary failed \(dwExitCode)")
       return false
     }
