@@ -757,6 +757,31 @@ ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
   return cloner.clone(cast);
 }
 
+ManagedValue SILGenBuilder::createUncheckedForwardingCast(SILLocation loc,
+                                                          ManagedValue value,
+                                                          SILType type) {
+  CleanupCloner cloner(*this, value);
+  SILValue cast = createUncheckedForwardingCast(loc, value.getValue(), type);
+  
+  // Currently createUncheckedBitCast only produces these
+  // instructions. We assert here to make sure if this changes, this code is
+  // updated.
+  assert((isa<UncheckedTrivialBitCastInst>(cast) ||
+          isa<UncheckedRefCastInst>(cast) ||
+          isa<UncheckedValueCastInst>(cast) ||
+          isa<ConvertFunctionInst>(cast)) &&
+         "SILGenBuilder is out of sync with SILBuilder.");
+
+  // If we have a trivial inst, just return early.
+  if (isa<UncheckedTrivialBitCastInst>(cast))
+    return ManagedValue::forObjectRValueWithoutOwnership(cast);
+
+  // Otherwise, we forward the cleanup of the input value and place the cleanup
+  // on the cast value since unchecked_ref_cast is "forwarding".
+  value.forward(SGF);
+  return cloner.clone(cast);
+}
+
 ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
                                                      ManagedValue original,
                                                      SILType type) {
