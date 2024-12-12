@@ -6838,6 +6838,14 @@ namespace {
                           IsABIAccessible_t abiAccessible)
       : EnumTypeInfoBase(strategy, irTy, copyable, abiAccessible) {}
   };
+
+  class BitwiseCopyableEnumTypeInfo
+      : public EnumTypeInfoBase<BitwiseCopyableTypeInfo> {
+  public:
+    BitwiseCopyableEnumTypeInfo(EnumImplStrategy &strategy, llvm::Type *irTy,
+                                IsABIAccessible_t abiAccessible)
+        : EnumTypeInfoBase(strategy, irTy, abiAccessible) {}
+  };
 } // end anonymous namespace
 
 const EnumImplStrategy &
@@ -7383,7 +7391,8 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
           KnownProtocolKind::BitwiseCopyable);
   if (bitwiseCopyableProtocol &&
       checkConformance(Type.getASTType(), bitwiseCopyableProtocol)) {
-    return BitwiseCopyableTypeInfo::create(enumTy, abiAccessible);
+    return registerEnumTypeInfo(
+        new BitwiseCopyableEnumTypeInfo(*this, enumTy, abiAccessible));
   }
   return registerEnumTypeInfo(
                        new ResilientEnumTypeInfo(*this, enumTy, cp,
