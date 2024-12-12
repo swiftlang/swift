@@ -24,6 +24,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/Type.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -135,10 +136,20 @@ private:
 struct ClangRecordMemberLookupDescriptor final {
   NominalTypeDecl *recordDecl;
   DeclName name;
+  clang::AccessSpecifier inheritance;
 
+  // Base case lookup on (most) derived class
   ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
-      : recordDecl(recordDecl), name(name) {
+      : recordDecl(recordDecl), name(name), inheritance(clang::AS_none) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
+  }
+
+  // Recursive lookup on inherited classes
+  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name,
+        clang::AccessSpecifier inheritance)
+      : recordDecl(recordDecl), name(name), inheritance(inheritance) {
+    assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
+    assert(inheritance != clang::AS_none && "class inheritance should be specified");
   }
 
   friend llvm::hash_code

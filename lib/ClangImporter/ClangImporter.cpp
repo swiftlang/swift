@@ -64,6 +64,7 @@
 #include "clang/Basic/LangStandard.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
@@ -6144,6 +6145,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
   NominalTypeDecl *recordDecl = desc.recordDecl;
   DeclName name = desc.name;
+  clang::AccessSpecifier inheritance = desc.inheritance;
 
   auto &ctx = recordDecl->getASTContext();
   auto allResults = evaluateOrDefault(
@@ -6180,7 +6182,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       foundNameArities.insert(getArity(valueDecl));
 
     for (auto base : cxxRecord->bases()) {
-      if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+      clang::AccessSpecifier baseAccess = base.getAccessSpecifier();
+      if (baseAccess != clang::AccessSpecifier::AS_public)
         continue;
 
       clang::QualType baseType = base.getType();
@@ -6199,7 +6202,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         // Add Clang members that are imported lazily.
         auto baseResults = evaluateOrDefault(
             ctx.evaluator,
-            ClangRecordMemberLookup({cast<NominalTypeDecl>(import), name}), {});
+            ClangRecordMemberLookup({cast<NominalTypeDecl>(import), name, baseAccess}), {});
         // Add members that are synthesized eagerly, such as subscripts.
         for (auto member :
              cast<NominalTypeDecl>(import)->getCurrentMembersWithoutLoading()) {
@@ -6218,6 +6221,20 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           // as that would cause an ambiguous lookup.
           if (foundNameArities.count(getArity(foundInBase)))
             continue;
+
+          // Do not importBaseMemberDecl() if this is a recursive lookup into
+          // some class's superclass. importBaseMemberDecl() caches synthesized
+          // members, which does not work if we call it on its result, e.g.:
+          //
+          //    importBaseMemberDecl(importBaseMemberDecl(foundInBase, recorDecl), recordDecl)
+          //
+          // Instead, we simply pass on the imported decl (foundInBase) as is,
+          // so that only the top-most request calls importBaseMemberDecl().
+          if (inheritance != clang::AS_none) {
+            result.push_back(foundInBase);
+            continue;
+          }
+
           if (auto newDecl = clangModuleLoader->importBaseMemberDecl(
                   foundInBase, recordDecl)) {
             result.push_back(newDecl);
