@@ -2323,11 +2323,11 @@ namespace {
 class IsolatedDeinitJob : public Job {
 private:
   void *Object;
-  DeinitWorkFunction *Work;
+  DeinitWorkFunction *__ptrauth_swift_deinit_work_function Work;
 
 public:
   IsolatedDeinitJob(JobPriority priority, void *object,
-                    DeinitWorkFunction *work)
+                    DeinitWorkFunction *__ptrauth_swift_deinit_work_function work)
       : Job({JobKind::IsolatedDeinit, priority}, &process), Object(object),
         Work(work) {}
 
