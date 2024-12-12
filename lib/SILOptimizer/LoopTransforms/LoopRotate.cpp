@@ -187,17 +187,6 @@ static void updateSSAForUseOfValue(
     updater.rewriteUse(*use);
   }
 
-  // Canonicalize inserted phis to avoid extra BB Args and if we find an address
-  // phi, stash it so we can handle it after we are done rewriting.
-  for (SILPhiArgument *arg : insertedPhis) {
-    if (SILValue inst = replaceBBArgWithCast(arg)) {
-      arg->replaceAllUsesWith(inst);
-      // DCE+SimplifyCFG runs as a post-pass cleanup.
-      // DCE replaces dead arg values with undef.
-      // SimplifyCFG deletes the dead BB arg.
-      continue;
-    }
-  }
 }
 
 static void
