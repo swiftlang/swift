@@ -30,7 +30,7 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
       guard libraryPath.hasSuffix(".wasm") else { break }
       let libraryFilePath = FilePath(libraryPath)
       do {
-        loadedWasmPlugins[moduleName] = try DefaultWasmPlugin(path: libraryFilePath)
+        self.loadedWasmPlugins[moduleName] = try DefaultWasmPlugin(path: libraryFilePath)
       } catch {
         return .loadPluginLibraryResult(
           loaded: false,
@@ -40,7 +40,7 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
       return .loadPluginLibraryResult(loaded: true, diagnostics: [])
     case .expandAttachedMacro(let macro, _, _, let syntax, _, _, _, _, _),
         .expandFreestandingMacro(let macro, _, _, let syntax, _):
-      if let response = expandMacro(macro, message: message, location: syntax.location) {
+      if let response = self.expandMacro(macro, message: message, location: syntax.location) {
         return response
       } // else break
     case .getCapability:
@@ -53,12 +53,20 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
     return base.handleMessage(message)
   }
 
+  func shutDown() throws {
+    for plugin in self.loadedWasmPlugins.values {
+      try plugin.shutDown()
+    }
+
+    self.loadedWasmPlugins = [:]
+  }
+
   private func expandMacro(
     _ macro: PluginMessage.MacroReference,
     message: HostToPluginMessage,
     location: PluginMessage.SourceLocation?
   ) -> PluginToHostMessage? {
-    guard let plugin = loadedWasmPlugins[macro.moduleName] else { return nil }
+    guard let plugin = self.loadedWasmPlugins[macro.moduleName] else { return nil }
     do {
       let request = try JSON.encode(message)
       let responseRaw = try plugin.handleMessage(request)
@@ -109,4 +117,6 @@ protocol WasmPlugin {
   init(path: FilePath) throws
 
   func handleMessage(_ json: [UInt8]) throws -> [UInt8]
+
+  func shutDown() throws
 }
