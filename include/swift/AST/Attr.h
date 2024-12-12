@@ -20,6 +20,7 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Identifier.h"
@@ -3188,6 +3189,52 @@ public:
   bool hasAttribute(bool allowInvalid = false) const {
     return getAttribute<AttrType>(allowInvalid) != nullptr;
   }
+};
+
+/// A wrapper for `AvailableAttr` that is enriched with additional semantic
+/// informaton, like its corresponding `AvailabilityDomain`.
+class SemanticAvailableAttr final {
+  const AvailableAttr *attr;
+  const AvailabilityDomain domain;
+
+public:
+  SemanticAvailableAttr(const AvailableAttr *attr, AvailabilityDomain domain)
+      : attr(attr), domain(domain) {}
+
+  const AvailableAttr *getParsedAttr() const { return attr; }
+  const AvailabilityDomain getDomain() const { return domain; }
+};
+
+/// An iterable range of `SemanticAvailableAttr`s.
+class SemanticAvailableAttributes {
+public:
+  class Filter final {
+    const Decl *decl;
+    bool includeInactive;
+
+  public:
+    Filter(const Decl *decl, bool includeInactive)
+        : decl(decl), includeInactive(includeInactive) {}
+
+    std::optional<SemanticAvailableAttr>
+    operator()(const DeclAttribute *attr) const;
+  };
+
+  using Range =
+      OptionalTransformRange<iterator_range<DeclAttributes::const_iterator>,
+                             Filter>;
+
+private:
+  Range attrRange;
+
+public:
+  SemanticAvailableAttributes(const DeclAttributes &attrs, const Decl *decl,
+                              bool includeInactive = false)
+      : attrRange(make_range(attrs.begin(), attrs.end()),
+                  Filter(decl, includeInactive)) {}
+
+  Range::iterator begin() const { return attrRange.begin(); }
+  Range::iterator end() const { return attrRange.end(); }
 };
 
 class alignas(1 << AttrAlignInBits) TypeAttribute

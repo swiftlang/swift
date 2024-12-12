@@ -6587,7 +6587,9 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
            ? enclosing->getDeclContext()->getAsDecl()
            : nullptr) {
     bool anyPlatformSpecificAttrs = false;
-    for (auto available: enclosing->getAttrs().getAttributes<AvailableAttr>()) {
+    for (auto semanticAttr : enclosing->getSemanticAvailableAttrs()) {
+      auto available = semanticAttr.getParsedAttr();
+
       if (available->getPlatform() == PlatformKind::none)
         continue;
 

@@ -451,7 +451,9 @@ class InheritedProtocolCollector {
 
     cache.emplace();
     while (D) {
-      for (auto *nextAttr : D->getAttrs().getAttributes<AvailableAttr>()) {
+      for (auto semanticAttr : D->getSemanticAvailableAttrs()) {
+        auto nextAttr = semanticAttr.getParsedAttr();
+
         // FIXME: This is just approximating the effects of nested availability
         // attributes for the same platform; formally they'd need to be merged.
         bool alreadyHasMoreSpecificAttrForThisPlatform =

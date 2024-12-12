@@ -11,9 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 
 using namespace swift;
+
+SemanticAvailableAttributes
+Decl::getSemanticAvailableAttrs(bool includeInactive) const {
+  return SemanticAvailableAttributes(getAttrs(), this, includeInactive);
+}
 
 AvailabilityDomain
 Decl::getDomainForAvailableAttr(const AvailableAttr *attr) const {
@@ -33,6 +39,17 @@ Decl::getDomainForAvailableAttr(const AvailableAttr *attr) const {
 
   case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
     return AvailabilityDomain::forPackageDescription();
+  }
+}
+
+bool AvailabilityDomain::isActive(ASTContext &ctx) const {
+  switch (kind) {
+  case Kind::Universal:
+  case Kind::SwiftLanguage:
+  case Kind::PackageDescription:
+    return true;
+  case Kind::Platform:
+    return isPlatformActive(getPlatformKind(), ctx.LangOpts);
   }
 }
 
