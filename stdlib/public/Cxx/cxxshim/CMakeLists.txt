@@ -67,6 +67,27 @@ foreach(sdk ${SWIFT_SDKS})
   endif()
 endforeach()
 
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+  set(module_dir "${SWIFTLIB_DIR}/embedded")
+  add_custom_command(OUTPUT ${module_dir}
+                     COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${module_dir}")
+  set(outputs)
+  foreach(source libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h)
+    add_custom_command(OUTPUT ${module_dir}/${source}
+                       DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source}
+                       COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${source}" "${module_dir}/${source}"
+                       COMMENT "Copying ${source} to ${module_dir}")
+    list(APPEND outputs "${module_dir}/${source}")
+  endforeach()
+  add_custom_target(cxxshim-embedded ALL
+                    DEPENDS ${outputs}
+                    COMMENT "Copying cxxshims to ${module_dir}")
+  list(APPEND libcxxshim_modulemap_target_list cxxshim-embedded)
+  swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h
+                             DESTINATION "lib/swift/embedded"
+                             COMPONENT compiler)
+endif()
+
 add_custom_target(libcxxshim_modulemap DEPENDS ${libcxxshim_modulemap_target_list})
 set_property(TARGET libcxxshim_modulemap PROPERTY FOLDER "Miscellaneous")
 add_dependencies(sdk-overlay libcxxshim_modulemap)
