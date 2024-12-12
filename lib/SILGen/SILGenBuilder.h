@@ -340,6 +340,11 @@ public:
   ManagedValue createUncheckedBitCast(SILLocation loc, ManagedValue original,
                                       SILType type);
 
+  using SILBuilder::createUncheckedForwardingCast;
+  ManagedValue createUncheckedForwardingCast(SILLocation loc,
+                                             ManagedValue original,
+                                             SILType type);
+
   using SILBuilder::createOpenExistentialRef;
   ManagedValue createOpenExistentialRef(SILLocation loc, ManagedValue arg,
                                         SILType openedType);
