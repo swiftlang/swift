@@ -44,4 +44,8 @@ struct WasmKitEngine: WasmEngine {
     guard let function = functions[name] else { return nil }
     return { _ = try function.invoke() }
   }
+
+  func shutDown() throws {
+    // No resources requiring explicit shut down in `WasmKitEngine`.
+  }
 }
