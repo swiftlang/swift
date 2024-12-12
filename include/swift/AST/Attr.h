@@ -3199,7 +3199,9 @@ class SemanticAvailableAttr final {
 
 public:
   SemanticAvailableAttr(const AvailableAttr *attr, AvailabilityDomain domain)
-      : attr(attr), domain(domain) {}
+      : attr(attr), domain(domain) {
+    assert(attr);
+  }
 
   const AvailableAttr *getParsedAttr() const { return attr; }
   const AvailabilityDomain getDomain() const { return domain; }

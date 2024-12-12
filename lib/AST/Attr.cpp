@@ -418,11 +418,8 @@ void DeclAttributes::dump(const Decl *D) const {
 /// introduction version and does not support deprecation, obsoletion, or
 /// messages.
 LLVM_READONLY
-static bool isShortAvailable(const DeclAttribute *DA) {
-  auto *AvailAttr = dyn_cast<AvailableAttr>(DA);
-  if (!AvailAttr)
-    return false;
-
+static bool isShortAvailable(const SemanticAvailableAttr &semanticAttr) {
+  auto *AvailAttr = semanticAttr.getParsedAttr();
   if (AvailAttr->isSPI())
     return false;
 
@@ -462,20 +459,21 @@ static bool isShortAvailable(const DeclAttribute *DA) {
 /// For example, iOS availability implies macCatalyst availability so if attributes for
 /// both are present and they have the same 'introduced' version, we can skip printing an
 /// explicit availability for macCatalyst.
-static bool isShortFormAvailabilityImpliedByOther(const AvailableAttr *Attr,
-    ArrayRef<const DeclAttribute *> Others) {
+static bool
+isShortFormAvailabilityImpliedByOther(SemanticAvailableAttr Attr,
+                                      ArrayRef<SemanticAvailableAttr> Others) {
   assert(isShortAvailable(Attr));
 
-  for (auto *DA : Others) {
-    auto *Other = cast<AvailableAttr>(DA);
-    if (Attr->getPlatform() == Other->getPlatform())
+  auto platform = Attr.getDomain().getPlatformKind();
+  for (auto other : Others) {
+    auto otherPlatform = other.getDomain().getPlatformKind();
+    if (platform == otherPlatform)
       continue;
 
-    if (!inheritsAvailabilityFromPlatform(Attr->getPlatform(),
-                                          Other->getPlatform()))
+    if (!inheritsAvailabilityFromPlatform(platform, otherPlatform))
       continue;
 
-    if (Attr->Introduced == Other->Introduced)
+    if (Attr.getParsedAttr()->Introduced == other.getParsedAttr()->Introduced)
       return true;
   }
   return false;
@@ -489,39 +487,43 @@ static bool isShortFormAvailabilityImpliedByOther(const AvailableAttr *Attr,
 /// this will print:
 ///   @available(OSX 10.10, iOS 8.0, *)
 static void printShortFormAvailable(const Decl *D,
-                                    ArrayRef<const DeclAttribute *> Attrs,
+                                    ArrayRef<SemanticAvailableAttr> Attrs,
                                     ASTPrinter &Printer,
                                     const PrintOptions &Options,
                                     bool forAtSpecialize = false) {
   assert(!Attrs.empty());
   if (!forAtSpecialize)
     Printer << "@available(";
-  auto FirstAvail = cast<AvailableAttr>(Attrs.front());
-  auto FirstAvailDomain = D->getDomainForAvailableAttr(FirstAvail);
-  if (Attrs.size() == 1 && !FirstAvailDomain.isPlatform()) {
-    assert(FirstAvail->Introduced.has_value());
-    Printer << FirstAvailDomain.getNameForAttributePrinting() << " ";
-    Printer << FirstAvail->Introduced.value().getAsString();
-    if (!forAtSpecialize)
-      Printer << ")";
-  } else {
-    for (auto *DA : Attrs) {
-      auto *AvailAttr = cast<AvailableAttr>(DA);
-      auto AvailAttrDomain = D->getDomainForAvailableAttr(AvailAttr);
-      assert(AvailAttr->Introduced.has_value());
-      // Avoid omitting available attribute when we are printing module interface.
-      if (!Options.IsForSwiftInterface &&
-          isShortFormAvailabilityImpliedByOther(AvailAttr, Attrs))
-        continue;
-      Printer << AvailAttrDomain.getNameForAttributePrinting() << " "
-              << AvailAttr->Introduced.value().getAsString() << ", ";
-    }
-    Printer << "*";
-    if (!forAtSpecialize)
-      Printer << ")";
+
+  bool isFirst = true;
+  bool isPlatformAvailability = false;
+  for (auto semanticAttr : Attrs) {
+    auto *availAttr = semanticAttr.getParsedAttr();
+    auto domain = semanticAttr.getDomain();
+    assert(availAttr->Introduced.has_value());
+
+    // Avoid omitting available attribute when we are printing module interface.
+    if (!Options.IsForSwiftInterface &&
+        isShortFormAvailabilityImpliedByOther(semanticAttr, Attrs))
+      continue;
+
+    Printer << (isFirst ? "" : ", ");
+    isFirst = false;
+
+    if (domain.isPlatform())
+      isPlatformAvailability = true;
+
+    Printer << domain.getNameForAttributePrinting() << " "
+            << availAttr->Introduced.value().getAsString();
   }
-  if (!forAtSpecialize)
+
+  if (isPlatformAvailability)
+    Printer << ", *";
+
+  if (!forAtSpecialize) {
+    Printer << ")";
     Printer.printNewline();
+  }
 }
 
 static void printShortFormBackDeployed(ArrayRef<const DeclAttribute *> Attrs,
@@ -775,9 +777,9 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   using AttributeVector = SmallVector<const DeclAttribute *, 8>;
 
   // Process attributes in passes.
-  AttributeVector shortAvailableAttributes;
-  const DeclAttribute *swiftVersionAvailableAttribute = nullptr;
-  const DeclAttribute *packageDescriptionVersionAvailableAttribute = nullptr;
+  SmallVector<SemanticAvailableAttr, 8> shortAvailableAttributes;
+  std::optional<SemanticAvailableAttr> swiftVersionAvailableAttribute;
+  std::optional<SemanticAvailableAttr> packageDescriptionVersionAvailableAttribute;
   AttributeVector backDeployedAttributes;
   AttributeVector longAttributes;
   AttributeVector attributes;
@@ -824,30 +826,31 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     // Be careful not to coalesce `@available(swift 5)` with other short
     // `available' attributes.
     if (auto *availableAttr = dyn_cast<AvailableAttr>(DA)) {
-      if (availableAttr->isLanguageVersionSpecific() &&
-          isShortAvailable(availableAttr)) {
-        swiftVersionAvailableAttribute = availableAttr;
-        continue;
-      }
-      if (availableAttr->isPackageDescriptionVersionSpecific() &&
-          isShortAvailable(availableAttr)) {
-        packageDescriptionVersionAvailableAttribute = availableAttr;
+      auto domain = D->getDomainForAvailableAttr(availableAttr);
+      auto semanticAttr = SemanticAvailableAttr(availableAttr, domain);
+      if (isShortAvailable(semanticAttr)) {
+        if (domain.isSwiftLanguage())
+          swiftVersionAvailableAttribute.emplace(semanticAttr);
+        else if (domain.isPackageDescription())
+          packageDescriptionVersionAvailableAttribute.emplace(semanticAttr);
+        else
+          shortAvailableAttributes.push_back(semanticAttr);
+
         continue;
       }
     }
 
     AttributeVector &which = DA->isDeclModifier() ? modifiers :
                              isa<BackDeployedAttr>(DA) ? backDeployedAttributes :
-                             isShortAvailable(DA) ? shortAvailableAttributes :
                              DA->isLongAttribute() ? longAttributes :
                              attributes;
     which.push_back(DA);
   }
 
   if (swiftVersionAvailableAttribute)
-    printShortFormAvailable(D, swiftVersionAvailableAttribute, Printer, Options);
+    printShortFormAvailable(D, *swiftVersionAvailableAttribute, Printer, Options);
   if (packageDescriptionVersionAvailableAttribute)
-    printShortFormAvailable(D, packageDescriptionVersionAvailableAttribute, Printer, Options);
+    printShortFormAvailable(D, *packageDescriptionVersionAvailableAttribute, Printer, Options);
   if (!shortAvailableAttributes.empty())
     printShortFormAvailable(D, shortAvailableAttributes, Printer, Options);
   if (!backDeployedAttributes.empty())
@@ -926,10 +929,12 @@ SemanticAvailableAttributes::Filter::operator()(
   return SemanticAvailableAttr(availableAttr, domain);
 }
 
-static void printAvailableAttr(const Decl *D, const AvailableAttr *Attr,
+static void printAvailableAttr(const Decl *D,
+                               const SemanticAvailableAttr &SemanticAttr,
                                ASTPrinter &Printer,
                                const PrintOptions &Options) {
-  auto Domain = D->getDomainForAvailableAttr(Attr);
+  auto Attr = SemanticAttr.getParsedAttr();
+  auto Domain = SemanticAttr.getDomain();
 
   // The parser rejects `@available(swift, unavailable)`, so when printing
   // attributes that are universally unavailable in Swift, we must print them
@@ -1159,6 +1164,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DeclAttrKind::Available: {
     auto Attr = cast<AvailableAttr>(this);
+    auto Domain = D->getDomainForAvailableAttr(Attr);
+    auto SemanticAttr = SemanticAvailableAttr(Attr, Domain);
+
     if (Options.printPublicInterface() && Attr->isSPI()) {
       assert(Attr->hasPlatform());
       assert(Attr->Introduced.has_value());
@@ -1182,7 +1190,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer.printAttrName("@available");
     }
     Printer << "(";
-    printAvailableAttr(D, Attr, Printer, Options);
+    printAvailableAttr(D, SemanticAttr, Printer, Options);
     Printer << ")";
     break;
   }
@@ -1276,17 +1284,19 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "kind: " << kind << ", ";
     if (target)
       Printer << "target: " << target << ", ";
-    auto availAttrs = attr->getAvailableAttrs();
-    if (!availAttrs.empty()) {
+    SmallVector<SemanticAvailableAttr, 8> semanticAvailAttrs;
+    for (auto availAttr : attr->getAvailableAttrs()) {
+      auto domain = D->getDomainForAvailableAttr(availAttr);
+      semanticAvailAttrs.push_back(SemanticAvailableAttr(availAttr, domain));
+    }
+
+    if (!semanticAvailAttrs.empty()) {
       Printer << "availability: ";
-      auto numAttrs = availAttrs.size();
-      if (numAttrs == 1) {
-        printAvailableAttr(D, availAttrs[0], Printer, Options);
+      if (semanticAvailAttrs.size() == 1) {
+        printAvailableAttr(D, semanticAvailAttrs[0], Printer, Options);
         Printer << "; ";
       } else {
-        SmallVector<const DeclAttribute *, 8> tmp(availAttrs.begin(),
-                                                  availAttrs.end());
-        printShortFormAvailable(D, tmp, Printer, Options,
+        printShortFormAvailable(D, semanticAvailAttrs, Printer, Options,
                                 true /*forAtSpecialize*/);
         Printer << "; ";
       }
