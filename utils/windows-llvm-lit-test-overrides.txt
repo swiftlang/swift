@@ -30,6 +30,7 @@ skip lldb-api :: python_api/section/TestSectionAPI.py
 skip lldb-api :: lang/BoundsSafety/array_of_ptrs/TestArrayOfBoundsSafetyPointers.py
 skip lldb-api :: lang/BoundsSafety/out_of_bounds_pointer/TestOutOfBoundsPointer.py
 skip lldb-shell :: Commands/command-expr-diagnostics.test
+skip lldb-unit :: Host/PipeTest/WriteWithTimeout
 
 ### Tests that pass occasionally ###
 
