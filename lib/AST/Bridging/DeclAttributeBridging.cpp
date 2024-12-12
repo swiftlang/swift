@@ -93,6 +93,16 @@ static std::optional<AccessLevel> unbridge(BridgedAccessLevel level) {
   llvm_unreachable("unhandled BridgedAccessLevel");
 }
 
+BridgedABIAttr BridgedABIAttr_createParsed(BridgedASTContext cContext,
+                                           BridgedSourceLoc atLoc,
+                                           BridgedSourceRange range,
+                                           BridgedNullableDecl abiDecl) {
+  return new (cContext.unbridged()) ABIAttr(abiDecl.unbridged(),
+                                            atLoc.unbridged(),
+                                            range.unbridged(),
+                                            /*isImplicit=*/false);
+}
+
 BridgedAccessControlAttr
 BridgedAccessControlAttr_createParsed(BridgedASTContext cContext,
                                       BridgedSourceRange cRange,

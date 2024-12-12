@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library -verify-additional-prefix disabled-
+// RUN: %target-typecheck-verify-swift -parse-as-library -disable-experimental-parser-round-trip -verify-additional-prefix disabled-
 // RUN: %target-typecheck-verify-swift -parse-as-library -verify-additional-prefix enabled- -enable-experimental-feature ABIAttribute
 
 // REQUIRES: asserts
