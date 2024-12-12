@@ -638,17 +638,24 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
                                              PoisonRefs_t poisonRefs,
                                              UsesMoveableValueDebugInfo_t moved,
-                                             bool trace) {
+                                             bool trace, bool overrideLoc) {
   if (shouldDropVariable(Var, Loc))
     return nullptr;
 
   llvm::SmallString<4> Name;
 
-  // Debug location overrides cannot apply to debug value instructions.
-  DebugLocOverrideRAII LocOverride{*this, std::nullopt};
-  return insert(DebugValueInst::create(
-      getSILDebugLocation(Loc, true), src, getModule(),
-      *substituteAnonymousArgs(Name, Var, Loc), poisonRefs, moved, trace));
+  SILDebugLocation DebugLoc;
+  if (overrideLoc) {
+    // Debug location overrides cannot apply to debug value instructions.
+    DebugLocOverrideRAII LocOverride{*this, std::nullopt};
+    DebugLoc = getSILDebugLocation(Loc, true);
+  } else {
+    DebugLoc = getSILDebugLocation(Loc, true);
+  }
+
+  return insert(DebugValueInst::create(DebugLoc, src, getModule(),
+                                       *substituteAnonymousArgs(Name, Var, Loc),
+                                       poisonRefs, moved, trace));
 }
 
 DebugValueInst *SILBuilder::createDebugValueAddr(
