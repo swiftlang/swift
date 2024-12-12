@@ -146,10 +146,11 @@ struct ClangRecordMemberLookupDescriptor final {
 
   // Recursive lookup on inherited classes
   ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name,
-        clang::AccessSpecifier inheritance)
+                                    clang::AccessSpecifier inheritance)
       : recordDecl(recordDecl), name(name), inheritance(inheritance) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
-    assert(inheritance != clang::AS_none && "class inheritance should be specified");
+    assert(inheritance != clang::AS_none &&
+           "class inheritance should be specified");
   }
 
   friend llvm::hash_code
