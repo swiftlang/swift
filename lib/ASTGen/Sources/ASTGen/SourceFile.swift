@@ -76,6 +76,7 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.TrailingComma, to: .trailingComma)
     mapFeature(.CoroutineAccessors, to: .coroutineAccessors)
     mapFeature(.ValueGenerics, to: .valueGenerics)
+    mapFeature(.ABIAttribute, to: .abiAttribute)
   }
 }
 

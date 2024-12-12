@@ -581,6 +581,11 @@ BridgedDeclAttribute BridgedDeclAttribute_createSimple(
     BridgedASTContext cContext, BridgedDeclAttrKind cKind,
     BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc);
 
+SWIFT_NAME("BridgedABIAttr.createParsed(_:atLoc:range:abiDecl:)")
+BridgedABIAttr BridgedABIAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc atLoc,
+    BridgedSourceRange range, BridgedNullableDecl abiDecl);
+
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAccessLevel {
   BridgedAccessLevelPrivate,
   BridgedAccessLevelFilePrivate,
