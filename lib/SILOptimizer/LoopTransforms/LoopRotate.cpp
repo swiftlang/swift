@@ -46,7 +46,7 @@ static llvm::cl::opt<bool> RotateSingleBlockLoop("looprotate-single-block-loop",
 
 static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
                        SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
-                       SILBasicBlock *upToBB);
+                       SILBasicBlock *upToBB, SILPassManager *pm);
 
 /// Check whether all operands are loop invariant.
 static bool
@@ -151,7 +151,8 @@ static void mapOperands(SILInstruction *inst,
 static void updateSSAForUseOfValue(
     SILSSAUpdater &updater, SmallVectorImpl<SILPhiArgument *> &insertedPhis,
     const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
-    SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock, SILValue Res) {
+    SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock, SILValue Res,
+    SILPassManager *pm) {
   // Find the mapped instruction.
   assert(valueMap.count(Res) && "Expected to find value in map!");
   SILValue MappedValue = valueMap.find(Res)->second;
@@ -187,17 +188,7 @@ static void updateSSAForUseOfValue(
     updater.rewriteUse(*use);
   }
 
-  // Canonicalize inserted phis to avoid extra BB Args and if we find an address
-  // phi, stash it so we can handle it after we are done rewriting.
-  for (SILPhiArgument *arg : insertedPhis) {
-    if (SILValue inst = replaceBBArgWithCast(arg)) {
-      arg->replaceAllUsesWith(inst);
-      // DCE+SimplifyCFG runs as a post-pass cleanup.
-      // DCE replaces dead arg values with undef.
-      // SimplifyCFG deletes the dead BB arg.
-      continue;
-    }
-  }
+  replacePhisWithIncomingValues(pm, insertedPhis);
 }
 
 static void
@@ -205,16 +196,17 @@ updateSSAForUseOfInst(SILSSAUpdater &updater,
                       SmallVectorImpl<SILPhiArgument *> &insertedPhis,
                       const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
                       SILBasicBlock *header, SILBasicBlock *entryCheckBlock,
-                      SILInstruction *inst) {
+                      SILInstruction *inst, SILPassManager *pm) {
   for (auto result : inst->getResults())
     updateSSAForUseOfValue(updater, insertedPhis, valueMap, header,
-                           entryCheckBlock, result);
+                           entryCheckBlock, result, pm);
 }
 
 /// Rewrite the code we just created in the preheader and update SSA form.
 static void rewriteNewLoopEntryCheckBlock(
     SILBasicBlock *header, SILBasicBlock *entryCheckBlock,
-    const llvm::DenseMap<ValueBase *, SILValue> &valueMap) {
+    const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
+    SILPassManager *pm) {
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
 
@@ -223,7 +215,7 @@ static void rewriteNewLoopEntryCheckBlock(
   for (unsigned i : range(header->getNumArguments())) {
     auto *arg = header->getArguments()[i];
     updateSSAForUseOfValue(updater, insertedPhis, valueMap, header,
-                           entryCheckBlock, arg);
+                           entryCheckBlock, arg, pm);
   }
 
   auto instIter = header->begin();
@@ -232,7 +224,7 @@ static void rewriteNewLoopEntryCheckBlock(
   while (instIter != header->end()) {
     auto &inst = *instIter;
     updateSSAForUseOfInst(updater, insertedPhis, valueMap, header,
-                          entryCheckBlock, &inst);
+                          entryCheckBlock, &inst, pm);
     ++instIter;
   }
 }
@@ -254,7 +246,7 @@ static void updateDomTree(DominanceInfo *domInfo, SILBasicBlock *preheader,
 }
 
 static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
-                                      SILLoopInfo *loopInfo) {
+                                      SILLoopInfo *loopInfo, SILPassManager *pm) {
   auto *latch = loop->getLoopLatch();
   if (!latch) {
     LLVM_DEBUG(llvm::dbgs()
@@ -264,11 +256,11 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
 
   bool didRotate = rotateLoop(
       loop, domInfo, loopInfo,
-      RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch);
+      RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch, pm);
 
   // Keep rotating at most until we hit the original latch.
   if (didRotate)
-    while (rotateLoop(loop, domInfo, loopInfo, false, latch)) {
+    while (rotateLoop(loop, domInfo, loopInfo, false, latch, pm)) {
     }
 
   return didRotate;
@@ -317,7 +309,7 @@ static bool isSingleBlockLoop(SILLoop *L) {
 /// loop for termination.
 static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
                        SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
-                       SILBasicBlock *upToBB) {
+                       SILBasicBlock *upToBB, SILPassManager *pm) {
   assert(loop != nullptr && domInfo != nullptr && loopInfo != nullptr
          && "Missing loop information");
 
@@ -443,7 +435,7 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // If there were any uses of instructions in the duplicated loop entry check
   // block rewrite them using the ssa updater.
-  rewriteNewLoopEntryCheckBlock(header, preheader, valueMap);
+  rewriteNewLoopEntryCheckBlock(header, preheader, valueMap, pm);
 
   loop->moveToHeader(newHeader);
 
@@ -509,7 +501,7 @@ class LoopRotation : public SILFunctionTransform {
         SILLoop *loop = worklist.pop_back_val();
         changed |= canonicalizeLoop(loop, domInfo, loopInfo);
         changed |=
-            rotateLoopAtMostUpToLatch(loop, domInfo, loopInfo);
+            rotateLoopAtMostUpToLatch(loop, domInfo, loopInfo, getPassManager());
       }
     }
 

@@ -1,4 +1,4 @@
-//===--- GuaranteedPhiUpdater.swift ---------------------------------------===//
+//===--- PhiUpdater.swift -------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -152,13 +152,100 @@ private func addEnclosingValues(
   return true
 }
 
-func registerGuaranteedPhiUpdater() {
-  BridgedUtilities.registerGuaranteedPhiUpdater(
+/// Replaces a phi with the unique incoming value if all incoming values are the same:
+/// ```
+///   bb1:
+///     br bb3(%1)
+///   bb2:
+///     br bb3(%1)
+///   bb3(%2 : $T):   // Predecessors: bb1, bb2
+///     use(%2)
+/// ```
+/// ->
+/// ```
+///   bb1:
+///     br bb3
+///   bb2:
+///     br bb3
+///   bb3:
+///     use(%1)
+/// ```
+///
+func replacePhiWithIncomingValue(phi: Phi, _ context: some MutatingContext) -> Bool {
+  if phi.predecessors.isEmpty {
+    return false
+  }
+  let uniqueIncomingValue = phi.incomingValues.first!
+  if !uniqueIncomingValue.parentFunction.hasOwnership {
+    // For the SSAUpdater it's only required to simplify phis in OSSA.
+    // This avoids that we need to handle cond_br instructions below.
+    return false
+  }
+  if phi.incomingValues.contains(where: { $0 != uniqueIncomingValue }) {
+    return false
+  }
+  if let borrowedFrom = phi.borrowedFrom {
+    borrowedFrom.uses.replaceAll(with: uniqueIncomingValue, context)
+    context.erase(instruction: borrowedFrom)
+  } else {
+    phi.value.uses.replaceAll(with: uniqueIncomingValue, context)
+  }
+
+  let block = phi.value.parentBlock
+  for incomingOp in phi.incomingOperands {
+    let existingBranch = incomingOp.instruction as! BranchInst
+    let argsWithRemovedPhiOp = existingBranch.operands.filter{ $0 != incomingOp }.map{ $0.value }
+    Builder(before: existingBranch, context).createBranch(to: block, arguments: argsWithRemovedPhiOp)
+    context.erase(instruction: existingBranch)
+  }
+  block.eraseArgument(at: phi.value.index, context)
+  return true
+}
+
+/// Replaces phis with the unique incoming values if all incoming values are the same.
+/// This is needed after running the SSAUpdater for an existing OSSA value, because the updater can
+/// insert unnecessary phis in the middle of the original liverange which breaks up the original
+/// liverange into smaller ones:
+/// ```
+///    %1 = def_of_owned_value
+///    %2 = begin_borrow %1
+///    ...
+///    br bb2(%1)
+///  bb2(%3 : @owned $T): // inserted by SSAUpdater
+///    ...
+///    end_borrow %2      // use after end-of-lifetime!
+///    destroy_value %3
+/// ```
+///
+/// It's not needed to run this utility if SSAUpdater is used to create a _new_ OSSA liverange.
+///
+func replacePhisWithIncomingValues(phis: [Phi], _ context: some MutatingContext) {
+  var currentPhis = phis
+  // Do this in a loop because replacing one phi might open up the opportunity for another phi
+  // and the order of phis in the array can be arbitrary.
+  while true {
+    var newPhis = [Phi]()
+    for phi in currentPhis {
+      if !replacePhiWithIncomingValue(phi: phi, context) {
+        newPhis.append(phi)
+      }
+    }
+    if newPhis.count == currentPhis.count {
+      return
+    }
+    currentPhis = newPhis
+  }
+}
+
+func registerPhiUpdater() {
+  BridgedUtilities.registerPhiUpdater(
+    // updateAllGuaranteedPhis
     { (bridgedCtxt: BridgedPassContext, bridgedFunction: BridgedFunction) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
       let function = bridgedFunction.function;
       updateGuaranteedPhis(in: function, context)
     },
+    // updateGuaranteedPhis
     { (bridgedCtxt: BridgedPassContext, bridgedPhiArray: BridgedArrayRef) in
       let context = FunctionPassContext(_bridged: bridgedCtxt)
       var guaranteedPhis = Stack<Phi>(context)
@@ -172,6 +259,15 @@ func registerGuaranteedPhiUpdater() {
         }
       }
       updateGuaranteedPhis(phis: guaranteedPhis, context)
+    },
+    // replacePhisWithIncomingValues
+    { (bridgedCtxt: BridgedPassContext, bridgedPhiArray: BridgedArrayRef) in
+      let context = FunctionPassContext(_bridged: bridgedCtxt)
+      var phis = [Phi]()
+      bridgedPhiArray.withElements(ofType: BridgedValue.self) {
+        phis = $0.map { Phi($0.value)! }
+      }
+      replacePhisWithIncomingValues(phis: phis, context)
     }
   )
 }
