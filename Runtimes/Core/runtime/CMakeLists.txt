@@ -76,9 +76,9 @@ endif()
 #       file rather than pushing them through macro flags.
 target_compile_definitions(swiftRuntime
   PRIVATE
-    -DswiftCore_EXPORTS
     -DSWIFT_RUNTIME
     -DSWIFT_TARGET_LIBRARY_NAME=swiftRuntime
+    $<$<BOOL:${BUILD_SHARED_LIBS}>:-DswiftCore_EXPORTS>
     $<$<BOOL:${SwiftCore_ENABLE_BACKTRACING}>:-DSWIFT_ENABLE_BACKTRACING>
     $<$<BOOL:${SwiftCore_ENABLE_OVERRIDABLE_RETAIN_RELEASE}>:-DSWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE>
     $<$<BOOL:${SwiftCore_ENABLE_MALLOC_TYPE}>:-DSWIFT_STDLIB_HAS_MALLOC_TYPE>
