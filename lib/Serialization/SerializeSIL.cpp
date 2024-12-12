@@ -1030,6 +1030,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
           ListOfValues.push_back(LC.first);
           ListOfValues.push_back(LC.second);
           ListOfValues.push_back(FNameID);
+        } else if (RawLoc.isFilenameAndLocation()) {
+          // TODO: this is a workaround until rdar://problem/25225083 is
+          // implemented.
+          attrs |= 1 << 9;
+          auto FNameLoc = RawLoc.getFilenameAndLocation();
+          ListOfValues.push_back(FNameLoc->line);
+          ListOfValues.push_back(FNameLoc->column);
+          ListOfValues.push_back(S.addUniquedStringRef(FNameLoc->filename));
         }
       }
 

@@ -1628,6 +1628,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto HasTrace = (Attr >> 2) & 0x1;
 
     bool HaveDebugVar = (Attr >> 3) & 0x1;
+    bool HasLoc = false;
 
     SILDebugVariable DebugVar;
     if (HaveDebugVar) {
@@ -1636,7 +1637,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       unsigned IsDenseMapSingleton = (Attr >> 5) & 0x3;
       bool HasType = (Attr >> 7) & 0x1;
       bool HasScope = (Attr >> 8) & 0x1;
-      bool HasLoc = (Attr >> 9) & 0x1;
+      HasLoc = (Attr >> 9) & 0x1;
 
       auto VarName = MF->getIdentifierText(ListOfValues[2]);
       auto ArgNo = ListOfValues[3];
@@ -1703,8 +1704,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       DebugVar.isDenseMapSingleton = IsDenseMapSingleton;
     }
 
-    ResultInst = Builder.createDebugValue(Loc, Value, DebugVar, PoisonRefs,
-                                          UsesMoveableValDebugInfo, HasTrace);
+    ResultInst =
+        Builder.createDebugValue(Loc, Value, DebugVar, PoisonRefs,
+                                 UsesMoveableValDebugInfo, HasTrace, !HasLoc);
 
     break;
   }
