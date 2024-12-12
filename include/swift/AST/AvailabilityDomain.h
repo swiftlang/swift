@@ -84,10 +84,7 @@ public:
   bool isPackageDescription() const { return kind == Kind::PackageDescription; }
 
   /// Returns the platform kind for this domain if applicable.
-  PlatformKind getPlatformKind() const {
-    assert(kind == Kind::Platform);
-    return platform;
-  }
+  PlatformKind getPlatformKind() const { return platform; }
 
   /// Returns true if this domain is considered active in the current
   /// compilation context.
