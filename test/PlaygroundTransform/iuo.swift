@@ -2,6 +2,8 @@
 // RUN: %target-playground-build-run-swift(-swift-version 5 -Xfrontend -playground)
 // RUN: %target-playground-build-run-swift(-swift-version 6 -Xfrontend -playground)
 
+// REQUIRES: executable_test
+
 import PlaygroundSupport
 
 class Layer {
