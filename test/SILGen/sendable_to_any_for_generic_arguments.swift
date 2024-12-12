@@ -15,8 +15,8 @@ extension Array where Element == Any {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s37sendable_to_any_for_generic_arguments31test_conditional_on_collections1uyAA4UserC_tF
-// CHECK: unchecked_bitwise_cast {{.*}} to $Dictionary<String, Any>
-// CHECK: unchecked_bitwise_cast {{.*}} to $Array<Any>
+// CHECK: unchecked_value_cast {{.*}} to $Dictionary<String, Any>
+// CHECK: unchecked_value_cast {{.*}} to $Array<Any>
 func test_conditional_on_collections(u: User) {
   u.dict.onlyWhenValueAny()
   u.arr.onlyWhenValueAny()
@@ -41,10 +41,10 @@ extension Array where Element == any Sendable {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s37sendable_to_any_for_generic_arguments41test_no_ambiguity_with_Sendable_extension1uyAA4UserC_tF
-// CHECK-NOT: unchecked_bitwise_cast {{.*}}
+// CHECK-NOT: unchecked_value_cast {{.*}}
 // CHECK: [[DICT_METHOD_REF:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszs8Sendable_pRs_rlE11noAmbiguityyyF : $@convention(method) (@guaranteed Dictionary<String, any Sendable>) -> ()
 // CHECK-NEXT: {{.*}} = apply [[DICT_METHOD_REF]]({{.*}}) : $@convention(method) (@guaranteed Dictionary<String, any Sendable>) -> ()
-// CHECK-NOT: unchecked_bitwise_cast {{.*}}
+// CHECK-NOT: unchecked_value_cast {{.*}}
 // CHECK: [[ARR_METHOD_REF:%.*]] = function_ref @$sSa37sendable_to_any_for_generic_argumentss8Sendable_pRszlE11noAmbiguityyyF : $@convention(method) (@guaranteed Array<any Sendable>) -> ()
 // CHECK-NEXT: {{.*}} = apply [[ARR_METHOD_REF]]({{.*}}) : $@convention(method) (@guaranteed Array<any Sendable>) -> ()
 func test_no_ambiguity_with_Sendable_extension(u: User) {
