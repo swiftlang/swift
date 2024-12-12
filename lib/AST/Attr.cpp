@@ -1159,8 +1159,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DeclAttrKind::Available: {
     auto Attr = cast<AvailableAttr>(this);
-    if (Options.SuppressNoAsyncAvailabilityAttr && Attr->isNoAsync())
-      return false;
     if (Options.printPublicInterface() && Attr->isSPI()) {
       assert(Attr->hasPlatform());
       assert(Attr->Introduced.has_value());
