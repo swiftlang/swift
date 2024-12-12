@@ -67,8 +67,8 @@ public actor MyAct {
 
 @available(SwiftStdlib 6.1, *)
 public actor MyActIsolatedDeinit {
-  // CHECK-LABEL: sil [serialized] [available 9999] [ossa] @$s19inlinable_attribute19MyActIsolatedDeinitCfZ : $@convention(thin) (@owned MyActIsolatedDeinit) -> ()
-  // CHECK-LABEL: sil [serialized] [available 9999] [ossa] @$s19inlinable_attribute19MyActIsolatedDeinitCfD : $@convention(method) (@owned MyActIsolatedDeinit) -> ()
+  // CHECK: sil [serialized] [[AVAILABILITY:\[available.*\]]] [ossa] @$s19inlinable_attribute19MyActIsolatedDeinitCfZ : $@convention(thin) (@owned MyActIsolatedDeinit) -> ()
+  // CHECK: sil [serialized] [[AVAILABILITY:\[available.*\]]] [ossa] @$s19inlinable_attribute19MyActIsolatedDeinitCfD : $@convention(method) (@owned MyActIsolatedDeinit) -> ()
   @inlinable isolated deinit {}
 }
 
