@@ -20,6 +20,8 @@ protocol WasmEngine {
   init(path: FilePath, imports: WASIBridgeToHost) throws
 
   func function(named name: String) throws -> WasmFunction?
+  
+  func shutDown() throws
 }
 
 typealias DefaultWasmPlugin = WasmEnginePlugin<DefaultWasmEngine>
@@ -79,6 +81,10 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
       }
       size = received
     }
+  }
+
+  func shutDown() throws {
+    try self.engine.shutDown()
   }
 }
 
