@@ -75,7 +75,7 @@ _ = ArchetypeToArchetypeCast(t1: c, t2: b)
 // y -> x where x is a super class of y.
 // CHECK-LABEL: sil shared {{.*}}@$s30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA1DC_AA1CCTt1g5 : $@convention(thin) (@guaranteed D) -> @owned C {
 // CHECK: [[T1:%.*]] = upcast %0 : $D to $C
-// CHECK: strong_retain %0 : $D
+// CHECK: strong_retain [[T1]]
 // CHECK: return [[T1]] : $C
 // CHECK: } // end sil function '$s30specialize_checked_cast_branch011ArchetypeToE4Cast2t12t2q_x_q_tr0_lFAA1DC_AA1CCTt1g5'
 _ = ArchetypeToArchetypeCast(t1: d, t2: c)

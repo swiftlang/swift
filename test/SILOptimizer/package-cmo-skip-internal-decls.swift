@@ -121,17 +121,17 @@ public func useInternal(_ arg: Base) -> Int {
   return PubKlass().pkgVar + arg.baseVarInternal.data
 }
 
-// CHECK-DAG: sil package [serialized_for_package] [canonical] @$s3Lib6usePkgySiAA4BaseCF : $@convention(thin) (@guaranteed Base) -> Int {
+// CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib6usePkgySiAA4BaseCF : $@convention(thin) (@guaranteed Base) -> Int {
 package func usePkg(_ arg: Base) -> Int {
   return arg.baseVarPkg
 }
 
-// CHECK-DAG: sil [serialized_for_package] [canonical] @$s3Lib6usePubySiAA0C5KlassCF : $@convention(thin) (@guaranteed PubKlass) -> Int {
+// CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib6usePubySiAA0C5KlassCF : $@convention(thin) (@guaranteed PubKlass) -> Int {
 public func usePub(_ arg: PubKlass) -> Int {
   return arg.pubVar + arg.pkgVar
 }
 
-// CHECK-DAG: sil [serialized_for_package] [canonical] @$s3Lib23usePubWithInternalFieldySiAA0c5KlassdE6MemberCF : $@convention(thin) (@guaranteed PubKlassWithInternalMember) -> Int {
+// CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib23usePubWithInternalFieldySiAA0c5KlassdE6MemberCF : $@convention(thin) (@guaranteed PubKlassWithInternalMember) -> Int {
 public func usePubWithInternalField(_ arg: PubKlassWithInternalMember) -> Int {
   return arg.pubVar + arg.pkgVar
 }
@@ -194,18 +194,18 @@ public class PubKlassWithInternalMember {
 }
 
 // createPubClass<A>(_:)
-// CHECK-DAG: sil [serialized_for_package] [canonical] @$s3Lib14createPubClassySixlF : $@convention(thin) <T> (@in_guaranteed T) -> Int {
+// CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib14createPubClassySixlF : $@convention(thin) <T> (@in_guaranteed T) -> Int {
 public func createPubClass<T>(_ t: T) -> Int {
   return getPubClass(t).foo()
 }
 
-// CHECK-DAG: sil [serialized_for_package] [_semantics "optimize.sil.specialize.generic.never"] [canonical] @$s3Lib20createPubClass_neverySixlF : $@convention(thin) <T> (@in_guaranteed T) -> Int {
+// CHECK-DAG: sil [serialized_for_package] [_semantics "optimize.sil.specialize.generic.never"] [canonical] [ossa] @$s3Lib20createPubClass_neverySixlF : $@convention(thin) <T> (@in_guaranteed T) -> Int {
 @_semantics("optimize.sil.specialize.generic.never")
 public func createPubClass_never<T>(_ t: T) -> Int {
   return getPubClass(t).foo()
 }
 
-// CHECK-DAG: sil [serialized_for_package] [canonical] @$s3Lib11getPubClassyAA13PublicDerivedCyxGxlF : $@convention(thin) <T> (@in_guaranteed T) -> @owned PublicDerived<T> {
+// CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib11getPubClassyAA13PublicDerivedCyxGxlF : $@convention(thin) <T> (@in_guaranteed T) -> @owned PublicDerived<T> {
 public func getPubClass<T>(_ t : T) -> PublicDerived<T> {
   return PublicDerived<T>(t)
 }
@@ -311,7 +311,7 @@ public func useInternalStructKeypath<T>(_ t: T) -> Int {
   return s[keyPath: getInternalStructKeypath(t)]
 }
 
-// CHECK-DAG: sil [serialized_for_package] [canonical] @$s3Lib19usePubStructKeypathySixlF : $@convention(thin) <T> (@in_guaranteed T) -> Int {
+// CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib19usePubStructKeypathySixlF : $@convention(thin) <T> (@in_guaranteed T) -> Int {
 public func usePubStructKeypath<T>(_ t: T) -> Int {
   let p = PubStruct()
   return p[keyPath: getPubStructKeypath(t)]
