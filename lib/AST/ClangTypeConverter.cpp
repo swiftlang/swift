@@ -227,24 +227,6 @@ clang::QualType ClangTypeConverter::convertMemberType(NominalTypeDecl *DC,
   return convert(memberType);
 }
 
-clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
-  auto importedType = reverseImportedTypeMapping(type);
-  if (!importedType.isNull())
-    return importedType;
-
-  // We might be looking at a builtin
-  auto builtinType = reverseBuiltinTypeMapping(type);
-  if (!builtinType.isNull())
-    return builtinType;
-
-  if (type->isPotentiallyBridgedValueType())
-    if (auto t = Context.getBridgedToObjC(type->getDecl(), type))
-      return convert(t);
-
-  // Out of ideas, there must've been some error. :(
-  return clang::QualType();
-}
-
 // TODO: It is unfortunate that we parse the name of a public library type
 // in order to break it down into a vector component and length that in theory
 // we could recover in some other way.
@@ -301,6 +283,24 @@ ClangTypeConverter::reverseImportedTypeMapping(StructType *type) {
 #include "swift/ClangImporter/SIMDMappedTypes.def"
 
   // This is not an imported type (according to the name)
+  return clang::QualType();
+}
+
+clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
+  auto importedType = reverseImportedTypeMapping(type);
+  if (!importedType.isNull())
+    return importedType;
+
+  // We might be looking at a builtin
+  auto builtinType = reverseBuiltinTypeMapping(type);
+  if (!builtinType.isNull())
+    return builtinType;
+
+  if (type->isPotentiallyBridgedValueType())
+    if (auto t = Context.getBridgedToObjC(type->getDecl(), type))
+      return convert(t);
+
+  // Out of ideas, there must've been some error. :(
   return clang::QualType();
 }
 
@@ -911,6 +911,7 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
   // a handful of Swift builtin types. These are enumerated here rather than
   // delegated to ClangTypeConverter::convert() (which is more general).
 
+  // This type was converted from Clang, so we can convert it back by
   if (auto nominal = type->getAs<NominalType>())
     if (auto clangDecl = nominal->getDecl()->getClangDecl())
       return convertClangDecl(type, clangDecl);
