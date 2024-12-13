@@ -20,8 +20,23 @@ public func bar(_ x: [Int64], sum: Int64) -> Int64 {
     return temp
 }
 
+// Make sure the generic signature of foo is always serialized. Otherwise, the
+// sil scope in fooCaller refers to the generic version of foo
+@inlinable @inline(__always)
+func foo<T: AdditiveArithmetic>(_ x: T, _ y : T) -> T {
+    return x + y
+}
+
+@inline(never) @_alwaysEmitIntoClient
+public func fooCaller<T: AdditiveArithmetic>(_ x: T, _ y : T) -> T {
+    return foo(x, y)
+}
+
 // BEGIN Main.swift
 import MyModule
+// sil_scope should refer to the specialized version of foo
+//CHECK: sil_scope {{.*}} { loc "{{.*}}MyModule.swift":11:6 parent @$s8MyModule3fooyxx_xts18AdditiveArithmeticRzlFSi_TG5 {{.*}} inlined_at {{.*}} }
+let _ = fooCaller(1, 2)
 
 func test() {
     let _ = bar([10], sum: 0)
