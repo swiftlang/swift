@@ -2029,6 +2029,17 @@ public:
 /// Workaround to disable thumb-mode until debugger support is there.
 bool shouldRemoveTargetFeature(StringRef);
 
+struct CXXBaseRecordLayout {
+  const clang::CXXRecordDecl *decl;
+  Size offset;
+  Size size;
+};
+
+/// Retrieves the base classes of a C++ struct/class ordered by their offset in
+/// the derived type's memory layout.
+SmallVector<CXXBaseRecordLayout, 1>
+getBasesAndOffsets(const clang::CXXRecordDecl *decl);
+
 } // end namespace irgen
 } // end namespace swift
 
