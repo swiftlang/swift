@@ -24,6 +24,7 @@ struct S<T> {
 
 struct Test {
   @preconcurrency var data: S<any Sendable>
+  @preconcurrency var funcRef: S<([any Sendable]) -> (any Sendable)?> = S(v: { $0.first })
 }
 
 
@@ -53,6 +54,13 @@ func test() {
   // CHECK: 42
   print(sameType(v2.data, with: Any.self))
   // CHECK: ultimate question
+
+  func expectsFuncAny(_ s: S<([Any]) -> Any?>) {
+    print(s.v([42]) ?? 0)
+  }
+
+  expectsFuncAny(v1.funcRef)
+  // CHECK: 42
 }
 
 test()
