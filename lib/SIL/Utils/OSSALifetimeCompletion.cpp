@@ -439,16 +439,22 @@ static bool endLifetimeAtBoundary(SILValue value,
   return changed;
 }
 
+bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
+    ScopedAddressValue scopedAddress, Boundary boundary) {
+  SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+  SSAPrunedLiveness liveness(scopedAddress->getFunction(), &discoveredBlocks);
+  scopedAddress.computeTransitiveLiveness(liveness);
+  return endLifetimeAtBoundary(scopedAddress.value, liveness, boundary,
+                               deadEndBlocks);
+}
+
 /// End the lifetime of \p value at unreachable instructions.
 ///
 /// Returns true if any new instructions were created to complete the lifetime.
 bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
                                                       Boundary boundary) {
   if (auto scopedAddress = ScopedAddressValue(value)) {
-    SmallVector<SILBasicBlock *, 8> discoveredBlocks;
-    SSAPrunedLiveness liveness(value->getFunction(), &discoveredBlocks);
-    scopedAddress.computeTransitiveLiveness(liveness);
-    return endLifetimeAtBoundary(value, liveness, boundary, deadEndBlocks);
+    return analyzeAndUpdateLifetime(scopedAddress, boundary);
   }
 
   // Called for inner borrows, inner adjacent reborrows, inner reborrows, and
