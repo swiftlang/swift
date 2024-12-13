@@ -2388,13 +2388,25 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
                                           PackExpansionType *expansion2,
                                           ConstraintKind kind, TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator) {
+  auto shapeLocator = locator.withPathElement(ConstraintLocator::PackShape);
   // The count types of two pack expansion types must have the same shape.
   addConstraint(ConstraintKind::SameShape, expansion1->getCountType(),
                 expansion2->getCountType(),
-                locator.withPathElement(ConstraintLocator::PackShape));
+                shapeLocator);
 
   auto pattern1 = expansion1->getPatternType();
   auto pattern2 = expansion2->getPatternType();
+
+  if (shouldAttemptFixes()) {
+    // If pack expansion types have different shapes, let's not attempt
+    // to match their pattern types to avoid producing any extra errors
+    // caused by shape differences.
+    if (hasFixFor(getConstraintLocator(shapeLocator))) {
+      recordAnyTypeVarAsPotentialHole(pattern1);
+      recordAnyTypeVarAsPotentialHole(pattern2);
+      return getTypeMatchSuccess();
+    }
+  }
 
   // If both sides are expanded or neither side is, just match them
   // directly.
