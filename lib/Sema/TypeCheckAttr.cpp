@@ -115,6 +115,11 @@ public:
     auto &C = D->getASTContext();
 
     if (isa<DestructorDecl>(D)) {
+      if (!C.LangOpts.hasFeature(Feature::IsolatedDeinit)) {
+        diagnoseAndRemoveAttr(attr, diag::isolated_deinit_experimental);
+        return;
+      }
+
       if (auto nominal = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
         if (!isa<ClassDecl>(nominal)) {
           // only classes and actors can have isolated deinit.
@@ -122,13 +127,6 @@ public:
           return;
         }
       }
-
-      TypeChecker::checkAvailability(
-        attr->getRange(), C.getIsolatedDeinitAvailability(),
-        D->getDeclContext(),
-        [&](StringRef platformName, llvm::VersionTuple version) {
-          return diagnoseAndRemoveAttr(attr, diag::isolated_deinit_unavailable, platformName, version);
-        });
     }
   }
 

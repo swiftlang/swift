@@ -1,8 +1,9 @@
-// RUN: %target-run-simple-swift( -target %target-swift-5.7-abi-triple -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift( -enable-experimental-feature IsolatedDeinit -target %target-swift-5.7-abi-triple -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
+// REQUIRES: swift_feature_IsolatedDeinit
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib

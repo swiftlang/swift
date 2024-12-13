@@ -1,10 +1,11 @@
-// RUN: %target-run-simple-swift( -target %target-future-triple %import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift( -enable-experimental-feature IsolatedDeinit -target %target-future-triple %import-libdispatch -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: libdispatch
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// REQUIRES: swift_feature_IsolatedDeinit
 
 import _Concurrency
 import Dispatch

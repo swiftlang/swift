@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -parse-as-library -target %target-future-triple -O -module-name=test %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature IsolatedDeinit -target %target-future-triple -O -module-name=test %s -emit-sil | %FileCheck %s
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_IsolatedDeinit
 
 @globalActor actor AnotherActor: GlobalActor {
   static let shared = AnotherActor()

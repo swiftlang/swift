@@ -2327,7 +2327,7 @@ private:
 
 public:
   IsolatedDeinitJob(JobPriority priority, void *object,
-                    DeinitWorkFunction *__ptrauth_swift_deinit_work_function work)
+                    DeinitWorkFunction *work)
       : Job({JobKind::IsolatedDeinit, priority}, &process), Object(object),
         Work(work) {}
 
