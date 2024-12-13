@@ -246,6 +246,7 @@ EXPECTED_DEFAULTS = {
     'lto_type': None,
     'maccatalyst': False,
     'maccatalyst_ios_tests': False,
+    'minimal_cxx_bootstrap': False,
     'musl_path': '/usr/local/musl',
     'linux_static_archs': ['x86_64', 'aarch64'],
     'native_clang_tools_path': None,
@@ -695,6 +696,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--clean-early-swift-driver', dest='clean_early_swift_driver'),
     EnableOption('--llvm-enable-modules'),
     EnableOption('--build-llvm', dest='_build_llvm'),
+    EnableOption('--minimal-cxx-bootstrap'),
 
     DisableOption('--skip-build-cmark', dest='build_cmark'),
     DisableOption('--skip-build-llvm', dest='build_llvm'),
