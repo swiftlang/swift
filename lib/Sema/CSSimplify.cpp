@@ -6702,6 +6702,9 @@ bool ConstraintSystem::repairFailures(
     if (flags.contains(TMF_MatchingGenericArguments))
       break;
 
+    if (hasAnyRestriction())
+      break;
+
     Type fromType;
     Type toType;
 
