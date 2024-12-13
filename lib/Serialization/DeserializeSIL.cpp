@@ -430,6 +430,7 @@ std::optional<SILLocation> SILDeserializer::readLoc(unsigned kind,
     case SILLocation::RegularKind:
       return RegularLocation(FNameLoc, Implicit);
   }
+  llvm_unreachable("Invalid LocationKind");
 }
 
 llvm::Expected<const SILDebugScope *>
