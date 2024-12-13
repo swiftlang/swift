@@ -49,6 +49,23 @@ struct ClassTemplate {
   T t;
 };
 
+struct PlainStruct {
+  int x;
+};
+
+struct CxxClass {
+  int x;
+  void method() {}
+};
+
+struct
+    __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:immortal")))
+    __attribute__((swift_attr("release:immortal")))
+FRT {
+  int x;
+};
+
 template <typename T>
 void takesPointerToDependent(ClassTemplate<T> *ct) {
   ct->t++;

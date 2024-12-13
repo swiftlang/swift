@@ -544,13 +544,17 @@ ClangTypeConverter::visitBoundGenericClassType(BoundGenericClassType *type) {
 }
 
 clang::QualType
-ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
+ClangTypeConverter::visitBoundGenericType(BoundGenericType *type, bool templateArgument) {
   // The only possibilities are *Pointer<T>, SIMD*<T> and Optional<T>.
+
+  auto convertType = [&](auto t) {
+    return templateArgument ? convertTemplateArgument(t) : convert(t);
+  };
 
   if (type->getDecl()->isOptionalDecl()) {
     auto args = type->getGenericArgs();
     assert((args.size() == 1) && "Optional should have 1 generic argument.");
-    clang::QualType innerTy = convert(args[0]);
+    clang::QualType innerTy = convertType(args[0]);
     if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()) ||
         args[0]->isForeignReferenceType())
       return innerTy;
@@ -588,17 +592,17 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
     return clang::QualType();
 
   case StructKind::Unmanaged:
-    return convert(argCanonicalTy);
+    return convertType(argCanonicalTy);
 
   case StructKind::UnsafeMutablePointer:
   case StructKind::AutoreleasingUnsafeMutablePointer: {
-    auto clangTy = convert(argCanonicalTy);
+    auto clangTy = convertType(argCanonicalTy);
     if (clangTy.isNull())
       return clang::QualType();
     return ClangASTContext.getPointerType(clangTy);
   }
   case StructKind::UnsafePointer: {
-    auto clangTy = convert(argCanonicalTy);
+    auto clangTy = convertType(argCanonicalTy);
     if (clangTy.isNull())
       return clang::QualType();
     return ClangASTContext.getPointerType(clangTy.withConst());
@@ -609,7 +613,7 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
 
     clang::QualType functionTy;
     if (isa<SILFunctionType>(argCanonicalTy->getCanonicalType())) {
-      functionTy = convert(argCanonicalTy);
+      functionTy = convertType(argCanonicalTy);
       if (functionTy.isNull())
         return clang::QualType();
     } else {
@@ -620,7 +624,7 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
   }
 
   case StructKind::SIMD: {
-    clang::QualType scalarTy = convert(argCanonicalTy);
+    clang::QualType scalarTy = convertType(argCanonicalTy);
     if (scalarTy.isNull())
       return clang::QualType();
     auto numEltsString = swiftStructDecl->getName().str();
@@ -956,11 +960,8 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
     return withCache([&]() { return reverseBuiltinTypeMapping(structType); });
   }
 
-  // NOTE: visitBoundGenericType() may call convert(), which makes it possible
-  // to instantiate a function template argument with a Swift type like
-  // `UnsafeePointer<SwiftType>`.
   if (auto boundGenericType = type->getAs<BoundGenericType>())
-    return withCache([&]() { return visitBoundGenericType(boundGenericType); });
+    return withCache([&]() { return visitBoundGenericType(boundGenericType, /*templateArgument=*/true); });
 
   // Most types cannot be used to instantiate C++ function templates; give up.
   return clang::QualType();

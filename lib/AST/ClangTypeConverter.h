@@ -123,7 +123,7 @@ private:
   clang::QualType visitProtocolType(ProtocolType *type);
   clang::QualType visitClassType(ClassType *type);
   clang::QualType visitBoundGenericClassType(BoundGenericClassType *type);
-  clang::QualType visitBoundGenericType(BoundGenericType *type);
+  clang::QualType visitBoundGenericType(BoundGenericType *type, bool templateArgument=false);
   clang::QualType visitEnumType(EnumType *type);
   clang::QualType visitFunctionType(FunctionType *type);
   clang::QualType visitProtocolCompositionType(ProtocolCompositionType *type);
