@@ -27,8 +27,10 @@ endif()
 
 
 target_compile_definitions(swiftStdlibStubs PRIVATE
-  swiftCore_EXPORTS
+  $<$<BOOL:${BUILD_SHARED_LIBS}>:-DswiftCore_EXPORTS>
   $<$<BOOL:${SwiftCore_ENABLE_UNICODE_DATA}>:-DSWIFT_STDLIB_ENABLE_UNICODE_DATA>)
+
+
 target_link_libraries(swiftStdlibStubs PRIVATE swiftShims)
 target_include_directories(swiftStdlibStubs PRIVATE
   "${PROJECT_BINARY_DIR}/include"
