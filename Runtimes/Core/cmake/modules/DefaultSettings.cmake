@@ -28,7 +28,7 @@ endmacro()
 # If no such default variable exists, the variable is not created.
 macro(defaulted_set variable type helptext)
   if(DEFINED ${variable}_default)
-    set(${variable} ${variable}_default CACHE ${type} ${helptext})
+    set(${variable} ${${variable}_default} CACHE ${type} ${helptext})
   endif()
 endmacro()
 

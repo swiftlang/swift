@@ -109,10 +109,12 @@ if(SwiftCore_ENABLE_BACKTRACING)
     CrashHandlerLinux.cpp)
 endif()
 
+target_sources(swiftRuntime PRIVATE
+  ErrorObject.mm
+  SwiftObject.mm)
+
 if(SwiftCore_ENABLE_OBJC_INTEROP)
   target_sources(swiftRuntime PRIVATE
-    ErrorObject.mm
-    SwiftObject.mm
     SwiftValue.mm
     ReflectionMirrorObjC.mm
     ObjCRuntimeGetImageNameFromClass.mm)
