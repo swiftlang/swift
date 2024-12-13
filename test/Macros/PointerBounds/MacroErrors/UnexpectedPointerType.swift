@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: pointer_bounds
 
 // RUN: %target-typecheck-verify-swift -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -verify
 

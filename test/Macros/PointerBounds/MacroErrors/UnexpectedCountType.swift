@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: pointer_bounds
 
 // XFAIL: *
 

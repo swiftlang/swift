@@ -28,7 +28,6 @@
 # Catalyst Support
 #   -- Will need shadow invocations to generate swiftmodules for Swift parts
 # Install *.abi.json, swiftdoc, and swiftsourceinfo
-# Pointer bounds (SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
 
 cmake_minimum_required(VERSION 3.26...3.29)
 

@@ -1,5 +1,4 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
-// REQUIRES: pointer_bounds
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -disable-availability-checking -plugin-path %swift-plugin-dir -o %t/CountedBy.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s

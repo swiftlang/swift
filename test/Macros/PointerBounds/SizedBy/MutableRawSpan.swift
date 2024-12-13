@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: pointer_bounds
 // REQUIRES: swift_feature_Span
 
 // RUN: not %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -enable-experimental-feature Span > %t.log 2>&1
