@@ -4016,6 +4016,24 @@ private:
 };
 } // end anonymous namespace
 
+static void suggestUnsafeOnEnclosingDecl(
+    SourceRange referenceRange, const DeclContext *referenceDC) {
+  ASTContext &ctx = referenceDC->getASTContext();
+  std::optional<ASTNode> versionCheckNode;
+  const Decl *memberLevelDecl = nullptr;
+  const Decl *typeLevelDecl = nullptr;
+  findAvailabilityFixItNodes(
+                             referenceRange, referenceDC, ctx.SourceMgr,
+      versionCheckNode, memberLevelDecl, typeLevelDecl);
+
+  auto decl = memberLevelDecl ? memberLevelDecl : typeLevelDecl;
+  if (!decl)
+    return;
+
+  decl->diagnose(diag::make_enclosing_context_unsafe, decl)
+    .fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
+}
+
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
@@ -4057,12 +4075,14 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
     if (type->isUnsafe()) {
       diagnoseUnsafeType(
           ctx, R.Start, type,
+          Where.getAvailability(),
           [&](Type specificType) {
             ctx.Diags.diagnose(
                 R.Start, diag::reference_to_unsafe_typed_decl,
                 call != nullptr && !isa<ParamDecl>(D), D,
                 specificType);
-            D->diagnose(diag::decl_declared_here, D);
+            suggestUnsafeOnEnclosingDecl(R, Where.getDeclContext());
+            D->diagnose(diag::unsafe_decl_here, D);
           });
     }
   }
@@ -4143,10 +4163,14 @@ diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
   if (!D->isUnsafe())
     return;
 
+  if (Where.getAvailability().allowsUnsafe())
+    return;
+
   SourceLoc diagLoc = call ? call->getLoc() : R.Start;
   ctx.Diags
     .diagnose(diagLoc, diag::reference_to_unsafe_decl, call != nullptr, D);
-  D->diagnose(diag::decl_declared_here, D);
+  suggestUnsafeOnEnclosingDecl(R, Where.getDeclContext());
+  D->diagnose(diag::unsafe_decl_here, D);
 }
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic

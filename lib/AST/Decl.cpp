@@ -1079,6 +1079,10 @@ bool Decl::isUnsafe() const {
       false);
 }
 
+bool Decl::allowsUnsafe() const {
+  return isUnsafe();
+}
+
 Type AbstractFunctionDecl::getThrownInterfaceType() const {
   if (!getThrownTypeRepr())
     return ThrownType.getType();

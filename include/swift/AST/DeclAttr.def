@@ -504,7 +504,7 @@ SIMPLE_DECL_ATTR(sensitive, Sensitive,
   159)
 
 SIMPLE_DECL_ATTR(unsafe, Unsafe,
-  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType |
+  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType | OnExtension |
   UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   160)

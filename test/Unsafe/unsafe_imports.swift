@@ -5,6 +5,7 @@
 
 import unsafe_decls
 
+// expected-note@+1 3{{mark the enclosing global function 'testUnsafe' '@unsafe' to allow it to use unsafe constructs}}
 func testUnsafe(_ ut: UnsafeType) { // expected-warning{{reference to unsafe struct 'UnsafeType'}}
   unsafe_c_function() // expected-warning{{call to unsafe global function 'unsafe_c_function'}}
 
