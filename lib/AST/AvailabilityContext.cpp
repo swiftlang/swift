@@ -241,6 +241,9 @@ void AvailabilityContext::print(llvm::raw_ostream &os) const {
 
   if (isDeprecated())
     os << " deprecated";
+
+  if (allowsUnsafe())
+    os << " allows_unsafe";
 }
 
 void AvailabilityContext::dump() const { print(llvm::errs()); }
