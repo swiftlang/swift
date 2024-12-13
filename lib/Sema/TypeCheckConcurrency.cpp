@@ -5608,6 +5608,15 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
         checkClassGlobalActorIsolation(classDecl, *isolationFromAttr);
     }
 
+    if (ctx.LangOpts.hasFeature(
+            Feature::NonIsolatedAsyncInheritsIsolationFromContext)) {
+      if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
+          func && func->hasAsync() && isolationFromAttr->isNonisolated() &&
+          func->getModuleContext() == ctx.MainModule) {
+        return {ActorIsolation::forCallerIsolationInheriting(), {}};
+      }
+    }
+
     return {*isolationFromAttr,
             IsolationSource(/*source*/ nullptr, IsolationSource::Explicit)};
   }
@@ -5622,6 +5631,16 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
   if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated) &&
       value->getModuleContext() == ctx.MainModule) {
     defaultIsolation = ActorIsolation::forMainActor(ctx);
+  }
+
+  // If we have an async function... by default we inherit isolation.
+  if (ctx.LangOpts.hasFeature(
+          Feature::NonIsolatedAsyncInheritsIsolationFromContext)) {
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
+        func && func->hasAsync() &&
+        func->getModuleContext() == ctx.MainModule) {
+      defaultIsolation = ActorIsolation::forCallerIsolationInheriting();
+    }
   }
 
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
