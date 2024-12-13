@@ -951,6 +951,9 @@ bool swift::emitFineModuleTraceIfNeeded(CompilerInstance &Instance,
   }
   ModuleDecl *mainModule = Instance.getMainModule();
   ASTContext &ctxt = mainModule->getASTContext();
+  if (ctxt.blockListConfig.hasBlockListAction(mainModule->getNameStr(),
+      BlockListKeyKind::ModuleName, BlockListAction::SkipEmittingFineModuleTrace))
+    return false;
   assert(!ctxt.hadError() &&
          "We should've already exited earlier if there was an error.");
 
