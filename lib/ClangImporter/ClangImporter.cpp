@@ -574,7 +574,7 @@ void importer::getNormalInvocationArguments(
   }
 
   if (LangOpts.EnableCXXInterop) {
-    if (auto path = getCxxShimModuleMapPath(searchPathOpts, triple)) {
+    if (auto path = getCxxShimModuleMapPath(searchPathOpts, LangOpts, triple)) {
       invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
     }
   }
