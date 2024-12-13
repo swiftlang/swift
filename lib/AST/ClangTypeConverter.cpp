@@ -910,20 +910,31 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
   // C++ function templates can only be instantiated with Clang types and
   // a handful of Swift builtin types. These are enumerated here rather than
   // delegated to ClangTypeConverter::convert() (which is more general).
+  auto withCache = [&](auto lookup) {
+    auto cached = Cache.find(type);
+    if (cached != Cache.end())
+      return cached->second;
 
-  // This type was converted from Clang, so we can convert it back by
+    auto result = lookup();
+    if (!result.isNull())
+      Cache.insert({type, result});
+    return result;
+  };
+
+  // This type was imported from Clang, so we can convert it back by retrieving
+  // ClangDecl stored in the imported type decl (without making a cache entry.)
   if (auto nominal = type->getAs<NominalType>())
     if (auto clangDecl = nominal->getDecl()->getClangDecl())
       return convertClangDecl(type, clangDecl);
 
   if (auto pointerType = type->getAs<BuiltinRawPointerType>())
-    return visitBuiltinRawPointerType(pointerType);
+    return withCache([&]() { return visitBuiltinRawPointerType(pointerType); });
 
   if (auto integerType = type->getAs<BuiltinIntegerType>())
-    return visitBuiltinIntegerType(integerType);
+    return withCache([&]() { return visitBuiltinIntegerType(integerType); });
 
   if (auto floatType = type->getAs<BuiltinFloatType>())
-    return visitBuiltinFloatType(floatType);
+    return withCache([&]() { return visitBuiltinFloatType(floatType); });
 
   if (auto structType = type->getAs<StructType>()) {
     // Swift structs are not supported in general, but some foreign types are
@@ -936,12 +947,20 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
             decl->getASTContext().Id_ObjectiveC)
       return clang::QualType();
 
-    auto importedType = reverseImportedTypeMapping(structType);
+    auto importedType =
+        withCache([&]() { return reverseImportedTypeMapping(structType); });
+
     if (!importedType.isNull())
       return importedType;
 
-    return reverseBuiltinTypeMapping(structType);
+    return withCache([&]() { return reverseBuiltinTypeMapping(structType); });
   }
+
+  // NOTE: visitBoundGenericType() may call convert(), which makes it possible
+  // to instantiate a function template argument with a Swift type like
+  // `UnsafeePointer<SwiftType>`.
+  if (auto boundGenericType = type->getAs<BoundGenericType>())
+    return withCache([&]() { return visitBoundGenericType(boundGenericType); });
 
   // Most types cannot be used to instantiate C++ function templates; give up.
   return clang::QualType();
