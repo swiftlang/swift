@@ -5093,6 +5093,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       switch (getActorIsolation(storage)) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
         break;
 

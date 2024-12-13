@@ -2940,6 +2940,10 @@ public:
       printFlag(true, "dynamically_isolated", CapturesColor);
       break;
 
+    case ActorIsolation::CallerIsolationInheriting:
+      printFlag(true, "isolated_to_caller_isolation", CapturesColor);
+      break;
+
     case ActorIsolation::ActorInstance:
       printFieldQuoted(isolation.getActorInstance()->printRef(),
                        "actor_isolated", CapturesColor);

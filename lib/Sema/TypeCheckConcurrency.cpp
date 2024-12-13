@@ -117,6 +117,10 @@ static bool requiresFlowIsolation(ActorIsolation typeIso,
   case ActorIsolation::NonisolatedUnsafe:
     return false;
 
+  // TODO: We probably want constructors to always be truly non-isolated.
+  case ActorIsolation::CallerIsolationInheriting:
+    llvm_unreachable("constructor cannot have nonisolated implicit actor "
+                     "instance isolation");
   case ActorIsolation::Erased:
     llvm_unreachable("constructor cannot have erased isolation");
 
@@ -544,6 +548,9 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule, VarDecl *var,
   case ActorIsolation::Unspecified:
     // if nonisolated, it's OK
     return true;
+
+  case ActorIsolation::CallerIsolationInheriting:
+    return false;
 
   case ActorIsolation::Erased:
     llvm_unreachable("variable cannot have erased isolation");
@@ -1740,6 +1747,9 @@ static bool wasLegacyEscapingUseRestriction(AbstractFunctionDecl *fn) {
     case ActorIsolation::Unspecified:
       assert(!fn->hasAsync());
       return true;
+    case ActorIsolation::CallerIsolationInheriting:
+      llvm_unreachable(
+          "destructor decl cannot have non implicit actor instance isolation");
     case ActorIsolation::Erased:
       llvm_unreachable("destructor decl cannot have erased isolation");
     }
@@ -1757,7 +1767,10 @@ static bool wasLegacyEscapingUseRestriction(AbstractFunctionDecl *fn) {
       assert(fn->hasAsync());
       return false;
     case ActorIsolation::Erased:
-      llvm_unreachable("function decl cannot have erased isolation");
+      llvm_unreachable("constructor decl cannot have erased isolation");
+    case ActorIsolation::CallerIsolationInheriting:
+      llvm_unreachable(
+          "constructor decl cannot have caller isolation inheriting isolation");
 
     case ActorIsolation::Unspecified:
       // this is basically just objc-marked inits.
@@ -2015,6 +2028,7 @@ static ActorIsolation getInnermostIsolatedContext(
   auto mutableDC = const_cast<DeclContext *>(dc);
   switch (auto isolation =
               getActorIsolationOfContext(mutableDC, getClosureActorIsolation)) {
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::ActorInstance:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:
@@ -2389,6 +2403,7 @@ namespace {
             (!fn->isAsyncContext() || fn != dc)) {
           switch (getActorIsolation(fn)) {
           case ActorIsolation::ActorInstance:
+          case ActorIsolation::CallerIsolationInheriting:
           case ActorIsolation::GlobalActor:
           case ActorIsolation::Nonisolated:
           case ActorIsolation::NonisolatedUnsafe:
@@ -2746,6 +2761,11 @@ namespace {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
+        return;
+
+      // Similarly to Nonisolated, caller inheriting isolation because we will
+      // inherit from the context.
+      case ActorIsolation::CallerIsolationInheriting:
         return;
 
       case ActorIsolation::Erased:
@@ -3226,6 +3246,7 @@ namespace {
           switch (isolation) {
           case ActorIsolation::Unspecified:
           case ActorIsolation::Nonisolated:
+          case ActorIsolation::CallerIsolationInheriting:
           case ActorIsolation::NonisolatedUnsafe:
             if (closure->isSendable()) {
               return ReferencedActor(var, isPotentiallyIsolated, ReferencedActor::SendableClosure);
@@ -3284,6 +3305,7 @@ namespace {
         // while general isolation is declaration-based.
         switch (auto isolation =
                     getActorIsolationOfContext(dc, getClosureActorIsolation)) {
+        case ActorIsolation::CallerIsolationInheriting:
         case ActorIsolation::Nonisolated:
         case ActorIsolation::NonisolatedUnsafe:
         case ActorIsolation::Unspecified:
@@ -3991,6 +4013,7 @@ namespace {
 
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
         actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/false);
         break;
@@ -4130,6 +4153,7 @@ namespace {
               decl, getDeclContext());
           switch (isolation) {
           case ActorIsolation::Nonisolated:
+          case ActorIsolation::CallerIsolationInheriting:
           case ActorIsolation::NonisolatedUnsafe:
           case ActorIsolation::Unspecified:
             break;
@@ -4339,6 +4363,7 @@ namespace {
 
           case ActorIsolation::Unspecified:
           case ActorIsolation::Nonisolated:
+          case ActorIsolation::CallerIsolationInheriting:
           case ActorIsolation::NonisolatedUnsafe:
             refKind = ReferencedActor::NonIsolatedContext;
             break;
@@ -4482,6 +4507,7 @@ namespace {
 
       // We must have parent isolation determined to get here.
       switch (parentIsolation) {
+      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::Unspecified:
@@ -4860,6 +4886,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
 
       case ActorIsolation::GlobalActor:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
         break;
       }
@@ -4884,6 +4911,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
       case ActorIsolation::ActorInstance:
         llvm_unreachable("protocol requirements cannot be actor instances");
 
+      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
         // We only need one nonisolated.
@@ -4962,6 +4990,7 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
       break;
 
@@ -4998,6 +5027,7 @@ getIsolationFromInheritedProtocols(ProtocolDecl *protocol) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
       return;
 
@@ -5072,6 +5102,7 @@ getIsolationFromWrappers(NominalTypeDecl *nominal) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
       break;
 
@@ -5270,6 +5301,7 @@ static bool checkClassGlobalActorIsolation(
   switch (superIsolation) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe: {
     return false;
   }
@@ -5472,6 +5504,7 @@ static void addAttributesForActorIsolation(ValueDecl *value,
                                            ActorIsolation isolation) {
   ASTContext &ctx = value->getASTContext();
   switch (isolation) {
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe: {
     value->getAttrs().add(new (ctx) NonisolatedAttr(
@@ -5666,7 +5699,8 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
       // Add nonisolated attribute
       addAttributesForActorIsolation(value, inferred);
       break;
-
+    case ActorIsolation::CallerIsolationInheriting:
+      break;
     case ActorIsolation::Erased:
       llvm_unreachable("cannot infer erased isolation");
     case ActorIsolation::GlobalActor: {
@@ -5702,6 +5736,7 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
 
       switch (auto enclosingIsolation = getActorIsolationOfContext(dc)) {
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::Unspecified:
         // Do nothing.
@@ -5976,6 +6011,7 @@ bool HasIsolatedSelfRequest::evaluate(
   if (auto var = dyn_cast<VarDecl>(value)) {
     switch (auto isolation = getActorIsolationFromWrappedProperty(var)) {
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::Unspecified:
       break;
@@ -6500,6 +6536,7 @@ bool swift::checkSendableConformance(
   case ActorIsolation::Unspecified:
   case ActorIsolation::ActorInstance:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
     break;
 
@@ -7016,6 +7053,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
       return fnType;
 
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::Unspecified:
       assert(fnType->getIsolation().isNonIsolated());
@@ -7297,6 +7335,7 @@ bool swift::isAccessibleAcrossActors(
     switch (isolation) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::Unspecified:
       return true;

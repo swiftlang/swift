@@ -84,6 +84,7 @@ void SILGenFunction::emitExpectedExecutorProlog() {
         case ActorIsolation::Nonisolated:
         case ActorIsolation::NonisolatedUnsafe:
         case ActorIsolation::Unspecified:
+        case ActorIsolation::CallerIsolationInheriting:
           return false;
 
         case ActorIsolation::Erased:
@@ -138,6 +139,7 @@ void SILGenFunction::emitExpectedExecutorProlog() {
     switch (actorIsolation.getKind()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
       break;
 
@@ -174,6 +176,7 @@ void SILGenFunction::emitExpectedExecutorProlog() {
     switch (actorIsolation.getKind()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
       break;
 
@@ -601,6 +604,7 @@ SILGenFunction::emitClosureIsolation(SILLocation loc, SILDeclRef constant,
   switch (isolation) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
     return emitNonIsolatedIsolation(loc);
 
@@ -652,6 +656,7 @@ SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
   switch (isolation.getKind()) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
     return std::nullopt;
 
