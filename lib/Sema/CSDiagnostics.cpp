@@ -1037,6 +1037,34 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::Member: {
+      auto *memberLoc = getConstraintLocator(anchor, path);
+      auto selectedOverload = getOverloadChoiceIfAvailable(memberLoc);
+      if (!selectedOverload)
+        return false;
+
+      auto baseTy = selectedOverload->choice.getBaseType()->getRValueType();
+      auto *memberRef = selectedOverload->choice.getDecl();
+
+      if (Mismatches.size() == 1) {
+        auto mismatchIdx = Mismatches.front();
+        auto actualArgTy = getActual()->getGenericArgs()[mismatchIdx];
+        auto requiredArgTy = getRequired()->getGenericArgs()[mismatchIdx];
+
+        emitDiagnostic(diag::types_not_equal_in_decl_ref, memberRef, baseTy,
+                       actualArgTy, requiredArgTy);
+        emitDiagnosticAt(memberRef, diag::decl_declared_here, memberRef);
+        return true;
+      }
+
+      emitDiagnostic(
+          diag::cannot_reference_conditional_member_on_base_multiple_mismatches,
+          memberRef, baseTy);
+      emitDiagnosticAt(memberRef, diag::decl_declared_here, memberRef);
+      emitNotesForMismatches();
+      return true;
+    }
+
     default:
       break;
     }
