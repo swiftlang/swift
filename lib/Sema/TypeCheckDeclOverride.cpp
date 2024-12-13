@@ -1736,6 +1736,7 @@ namespace  {
     UNINTERESTING_ATTR(PreInverseGenerics)
     UNINTERESTING_ATTR(Lifetime)
     UNINTERESTING_ATTR(AddressableSelf)
+    UNINTERESTING_ATTR(Unsafe)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1766,17 +1767,6 @@ namespace  {
     }
 
     void visitObjCAttr(ObjCAttr *attr) {}
-
-    void visitUnsafeAttr(UnsafeAttr *attr) {
-      if (!Base->getASTContext().LangOpts.hasFeature(Feature::WarnUnsafe))
-        return;
-
-      if (Override->isUnsafe() && !Base->isUnsafe()) {
-        Diags.diagnose(Override, diag::override_safe_withunsafe,
-                       Base->getDescriptiveKind());
-        Diags.diagnose(Base, diag::overridden_here);
-      }
-    }
   };
 } // end anonymous namespace
 
@@ -2252,6 +2242,25 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     diagnoseOverrideForAvailability(override, base);
   }
 
+  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
+      override->isUnsafe() && !base->isUnsafe()) {
+    // Don't diagnose @unsafe overrides if the subclass is @unsafe.
+    auto overridingClass = override->getDeclContext()->getSelfClassDecl();
+    bool shouldDiagnose = !overridingClass || !overridingClass->allowsUnsafe();
+
+    if (shouldDiagnose) {
+      override->diagnose(diag::override_safe_withunsafe,
+                         base->getDescriptiveKind());
+      if (overridingClass) {
+        overridingClass->diagnose(
+            diag::make_subclass_unsafe, overridingClass->getName()
+        ).fixItInsert(
+            overridingClass->getAttributeInsertionLoc(false), "@unsafe ");
+      }
+
+      base->diagnose(diag::overridden_here);
+    }
+  }
   /// Check attributes associated with the base; some may need to merged with
   /// or checked against attributes in the overriding declaration.
   AttributeOverrideChecker attrChecker(base, override);

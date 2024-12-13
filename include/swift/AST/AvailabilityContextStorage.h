@@ -43,6 +43,10 @@ struct AvailabilityContext::PlatformInfo {
   /// platform.
   unsigned IsDeprecated : 1;
 
+  /// Whether or not the context allows unsafe code within it, e.g., via the
+  /// `@unsafe` attribute.
+  unsigned AllowsUnsafe: 1;
+
   /// Sets each field to the value of the corresponding field in `other` if the
   /// other is more restrictive. Returns true if any field changed as a result
   /// of adding this constraint.
@@ -63,6 +67,7 @@ struct AvailabilityContext::PlatformInfo {
     ID.AddBoolean(IsUnavailableInEmbedded);
     ID.AddInteger(static_cast<uint8_t>(UnavailablePlatform));
     ID.AddBoolean(IsDeprecated);
+    ID.AddBoolean(AllowsUnsafe);
   }
 };
 

@@ -6671,11 +6671,15 @@ Type ExplicitCaughtTypeRequest::evaluate(
 }
 
 void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
+                               AvailabilityContext availability,
                                llvm::function_ref<void(Type)> diagnose) {
   if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
     return;
 
   if (!type->isUnsafe())
+    return;
+
+  if (availability.allowsUnsafe())
     return;
 
   // Look for a specific @unsafe nominal type.
@@ -6698,4 +6702,11 @@ void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
       specificTypeDecl->diagnose(diag::unsafe_decl_here, specificTypeDecl);
     }
   }
+}
+
+void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
+                               const DeclContext *dc,
+                               llvm::function_ref<void(Type)> diagnose) {
+  auto availability = TypeChecker::availabilityAtLocation(loc, dc);
+  return diagnoseUnsafeType(ctx, loc, type, availability, diagnose);
 }

@@ -1549,3 +1549,10 @@ bool DeclContext::isAlwaysAvailableConformanceContext() const {
 
   return deploymentTarget.isContainedIn(conformanceAvailability);
 }
+
+bool DeclContext::allowsUnsafe() const {
+  if (auto decl = getAsDecl())
+    return decl->allowsUnsafe();
+
+  return false;
+}

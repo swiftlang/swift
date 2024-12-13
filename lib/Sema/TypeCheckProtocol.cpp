@@ -1368,6 +1368,20 @@ swift::witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
   return false;
 }
 
+void swift::suggestUnsafeMarkerOnConformance(
+    NormalProtocolConformance *conformance) {
+  auto dc = conformance->getDeclContext();
+  auto decl = dc->getAsDecl();
+  if (!decl)
+    return;
+
+  decl->diagnose(
+      diag::make_conforming_context_unsafe,
+      decl->getDescriptiveKind(),
+      conformance->getProtocol()->getName()
+  ).fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
+}
+
 /// Determine whether one requirement match is better than the other.
 static bool isBetterMatch(DeclContext *dc, ValueDecl *requirement,
                           const RequirementMatch &match1,
@@ -2465,7 +2479,12 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   if (conformance->isUnchecked() &&
       Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
       Context.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
-    Context.Diags.diagnose(ComplainLoc, diag::unchecked_conformance_is_unsafe);
+
+    if (!conformance->getDeclContext()->allowsUnsafe()) {
+      Context.Diags.diagnose(
+          ComplainLoc, diag::unchecked_conformance_is_unsafe);
+      suggestUnsafeMarkerOnConformance(conformance);
+    }
   }
 
   bool allowImpliedConditionalConformance = false;
@@ -5144,10 +5163,12 @@ void ConformanceChecker::resolveValueWitnesses() {
       // If we're disallowing unsafe code, check for an unsafe witness to a
       // safe requirement.
       if (C.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-          witness->isUnsafe() && !requirement->isUnsafe()) {
+          witness->isUnsafe() && !requirement->isUnsafe() &&
+          !witness->getDeclContext()->allowsUnsafe()) {
         witness->diagnose(diag::witness_unsafe,
                           witness->getDescriptiveKind(),
                           witness->getName());
+        suggestUnsafeMarkerOnConformance(Conformance);
       }
 
       // Objective-C checking for @objc requirements.

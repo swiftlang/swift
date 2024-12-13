@@ -8091,6 +8091,15 @@ GROUPED_WARNING(reference_to_unsafe_typed_decl,Unsafe,none,
       (bool, const ValueDecl *, Type))
 NOTE(unsafe_decl_here,none,
      "unsafe %kindbase0 declared here", (const ValueDecl *))
+NOTE(make_enclosing_context_unsafe,none,
+     "mark the enclosing %kindbase0 '@unsafe' to allow it to use unsafe constructs",
+     (const Decl *))
+NOTE(make_subclass_unsafe,none,
+     "mark the class %0 '@unsafe' to allow unsafe overrides of safe superclass methods",
+     (DeclName))
+NOTE(make_conforming_context_unsafe,none,
+     "mark the enclosing %0 with '@unsafe' to allow unsafe conformance to protocol %1",
+     (DescriptiveDeclKind, DeclName))
 
 //===----------------------------------------------------------------------===//
 // MARK: Value Generics

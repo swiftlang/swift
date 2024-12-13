@@ -366,9 +366,11 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
     diagnoseUnsafeType(ctx,
                        loc,
                        type,
+                       conformance->getDeclContext(),
                        [&](Type specificType) {
       ctx.Diags.diagnose(
           loc, diag::type_witness_unsafe, specificType, assocType->getName());
+      suggestUnsafeMarkerOnConformance(conformance);
       assocType->diagnose(diag::decl_declared_here, assocType);
     });
   }
