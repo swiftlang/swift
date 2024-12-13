@@ -877,7 +877,7 @@ class StackAllocationPromoter {
   ///     deleted
   SmallVectorImpl<SILInstruction *> &instructionsToDelete;
 
-  SmallVectorImpl<SILValue> &valuesToComplete;
+  llvm::SmallSetVector<SILValue, 4> &valuesToComplete;
 
   /// The last instruction in each block that initializes the storage that is
   /// not succeeded by an instruction that deinitializes it.
@@ -927,7 +927,7 @@ public:
       DomTreeLevelMap &inputDomTreeLevels, SILBuilderContext &inputCtx,
       InstructionDeleter &deleter,
       SmallVectorImpl<SILInstruction *> &instructionsToDelete,
-      SmallVectorImpl<SILValue> &valuesToComplete)
+      llvm::SmallSetVector<SILValue, 4> &valuesToComplete)
       : asi(inputASI), dsi(nullptr), domInfo(inputDomInfo),
         domTreeLevels(inputDomTreeLevels), ctx(inputCtx), deleter(deleter),
         instructionsToDelete(instructionsToDelete),
@@ -1797,19 +1797,18 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
       SILPhiArgument *argument = cast<SILPhiArgument>(
           block->getArgument(block->getNumArguments() - 1));
       assert(argument->isPhi());
-      valuesToComplete.push_back(argument);
+      valuesToComplete.insert(argument);
     }
     for (auto it : initializationPoints) {
       auto *si = it.second;
       auto stored = si->getOperand(CopyLikeInstruction::Src);
-      valuesToComplete.push_back(stored);
+      valuesToComplete.insert(stored);
       if (auto lexical = getLexicalValueForStore(si, asi)) {
-        valuesToComplete.push_back(lexical);
+        valuesToComplete.insert(lexical);
       }
     }
   }
 
-  // ... and erase the allocation.
   deleter.forceDeleteWithUsers(asi);
 }
 
@@ -1844,10 +1843,11 @@ class MemoryToRegisters {
   /// promotion.
   SILBuilderContext ctx;
 
-  InstructionDeleter deleter;
   SmallVector<SILInstruction *, 32> instructionsToDelete;
 
-  SmallVector<SILValue> valuesToComplete;
+  llvm::SmallSetVector<SILValue, 4> valuesToComplete;
+
+  InstructionDeleter deleter;
 
   /// Returns the dom tree levels for the current function. Computes these
   /// lazily.
@@ -1909,7 +1909,15 @@ public:
       : f(inputFunc), domInfo(inputDomInfo),
         deadEndBlocksAnalysis(deadEndBlocksAnalysis),
         accessBlockAnalysis(accessBlockAnalysis),
-        calleeAnalysis(calleeAnalysis), ctx(inputFunc.getModule()) {}
+        calleeAnalysis(calleeAnalysis), ctx(inputFunc.getModule()) {
+    deleter.setCallbacks(std::move(
+        InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
+          for (SILValue res : instToDelete->getResults()) {
+            valuesToComplete.remove(res);
+          }
+          instToDelete->eraseFromParent();
+        })));
+  }
 
   /// Promote memory to registers. Return True on change.
   bool run();
