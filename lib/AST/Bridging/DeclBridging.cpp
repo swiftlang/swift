@@ -338,12 +338,14 @@ BridgedTypeAliasDecl BridgedTypeAliasDecl_createParsed(
   return decl;
 }
 
-static void setParsedMembers(IterableDeclContext *IDC,
-                             BridgedArrayRef bridgedMembers) {
+static void setParsedMembers(IterableDeclContext *IDC, BridgedArrayRef cMembers,
+                             BridgedFingerprint cFingerprint) {
   auto &ctx = IDC->getDecl()->getASTContext();
 
+  Fingerprint fp = cFingerprint.unbridged();
+
   SmallVector<Decl *> members;
-  for (auto *decl : bridgedMembers.unbridged<Decl *>()) {
+  for (auto *decl : cMembers.unbridged<Decl *>()) {
     members.push_back(decl);
 
     // Add any variables bound to the list of decls.
@@ -364,19 +366,22 @@ static void setParsedMembers(IterableDeclContext *IDC,
 
   IDC->setMaybeHasOperatorDeclarations();
   IDC->setMaybeHasNestedClassDeclarations();
+  // FIXME: Split requests. e.g. DeclMembersFingerprintRequest.
   ctx.evaluator.cacheOutput(
       ParseMembersRequest{IDC},
-      FingerprintAndMembers{std::nullopt, ctx.AllocateCopy(members)});
+      FingerprintAndMembers{fp, ctx.AllocateCopy(members)});
 }
 
-void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl bridgedDecl,
-                                             BridgedArrayRef bridgedMembers) {
-  setParsedMembers(bridgedDecl.unbridged(), bridgedMembers);
+void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl cDecl,
+                                             BridgedArrayRef cMembers,
+                                             BridgedFingerprint cFingerprint) {
+  setParsedMembers(cDecl.unbridged(), cMembers, cFingerprint);
 }
 
-void BridgedExtensionDecl_setParsedMembers(BridgedExtensionDecl bridgedDecl,
-                                           BridgedArrayRef bridgedMembers) {
-  setParsedMembers(bridgedDecl.unbridged(), bridgedMembers);
+void BridgedExtensionDecl_setParsedMembers(BridgedExtensionDecl cDecl,
+                                           BridgedArrayRef cMembers,
+                                           BridgedFingerprint cFingerprint) {
+  setParsedMembers(cDecl.unbridged(), cMembers, cFingerprint);
 }
 
 static ArrayRef<InheritedEntry>

@@ -24,6 +24,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Fingerprint.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -459,6 +460,14 @@ SwiftInt BridgedSubstitutionMap::getNumConformances() const {
 
 BridgedConformance BridgedSubstitutionMap::getConformance(SwiftInt index) const {
   return unbridged().getConformances()[index];
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedFingerprint
+//===----------------------------------------------------------------------===//
+
+swift::Fingerprint BridgedFingerprint::unbridged() const {
+  return swift::Fingerprint({this->v1, this->v2});
 }
 
 //===----------------------------------------------------------------------===//

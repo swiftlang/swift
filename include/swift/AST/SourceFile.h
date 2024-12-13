@@ -153,7 +153,7 @@ private:
   /// this source file.
   ///
   /// We only collect interface hash for primary input files.
-  std::optional<StableHasher> InterfaceHasher;
+  std::optional<Fingerprint> InterfaceHash;
 
   /// The ID for the memory buffer containing this file's source.
   unsigned BufferID;
@@ -756,19 +756,14 @@ public:
     return ParsingOpts.contains(ParsingFlags::EnableInterfaceHash);
   }
 
-  /// Retrieve a fingerprint value that summarizes the declarations in this
-  /// source file.
+  /// Retrieve a fingerprint value that summarizes the top-level declarations in
+  /// this source file.
   ///
   /// Note that the interface hash merely summarizes the top-level declarations
   /// in this file. Type body fingerprints are currently implemented such that
   /// they divert tokens away from the hasher used for fingerprints. That is,
   /// changes to the bodies of types and extensions will not result in a change
-  /// to the interface hash.
-  ///
-  /// In order for the interface hash to be enabled, this source file must be a
-  /// primary and the compiler must be set in incremental mode. If this is not
-  /// the case, this function will try to signal with an assert. It is useful
-  /// to guard requests for the interface hash with \c hasInterfaceHash().
+  /// to the source file interface hash.
   Fingerprint getInterfaceHash() const;
 
   void dumpInterfaceHash(llvm::raw_ostream &out) {
