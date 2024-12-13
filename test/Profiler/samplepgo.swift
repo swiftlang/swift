@@ -37,6 +37,11 @@
 // CHECK-NODATA-LABEL: !llvm.module.flags
 // CHECK-NODATA-NOT: Profile
 
+// FIXME: It appears that Windows does not use the new swift-driver.
+// This test in particular includes end-to-end testing coverage via
+// that driver to ensure the flag works.
+// REQUIRES: OS=macosx || OS=linux-gnu
+
 
 //--- program.swift
 public func anything() {}
