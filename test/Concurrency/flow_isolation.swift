@@ -1,7 +1,8 @@
-// RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s
-// RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -enable-experimental-feature IsolatedDeinit -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-experimental-feature IsolatedDeinit -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: swift_feature_RegionBasedIsolation
+// REQUIRES: swift_feature_IsolatedDeinit
 
 func randomBool() -> Bool { return false }
 func logTransaction(_ i: Int) {}

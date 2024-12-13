@@ -1,8 +1,9 @@
-// RUN: %target-run-simple-swift(-target %target-future-triple) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature IsolatedDeinit -target %target-future-triple) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+// REQUIRES: swift_feature_IsolatedDeinit
 
 var isDead: Bool = false
 
