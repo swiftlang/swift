@@ -31,6 +31,7 @@ struct NonTrivialStruct {
 sil [_semantics "array.uninitialized_intrinsic"] @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
 
 sil [_semantics "array.uninitialized"] @adoptStorageSpecializedForInt : $@convention(method) (@guaranteed _ContiguousArrayStorage<Int>, Builtin.Word, @thin Array<Int>.Type) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+sil [_semantics "array.uninitialized"] @allocUninitialized : $@convention(thin) (Int) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
 
 sil [_semantics "array.finalize_intrinsic"] @finalize : $@convention(thin) (@owned Array<Int>) -> @owned Array<Int>
 
@@ -188,5 +189,25 @@ bb0(%0 : @owned $Klass):
   dealloc_stack %1 : $*NonTrivialStruct
   %t = tuple ()
   return %t : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @dead_array_with_borrow :
+// CHECK-NOT:     apply
+// CHECK:         %1 = tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'dead_array_with_borrow'
+sil [ossa] @dead_array_with_borrow : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = function_ref @allocUninitialized : $@convention(thin) (Int) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+  %3 = apply %2(%0) : $@convention(thin) (Int) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+  (%4, %5) = destructure_tuple %3
+  debug_value %4, let, name "a"
+  %7 = begin_borrow [lexical] %4
+  fix_lifetime %7
+  end_borrow %7
+  destroy_value %4
+  %11 = tuple ()
+  return %11
 }
 
