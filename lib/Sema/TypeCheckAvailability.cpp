@@ -869,6 +869,50 @@ private:
     return Range;
   }
 
+  /// Enumerate the AST nodes and their corresponding source ranges for
+  /// the body (or bodies) of the given declaration.
+  void enumerateBodyRanges(
+     Decl *decl,
+     llvm::function_ref<void(Decl *decl, ASTNode body, SourceRange)> acceptBody
+  ) {
+    // Top level code always uses the deployment target.
+    if (auto tlcd = dyn_cast<TopLevelCodeDecl>(decl)) {
+      if (auto bodyStmt = tlcd->getBody()) {
+        acceptBody(tlcd, bodyStmt, refinementSourceRangeForDecl(tlcd));
+      }
+      return;
+    }
+
+    // For functions, provide the body source range.
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+      if (!afd->isImplicit()) {
+        if (auto body = afd->getBody(/*canSynthesize*/ false)) {
+          acceptBody(afd, body, afd->getBodySourceRange());
+        }
+      }
+      return;
+    }
+
+    // Pattern binding declarations have initial values that are their
+    // bodies.
+    if (auto *pbd = dyn_cast<PatternBindingDecl>(decl)) {
+      for (unsigned index : range(pbd->getNumPatternEntries())) {
+        auto var = pbd->getAnchoringVarDecl(index);
+        if (!var)
+          continue;
+
+        auto *initExpr = pbd->getInit(index);
+        if (initExpr && !initExpr->isImplicit()) {
+          assert(initExpr->getSourceRange().isValid());
+
+          // Create a scope for the init written in the source.
+          acceptBody(var, initExpr, initExpr->getSourceRange());
+        }
+      }
+      return;
+    }
+  }
+
   // Creates an implicit decl scope specifying the deployment target for
   // `range` in decl `D`.
   AvailabilityScope *
@@ -880,89 +924,85 @@ private:
         Context, D, getCurrentScope(), Availability, range);
   }
 
+  /// Determine whether the body of the given declaration has
+  /// deployment-target availability.
+  static bool bodyIsDeploymentTarget(Decl *decl) {
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+      return afd->getResilienceExpansion() != ResilienceExpansion::Minimal;
+    }
+
+    if (auto var = dyn_cast<VarDecl>(decl)) {
+      // Var decls may have associated pattern binding decls or property
+      // wrappers with init expressions. Those expressions need to be
+      // constrained to the deployment target unless they are exposed to
+      // clients.
+      return var->hasInitialValue() && !var->isInitExposedToClients();
+    }
+
+    return true;
+  }
+
   void buildContextsForBodyOfDecl(Decl *D) {
-    // Are we already constrained by the deployment target? If not, adding
+    // Are we already constrained by the deployment target and the declaration
+    // doesn't explicitly allow unsafe constructs in its definition, adding
     // new contexts won't change availability.
-    if (isCurrentScopeContainedByDeploymentTarget())
+    bool allowsUnsafe = D->getAttrs().hasAttribute<SafeAttr>();
+    if (isCurrentScopeContainedByDeploymentTarget() && !allowsUnsafe)
       return;
 
-    // Top level code always uses the deployment target.
-    if (auto tlcd = dyn_cast<TopLevelCodeDecl>(D)) {
-      if (auto bodyStmt = tlcd->getBody()) {
-        pushDeclBodyContext(
-            tlcd, {{bodyStmt, createImplicitDeclContextForDeploymentTarget(
-                                  tlcd, refinementSourceRangeForDecl(tlcd))}});
-      }
-      return;
-    }
+    // Enumerate all of the body scopes to apply availability.
+    llvm::SmallVector<std::pair<ASTNode, AvailabilityScope *>, 4>
+        nodesAndScopes;
+    enumerateBodyRanges(D, [&](Decl *decl, ASTNode body, SourceRange range) {
+      auto availability = getCurrentScope()->getAvailabilityContext();
 
-    // Function bodies use the deployment target if they are within the module's
-    // resilience domain.
-    if (auto afd = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (!afd->isImplicit() &&
-          afd->getResilienceExpansion() != ResilienceExpansion::Minimal) {
-        if (auto body = afd->getBody(/*canSynthesize*/ false)) {
-          pushDeclBodyContext(
-              afd, {{body, createImplicitDeclContextForDeploymentTarget(
-                               afd, afd->getBodySourceRange())}});
-        }
-      }
-      return;
-    }
-
-    // Pattern binding declarations can have children corresponding to property
-    // wrappers and the initial values provided in each pattern binding entry
-    if (auto *pbd = dyn_cast<PatternBindingDecl>(D)) {
-      llvm::SmallVector<std::pair<ASTNode, AvailabilityScope *>, 4>
-          nodesAndScopes;
-
-      for (unsigned index : range(pbd->getNumPatternEntries())) {
-        auto var = pbd->getAnchoringVarDecl(index);
-        if (!var)
-          continue;
-
-        // Var decls may have associated pattern binding decls or property
-        // wrappers with init expressions. Those expressions need to be
-        // constrained to the deployment target unless they are exposed to
-        // clients.
-        if (!var->hasInitialValue() || var->isInitExposedToClients())
-          continue;
-
-        auto *initExpr = pbd->getInit(index);
-        if (initExpr && !initExpr->isImplicit()) {
-          assert(initExpr->getSourceRange().isValid());
-
-          // Create a scope for the init written in the source.
-          nodesAndScopes.push_back(
-              {initExpr, createImplicitDeclContextForDeploymentTarget(
-                             var, initExpr->getSourceRange())});
-        }
+      // Apply deployment-target availability if appropriate for this body.
+      if (!isCurrentScopeContainedByDeploymentTarget() &&
+          bodyIsDeploymentTarget(decl)) {
+        availability.constrainWithPlatformRange(
+             AvailabilityRange::forDeploymentTarget(Context), Context);
       }
 
-      if (nodesAndScopes.size() > 0)
-        pushDeclBodyContext(pbd, nodesAndScopes);
+      // Allow unsafe if appropriate for this body.
+      if (allowsUnsafe) {
+        availability.constrainWithAllowsUnsafe(Context);
+      }
 
-      // Ideally any init expression would be returned by `getInit()` above.
-      // However, for property wrappers it doesn't get populated until
-      // typechecking completes (which is too late). Instead, we find the
-      // the property wrapper attribute and use its source range to create a
-      // scope for the initializer expression.
-      //
-      // FIXME: Since we don't have an expression here, we can't build out its
-      // scope. If the Expr that will eventually be created contains a closure
-      // expression, then it might have AST nodes that need to be refined. For
-      // example, property wrapper initializers that takes block arguments
-      // are not handled correctly because of this (rdar://77841331).
-      if (auto firstVar = pbd->getAnchoringVarDecl(0)) {
-        if (firstVar->hasInitialValue() &&
-            !firstVar->isInitExposedToClients()) {
-          for (auto *wrapper : firstVar->getAttachedPropertyWrappers()) {
-            createImplicitDeclContextForDeploymentTarget(firstVar,
-                                                         wrapper->getRange());
+      nodesAndScopes.push_back({
+          body,
+          AvailabilityScope::createForDeclImplicit(
+              Context, decl, getCurrentScope(), availability, range)
+      });
+    });
+
+    if (nodesAndScopes.size() > 0)
+      pushDeclBodyContext(D, nodesAndScopes);
+
+    if (!isCurrentScopeContainedByDeploymentTarget()) {
+      // Pattern binding declarations can have children corresponding to property
+      // wrappers, which we handle separately.
+      if (auto *pbd = dyn_cast<PatternBindingDecl>(D)) {
+        // Ideally any init expression would be returned by `getInit()` above.
+        // However, for property wrappers it doesn't get populated until
+        // typechecking completes (which is too late). Instead, we find the
+        // the property wrapper attribute and use its source range to create a
+        // scope for the initializer expression.
+        //
+        // FIXME: Since we don't have an expression here, we can't build out its
+        // scope. If the Expr that will eventually be created contains a closure
+        // expression, then it might have AST nodes that need to be refined. For
+        // example, property wrapper initializers that takes block arguments
+        // are not handled correctly because of this (rdar://77841331).
+        if (auto firstVar = pbd->getAnchoringVarDecl(0)) {
+          if (firstVar->hasInitialValue() &&
+              !firstVar->isInitExposedToClients()) {
+            for (auto *wrapper : firstVar->getAttachedPropertyWrappers()) {
+              createImplicitDeclContextForDeploymentTarget(firstVar,
+                                                           wrapper->getRange());
+            }
           }
         }
       }
-      return;
     }
   }
 

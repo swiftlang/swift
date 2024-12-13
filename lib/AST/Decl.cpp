@@ -1080,7 +1080,7 @@ bool Decl::isUnsafe() const {
 }
 
 bool Decl::allowsUnsafe() const {
-  return getAttrs().hasAttribute<SafeAttr>() || isUnsafe();
+  return isUnsafe();
 }
 
 Type AbstractFunctionDecl::getThrownInterfaceType() const {

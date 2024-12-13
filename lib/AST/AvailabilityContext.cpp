@@ -194,6 +194,15 @@ void AvailabilityContext::constrainWithDecl(const Decl *decl) {
   constrainWithDeclAndPlatformRange(decl, AvailabilityRange::alwaysAvailable());
 }
 
+void AvailabilityContext::constrainWithAllowsUnsafe(ASTContext &ctx) {
+  if (allowsUnsafe())
+    return;
+
+  PlatformInfo platformInfo{Info->Platform};
+  platformInfo.AllowsUnsafe = true;
+  Info = Storage::get(platformInfo, ctx);
+}
+
 void AvailabilityContext::constrainWithPlatformRange(
     const AvailabilityRange &platformRange, ASTContext &ctx) {
   PlatformInfo platformAvailability{Info->Platform};
