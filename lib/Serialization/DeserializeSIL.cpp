@@ -394,8 +394,8 @@ SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
   return maybeKind;
 }
 
-std::optional<SILLocation> SILDeserializer::readLoc(unsigned kind,
-                                     SmallVectorImpl<uint64_t> &scratch) {
+std::optional<SILLocation>
+SILDeserializer::readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch) {
   unsigned LocationKind, Implicit = 0;
   SILLocation::FilenameAndLocation *FNameLoc = nullptr;
   // Each SourceLoc opaque pointer is serialized once. Successive appearences
@@ -409,8 +409,8 @@ std::optional<SILLocation> SILDeserializer::readLoc(unsigned kind,
     FNameLoc = ParsedLocs[LocID - 1];
   } else {
     ValueID Row = 0, Col = 0, FNameID = 0;
-    SourceLocLayout::readRecord(scratch, Row, Col, FNameID, LocationKind, Implicit);
-
+    SourceLocLayout::readRecord(scratch, Row, Col, FNameID, LocationKind,
+                                Implicit);
 
     FNameLoc = SILLocation::FilenameAndLocation::alloc(
         Row, Col, MF->getIdentifierText(FNameID), SILMod);
@@ -418,18 +418,21 @@ std::optional<SILLocation> SILDeserializer::readLoc(unsigned kind,
     ParsedLocs.push_back(FNameLoc);
   }
 
-  switch(LocationKind) {
-    case SILLocation::ReturnKind:
-      return ReturnLocation(FNameLoc, Implicit);
-    case SILLocation::ImplicitReturnKind:
-      return ImplicitReturnLocation(FNameLoc, Implicit);
-    case SILLocation::InlinedKind:
-    case SILLocation::MandatoryInlinedKind:
-    case SILLocation::CleanupKind:
-    case SILLocation::ArtificialUnreachableKind:
-    case SILLocation::RegularKind:
-      return RegularLocation(FNameLoc, Implicit);
+  switch (LocationKind) {
+  case SILLocation::ReturnKind:
+    return ReturnLocation(FNameLoc, Implicit);
+  case SILLocation::ImplicitReturnKind:
+    return ImplicitReturnLocation(FNameLoc, Implicit);
+  case SILLocation::InlinedKind:
+  case SILLocation::MandatoryInlinedKind:
+  case SILLocation::CleanupKind:
+  case SILLocation::ArtificialUnreachableKind:
+  case SILLocation::RegularKind:
+    return RegularLocation(FNameLoc, Implicit);
   }
+
+  // LocationKind was not a recognized SILLocation::LocationKind.
+  return std::nullopt;
 }
 
 llvm::Expected<const SILDebugScope *>
