@@ -105,7 +105,7 @@ extension ASTGenVisitor {
       underlyingType: self.generate(type: node.initializer.value),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
     return decl
   }
 
@@ -129,7 +129,7 @@ extension ASTGenVisitor {
         end: node.memberBlock.rightBrace
       )
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     let members = self.withDeclContext(decl.asDeclContext) {
       self.generate(memberBlockItemList: node.memberBlock.members)
@@ -163,7 +163,7 @@ extension ASTGenVisitor {
         end: node.memberBlock.rightBrace
       )
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     let members = self.withDeclContext(decl.asDeclContext) {
       self.generate(memberBlockItemList: node.memberBlock.members)
@@ -198,7 +198,7 @@ extension ASTGenVisitor {
       ),
       isActor: false
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     let members = self.withDeclContext(decl.asDeclContext) {
       self.generate(memberBlockItemList: node.memberBlock.members)
@@ -233,7 +233,7 @@ extension ASTGenVisitor {
       ),
       isActor: true
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     let members = self.withDeclContext(decl.asDeclContext) {
       self.generate(memberBlockItemList: node.memberBlock.members)
@@ -270,7 +270,7 @@ extension ASTGenVisitor {
         end: node.memberBlock.rightBrace
       )
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     let members = self.withDeclContext(decl.asDeclContext) {
       self.generate(memberBlockItemList: node.memberBlock.members)
@@ -300,7 +300,7 @@ extension ASTGenVisitor {
       defaultType: self.generate(type: node.initializer?.value),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
     return decl
   }
 }
@@ -322,7 +322,7 @@ extension ASTGenVisitor {
         end: node.memberBlock.rightBrace
       )
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     let members = self.withDeclContext(decl.asDeclContext) {
       self.generate(memberBlockItemList: node.memberBlock.members)
@@ -364,7 +364,7 @@ extension ASTGenVisitor {
       guard let elemDecl = self.generate(enumCaseElement: elem) else {
         return nil
       }
-      elemDecl.asDecl.setAttrs(attrs.attributes)
+      elemDecl.asDecl.attachParsedAttrs(attrs.attributes)
       return elemDecl
     })
     return .createParsed(
@@ -439,7 +439,7 @@ extension ASTGenVisitor {
       throwsSpecifierLoc: self.generateSourceLoc(node.effectSpecifiers?.throwsClause),
       thrownType: self.generate(type: node.effectSpecifiers?.thrownError)
     )
-    accessor.asDecl.setAttrs(attrs)
+    accessor.asDecl.attachParsedAttrs(attrs)
     if let body = node.body {
       self.withDeclContext(accessor.asDeclContext) {
         accessor.setParsedBody(self.generate(codeBlock: body))
@@ -600,7 +600,7 @@ extension ASTGenVisitor {
       arrowLoc: self.generateSourceLoc(node.returnClause.arrow),
       returnType: self.generate(type: node.returnClause.type)
     )
-    subscriptDecl.asDecl.setAttrs(attrs.attributes)
+    subscriptDecl.asDecl.attachParsedAttrs(attrs.attributes)
 
     if let accessors = node.accessorBlock {
       let storage = subscriptDecl.asAbstractStorageDecl
@@ -635,7 +635,7 @@ extension ASTGenVisitor {
       returnType: self.generate(type: node.signature.returnClause?.type),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
@@ -662,7 +662,7 @@ extension ASTGenVisitor {
       thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
@@ -681,7 +681,7 @@ extension ASTGenVisitor {
       declContext: self.declContext,
       deinitKeywordLoc: self.generateSourceLoc(node.deinitKeyword)
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
@@ -711,7 +711,7 @@ extension ASTGenVisitor {
       resultType: self.generate(type: node.signature.returnClause?.type),
       definition: self.generate(expr: node.definition?.value)
     )
-    decl.asDecl.setAttrs(attrs.attributes);
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
     return decl;
   }
 }
@@ -733,7 +733,7 @@ extension ASTGenVisitor {
       rightAngleLoc: info.rightAngleLoc,
       args: info.arguments
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     return decl
   }
@@ -890,7 +890,7 @@ extension ASTGenVisitor {
       lowerThanNames: self.generate(precedenceGroupNameList: body.lowerThanRelation?.precedenceGroups),
       rightBraceLoc: self.generateSourceLoc(node.rightBrace)
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
     return decl
   }
 }
@@ -937,7 +937,7 @@ extension ASTGenVisitor {
         self.generateLocatedIdentifier($0.name)
       }.bridgedArray(in: self)
     )
-    decl.asDecl.setAttrs(attrs.attributes)
+    decl.asDecl.attachParsedAttrs(attrs.attributes)
     return decl
   }
 }

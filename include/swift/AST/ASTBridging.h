@@ -918,8 +918,8 @@ BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
 
 struct BridgedFingerprint;
 
-SWIFT_NAME("BridgedDecl.setAttrs(self:_:)")
-void BridgedDecl_setAttrs(BridgedDecl decl, BridgedDeclAttributes attrs);
+SWIFT_NAME("BridgedDecl.attachParsedAttrs(self:_:)")
+void BridgedDecl_attachParsedAttrs(BridgedDecl decl, BridgedDeclAttributes attrs);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedStaticSpelling {
   BridgedStaticSpellingNone,
