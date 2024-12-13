@@ -4783,6 +4783,8 @@ struct ParamLowering {
     return ClaimedParamsRef(result, (unsigned)-1);
   }
 
+  void claimImplicitParameters() { Params = Params.drop_front(); }
+
   ArrayRef<SILParameterInfo>
   claimCaptureParams(ArrayRef<ManagedValue> captures) {
     auto firstCapture = Params.size() - captures.size();
@@ -5445,6 +5447,18 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
       options |= ApplyFlags::DoesNotAwait;
     }
 
+    // Before we do anything, claim the implicit parameters. This prevents us
+    // from attempting to handle the implicit parameters when we emit explicit
+    // parameters.
+    //
+    // NOTE: The actual work needs to be done /after/ we emit the normal
+    // parameters since we are going to reverse the order.
+    if (auto isolated = substFnType->maybeGetIsolatedParameter();
+        isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
+      assert(SGF.ExpectedExecutor.isNecessary());
+      paramLowering.claimImplicitParameters();
+    }
+
     // Collect the captures, if any.
     if (callee.hasCaptures()) {
       (void)paramLowering.claimCaptureParams(callee.getCaptures());
@@ -5474,6 +5488,18 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     // Claim the method formal params.
     std::move(*callSite).emit(SGF, origFormalType, substFnType, paramLowering,
                               args.back(), delayedArgs, siteForeignError);
+  }
+
+  // Now, actually handle the implicit parameters.
+  if (auto isolated = substFnType->maybeGetIsolatedParameter();
+      isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
+    auto executor =
+        ManagedValue::forBorrowedObjectRValue(SGF.ExpectedExecutor.getEager());
+    args.push_back({});
+    // NOTE: Even though this calls emitActorInstanceIsolation, this also
+    // handles glboal actor isolated cases.
+    args.back().push_back(SGF.emitActorInstanceIsolation(
+        callSite->Loc, executor, executor.getType().getASTType()));
   }
 
   uncurriedLoc = callSite->Loc;
