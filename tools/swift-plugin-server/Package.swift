@@ -32,6 +32,14 @@ let package = Package(
         .product(name: "_SwiftLibraryPluginProvider", package: "swift-syntax"),
       ]
     ),
+    .testTarget(
+      name: "PluginServerTests",
+      dependencies: [
+        .product(name: "WAT", package: "WasmKit"),
+        .product(name: "WasmKit", package: "WasmKit"),
+        "swift-plugin-server",
+      ]
+    ),
   ],
   cxxLanguageStandard: .cxx17
 )
