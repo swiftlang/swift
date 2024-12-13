@@ -62,6 +62,7 @@ extension S where T == Any {
 struct TestGeneral {
   @preconcurrency var v: S<any Sendable>
   @preconcurrency var optV: S<[(any Sendable)?]>
+  @preconcurrency var funcV: S<([any Sendable]) -> (any Sendable)?>
 
   func accepts_any(_: S<Any>) {}
   func accepts_opt_any(_: S<[Any?]>) {}
@@ -152,6 +153,32 @@ struct TestGeneral {
     func accepts_any(_: V<Any>) {}
 
     let test = Test(data: V(v: 42))
+    accepts_any(test.data)
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s37sendable_to_any_for_generic_arguments11TestGeneralV023test_function_types_as_E5_argsyyF
+  // CHECK: [[FUNCV_REF:%.*]] = struct_extract %0, #TestGeneral.funcV
+  // CHECK-NEXT: %3 = unchecked_trivial_bit_cast [[FUNCV_REF]] to $S<(Array<Any>) -> Optional<Any>>
+  // CHECK: [[DATA_REF:%.*]] = struct_extract %20, #<abstract function>Test.data
+  // CHECK-NEXT: [[DATA_COPY:%.*]] = copy_value [[DATA_REF]]
+  // CHECK-NEXT: [[DATA_ANY:%.*]] = unchecked_value_cast [[DATA_COPY]] to $V<(Array<Any>) -> Any>
+  // CHECK: [[ACCEPTS_ANY:%.*]] = function_ref @$s37sendable_to_any_for_generic_arguments11TestGeneralV023test_function_types_as_E5_argsyyF08accepts_C0L_yyAcDyyF1VL_VyypSayypGcGF : $@convention(thin) (@guaranteed V<(Array<Any>) -> Any>) -> ()
+  // CHECK-NEXT: {{.*}} = apply [[ACCEPTS_ANY]]([[DATA_ANY]]) : $@convention(thin) (@guaranteed V<(Array<Any>) -> Any>) -> ()
+  func test_function_types_as_generic_args() {
+    let _: S<([Any]) -> Any?> = funcV
+
+    struct V<T> {
+      let v: T
+    }
+
+    struct Test {
+      @preconcurrency var data: V<([any Sendable]) -> any Sendable>
+    }
+
+
+    func accepts_any(_: V<([Any]) -> Any>) {}
+
+    let test = Test(data: V(v: { $0.first! }))
     accepts_any(test.data)
   }
 }

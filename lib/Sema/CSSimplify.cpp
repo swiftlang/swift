@@ -3670,14 +3670,69 @@ static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
 /// Note that it's currently impossible to figure out precisely
 /// where `any Sendable` type came from.
 static bool matchSendableExistentialToAnyInGenericArgumentPosition(
-    ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
+    ConstraintSystem &cs, Type lhs, Type rhs,
+    ConstraintLocatorBuilder locator) {
   auto &ctx = cs.getASTContext();
   if (ctx.isSwiftVersionAtLeast(6) ||
       ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)
     return false;
 
+  // Avoid heavier checks if are not `any Sendable` and `Any`.
+  if (!(lhs->isSendableExistential() || lhs->isAny()) ||
+      !(rhs->isSendableExistential() || rhs->isAny()))
+    return false;
+
   auto last = locator.last();
-  if (!last || !last->is<LocatorPathElt::GenericArgument>())
+  // `any Sendable` -> `Any` conversion is allowed for generic arguments
+  // and for function argument/result positions if generic argument is
+  // bound to a function type.
+  if (!last || !(last->is<LocatorPathElt::GenericArgument>() ||
+                 last->is<LocatorPathElt::FunctionArgument>() ||
+                 last->is<LocatorPathElt::FunctionResult>()))
+    return false;
+
+  SmallVector<LocatorPathElt, 4> path;
+  auto anchor = locator.getLocatorParts(path);
+
+  {
+    std::optional<unsigned> dropFromIdx;
+    bool inGenericArgumentContext = false;
+
+    for (unsigned i = 0, n = path.size(); i < n; ++i) {
+      const auto &elt = path[i];
+      if (elt.is<LocatorPathElt::GenericType>()) {
+        if (!dropFromIdx)
+          dropFromIdx = i;
+        continue;
+      }
+
+      if (elt.is<LocatorPathElt::GenericArgument>()) {
+        inGenericArgumentContext = true;
+        continue;
+      }
+
+      // For example: `[(any Sendable) -> Void]` -> `[(Any) -> Void]`
+      if (elt.is<LocatorPathElt::FunctionArgument>()) {
+        if (inGenericArgumentContext) {
+          // `matchFunctionTypes` accounts for contravariance even under
+          // equality constraint (because it shouldn't matter), but it does
+          // in this case.
+          std::swap(lhs, rhs);
+        }
+      }
+    }
+
+    // If we are not in generic argument context,
+    // this conversion don't apply.
+    if (!inGenericArgumentContext || !dropFromIdx)
+      return false;
+
+    // Drop all of the elements that would get in a way of
+    // finding the underlying declaration reference first.
+    path.pop_back_n(path.size() - *dropFromIdx);
+  }
+
+  if (!(lhs->isSendableExistential() && rhs->isAny()))
     return false;
 
   std::function<bool(ConstraintLocator *)> isPreconcurrencyContext =
@@ -3706,21 +3761,6 @@ static bool matchSendableExistentialToAnyInGenericArgumentPosition(
 
         return true;
       };
-
-  SmallVector<LocatorPathElt> path;
-  auto anchor = locator.getLocatorParts(path);
-
-  // Drop all of the generic type and argument elements
-  // from the locator first.
-  while (!path.empty()) {
-    auto last = path.back();
-    if (last.is<LocatorPathElt::GenericArgument>() ||
-        last.is<LocatorPathElt::GenericType>()) {
-      path.pop_back();
-      continue;
-    }
-    break;
-  }
 
   if (!isPreconcurrencyContext(cs.getConstraintLocator(anchor, path)))
     return false;
@@ -3777,22 +3817,18 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     return result;
   }
 
+  // `any Sendable` -> `Any`
+  if (matchSendableExistentialToAnyInGenericArgumentPosition(*this, type1,
+                                                             type2, locator))
+    return getTypeMatchSuccess();
+
   // Handle existential types.
   if (auto *existential1 = type1->getAs<ExistentialType>()) {
     auto existential2 = type2->castTo<ExistentialType>();
 
-    auto constraintTy1 = existential1->getConstraintType();
-    auto constraintTy2 = existential2->getConstraintType();
-
-    if (constraintTy1->getKnownProtocol() == KnownProtocolKind::Sendable &&
-        constraintTy2->isAny()) {
-      if (matchSendableExistentialToAnyInGenericArgumentPosition(*this,
-                                                                 locator))
-        return getTypeMatchSuccess();
-    }
-
     auto result = matchTypes(
-        constraintTy1, constraintTy2, ConstraintKind::Bind, subflags,
+        existential1->getConstraintType(), existential2->getConstraintType(),
+        ConstraintKind::Bind, subflags,
         locator.withPathElement(ConstraintLocator::ExistentialConstraintType));
 
     if (result.isFailure())
@@ -4408,10 +4444,8 @@ ConstraintSystem::matchTypesBindTypeVar(
   // with `any Sendable` and other concurrency attributes.
   if (typeVar->getImpl().getGenericParameter() &&
       !flags.contains(TMF_BindingTypeVariable) &&
-      type->isMarkerExistential()) {
-    auto constraintTy = type->castTo<ExistentialType>()->getConstraintType();
-    if (constraintTy->getKnownProtocol() == KnownProtocolKind::Sendable)
-      return formUnsolvedResult();
+      type->isSendableExistential()) {
+    return formUnsolvedResult();
   }
 
   // Attempt to fix situations where type variable can't be bound
