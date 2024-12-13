@@ -61,6 +61,10 @@ void swift_ASTGen_buildTopLevelASTNodes(
     void *_Nonnull outputContext,
     void (*_Nonnull)(BridgedASTNode, void *_Nonnull));
 
+BridgedFingerprint
+swift_ASTGen_getSourceFileFingerprint(void *_Nonnull sourceFile,
+                                      BridgedASTContext astContext);
+
 void swift_ASTGen_freeBridgedString(BridgedStringRef);
 
 // MARK: - Regex parsing

@@ -239,6 +239,12 @@ extension BridgedSourceRange {
   }
 }
 
+extension Fingerprint {
+  var bridged: BridgedFingerprint {
+    BridgedFingerprint(v1: self.core.0, v2: self.core.1)
+  }
+}
+
 /// Helper collection type that lazily concatenates two collections.
 struct ConcatCollection<C1: Collection, C2: Collection> where C1.Element == C2.Element {
   let c1: C1

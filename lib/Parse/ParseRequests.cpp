@@ -302,10 +302,16 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
       &Diags, exportedSourceFile, declContext, Ctx,
       static_cast<SmallVectorImpl<ASTNode> *>(&items), appendToVector);
 
+  // Fingerprint.
+  // FIXME: Split request (SourceFileFingerprintRequest).
+  std::optional<Fingerprint> fp;
+  if (SF.hasInterfaceHash())
+    fp = swift_ASTGen_getSourceFileFingerprint(exportedSourceFile, Ctx)
+             .unbridged();
+
   return SourceFileParsingResult{/*TopLevelItems=*/Ctx.AllocateCopy(items),
                                  /*CollectedTokens=*/std::nullopt,
-                                 // FIXME: Implement interface hash.
-                                 /*InterfaceHasher=*/std::nullopt};
+                                 /*Fingerprint=*/fp};
 }
 #endif // SWIFT_BUILD_SWIFT_SYNTAX
 
@@ -431,8 +437,11 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
   if (auto tokens = parser.takeTokenReceiver()->finalize())
     tokensRef = ctx.AllocateCopy(*tokens);
 
-  return SourceFileParsingResult{ctx.AllocateCopy(items), tokensRef,
-                                 parser.CurrentTokenHash};
+  std::optional<Fingerprint> fp;
+  if (parser.CurrentTokenHash)
+    fp = Fingerprint(std::move(*parser.CurrentTokenHash));
+
+  return SourceFileParsingResult{ctx.AllocateCopy(items), tokensRef, fp};
 }
 
 } // namespace
@@ -472,7 +481,7 @@ ParseSourceFileRequest::getCachedResult() const {
     return std::nullopt;
 
   return SourceFileParsingResult{*items, SF->AllCollectedTokens,
-                                 SF->InterfaceHasher};
+                                 SF->InterfaceHash};
 }
 
 void ParseSourceFileRequest::cacheResult(SourceFileParsingResult result) const {
@@ -480,7 +489,7 @@ void ParseSourceFileRequest::cacheResult(SourceFileParsingResult result) const {
   assert(!SF->Items);
   SF->Items = result.TopLevelItems;
   SF->AllCollectedTokens = result.CollectedTokens;
-  SF->InterfaceHasher = result.InterfaceHasher;
+  SF->InterfaceHash = result.Fingerprint;
 
   // Verify the parsed source file.
   verify(*SF);
