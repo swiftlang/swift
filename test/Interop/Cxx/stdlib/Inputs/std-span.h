@@ -5,53 +5,51 @@
 #include <string>
 #include <span>
 
-using ConstSpan = std::span<const int>;
-using Span = std::span<int>;
+using ConstSpanOfInt = std::span<const int>;
+using SpanOfInt = std::span<int>;
 using ConstSpanOfString = std::span<const std::string>;
 using SpanOfString = std::span<std::string>;
 
 static int iarray[]{1, 2, 3};
 static std::string sarray[]{"", "ab", "abc"};
-static ConstSpan icspan = {iarray};
-static Span ispan = {iarray};
+static ConstSpanOfInt icspan = {iarray};
+static SpanOfInt ispan = {iarray};
 static ConstSpanOfString scspan = {sarray};
 static SpanOfString sspan = {sarray};
 
 struct SpanBox {
-  ConstSpan icspan;
-  Span ispan;
+  ConstSpanOfInt icspan;
+  SpanOfInt ispan;
   ConstSpanOfString scspan;
   SpanOfString sspan;
 };
 
 class CppApi {
 public:
-  ConstSpan getConstSpan();
-  Span getSpan();
+  ConstSpanOfInt getConstSpan();
+  SpanOfInt getSpan();
 };
 
-ConstSpan CppApi::getConstSpan() {
-  ConstSpan sp{new int[2], 2};
+ConstSpanOfInt CppApi::getConstSpan() {
+  ConstSpanOfInt sp{new int[2], 2};
   return sp;
 }
 
-Span CppApi::getSpan() {
-  Span sp{new int[2], 2};
+SpanOfInt CppApi::getSpan() {
+  SpanOfInt sp{new int[2], 2};
   return sp;
 }
 
-inline ConstSpan initConstSpan() {
-  const int a[]{1, 2, 3};
-  return ConstSpan(a);
+inline ConstSpanOfInt initConstSpan() {
+  return ConstSpanOfInt(iarray);
 }
 
-inline Span initSpan() {
-  int a[]{1, 2, 3};
-  return Span(a);
+inline SpanOfInt initSpan() {
+  return SpanOfInt(iarray);
 }
 
-inline Span initSpan(int arr[], size_t size) {
-  return Span(arr, size);
+inline SpanOfInt initSpan(int arr[], size_t size) {
+  return SpanOfInt(arr, size);
 }
 
 inline struct SpanBox getStructSpanBox() { return {iarray, iarray, sarray, sarray}; }

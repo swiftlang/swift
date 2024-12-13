@@ -9,6 +9,14 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+import Builtin
+
+@usableFromInline
+internal func unsafeBitCast<T: ~Escapable, U>(
+   _ x: T, to type: U.Type
+) -> U {
+  Builtin.reinterpretCast(x)
+}
 
 /// A C++ type that is an object that can refer to a contiguous sequence of objects.
 ///
@@ -19,6 +27,9 @@ public protocol CxxSpan<Element> {
 
   init()
   init(_ unsafePointer : UnsafePointer<Element>, _ count: Size)
+
+  func size() -> Size
+  func __dataUnsafe() -> UnsafePointer<Element>?
 }
 
 extension CxxSpan {
@@ -35,6 +46,28 @@ extension CxxSpan {
     precondition(unsafeMutableBufferPointer.baseAddress != nil, 
                   "UnsafeMutableBufferPointer should not point to nil")
     self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+  }
+
+  @available(SwiftStdlib 6.1, *)
+  @inlinable
+  @unsafe
+  public init(_ span: Span<Element>) {
+    let (p, c) = unsafeBitCast(span, to: (UnsafeRawPointer?, Int).self)
+    precondition(p != nil, "Span should not point to nil")
+    let binding = p!.bindMemory(to: Element.self, capacity: c)
+    self.init(binding, Size(c))
+  }
+}
+
+@available(SwiftStdlib 6.1, *)
+extension Span {
+  @_alwaysEmitIntoClient
+  @lifetime(immortal)
+  @unsafe
+  public init<T: CxxSpan<Element>>(
+    _unsafeCxxSpan span: T,
+  ) {
+    self.init(_unsafeElements: .init(start: span.__dataUnsafe(), count: Int(span.size())))
   }
 }
 
