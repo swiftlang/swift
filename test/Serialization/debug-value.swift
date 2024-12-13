@@ -2,7 +2,7 @@
 // RUN: %{python} %utils/split_file.py -o %t %s
 
 // RUN: %target-swift-frontend -g -experimental-serialize-debug-info -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -O
-// RUN: %target-swift-frontend -g -I %t %t/Main.swift -experimental-serialize-debug-info -emit-sil -o - | %FileCheck %s
+// RUN: %target-swift-frontend -g -I %t %t/Main.swift -experimental-serialize-debug-info -emit-sil -o - -O -Xllvm -sil-print-types| %FileCheck %s
 
 // Shadow copies should not be emitted for imported functions as the imported
 // function might be optimized which breaks the unoptimized invariant of
