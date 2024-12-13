@@ -46,6 +46,7 @@ bool AvailabilityContext::PlatformInfo::constrainWith(
         CONSTRAIN_BOOL(IsUnavailableInEmbedded, other.IsUnavailableInEmbedded);
   }
   isConstrained |= CONSTRAIN_BOOL(IsDeprecated, other.IsDeprecated);
+  isConstrained |= CONSTRAIN_BOOL(AllowsUnsafe, other.AllowsUnsafe);
 
   return isConstrained;
 }
@@ -63,6 +64,7 @@ bool AvailabilityContext::PlatformInfo::constrainWith(const Decl *decl) {
   }
 
   isConstrained |= CONSTRAIN_BOOL(IsDeprecated, decl->isDeprecated());
+  isConstrained |= CONSTRAIN_BOOL(AllowsUnsafe, decl->allowsUnsafe());
 
   return isConstrained;
 }
@@ -128,7 +130,8 @@ AvailabilityContext::forPlatformRange(const AvailabilityRange &range,
   PlatformInfo platformInfo{range, PlatformKind::none,
                             /*IsUnavailable*/ false,
                             /*IsUnavailableInEmbedded*/ false,
-                            /*IsDeprecated*/ false};
+                            /*IsDeprecated*/ false,
+                            /*AllowsUnsafe*/ false};
   return AvailabilityContext(Storage::get(platformInfo, ctx));
 }
 
@@ -151,7 +154,8 @@ AvailabilityContext::get(const AvailabilityRange &platformAvailability,
                                 ? *unavailablePlatform
                                 : PlatformKind::none,
                             unavailablePlatform.has_value(),
-                            /*IsUnavailableInEmbedded*/ false, deprecated};
+                            /*IsUnavailableInEmbedded*/ false, deprecated,
+                            /*AllowsUnsafe*/ false};
   return AvailabilityContext(Storage::get(platformInfo, ctx));
 }
 
@@ -168,6 +172,10 @@ AvailabilityContext::getUnavailablePlatformKind() const {
 
 bool AvailabilityContext::isUnavailableInEmbedded() const {
   return Info->Platform.IsUnavailableInEmbedded;
+}
+
+bool AvailabilityContext::allowsUnsafe() const {
+  return Info->Platform.AllowsUnsafe;
 }
 
 bool AvailabilityContext::isDeprecated() const {
@@ -233,6 +241,9 @@ void AvailabilityContext::print(llvm::raw_ostream &os) const {
 
   if (isDeprecated())
     os << " deprecated";
+
+  if (allowsUnsafe())
+    os << " allows_unsafe";
 }
 
 void AvailabilityContext::dump() const { print(llvm::errs()); }
