@@ -2837,6 +2837,26 @@ public:
   UNIMPLEMENTED_CLONE(RawLayoutAttr)
 };
 
+class SafeAttr final : public DeclAttribute {
+public:
+  /// The optional message.
+  const StringRef message;
+
+  SafeAttr(SourceLoc atLoc, SourceRange range, StringRef message,
+           bool isImplicit = false)
+      : DeclAttribute(DeclAttrKind::Safe, atLoc, range, isImplicit),
+        message(message) { }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Safe;
+  }
+
+  /// Create a copy of this attribute.
+  SafeAttr *clone(ASTContext &ctx) const {
+    return new (ctx) SafeAttr(AtLoc, Range, message, isImplicit());
+  }
+};
+
 class LifetimeAttr final : public DeclAttribute {
   LifetimeEntry *entry;
 

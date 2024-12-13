@@ -504,8 +504,8 @@ SIMPLE_DECL_ATTR(sensitive, Sensitive,
   159)
 
 SIMPLE_DECL_ATTR(unsafe, Unsafe,
-  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType | OnExtension |
-  UserInaccessible |
+  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType |
+  OnExtension | OnTypeAlias | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   160)
 
@@ -517,7 +517,13 @@ SIMPLE_DECL_ATTR(_addressableSelf, AddressableSelf,
   OnAccessor | OnConstructor | OnFunc | OnSubscript | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | UserInaccessible,
   162)
 
-LAST_DECL_ATTR(AddressableSelf)
+DECL_ATTR(safe, Safe,
+  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType |
+  OnExtension | OnTypeAlias | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  163)
+
+LAST_DECL_ATTR(Safe)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
