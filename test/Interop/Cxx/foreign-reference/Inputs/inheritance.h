@@ -27,3 +27,44 @@ public:
     SubT(const SubT &) = delete;
     static SubT &getSubT() { static SubT singleton; return singleton; }
 };
+
+struct
+__attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal")))
+BaseWithVirtualDestructor {
+    int baseField = 123;
+
+    BaseWithVirtualDestructor() {}
+    virtual ~BaseWithVirtualDestructor() {}
+};
+
+struct
+__attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal")))
+DerivedWithVirtualDestructor : public BaseWithVirtualDestructor {
+    int derivedField = 456;
+
+    DerivedWithVirtualDestructor() : BaseWithVirtualDestructor() {}
+    ~DerivedWithVirtualDestructor() override {}
+};
+
+struct
+__attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal")))
+DerivedOutOfOrder : public BaseT, public DerivedWithVirtualDestructor {
+    // DerivedWithVirtualDestructor is the primary base class despite being the
+    // second one the list.
+
+    int leafField = 789; 
+
+    DerivedOutOfOrder() = default;
+    ~DerivedOutOfOrder() override {}
+
+    static DerivedOutOfOrder& getInstance() {
+      static DerivedOutOfOrder singleton;
+      return singleton;
+    }
+};

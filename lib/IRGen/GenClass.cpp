@@ -294,32 +294,18 @@ namespace {
       if (!cxxRecord)
         return;
 
-      auto &layout = cxxRecord->getASTContext().getASTRecordLayout(cxxRecord);
-
-      for (auto base : cxxRecord->bases()) {
-        if (base.isVirtual())
-          continue;
-
-        auto baseType = base.getType().getCanonicalType();
-
-        auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-        auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
-
-        if (baseCxxRecord->isEmpty())
-          continue;
-
-        auto offset = Size(layout.getBaseClassOffset(baseCxxRecord).getQuantity());
-        auto size = Size(cxxRecord->getASTContext().getTypeSizeInChars(baseType).getQuantity());
-
-        if (offset != CurSize) {
-          assert(offset > CurSize);
-          auto paddingSize = offset - CurSize;
-          auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(paddingSize, Alignment(1));
+      auto bases = getBasesAndOffsets(cxxRecord);
+      for (auto base : bases) {
+        if (base.offset != CurSize) {
+          assert(base.offset > CurSize);
+          auto paddingSize = base.offset - CurSize;
+          auto &opaqueTI =
+              IGM.getOpaqueStorageTypeInfo(paddingSize, Alignment(1));
           auto element = ElementLayout::getIncomplete(opaqueTI);
           addField(element, LayoutStrategy::Universal);
         }
 
-        auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(size, Alignment(1));
+        auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(base.size, Alignment(1));
         auto element = ElementLayout::getIncomplete(opaqueTI);
         addField(element, LayoutStrategy::Universal);
       }
