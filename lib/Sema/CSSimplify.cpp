@@ -2384,27 +2384,28 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
   auto *const pack1 = pattern1->getAs<PackType>();
   auto *const pack2 = pattern2->getAs<PackType>();
 
-  // If both sides are expanded or neither side is, just match them
+  // If both sides are expanded or neither side is, proceed to matching them
   // directly.
-  if ((bool)pack1 == (bool)pack2) {
-    return matchTypes(pattern1, pattern2, kind, flags, locator);
+  // Otherwise, we have something like `Foo<$T0>` vs.
+  // `Pack{Foo<Int>, Foo<String>}` or vice versa.
+  // We're going to bind `$T0` to `Pack{Int, String}` and unfold `Foo<$T0>` into
+  // `Pack{Foo<$T3>, Foo<$T4>} first.
+  if ((bool)pack1 != (bool)pack2) {
+    if (pack1) {
+      pattern2 =
+          replaceTypeVariablesWithFreshPacks(*this, pattern2, pack1, locator);
+    } else {
+      pattern1 =
+          replaceTypeVariablesWithFreshPacks(*this, pattern1, pack2, locator);
+    }
+
+    if (!(pattern1 && pattern2)) {
+      return getTypeMatchFailure(locator);
+    }
   }
 
-  // We have something like `Foo<$T0>` vs `Pack{Foo<Int>, Foo<String>}` or vice
-  // versa. We're going to bind $T0 to Pack{Int, String}.
-  if (pack1) {
-    pack2 = replaceTypeVariablesWithFreshPacks(*this, pattern2, pack1, locator);
-  } else {
-    pack1 = replaceTypeVariablesWithFreshPacks(*this, pattern1, pack2, locator);
-  }
-
-  if (pack1 && pack2) {
-    addConstraint(kind, pack1, pack2, locator);
-
-    return getTypeMatchSuccess();
-  }
-
-  return getTypeMatchFailure(locator);
+  // Continue matching.
+  return matchTypes(pattern1, pattern2, kind, flags, locator);
 }
 
 /// Check where a representation is a subtype of another.
