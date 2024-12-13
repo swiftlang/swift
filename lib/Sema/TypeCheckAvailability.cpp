@@ -4058,6 +4058,9 @@ private:
 
 static void suggestUnsafeOnEnclosingDecl(
     SourceRange referenceRange, const DeclContext *referenceDC) {
+  if (referenceRange.isInvalid())
+    return;
+
   ASTContext &ctx = referenceDC->getASTContext();
   std::optional<ASTNode> versionCheckNode;
   const Decl *memberLevelDecl = nullptr;
