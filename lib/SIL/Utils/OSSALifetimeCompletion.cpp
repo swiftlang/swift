@@ -51,6 +51,7 @@
 
 #include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -443,7 +444,47 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
     ScopedAddressValue scopedAddress, Boundary boundary) {
   SmallVector<SILBasicBlock *, 8> discoveredBlocks;
   SSAPrunedLiveness liveness(scopedAddress->getFunction(), &discoveredBlocks);
-  scopedAddress.computeTransitiveLiveness(liveness);
+  liveness.initializeDef(scopedAddress.value);
+
+  struct Walker : TransitiveAddressWalker<Walker> {
+    OSSALifetimeCompletion &completion;
+    ScopedAddressValue scopedAddress;
+    Boundary boundary;
+    SSAPrunedLiveness &liveness;
+    Walker(OSSALifetimeCompletion &completion, ScopedAddressValue scopedAddress,
+           Boundary boundary, SSAPrunedLiveness &liveness)
+        : completion(completion), scopedAddress(scopedAddress),
+          boundary(boundary), liveness(liveness) {}
+    bool visitUse(Operand *use) {
+      auto *user = use->getUser();
+      if (scopedAddress.isScopeEndingUse(use)) {
+        liveness.updateForUse(user, /*lifetimeEnding=*/true);
+        return true;
+      }
+      liveness.updateForUse(user, /*lifetimeEnding=*/false);
+      for (auto result : user->getResults()) {
+        auto shouldComplete =
+            (bool)BorrowedValue(result) || (bool)ScopedAddressValue(result);
+        if (!shouldComplete)
+          continue;
+        auto completed = completion.completeOSSALifetime(result, boundary);
+        switch (completed) {
+        case LifetimeCompletion::NoLifetime:
+          break;
+        case LifetimeCompletion::AlreadyComplete:
+        case LifetimeCompletion::WasCompleted:
+          for (auto *consume : result->getConsumingUses()) {
+            liveness.updateForUse(consume->getUser(), /*lifetimeEnding=*/false);
+          }
+          break;
+        }
+      }
+      return true;
+    }
+  };
+  Walker walker(*this, scopedAddress, boundary, liveness);
+  std::move(walker).walk(scopedAddress.value);
+
   return endLifetimeAtBoundary(scopedAddress.value, liveness, boundary,
                                deadEndBlocks);
 }

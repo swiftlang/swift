@@ -817,6 +817,90 @@ die:
   unreachable
 }
 
+// CHECK-LABEL: begin running test {{.*}} on load_borrow_of_store_borrow_1: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @load_borrow_of_store_borrow_1 : {{.*}} {
+// CHECK:         [[TOKEN:%[^,]+]] = store_borrow
+// CHECK:         [[LOAD:%[^,]+]] = load_borrow [[TOKEN]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[LOAD]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK-NEXT:    end_borrow [[LOAD]]
+// CHECK-NEXT:    end_borrow [[TOKEN]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'load_borrow_of_store_borrow_1'
+// CHECK-LABEL: end running test {{.*}} on load_borrow_of_store_borrow_1: ossa_lifetime_completion
+sil [ossa] @load_borrow_of_store_borrow_1 : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @guaranteed $C):
+  specify_test "ossa_lifetime_completion %token availability"
+  %addr = alloc_stack $C
+  %token = store_borrow %instance to %addr
+  %load = load_borrow %token
+  %borrow = begin_borrow %load
+  cond_br undef, exit, die
+
+exit:
+  end_borrow %borrow
+  end_borrow %load
+  end_borrow %token
+  dealloc_stack %addr
+  %retval = tuple ()
+  return %retval : $()
+die:
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on load_borrow_of_store_borrow_2: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @load_borrow_of_store_borrow_2 : {{.*}} {
+// CHECK:         [[TOKEN:%[^,]+]] = store_borrow
+// CHECK:         [[LOAD:%[^,]+]] = load_borrow [[TOKEN]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[LOAD]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK-NEXT:    end_borrow [[LOAD]]
+// CHECK-NEXT:    end_borrow [[TOKEN]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'load_borrow_of_store_borrow_2'
+// CHECK-LABEL: end running test {{.*}} on load_borrow_of_store_borrow_2: ossa_lifetime_completion
+sil [ossa] @load_borrow_of_store_borrow_2 : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @guaranteed $C):
+  specify_test "ossa_lifetime_completion %token availability"
+  %addr = alloc_stack $C
+  %token = store_borrow %instance to %addr
+  %load = load_borrow %token
+  %borrow = begin_borrow %load
+  cond_br undef, exit, die
+
+exit:
+  end_borrow %borrow
+  end_borrow %load
+  end_borrow %token
+  dealloc_stack %addr
+  %retval = tuple ()
+  return %retval : $()
+die:
+  end_borrow %borrow
+  end_borrow %load
+  unreachable
+}
+
+sil [ossa] @load_borrow_1 : $@convention(thin) (@in_guaranteed C) -> () {
+entry(%addr : $*C):
+  specify_test "ossa_lifetime_completion %load availability"
+  %load = load_borrow %addr
+  %borrow = begin_borrow %load
+  cond_br undef, exit, die
+
+exit:
+  end_borrow %borrow
+  end_borrow %load
+  %retval = tuple ()
+  return %retval : $()
+die:
+  unreachable
+}
+
 // CHECK-LABEL: begin running test {{.*}} on begin_access: ossa_lifetime_completion
 // CHECK-LABEL: sil [ossa] @begin_access : {{.*}} {
 // CHECK:         [[TOKEN:%[^,]+]] = begin_access
@@ -836,6 +920,37 @@ entry(%instance : @guaranteed $C):
 exit:
   end_access %access : $*C
   dealloc_stack %addr : $*C
+  %retval = tuple ()
+  return %retval : $()
+die:
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on load_borrow_of_begin_access: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @load_borrow_of_begin_access : {{.*}} {
+// CHECK:         [[ACCESS:%[^,]+]] = begin_access
+// CHECK:         [[LOAD:%[^,]+]] = load_borrow [[ACCESS]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[LOAD]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK-NEXT:    end_borrow [[LOAD]]
+// CHECK-NEXT:    end_access [[ACCESS]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'load_borrow_of_begin_access'
+// CHECK-LABEL: end running test {{.*}} on load_borrow_of_begin_access: ossa_lifetime_completion
+sil [ossa] @load_borrow_of_begin_access : $@convention(thin) (@in_guaranteed C) -> () {
+entry(%addr : $*C):
+  specify_test "ossa_lifetime_completion %access availability"
+  %access = begin_access [static] [read] %addr : $*C
+  %load = load_borrow %access
+  %borrow = begin_borrow %load
+  cond_br undef, exit, die
+
+exit:
+  end_borrow %borrow
+  end_borrow %load
+  end_access %access : $*C
   %retval = tuple ()
   return %retval : $()
 die:
