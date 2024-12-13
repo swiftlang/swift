@@ -22,6 +22,7 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -853,7 +854,8 @@ public:
   }
 };
 
-static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
+static void createFineModuleTraceFile(CompilerInstance &instance,
+                                      const InputFile &input) {
   StringRef tracePath = input.getFineModuleTracePath();
   if (tracePath.empty()) {
     // we basically rely on the passing down of module trace file path
@@ -862,27 +864,8 @@ static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
     // specifically.
     return;
   }
+  ModuleDecl *MD = instance.getMainModule();
   auto &ctx = MD->getASTContext();
-  std::vector<SourceFile*> filesToWalk;
-  for (auto *FU : MD->getFiles()) {
-    if (auto *SF = dyn_cast<SourceFile>(FU)) {
-      switch (SF->Kind) {
-      case swift::SourceFileKind::Library:
-      case swift::SourceFileKind::Main:
-      case swift::SourceFileKind::MacroExpansion:
-      case swift::SourceFileKind::DefaultArgument:
-        filesToWalk.push_back(SF);
-        LLVM_FALLTHROUGH;
-      case swift::SourceFileKind::SIL:
-      case swift::SourceFileKind::Interface:
-        continue;
-      }
-    }
-  }
-  // No source files to walk, abort.
-  if (filesToWalk.empty()) {
-    return;
-  }
   // Write output via atomic append.
   llvm::vfs::OutputConfig config;
   config.setAppend().setAtomicWrite();
@@ -893,10 +876,11 @@ static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
     return;
   }
   ObjcMethodReferenceCollector collector(MD);
-  for (auto *SF: filesToWalk) {
-    collector.setFileBeforeVisiting(SF);
-    collector.walk(*SF);
-  }
+  instance.forEachFileToTypeCheck([&](SourceFile& SF) {
+    collector.setFileBeforeVisiting(&SF);
+    collector.walk(SF);
+    return false;
+  });
 
   // print this json line.
   std::string stringBuffer;
@@ -915,18 +899,63 @@ static void createFineModuleTraceFile(const InputFile &input, ModuleDecl *MD) {
   }
 }
 
-bool swift::emitFineModuleTraceIfNeeded(ModuleDecl *mainModule,
-                                        const FrontendOptions &opts) {
-  // When lazy type checking is enabled, we may end up with a partial AST.
-  // Walking on these partial AST completely may expose latent bugs.
-  if (mainModule->getASTContext().TypeCheckerOpts.EnableLazyTypecheck)
+static bool shouldActionTypeEmitFineModuleTrace(FrontendOptions::ActionType action) {
+  // Only full compilation jobs should emit fine module tracing file.
+  // Other partial compilation jobs, such as emitting modules, only typecheck partially
+  // so walking into every function bodies may be risky.
+  switch(action) {
+  case swift::FrontendOptions::ActionType::Typecheck:
+  case swift::FrontendOptions::ActionType::EmitSILGen:
+  case swift::FrontendOptions::ActionType::EmitSIL:
+  case swift::FrontendOptions::ActionType::EmitAssembly:
+  case swift::FrontendOptions::ActionType::EmitLoweredSIL:
+  case swift::FrontendOptions::ActionType::EmitIRGen:
+  case swift::FrontendOptions::ActionType::EmitIR:
+  case swift::FrontendOptions::ActionType::EmitBC:
+  case swift::FrontendOptions::ActionType::EmitObject:
+    return true;
+  case swift::FrontendOptions::ActionType::NoneAction:
+  case swift::FrontendOptions::ActionType::Parse:
+  case swift::FrontendOptions::ActionType::ResolveImports:
+  case swift::FrontendOptions::ActionType::DumpParse:
+  case swift::FrontendOptions::ActionType::DumpInterfaceHash:
+  case swift::FrontendOptions::ActionType::DumpAST:
+  case swift::FrontendOptions::ActionType::PrintAST:
+  case swift::FrontendOptions::ActionType::PrintASTDecl:
+  case swift::FrontendOptions::ActionType::DumpScopeMaps:
+  case swift::FrontendOptions::ActionType::DumpAvailabilityScopes:
+  case swift::FrontendOptions::ActionType::EmitImportedModules:
+  case swift::FrontendOptions::ActionType::EmitPCH:
+  case swift::FrontendOptions::ActionType::EmitModuleOnly:
+  case swift::FrontendOptions::ActionType::MergeModules:
+  case swift::FrontendOptions::ActionType::CompileModuleFromInterface:
+  case swift::FrontendOptions::ActionType::TypecheckModuleFromInterface:
+  case swift::FrontendOptions::ActionType::EmitSIBGen:
+  case swift::FrontendOptions::ActionType::EmitSIB:
+  case swift::FrontendOptions::ActionType::Immediate:
+  case swift::FrontendOptions::ActionType::REPL:
+  case swift::FrontendOptions::ActionType::DumpTypeInfo:
+  case swift::FrontendOptions::ActionType::EmitPCM:
+  case swift::FrontendOptions::ActionType::DumpPCM:
+  case swift::FrontendOptions::ActionType::ScanDependencies:
+  case swift::FrontendOptions::ActionType::PrintVersion:
+  case swift::FrontendOptions::ActionType::PrintFeature:
     return false;
+  }
+}
+
+bool swift::emitFineModuleTraceIfNeeded(CompilerInstance &Instance,
+                                        const FrontendOptions &opts) {
+  if (!shouldActionTypeEmitFineModuleTrace(opts.RequestedAction)) {
+    return false;
+  }
+  ModuleDecl *mainModule = Instance.getMainModule();
   ASTContext &ctxt = mainModule->getASTContext();
   assert(!ctxt.hadError() &&
          "We should've already exited earlier if there was an error.");
 
   opts.InputsAndOutputs.forEachInput([&](const InputFile &input) {
-    createFineModuleTraceFile(input, mainModule);
+    createFineModuleTraceFile(Instance, input);
     return true;
   });
   return false;
