@@ -783,7 +783,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector attributes;
   AttributeVector modifiers;
   bool libraryLevelAPI =
-      D->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API;
+      D && D->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API;
 
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
     // Don't skip implicit custom attributes. Custom attributes like global
@@ -1022,6 +1022,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     break;
   }
+
   default:
     break;
   }
@@ -1584,6 +1585,22 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::ABI: {
+    auto *attr = cast<ABIAttr>(this);
+    Printer << "@abi(";
+    Decl *abiDecl = attr->abiDecl;
+    if (abiDecl && Options.ExplodePatternBindingDecls
+          && isa<PatternBindingDecl>(abiDecl) && D && isa<VarDecl>(D))
+      abiDecl = cast<PatternBindingDecl>(abiDecl)
+                    ->getVarAtSimilarStructuralPosition(
+                                      const_cast<VarDecl *>(cast<VarDecl>(D)));
+    if (abiDecl)
+      abiDecl->print(Printer, Options);
+    Printer << ")";
+
+    break;
+  }
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
@@ -1623,12 +1640,26 @@ uint64_t DeclAttribute::getOptions(DeclAttrKind DK) {
   llvm_unreachable("bad DeclAttrKind");
 }
 
+std::optional<Feature> DeclAttribute::getRequiredFeature(DeclAttrKind DK) {
+  switch (DK) {
+#define DECL_ATTR_FEATURE_REQUIREMENT(CLASS, FEATURE_NAME)                     \
+  case DeclAttrKind::CLASS:                                                    \
+    return Feature::FEATURE_NAME;
+#include "swift/AST/DeclAttr.def"
+  default:
+    return std::nullopt;
+  }
+  llvm_unreachable("bad DeclAttrKind");
+}
+
 StringRef DeclAttribute::getAttrName() const {
   switch (getKind()) {
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...)                                     \
   case DeclAttrKind::CLASS:                                                    \
     return #NAME;
 #include "swift/AST/DeclAttr.def"
+  case DeclAttrKind::ABI:
+    return "abi";
   case DeclAttrKind::SILGenName:
     return "_silgen_name";
   case DeclAttrKind::Alignment:
@@ -2832,6 +2863,30 @@ LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
   return new (context) LifetimeAttr(atLoc, baseRange, implicit, entry);
 }
 
+void ASTContext::recordABIAttr(ABIAttr *attr, Decl *owner) {
+  // The ABIAttr on a VarDecl ought to point to its PBD.
+  if (auto VD = dyn_cast<VarDecl>(owner)) {
+    if (auto PBD = VD->getParentPatternBinding()) {
+      owner = PBD;
+    }
+  }
+
+  auto recordABIDecl = [&](Decl *decl) {
+    ABIDeclCounterparts.insert({ decl, owner });
+  };
+
+  if (auto abiPBD = dyn_cast<PatternBindingDecl>(attr->abiDecl)) {
+    // Add to *every* VarDecl in the ABI PBD, even ones that don't properly
+    // match anything in the API PBD.
+    for (auto i : range(abiPBD->getNumPatternEntries())) {
+      abiPBD->getPattern(i)->forEachVariable(recordABIDecl);
+    }
+    return;
+  }
+
+  recordABIDecl(attr->abiDecl);
+}
+
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
   if (attr)
     attr->print(out);
@@ -2854,6 +2909,10 @@ static bool hasDeclAttribute(const LangOptions &langOpts,
     return false;
   if (DeclAttribute::isConcurrencyOnly(*kind))
     return false;
+
+  if (auto feature = DeclAttribute::getRequiredFeature(*kind))
+    if (!langOpts.hasFeature(*feature))
+      return false;
 
   return true;
 }

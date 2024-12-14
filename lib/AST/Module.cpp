@@ -150,6 +150,11 @@ class swift::SourceLookupCache {
     void add(ValueDecl *VD) {
       if (!VD->hasName()) return;
       VD->getName().addToLookupTable(Members, VD);
+
+      auto abiRole = ABIRoleInfo(VD);
+      if (!abiRole.providesABI() && abiRole.getCounterpart())
+        abiRole.getCounterpart()->getName()
+            .addToLookupTable(Members, abiRole.getCounterpart());
     }
 
     void clear() {
@@ -546,7 +551,8 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   if (I != TopLevelValues.end()) {
     Result.reserve(I->second.size());
     for (ValueDecl *Elt : I->second)
-      Result.push_back(Elt);
+      if (ABIRoleInfo(Elt).matchesOptions(Flags))
+        Result.push_back(Elt);
   }
 
   // If we aren't supposed to find names introduced by macros, we're done.
@@ -639,7 +645,8 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
     if (I == TopLevelValues.end()) return;
 
     for (auto vd : I->second)
-      Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
+      if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
+        Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
     return;
   }
 
@@ -649,7 +656,8 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
       // entry for the simple name so that we report each declaration once.
       if (tlv.first.isSimpleName() && !vd->getName().isSimpleName())
         continue;
-      Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
+      if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
+        Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
     }
   }
 
@@ -674,7 +682,8 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
     });
   }
   for (auto *vd : macroExpandedDecls) {
-    Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
+    if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
+      Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
   }
 }
 
@@ -692,8 +701,9 @@ void SourceLookupCache::lookupClassMembers(ImportPath::Access accessPath,
       for (ValueDecl *vd : member.second) {
         auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
         if (nominal && nominal->getName() == accessPath.front().Item)
-          consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
-                             DynamicLookupInfo::AnyObject);
+          if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
+            consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
+                               DynamicLookupInfo::AnyObject);
       }
     }
     return;
@@ -706,8 +716,9 @@ void SourceLookupCache::lookupClassMembers(ImportPath::Access accessPath,
       continue;
 
     for (ValueDecl *vd : member.second)
-      consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
-                         DynamicLookupInfo::AnyObject);
+      if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
+        consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
+                           DynamicLookupInfo::AnyObject);
   }
 }
 
@@ -724,7 +735,8 @@ void SourceLookupCache::lookupClassMember(ImportPath::Access accessPath,
     for (ValueDecl *vd : iter->second) {
       auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
       if (nominal && nominal->getName() == accessPath.front().Item)
-        results.push_back(vd);
+        if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
+          results.push_back(vd);
     }
     return;
   }
@@ -3848,7 +3860,7 @@ void SynthesizedFileUnit::lookupValue(
     SmallVectorImpl<ValueDecl *> &result) const {
   for (auto *decl : TopLevelDecls) {
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
-      if (VD->getName().matchesRef(name)) {
+      if (VD->getName().matchesRef(name) && ABIRoleInfo(VD).matchesOptions(Flags)) {
         result.push_back(VD);
       }
     }

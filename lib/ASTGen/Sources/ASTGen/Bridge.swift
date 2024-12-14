@@ -26,6 +26,7 @@ extension BridgedNullable {
 
 extension BridgedSourceLoc: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedIdentifier: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableExpr: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableStmt: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableTypeRepr: /*@retroactive*/ swiftASTGen.BridgedNullable {}
@@ -59,6 +60,9 @@ extension Optional where Wrapped: BridgedHasNullable {
 
 extension BridgedStmt: BridgedHasNullable {
   typealias Nullable = BridgedNullableStmt
+}
+extension BridgedDecl: BridgedHasNullable {
+  typealias Nullable = BridgedNullableDecl
 }
 extension BridgedExpr: BridgedHasNullable {
   typealias Nullable = BridgedNullableExpr

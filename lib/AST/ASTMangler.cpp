@@ -66,6 +66,54 @@
 using namespace swift;
 using namespace swift::Mangle;
 
+template<typename DeclType>
+static DeclType *getABIDecl(DeclType *D) {
+  if (!D)
+    return nullptr;
+
+  auto abiRole = ABIRoleInfo(D);
+  if (!abiRole.providesABI())
+    return abiRole.getCounterpart();
+  return nullptr;
+}
+
+static std::optional<ASTMangler::SymbolicReferent>
+getABIDecl(ASTMangler::SymbolicReferent ref) {
+  switch (ref.getKind()) {
+  case ASTMangler::SymbolicReferent::NominalType:
+    if (auto abiTypeDecl = getABIDecl(ref.getNominalType())) {
+      return ASTMangler::SymbolicReferent(abiTypeDecl);
+    }
+    break;
+
+  case ASTMangler::SymbolicReferent::OpaqueType:
+    if (auto abiTypeDecl = getABIDecl(ref.getOpaqueType())) {
+      return ASTMangler::SymbolicReferent(abiTypeDecl);
+    }
+    break;
+
+  case ASTMangler::SymbolicReferent::ExtendedExistentialTypeShape:
+    // Do nothing; mangling will use the underlying ABI decls in the end.
+    break;
+  }
+
+  return std::nullopt;
+}
+
+void ASTMangler::addSubstitution(const Decl *decl) {
+  if (auto abiDecl = getABIDecl(decl)) {
+    return addSubstitution(abiDecl);
+  }
+  return Mangler::addSubstitution(decl);
+}
+
+bool ASTMangler::tryMangleSubstitution(const Decl *decl) {
+  if (auto abiDecl = getABIDecl(decl)) {
+    return tryMangleSubstitution(abiDecl);
+  }
+  return Mangler::tryMangleSubstitution(decl);
+}
+
 bool ASTMangler::inversesAllowed(const Decl *decl) {
   if (!decl)
     return true;
@@ -302,6 +350,10 @@ std::string ASTMangler::mangleClosureWitnessThunk(
 }
 
 std::string ASTMangler::mangleGlobalVariableFull(const VarDecl *decl) {
+  if (auto abiDecl = getABIDecl(decl)) {
+    return mangleGlobalVariableFull(abiDecl);
+  }
+
   // Clang globals get mangled using Clang's mangler.
   if (auto clangDecl =
       dyn_cast_or_null<clang::DeclaratorDecl>(decl->getClangDecl())) {
@@ -431,6 +483,10 @@ std::string ASTMangler::mangleGlobalInit(const PatternBindingDecl *pd,
   Pattern *pattern = pd->getPattern(pbdEntry);
   bool first = true;
   pattern->forEachVariable([&](VarDecl *D) {
+    if (auto abiD = getABIDecl(D)) {
+      D = abiD;
+    }
+
     if (first) {
       BaseEntitySignature base(D);
       appendContextOf(D, base);
@@ -519,6 +575,10 @@ std::string ASTMangler::mangleAutoDiffLinearMap(
 
 void ASTMangler::beginManglingWithAutoDiffOriginalFunction(
     const AbstractFunctionDecl *afd) {
+  if (auto abiAFD = getABIDecl(afd)) {
+    return beginManglingWithAutoDiffOriginalFunction(abiAFD);
+  }
+
   if (auto *attr = afd->getAttrs().getAttribute<SILGenNameAttr>()) {
     beginManglingWithoutPrefix();
     appendOperator(attr->Name);
@@ -852,6 +912,10 @@ void ASTMangler::appendAnyDecl(const ValueDecl *Decl) {
   } else if (auto GTD = dyn_cast<GenericTypeDecl>(Decl)) {
     appendAnyGenericType(GTD);
   } else if (isa<AssociatedTypeDecl>(Decl)) {
+    if (auto abiDecl = getABIDecl(Decl)) {
+      return appendAnyDecl(abiDecl);
+    }
+
     BaseEntitySignature base(Decl);
     appendContextOf(Decl, base);
     appendDeclName(Decl);
@@ -904,6 +968,10 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
 }
 
 std::string ASTMangler::mangleLocalTypeDecl(const TypeDecl *type) {
+  if (auto abiType = getABIDecl(type)) {
+    return mangleLocalTypeDecl(abiType);
+  }
+
   beginManglingWithoutPrefix();
   AllowNamelessEntities = true;
   OptimizeProtocolNames = false;
@@ -954,6 +1022,10 @@ std::string ASTMangler::mangleHasSymbolQuery(const ValueDecl *Decl) {
   } else if (auto GTD = dyn_cast<GenericTypeDecl>(Decl)) {
     appendAnyGenericType(GTD);
   } else if (isa<AssociatedTypeDecl>(Decl)) {
+    if (auto abiDecl = getABIDecl(Decl)) {
+      Decl = abiDecl;
+    }
+    
     BaseEntitySignature nullBase(nullptr);
     appendContextOf(Decl, nullBase);
     appendDeclName(Decl);
@@ -1061,6 +1133,7 @@ getOverriddenSwiftProtocolObjCName(const ValueDecl *decl,
 }
 
 void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name) {
+  ASSERT(!getABIDecl(decl) && "caller should make sure we get ABI decls");
   if (name.empty())
     name = decl->getBaseName();
   assert(!name.isSpecial() && "Cannot print special names");
@@ -1196,6 +1269,10 @@ void ASTMangler::appendExistentialLayout(
   bool DroppedRequiresClass = false;
   bool SawRequiresClass = false;
   for (auto proto : layout.getProtocols()) {
+    if (auto abiProto = getABIDecl(proto)) {
+      proto = abiProto;
+    }
+
     // Skip requirements to conform to an invertible protocols.
     // We only mangle inverse requirements, but as a constrained existential.
     if (proto->getInvertibleProtocolKind())
@@ -1553,6 +1630,9 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
         Decl = typeAlias->getDecl();
       else
         Decl = type->getAnyGeneric();
+      if (auto abiDecl = getABIDecl(Decl)) {
+        Decl = abiDecl;
+      }
       if (shouldMangleAsGeneric(type)) {
         // Try to mangle the entire name as a substitution.
         if (tryMangleTypeSubstitution(tybase, sig))
@@ -2050,6 +2130,11 @@ void ASTMangler::appendSymbolicExtendedExistentialType(
                                              Type type,
                                              GenericSignature sig,
                                              const ValueDecl *forDecl) {
+  if (auto abiShapeReferent = getABIDecl(shapeReferent)) {
+    return appendSymbolicExtendedExistentialType(abiShapeReferent.value(), type,
+                                                 sig, forDecl);
+  }
+
   assert(shapeReferent.getKind() ==
            SymbolicReferent::ExtendedExistentialTypeShape);
   assert(canSymbolicReference(shapeReferent));
@@ -2581,6 +2666,7 @@ void ASTMangler::appendContext(const DeclContext *ctx,
 void ASTMangler::appendModule(const ModuleDecl *module,
                               StringRef useModuleName) {
   assert(!module->getParent() && "cannot mangle nested modules!");
+  ASSERT(!getABIDecl(module));
 
   // Use the module real name in mangling; this is the physical name
   // of the module on-disk, which can be different if -module-alias is
@@ -2638,6 +2724,10 @@ void ASTMangler::appendModule(const ModuleDecl *module,
 void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
                                     bool allowStandardSubstitution) {
   assert(AllowMarkerProtocols || !protocol->isMarkerProtocol());
+
+  if (auto abiProtocol = getABIDecl(protocol)) {
+    return appendProtocolName(abiProtocol, allowStandardSubstitution);
+  }
 
   if (allowStandardSubstitution && tryAppendStandardSubstitution(protocol))
     return;
@@ -2700,6 +2790,10 @@ ASTMangler::getClangDeclForMangling(const ValueDecl *vd) {
 }
 
 void ASTMangler::appendSymbolicReference(SymbolicReferent referent) {
+  if (auto abiReferent = getABIDecl(referent)) {
+    return appendSymbolicReference(abiReferent.value());
+  }
+
   // Drop in a placeholder. The real reference value has to be filled in during
   // lowering to IR.
   auto offset = Buffer.str().size();
@@ -2833,6 +2927,10 @@ void ASTMangler::appendContextualInverses(const GenericTypeDecl *contextDecl,
 void ASTMangler::appendExtension(const ExtensionDecl* ext,
                                  BaseEntitySignature &base,
                                  StringRef useModuleName) {
+  if (auto abiExt = getABIDecl(ext)) {
+    return appendExtension(abiExt, base, useModuleName);
+  }
+
   auto decl = ext->getExtendedNominal();
   // Recover from erroneous extension.
   if (!decl)
@@ -2883,6 +2981,10 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
 
 void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
                                       BaseEntitySignature &base) {
+  if (auto abiDecl = getABIDecl(decl)) {
+    return appendAnyGenericType(abiDecl);
+  }
+
   auto *nominal = dyn_cast<NominalTypeDecl>(decl);
 
   if (nominal && isa<BuiltinTupleDecl>(nominal))
@@ -3795,6 +3897,10 @@ ASTMangler::dropProtocolsFromAssociatedTypes(Type type,
 void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt,
                                           GenericSignature sig) {
   if (auto assocTy = dmt->getAssocType()) {
+    if (auto abiAssocTy = getABIDecl(assocTy)) {
+      assocTy = abiAssocTy;
+    }
+
     appendIdentifier(assocTy->getName().str());
 
     // If the base type is known to have a single protocol conformance
@@ -3901,6 +4007,10 @@ CanType ASTMangler::getDeclTypeForMangling(
                                        const ValueDecl *decl,
                                        GenericSignature &genericSig,
                                        GenericSignature &parentGenericSig) {
+  if (auto abiDecl = getABIDecl(decl)) {
+    return getDeclTypeForMangling(abiDecl, genericSig, parentGenericSig);
+  }
+
   genericSig = GenericSignature();
   parentGenericSig = GenericSignature();
 
@@ -4000,6 +4110,10 @@ bool ASTMangler::tryAppendStandardSubstitution(const GenericTypeDecl *decl) {
 
 void ASTMangler::appendConstructorEntity(const ConstructorDecl *ctor,
                                          bool isAllocating) {
+  if (auto abiCtor = getABIDecl(ctor)) {
+    return appendConstructorEntity(abiCtor, isAllocating);
+  }
+
   BaseEntitySignature base(ctor);
   appendContextOf(ctor, base);
   appendDeclType(ctor, base);
@@ -4013,6 +4127,10 @@ void ASTMangler::appendConstructorEntity(const ConstructorDecl *ctor,
 
 void ASTMangler::appendDestructorEntity(const DestructorDecl *dtor,
                                         DestructorKind kind) {
+  if (auto abiDtor = getABIDecl(dtor)) {
+    return appendDestructorEntity(abiDtor, kind);
+  }
+
   BaseEntitySignature base(dtor);
   appendContextOf(dtor, base);
   switch (kind) {
@@ -4031,6 +4149,10 @@ void ASTMangler::appendDestructorEntity(const DestructorDecl *dtor,
 void ASTMangler::appendAccessorEntity(StringRef accessorKindCode,
                                       const AbstractStorageDecl *decl,
                                       bool isStatic) {
+  if (auto abiDecl = getABIDecl(decl)) {
+    return appendAccessorEntity(accessorKindCode, abiDecl, isStatic);
+  }
+
   BaseEntitySignature base(decl);
   appendContextOf(decl, base);
   if (auto *varDecl = dyn_cast<VarDecl>(decl)) {
@@ -4058,6 +4180,10 @@ void ASTMangler::appendEntity(const ValueDecl *decl,
                               BaseEntitySignature &base,
                               StringRef EntityOp,
                               bool isStatic) {
+  if (auto abiDecl = getABIDecl(decl)) {
+    return appendEntity(abiDecl, base, EntityOp, isStatic);
+  }
+
   appendContextOf(decl, base);
   appendDeclName(decl);
   appendDeclType(decl, base);
@@ -4069,7 +4195,11 @@ void ASTMangler::appendEntity(const ValueDecl *decl,
 void ASTMangler::appendEntity(const ValueDecl *decl) {
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
-  
+
+  if (auto abiDecl = getABIDecl(decl)) {
+    return appendEntity(abiDecl);
+  }
+
   // Handle accessors specially, they are mangled as modifiers on the accessed
   // declaration.
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
@@ -4424,6 +4554,10 @@ ASTMangler::mangleOpaqueTypeDescriptorRecord(const OpaqueTypeDecl *decl) {
 
 void ASTMangler::appendDistributedThunk(
     const AbstractFunctionDecl *thunk, bool asReference) {
+  if (auto abiThunk = getABIDecl(thunk)) {
+    return appendDistributedThunk(abiThunk, asReference);
+  }
+
   // Marker protocols cannot be checked at runtime, so there is no point
   // in recording them for distributed thunks.
   llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(AllowMarkerProtocols,
@@ -4486,6 +4620,9 @@ void ASTMangler::appendDistributedThunk(
     if (stubClassLookupResults.size() > 0) {
       stubActorDecl =
           dyn_cast_or_null<NominalTypeDecl>(stubClassLookupResults.front());
+      if (auto abiStub = getABIDecl(stubActorDecl)) {
+        stubActorDecl = abiStub;
+      }
     }
   }
 
@@ -4505,7 +4642,11 @@ void ASTMangler::appendDistributedThunk(
            "mangled as thunks");
     // A distributed getter is mangled as the name of its storage (i.e. "the
     // var")
-    appendIdentifier(accessor->getStorage()->getBaseIdentifier().str());
+    auto storage = accessor->getStorage();
+    if (auto abiStorage = getABIDecl(storage)) {
+      storage = abiStorage;
+    }
+    appendIdentifier(storage->getBaseIdentifier().str());
   } else {
     appendIdentifier(thunk->getBaseIdentifier().str());
   }
@@ -4812,6 +4953,10 @@ getPrecheckedLocalContextDiscriminator(const Decl *decl, Identifier name) {
 
 std::string ASTMangler::mangleAttachedMacroExpansion(
     const Decl *decl, CustomAttr *attr, MacroRole role) {
+  if (auto abiDecl = getABIDecl(decl)) {
+    return mangleAttachedMacroExpansion(decl, attr, role);
+  }
+
   // FIXME(kavon): using the decl causes a cycle. Is a null base fine?
   BaseEntitySignature nullBase(nullptr);
 
@@ -4926,6 +5071,7 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
 static void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
                                           ParameterizedProtocolType *PPT) {
   auto protoTy = PPT->getBaseType();
+  ASSERT(!getABIDecl(protoTy->getDecl()) && "need to figure out behavior");
   PPT->getRequirements(protoTy->getDecl()->getSelfInterfaceType(), reqs);
 }
 
@@ -4946,6 +5092,7 @@ static void extractExistentialInverseRequirements(
   for (auto ip : PCT->getInverses()) {
     auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
     assert(proto);
+    ASSERT(!getABIDecl(proto) && "can't use @abi on inverse protocols");
     inverses.push_back({existentialSelf, proto, SourceLoc()});
   }
 }
