@@ -28,6 +28,12 @@ public extension PathProtocol {
     return Self(result)
   }
 
+  /// Drops the last `n` components, or all components if `n` is greater
+  /// than the number of components.
+  func dropLast(_ n: Int = 1) -> Self {
+    Self(FilePath(root: storage.root, storage.components.dropLast(n)))
+  }
+
   var fileName: String {
     storage.lastComponent?.string ?? ""
   }
