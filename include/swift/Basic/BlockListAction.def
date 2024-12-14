@@ -24,5 +24,6 @@ BLOCKLIST_ACTION(ShouldUseTextualModule)
 BLOCKLIST_ACTION(DowngradeInterfaceVerificationFailure)
 BLOCKLIST_ACTION(ShouldUseLayoutStringValueWitnesses)
 BLOCKLIST_ACTION(ShouldDisableOwnershipVerification)
+BLOCKLIST_ACTION(SkipEmittingFineModuleTrace)
 
 #undef BLOCKLIST_ACTION

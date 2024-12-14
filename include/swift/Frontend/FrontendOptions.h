@@ -565,6 +565,10 @@ public:
 
   /// All block list configuration files to be honored in this compilation.
   std::vector<std::string> BlocklistConfigFilePaths;
+
+  /// Whether explicitly disble fine-grained module tracing in this compiler
+  /// invocation.
+  bool DisableFineModuleTracing = false;
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);

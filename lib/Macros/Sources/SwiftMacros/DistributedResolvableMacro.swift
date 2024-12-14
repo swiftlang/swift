@@ -174,7 +174,7 @@ extension DistributedResolvableMacro {
 
     // The $Stub is always generic over the actor system: $Stub<ActorSystem>
     var primaryTypeParams: [String] = primaryAssociatedTypes.map {
-      $0.as(PrimaryAssociatedTypeSyntax.self)!.name.trimmed.text
+      $0.name.trimmed.text
     }
 
     // Don't duplicate the ActorSystem type parameter if it already was declared
