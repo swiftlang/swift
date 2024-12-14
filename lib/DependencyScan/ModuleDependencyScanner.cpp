@@ -169,13 +169,54 @@ static bool isSwiftDependencyKind(ModuleDependencyKind Kind) {
          Kind == ModuleDependencyKind::SwiftPlaceholder;
 }
 
+// Wrap the clang file mapping overlay filesystems in a proxy filesystem,
+// to avoid enumerating the overlay filesystems in a `visitChildFileSystems`,
+// as clang's dependency scanner tries to validate that the number of
+// overlay file systems used is the same as the number of `-ivfsoverlay`
+// flags passed through the clang invocation. This validation causes an
+// assertion failure if the filesystem isn't hidden.
+// We don't need to expose the clang importer overlay filesystem to clang's
+// dependency scanner, as it only needs to optimize overlay VFS that are
+// explicitly passed to it via `-ivfsoverlay`.
+class SilentClangImporterOverlayWrapperFS : public llvm::vfs::ProxyFileSystem {
+public:
+  SilentClangImporterOverlayWrapperFS(
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS)
+      : llvm::vfs::ProxyFileSystem(fs), baseFS(baseFS) {}
+
+  void visitChildFileSystems(VisitCallbackTy Callback) override {
+    // Do not forward to proxy, instead count the base and forward
+    // to base directly, bypassing the installed clang overlay filesystems.
+    if (baseFS) {
+      Callback(*baseFS);
+      baseFS->visitChildFileSystems(Callback);
+    }
+  }
+
+private:
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS;
+};
+
+static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+getClangInvocationOverlayScanningVFS(
+    ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS) {
+  auto fileMapping = swift::getClangInvocationFileMapping(
+      ctx, baseFS, /*suppressDiagnostic=*/true);
+  if (fileMapping.redirectedFiles.empty())
+    return baseFS;
+  return createClangInvocationFileMappingVFS(fileMapping, ctx, baseFS);
+}
+
 ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     SwiftDependencyScanningService &globalScanningService,
     const CompilerInvocation &ScanCompilerInvocation,
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
     swift::DependencyTracker &DependencyTracker, DiagnosticEngine &Diagnostics)
-    : clangScanningTool(*globalScanningService.ClangScanningService,
-                        globalScanningService.getClangScanningFS()) {
+    : clangScanningTool(
+          *globalScanningService.ClangScanningService,
+          getClangInvocationOverlayScanningVFS(
+              ScanASTContext, globalScanningService.getClangScanningFS())) {
   // Create a scanner-specific Invocation and ASTContext.
   workerCompilerInvocation =
       std::make_unique<CompilerInvocation>(ScanCompilerInvocation);
