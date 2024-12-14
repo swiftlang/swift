@@ -838,16 +838,15 @@ extension ContiguousArray: RangeReplaceableCollection {
     contentsOf newElements: __owned some Collection<Element>
   ) {
     let newElementsCount = newElements.count
+    defer {
+      _endMutation()
+    }
+    _reserveCapacityImpl(minimumCapacity: self.count + newElementsCount,
+                         growForAppend: true)
     // This check prevents a data race writing to _swiftEmptyArrayStorage
     if newElementsCount == 0 {
       return
     }
-    defer {
-      _endMutation()
-    }
-
-    _reserveCapacityImpl(minimumCapacity: self.count + newElementsCount,
-                         growForAppend: true)
 
     let oldCount = _buffer.mutableCount
     let startNewElements = _buffer.mutableFirstElementAddress + oldCount
