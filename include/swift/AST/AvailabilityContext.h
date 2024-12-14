@@ -106,6 +106,9 @@ public:
   constrainWithDeclAndPlatformRange(const Decl *decl,
                                     const AvailabilityRange &platformRange);
 
+  /// Constrain to allow unsafe code.
+  void constrainWithAllowsUnsafe(ASTContext &ctx);
+
   /// Returns true if `other` is as available or is more available.
   bool isContainedIn(const AvailabilityContext other) const;
 
