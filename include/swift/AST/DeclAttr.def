@@ -429,7 +429,7 @@ CONTEXTUAL_DECL_ATTR(weak, ReferenceOwnership,
   49)
 CONTEXTUAL_DECL_ATTR_ALIAS(unowned, ReferenceOwnership)
 SIMPLE_DECL_ATTR(rethrows, Rethrows,
-  OnFunc | OnConstructor | RejectByParser | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  OnFunc | OnConstructor | DeclModifier | RejectByParser | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   57)
 CONTEXTUAL_SIMPLE_DECL_ATTR(indirect, Indirect,
   DeclModifier | OnEnum | OnEnumElement | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
