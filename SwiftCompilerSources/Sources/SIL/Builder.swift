@@ -24,14 +24,14 @@ public struct Builder {
     case staticInitializer(GlobalVariable)
   }
 
-  let insertAt: InsertionPoint
+  public let insertionPoint: InsertionPoint
   let location: Location
   private let notificationHandler: BridgedChangeNotificationHandler
   private let notifyNewInstruction: (Instruction) -> ()
 
   /// Return 'nil' when inserting at the start of a function or in a global initializer.
   public var insertionBlock: BasicBlock? {
-    switch insertAt {
+    switch insertionPoint {
     case let .before(inst):
       return inst.parentBlock
     case let .atEndOf(block):
@@ -42,7 +42,7 @@ public struct Builder {
   }
 
   public var bridged: BridgedBuilder {
-    switch insertAt {
+    switch insertionPoint {
     case .before(let inst):
       return BridgedBuilder(insertAt: .beforeInst, insertionObj: inst.bridged.obj,
                             loc: location.bridged)
@@ -73,7 +73,7 @@ public struct Builder {
   public init(insertAt: InsertionPoint, location: Location,
               _ notifyNewInstruction: @escaping (Instruction) -> (),
               _ notificationHandler: BridgedChangeNotificationHandler) {
-    self.insertAt = insertAt
+    self.insertionPoint = insertAt
     self.location = location;
     self.notifyNewInstruction = notifyNewInstruction
     self.notificationHandler = notificationHandler

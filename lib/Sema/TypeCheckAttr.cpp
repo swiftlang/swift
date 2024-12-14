@@ -388,6 +388,7 @@ public:
   void visitSILGenNameAttr(SILGenNameAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
   void visitLifetimeAttr(LifetimeAttr *attr);
+  void visitAddressableSelfAttr(AddressableSelfAttr *attr);
 };
 
 } // end anonymous namespace
@@ -4973,8 +4974,11 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
 
   // unowned(unsafe) is unsafe (duh).
   if (ownershipKind == ReferenceOwnership::Unmanaged &&
-      ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+      ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
+      !var->allowsUnsafe()) {
     Diags.diagnose(attr->getLocation(), diag::unowned_unsafe_is_unsafe);
+    var->diagnose(diag::make_enclosing_context_unsafe, var)
+      .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
   }
 
   if (attr->isInvalid())
@@ -7194,8 +7198,14 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // nonisolated(unsafe) is unsafe, but only under strict concurrency.
   if (attr->isUnsafe() &&
       Ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)
+      Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
+      !D->allowsUnsafe()) {
     Ctx.Diags.diagnose(attr->getLocation(), diag::nonisolated_unsafe_is_unsafe);
+    if (auto var = dyn_cast<VarDecl>(D)) {
+      var->diagnose(diag::make_enclosing_context_unsafe, var)
+        .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
+    }
+  }
 
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.
@@ -7766,6 +7776,16 @@ void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
 }
 
 void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {}
+
+void AttributeChecker::visitAddressableSelfAttr(AddressableSelfAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::AddressableParameters)) {
+    Ctx.Diags.diagnose(attr->getLocation(), diag::addressable_not_enabled);
+  }
+  
+  if (!D->getDeclContext()->isTypeContext()) {
+    Ctx.Diags.diagnose(attr->getLocation(), diag::addressableSelf_not_on_method);
+  }
+}
 
 namespace {
 

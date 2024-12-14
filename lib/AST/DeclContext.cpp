@@ -869,6 +869,9 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
       }
       break;
     }
+    case InitializerKind::CustomAttribute:
+      OS << " CustomAttribute";
+      break;
     }
     break;
   }
@@ -1545,4 +1548,11 @@ bool DeclContext::isAlwaysAvailableConformanceContext() const {
   auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
 
   return deploymentTarget.isContainedIn(conformanceAvailability);
+}
+
+bool DeclContext::allowsUnsafe() const {
+  if (auto decl = getAsDecl())
+    return decl->allowsUnsafe();
+
+  return false;
 }

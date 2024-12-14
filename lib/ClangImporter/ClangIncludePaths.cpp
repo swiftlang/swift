@@ -27,14 +27,18 @@ using namespace swift;
 using Path = SmallString<128>;
 
 static std::optional<Path> getActualModuleMapPath(
-    StringRef name, SearchPathOptions &Opts, const llvm::Triple &triple,
-    bool isArchSpecific,
+    StringRef name, SearchPathOptions &Opts, const LangOptions &LangOpts,
+    const llvm::Triple &triple, bool isArchSpecific,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   StringRef platform;
   if (swift::tripleIsMacCatalystEnvironment(triple))
     platform = "macosx";
   else
     platform = swift::getPlatformNameForTriple(triple);
+
+  if (LangOpts.hasFeature(Feature::Embedded))
+    platform = "embedded";
+
   StringRef arch = swift::getMajorArchitectureName(triple);
 
   Path result;
@@ -95,16 +99,18 @@ static std::optional<Path> getInjectedModuleMapPath(
 }
 
 static std::optional<Path> getLibStdCxxModuleMapPath(
-    SearchPathOptions &opts, const llvm::Triple &triple,
+    SearchPathOptions &opts, const LangOptions &langOpts,
+    const llvm::Triple &triple,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
-  return getActualModuleMapPath("libstdcxx.modulemap", opts, triple,
+  return getActualModuleMapPath("libstdcxx.modulemap", opts, langOpts, triple,
                                 /*isArchSpecific*/ false, vfs);
 }
 
 std::optional<SmallString<128>>
 swift::getCxxShimModuleMapPath(SearchPathOptions &opts,
+                               const LangOptions &langOpts,
                                const llvm::Triple &triple) {
-  return getActualModuleMapPath("libcxxshim.modulemap", opts, triple,
+  return getActualModuleMapPath("libcxxshim.modulemap", opts, langOpts, triple,
                                 /*isArchSpecific*/ false,
                                 llvm::vfs::getRealFileSystem());
 }
@@ -225,7 +231,8 @@ getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
 
   Path actualModuleMapPath;
   if (auto path = getActualModuleMapPath(modulemapFileName, ctx.SearchPathOpts,
-                                         triple, /*isArchSpecific*/ true, vfs))
+                                         ctx.LangOpts, triple,
+                                         /*isArchSpecific*/ true, vfs))
     actualModuleMapPath = path.value();
   else
     // FIXME: Emit a warning of some kind.
@@ -305,7 +312,8 @@ static void getLibStdCxxFileMapping(
   }
 
   Path actualModuleMapPath;
-  if (auto path = getLibStdCxxModuleMapPath(ctx.SearchPathOpts, triple, vfs))
+  if (auto path = getLibStdCxxModuleMapPath(ctx.SearchPathOpts, ctx.LangOpts,
+                                            triple, vfs))
     actualModuleMapPath = path.value();
   else
     return;

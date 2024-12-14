@@ -291,6 +291,10 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
 }
 
 static bool usesFeatureAddressableParameters(Decl *d) {
+  if (d->getAttrs().hasAttribute<AddressableSelfAttr>()) {
+    return true;
+  }
+
   auto fd = dyn_cast<AbstractFunctionDecl>(d);
   if (!fd) {
     return false;
@@ -321,6 +325,7 @@ static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
 
 UNINTERESTING_FEATURE(WarnUnsafe)
 UNINTERESTING_FEATURE(SafeInterop)
+UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(CoroutineAccessorsAllocateInCallee)

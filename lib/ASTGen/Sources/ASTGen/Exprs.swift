@@ -224,18 +224,8 @@ extension ASTGenVisitor {
     var result = GeneratedClosureSignature()
 
     // Attributes.
-    visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
-      switch element {
-      case .ifConfigDecl(let ifConfigDecl):
-        return .ifConfigDecl(ifConfigDecl)
-      case .attribute(let attribute):
-        return .underlying(attribute)
-      }
-    } body: { node in
-      var initCtx: BridgedPatternBindingInitializer?
-      if let attr = self.generateDeclAttribute(attribute: node, initContext: &initCtx) {
-        result.attributes.add(attr)
-      }
+    self.generateDeclAttributes(attributeList: node.attributes) { attr in
+      result.attributes.add(attr)
     }
 
     if let node = node.capture {

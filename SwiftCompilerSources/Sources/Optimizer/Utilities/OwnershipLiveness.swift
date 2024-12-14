@@ -913,7 +913,7 @@ struct LivenessBoundary : CustomStringConvertible {
 
   // Compute the boundary of a singly-defined range.
   init(value: Value, range: InstructionRange, _ context: Context) {
-    assert(range.isValid)
+    assert(range.blockRange.isValid)
 
     lastUsers = Stack<Instruction>(context)
     boundaryEdges = Stack<BasicBlock>(context)

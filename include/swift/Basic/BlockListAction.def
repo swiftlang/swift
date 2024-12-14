@@ -23,5 +23,6 @@ BLOCKLIST_ACTION(ShouldUseBinaryModule)
 BLOCKLIST_ACTION(ShouldUseTextualModule)
 BLOCKLIST_ACTION(DowngradeInterfaceVerificationFailure)
 BLOCKLIST_ACTION(ShouldUseLayoutStringValueWitnesses)
+BLOCKLIST_ACTION(ShouldDisableOwnershipVerification)
 
 #undef BLOCKLIST_ACTION

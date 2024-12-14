@@ -1659,6 +1659,11 @@ public:
   /// Verifies the lifetime of memory locations in the function.
   void verifyMemoryLifetime(CalleeCache *calleeCache);
 
+  /// Verifies ownership of the function.
+  /// Since we don't have complete lifetimes everywhere, computes DeadEndBlocks
+  /// and calls verifyOwnership(DeadEndBlocks *deadEndBlocks)
+  void verifyOwnership() const;
+
   /// Run the SIL ownership verifier to check that all values with ownership
   /// have a linear lifetime. Regular OSSA invariants are checked separately in
   /// normal SIL verification.

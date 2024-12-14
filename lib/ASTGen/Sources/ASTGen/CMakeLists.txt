@@ -8,12 +8,14 @@ add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   Diagnostics.swift
   DiagnosticsBridge.swift
   Exprs.swift
+  Fingerprint.swift
   Generics.swift
   Literals.swift
   ParameterClause.swift
   Patterns.swift
   Regex.swift
   SourceFile.swift
+  StableHasher.swift
   Stmts.swift
   TypeAttrs.swift
   Types.swift

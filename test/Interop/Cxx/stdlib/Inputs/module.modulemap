@@ -40,6 +40,12 @@ module StdString {
   export *
 }
 
+module StdStringAndVector {
+  header "std-string-and-vector.h"
+  requires cplusplus
+  export *
+}
+
 module StdStringView {
   header "std-string-view.h"
   requires cplusplus

@@ -779,19 +779,6 @@ static SILValue isConstIndexAddr(SILValue val, unsigned &index) {
   return IA->getBase();
 }
 
-SILInstruction *SILCombiner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
-  // If we have a load_borrow that only has non_debug end_borrow uses, delete
-  // it.
-  if (llvm::all_of(getNonDebugUses(lbi), [](Operand *use) {
-        return isa<EndBorrowInst>(use->getUser());
-      })) {
-    eraseInstIncludingUsers(lbi);
-    return nullptr;
-  }
-
-  return nullptr;
-}
-
 /// Optimize nested index_addr instructions:
 /// Example in SIL pseudo code:
 ///    %1 = index_addr %ptr, x
@@ -1770,22 +1757,6 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
                                             APInt(1, 0));
   }
 
-  return nullptr;
-}
-
-SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *fli) {
-  // fix_lifetime(alloc_stack) -> fix_lifetime(load(alloc_stack))
-  Builder.setCurrentDebugScope(fli->getDebugScope());
-  if (auto *ai = dyn_cast<AllocStackInst>(fli->getOperand())) {
-    if (fli->getOperand()->getType().isLoadable(*fli->getFunction())) {
-      // load when ossa is disabled
-      auto load = Builder.emitLoadBorrowOperation(fli->getLoc(), ai);
-      Builder.createFixLifetime(fli->getLoc(), load);
-      // no-op when ossa is disabled
-      Builder.emitEndBorrowOperation(fli->getLoc(), load);
-      return eraseInstFromFunction(*fli);
-    }
-  }
   return nullptr;
 }
 

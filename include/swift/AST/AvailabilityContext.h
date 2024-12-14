@@ -86,6 +86,10 @@ public:
   /// Returns true if this context is `@_unavailableInEmbedded`.
   bool isUnavailableInEmbedded() const;
 
+  /// Returns true if this context allows the use of unsafe constructs inside
+  /// it.
+  bool allowsUnsafe() const;
+
   /// Constrain with another `AvailabilityContext`.
   void constrainWithContext(const AvailabilityContext &other, ASTContext &ctx);
 

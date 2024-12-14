@@ -55,16 +55,20 @@ struct MyContainer {
 import Test
 import CoreFoundation
 
+// expected-note@+1{{mark the enclosing global function 'useUnsafeParam' '@unsafe' to allow it to use unsafe constructs}}{{1-1=@unsafe }}
 func useUnsafeParam(x: Unannotated) { // expected-warning{{reference to unsafe struct 'Unannotated'}}
 }
 
+// expected-note@+2{{mark the enclosing global function 'useUnsafeParam2' '@unsafe' to allow it to use unsafe constructs}}{{10:1-1=@unsafe }}
 @available(SwiftStdlib 5.8, *)
 func useUnsafeParam2(x: UnsafeReference) { // expected-warning{{reference to unsafe class 'UnsafeReference'}}
 }
 
+// expected-note@+1{{mark the enclosing global function 'useUnsafeParam3' '@unsafe' to allow it to use unsafe constructs}}{{1-1=@unsafe }}
 func useUnsafeParam3(x: UnknownEscapabilityAggregate) { // expected-warning{{reference to unsafe struct 'UnknownEscapabilityAggregate'}}
 }
 
+// expected-note@+1{{mark the enclosing global function 'useSafeParams' '@unsafe' to allow it to use unsafe constructs}}{{1-1=@unsafe }}
 func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer) {
     let _ = c.__beginUnsafe() // expected-warning{{call to unsafe instance method '__beginUnsafe'}}
 }

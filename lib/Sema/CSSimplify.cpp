@@ -1620,6 +1620,21 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
             cs, contextualType, extraArguments,
             cs.getConstraintLocator(locator));
 
+        for (const auto &extraArg : extraArguments) {
+          auto argument = argList->get(extraArg.first);
+          auto argType = extraArg.second.getPlainType();
+
+          // Prevent closure resolution by binding it to a placeholder
+          // because the main issue here is invalid overload and
+          // errors produced from the closure body are going to be
+          // superfluous.
+          if (isExpr<ClosureExpr>(argument.getExpr())) {
+            cs.recordTypeVariablesAsHoles(argType);
+          } else {
+            cs.recordAnyTypeVarAsPotentialHole(argType);
+          }
+        }
+
         if (cs.recordFix(fix, /*impact=*/extraArguments.size() * 5))
           return cs.getTypeMatchFailure(locator);
       }
@@ -11369,6 +11384,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFallbackTypeConstraint(
     }
 
     return SolutionKind::Unsolved;
+  }
+
+  // Propagate placeholders into an inferred closure type. Without this
+  // we'd produce superfluous diagnostics about parameter/result types.
+  if (defaultableType->isPlaceholder() && locator.directlyAt<ClosureExpr>()) {
+    recordTypeVariablesAsHoles(fallbackType);
   }
 
   // Otherwise, any type is fine.

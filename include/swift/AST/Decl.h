@@ -66,6 +66,7 @@ namespace swift {
   class AccessorDecl;
   class ApplyExpr;
   class AvailabilityRange;
+  class AvailabilityDomain;
   class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
@@ -1190,6 +1191,10 @@ public:
   /// used in a "safe" dialect.
   bool isUnsafe() const;
 
+  /// Whether this declaration explicitly states that it is allowed to contain
+  /// unsafe code.
+  bool allowsUnsafe() const;
+
 private:
   bool isUnsafeComputed() const {
     return Bits.Decl.IsUnsafeComputed;
@@ -1389,6 +1394,10 @@ public:
   /// Determine whether this Decl has either Private or FilePrivate access,
   /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
+
+  /// Returns the availability domain associated with the given `AvailableAttr`
+  /// that is attached to this decl.
+  AvailabilityDomain getDomainForAvailableAttr(const AvailableAttr *attr) const;
 
   /// Returns the active platform-specific `@available` attribute for this decl.
   /// There may be multiple `@available` attributes that are relevant to the
@@ -1903,6 +1912,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   friend class Decl;
 public:
   using Decl::getASTContext;
+  using Decl::allowsUnsafe;
 
   /// Create a new extension declaration.
   static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
@@ -3375,6 +3385,7 @@ public:
   using DeclContext::operator new;
   using DeclContext::operator delete;
   using TypeDecl::getDeclaredInterfaceType;
+  using Decl::allowsUnsafe;
 
   static bool classof(const DeclContext *C) {
     if (auto D = C->getAsDecl())

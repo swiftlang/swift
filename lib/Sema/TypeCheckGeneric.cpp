@@ -1147,13 +1147,16 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
   if (parentDC->getSelfProtocolDecl())
     return result;
 
-  auto genericSig = typeAlias->getGenericSignature();
-  SubstitutionMap subs;
-  if (genericSig)
-    subs = genericSig->getIdentitySubstitutionMap();
-
   Type parent;
   if (parentDC->isTypeContext())
     parent = parentDC->getSelfInterfaceType();
-  return TypeAliasType::get(typeAlias, parent, subs, result);
+
+  SmallVector<Type, 2> genericArgs;
+  if (auto *params = typeAlias->getGenericParams()) {
+    for (auto *param : *params) {
+      genericArgs.push_back(param->getDeclaredInterfaceType());
+    }
+  }
+
+  return TypeAliasType::get(typeAlias, parent, genericArgs, result);
 }

@@ -1301,11 +1301,8 @@ Type TypeResolution::applyUnboundGenericArguments(
 
   // Form a sugared typealias reference.
   if (typealias && (!parentTy || !parentTy->isAnyExistentialType())) {
-    auto genericSig = typealias->getGenericSignature();
-    auto subMap = SubstitutionMap::get(genericSig,
-                                       QueryTypeSubstitutionMap{subs},
-                                       LookUpConformanceInModule());
-    resultType = TypeAliasType::get(typealias, parentTy, subMap, resultType);
+    resultType = TypeAliasType::get(typealias, parentTy, genericArgs,
+                                    resultType);
   }
 
   return resultType;
@@ -5049,7 +5046,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
           typeAlias->getDecl()->getName() == getASTContext().getIdentifier("CFTypeRef")) {
         return TypeAliasType::get(typeAlias->getDecl(),
                                   typeAlias->getParent(),
-                                  typeAlias->getSubstitutionMap(),
+                                  typeAlias->getDirectGenericArgs(),
                                   constraint);
       }
 
@@ -6136,7 +6133,7 @@ Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
   // If we're referring to a typealias within a generic context, build
   // a sugared alias type.
   if (aliasDecl && (!sugaredBaseTy || !sugaredBaseTy->isAnyExistentialType())) {
-    resultType = TypeAliasType::get(aliasDecl, sugaredBaseTy, subs, resultType);
+    resultType = TypeAliasType::get(aliasDecl, sugaredBaseTy, {}, resultType);
   }
 
   return resultType;
@@ -6674,11 +6671,15 @@ Type ExplicitCaughtTypeRequest::evaluate(
 }
 
 void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
+                               AvailabilityContext availability,
                                llvm::function_ref<void(Type)> diagnose) {
   if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
     return;
 
   if (!type->isUnsafe())
+    return;
+
+  if (availability.allowsUnsafe())
     return;
 
   // Look for a specific @unsafe nominal type.
@@ -6701,4 +6702,11 @@ void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
       specificTypeDecl->diagnose(diag::unsafe_decl_here, specificTypeDecl);
     }
   }
+}
+
+void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
+                               const DeclContext *dc,
+                               llvm::function_ref<void(Type)> diagnose) {
+  auto availability = TypeChecker::availabilityAtLocation(loc, dc);
+  return diagnoseUnsafeType(ctx, loc, type, availability, diagnose);
 }

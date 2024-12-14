@@ -960,6 +960,9 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_SET);
   BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE);
   BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE_REF);
+  BLOCK_RECORD(sil_block, SIL_SOURCE_LOC);
+  BLOCK_RECORD(sil_block, SIL_SOURCE_LOC_REF);
+
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -5480,17 +5483,21 @@ public:
 
   void visitTypeAliasType(const TypeAliasType *alias) {
     using namespace decls_block;
+
     const TypeAliasDecl *typeAlias = alias->getDecl();
-    auto underlyingType = typeAlias->getUnderlyingType();
+    SmallVector<TypeID, 8> genericArgIDs;
+
+    for (auto next : alias->getDirectGenericArgs())
+      genericArgIDs.push_back(S.addTypeRef(next));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[TypeAliasTypeLayout::Code];
     TypeAliasTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
         S.addDeclRef(typeAlias, /*allowTypeAliasXRef*/true),
-        S.addTypeRef(alias->getParent()),
-        S.addTypeRef(underlyingType),
+        S.addTypeRef(typeAlias->getUnderlyingType()),
         S.addTypeRef(alias->getSinglyDesugaredType()),
-        S.addSubstitutionMapRef(alias->getSubstitutionMap()));
+        S.addTypeRef(alias->getParent()),
+        genericArgIDs);
   }
 
   template <typename Layout>

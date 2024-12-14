@@ -39,8 +39,9 @@ static inline StringRef getUSRSpacePrefix() {
 
 bool ide::printTypeUSR(Type Ty, raw_ostream &OS) {
   assert(!Ty->hasArchetype() && "cannot have contextless archetypes mangled.");
+  Ty = Ty->getCanonicalType()->getRValueType();
   Mangle::ASTMangler Mangler(Ty->getASTContext());
-  OS << Mangler.mangleTypeAsUSR(Ty->getRValueType());
+  OS << Mangler.mangleTypeAsUSR(Ty);
   return false;
 }
 

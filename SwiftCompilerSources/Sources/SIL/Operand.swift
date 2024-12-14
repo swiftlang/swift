@@ -13,7 +13,7 @@
 import SILBridging
 
 /// An operand of an instruction.
-public struct Operand : CustomStringConvertible, NoReflectionChildren {
+public struct Operand : CustomStringConvertible, NoReflectionChildren, Equatable {
   public let bridged: BridgedOperand
 
   public init(bridged: BridgedOperand) {
