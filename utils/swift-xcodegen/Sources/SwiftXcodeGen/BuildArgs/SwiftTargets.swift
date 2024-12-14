@@ -212,7 +212,11 @@ struct SwiftTargets {
     // Add the dependencies. We track dependencies for any input files, along
     // with any recorded swiftmodule dependencies.
     dependenciesByTargetName.withValue(for: name, default: []) { deps in
-      deps.formUnion(rule.inputs)
+      deps.formUnion(
+        rule.inputs.filter {
+          $0.hasExtension(.swiftmodule) || $0.hasExtension(.o)
+        }
+      )
       deps.formUnion(
         rule.dependencies.filter { $0.hasExtension(.swiftmodule) }
       )

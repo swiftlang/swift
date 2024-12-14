@@ -531,11 +531,20 @@ fileprivate final class ProjectGenerator {
     guard checkNotExcluded(buildRule.parentPath, for: "Swift target") else {
       return nil
     }
-    // Create the target. Swift targets can always use buildable folders
-    // since they have a consistent set of arguments.
+    // Swift targets can almost always use buildable folders since they have
+    // a consistent set of arguments, but we need to ensure we don't have any
+    // child source files that aren't part of the target.
+    let canUseBuildableFolder = try {
+      guard let parent = buildRule.parentPath else { return false }
+      let repoSources = Set(buildRule.sources.repoSources)
+      return try getAllRepoSubpaths(of: parent)
+        .allSatisfy { !$0.isSourceLike || repoSources.contains($0) }
+    }()
+    // Create the target.
     let target = generateBaseTarget(
-      targetInfo.name, at: buildRule.parentPath, canUseBuildableFolder: true,
-      productType: .staticArchive, includeInAllTarget: includeInAllTarget
+      targetInfo.name, at: buildRule.parentPath,
+      canUseBuildableFolder: canUseBuildableFolder, productType: .staticArchive,
+      includeInAllTarget: includeInAllTarget
     )
     guard let target else { return nil }
 
@@ -557,6 +566,13 @@ fileprivate final class ProjectGenerator {
     if targetInfo.emitModuleRule != nil {
       buildSettings.common.DEFINES_MODULE = "YES"
     }
+
+    // Disable the Obj-C bridging header; we don't currently use this, and
+    // even if we did, we'd probably want to use the one in the Ninja build
+    // folder.
+    // This also works around a compiler crash
+    // (https://github.com/swiftlang/swift/issues/78190).
+    buildSettings.common.SWIFT_OBJC_INTERFACE_HEADER_NAME = ""
 
     if let last = buildArgs.takeFlagGroup(.O, .Onone) {
       buildSettings.common.SWIFT_OPTIMIZATION_LEVEL = last.printed
