@@ -167,6 +167,21 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
     return try spec.generateAndWrite(into: outputDir)
   }
 
+  func writeSwiftRuntimesXcodeProject(
+    for ninja: NinjaBuildDir, into outputDir: AbsolutePath
+  ) throws -> GeneratedProject {
+    let buildDir = try ninja.buildDir(for: .swiftRuntimes)
+    var spec = newProjectSpec("SwiftRuntimes", for: buildDir)
+
+    spec.addClangTarget(at: "core", mayHaveUnbuildableFiles: true)
+    spec.addSwiftTargets(below: "core")
+
+    if self.addDocs {
+      spec.addTopLevelDocs()
+    }
+    return try spec.generateAndWrite(into: outputDir)
+  }
+
   @discardableResult
   func writeClangXcodeProject(
     for ninja: NinjaBuildDir, into outputDir: AbsolutePath
@@ -327,6 +342,15 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
     let swiftProj = try await runTask {
       try writeSwiftXcodeProject(for: buildDir, into: outputDir)
     }
+    let runtimesProj = try await runTask { () -> GeneratedProject? in
+      guard let runtimesBuildDir = self.runtimesBuildDir?.absoluteInWorkingDir else {
+        return nil
+      }
+      let buildDir = try NinjaBuildDir(
+        at: runtimesBuildDir, projectRootDir: projectRootDir
+      )
+      return try writeSwiftRuntimesXcodeProject(for: buildDir, into: outputDir)
+    }
     let llvmProj = try await runTask {
       self.addLLVM ? try writeLLVMXcodeProject(for: buildDir, into: outputDir) : nil
     }
@@ -337,7 +361,12 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       self.addLLDB ? try writeLLDBXcodeProject(for: buildDir, into: outputDir) : nil
     }
 
-    let swiftWorkspace = try await getWorkspace(for: swiftProj.value)
+    var swiftWorkspace = try await getWorkspace(for: swiftProj.value)
+
+    if let runtimesProj = try await runtimesProj.value {
+      swiftWorkspace.addProject(runtimesProj)
+      try swiftWorkspace.write("Swift+Runtimes", into: outputDir)
+    }
 
     if let llvmProj = try await llvmProj.value {
       var swiftLLVMWorkspace = swiftWorkspace
