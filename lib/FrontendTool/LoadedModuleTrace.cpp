@@ -946,6 +946,9 @@ static bool shouldActionTypeEmitFineModuleTrace(FrontendOptions::ActionType acti
 
 bool swift::emitFineModuleTraceIfNeeded(CompilerInstance &Instance,
                                         const FrontendOptions &opts) {
+  if (opts.DisableFineModuleTracing) {
+    return false;
+  }
   if (!shouldActionTypeEmitFineModuleTrace(opts.RequestedAction)) {
     return false;
   }
