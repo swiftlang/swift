@@ -30,17 +30,20 @@ public final class NinjaBuildDir: Sendable {
     let couldBeParent = buildDir.fileName.hasPrefix("swift-")
     throw XcodeGenError.noSwiftBuildDir(buildDir, couldBeParent: couldBeParent)
   }
-  
-  private static func detectProjectRoot(
-    buildDir: AbsolutePath
-  ) throws -> AbsolutePath {
-    guard let parent = buildDir.parentDir else {
-      throw XcodeGenError.expectedParent(buildDir)
+
+  // We can infer the project root from the location of swift-xcodegen itself.
+  //                      1     2         3          4           5         6      7
+  // #filePath = <root>/swift/utils/swift-xcodegen/Sources/SwiftXcodeGen/Ninja/NinjaBuildDir.swift
+  private static let inferredProjectRootPath = AbsolutePath(#filePath).dropLast(7)
+
+  private static func detectProjectRoot() throws -> AbsolutePath {
+    let inferredSwiftPath = inferredProjectRootPath.appending(Repo.swift.relativePath)
+    guard inferredSwiftPath.exists else {
+      throw XcodeGenError.couldNotInferProjectRoot(
+        reason: "expected swift repo at '\(inferredSwiftPath)'"
+      )
     }
-    guard let projectDir = parent.parentDir else {
-      throw XcodeGenError.expectedParent(parent)
-    }
-    return projectDir
+    return inferredProjectRootPath
   }
   
   public init(at path: AbsolutePath, projectRootDir: AbsolutePath?) throws {
@@ -49,7 +52,7 @@ public final class NinjaBuildDir: Sendable {
     }
     self.path = path
     self.tripleSuffix = try Self.detectTripleSuffix(buildDir: path)
-    self.projectRootDir = try projectRootDir ?? Self.detectProjectRoot(buildDir: path)
+    self.projectRootDir = try projectRootDir ?? Self.detectProjectRoot()
   }
   
   public func buildDir(for repo: Repo) throws -> RepoBuildDir {
