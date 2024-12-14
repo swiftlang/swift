@@ -1598,6 +1598,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::Safe: {
+    auto *attr = cast<SafeAttr>(this);
+    Printer.printAttrName("@safe");
+    Printer << "(unchecked";
+    if (!attr->message.empty()) {
+      Printer << ", message: ";
+      Printer.printEscapedStringLiteral(attr->message);
+    }
+    Printer << ")";
+    break;
+  }
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
