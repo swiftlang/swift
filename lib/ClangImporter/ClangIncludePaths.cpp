@@ -634,7 +634,6 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
 
   GetWindowsFileMappings(result, ctx, vfs,
                          result.requiresBuiltinHeadersInSystemModules);
-
   return result;
 }
 
