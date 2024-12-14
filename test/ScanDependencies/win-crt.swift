@@ -1,4 +1,5 @@
 // RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -scan-dependencies -Xcc -v %s -o -
 // RUN: %target-swift-frontend -scan-dependencies -Xcc -v %s -o - | %validate-json | %FileCheck %s
 
 // We want to explicitly import WinSDK's CRT.
