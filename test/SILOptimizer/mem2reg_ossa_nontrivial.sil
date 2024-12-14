@@ -62,6 +62,8 @@ sil [ossa] @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStr
 sil [ossa] @get_nontrivialenum : $@convention(thin) () -> @owned NonTrivialEnum
 sil [ossa] @get_optionalnontrivialstruct : $@convention(thin) () -> @owned FakeOptional<NonTrivialStruct>
 sil [ossa] @take_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+sil @get : $@convention(thin) () -> @owned FakeOptional<Klass>
+sil @use : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
 
 ///////////
 // Tests //
@@ -1486,4 +1488,64 @@ bb1:
   dealloc_stack %1 : $*FakeOptional<Klass>
   %t = tuple ()
   return %t : $()
+}
+
+// Ensure no verification failure
+sil [ossa] @test_store_enum_value_in_multiple_locs1 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get : $@convention(thin) () -> @owned FakeOptional<Klass>
+  %1 = apply %0() : $@convention(thin) () -> @owned FakeOptional<Klass>
+  %2 = begin_borrow [lexical] %1
+  cond_br undef, bb2, bb1
+
+bb1:
+  br bb3
+
+bb2:
+  %5 = alloc_stack [lexical] $FakeOptional<Klass>
+  %6 = store_borrow %2 to %5
+  cond_br undef, bb8, bb9
+
+bb3:
+  cond_br undef, bb5, bb4
+
+bb4:
+  unreachable
+
+bb5:
+  %11 = alloc_stack $FakeOptional<Klass>
+  %12 = store_borrow %2 to %11
+  %14 = load_borrow %12
+  %15 = begin_borrow [lexical] %14
+  %16 = alloc_stack $FakeOptional<Klass>
+  %17 = store_borrow %15 to %16
+  cond_br undef, bb6, bb7
+
+bb6:
+  fix_lifetime %17
+  end_borrow %17
+  dealloc_stack %16
+  end_borrow %15
+  end_borrow %14
+  end_borrow %12
+  dealloc_stack %11
+  end_borrow %2
+  destroy_value %1
+  %29 = tuple ()
+  return %29
+
+bb7:
+  end_borrow %17
+  dealloc_stack %16
+  unreachable
+
+bb8:
+  end_borrow %6
+  dealloc_stack %5
+  unreachable
+
+bb9:
+  end_borrow %6
+  dealloc_stack %5
+  br bb3
 }
