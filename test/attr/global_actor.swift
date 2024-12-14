@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking -package-name myPkg -enable-experimental-feature IsolatedDeinit
+// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking -package-name myPkg
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_IsolatedDeinit
 
 actor SomeActor { }
 

@@ -1,6 +1,5 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature IsolatedDeinit -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors -target %target-swift-5.1-abi-triple %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors -target %target-swift-5.1-abi-triple %s | %FileCheck %s
 
-// REQUIRES: swift_feature_IsolatedDeinit
 
 // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute15fragileFunctionyyF : $@convention(thin) () -> ()
 @inlinable public func fragileFunction() {
@@ -66,9 +65,10 @@ public actor MyAct {
   }
 }
 
+@available(SwiftStdlib 6.1, *)
 public actor MyActIsolatedDeinit {
-  // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute19MyActIsolatedDeinitCfZ : $@convention(thin) (@owned MyActIsolatedDeinit) -> ()
-  // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute19MyActIsolatedDeinitCfD : $@convention(method) (@owned MyActIsolatedDeinit) -> ()
+  // CHECK: sil [serialized] [[AVAILABILITY:.*]][ossa] @$s19inlinable_attribute19MyActIsolatedDeinitCfZ : $@convention(thin) (@owned MyActIsolatedDeinit) -> ()
+  // CHECK: sil [serialized] [[AVAILABILITY:.*]][ossa] @$s19inlinable_attribute19MyActIsolatedDeinitCfD : $@convention(method) (@owned MyActIsolatedDeinit) -> ()
   @inlinable isolated deinit {}
 }
 
