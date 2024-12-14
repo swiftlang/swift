@@ -28,6 +28,8 @@ DIAG(REMARK,ID,Options,Text,Signature)
 
 NOTE(decl_declared_here,none,
      "%0 declared here", (const ValueDecl *))
+NOTE(clang_decl_declared_here,none,
+     "%0 declared here",(const clang::NamedDecl*))
 NOTE(decl_declared_here_base,none,
      "%base0 declared here", (const ValueDecl *))
 NOTE(name_declared_here,none,
