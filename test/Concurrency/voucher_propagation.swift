@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -target %target-swift-5.1-abi-triple -enable-experimental-feature IsolatedDeinit -o %t/voucher_propagation
+// RUN: %target-build-swift %s -target %target-swift-5.1-abi-triple -o %t/voucher_propagation
 // RUN: %target-codesign %t/voucher_propagation
 // RUN: MallocStackLogging=1 %target-run %t/voucher_propagation
 
@@ -13,7 +13,6 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // REQUIRES: OS=macosx
-// REQUIRES: swift_feature_IsolatedDeinit
 
 import Darwin
 import Dispatch // expected-warning {{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'Dispatch'}}
@@ -76,6 +75,7 @@ actor Counter {
   func get() -> Int { n }
 }
 
+@available(SwiftStdlib 6.1, *)
 actor ActorWithSelfIsolatedDeinit {
   let expectedVoucher: voucher_t?
   let group: DispatchGroup
@@ -102,6 +102,7 @@ actor ActorWithSelfIsolatedDeinit {
   }
 }
 
+@available(SwiftStdlib 6.1, *)
 actor ActorWithDeinitIsolatedOnAnother {
   let expectedVoucher: voucher_t?
   let group: DispatchGroup
@@ -121,6 +122,7 @@ actor ActorWithDeinitIsolatedOnAnother {
   }
 }
 
+@available(SwiftStdlib 6.1, *)
 class ClassWithIsolatedDeinit {
   let expectedVoucher: voucher_t?
   let group: DispatchGroup
@@ -427,47 +429,49 @@ if #available(SwiftStdlib 5.1, *) {
      group.wait()
    }
   }
-  
-  tests.test("voucher propagation in isolated deinit [fast path]") {
-    withVouchers { v1, v2, v3 in
-      let group = DispatchGroup()
-      group.enter()
-      group.enter()
-      group.enter()
-      Task {
-        await AnotherActor.shared.performTesting {
-          adopt(voucher: v1)
-          _ = ClassWithIsolatedDeinit(expectedVoucher: v1, group: group)
+
+  if #available(SwiftStdlib 6.1, *) {
+    tests.test("voucher propagation in isolated deinit [fast path]") {
+      withVouchers { v1, v2, v3 in
+        let group = DispatchGroup()
+        group.enter()
+        group.enter()
+        group.enter()
+        Task {
+          await AnotherActor.shared.performTesting {
+            adopt(voucher: v1)
+            _ = ClassWithIsolatedDeinit(expectedVoucher: v1, group: group)
+          }
+          await AnotherActor.shared.performTesting {
+            adopt(voucher: v2)
+            _ = ActorWithSelfIsolatedDeinit(expectedVoucher: v2, group: group)
+          }
+          await AnotherActor.shared.performTesting {
+            adopt(voucher: v3)
+            _ = ActorWithDeinitIsolatedOnAnother(expectedVoucher: v3, group: group)
+          }
         }
-        await AnotherActor.shared.performTesting {
-          adopt(voucher: v2)
-          _ = ActorWithSelfIsolatedDeinit(expectedVoucher: v2, group: group)
-        }
-        await AnotherActor.shared.performTesting {
-          adopt(voucher: v3)
-          _ = ActorWithDeinitIsolatedOnAnother(expectedVoucher: v3, group: group)
-        }
+        group.wait()
       }
-      group.wait()
     }
-  }
-  
-  tests.test("voucher propagation in isolated deinit [slow path]") {
-    withVouchers { v1, v2, v3 in
-      let group = DispatchGroup()
-      group.enter()
-      group.enter()
-      Task {
-        do {
-          adopt(voucher: v1)
-          _ = ActorWithDeinitIsolatedOnAnother(expectedVoucher: v1, group: group)
+
+    tests.test("voucher propagation in isolated deinit [slow path]") {
+      withVouchers { v1, v2, v3 in
+        let group = DispatchGroup()
+        group.enter()
+        group.enter()
+        Task {
+          do {
+            adopt(voucher: v1)
+            _ = ActorWithDeinitIsolatedOnAnother(expectedVoucher: v1, group: group)
+          }
+          do {
+            adopt(voucher: v2)
+            _ = ClassWithIsolatedDeinit(expectedVoucher: v2, group: group)
+          }
         }
-        do {
-          adopt(voucher: v2)
-          _ = ClassWithIsolatedDeinit(expectedVoucher: v2, group: group)
-        }
+        group.wait()
       }
-      group.wait()
     }
   }
 }
