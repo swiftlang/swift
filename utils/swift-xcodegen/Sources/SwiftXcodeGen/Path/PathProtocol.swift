@@ -127,6 +127,10 @@ extension PathProtocol {
     hasExtension(.c, .cpp, .m, .mm)
   }
 
+  var isSourceLike: Bool {
+    isCSourceLike || hasExtension(.swift)
+  }
+
   var isDocLike: Bool {
     hasExtension(.md, .rst) || fileName.starts(with: "README")
   }
