@@ -3214,6 +3214,69 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Safe: {
+    if (!consumeIfAttributeLParen()) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserError();
+    }
+
+    StringRef parsedName = Tok.getText();
+    if (!consumeIf(tok::identifier) || parsedName != "unchecked") {
+      diagnose(Loc, diag::safe_attr_unchecked);
+      errorAndSkipUntilConsumeRightParen(*this, AttrName);
+      return makeParserError();
+    }
+
+    StringRef message;
+    if (consumeIf(tok::comma)) {
+      if (!Tok.is(tok::identifier)) {
+        diagnose(Tok, diag::attr_expected_label, "message", AttrName);
+        errorAndSkipUntilConsumeRightParen(*this, AttrName);
+        return makeParserError();
+      }
+
+      StringRef flag = Tok.getText();
+
+      if (flag != "message") {
+        diagnose(Tok.getLoc(), diag::attr_unknown_option, flag, AttrName);
+        errorAndSkipUntilConsumeRightParen(*this, AttrName);
+        return makeParserError();
+      }
+      consumeToken();
+      if (!consumeIf(tok::colon)) {
+        diagnose(Tok.getLoc(), diag::attr_expected_colon_after_label, flag);
+        errorAndSkipUntilConsumeRightParen(*this, AttrName);
+        return makeParserError();
+      }
+      if (!Tok.is(tok::string_literal)) {
+        diagnose(Tok.getLoc(), diag::attr_expected_string_literal, AttrName);
+        errorAndSkipUntilConsumeRightParen(*this, AttrName);
+        return makeParserSuccess();
+      }
+
+      std::optional<StringRef> value =
+          getStringLiteralIfNotInterpolated(Tok.getLoc(), flag);
+      if (!value) {
+        errorAndSkipUntilConsumeRightParen(*this, AttrName);
+        return makeParserError();
+      }
+      consumeToken();
+      message = *value;
+    }
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(PreviousLoc, diag::attr_expected_rparen,
+          AttrName, /*isModifier*/false)
+        .fixItInsertAfter(PreviousLoc, ")");
+    }
+    AttrRange = SourceRange(Loc, PreviousLoc);
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) SafeAttr(AtLoc, AttrRange, message));
+    break;
+  }
+
   case DeclAttrKind::Section: {
     if (!consumeIfAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,

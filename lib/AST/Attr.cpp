@@ -1715,7 +1715,8 @@ StringRef DeclAttribute::getAttrName() const {
     AccessLevel access = cast<AbstractAccessControlAttr>(this)->getAccess();
     return getAccessLevelSpelling(access);
   }
-
+  case DeclAttrKind::Safe:
+    return "safe";
   case DeclAttrKind::SPIAccessControl:
     return "_spi";
   case DeclAttrKind::ReferenceOwnership:

@@ -2271,6 +2271,12 @@ namespace decls_block {
                      BCArray<BCFixed<1>> // concatenated param indices
                      >;
 
+  using SafeDeclAttrLayout = BCRecordLayout<
+    Safe_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCBlob      // message
+  >;
+
   using AbstractClosureExprLayout = BCRecordLayout<
     ABSTRACT_CLOSURE_EXPR_CONTEXT,
     TypeIDField, // type
