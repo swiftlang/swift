@@ -124,7 +124,7 @@ extension PathProtocol {
   }
 
   var isCSourceLike: Bool {
-    hasExtension(.c, .cpp)
+    hasExtension(.c, .cpp, .m, .mm)
   }
 
   var isDocLike: Bool {
