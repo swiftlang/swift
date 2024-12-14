@@ -1248,6 +1248,10 @@ def skip_import_in_public_interface:
   HelpText<"Skip the import statement corresponding to a module name "
            "when printing the public interface.">;
 
+def disable_fine_module_tracing:
+  Flag<["-"], "disable-fine-module-tracing">,
+  HelpText<"Skip the emission of fine grained module tracing file.">;
+
 def clang_header_expose_decls:
   Joined<["-"], "clang-header-expose-decls=">,
   HelpText<"Which declarations should be exposed in the generated clang header.">,

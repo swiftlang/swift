@@ -946,11 +946,17 @@ static bool shouldActionTypeEmitFineModuleTrace(FrontendOptions::ActionType acti
 
 bool swift::emitFineModuleTraceIfNeeded(CompilerInstance &Instance,
                                         const FrontendOptions &opts) {
+  if (opts.DisableFineModuleTracing) {
+    return false;
+  }
   if (!shouldActionTypeEmitFineModuleTrace(opts.RequestedAction)) {
     return false;
   }
   ModuleDecl *mainModule = Instance.getMainModule();
   ASTContext &ctxt = mainModule->getASTContext();
+  if (ctxt.blockListConfig.hasBlockListAction(mainModule->getNameStr(),
+      BlockListKeyKind::ModuleName, BlockListAction::SkipEmittingFineModuleTrace))
+    return false;
   assert(!ctxt.hadError() &&
          "We should've already exited earlier if there was an error.");
 

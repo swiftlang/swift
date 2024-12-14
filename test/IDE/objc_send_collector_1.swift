@@ -10,6 +10,18 @@
 // RUN: SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH=%t/given_trace_2.json %target-swift-frontend  -I %t/lib/swift -emit-module %s %S/Inputs/objc_send_collector_2.swift -module-name main -swift-version 5 -F %S/Inputs/mock-sdk -emit-loaded-module-trace-path %t/.MODULE_TRACE -enable-library-evolution
 // RUN: not ls %t/given_trace_2.json
 
+
+// RUN: echo "---" > %t/blocklist.yml
+// RUN: echo "SkipEmittingFineModuleTrace:" >> %t/blocklist.yml
+// RUN: echo "  ModuleName:" >> %t/blocklist.yml
+// RUN: echo "    - FooBar" >> %t/blocklist.yml
+
+// RUN: SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH=%t/given_trace_3.json %target-swift-frontend  -I %t/lib/swift -typecheck %s %S/Inputs/objc_send_collector_2.swift -module-name FooBar -swift-version 5 -F %S/Inputs/mock-sdk -emit-loaded-module-trace-path %t/.MODULE_TRACE -blocklist-file %t/blocklist.yml
+// RUN: not ls %t/given_trace_3.json
+
+// RUN: SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH=%t/given_trace_4.json %target-swift-frontend  -I %t/lib/swift -typecheck %s %S/Inputs/objc_send_collector_2.swift -module-name FooBar -swift-version 5 -F %S/Inputs/mock-sdk -emit-loaded-module-trace-path %t/.MODULE_TRACE -disable-fine-module-tracing
+// RUN: not ls %t/given_trace_4.json
+
 // REQUIRES: objc_interop
 
 import Foo
