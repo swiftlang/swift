@@ -4073,8 +4073,17 @@ static void suggestUnsafeOnEnclosingDecl(
   if (!decl)
     return;
 
-  decl->diagnose(diag::make_enclosing_context_unsafe, decl)
-    .fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
+  if (versionCheckNode.has_value()) {
+    // The unsafe construct is inside the body of the entity, so suggest
+    // @safe(unchecked) on the declaration.
+    decl->diagnose(diag::encapsulate_unsafe_in_enclosing_context, decl)
+      .fixItInsert(decl->getAttributeInsertionLoc(false),
+                   "@safe(unchecked) ");
+  } else {
+    // The unsafe construct is not part of the body, so
+    decl->diagnose(diag::make_enclosing_context_unsafe, decl)
+      .fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
+  }
 }
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
