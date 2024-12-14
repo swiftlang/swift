@@ -19,7 +19,7 @@ func g() {
   unsafeFunction()
 }
 
-// expected-note@+2{{mark the enclosing global function 'h' '@unsafe' to allow it to use unsafe constructs}}
+// expected-note@+2{{make global function 'h' @unsafe to indicate that its use is not memory-safe}}
 @safe(unchecked, message: "I was careful")
 func h(_: UnsafeType) { // expected-warning{{reference to unsafe struct 'UnsafeType' [Unsafe]}}
   unsafeFunction()

@@ -6,7 +6,8 @@
 // REQUIRES: swift_feature_AllowUnsafeAttribute
 // REQUIRES: swift_feature_WarnUnsafe
 
-// expected-note@+1 4{{mark the enclosing global function 'test' '@unsafe' to allow it to use unsafe constructs}}{{1-1=@unsafe }}
+// expected-note@+2 2{{make global function 'test' @safe(unchecked) to allow it to use unsafe constructs in its definition}}{{1-1=@safe(unchecked) }}
+// expected-note@+1 2{{make global function 'test' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
 func test(
   x: OpaquePointer, // expected-warning{{reference to unsafe struct 'OpaquePointer'}}
   other: UnsafeMutablePointer<Int> // expected-warning{{reference to unsafe generic struct 'UnsafeMutablePointer'}}
