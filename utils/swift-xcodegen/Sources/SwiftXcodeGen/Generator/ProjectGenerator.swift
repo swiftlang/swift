@@ -558,6 +558,13 @@ fileprivate final class ProjectGenerator {
       buildSettings.common.DEFINES_MODULE = "YES"
     }
 
+    // Disable the Obj-C bridging header; we don't currently use this, and
+    // even if we did, we'd probably want to use the one in the Ninja build
+    // folder.
+    // This also works around a compiler crash
+    // (https://github.com/swiftlang/swift/issues/78190).
+    buildSettings.common.SWIFT_OBJC_INTERFACE_HEADER_NAME = ""
+
     if let last = buildArgs.takeFlagGroup(.O, .Onone) {
       buildSettings.common.SWIFT_OPTIMIZATION_LEVEL = last.printed
     }
