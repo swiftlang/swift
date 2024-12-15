@@ -2381,16 +2381,19 @@ ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
   auto pattern1 = expansion1->getPatternType();
   auto pattern2 = expansion2->getPatternType();
 
+  auto *const typeVar1 = pattern1->getAs<TypeVariableType>();
+  auto *const typeVar2 = pattern2->getAs<TypeVariableType>();
+
   auto *const pack1 = pattern1->getAs<PackType>();
   auto *const pack2 = pattern2->getAs<PackType>();
 
-  // If both sides are expanded or neither side is, proceed to matching them
-  // directly.
+  // If either side is a type variable, neither side is expanded, or both sides
+  // are expanded, proceed to matching them directly.
   // Otherwise, we have something like `Foo<$T0>` vs.
   // `Pack{Foo<Int>, Foo<String>}` or vice versa.
   // We're going to bind `$T0` to `Pack{Int, String}` and unfold `Foo<$T0>` into
-  // `Pack{Foo<$T3>, Foo<$T4>} first.
-  if ((bool)pack1 != (bool)pack2) {
+  // `Pack{Foo<$T3>, Foo<$T4>} first, then match.
+  if (!typeVar1 && !typeVar2 && (bool)pack1 != (bool)pack2) {
     if (pack1) {
       pattern2 =
           replaceTypeVariablesWithFreshPacks(*this, pattern2, pack1, locator);
