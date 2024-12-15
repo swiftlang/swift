@@ -557,8 +557,10 @@ fileprivate final class ProjectGenerator {
 
     applySubstitutions(to: &buildArgs, target: target, targetInfo: targetInfo)
 
+    // Follow the same logic as swift-driver and set the module name to 'main'
+    // if we don't have one.
     let moduleName = buildArgs.takePrintedLastValue(for: .moduleName)
-    buildSettings.common.PRODUCT_MODULE_NAME = moduleName
+    buildSettings.common.PRODUCT_MODULE_NAME = moduleName ?? "main"
 
     // Emit a module if we need to.
     // TODO: This currently just uses the build rule command args, should we
