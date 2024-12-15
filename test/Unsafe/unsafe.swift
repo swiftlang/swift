@@ -92,6 +92,7 @@ func testMe(
 // -----------------------------------------------------------------------
 // Various declaration kinds
 // -----------------------------------------------------------------------
+// expected-note@+1{{make type alias 'SuperUnsafe' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
 typealias SuperUnsafe = UnsafeSuper // expected-warning{{reference to unsafe class 'UnsafeSuper' [Unsafe]}}
 @unsafe typealias SuperUnsafe2 = UnsafeSuper
 

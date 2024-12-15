@@ -1853,8 +1853,8 @@ static bool isTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 
   bool IsModuleScopeContext = D->getDeclContext()->isModuleScopeContext();
 
-  // We consider global functions to be "type level"
-  if (isa<FuncDecl>(D)) {
+  // We consider global functions, type aliases, and macros to be "type level"
+  if (isa<FuncDecl>(D) || isa<MacroDecl>(D) || isa<TypeAliasDecl>(D)) {
     return IsModuleScopeContext;
   }
 
@@ -4073,8 +4073,6 @@ private:
 };
 } // end anonymous namespace
 
-llvm::DenseSet<const Decl *> reportedDecls;
-
 static void suggestUnsafeOnEnclosingDecl(
     SourceRange referenceRange, const DeclContext *referenceDC) {
   if (referenceRange.isInvalid())
@@ -4092,9 +4090,6 @@ static void suggestUnsafeOnEnclosingDecl(
   if (!decl)
     return;
 
-  if (!reportedDecls.insert(decl).second)
-    return;
-  
   if (versionCheckNode.has_value()) {
     // The unsafe construct is inside the body of the entity, so suggest
     // @safe(unchecked) on the declaration.
