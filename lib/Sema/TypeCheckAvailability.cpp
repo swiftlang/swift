@@ -950,6 +950,12 @@ private:
     if (auto accessor = dyn_cast<AccessorDecl>(decl))
       return declHasSafeAttr(accessor->getStorage());
 
+    // Attributes for pattern binding declarations are on the first variable.
+    if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
+      if (auto var = pbd->getAnchoringVarDecl(0))
+        return declHasSafeAttr(var);
+    }
+
     return false;
   }
 
