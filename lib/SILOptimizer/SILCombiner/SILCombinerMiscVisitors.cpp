@@ -1961,7 +1961,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // does not have a meaning, so just eliminate it.
   {
     SILType baseType = mdi->getBase()->getType();
-    if (baseType.isObject() && baseType.isTrivial(*mdi->getFunction())) {
+    if (baseType.getObjectType().isTrivial(*mdi->getFunction())) {
       SILValue value = mdi->getValue();
       mdi->replaceAllUsesWith(value);
       return eraseInstFromFunction(*mdi);
