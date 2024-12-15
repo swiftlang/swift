@@ -972,7 +972,7 @@ static SILValue tryRewriteToPartialApplyStack(
 
   // Don't run insertDeallocOfCapturedArguments if newPA is in an unreachable
   // block insertDeallocOfCapturedArguments will run code that computes the DF
-  // for newPA that will loop infinetly.
+  // for newPA that will loop infinitely.
   if (unreachableBlocks.count(newPA->getParent()))
     return closureOp;
 
