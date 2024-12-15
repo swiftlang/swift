@@ -250,22 +250,6 @@ private struct DiagnoseDependence {
   }
 }
 
-private extension Instruction {
-  func findVarDecl() -> VarDecl? {
-    if let varDeclInst = self as? VarDeclInstruction {
-      return varDeclInst.varDecl
-    }
-    for result in results {
-      for use in result.uses {
-        if let debugVal = use.instruction as? DebugValueInst {
-          return debugVal.varDecl
-        }
-      }
-    }
-    return nil
-  }
-}
-
 // Identify a best-effort variable declaration based on a defining SIL
 // value or any lifetime dependent use of that SIL value.
 private struct LifetimeVariable {

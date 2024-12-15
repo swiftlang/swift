@@ -52,6 +52,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 private let verbose = false
@@ -593,17 +594,8 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
   }
 
   mutating func walkUp(value: Value, _ owner: Value?) -> WalkResult {
-    switch value.definingInstruction {
-    case let moveInst as MoveValueInst:
-      if moveInst.isFromVarDecl {
-        return introducer(moveInst, owner)
-      }
-    case let borrow as BeginBorrowInst:
-      if borrow.isFromVarDecl {
-        return introducer(borrow, owner)
-      }
-    default:
-      break
+    if let inst = value.definingInstruction, VariableScopeInstruction(inst) != nil {
+      return introducer(value, owner)
     }
     return walkUpDefault(dependent: value, owner: owner)
   }
