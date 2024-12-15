@@ -60,15 +60,15 @@ internal enum UTF8ValidationResult {
 
 // FIXME: refactor other parts of stdlib to avoid this dumb mirror enum
 //
-// Mirror of UTF8.EncodingError.Kind, available on 6.1
+// Mirror of UTF8.ValidationError.Kind, available on 6.1
 internal struct _UTF8EncodingErrorKind: Error, Sendable, Hashable
 // TODO: embedded?, Codable
   , RawRepresentable {
   internal var rawValue: UInt8
 
-  @available(SwiftStdlib 6.1, *)
-  internal var _publicKind: UTF8.EncodingError.Kind {
-    .init(rawValue: self.rawValue)
+  @available(SwiftStdlib 6.2, *)
+  internal var _publicKind: UTF8.ValidationError.Kind {
+    .init(rawValue: self.rawValue)!
   }
 
   @inlinable

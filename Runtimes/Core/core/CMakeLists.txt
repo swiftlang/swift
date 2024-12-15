@@ -210,6 +210,13 @@ add_library(swiftCore
   UTF8.swift
   UTF16.swift
   UTF32.swift
+  UTF8Span.swift
+  UTF8SpanBits.swift
+  UTF8SpanComparisons.swift
+  UTF8SpanFundamentals.swift
+  UTF8SpanInternalHelpers.swift
+  UTF8SpanIterators.swift
+  UTF8EncodingError.swift
   Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
   StringGraphemeBreaking.swift # ORDER DEPENDENCY: Must follow UTF16.swift
   ValidUTF8Buffer.swift
