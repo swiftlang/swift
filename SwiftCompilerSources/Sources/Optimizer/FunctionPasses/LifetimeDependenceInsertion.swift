@@ -218,11 +218,10 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
     case .result, .inParameter, .inoutParameter:
       // Create a new dependence on the apply's access to the argument.
       for varIntoducer in gatherVariableIntroducers(for: source.value, context) {
-        if let scope = LifetimeDependence.Scope(base: varIntoducer, context) {
-          log("Scoped lifetime from \(source.value)")
-          log("  scope: \(scope)")
-          bases.append(scope.parentValue)
-        }
+        let scope = LifetimeDependence.Scope(base: varIntoducer, context)
+        log("Scoped lifetime from \(source.value)")
+        log("  scope: \(scope)")
+        bases.append(scope.parentValue)
       }
     }
   }

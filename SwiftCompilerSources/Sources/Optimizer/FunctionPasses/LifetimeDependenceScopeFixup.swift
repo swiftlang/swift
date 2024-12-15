@@ -299,9 +299,7 @@ private extension LifetimeDependence.Scope {
                                                        dependsOnArg: dependsOnArg))
     case let .borrowed(beginBorrow):
       let borrowedValue = beginBorrow.baseOperand!.value
-      guard let enclosingScope = LifetimeDependence.Scope(base: borrowedValue, context) else {
-        return nil
-      }
+      let enclosingScope = LifetimeDependence.Scope(base: borrowedValue, context)
       innerScopes.push(self)
       var innerBorrowScopes = innerScopes
       innerBorrowScopes.push(enclosingScope)
@@ -323,9 +321,7 @@ private extension LifetimeDependence.Scope {
         guard let dep = applySite.resultDependence(on: operand), dep == .scope else {
           continue
         }
-        guard let enclosingScope = LifetimeDependence.Scope(base: operand.value, context) else {
-          continue
-        }
+        let enclosingScope = LifetimeDependence.Scope(base: operand.value, context)
         if let operandExtensions = enclosingScope.gatherExtensions(innerScopes: innerScopes, context) {
           extensions.append(contentsOf: operandExtensions)
         } else {

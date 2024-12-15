@@ -119,7 +119,7 @@ extension LazyFilterSequence : /*@retroactive*/ SIL.CollectionLikeSequence,
 //===----------------------------------------------------------------------===//
 
 public struct SingleInlineArray<Element>: RandomAccessCollection, FormattedLikeArray {
-  private var singleElement: Element?
+  public var singleElement: Element?
   private var multipleElements: [Element] = []
 
   public init() {}
