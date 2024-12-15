@@ -97,7 +97,7 @@ internal func _stringCompareInternal(
 }
 
 @_effects(readonly)
-private func _stringCompareFastUTF8(
+internal func _stringCompareFastUTF8(
   _ utf8Left: UnsafeBufferPointer<UInt8>,
   _ utf8Right: UnsafeBufferPointer<UInt8>,
   expecting: _StringComparisonResult,

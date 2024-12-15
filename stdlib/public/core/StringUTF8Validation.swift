@@ -68,7 +68,7 @@ internal struct _UTF8EncodingErrorKind: Error, Sendable, Hashable
 
   @available(SwiftStdlib 6.1, *)
   internal var _publicKind: UTF8.EncodingError.Kind {
-    .init(rawValue: self.rawValue)
+    .init(rawValue: self.rawValue)!
   }
 
   @inlinable
