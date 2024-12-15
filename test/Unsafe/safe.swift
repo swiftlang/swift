@@ -30,7 +30,7 @@ func rethrowing(body: (UnsafeType) throws -> Void) rethrows { } // expected-warn
 
 class HasStatics {
   // expected-note@+1{{make static method 'f' @unsafe to indicate that its use is not memory-safe}}{{3-3=@unsafe }}
-  static func f(_: UnsafeType) { } // expected-warning{{reference to unsafe struct 'UnsafeType' [Unsafe]}}
+  static internal func f(_: UnsafeType) { } // expected-warning{{reference to unsafe struct 'UnsafeType' [Unsafe]}}
 }
 
 @unsafe
