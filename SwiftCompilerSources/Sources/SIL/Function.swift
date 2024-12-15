@@ -40,6 +40,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }
 
+  public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
+
   public var specializationLevel: Int { bridged.specializationLevel() }
   
   public var hasOwnership: Bool { bridged.hasOwnership() }
