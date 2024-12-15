@@ -458,6 +458,19 @@ extension Unicode.Scalar {
   }
 }
 
+extension Unicode {
+  /// **QUESTION**: Hashable? Codable?
+  /// **QUESTION**: Can we be frozen? What's the cost of resiliency here?
+  public struct GraphemeBreakingState: Sendable, Equatable {
+    internal var _state: _GraphemeBreakingState
+
+    /// ...
+    public init() {
+      self._state = .init()
+    }
+  }
+}
+
 internal struct _GraphemeBreakingState: Sendable, Equatable {
   // When we're looking through an indic sequence, one of the requirements is
   // that there is at LEAST 1 Virama present between two linking consonants.
@@ -515,6 +528,8 @@ extension Unicode {
     internal var _previous: Unicode.Scalar
     internal var _state: _GraphemeBreakingState
 
+    /// Refactoring TODO: should we use a quick check result?
+    ///
     /// Returns a non-nil value if it can be determined whether there is a
     /// grapheme break between `scalar1` and `scalar2` without knowing anything
     /// about the scalars that precede `scalar1`. This can optionally be used as
