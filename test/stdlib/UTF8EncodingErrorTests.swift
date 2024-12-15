@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift(-enable-experimental-feature Span) -enable-experimental-feature Span %S/Inputs/ 
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature Span) -enable-experimental-feature Span %S/Inputs/
 
 // REQUIRES: executable_test
 
@@ -35,7 +35,7 @@ private struct ValidationError {
 
 
   init(
-    _ error: UTF8.EncodingError, 
+    _ error: UTF8.EncodingError,
     errorStart: Bool
   ) {
     self.error = error
@@ -88,7 +88,7 @@ private struct ValidationTestCase {
   init(
     _ bytes: [UInt8],
     _ errors: [ValidationError],
-    file: String = #file, 
+    file: String = #file,
     line: UInt = #line
   ) {
     self.bytes = bytes
@@ -109,25 +109,27 @@ private struct ValidationTestCase {
   func expect<T: Equatable>(
     _ lhs: T,
     _ rhs: T,
-    file: String = #file, 
+    file: String = #file,
     line: UInt = #line
   ) {
     expectEqual(
-      lhs, 
-      rhs, 
+      lhs,
+      rhs,
       stackTrace: loc.withCurrentLoc(file: file, line: line))
   }
   func fail(
     _ message: String,
-    file: String = #file, 
+    file: String = #file,
     line: UInt = #line
   ) {
     expectationFailure(
-      message, 
-      trace: "", 
+      message,
+      trace: "",
       stackTrace: loc.with(.init(file, line)))
   }
 
+  /// Test UTF8._checkAllErrors(), which matches directly against
+  /// the provided expected-errors.
   func testAllErrors() {
     let caughtErrors = Array(UTF8._checkAllErrors(bytes))
     for i in 0..<Swift.min(caughtErrors.count, errors.count) {
@@ -136,8 +138,10 @@ private struct ValidationTestCase {
     expect(caughtErrors.count, errors.count)
   }
 
+  /// Test UTF8Span validation. Surface subsequent errors by slicing the
+  /// input (which will convert the error-kind to .unexpectedContinuationByte)
   func testSpanSlicedErrors() {
-    bytes.withSpan { span in 
+    bytes.withSpan { span in
       if errors.isEmpty {
         do throws(UTF8.EncodingError) {
           // No errors expected
@@ -148,22 +152,42 @@ private struct ValidationTestCase {
         return
       }
 
-      // Check for each error.
-      // NOTE: We currently do it by slicing, which will change the
-      // error classification.
-      for errorIdx in errors.indices {
-        let expectedError = fetchError(at: errorIdx, wasSliced: true)
-        let start = expectedError.range.lowerBound
+      // Check every error, by slicing (which will change error classification
+      // of continuation bytes in multi-byte errors to .unexpectedContinuation)
+      var currentPos = 0
+      var errorIdx = 0
+      while true {
         do throws(UTF8.EncodingError) {
-          _ = try UTF8Span(_validating: span._extracting(start...))
-          fail("Expected a thrown UTF-8 encoding error")
+          // print("extracting \(currentPos)")
+          _ = try UTF8Span(_validating: span._extracting(currentPos...))
+
+          if errorIdx != errors.endIndex {
+            fail("Expected a thrown UTF-8 encoding error")
+          }
+          break
         } catch {
+          guard errorIdx < errors.endIndex else {
+            fail("Found unexpected subsequent error \(error)")
+            break
+          }
+
+          let expectedError = fetchError(at: errorIdx, wasSliced: true)
+          // print(currentPos)
+          // print(error)
+
+          // print(error.range._offset(by: currentPos))
+
+
           let adjustedErr = UTF8.EncodingError(
             error.kind,
-            error.range._offset(by: start)
+            error.range._offset(by: currentPos)
           )
           expect(expectedError, adjustedErr)
+
+          currentPos = adjustedErr.range.upperBound
+          errorIdx += 1
         }
+
       }
 
       // Rest of input should be error-free
@@ -186,10 +210,6 @@ private struct ValidationTestCase {
 }
 
 if #available(SwiftStdlib 6.1, *) {
-  // suite.test("UTF8EncodingError/test") {
-  //   fatalError()
-  // }
-
   suite.test("UTF8Span/encoding errors") {
     func test(_ t: ValidationTestCase) {
       t.run()
@@ -262,7 +282,7 @@ if #available(SwiftStdlib 6.1, *) {
       [.overlongEncodingByte(at: 0), // E0
        .overlongEncodingByte(at: 1, errorStart: false), // 81
        .overlongEncodingByte(at: 2, errorStart: false), // 80
-      ]))    
+      ]))
   }
 }
 
