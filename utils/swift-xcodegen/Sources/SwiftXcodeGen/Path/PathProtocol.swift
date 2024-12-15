@@ -38,6 +38,10 @@ public extension PathProtocol {
     storage.lastComponent?.string ?? ""
   }
 
+  var isEmpty: Bool {
+    storage.isEmpty
+  }
+
   func appending(_ relPath: RelativePath) -> Self {
     Self(storage.pushing(relPath.storage))
   }

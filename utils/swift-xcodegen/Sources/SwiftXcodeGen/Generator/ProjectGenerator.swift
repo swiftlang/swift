@@ -228,6 +228,14 @@ fileprivate final class ProjectGenerator {
       }
       guard buildableFolder != nil ||
               group(for: repoRelativePath.appending(parentPath)) != nil else {
+        // If this isn't a child of an explicitly added reference, something
+        // has probably gone wrong.
+        if !spec.referencesToAdd.contains(where: { parentPath.hasPrefix($0.path) }) {
+          log.warning("""
+            Target '\(name)' at '\(repoRelativePath.appending(parentPath))' is \
+            nested in a folder reference; skipping. This is likely an xcodegen bug.
+            """)
+        }
         return nil
       }
     }
@@ -275,6 +283,50 @@ fileprivate final class ProjectGenerator {
     }
   }
 
+  /// Checks whether a target can be represented using a buildable folder.
+  func canUseBuildableFolder(
+    at parentPath: RelativePath, sources: [RelativePath]
+  ) throws -> Bool {
+    // To use a buildable folder, all child sources need to be accounted for
+    // in the target. If we have any stray sources not part of the target,
+    // attempting to use a buildable folder would incorrectly include them.
+    // Additionally, special targets like "Unbuildables" have an empty parent
+    // path, avoid buildable folders for them.
+    guard spec.useBuildableFolders, !parentPath.isEmpty else { return false }
+    let sources = Set(sources)
+    return try getAllRepoSubpaths(of: parentPath)
+      .allSatisfy { !$0.isSourceLike || sources.contains($0) }
+  }
+
+  /// Checks whether a given Clang target can be represented using a buildable
+  /// folder.
+  func canUseBuildableFolder(for clangTarget: ClangTarget) throws -> Bool {
+    // In addition to the standard checking, we also must not have any
+    // unbuildable sources or sources with unique arguments.
+    // TODO: To improve the coverage of buildable folders, we ought to start
+    // automatically splitting umbrella Clang targets like 'stdlib', since
+    // they currently always have files with unique args.
+    guard spec.useBuildableFolders, clangTarget.unbuildableSources.isEmpty else {
+      return false
+    }
+    let parent = clangTarget.parentPath
+    let sources = clangTarget.sources.map(\.path)
+    let hasConsistentArgs = try sources.allSatisfy {
+      try !buildDir.clangArgs.hasUniqueArgs(for: $0, parent: parent)
+    }
+    guard hasConsistentArgs else { return false }
+    return try canUseBuildableFolder(at: parent, sources: sources)
+  }
+
+  func canUseBuildableFolder(
+    for buildRule: SwiftTarget.BuildRule
+  ) throws -> Bool {
+    guard let parentPath = buildRule.parentPath else { return false }
+    return try canUseBuildableFolder(
+      at: parentPath, sources: buildRule.sources.repoSources
+    )
+  }
+
   func generateClangTarget(
     _ targetInfo: ClangTarget, includeInAllTarget: Bool = true
   ) throws {
@@ -303,20 +355,10 @@ fileprivate final class ProjectGenerator {
       }
       return
     }
-    // Can only use buildable folders if there are no unique arguments and no
-    // unbuildable sources.
-    // TODO: To improve the coverage of buildable folders, we ought to start
-    // automatically splitting umbrella Clang targets like 'stdlib', since
-    // they always have files with unique args.
-    let canUseBuildableFolders =
-      try spec.useBuildableFolders && targetInfo.unbuildableSources.isEmpty &&
-      targetInfo.sources.allSatisfy {
-        try !buildDir.clangArgs.hasUniqueArgs(for: $0.path, parent: targetPath)
-      }
-
     let target = generateBaseTarget(
       targetInfo.name, at: targetPath,
-      canUseBuildableFolder: canUseBuildableFolders, productType: .staticArchive,
+      canUseBuildableFolder: try canUseBuildableFolder(for: targetInfo),
+      productType: .staticArchive,
       includeInAllTarget: includeInAllTarget
     )
     guard let target else { return }
@@ -531,19 +573,11 @@ fileprivate final class ProjectGenerator {
     guard checkNotExcluded(buildRule.parentPath, for: "Swift target") else {
       return nil
     }
-    // Swift targets can almost always use buildable folders since they have
-    // a consistent set of arguments, but we need to ensure we don't have any
-    // child source files that aren't part of the target.
-    let canUseBuildableFolder = try {
-      guard let parent = buildRule.parentPath else { return false }
-      let repoSources = Set(buildRule.sources.repoSources)
-      return try getAllRepoSubpaths(of: parent)
-        .allSatisfy { !$0.isSourceLike || repoSources.contains($0) }
-    }()
     // Create the target.
     let target = generateBaseTarget(
       targetInfo.name, at: buildRule.parentPath,
-      canUseBuildableFolder: canUseBuildableFolder, productType: .staticArchive,
+      canUseBuildableFolder: try canUseBuildableFolder(for: buildRule),
+      productType: .staticArchive,
       includeInAllTarget: includeInAllTarget
     )
     guard let target else { return nil }
