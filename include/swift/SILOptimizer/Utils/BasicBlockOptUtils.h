@@ -38,9 +38,14 @@ class SILLoopInfo;
 /// Compute the set of reachable blocks.
 class ReachableBlocks {
   BasicBlockSet visited;
+  bool isComputed;
 
 public:
-  ReachableBlocks(SILFunction *function) : visited(function) {}
+  ReachableBlocks(SILFunction *function)
+      : visited(function), isComputed(false) {}
+
+  /// Populate `visited` with the blocks reachable in the function.
+  void compute();
 
   /// Invoke \p visitor for each reachable block in \p f in worklist order (at
   /// least one predecessor has been visited--defs are always visited before

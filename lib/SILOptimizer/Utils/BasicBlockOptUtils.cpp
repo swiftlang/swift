@@ -41,6 +41,12 @@ bool ReachableBlocks::visit(function_ref<bool(SILBasicBlock *)> visitor) {
   return true;
 }
 
+void ReachableBlocks::compute() {
+  // Visit all the blocks without doing any extra work.
+  visit([](SILBasicBlock *) { return true; });
+  isComputed = true;
+}
+
 ReachingReturnBlocks::ReachingReturnBlocks(SILFunction *function)
     : worklist(function) {
   for (SILBasicBlock &block : *function) {
@@ -57,8 +63,7 @@ ReachingReturnBlocks::ReachingReturnBlocks(SILFunction *function)
 
 bool swift::removeUnreachableBlocks(SILFunction &f) {
   ReachableBlocks reachable(&f);
-  // Visit all the blocks without doing any extra work.
-  reachable.visit([](SILBasicBlock *) { return true; });
+  reachable.compute();
 
   // Remove the blocks we never reached. Assume the entry block is visited.
   // Reachable's visited set contains dangling pointers during this loop.
