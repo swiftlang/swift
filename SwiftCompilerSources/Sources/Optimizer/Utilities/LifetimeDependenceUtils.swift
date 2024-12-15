@@ -597,6 +597,11 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
     if let inst = value.definingInstruction, VariableScopeInstruction(inst) != nil {
       return introducer(value, owner)
     }
+    // Finding a variable introducer requires following the mark_dependence forwarded value, not the base value like the
+    // default LifetimeDependenceUseDefWalker.
+    if value is MarkDependenceInst {
+      return walkUpDefault(forwarded: value, owner)
+    }
     return walkUpDefault(dependent: value, owner: owner)
   }
 
