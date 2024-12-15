@@ -637,7 +637,7 @@ void DCE::endLifetimeOfLiveValue(Operand *op, SILInstruction *insertPt) {
   // If DCE is going to delete the block in which we have to insert a
   // compensating lifetime end, let complete lifetimes utility handle it.
   if (!LiveBlocks.contains(insertPt->getParent())) {
-    valuesToComplete.push_back(value);
+    valuesToComplete.push_back(lookThroughBorrowedFromDef(value));
     return;
   }
 
