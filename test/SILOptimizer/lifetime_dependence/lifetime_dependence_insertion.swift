@@ -48,3 +48,17 @@ func bv_borrow_var(p: UnsafeRawPointer, i: Int) {
   let bv = nc.getBV()
   use(bv)
 }
+
+// LifetimeDependence.Scope needs to see through typed-to-raw pointer conversion.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s4test18bv_pointer_convert1pAA2BVVSPySiG_tF : $@convention(thin) (UnsafePointer<Int>) -> @lifetime(borrow 0) @owned BV {
+// CHECK: bb0(%0 : $UnsafePointer<Int>):
+// CHECK: apply %{{.*}}<UnsafePointer<Int>, UnsafeRawPointer>([[RAW:%.*]], %{{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : _Pointer, τ_0_1 : _Pointer> (@in_guaranteed τ_0_0) -> @out τ_0_1
+// CHECK: [[RAW:%.*]] = load [trivial] %6 : $*UnsafeRawPointer
+// CHECK: [[BV:%.*]] = apply %13([[RAW]], {{.*}}) : $@convention(method) (UnsafeRawPointer, Int, @thin BV.Type) -> @lifetime(borrow 0) @owned BV
+// CHECK: return [[BV]] : $BV
+// CHECK-LABEL: } // end sil function '$s4test18bv_pointer_convert1pAA2BVVSPySiG_tF'
+@lifetime(borrow p)
+func bv_pointer_convert(p: UnsafePointer<Int>) -> BV {
+  BV(p, 0)
+}

@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
@@ -538,9 +539,17 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
                              : afd->getParameters()->size();
 
   auto *cd = dyn_cast<ConstructorDecl>(afd);
-  if (cd && cd->isImplicit()) {
-    if (cd->getParameters()->size() == 0) {
+  if (cd && cd->getParameters()->size() == 0) {
+    if (cd->isImplicit()) {
       return std::nullopt;
+    }
+    if (auto *sf = afd->getParentSourceFile()) {
+      // The AST printer makes implicit initializers explicit, but does not
+      // print the @lifetime annotations. Until that is fixed, avoid diagnosing
+      // this as an error.
+      if (sf->Kind == SourceFileKind::SIL) {
+        return std::nullopt;
+      }
     }
   }
 
