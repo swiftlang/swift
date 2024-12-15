@@ -942,11 +942,22 @@ private:
     return true;
   }
 
+  /// Determine whether the given declaration has the @safe attribute.
+  static bool declHasSafeAttr(Decl *decl) {
+    if (decl->getAttrs().hasAttribute<SafeAttr>())
+      return true;
+
+    if (auto accessor = dyn_cast<AccessorDecl>(decl))
+      return declHasSafeAttr(accessor->getStorage());
+
+    return false;
+  }
+
   void buildContextsForBodyOfDecl(Decl *D) {
     // Are we already constrained by the deployment target and the declaration
     // doesn't explicitly allow unsafe constructs in its definition, adding
     // new contexts won't change availability.
-    bool allowsUnsafe = D->getAttrs().hasAttribute<SafeAttr>();
+    bool allowsUnsafe = declHasSafeAttr(D);
     if (isCurrentScopeContainedByDeploymentTarget() && !allowsUnsafe)
       return;
 
@@ -4056,6 +4067,8 @@ private:
 };
 } // end anonymous namespace
 
+llvm::DenseSet<const Decl *> reportedDecls;
+
 static void suggestUnsafeOnEnclosingDecl(
     SourceRange referenceRange, const DeclContext *referenceDC) {
   if (referenceRange.isInvalid())
@@ -4073,6 +4086,9 @@ static void suggestUnsafeOnEnclosingDecl(
   if (!decl)
     return;
 
+  if (!reportedDecls.insert(decl).second)
+    return;
+  
   if (versionCheckNode.has_value()) {
     // The unsafe construct is inside the body of the entity, so suggest
     // @safe(unchecked) on the declaration.

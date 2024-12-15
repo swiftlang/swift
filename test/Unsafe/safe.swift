@@ -33,6 +33,19 @@ class HasStatics {
   static func f(_: UnsafeType) { } // expected-warning{{reference to unsafe struct 'UnsafeType' [Unsafe]}}
 }
 
+@unsafe
+func unsafeInt() -> Int { 5 }
+
+struct HasProperties {
+  @safe(unchecked) var computed: Int {
+    unsafeInt()
+  }
+
+  @unsafe var computedUnsafe: Int {
+    unsafeInt()
+  }
+}
+
 // Parsing issues
 @safe // expected-error{{expected '(' in 'safe' attribute}}
 func bad1() { }
