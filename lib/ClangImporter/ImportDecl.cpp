@@ -4442,7 +4442,7 @@ namespace {
         if (!importedBaseMethod)
           return nullptr;
         auto clonedMethod = dyn_cast_or_null<FuncDecl>(
-            Impl.importBaseMemberDecl(importedBaseMethod, importedDC));
+            Impl.importBaseMemberDecl(importedBaseMethod, importedDC, clang::AS_none));
         if (!clonedMethod)
           return nullptr;
 
@@ -9616,24 +9616,9 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       if (!shouldAddBaseMember)
         continue;
       // So we need to clone the member into the derived class.
-      if (auto newDecl = importBaseMemberDecl(namedMember, swiftDecl)) {
-        // Adjust access according to whichever is more restrictive, between
-        // what the namedMember was declared with or what it is inherited with.
-        // Instead of looking at the C++ access of namedMember->getClangDecl(),
-        // we just use the Swift AccessLevel that it got converted to and
-        // compare it to the converted inheritance access specifier; this relies
-        // on importer::convertClangAccess() being a linear mapping.
-        auto adjustedAccess = std::min(newDecl->getFormalAccess(),
-                                       importer::convertClangAccess(inheritance));
-        newDecl->overwriteAccess(adjustedAccess);
-
-        // Also adjust access of accessors, for imported storage decls
-        if (auto asd = dyn_cast<AbstractStorageDecl>(newDecl))
-          for (auto acc : asd->getAllAccessors())
-            acc->overwriteAccess(adjustedAccess);
-
+      if (auto newDecl = importBaseMemberDecl(namedMember, swiftDecl, inheritance))
         swiftDecl->addMember(newDecl);
-      }
+
       continue;
     }
 
@@ -9674,9 +9659,14 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       if (!isa<clang::RecordType>(baseType))
         continue;
 
+      auto access = base.getAccessSpecifier();
+      if (inheritance != clang::AS_none)
+        // For nested inheritance, clamp inheritance to least permissive level
+        // which is the largest numerical value for clang::AccessSpecifier
+        access = std::max(inheritance, access);
+
       auto *baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-      loadAllMembersOfRecordDecl(swiftDecl, baseRecord,
-                                 base.getAccessSpecifier());
+      loadAllMembersOfRecordDecl(swiftDecl, baseRecord, access);
     }
   }
 }

@@ -2778,6 +2778,10 @@ private:
 
     /// Whether we've evaluated the ApplyAccessNoteRequest.
     unsigned accessNoteApplied : 1;
+
+    /// Whether this declaration represents an inherited C++ member that is
+    /// lazily cloned from a base class.
+    unsigned isLazilyInheritedClone : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
@@ -3179,6 +3183,17 @@ public:
   void setImplicitlyUnwrappedOptional(bool isIUO) {
     LazySemanticInfo.isIUOComputed = 1;
     LazySemanticInfo.isIUO = isIUO;
+  }
+
+  /// Returns true if this decl represents an inherited C++ member that is
+  /// lazily cloned from a base class.
+  bool isLazilyInheritedClone() const {
+    return LazySemanticInfo.isLazilyInheritedClone;
+  }
+
+  /// Marks this decl as representing an inherited C++ member.
+  void setLazilyInheritedClone(bool isLazilyInheritedClone) {
+    LazySemanticInfo.isLazilyInheritedClone = isLazilyInheritedClone;
   }
 
   /// Returns the protocol requirements that this decl conforms to.

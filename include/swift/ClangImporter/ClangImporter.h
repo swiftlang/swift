@@ -658,7 +658,8 @@ public:
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl,
-                                  DeclContext *newContext) override;
+                                  DeclContext *newContext,
+                                  clang::AccessSpecifier inheritance) override;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.

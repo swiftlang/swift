@@ -694,7 +694,8 @@ public:
 
   bool isDefaultArgSafeToImport(const clang::ParmVarDecl *param);
 
-  ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext);
+  ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
+                                  clang::AccessSpecifier inheritance);
 
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 
