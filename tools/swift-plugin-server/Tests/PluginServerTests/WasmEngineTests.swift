@@ -71,6 +71,7 @@ struct WasmEngineTests {
     let binary = try wat2wasm(echo)
     let echoURL = FileManager.default.temporaryDirectory.appendingPathExtension("echo.wasm")
     try Data(binary).write(to: echoURL)
+    defer { try! FileManager.default.removeItem(at: echoURL) }
 
     let engine = try WasmEnginePlugin<WasmKitEngine>(path: FilePath(echoURL.path))
     let input: [UInt8] = [1,2,3,4,5]
