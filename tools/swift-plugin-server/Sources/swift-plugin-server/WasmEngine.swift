@@ -29,7 +29,7 @@ import WasmTypes
 typealias WasmFunction = () throws -> Void
 
 protocol WasmEngine {
-  init(path: FilePath, stdinPath: FilePath, stdoutPath: FilePath) throws
+  init(pluginPath: FilePath, stdinPath: FilePath, stdoutPath: FilePath) throws
 
   func function(named name: String) throws -> WasmFunction?
 
@@ -74,7 +74,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
       throw Error.failedToCreateNamedPipe(self.stdoutPath)
     }
 
-    self.engine = try Engine(path: path, stdinPath: self.stdinPath, stdoutPath: self.stdoutPath)
+    self.engine = try Engine(pluginPath: path, stdinPath: self.stdinPath, stdoutPath: self.stdoutPath)
 
     let exportName = "swift_wasm_macro_v1_pump"
     guard let pump = try engine.function(named: exportName) else {
