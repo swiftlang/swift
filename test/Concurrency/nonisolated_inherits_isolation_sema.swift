@@ -1,5 +1,9 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6 -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext -parse-as-library
 
+// REQUIRES: asserts
+// REQUIRES: concurrency
+// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+
 class NonSendable {} // expected-note {{}}
 
 @MainActor var global = NonSendable()
