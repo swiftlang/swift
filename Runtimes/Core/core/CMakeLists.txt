@@ -322,6 +322,8 @@ target_link_libraries(swiftCore
     swiftDemangling
     swiftStdlibStubs
     swiftThreading)
+target_link_options(swiftCore PRIVATE
+  -nostartfiles)
 if(NOT POLICY CMP0157)
   target_compile_options(swiftCore PRIVATE
     $<TARGET_OBJECTS:swiftRuntime>
