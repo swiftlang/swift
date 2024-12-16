@@ -104,6 +104,9 @@ struct SILGenCleanup : SILModuleTransform {
   void run() override;
 
   bool completeOSSALifetimes(SILFunction *function);
+  template <typename Range>
+  bool completeLifetimesInRange(Range const &range,
+                                OSSALifetimeCompletion &completion);
 };
 
 bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
@@ -120,7 +123,16 @@ bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
       getAnalysis<PostOrderAnalysis>()->get(function);
   DeadEndBlocks *deb = getAnalysis<DeadEndBlocksAnalysis>()->get(function);
   OSSALifetimeCompletion completion(function, /*DomInfo*/ nullptr, *deb);
-  for (auto *block : postOrder->getPostOrder()) {
+  changed |= completeLifetimesInRange(postOrder->getPostOrder(), completion);
+  function->verifyOwnership(/*deadEndBlocks=*/nullptr);
+  return changed;
+}
+
+template <typename Range>
+bool SILGenCleanup::completeLifetimesInRange(
+    Range const &range, OSSALifetimeCompletion &completion) {
+  bool changed = false;
+  for (auto *block : range) {
     LLVM_DEBUG(llvm::dbgs()
                << "Completing lifetimes in bb" << block->getDebugID() << "\n");
     for (SILInstruction &inst : reverse(*block)) {
@@ -145,7 +157,6 @@ bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
       }
     }
   }
-  function->verifyOwnership(/*deadEndBlocks=*/nullptr);
   return changed;
 }
 
