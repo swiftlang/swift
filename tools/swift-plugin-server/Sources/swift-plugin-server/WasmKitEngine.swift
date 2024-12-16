@@ -10,25 +10,38 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SystemPackage
 import WASI
 import WasmKit
 import WasmKitWASI
-import SystemPackage
 
 typealias DefaultWasmEngine = WasmKitEngine
 
 struct WasmKitEngine: WasmEngine {
   private let engine: Engine
   private let functions: [String: Function]
+  private let hostToPlugin: FileDescriptor
+  private let pluginToHost: FileDescriptor
 
-  init(path: FilePath, imports: WASIBridgeToHost) throws {
+  init(pluginPath: FilePath) throws {
+    let hostToPluginPipe = try FileDescriptor.pipe()
+    let pluginToHostPipe = try FileDescriptor.pipe()
+    self.hostToPlugin = hostToPluginPipe.writeEnd
+    self.pluginToHost = pluginToHostPipe.readEnd
+
     var configuration = EngineConfiguration()
     configuration.stackSize = 1 << 20
     self.engine = Engine(configuration: configuration)
     let store = Store(engine: engine)
 
-    let module = try parseWasm(filePath: path)
+    let module = try parseWasm(filePath: pluginPath)
     var moduleImports = Imports()
+
+    let imports = try WASIBridgeToHost(
+      stdin: hostToPluginPipe.readEnd,
+      stdout: pluginToHostPipe.writeEnd,
+      stderr: .standardError
+    )
     imports.link(to: &moduleImports, store: store)
     let instance = try module.instantiate(store: store, imports: moduleImports)
     var functions = [String: Function]()
@@ -45,7 +58,16 @@ struct WasmKitEngine: WasmEngine {
     return { _ = try function.invoke() }
   }
 
+  func writeToPlugin(_ storage: some Sequence<UInt8>) throws {
+    try self.hostToPlugin.writeAll(storage)
+  }
+
+  func readFromPlugin(into storage: UnsafeMutableRawBufferPointer) throws -> Int {
+    try self.pluginToHost.read(into: storage)
+  }
+
   func shutDown() throws {
-    // No resources requiring explicit shut down in `WasmKitEngine`.
+    try self.hostToPlugin.close()
+    try self.pluginToHost.close()
   }
 }
