@@ -115,11 +115,6 @@ public:
     auto &C = D->getASTContext();
 
     if (isa<DestructorDecl>(D)) {
-      if (!C.LangOpts.hasFeature(Feature::IsolatedDeinit)) {
-        diagnoseAndRemoveAttr(attr, diag::isolated_deinit_experimental);
-        return;
-      }
-
       if (auto nominal = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
         if (!isa<ClassDecl>(nominal)) {
           // only classes and actors can have isolated deinit.
@@ -127,6 +122,13 @@ public:
           return;
         }
       }
+
+      TypeChecker::checkAvailability(
+        attr->getRange(), C.getIsolatedDeinitAvailability(),
+        D->getDeclContext(),
+        [&](StringRef platformName, llvm::VersionTuple version) {
+          return diagnoseAndRemoveAttr(attr, diag::isolated_deinit_unavailable, platformName, version);
+        });
     }
   }
 
@@ -387,6 +389,7 @@ public:
   void visitWeakLinkedAttr(WeakLinkedAttr *attr);
   void visitSILGenNameAttr(SILGenNameAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
+  void visitSafeAttr(SafeAttr *attr);
   void visitLifetimeAttr(LifetimeAttr *attr);
   void visitAddressableSelfAttr(AddressableSelfAttr *attr);
 };
@@ -4974,8 +4977,11 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
 
   // unowned(unsafe) is unsafe (duh).
   if (ownershipKind == ReferenceOwnership::Unmanaged &&
-      ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+      ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
+      !var->allowsUnsafe()) {
     Diags.diagnose(attr->getLocation(), diag::unowned_unsafe_is_unsafe);
+    var->diagnose(diag::make_enclosing_context_unsafe, var)
+      .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
   }
 
   if (attr->isInvalid())
@@ -7195,8 +7201,14 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // nonisolated(unsafe) is unsafe, but only under strict concurrency.
   if (attr->isUnsafe() &&
       Ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)
+      Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
+      !D->allowsUnsafe()) {
     Ctx.Diags.diagnose(attr->getLocation(), diag::nonisolated_unsafe_is_unsafe);
+    if (auto var = dyn_cast<VarDecl>(D)) {
+      var->diagnose(diag::make_enclosing_context_unsafe, var)
+        .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
+    }
+  }
 
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.
@@ -7760,6 +7772,13 @@ void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
 }
 
 void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
+  if (Ctx.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
+    return;
+
+  diagnoseAndRemoveAttr(attr, diag::unsafe_attr_disabled);
+}
+
+void AttributeChecker::visitSafeAttr(SafeAttr *attr) {
   if (Ctx.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
     return;
 

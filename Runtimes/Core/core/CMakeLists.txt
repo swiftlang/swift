@@ -265,6 +265,10 @@ if(SwiftCore_ENABLE_VECTOR_TYPES)
     "${CMAKE_CURRENT_BINARY_DIR}/SIMDVectorTypes.swift")
 endif()
 
+if(APPLE AND BUILD_SHARED_LIBS)
+  target_link_options(swiftCore PRIVATE "SHELL:-Xlinker -headerpad_max_install_names")
+endif()
+
 target_compile_options(swiftCore PRIVATE
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
@@ -278,6 +282,8 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature MemberImportVisibility>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature TypedThrows>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Macros>"
@@ -306,7 +312,7 @@ target_compile_definitions(swiftCore PRIVATE
   $<$<BOOL:${SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS}>:-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER>
   $<$<COMPILE_LANGUAGE:C,CX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftCore>)
 target_compile_options(swiftCore PRIVATE
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -DswiftCore_EXPORTS>")
+  "$<$<AND:$<BOOL:${BUILD_SHARED_LIBS}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -DswiftCore_EXPORTS>")
 
 target_link_libraries(swiftCore PRIVATE swiftShims)
 target_link_libraries(swiftCore

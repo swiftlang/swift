@@ -134,6 +134,7 @@ public:
 
 protected:
   bool analyzeAndUpdateLifetime(SILValue value, Boundary boundary);
+  bool analyzeAndUpdateLifetime(ScopedAddressValue value, Boundary boundary);
 };
 
 //===----------------------------------------------------------------------===//

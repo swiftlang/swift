@@ -401,6 +401,88 @@ public protocol VarDeclInstruction {
   var varDecl: VarDecl? { get }
 }
 
+/// A scoped instruction whose single result introduces a variable scope.
+///
+/// The scope-ending uses represent the end of the variable scope. This allows trivial 'let' variables to be treated
+/// like a value with ownership. 'var' variables are primarily represented as addressable allocations via alloc_box or
+/// alloc_stack, but may have redundant VariableScopeInstructions.
+public enum VariableScopeInstruction {
+  case beginBorrow(BeginBorrowInst)
+  case moveValue(MoveValueInst)
+
+  public init?(_ inst: Instruction?) {
+    switch inst {
+    case let bbi as BeginBorrowInst:
+      guard bbi.isFromVarDecl else {
+        return nil
+      }
+      self = .beginBorrow(bbi)
+    case let mvi as MoveValueInst:
+      guard mvi.isFromVarDecl else {
+        return nil
+      }
+      self = .moveValue(mvi)
+    default:
+      return nil
+    }
+  }
+
+  public var instruction: Instruction {
+    switch self {
+    case let .beginBorrow(bbi):
+      return bbi
+    case let .moveValue(mvi):
+      return mvi
+    }
+  }
+
+  public var scopeBegin: Value {
+    instruction as! SingleValueInstruction
+  }
+
+  public var endOperands: LazyFilterSequence<UseList> {
+    return scopeBegin.uses.endingLifetime
+  }
+
+  // TODO: with SIL verification, we might be able to make varDecl non-Optional.
+  public var varDecl: VarDecl? {
+    if let debugVarDecl = instruction.debugVarDecl {
+      return debugVarDecl
+    }
+    // SILGen may produce double var_decl instructions for the same variable:
+    //   %box = alloc_box [var_decl] "x"
+    //   begin_borrow %box [var_decl]
+    //
+    // Assume that, if the begin_borrow or move_value does not have its own debug_value, then it must actually be
+    // associated with its operand's var_decl.
+    return instruction.operands[0].value.definingInstruction?.findVarDecl()
+  }
+}
+
+extension Instruction {
+  /// Find a variable declaration assoicated with this instruction.
+  public func findVarDecl() -> VarDecl? {
+    if let varDeclInst = self as? VarDeclInstruction {
+      return varDeclInst.varDecl
+    }
+    if let varScopeInst = VariableScopeInstruction(self) {
+      return varScopeInst.varDecl
+    }
+    return debugVarDecl
+  }
+
+  var debugVarDecl: VarDecl? {
+    for result in results {
+      for use in result.uses {
+        if let debugVal = use.instruction as? DebugValueInst {
+          return debugVal.varDecl
+        }
+      }
+    }
+    return nil
+  }
+}
+
 public protocol DebugVariableInstruction : VarDeclInstruction {
   typealias DebugVariable = OptionalBridgedSILDebugVariable
 

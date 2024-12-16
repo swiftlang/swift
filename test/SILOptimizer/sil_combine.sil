@@ -3785,6 +3785,22 @@ bb0(%0 : $B):
   return %2 : $B
 }
 
+// CHECK-LABEL: sil @mark_dependence_trivial_address_base :
+// CHECK: bb0(
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: alloc_stack $Int
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'mark_dependence_trivial_address_base'
+sil @mark_dependence_trivial_address_base : $@convention(thin) (@guaranteed B) -> @owned B {
+bb0(%0 : $B):
+  strong_retain %0 : $B
+  %1 = alloc_stack $Int
+  %2 = mark_dependence %0 : $B on %1 : $*Int
+  dealloc_stack %1 : $*Int
+  return %2 : $B
+}
+
 protocol _NSArrayCore {}
 
 // CHECK-LABEL: sil @mark_dependence_base2

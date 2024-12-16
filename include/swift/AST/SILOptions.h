@@ -160,6 +160,9 @@ public:
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
+  /// Verify ownership after every pass.
+  bool VerifyOwnershipAll = false;
+
   /// If true, no SIL verification is done at all.
   bool VerifyNone = false;
 

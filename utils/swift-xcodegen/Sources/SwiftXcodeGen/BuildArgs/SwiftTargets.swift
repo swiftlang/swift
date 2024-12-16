@@ -200,19 +200,28 @@ struct SwiftTargets {
 
     guard let buildArgs = try computeBuildArgs(for: rule) else { return }
 
-    let moduleName = buildArgs.lastValue(for: .moduleName)
+    // Pick up the module name from the arguments, or use an explicitly
+    // specified module name if we have one. The latter might be invalid so
+    // may not be part of the build args (e.g 'swift-plugin-server'), but is
+    // fine for generation.
+    let moduleName = buildArgs.lastValue(for: .moduleName) ??
+                       rule.attributes[.swiftModuleName]?.value
     guard let moduleName else {
       log.debug("! Skipping Swift target with output \(primaryOutput); no module name")
       return
     }
-    let moduleLinkName = rule.attributes[.swiftLibraryName]?.value ?? 
+    let moduleLinkName = rule.attributes[.swiftLibraryName]?.value ??
                            buildArgs.lastValue(for: .moduleLinkName)
     let name = moduleLinkName ?? moduleName
 
     // Add the dependencies. We track dependencies for any input files, along
     // with any recorded swiftmodule dependencies.
     dependenciesByTargetName.withValue(for: name, default: []) { deps in
-      deps.formUnion(rule.inputs)
+      deps.formUnion(
+        rule.inputs.filter {
+          $0.hasExtension(.swiftmodule) || $0.hasExtension(.o)
+        }
+      )
       deps.formUnion(
         rule.dependencies.filter { $0.hasExtension(.swiftmodule) }
       )

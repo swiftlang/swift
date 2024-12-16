@@ -2106,6 +2106,9 @@ ERROR(parser_new_parser_errors,none,
       "new Swift parser generated errors for code that C++ parser accepted",
        ())
 
+ERROR(safe_attr_unchecked,none,
+      "'@safe' attribute must be written as '@safe(unchecked)'", ())
+
 // MARK: Reference Binding Diagnostics
 ERROR(sil_markuncheckedreferencebinding_requires_attribute,none,
       "mark_unchecked_reference_binding requires an attribute like [inout]", ())

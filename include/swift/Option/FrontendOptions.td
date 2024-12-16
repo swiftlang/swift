@@ -941,6 +941,9 @@ def sil_verify_all : Flag<["-"], "sil-verify-all">,
   
 def sil_verify_none : Flag<["-"], "sil-verify-none">,
   HelpText<"Completely disable SIL verification">;
+
+def sil_ownership_verify_all : Flag<["-"], "sil-ownership-verify-all">,
+  HelpText<"Verify ownership after each transform">;
   
 def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
   HelpText<"Verify all SubstitutionMaps on construction">;
@@ -1244,6 +1247,10 @@ def skip_import_in_public_interface:
   Separate<["-"], "skip-import-in-public-interface">,
   HelpText<"Skip the import statement corresponding to a module name "
            "when printing the public interface.">;
+
+def disable_fine_module_tracing:
+  Flag<["-"], "disable-fine-module-tracing">,
+  HelpText<"Skip the emission of fine grained module tracing file.">;
 
 def clang_header_expose_decls:
   Joined<["-"], "clang-header-expose-decls=">,

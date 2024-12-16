@@ -134,8 +134,9 @@ struct BridgedUtilities {
   typedef void (* _Nonnull UpdatePhisFn)(BridgedPassContext, BridgedArrayRef);
 
   static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
-  static void registerGuaranteedPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
-                                           UpdatePhisFn updateBorrowedFromPhisFn);
+  static void registerPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
+                                 UpdatePhisFn updateBorrowedFromPhisFn,
+                                 UpdatePhisFn replacePhisWithIncomingValuesFn);
 };
 
 struct BridgedBasicBlockSet {

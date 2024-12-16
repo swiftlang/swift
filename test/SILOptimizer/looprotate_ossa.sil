@@ -404,49 +404,6 @@ bb0(%a0 : $Int32):
   return %t1 : $()
 }
 
-// Test the SSA Updater utility: replaceBBArgWithCast().
-//
-// CHECK-LABEL: sil [ossa] @struct_arg :
-// CHECK: bb0:
-// CHECK:  cond_br
-// CHECK: bb1:
-// CHECK:  br bb3
-// CHECK: bb3({{%.*}} : $Builtin.Int32, [[WORD:%.*]] : $Builtin.Int32
-// CHECK:  [[STRUCT:%[0-9]+]] = struct $Int32 ([[WORD]]
-// CHECK:  apply {{.*}}([[STRUCT]])
-// CHECK:  cond_br
-// CHECK: bb6({{.*}}):
-// CHECK:  return
-// CHECK-LABEL: } // end sil function 'struct_arg'
-sil [ossa] @struct_arg : $@convention(thin) () -> () {
-bb0:
-  %c0 = integer_literal $Builtin.Int32, 0
-  %c100 = integer_literal $Builtin.Int32, 100
-  br bb1(%c0 : $Builtin.Int32, %c0 : $Builtin.Int32)
-
-bb1(%a1 : $Builtin.Int32, %a0 : $Builtin.Int32):
-  %s0 = struct $Int32 (%a0 : $Builtin.Int32)
-  %z1 = builtin "cmp_eq_Word"(%a0 : $Builtin.Int32, %c100 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %z1, bb2, bb3
-
-bb3:
-  %c1 = integer_literal $Builtin.Int32, 1
-  %z2 = integer_literal $Builtin.Int1, 0
-  %d1 = builtin "sadd_with_overflow_Word"(%a0 : $Builtin.Int32, %c1 : $Builtin.Int32, %z2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
-  %t1 = tuple_extract %d1 : $(Builtin.Int32, Builtin.Int1), 0
-  %d2 = builtin "sadd_with_overflow_Word"(%a1 : $Builtin.Int32, %c1 : $Builtin.Int32, %z2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
-  %t2 = tuple_extract %d2 : $(Builtin.Int32, Builtin.Int1), 0
-  %f1 = function_ref @readInt : $@convention(thin) (Int32) -> ()
-  %l1 = apply %f1(%s0) : $@convention(thin) (Int32) -> ()
-  br bb1(%t2 : $Builtin.Int32, %t1 : $Builtin.Int32)
-
-bb2:
-  %14 = struct $Int32 (%a1 : $Builtin.Int32)
-  %t3 = tuple ()
-  return %t3 : $()
-
-}
-
 // Test LoopRotate insertBackedgeBlock.
 //
 // CHECK-LABEL: sil [ossa] @insert_backedge_block :
@@ -623,5 +580,136 @@ bb3:
   destroy_value %m : $Bar
   %26 = struct $Int32 (%5 : $Builtin.Int32)
   return %26 : $Int32
+}
+
+// Make sure that no unnecessary phis are inserted which would cause an ownership error.
+// CHECK-LABEL: sil [ossa] @test_ssa_updater_owned :
+// CHECK:         begin_borrow
+// CHECK-NOT:   bb({{.*@owned.*}}):
+// CHECK:         end_borrow
+// CHECK-LABEL: } // end sil function 'test_ssa_updater_owned'
+sil [ossa] @test_ssa_updater_owned : $@convention(thin) (@owned String, @guaranteed String) -> () {
+bb0(%0 : @owned $String, %1 : @guaranteed $String):
+  %2 = integer_literal $Builtin.Int64, 0
+  br bb1(%0, %2)
+
+bb1(%4 : @owned $String, %5 : $Builtin.Int64):
+  cond_br undef, bb14, bb2
+
+bb2:
+  %7 = integer_literal $Builtin.Int64, 1
+  %8 = begin_borrow %4
+  cond_br undef, bb4, bb3
+
+bb3:
+  br bb5
+
+bb4:
+  cond_br undef, bb7, bb8
+
+bb5:
+  cond_br undef, bb10, bb6
+
+bb6:
+  br bb9
+
+bb7:
+  br bb9
+
+bb8:
+  br bb12
+
+bb9:
+  br bb11
+
+bb10:
+  br bb11
+
+bb11:
+  end_borrow %8
+  destroy_value %4
+  br bb13
+
+bb12:
+  end_borrow %8
+  destroy_value [dead_end] %4
+  unreachable 
+
+bb13:
+  %24 = copy_value %1
+  br bb1(%24, %7)
+
+bb14:
+  destroy_value %4
+  %27 = tuple ()
+  return %27
+}
+
+// Make sure that no unnecessary phis are inserted which would cause an ownership error.
+// CHECK-LABEL: sil [ossa] @test_ssa_updater_guaranteed :
+// CHECK:         begin_borrow
+// CHECK:         begin_borrow
+// CHECK-NOT:   bb({{.*@reborrow.*}}):
+// CHECK:         end_borrow
+// CHECK-LABEL: } // end sil function 'test_ssa_updater_guaranteed'
+sil [ossa] @test_ssa_updater_guaranteed : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = begin_borrow %0
+  br bb1(%3, %2)
+
+bb1(%4 : @reborrow $String, %5 : $Builtin.Int64):
+  %6 = borrowed %4 from (%0)
+  cond_br undef, bb14, bb2
+
+bb2:
+  %7 = integer_literal $Builtin.Int64, 1
+  %8 = begin_borrow %6
+  cond_br undef, bb4, bb3
+
+bb3:
+  br bb5
+
+bb4:
+  cond_br undef, bb7, bb8
+
+bb5:
+  cond_br undef, bb10, bb6
+
+bb6:
+  br bb9
+
+bb7:
+  br bb9
+
+bb8:
+  br bb12
+
+bb9:
+  br bb11
+
+bb10:
+  br bb11
+
+bb11:
+  end_borrow %8
+  end_borrow %6
+  br bb13
+
+bb12:
+  end_borrow %8
+  end_borrow %6
+  destroy_value [dead_end] %0
+  unreachable 
+
+bb13:
+  %24 = begin_borrow %0
+  br bb1(%24, %7)
+
+bb14:
+  end_borrow %6
+  destroy_value %0
+  %27 = tuple ()
+  return %27
 }
 

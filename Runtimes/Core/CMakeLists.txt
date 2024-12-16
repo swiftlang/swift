@@ -91,6 +91,7 @@ defaulted_option(SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS "Resolve ab
 defaulted_option(SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment")
 defaulted_option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime. Assumes the presence of os_log(3) and the os_signpost(3) API.")
 option(SwiftCore_ENABLE_UNICODE_DATA "Include unicode data in Swift runtimes" ON)
+option(SwiftCore_ENABLE_SHORT_MANGLING_LOOKUPS "Build with fast-path context descriptor lookups based on well-known short manglings." ON)
 
 defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support")
 defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift backtracer")
@@ -100,6 +101,7 @@ option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)
 option(SwiftCore_ENABLE_INTERNAL_CHECKS "" OFF)
 
 defaulted_set(SwiftCore_OBJECT_FORMAT STRING "Object format: ELF COFF")
+defaulted_set(SwiftCore_THREADING_PACKAGE STRING "Threading Package: C11 Linux PThreads Win32")
 
 # TODO: Most of these should be attached to specific targets rather than applied
 #       globally. They can be applied as part of the library interface if they
@@ -118,6 +120,7 @@ add_compile_definitions(
   $<$<BOOL:${SwiftCore_ENABLE_UNICODE_DATA}>:-DSWIFT_STDLIB_ENABLE_UNICODE_DATA> # Stubs
   $<$<BOOL:${SwiftCore_ENABLE_ENVIRONMENT}>:-DSWIFT_STDLIB_HAS_ENVIRON> # Concurrency, runtime, shims, platform overlay
   $<$<BOOL:${SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT}>:-DSWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT> # Concurrency, Compatibility override, magic symbols
+  $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_THREADING_${SwiftCore_THREADING_PACKAGE}>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER=$<BOOL:${SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER}>>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>>)
 
@@ -125,6 +128,7 @@ add_compile_options(
   $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
   $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
   $<$<COMPILE_LANGUAGE:CXX>:-funwind-tables>
+  "$<$<AND:$<COMPILE_LANGUAGE:Swift>,$<PLATFORM_ID:Windows>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
   $<$<AND:$<COMPILE_LANGUAGE:Swift>,$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>>:-enable-library-evolution>)
 
 include_directories(include)

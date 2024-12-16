@@ -574,7 +574,7 @@ void importer::getNormalInvocationArguments(
   }
 
   if (LangOpts.EnableCXXInterop) {
-    if (auto path = getCxxShimModuleMapPath(searchPathOpts, triple)) {
+    if (auto path = getCxxShimModuleMapPath(searchPathOpts, LangOpts, triple)) {
       invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
     }
   }
@@ -2015,6 +2015,9 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   FrontendOpts.DisableFree = false;
   if (FrontendOpts.CASIncludeTreeID.empty())
     FrontendOpts.Inputs.clear();
+
+  // Share the CASOption and the underlying CAS.
+  invocation->setCASOption(Impl.Invocation->getCASOptsPtr());
 
   auto clonedInstance = std::make_unique<clang::CompilerInstance>(
     Impl.Instance->getPCHContainerOperations(),

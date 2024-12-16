@@ -1915,11 +1915,14 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
 
 static BridgedUtilities::UpdateFunctionFn updateAllGuaranteedPhisFunction;
 static BridgedUtilities::UpdatePhisFn updateGuaranteedPhisFunction;
+static BridgedUtilities::UpdatePhisFn replacePhisWithIncomingValuesFunction;
 
-void BridgedUtilities::registerGuaranteedPhiUpdater(UpdateFunctionFn updateAllGuaranteedPhisFn,
-                                                    UpdatePhisFn updateGuaranteedPhisFn) {
+void BridgedUtilities::registerPhiUpdater(UpdateFunctionFn updateAllGuaranteedPhisFn,
+                                          UpdatePhisFn updateGuaranteedPhisFn,
+                                          UpdatePhisFn replacePhisWithIncomingValuesFn) {
   updateAllGuaranteedPhisFunction = updateAllGuaranteedPhisFn;
   updateGuaranteedPhisFunction = updateGuaranteedPhisFn;
+  replacePhisWithIncomingValuesFunction = replacePhisWithIncomingValuesFn;
 }
 
 void swift::updateAllGuaranteedPhis(SILPassManager *pm, SILFunction *f) {
@@ -1936,4 +1939,15 @@ void swift::updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> 
     bridgedPhis.push_back({phi});
   }
   updateGuaranteedPhisFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
+}
+
+void swift::replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
+  if (!replacePhisWithIncomingValuesFunction)
+    return;
+
+  llvm::SmallVector<BridgedValue, 8> bridgedPhis;
+  for (SILPhiArgument *phi : phis) {
+    bridgedPhis.push_back({phi});
+  }
+  replacePhisWithIncomingValuesFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
 }

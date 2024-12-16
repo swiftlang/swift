@@ -131,9 +131,14 @@ extension ASTGenVisitor {
     )
     decl.asDecl.setAttrs(attrs.attributes)
 
-    self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members).lazy.bridgedArray(in: self))
+    let members = self.withDeclContext(decl.asDeclContext) {
+      self.generate(memberBlockItemList: node.memberBlock.members)
     }
+    let fp = self.generateFingerprint(declGroup: node)
+    decl.setParsedMembers(
+      members.lazy.bridgedArray(in: self),
+      fingerprint: fp.bridged
+    )
 
     return decl
   }
@@ -160,9 +165,14 @@ extension ASTGenVisitor {
     )
     decl.asDecl.setAttrs(attrs.attributes)
 
-    self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members).lazy.bridgedArray(in: self))
+    let members = self.withDeclContext(decl.asDeclContext) {
+      self.generate(memberBlockItemList: node.memberBlock.members)
     }
+    let fp = self.generateFingerprint(declGroup: node)
+    decl.setParsedMembers(
+      members.lazy.bridgedArray(in: self),
+      fingerprint: fp.bridged
+    )
 
     return decl
   }
@@ -190,9 +200,14 @@ extension ASTGenVisitor {
     )
     decl.asDecl.setAttrs(attrs.attributes)
 
-    self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members).lazy.bridgedArray(in: self))
+    let members = self.withDeclContext(decl.asDeclContext) {
+      self.generate(memberBlockItemList: node.memberBlock.members)
     }
+    let fp = self.generateFingerprint(declGroup: node)
+    decl.setParsedMembers(
+      members.lazy.bridgedArray(in: self),
+      fingerprint: fp.bridged
+    )
 
     return decl
   }
@@ -220,9 +235,14 @@ extension ASTGenVisitor {
     )
     decl.asDecl.setAttrs(attrs.attributes)
 
-    self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members).lazy.bridgedArray(in: self))
+    let members = self.withDeclContext(decl.asDeclContext) {
+      self.generate(memberBlockItemList: node.memberBlock.members)
     }
+    let fp = self.generateFingerprint(declGroup: node)
+    decl.setParsedMembers(
+      members.lazy.bridgedArray(in: self),
+      fingerprint: fp.bridged
+    )
 
     return decl
   }
@@ -252,9 +272,14 @@ extension ASTGenVisitor {
     )
     decl.asDecl.setAttrs(attrs.attributes)
 
-    self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members).lazy.bridgedArray(in: self))
+    let members = self.withDeclContext(decl.asDeclContext) {
+      self.generate(memberBlockItemList: node.memberBlock.members)
     }
+    let fp = self.generateFingerprint(declGroup: node)
+    decl.setParsedMembers(
+      members.lazy.bridgedArray(in: self),
+      fingerprint: fp.bridged
+    )
 
     return decl
   }
@@ -299,9 +324,14 @@ extension ASTGenVisitor {
     )
     decl.asDecl.setAttrs(attrs.attributes)
 
-    self.withDeclContext(decl.asDeclContext) {
-      decl.setParsedMembers(self.generate(memberBlockItemList: node.memberBlock.members).lazy.bridgedArray(in: self))
+    let members = self.withDeclContext(decl.asDeclContext) {
+      self.generate(memberBlockItemList: node.memberBlock.members)
     }
+    let fp = self.generateFingerprint(declGroup: node)
+    decl.setParsedMembers(
+      members.lazy.bridgedArray(in: self),
+      fingerprint: fp.bridged
+    )
 
     return decl
   }

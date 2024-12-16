@@ -1760,22 +1760,6 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *fli) {
-  // fix_lifetime(alloc_stack) -> fix_lifetime(load(alloc_stack))
-  Builder.setCurrentDebugScope(fli->getDebugScope());
-  if (auto *ai = dyn_cast<AllocStackInst>(fli->getOperand())) {
-    if (fli->getOperand()->getType().isLoadable(*fli->getFunction())) {
-      // load when ossa is disabled
-      auto load = Builder.emitLoadBorrowOperation(fli->getLoc(), ai);
-      Builder.createFixLifetime(fli->getLoc(), load);
-      // no-op when ossa is disabled
-      Builder.emitEndBorrowOperation(fli->getLoc(), load);
-      return eraseInstFromFunction(*fli);
-    }
-  }
-  return nullptr;
-}
-
 static std::optional<SILType>
 shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
                                                    CanType storageMetaTy) {
@@ -1977,7 +1961,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // does not have a meaning, so just eliminate it.
   {
     SILType baseType = mdi->getBase()->getType();
-    if (baseType.isObject() && baseType.isTrivial(*mdi->getFunction())) {
+    if (baseType.getObjectType().isTrivial(*mdi->getFunction())) {
       SILValue value = mdi->getValue();
       mdi->replaceAllUsesWith(value);
       return eraseInstFromFunction(*mdi);

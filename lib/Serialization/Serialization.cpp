@@ -3376,6 +3376,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::Safe: {
+      auto *theAttr = cast<SafeAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[SafeDeclAttrLayout::Code];
+      SafeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                     theAttr->isImplicit(),
+                                     theAttr->message);
+      return;
+    }
+
     case DeclAttrKind::MacroRole: {
       auto *theAttr = cast<MacroRoleAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[MacroRoleDeclAttrLayout::Code];
