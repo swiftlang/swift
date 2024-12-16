@@ -70,7 +70,7 @@ bool swift::removeUnreachableBlocks(SILFunction &f) {
   bool changed = false;
   for (auto ii = std::next(f.begin()), end = f.end(); ii != end;) {
     auto *bb = &*ii++;
-    if (!reachable.isVisited(bb)) {
+    if (!reachable.isReachable(bb)) {
       bb->removeDeadBlock();
       changed = true;
     }
