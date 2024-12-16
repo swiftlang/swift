@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SystemPackage
 import WASI
 import WasmTypes
-import SystemPackage
 
 typealias WasmFunction = () throws -> Void
 
@@ -20,7 +20,7 @@ protocol WasmEngine {
   init(path: FilePath, imports: WASIBridgeToHost) throws
 
   func function(named name: String) throws -> WasmFunction?
-  
+
   func shutDown() throws
 }
 
@@ -44,7 +44,8 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
       stdout: pluginToHostPipes.writeEnd,
       stderr: .standardError
     )
-    engine = try Engine(path: path, imports: bridge)
+
+    self.engine = try Engine(path: path, imports: bridge)
 
     let exportName = "swift_wasm_macro_v1_pump"
     guard let pump = try engine.function(named: exportName) else {
@@ -60,11 +61,11 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
 
   func handleMessage(_ json: [UInt8]) throws -> [UInt8] {
     try withUnsafeBytes(of: UInt64(json.count).littleEndian) {
-      _ = try hostToPlugin.writeAll($0)
+      _ = try self.hostToPlugin.writeAll($0)
     }
-    try hostToPlugin.writeAll(json)
+    try self.hostToPlugin.writeAll(json)
 
-    try pumpFunction()
+    try self.pumpFunction()
 
     let lengthRaw = try withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 8) { buffer in
       let lengthCount = try pluginToHost.read(into: UnsafeMutableRawBufferPointer(buffer))
@@ -100,25 +101,25 @@ struct WasmEngineError: Error, CustomStringConvertible {
 // but it is available in the latest main branch. Remove the following code when we
 // update to the next release of swift-system.
 #if os(Windows)
-import ucrt
+  import ucrt
 
-internal var system_errno: CInt {
-  var value: CInt = 0
-  _ = ucrt._get_errno(&value)
-  return value
-}
+  var system_errno: CInt {
+    var value: CInt = 0
+    _ = ucrt._get_errno(&value)
+    return value
+  }
 
-extension FileDescriptor {
-  static func pipe() throws -> (readEnd: FileDescriptor, writeEnd: FileDescriptor) {
-    var fds: (Int32, Int32) = (-1, -1)
-    return try withUnsafeMutablePointer(to: &fds) { pointer in
-      return try pointer.withMemoryRebound(to: Int32.self, capacity: 2) { fds in
-        guard _pipe(fds, 4096, _O_BINARY | _O_NOINHERIT) == 0 else {
-          throw Errno(rawValue: system_errno)
+  extension FileDescriptor {
+    static func pipe() throws -> (readEnd: FileDescriptor, writeEnd: FileDescriptor) {
+      var fds: (Int32, Int32) = (-1, -1)
+      return try withUnsafeMutablePointer(to: &fds) { pointer in
+        try pointer.withMemoryRebound(to: Int32.self, capacity: 2) { fds in
+          guard _pipe(fds, 4096, _O_BINARY | _O_NOINHERIT) == 0 else {
+            throw Errno(rawValue: system_errno)
+          }
+          return (FileDescriptor(rawValue: fds[0]), FileDescriptor(rawValue: fds[1]))
         }
-        return (FileDescriptor(rawValue: fds[0]), FileDescriptor(rawValue: fds[1]))
       }
     }
   }
-}
 #endif
