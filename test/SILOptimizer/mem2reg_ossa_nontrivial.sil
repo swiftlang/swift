@@ -1495,7 +1495,7 @@ sil [ossa] @test_store_enum_value_in_multiple_locs1 : $@convention(thin) () -> (
 bb0:
   %0 = function_ref @get : $@convention(thin) () -> @owned FakeOptional<Klass>
   %1 = apply %0() : $@convention(thin) () -> @owned FakeOptional<Klass>
-  %2 = begin_borrow [lexical] %1
+  %2 = begin_borrow [lexical] %1 : $FakeOptional<Klass>
   cond_br undef, bb2, bb1
 
 bb1:
@@ -1503,7 +1503,7 @@ bb1:
 
 bb2:
   %5 = alloc_stack [lexical] $FakeOptional<Klass>
-  %6 = store_borrow %2 to %5
+  %6 = store_borrow %2 to %5 : $*FakeOptional<Klass>
   cond_br undef, bb8, bb9
 
 bb3:
@@ -1514,38 +1514,38 @@ bb4:
 
 bb5:
   %11 = alloc_stack $FakeOptional<Klass>
-  %12 = store_borrow %2 to %11
-  %14 = load_borrow %12
-  %15 = begin_borrow [lexical] %14
+  %12 = store_borrow %2 to %11 : $*FakeOptional<Klass>
+  %14 = load_borrow %12 : $*FakeOptional<Klass>
+  %15 = begin_borrow [lexical] %14 : $FakeOptional<Klass>
   %16 = alloc_stack $FakeOptional<Klass>
-  %17 = store_borrow %15 to %16
+  %17 = store_borrow %15 to %16 : $*FakeOptional<Klass>
   cond_br undef, bb6, bb7
 
 bb6:
-  fix_lifetime %17
-  end_borrow %17
-  dealloc_stack %16
-  end_borrow %15
-  end_borrow %14
-  end_borrow %12
-  dealloc_stack %11
-  end_borrow %2
-  destroy_value %1
+  fix_lifetime %17 : $*FakeOptional<Klass>
+  end_borrow %17 : $*FakeOptional<Klass>
+  dealloc_stack %16 : $*FakeOptional<Klass>
+  end_borrow %15 : $FakeOptional<Klass>
+  end_borrow %14 : $FakeOptional<Klass>
+  end_borrow %12 : $*FakeOptional<Klass>
+  dealloc_stack %11 : $*FakeOptional<Klass>
+  end_borrow %2 : $FakeOptional<Klass>
+  destroy_value %1 : $FakeOptional<Klass>
   %29 = tuple ()
-  return %29
+  return %29 : $()
 
 bb7:
-  end_borrow %17
-  dealloc_stack %16
+  end_borrow %17 : $*FakeOptional<Klass>
+  dealloc_stack %16 : $*FakeOptional<Klass>
   unreachable
 
 bb8:
-  end_borrow %6
-  dealloc_stack %5
+  end_borrow %6 : $*FakeOptional<Klass>
+  dealloc_stack %5 : $*FakeOptional<Klass>
   unreachable
 
 bb9:
-  end_borrow %6
-  dealloc_stack %5
+  end_borrow %6 : $*FakeOptional<Klass>
+  dealloc_stack %5 : $*FakeOptional<Klass>
   br bb3
 }

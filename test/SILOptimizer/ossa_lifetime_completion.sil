@@ -834,16 +834,16 @@ sil [ossa] @load_borrow_of_store_borrow_1 : $@convention(thin) (@guaranteed C) -
 entry(%instance : @guaranteed $C):
   specify_test "ossa_lifetime_completion %token availability"
   %addr = alloc_stack $C
-  %token = store_borrow %instance to %addr
-  %load = load_borrow %token
-  %borrow = begin_borrow %load
+  %token = store_borrow %instance to %addr : $*C
+  %load = load_borrow %token : $*C
+  %borrow = begin_borrow %load : $C
   cond_br undef, exit, die
 
 exit:
-  end_borrow %borrow
-  end_borrow %load
-  end_borrow %token
-  dealloc_stack %addr
+  end_borrow %borrow : $C
+  end_borrow %load : $C
+  end_borrow %token : $*C
+  dealloc_stack %addr : $*C
   %retval = tuple ()
   return %retval : $()
 die:
@@ -867,34 +867,34 @@ sil [ossa] @load_borrow_of_store_borrow_2 : $@convention(thin) (@guaranteed C) -
 entry(%instance : @guaranteed $C):
   specify_test "ossa_lifetime_completion %token availability"
   %addr = alloc_stack $C
-  %token = store_borrow %instance to %addr
-  %load = load_borrow %token
-  %borrow = begin_borrow %load
+  %token = store_borrow %instance to %addr : $*C
+  %load = load_borrow %token : $*C
+  %borrow = begin_borrow %load : $C
   cond_br undef, exit, die
 
 exit:
-  end_borrow %borrow
-  end_borrow %load
-  end_borrow %token
-  dealloc_stack %addr
+  end_borrow %borrow : $C
+  end_borrow %load : $C
+  end_borrow %token : $*C
+  dealloc_stack %addr : $*C
   %retval = tuple ()
   return %retval : $()
 die:
-  end_borrow %borrow
-  end_borrow %load
+  end_borrow %borrow : $C
+  end_borrow %load : $C
   unreachable
 }
 
 sil [ossa] @load_borrow_1 : $@convention(thin) (@in_guaranteed C) -> () {
 entry(%addr : $*C):
   specify_test "ossa_lifetime_completion %load availability"
-  %load = load_borrow %addr
-  %borrow = begin_borrow %load
+  %load = load_borrow %addr : $*C
+  %borrow = begin_borrow %load : $C
   cond_br undef, exit, die
 
 exit:
-  end_borrow %borrow
-  end_borrow %load
+  end_borrow %borrow : $C
+  end_borrow %load : $C
   %retval = tuple ()
   return %retval : $()
 die:
@@ -943,13 +943,13 @@ sil [ossa] @load_borrow_of_begin_access : $@convention(thin) (@in_guaranteed C) 
 entry(%addr : $*C):
   specify_test "ossa_lifetime_completion %access availability"
   %access = begin_access [static] [read] %addr : $*C
-  %load = load_borrow %access
-  %borrow = begin_borrow %load
+  %load = load_borrow %access : $*C
+  %borrow = begin_borrow %load : $C
   cond_br undef, exit, die
 
 exit:
-  end_borrow %borrow
-  end_borrow %load
+  end_borrow %borrow : $C
+  end_borrow %load : $C
   end_access %access : $*C
   %retval = tuple ()
   return %retval : $()
