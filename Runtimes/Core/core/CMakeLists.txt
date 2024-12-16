@@ -347,6 +347,8 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Swift.swiftmodule"
 emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)
 
+include("${SwiftCore_VENDOR_MODULE_DIR}/swiftCore.cmake" OPTIONAL)
+
 # TODO: Embedded SwiftCore builds
 # FIXME: Embedded builds should be separate CMake invocations because they are
 #        building for a different environment. I'm not sure how CMake will
