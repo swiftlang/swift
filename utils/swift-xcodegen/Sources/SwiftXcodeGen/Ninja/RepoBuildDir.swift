@@ -27,9 +27,9 @@ public final class RepoBuildDir: Sendable {
   init(_ repo: Repo, for parent: NinjaBuildDir) throws {
     self.projectRootDir = parent.projectRootDir
     self.repo = repo
-    self.path = parent.path.appending(
-      "\(repo.buildDirPrefix)-\(parent.tripleSuffix)"
-    )
+    self.path = try repo.buildDirPrefix.map { prefix in
+      parent.path.appending("\(prefix)-\(try parent.tripleSuffix)")
+    } ?? parent.path
     self.repoRelativePath = repo.relativePath
     self.repoPath = projectRootDir.appending(repo.relativePath)
     self.repoDirCache = DirectoryCache(root: repoPath)

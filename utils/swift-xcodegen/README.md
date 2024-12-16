@@ -105,6 +105,14 @@ PROJECT CONFIGURATION:
                           unfortunately means some Clang targes such as 'lib/Basic' and 'stdlib'
                           cannot currently use buildable folders. (default: --buildable-folders)
 
+  --runtimes-build-dir <runtimes-build-dir>
+                          Experimental: The path to a build directory for the new 'Runtimes/'
+                          stdlib CMake build. This creates a separate 'SwiftRuntimes' project, along
+                          with a 'Swift+Runtimes' workspace.
+
+                          Note: This requires passing '-DCMAKE_EXPORT_COMPILE_COMMANDS=YES' to
+                          CMake.
+
 MISC:
   --project-root-dir <project-root-dir>
                           The project root directory, which is the parent directory of the Swift repo.
