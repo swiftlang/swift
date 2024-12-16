@@ -75,9 +75,16 @@ extension ClosureParameterSyntax: ValueParameterSyntax {
 }
 
 extension ASTGenVisitor {
-  func generate(functionParameter node: FunctionParameterSyntax, forSubscript: Bool) -> BridgedParamDecl {
+  func generate(functionParameter node: FunctionParameterSyntax, for context: ParameterContext) -> BridgedParamDecl {
     // For non-subscripts, the argument name is defaulted to the parameter name.
-    self.makeParamDecl(node, argNameByDefault: !forSubscript)
+    let argNameByDefault: Bool
+    switch context {
+    case .operator, .subscript:
+      argNameByDefault = false
+    case .function, .initializer, .macro:
+      argNameByDefault = true
+    }
+    return self.makeParamDecl(node, argNameByDefault: argNameByDefault)
   }
 
   func generate(enumCaseParameter node: EnumCaseParameterSyntax) -> BridgedParamDecl {
@@ -159,14 +166,22 @@ extension ASTGenVisitor {
 // MARK: - ParameterList
 
 extension ASTGenVisitor {
+
+  enum ParameterContext {
+    case function
+    case initializer
+    case macro
+    case `subscript`
+    case `operator`
+  }
   func generate(
     functionParameterClause node: FunctionParameterClauseSyntax,
-    forSubscript: Bool
+    for context: ParameterContext
   ) -> BridgedParameterList {
     BridgedParameterList.createParsed(
       self.ctx,
       leftParenLoc: self.generateSourceLoc(node.leftParen),
-      parameters: self.generate(functionParameterList: node.parameters, forSubscript: forSubscript),
+      parameters: self.generate(functionParameterList: node.parameters, for: context),
       rightParenLoc: self.generateSourceLoc(node.rightParen)
     )
   }
@@ -228,7 +243,7 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   @inline(__always)
-  func generate(functionParameterList node: FunctionParameterListSyntax, forSubscript: Bool) -> BridgedArrayRef {
-    node.lazy.map({ self.generate(functionParameter: $0, forSubscript: forSubscript) }).bridgedArray(in: self)
+  func generate(functionParameterList node: FunctionParameterListSyntax, for context: ParameterContext) -> BridgedArrayRef {
+    node.lazy.map({ self.generate(functionParameter: $0, for: context) }).bridgedArray(in: self)
   }
 }

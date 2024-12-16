@@ -713,6 +713,10 @@ public:
   /// target. Used for conformance lookup disambiguation.
   bool isAlwaysAvailableConformanceContext() const;
 
+  /// Determines whether this context is explicitly allowed to use unsafe
+  /// constructs.
+  bool allowsUnsafe() const;
+
   /// \returns true if traversal was aborted, false otherwise.
   bool walkContext(ASTWalker &Walker);
 

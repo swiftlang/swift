@@ -291,9 +291,10 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   StringRef SDKPath = Instance.getASTContext().SearchPathOpts.getSDKPath();
 
   auto SDKRelativePath = getRelativeDepPath(InPath, SDKPath);
-  if (SDKRelativePath.has_value())
+  if (SDKRelativePath.has_value()) {
     SerializationOpts.ModuleInterface = SDKRelativePath.value();
-  else
+    SerializationOpts.IsInterfaceSDKRelative = true;
+  } else
     SerializationOpts.ModuleInterface = InPath;
 
   SerializationOpts.SDKName = Instance.getASTContext().LangOpts.SDKName;

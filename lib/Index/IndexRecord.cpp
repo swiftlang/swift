@@ -761,6 +761,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  SourceFile *initialFile) {
   StringRef filename = module->getModuleSourceFilename();
   std::string moduleName = module->getNameStr().str();
+  auto &ctx = module->getASTContext();
 
   // If this is a cross-import overlay, make sure we use the name of the
   // underlying module instead.
@@ -786,7 +787,6 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
       !module->isBuiltFromInterface() &&
       !module->isStdlibModule()) {
-    auto &ctx = module->getASTContext();
     llvm::SaveAndRestore<bool> S(ctx.IgnoreAdjacentModules, true);
 
     ImportPath::Module::Builder builder(module->getName());
@@ -800,6 +800,22 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       skipIndexingModule = true;
     }
   }
+
+  // If this module is blocklisted from us using its textual interface,
+  // then under Implicitly-Built modules it will not get indexed, since
+  // indexing will not be able to spawn swiftinterface compilation.
+  // With explicitly-built modules, none of the dependency modules get built
+  // from interface during indexing, which means we directly index input
+  // binary modules.
+  //
+  // For now, for functional parity with Implicit Module Builds, disable indexing
+  // of modules during Explicit Module Builds which would not get indexed during
+  // Implicit Module Builds.
+  if (explicitModuleBuild &&
+      ctx.blockListConfig.hasBlockListAction(moduleName,
+                                             BlockListKeyKind::ModuleName,
+                                             BlockListAction::ShouldUseBinaryModule))
+    skipIndexingModule = true;
 
   if (module->getASTContext().LangOpts.EnableIndexingSystemModuleRemarks) {
     diags.diagnose(SourceLoc(),

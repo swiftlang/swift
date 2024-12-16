@@ -76,19 +76,23 @@ endif()
 #       file rather than pushing them through macro flags.
 target_compile_definitions(swiftRuntime
   PRIVATE
-    -DswiftCore_EXPORTS
     -DSWIFT_RUNTIME
     -DSWIFT_TARGET_LIBRARY_NAME=swiftRuntime
+    $<$<BOOL:${BUILD_SHARED_LIBS}>:-DswiftCore_EXPORTS>
     $<$<BOOL:${SwiftCore_ENABLE_BACKTRACING}>:-DSWIFT_ENABLE_BACKTRACING>
     $<$<BOOL:${SwiftCore_ENABLE_OVERRIDABLE_RETAIN_RELEASE}>:-DSWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE>
     $<$<BOOL:${SwiftCore_ENABLE_MALLOC_TYPE}>:-DSWIFT_STDLIB_HAS_MALLOC_TYPE>
-    $<$<BOOL:${SwiftCore_BACKTRACER_PATH}>:-DSWIFT_RUNTIME_FIXED_BACKTRACER_PATH="${SwiftCore_BACKTRACER_PATH}">)
+    $<$<BOOL:${SwiftCore_BACKTRACER_PATH}>:-DSWIFT_RUNTIME_FIXED_BACKTRACER_PATH="${SwiftCore_BACKTRACER_PATH}">
+    $<$<BOOL:${SwiftCore_ENABLE_STDLIB_TRACING}>:-DSWIFT_STDLIB_TRACING>
+    $<$<BOOL:${SwiftCore_ENABLE_SHORT_MANGLING_LOOKUPS}>:-DSWIFT_STDLIB_SHORT_MANGLING_LOOKUPS>)
 
 target_include_directories(swiftRuntime PRIVATE
   "${PROJECT_BINARY_DIR}/include"
   "${CMAKE_CURRENT_SOURCE_DIR}")
 
-target_link_libraries(swiftRuntime PRIVATE swiftShims)
+target_link_libraries(swiftRuntime PRIVATE
+  $<$<PLATFORM_ID:Windows>:User32>
+  swiftShims)
 
 # FIXME: Refactor so that we're not pulling sources from the compiler files
 target_sources(swiftRuntime PRIVATE
@@ -108,10 +112,12 @@ if(SwiftCore_ENABLE_BACKTRACING)
     CrashHandlerLinux.cpp)
 endif()
 
+target_sources(swiftRuntime PRIVATE
+  ErrorObject.mm
+  SwiftObject.mm)
+
 if(SwiftCore_ENABLE_OBJC_INTEROP)
   target_sources(swiftRuntime PRIVATE
-    ErrorObject.mm
-    SwiftObject.mm
     SwiftValue.mm
     ReflectionMirrorObjC.mm
     ObjCRuntimeGetImageNameFromClass.mm)

@@ -956,7 +956,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // result type of this function.
   ConstraintKind resultConstraintKind = ConstraintKind::Conversion;
   if (auto opaque = resultContextType->getAs<OpaqueTypeArchetypeType>()) {
-    if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(func)) {
+    if (opaque->getDecl()->isOpaqueReturnTypeOf(func)) {
       resultConstraintKind = ConstraintKind::Equal;
     }
   }

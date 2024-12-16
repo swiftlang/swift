@@ -4564,7 +4564,7 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
   }
 
   // If the regular result type is void, there is nothing to explode
-  if (!resultType.isVoid()) {
+  if (!nativeSchema.empty()) {
     Explosion resultExplosion;
     if (auto *structTy =
             dyn_cast<llvm::StructType>(nativeSchema.getExpandedType(IGF.IGM))) {

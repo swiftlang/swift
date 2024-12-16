@@ -55,10 +55,10 @@ bool areArraysEqual(RCIdentityFunctionInfo *RCIA, SILValue A, SILValue B,
     return true;
   // We have stripped off struct_extracts. Remove the load to look at the
   // address we are loading from.
-  if (auto *ALoad = dyn_cast<LoadInst>(A))
-    A = ALoad->getOperand();
-  if (auto *BLoad = dyn_cast<LoadInst>(B))
-    B = BLoad->getOperand();
+  if (isa<LoadInst>(A) || isa<LoadBorrowInst>(A))
+    A = cast<SingleValueInstruction>(A)->getOperand(0);
+  if (isa<LoadInst>(B) || isa<LoadBorrowInst>(B))
+    B = cast<SingleValueInstruction>(B)->getOperand(0);
   // Strip off struct_extract_refs until we hit array address.
   if (ArrayAddress) {
     StructElementAddrInst *SEAI = nullptr;
@@ -463,6 +463,10 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
       return false;
     }
 
+    if (isa<LoadBorrowInst>(UseInst)) {
+      continue;
+    }
+
     if (isa<DeallocStackInst>(UseInst)) {
       // Handle destruction of a local array.
       continue;
@@ -567,6 +571,9 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
     }
 
     if (isa<MarkDependenceInst>(UseInst))
+      continue;
+
+    if (isa<EndBorrowInst>(UseInst))
       continue;
 
     if (UseInst->isDebugInstruction())

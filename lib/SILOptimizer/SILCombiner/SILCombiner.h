@@ -252,7 +252,6 @@ public:
   // NOTE: The load optimized in this method is a load [trivial].
   SILInstruction *optimizeLoadFromStringLiteral(LoadInst *li);
 
-  SILInstruction *visitLoadBorrowInst(LoadBorrowInst *LI);
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
@@ -282,7 +281,6 @@ public:
   SILInstruction *visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI);
   SILInstruction *visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI);
   SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);
-  SILInstruction *visitFixLifetimeInst(FixLifetimeInst *FLI);
   SILInstruction *visitSwitchValueInst(SwitchValueInst *SVI);
   SILInstruction *
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);

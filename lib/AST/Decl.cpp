@@ -1079,6 +1079,10 @@ bool Decl::isUnsafe() const {
       false);
 }
 
+bool Decl::allowsUnsafe() const {
+  return isUnsafe();
+}
+
 Type AbstractFunctionDecl::getThrownInterfaceType() const {
   if (!getThrownTypeRepr())
     return ThrownType.getType();
@@ -2061,8 +2065,17 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
     // FIXME: We ought to reconsider this since it won't recontextualize any
     // closures/decls present in the initialization expr. This currently should
     // only affect implicit code though.
-    if (!initContext && !Parent->isLocalContext())
+    if (!initContext && !Parent->isLocalContext()) {
       initContext = PatternBindingInitializer::create(Parent);
+    }
+
+    // Set up the custom attribute contexts for each variable in this pattern.
+    PBD->getPattern(idx)->forEachVariable([&](VarDecl *var) {
+      for (auto custom : var->getAttrs().getAttributes<CustomAttr>()) {
+        if (auto attributeInit = custom->getInitContext())
+          attributeInit->setEnclosingInitializer(initContext);
+      }
+    });
 
     // We need to call setPattern to ensure the VarDecls in the pattern have
     // the PatternBindingDecl set as their parent. We also need to call
@@ -8576,7 +8589,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
-      isSending());
+      isSending(), isAddressable());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
@@ -9938,6 +9951,9 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
   *selfDecl = new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
                                   getLoc(), ctx.Id_self, this);
   (*selfDecl)->setImplicit();
+  if (getAttrs().hasAttribute<AddressableSelfAttr>()) {
+    (*selfDecl)->setAddressable(true);
+  }
   return *selfDecl;
 }
 
@@ -9990,16 +10006,17 @@ OpaqueTypeDecl *OpaqueTypeDecl::get(
       OpaqueReturnTypeReprs);
 }
 
-bool OpaqueTypeDecl::isOpaqueReturnTypeOfFunction(
-                                       const AbstractFunctionDecl *func) const {
-  // Either the function is declared with its own opaque return type...
-  if (getNamingDecl() == func)
+bool OpaqueTypeDecl::isOpaqueReturnTypeOf(const Decl *ownerDecl) const {
+  if (getNamingDecl() == ownerDecl)
     return true;
 
-  // ...or the function is a getter for a property or subscript with an
-  // opaque return type.
-  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+  if (auto accessor = dyn_cast<AccessorDecl>(ownerDecl)) {
     return accessor->isGetter() && getNamingDecl() == accessor->getStorage();
+  }
+
+  if (auto patternBinding = dyn_cast<PatternBindingDecl>(ownerDecl)) {
+    if (auto *varDecl = dyn_cast<VarDecl>(getNamingDecl()))
+      return varDecl->getParentPatternBinding() == patternBinding;
   }
 
   return false;

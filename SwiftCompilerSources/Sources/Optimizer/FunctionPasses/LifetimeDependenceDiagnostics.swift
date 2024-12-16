@@ -9,6 +9,15 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// Pass dependencies:
+///
+/// - After MoveOnly checking fixes non-Copyable lifetimes.
+///
+/// - Before MoveOnlyTypeEliminator removes ownership operations on trivial types, which loses variable information
+/// required for diagnostics.
+///
+//===----------------------------------------------------------------------===//
 
 import AST
 import SIL
@@ -250,22 +259,6 @@ private struct DiagnoseDependence {
   }
 }
 
-private extension Instruction {
-  func findVarDecl() -> VarDecl? {
-    if let varDeclInst = self as? VarDeclInstruction {
-      return varDeclInst.varDecl
-    }
-    for result in results {
-      for use in result.uses {
-        if let debugVal = use.instruction as? DebugValueInst {
-          return debugVal.varDecl
-        }
-      }
-    }
-    return nil
-  }
-}
-
 // Identify a best-effort variable declaration based on a defining SIL
 // value or any lifetime dependent use of that SIL value.
 private struct LifetimeVariable {
@@ -327,7 +320,7 @@ private struct LifetimeVariable {
       self = Self(introducer: allocStack)
     case .global(let globalVar):
       self.varDecl = globalVar.varDecl
-      self.sourceLoc = nil
+      self.sourceLoc = varDecl?.nameLoc
     case .class(let refAddr):
       self.varDecl = refAddr.varDecl
       self.sourceLoc = refAddr.location.sourceLoc

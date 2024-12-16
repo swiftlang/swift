@@ -18,6 +18,18 @@ struct Str {
   @_hasStorage var b: B
 }
 
+sil @unknown_func : $@convention(thin) () -> ()
+sil @unknown_releaseing_func : $@convention(thin) (@owned B) -> ()
+
+sil @$s4test1BCfD : $@convention(method) (@owned B) -> () {
+// Note that the destructor is not destroying, but it must block the optimization.
+[global: ]
+bb0(%0 : $B):
+  dealloc_ref %0
+  %r = tuple ()
+  return %r
+}
+
 // CHECK-LABEL: sil @devirtualize_object
 // CHECK: [[A:%[0-9]+]] = alloc_ref
 // CHECK-NEXT: [[BD:%.*]] = begin_dealloc_ref [[A]] : $B of [[A]]
@@ -71,37 +83,69 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @dont_devirtualize_wrong_release
-// CHECK: alloc_ref
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: dealloc_ref
-// CHECK: return
-// CHECK: } // end sil function 'dont_devirtualize_wrong_release'
-sil @dont_devirtualize_wrong_release : $@convention(thin) (@owned B) -> () {
-bb0(%0 : $B):
-  %1 = alloc_ref $B
+// CHECK-LABEL: sil @dont_devirtualize_devirtualized_not_inlined :
+// CHECK:         alloc_ref
+// CHECK-NEXT:    strong_retain
+// CHECK-NEXT:    strong_release
+// CHECK-NEXT:    begin_dealloc_ref
+// CHECK: } // end sil function 'dont_devirtualize_devirtualized_not_inlined'
+sil @dont_devirtualize_devirtualized_not_inlined : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $B
+  strong_retain %1 : $B
   strong_release %1 : $B
-  strong_release %0 : $B
-  dealloc_ref %1 : $B
+  %6 = begin_dealloc_ref %1 : $B of %1 : $B
+  %7 = function_ref @$s4test1BCfD : $@convention(method) (@owned B) -> ()
+  %8 = apply %7(%6) : $@convention(method) (@owned B) -> ()
+  dealloc_stack_ref %1 : $B
   %r = tuple ()
   return %r : $()
 }
 
-// CHECK-LABEL: sil @dont_devirtualize_unknown_release
-// CHECK: alloc_ref
-// CHECK-NEXT: strong_release
-// CHECK: [[F:%[0-9]+]] = function_ref @unknown_func
-// CHECK-NEXT: apply [[F]]()
-// CHECK-NEXT: dealloc_ref
-// CHECK: } // end sil function 'dont_devirtualize_unknown_release'
-sil @dont_devirtualize_unknown_release : $@convention(thin) (@owned B) -> () {
+// CHECK-LABEL: sil @devirtualize_with_other_release_in_between :
+// CHECK:         %1 = alloc_ref [stack] $B
+// CHECK-NOT:     release
+// CHECK:         apply
+// CHECK-NEXT:    strong_release %0
+// CHECK-NEXT:    dealloc_stack_ref %1
+// CHECK:       } // end sil function 'devirtualize_with_other_release_in_between'
+sil @devirtualize_with_other_release_in_between : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
-  %1 = alloc_ref $B
+  %1 = alloc_ref [stack] $B
+  strong_release %1 : $B
+  strong_release %0 : $B
+  dealloc_stack_ref %1 : $B
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @devirtualize_with_apply_in_between :
+// CHECK:         alloc_ref
+// CHECK-NEXT:    begin_dealloc_ref
+// CHECK-NOT:     release
+// CHECK:       } // end sil function 'devirtualize_with_apply_in_between'
+sil @devirtualize_with_apply_in_between : $@convention(thin) (@owned B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_ref [stack] $B
   strong_release %1 : $B
   %f = function_ref @unknown_func : $@convention(thin) () -> ()
   %a = apply %f() : $@convention(thin) () -> ()
-  dealloc_ref %1 : $B
+  dealloc_stack_ref %1 : $B
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_devirtualize_unknown_release :
+// CHECK:         alloc_ref
+// CHECK-NEXT:    strong_release
+// CHECK:       } // end sil function 'dont_devirtualize_unknown_release'
+sil @dont_devirtualize_unknown_release : $@convention(thin) (@owned B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_ref [stack] $B
+  strong_release %1 : $B
+  %f = function_ref @unknown_releaseing_func : $@convention(thin) (@owned B) -> ()
+  %a = apply %f(%1) : $@convention(thin) (@owned B) -> ()
+  dealloc_stack_ref %1 : $B
   %r = tuple ()
   return %r : $()
 }
@@ -205,10 +249,24 @@ bb3(%a : $B):
   return %r : $()
 }
 
-
-sil @unknown_func : $@convention(thin) () -> ()
-
-sil @$s4test1BCfD : $@convention(method) (@owned B) -> ()
+// CHECK-LABEL: sil @devirtualize_double_release :
+// CHECK-NOT:     release
+// CHECK: } // end sil function 'devirtualize_double_release'
+sil @devirtualize_double_release : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [stack] $B
+  %1 = end_init_let_ref %0
+  %2 = alloc_ref [stack] $B
+  %3 = end_init_let_ref %2
+  strong_release %1
+  strong_release %3
+  %4 = function_ref @unknown_func : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  dealloc_stack_ref %2
+  dealloc_stack_ref %0
+  %r = tuple ()
+  return %r
+}
 
 sil_vtable B {
   #B.deinit!deallocator: @$s4test1BCfD

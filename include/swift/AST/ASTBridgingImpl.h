@@ -24,6 +24,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Fingerprint.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -36,6 +37,11 @@ BridgedIdentifier::BridgedIdentifier(swift::Identifier ident)
 
 swift::Identifier BridgedIdentifier::unbridged() const {
   return swift::Identifier::getFromOpaquePointer(Raw);
+}
+
+SWIFT_NAME("getter:BridgedIdentifier.isOperator(self:)")
+bool BridgedIdentifier_isOperator(const BridgedIdentifier ident) {
+  return ident.unbridged().isOperator();
 }
 
 //===----------------------------------------------------------------------===//
@@ -454,6 +460,14 @@ SwiftInt BridgedSubstitutionMap::getNumConformances() const {
 
 BridgedConformance BridgedSubstitutionMap::getConformance(SwiftInt index) const {
   return unbridged().getConformances()[index];
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedFingerprint
+//===----------------------------------------------------------------------===//
+
+swift::Fingerprint BridgedFingerprint::unbridged() const {
+  return swift::Fingerprint({this->v1, this->v2});
 }
 
 //===----------------------------------------------------------------------===//

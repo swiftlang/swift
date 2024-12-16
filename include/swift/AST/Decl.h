@@ -66,6 +66,7 @@ namespace swift {
   class AccessorDecl;
   class ApplyExpr;
   class AvailabilityRange;
+  class AvailabilityDomain;
   class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
@@ -1190,6 +1191,10 @@ public:
   /// used in a "safe" dialect.
   bool isUnsafe() const;
 
+  /// Whether this declaration explicitly states that it is allowed to contain
+  /// unsafe code.
+  bool allowsUnsafe() const;
+
 private:
   bool isUnsafeComputed() const {
     return Bits.Decl.IsUnsafeComputed;
@@ -1390,6 +1395,10 @@ public:
   /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
 
+  /// Returns the availability domain associated with the given `AvailableAttr`
+  /// that is attached to this decl.
+  AvailabilityDomain getDomainForAvailableAttr(const AvailableAttr *attr) const;
+
   /// Returns the active platform-specific `@available` attribute for this decl.
   /// There may be multiple `@available` attributes that are relevant to the
   /// current platform, but the returned one has the highest priority.
@@ -1432,15 +1441,6 @@ public:
   /// extension) that makes it unavailable.
   const AvailableAttr *
   getUnavailableAttr(bool ignoreAppExtensions = false) const;
-
-  /// Retrieve the @available attribute that provides the OS version range that
-  /// this declaration is available in.
-  ///
-  /// This attribute may come from an enclosing decl since availability is
-  /// inherited. The second member of the returned pair is the decl that owns
-  /// the attribute.
-  std::optional<std::pair<const AvailableAttr *, const Decl *>>
-  getSemanticAvailableRangeAttr() const;
 
   /// Returns true if the decl is effectively always unavailable in the current
   /// compilation context. This query differs from \c isUnavailable() because it
@@ -1912,6 +1912,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   friend class Decl;
 public:
   using Decl::getASTContext;
+  using Decl::allowsUnsafe;
 
   /// Create a new extension declaration.
   static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
@@ -3384,6 +3385,7 @@ public:
   using DeclContext::operator new;
   using DeclContext::operator delete;
   using TypeDecl::getDeclaredInterfaceType;
+  using Decl::allowsUnsafe;
 
   static bool classof(const DeclContext *C) {
     if (auto D = C->getAsDecl())
@@ -3492,7 +3494,7 @@ public:
   ///
   /// This is more complex than just checking `getNamingDecl` because the
   /// function could also be the getter of a storage declaration.
-  bool isOpaqueReturnTypeOfFunction(const AbstractFunctionDecl *func) const;
+  bool isOpaqueReturnTypeOf(const Decl *owner) const;
 
   /// Get the ordinal of the anonymous opaque parameter of this decl with type
   /// repr `repr`, as introduce implicitly by an occurrence of "some" in return
@@ -6817,6 +6819,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
+    
+    /// Whether this parameter is `@_addressable`.
+    IsAddressable = 1 << 3,
 
     /// Whether or not this parameter is 'sending'.
     IsSending = 1 << 4,
@@ -7105,6 +7110,18 @@ public:
       addFlag(Flag::IsSending);
     else
       removeFlag(Flag::IsSending);
+  }
+
+  /// Whether or not this parameter is marked with '@_addressable'.
+  bool isAddressable() const {
+    return getOptions().contains(Flag::IsAddressable);
+  }
+  
+  void setAddressable(bool value = true) {
+    if (value)
+      addFlag(Flag::IsAddressable);
+    else
+      removeFlag(Flag::IsAddressable);
   }
 
   /// Whether or not this parameter is marked with '_const'.

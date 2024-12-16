@@ -3506,6 +3506,31 @@ public:
 private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType,
             std::optional<AnyFunctionType::Param> origParam = std::nullopt) {
+    if (origParam && origParam->isAddressable()) {
+      // If the function takes an addressable parameter, and its argument is
+      // a reference to an addressable declaration with compatible ownership,
+      // forward the address along in-place.
+      if (arg.isExpr()) {
+        auto expr = std::move(arg).asKnownExpr();
+        
+        if (auto le = dyn_cast<LoadExpr>(expr)) {
+          expr = le->getSubExpr();
+        }
+        if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
+          if (auto param = dyn_cast<ParamDecl>(dre->getDecl())) {
+            if (param->isAddressable()
+              && param->getValueOwnership() == origParam->getValueOwnership()) {
+              auto addr = SGF.VarLocs[param].value;
+              claimNextParameters(1);
+              Args.push_back(ManagedValue::forBorrowedAddressRValue(addr));
+              return;
+            }
+          }
+        }
+        arg = ArgumentSource(expr);
+      }
+    }
+            
     if (!arg.hasLValueType()) {
       // If the unsubstituted function type has a parameter of tuple type,
       // explode the tuple value.

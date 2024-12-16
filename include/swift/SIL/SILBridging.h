@@ -525,6 +525,7 @@ struct BridgedFunction {
   BRIDGED_INLINE void setLinkage(BridgedLinkage linkage) const;
   BRIDGED_INLINE void setIsSerialized(bool isSerialized) const;
   bool isTrapNoReturn() const;
+  bool isConvertPointerToPointerArgument() const;
   bool isAutodiffVJP() const;
   SwiftInt specializationLevel() const;
   SWIFT_IMPORT_UNSAFE BridgedSubstitutionMap getMethodSubstitutions(BridgedSubstitutionMap contextSubs) const;
@@ -865,6 +866,7 @@ struct BridgedArgument {
   BRIDGED_INLINE swift::SILArgument * _Nonnull getArgument() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getParent() const;
   BRIDGED_INLINE bool isReborrow() const;
+  BRIDGED_INLINE bool FunctionArgument_isLexical() const;
   BRIDGED_INLINE void setReborrow(bool reborrow) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getVarDecl() const;
   BRIDGED_INLINE void copyFlags(BridgedArgument fromArgument) const;

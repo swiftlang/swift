@@ -359,23 +359,31 @@ Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
 }
 
 Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
-                                      ConstraintLocatorBuilder locator) {
+                                      ConstraintLocatorBuilder locator,
+                                      Decl *ownerDecl) {
+  // FIXME: Require non-null ownerDecl and fix remaining callers
+  // ASSERT(ownerDecl);
+
   // Early return if `type` is `NULL` or if there are no opaque archetypes (in
   // which case there is certainly nothing for us to do).
   if (!type || !type->hasOpaqueArchetype())
     return type;
 
-  if (!(context == CTP_Initialization || context == CTP_ReturnStmt))
+  if (context != CTP_Initialization && context != CTP_ReturnStmt)
     return type;
 
   auto shouldOpen = [&](OpaqueTypeArchetypeType *opaqueType) {
-    if (context != CTP_ReturnStmt)
+    if (context == CTP_Initialization) {
+      if (!ownerDecl)
+        return true;
+
+      return opaqueType->getDecl()->isOpaqueReturnTypeOf(ownerDecl);
+    } else {
+      if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
+        return opaqueType->getDecl()->isOpaqueReturnTypeOf(func);
+
       return true;
-
-    if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
-      return opaqueType->getDecl()->isOpaqueReturnTypeOfFunction(func);
-
-    return true;
+    }
   };
 
   return type.transformRec([&](Type type) -> std::optional<Type> {
@@ -686,13 +694,8 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
                                     FunctionRefInfo functionRefInfo, FunctionType *functionType,
                                     ConstraintLocatorBuilder locator) {
   // Only apply property wrappers to unapplied references to functions.
-  // FIXME(FunctionRefInfo): This should just be `isUnapplied()`, which would
-  // fix https://github.com/swiftlang/swift/issues/77823, but we also need to
-  // correctly handle the wrapping in matchCallArguments.
-  if (!(functionRefInfo.isCompoundName() ||
-        functionRefInfo.isUnappliedBaseName())) {
+  if (!functionRefInfo.isUnapplied())
     return functionType;
-  }
 
   // This transform is not applicable to pattern matching context.
   //
@@ -706,16 +709,8 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
   SmallVector<AnyFunctionType::Param, 4> adjustedParamTypes;
 
   DeclNameLoc nameLoc;
-  auto *ref = getAsExpr(locator.getAnchor());
-  if (auto *declRef = dyn_cast<DeclRefExpr>(ref)) {
-    nameLoc = declRef->getNameLoc();
-  } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(ref)) {
-    nameLoc = dotExpr->getNameLoc();
-  } else if (auto *overloadedRef = dyn_cast<OverloadedDeclRefExpr>(ref)) {
-    nameLoc = overloadedRef->getNameLoc();
-  } else if (auto *memberExpr = dyn_cast<UnresolvedMemberExpr>(ref)) {
-    nameLoc = memberExpr->getNameLoc();
-  }
+  if (auto *ref = getAsExpr(locator.getAnchor()))
+    nameLoc = ref->getNameLoc();
 
   for (unsigned i : indices(*paramList)) {
     Identifier argLabel;

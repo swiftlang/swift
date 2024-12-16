@@ -228,6 +228,14 @@ fileprivate final class ProjectGenerator {
       }
       guard buildableFolder != nil ||
               group(for: repoRelativePath.appending(parentPath)) != nil else {
+        // If this isn't a child of an explicitly added reference, something
+        // has probably gone wrong.
+        if !spec.referencesToAdd.contains(where: { parentPath.hasPrefix($0.path) }) {
+          log.warning("""
+            Target '\(name)' at '\(repoRelativePath.appending(parentPath))' is \
+            nested in a folder reference; skipping. This is likely an xcodegen bug.
+            """)
+        }
         return nil
       }
     }
@@ -275,6 +283,50 @@ fileprivate final class ProjectGenerator {
     }
   }
 
+  /// Checks whether a target can be represented using a buildable folder.
+  func canUseBuildableFolder(
+    at parentPath: RelativePath, sources: [RelativePath]
+  ) throws -> Bool {
+    // To use a buildable folder, all child sources need to be accounted for
+    // in the target. If we have any stray sources not part of the target,
+    // attempting to use a buildable folder would incorrectly include them.
+    // Additionally, special targets like "Unbuildables" have an empty parent
+    // path, avoid buildable folders for them.
+    guard spec.useBuildableFolders, !parentPath.isEmpty else { return false }
+    let sources = Set(sources)
+    return try getAllRepoSubpaths(of: parentPath)
+      .allSatisfy { !$0.isSourceLike || sources.contains($0) }
+  }
+
+  /// Checks whether a given Clang target can be represented using a buildable
+  /// folder.
+  func canUseBuildableFolder(for clangTarget: ClangTarget) throws -> Bool {
+    // In addition to the standard checking, we also must not have any
+    // unbuildable sources or sources with unique arguments.
+    // TODO: To improve the coverage of buildable folders, we ought to start
+    // automatically splitting umbrella Clang targets like 'stdlib', since
+    // they currently always have files with unique args.
+    guard spec.useBuildableFolders, clangTarget.unbuildableSources.isEmpty else {
+      return false
+    }
+    let parent = clangTarget.parentPath
+    let sources = clangTarget.sources.map(\.path)
+    let hasConsistentArgs = try sources.allSatisfy {
+      try !buildDir.clangArgs.hasUniqueArgs(for: $0, parent: parent)
+    }
+    guard hasConsistentArgs else { return false }
+    return try canUseBuildableFolder(at: parent, sources: sources)
+  }
+
+  func canUseBuildableFolder(
+    for buildRule: SwiftTarget.BuildRule
+  ) throws -> Bool {
+    guard let parentPath = buildRule.parentPath else { return false }
+    return try canUseBuildableFolder(
+      at: parentPath, sources: buildRule.sources.repoSources
+    )
+  }
+
   func generateClangTarget(
     _ targetInfo: ClangTarget, includeInAllTarget: Bool = true
   ) throws {
@@ -303,20 +355,10 @@ fileprivate final class ProjectGenerator {
       }
       return
     }
-    // Can only use buildable folders if there are no unique arguments and no
-    // unbuildable sources.
-    // TODO: To improve the coverage of buildable folders, we ought to start
-    // automatically splitting umbrella Clang targets like 'stdlib', since
-    // they always have files with unique args.
-    let canUseBuildableFolders =
-      try spec.useBuildableFolders && targetInfo.unbuildableSources.isEmpty &&
-      targetInfo.sources.allSatisfy {
-        try !buildDir.clangArgs.hasUniqueArgs(for: $0.path, parent: targetPath)
-      }
-
     let target = generateBaseTarget(
       targetInfo.name, at: targetPath,
-      canUseBuildableFolder: canUseBuildableFolders, productType: .staticArchive,
+      canUseBuildableFolder: try canUseBuildableFolder(for: targetInfo),
+      productType: .staticArchive,
       includeInAllTarget: includeInAllTarget
     )
     guard let target else { return }
@@ -531,11 +573,12 @@ fileprivate final class ProjectGenerator {
     guard checkNotExcluded(buildRule.parentPath, for: "Swift target") else {
       return nil
     }
-    // Create the target. Swift targets can always use buildable folders
-    // since they have a consistent set of arguments.
+    // Create the target.
     let target = generateBaseTarget(
-      targetInfo.name, at: buildRule.parentPath, canUseBuildableFolder: true,
-      productType: .staticArchive, includeInAllTarget: includeInAllTarget
+      targetInfo.name, at: buildRule.parentPath,
+      canUseBuildableFolder: try canUseBuildableFolder(for: buildRule),
+      productType: .staticArchive,
+      includeInAllTarget: includeInAllTarget
     )
     guard let target else { return nil }
 
@@ -548,8 +591,10 @@ fileprivate final class ProjectGenerator {
 
     applySubstitutions(to: &buildArgs, target: target, targetInfo: targetInfo)
 
+    // Follow the same logic as swift-driver and set the module name to 'main'
+    // if we don't have one.
     let moduleName = buildArgs.takePrintedLastValue(for: .moduleName)
-    buildSettings.common.PRODUCT_MODULE_NAME = moduleName
+    buildSettings.common.PRODUCT_MODULE_NAME = moduleName ?? "main"
 
     // Emit a module if we need to.
     // TODO: This currently just uses the build rule command args, should we
@@ -557,6 +602,13 @@ fileprivate final class ProjectGenerator {
     if targetInfo.emitModuleRule != nil {
       buildSettings.common.DEFINES_MODULE = "YES"
     }
+
+    // Disable the Obj-C bridging header; we don't currently use this, and
+    // even if we did, we'd probably want to use the one in the Ninja build
+    // folder.
+    // This also works around a compiler crash
+    // (https://github.com/swiftlang/swift/issues/78190).
+    buildSettings.common.SWIFT_OBJC_INTERFACE_HEADER_NAME = ""
 
     if let last = buildArgs.takeFlagGroup(.O, .Onone) {
       buildSettings.common.SWIFT_OPTIMIZATION_LEVEL = last.printed

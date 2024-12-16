@@ -364,6 +364,9 @@ void updateAllGuaranteedPhis(SILPassManager *pm, SILFunction *f);
 /// Updates the reborrow flags and the borrowed-from instructions for all `phis`.
 void updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
 
+/// Replaces phis with the unique incoming values if all incoming values are the same.
+void replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
+
 } // namespace swift
 
 #endif

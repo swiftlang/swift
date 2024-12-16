@@ -376,33 +376,27 @@ static void highlightOffendingType(InFlightDiagnostic &diag,
 
 /// Emit a note on \p limitImport when it restricted the access level
 /// of a type.
-static void noteLimitingImport(const Decl *userDecl,
-                               ASTContext &ctx,
+static void noteLimitingImport(const Decl *userDecl, ASTContext &ctx,
                                const ImportAccessLevel limitImport,
-                               const TypeRepr *complainRepr) {
+                               const Decl *complainDecl) {
   if (!limitImport.has_value())
     return;
 
   assert(limitImport->accessLevel != AccessLevel::Public &&
          "a public import shouldn't limit the access level of a decl");
 
-  if (auto *declRefTR = dyn_cast_or_null<DeclRefTypeRepr>(complainRepr)) {
-    ValueDecl *VD = declRefTR->getBoundDecl();
-
+  if (complainDecl) {
     // When using an IDE in a large file the decl_import_via_here note
     // may be easy to miss on the import. Duplicate the information on the
     // error line as well so it can't be missed.
     if (userDecl)
-      userDecl->diagnose(diag::decl_import_via_local,
-                     VD,
-                     limitImport->accessLevel,
-                     limitImport->module.importedModule);
+      userDecl->diagnose(diag::decl_import_via_local, complainDecl,
+                         limitImport->accessLevel,
+                         limitImport->module.importedModule);
 
     if (limitImport->importLoc.isValid())
-      ctx.Diags.diagnose(limitImport->importLoc,
-                         diag::decl_import_via_here,
-                         VD,
-                         limitImport->accessLevel,
+      ctx.Diags.diagnose(limitImport->importLoc, diag::decl_import_via_here,
+                         complainDecl, limitImport->accessLevel,
                          limitImport->module.importedModule);
   } else if (limitImport->importLoc.isValid()) {
     ctx.Diags.diagnose(limitImport->importLoc, diag::module_imported_here,
@@ -411,14 +405,21 @@ static void noteLimitingImport(const Decl *userDecl,
   }
 }
 
+static void noteLimitingImport(const Decl *userDecl, ASTContext &ctx,
+                               const ImportAccessLevel limitImport,
+                               const TypeRepr *complainRepr) {
+  const Decl *complainDecl = nullptr;
+  if (auto *declRefTR = dyn_cast_or_null<DeclRefTypeRepr>(complainRepr))
+    complainDecl = declRefTR->getBoundDecl();
+
+  noteLimitingImport(userDecl, ctx, limitImport, complainDecl);
+}
+
 static void noteLimitingImport(const Decl *userDecl,
                                const ImportAccessLevel limitImport,
                                const TypeRepr *complainRepr) {
-  if (!limitImport.has_value())
-    return;
-
-  ASTContext &ctx = userDecl->getASTContext();
-  noteLimitingImport(userDecl, ctx, limitImport, complainRepr);
+  noteLimitingImport(userDecl, userDecl->getASTContext(), limitImport,
+                     complainRepr);
 }
 
 void AccessControlCheckerBase::checkGenericParamAccess(
@@ -625,7 +626,8 @@ public:
     if (seenVars.count(theVar) || theVar->isInvalid())
       return;
 
-    checkTypeAccess(theVar->getInterfaceType(), nullptr, theVar,
+    Type interfaceType = theVar->getInterfaceType();
+    checkTypeAccess(interfaceType, nullptr, theVar,
                     /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
@@ -644,8 +646,24 @@ public:
       DE.diagnose(NP->getLoc(), diagID, theVar->isLet(),
                   isTypeContext, isExplicit, theVarAccess,
                   isa<FileUnit>(theVar->getDeclContext()),
-                  typeAccess, theVar->getInterfaceType());
-      noteLimitingImport(theVar, importLimit, complainRepr);
+                  typeAccess, interfaceType);
+
+      // As we pass in a null typeRepr the complainRepr will always be null.
+      // Extract the module import from the interface type instead.
+      const Decl *complainDecl = nullptr;
+      ImportAccessLevel complainImport = std::nullopt;
+      interfaceType.walk(SimpleTypeDeclFinder([&](const ValueDecl *VD) {
+        ImportAccessLevel import = VD->getImportAccessFrom(theVar->getDeclContext());
+        if (import.has_value() && import->accessLevel < VD->getFormalAccess()) {
+          complainDecl = VD;
+          complainImport = import;
+          return TypeWalker::Action::Stop;
+        }
+        return TypeWalker::Action::Continue;
+      }));
+
+      noteLimitingImport(theVar, theVar->getASTContext(), complainImport,
+                         complainDecl);
     });
   }
 
@@ -1828,6 +1846,8 @@ public:
   }
 };
 
+bool isFragileClangDecl(const clang::Decl *decl);
+
 bool isFragileClangType(clang::QualType type) {
   if (type.isNull())
     return true;
@@ -1842,13 +1862,12 @@ bool isFragileClangType(clang::QualType type) {
   // Pointers to non-fragile types are non-fragile.
   if (underlyingTypePtr->isPointerType())
     return isFragileClangType(underlyingTypePtr->getPointeeType());
+  if (auto tagDecl = underlyingTypePtr->getAsTagDecl())
+    return isFragileClangDecl(tagDecl);
   return true;
 }
 
-bool isFragileClangNode(const ClangNode &node) {
-  auto *decl = node.getAsDecl();
-  if (!decl)
-    return false;
+bool isFragileClangDecl(const clang::Decl *decl) {
   // Namespaces by themselves don't impact ABI.
   if (isa<clang::NamespaceDecl>(decl))
     return false;
@@ -1856,6 +1875,8 @@ bool isFragileClangNode(const ClangNode &node) {
   if (isa<clang::ObjCContainerDecl>(decl))
     return false;
   if (auto *fd = dyn_cast<clang::FunctionDecl>(decl)) {
+    if (auto *ctorDecl = dyn_cast<clang::CXXConstructorDecl>(fd))
+      return isFragileClangDecl(ctorDecl->getParent());
     if (!isa<clang::CXXMethodDecl>(decl) &&
         !isFragileClangType(fd->getDeclaredReturnType())) {
       for (const auto *param : fd->parameters()) {
@@ -1885,11 +1906,25 @@ bool isFragileClangNode(const ClangNode &node) {
   if (auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl))
     return isFragileClangType(typedefDecl->getUnderlyingType());
   if (auto *rd = dyn_cast<clang::RecordDecl>(decl)) {
-    if (!isa<clang::CXXRecordDecl>(rd))
+    auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(rd);
+    if (!cxxRecordDecl)
       return false;
-    return !rd->getDeclContext()->isExternCContext();
+    return !cxxRecordDecl->isCLike() &&
+           !cxxRecordDecl->getDeclContext()->isExternCContext();
   }
+  if (auto *varDecl = dyn_cast<clang::VarDecl>(decl))
+    return isFragileClangType(varDecl->getType());
+  if (auto *fieldDecl = dyn_cast<clang::FieldDecl>(decl))
+    return isFragileClangType(fieldDecl->getType()) ||
+           isFragileClangDecl(fieldDecl->getParent());
   return true;
+}
+
+bool isFragileClangNode(const ClangNode &node) {
+  auto *decl = node.getAsDecl();
+  if (!decl)
+    return false;
+  return isFragileClangDecl(decl);
 }
 
 } // end anonymous namespace

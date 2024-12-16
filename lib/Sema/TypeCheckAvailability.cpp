@@ -21,6 +21,7 @@
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsParse.h"
@@ -345,8 +346,8 @@ static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
 static bool isInsideCompatibleUnavailableDeclaration(
     const Decl *D, AvailabilityContext availabilityContext,
     const AvailableAttr *attr) {
-  auto referencedPlatform = availabilityContext.getUnavailablePlatformKind();
-  if (!referencedPlatform)
+  auto contextPlatform = availabilityContext.getUnavailablePlatformKind();
+  if (!contextPlatform)
     return false;
 
   if (!attr->isUnconditionallyUnavailable())
@@ -354,8 +355,8 @@ static bool isInsideCompatibleUnavailableDeclaration(
 
   // Refuse calling universally unavailable functions from unavailable code,
   // but allow the use of types.
-  PlatformKind platform = attr->getPlatform();
-  if (platform == PlatformKind::none && !attr->isForEmbedded() &&
+  PlatformKind declPlatform = attr->getPlatform();
+  if (declPlatform == PlatformKind::none && !attr->isForEmbedded() &&
       !isa<TypeDecl>(D) && !isa<ExtensionDecl>(D))
     return false;
 
@@ -364,8 +365,9 @@ static bool isInsideCompatibleUnavailableDeclaration(
   if (attr->isForEmbedded())
     return availabilityContext.isUnavailableInEmbedded();
 
-  return (*referencedPlatform == platform ||
-          inheritsAvailabilityFromPlatform(platform, *referencedPlatform));
+  return (*contextPlatform == PlatformKind::none ||
+          *contextPlatform == declPlatform ||
+          inheritsAvailabilityFromPlatform(declPlatform, *contextPlatform));
 }
 
 const AvailableAttr *
@@ -867,6 +869,50 @@ private:
     return Range;
   }
 
+  /// Enumerate the AST nodes and their corresponding source ranges for
+  /// the body (or bodies) of the given declaration.
+  void enumerateBodyRanges(
+     Decl *decl,
+     llvm::function_ref<void(Decl *decl, ASTNode body, SourceRange)> acceptBody
+  ) {
+    // Top level code always uses the deployment target.
+    if (auto tlcd = dyn_cast<TopLevelCodeDecl>(decl)) {
+      if (auto bodyStmt = tlcd->getBody()) {
+        acceptBody(tlcd, bodyStmt, refinementSourceRangeForDecl(tlcd));
+      }
+      return;
+    }
+
+    // For functions, provide the body source range.
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+      if (!afd->isImplicit()) {
+        if (auto body = afd->getBody(/*canSynthesize*/ false)) {
+          acceptBody(afd, body, afd->getBodySourceRange());
+        }
+      }
+      return;
+    }
+
+    // Pattern binding declarations have initial values that are their
+    // bodies.
+    if (auto *pbd = dyn_cast<PatternBindingDecl>(decl)) {
+      for (unsigned index : range(pbd->getNumPatternEntries())) {
+        auto var = pbd->getAnchoringVarDecl(index);
+        if (!var)
+          continue;
+
+        auto *initExpr = pbd->getInit(index);
+        if (initExpr && !initExpr->isImplicit()) {
+          assert(initExpr->getSourceRange().isValid());
+
+          // Create a scope for the init written in the source.
+          acceptBody(var, initExpr, initExpr->getSourceRange());
+        }
+      }
+      return;
+    }
+  }
+
   // Creates an implicit decl scope specifying the deployment target for
   // `range` in decl `D`.
   AvailabilityScope *
@@ -878,89 +924,85 @@ private:
         Context, D, getCurrentScope(), Availability, range);
   }
 
+  /// Determine whether the body of the given declaration has
+  /// deployment-target availability.
+  static bool bodyIsDeploymentTarget(Decl *decl) {
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+      return afd->getResilienceExpansion() != ResilienceExpansion::Minimal;
+    }
+
+    if (auto var = dyn_cast<VarDecl>(decl)) {
+      // Var decls may have associated pattern binding decls or property
+      // wrappers with init expressions. Those expressions need to be
+      // constrained to the deployment target unless they are exposed to
+      // clients.
+      return var->hasInitialValue() && !var->isInitExposedToClients();
+    }
+
+    return true;
+  }
+
   void buildContextsForBodyOfDecl(Decl *D) {
-    // Are we already constrained by the deployment target? If not, adding
+    // Are we already constrained by the deployment target and the declaration
+    // doesn't explicitly allow unsafe constructs in its definition, adding
     // new contexts won't change availability.
-    if (isCurrentScopeContainedByDeploymentTarget())
+    bool allowsUnsafe = D->getAttrs().hasAttribute<SafeAttr>();
+    if (isCurrentScopeContainedByDeploymentTarget() && !allowsUnsafe)
       return;
 
-    // Top level code always uses the deployment target.
-    if (auto tlcd = dyn_cast<TopLevelCodeDecl>(D)) {
-      if (auto bodyStmt = tlcd->getBody()) {
-        pushDeclBodyContext(
-            tlcd, {{bodyStmt, createImplicitDeclContextForDeploymentTarget(
-                                  tlcd, refinementSourceRangeForDecl(tlcd))}});
-      }
-      return;
-    }
+    // Enumerate all of the body scopes to apply availability.
+    llvm::SmallVector<std::pair<ASTNode, AvailabilityScope *>, 4>
+        nodesAndScopes;
+    enumerateBodyRanges(D, [&](Decl *decl, ASTNode body, SourceRange range) {
+      auto availability = getCurrentScope()->getAvailabilityContext();
 
-    // Function bodies use the deployment target if they are within the module's
-    // resilience domain.
-    if (auto afd = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (!afd->isImplicit() &&
-          afd->getResilienceExpansion() != ResilienceExpansion::Minimal) {
-        if (auto body = afd->getBody(/*canSynthesize*/ false)) {
-          pushDeclBodyContext(
-              afd, {{body, createImplicitDeclContextForDeploymentTarget(
-                               afd, afd->getBodySourceRange())}});
-        }
-      }
-      return;
-    }
-
-    // Pattern binding declarations can have children corresponding to property
-    // wrappers and the initial values provided in each pattern binding entry
-    if (auto *pbd = dyn_cast<PatternBindingDecl>(D)) {
-      llvm::SmallVector<std::pair<ASTNode, AvailabilityScope *>, 4>
-          nodesAndScopes;
-
-      for (unsigned index : range(pbd->getNumPatternEntries())) {
-        auto var = pbd->getAnchoringVarDecl(index);
-        if (!var)
-          continue;
-
-        // Var decls may have associated pattern binding decls or property
-        // wrappers with init expressions. Those expressions need to be
-        // constrained to the deployment target unless they are exposed to
-        // clients.
-        if (!var->hasInitialValue() || var->isInitExposedToClients())
-          continue;
-
-        auto *initExpr = pbd->getInit(index);
-        if (initExpr && !initExpr->isImplicit()) {
-          assert(initExpr->getSourceRange().isValid());
-
-          // Create a scope for the init written in the source.
-          nodesAndScopes.push_back(
-              {initExpr, createImplicitDeclContextForDeploymentTarget(
-                             var, initExpr->getSourceRange())});
-        }
+      // Apply deployment-target availability if appropriate for this body.
+      if (!isCurrentScopeContainedByDeploymentTarget() &&
+          bodyIsDeploymentTarget(decl)) {
+        availability.constrainWithPlatformRange(
+             AvailabilityRange::forDeploymentTarget(Context), Context);
       }
 
-      if (nodesAndScopes.size() > 0)
-        pushDeclBodyContext(pbd, nodesAndScopes);
+      // Allow unsafe if appropriate for this body.
+      if (allowsUnsafe) {
+        availability.constrainWithAllowsUnsafe(Context);
+      }
 
-      // Ideally any init expression would be returned by `getInit()` above.
-      // However, for property wrappers it doesn't get populated until
-      // typechecking completes (which is too late). Instead, we find the
-      // the property wrapper attribute and use its source range to create a
-      // scope for the initializer expression.
-      //
-      // FIXME: Since we don't have an expression here, we can't build out its
-      // scope. If the Expr that will eventually be created contains a closure
-      // expression, then it might have AST nodes that need to be refined. For
-      // example, property wrapper initializers that takes block arguments
-      // are not handled correctly because of this (rdar://77841331).
-      if (auto firstVar = pbd->getAnchoringVarDecl(0)) {
-        if (firstVar->hasInitialValue() &&
-            !firstVar->isInitExposedToClients()) {
-          for (auto *wrapper : firstVar->getAttachedPropertyWrappers()) {
-            createImplicitDeclContextForDeploymentTarget(firstVar,
-                                                         wrapper->getRange());
+      nodesAndScopes.push_back({
+          body,
+          AvailabilityScope::createForDeclImplicit(
+              Context, decl, getCurrentScope(), availability, range)
+      });
+    });
+
+    if (nodesAndScopes.size() > 0)
+      pushDeclBodyContext(D, nodesAndScopes);
+
+    if (!isCurrentScopeContainedByDeploymentTarget()) {
+      // Pattern binding declarations can have children corresponding to property
+      // wrappers, which we handle separately.
+      if (auto *pbd = dyn_cast<PatternBindingDecl>(D)) {
+        // Ideally any init expression would be returned by `getInit()` above.
+        // However, for property wrappers it doesn't get populated until
+        // typechecking completes (which is too late). Instead, we find the
+        // the property wrapper attribute and use its source range to create a
+        // scope for the initializer expression.
+        //
+        // FIXME: Since we don't have an expression here, we can't build out its
+        // scope. If the Expr that will eventually be created contains a closure
+        // expression, then it might have AST nodes that need to be refined. For
+        // example, property wrapper initializers that takes block arguments
+        // are not handled correctly because of this (rdar://77841331).
+        if (auto firstVar = pbd->getAnchoringVarDecl(0)) {
+          if (firstVar->hasInitialValue() &&
+              !firstVar->isInitExposedToClients()) {
+            for (auto *wrapper : firstVar->getAttachedPropertyWrappers()) {
+              createImplicitDeclContextForDeploymentTarget(firstVar,
+                                                           wrapper->getRange());
+            }
           }
         }
       }
-      return;
     }
   }
 
@@ -2961,32 +3003,37 @@ public:
 private:
   Status DiagnosticStatus;
   const AvailableAttr *Attr;
-  StringRef Platform;
-  StringRef VersionedPlatform;
+  AvailabilityDomain Domain;
 
 public:
   UnavailabilityDiagnosticInfo(Status status, const AvailableAttr *attr,
-                               StringRef platform, StringRef versionedPlatform)
-      : DiagnosticStatus(status), Attr(attr), Platform(platform),
-        VersionedPlatform(versionedPlatform) {
+                               AvailabilityDomain domain)
+      : DiagnosticStatus(status), Attr(attr), Domain(domain) {
     assert(attr);
-    assert(status == Status::AlwaysUnavailable || !VersionedPlatform.empty());
   };
 
   Status getStatus() const { return DiagnosticStatus; }
   const AvailableAttr *getAttr() const { return Attr; }
+  AvailabilityDomain getDomain() const { return Domain; }
+  StringRef getDomainName() const { return Domain.getNameForDiagnostics(); }
 
-  /// Returns the platform name (or "Swift" for a declaration that is
-  /// unavailable in Swift) to print in the main unavailability diangostic. May
-  /// be empty.
-  StringRef getPlatform() const { return Platform; }
+  bool shouldHideDomainNameInUnversionedDiagnostics() const {
+    switch (getDomain().getKind()) {
+    case AvailabilityDomain::Kind::Universal:
+      return true;
+    case AvailabilityDomain::Kind::Platform:
+      return false;
 
-  /// Returns the platform name to print in diagnostic notes about the version
-  /// in which a declaration either will become available or previously became
-  /// obsoleted.
-  StringRef getVersionedPlatform() const {
-    assert(DiagnosticStatus != Status::AlwaysUnavailable);
-    return VersionedPlatform;
+    case AvailabilityDomain::Kind::PackageDescription:
+    case AvailabilityDomain::Kind::SwiftLanguage:
+      switch (DiagnosticStatus) {
+      case Status::AlwaysUnavailable:
+        return false;
+      case Status::IntroducedInVersion:
+      case Status::Obsoleted:
+        return true;
+      }
+    }
   }
 };
 
@@ -2998,32 +3045,7 @@ getExplicitUnavailabilityDiagnosticInfo(const Decl *decl,
     return std::nullopt;
 
   ASTContext &ctx = decl->getASTContext();
-  StringRef platform = "";
-  StringRef versionedPlatform = "";
-  switch (attr->getPlatformAgnosticAvailability()) {
-  case PlatformAgnosticAvailabilityKind::Deprecated:
-    llvm_unreachable("shouldn't see deprecations in explicit unavailability");
-
-  case PlatformAgnosticAvailabilityKind::NoAsync:
-    llvm_unreachable("shouldn't see noasync in explicit unavailability");
-
-  case PlatformAgnosticAvailabilityKind::None:
-  case PlatformAgnosticAvailabilityKind::Unavailable:
-    if (attr->getPlatform() != PlatformKind::none) {
-      platform = attr->prettyPlatformString();
-      versionedPlatform = platform;
-    }
-    break;
-  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-    versionedPlatform = "Swift";
-    break;
-  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-    versionedPlatform = "PackageDescription";
-    break;
-  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-    platform = "Swift";
-    break;
-  }
+  auto domain = decl->getDomainForAvailableAttr(attr);
 
   switch (attr->getVersionAvailability(ctx)) {
   case AvailableVersionComparison::Available:
@@ -3036,18 +3058,17 @@ getExplicitUnavailabilityDiagnosticInfo(const Decl *decl,
         attr->Introduced.has_value()) {
       return UnavailabilityDiagnosticInfo(
           UnavailabilityDiagnosticInfo::Status::IntroducedInVersion, attr,
-          platform, versionedPlatform);
+          domain);
     } else {
       return UnavailabilityDiagnosticInfo(
           UnavailabilityDiagnosticInfo::Status::AlwaysUnavailable, attr,
-          platform, versionedPlatform);
+          domain);
     }
     break;
 
   case AvailableVersionComparison::Obsoleted:
     return UnavailabilityDiagnosticInfo(
-        UnavailabilityDiagnosticInfo::Status::Obsoleted, attr, platform,
-        versionedPlatform);
+        UnavailabilityDiagnosticInfo::Status::Obsoleted, attr, domain);
   }
 }
 
@@ -3069,7 +3090,11 @@ bool diagnoseExplicitUnavailability(
 
   auto type = rootConf->getType();
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-  StringRef platform = diagnosticInfo->getPlatform();
+  StringRef versionedPlatform = diagnosticInfo->getDomainName();
+  StringRef platform =
+      diagnosticInfo->shouldHideDomainNameInUnversionedDiagnostics()
+          ? ""
+          : versionedPlatform;
   const AvailableAttr *attr = diagnosticInfo->getAttr();
 
   // Downgrade unavailable Sendable conformance diagnostics where
@@ -3093,13 +3118,12 @@ bool diagnoseExplicitUnavailability(
     break;
   case UnavailabilityDiagnosticInfo::Status::IntroducedInVersion:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
-                   type, proto, diagnosticInfo->getVersionedPlatform(),
-                   *attr->Introduced);
+                   type, proto, versionedPlatform, *attr->Introduced);
     break;
   case UnavailabilityDiagnosticInfo::Status::Obsoleted:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
-                  diagnosticInfo->getVersionedPlatform(), *attr->Obsoleted)
+                  versionedPlatform, *attr->Obsoleted)
         .highlight(attr->getRange());
     break;
   }
@@ -3496,7 +3520,11 @@ bool diagnoseExplicitUnavailability(
   SourceLoc Loc = R.Start;
   ASTContext &ctx = D->getASTContext();
   auto &diags = ctx.Diags;
-  StringRef platform = diagnosticInfo->getPlatform();
+  StringRef versionedPlatform = diagnosticInfo->getDomainName();
+  StringRef platform =
+      diagnosticInfo->shouldHideDomainNameInUnversionedDiagnostics()
+          ? ""
+          : versionedPlatform;
 
   // TODO: Consider removing this.
   // ObjC keypaths components weren't checked previously, so errors are demoted
@@ -3549,13 +3577,13 @@ bool diagnoseExplicitUnavailability(
   case UnavailabilityDiagnosticInfo::Status::IntroducedInVersion:
     diags
         .diagnose(D, diag::availability_introduced_in_version, D,
-                  diagnosticInfo->getVersionedPlatform(), *Attr->Introduced)
+                  versionedPlatform, *Attr->Introduced)
         .highlight(Attr->getRange());
     break;
   case UnavailabilityDiagnosticInfo::Status::Obsoleted:
     diags
-        .diagnose(D, diag::availability_obsoleted, D,
-                  diagnosticInfo->getVersionedPlatform(), *Attr->Obsoleted)
+        .diagnose(D, diag::availability_obsoleted, D, versionedPlatform,
+                  *Attr->Obsoleted)
         .highlight(Attr->getRange());
     break;
   }
@@ -4028,6 +4056,36 @@ private:
 };
 } // end anonymous namespace
 
+static void suggestUnsafeOnEnclosingDecl(
+    SourceRange referenceRange, const DeclContext *referenceDC) {
+  if (referenceRange.isInvalid())
+    return;
+
+  ASTContext &ctx = referenceDC->getASTContext();
+  std::optional<ASTNode> versionCheckNode;
+  const Decl *memberLevelDecl = nullptr;
+  const Decl *typeLevelDecl = nullptr;
+  findAvailabilityFixItNodes(
+                             referenceRange, referenceDC, ctx.SourceMgr,
+      versionCheckNode, memberLevelDecl, typeLevelDecl);
+
+  auto decl = memberLevelDecl ? memberLevelDecl : typeLevelDecl;
+  if (!decl)
+    return;
+
+  if (versionCheckNode.has_value()) {
+    // The unsafe construct is inside the body of the entity, so suggest
+    // @safe(unchecked) on the declaration.
+    decl->diagnose(diag::encapsulate_unsafe_in_enclosing_context, decl)
+      .fixItInsert(decl->getAttributeInsertionLoc(false),
+                   "@safe(unchecked) ");
+  } else {
+    // The unsafe construct is not part of the body, so
+    decl->diagnose(diag::make_enclosing_context_unsafe, decl)
+      .fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
+  }
+}
+
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
@@ -4069,12 +4127,14 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
     if (type->isUnsafe()) {
       diagnoseUnsafeType(
           ctx, R.Start, type,
+          Where.getAvailability(),
           [&](Type specificType) {
             ctx.Diags.diagnose(
                 R.Start, diag::reference_to_unsafe_typed_decl,
                 call != nullptr && !isa<ParamDecl>(D), D,
                 specificType);
-            D->diagnose(diag::decl_declared_here, D);
+            suggestUnsafeOnEnclosingDecl(R, Where.getDeclContext());
+            D->diagnose(diag::unsafe_decl_here, D);
           });
     }
   }
@@ -4155,10 +4215,14 @@ diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
   if (!D->isUnsafe())
     return;
 
+  if (Where.getAvailability().allowsUnsafe())
+    return;
+
   SourceLoc diagLoc = call ? call->getLoc() : R.Start;
   ctx.Diags
     .diagnose(diagLoc, diag::reference_to_unsafe_decl, call != nullptr, D);
-  D->diagnose(diag::decl_declared_here, D);
+  suggestUnsafeOnEnclosingDecl(R, Where.getDeclContext());
+  D->diagnose(diag::unsafe_decl_here, D);
 }
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic

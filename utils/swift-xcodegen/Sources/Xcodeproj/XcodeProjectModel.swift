@@ -441,6 +441,7 @@ public struct Xcode {
       public var SWIFT_FORCE_DYNAMIC_LINK_STDLIB: String?
       public var SWIFT_INCLUDE_PATHS: [String]?
       public var SWIFT_MODULE_ALIASES: [String: String]?
+      public var SWIFT_OBJC_INTERFACE_HEADER_NAME: String?
       public var SWIFT_OPTIMIZATION_LEVEL: String?
       public var SWIFT_VERSION: String?
       public var TARGET_NAME: String?

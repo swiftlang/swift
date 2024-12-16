@@ -68,6 +68,9 @@ static SILInstruction *getConstant(SILValue V) {
   if (auto *lit = dyn_cast<LiteralInst>(V))
     return lit;
 
+  if (auto *uc = dyn_cast<UpcastInst>(V))
+    V = uc->getOperand();
+
   if (auto *kp = dyn_cast<KeyPathInst>(V)) {
     // We could support operands, if they are constants, to enable propagation
     // of subscript keypaths. This would require to add the operands in the
@@ -567,7 +570,11 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
       // keypath instruction in this pass, but let dead-object-elimination clean
       // it up later.
       if (!PAI->isOnStack()) {
-        if (getSingleNonDebugUser(kp) != PAI)
+        SILInstruction *user = getSingleNonDebugUser(kp);
+        if (auto *uc = dyn_cast_or_null<UpcastInst>(user))
+          user = getSingleNonDebugUser(uc);
+
+        if (user != PAI)
           return false;
         toDelete.push_back(kp);
       }

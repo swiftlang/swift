@@ -224,18 +224,8 @@ extension ASTGenVisitor {
     var result = GeneratedClosureSignature()
 
     // Attributes.
-    visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
-      switch element {
-      case .ifConfigDecl(let ifConfigDecl):
-        return .ifConfigDecl(ifConfigDecl)
-      case .attribute(let attribute):
-        return .underlying(attribute)
-      }
-    } body: { node in
-      var initCtx: BridgedPatternBindingInitializer?
-      if let attr = self.generateDeclAttribute(attribute: node, initContext: &initCtx) {
-        result.attributes.add(attr)
-      }
+    self.generateDeclAttributes(attributeList: node.attributes) { attr in
+      result.attributes.add(attr)
     }
 
     if let node = node.capture {
@@ -476,26 +466,37 @@ extension ASTGenVisitor {
     let baseNameLoc = self.generateSourceLoc(node.baseName)
 
     if let argumentClause = node.argumentNames {
-      let labels = argumentClause.arguments.lazy.map {
-        self.generateIdentifier($0.name)
-      }
-      let labelLocs = argumentClause.arguments.lazy.map {
-        self.generateSourceLoc($0.name)
-      }
-      return (
-        name: .createParsed(
-          self.ctx,
-          baseName: baseName,
-          argumentLabels: labels.bridgedArray(in: self)
-        ),
-        loc: .createParsed(
-          self.ctx,
-          baseNameLoc: baseNameLoc,
-          lParenLoc: self.generateSourceLoc(argumentClause.leftParen),
-          argumentLabelLocs: labelLocs.bridgedArray(in: self),
-          rParenLoc: self.generateSourceLoc(argumentClause.rightParen)
+      if argumentClause.arguments.isEmpty {
+        return (
+          name: .createParsed(
+            self.ctx,
+            baseName: baseName,
+            argumentLabels: BridgedArrayRef()
+          ),
+          loc: .createParsed(baseNameLoc)
         )
-      )
+      } else {
+        let labels = argumentClause.arguments.lazy.map {
+          self.generateIdentifier($0.name)
+        }
+        let labelLocs = argumentClause.arguments.lazy.map {
+          self.generateSourceLoc($0.name)
+        }
+        return (
+          name: .createParsed(
+            self.ctx,
+            baseName: baseName,
+            argumentLabels: labels.bridgedArray(in: self)
+          ),
+          loc: .createParsed(
+            self.ctx,
+            baseNameLoc: baseNameLoc,
+            lParenLoc: self.generateSourceLoc(argumentClause.leftParen),
+            argumentLabelLocs: labelLocs.bridgedArray(in: self),
+            rParenLoc: self.generateSourceLoc(argumentClause.rightParen)
+          )
+        )
+      }
     } else {
       return (
         name: .createParsed(baseName),

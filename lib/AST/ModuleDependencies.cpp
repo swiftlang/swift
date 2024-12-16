@@ -22,6 +22,7 @@
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Strings.h"
 #include "clang/CAS/IncludeTree.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
@@ -500,7 +501,7 @@ swift::dependencies::registerCxxInteropLibraries(
     RegistrationCallback(LinkLibrary("stdc++", LibraryKind::Library));
 
   // Do not try to link Cxx with itself.
-  if (mainModuleName != "Cxx") {
+  if (mainModuleName != CXX_MODULE_NAME) {
     RegistrationCallback(LinkLibrary(Target.isOSWindows() && hasStaticCxx
                                         ? "libswiftCxx"
                                         : "swiftCxx",
@@ -509,7 +510,7 @@ swift::dependencies::registerCxxInteropLibraries(
 
   // Do not try to link CxxStdlib with the C++ standard library, Cxx or
   // itself.
-  if (llvm::none_of(llvm::ArrayRef{"Cxx", "CxxStdlib", "std"},
+  if (llvm::none_of(llvm::ArrayRef<StringRef>{CXX_MODULE_NAME, "CxxStdlib", "std"},
                     [mainModuleName](StringRef Name) {
                       return mainModuleName == Name;
                     })) {
@@ -719,116 +720,6 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   return false;
 }
 
-SwiftDependencyScanningService::ContextSpecificGlobalCacheState *
-SwiftDependencyScanningService::getCacheForScanningContextHash(StringRef scanningContextHash) const {
-  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
-  auto contextSpecificCache = ContextSpecificCacheMap.find(scanningContextHash);
-  assert(contextSpecificCache != ContextSpecificCacheMap.end() &&
-         "Global Module Dependencies Cache not configured with context-specific "
-         "state.");
-  return contextSpecificCache->getValue().get();
-}
-
-const ModuleNameToDependencyMap &
-SwiftDependencyScanningService::getDependenciesMap(
-    ModuleDependencyKind kind, StringRef scanContextHash) const {
-  auto contextSpecificCache = getCacheForScanningContextHash(scanContextHash);
-  auto it = contextSpecificCache->ModuleDependenciesMap.find(kind);
-  assert(it != contextSpecificCache->ModuleDependenciesMap.end() &&
-         "invalid dependency kind");
-  return it->second;
-}
-
-ModuleNameToDependencyMap &
-SwiftDependencyScanningService::getDependenciesMap(
-    ModuleDependencyKind kind, StringRef scanContextHash) {
-  auto contextSpecificCache = getCacheForScanningContextHash(scanContextHash);
-  auto it = contextSpecificCache->ModuleDependenciesMap.find(kind);
-  assert(it != contextSpecificCache->ModuleDependenciesMap.end() &&
-         "invalid dependency kind");
-  return it->second;
-}
-
-void SwiftDependencyScanningService::configureForContextHash(StringRef scanningContextHash) {
-  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
-  auto knownContext = ContextSpecificCacheMap.find(scanningContextHash);
-  if (knownContext == ContextSpecificCacheMap.end()) {
-    // First time scanning with this context, initialize context-specific state.
-    std::unique_ptr<ContextSpecificGlobalCacheState> contextSpecificCache =
-        std::make_unique<ContextSpecificGlobalCacheState>();
-    for (auto kind = ModuleDependencyKind::FirstKind;
-         kind != ModuleDependencyKind::LastKind; ++kind) {
-      contextSpecificCache->ModuleDependenciesMap.insert({kind, ModuleNameToDependencyMap()});
-    }
-    ContextSpecificCacheMap.insert({scanningContextHash.str(), std::move(contextSpecificCache)});
-    AllContextHashes.push_back(scanningContextHash.str());
-  }
-}
-
-std::optional<const ModuleDependencyInfo *>
-SwiftDependencyScanningService::findDependency(
-    StringRef moduleName, std::optional<ModuleDependencyKind> kind,
-    StringRef scanningContextHash) const {
-  if (!kind) {
-    for (auto kind = ModuleDependencyKind::FirstKind;
-         kind != ModuleDependencyKind::LastKind; ++kind) {
-      auto dep = findDependency(moduleName, kind, scanningContextHash);
-      if (dep.has_value())
-        return dep.value();
-    }
-    return std::nullopt;
-  }
-
-  assert(kind.has_value() && "Expected dependencies kind for lookup.");
-  const auto &map = getDependenciesMap(kind.value(), scanningContextHash);
-  auto known = map.find(moduleName);
-  if (known != map.end())
-    return &(known->second);
-
-  return std::nullopt;
-}
-
-bool SwiftDependencyScanningService::hasDependency(
-    StringRef moduleName, std::optional<ModuleDependencyKind> kind,
-    StringRef scanContextHash) const {
-  return findDependency(moduleName, kind, scanContextHash).has_value();
-}
-
-const ModuleDependencyInfo *SwiftDependencyScanningService::recordDependency(
-    StringRef moduleName, ModuleDependencyInfo dependencies,
-    StringRef scanContextHash) {
-  auto kind = dependencies.getKind();
-  auto &map = getDependenciesMap(kind, scanContextHash);
-  map.insert({moduleName, dependencies});
-  return &(map[moduleName]);
-}
-
-const ModuleDependencyInfo *SwiftDependencyScanningService::updateDependency(
-    ModuleDependencyID moduleID, ModuleDependencyInfo dependencies,
-    StringRef scanningContextHash) {
-  auto &map = getDependenciesMap(moduleID.Kind, scanningContextHash);
-  auto known = map.find(moduleID.ModuleName);
-  assert(known != map.end() && "Not yet added to map");
-  known->second = std::move(dependencies);
-  return &(known->second);
-}
-
-llvm::StringMap<const ModuleDependencyInfo *> &
-ModuleDependenciesCache::getDependencyReferencesMap(
-    ModuleDependencyKind kind) {
-  auto it = ModuleDependenciesMap.find(kind);
-  assert(it != ModuleDependenciesMap.end() && "invalid dependency kind");
-  return it->second;
-}
-
-const llvm::StringMap<const ModuleDependencyInfo *> &
-ModuleDependenciesCache::getDependencyReferencesMap(
-    ModuleDependencyKind kind) const {
-  auto it = ModuleDependenciesMap.find(kind);
-  assert(it != ModuleDependenciesMap.end() && "invalid dependency kind");
-  return it->second;
-}
-
 ModuleDependenciesCache::ModuleDependenciesCache(
     SwiftDependencyScanningService &globalScanningService,
     std::string mainScanModuleName, std::string moduleOutputPath,
@@ -837,12 +728,27 @@ ModuleDependenciesCache::ModuleDependenciesCache(
       mainScanModuleName(mainScanModuleName),
       scannerContextHash(scannerContextHash),
       moduleOutputPath(moduleOutputPath) {
-  globalScanningService.configureForContextHash(scannerContextHash);
   for (auto kind = ModuleDependencyKind::FirstKind;
-       kind != ModuleDependencyKind::LastKind; ++kind) {
-    ModuleDependenciesMap.insert(
-        {kind, llvm::StringMap<const ModuleDependencyInfo *>()});
-  }
+       kind != ModuleDependencyKind::LastKind; ++kind)
+    ModuleDependenciesMap.insert({kind, ModuleNameToDependencyMap()});
+}
+
+const ModuleNameToDependencyMap &
+ModuleDependenciesCache::getDependenciesMap(
+    ModuleDependencyKind kind) const {
+  auto it = ModuleDependenciesMap.find(kind);
+  assert(it != ModuleDependenciesMap.end() &&
+         "invalid dependency kind");
+  return it->second;
+}
+
+ModuleNameToDependencyMap &
+ModuleDependenciesCache::getDependenciesMap(
+    ModuleDependencyKind kind) {
+  auto it = ModuleDependenciesMap.find(kind);
+  assert(it != ModuleDependenciesMap.end() &&
+         "invalid dependency kind");
+  return it->second;
 }
 
 std::optional<const ModuleDependencyInfo *>
@@ -854,12 +760,27 @@ ModuleDependenciesCache::findDependency(
 std::optional<const ModuleDependencyInfo *>
 ModuleDependenciesCache::findDependency(
     StringRef moduleName, std::optional<ModuleDependencyKind> kind) const {
-  auto optionalDep = globalScanningService.findDependency(moduleName, kind,
-                                                          scannerContextHash);
+  if (!kind) {
+    for (auto kind = ModuleDependencyKind::FirstKind;
+         kind != ModuleDependencyKind::LastKind; ++kind) {
+      auto dep = findDependency(moduleName, kind);
+      if (dep.has_value())
+        return dep.value();
+    }
+    return std::nullopt;
+  }
+      
+  assert(kind.has_value() && "Expected dependencies kind for lookup.");
+  std::optional<const ModuleDependencyInfo *> optionalDep = std::nullopt;
+  const auto &map = getDependenciesMap(kind.value());
+  auto known = map.find(moduleName);
+  if (known != map.end())
+    optionalDep = &(known->second);
+      
   // During a scan, only produce the cached source module info for the current
   // module under scan.
-  if (optionalDep) {
-    auto dep = *optionalDep;
+  if (optionalDep.has_value()) {
+    auto dep = optionalDep.value();
     if (dep->getAsSwiftSourceModule() &&
         moduleName != mainScanModuleName &&
         moduleName != "DummyMainModuleForResolvingCrossImportOverlays") {
@@ -868,16 +789,6 @@ ModuleDependenciesCache::findDependency(
   }
 
   return optionalDep;
-}
-
-std::optional<const ModuleDependencyInfo *>
-ModuleDependenciesCache::findDependency(StringRef moduleName) const {
-  for (auto kind = ModuleDependencyKind::FirstKind;
-       kind != ModuleDependencyKind::LastKind; ++kind) {
-    if (auto found = findDependency(moduleName, kind))
-      return found;
-  }
-  return std::nullopt;
 }
 
 std::optional<const ModuleDependencyInfo *>
@@ -911,10 +822,9 @@ bool ModuleDependenciesCache::hasDependency(
 
 bool ModuleDependenciesCache::hasDependency(StringRef moduleName) const {
   for (auto kind = ModuleDependencyKind::FirstKind;
-       kind != ModuleDependencyKind::LastKind; ++kind) {
+       kind != ModuleDependencyKind::LastKind; ++kind)
     if (findDependency(moduleName, kind).has_value())
       return true;
-  }
   return false;
 }
 
@@ -923,19 +833,15 @@ bool ModuleDependenciesCache::hasSwiftDependency(StringRef moduleName) const {
 }
 
 void ModuleDependenciesCache::recordDependency(
-    StringRef moduleName, ModuleDependencyInfo dependencies) {
-  auto dependenciesKind = dependencies.getKind();
-  const ModuleDependencyInfo *recordedDependencies =
-        globalScanningService.recordDependency(moduleName, dependencies,
-                                               scannerContextHash);
-  auto &map = getDependencyReferencesMap(dependenciesKind);
-  assert(map.count(moduleName) == 0 && "Already added to map");
-  map.insert({moduleName, recordedDependencies});
+    StringRef moduleName, ModuleDependencyInfo dependency) {
+  auto dependenciesKind = dependency.getKind();
+  auto &map = getDependenciesMap(dependenciesKind);
+  map.insert({moduleName, dependency});
 }
 
 void ModuleDependenciesCache::recordDependencies(
-    ModuleDependencyVector moduleDependencies) {
-  for (const auto &dep : moduleDependencies) {
+    ModuleDependencyVector dependencies) {
+  for (const auto &dep : dependencies) {
     if (!hasDependency(dep.first))
       recordDependency(dep.first.ModuleName, dep.second);
     if (dep.second.getKind() == ModuleDependencyKind::Clang) {
@@ -948,14 +854,9 @@ void ModuleDependenciesCache::recordDependencies(
 
 void ModuleDependenciesCache::updateDependency(
     ModuleDependencyID moduleID, ModuleDependencyInfo dependencyInfo) {
-  const ModuleDependencyInfo *updatedDependencies =
-    globalScanningService.updateDependency(moduleID, dependencyInfo,
-                                           scannerContextHash);
-  auto &map = getDependencyReferencesMap(moduleID.Kind);
-  auto known = map.find(moduleID.ModuleName);
-  if (known != map.end())
-    map.erase(known);
-  map.insert({moduleID.ModuleName, updatedDependencies});
+  auto &map = getDependenciesMap(moduleID.Kind);
+  assert(map.find(moduleID.ModuleName) != map.end() && "Not yet added to map");
+  map.insert_or_assign(moduleID.ModuleName, std::move(dependencyInfo));
 }
 
 void

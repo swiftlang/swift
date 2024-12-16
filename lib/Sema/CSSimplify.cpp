@@ -1620,6 +1620,21 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
             cs, contextualType, extraArguments,
             cs.getConstraintLocator(locator));
 
+        for (const auto &extraArg : extraArguments) {
+          auto argument = argList->get(extraArg.first);
+          auto argType = extraArg.second.getPlainType();
+
+          // Prevent closure resolution by binding it to a placeholder
+          // because the main issue here is invalid overload and
+          // errors produced from the closure body are going to be
+          // superfluous.
+          if (isExpr<ClosureExpr>(argument.getExpr())) {
+            cs.recordTypeVariablesAsHoles(argType);
+          } else {
+            cs.recordAnyTypeVarAsPotentialHole(argType);
+          }
+        }
+
         if (cs.recordFix(fix, /*impact=*/extraArguments.size() * 5))
           return cs.getTypeMatchFailure(locator);
       }
@@ -1725,6 +1740,17 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       continue;
     }
 
+    // See if we have a parameter label specified in the function's DeclNameLoc.
+    Identifier compoundParamLabel;
+    if (auto *E = getAsExpr(calleeLocator->getAnchor())) {
+      auto nameLoc = E->getNameLoc();
+      if (auto labelLoc = nameLoc.getArgumentLabelLoc(paramIdx)) {
+        auto &ctx = cs.getASTContext();
+        auto labelTok = Lexer::getTokenAtLocation(ctx.SourceMgr, labelLoc);
+        compoundParamLabel = ctx.getIdentifier(labelTok.getText());
+      }
+    }
+
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::ApplyArgToParam(
@@ -1813,14 +1839,17 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         openedExistentials.push_back({openedTypeVar, opened});
       }
 
-      auto argLabel = argument.getLabel();
+      // If we have a compound function reference (e.g `fn($x:)`), respect
+      // the parameter label given. Otherwise look at the argument label.
+      auto wrapperArgLabel = compoundParamLabel.empty() ? argument.getLabel()
+                                                        : compoundParamLabel;
       if (paramInfo.hasExternalPropertyWrapper(paramIdx) ||
-          argLabel.hasDollarPrefix()) {
+          wrapperArgLabel.hasDollarPrefix()) {
         auto *param = getParameterAt(callee, paramIdx);
         assert(param);
         if (cs.applyPropertyWrapperToParameter(paramTy, argTy,
                                                const_cast<ParamDecl *>(param),
-                                               argLabel, subKind, loc)
+                                               wrapperArgLabel, subKind, loc)
                 .isFailure()) {
           return cs.getTypeMatchFailure(loc);
         }
@@ -11357,6 +11386,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFallbackTypeConstraint(
     return SolutionKind::Unsolved;
   }
 
+  // Propagate placeholders into an inferred closure type. Without this
+  // we'd produce superfluous diagnostics about parameter/result types.
+  if (defaultableType->isPlaceholder() && locator.directlyAt<ClosureExpr>()) {
+    recordTypeVariablesAsHoles(fallbackType);
+  }
+
   // Otherwise, any type is fine.
   return SolutionKind::Solved;
 }
@@ -15927,7 +15962,9 @@ void ConstraintSystem::addContextualConversionConstraint(
   }
 
   // Add the constraint.
-  auto openedType = openOpaqueType(conversionType, purpose, locator);
+  // FIXME: This is the wrong place to be opening the opaque type.
+  auto openedType = openOpaqueType(conversionType, purpose, locator,
+                                   /*ownerDecl=*/nullptr);
   addConstraint(constraintKind, getType(expr), openedType, locator,
                 /*isFavored*/ true);
 }

@@ -52,6 +52,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 private let verbose = false
@@ -593,17 +594,13 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
   }
 
   mutating func walkUp(value: Value, _ owner: Value?) -> WalkResult {
-    switch value.definingInstruction {
-    case let moveInst as MoveValueInst:
-      if moveInst.isFromVarDecl {
-        return introducer(moveInst, owner)
-      }
-    case let borrow as BeginBorrowInst:
-      if borrow.isFromVarDecl {
-        return introducer(borrow, owner)
-      }
-    default:
-      break
+    if let inst = value.definingInstruction, VariableScopeInstruction(inst) != nil {
+      return introducer(value, owner)
+    }
+    // Finding a variable introducer requires following the mark_dependence forwarded value, not the base value like the
+    // default LifetimeDependenceUseDefWalker.
+    if value is MarkDependenceInst {
+      return walkUpDefault(forwarded: value, owner)
     }
     return walkUpDefault(dependent: value, owner: owner)
   }
@@ -749,6 +746,11 @@ extension LifetimeDependenceUseDefWalker {
         return walkUp(newLifetime: store.source)
       case let srcDestInst as SourceDestAddrInstruction:
         return walkUp(address: srcDestInst.sourceOperand.value)
+      case let apply as FullApplySite:
+        if let f = apply.referencedFunction,
+           f.isConvertPointerToPointerArgument {
+          return walkUp(address: apply.parameterOperands[0].value)
+        }
       default:
         break
       }

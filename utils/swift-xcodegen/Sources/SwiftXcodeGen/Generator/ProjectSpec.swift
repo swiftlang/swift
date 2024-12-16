@@ -130,8 +130,9 @@ extension ProjectSpec {
     _ path: RelativePath, for description: String
   ) -> RelativePath? {
     let path = mapKnownPath(path)
-    guard repoRoot.appending(path).exists else {
-      log.warning("Skipping \(description) at '\(path)'; does not exist")
+    let absPath = repoRoot.appending(path)
+    guard absPath.exists else {
+      log.warning("Skipping \(description) at '\(absPath)'; does not exist")
       return nil
     }
     return path

@@ -32,6 +32,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/StringExtras.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallString.h"
@@ -181,7 +182,7 @@ public:
 
 private:
   virtual void write_impl(const char *Ptr, size_t Size) override {
-    base_os.write_escaped(StringRef(Ptr, Size), /*UseHexEscapes=*/true);
+    writeEscaped(StringRef(Ptr, Size), base_os);
   }
 
   virtual uint64_t current_pos() const override {
@@ -1594,6 +1595,7 @@ namespace {
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD, StringRef label) {
       printCommon(PBD, "pattern_binding_decl", label);
+      printAttributes(PBD);
 
       for (auto idx : range(PBD->getNumPatternEntries())) {
         printRec(PBD->getPattern(idx));
@@ -1910,17 +1912,7 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::Initializer:
-    switch (cast<Initializer>(dc)->getInitializerKind()) {
-    case InitializerKind::PatternBinding:
-      os << "pattern binding initializer";
-      break;
-    case InitializerKind::DefaultArgument:
-      os << "default argument initializer";
-      break;
-    case InitializerKind::PropertyWrapper:
-      os << "property wrapper initializer";
-      break;
-    }
+    simple_display(os, cast<Initializer>(dc));
     break;
 
   case DeclContextKind::TopLevelCodeDecl:
@@ -3744,6 +3736,7 @@ public:
   }
 
   TRIVIAL_ATTR_PRINTER(Actor, actor)
+  TRIVIAL_ATTR_PRINTER(AddressableSelf, _addressableSelf)
   TRIVIAL_ATTR_PRINTER(AlwaysEmitConformanceMetadata,
                        always_emit_conformance_metadata)
   TRIVIAL_ATTR_PRINTER(AlwaysEmitIntoClient, always_emit_into_client)
@@ -4121,6 +4114,11 @@ public:
     if (Attr->Proto) {
       printFieldRaw([&](auto &out) { Attr->Proto->dumpRef(out); }, "");
     }
+    printFoot();
+  }
+  void visitSafeAttr(SafeAttr *Attr, StringRef label) {
+    printCommon(Attr, "safe_attr", label);
+    printFieldQuoted(Attr->message, "message");
     printFoot();
   }
   void visitSILGenNameAttr(SILGenNameAttr *Attr, StringRef label) {

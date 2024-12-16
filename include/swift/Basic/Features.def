@@ -406,11 +406,15 @@ EXPERIMENTAL_FEATURE(WarnUnsafe, true)
 /// Import unsafe C and C++ constructs as @unsafe.
 EXPERIMENTAL_FEATURE(SafeInterop, true)
 
+// Import bounds safety and lifetime attributes from interop headers to
+// generate Swift wrappers with safe pointer types.
+EXPERIMENTAL_FEATURE(SafeInteropWrappers, false)
+
 /// Ignore resilience errors due to C++ types.
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 
 // Isolated deinit
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedDeinit, true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 
 // Enable values in generic signatures, e.g. <let N: Int>
 EXPERIMENTAL_FEATURE(ValueGenerics, true)
@@ -429,6 +433,8 @@ EXPERIMENTAL_FEATURE(CoroutineAccessorsAllocateInCallee, false)
 
 // When a parameter has unspecified isolation, infer it as main actor isolated.
 EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
+
+EXPERIMENTAL_FEATURE(AddressableParameters, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
