@@ -14,17 +14,17 @@
 @_spi(PluginMessage) import SwiftLibraryPluginProvider
 
 #if canImport(Darwin)
-import Darwin
+  import Darwin
 #elseif canImport(Glibc)
-import Glibc
+  import Glibc
 #elseif canImport(Bionic)
-import Bionic
+  import Bionic
 #elseif canImport(Musl)
-import Musl
+  import Musl
 #elseif canImport(ucrt)
-import ucrt
+  import ucrt
 #else
-#error("'malloc' not found")
+  #error("'malloc' not found")
 #endif
 
 /// Entry point.
@@ -80,11 +80,10 @@ struct InProcPluginServer {
 
   func handleMessage(_ input: UnsafeBufferPointer<UInt8>) throws -> [UInt8] {
     let request = try JSON.decode(HostToPluginMessage.self, from: input)
-    let response =  handler.handleMessage(request)
+    let response = self.handler.handleMessage(request)
     return try JSON.encode(response)
   }
 
   @MainActor
   static let shared = Self()
 }
-
