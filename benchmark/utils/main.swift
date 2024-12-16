@@ -26,6 +26,7 @@ import ArrayOfGenericRef
 import ArrayOfPOD
 import ArrayOfRef
 import ArrayRemoveAll
+import ArrayRRC
 import ArraySetElement
 import ArraySubscript
 import AsyncTree
@@ -226,6 +227,7 @@ register(ArrayOfGenericRef.benchmarks)
 register(ArrayOfPOD.benchmarks)
 register(ArrayOfRef.benchmarks)
 register(ArrayRemoveAll.benchmarks)
+register(ArrayRRC.benchmarks)
 register(ArraySetElement.benchmarks)
 register(ArraySubscript.benchmarks)
 register(AsyncTree.benchmarks)
