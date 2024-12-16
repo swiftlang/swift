@@ -16,18 +16,18 @@ var TemplatingTestSuite = TestSuite("Foreign references work with templates")
 
 TemplatingTestSuite.test("SubT") {
     let s: SubT = SubT.getSubT()
-    assert(!s.isBase)
+    expectFalse(s.isBase)
     let sc: BaseT = cast(s)
-    assert(!sc.isBase)
+    expectFalse(sc.isBase)
     let sx: BaseT = cxxCast(s)      // should instantiate I to SubT and O to BaseT
-    assert(!sc.isBase)
+    expectFalse(sc.isBase)
 }
 
 TemplatingTestSuite.test("BaseT") {
     let b: BaseT = BaseT.getBaseT()
-    assert(b.isBase)
+    expectTrue(b.isBase)
     let bc: BaseT = cxxCast(b)      // should instantiate I and O both to BaseT
-    assert(bc.isBase)
+    expectTrue(bc.isBase)
 }
 
 runAllTests()
