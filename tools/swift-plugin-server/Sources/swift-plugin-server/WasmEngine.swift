@@ -10,6 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(WASILibc)
+import WASILibc
+#else
+#error("Unsupported platform")
+#endif
+
 import SystemPackage
 import WASI
 import WasmTypes
@@ -17,9 +29,12 @@ import WasmTypes
 typealias WasmFunction = () throws -> Void
 
 protocol WasmEngine {
-  init(path: FilePath, imports: WASIBridgeToHost) throws
+  init(path: FilePath, stdinPath: FilePath, stdoutPath: FilePath) throws
 
   func function(named name: String) throws -> WasmFunction?
+
+  func writeToPlugin(_ storage: some Sequence<UInt8>) throws
+  func readFromPlugin(into storage: UnsafeMutableRawBufferPointer) throws -> Int
 
   func shutDown() throws
 }
@@ -28,24 +43,38 @@ typealias DefaultWasmPlugin = WasmEnginePlugin<DefaultWasmEngine>
 
 // a WasmPlugin implementation that delegates to a WasmEngine
 struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
-  private let hostToPlugin: FileDescriptor
-  private let pluginToHost: FileDescriptor
+  enum Error: Swift.Error {
+    case failedToCreateNamedPipe(FilePath)
+  }
+
   private let pumpFunction: WasmFunction
+  private let tempDirectory: FilePath
+  private let stdinPath: FilePath
+  private let stdoutPath: FilePath
   let engine: Engine
 
   init(path: FilePath) throws {
-    let hostToPluginPipes = try FileDescriptor.pipe()
-    let pluginToHostPipes = try FileDescriptor.pipe()
-    self.hostToPlugin = hostToPluginPipes.writeEnd
-    self.pluginToHost = pluginToHostPipes.readEnd
+    self.tempDirectory = try createUniqueTemporaryDirectory(basename: "swift_wasm_macros")
+    self.stdinPath = self.tempDirectory.appending("stdin")
+    self.stdoutPath = self.tempDirectory.appending("stdout")
 
-    let bridge = try WASIBridgeToHost(
-      stdin: hostToPluginPipes.readEnd,
-      stdout: pluginToHostPipes.writeEnd,
-      stderr: .standardError
-    )
+    let stdinResult = self.stdinPath.withCString {
+      mkfifo($0, S_IRUSR | S_IWUSR)
+    }
 
-    self.engine = try Engine(path: path, imports: bridge)
+    guard stdinResult == 0 else {
+      throw Error.failedToCreateNamedPipe(self.stdinPath)
+    }
+
+    let stdoutResult = self.stdoutPath.withCString {
+      mkfifo($0, S_IRUSR | S_IWUSR)
+    }
+
+    guard stdoutResult == 0 else {
+      throw Error.failedToCreateNamedPipe(self.stdoutPath)
+    }
+
+    self.engine = try Engine(path: path, stdinPath: self.stdinPath, stdoutPath: self.stdoutPath)
 
     let exportName = "swift_wasm_macro_v1_pump"
     guard let pump = try engine.function(named: exportName) else {
@@ -61,14 +90,14 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
 
   func handleMessage(_ json: [UInt8]) throws -> [UInt8] {
     try withUnsafeBytes(of: UInt64(json.count).littleEndian) {
-      _ = try self.hostToPlugin.writeAll($0)
+      _ = try engine.writeToPlugin($0)
     }
-    try self.hostToPlugin.writeAll(json)
+    try engine.writeToPlugin(json)
 
     try self.pumpFunction()
 
     let lengthRaw = try withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 8) { buffer in
-      let lengthCount = try pluginToHost.read(into: UnsafeMutableRawBufferPointer(buffer))
+      let lengthCount = try engine.readFromPlugin(into: UnsafeMutableRawBufferPointer(buffer))
       guard lengthCount == 8 else {
         throw WasmEngineError(message: "Wasm plugin sent invalid response")
       }
@@ -76,7 +105,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
     }
     let length = Int(UInt64(littleEndian: lengthRaw))
     return try [UInt8](unsafeUninitializedCapacity: length) { buffer, size in
-      let received = try pluginToHost.read(into: UnsafeMutableRawBufferPointer(buffer))
+      let received = try engine.readFromPlugin(into: UnsafeMutableRawBufferPointer(buffer))
       guard received == length else {
         throw WasmEngineError(message: "Wasm plugin sent truncated response")
       }
@@ -86,6 +115,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
 
   func shutDown() throws {
     try self.engine.shutDown()
+    try _recursiveRemove(at: self.tempDirectory)
   }
 }
 

@@ -20,8 +20,13 @@ typealias DefaultWasmEngine = WasmKitEngine
 struct WasmKitEngine: WasmEngine {
   private let engine: Engine
   private let functions: [String: Function]
+  private let hostToPlugin: FileDescriptor
+  private let pluginToHost: FileDescriptor
 
-  init(path: FilePath, imports: WASIBridgeToHost) throws {
+  init(path: FilePath, stdinPath: FilePath, stdoutPath: FilePath) throws {
+    self.hostToPlugin = try FileDescriptor.open(stdinPath, .readWrite)
+    self.pluginToHost = try FileDescriptor.open(stdoutPath, .readWrite)
+
     var configuration = EngineConfiguration()
     configuration.stackSize = 1 << 20
     self.engine = Engine(configuration: configuration)
@@ -29,6 +34,12 @@ struct WasmKitEngine: WasmEngine {
 
     let module = try parseWasm(filePath: path)
     var moduleImports = Imports()
+
+    let imports = try WASIBridgeToHost(
+      stdin: self.hostToPlugin,
+      stdout: self.pluginToHost,
+      stderr: .standardError
+    )
     imports.link(to: &moduleImports, store: store)
     let instance = try module.instantiate(store: store, imports: moduleImports)
     var functions = [String: Function]()
@@ -45,7 +56,16 @@ struct WasmKitEngine: WasmEngine {
     return { _ = try function.invoke() }
   }
 
+  func writeToPlugin(_ storage: some Sequence<UInt8>) throws {
+    try self.hostToPlugin.writeAll(storage)
+  }
+
+  func readFromPlugin(into storage: UnsafeMutableRawBufferPointer) throws -> Int {
+    try self.pluginToHost.read(into: storage)
+  }
+
   func shutDown() throws {
-    // No resources requiring explicit shut down in `WasmKitEngine`.
+    try self.hostToPlugin.close()
+    try self.pluginToHost.close()
   }
 }
