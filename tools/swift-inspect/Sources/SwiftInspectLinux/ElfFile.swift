@@ -30,18 +30,16 @@ class ElfFile {
   public init(filePath: String) throws {
     self.filePath = filePath
 
-    let fileData = try Data(contentsOf: URL(fileURLWithPath: filePath), options: .alwaysMapped)
-    self.fileData = fileData
+    self.fileData = try Data(contentsOf: URL(fileURLWithPath: filePath), options: .alwaysMapped)
 
-    let identLen = Int(EI_NIDENT)
-    let identMagic = String(bytes: fileData[0..<identLen].prefix(Int(SELFMAG)), encoding: .utf8)
-    guard identMagic == ELFMAG else {
-      throw ELFError.notELF64(filePath)
+    let ident = fileData.prefix(upTo: Int(EI_NIDENT))
+
+    guard String(bytes: ident.prefix(Int(SELFMAG)), encoding: .utf8) == ELFMAG else {
+      throw ELFError.notELF64(filePath, "\(ident.prefix(Int(SELFMAG))) != ELFMAG")
     }
 
-    let identClass = fileData[Int(EI_CLASS)]
-    guard identClass == ELFCLASS64 else {
-      throw ELFError.notELF64(filePath, "\(identClass) != ELFCLASS64")
+    guard ident[Int(EI_CLASS)] == ELFCLASS64 else {
+      throw ELFError.notELF64(filePath, "\(ident[Int(EI_CLASS)]) != ELFCLASS64")
     }
 
     let ehdrSize = MemoryLayout<Elf64_Ehdr>.size
