@@ -3643,11 +3643,6 @@ static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
 static bool matchSendableExistentialToAnyInGenericArgumentPosition(
     ConstraintSystem &cs, Type lhs, Type rhs,
     ConstraintLocatorBuilder locator) {
-  auto &ctx = cs.getASTContext();
-  if (ctx.isSwiftVersionAtLeast(6) ||
-      ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)
-    return false;
-
   // Avoid heavier checks if are not `any Sendable` and `Any`.
   if (!(lhs->isSendableExistential() || lhs->isAny()) ||
       !(rhs->isSendableExistential() || rhs->isAny()))
