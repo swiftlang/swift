@@ -17,10 +17,10 @@ func testSetX(_ x: CInt) {
 
 testSetX(2)
 
-// CHECK: define {{.*}}linkonce_odr{{.*}} ptr @{{.*}}31NonCopyableHolderDerivedDerived{{.*}}33__synthesizedBaseGetterAccessor_x{{.*}}
+// CHECK: define {{.*}}linkonce_odr{{.*}} ptr @{{(.*)(31NonCopyableHolderDerivedDerived*33__synthesizedBaseGetterAccessor_x|__synthesizedBaseGetterAccessor_x@NonCopyableHolderDerivedDerived)(.*)}}
 // CHECK: %[[VPTR:.*]] = getelementptr inbounds %struct.NonCopyableHolder
 // CHECK: ret ptr %[[VPTR]]
 
-// CHECK: define {{.*}}linkonce_odr{{.*}} ptr @{{.*}}31NonCopyableHolderDerivedDerived{{.*}}33__synthesizedBaseSetterAccessor_x{{.*}}
+// CHECK: define {{.*}}linkonce_odr{{.*}} ptr @{{(.*)(31NonCopyableHolderDerivedDerived33__synthesizedBaseSetterAccessor_x|__synthesizedBaseSetterAccessor_x@NonCopyableHolderDerivedDerived)(.*)}}
 // CHECK: %[[VPTRS:.*]] = getelementptr inbounds %struct.NonCopyableHolder
 // CHECK: ret ptr %[[VPTRS]]
