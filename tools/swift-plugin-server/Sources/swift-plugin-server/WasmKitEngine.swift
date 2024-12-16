@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SystemPackage
 import WASI
 import WasmKit
 import WasmKitWASI
-import SystemPackage
 
 typealias DefaultWasmEngine = WasmKitEngine
 

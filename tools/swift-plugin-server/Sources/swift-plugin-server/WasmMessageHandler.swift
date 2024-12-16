@@ -15,7 +15,7 @@ import SystemPackage
 
 /// A `PluginMessageHandler` that intercepts messages intended for Wasm plugins.
 final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMessageHandler {
-  private var loadedWasmPlugins: [String: WasmPlugin] = [:]
+  private var loadedWasmPlugins: [String: any WasmPlugin] = [:]
 
   let base: Base
   init(base: Base) {
@@ -26,7 +26,7 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
   /// Otherwise, forward it to `base`.
   func handleMessage(_ message: HostToPluginMessage) -> PluginToHostMessage {
     switch message {
-    case .loadPluginLibrary(let libraryPath, let moduleName):
+    case let .loadPluginLibrary(libraryPath, moduleName):
       guard libraryPath.hasSuffix(".wasm") else { break }
       let libraryFilePath = FilePath(libraryPath)
       do {
@@ -38,19 +38,19 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
         )
       }
       return .loadPluginLibraryResult(loaded: true, diagnostics: [])
-    case .expandAttachedMacro(let macro, _, _, let syntax, _, _, _, _, _),
-        .expandFreestandingMacro(let macro, _, _, let syntax, _):
+    case let .expandAttachedMacro(macro, _, _, syntax, _, _, _, _, _),
+         let .expandFreestandingMacro(macro, _, _, syntax, _):
       if let response = self.expandMacro(macro, message: message, location: syntax.location) {
         return response
       } // else break
     case .getCapability:
       break
-#if !SWIFT_PACKAGE
-    @unknown default:
-      break
-#endif
+    #if !SWIFT_PACKAGE
+      @unknown default:
+        break
+    #endif
     }
-    return base.handleMessage(message)
+    return self.base.handleMessage(message)
   }
 
   func shutDown() throws {
@@ -91,8 +91,8 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
   }
 }
 
-extension PluginMessage.Diagnostic {
-  fileprivate init(
+fileprivate extension PluginMessage.Diagnostic {
+  init(
     errorMessage: String,
     position: PluginMessage.Diagnostic.Position = .invalid
   ) {
@@ -107,8 +107,8 @@ extension PluginMessage.Diagnostic {
   }
 }
 
-extension PluginMessage.SourceLocation {
-  fileprivate var position: PluginMessage.Diagnostic.Position {
+fileprivate extension PluginMessage.SourceLocation {
+  var position: PluginMessage.Diagnostic.Position {
     .init(fileName: fileName, offset: offset)
   }
 }
