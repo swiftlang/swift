@@ -53,6 +53,16 @@ public:
     return visited.contains(block);
   }
 
+  bool hasUnreachableBlocks() const {
+    assert(isComputed);
+    for (auto &block : *visited.getFunction()) {
+      if (!isReachable(&block)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
 private:
   /// Invoke \p visitor for each reachable block in \p f in worklist order (at
   /// least one predecessor has been visited--defs are always visited before
