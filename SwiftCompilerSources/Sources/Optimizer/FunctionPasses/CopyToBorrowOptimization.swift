@@ -98,8 +98,10 @@ private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) {
     return
   }
 
-  var liverange = InstructionRange(begin: copy, ends: collectedUses.destroys, context)
+  var liverange = InstructionRange(begin: copy, context)
   defer { liverange.deinitialize() }
+  liverange.insert(contentsOf: collectedUses.destroys)
+  liverange.insert(contentsOf: collectedUses.usersInDeadEndBlocks)
 
   if !liverange.isFullyContainedIn(borrowScopeOf: copy.fromValue.lookThroughForwardingInstructions) {
     return
