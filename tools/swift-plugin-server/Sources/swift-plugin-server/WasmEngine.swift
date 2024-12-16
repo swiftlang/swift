@@ -10,17 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SystemPackage
 import WASI
 import WasmTypes
-import SystemPackage
 
 typealias WasmFunction = () throws -> Void
 
 protocol WasmEngine {
-  init(path: FilePath, imports: WASIBridgeToHost) throws
+  init(pluginPath: FilePath) throws
 
   func function(named name: String) throws -> WasmFunction?
-  
+
+  func writeToPlugin(_ storage: some Sequence<UInt8>) throws
+  func readFromPlugin(into storage: UnsafeMutableRawBufferPointer) throws -> Int
+
   func shutDown() throws
 }
 
@@ -28,23 +31,11 @@ typealias DefaultWasmPlugin = WasmEnginePlugin<DefaultWasmEngine>
 
 // a WasmPlugin implementation that delegates to a WasmEngine
 struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
-  private let hostToPlugin: FileDescriptor
-  private let pluginToHost: FileDescriptor
   private let pumpFunction: WasmFunction
   let engine: Engine
 
   init(path: FilePath) throws {
-    let hostToPluginPipes = try FileDescriptor.pipe()
-    let pluginToHostPipes = try FileDescriptor.pipe()
-    self.hostToPlugin = hostToPluginPipes.writeEnd
-    self.pluginToHost = pluginToHostPipes.readEnd
-
-    let bridge = try WASIBridgeToHost(
-      stdin: hostToPluginPipes.readEnd,
-      stdout: pluginToHostPipes.writeEnd,
-      stderr: .standardError
-    )
-    engine = try Engine(path: path, imports: bridge)
+    self.engine = try Engine(pluginPath: path)
 
     let exportName = "swift_wasm_macro_v1_pump"
     guard let pump = try engine.function(named: exportName) else {
@@ -60,14 +51,14 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
 
   func handleMessage(_ json: [UInt8]) throws -> [UInt8] {
     try withUnsafeBytes(of: UInt64(json.count).littleEndian) {
-      _ = try hostToPlugin.writeAll($0)
+      _ = try engine.writeToPlugin($0)
     }
-    try hostToPlugin.writeAll(json)
+    try engine.writeToPlugin(json)
 
-    try pumpFunction()
+    try self.pumpFunction()
 
     let lengthRaw = try withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 8) { buffer in
-      let lengthCount = try pluginToHost.read(into: UnsafeMutableRawBufferPointer(buffer))
+      let lengthCount = try engine.readFromPlugin(into: UnsafeMutableRawBufferPointer(buffer))
       guard lengthCount == 8 else {
         throw WasmEngineError(message: "Wasm plugin sent invalid response")
       }
@@ -75,7 +66,7 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
     }
     let length = Int(UInt64(littleEndian: lengthRaw))
     return try [UInt8](unsafeUninitializedCapacity: length) { buffer, size in
-      let received = try pluginToHost.read(into: UnsafeMutableRawBufferPointer(buffer))
+      let received = try engine.readFromPlugin(into: UnsafeMutableRawBufferPointer(buffer))
       guard received == length else {
         throw WasmEngineError(message: "Wasm plugin sent truncated response")
       }
@@ -100,25 +91,25 @@ struct WasmEngineError: Error, CustomStringConvertible {
 // but it is available in the latest main branch. Remove the following code when we
 // update to the next release of swift-system.
 #if os(Windows)
-import ucrt
+  import ucrt
 
-internal var system_errno: CInt {
-  var value: CInt = 0
-  _ = ucrt._get_errno(&value)
-  return value
-}
+  var system_errno: CInt {
+    var value: CInt = 0
+    _ = ucrt._get_errno(&value)
+    return value
+  }
 
-extension FileDescriptor {
-  static func pipe() throws -> (readEnd: FileDescriptor, writeEnd: FileDescriptor) {
-    var fds: (Int32, Int32) = (-1, -1)
-    return try withUnsafeMutablePointer(to: &fds) { pointer in
-      return try pointer.withMemoryRebound(to: Int32.self, capacity: 2) { fds in
-        guard _pipe(fds, 4096, _O_BINARY | _O_NOINHERIT) == 0 else {
-          throw Errno(rawValue: system_errno)
+  extension FileDescriptor {
+    static func pipe() throws -> (readEnd: FileDescriptor, writeEnd: FileDescriptor) {
+      var fds: (Int32, Int32) = (-1, -1)
+      return try withUnsafeMutablePointer(to: &fds) { pointer in
+        try pointer.withMemoryRebound(to: Int32.self, capacity: 2) { fds in
+          guard _pipe(fds, 4096, _O_BINARY | _O_NOINHERIT) == 0 else {
+            throw Errno(rawValue: system_errno)
+          }
+          return (FileDescriptor(rawValue: fds[0]), FileDescriptor(rawValue: fds[1]))
         }
-        return (FileDescriptor(rawValue: fds[0]), FileDescriptor(rawValue: fds[1]))
       }
     }
   }
-}
 #endif

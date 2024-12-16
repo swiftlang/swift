@@ -14,7 +14,7 @@
 @_spi(PluginMessage) import SwiftLibraryPluginProvider
 
 @main
-final class SwiftPluginServer {
+enum SwiftPluginServer {
   static func main() throws {
     let connection = try StandardIOMessageConnection()
     let listener = CompilerPluginMessageListener(
