@@ -461,12 +461,12 @@ func getParameterIndexForDeclRef(
 /// Intended to map to C attributes like __counted_by, __ended_by and __no_escape,
 /// for automatic application by ClangImporter when the C declaration is annotated
 /// appropriately.
-public struct PointerBoundsMacro: PeerMacro {
+public struct SwiftifyImportMacro: PeerMacro {
   static func parseEnumName(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> String {
     guard let calledExpr = enumConstructorExpr.calledExpression.as(MemberAccessExprSyntax.self)
     else {
       throw DiagnosticError(
-        "expected PointerParam enum literal as argument, got '\(enumConstructorExpr)'",
+        "expected _PointerParam enum literal as argument, got '\(enumConstructorExpr)'",
         node: enumConstructorExpr)
     }
     return calledExpr.declName.baseName.text
@@ -564,7 +564,7 @@ public struct PointerBoundsMacro: PeerMacro {
     let paramExpr = paramAST.expression
     guard let enumConstructorExpr = paramExpr.as(FunctionCallExprSyntax.self) else {
       throw DiagnosticError(
-        "expected PointerParam enum literal as argument, got '\(paramExpr)'", node: paramExpr)
+        "expected _PointerParam enum literal as argument, got '\(paramExpr)'", node: paramExpr)
     }
     let enumName = try parseEnumName(enumConstructorExpr)
     switch enumName {
@@ -627,7 +627,7 @@ public struct PointerBoundsMacro: PeerMacro {
       }
       if argByIndex[i] != nil {
         throw DiagnosticError(
-          "multiple PointerParams referring to parameter with index "
+          "multiple _PointerParams referring to parameter with index "
             + "\(i): \(pointerArg) and \(argByIndex[i]!)", node: pointerArg.original)
       }
       argByIndex[i] = pointerArg
@@ -647,7 +647,7 @@ public struct PointerBoundsMacro: PeerMacro {
   ) throws -> [DeclSyntax] {
     do {
       guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
-        throw DiagnosticError("@PointerBounds only works on functions", node: declaration)
+        throw DiagnosticError("@_SwiftifyImport only works on functions", node: declaration)
       }
 
       let argumentList = node.arguments!.as(LabeledExprListSyntax.self)!
@@ -692,7 +692,7 @@ public struct PointerBoundsMacro: PeerMacro {
             case .attribute(let attr):
               // don't apply this macro recursively, and avoid dupe _alwaysEmitIntoClient
               let name = attr.attributeName.as(IdentifierTypeSyntax.self)?.name.text
-              return name == nil || (name != "PointerBounds" && name != "_alwaysEmitIntoClient")
+              return name == nil || (name != "_SwiftifyImport" && name != "_alwaysEmitIntoClient")
             default: return true
             }
           } + [

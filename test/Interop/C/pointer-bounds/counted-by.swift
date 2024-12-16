@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -disable-availability-checking -plugin-path %swift-plugin-dir -o %t/CountedBy.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s
 
-// Check that ClangImporter correctly infers and expands @PointerBounds macros for functions with __counted_by parameters.
+// Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __counted_by parameters.
 
 import CountedByClang
 

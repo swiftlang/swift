@@ -4,6 +4,6 @@
 
 let countString = "len"
 // expected-error@+1{{expected string literal for 'count' parameter, got countString}}
-@PointerBounds(.countedBy(pointer: 1, count: countString))
+@_SwiftifyImport(.countedBy(pointer: 1, count: countString))
 func myFunc(_ ptr: UnsafePointer<CInt>, _ len: String) {
 }

@@ -8631,7 +8631,7 @@ public:
   bool firstParam = true;
   PointerParamInfoPrinter(clang::ASTContext &ctx, llvm::raw_ostream &out)
       : ctx(ctx), out(out) {
-    out << "@PointerBounds(";
+    out << "@_SwiftifyImport(";
   }
   ~PointerParamInfoPrinter() { out << ")"; }
 

@@ -1,9 +1,9 @@
-/// Different ways to annotate pointer parameters using the `@PointerBounds` macro.
+/// Different ways to annotate pointer parameters using the `@_SwiftifyImport` macro.
 /// All indices into parameter lists start at 1. Indices __must__ be integer literals, and strings
-/// __must__ be string literals, because their contents are parsed by the `@PointerBounds` macro.
+/// __must__ be string literals, because their contents are parsed by the `@_SwiftifyImport` macro.
 /// Only 1 instance of `countedBy`, `sizedBy` or `endedBy` can refer to each pointer index, however
 /// `nonescaping` is orthogonal to the rest and can (and should) overlap with other annotations.
-public enum PointerParam {
+public enum _PointerParam {
     /// Corresponds to the C `__counted_by(count)` attribute.
     /// Parameter pointer: index of pointer in function parameter list. Must be of type
     /// `Unsafe[Mutable]Pointer<T>[?]`, i.e. not an `UnsafeRawPointer`.
@@ -40,5 +40,5 @@ public enum PointerParam {
 /// Parameter paramInfo: information about how the function uses the pointer passed to it. The
 /// safety of the generated wrapper function depends on this info being extensive and accurate.
 @attached(peer, names: overloaded)
-public macro PointerBounds(_ paramInfo: PointerParam...) =
-    #externalMacro(module: "SwiftMacros", type: "PointerBoundsMacro")
+public macro _SwiftifyImport(_ paramInfo: _PointerParam...) =
+    #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")

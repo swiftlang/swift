@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions 2>&1 | %FileCheck --match-full-lines %s
 
-@PointerBounds(.sizedBy(pointer: 1, size: "size"), .sizedBy(pointer: 3, size: "size2"))
+@_SwiftifyImport(.sizedBy(pointer: 1, size: "size"), .sizedBy(pointer: 3, size: "size2"))
 func myFunc(_ ptr: UnsafeRawPointer, _ size: CInt, _ ptr2: UnsafeRawPointer, _ size2: CInt) {
 }
 

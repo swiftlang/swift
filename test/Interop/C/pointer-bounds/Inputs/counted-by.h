@@ -4,7 +4,8 @@
 
 void simple(int len, int * __counted_by(len) p);
 
-void swiftAttr(int len, int * p) __attribute__((swift_attr("@PointerBounds(.countedBy(pointer: 2, count: \"len\"))")));
+void swiftAttr(int len, int *p) __attribute__((
+    swift_attr("@_SwiftifyImport(.countedBy(pointer: 2, count: \"len\"))")));
 
 void shared(int len, int * __counted_by(len) p1, int * __counted_by(len) p2);
 
