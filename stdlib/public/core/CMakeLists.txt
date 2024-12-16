@@ -230,7 +230,7 @@ split_embedded_sources(
   EMBEDDED Int128.swift
   EMBEDDED Mirror.swift
     NORMAL PlaygroundDisplay.swift
-  EMBEDDED PointerBounds.swift
+  EMBEDDED SwiftifyImport.swift
     NORMAL CommandLine.swift
   EMBEDDED SliceBuffer.swift
   EMBEDDED StaticBigInt.swift
