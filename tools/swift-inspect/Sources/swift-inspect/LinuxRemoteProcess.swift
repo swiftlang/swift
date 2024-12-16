@@ -112,7 +112,7 @@
         self.symbolCache = try SwiftInspectLinux.SymbolCache(for: process)
         self.memoryMap = try SwiftInspectLinux.MemoryMap(for: processId)
       } catch {
-        fputs("failed initialization for process \(processId): \(error)\n", stderr)
+        fatalError("failed initialization for process \(processId): \(error)")
         return nil
       }
 
@@ -152,7 +152,7 @@
     }
 
     internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
-      fputs("heap iteration is not supported on Linux\n", stderr)
+      fatalError("heap iteration is not supported on Linux")
     }
   }
 #endif  // os(Linux)

@@ -37,9 +37,7 @@ public class SymbolCache {
     self.linkMap = try LinkMap(for: process)
     var symbolLookup: SymbolLookup = [:]
     for linkMapEntry in linkMap.entries {
-      guard FileManager.default.fileExists(atPath: linkMapEntry.moduleName) else { continue }
-
-      let elfFile = try ElfFile(filePath: linkMapEntry.moduleName)
+      guard let elfFile = try? ElfFile(filePath: linkMapEntry.moduleName) else { continue }
       let symbolMap = try elfFile.loadSymbols(baseAddress: linkMapEntry.baseAddress)
       symbolLookup[linkMapEntry.moduleName] = symbolMap
     }
