@@ -1,3 +1,5 @@
+@testable import swift_plugin_server
+import Foundation
 import SystemPackage
 import Testing
 import WasmKit
@@ -67,35 +69,11 @@ struct WasmEngineTests {
   @Test
   func basic() throws {
     let binary = try wat2wasm(echo)
-    let module = try parseWasm(bytes: binary)
+    let echoURL = FileManager.default.temporaryDirectory.appendingPathExtension("echo.wasm")
+    try Data(binary).write(to: echoURL)
 
-    let engine = Engine()
-    let store = Store(engine: engine)
-
-    var imports = Imports()
-
-    let hostToPluginPipe = try FileDescriptor.pipe()
-    let pluginToHostPipe = try FileDescriptor.pipe()
-
-      let bridge = try WASIBridgeToHost(
-        stdin: hostToPluginPipe.readEnd,
-        stdout: pluginToHostPipe.writeEnd,
-        stderr: .standardError
-      )
-
-    bridge.link(to: &imports, store: store)
-    let instance = try module.instantiate(store: store, imports: imports)
-    #expect(try instance.exports[function: "_start"]!() == [])
-
-    let str = "Hello World!\n"
-    try hostToPluginPipe.writeEnd.writeAll(str.utf8)
-
-    #expect(try instance.exports[function: "swift_wasm_macro_v1_pump"]!() == [])
-
-    var buffer = [UInt8](repeating: 0, count: 13)
-    _ = try buffer.withUnsafeMutableBytes {
-      try pluginToHostPipe.readEnd.read(into: $0)
-    }
-    #expect(String(decoding: buffer, as: UTF8.self) == str)
+    let engine = try WasmEnginePlugin<WasmKitEngine>(path: FilePath(echoURL.path))
+    let input: [UInt8] = [1,2,3,4,5]
+    #expect(try engine.handleMessage(input) == input)
   }
 }
