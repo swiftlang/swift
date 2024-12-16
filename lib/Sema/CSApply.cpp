@@ -7034,9 +7034,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         }
       }
 
-      if (!(ctx.isSwiftVersionAtLeast(6) ||
-            ctx.LangOpts.StrictConcurrencyLevel ==
-                StrictConcurrency::Complete)) {
+      // `any Sendable` -> `Any` conversion is allowed in generic
+      // argument positions.
+      {
         auto erasedFromType = fromType->stripConcurrency(
             /*recursive=*/true, /*dropGlobalActor=*/false);
         auto erasedToType = toType->stripConcurrency(
