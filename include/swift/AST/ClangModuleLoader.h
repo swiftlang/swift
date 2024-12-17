@@ -204,8 +204,10 @@ public:
 
   /// Imports a clang decl from a base class, cloning it for \param newContext
   /// if it wasn't cloned for this specific context before.
-  virtual ValueDecl *importBaseMemberDecl(ValueDecl *decl,
-                                          DeclContext *newContext) = 0;
+  virtual ValueDecl *
+  importBaseMemberDecl(ValueDecl *decl,
+                       DeclContext *newContext,
+                       clang::AccessSpecifier inheritance) = 0;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.

@@ -16,7 +16,9 @@
 #ifndef SWIFT_CLANG_IMPORTER_H
 #define SWIFT_CLANG_IMPORTER_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
 /// The maximum number of SIMD vector elements we currently try to import.
@@ -656,7 +658,8 @@ public:
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl,
-                                  DeclContext *newContext) override;
+                                  DeclContext *newContext,
+                                  clang::AccessSpecifier inheritance) override;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
@@ -729,6 +732,19 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
                                      NominalTypeDecl *selfType,
                                      std::optional<Type> parameterType);
 
+/// Read file IDs from 'private_fileid' Swift attributes on a Clang decl.
+///
+/// May return >1 fileID when a decl is annotated more than once, which should
+/// be treated as an error and appropriately diagnosed (using the included
+/// SourceLocation).
+SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
+getPrivateFileIDAttrs(const clang::Decl *decl);
+
+/// Map the access specifier of a Clang record member to a Swift access level.
+///
+/// This mapping is conservative: the resulting Swift access should be at _most_
+/// as permissive as the input C++ access.
+AccessLevel convertClangAccess(clang::AccessSpecifier access);
 } // namespace importer
 
 struct ClangInvocationFileMapping {

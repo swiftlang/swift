@@ -24,6 +24,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/Type.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -126,29 +127,46 @@ public:
 private:
   friend SimpleRequest;
 
-  // Evaluation.
   TinyPtrVector<ValueDecl *>
   evaluate(Evaluator &evaluator, CXXNamespaceMemberLookupDescriptor desc) const;
 };
 
 /// The input type for a record member lookup request.
+///
+/// These lookups may be requested recursively in the case of inheritance,
+/// for which we separately keep track of the derived class where we started
+/// looking (startDecl) and the access level for the current inheritance.
 struct ClangRecordMemberLookupDescriptor final {
-  NominalTypeDecl *recordDecl;
-  DeclName name;
+  NominalTypeDecl *recordDecl;        // Where we are currently looking
+  NominalTypeDecl *startDecl;         // Where we started looking
+  DeclName name;                      // What we are looking for
+  clang::AccessSpecifier inheritance; // Public, protected, or private inheritance
+                                      // (clang::AS_none means no inheritance)
 
   ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
-      : recordDecl(recordDecl), name(name) {
+      : recordDecl(recordDecl), startDecl(recordDecl), name(name), inheritance(clang::AS_none) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
   }
 
+  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name,
+      clang::AccessSpecifier inheritance, NominalTypeDecl *startDecl)
+      : recordDecl(recordDecl), startDecl(startDecl), name(name), inheritance(inheritance) {
+    assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
+    assert(isa<clang::RecordDecl>(startDecl->getClangDecl()));
+    assert(inheritance != clang::AS_none && "recursive member lookup should use non-none inheritance");
+  }
+
+public:
+  friend class ClangRecordMemberLookup;
+
   friend llvm::hash_code
   hash_value(const ClangRecordMemberLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.name, desc.recordDecl);
+    return llvm::hash_combine(desc.name, desc.recordDecl, desc.inheritance);
   }
 
   friend bool operator==(const ClangRecordMemberLookupDescriptor &lhs,
                          const ClangRecordMemberLookupDescriptor &rhs) {
-    return lhs.name == rhs.name && lhs.recordDecl == rhs.recordDecl;
+    return lhs.name == rhs.name && lhs.recordDecl == rhs.recordDecl && lhs.inheritance == rhs.inheritance;
   }
 
   friend bool operator!=(const ClangRecordMemberLookupDescriptor &lhs,

@@ -63,6 +63,7 @@
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/LangStandard.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
@@ -5927,9 +5928,6 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
     bodyParams = ParameterList::createEmpty(ctx);
   }
 
-  assert(baseClassVar->getFormalAccess() == AccessLevel::Public &&
-         "base class member must be public");
-
   auto getterDecl = AccessorDecl::create(
       ctx,
       /*FuncLoc=*/SourceLoc(),
@@ -5942,7 +5940,7 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
                  : computedType,
       declContext);
   getterDecl->setIsTransparent(true);
-  getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->setAccess(baseClassVar->getFormalAccess());
   getterDecl->setBodySynthesizer(useAddress
                                      ? synthesizeBaseClassFieldAddressGetterBody
                                      : synthesizeBaseClassFieldGetterBody,
@@ -6060,6 +6058,7 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
     out->copyFormalAccessFrom(fn);
     out->setBodySynthesizer(synthesizeBaseClassMethodBody, fn);
     out->setSelfAccessKind(fn->getSelfAccessKind());
+    out->setLazilyInheritedClone(true);
     return out;
   }
 
@@ -6080,6 +6079,7 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
                       makeBaseClassMemberAccessors(newContext, out, subscript),
                       SourceLoc());
     out->setImplInfo(subscript->getImplInfo());
+    out->setLazilyInheritedClone(true);
     return out;
   }
 
@@ -6114,6 +6114,7 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
                    : StorageImplInfo(ReadImplKind::Address))
             : StorageImplInfo::getComputed(isMutable));
     out->setIsSetterMutating(true);
+    out->setLazilyInheritedClone(true);
     return out;
   }
 
@@ -6126,6 +6127,7 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
                       typeAlias->getGenericParams(), newContext);
     out->setUnderlyingType(typeAlias->getUnderlyingType());
     out->copyFormalAccessFrom(typeAlias);
+    out->setLazilyInheritedClone(true);
     return out;
   }
 
@@ -6137,6 +6139,7 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
         typeDecl->getLoc(), nullptr, newContext);
     out->setUnderlyingType(typeDecl->getInterfaceType());
     out->copyFormalAccessFrom(typeDecl);
+    out->setLazilyInheritedClone(true);
     return out;
   }
 
@@ -6146,10 +6149,12 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
 TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
   NominalTypeDecl *recordDecl = desc.recordDecl;
+  NominalTypeDecl *startDecl = desc.startDecl;
   DeclName name = desc.name;
+  clang::AccessSpecifier inheritance = desc.inheritance;
 
   auto &ctx = recordDecl->getASTContext();
-  auto allResults = evaluateOrDefault(
+  auto directResults = evaluateOrDefault(
       ctx.evaluator,
       ClangDirectLookupRequest({recordDecl, recordDecl->getClangDecl(), name}),
       {});
@@ -6157,7 +6162,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   // Find the results that are actually a member of "recordDecl".
   TinyPtrVector<ValueDecl *> result;
   ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
-  for (auto found : allResults) {
+  for (auto found : directResults) {
     auto named = found.get<clang::NamedDecl *>();
     if (dyn_cast<clang::Decl>(named->getDeclContext()) ==
         recordDecl->getClangDecl()) {
@@ -6165,14 +6170,56 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       if (isa<clang::CXXConstructorDecl>(named) && isa<ClassDecl>(recordDecl))
         continue;
 
-      if (auto import = clangModuleLoader->importDeclDirectly(named))
-        result.push_back(cast<ValueDecl>(import));
+      // Skip this member if it is being inherited but was declared private.
+      if (inheritance != clang::AS_none && named->getAccess() == clang::AS_private)
+        continue;
+
+      if (auto imported = clangModuleLoader->importDeclDirectly(named)) {
+        if (inheritance == clang::AS_none) {
+          // If this member is not inherited, we can directly push the imported
+          // decl into the list of results.
+          assert(recordDecl == startDecl && "this member was not found in a base class");
+          result.push_back(cast<ValueDecl>(imported));
+        } else {
+          // This member is inherited, so we need to use importBaseMemberDecl()
+          // to clone it and synthesize any necessary indirection. We pass
+          // startDecl instead of recordDecl to indicate where are cloning to,
+          // which is important for ensuring the cache is consistent.
+          auto cloneDecl = clangModuleLoader->importBaseMemberDecl(cast<ValueDecl>(imported), startDecl, inheritance);
+          if (cloneDecl)
+            result.push_back(cloneDecl);
+        }
+      }
     }
   }
 
-  // If this is a C++ record, look through any base classes.
+  // If this is a C++ record, there are additional places to look.
   if (auto cxxRecord =
           dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
+
+    // If we are looking in this C++ record because it was inherited, we also
+    // need to consider members that are synthesized eagerly, such as
+    // subscripts. Non-inherited, eagerly synthesized members should already be
+    // present and found by the direct lookup.
+    if (inheritance != clang::AS_none) {
+      for (auto member : recordDecl->getCurrentMembersWithoutLoading()) {
+        auto namedMember = dyn_cast<ValueDecl>(member);
+        // Skip inherited entries, as that would wrongly imply that lookup is
+        // ambiguous (and also end up cloning a clone, which we don't want).
+        if (!namedMember || namedMember->isLazilyInheritedClone())
+          continue;
+
+        // Skip entries that don't match the name we're looking up.
+        if (!namedMember->hasName() || namedMember->getName().getBaseName() != name)
+          continue;
+
+        // This member is inherited, so we need to use importBaseMemberDecl().
+        auto cloneDecl = clangModuleLoader->importBaseMemberDecl(namedMember, startDecl, inheritance);
+        if (cloneDecl && !llvm::is_contained(result, cloneDecl))
+          result.push_back(cloneDecl);
+      }
+    }
+
     // Capture the arity of already found members in the
     // current record, to avoid adding ambiguous members
     // from base classes.
@@ -6183,7 +6230,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       foundNameArities.insert(getArity(valueDecl));
 
     for (auto base : cxxRecord->bases()) {
-      if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+      // Skip this base class if this is a case of nested private inheritance.
+      // See ClangImporter::Implementation::loadAllMembersOfRecordDecl for more
+      // details.
+      if (inheritance != clang::AS_none &&
+          base.getAccessSpecifier() == clang::AS_private)
         continue;
 
       clang::QualType baseType = base.getType();
@@ -6193,38 +6244,30 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         continue;
 
       auto *baseRecord = baseType->getAs<clang::RecordType>()->getDecl();
-      if (auto import = clangModuleLoader->importDeclDirectly(baseRecord)) {
+      if (auto baseDecl = clangModuleLoader->importDeclDirectly(baseRecord)) {
         // If we are looking up the base class, go no further. We will have
         // already found it during the other lookup.
-        if (cast<ValueDecl>(import)->getName() == name)
+        if (cast<ValueDecl>(baseDecl)->getName() == name)
           continue;
+
+        auto access = base.getAccessSpecifier();
+        if (inheritance != clang::AS_none)
+          // For nested inheritance, clamp inheritance to least permissive level
+          // which is the largest numerical value for clang::AccessSpecifier
+          access = std::max(inheritance, access);
 
         // Add Clang members that are imported lazily.
         auto baseResults = evaluateOrDefault(
             ctx.evaluator,
-            ClangRecordMemberLookup({cast<NominalTypeDecl>(import), name}), {});
-        // Add members that are synthesized eagerly, such as subscripts.
-        for (auto member :
-             cast<NominalTypeDecl>(import)->getCurrentMembersWithoutLoading()) {
-          if (auto namedMember = dyn_cast<ValueDecl>(member)) {
-            if (namedMember->hasName() &&
-                namedMember->getName().getBaseName() == name &&
-                // Make sure we don't add duplicate entries, as that would
-                // wrongly imply that lookup is ambiguous.
-                !llvm::is_contained(baseResults, namedMember)) {
-              baseResults.push_back(namedMember);
-            }
-          }
-        }
+            ClangRecordMemberLookup({cast<NominalTypeDecl>(baseDecl), name, access, startDecl}), {});
+
         for (auto foundInBase : baseResults) {
           // Do not add duplicate entry with the same arity,
           // as that would cause an ambiguous lookup.
           if (foundNameArities.count(getArity(foundInBase)))
             continue;
-          if (auto newDecl = clangModuleLoader->importBaseMemberDecl(
-                  foundInBase, recordDecl)) {
-            result.push_back(newDecl);
-          }
+
+          result.push_back(foundInBase);
         }
       }
     }
@@ -7476,12 +7519,10 @@ Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
   return Impl.importDecl(decl, Impl.CurrentVersion);
 }
 
-ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
-    ValueDecl *decl, DeclContext *newContext) {
-  // Do not clone private C++ decls.
-  if (decl->getFormalAccess() < AccessLevel::Public)
-    return nullptr;
-
+ValueDecl *
+ClangImporter::Implementation::importBaseMemberDecl(ValueDecl *decl,
+                                                    DeclContext *newContext,
+                                                    clang::AccessSpecifier inheritance) {
   // Make sure we don't clone the decl again for this class, as that would
   // result in multiple definitions of the same symbol.
   std::pair<ValueDecl *, DeclContext *> key = {decl, newContext};
@@ -7489,6 +7530,23 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   if (known == clonedBaseMembers.end()) {
     ValueDecl *cloned = cloneBaseMemberDecl(decl, newContext);
     known = clonedBaseMembers.insert({key, cloned}).first;
+    if (known->second && inheritance != clang::AS_none) {
+      auto cloneDecl = known->second;
+      // Adjust access according to whichever is more restrictive, between
+      // what the namedMember was declared with or what it is inherited with.
+      // Instead of looking at the C++ access of namedMember->getClangDecl(),
+      // we just use the Swift AccessLevel that it got converted to and
+      // compare it to the converted inheritance access specifier; this relies
+      // on importer::convertClangAccess() being a linear mapping.
+      auto adjustedAccess = std::min(cloneDecl->getFormalAccess(),
+                                     importer::convertClangAccess(inheritance));
+      cloneDecl->overwriteAccess(adjustedAccess);
+
+      // Also adjust access of accessors, for imported storage decls
+      if (auto asd = dyn_cast<AbstractStorageDecl>(cloneDecl))
+        for (auto accessor : asd->getAllAccessors())
+          accessor->overwriteAccess(adjustedAccess);
+    }
   }
 
   return known->second;
@@ -7505,8 +7563,9 @@ size_t ClangImporter::Implementation::getImportedBaseMemberDeclArity(
 }
 
 ValueDecl *ClangImporter::importBaseMemberDecl(ValueDecl *decl,
-                                               DeclContext *newContext) {
-  return Impl.importBaseMemberDecl(decl, newContext);
+                                               DeclContext *newContext,
+                                               clang::AccessSpecifier inheritance) {
+  return Impl.importBaseMemberDecl(decl, newContext, inheritance);
 }
 
 void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {
@@ -8253,4 +8312,19 @@ importer::getCxxReferencePointeeTypeOrNone(const clang::Type *type) {
 bool importer::isCxxConstReferenceType(const clang::Type *type) {
   auto pointeeType = getCxxReferencePointeeTypeOrNone(type);
   return pointeeType && pointeeType->isConstQualified();
+}
+
+SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
+importer::getPrivateFileIDAttrs(const clang::Decl *decl) {
+  llvm::SmallVector<std::pair<StringRef, clang::SourceLocation>, 1> files;
+  auto prefix = StringRef("private_fileid:");
+
+  if (decl->hasAttrs())
+    for (const auto *attr : decl->getAttrs())
+      if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+        if (swiftAttr->getAttribute().starts_with(prefix))
+          files.push_back({swiftAttr->getAttribute().drop_front(prefix.size()),
+                           attr->getLocation()});
+
+  return files;
 }
