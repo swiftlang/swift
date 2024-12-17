@@ -1,0 +1,20 @@
+// RUN: %scale-test --invert-result --begin 1 --end 8 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts,no_asan
+
+protocol Number {}
+
+struct Zero: Number {}
+struct One: Number {}
+
+extension Number {
+  func plusZero() -> Sum<Self, Zero> {}
+}
+
+struct Sum<each N>: Number {
+  func plusZero() -> Sum<repeat each N, Zero> {}
+}
+
+let m = Zero()
+%for i in range(0, N):
+  .plusZero()
+%end
