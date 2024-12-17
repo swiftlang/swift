@@ -83,6 +83,9 @@ public:
     push(initialBlock);
   }
 
+  /// Whether there are any remaining blocks to process.
+  bool empty() { return worklist.empty(); }
+
   /// Pops the last added element from the worklist or returns null, if the
   /// worklist is empty.
   SILBasicBlock *pop() {
