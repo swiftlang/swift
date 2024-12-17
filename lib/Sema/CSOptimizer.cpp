@@ -253,37 +253,6 @@ static void findFavoredChoicesBasedOnArity(
     favoredChoice(choice);
 }
 
-/// Determine whether the given disjunction serves as a base of
-/// another member reference i.e. `x.y` where `x` could be overloaded.
-static bool isPartOfMemberChain(ConstraintSystem &CS, Constraint *disjunction) {
-  if (isOperatorDisjunction(disjunction))
-    return false;
-
-  auto &CG = CS.getConstraintGraph();
-
-  TypeVariableType *typeVar = nullptr;
-
-  // If disjunction is applied, the member is chained on the result.
-  if (auto appliedFn = CS.getAppliedDisjunctionArgumentFunction(disjunction)) {
-    typeVar = appliedFn->getResult()->getAs<TypeVariableType>();
-  } else {
-    typeVar = disjunction->getNestedConstraints()[0]
-                  ->getFirstType()
-                  ->getAs<TypeVariableType>();
-  }
-
-  if (!typeVar)
-    return false;
-
-  return llvm::any_of(
-      CG[typeVar].getConstraints(), [&typeVar](Constraint *constraint) {
-        if (constraint->getKind() != ConstraintKind::ValueMember)
-          return false;
-
-        return constraint->getFirstType()->isEqual(typeVar);
-      });
-}
-
 } // end anonymous namespace
 
 /// Given a set of disjunctions, attempt to determine
@@ -318,11 +287,26 @@ static void determineBestChoicesInContext(
         getApplicableFnConstraint(cs.getConstraintGraph(), disjunction);
 
     if (applicableFn.isNull()) {
-      // If this is a chained member reference it could be prioritized since
-      // it helps to establish context for other calls i.e. `a.b + 2` if
-      // `a` is a disjunction it should be preferred over `+`.
-      if (isPartOfMemberChain(cs, disjunction))
-        recordResult(disjunction, {/*score=*/1.0});
+      auto *locator = disjunction->getLocator();
+      if (auto expr = getAsExpr(locator->getAnchor())) {
+        if (auto *parentExpr = cs.getParentExpr(expr)) {
+          // If this is a chained member reference or a direct operator
+          // argument it could be prioritized since it helps to establish
+          // context for other calls i.e. `(a.)b + 2` if `a` and/or `b`
+          // are disjunctions they should be preferred over `+`.
+          switch (parentExpr->getKind()) {
+          case ExprKind::Binary:
+          case ExprKind::PrefixUnary:
+          case ExprKind::PostfixUnary:
+          case ExprKind::UnresolvedDot:
+            recordResult(disjunction, {/*score=*/1.0});
+            continue;
+
+          default:
+            break;
+          }
+        }
+      }
 
       continue;
     }

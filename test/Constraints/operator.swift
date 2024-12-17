@@ -375,3 +375,20 @@ do {
     col <<<>>> val // Ok
   }
 }
+
+// Make sure that ?? selects an overload that doesn't produce an optional.
+do {
+  class Obj {
+    var x: String!
+  }
+
+  class Child : Obj {
+    func x() -> String? { nil }
+    static func x(_: Int) -> String { "" }
+  }
+
+  func test(arr: [Child], v: String, defaultV: Child) -> Child {
+    let result = arr.first { $0.x == v } ?? defaultV
+    return result // Ok
+  }
+}
