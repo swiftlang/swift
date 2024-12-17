@@ -1400,6 +1400,29 @@ public:
           // then look at all of the closure arguments.
           LLVM_FALLTHROUGH;
         } else {
+          // Mitigation for a historic incorrect type-checker behavior
+          // caused by one of the performance hacks that used to favor
+          // sync constructor overload over async one in async context
+          // if initializers take a single unlabeled argument.
+          //
+          // struct S {
+          //   init(_: Int) {}
+          //   init(_: Int) async {}
+          // }
+          //
+          // func test(v: Int) async { S(v) }
+          //
+          // The type-checker should use `init(_: Int) async` in `test` context
+          // but used to select the sync overload. The hack is now gone but we
+          // need to downgrade an error to a warning to give the developers time
+          // to fix their code.
+          if (kind == EffectKind::Async &&
+              fnRef.getKind() == AbstractFunction::Function) {
+            if (auto *ctor = dyn_cast<ConstructorRefCallExpr>(E->getFn())) {
+              if (ctor->getFn()->isImplicit() && args->isUnlabeledUnary())
+                result.setDowngradeToWarning(true);
+            }
+          }
           break;
         }
 
