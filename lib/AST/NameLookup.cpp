@@ -2739,6 +2739,17 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       }
     }
 
+    // Qualified name lookup can find generic value parameters.
+    auto gpList = current->getGenericParams();
+
+    if (gpList && !member.isSpecial()) {
+      if (auto gp = gpList->lookUpGenericParam(member.getBaseIdentifier())) {
+        if (gp->isValue()) {
+          decls.push_back(gp);
+        }
+      }
+    }
+
     // If we're not looking at a protocol and we're not supposed to
     // visit the protocols that this type conforms to, skip the next
     // step.
