@@ -41,8 +41,10 @@ let some = Some(keyPath: \Demo.here)
 func testFunc() {
   let _: (S) -> Int = \.i
   _ = ([S]()).map(\.i)
-  _ = \S.init // expected-error {{key path cannot refer to initializer 'init()'}}
-  _ = ([S]()).map(\.init) // expected-error {{key path cannot refer to initializer 'init()'}}
+  _ = \S.Type.init
+  _ = \S.init // expected-error {{static member 'init()' cannot be used on instance of type 'S'}}
+  _ = ([S.Type]()).map(\.init)
+  _ = ([S]()).map(\.init) // expected-error {{static member 'init()' cannot be used on instance of type 'S'}}
 
   let kp = \S.i
   let _: KeyPath<S, Int> = kp // works, because type defaults to KeyPath nominal
