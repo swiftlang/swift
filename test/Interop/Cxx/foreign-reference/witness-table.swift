@@ -63,11 +63,10 @@ WitnessTableTestSuite.test("As a Sequence") {
 
 WitnessTableTestSuite.test("As an existential") {
   let existential: any ListNode = makeLinkedList()
-  let cast: CxxLinkedList? = existential as? CxxLinkedList
-  expectNotNil(cast)
-  expectEqual(cast?.value, 0)
-  expectEqual(cast?.next()?.value, 1)
-  expectEqual(cast?.next()?.next()?.value, 2)
+  let cast: CxxLinkedList = existential as! CxxLinkedList
+  expectEqual(cast.value, 0)
+  expectEqual(cast.next()?.value, 1)
+  expectEqual(cast.next()?.next()?.value, 2)
 }
 
 }

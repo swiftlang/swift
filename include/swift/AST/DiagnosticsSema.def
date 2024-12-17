@@ -4538,8 +4538,8 @@ NOTE(silence_inject_forced_downcast,none,
      "add parentheses around the cast to silence this warning", ())
 
 ERROR(conditional_downcast_foreign,none,
-      "conditional downcast to CoreFoundation type %0 will always succeed",
-      (Type))
+      "conditional downcast to %select{CoreFoundation|foreign reference}1 type %0 will always succeed",
+      (Type, bool))
 NOTE(note_explicitly_compare_cftypeid,none,
       "did you mean to explicitly compare the CFTypeIDs of %0 and %1?",
       (DeclBaseName, Type))

@@ -4198,14 +4198,23 @@ namespace {
                                     castKind,
         [&](Expr *sub, Type resultType) -> Expr* {
 
-        // Complain about conditional casts to CF class types; they can't
-        // actually be conditionally checked.
+        // Complain about conditional casts to CF class types, as well as C++
+        // foreign reference types; they can't actually be conditionally
+        // checked.
         if (castKind == OptionalBindingsCastKind::Conditional) {
           Type destValueType = resultType->getOptionalObjectType();
           auto destObjectType = destValueType;
           if (auto metaTy = destObjectType->getAs<MetatypeType>())
             destObjectType = metaTy->getInstanceType();
           if (auto destClass = destObjectType->getClassOrBoundGenericClass()) {
+            if (destClass->isForeignReferenceType()) {
+              if (SuppressDiagnostics)
+                return nullptr;
+
+              ctx.Diags.diagnose(
+                  cast->getLoc(), diag::conditional_downcast_foreign,
+                  destValueType, /* isForeignReferenceType */ true);
+            }
             if (destClass->getForeignClassKind() ==
                   ClassDecl::ForeignKind::CFType) {
               if (SuppressDiagnostics)
@@ -4213,7 +4222,7 @@ namespace {
 
               auto &de = ctx.Diags;
               de.diagnose(cast->getLoc(), diag::conditional_downcast_foreign,
-                          destValueType);
+                          destValueType, /* isForeignReferenceType */ false);
               ConcreteDeclRef refDecl = sub->getReferencedDecl();
               if (refDecl) {
                 de.diagnose(cast->getLoc(),
