@@ -10,11 +10,13 @@ extension IIBase1 {
 
         // For instance, a non-idempotent ClangRecordMemberLookup would cause
         // the following to appear ambiguous:
-        method()
+        methodBase()
+        methodIBase()
     }
 }
 
 func f(v: IIBase1) {
     v.missing() // expected-error {{'IIBase1' has no member 'missing'}}
-    v.method()
+    v.methodBase()
+    v.methodIBase()
 }

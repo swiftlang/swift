@@ -8,7 +8,8 @@ var InheritedMemberTestSuite = TestSuite("Test if inherited lookup works")
 
 InheritedMemberTestSuite.test("IIBase1::method() resolves to grandparent") {
   let iibase1 = IIBase1()
-  expectEqual(iibase1.method(), 1)
+  expectEqual(iibase1.methodBase(), 1)
+  expectEqual(iibase1.methodIBase(), 11)
 }
 
 runAllTests()
