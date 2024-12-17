@@ -61,7 +61,7 @@ struct SuperHolder {
 // -----------------------------------------------------------------------
 // Inheritance of @unsafe
 // -----------------------------------------------------------------------
-@unsafe class UnsafeSuper { // expected-note 3{{'UnsafeSuper' declared here}}
+@unsafe class UnsafeSuper { // expected-note 5{{'UnsafeSuper' declared here}}
   func f() { } // expected-note{{unsafe instance method 'f' declared here}}
 };
 
@@ -87,4 +87,18 @@ func testMe(
   // expected-warning@-1{{reference to parameter 'unsafeSuper' involves unsafe type 'UnsafeSuper'}}
 
   _ = getPointers() // expected-warning{{call to global function 'getPointers' involves unsafe type 'PointerType'}}
+}
+
+// -----------------------------------------------------------------------
+// Various declaration kinds
+// -----------------------------------------------------------------------
+// expected-note@+1{{make type alias 'SuperUnsafe' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+typealias SuperUnsafe = UnsafeSuper // expected-warning{{reference to unsafe class 'UnsafeSuper' [Unsafe]}}
+@unsafe typealias SuperUnsafe2 = UnsafeSuper
+
+enum HasUnsafeThings {
+// expected-note@+1{{make enum case 'one' @unsafe to indicate that its use is not memory-safe}}
+case one(UnsafeSuper) // expected-warning{{reference to unsafe class 'UnsafeSuper' [Unsafe]}}
+
+@unsafe case two(UnsafeSuper)
 }

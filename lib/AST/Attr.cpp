@@ -861,12 +861,26 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     DA->print(Printer, Options, D);
 }
 
+static bool attributeIsNotAtStart(const DeclAttribute *attr) {
+  switch (attr->getKind()) {
+  case DeclAttrKind::Rethrows:
+  case DeclAttrKind::Reasync:
+    return true;
+
+  default:
+    return false;
+  }
+}
+
 SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
   if (isEmpty())
     return SourceLoc();
 
   const DeclAttribute *lastAttr = nullptr;
   for (auto attr : *this) {
+    if (attributeIsNotAtStart(attr))
+      continue;
+
     if (attr->getRangeWithAt().Start.isValid() &&
         (!forModifiers || attr->isDeclModifier()))
       lastAttr = attr;
@@ -1581,6 +1595,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Lifetime: {
     auto *attr = cast<LifetimeAttr>(this);
     Printer << attr->getLifetimeEntry()->getString();
+    break;
+  }
+
+  case DeclAttrKind::Safe: {
+    auto *attr = cast<SafeAttr>(this);
+    Printer.printAttrName("@safe");
+    Printer << "(unchecked";
+    if (!attr->message.empty()) {
+      Printer << ", message: ";
+      Printer.printEscapedStringLiteral(attr->message);
+    }
+    Printer << ")";
     break;
   }
 
