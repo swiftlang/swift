@@ -246,3 +246,126 @@ extension Character {
     return _str._guts.isSmall
   }
 }
+
+extension Character {
+
+  /// The contents of this character, normalized to the given form.
+  ///
+  /// The result is canonically equivalent to this character.
+  ///
+  /// ```swift
+  /// let original: Character = "é"
+  ///
+  /// let nfc = original.normalized(.nfc)
+  /// for scalar in nfc.unicodeScalars {
+  ///   print(scalar.escaped(asASCII: true)) // "\u{00E9}"
+  /// }
+  ///
+  /// let nfd = original.normalized(.nfd)
+  /// for scalar in nfd.unicodeScalars {
+  ///   print(scalar.escaped(asASCII: true)) // "e", "\u{0301}"
+  /// }
+  ///
+  /// assert(original == nfd)
+  /// assert(nfc == nfd)
+  /// ```
+  ///
+  // @available(SwiftStdlib 9999, *)
+  public func normalized(
+    _ form: Unicode.CanonicalNormalizationForm
+  ) -> Character {
+    Character(unchecked: _str.normalized(form))
+  }
+}
+
+// FIXME: Improve these and move them somewhere logical.
+
+extension String.UTF8View: Equatable, Hashable, Comparable {
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.lexicographicallyPrecedes(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    for cu in self { hasher.combine(cu) }
+  }
+}
+
+extension Substring.UTF8View: Equatable, Hashable, Comparable {
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.lexicographicallyPrecedes(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    for cu in self { hasher.combine(cu) }
+  }
+}
+
+extension String.UTF16View: Equatable, Hashable, Comparable {
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.lexicographicallyPrecedes(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    for cu in self { hasher.combine(cu) }
+  }
+}
+
+extension Substring.UTF16View: Equatable, Hashable, Comparable {
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.lexicographicallyPrecedes(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    for cu in self { hasher.combine(cu) }
+  }
+}
+
+extension String.UnicodeScalarView: Equatable, Hashable, Comparable {
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.lexicographicallyPrecedes(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    for cu in self { hasher.combine(cu) }
+  }
+}
+
+extension Substring.UnicodeScalarView: Equatable, Hashable, Comparable {
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.lexicographicallyPrecedes(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    for cu in self { hasher.combine(cu) }
+  }
+}

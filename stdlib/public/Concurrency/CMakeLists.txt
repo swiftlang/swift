@@ -173,6 +173,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   ContinuousClock.swift
   SuspendingClock.swift
   TaskSleepDuration.swift
+  Unicode+NormalizedScalarsAsync.swift
 )
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
