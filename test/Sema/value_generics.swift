@@ -119,3 +119,17 @@ func testC4<let T: Int>(with c: C<T, T>) {
 }
 
 struct D<let N: Int & P> {} // expected-error {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
+
+struct E<A, let b: Int> {}
+
+func testE1() -> Int {
+  E<Int, 123>.b // OK
+}
+
+func testE2() -> Int {
+  E<Int, 123>.A // expected-error {{type 'E<Int, 123>' has no member 'A'}}
+}
+
+func testE3<let c: Int>(_: E<Int, c>.Type = E<Int, c>.self) -> Int {
+  E<Int, c>.b // OK
+}

@@ -1465,6 +1465,12 @@ public:
     this->paramType = paramType;
   }
 
+  /// Retrieves the underlying value type of the parameter type referenced by
+  /// this expression.
+  Type getValueType() const {
+    return valueType;
+  }
+
   SourceRange getSourceRange() const {
     return loc.getSourceRange();
   }
