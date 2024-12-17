@@ -30,6 +30,13 @@ public struct AStruct {
   public static var property2: Int = 2
   private(set) public static var property3: Int = 1
   private(set) public static var property4: Int = 4
+  public static func x(val value: Int) -> Int { return value }
+  public static func y(val value: Int) -> Int { return value }
+  
+  public init(val value: Int = 2024) {
+    year = value
+  }
+  public var year: Int
 }
 
 //--- LibB.swift
@@ -41,6 +48,10 @@ public let keyPath3FromLibB = \AStruct.Type.property3
 public let keyPath4FromLibB = \AStruct.Type.property4
 public var keyPath5FromLibB = \AStruct.Type.property1 // WritableKeyPath with public setter
 public var keyPath6FromLibB = \Int.Type.zero
+public let keyPath7FromLibB = \AStruct.Type.x(val: 10)
+public let keyPath8FromLibB = \AStruct.Type.y(val: 10)
+public let keyPath9FromLibB = \AStruct.Type.init
+public let keyPath10FromLibB = \AStruct.Type.init(val: 2025)
 
 //--- LibC.swift
 import LibA
@@ -51,6 +62,9 @@ public let keyPath3FromLibC = \AStruct.Type.property3 // Read-only with private 
 public let keyPath4FromLibC = \AStruct.Type.property4
 public var keyPath5FromLibC = \Int.Type.zero
 public var keyPath6FromLibC = \Int.Type.max
+public let keyPath7FromLibC = \AStruct.Type.x(val: 10)
+public let keyPath8FromLibC = \AStruct.Type.init
+public let keyPath9FromLibC = \AStruct.Type.init(val: 2026)
 
 //--- main.swift
 import LibB
@@ -73,3 +87,12 @@ print(keyPath5FromLibB == keyPath3FromLibC)
 print(keyPath6FromLibB == keyPath5FromLibC)
 // Check: false
 print(keyPath6FromLibB == keyPath6FromLibC)
+
+// CHECK: true
+print(keyPath7FromLibB == keyPath7FromLibC)
+// CHECK: false
+print(keyPath8FromLibB == keyPath7FromLibC)
+// CHECK: true
+print(keyPath9FromLibB == keyPath8FromLibC)
+// CHECK: true
+print(keyPath10FromLibB != keyPath9FromLibC)

@@ -475,6 +475,44 @@ var namedTupleLens = Lens<(question: String, answer: Int)>((question: "ultimate 
 _ = namedTupleLens.question.count
 _ = namedTupleLens.answer
 
+struct MethodAndInitializerTest {
+  let value: Int
+  init(value: Int) { self.value = value }
+  func instanceMethod() -> String { return "InstanceMethod" }
+  static func staticMethod() -> Int { return 42 }
+}
+
+@dynamicMemberLookup
+struct MethodAndInitializerLens<T> {
+  var value: T
+  var type: T.Type
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+      return value[keyPath: member]
+  }
+
+  subscript<U>(dynamicMember member: (T) -> () -> U) -> () -> U {
+      return { member(self.value)() }
+  }
+
+  subscript<U>(dynamicMember member: (T.Type) -> () -> U) -> () -> U {
+      return { member(self.type)() }
+  }
+}
+
+func test_method_and_init_lens() {
+  let instance = MethodAndInitializerTest(value: 10)
+  let methodLens = MethodAndInitializerLens(value: instance, type: MethodAndInitializerTest.self)
+
+  let _ = methodLens[dynamicMember: MethodAndInitializerTest.instanceMethod]()
+
+  let staticMethodClosure = methodLens[dynamicMember: { $0.staticMethod }]
+  let _ = staticMethodClosure()
+
+  let initializer = MethodAndInitializerTest.init
+  let _ = MethodAndInitializerLens(value: initializer(20), type: MethodAndInitializerTest.self)
+}
+
 @dynamicMemberLookup
 class A<T> {
   var value: T
@@ -484,6 +522,19 @@ class A<T> {
   }
 
   subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+  }
+}
+
+@dynamicMemberLookup
+class AMetatype<T> {
+  var value: T.Type
+
+  init(_ v: T.Type) {
+    self.value = v
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T.Type, U>) -> U {
     get { return value[keyPath: member] }
   }
 }
@@ -686,6 +737,11 @@ func invalid_refs_through_dynamic_lookup() {
     _ = lens.bar()
     _ = lens.bar().faz + 1 
     _ = lens.baz("hello")  // expected-error {{static member 'baz' cannot be used on instance of type 'S'}}
+  }
+  
+  func testStatic(_ lens: AMetatype<S>) {
+    _ = lens.foo
+    _ = lens.baz("hello")
   }
 }
 
