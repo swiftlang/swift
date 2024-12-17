@@ -7,7 +7,7 @@
 func unsafeFunction() { }
 
 @unsafe
-struct UnsafeType { } // expected-note{{unsafe struct 'UnsafeType' declared here}}
+struct UnsafeType { } // expected-note 3{{unsafe struct 'UnsafeType' declared here}}
 
 @safe(unchecked)
 func f() {
@@ -23,6 +23,37 @@ func g() {
 @safe(unchecked, message: "I was careful")
 func h(_: UnsafeType) { // expected-warning{{reference to unsafe struct 'UnsafeType' [Unsafe]}}
   unsafeFunction()
+}
+
+// expected-note@+1 {{make global function 'rethrowing' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+func rethrowing(body: (UnsafeType) throws -> Void) rethrows { } // expected-warning{{reference to unsafe struct 'UnsafeType' [Unsafe]}}
+
+class HasStatics {
+  // expected-note@+1{{make static method 'f' @unsafe to indicate that its use is not memory-safe}}{{3-3=@unsafe }}
+  static internal func f(_: UnsafeType) { } // expected-warning{{reference to unsafe struct 'UnsafeType' [Unsafe]}}
+
+  
+}
+
+@unsafe
+func unsafeInt() -> Int { 5 }
+
+struct HasProperties {
+  @safe(unchecked) var computed: Int {
+    unsafeInt()
+  }
+
+  @unsafe var computedUnsafe: Int {
+    unsafeInt()
+  }
+
+  @safe(unchecked) static var blah: Int = {
+    unsafeInt()
+  }()
+
+  @unsafe static var blahUnsafe: Int = {
+    unsafeInt()
+  }()
 }
 
 // Parsing issues

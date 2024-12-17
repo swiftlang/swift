@@ -65,13 +65,16 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
           // but the change won't appear in -sil-print-function. Ideally, we could notify context of a flag change
           // without invalidating analyses.
           lifetimeDep.resolve(context)
+          continue
         }
-      } else {
-        // For now, if the mark_dependence wasn't recognized as a lifetime dependence, conservatively settle it as
-        // escaping. In the future, we should not need this because, for escapable types, mark_dependence [unresolved]
-        // will all be settled during an early LifetimeNormalization pass.
-        markDep.settleToEscaping()
       }
+      // For now, if the mark_dependence wasn't recognized as a lifetime dependency, or if the dependencies uses are not
+      // in scope, conservatively settle it as escaping. For example, it is not uncommon for the pointer value returned
+      // by `unsafeAddress` to outlive its `self` argument. This will not be diagnosed as an error, but the
+      // mark_dependence will hanceforth be treated as an unknown use by the optimizer.  In the future, we should not
+      // need to set this flag during diagnostics because, for escapable types, mark_dependence [unresolved] will all be
+      // settled during an early LifetimeNormalization pass.
+      markDep.settleToEscaping()
       continue
     }
     if let apply = instruction as? FullApplySite {
@@ -97,7 +100,15 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
 /// Return true on success.
 private func analyze(dependence: LifetimeDependence, _ context: FunctionPassContext) -> Bool {
   log("Dependence scope:\n\(dependence)")
-    
+
+  // Early versions of Span in the standard library violate trivial lifetimes. Contemporary versions of the compiler
+  // simply ignored dependencies on trivial values.
+  if !context.options.hasFeature(.LifetimeDependenceDiagnoseTrivial) {
+    if dependence.parentValue.type.objectType.isTrivial(in: dependence.function) {
+      return true
+    }
+  }
+
   // Compute this dependence scope.
   var range = dependence.computeRange(context)
   defer { range?.deinitialize() }
@@ -110,8 +121,10 @@ private func analyze(dependence: LifetimeDependence, _ context: FunctionPassCont
   // Check each lifetime-dependent use via a def-use visitor
   var walker = DiagnoseDependenceWalker(diagnostics, context)
   defer { walker.deinitialize() }
-  _ = walker.walkDown(root: dependence.dependentValue)
-  return !error
+  let result = walker.walkDown(root: dependence.dependentValue)
+  // The walk may abort without a diagnostic error.
+  assert(!error || result == .abortWalk)
+  return result == .continueWalk
 }
 
 /// Analyze and diagnose a single LifetimeDependence.
@@ -214,6 +227,10 @@ private struct DiagnoseDependence {
   }
 
   func reportError(operand: Operand, diagID: DiagID) {
+    // If the dependent value is Escapable, then mark_dependence resolution fails, but this is not a diagnostic error.
+    if dependence.dependentValue.isEscapable {
+      return
+    }
     onError()
 
     // Identify the escaping variable.

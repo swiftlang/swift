@@ -1,8 +1,11 @@
 // RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -enable-experimental-feature LifetimeDependence | %FileCheck %s
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
+// RUN: | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 // TODO: Use real Range
 public struct FakeRange<Bound> {

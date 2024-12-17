@@ -1,9 +1,19 @@
 // RUN: %target-swift-frontend %s \
 // RUN: -emit-sil  -target %target-swift-5.1-abi-triple \
 // RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
+
+@_unsafeNonescapableResult
+@lifetime(source)
+func unsafeLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
+  dependent: consuming T, dependsOn source: borrowing U)
+  -> T {
+  dependent
+}
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
@@ -134,6 +144,7 @@ struct GenericBufferView<Element> : ~Escapable {
   let count: Int
 
 // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewV11baseAddress5countACyxGSV_SitcfC : $@convention(method) <Element> (UnsafeRawPointer, Int, @thin GenericBufferView<Element>.Type) -> @lifetime(borrow 0) @owned GenericBufferView<Element> {
+  @lifetime(borrow baseAddress)
   init<Storage>(baseAddress: Pointer,
                 count: Int,
                 dependsOn: borrowing Storage) {
@@ -160,10 +171,13 @@ struct GenericBufferView<Element> : ~Escapable {
 // CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewVyACyxGAA9FakeRangeVySVGcig : $@convention(method) <Element> (FakeRange<UnsafeRawPointer>, @guaranteed GenericBufferView<Element>) -> @lifetime(copy 1) @owned GenericBufferView<Element> {
   subscript(bounds: FakeRange<Pointer>) -> Self {
     get {
-      GenericBufferView(
-        baseAddress: UnsafeRawPointer(bounds.lowerBound),
+      let pointer = UnsafeRawPointer(bounds.lowerBound)
+      let result = GenericBufferView(
+        baseAddress: pointer,
         count: bounds.upperBound.distance(to:bounds.lowerBound) / MemoryLayout<Element>.stride
       )
+      // assuming that bounds is within self
+      return unsafeLifetime(dependent: result, dependsOn: self)
     }
   }
 }

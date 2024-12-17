@@ -2,9 +2,11 @@
 // RUN: -emit-sil  \
 // RUN: -enable-builtin-module \
 // RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 import Builtin
 

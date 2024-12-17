@@ -942,11 +942,28 @@ private:
     return true;
   }
 
+  /// Determine whether the given declaration has the @safe attribute.
+  static bool declHasSafeAttr(Decl *decl) {
+    if (decl->getAttrs().hasAttribute<SafeAttr>())
+      return true;
+
+    if (auto accessor = dyn_cast<AccessorDecl>(decl))
+      return declHasSafeAttr(accessor->getStorage());
+
+    // Attributes for pattern binding declarations are on the first variable.
+    if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
+      if (auto var = pbd->getAnchoringVarDecl(0))
+        return declHasSafeAttr(var);
+    }
+
+    return false;
+  }
+
   void buildContextsForBodyOfDecl(Decl *D) {
     // Are we already constrained by the deployment target and the declaration
     // doesn't explicitly allow unsafe constructs in its definition, adding
     // new contexts won't change availability.
-    bool allowsUnsafe = D->getAttrs().hasAttribute<SafeAttr>();
+    bool allowsUnsafe = declHasSafeAttr(D);
     if (isCurrentScopeContainedByDeploymentTarget() && !allowsUnsafe)
       return;
 
@@ -1836,8 +1853,8 @@ static bool isTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 
   bool IsModuleScopeContext = D->getDeclContext()->isModuleScopeContext();
 
-  // We consider global functions to be "type level"
-  if (isa<FuncDecl>(D)) {
+  // We consider global functions, type aliases, and macros to be "type level"
+  if (isa<FuncDecl>(D) || isa<MacroDecl>(D) || isa<TypeAliasDecl>(D)) {
     return IsModuleScopeContext;
   }
 

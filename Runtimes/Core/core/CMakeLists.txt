@@ -322,6 +322,8 @@ target_link_libraries(swiftCore
     swiftDemangling
     swiftStdlibStubs
     swiftThreading)
+target_link_options(swiftCore PRIVATE
+  -nostartfiles)
 if(NOT POLICY CMP0157)
   target_compile_options(swiftCore PRIVATE
     $<TARGET_OBJECTS:swiftRuntime>
@@ -344,6 +346,8 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Swift.swiftmodule"
   RENAME "${SwiftCore_MODULE_TRIPLE}.swiftmodule")
 emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)
+
+include("${SwiftCore_VENDOR_MODULE_DIR}/swiftCore.cmake" OPTIONAL)
 
 # TODO: Embedded SwiftCore builds
 # FIXME: Embedded builds should be separate CMake invocations because they are

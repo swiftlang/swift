@@ -2106,3 +2106,16 @@ bb3:
   return %0
 }
 
+// CHECK-LABEL: sil [ossa] @user_in_dead_end_block :
+// CHECK:         %2 = copy_value %1
+// CHECK:       } // end sil function 'user_in_dead_end_block'
+sil [ossa] @user_in_dead_end_block : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0
+  %2 = copy_value %1
+  end_borrow %1
+  %4 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  unreachable
+}
+
