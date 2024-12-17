@@ -691,8 +691,7 @@ static void checkRedeclaration(PrecedenceGroupDecl *group) {
 
 /// Check whether \c current is a redeclaration.
 evaluator::SideEffect
-CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
-                                    NominalTypeDecl *SelfNominalType) const {
+CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
   // Ignore invalid and anonymous declarations.
   if (current->isInvalid() || !current->hasName())
     return std::make_tuple<>();
@@ -1135,6 +1134,26 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       break;
     }
   }
+
+  // Look to see if this type has a value generic with the same name and that
+  // the current value is a property.
+  if (currentDC->isTypeContext() && currentDC->isGenericContext() &&
+      isa<VarDecl>(current)) {
+    auto gpList = currentDC->getAsDecl()->getAsGenericContext()->getGenericParams();
+
+    if (gpList && !current->getBaseName().isSpecial()) {
+      auto gp = gpList->lookUpGenericParam(current->getBaseIdentifier());
+
+      if (gp && gp->isValue()) {
+        ctx.Diags.diagnoseWithNotes(
+          current->diagnose(diag::invalid_redecl, current), [&]() {
+          gp->diagnose(diag::invalid_redecl_prev, gp);
+        });
+        current->setInvalid();
+      }
+    }
+  }
+
   return std::make_tuple<>();
 }
 
@@ -2348,11 +2367,7 @@ public:
       // Force some requests, which can produce diagnostics.
 
       // Check redeclaration.
-      (void)evaluateOrDefault(
-          Ctx.evaluator,
-          CheckRedeclarationRequest{
-              VD, VD->getDeclContext()->getSelfNominalTypeDecl()},
-          {});
+      (void)evaluateOrDefault(Ctx.evaluator, CheckRedeclarationRequest{VD}, {});
 
       // Compute access level.
       (void) VD->getFormalAccess();

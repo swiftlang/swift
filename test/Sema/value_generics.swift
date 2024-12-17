@@ -120,7 +120,18 @@ func testC4<let T: Int>(with c: C<T, T>) {
 
 struct D<let N: Int & P> {} // expected-error {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
 
-struct E<A, let b: Int> {}
+struct E<A, let b: Int> { // expected-note {{'b' previously declared here}}
+                          // expected-note@-1 {{'b' previously declared here}}
+  static var b: Int { // expected-error {{invalid redeclaration of 'b'}}
+                      // expected-note@-1 {{'b' declared here}}
+    123
+  }
+
+  let b: String // expected-error {{invalid redeclaration of 'b'}}
+                // expected-note@-1 {{'b' declared here}}
+
+  func b() {} // expected-note {{'b' declared here}}
+}
 
 func testE1() -> Int {
   E<Int, 123>.b // OK
@@ -132,4 +143,13 @@ func testE2() -> Int {
 
 func testE3<let c: Int>(_: E<Int, c>.Type = E<Int, c>.self) -> Int {
   E<Int, c>.b // OK
+}
+
+func testShadowing<let a: Int>(_: A<a>) {
+  var a: Int {
+    123
+  }
+
+  print(a) // OK
+  print(a.self) // OK
 }
