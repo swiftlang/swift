@@ -29,7 +29,7 @@ import WasmTypes
 typealias WasmFunction = () throws -> Void
 
 protocol WasmEngine {
-  init(pluginPath: FilePath, stdinPath: FilePath, stdoutPath: FilePath) throws
+  init(pluginPath: FilePath) throws
 
   func function(named name: String) throws -> WasmFunction?
 
@@ -43,38 +43,11 @@ typealias DefaultWasmPlugin = WasmEnginePlugin<DefaultWasmEngine>
 
 // a WasmPlugin implementation that delegates to a WasmEngine
 struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
-  enum Error: Swift.Error {
-    case failedToCreateNamedPipe(FilePath)
-  }
-
   private let pumpFunction: WasmFunction
-  private let tempDirectory: FilePath
-  private let stdinPath: FilePath
-  private let stdoutPath: FilePath
   let engine: Engine
 
   init(path: FilePath) throws {
-    self.tempDirectory = try createUniqueTemporaryDirectory(basename: "swift_wasm_macros")
-    self.stdinPath = self.tempDirectory.appending("stdin")
-    self.stdoutPath = self.tempDirectory.appending("stdout")
-
-    let stdinResult = self.stdinPath.withCString {
-      mkfifo($0, S_IRUSR | S_IWUSR)
-    }
-
-    guard stdinResult == 0 else {
-      throw Error.failedToCreateNamedPipe(self.stdinPath)
-    }
-
-    let stdoutResult = self.stdoutPath.withCString {
-      mkfifo($0, S_IRUSR | S_IWUSR)
-    }
-
-    guard stdoutResult == 0 else {
-      throw Error.failedToCreateNamedPipe(self.stdoutPath)
-    }
-
-    self.engine = try Engine(pluginPath: path, stdinPath: self.stdinPath, stdoutPath: self.stdoutPath)
+    self.engine = try Engine(pluginPath: path)
 
     let exportName = "swift_wasm_macro_v1_pump"
     guard let pump = try engine.function(named: exportName) else {
@@ -115,7 +88,6 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
 
   func shutDown() throws {
     try self.engine.shutDown()
-    try _recursiveRemove(at: self.tempDirectory)
   }
 }
 

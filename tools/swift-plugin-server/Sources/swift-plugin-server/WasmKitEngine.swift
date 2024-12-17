@@ -23,9 +23,11 @@ struct WasmKitEngine: WasmEngine {
   private let hostToPlugin: FileDescriptor
   private let pluginToHost: FileDescriptor
 
-  init(pluginPath: FilePath, stdinPath: FilePath, stdoutPath: FilePath) throws {
-    self.hostToPlugin = try FileDescriptor.open(stdinPath, .readWrite)
-    self.pluginToHost = try FileDescriptor.open(stdoutPath, .readWrite)
+  init(pluginPath: FilePath) throws {
+    let hostToPluginPipe = try FileDescriptor.pipe()
+    let pluginToHostPipe = try FileDescriptor.pipe()
+    self.hostToPlugin = hostToPluginPipe.writeEnd
+    self.pluginToHost = pluginToHostPipe.readEnd
 
     var configuration = EngineConfiguration()
     configuration.stackSize = 1 << 20
@@ -36,8 +38,8 @@ struct WasmKitEngine: WasmEngine {
     var moduleImports = Imports()
 
     let imports = try WASIBridgeToHost(
-      stdin: self.hostToPlugin,
-      stdout: self.pluginToHost,
+      stdin: hostToPluginPipe.readEnd,
+      stdout: pluginToHostPipe.writeEnd,
       stderr: .standardError
     )
     imports.link(to: &moduleImports, store: store)
