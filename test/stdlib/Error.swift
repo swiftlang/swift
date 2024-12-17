@@ -229,7 +229,7 @@ func throwJazzHandsTyped() throws(SillyError) {
 // not available, so pass it through an UnsafeRawPointer.
 @available(SwiftStdlib 5.8, *)
 @_silgen_name("_swift_setWillThrowHandler")
-func setWillThrowHandler(
+public func setWillThrowHandler(
     _ handler: (@convention(c) (UnsafeRawPointer) -> Void)?
 )
 
