@@ -368,28 +368,6 @@ namespace {
                                   ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
 
-    template <class Fn>
-    void forEachNonEmptyBase(Fn fn) const {
-      auto &layout = ClangDecl->getASTContext().getASTRecordLayout(ClangDecl);
-
-      if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
-        for (auto base : cxxRecord->bases()) {
-          auto baseType = base.getType().getCanonicalType();
-
-          auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-          auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
-
-          if (baseCxxRecord->isEmpty())
-            continue;
-
-          auto offset = layout.getBaseClassOffset(baseCxxRecord);
-          auto size =
-              ClangDecl->getASTContext().getTypeSizeInChars(baseType);
-          fn(baseType, offset, size);
-        }
-      }
-    }
-
   public:
     LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                                 unsigned explosionSize, llvm::Type *storageType,
@@ -446,10 +424,11 @@ namespace {
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
-      forEachNonEmptyBase([&](clang::QualType type, clang::CharUnits offset,
-                              clang::CharUnits) {
-        lowering.addTypedData(type, offset);
-      });
+      if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
+        for (auto base : getBasesAndOffsets(cxxRecordDecl)) {
+          lowering.addTypedData(base.decl, base.offset.asCharUnits());
+        }
+      }
 
       lowering.addTypedData(ClangDecl, offset.asCharUnits());
     }
@@ -1384,23 +1363,12 @@ private:
   void collectBases(const clang::RecordDecl *decl) {
     auto &layout = decl->getASTContext().getASTRecordLayout(decl);
     if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(decl)) {
-      for (auto base : cxxRecord->bases()) {
-        if (base.isVirtual())
-          continue;
-
-        auto baseType = base.getType().getCanonicalType();
-
-        auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-        auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
-
-        if (baseCxxRecord->isEmpty())
-          continue;
-
-        auto baseOffset = Size(layout.getBaseClassOffset(baseCxxRecord).getQuantity());
-        SubobjectAdjustment += baseOffset;
-        collectBases(baseCxxRecord);
-        collectStructFields(baseCxxRecord);
-        SubobjectAdjustment -= baseOffset;
+      auto bases = getBasesAndOffsets(cxxRecord);
+      for (auto base : bases) {
+        SubobjectAdjustment += base.offset;
+        collectBases(base.decl);
+        collectStructFields(base.decl);
+        SubobjectAdjustment -= base.offset;
       }
     }
   }

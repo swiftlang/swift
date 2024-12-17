@@ -132,3 +132,27 @@ struct DerivedHasTailPadding : public BaseAlign8 {
 struct DerivedUsesBaseTailPadding : public DerivedHasTailPadding {
   short field2 = 789;
 }; // sizeof=16, dsize=14, align=8
+
+// MARK: Types with an out-of-order inheritance.
+
+struct BaseWithVirtualDestructor {
+  int baseField = 123;
+
+  virtual ~BaseWithVirtualDestructor() {}
+};
+
+struct DerivedWithVirtualDestructor : public BaseWithVirtualDestructor {
+  int derivedField = 456;
+
+  ~DerivedWithVirtualDestructor() override {}
+};
+
+struct DerivedOutOfOrder : public HasOneField,
+                           public DerivedWithVirtualDestructor {
+  // DerivedWithVirtualDestructor is the primary base class despite being the
+  // second one the list.
+
+  int leafField = 789;
+
+  ~DerivedOutOfOrder() override {}
+};

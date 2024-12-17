@@ -737,7 +737,9 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     auto *declA = LastSolvedChoice->first->getOverloadChoice().getDecl();
     auto *declB = static_cast<Constraint *>(choice)->getOverloadChoice().getDecl();
 
-    if (declA->getBaseIdentifier().isArithmeticOperator() &&
+    if ((declA->getBaseIdentifier().isArithmeticOperator() ||
+         declA->getBaseIdentifier().isBitwiseOperator() ||
+         declA->getBaseIdentifier().isShiftOperator()) &&
         TypeChecker::isDeclRefinementOf(declA, declB)) {
       return skip("subtype");
     }
