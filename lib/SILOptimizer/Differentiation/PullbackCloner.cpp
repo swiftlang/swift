@@ -1736,13 +1736,21 @@ public:
   /// move_value, begin_borrow.
   ///   Original: y = copy_value x
   ///    Adjoint: adj[x] += adj[y]
-  void visitValueOwnershipInst(SingleValueInstruction *svi) {
+  void visitValueOwnershipInst(SingleValueInstruction *svi,
+                               bool needZeroResAdj = false) {
     assert(svi->getNumOperands() == 1);
     auto *bb = svi->getParent();
     switch (getTangentValueCategory(svi)) {
     case SILValueCategory::Object: {
       auto adj = getAdjointValue(bb, svi);
       addAdjointValue(bb, svi->getOperand(0), adj, svi->getLoc());
+      if (needZeroResAdj) {
+        assert(svi->getNumResults() == 1);
+        SILValue val = svi->getResult(0);
+        setAdjointValue(
+            bb, val,
+            makeZeroAdjointValue(getRemappedTangentType(val->getType())));
+      }
       break;
     }
     case SILValueCategory::Address: {
@@ -1768,8 +1776,16 @@ public:
 
   /// Handle `move_value` instruction.
   ///   Original: y = move_value x
-  ///    Adjoint: adj[x] += adj[y]
-  void visitMoveValueInst(MoveValueInst *mvi) { visitValueOwnershipInst(mvi); }
+  ///    Adjoint: adj[x] += adj[y]; adj[y] = 0
+  void visitMoveValueInst(MoveValueInst *mvi) {
+    switch (getTangentValueCategory(mvi)) {
+    case SILValueCategory::Address:
+      llvm::report_fatal_error("AutoDiff does not support move_value with "
+                               "SILValueCategory::Address");
+    case SILValueCategory::Object:
+      visitValueOwnershipInst(mvi, /*needZeroResAdj=*/true);
+    }
+  }
 
   void visitEndInitLetRefInst(EndInitLetRefInst *eir) { visitValueOwnershipInst(eir); }
 
