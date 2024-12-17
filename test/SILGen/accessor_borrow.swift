@@ -1,8 +1,10 @@
 // RUN: %target-swift-emit-silgen -module-name accessor_borrow \
 // RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN: %s | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 struct NE: ~Escapable {}
 

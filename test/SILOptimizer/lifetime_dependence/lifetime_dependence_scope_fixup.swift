@@ -1,9 +1,11 @@
 // RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil \
 // RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 struct NCContainer : ~Copyable {
   let ptr: UnsafeRawBufferPointer
@@ -157,14 +159,15 @@ func test6(_ a: Array<Int>) {
 // CHECK-LABEL: sil hidden @$s31lifetime_dependence_scope_fixup5test7yySWF : $@convention(thin) (UnsafeRawBufferPointer) -> () {
 // CHECK:   [[CONT:%.*]] = alloc_stack [var_decl] $View
 // function_ref View.init(_:_:)
-// CHECK:   [[VIEW1:%.*]] = apply %{{.*}}(%0, %{{.*}}, %{{.*}}) : $@convention(method) (UnsafeRawBufferPointer, Int, @thin View.Type) -> @lifetime(borrow 0) @owned View // users: %14, %9, %12, %8
+// CHECK:   [[VIEW1:%.*]] = apply %{{.*}}(%0, %{{.*}}, %{{.*}}) : $@convention(method) (UnsafeRawBufferPointer, Int, @thin View.Type) -> @lifetime(borrow 0) @owned View
+// CHECK:   [[MD1:%.*]] = mark_dependence [nonescaping] %{{.*}} : $View on %0 : $UnsafeRawBufferPointer
 // CHECK:   [[BA:%.*]] = begin_access [read] [static] [[CONT]] : $*View
 // CHECK:   [[FUNC:%.*]] = function_ref @$s31lifetime_dependence_scope_fixup16getBorrowingViewyAA0G0VADF : $@convention(thin) (@guaranteed View) -> @lifetime(borrow 0) @owned View
-// CHECK:   [[VIEW2:%.*]] = apply [[FUNC]]([[VIEW1]]) : $@convention(thin) (@guaranteed View) -> @lifetime(borrow 0) @owned View
-// CHECK:   [[MDI:%.*]] = mark_dependence [nonescaping] [[VIEW2]] : $View on [[BA]] : $*View
+// CHECK:   [[VIEW2:%.*]] = apply [[FUNC]]([[MD1]]) : $@convention(thin) (@guaranteed View) -> @lifetime(borrow 0) @owned View
+// CHECK:   [[MD2:%.*]] = mark_dependence [nonescaping] [[VIEW2]] : $View on [[BA]] : $*View
 // CHECK:   [[USE:%.*]] = function_ref @$s31lifetime_dependence_scope_fixup3useyyAA4ViewVF : $@convention(thin) (@guaranteed View) -> ()
-// CHECK:   apply [[USE]]([[MDI]]) : $@convention(thin) (@guaranteed View) -> ()
-// CHECK:   release_value [[MDI]] : $View
+// CHECK:   apply [[USE]]([[MD2]]) : $@convention(thin) (@guaranteed View) -> ()
+// CHECK:   release_value [[MD2]] : $View
 // CHECK:   end_access [[BA]] : $*View
 // CHECK-LABEL: } // end sil function '$s31lifetime_dependence_scope_fixup5test7yySWF'
 func test7(_ a: UnsafeRawBufferPointer) {
