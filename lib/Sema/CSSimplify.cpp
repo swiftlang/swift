@@ -9914,10 +9914,16 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     const auto isUnsupportedExistentialMemberAccess = [&] {
       // We may not be able to derive a well defined type for an existential
       // member access if the member's signature references 'Self'.
-      if (instanceTy->isExistentialType() &&
-          decl->getDeclContext()->getSelfProtocolDecl()) {
-        if (!isMemberAvailableOnExistential(instanceTy, decl)) {
+      if (instanceTy->isExistentialType()) {
+        switch (isMemberAvailableOnExistential(instanceTy, decl)) {
+        case ExistentialMemberAccessLimitation::Unsupported:
+        // TODO: Write-only accesses are not supported yet.
+        case ExistentialMemberAccessLimitation::WriteOnly:
           return true;
+
+        case ExistentialMemberAccessLimitation::ReadOnly:
+        case ExistentialMemberAccessLimitation::None:
+          break;
         }
       }
 
