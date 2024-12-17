@@ -73,8 +73,8 @@ struct WasmEngineTests {
     try Data(binary).write(to: echoURL)
     defer { try! FileManager.default.removeItem(at: echoURL) }
 
-    let engine = try WasmEnginePlugin<WasmKitEngine>(path: FilePath(echoURL.path))
+    let wasmKit = try WasmEnginePlugin<WasmKitEngine>(path: FilePath(echoURL.path))
     let input: [UInt8] = [1,2,3,4,5]
-    #expect(try engine.handleMessage(input) == input)
+    #expect(try wasmKit.handleMessage(input) == input)
   }
 }
