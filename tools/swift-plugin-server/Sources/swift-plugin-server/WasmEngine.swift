@@ -10,18 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#elseif canImport(WASILibc)
-import WASILibc
-#else
-#error("Unsupported platform")
-#endif
-
 import SystemPackage
 import WASI
 import WasmTypes
