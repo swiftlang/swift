@@ -94,10 +94,10 @@ Func Sequence.map(_:) has been removed
 Constructor Result.init(catching:) has been removed
 Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
 Func withoutActuallyEscaping(_:do:) has mangled name changing from 'Swift.withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B' to 'Swift.__abi_withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B'
-Func withoutActuallyEscaping(_:do:) is now without @rethrows
+Func withoutActuallyEscaping(_:do:) is now without rethrows
 Func _openExistential(_:do:) has been renamed to Func __abi_openExistential(_:do:)
 Func _openExistential(_:do:) has mangled name changing from 'Swift._openExistential<A, B, C>(_: A, do: (B) throws -> C) throws -> C' to 'Swift.__abi_openExistential<A, B, C>(_: A, do: (B) throws -> C) throws -> C'
-Func _openExistential(_:do:) is now without @rethrows
+Func _openExistential(_:do:) is now without rethrows
 
 
 // These haven't actually been removed; they are simply marked unavailable.
@@ -122,11 +122,11 @@ Func UnsafeBufferPointer.withMemoryRebound(to:_:) has been removed
 Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has been removed
 Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has been removed
-Func _AnySequenceBox._map(_:) is now without @rethrows
-Func _BidirectionalCollectionBox._map(_:) is now without @rethrows
-Func _CollectionBox._map(_:) is now without @rethrows
-Func _RandomAccessCollectionBox._map(_:) is now without @rethrows
-Func _SequenceBox._map(_:) is now without @rethrows
+Func _AnySequenceBox._map(_:) is now without rethrows
+Func _BidirectionalCollectionBox._map(_:) is now without rethrows
+Func _CollectionBox._map(_:) is now without rethrows
+Func _RandomAccessCollectionBox._map(_:) is now without rethrows
+Func _SequenceBox._map(_:) is now without rethrows
 Func UnsafeMutableRawBufferPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableBufferPointer.assign(repeating:) has been removed
