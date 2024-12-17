@@ -997,8 +997,7 @@ ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
   // resilient expansion if the context's and the opaque type's module are in
   // the same package.
   if (contextExpansion == ResilienceExpansion::Maximal &&
-      module->isResilient() && module->serializePackageEnabled() &&
-      module->inSamePackage(contextModule))
+      namingDecl->bypassResilienceInPackage(contextModule))
     return OpaqueSubstitutionKind::SubstituteSamePackageMaximalResilience;
 
   // Allow general replacement from non resilient modules. Otherwise, disallow.
