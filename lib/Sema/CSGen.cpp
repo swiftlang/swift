@@ -1695,9 +1695,18 @@ namespace {
         return Type();
       }
 
-      auto archetype = type->castTo<ArchetypeType>();
-      E->setParamType(archetype);
-      return archetype->getValueType();
+      if (auto archetype = type->getAs<ArchetypeType>()) {
+        ASSERT(archetype->getValueType()->isEqual(E->getValueType()));
+      } else {
+        auto qualTypeRepr = cast<QualifiedIdentTypeRepr>(E->getParamTypeRepr());
+        ASSERT(qualTypeRepr->isBound() && "Non-archetype type value expr with \
+                                          no bound decl?");
+        auto boundDecl = cast<GenericTypeParamDecl>(qualTypeRepr->getBoundDecl());
+        ASSERT(boundDecl->getValueType()->isEqual(E->getValueType()));
+      }
+
+      E->setParamType(type);
+      return E->getValueType();
     }
 
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
