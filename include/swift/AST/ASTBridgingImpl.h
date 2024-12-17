@@ -467,7 +467,7 @@ BridgedConformance BridgedSubstitutionMap::getConformance(SwiftInt index) const 
 //===----------------------------------------------------------------------===//
 
 swift::Fingerprint BridgedFingerprint::unbridged() const {
-  return swift::Fingerprint({this->v1, this->v2});
+  return swift::Fingerprint(swift::Fingerprint::Core{this->v1, this->v2});
 }
 
 //===----------------------------------------------------------------------===//
