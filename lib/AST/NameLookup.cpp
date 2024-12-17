@@ -2717,10 +2717,10 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     auto gpList = current->getGenericParams();
 
     if (gpList && !member.isSpecial()) {
-      if (auto gp = gpList->lookUpGenericParam(member.getBaseIdentifier())) {
-        if (gp->isValue()) {
-          decls.push_back(gp);
-        }
+      auto gp = gpList->lookUpGenericParam(member.getBaseIdentifier());
+
+      if (gp && gp->isValue()) {
+        decls.push_back(gp);
       }
     }
 
