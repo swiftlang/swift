@@ -8,4 +8,6 @@ struct IBase1 : Base1 {
   int methodIBase(void) const { return 11; }
 };
 
-struct IIBase1 : IBase1 {};
+struct IIBase1 : IBase1 {
+  int methodIIBase(void) const { return 111; }
+};

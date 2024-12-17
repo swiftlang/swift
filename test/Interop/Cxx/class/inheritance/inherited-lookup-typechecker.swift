@@ -12,6 +12,7 @@ extension IIBase1 {
         // the following to appear ambiguous:
         methodBase()
         methodIBase()
+        methodIIBase()
     }
 }
 
@@ -19,4 +20,5 @@ func f(v: IIBase1) {
     v.missing() // expected-error {{'IIBase1' has no member 'missing'}}
     v.methodBase()
     v.methodIBase()
+    v.methodIIBase()
 }
