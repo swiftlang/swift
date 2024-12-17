@@ -70,7 +70,7 @@ static bool isSupportedOperator(Constraint *disjunction) {
 
   auto name = decl->getBaseIdentifier();
   if (name.isArithmeticOperator() || name.isStandardComparisonOperator() ||
-      name.is("^")) {
+      name.isBitwiseOperator()) {
     return true;
   }
 
