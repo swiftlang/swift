@@ -4572,15 +4572,76 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
   return access == AccessLevel::Open;
 }
 
+/// Used to track whether accessing this decl from another module is allowed resilience bypassing.
+static llvm::DenseMap<Identifier, Identifier> DeclResilienceBypassMap;
+
 bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
-  // If the defining module is built with package-cmo, bypass
-  // resilient access from the use site that belongs to a module
-  // in the same package.
+  // To allow bypassing resilience when accessing this decl from a
+  // use site, the module of the use site should be in the same package
+  // as the module of this decl.
   auto declModule = getModuleContext();
-  return declModule->inSamePackage(accessingModule) &&
-         declModule->isResilient() &&
-         declModule->allowNonResilientAccess() &&
-         declModule->serializePackageEnabled();
+  if (!declModule->inSamePackage(accessingModule))
+    return false;
+
+  // First look up the cached value
+  if (accessingModule &&
+      accessingModule != declModule &&
+      !getBaseName().isSpecial()) {
+    auto found = DeclResilienceBypassMap.find(getBaseIdentifier());
+    if (found != DeclResilienceBypassMap.end()) {
+      if (found->getSecond() == accessingModule->getBaseIdentifier())
+        return true;
+    }
+  }
+
+  // Package optimization allows bypassing resilience, but it assumes the
+  // memory layout of the decl being accessed is correct. When this assumption
+  // fails due to a deserialization error of its members, the use site accesses
+  // the layout of the decl with a wrong field offset, resulting in UB or a crash.
+  // The deserialization error is currently not caught at compile time due to
+  // LangOpts.EnableDeserializationRecovery being enabled by default (to allow
+  // for recovery of some of the deserialization errors at a later time). In case
+  // of member deserialization, however, it's not necessarily recovered later on
+  // and is silently dropped.
+  // The following tracks errors in member deserialization by recursively loading
+  // members of a type (if not done) and checking whether the type's members, and
+  // their respective types (recursively), encountered deserialization failures.
+  // If any such type is found, it fails and emits a diagnostic at compile time.
+  // Simply disallowing resilience bypassing here and continuing is insufficient
+  // because it would later (during SIL deserialiaztion) require skipping instructions
+  // that were valid in the imported module but are no longer valid at the client
+  // module due to type requirement mismatch; addressing this would involve exhaustive
+  // instruction checks that can be complex and error-prone.
+  if (declModule->isResilient() &&
+      declModule->allowNonResilientAccess() &&
+      declModule->serializePackageEnabled()) {
+    // If this decl is accessed from another module, check if deserializing
+    // members of this decl had an error; if it errored, the decl now has
+    // an incorrect memory layout, and accessing it directly would most likely
+    // use a wrong field offset, resulting in UB or crash. To prevent this,
+    // fail and emit diagnostic here.
+    if (accessingModule &&
+        accessingModule != declModule &&
+        !getBaseName().isSpecial()) {
+      if (auto IDC = dyn_cast<IterableDeclContext>(this)) {
+        // Recursively check if members and their members have failing
+        // deserialization.
+        IDC->checkDeserializeMemberErrorRecursively();
+        // If member deserialization had an error, fail and emit diag here.
+        if (IDC->hasDeserializeMemberError()) {
+          getASTContext().Diags.diagnose(getLoc(),
+                                         diag::cannot_bypass_resilience_due_to_deserialization_error,
+                                         getBaseIdentifier());
+          return false;
+        }
+      }
+      if (!DeclResilienceBypassMap.insert({getBaseIdentifier(), accessingModule->getBaseIdentifier()}).second) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
 }
 
 /// Given the formal access level for using \p VD, compute the scope where

@@ -1173,6 +1173,50 @@ void IterableDeclContext::loadAllMembers() const {
     --s->getFrontendCounters().NumUnloadedLazyIterableDeclContexts;
 }
 
+// This checks whether types of members and their respective members
+// (recursively) were deserialized correctly.
+void IterableDeclContext::checkDeserializeMemberErrorRecursively() {
+  if (!didDeserializeMembers()) {
+    // This needs to be set to force load all members if not done already.
+    setHasLazyMembers(true);
+    // Call getMembers to actually load them all.
+    auto members = getMembers();
+    assert(!hasLazyMembers());
+    assert(didDeserializeMembers());
+  }
+  // Members could have been deserialized from other calls, so we
+  // still need to check for an error here even if they might have
+  // already been deserialized.
+  if (!hasDeserializeMemberError()) {
+    // If members are already loaded, getMembers call should be inexpensive.
+    for (auto member: getMembers()) {
+      if (auto *PBD = dyn_cast<PatternBindingDecl>(member)) {
+        for (auto i : range(PBD->getNumPatternEntries())) {
+          auto pattern = PBD->getPattern(i);
+          pattern->forEachVariable([&](const VarDecl *VD) {
+            // In case of Optional, looking up the unwrapped type.
+            if (auto actualType =
+                VD->getInterfaceType()->getCanonicalType().getOptionalObjectType()) {
+              if (auto fieldNominal = actualType->getNominalOrBoundGenericNominal()) {
+                if (auto fieldIDC = dyn_cast<IterableDeclContext>(fieldNominal)) {
+                  // Recursively check on the type of a member.
+                  fieldIDC->checkDeserializeMemberErrorRecursively();
+                  // If the member had deserialization failure, mark the
+                  // same for its containing type.
+                  if (fieldIDC->hasDeserializeMemberError()) {
+                    setHasDeserializeMemberError(true);
+                    return;
+                  }
+                }
+              }
+            }
+          });
+        }
+      }
+    }
+  }
+}
+
 bool IterableDeclContext::wasDeserialized() const {
   const DeclContext *DC = getAsGenericContext();
   if (auto F = dyn_cast<FileUnit>(DC->getModuleScopeContext())) {
