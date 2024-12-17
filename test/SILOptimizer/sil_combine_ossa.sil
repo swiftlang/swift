@@ -3197,9 +3197,9 @@ bb3 (%10: $Builtin.Int32):
 }
 
 // CHECK-LABEL: sil [ossa] @delete_dead_alloc_stack
-// XHECK: bb0
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
 sil [ossa] @delete_dead_alloc_stack : $(@inout B) -> () {
 bb0(%0 : $*B):
   %1 = alloc_stack $B
@@ -3211,10 +3211,10 @@ bb0(%0 : $*B):
 }
 
 // CHECK-LABEL: sil [ossa] @delete_dead_alloc_stack2
-// XHECK: bb0
-// XHECK-NEXT: destroy_addr %0
-// XHECK-NEXT: tuple
-// XHECK-NEXT: return
+// CHECK: bb0
+// CHECK-NEXT: destroy_addr %0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
 sil [ossa] @delete_dead_alloc_stack2 : $(@in B) -> () {
 bb0(%0 : $*B):
   %1 = alloc_stack $B
@@ -3380,9 +3380,9 @@ enum VendingMachineError: Error {
 // Check that we can delete exceptions if we can inline the `throw`
 // block into the `try` block.
 // CHECK-LABEL: @RemoveUnusedException
-// XHECK-NOT: alloc_existential_box
-// XHECK-NOT: enum $VendingMachineError
-// XHECK: return
+// CHECK-NOT: alloc_existential_box
+// CHECK-NOT: enum $VendingMachineError
+// CHECK: return
 sil hidden [ossa] @RemoveUnusedException : $@convention(thin) (Int32) -> (Double, @error Error) {
 bb0(%0 : $Int32):
   debug_value %0 : $Int32, let, name "x" // id: %1
@@ -3865,16 +3865,16 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 }
 
 // CHECK-LABEL: sil [ossa] @enum_promotion_case3 :
-// XHECK: bb0([[B_PTR:%[0-9]+]]
-// XHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
-// XHECK-NEXT: [[LIFETIME_EXTEND_B_PTR:%.*]] = copy_value [[B_PTR]]
-// XHECK-NEXT: destroy_value [[B_PTR]]
-// XHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[LIFETIME_EXTEND_B_PTR]] : $B
-// XHECK-NEXT: store [[ENUM]] to [init] [[ALLOCA]]
-// XHECK-NEXT: [[RESULT:%[0-9]+]] = load [take] [[ALLOCA]]
-// XHECK-NEXT: dealloc_stack
-// XHECK-NEXT: return [[RESULT]]
-// XHECK: } // end sil function 'enum_promotion_case3'
+// CHECK: bb0([[B_PTR:%[0-9]+]]
+// CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
+// CHECK-NEXT: [[LIFETIME_EXTEND_B_PTR:%.*]] = copy_value [[B_PTR]]
+// CHECK-NEXT: destroy_value [[B_PTR]]
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[LIFETIME_EXTEND_B_PTR]] : $B
+// CHECK-NEXT: store [[ENUM]] to [init] [[ALLOCA]]
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = load [take] [[ALLOCA]]
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return [[RESULT]]
+// CHECK: } // end sil function 'enum_promotion_case3'
 sil [ossa] @enum_promotion_case3 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
 bb0(%0 : @owned $B):
   %2 = alloc_stack $FakeOptional<B>
@@ -3918,13 +3918,13 @@ sil [ossa] @init_enum : $@convention(thin) () -> @out B
 // Localize the initialization of the enum payload to enable mem2reg for the enum.
 
 // CHECK-LABEL: sil [ossa] @enum_promotion_case4
-// XHECK:  [[V1:%.*]] = alloc_stack $FakeOptional
-// XHECK:  [[V2:%.*]] = function_ref @init_enum
-// XHECK:  [[V3:%.*]] = alloc_stack $B
-// XHECK:               apply [[V2]]([[V3]])
-// XHECK:  [[V4:%.*]] = load [take] [[V3]]
-// XHECK:  [[V5:%.*]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[V4]]
-// XHECK:  store [[V5]] to [init] [[V1]]
+// CHECK:  [[V1:%.*]] = alloc_stack $FakeOptional
+// CHECK:  [[V2:%.*]] = function_ref @init_enum
+// CHECK:  [[V3:%.*]] = alloc_stack $B
+// CHECK:               apply [[V2]]([[V3]])
+// CHECK:  [[V4:%.*]] = load [take] [[V3]]
+// CHECK:  [[V5:%.*]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[V4]]
+// CHECK:  store [[V5]] to [init] [[V1]]
 
 sil [ossa] @enum_promotion_case4 : $@convention(thin) () -> @owned FakeOptional<B> {
 bb0:
@@ -3993,9 +3993,9 @@ sil [ossa] @plus : $@convention(method) <Self where Self : PM> (@in_guaranteed S
 sil [ossa] @minus : $@convention(method) <Self where Self : PM> (@in_guaranteed Self) -> ()
 
 // CHECK-LABEL: sil [ossa] @silcombine_dont_change_allocstack_for_opened_archetypes
-// XHECK-NOT: alloc_stack{{.*}}opened
-// XHECK: open_existential_addr immutable_access {{%[0-9]+}} : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60", PM) Self
-// XHECK: return
+// CHECK-NOT: alloc_stack{{.*}}opened
+// CHECK: open_existential_addr immutable_access {{%[0-9]+}} : $*any PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60", any PM) Self
+// CHECK: return
 sil [ossa] @silcombine_dont_change_allocstack_for_opened_archetypes : $@convention(thin) (@owned VV) -> () {
 bb0(%0 : @owned $VV):
   %8 = alloc_stack $PM, let, name "x"
@@ -4295,10 +4295,10 @@ bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
 }
 
 // CHECK-LABEL: sil [ossa] @mark_dependence_trivial_object_base :
-// XHECK: bb0(
-// XHECK-NEXT: copy_value
-// XHECK-NEXT: return
-// XHECK: } // end sil function 'mark_dependence_trivial_object_base'
+// CHECK: bb0(
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'mark_dependence_trivial_object_base'
 sil [ossa] @mark_dependence_trivial_object_base : $@convention(thin) (@guaranteed B) -> @owned B {
 bb0(%0 : @guaranteed $B):
   %0a = copy_value %0 : $B
