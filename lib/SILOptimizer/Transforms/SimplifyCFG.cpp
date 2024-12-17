@@ -3730,8 +3730,6 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
     }
     if (inst->getOwnershipKind() == OwnershipKind::Owned)
       return !inst->getSingleUse();
-    if (BorrowedValue borrow = BorrowedValue(inst->getOperand(0)))
-      return borrow.isLocalScope();
     return false;
   };
 
