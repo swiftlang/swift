@@ -1202,48 +1202,6 @@ extension Array: RangeReplaceableCollection {
     _appendElementAssumeUniqueAndCapacity(oldCount, newElement: newElement)
     _endMutation()
   }
-  
-  /// Adds the elements of a collection to the end of the array.
-  ///
-  /// Use this method to append the elements of a collection to the end of this
-  /// array. This example appends the elements of a `Range<Int>` instance
-  /// to an array of integers.
-  ///
-  ///     var numbers = [1, 2, 3, 4, 5]
-  ///     numbers.append(contentsOf: 10...15)
-  ///     print(numbers)
-  ///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
-  ///
-  /// - Parameter newElements: The elements to append to the array.
-  ///
-  /// - Complexity: O(*m*) on average, where *m* is the length of
-  ///   `newElements`, over many calls to `append(contentsOf:)` on the same
-  ///   array.
-  @_alwaysEmitIntoClient
-  @_semantics("array.append_contentsOf")
-  @_effects(notEscaping self.value**)
-  public mutating func append(contentsOf newElements: __owned some Collection<Element>) {
-    let newElementsCount = newElements.count
-    defer {
-      _endMutation()
-    }
-    _reserveCapacityImpl(minimumCapacity: self.count + newElementsCount,
-                         growForAppend: true)
-    // This check prevents a data race writing to _swiftEmptyArrayStorage
-    if newElementsCount == 0 {
-      return
-    }
-
-    let oldCount = _buffer.mutableCount
-    let startNewElements = _buffer.mutableFirstElementAddress + oldCount
-    let buf = UnsafeMutableBufferPointer(
-                start: startNewElements,
-                count: newElementsCount)
-    _debugPrecondition(buf.endIndex <= _buffer.mutableCapacity)
-    let end = buf.initialize(fromContentsOf: newElements)
-    _precondition(end == buf.endIndex)
-    _buffer.mutableCount = _buffer.mutableCount + newElementsCount
-  }
 
   /// Adds the elements of a sequence to the end of the array.
   ///
@@ -1267,14 +1225,6 @@ extension Array: RangeReplaceableCollection {
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
-    let wasContiguous = newElements.withContiguousStorageIfAvailable {
-      append(contentsOf: $0)
-      return true
-    }
-    if wasContiguous != nil {
-      return
-    }
-      
     defer {
       _endMutation()
     }
