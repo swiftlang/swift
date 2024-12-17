@@ -135,9 +135,11 @@ private:
 struct ClangRecordMemberLookupDescriptor final {
   NominalTypeDecl *recordDecl;
   DeclName name;
+  bool inherited;
 
-  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
-      : recordDecl(recordDecl), name(name) {
+  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name,
+                                    bool inherited = false)
+      : recordDecl(recordDecl), name(name), inherited(inherited) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
   }
 
