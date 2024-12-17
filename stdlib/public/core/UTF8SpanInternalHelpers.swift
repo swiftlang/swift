@@ -111,6 +111,8 @@ extension UnsafeRawPointer {
     _ i: Int,
     limitedBy end: Int
   ) -> Bool {
+    print(i)
+    print(end)
     _internalInvariant(i >= 0 && i <= end)
     if i == 0 || i == end {
       return true

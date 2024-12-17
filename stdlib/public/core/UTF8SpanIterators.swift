@@ -1,5 +1,10 @@
 @available(SwiftStdlib 6.1, *)
 extension UTF8Span {
+
+  public func _makeScalarIterator() -> ScalarIterator {
+    .init(self)
+  }
+
   /// Iterate the `Unicode.Scalar`s  contents of a `UTF8Span`.
   ///
   /// **TODO**: Examples
@@ -12,6 +17,7 @@ extension UTF8Span {
     /// **TODO**: private(set)?
     public var currentCodeUnitOffset: Int
 
+    // TODO: underscored init?
     public init(_ codeUnits: UTF8Span) {
       self.codeUnits = codeUnits
       self.currentCodeUnitOffset = 0
@@ -141,6 +147,11 @@ extension UTF8Span {
 
 @available(SwiftStdlib 6.1, *)
 extension UTF8Span {
+
+  public func _makeCharacterIterator() -> CharacterIterator {
+    .init(self)
+  }
+
   /// Iterate the `Character` contents of a `UTF8Span`.
   ///
   /// **TODO**: Examples
@@ -177,6 +188,7 @@ extension UTF8Span {
     /// **TODO**: private(set)?
     public var currentCodeUnitOffset: Int
 
+    // TODO: underscored init?
     public init(_ span: UTF8Span) {
       self.codeUnits = span
       self.currentCodeUnitOffset = 0
@@ -212,7 +224,7 @@ extension UTF8Span {
       _internalInvariant(codeUnits.isScalarAligned(currentCodeUnitOffset))
       let (result, newPos) = codeUnits.unsafeBaseAddress._decodeCharacter(
         endingAt: currentCodeUnitOffset,
-        limitedBy: 0)
+        limitedBy: codeUnits.count)
       self.currentCodeUnitOffset = newPos
       return result
     }
@@ -274,10 +286,15 @@ extension UTF8Span {
       fatalError()
     }
   }
+
 }
 
 @available(SwiftStdlib 6.1, *)
 extension UTF8Span {
+
+  public func _makeGraphemeBreakIterator() -> GraphemeBreakIterator {
+    .init(self)
+  }
 
   /// **QUESTION**: There are many ways we could expose this functionality and
   ///   I'd like some help here. As written, the caller would be looking at
@@ -292,12 +309,14 @@ extension UTF8Span {
     public var currentCodeUnitOffset: Int
     public var state: Unicode.GraphemeBreakingState
 
+    // TODO: underscored init?
     public init(_ span: UTF8Span) {
       self.codeUnits = span
       self.currentCodeUnitOffset = 0
       self.state = .init()
     }
 
+    // TODO: underscored init?
     public init(_ span: UTF8Span, using state: Unicode.GraphemeBreakingState) {
       self.codeUnits = span
       self.currentCodeUnitOffset = 0

@@ -199,6 +199,8 @@ extension UTF8Span {
   ) throws(E) -> Result {
     try body(unsafeBaseAddress._ubp(0..<count))
   }
+
+  // TODO: withSpan or similar?
 }
 
 // MARK: Internals
