@@ -512,10 +512,33 @@ static bool doesStorageProduceLValue(
   if (!storage->isSetterAccessibleFrom(useDC))
     return false;
 
-  // If there is no base, or the base is an lvalue, then a reference
-  // produces an lvalue.
-  if (!baseType || baseType->is<LValueType>())
+  // This path handles storage that is mutable in the given context.
+
+  if (!baseType) {
     return true;
+  }
+
+  {
+    const auto rValueInstanceTy =
+        baseType->getRValueType()->getMetatypeInstanceType();
+    if (rValueInstanceTy->isExistentialType()) {
+      switch (isMemberAvailableOnExistential(rValueInstanceTy, storage)) {
+      case ExistentialMemberAccessLimitation::Unsupported:
+      case ExistentialMemberAccessLimitation::ReadOnly:
+        // Never an lvalue because the current type system cannot represent the
+        // setter's type out of context.
+        return false;
+
+      case ExistentialMemberAccessLimitation::WriteOnly:
+      case ExistentialMemberAccessLimitation::None:
+        break;
+      }
+    }
+  }
+
+  if (baseType->is<LValueType>()) {
+    return true;
+  }
 
   // The base is an rvalue type. The only way an accessor can
   // produce an lvalue is if we have a property where both the

@@ -1168,7 +1168,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
         // the default witness for 'Collection.Iterator', which is defined
         // as 'IndexingIterator<Self>'.
         const auto selfRefInfo = findExistentialSelfReferences(req);
-        if (!selfRefInfo.assocTypeRef) {
+        if (!selfRefInfo.hasDependentMemberTypeRef()) {
           covariantSelf = classDecl;
         }
       }
@@ -4088,9 +4088,9 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   // prevent conformance from succeeding.
   const auto selfRefInfo = findExistentialSelfReferences(requirement);
 
-  if (selfRefInfo.selfRef == TypePosition::Invariant ||
-      (selfRefInfo.selfRef == TypePosition::Covariant &&
-       !selfRefInfo.hasCovariantSelfResult)) {
+  if (selfRefInfo.hasDirectRef(TypePosition::Invariant) ||
+      (selfRefInfo.hasDirectRef(TypePosition::Covariant) &&
+       !selfRefInfo.hasCovariantGenericParamResult())) {
     // References to Self in a position where subclasses cannot do
     // the right thing. Complain if the adoptee is a non-final
     // class.
@@ -4104,7 +4104,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
                        conformance->getType());
         emitDeclaredHereIfNeeded(diags, diagLoc, witness);
       });
-  } else if (selfRefInfo.hasCovariantSelfResult) {
+  } else if (selfRefInfo.hasCovariantGenericParamResult()) {
     // The reference to Self occurs in the result type of a method/subscript
     // or the type of a property. A non-final class can satisfy this requirement
     // by holding onto Self accordingly.
@@ -4170,7 +4170,8 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   // associated types.
   if (isa<FuncDecl>(witness) || isa<SubscriptDecl>(witness)) {
     if (witness->getDeclContext()->getExtendedProtocolDecl()) {
-      if (selfRefInfo.hasCovariantSelfResult && selfRefInfo.assocTypeRef) {
+      if (selfRefInfo.hasCovariantGenericParamResult() &&
+          selfRefInfo.hasDependentMemberTypeRef()) {
         getASTContext().addDelayedConformanceDiag(Conformance, false,
           [witness, requirement](NormalProtocolConformance *conformance) {
             auto proto = conformance->getProtocol();
