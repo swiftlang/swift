@@ -341,8 +341,9 @@ extension AddressInitializationWalker {
   }
 
   mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
-    // An inout yield is a partial write.
-    return .abortWalk
+    // An inout yield is a partial write. Initialization via coroutine is not supported, so we assume a prior
+    // initialization must dominate the yield.
+    return .continueWalk
   }
 
   mutating func dependentAddressUse(of operand: Operand, into value: Value)

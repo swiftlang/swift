@@ -56,8 +56,9 @@ func computeLinearLiveness(for definingValue: Value, _ context: Context)
   -> InstructionRange {
 
   assert(definingValue.ownership == .owned
-    || BeginBorrowValue(definingValue) != nil,
-    "value must define an OSSA lifetime")
+           || BeginBorrowValue(definingValue) != nil
+           || VariableScopeInstruction(definingValue.definingInstruction) != nil,
+         "value must define an OSSA lifetime or variable scope")
 
   // InstructionRange cannot directly represent the beginning of the block
   // so we fake it with getRepresentativeInstruction().

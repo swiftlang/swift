@@ -3,13 +3,14 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature LifetimeDependence
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature LifetimeDependenceDiagnoseTrivial
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 // Lifetime dependence semantics by example.
-
 struct Span<T>: ~Escapable {
   private var base: UnsafePointer<T>
   private var count: Int
@@ -29,7 +30,8 @@ struct Span<T>: ~Escapable {
 
 extension Span {
   consuming func dropFirst() -> Span<T> {
-    let local = Span(base: self.base + 1, count: self.count - 1)
+    let nextPointer = self.base + 1
+    let local = Span(base: nextPointer, count: self.count - 1)
     return unsafeLifetime(dependent: local, dependsOn: self)
   }
 }
@@ -65,11 +67,12 @@ extension Span {
 }
 
 extension Array {
-  // TODO: comment out
-  borrowing func span() -> /* */ Span<Element> {
+  @lifetime(borrow self)
+  borrowing func span() -> Span<Element> {
     /* not the real implementation */
     let p = self.withUnsafeBufferPointer { $0.baseAddress! }
-    return Span(base: p, count: 1)
+    let span = Span(base: p, count: 1)
+    return unsafeLifetime(dependent: span, scope: self)
   }
 }
 
@@ -158,3 +161,16 @@ func testScopedOfInheritedWithLet(_ arg: [Int] ) {
   // expected-note @-1{{it depends on the lifetime of this parent value}}  
   _ = result
 } // expected-note {{this use of the lifetime-dependent value is out of scope}}
+
+// =============================================================================
+// Scoped dependence on trivial values
+// =============================================================================
+
+@lifetime(borrow a)
+func testTrivialScope<T>(a: Array<T>) -> Span<T> {
+  let p = a.withUnsafeBufferPointer { $0.baseAddress! }
+  return Span(base: p, count: 1)
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-3{{it depends on the lifetime of variable 'p'}}
+  // expected-note  @-3{{this use causes the lifetime-dependent value to escape}}
+}

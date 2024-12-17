@@ -1,10 +1,12 @@
 // RUN: %target-sil-opt -test-runner %s \
 // RUN:   -sil-verify-all \
 // RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN:   2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 import Builtin
 
