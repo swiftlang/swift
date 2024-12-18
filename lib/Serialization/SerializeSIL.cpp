@@ -1692,6 +1692,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     break;
   }
+  case SILInstructionKind::IgnoredUseInst: {
+    // Use SILOneOperandLayout to specify our operand.
+    auto *iui = cast<IgnoredUseInst>(&SI);
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    SILOneOperandLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)iui->getKind(), 0,
+        S.addTypeRef(iui->getOperand()->getType().getRawASTType()),
+        (unsigned)iui->getOperand()->getType().getCategory(),
+        addValueRef(iui->getOperand()));
+    break;
+  }
   case SILInstructionKind::DynamicFunctionRefInst: {
     // Use SILOneOperandLayout to specify the function type and the function
     // name (IdentifierID).

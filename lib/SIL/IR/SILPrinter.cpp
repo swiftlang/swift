@@ -2873,6 +2873,10 @@ public:
     *this << GI->getFormalResumeType();
   }
 
+  void visitIgnoredUseInst(IgnoredUseInst *i) {
+    *this << getIDAndType(i->getOperand());
+  }
+
   void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *GI) {
     if (GI->throws())
       *this << "[throws] ";

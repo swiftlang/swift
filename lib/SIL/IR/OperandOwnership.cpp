@@ -214,6 +214,7 @@ OPERAND_OWNERSHIP(TrivialUse, GlobalAddr)
 // The dealloc_stack_ref operand needs to have NonUse ownership because
 // this use comes after the last consuming use (which is usually a dealloc_ref).
 OPERAND_OWNERSHIP(NonUse, DeallocStackRef)
+OPERAND_OWNERSHIP(InstantaneousUse, IgnoredUse)
 
 // Use an owned or guaranteed value only for the duration of the operation.
 OPERAND_OWNERSHIP(InstantaneousUse, ExistentialMetatype)
