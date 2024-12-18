@@ -445,9 +445,9 @@ enum HostComponent {
   PackageManager
   Markdown
   Format
+  LMDB
   IndexStoreDB
   SourceKitLSP
-  LMDB
   SymbolKit
   DocC
   SwiftInspect
@@ -2471,6 +2471,15 @@ function Test-Format {
   }
 }
 
+function Build-LMDB($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-lmdb `
+    -Bin (Get-HostProjectBinaryCache LMDB) `
+    -Arch $Arch `
+    -UseMSVCCompilers C `
+    -BuildTargets default
+}
+
 function Build-IndexStoreDB($Arch) {
   $SDKInstallRoot = (Get-HostSwiftSDK);
 
@@ -2486,6 +2495,7 @@ function Build-IndexStoreDB($Arch) {
       BUILD_SHARED_LIBS = "NO";
       CMAKE_C_FLAGS = @("-I$SDKInstallRoot\usr\include", "-I$SDKInstallRoot\usr\include\Block");
       CMAKE_CXX_FLAGS = @("-I$SDKInstallRoot\usr\include", "-I$SDKInstallRoot\usr\include\Block");
+      LMDB_DIR = (Get-HostProjectCMakeModules LMDB);
     }
 }
 
@@ -2507,19 +2517,23 @@ function Build-SourceKitLSP($Arch) {
       SwiftCrypto_DIR = (Get-HostProjectCMakeModules Crypto);
       SwiftCollections_DIR = (Get-HostProjectCMakeModules Collections);
       SwiftPM_DIR = (Get-HostProjectCMakeModules PackageManager);
+      LMDB_DIR = (Get-HostProjectCMakeModules LMDB);
       IndexStoreDB_DIR = (Get-HostProjectCMakeModules IndexStoreDB);
     }
 }
 
 function Test-SourceKitLSP {
   $SwiftPMArguments = @(
+    # dispatch
+    "-Xcc", "-I$SourceCache\swift-corelibs-libdispatch",
+    "-Xcc", "-I$SourceCache\swift-corelibs-libdispatch\src\BlocksRuntime",
     # swift-syntax
     "-Xswiftc", "-I$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
     "-Xswiftc", "-L$(Get-HostProjectBinaryCache Compilers)\lib\swift\host",
     # swift-cmark
-    "-Xswiftc", "-I$($SourceCache)\cmark\src\include",
-    "-Xswiftc", "-I$($SourceCache)\cmark\extensions\include",
-    "-Xlinker", "-I$($SourceCache)\cmark\extensions\include",
+    "-Xswiftc", "-I$SourceCache\cmark\src\include",
+    "-Xswiftc", "-I$SourceCache\cmark\extensions\include",
+    "-Xlinker", "-I$SourceCache\cmark\extensions\include",
     "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\src\cmark-gfm.lib",
     "-Xlinker", "$(Get-CMarkBinaryCache $HostArch)\extensions\cmark-gfm-extensions.lib",
     # swift-system
@@ -2560,6 +2574,8 @@ function Test-SourceKitLSP {
     "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Index\Index.lib",
     "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\LLVMSupport\LLVMSupport.lib",
     "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Support\Support.lib",
+    # LMDB
+    "-Xlinker", "$(Get-HostProjectBinaryCache LMDB)\lib\CLMDB.lib",
     # sourcekit-lsp
     "-Xswiftc", "-I$($SourceCache)\sourcekit-lsp\Sources\CAtomics\include",
     "-Xswiftc", "-I$($SourceCache)\sourcekit-lsp\Sources\CSourcekitd\include",
@@ -2870,6 +2886,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-PackageManager $HostArch
   Invoke-BuildStep Build-Markdown $HostArch
   Invoke-BuildStep Build-Format $HostArch
+  Invoke-BuildStep Build-LMDB $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
   Invoke-BuildStep Build-Inspect $HostArch
