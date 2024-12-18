@@ -143,6 +143,31 @@ internal func getRemoteProcess(processId: ProcessIdentifier,
   return WindowsRemoteProcess(processId: processId)
 }
 
+#elseif os(Linux)
+import Foundation
+
+internal typealias ProcessIdentifier = LinuxRemoteProcess.ProcessIdentifier
+
+internal func process(matching: String) -> ProcessIdentifier? {
+  guard let processId = LinuxRemoteProcess.ProcessIdentifier(matching) else {
+    return nil
+  }
+
+  let procfs_path = "/proc/\(processId)"
+  var isDirectory: Bool = false
+  guard FileManager.default.fileExists(atPath: procfs_path, isDirectory: &isDirectory)
+        && isDirectory else {
+    return nil
+  }
+
+  return processId
+}
+
+internal func getRemoteProcess(processId: ProcessIdentifier,
+                               options: UniversalOptions) -> (any RemoteProcess)? {
+  return LinuxRemoteProcess(processId: processId)
+}
+
 #else
 #error("Unsupported platform")
 #endif

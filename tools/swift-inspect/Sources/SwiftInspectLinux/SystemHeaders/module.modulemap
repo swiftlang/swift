@@ -1,0 +1,7 @@
+module LinuxSystemHeaders {
+  header "auxvec.h"
+  header "elf.h"
+  header "link.h"
+  header "uio.h"
+  export *
+}

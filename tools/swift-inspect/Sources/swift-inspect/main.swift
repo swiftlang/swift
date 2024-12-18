@@ -136,13 +136,20 @@ internal struct SwiftInspect: ParsableCommand {
     DumpArrays.self,
     DumpConcurrency.self,
   ]
-#else
+#elseif os(Windows)
   static let subcommands: [ParsableCommand.Type] = [
     DumpConformanceCache.self,
     DumpRawMetadata.self,
     DumpGenericMetadata.self,
     DumpCacheNodes.self,
     DumpArrays.self,
+  ]
+#else
+  static let subcommands: [ParsableCommand.Type] = [
+    DumpConformanceCache.self,
+    DumpRawMetadata.self,
+    DumpGenericMetadata.self,
+    DumpCacheNodes.self,
   ]
 #endif
 
