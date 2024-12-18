@@ -5097,8 +5097,6 @@ static const llvm::StringMap<std::vector<int>> STLConditionalEscapableParams{
     {"multimap", {0, 1}},
     {"flat_multimap", {0, 1}},
     {"unordered_multimap", {0, 1}},
-    {"span", {0}},   // TODO: remove when span is non-escapable by default
-    {"mdspan", {0}}, // TODO: remove when mdspan is non-escapable by default
 };
 
 static std::set<StringRef>
