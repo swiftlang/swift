@@ -36,6 +36,11 @@ extension CxxLinkedList : ListNode { }
 @available(SwiftStdlib 5.8, *)
 extension MyCxxSequence : Sequence, IteratorProtocol { }
 
+class SwiftLinkedList: ListNode {
+  typealias Element = Int
+  func next() -> Int? { return nil }
+}
+
 if #available(SwiftStdlib 5.8, *) {
 
 var WitnessTableTestSuite = TestSuite("Use foreign reference in a generic context")
@@ -68,6 +73,10 @@ WitnessTableTestSuite.test("As an existential") {
   expectEqual(cast?.value, 0)
   expectEqual(cast?.next()?.value, 1)
   expectEqual(cast?.next()?.next()?.value, 2)
+
+  let notACxxValue: any ListNode = SwiftLinkedList()
+  let invalidCast = notACxxValue as? CxxLinkedList
+  expectNil(invalidCast)
 }
 
 }
