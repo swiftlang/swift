@@ -13405,9 +13405,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     Type result2 = func2->getResult();
     if (result2->hasTypeVariable() && !openedExistentials.empty()) {
       for (const auto &opened : openedExistentials) {
-        result2 = typeEraseOpenedExistentialReference(
-            result2, opened.second->getExistentialType(), opened.first,
+        auto originalTy = result2;
+        if (auto *lvalueTy = dyn_cast<LValueType>(originalTy.getPointer())) {
+          originalTy = lvalueTy->getObjectType();
+        }
+
+        const auto erasedTy = typeEraseOpenedExistentialReference(
+            originalTy, opened.second->getExistentialType(), opened.first,
             TypePosition::Covariant);
+
+        if (originalTy.getPointer() != erasedTy.getPointer()) {
+          // We currently cannot keep lvalueness if the object type changed.
+          result2 = erasedTy;
+        }
       }
     }
 
