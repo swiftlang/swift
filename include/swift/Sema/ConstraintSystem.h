@@ -2339,7 +2339,7 @@ private:
   ConstraintList InactiveConstraints;
 
   /// The constraint graph.
-  ConstraintGraph &CG;
+  ConstraintGraph CG;
 
   /// A mapping from constraint locators to the set of opened types associated
   /// with that locator.
@@ -2707,7 +2707,7 @@ public:
   ~ConstraintSystem();
 
   /// Retrieve the constraint graph associated with this constraint system.
-  ConstraintGraph &getConstraintGraph() const { return CG; }
+  ConstraintGraph &getConstraintGraph() { return CG; }
 
   /// Retrieve the AST context.
   ASTContext &getASTContext() const { return Context; }
