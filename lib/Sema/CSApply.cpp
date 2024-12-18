@@ -5799,17 +5799,15 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType) {
   if (fromInstanceType->isExistentialType()) {
     // Coercion from superclass-constrained existential to its
     // concrete superclass.
-    auto fromArchetype =
-        OpenedArchetypeType::getAny(fromType->getCanonicalType());
+    auto fromOpenedType = OpenedArchetypeType::openAnyExistentialType(fromType);
 
-    auto *archetypeVal = cs.cacheType(new (ctx) OpaqueValueExpr(
-        expr->getSourceRange(), fromArchetype));
+    auto *openedTypeVal = cs.cacheType(
+        new (ctx) OpaqueValueExpr(expr->getSourceRange(), fromOpenedType));
 
-    auto *result = coerceSuperclass(archetypeVal, toType);
+    auto *result = coerceSuperclass(openedTypeVal, toType);
 
     return cs.cacheType(
-      new (ctx) OpenExistentialExpr(expr, archetypeVal, result,
-                                           toType));
+        new (ctx) OpenExistentialExpr(expr, openedTypeVal, result, toType));
   }
 
   // Coercion from subclass to superclass.
@@ -6860,7 +6858,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   // For existential-to-existential coercions, open the source existential.
   Type openedFromType;
   if (fromType->isAnyExistentialType()) {
-    openedFromType = OpenedArchetypeType::getAny(fromType->getCanonicalType());
+    openedFromType = OpenedArchetypeType::openAnyExistentialType(fromType);
   }
 
   Type openedFromInstanceType = openedFromType;

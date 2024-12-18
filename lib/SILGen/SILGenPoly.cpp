@@ -254,8 +254,8 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
   FormalEvaluationScope scope(*this);
 
   if (inputType->isAnyExistentialType()) {
-    CanType openedType = OpenedArchetypeType::getAny(inputType)
-        ->getCanonicalType();
+    CanType openedType = OpenedArchetypeType::openAnyExistentialType(inputType)
+                             ->getCanonicalType();
     SILType loweredOpenedType = getLoweredType(openedType);
 
     input = emitOpenExistential(loc, input,
@@ -270,10 +270,10 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
   // Look through metatypes
   while (isa<MetatypeType>(fromInstanceType) &&
          isa<ExistentialMetatypeType>(toInstanceType)) {
-    fromInstanceType = cast<MetatypeType>(fromInstanceType)
-      .getInstanceType();
-    toInstanceType = cast<ExistentialMetatypeType>(toInstanceType)
-      ->getExistentialInstanceType()->getCanonicalType();
+    fromInstanceType =
+        fromInstanceType->getMetatypeInstanceType()->getCanonicalType();
+    toInstanceType =
+        toInstanceType->getMetatypeInstanceType()->getCanonicalType();
   }
 
   assert(!fromInstanceType.isAnyExistentialType());
@@ -636,14 +636,11 @@ ManagedValue Transform::transform(ManagedValue v,
 
   // - upcasting class-constrained existentials or metatypes thereof
   if (inputSubstType->isAnyExistentialType()) {
-    auto instanceType = inputSubstType;
-    while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(instanceType))
-      instanceType = metatypeType.getInstanceType();
-
-    auto layout = instanceType.getExistentialLayout();
+    auto layout = inputSubstType.getExistentialLayout();
     if (layout.getSuperclass()) {
-      CanType openedType = OpenedArchetypeType::getAny(inputSubstType)
-          ->getCanonicalType();
+      CanType openedType =
+          OpenedArchetypeType::openAnyExistentialType(inputSubstType)
+              ->getCanonicalType();
       SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
       FormalEvaluationScope scope(SGF);

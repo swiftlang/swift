@@ -5574,17 +5574,19 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential) {
       ->getCanonicalType());
 }
 
-Type OpenedArchetypeType::getAny(Type existential) {
+Type OpenedArchetypeType::openAnyExistentialType(Type existential) {
   assert(existential->isAnyExistentialType());
 
   if (auto metatypeTy = existential->getAs<ExistentialMetatypeType>()) {
-    auto instanceTy = metatypeTy->getExistentialInstanceType();
-    auto openedInstanceTy = OpenedArchetypeType::getAny(instanceTy);
+    auto openedInstanceTy = OpenedArchetypeType::openAnyExistentialType(
+        metatypeTy->getExistentialInstanceType());
+
+    std::optional<MetatypeRepresentation> representation;
     if (metatypeTy->hasRepresentation()) {
-      return MetatypeType::get(openedInstanceTy,
-                               metatypeTy->getRepresentation());
+      representation = metatypeTy->getRepresentation();
     }
-    return MetatypeType::get(openedInstanceTy);
+
+    return MetatypeType::get(openedInstanceTy, representation);
   }
 
   return OpenedArchetypeType::get(existential->getCanonicalType());

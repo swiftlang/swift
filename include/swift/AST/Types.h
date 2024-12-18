@@ -7001,7 +7001,7 @@ public:
   /// will unwrap any existential metatype containers.
   ///
   /// \param existential The existential type or existential metatype to open.
-  static Type getAny(Type existential);
+  static Type openAnyExistentialType(Type existential);
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpenedArchetype;
