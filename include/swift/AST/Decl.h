@@ -2828,7 +2828,6 @@ private:
 
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
-
 protected:
   ValueDecl(DeclKind K,
             llvm::PointerUnion<DeclContext *, ASTContext *> context,
