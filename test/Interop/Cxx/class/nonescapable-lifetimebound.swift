@@ -82,6 +82,29 @@ View returnsImmortal() SWIFT_RETURNS_INDEPENDENT_VALUE {
     return View();
 }
 
+void copyView(View view1 [[clang::lifetime_capture_by(view2)]], View &view2) {
+    view2 = view1;
+}
+
+struct SWIFT_NONESCAPABLE CaptureView {
+    CaptureView() : view(nullptr) {}
+    CaptureView(View p [[clang::lifetimebound]]) : view(p) {}
+
+    void captureView(View v [[clang::lifetime_capture_by(this)]]) {
+        view = v;
+    }
+
+    void handOut(View &v) const [[clang::lifetime_capture_by(v)]] {
+       v = view; 
+    }
+
+    View view;
+};
+
+CaptureView getCaptureView(const Owner& owner [[clang::lifetimebound]]) {
+    return CaptureView(View{&owner.data});
+}
+
 // CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
 // CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
@@ -92,6 +115,10 @@ View returnsImmortal() SWIFT_RETURNS_INDEPENDENT_VALUE {
 // CHECK: sil [clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
 // CHECK: sil [clang OtherView.init] {{.*}} : $@convention(c) (@guaranteed View) -> @lifetime(copy 0) @out OtherView
 // CHECK: sil [clang returnsImmortal] {{.*}} : $@convention(c) () -> @lifetime(immortal) @autoreleased View
+// CHECK: sil [clang copyView] {{.*}} : $@convention(c) (View, @lifetime(copy 0) @inout View) -> ()
+// CHECK: sil [clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased CaptureView
+// CHECK: sil [clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
+// CHECK: sil [clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
 
 // CHECK-NO-LIFETIMES: nonescapable.h:36:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
 // CHECK-NO-LIFETIMES: nonescapable.h:40:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
@@ -104,6 +131,7 @@ View returnsImmortal() SWIFT_RETURNS_INDEPENDENT_VALUE {
 // CHECK-NO-LIFETIMES: nonescapable.h:13:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
 // CHECK-NO-LIFETIMES: nonescapable.h:14:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
 // CHECK-NO-LIFETIMES: nonescapable.h:68:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:91:13: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
 // CHECK-NO-LIFETIMES-NOT: error
 
 //--- test.swift
@@ -113,7 +141,7 @@ import Test
 public func test() {
     let o = makeOwner()
     let o2 = makeOwner()
-    let v1 = getView(o)
+    var v1 = getView(o)
     let v2 = getViewFromFirst(o, o2)
     let _ = getViewFromEither(o, o2)
     let _ = o.handOutView()
@@ -122,4 +150,8 @@ public func test() {
     let defaultView = View()
     let _ = OtherView(defaultView)
     let _ = returnsImmortal()
+    copyView(v2, &v1)
+    var cv = getCaptureView(o)
+    cv.captureView(v1)
+    cv.handOut(&v1)
 }
