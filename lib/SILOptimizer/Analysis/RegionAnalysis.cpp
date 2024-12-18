@@ -3053,6 +3053,7 @@ CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Ignored)
 CONSTANT_TRANSLATION(SpecifyTestInst, Ignored)
 CONSTANT_TRANSLATION(TypeValueInst, Ignored)
+CONSTANT_TRANSLATION(IgnoredUseInst, Ignored)
 
 //===---
 // Require

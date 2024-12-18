@@ -334,7 +334,8 @@ bool swift::isEndOfScopeMarker(SILInstruction *user) {
 
 bool swift::isIncidentalUse(SILInstruction *user) {
   return isEndOfScopeMarker(user) || user->isDebugInstruction() ||
-         isa<FixLifetimeInst>(user) || isa<EndLifetimeInst>(user);
+         isa<FixLifetimeInst>(user) || isa<EndLifetimeInst>(user) ||
+         isa<IgnoredUseInst>(user);
 }
 
 bool swift::onlyAffectsRefCount(SILInstruction *user) {
@@ -622,6 +623,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::DebugStepInst:
   case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::TypeValueInst:
+  case SILInstructionKind::IgnoredUseInst:
     return RuntimeEffect::NoEffect;
       
   case SILInstructionKind::OpenExistentialMetatypeInst:
