@@ -913,13 +913,6 @@ namespace swift {
     /// is for testing purposes.
     std::vector<std::string> DebugForbidTypecheckPrefixes;
 
-    /// The upper bound to number of sub-expressions unsolved
-    /// before termination of the shrink phrase of the constraint solver.
-    unsigned SolverShrinkUnsolvedThreshold = 10;
-
-    /// Disable the shrink phase of the expression type checker.
-    bool SolverDisableShrink = false;
-
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
     
@@ -935,6 +928,9 @@ namespace swift {
     /// Allow request evalutation to perform type checking lazily, instead of
     /// eagerly typechecking source files after parsing.
     bool EnableLazyTypecheck = false;
+
+    /// Disable the component splitter phase of the expression type checker.
+    bool SolverDisableSplitter = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.

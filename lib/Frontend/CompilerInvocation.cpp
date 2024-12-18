@@ -1775,8 +1775,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                              Opts.SolverScopeThreshold);
   setUnsignedIntegerArgument(OPT_solver_trail_threshold_EQ,
                              Opts.SolverTrailThreshold);
-  setUnsignedIntegerArgument(OPT_solver_shrink_unsolved_threshold,
-                             Opts.SolverShrinkUnsolvedThreshold);
 
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeExpressions |=
@@ -1865,8 +1863,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     Opts.DebugForbidTypecheckPrefixes.push_back(A);
   }
 
-  if (Args.getLastArg(OPT_solver_disable_shrink))
-    Opts.SolverDisableShrink = true;
+  if (Args.getLastArg(OPT_solver_disable_splitter))
+    Opts.SolverDisableSplitter = true;
 
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
