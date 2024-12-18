@@ -27,6 +27,20 @@ if(WIN32)
     Sources/SwiftInspectClient/SwiftInspectClient.cpp)
   target_link_libraries(SwiftInspectClient PRIVATE
     SwiftInspectClientInterface)
+elseif(LINUX)
+  string(APPEND CMAKE_Swift_FLAGS " -Xcc -D_GNU_SOURCE")
+  add_library(SwiftInspectLinux STATIC
+    Sources/SwiftInspectLinux/ElfFile.swift
+    Sources/SwiftInspectLinux/LinkMap.swift
+    Sources/SwiftInspectLinux/MemoryMap.swift
+    Sources/SwiftInspectLinux/Process.swift
+    Sources/SwiftInspectLinux/ProcFS.swift
+    Sources/SwiftInspectLinux/SymbolCache.swift)
+  target_link_libraries(SwiftInspectLinux PRIVATE
+    LinuxSystemHeaders)
+  add_library(LinuxSystemHeaders INTERFACE)
+  target_include_directories(LinuxSystemHeaders INTERFACE
+    Sources/SwiftInspectLinux/SystemHeaders)
 endif()
 
 add_executable(swift-inspect
@@ -38,6 +52,7 @@ add_executable(swift-inspect
   Sources/swift-inspect/Operations/DumpRawMetadata.swift
   Sources/swift-inspect/Backtrace.swift
   Sources/swift-inspect/DarwinRemoteProcess.swift
+  Sources/swift-inspect/LinuxRemoteProcess.swift
   Sources/swift-inspect/main.swift
   Sources/swift-inspect/Process.swift
   Sources/swift-inspect/RemoteMirror+Extensions.swift
@@ -54,6 +69,11 @@ target_link_libraries(swift-inspect PRIVATE
 if(WIN32)
   target_link_libraries(swift-inspect PRIVATE
     SwiftInspectClientInterface)
+elseif(LINUX)
+  target_link_libraries(swift-inspect PRIVATE
+    SwiftInspectLinux)
+  target_link_libraries(swift-inspect PRIVATE
+    LinuxSystemHeaders)
 endif()
 
 install(TARGETS swift-inspect
