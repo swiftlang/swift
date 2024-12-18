@@ -196,6 +196,7 @@ extern "C" char **_environ;
 static void platformInitialize(void *context) {
   (void)context;
   char buffer[PROP_VALUE_MAX] = "";
+// Only system properties prefixed with "debug." can be set without root access.
 #define SYSPROP_PREFIX "debug.org.swift.runtime."
 #define VARIABLE(name, type, defaultValue, help)                \
   if (__system_property_get(SYSPROP_PREFIX #name, buffer)) {    \
