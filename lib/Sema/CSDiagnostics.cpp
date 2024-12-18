@@ -911,16 +911,44 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   // before pointer types could be compared.
   auto locator = getLocator();
   auto path = locator->getPath();
-  unsigned toDrop = 0;
-  for (const auto &elt : llvm::reverse(path)) {
-    if (!elt.is<LocatorPathElt::OptionalPayload>())
-      break;
 
-    // Disregard optional payload element to look at its source.
-    ++toDrop;
+  // If there are generic types involved, we need to find
+  // the outermost generic types and report on them instead
+  // of their arguments.
+  // For example:
+  //
+  //    <expr> -> contextual type
+  //           -> generic type S<[Int]>
+  //           -> generic type S<[String]>
+  //           -> generic argument #0
+  //
+  // Is going to have from/to types as `[Int]` and `[String]` but
+  // the diagnostic should mention `S<[Int]>` and `S<[String]>`
+  // because it refers to a contextual type location.
+  if (locator->isLastElement<LocatorPathElt::GenericArgument>()) {
+    for (unsigned i = 0; i < path.size(); ++i) {
+      if (auto genericType = path[i].getAs<LocatorPathElt::GenericType>()) {
+        ASSERT(i + 1 < path.size());
+
+        fromType = resolveType(genericType->getType());
+        toType = resolveType(
+            path[i + 1].castTo<LocatorPathElt::GenericType>().getType());
+        break;
+      }
+    }
   }
 
-  path = path.drop_back(toDrop);
+  while (!path.empty()) {
+    auto last = path.back();
+    if (last.is<LocatorPathElt::OptionalPayload>() ||
+        last.is<LocatorPathElt::GenericType>() ||
+        last.is<LocatorPathElt::GenericArgument>()) {
+      path = path.drop_back();
+      continue;
+    }
+
+    break;
+  }
 
   std::optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
@@ -1014,6 +1042,34 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     case ConstraintLocator::CoercionOperand: {
       diagnostic = getDiagnosticFor(CTP_CoerceOperand);
       break;
+    }
+
+    case ConstraintLocator::Member: {
+      auto *memberLoc = getConstraintLocator(anchor, path);
+      auto selectedOverload = getOverloadChoiceIfAvailable(memberLoc);
+      if (!selectedOverload)
+        return false;
+
+      auto baseTy = selectedOverload->choice.getBaseType()->getRValueType();
+      auto *memberRef = selectedOverload->choice.getDecl();
+
+      if (Mismatches.size() == 1) {
+        auto mismatchIdx = Mismatches.front();
+        auto actualArgTy = getActual()->getGenericArgs()[mismatchIdx];
+        auto requiredArgTy = getRequired()->getGenericArgs()[mismatchIdx];
+
+        emitDiagnostic(diag::types_not_equal_in_decl_ref, memberRef, baseTy,
+                       actualArgTy, requiredArgTy);
+        emitDiagnosticAt(memberRef, diag::decl_declared_here, memberRef);
+        return true;
+      }
+
+      emitDiagnostic(
+          diag::cannot_reference_conditional_member_on_base_multiple_mismatches,
+          memberRef, baseTy);
+      emitDiagnosticAt(memberRef, diag::decl_declared_here, memberRef);
+      emitNotesForMismatches();
+      return true;
     }
 
     default:

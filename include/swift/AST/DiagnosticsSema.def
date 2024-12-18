@@ -2798,6 +2798,9 @@ ERROR(types_not_inherited_decl,none,
 ERROR(types_not_inherited_in_decl_ref,none,
       "referencing %kind0 on %1 requires that %2 inherit from %3",
       (const ValueDecl *, Type, Type, Type))
+ERROR(cannot_reference_conditional_member_on_base_multiple_mismatches,none,
+      "cannot reference %kind0 on %1",
+      (const ValueDecl *, Type))
 NOTE(where_requirement_failure_one_subst,none,
      "where %0 = %1", (Type, Type))
 NOTE(where_requirement_failure_both_subst,none,

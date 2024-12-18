@@ -647,7 +647,6 @@ do {
     // FIXME: The count of '(Int, Int), repeat each U' is not statically known, but error suggests that it is 2.
     S<(Int, Int), repeat each U>().method((3, 4))
     // expected-error@-1 {{pack expansion requires that '(Int, Int), repeat each U' and '(Int, Int)' have the same shape}}
-    // expected-error@-2 {{pack expansion requires that '' and 'each U' have the same shape}}
 
     // FIXME: The count of '(Int, Int), repeat each U' is not statically known, but error suggests that it is 2.
     S<(Int, Int), repeat each U>().property((3, 4))
