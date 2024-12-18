@@ -26,6 +26,10 @@ struct ModulePassContext : Context, CustomStringConvertible {
     return String(taking: _bridged.getModuleDescription())
   }
 
+  var enableWMORequiredDiagnostics: Bool {
+    _bridged.enableWMORequiredDiagnostics()
+  }
+
   struct FunctionList : CollectionLikeSequence, IteratorProtocol {
     private var currentFunction: Function?
     
