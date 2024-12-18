@@ -918,7 +918,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
           emittedModule, declPrinter);
       auto s = typePrinter.visit(ty, optionalKind, param.isInOut());
-      assert(!s.isUnsupported());
+      resultingRepresentation.merge(s);
     };
     signature.visitParameterList(
         [&](const LoweredFunctionSignature::IndirectResultValue
