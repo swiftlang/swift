@@ -3061,8 +3061,11 @@ getExplicitUnavailabilityDiagnosticInfo(const Decl *decl,
   if (!attr)
     return std::nullopt;
 
+  auto semanticAttr = decl->getSemanticAvailableAttr(attr);
+  if (!semanticAttr)
+    return std::nullopt;
+
   ASTContext &ctx = decl->getASTContext();
-  auto domain = decl->getDomainForAvailableAttr(attr);
 
   switch (attr->getVersionAvailability(ctx)) {
   case AvailableVersionComparison::Available:
@@ -3075,17 +3078,18 @@ getExplicitUnavailabilityDiagnosticInfo(const Decl *decl,
         attr->Introduced.has_value()) {
       return UnavailabilityDiagnosticInfo(
           UnavailabilityDiagnosticInfo::Status::IntroducedInVersion, attr,
-          domain);
+          semanticAttr->getDomain());
     } else {
       return UnavailabilityDiagnosticInfo(
           UnavailabilityDiagnosticInfo::Status::AlwaysUnavailable, attr,
-          domain);
+          semanticAttr->getDomain());
     }
     break;
 
   case AvailableVersionComparison::Obsoleted:
     return UnavailabilityDiagnosticInfo(
-        UnavailabilityDiagnosticInfo::Status::Obsoleted, attr, domain);
+        UnavailabilityDiagnosticInfo::Status::Obsoleted, attr,
+        semanticAttr->getDomain());
   }
 }
 

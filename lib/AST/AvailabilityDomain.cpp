@@ -16,32 +16,6 @@
 
 using namespace swift;
 
-SemanticAvailableAttributes
-Decl::getSemanticAvailableAttrs(bool includeInactive) const {
-  return SemanticAvailableAttributes(getAttrs(), this, includeInactive);
-}
-
-AvailabilityDomain
-Decl::getDomainForAvailableAttr(const AvailableAttr *attr) const {
-  if (attr->hasPlatform())
-    return AvailabilityDomain::forPlatform(attr->getPlatform());
-
-  switch (attr->getPlatformAgnosticAvailability()) {
-  case PlatformAgnosticAvailabilityKind::Deprecated:
-  case PlatformAgnosticAvailabilityKind::Unavailable:
-  case PlatformAgnosticAvailabilityKind::NoAsync:
-  case PlatformAgnosticAvailabilityKind::None:
-    return AvailabilityDomain::forUniversal();
-
-  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-    return AvailabilityDomain::forSwiftLanguage();
-
-  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-    return AvailabilityDomain::forPackageDescription();
-  }
-}
-
 bool AvailabilityDomain::isActive(ASTContext &ctx) const {
   switch (kind) {
   case Kind::Universal:
