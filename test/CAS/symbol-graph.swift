@@ -23,7 +23,7 @@
 // RUN:   -parse-stdlib -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/main.swift -o %t/Test.swiftmodule -swift-version 5 -cache-compile-job -cas-path %t/cas -I %t/include \
 // RUN:   -emit-symbol-graph -emit-symbol-graph-dir %t/symbol-graph2 \
-// RUN:   -emit-module @%t/Test.cmd -Rcache-compile-job 2>&1 | %FileCheck %s --check-prefix=CACHE-MISS
+// RUN:   -emit-module @%t/Test.cmd -Rcache-compile-job 2>&1 | %FileCheck %s --check-prefix=CACHE-HIT
 
 // CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}symbol-graph2{{/|\\}}Test.symbols.json': key 'llvmcas://{{.*}}'
 // CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}symbol-graph2{{/|\\}}Test@A.symbols.json': key 'llvmcas://{{.*}}'
