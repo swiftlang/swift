@@ -28,7 +28,10 @@ if(WIN32)
   target_link_libraries(SwiftInspectClient PRIVATE
     SwiftInspectClientInterface)
 elseif(LINUX)
-  string(APPEND CMAKE_Swift_FLAGS " -Xcc -D_GNU_SOURCE")
+  add_library(LinuxSystemHeaders INTERFACE)
+  target_include_directories(LinuxSystemHeaders INTERFACE
+    Sources/SwiftInspectLinux/SystemHeaders)
+
   add_library(SwiftInspectLinux STATIC
     Sources/SwiftInspectLinux/ElfFile.swift
     Sources/SwiftInspectLinux/LinkMap.swift
@@ -36,11 +39,10 @@ elseif(LINUX)
     Sources/SwiftInspectLinux/Process.swift
     Sources/SwiftInspectLinux/ProcFS.swift
     Sources/SwiftInspectLinux/SymbolCache.swift)
-  target_link_libraries(SwiftInspectLinux PRIVATE
+  target_compile_options(SwiftInspectLinux PRIVATE
+    -Xcc -D_GNU_SOURCE)
+  target_link_libraries(SwiftInspectLinux PUBLIC
     LinuxSystemHeaders)
-  add_library(LinuxSystemHeaders INTERFACE)
-  target_include_directories(LinuxSystemHeaders INTERFACE
-    Sources/SwiftInspectLinux/SystemHeaders)
 endif()
 
 add_executable(swift-inspect
@@ -72,8 +74,6 @@ if(WIN32)
 elseif(LINUX)
   target_link_libraries(swift-inspect PRIVATE
     SwiftInspectLinux)
-  target_link_libraries(swift-inspect PRIVATE
-    LinuxSystemHeaders)
 endif()
 
 install(TARGETS swift-inspect
