@@ -1825,7 +1825,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         std::tie(openedTypeVar, existentialType, adjustments) = *existentialArg;
 
         OpenedArchetypeType *opened;
-        std::tie(argTy, opened) = cs.openExistentialType(
+        std::tie(argTy, opened) = cs.openAnyExistentialType(
             existentialType, cs.getConstraintLocator(loc));
 
         if (adjustments.contains(OpenedExistentialAdjustmentFlags::LValue))
@@ -8651,7 +8651,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (type->isExistentialType()) {
       if (auto elt = loc->getLastElementAs<LocatorPathElt::ContextualType>()) {
         if (elt->getPurpose() == CTP_ForEachSequence) {
-          type = openExistentialType(type, loc).first;
+          type = openAnyExistentialType(type, loc).first;
         }
       }
     }
@@ -12463,8 +12463,8 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
   if (type2->isAnyExistentialType()) {
     // We have the existential side. Produce an opened archetype and bind
     // type1 to it.
-    Type openedTy = openExistentialType(type2, getConstraintLocator(locator))
-        .first;
+    Type openedTy =
+        openAnyExistentialType(type2, getConstraintLocator(locator)).first;
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
   }
   if (!type2->isTypeVariableOrMember())
