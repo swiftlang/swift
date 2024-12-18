@@ -826,15 +826,18 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     // Be careful not to coalesce `@available(swift 5)` with other short
     // `available' attributes.
     if (auto *availableAttr = dyn_cast<AvailableAttr>(DA)) {
-      auto domain = D->getDomainForAvailableAttr(availableAttr);
-      auto semanticAttr = SemanticAvailableAttr(availableAttr, domain);
-      if (isShortAvailable(semanticAttr)) {
+      auto semanticAttr = D->getSemanticAvailableAttr(availableAttr);
+      if (!semanticAttr)
+        continue;
+
+      auto domain = semanticAttr->getDomain();
+      if (isShortAvailable(*semanticAttr)) {
         if (domain.isSwiftLanguage())
-          swiftVersionAvailableAttribute.emplace(semanticAttr);
+          swiftVersionAvailableAttribute.emplace(*semanticAttr);
         else if (domain.isPackageDescription())
-          packageDescriptionVersionAvailableAttribute.emplace(semanticAttr);
+          packageDescriptionVersionAvailableAttribute.emplace(*semanticAttr);
         else
-          shortAvailableAttributes.push_back(semanticAttr);
+          shortAvailableAttributes.push_back(*semanticAttr);
 
         continue;
       }
@@ -912,6 +915,10 @@ ParsedDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
   return Attr;
 }
 
+bool SemanticAvailableAttr::isActive(ASTContext &ctx) const {
+  return domain.isActive(ctx);
+}
+
 std::optional<SemanticAvailableAttr>
 SemanticAvailableAttributes::Filter::operator()(
     const DeclAttribute *attr) const {
@@ -922,11 +929,14 @@ SemanticAvailableAttributes::Filter::operator()(
   if (availableAttr->isInvalid())
     return std::nullopt;
 
-  auto domain = decl->getDomainForAvailableAttr(availableAttr);
-  if (!includeInactive && !domain.isActive(decl->getASTContext()))
+  auto semanticAttr = decl->getSemanticAvailableAttr(availableAttr);
+  if (!semanticAttr)
     return std::nullopt;
 
-  return SemanticAvailableAttr(availableAttr, domain);
+  if (!includeInactive && !semanticAttr->isActive(decl->getASTContext()))
+    return std::nullopt;
+
+  return *semanticAttr;
 }
 
 static void printAvailableAttr(const Decl *D,
@@ -1164,8 +1174,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DeclAttrKind::Available: {
     auto Attr = cast<AvailableAttr>(this);
-    auto Domain = D->getDomainForAvailableAttr(Attr);
-    auto SemanticAttr = SemanticAvailableAttr(Attr, Domain);
+    auto SemanticAttr = D->getSemanticAvailableAttr(Attr);
+    if (!SemanticAttr)
+      return false;
 
     if (Options.printPublicInterface() && Attr->isSPI()) {
       assert(Attr->hasPlatform());
@@ -1190,7 +1201,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer.printAttrName("@available");
     }
     Printer << "(";
-    printAvailableAttr(D, SemanticAttr, Printer, Options);
+    printAvailableAttr(D, *SemanticAttr, Printer, Options);
     Printer << ")";
     break;
   }
@@ -1286,8 +1297,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << "target: " << target << ", ";
     SmallVector<SemanticAvailableAttr, 8> semanticAvailAttrs;
     for (auto availAttr : attr->getAvailableAttrs()) {
-      auto domain = D->getDomainForAvailableAttr(availAttr);
-      semanticAvailAttrs.push_back(SemanticAvailableAttr(availAttr, domain));
+      if (auto semanticAttr = D->getSemanticAvailableAttr(availAttr))
+        semanticAvailAttrs.push_back(*semanticAttr);
     }
 
     if (!semanticAvailAttrs.empty()) {

@@ -3205,6 +3205,18 @@ public:
 
   const AvailableAttr *getParsedAttr() const { return attr; }
   const AvailabilityDomain getDomain() const { return domain; }
+
+  /// Returns the platform kind that the attribute applies to, or
+  /// `PlatformKind::none` if the attribute is not platform specific.
+  bool isPlatformSpecific() const { return domain.isPlatform(); }
+
+  /// Returns the platform kind that the attribute applies to, or
+  /// `PlatformKind::none` if the attribute is not platform specific.
+  PlatformKind getPlatformKind() const { return domain.getPlatformKind(); }
+
+  /// Returns true if this attribute is considered active in the current
+  /// compilation context.
+  bool isActive(ASTContext &ctx) const;
 };
 
 /// An iterable range of `SemanticAvailableAttr`s.

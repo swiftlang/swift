@@ -464,6 +464,35 @@ bool Decl::isAvailableAsSPI() const {
   return AvailabilityInference::isAvailableAsSPI(this);
 }
 
+SemanticAvailableAttributes
+Decl::getSemanticAvailableAttrs(bool includeInactive) const {
+  return SemanticAvailableAttributes(getAttrs(), this, includeInactive);
+}
+
+std::optional<SemanticAvailableAttr>
+Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
+  auto domainForAvailableAttr = [](const AvailableAttr *attr) {
+    if (attr->hasPlatform())
+      return AvailabilityDomain::forPlatform(attr->getPlatform());
+
+    switch (attr->getPlatformAgnosticAvailability()) {
+    case PlatformAgnosticAvailabilityKind::Deprecated:
+    case PlatformAgnosticAvailabilityKind::Unavailable:
+    case PlatformAgnosticAvailabilityKind::NoAsync:
+    case PlatformAgnosticAvailabilityKind::None:
+      return AvailabilityDomain::forUniversal();
+
+    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+      return AvailabilityDomain::forSwiftLanguage();
+
+    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
+      return AvailabilityDomain::forPackageDescription();
+    }
+  };
+  return SemanticAvailableAttr(attr, domainForAvailableAttr(attr));
+}
+
 const AvailableAttr *
 Decl::getActiveAvailableAttrForCurrentPlatform(bool ignoreAppExtensions) const {
   const AvailableAttr *bestAttr = nullptr;
