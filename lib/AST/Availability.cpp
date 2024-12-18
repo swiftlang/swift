@@ -791,15 +791,17 @@ bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
 }
 
 AvailabilityRange AvailabilityInference::annotatedAvailableRangeForAttr(
-    const SpecializeAttr *attr, ASTContext &ctx) {
+    const Decl *D, const SpecializeAttr *attr, ASTContext &ctx) {
 
   const AvailableAttr *bestAvailAttr = nullptr;
 
   for (auto *availAttr : attr->getAvailableAttrs()) {
-    if (availAttr == nullptr || !availAttr->Introduced.has_value() ||
-        !availAttr->isActivePlatform(ctx) ||
-        availAttr->isLanguageVersionSpecific() ||
-        availAttr->isPackageDescriptionVersionSpecific()) {
+    auto semanticAttr = D->getSemanticAvailableAttr(availAttr);
+    if (!semanticAttr)
+      continue;
+
+    if (!availAttr->Introduced.has_value() || !semanticAttr->isActive(ctx) ||
+        !semanticAttr->isPlatformSpecific()) {
       continue;
     }
 
