@@ -515,12 +515,12 @@ public:
         const_cast<DeclContext *>(this)->getInnermostSkippedFunctionContext();
   }
 
-  /// Returns the innermost context that is a ClosureExpr, which defines how
-  /// self behaves, unless within a type context that redefines self.
+  /// Returns the innermost ClosureExpr context that can propagate its captures
+  /// to this DeclContext.
   LLVM_READONLY
-  ClosureExpr *getInnermostClosureForSelfCapture();
-  const ClosureExpr *getInnermostClosureForSelfCapture() const {
-    return const_cast<DeclContext *>(this)->getInnermostClosureForSelfCapture();
+  ClosureExpr *getInnermostClosureForCaptures();
+  const ClosureExpr *getInnermostClosureForCaptures() const {
+    return const_cast<DeclContext *>(this)->getInnermostClosureForCaptures();
   }
 
   /// Returns the semantic parent of this context.  A context has a
@@ -713,6 +713,10 @@ public:
   /// target. Used for conformance lookup disambiguation.
   bool isAlwaysAvailableConformanceContext() const;
 
+  /// Determines whether this context is explicitly allowed to use unsafe
+  /// constructs.
+  bool allowsUnsafe() const;
+
   /// \returns true if traversal was aborted, false otherwise.
   bool walkContext(ASTWalker &Walker);
 
@@ -798,6 +802,14 @@ class IterableDeclContext {
   /// while skipping the body of this context.
   unsigned HasNestedClassDeclarations : 1;
 
+  /// Whether we were inside a freestanding macro argument when we were parsed.
+  /// We must restore this when delayed parsing the body.
+  unsigned InFreestandingMacroArgument : 1;
+
+  /// Whether delayed parsing detect a possible custom derivative definition
+  /// while skipping the body of this context.
+  unsigned HasDerivativeDeclarations : 1;
+
   template<class A, class B, class C>
   friend struct ::llvm::CastInfo;
 
@@ -813,7 +825,9 @@ public:
     : LastDeclAndKind(nullptr, kind) {
     AddedParsedMembers = 0;
     HasOperatorDeclarations = 0;
+    HasDerivativeDeclarations = 0;
     HasNestedClassDeclarations = 0;
+    InFreestandingMacroArgument = 0;
   }
 
   /// Determine the kind of iterable context we have.
@@ -839,6 +853,24 @@ public:
   void setMaybeHasNestedClassDeclarations() {
     assert(hasUnparsedMembers());
     HasNestedClassDeclarations = 1;
+  }
+
+  bool inFreestandingMacroArgument() const {
+    return InFreestandingMacroArgument;
+  }
+
+  void setInFreestandingMacroArgument() {
+    assert(hasUnparsedMembers());
+    InFreestandingMacroArgument = 1;
+  }
+
+  bool maybeHasDerivativeDeclarations() const {
+    return HasDerivativeDeclarations;
+  }
+
+  void setMaybeHasDerivativeDeclarations() {
+    assert(hasUnparsedMembers());
+    HasDerivativeDeclarations = 1;
   }
 
   /// Retrieve the current set of members in this context.

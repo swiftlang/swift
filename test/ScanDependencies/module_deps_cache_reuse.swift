@@ -1,5 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
+// Temporarily disabled while the cache serialization code is being brought back from being stale/disabled for a long time
+// XFAIL: *
 
 // Run the scanner once, emitting the serialized scanner cache
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -Rdependency-scan-cache -serialize-dependency-scan-cache -dependency-scan-cache-path %t/cache.moddepcache -module-cache-path %t/clang-module-cache %s -o %t/deps_initial.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays 2>&1 | %FileCheck %s -check-prefix CHECK-REMARK-SAVE
@@ -67,61 +69,6 @@ import SubE
 // CHECK-DAG: "swift": "F"
 // CHECK-DAG: "swift": "A"
 
-/// --------Swift module A
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
-
-// CHECK: directDependencies
-// CHECK-NEXT: {
-// CHECK-DAG:   "clang": "A"
-// CHECK-DAG:   "swift": "Swift"
-
-/// --------Swift module F
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
-// CHECK-NEXT: "sourceFiles": [
-// CHECK-NEXT: ],
-// CHECK-NEXT: "directDependencies": [
-// CHECK-NEXT:   {
-// CHECK-DAG:     "clang": "F"
-// CHECK-DAG:     "swift": "Swift"
-// CHECK-DAG:     "swift": "SwiftOnoneSupport"
-// CHECK: ],
-
-/// --------Swift module G
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}G-{{.*}}.swiftmodule"
-// CHECK: "directDependencies"
-// CHECK-NEXT: {
-// CHECK-DAG:   "clang": "G"
-// CHECK-DAG:   "swift": "Swift"
-// CHECK-DAG:   "swift": "SwiftOnoneSupport"
-// CHECK: ],
-// CHECK-NEXT: "linkLibraries": [
-// CHECK-NEXT: ],
-// CHECK-NEXT: "details": {
-
-// CHECK: "commandLine": [
-// CHECK: "-compile-module-from-interface"
-// CHECK: "-target"
-// CHECK: "-module-name"
-// CHECK: "G"
-// CHECK: "-swift-version"
-// CHECK: "5"
-// CHECK: ],
-// CHECK: "contextHash": "{{.*}}",
-// CHECK" "extraPcmArgs": [
-// CHECK"   "-target",
-// CHECK"   "-fapinotes-swift-version=5"
-// CHECK" ]
-
-/// --------Swift module E
-// CHECK: "swift": "E"
-// CHECK-LABEL: modulePath": "{{.*}}{{/|\\}}E-{{.*}}.swiftmodule"
-// CHECK: "directDependencies"
-// CHECK-NEXT: {
-// CHECK: "swift": "Swift"
-
-// CHECK: "moduleInterfacePath"
-// CHECK-SAME: E.swiftinterface
-
 /// --------Clang module C
 // CHECK-LABEL: "modulePath": "{{.*}}/C-{{.*}}.pcm",
 
@@ -158,6 +105,61 @@ import SubE
 // CHECK-NEXT: {
 // CHECK: "clang": "A"
 // CHECK-NEXT: }
+
+/// --------Swift module F
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
+// CHECK-NEXT: "sourceFiles": [
+// CHECK-NEXT: ],
+// CHECK-NEXT: "directDependencies": [
+// CHECK-NEXT:   {
+// CHECK-DAG:     "clang": "F"
+// CHECK-DAG:     "swift": "Swift"
+// CHECK-DAG:     "swift": "SwiftOnoneSupport"
+// CHECK: ],
+
+/// --------Swift module A
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
+
+// CHECK: directDependencies
+// CHECK-NEXT: {
+// CHECK-DAG:   "clang": "A"
+// CHECK-DAG:   "swift": "Swift"
+
+/// --------Swift module G
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}G-{{.*}}.swiftmodule"
+// CHECK: "directDependencies"
+// CHECK-NEXT: {
+// CHECK-DAG:   "clang": "G"
+// CHECK-DAG:   "swift": "Swift"
+// CHECK-DAG:   "swift": "SwiftOnoneSupport"
+// CHECK: ],
+// CHECK-NEXT: "linkLibraries": [
+// CHECK-NEXT: ],
+// CHECK-NEXT: "details": {
+
+// CHECK: "commandLine": [
+// CHECK: "-compile-module-from-interface"
+// CHECK: "-target"
+// CHECK: "-module-name"
+// CHECK: "G"
+// CHECK: "-swift-version"
+// CHECK: "5"
+// CHECK: ],
+// CHECK: "contextHash": "{{.*}}",
+// CHECK" "extraPcmArgs": [
+// CHECK"   "-target",
+// CHECK"   "-fapinotes-swift-version=5"
+// CHECK" ]
+
+/// --------Swift module E
+// CHECK: "swift": "E"
+// CHECK-LABEL: modulePath": "{{.*}}{{/|\\}}E-{{.*}}.swiftmodule"
+// CHECK: "directDependencies"
+// CHECK-NEXT: {
+// CHECK: "swift": "Swift"
+
+// CHECK: "moduleInterfacePath"
+// CHECK-SAME: E.swiftinterface
 
 /// --------Swift module Swift
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",

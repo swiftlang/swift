@@ -16,7 +16,7 @@ public let s = S<Int>(t: 0)
 // DWARF: !DICompositeType(tag: DW_TAG_structure_type,
 // DWARF-SAME:             templateParams: ![[PARAMS:[0-9]+]]
 // DWARF-SAME:             identifier: "$s18BoundGenericStruct1SVySiGD"
-// DWARF-SAME:             specification_of:
+// DWARF-SAME:             specification:
 
 // DWARF: ![[PARAMS]] = !{![[INTPARAM:[0-9]+]]}
 // DWARF: ![[INTPARAM]] = !DITemplateTypeParameter(type: ![[INT:[0-9]+]])
@@ -42,7 +42,7 @@ public let inner = S2<Double>.Inner(t:4.2)
 
 // DWARF: !DICompositeType(tag: DW_TAG_structure_type, scope: ![[SCOPE1:[0-9]+]],
 // DWARF-SAME: size: 64, {{.*}}, templateParams: ![[PARAMS2:[0-9]+]], identifier: "$s18BoundGenericStruct2S2V5InnerVySd_GD"
-// DWARF-SAME: specification_of: ![[SPECIFICATION:[0-9]+]]
+// DWARF-SAME: specification: ![[SPECIFICATION:[0-9]+]]
 
 // DWARF: ![[SCOPE1]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s18BoundGenericStruct2S2VyxGD", 
 

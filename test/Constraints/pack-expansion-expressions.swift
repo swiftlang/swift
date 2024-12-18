@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.9-abi-triple
 
 func tuplify<each T>(_ t: repeat each T) -> (repeat each T) {
   return (repeat each t)
@@ -647,7 +647,6 @@ do {
     // FIXME: The count of '(Int, Int), repeat each U' is not statically known, but error suggests that it is 2.
     S<(Int, Int), repeat each U>().method((3, 4))
     // expected-error@-1 {{pack expansion requires that '(Int, Int), repeat each U' and '(Int, Int)' have the same shape}}
-    // expected-error@-2 {{pack expansion requires that '' and 'each U' have the same shape}}
 
     // FIXME: The count of '(Int, Int), repeat each U' is not statically known, but error suggests that it is 2.
     S<(Int, Int), repeat each U>().property((3, 4))

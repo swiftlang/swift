@@ -159,6 +159,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RandomTree
     single-source/RandomValues
     single-source/RangeAssignment
+    single-source/RangeContains
     single-source/RangeIteration
     single-source/RangeOverlaps
     single-source/RangeReplaceableCollectionPlusDefault

@@ -88,7 +88,7 @@ public:
 struct SourceFileParsingResult {
   ArrayRef<ASTNode> TopLevelItems;
   std::optional<ArrayRef<Token>> CollectedTokens;
-  std::optional<StableHasher> InterfaceHasher;
+  std::optional<Fingerprint> Fingerprint;
 };
 
 /// Parse the top-level items of a SourceFile.

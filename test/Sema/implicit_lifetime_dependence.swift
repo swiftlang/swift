@@ -1,10 +1,12 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature LifetimeDependence
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct BufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeRawBufferPointer?
   let c: Int
-  init(_ ptr: UnsafeRawBufferPointer?, _ c: Int) -> dependsOn(ptr) Self {
+  @lifetime(borrow ptr)
+  init(_ ptr: UnsafeRawBufferPointer?, _ c: Int) {
     self.ptr = ptr
     self.c = c
   }

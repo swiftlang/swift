@@ -23,7 +23,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
       set(extra_c_compile_flags -D__MACH__ -D__APPLE__ -ffreestanding)
     endif()
-    
+    list(APPEND extra_c_compile_flags -nostdinc++)
+
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")

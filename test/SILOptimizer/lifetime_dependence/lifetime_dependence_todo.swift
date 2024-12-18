@@ -1,10 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -o /dev/null \
 // RUN:   -verify \
-// RUN:   -sil-verify-all \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -sil-verify-all
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
 // Future tests for LifetimeDependenceDiagnostics.

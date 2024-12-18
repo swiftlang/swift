@@ -111,7 +111,7 @@ std::string toMangledTypeNameString(const swift::Type &Type) {
   auto PrintingType = Type;
   if (Type->hasArchetype())
     PrintingType = Type->mapTypeOutOfContext();
-  return Mangle::ASTMangler().mangleTypeWithoutPrefix(PrintingType->getCanonicalType());
+  return Mangle::ASTMangler(Type->getASTContext()).mangleTypeWithoutPrefix(PrintingType->getCanonicalType());
 }
 
 } // namespace
@@ -294,12 +294,12 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
 
       if (functionKind == ExprKind::DeclRef) {
         auto declRefExpr = cast<DeclRefExpr>(callExpr->getFn());
-        auto caseName =
+        auto identifier =
             declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
 
         std::vector<FunctionParameter> parameters =
             extractFunctionArguments(callExpr->getArgs());
-        return std::make_shared<FunctionCallValue>(caseName, parameters);
+        return std::make_shared<FunctionCallValue>(identifier, parameters);
       }
 
       if (functionKind == ExprKind::ConstructorRefCall) {
@@ -313,12 +313,33 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
         auto fn = dotSyntaxCallExpr->getFn();
         if (fn->getKind() == ExprKind::DeclRef) {
           auto declRefExpr = cast<DeclRefExpr>(fn);
-          auto caseName =
+          auto baseIdentifierName =
               declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
 
           std::vector<FunctionParameter> parameters =
               extractFunctionArguments(callExpr->getArgs());
-          return std::make_shared<EnumValue>(caseName, parameters);
+
+          auto declRef = dotSyntaxCallExpr->getFn()->getReferencedDecl();
+          switch (declRef.getDecl()->getKind()) {
+          case DeclKind::EnumElement: {
+            return std::make_shared<EnumValue>(baseIdentifierName, parameters);
+          }
+
+          case DeclKind::Func: {
+            auto identifier = declRefExpr->getDecl()
+                                  ->getName()
+                                  .getBaseIdentifier()
+                                  .str()
+                                  .str();
+
+            return std::make_shared<StaticFunctionCallValue>(
+                identifier, callExpr->getType(), parameters);
+          }
+
+          default: {
+            break;
+          }
+          }
         }
       }
 
@@ -836,6 +857,27 @@ void writeValue(llvm::json::OStream &JSON,
     break;
   }
 
+  case CompileTimeValue::ValueKind::StaticFunctionCall: {
+    auto staticFunctionCallValue = cast<StaticFunctionCallValue>(value);
+
+    JSON.attribute("valueKind", "StaticFunctionCall");
+    JSON.attributeObject("value", [&]() {
+      JSON.attribute("type", toFullyQualifiedTypeNameString(
+                                 staticFunctionCallValue->getType()));
+      JSON.attribute("memberLabel", staticFunctionCallValue->getLabel());
+      JSON.attributeArray("arguments", [&] {
+        for (auto FP : staticFunctionCallValue->getParameters()) {
+          JSON.object([&] {
+            JSON.attribute("label", FP.Label);
+            JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
+            writeValue(JSON, FP.Value);
+          });
+        }
+      });
+    });
+    break;
+  }
+
   case CompileTimeValue::ValueKind::MemberReference: {
     auto memberReferenceValue = cast<MemberReferenceValue>(value);
     JSON.attribute("valueKind", "MemberReference");
@@ -846,6 +888,7 @@ void writeValue(llvm::json::OStream &JSON,
     });
     break;
   }
+
   case CompileTimeValue::ValueKind::InterpolatedString: {
     auto interpolatedStringValue = cast<InterpolatedStringLiteralValue>(value);
     JSON.attribute("valueKind", "InterpolatedStringLiteral");
@@ -1062,14 +1105,11 @@ createBuilderCompileTimeValue(CustomAttr *AttachedResultBuilder,
 void writeSingleBuilderMemberElement(
     llvm::json::OStream &JSON, std::shared_ptr<CompileTimeValue> Element) {
   switch (Element.get()->getKind()) {
-  case CompileTimeValue::ValueKind::Enum: {
-    auto enumValue = cast<EnumValue>(Element.get());
-    if (enumValue->getIdentifier() == "buildExpression") {
-      if (enumValue->getParameters().has_value()) {
-        auto params = enumValue->getParameters().value();
-        for (auto FP : params) {
-          writeValue(JSON, FP.Value);
-        }
+  case CompileTimeValue::ValueKind::StaticFunctionCall: {
+    auto staticFunctionCallValue = cast<StaticFunctionCallValue>(Element.get());
+    if (staticFunctionCallValue->getLabel() == "buildExpression") {
+      for (auto FP : staticFunctionCallValue->getParameters()) {
+        writeValue(JSON, FP.Value);
       }
     }
     break;
@@ -1350,6 +1390,26 @@ void writeConformances(llvm::json::OStream &JSON,
   });
 }
 
+void writeAllConformances(llvm::json::OStream &JSON,
+                          const NominalTypeDecl &NomTypeDecl) {
+  JSON.attributeArray("allConformances", [&] {
+    for (auto *Conformance : NomTypeDecl.getAllConformances()) {
+      auto Proto = Conformance->getProtocol();
+      // FIXME(noncopyable_generics): Should these be included?
+      if (Proto->getInvertibleProtocolKind())
+        continue;
+
+      JSON.object([&] {
+        JSON.attribute("protocolName",
+                       toFullyQualifiedProtocolNameString(*Proto));
+        JSON.attribute(
+            "conformanceDefiningModule",
+            Conformance->getDeclContext()->getParentModule()->getName().str());
+      });
+    }
+  });
+}
+
 void writeTypeName(llvm::json::OStream &JSON, const TypeDecl &TypeDecl) {
   JSON.attribute("typeName",
                  toFullyQualifiedTypeNameString(
@@ -1383,6 +1443,10 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
         writeNominalTypeKind(JSON, *NomTypeDecl);
         writeLocationInformation(JSON, SourceLoc, Ctx);
         writeConformances(JSON, *NomTypeDecl);
+
+        // "conformances" will be removed once all clients move to
+        // "allConformances"
+        writeAllConformances(JSON, *NomTypeDecl);
         writeAssociatedTypeAliases(JSON, *NomTypeDecl);
         writeProperties(JSON, TypeInfo, *NomTypeDecl);
         writeEnumCases(JSON, TypeInfo.EnumElements);

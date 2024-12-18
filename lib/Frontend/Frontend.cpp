@@ -200,6 +200,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
   serializationOpts.UserModuleVersion = opts.UserModuleVersion;
   serializationOpts.AllowableClients = opts.AllowableClients;
+  serializationOpts.SerializeDebugInfoSIL = opts.SerializeDebugInfoSIL;
 
   serializationOpts.PublicDependentLibraries =
       getIRGenOptions().PublicLinkLibraries;
@@ -302,7 +303,8 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
       Invocation.getSILOptions(), Invocation.getSearchPathOptions(),
       Invocation.getClangImporterOptions(), Invocation.getSymbolGraphOptions(),
-      Invocation.getCASOptions(), SourceMgr, Diagnostics, OutputBackend));
+      Invocation.getCASOptions(), Invocation.getSerializationOptions(),
+      SourceMgr, Diagnostics, OutputBackend));
   if (!Invocation.getFrontendOptions().ModuleAliasMap.empty())
     Context->setModuleAliases(Invocation.getFrontendOptions().ModuleAliasMap);
 
@@ -384,7 +386,8 @@ void CompilerInstance::setupStatsReporter() {
       Invoke.getFrontendOptions().FineGrainedTimers,
       Invoke.getFrontendOptions().TraceStats,
       Invoke.getFrontendOptions().ProfileEvents,
-      Invoke.getFrontendOptions().ProfileEntities);
+      Invoke.getFrontendOptions().ProfileEntities,
+      Invoke.getFrontendOptions().PrintZeroStats);
   // Hand the stats reporter down to the ASTContext so the rest of the compiler
   // can use it.
   getASTContext().setStatsReporter(Reporter.get());
@@ -483,6 +486,7 @@ void CompilerInstance::setupOutputBackend() {
     auto &InAndOuts = Invocation.getFrontendOptions().InputsAndOutputs;
     CASOutputBackend = createSwiftCachingOutputBackend(
         *CAS, *ResultCache, *CompileJobBaseKey, InAndOuts,
+        Invocation.getFrontendOptions(),
         Invocation.getFrontendOptions().RequestedAction);
 
     if (Invocation.getIRGenOptions().UseCASBackend) {
@@ -562,7 +566,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     return true;
   }
 
-  setupStatsReporter();
+  if (hasASTContext()) {
+    setupStatsReporter();
+  }
 
   if (setupDiagnosticVerifierIfNeeded()) {
     Error = "Setting up diagnostics verifier failed";
@@ -818,8 +824,11 @@ bool CompilerInstance::setUpModuleLoaders() {
   }
 
   // Configure ModuleInterfaceChecker for the ASTContext.
+  auto CacheFromInvocation = getInvocation().getClangModuleCachePath();
   auto const &Clang = clangImporter->getClangInstance();
-  std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
+  std::string ModuleCachePath = CacheFromInvocation.empty()
+                                    ? getModuleCachePathFromClang(Clang)
+                                    : CacheFromInvocation.str();
   auto &FEOpts = Invocation.getFrontendOptions();
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   Context->addModuleInterfaceChecker(
@@ -1443,10 +1452,13 @@ bool CompilerInstance::createFilesForMainModule(
 }
 
 ModuleDecl *CompilerInstance::getMainModule() const {
-  if (!MainModule) {
-    Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-    MainModule = ModuleDecl::createMainModule(*Context, ID,
-                                              getImplicitImportInfo());
+  if (MainModule)
+    return MainModule;
+
+  Identifier ID = Context->getIdentifier(Invocation.getModuleName());
+  MainModule = ModuleDecl::createMainModule(
+      *Context, ID, getImplicitImportInfo(),
+      [&](ModuleDecl *MainModule, auto addFile) {
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
     if (Invocation.getFrontendOptions().EnablePrivateImports)
@@ -1476,7 +1488,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().isSwiftVersionAtLeast(6))
       MainModule->setIsConcurrencyChecked(true);
     if (Invocation.getLangOptions().EnableCXXInterop &&
-        Invocation.getLangOptions().RequireCxxInteropToImportCxxInteropModule)
+        Invocation.getLangOptions()
+            .RequireCxxInteropToImportCxxInteropModule)
       MainModule->setHasCxxInteroperability();
     if (Invocation.getLangOptions().EnableCXXInterop)
       MainModule->setCXXStdlibKind(Invocation.getLangOptions().CXXStdlib);
@@ -1484,6 +1497,13 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setAllowNonResilientAccess();
     if (Invocation.getSILOptions().EnableSerializePackage)
       MainModule->setSerializePackageEnabled();
+
+    if (!Invocation.getFrontendOptions()
+             .SwiftInterfaceCompilerVersion.empty()) {
+      auto compilerVersion =
+          Invocation.getFrontendOptions().SwiftInterfaceCompilerVersion;
+      MainModule->setSwiftInterfaceCompilerVersion(compilerVersion);
+    }
 
     // Register the main module with the AST context.
     Context->addLoadedModule(MainModule);
@@ -1493,7 +1513,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     SmallVector<FileUnit *, 16> files;
     if (!createFilesForMainModule(MainModule, files)) {
       for (auto *file : files)
-        MainModule->addFile(*file);
+        addFile(file);
     } else {
       // If we failed to load a partial module, mark the main module as having
       // "failed to load", as it will contain no files. Note that we don't try
@@ -1502,7 +1522,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       // into a partial module that failed to load.
       MainModule->setFailedToLoad();
     }
-  }
+  });
   return MainModule;
 }
 
@@ -1539,19 +1559,8 @@ bool CompilerInstance::performParseAndResolveImportsOnly() {
     }
   }
 
-  // Resolve imports for all the source files.
-  for (auto *file : mainModule->getFiles()) {
-    if (auto *SF = dyn_cast<SourceFile>(file))
-      performImportResolution(*SF);
-  }
-
-  assert(llvm::all_of(mainModule->getFiles(), [](const FileUnit *File) -> bool {
-    auto *SF = dyn_cast<SourceFile>(File);
-    if (!SF)
-      return true;
-    return SF->ASTStage >= SourceFile::ImportsResolved;
-  }) && "some files have not yet had their imports resolved");
-  mainModule->setHasResolvedImports();
+  // Resolve imports for all the source files in the module.
+  performImportResolution(mainModule);
 
   bindExtensions(*mainModule);
   return Context->hadError();

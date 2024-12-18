@@ -179,6 +179,9 @@ DiagnosticState::DiagnosticState() {
   warningsAsErrors.resize(LocalDiagID::NumDiags);
 }
 
+Diagnostic::Diagnostic(DiagID ID)
+    : Diagnostic(ID, storedDiagnosticInfos[(unsigned)ID].groupID) {}
+
 static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
   return CharSourceRange(SM, SR.Start, Lexer::getLocForEndOfToken(SM, SR.End));
 }
@@ -222,6 +225,13 @@ InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
   if (Engine && Start.isValid())
     Engine->getActiveDiagnostic()
         .addRange(toCharSourceRange(Engine->SourceMgr, Start, End));
+  return *this;
+}
+
+InFlightDiagnostic &InFlightDiagnostic::highlightChars(CharSourceRange Range) {
+  assert(IsActive && "Cannot modify an inactive diagnostic");
+  if (Engine && Range.getStart().isValid())
+    Engine->getActiveDiagnostic().addRange(Range);
   return *this;
 }
 
@@ -457,8 +467,8 @@ InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
       limit(Engine->getActiveDiagnostic().BehaviorLimit,
             DiagnosticBehavior::Unspecified);
 
-  Engine->WrappedDiagnostics.push_back(
-       *Engine->diagnosticInfoForDiagnostic(Engine->getActiveDiagnostic()));
+  Engine->WrappedDiagnostics.push_back(*Engine->diagnosticInfoForDiagnostic(
+      Engine->getActiveDiagnostic(), /* includeDiagnosticName= */ false));
 
   Engine->state.swap(tempState);
 
@@ -471,6 +481,7 @@ InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
   // Overwrite the ID and argument with those from the wrapper.
   Engine->getActiveDiagnostic().ID = wrapper.ID;
   Engine->getActiveDiagnostic().Args = wrapper.Args;
+  // Intentionally keeping the original GroupID here
 
   // Set the argument to the diagnostic being wrapped.
   assert(wrapper.getArgs().front().getKind() == DiagnosticArgumentKind::Diagnostic);
@@ -700,8 +711,8 @@ static bool typeSpellingIsAmbiguous(Type type,
   for (auto arg : Args) {
     if (arg.getKind() == DiagnosticArgumentKind::Type) {
       auto argType = arg.getAsType();
-      if (argType && argType->getWithoutParens().getPointer() != type.getPointer() &&
-          argType->getWithoutParens().getString(PO) == type.getString(PO)) {
+      if (argType && argType.getPointer() != type.getPointer() &&
+          argType.getString(PO) == type.getString(PO)) {
         // Currently, existential types are spelled the same way
         // as protocols and compositions. We can remove this once
         // existenials are printed with 'any'.
@@ -893,41 +904,20 @@ static void formatDiagnosticArgument(StringRef Modifier,
     // Compute the appropriate print options for this argument.
     auto printOptions = PrintOptions::forDiagnosticArguments();
     if (Arg.getKind() == DiagnosticArgumentKind::Type) {
-      type = Arg.getAsType()->getWithoutParens();
-      if (type.isNull()) {
-        // FIXME: We should never receive a nullptr here, but this is causing
-        // crashes (rdar://75740683). Remove once ParenType never contains
-        // nullptr as the underlying type.
-        Out << "<null>";
-        break;
-      }
+      type = Arg.getAsType();
       if (type->getASTContext().TypeCheckerOpts.PrintFullConvention)
         printOptions.PrintFunctionRepresentationAttrs =
             PrintOptions::FunctionRepresentationMode::Full;
       needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
     } else if (Arg.getKind() == DiagnosticArgumentKind::FullyQualifiedType) {
-      type = Arg.getAsFullyQualifiedType().getType()->getWithoutParens();
-      if (type.isNull()) {
-        // FIXME: We should never receive a nullptr here, but this is causing
-        // crashes (rdar://75740683). Remove once ParenType never contains
-        // nullptr as the underlying type.
-        Out << "<null>";
-        break;
-      }
+      type = Arg.getAsFullyQualifiedType().getType();
       if (type->getASTContext().TypeCheckerOpts.PrintFullConvention)
         printOptions.PrintFunctionRepresentationAttrs =
             PrintOptions::FunctionRepresentationMode::Full;
       needsQualification = true;
     } else {
       assert(Arg.getKind() == DiagnosticArgumentKind::WitnessType);
-      type = Arg.getAsWitnessType().getType()->getWithoutParens();
-      if (type.isNull()) {
-        // FIXME: We should never receive a nullptr here, but this is causing
-        // crashes (rdar://75740683). Remove once ParenType never contains
-        // nullptr as the underlying type.
-        Out << "<null>";
-        break;
-      }
+      type = Arg.getAsWitnessType().getType();
       printOptions.PrintGenericRequirements = false;
       printOptions.PrintInverseRequirements = false;
       needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
@@ -1261,8 +1251,8 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
     anyErrorOccurred = true;
   }
 
-  assert((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
-  assert((!AssertOnWarning || (lvl != DiagnosticBehavior::Warning)) &&
+  ASSERT((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
+  ASSERT((!AssertOnWarning || (lvl != DiagnosticBehavior::Warning)) &&
          "We emitted a warning?!");
 
   previousBehavior = lvl;
@@ -1308,7 +1298,8 @@ void DiagnosticEngine::forwardTentativeDiagnosticsTo(
 }
 
 std::optional<DiagnosticInfo>
-DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
+DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
+                                              bool includeDiagnosticName) {
   auto behavior = state.determineBehavior(diagnostic);
   if (behavior == DiagnosticBehavior::Ignore)
     return std::nullopt;
@@ -1350,6 +1341,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
 #include "swift/Basic/MacroRoles.def"
       case GeneratedSourceInfo::PrettyPrinted:
       case GeneratedSourceInfo::DefaultArgument:
+      case GeneratedSourceInfo::AttributeFromClang:
         fixIts = {};
         break;
       case GeneratedSourceInfo::ReplacedFunctionBody:
@@ -1360,12 +1352,19 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
     }
   }
 
-  return DiagnosticInfo(
-      diagnostic.getID(), loc, toDiagnosticKind(behavior),
-      diagnosticStringFor(diagnostic.getID(), getPrintDiagnosticNamesMode()),
-      diagnostic.getArgs(), Category, getDefaultDiagnosticLoc(),
-      /*child note info*/ {}, diagnostic.getRanges(), fixIts,
-      diagnostic.isChildNote());
+  llvm::StringRef format;
+  if (includeDiagnosticName)
+    format =
+        diagnosticStringWithNameFor(diagnostic.getID(), diagnostic.getGroupID(),
+                                    getPrintDiagnosticNamesMode());
+  else
+    format = diagnosticStringFor(diagnostic.getID());
+
+  return DiagnosticInfo(diagnostic.getID(), loc, toDiagnosticKind(behavior),
+                        format, diagnostic.getArgs(), Category,
+                        getDefaultDiagnosticLoc(),
+                        /*child note info*/ {}, diagnostic.getRanges(), fixIts,
+                        diagnostic.isChildNote());
 }
 
 static DeclName
@@ -1395,6 +1394,7 @@ getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     return DeclName();
   }
 }
@@ -1456,6 +1456,7 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
 
     case GeneratedSourceInfo::DefaultArgument:
     case GeneratedSourceInfo::ReplacedFunctionBody:
+    case GeneratedSourceInfo::AttributeFromClang:
       return childNotes;
     }
 
@@ -1473,7 +1474,9 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   ArrayRef<Diagnostic> childNotes = diagnostic.getChildNotes();
   std::vector<Diagnostic> extendedChildNotes;
 
-  if (auto info = diagnosticInfoForDiagnostic(diagnostic)) {
+  if (auto info =
+          diagnosticInfoForDiagnostic(diagnostic,
+                                      /* includeDiagnosticName= */ true)) {
     // If the diagnostic location is within a buffer containing generated
     // source code, add child notes showing where the generation occurred.
     // We need to avoid doing this if this is itself a child note, as otherwise
@@ -1489,7 +1492,9 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
 
     SmallVector<DiagnosticInfo, 1> childInfo;
     for (unsigned i : indices(childNotes)) {
-      auto child = diagnosticInfoForDiagnostic(childNotes[i]);
+      auto child =
+          diagnosticInfoForDiagnostic(childNotes[i],
+                                      /* includeDiagnosticName= */ true);
       assert(child);
       assert(child->Kind == DiagnosticKind::Note &&
              "Expected child diagnostics to all be notes?!");
@@ -1527,12 +1532,18 @@ DiagnosticKind DiagnosticEngine::declaredDiagnosticKindFor(const DiagID id) {
   return storedDiagnosticInfos[(unsigned)id].kind;
 }
 
-llvm::StringRef DiagnosticEngine::diagnosticStringFor(
-    const DiagID id, PrintDiagnosticNamesMode printDiagnosticNamesMode) {
+llvm::StringRef DiagnosticEngine::diagnosticStringFor(DiagID id) {
   llvm::StringRef message = diagnosticStrings[(unsigned)id];
   if (auto localizationProducer = localization.get()) {
     message = localizationProducer->getMessageOr(id, message);
   }
+  return message;
+}
+
+llvm::StringRef DiagnosticEngine::diagnosticStringWithNameFor(
+    DiagID id, DiagGroupID groupID,
+    PrintDiagnosticNamesMode printDiagnosticNamesMode) {
+  auto message = diagnosticStringFor(id);
   auto formatMessageWithName = [&](StringRef message, StringRef name) {
     const int additionalCharsLength = 3; // ' ', '[', ']'
     std::string messageWithName;
@@ -1551,7 +1562,6 @@ llvm::StringRef DiagnosticEngine::diagnosticStringFor(
     message = formatMessageWithName(message, diagnosticIDStringFor(id));
     break;
   case PrintDiagnosticNamesMode::Group:
-    auto groupID = storedDiagnosticInfos[(unsigned)id].groupID;
     if (groupID != DiagGroupID::no_group) {
       message =
           formatMessageWithName(message, getDiagGroupInfoByID(groupID).name);

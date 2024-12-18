@@ -221,3 +221,12 @@ extension NewGeneric {
     return NewGeneric()
   }
 }
+extension (NewGeneric) {
+  static func oldMember2() -> OldGeneric {
+    return OldGeneric()
+  }
+
+  static func newMember2() -> NewGeneric {
+    return NewGeneric()
+  }
+}

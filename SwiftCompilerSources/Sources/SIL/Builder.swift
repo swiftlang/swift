@@ -24,13 +24,25 @@ public struct Builder {
     case staticInitializer(GlobalVariable)
   }
 
-  let insertAt: InsertionPoint
+  public let insertionPoint: InsertionPoint
   let location: Location
   private let notificationHandler: BridgedChangeNotificationHandler
   private let notifyNewInstruction: (Instruction) -> ()
 
+  /// Return 'nil' when inserting at the start of a function or in a global initializer.
+  public var insertionBlock: BasicBlock? {
+    switch insertionPoint {
+    case let .before(inst):
+      return inst.parentBlock
+    case let .atEndOf(block):
+      return block
+    case .atStartOf, .staticInitializer:
+      return nil
+    }
+  }
+
   public var bridged: BridgedBuilder {
-    switch insertAt {
+    switch insertionPoint {
     case .before(let inst):
       return BridgedBuilder(insertAt: .beforeInst, insertionObj: inst.bridged.obj,
                             loc: location.bridged)
@@ -61,7 +73,7 @@ public struct Builder {
   public init(insertAt: InsertionPoint, location: Location,
               _ notifyNewInstruction: @escaping (Instruction) -> (),
               _ notificationHandler: BridgedChangeNotificationHandler) {
-    self.insertAt = insertAt
+    self.insertionPoint = insertAt
     self.location = location;
     self.notifyNewInstruction = notifyNewInstruction
     self.notificationHandler = notificationHandler
@@ -205,8 +217,14 @@ public struct Builder {
     return notifyNew(bridged.createCopyValue(operand.bridged).getAs(CopyValueInst.self))
   }
 
-  public func createBeginBorrow(of value: Value) -> BeginBorrowInst {
-    return notifyNew(bridged.createBeginBorrow(value.bridged).getAs(BeginBorrowInst.self))
+  public func createBeginBorrow(
+    of value: Value,
+    isLexical: Bool = false,
+    hasPointerEscape: Bool = false,
+    isFromVarDecl: Bool = false
+  ) -> BeginBorrowInst {
+    return notifyNew(bridged.createBeginBorrow(value.bridged,
+             isLexical, hasPointerEscape, isFromVarDecl).getAs(BeginBorrowInst.self))
   }
 
   public func createBorrowedFrom(borrowedValue: Value, enclosingValues: [Value]) -> BorrowedFromInst {
@@ -474,6 +492,18 @@ public struct Builder {
   public func createEndAccess(beginAccess: BeginAccessInst) -> EndAccessInst {
       let endAccess = bridged.createEndAccess(beginAccess.bridged)
       return notifyNew(endAccess.getAs(EndAccessInst.self))
+  }
+
+  @discardableResult
+  public func createEndApply(beginApply: BeginApplyInst) -> EndApplyInst {
+    let endApply = bridged.createEndApply(beginApply.token.bridged)
+    return notifyNew(endApply.getAs(EndApplyInst.self))
+  }
+
+  @discardableResult
+  public func createAbortApply(beginApply: BeginApplyInst) -> AbortApplyInst {
+    let endApply = bridged.createAbortApply(beginApply.token.bridged)
+    return notifyNew(endApply.getAs(AbortApplyInst.self))
   }
 
   public func createConvertFunction(originalFunction: Value, resultType: Type, withoutActuallyEscaping: Bool) -> ConvertFunctionInst {

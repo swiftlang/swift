@@ -340,6 +340,11 @@ public:
   ManagedValue createUncheckedBitCast(SILLocation loc, ManagedValue original,
                                       SILType type);
 
+  using SILBuilder::createUncheckedForwardingCast;
+  ManagedValue createUncheckedForwardingCast(SILLocation loc,
+                                             ManagedValue original,
+                                             SILType type);
+
   using SILBuilder::createOpenExistentialRef;
   ManagedValue createOpenExistentialRef(SILLocation loc, ManagedValue arg,
                                         SILType openedType);
@@ -535,6 +540,11 @@ public:
 
     createTupleAddrConstructor(loc, destAddr, values, isInitOfDest);
   }
+
+  using SILBuilder::createHopToMainActorIfNeededThunk;
+  ManagedValue
+  createHopToMainActorIfNeededThunk(SILLocation loc, ManagedValue op,
+                                    SubstitutionMap substitutionMap = {});
 };
 
 } // namespace Lowering

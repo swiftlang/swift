@@ -345,6 +345,12 @@ public:
     return {};
   }
 
+  /// Returns the version of the Swift compiler used to create generate
+  /// .swiftinterface file if this file is produced from one.
+  virtual version::Version getSwiftInterfaceCompilerVersion() const {
+    return {};
+  }
+
   SWIFT_DEBUG_DUMPER(dumpDisplayDecls());
   SWIFT_DEBUG_DUMPER(dumpTopLevelDecls());
 
@@ -480,9 +486,11 @@ void simple_display(llvm::raw_ostream &out, const FileUnit *file);
 inline FileUnit &ModuleDecl::getMainFile(FileUnitKind expectedKind) const {
   assert(expectedKind != FileUnitKind::Source &&
          "must use specific source kind; see getMainSourceFile");
-  assert(!Files.empty() && "No files added yet");
-  assert(Files.front()->getKind() == expectedKind);
-  return *Files.front();
+
+  auto files = getFiles();
+  assert(!files.empty() && "No files in module");
+  assert(files.front()->getKind() == expectedKind);
+  return *files.front();
 }
 
 } // end namespace swift

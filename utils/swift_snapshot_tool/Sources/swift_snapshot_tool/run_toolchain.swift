@@ -1,3 +1,14 @@
+//===--- run_toolchain.swift ----------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
 import ArgumentParser
 import Foundation
@@ -6,9 +17,9 @@ struct RunToolchains: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "run",
     discussion: """
-      Run a toolchain like bisect would. Passes in name of swift as the
-      environment variabless SWIFTC and SWIFT_FRONTEND
-      """)
+    Run a toolchain like bisect would. Passed the environment variables:
+    \(environmentVariables)
+    """)
 
   @Flag var platform: Platform = .osx
 
@@ -56,7 +67,7 @@ struct RunToolchains: AsyncParsableCommand {
     }
 
     // Load our tags from swift's github repo
-    let tags = try! await getTagsFromSwiftRepo(branch: branch, dryRun: true)
+    let tags = try! await getTagsFromSwiftRepo(branch: branch)
 
     guard var tagIndex = tags.firstIndex(where: { $0.tag.name == self.tag }) else {
       log("Failed to find tag: \(self.tag)")

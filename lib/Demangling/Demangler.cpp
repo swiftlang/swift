@@ -185,6 +185,7 @@ int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
     /*Swift 4*/   "_T0",
     /*Swift 4.x*/ "$S", "_$S",
     /*Swift 5+*/  "$s", "_$s",
+    /*Swift 5+ Embedded Swift*/  "$e", "_$e",
     /*Swift 5+ for filenames*/ "@__swiftmacro_",
   };
 
@@ -324,7 +325,8 @@ bool swift::Demangle::isStruct(llvm::StringRef mangledName) {
 }
 
 std::string swift::Demangle::mangledNameForTypeMetadataAccessor(
-    StringRef moduleName, StringRef typeName, Node::Kind typeKind) {
+    StringRef moduleName, StringRef typeName, Node::Kind typeKind,
+    Mangle::ManglingFlavor Flavor) {
   using namespace Demangle;
 
   //  kind=Global
@@ -353,7 +355,7 @@ std::string swift::Demangle::mangledNameForTypeMetadataAccessor(
     global->addChild(nominalDescriptor, D);
   }
 
-  auto mangleResult = mangleNode(global);
+  auto mangleResult = mangleNode(global, Flavor);
   assert(mangleResult.isSuccess());
   return mangleResult.result();
 }
@@ -747,6 +749,9 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
   if (PrefixLength == 0)
     return nullptr;
 
+  if (MangledName.starts_with(MANGLING_PREFIX_EMBEDDED_STR))
+    Flavor = ManglingFlavor::Embedded;
+
   IsOldFunctionTypeMangling = isOldFunctionTypeMangling(MangledName);
   Pos += PrefixLength;
 
@@ -756,6 +761,8 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
     return nullptr;
 
   NodePointer topLevel = createNode(Node::Kind::Global);
+
+  NodePointer suffix = popNode(Node::Kind::Suffix);
 
   NodePointer Parent = topLevel;
   while (NodePointer FuncAttr = popNode(isFunctionAttr)) {
@@ -774,6 +781,9 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
         break;
     }
   }
+  if (suffix)
+    topLevel->addChild(suffix, *this);
+
   if (topLevel->getNumChildren() == 0)
     return nullptr;
 
@@ -799,6 +809,12 @@ NodePointer Demangler::demangleType(StringRef MangledName,
 bool Demangler::parseAndPushNodes() {
   const auto textSize = Text.size();
   while (Pos < textSize) {
+    // Programs may look up a type by NUL-terminated name with an excessive
+    // length. Keep them working by returning success if we encounter a NUL in
+    // the middle of the string where an operator is expected.
+    if (peekChar() == '\0')
+      return true;
+
     NodePointer Node = demangleOperator();
     if (!Node)
       return false;
@@ -1464,6 +1480,18 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
     }
+    case 'V': {
+      NodePointer element = popNode(Node::Kind::Type);
+      if (!element)
+        return nullptr;
+      NodePointer size = popNode(Node::Kind::Type);
+      if (!size)
+        return nullptr;
+      Ty = createNode(Node::Kind::BuiltinFixedArray);
+      Ty->addChild(size, *this);
+      Ty->addChild(element, *this);
+      break;
+    }
     case 'O':
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                BUILTIN_TYPE_NAME_UNKNOWNOBJECT);
@@ -1567,14 +1595,15 @@ static void setParentForOpaqueReturnTypeNodesImpl(
 /// Associate any \c OpaqueReturnType nodes with the declaration whose opaque
 /// return type they refer back to.
 static Node *setParentForOpaqueReturnTypeNodes(Demangler &D, Node *parent,
-                                               Node *visitedNode) {
+                                               Node *visitedNode,
+                                               ManglingFlavor Flavor) {
   if (!parent || !visitedNode)
     return nullptr;
   std::string parentID;
   setParentForOpaqueReturnTypeNodesImpl(D, *visitedNode, [&] {
     if (!parentID.empty())
       return StringRef(parentID);
-    const auto mangleResult = mangleNode(parent);
+    const auto mangleResult = mangleNode(parent, Flavor);
     assert(mangleResult.isSuccess());
     parentID = mangleResult.result();
     return StringRef(parentID);
@@ -1599,7 +1628,7 @@ NodePointer Demangler::demanglePlainFunction() {
     ? createWithChildren(Node::Kind::Function, Ctx, Name, LabelList, Type)
     : createWithChildren(Node::Kind::Function, Ctx, Name, Type);
     
-  result = setParentForOpaqueReturnTypeNodes(*this, result, Type);
+  result = setParentForOpaqueReturnTypeNodes(*this, result, Type, Flavor);
   return result;
 }
 
@@ -2345,6 +2374,8 @@ NodePointer Demangler::demangleImplFunctionType() {
   const char *CoroAttr = nullptr;
   if (nextIf('A'))
     CoroAttr = "yield_once";
+  else if (nextIf('I'))
+    CoroAttr = "yield_once_2";
   else if (nextIf('G'))
     CoroAttr = "yield_many";
   if (CoroAttr)
@@ -2789,6 +2820,18 @@ NodePointer Demangler::popProtocolConformance() {
 
 NodePointer Demangler::demangleThunkOrSpecialization() {
   switch (char c = nextChar()) {
+    // Thunks that are from a thunk inst. We take the TT namespace.
+    case 'T': {
+      switch (nextChar()) {
+      case 'I':
+        return createWithChild(Node::Kind::SILThunkIdentity, popNode(isEntity));
+      case 'H':
+        return createWithChild(Node::Kind::SILThunkHopToMainActorIfNeeded,
+                               popNode(isEntity));
+      default:
+        return nullptr;
+      }
+    }
     case 'c': return createWithChild(Node::Kind::CurryThunk, popNode(isEntity));
     case 'j': return createWithChild(Node::Kind::DispatchThunk, popNode(isEntity));
     case 'q': return createWithChild(Node::Kind::MethodDescriptor, popNode(isEntity));
@@ -4055,7 +4098,7 @@ NodePointer Demangler::demangleEntity(Node::Kind Kind) {
   auto result = LabelList ? createWithChildren(Kind, Context, Name, LabelList, Type)
                           : createWithChildren(Kind, Context, Name, Type);
                           
-  result = setParentForOpaqueReturnTypeNodes(*this, result, Type);
+  result = setParentForOpaqueReturnTypeNodes(*this, result, Type, Flavor);
   return result;
 }
 
@@ -4079,7 +4122,7 @@ NodePointer Demangler::demangleSubscript() {
   Subscript = addChild(Subscript, Type);
   addChild(Subscript, PrivateName);
   
-  Subscript = setParentForOpaqueReturnTypeNodes(*this, Subscript, Type);
+  Subscript = setParentForOpaqueReturnTypeNodes(*this, Subscript, Type, Flavor);
 
   return demangleAccessor(Subscript);
 }
@@ -4419,11 +4462,11 @@ NodePointer Demangler::demangleIntegerType() {
   switch (peekChar()) {
   case 'n':
     nextChar();
-    integer = createNode(Node::Kind::NegativeInteger, -demangleNatural());
+    integer = createNode(Node::Kind::NegativeInteger, -demangleIndex());
     break;
 
   default:
-    integer = createNode(Node::Kind::Integer, demangleNatural());
+    integer = createNode(Node::Kind::Integer, demangleIndex());
     break;
   }
 

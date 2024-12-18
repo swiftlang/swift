@@ -81,8 +81,10 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // the struct is equivalent to a ref count operation on the extracted
   // member. Strip off the extract.
   if (auto *SEI = dyn_cast<StructExtractInst>(V))
-    if (SEI->isFieldOnlyNonTrivialField() && !hasValueDeinit(SEI->getOperand()))
+    if (SEI->isFieldOnlyNonTrivialField() && !SEI->getOperand()->getType().isMoveOnly()) {
+      assert(!hasValueDeinit(SEI->getOperand()));
       return SEI->getOperand();
+    }
 
   // If we have a struct instruction with only one non-trivial stored field, the
   // only reference count that can be modified is the non-trivial field. Return

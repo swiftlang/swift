@@ -18,6 +18,7 @@
 #ifndef SWIFT_REFLECTION_TYPEREFBUILDER_H
 #define SWIFT_REFLECTION_TYPEREFBUILDER_H
 
+#include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Remote/ExternalTypeRefCache.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/RemoteInspection/DescriptorFinder.h"
@@ -400,6 +401,10 @@ public:
   TypeRefBuilder(const TypeRefBuilder &other) = delete;
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
 
+  Mangle::ManglingFlavor getManglingFlavor() {
+    return Mangle::ManglingFlavor::Default;
+  }
+
 private:
   Demangle::Demangler Dem;
 
@@ -529,7 +534,13 @@ public:
     bool reflectionNameMatches(RemoteRef<char> reflectionName,
                                StringRef searchName);
 
+    std::optional<std::reference_wrapper<const ReflectionInfo>>
+    findReflectionInfoWithTypeRefContainingAddress(uint64_t remoteAddr);
+
     std::vector<ReflectionInfo> ReflectionInfos;
+
+    // Sorted indexes of elements in ReflectionInfos.
+    std::vector<uint32_t> ReflectionInfoIndexesSortedByTypeReferenceRange;
 
     /// Indexes of Reflection Infos we've already processed.
     llvm::DenseSet<size_t> ProcessedReflectionInfoIndexes;
@@ -845,7 +856,7 @@ public:
   }
 
   BuiltTypeDecl createTypeDecl(Node *node, std::vector<size_t> paramsPerLevel) {
-    auto mangling = Demangle::mangleNode(node);
+    auto mangling = Demangle::mangleNode(node, getManglingFlavor());
     if (!mangling.isSuccess()) {
       return std::nullopt;
     }
@@ -858,7 +869,7 @@ public:
   }
 
   BuiltTypeDecl createTypeDecl(Node *node, bool &typeAlias) {
-    auto mangling = Demangle::mangleNode(node);
+    auto mangling = Demangle::mangleNode(node, getManglingFlavor());
     if (!mangling.isSuccess()) {
       return std::nullopt;
     }
@@ -870,7 +881,7 @@ public:
   }
 
   BuiltProtocolDecl createProtocolDecl(Node *node) {
-    auto mangling = Demangle::mangleNode(node);
+    auto mangling = Demangle::mangleNode(node, getManglingFlavor());
     if (!mangling.isSuccess()) {
       return std::nullopt;
     }
@@ -927,6 +938,12 @@ public:
     return nullptr;
   }
 
+  const TypeRef *createBuiltinFixedArrayType(const TypeRef *size,
+                                             const TypeRef *element) {
+    // FIXME: implement
+    return nullptr;
+  }
+
   // Construct a bound generic type ref along with the parent type info
   // The parent list contains every parent type with at least 1 generic
   // type parameter.
@@ -967,7 +984,7 @@ public:
     auto argBegin = args.begin();
     for (size_t i = 0; i < nodes.size(); i++) {
       // Get the mangling for this node
-      auto mangling = Demangle::mangleNode(nodes[i]);
+      auto mangling = Demangle::mangleNode(nodes[i], getManglingFlavor());
       if (!mangling.isSuccess()) {
         return nullptr;
       }
@@ -1010,7 +1027,7 @@ public:
       return nullptr;
     }
     auto startNode = node->getFirstChild();
-    auto mangling = Demangle::mangleNode(startNode);
+    auto mangling = Demangle::mangleNode(startNode, getManglingFlavor());
     if (!mangling.isSuccess()) {
       return nullptr;
     }
@@ -1095,7 +1112,8 @@ public:
       return underlyingTy->subst(*this, subs);
     }
 
-    auto mangling = mangleNode(opaqueDescriptor, SymbolicResolver(), Dem);
+    auto mangling = mangleNode(opaqueDescriptor, SymbolicResolver(), Dem,
+                               getManglingFlavor());
     if (!mangling.isSuccess())
       return nullptr;
 
@@ -2149,7 +2167,8 @@ private:
         std::string demangledTypeName =
             nodeToString(demangleTypeRef(typeTypeRef));
         std::string mangledTypeName;
-        auto typeMangling = Demangle::mangleNode(demangleTypeRef(typeTypeRef));
+        auto typeMangling = Demangle::mangleNode(demangleTypeRef(typeTypeRef),
+                                                 getManglingFlavor());
         if (!typeMangling.isSuccess())
           mangledTypeName = "";
         else
@@ -2244,7 +2263,8 @@ private:
           auto typeRoot = nomTypeDescriptorRoot->getChild(0);
           typeName = nodeToString(typeRoot);
 
-          auto typeMangling = Demangle::mangleNode(typeRoot);
+          auto typeMangling =
+              Demangle::mangleNode(typeRoot, Mangle::ManglingFlavor::Default);
           if (!typeMangling.isSuccess())
             mangledTypeName = "";
           else

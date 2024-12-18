@@ -608,7 +608,7 @@ SerializedKind_t CallSiteDescriptor::getSerializedKind() const {
 
 std::string CallSiteDescriptor::createName() const {
   auto P = Demangle::SpecializationPass::ClosureSpecializer;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, getSerializedKind(),
+  Mangle::FunctionSignatureSpecializationMangler Mangler(getApplyCallee()->getASTContext(), P, getSerializedKind(),
                                                          getApplyCallee());
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {

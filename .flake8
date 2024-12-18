@@ -44,6 +44,7 @@ filename =
 exclude =
     .git,
     __pycache__,
+    .build,
 
 ignore =
     # The black tool treats slices consistently, the E203 warning is not PEP8

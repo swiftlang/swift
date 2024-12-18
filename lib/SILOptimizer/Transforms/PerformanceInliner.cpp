@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
@@ -470,6 +471,16 @@ bool SILPerformanceInliner::isProfitableToInline(
   // Start with a base benefit.
   int BaseBenefit = isa<BeginApplyInst>(AI) ? RemovedCoroutineCallBenefit
                                             : RemovedCallBenefit;
+
+  // If function has more than 5 parameters / results, then increase base
+  // benefit for each additional parameter. We assume that for each extra
+  // parameter or result we'd eliminate extra pair of loads and stores used to
+  // pass / return value via stack.
+  unsigned numParameters = AI->getNumRealOperands(), numResults = AI->getNumResults();
+  if (numParameters > 5)
+    BaseBenefit += (RemovedLoadBenefit + RemovedStoreBenefit) * (numParameters - 5);
+  if (numResults > 5)
+    BaseBenefit += (RemovedLoadBenefit + RemovedStoreBenefit) * (numResults - 5);
 
   // Osize heuristic.
   //
@@ -1286,7 +1297,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (invalidatedStackNesting) {
     StackNesting::fixNesting(Caller);
   }
-  updateBorrowedFrom(pm, Caller);
+  updateAllGuaranteedPhis(pm, Caller);
 
   // If we were asked to verify our caller after inlining all callees we could
   // find into it, do so now. This makes it easier to catch verification bugs in
@@ -1362,6 +1373,7 @@ public:
     // can further optimize this function before attempting to inline
     // in it again.
     if (Inliner.inlineCallsIntoFunction(getFunction())) {
+      removeUnreachableBlocks(*getFunction());
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
       restartPassPipeline();
     }

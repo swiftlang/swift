@@ -296,9 +296,12 @@ public:
     if (!ForceGeneratedSourceToDisk) {
       auto BufferID = SM.findBufferContainingLoc(SL);
       if (auto generatedInfo = SM.getGeneratedSourceInfo(BufferID)) {
-        // We only care about macros, so skip everything else.
+        // We only care about macro expansion buffers,
+        // so skip everything else.
         if (generatedInfo->kind != GeneratedSourceInfo::ReplacedFunctionBody &&
-            generatedInfo->kind != GeneratedSourceInfo::PrettyPrinted)
+            generatedInfo->kind != GeneratedSourceInfo::PrettyPrinted &&
+            generatedInfo->kind != GeneratedSourceInfo::DefaultArgument &&
+            generatedInfo->kind != GeneratedSourceInfo::AttributeFromClang)
           if (auto *MemBuf = SM.getLLVMSourceMgr().getMemoryBuffer(BufferID)) {
             Source = MemBuf->getBuffer();
             // This is copying the buffer twice, but Xcode depends on this
@@ -341,6 +344,15 @@ public:
   IRGenDebugInfoFormat getDebugInfoFormat() { return Opts.DebugInfoFormat; }
 
 private:
+  /// Convert a SILLocation into the corresponding LLVM Loc.
+  FileAndLocation computeLLVMLoc(const SILDebugScope *DS, SILLocation Loc);
+
+  /// Compute the LLVM DebugLoc when targeting CodeView. In CodeView, zero is
+  /// not an artificial line location; attempt to avoid those line locations near
+  /// user code to reduce the number of breaks in the linetables.
+  FileAndLocation computeLLVMLocCodeView(const SILDebugScope *DS,
+                                         SILLocation Loc);
+
   static StringRef getFilenameFromDC(const DeclContext *DC) {
     if (auto *LF = dyn_cast<LoadedFile>(DC))
       return LF->getFilename();
@@ -839,6 +851,7 @@ private:
                               TheCU->getProducer(), true, StringRef(), 0,
                               RemappedASTFile, llvm::DICompileUnit::FullDebug,
                               Signature);
+        // NOTE: not setting DebugInfoForProfiling here
         DIB.finalize();
       }
     }
@@ -996,11 +1009,6 @@ private:
     // Strip off top level of type sugar (except for type aliases).
     // We don't want Optional<T> and T? to get different debug types.
     while (true) {
-      if (auto *ParenTy = dyn_cast<ParenType>(Ty.getPointer())) {
-        Ty = ParenTy->getUnderlyingType();
-        continue;
-      }
-
       if (auto *SugarTy = dyn_cast<SyntaxSugarType>(Ty.getPointer())) {
         Ty = SugarTy->getSinglyDesugaredType();
         continue;
@@ -1015,7 +1023,7 @@ private:
     Ty = Ty->replaceSubstitutedSILFunctionTypesWithUnsubstituted(
         IGM.getSILModule());
 
-    Mangle::ASTMangler Mangler;
+    Mangle::ASTMangler Mangler(IGM.Context);
     std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
 
     // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
@@ -1088,7 +1096,8 @@ private:
              "no mangled name and no human readable name given");
     else
       assert((UniqueID.starts_with("_T") ||
-              UniqueID.starts_with(MANGLING_PREFIX_STR)) &&
+              UniqueID.starts_with(MANGLING_PREFIX_STR) ||
+              UniqueID.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) &&
              "UID is not a mangled name");
 #endif
 
@@ -1188,7 +1197,7 @@ private:
 
     auto DbgTy = DebugTypeInfo::getFromTypeInfo(
         UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
-    Mangle::ASTMangler Mangler;
+    Mangle::ASTMangler Mangler(IGM.Context);
     std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
         UnsubstitutedTy->mapTypeOutOfContext(), {});
     if (DeclTypeMangledName == MangledName) {
@@ -1246,7 +1255,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
 
   auto DbgTy = DebugTypeInfo::getFromTypeInfo(
       UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(IGM.Context);
   std::string DeclTypeMangledName =
       Mangler.mangleTypeForDebugger(UnsubstitutedTy->mapTypeOutOfContext(), {});
   if (DeclTypeMangledName == MangledName) {
@@ -1389,21 +1398,9 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       }
     }
 
-    APInt SpareBitsMask;
-    auto &EnumStrategy =
-        getEnumImplStrategy(IGM, DbgTy.getType()->getCanonicalType());
-
-    auto VariantOffsetInBits = 0;
-    if (auto SpareBitsMaskInfo = EnumStrategy.calculateSpareBitsMask()) {
-      SpareBitsMask = SpareBitsMaskInfo->bits;
-      // The offset of the variant mask in the overall enum.
-      VariantOffsetInBits = SpareBitsMaskInfo->byteOffset * 8;
-    }
-
     auto VPTy = DBuilder.createVariantPart(
         Scope, {}, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
-        DBuilder.getOrCreateArray(Elements), /*UniqueIdentifier=*/"",
-        VariantOffsetInBits, SpareBitsMask);
+        DBuilder.getOrCreateArray(Elements), /*UniqueIdentifier=*/"");
 
     auto DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
@@ -1792,8 +1789,40 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       return InternalType;
     }
 
+    llvm::DIType *SpecificationOf = nullptr;
+    if (auto *TypeDecl = DbgTy.getType()->getNominalOrBoundGenericNominal()) {
+      // If this is a nominal type that has the @_originallyDefinedIn attribute,
+      // IRGenDebugInfo emits a forward declaration of the type as a child
+      // of the original module, and the type with a specification pointing to
+      // the forward declaraation. We do this so LLDB has enough information to
+      // both find the type in reflection metadata (the parent module name) and
+      // find it in the swiftmodule (the module name in the type mangled name).
+      if (auto Attribute =
+              TypeDecl->getAttrs().getAttribute<OriginallyDefinedInAttr>()) {
+        auto Identifier = IGM.getSILModule().getASTContext().getIdentifier(
+            Attribute->OriginalModuleName);
+
+        void *Key = (void *)Identifier.get();
+        auto InnerScope =
+            getOrCreateModule(Key, TheCU, Attribute->OriginalModuleName, {});
+        SpecificationOf = DBuilder.createForwardDecl(
+            llvm::dwarf::DW_TAG_structure_type, TypeDecl->getNameStr(),
+            InnerScope, File, 0, llvm::dwarf::DW_LANG_Swift, 0, 0);
+      }
+    }
+
     // Here goes!
     switch (BaseTy->getKind()) {
+    case TypeKind::BuiltinUnboundGeneric:
+      llvm_unreachable("not a real type");
+      
+    case TypeKind::BuiltinFixedArray: {
+      // TODO: provide proper array debug info
+      unsigned FwdDeclLine = 0;
+      return createOpaqueStruct(Scope, "Builtin.FixedArray", MainFile, FwdDeclLine,
+                                SizeInBits, AlignInBits, Flags, MangledName);
+    }
+    
     case TypeKind::BuiltinPackIndex:
     case TypeKind::BuiltinInteger: {
       Encoding = llvm::dwarf::DW_ATE_unsigned;
@@ -1884,7 +1913,8 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
             llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, L.File,
             FwdDeclLine, llvm::dwarf::DW_LANG_Swift, 0, AlignInBits);
       return createOpaqueStruct(Scope, Name, L.File, FwdDeclLine, SizeInBits,
-                                AlignInBits, Flags, MangledName);
+                                AlignInBits, Flags, MangledName, {},
+                                SpecificationOf);
     }
 
     case TypeKind::Class: {
@@ -1921,7 +1951,8 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
         return DIType;
       }
       return createPointerSizedStruct(Scope, Decl->getNameStr(), L.File,
-                                      FwdDeclLine, Flags, MangledName);
+                                      FwdDeclLine, Flags, MangledName,
+                                      SpecificationOf);
     }
 
     case TypeKind::Protocol: {
@@ -1967,11 +1998,11 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
         return createSpecializedStructOrClassType(
             StructTy, Decl, Scope, L.File, L.Line, SizeInBits, AlignInBits,
             Flags, MangledName);
-      
+
       return createOpaqueStructWithSizedContainer(
           Scope, Decl ? Decl->getNameStr() : "", L.File, FwdDeclLine,
           SizeInBits, AlignInBits, Flags, MangledName,
-          collectGenericParams(StructTy));
+          collectGenericParams(StructTy), SpecificationOf);
     }
 
     case TypeKind::BoundGenericClass: {
@@ -1989,9 +2020,9 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       // attribute accordingly.
       assert(SizeInBits ==
              CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
-      return createPointerSizedStruct(Scope,
-                                      Decl ? Decl->getNameStr() : MangledName,
-                                      L.File, FwdDeclLine, Flags, MangledName);
+      return createPointerSizedStruct(
+          Scope, Decl ? Decl->getNameStr() : MangledName, L.File, FwdDeclLine,
+          Flags, MangledName, SpecificationOf);
     }
 
     case TypeKind::Pack:
@@ -2112,7 +2143,7 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       }
       return createOpaqueStruct(Scope, Decl->getName().str(), L.File,
                                 FwdDeclLine, SizeInBits, AlignInBits, Flags,
-                                MangledName);
+                                MangledName, {}, SpecificationOf);
     }
 
     case TypeKind::BoundGenericEnum: {
@@ -2132,7 +2163,8 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       }
       return createOpaqueStructWithSizedContainer(
           Scope, Decl->getName().str(), L.File, FwdDeclLine, SizeInBits,
-          AlignInBits, Flags, MangledName, collectGenericParams(EnumTy));
+          AlignInBits, Flags, MangledName, collectGenericParams(EnumTy),
+          SpecificationOf);
     }
 
     case TypeKind::BuiltinVector: {
@@ -2182,9 +2214,10 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
                                     L.File, 0, Scope);
     }
 
-    case TypeKind::Paren: {
-      auto Ty = cast<ParenType>(BaseTy)->getUnderlyingType();
-      return getOrCreateDesugaredType(Ty, DbgTy);
+    case TypeKind::Locatable: {
+      auto *Sugar = cast<LocatableType>(BaseTy);
+      auto *CanTy = Sugar->getSinglyDesugaredType();
+      return getOrCreateDesugaredType(CanTy, DbgTy);
     }
 
     // SyntaxSugarType derivations.
@@ -2312,7 +2345,8 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     }
   }
 
-  llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy) {
+  llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy,
+                                llvm::DIScope *Scope = nullptr) {
     // Is this an empty type?
     if (DbgTy.isNull())
       // We can't use the empty type as an index into DenseMap.
@@ -2344,7 +2378,6 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     //
     // FIXME: Builtin and qualified types in LLVM have no parent
     // scope. TODO: This can be fixed by extending DIBuilder.
-    llvm::DIScope *Scope = nullptr;
     // Make sure to retrieve the context of the type alias, not the pointee.
     DeclContext *Context = nullptr;
     const Decl *TypeDecl = nullptr;
@@ -2494,7 +2527,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly,
       /* DWOId */ 0, /* SplitDebugInlining */ true,
-      /* DebugInfoForProfiling */ false,
+      /* DebugInfoForProfiling */ Opts.DebugInfoForProfiling,
       llvm::DICompileUnit::DebugNameTableKind::Default,
       /* RangesBaseAddress */ false, DebugPrefixMap.remapPath(Sysroot), SDK);
 
@@ -2597,6 +2630,40 @@ bool IRGenDebugInfoImpl::lineEntryIsSane(FileAndLocation DL,
 }
 #endif
 
+IRGenDebugInfoImpl::FileAndLocation
+IRGenDebugInfoImpl::computeLLVMLocCodeView(const SILDebugScope *DS,
+                                           SILLocation Loc) {
+  // If the scope has not changed and the line number is either zero or
+  // artificial, we want to keep the most recent debug location.
+  if (DS == LastScope && (Loc.is<ArtificialUnreachableLocation>() ||
+                          Loc.isLineZero(SM) || Loc.isHiddenFromDebugInfo()))
+    return LastFileAndLocation;
+
+  // Decode the location.
+  return decodeFileAndLocation(Loc);
+}
+
+IRGenDebugInfoImpl::FileAndLocation
+IRGenDebugInfoImpl::computeLLVMLoc(const SILDebugScope *DS, SILLocation Loc) {
+  SILFunction *Fn = DS->getInlinedFunction();
+  if (Fn && (Fn->isThunk() || Fn->isTransparent()))
+    return {0, 0, CompilerGeneratedFile};
+
+  if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
+    return computeLLVMLocCodeView(DS, Loc);
+
+  FileAndLocation L =
+      Loc.isInPrologue() ? FileAndLocation() : decodeFileAndLocation(Loc);
+
+  // Otherwise use a line 0 artificial location, but the file from the location.
+  if (Loc.isHiddenFromDebugInfo()) {
+    L.Line = 0;
+    L.Column = 0;
+  }
+
+  return L;
+}
+
 void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
                                        const SILDebugScope *DS,
                                        SILLocation Loc) {
@@ -2605,38 +2672,7 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
   if (!Scope)
     return;
 
-  // NOTE: In CodeView, zero is not an artificial line location. We try to
-  //       avoid those line locations near user code to reduce the number
-  //       of breaks in the linetables.
-  FileAndLocation L;
-  SILFunction *Fn = DS->getInlinedFunction();
-  if (Fn && (Fn->isThunk() || Fn->isTransparent())) {
-    L = {0, 0, CompilerGeneratedFile};
-  } else if (DS == LastScope && Loc.isHiddenFromDebugInfo()) {
-    // Reuse the last source location if we are still in the same
-    // scope to get a more contiguous line table.
-    L = LastFileAndLocation;
-  } else if (DS == LastScope &&
-             (Loc.is<ArtificialUnreachableLocation>() || Loc.isLineZero(SM)) &&
-             Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView) {
-    // If the scope has not changed and the line number is either zero or
-    // artificial, we want to keep the most recent debug location.
-    L = LastFileAndLocation;
-  } else {
-    // Decode the location.
-    if (!Loc.isInPrologue() ||
-        Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
-      L = decodeFileAndLocation(Loc);
-
-    // Otherwise use a line 0 artificial location, but the file from the
-    // location. If we are emitting CodeView, we do not want to use line zero
-    // since it does not represent an artificial line location.
-    if (Loc.isHiddenFromDebugInfo() &&
-        Opts.DebugInfoFormat != IRGenDebugInfoFormat::CodeView) {
-      L.Line = 0;
-      L.Column = 0;
-    }
-  }
+  FileAndLocation L = computeLLVMLoc(DS, Loc);
 
   if (L.getFilename() != Scope->getFilename()) {
     // We changed files in the middle of a scope. This happens, for
@@ -3376,9 +3412,9 @@ struct DbgIntrinsicEmitter {
 
   ///
 
-  llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
-                            llvm::DIExpression *Expr,
-                            const llvm::DILocation *DL) {
+  llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+                          llvm::DIExpression *Expr,
+                          const llvm::DILocation *DL) {
     if (auto *Inst = InsertPt.dyn_cast<llvm::Instruction *>()) {
       return insert(Addr, VarInfo, Expr, DL, Inst);
     } else {
@@ -3387,10 +3423,10 @@ struct DbgIntrinsicEmitter {
     }
   }
 
-  llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
-                            llvm::DIExpression *Expr,
-                            const llvm::DILocation *DL,
-                            llvm::Instruction *InsertBefore) {
+  llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+                          llvm::DIExpression *Expr,
+                          const llvm::DILocation *DL,
+                          llvm::Instruction *InsertBefore) {
     if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, InsertBefore);
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
@@ -3398,10 +3434,10 @@ struct DbgIntrinsicEmitter {
                                             InsertBefore);
   }
 
-  llvm::Instruction *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
-                            llvm::DIExpression *Expr,
-                            const llvm::DILocation *DL,
-                            llvm::BasicBlock *Block) {
+  llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+                          llvm::DIExpression *Expr,
+                          const llvm::DILocation *DL,
+                          llvm::BasicBlock *Block) {
     if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);

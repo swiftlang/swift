@@ -330,7 +330,11 @@ reportOnCrash(uint32_t flags, const char *message)
     if (previous)
       swift_asprintf(&current, "%s%s", current, message);
     else
+#if defined(_WIN32)
+      current = ::_strdup(message);
+#else
       current = ::strdup(message);
+#endif
   } while (!std::atomic_compare_exchange_strong_explicit(&kFatalErrorMessage,
                                                          &previous,
                                                          static_cast<const char *>(current),

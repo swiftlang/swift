@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -disable-availability-checking -emit-sil -verify %s
+// RUN: not %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-sil -verify %s
 
 // https://github.com/apple/swift/issues/55099
 // Differentiation transform crashes for original function with opaque

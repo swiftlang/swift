@@ -619,7 +619,6 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
   if (auto *initContext = binding->getInitContext(i)) {
     auto *init = binding->getInit(i);
     TypeChecker::contextualizeInitializer(initContext, init);
-    TypeChecker::checkInitializerEffects(initContext, init);
   }
 }
 
@@ -718,13 +717,19 @@ static void diagnoseReadWriteMutatingnessMismatch(
   auto disagreesWithWriter = (isWriterMutating != isModifierMutating);
   auto disagreesWithBoth = disagreesWithReader && disagreesWithWriter;
 
+  bool hasCoroutineAccessorFeature =
+      storage->getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors);
+
   auto readerAccessor = directAccessorKindForReadImpl(storage->getReadImpl());
   StringRef readerAccessorName =
       readerAccessor.has_value()
-          ? getAccessorNameForDiagnostic(*readerAccessor, /*article=*/false)
+          ? getAccessorNameForDiagnostic(
+                *readerAccessor, /*article=*/false,
+                /*underscored=*/hasCoroutineAccessorFeature)
           : "the inherited accessor";
   StringRef writerAccessorName =
-      getAccessorNameForDiagnostic(writerAccesor, /*article=*/false);
+      getAccessorNameForDiagnostic(writerAccesor, /*article=*/false,
+                                   /*underscored=*/hasCoroutineAccessorFeature);
   unsigned diagnosticForm;
   if (isModifierMutating) {
     // modifier can't be mutating when both the setter is nonmutating and the
@@ -746,16 +751,20 @@ static void diagnoseReadWriteMutatingnessMismatch(
 
   modifyAccessor->diagnose(
       diag::readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,
-      getAccessorNameForDiagnostic(readWriterAccessor, /*article=*/false),
+      getAccessorNameForDiagnostic(readWriterAccessor, /*article=*/false,
+                                   /*underscored=*/hasCoroutineAccessorFeature),
       isModifierMutating ? SelfAccessKind::Mutating
                          : SelfAccessKind::NonMutating,
       diagnosticForm, writerAccessorName, SelfAccessKind::NonMutating,
       readerAccessorName, SelfAccessKind::Mutating);
   auto *writer = storage->getParsedAccessor(writerAccesor);
   if (disagreesWithWriter && writer) {
-    writer->diagnose(
-        diag::previous_accessor,
-        getAccessorNameForDiagnostic(writerAccesor, /*article=*/false), 0);
+    writer->diagnose(diag::previous_accessor,
+                     getAccessorNameForDiagnostic(
+                         writerAccesor,
+                         /*article=*/false,
+                         /*underscored=*/hasCoroutineAccessorFeature),
+                     0);
   }
   AccessorDecl *reader = nullptr;
   if (disagreesWithReader && readerAccessor.has_value() &&
@@ -860,6 +869,21 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     return OpaqueReadOwnership::Borrowed;
   };
 
+  if (auto *accessorDecl = storage->getAccessor(AccessorKind::Read)) {
+    auto lifetimeDependencies = accessorDecl->getLifetimeDependencies();
+    if (lifetimeDependencies.has_value() && !lifetimeDependencies->empty()) {
+      for (auto &lifetimeDependenceInfo : *lifetimeDependencies) {
+        if (lifetimeDependenceInfo.hasScopeLifetimeParamIndices()) {
+          // A scoped lifetime dependence borrows its source.
+          return OpaqueReadOwnership::Borrowed;
+        }
+      }
+    }
+  }
+
+  if (storage->getAccessor(AccessorKind::Read2))
+    return OpaqueReadOwnership::Borrowed;
+
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
@@ -926,14 +950,25 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
   return ParameterList::create(context, elements);
 }
 
-static bool doesAccessorHaveBody(AccessorDecl *accessor) {
-  // Protocol requirements don't have bodies.
-  //
-  // FIXME: Revisit this if we ever get 'real' default implementations.
-  if (isa<ProtocolDecl>(accessor->getDeclContext()))
-    return false;
-
+bool AccessorDecl::doesAccessorHaveBody() const {
+  auto *accessor = this;
   auto *storage = accessor->getStorage();
+
+  if (isa<ProtocolDecl>(accessor->getDeclContext())) {
+    if (!accessor->getASTContext().LangOpts.hasFeature(
+            Feature::CoroutineAccessors)) {
+      return false;
+    }
+    if (!requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
+      return false;
+    }
+    if (storage->getOverrideLoc()) {
+      return false;
+    }
+    return accessor->getStorage()
+        ->requiresCorrespondingUnderscoredCoroutineAccessor(
+            accessor->getAccessorKind(), accessor);
+  }
 
   // NSManaged getters and setters don't have bodies.
   if (storage->getAttrs().hasAttribute<NSManagedAttr>(/*AllowInvalid=*/true))
@@ -1199,14 +1234,11 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
         // Check for availability of wrappedValue.
         if (accessor->getAccessorKind() == AccessorKind::Get ||
-            isYieldingDefaultNonmutatingAccessor(accessor->getAccessorKind())) {
-          if (wrappedValue->getAttrs().getUnavailable(ctx)) {
-            ExportContext where = ExportContext::forDeclSignature(var);
-            diagnoseExplicitUnavailability(
-                wrappedValue,
-                var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
-                where, nullptr);
-          }
+            isYieldingImmutableAccessor(accessor->getAccessorKind())) {
+          diagnoseDeclAvailability(
+              wrappedValue,
+              var->getAttachedPropertyWrappers()[i]->getRangeWithAt(), nullptr,
+              ExportContext::forDeclSignature(accessor));
         }
 
         underlyingVars.push_back({ wrappedValue, isWrapperRefLValue });
@@ -2204,13 +2236,15 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
 
   auto storage = accessor->getStorage();
   auto storageReadWriteImpl = storage->getReadWriteImpl();
-  auto target = (accessor->hasForcedStaticDispatch()
-                   ? TargetImpl::Ordinary
-                   : TargetImpl::Implementation);
+  ProtocolDecl *proto = llvm::dyn_cast_if_present<ProtocolDecl>(
+      accessor->getStorage()->getDeclContext()->getAsDecl());
+  auto target = (accessor->hasForcedStaticDispatch() || proto
+                     ? TargetImpl::Ordinary
+                     : TargetImpl::Implementation);
 
   // If this is a variable with an attached property wrapper, then
   // the accessors need to yield the wrappedValue or projectedValue.
-  if (isYieldingDefaultNonmutatingAccessor(accessor->getAccessorKind()) ||
+  if (isYieldingImmutableAccessor(accessor->getAccessorKind()) ||
       storageReadWriteImpl == ReadWriteImplKind::Modify) {
     if (auto var = dyn_cast<VarDecl>(storage)) {
       if (var->hasAttachedPropertyWrapper()) {
@@ -2224,11 +2258,11 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
     }
   }
 
-  SourceLoc loc = storage->getLoc();
+  SourceLoc loc =
+      accessor->getLoc().isValid() ? accessor->getLoc() : storage->getLoc();
   SmallVector<ASTNode, 1> body;
 
-  bool isModify =
-      isYieldingDefaultMutatingAccessor(accessor->getAccessorKind());
+  bool isModify = isYieldingMutableAccessor(accessor->getAccessorKind());
 
   // Special-case for a modify coroutine of a simple stored property with
   // observers. We can yield a borrowed copy of the underlying storage
@@ -2272,11 +2306,12 @@ synthesizeReadCoroutineBody(AccessorDecl *read, ASTContext &ctx) {
 /// Synthesize the body of a read coroutine.
 static std::pair<BraceStmt *, bool>
 synthesizeRead2CoroutineBody(AccessorDecl *read, ASTContext &ctx) {
-  assert(read->getStorage()->getReadImpl() != ReadImplKind::Read2);
+  assert(read->getStorage()->getReadImpl() != ReadImplKind::Read2 ||
+         isa<ProtocolDecl>(read->getStorage()->getDeclContext()->getAsDecl()));
   return synthesizeCoroutineAccessorBody(read, ctx);
 }
 
-/// Synthesize the body of a modify coroutine.
+/// Synthesize the body of a _modify coroutine.
 static std::pair<BraceStmt *, bool>
 synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
 #ifndef NDEBUG
@@ -2285,6 +2320,21 @@ synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
   auto hasWrapper = isa<VarDecl>(storage) &&
                     cast<VarDecl>(storage)->hasAttachedPropertyWrapper();
   assert((hasWrapper || impl != ReadWriteImplKind::Modify) &&
+         impl != ReadWriteImplKind::Immutable);
+#endif
+  return synthesizeCoroutineAccessorBody(modify, ctx);
+}
+
+/// Synthesize the body of a modify coroutine.
+static std::pair<BraceStmt *, bool>
+synthesizeModify2CoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
+#ifndef NDEBUG
+  auto storage = modify->getStorage();
+  auto impl = storage->getReadWriteImpl();
+  auto hasWrapper = isa<VarDecl>(storage) &&
+                    cast<VarDecl>(storage)->hasAttachedPropertyWrapper();
+  assert((hasWrapper || impl != ReadWriteImplKind::Modify2 ||
+          isa<ProtocolDecl>(storage->getDeclContext()->getAsDecl())) &&
          impl != ReadWriteImplKind::Immutable);
 #endif
   return synthesizeCoroutineAccessorBody(modify, ctx);
@@ -2313,8 +2363,10 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
     return synthesizeRead2CoroutineBody(accessor, ctx);
 
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
     return synthesizeModifyCoroutineBody(accessor, ctx);
+
+  case AccessorKind::Modify2:
+    return synthesizeModify2CoroutineBody(accessor, ctx);
 
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
@@ -2335,7 +2387,7 @@ static void finishImplicitAccessor(AccessorDecl *accessor,
   if (ctx.Stats)
     ++ctx.Stats->getFrontendCounters().NumAccessorsSynthesized;
 
-  if (doesAccessorHaveBody(accessor))
+  if (accessor->doesAccessorHaveBody())
     accessor->setBodySynthesizer(&synthesizeAccessorBody);
 }
 
@@ -2511,8 +2563,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   }
   
   if (!asAvailableAs.empty()) {
-    AvailabilityInference::applyInferredAvailableAttrs(
-        setter, asAvailableAs, ctx);
+    AvailabilityInference::applyInferredAvailableAttrs(setter, asAvailableAs);
   }
   
   finishImplicitAccessor(setter, ctx);
@@ -2529,7 +2580,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   SourceLoc loc = storage->getLoc();
 
   bool isMutating = storage->isGetterMutating();
-  if (isYieldingDefaultMutatingAccessor(kind))
+  if (isYieldingMutableAccessor(kind))
     isMutating |= storage->isSetterMutating();
 
   auto dc = storage->getDeclContext();
@@ -2566,7 +2617,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   if (FuncDecl *getter = storage->getParsedAccessor(AccessorKind::Get)) {
     asAvailableAs.push_back(getter);
   }
-  if (isYieldingDefaultMutatingAccessor(kind)) {
+  if (isYieldingMutableAccessor(kind)) {
     if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set)) {
       asAvailableAs.push_back(setter);
     }
@@ -2576,11 +2627,10 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
     addPropertyWrapperAccessorAvailability(var, kind, asAvailableAs);
   }
 
-  AvailabilityInference::applyInferredAvailableAttrs(accessor,
-                                                     asAvailableAs, ctx);
+  AvailabilityInference::applyInferredAvailableAttrs(accessor, asAvailableAs);
 
   // A modify coroutine should have the same SPI visibility as the setter.
-  if (isYieldingDefaultMutatingAccessor(kind)) {
+  if (isYieldingMutableAccessor(kind)) {
     if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set))
       applyInferredSPIAccessControlAttr(accessor, setter, ctx);
   }
@@ -2617,6 +2667,15 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
                                     AbstractStorageDecl *storage,
                                     AccessorKind kind) const {
   auto &ctx = storage->getASTContext();
+
+  if (auto *accessor = storage->getAccessor(kind)) {
+    if (!isa<ProtocolDecl>(storage->getDeclContext())) {
+      return accessor;
+    }
+    assert(accessor->doesAccessorHaveBody());
+    accessor->setBodySynthesizer(&synthesizeAccessorBody);
+    return accessor;
+  }
 
   switch (kind) {
   case AccessorKind::Get:
@@ -2697,9 +2756,67 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-bool
-RequiresOpaqueModifyCoroutineRequest::evaluate(Evaluator &evaluator,
-                                               AbstractStorageDecl *storage) const {
+/// When the CoroutineAccessors feature is available, the coroutine accessor
+/// _could_ be required.  That non-underscored accessor would be preferred to
+/// its underscored counterpart accessor.
+///
+/// The underscored accessor could, however, still be required for ABI
+/// stability.
+bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
+    AccessorKind kind, AccessorDecl const *decl) const {
+  auto &ctx = getASTContext();
+  assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
+  assert(kind == AccessorKind::Modify2 || kind == AccessorKind::Read2);
+
+  // Non-stable modules have no ABI to keep stable.
+  if (getModuleContext()->getResilienceStrategy() !=
+      ResilienceStrategy::Resilient)
+    return false;
+
+  // Non-exported storage has no ABI to keep stable.
+  if (!isExported(this))
+    return false;
+
+  // The non-underscored accessor is not present, the underscored accessor
+  // won't be either.
+  // TODO: CoroutineAccessors: What if only the underscored is written out?
+  auto *accessor = decl ? decl : getOpaqueAccessor(kind);
+  if (!accessor)
+    return false;
+
+  // Availability checks are only relevant on targets which support versioned
+  // availability.  Otherwise, since we're building with library evolution,
+  // conservatively assume that the binary must keep ABI compatibility with its
+  // prior versions, and emit the underscored variant.
+  if (!ctx.supportsVersionedAvailability())
+    return true;
+
+  auto modifyAvailability = TypeChecker::availabilityAtLocation({}, accessor);
+  auto featureAvailability = ctx.getCoroutineAccessorsRuntimeAvailability();
+  // If accessor was introduced only after the feature was, there's no old ABI
+  // to maintain.
+  if (modifyAvailability.getPlatformRange().isContainedIn(featureAvailability))
+    return false;
+
+  // The underscored accessor is required for ABI stability.
+  return true;
+}
+
+bool RequiresOpaqueModifyCoroutineRequest::evaluate(
+    Evaluator &evaluator, AbstractStorageDecl *storage,
+    bool isUnderscored) const {
+  auto &ctx = storage->getASTContext();
+  bool hasModifyFeature = ctx.LangOpts.hasFeature(Feature::CoroutineAccessors);
+
+  // No `modify` accessor without the feature.
+  if (!hasModifyFeature && !isUnderscored)
+    return false;
+
+  if (hasModifyFeature && isUnderscored) {
+    return storage->requiresCorrespondingUnderscoredCoroutineAccessor(
+        AccessorKind::Modify2);
+  }
+
   // Only for mutable storage.
   if (!storage->supportsMutation())
     return false;
@@ -2754,7 +2871,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   if (!accessor->isImplicit())
     return false;
 
-  if (!doesAccessorHaveBody(accessor))
+  if (!accessor->doesAccessorHaveBody())
     return false;
 
   auto *DC = accessor->getDeclContext();
@@ -3849,8 +3966,12 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       readImpl = ReadImplKind::Get;
       writeImpl = WriteImplKind::Set;
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
-    } else if (storage->getParsedAccessor(AccessorKind::Get)) {
+    }
+    if (storage->getParsedAccessor(AccessorKind::Get)) {
       readImpl = ReadImplKind::Get;
+    }
+    if (storage->getParsedAccessor(AccessorKind::Read2)) {
+      readImpl = ReadImplKind::Read2;
     }
 
     StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
@@ -3864,6 +3985,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);
   bool hasDidSet = storage->getParsedAccessor(AccessorKind::DidSet);
+  bool hasCoroutineAccessorFeature =
+      storage->getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors);
   if ((hasWillSet || hasDidSet) && !isa<SubscriptDecl>(storage)) {
     // Observers conflict with non-observers.
     AccessorDecl *firstNonObserver = nullptr;
@@ -3876,19 +3999,21 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
     if (firstNonObserver) {
       if (auto willSet = storage->getParsedAccessor(AccessorKind::WillSet)) {
-        willSet->diagnose(
-            diag::observing_accessor_conflicts_with_accessor, 0,
-            getAccessorNameForDiagnostic(
-                firstNonObserver->getAccessorKind(), /*article=*/ true));
+        willSet->diagnose(diag::observing_accessor_conflicts_with_accessor, 0,
+                          getAccessorNameForDiagnostic(
+                              firstNonObserver->getAccessorKind(),
+                              /*article=*/true,
+                              /*underscored=*/hasCoroutineAccessorFeature));
         willSet->setInvalid();
         hasWillSet = false;
       }
 
       if (auto didSet = storage->getParsedAccessor(AccessorKind::DidSet)) {
-        didSet->diagnose(
-            diag::observing_accessor_conflicts_with_accessor, 1,
-            getAccessorNameForDiagnostic(
-              firstNonObserver->getAccessorKind(), /*article=*/ true));
+        didSet->diagnose(diag::observing_accessor_conflicts_with_accessor, 1,
+                         getAccessorNameForDiagnostic(
+                             firstNonObserver->getAccessorKind(),
+                             /*article=*/true,
+                             /*underscored=*/hasCoroutineAccessorFeature));
         didSet->setInvalid();
         hasDidSet = false;
       }

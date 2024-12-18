@@ -94,10 +94,10 @@ Func Sequence.map(_:) has been removed
 Constructor Result.init(catching:) has been removed
 Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
 Func withoutActuallyEscaping(_:do:) has mangled name changing from 'Swift.withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B' to 'Swift.__abi_withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B'
-Func withoutActuallyEscaping(_:do:) is now without @rethrows
+Func withoutActuallyEscaping(_:do:) is now without rethrows
 Func _openExistential(_:do:) has been renamed to Func __abi_openExistential(_:do:)
 Func _openExistential(_:do:) has mangled name changing from 'Swift._openExistential<A, B, C>(_: A, do: (B) throws -> C) throws -> C' to 'Swift.__abi_openExistential<A, B, C>(_: A, do: (B) throws -> C) throws -> C'
-Func _openExistential(_:do:) is now without @rethrows
+Func _openExistential(_:do:) is now without rethrows
 
 
 // These haven't actually been removed; they are simply marked unavailable.
@@ -122,11 +122,11 @@ Func UnsafeBufferPointer.withMemoryRebound(to:_:) has been removed
 Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has been removed
 Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has been removed
-Func _AnySequenceBox._map(_:) is now without @rethrows
-Func _BidirectionalCollectionBox._map(_:) is now without @rethrows
-Func _CollectionBox._map(_:) is now without @rethrows
-Func _RandomAccessCollectionBox._map(_:) is now without @rethrows
-Func _SequenceBox._map(_:) is now without @rethrows
+Func _AnySequenceBox._map(_:) is now without rethrows
+Func _BidirectionalCollectionBox._map(_:) is now without rethrows
+Func _CollectionBox._map(_:) is now without rethrows
+Func _RandomAccessCollectionBox._map(_:) is now without rethrows
+Func _SequenceBox._map(_:) is now without rethrows
 Func UnsafeMutableRawBufferPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableBufferPointer.assign(repeating:) has been removed
@@ -793,6 +793,9 @@ Var UnsafeBufferPointer.debugDescription has mangled name changing from 'Swift.U
 Var UnsafeBufferPointer.debugDescription is now with @_preInverseGenerics
 Var UnsafeMutableBufferPointer.debugDescription has mangled name changing from 'Swift.UnsafeMutableBufferPointer.debugDescription : Swift.String' to '(extension in Swift):Swift.UnsafeMutableBufferPointer< where A: ~Swift.Copyable>.debugDescription : Swift.String'
 Var UnsafeMutableBufferPointer.debugDescription is now with @_preInverseGenerics
+Func _isPOD(_:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Func _isPOD(_:) has mangled name changing from 'Swift._isPOD<A>(A.Type) -> Swift.Bool' to 'Swift._isPOD<A where A: ~Swift.Copyable, A: ~Swift.Escapable>(A.Type) -> Swift.Bool'
+Func _isPOD(_:) is now with @_preInverseGenerics
 
 Func FixedWidthInteger.&*(_:_:) has been added as a protocol requirement
 

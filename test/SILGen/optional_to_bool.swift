@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 public protocol P {}
 extension Int: P {}

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -silgen-cleanup %s -I %S/Inputs -enable-sil-verify-all -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -silgen-cleanup %s -I %S/Inputs -enable-sil-verify-all -enable-experimental-cxx-interop | %FileCheck %s
 
 sil_stage canonical
 

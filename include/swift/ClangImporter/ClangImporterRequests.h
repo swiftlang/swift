@@ -22,6 +22,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -134,9 +135,11 @@ private:
 struct ClangRecordMemberLookupDescriptor final {
   NominalTypeDecl *recordDecl;
   DeclName name;
+  bool inherited;
 
-  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
-      : recordDecl(recordDecl), name(name) {
+  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name,
+                                    bool inherited = false)
+      : recordDecl(recordDecl), name(name), inherited(inherited) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
   }
 
@@ -326,9 +329,15 @@ struct CxxRecordSemanticsDescriptor final {
   const clang::RecordDecl *decl;
   ASTContext &ctx;
 
-  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl,
-                               ASTContext &ctx)
-      : decl(decl), ctx(ctx) {}
+  /// Whether to emit warnings for missing destructor or copy constructor
+  /// whenever the classification of the type assumes that they exist (e.g. for
+  /// a value type).
+  bool shouldDiagnoseLifetimeOperations;
+
+  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl, ASTContext &ctx,
+                               bool shouldDiagnoseLifetimeOperations = true)
+      : decl(decl), ctx(ctx),
+        shouldDiagnoseLifetimeOperations(shouldDiagnoseLifetimeOperations) {}
 
   friend llvm::hash_code hash_value(const CxxRecordSemanticsDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
@@ -353,7 +362,7 @@ SourceLoc extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc);
 ///
 /// Do not evaluate this request before importing has started. For example, it
 /// is OK to invoke this request when importing a decl, but it is not OK to
-/// import this request when importing names. This is because when importing
+/// evaluate this request when importing names. This is because when importing
 /// names, Clang sema has not yet defined implicit special members, so the
 /// results will be flakey/incorrect.
 class CxxRecordSemantics
@@ -504,6 +513,8 @@ enum class CxxEscapability { Escapable, NonEscapable, Unknown };
 
 struct EscapabilityLookupDescriptor final {
   const clang::Type *type;
+  ClangImporter::Implementation &impl;
+  bool annotationOnly = true;
 
   friend llvm::hash_code hash_value(const EscapabilityLookupDescriptor &desc) {
     return llvm::hash_combine(desc.type);
@@ -511,7 +522,7 @@ struct EscapabilityLookupDescriptor final {
 
   friend bool operator==(const EscapabilityLookupDescriptor &lhs,
                          const EscapabilityLookupDescriptor &rhs) {
-    return lhs.type == rhs.type;
+    return lhs.type == rhs.type && lhs.annotationOnly == rhs.annotationOnly;
   }
 
   friend bool operator!=(const EscapabilityLookupDescriptor &lhs,

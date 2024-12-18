@@ -14,6 +14,18 @@ import ASTBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
+protocol DoStmtOrExprSyntax {
+  var doKeyword: TokenSyntax { get }
+  var throwsClause: ThrowsClauseSyntax? { get }
+  var body: CodeBlockSyntax { get }
+  var catchClauses: CatchClauseListSyntax { get }
+}
+extension DoStmtSyntax: DoStmtOrExprSyntax {}
+extension DoExprSyntax: DoStmtOrExprSyntax {
+  // FIXME: DoExprSyntax is missing throwsClause?
+  var throwsClause: ThrowsClauseSyntax? { return nil }
+}
+
 extension ASTGenVisitor {
   func generate(stmt node: StmtSyntax) -> BridgedStmt {
     switch node.as(StmtSyntaxEnum.self) {
@@ -38,7 +50,7 @@ extension ASTGenVisitor {
     case .labeledStmt(let node):
       return self.generate(labeledStmt: node)
     case .missingStmt:
-      break
+      fatalError("unimplemented")
     case .repeatStmt(let node):
       return self.generate(repeatStmt: node).asStmt
     case .returnStmt(let node):
@@ -52,14 +64,13 @@ extension ASTGenVisitor {
     case .yieldStmt(let node):
       return self.generate(yieldStmt: node).asStmt
     }
-    return self.generateWithLegacy(node)
   }
 
-  func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode {
+  func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode? {
     // TODO: Set semicolon loc.
     switch node.item {
     case .decl(let node):
-      return .decl(self.generate(decl: node))
+      return self.generate(decl: node).map { .decl($0) }
     case .stmt(let node):
       return .stmt(self.generate(stmt: node))
     case .expr(let node):
@@ -75,7 +86,10 @@ extension ASTGenVisitor {
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { codeBlockItem in
-      allItems.append(self.generate(codeBlockItem: codeBlockItem).bridged)
+      guard let item = self.generate(codeBlockItem: codeBlockItem) else {
+        return
+      }
+      allItems.append(item.bridged)
     }
 
     return allItems.lazy.bridgedArray(in: self)
@@ -262,6 +276,13 @@ extension ASTGenVisitor {
   }
 
   func generate(doStmt node: DoStmtSyntax, labelInfo: BridgedLabeledStmtInfo = nil) -> BridgedStmt {
+    return self.generate(doStmtOrExpr: node, labelInfo: labelInfo)
+  }
+
+  func generate(
+    doStmtOrExpr node: some DoStmtOrExprSyntax,
+    labelInfo: BridgedLabeledStmtInfo = nil
+  ) -> BridgedStmt {
     if node.catchClauses.isEmpty {
       // FIXME: Handle
       precondition(node.throwsClause == nil)

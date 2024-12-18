@@ -41,9 +41,9 @@ ComponentStep::Scope::Scope(ComponentStep &component)
   auto &workList = CS.InactiveConstraints;
   workList.splice(workList.end(), *component.Constraints);
 
-  SolverScope = new ConstraintSystem::SolverScope(CS);
-  PrevPartialScope = CS.solverState->PartialSolutionScope;
-  CS.solverState->PartialSolutionScope = SolverScope;
+  SolverScope.emplace(CS);
+  prevPartialSolutionFixes = CS.solverState->numPartialSolutionFixes;
+  CS.solverState->numPartialSolutionFixes = CS.Fixes.size();
 }
 
 StepResult SplitterStep::take(bool prevFailed) {
@@ -234,7 +234,7 @@ bool SplitterStep::mergePartialSolutions() const {
       if (!IncludeInMergedResults[i])
         continue;
 
-      CS.applySolution(PartialSolutions[i][indices[i]]);
+      CS.replaySolution(PartialSolutions[i][indices[i]]);
     }
 
     // This solution might be worse than the best solution found so far.
@@ -328,7 +328,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   // If there are any dependent partial solutions to compose, do so now.
   if (!DependsOnPartialSolutions.empty()) {
     for (auto partial : DependsOnPartialSolutions) {
-      CS.applySolution(*partial);
+      CS.replaySolution(*partial);
     }
 
     // Activate all of the one-way constraints.
@@ -425,12 +425,16 @@ StepResult ComponentStep::take(bool prevFailed) {
     case StepKind::Binding:
       return suspend(
           std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
-    case StepKind::Disjunction:
+    case StepKind::Disjunction: {
+      CS.retireConstraint(disjunction);
       return suspend(
           std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
-    case StepKind::Conjunction:
+    }
+    case StepKind::Conjunction: {
+      CS.retireConstraint(conjunction);
       return suspend(
           std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
+    }
     }
     llvm_unreachable("Unhandled case in switch!");
   }
@@ -733,7 +737,9 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     auto *declA = LastSolvedChoice->first->getOverloadChoice().getDecl();
     auto *declB = static_cast<Constraint *>(choice)->getOverloadChoice().getDecl();
 
-    if (declA->getBaseIdentifier().isArithmeticOperator() &&
+    if ((declA->getBaseIdentifier().isArithmeticOperator() ||
+         declA->getBaseIdentifier().isBitwiseOperator() ||
+         declA->getBaseIdentifier().isShiftOperator()) &&
         TypeChecker::isDeclRefinementOf(declA, declB)) {
       return skip("subtype");
     }
@@ -879,23 +885,26 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
     // Note that solution is removed here. This is done
     // because we want build a single complete solution
     // incrementally.
-    CS.applySolution(Solutions.pop_back_val());
+    CS.replaySolution(Solutions.pop_back_val(),
+                      /*shouldIncrementScore=*/false);
   }
 
   // Make sure that element is solved in isolation
   // by dropping all scoring information.
-  CS.CurrentScore = Score();
+  CS.clearScore();
 
-  // Reset the scope counter to avoid "too complex" failures
-  // when closure has a lot of elements in the body.
-  CS.CountScopes = 0;
+  // Reset the scope and trail counters to avoid "too complex"
+  // failures when closure has a lot of elements in the body.
+  CS.NumSolverScopes = 0;
+  CS.NumTrailSteps = 0;
 
   // If timer is enabled, let's reset it so that each element
   // (expression) gets a fresh time slice to get solved. This
   // is important for closures with large number of statements
   // in them.
   if (CS.Timer) {
-    CS.Timer.emplace(element.getLocator(), CS);
+    CS.Timer.reset();
+    CS.startExpressionTimer(element.getLocator());
   }
 
   auto success = element.attempt(CS);
@@ -1024,14 +1033,15 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
         for (auto &solution : Solutions) {
           ConstraintSystem::SolverScope scope(CS);
 
-          CS.applySolution(solution);
+          CS.replaySolution(solution,
+                            /*shouldIncrementScore=*/false);
 
-          // `applySolution` changes best/current scores
+          // `replaySolution` changes best/current scores
           // of the constraint system, so they have to be
           // restored right afterwards because score of the
           // element does contribute to the overall score.
           restoreBestScore();
-          restoreCurrentScore(solution.getFixedScore());
+          updateScoreAfterConjunction(solution.getFixedScore());
 
           // Transform all of the unbound outer variables into
           // placeholders since we are not going to solve for
@@ -1083,10 +1093,10 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 }
 
 void ConjunctionStep::restoreOuterState(const Score &solutionScore) const {
-  // Restore best/current score, since upcoming step is going to
-  // work with outer scope in relation to the conjunction.
+  // Restore best score and update current score, since upcoming step
+  // is going to work with outer scope in relation to the conjunction.
   restoreBestScore();
-  restoreCurrentScore(solutionScore);
+  updateScoreAfterConjunction(solutionScore);
 
   // Active all of the previously out-of-scope constraints
   // because conjunction can propagate type information up
@@ -1100,8 +1110,9 @@ void ConjunctionStep::restoreOuterState(const Score &solutionScore) const {
   }
 }
 
-void ConjunctionStep::SolverSnapshot::applySolution(const Solution &solution) {
-  CS.applySolution(solution);
+void ConjunctionStep::SolverSnapshot::replaySolution(const Solution &solution) {
+  CS.replaySolution(solution,
+                    /*shouldIncreaseScore=*/false);
 
   if (!CS.shouldAttemptFixes())
     return;

@@ -1,8 +1,9 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature IsolatedDeinit -Xfrontend -disable-availability-checking) | %FileCheck %s
+// RUN: %target-run-simple-swift(-target %target-future-triple) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 var isDead: Bool = false
 

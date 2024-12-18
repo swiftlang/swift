@@ -180,3 +180,20 @@ struct OverloadInImplicitAsyncClosure {
 
   init(int: Int) throws { }
 }
+
+@available(SwiftStdlib 5.5, *)
+func test(_: Int) async throws {}
+
+@discardableResult
+@available(SwiftStdlib 5.5, *)
+func test(_: Int) -> String { "" }
+
+@available(SwiftStdlib 5.5, *)
+func compute(_: @escaping () -> Void) {}
+
+@available(SwiftStdlib 5.5, *)
+func test_sync_in_closure_context() {
+  compute {
+    test(42) // Ok (select sync overloads and discards the result)
+  }
+}

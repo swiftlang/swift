@@ -90,7 +90,7 @@ bool swift_task_isMainExecutorImpl(SwiftExecutorRef executor) {
 }
 
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift)
-void swift_task_asyncMainDrainQueueImpll() {
+void swift_task_asyncMainDrainQueueImpl() {
   swift_reportError(0, "operation unsupported without libdispatch: "
                        "swift_task_asyncMainDrainQueue");
 }

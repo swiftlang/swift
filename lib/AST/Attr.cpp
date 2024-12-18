@@ -17,6 +17,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -353,272 +354,32 @@ bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) 
   llvm_unreachable("bad DeclKind");
 }
 
-bool
-DeclAttributes::isUnavailableInSwiftVersion(
-  const version::Version &effectiveVersion) const {
-  llvm::VersionTuple vers = effectiveVersion;
-  for (auto attr : *this) {
-    if (auto available = dyn_cast<AvailableAttr>(attr)) {
-      if (available->isInvalid())
-        continue;
+// Ensure that every DeclAttribute subclass implements its own CloneAttr.
+static void checkDeclAttributeClones() {
+#define DECL_ATTR(_,CLASS,...) \
+  CLASS##Attr *(CLASS##Attr::*ptr##CLASS)(ASTContext &) const = &CLASS##Attr::clone; \
+  (void)ptr##CLASS;
+#include "swift/AST/DeclAttr.def"
+}
 
-      if (available->getPlatformAgnosticAvailability() ==
-          PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
-        if (available->Introduced.has_value() &&
-            available->Introduced.value() > vers)
-          return true;
-        if (available->Obsoleted.has_value() &&
-            available->Obsoleted.value() <= vers)
-          return true;
-      }
-    }
+DeclAttribute *DeclAttribute::clone(ASTContext &ctx) const {
+  (void)checkDeclAttributeClones;
+  switch (getKind()) {
+#define DECL_ATTR(_,CLASS, ...) \
+  case DeclAttrKind::CLASS: return static_cast<const CLASS##Attr *>(this)->clone(ctx);
+#include "swift/AST/DeclAttr.def"
   }
-
-  return false;
 }
 
-const AvailableAttr *
-DeclAttributes::findMostSpecificActivePlatform(const ASTContext &ctx,
-                                               bool ignoreAppExtensions) const {
-  const AvailableAttr *bestAttr = nullptr;
-
-  for (auto attr : *this) {
-    auto *avAttr = dyn_cast<AvailableAttr>(attr);
-    if (!avAttr)
-      continue;
-
-    if (avAttr->isInvalid())
-      continue;
-
-    if (!avAttr->hasPlatform())
-      continue;
-
-    if (!avAttr->isActivePlatform(ctx))
-      continue;
-
-    if (ignoreAppExtensions && isApplicationExtensionPlatform(avAttr->Platform))
-      continue;
-
-    // We have an attribute that is active for the platform, but
-    // is it more specific than our current best?
-    if (!bestAttr || inheritsAvailabilityFromPlatform(avAttr->Platform,
-                                                      bestAttr->Platform)) {
-      bestAttr = avAttr;
-    }
+bool DeclAttribute::canClone() const {
+  switch (getKind()) {
+#define DECL_ATTR(_,CLASS, ...)                                \
+  case DeclAttrKind::CLASS:                                    \
+    if (&CLASS##Attr::canClone == &DeclAttribute::canClone)    \
+      return true;                                             \
+    return static_cast<const CLASS##Attr *>(this)->canClone();
+#include "swift/AST/DeclAttr.def"
   }
-
-  return bestAttr;
-}
-
-const AvailableAttr *
-DeclAttributes::getPotentiallyUnavailable(const ASTContext &ctx) const {
-  const AvailableAttr *potential = nullptr;
-  const AvailableAttr *conditional = nullptr;
-
-  for (auto Attr : *this)
-    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-      if (AvAttr->isInvalid())
-        continue;
-
-      if (!AvAttr->isActivePlatform(ctx) &&
-          !AvAttr->isLanguageVersionSpecific() &&
-          !AvAttr->isPackageDescriptionVersionSpecific())
-        continue;
-
-      // Definitely not available.
-      if (AvAttr->isUnconditionallyUnavailable())
-        return AvAttr;
-
-      switch (AvAttr->getVersionAvailability(ctx)) {
-      case AvailableVersionComparison::Available:
-        // Doesn't limit the introduced version.
-        break;
-
-      case AvailableVersionComparison::PotentiallyUnavailable:
-        // We'll return this if we don't see something that proves it's
-        // not available in this version.
-        potential = AvAttr;
-        break;
-
-      case AvailableVersionComparison::Unavailable:
-      case AvailableVersionComparison::Obsoleted:
-        conditional = AvAttr;
-        break;
-      }
-    }
-
-  if (conditional)
-    return conditional;
-  return potential;
-}
-
-const AvailableAttr *
-DeclAttributes::getUnavailable(const ASTContext &ctx,
-                               bool ignoreAppExtensions) const {
-  const AvailableAttr *conditional = nullptr;
-  const AvailableAttr *bestActive =
-      findMostSpecificActivePlatform(ctx, ignoreAppExtensions);
-
-  for (auto Attr : *this)
-    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-      if (AvAttr->isInvalid())
-        continue;
-
-      // If this is a platform-specific attribute and it isn't the most
-      // specific attribute for the current platform, we're done.
-      if (AvAttr->hasPlatform() &&
-          (!bestActive || AvAttr != bestActive))
-        continue;
-
-      // If this attribute doesn't apply to the active platform, we're done.
-      if (!AvAttr->isActivePlatform(ctx) &&
-          !AvAttr->isLanguageVersionSpecific() &&
-          !AvAttr->isPackageDescriptionVersionSpecific())
-        continue;
-
-      if (ignoreAppExtensions &&
-          isApplicationExtensionPlatform(AvAttr->Platform))
-        continue;
-
-      // Unconditional unavailable.
-      if (AvAttr->isUnconditionallyUnavailable())
-        return AvAttr;
-
-      switch (AvAttr->getVersionAvailability(ctx)) {
-      case AvailableVersionComparison::Available:
-      case AvailableVersionComparison::PotentiallyUnavailable:
-        break;
-
-      case AvailableVersionComparison::Obsoleted:
-      case AvailableVersionComparison::Unavailable:
-        conditional = AvAttr;
-        break;
-      }
-    }
-  return conditional;
-}
-
-const AvailableAttr *
-DeclAttributes::getDeprecated(const ASTContext &ctx) const {
-  const AvailableAttr *conditional = nullptr;
-  const AvailableAttr *bestActive = findMostSpecificActivePlatform(ctx);
-  for (auto Attr : *this) {
-    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-      if (AvAttr->isInvalid())
-        continue;
-
-      if (AvAttr->hasPlatform() &&
-          (!bestActive || AvAttr != bestActive))
-        continue;
-
-      if (!AvAttr->isActivePlatform(ctx) &&
-          !AvAttr->isLanguageVersionSpecific() &&
-          !AvAttr->isPackageDescriptionVersionSpecific())
-        continue;
-
-      // Unconditional deprecated.
-      if (AvAttr->isUnconditionallyDeprecated())
-        return AvAttr;
-
-      std::optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
-
-      StringRef DeprecatedPlatform = AvAttr->prettyPlatformString();
-      llvm::VersionTuple RemappedDeprecatedVersion;
-      if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-          AvAttr, ctx, DeprecatedPlatform, RemappedDeprecatedVersion))
-        DeprecatedVersion = RemappedDeprecatedVersion;
-
-      if (!DeprecatedVersion.has_value())
-        continue;
-
-      llvm::VersionTuple MinVersion = AvAttr->getActiveVersion(ctx);
-
-      // We treat the declaration as deprecated if it is deprecated on
-      // all deployment targets.
-      // Once availability checking is enabled by default, we should
-      // query the type refinement context hierarchy to determine
-      // whether a declaration is deprecated on all versions
-      // allowed by the context containing the reference.
-      if (DeprecatedVersion.value() <= MinVersion) {
-        conditional = AvAttr;
-      }
-    }
-  }
-  return conditional;
-}
-
-const AvailableAttr *
-DeclAttributes::getSoftDeprecated(const ASTContext &ctx) const {
-  const AvailableAttr *conditional = nullptr;
-  const AvailableAttr *bestActive = findMostSpecificActivePlatform(ctx);
-  for (auto Attr : *this) {
-    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-      if (AvAttr->isInvalid())
-        continue;
-
-      if (AvAttr->hasPlatform() &&
-          (!bestActive || AvAttr != bestActive))
-        continue;
-
-      if (!AvAttr->isActivePlatform(ctx) &&
-          !AvAttr->isLanguageVersionSpecific() &&
-          !AvAttr->isPackageDescriptionVersionSpecific())
-        continue;
-
-      std::optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
-      if (!DeprecatedVersion.has_value())
-        continue;
-
-      llvm::VersionTuple ActiveVersion = AvAttr->getActiveVersion(ctx);
-
-      if (DeprecatedVersion.value() > ActiveVersion) {
-        conditional = AvAttr;
-      }
-    }
-  }
-  return conditional;
-}
-
-const AvailableAttr *DeclAttributes::getNoAsync(const ASTContext &ctx) const {
-  const AvailableAttr *bestAttr = nullptr;
-  for (const DeclAttribute *attr : *this) {
-    if (const AvailableAttr *avAttr = dyn_cast<AvailableAttr>(attr)) {
-      if (avAttr->isInvalid())
-        continue;
-
-      if (avAttr->getPlatformAgnosticAvailability() ==
-          PlatformAgnosticAvailabilityKind::NoAsync) {
-        // An API may only be unavailable on specific platforms.
-        // If it doesn't have a platform associated with it, then it's
-        // unavailable for all platforms, so we should include it. If it does
-        // have a platform and we are not that platform, then it doesn't apply
-        // to us.
-        const bool isGoodForPlatform =
-            (avAttr->hasPlatform() && avAttr->isActivePlatform(ctx)) ||
-            !avAttr->hasPlatform();
-
-        if (!isGoodForPlatform)
-          continue;
-
-        if (!bestAttr) {
-          // If there is no best attr selected
-          // and the attr either has an active platform, or doesn't have one at
-          // all, select it.
-          bestAttr = avAttr;
-        } else if (bestAttr && avAttr->hasPlatform() &&
-                   bestAttr->hasPlatform() &&
-                   inheritsAvailabilityFromPlatform(avAttr->Platform,
-                                                    bestAttr->Platform)) {
-          // if they both have a viable platform, use the better one
-          bestAttr = avAttr;
-        } else if (avAttr->hasPlatform() && !bestAttr->hasPlatform()) {
-          // Use the one more specific
-          bestAttr = avAttr;
-        }
-      }
-    }
-  }
-  return bestAttr;
 }
 
 const BackDeployedAttr *
@@ -662,7 +423,7 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   if (!AvailAttr)
     return false;
 
-  if (AvailAttr->IsSPI)
+  if (AvailAttr->isSPI())
     return false;
 
   if (!AvailAttr->Introduced.has_value())
@@ -680,7 +441,7 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   if (!AvailAttr->Rename.empty())
     return false;
 
-  switch (AvailAttr->PlatformAgnostic) {
+  switch (AvailAttr->getPlatformAgnosticAvailability()) {
   case PlatformAgnosticAvailabilityKind::Deprecated:
   case PlatformAgnosticAvailabilityKind::Unavailable:
   case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
@@ -707,10 +468,11 @@ static bool isShortFormAvailabilityImpliedByOther(const AvailableAttr *Attr,
 
   for (auto *DA : Others) {
     auto *Other = cast<AvailableAttr>(DA);
-    if (Attr->Platform == Other->Platform)
+    if (Attr->getPlatform() == Other->getPlatform())
       continue;
 
-    if (!inheritsAvailabilityFromPlatform(Attr->Platform, Other->Platform))
+    if (!inheritsAvailabilityFromPlatform(Attr->getPlatform(),
+                                          Other->getPlatform()))
       continue;
 
     if (Attr->Introduced == Other->Introduced)
@@ -726,7 +488,8 @@ static bool isShortFormAvailabilityImpliedByOther(const AvailableAttr *Attr,
 ///   @available(iOS, introduced: 8.0)
 /// this will print:
 ///   @available(OSX 10.10, iOS 8.0, *)
-static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
+static void printShortFormAvailable(const Decl *D,
+                                    ArrayRef<const DeclAttribute *> Attrs,
                                     ASTPrinter &Printer,
                                     const PrintOptions &Options,
                                     bool forAtSpecialize = false) {
@@ -734,28 +497,23 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   if (!forAtSpecialize)
     Printer << "@available(";
   auto FirstAvail = cast<AvailableAttr>(Attrs.front());
-  if (Attrs.size() == 1 &&
-      FirstAvail->getPlatformAgnosticAvailability() !=
-      PlatformAgnosticAvailabilityKind::None) {
+  auto FirstAvailDomain = D->getDomainForAvailableAttr(FirstAvail);
+  if (Attrs.size() == 1 && !FirstAvailDomain.isPlatform()) {
     assert(FirstAvail->Introduced.has_value());
-    if (FirstAvail->isLanguageVersionSpecific()) {
-      Printer << "swift ";
-    } else {
-      assert(FirstAvail->isPackageDescriptionVersionSpecific());
-      Printer << "_PackageDescription ";
-    }
+    Printer << FirstAvailDomain.getNameForAttributePrinting() << " ";
     Printer << FirstAvail->Introduced.value().getAsString();
     if (!forAtSpecialize)
       Printer << ")";
   } else {
     for (auto *DA : Attrs) {
       auto *AvailAttr = cast<AvailableAttr>(DA);
+      auto AvailAttrDomain = D->getDomainForAvailableAttr(AvailAttr);
       assert(AvailAttr->Introduced.has_value());
       // Avoid omitting available attribute when we are printing module interface.
       if (!Options.IsForSwiftInterface &&
           isShortFormAvailabilityImpliedByOther(AvailAttr, Attrs))
         continue;
-      Printer << platformString(AvailAttr->Platform) << " "
+      Printer << AvailAttrDomain.getNameForAttributePrinting() << " "
               << AvailAttr->Introduced.value().getAsString() << ", ";
     }
     Printer << "*";
@@ -984,7 +742,7 @@ static std::optional<PlatformKind>
 referencedPlatform(const DeclAttribute *attr) {
   switch (attr->getKind()) {
   case DeclAttrKind::Available:
-    return static_cast<const AvailableAttr *>(attr)->Platform;
+    return static_cast<const AvailableAttr *>(attr)->getPlatform();
   case DeclAttrKind::BackDeployed:
     return static_cast<const BackDeployedAttr *>(attr)->Platform;
   case DeclAttrKind::OriginallyDefinedIn:
@@ -1087,11 +845,11 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   if (swiftVersionAvailableAttribute)
-    printShortFormAvailable(swiftVersionAvailableAttribute, Printer, Options);
+    printShortFormAvailable(D, swiftVersionAvailableAttribute, Printer, Options);
   if (packageDescriptionVersionAvailableAttribute)
-    printShortFormAvailable(packageDescriptionVersionAvailableAttribute, Printer, Options);
+    printShortFormAvailable(D, packageDescriptionVersionAvailableAttribute, Printer, Options);
   if (!shortAvailableAttributes.empty())
-    printShortFormAvailable(shortAvailableAttributes, Printer, Options);
+    printShortFormAvailable(D, shortAvailableAttributes, Printer, Options);
   if (!backDeployedAttributes.empty())
     printShortFormBackDeployed(backDeployedAttributes, Printer, Options);
 
@@ -1103,12 +861,26 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     DA->print(Printer, Options, D);
 }
 
+static bool attributeIsNotAtStart(const DeclAttribute *attr) {
+  switch (attr->getKind()) {
+  case DeclAttrKind::Rethrows:
+  case DeclAttrKind::Reasync:
+    return true;
+
+  default:
+    return false;
+  }
+}
+
 SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
   if (isEmpty())
     return SourceLoc();
 
   const DeclAttribute *lastAttr = nullptr;
   for (auto attr : *this) {
+    if (attributeIsNotAtStart(attr))
+      continue;
+
     if (attr->getRangeWithAt().Start.isValid() &&
         (!forModifiers || attr->isDeclModifier()))
       lastAttr = attr;
@@ -1137,14 +909,19 @@ ParsedDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
   return Attr;
 }
 
-static void printAvailableAttr(const AvailableAttr *Attr, ASTPrinter &Printer,
+static void printAvailableAttr(const Decl *D, const AvailableAttr *Attr,
+                               ASTPrinter &Printer,
                                const PrintOptions &Options) {
-  if (Attr->isLanguageVersionSpecific())
-    Printer << "swift";
-  else if (Attr->isPackageDescriptionVersionSpecific())
-    Printer << "_PackageDescription";
+  auto Domain = D->getDomainForAvailableAttr(Attr);
+
+  // The parser rejects `@available(swift, unavailable)`, so when printing
+  // attributes that are universally unavailable in Swift, we must print them
+  // as universally unavailable instead.
+  // FIXME: Reconsider this, it's a weird special case.
+  if (Domain.isSwiftLanguage() && Attr->isUnconditionallyUnavailable())
+    Printer << "*";
   else
-    Printer << Attr->platformString();
+    Printer << Domain.getNameForAttributePrinting();
 
   if (Attr->isUnconditionallyUnavailable())
     Printer << ", unavailable";
@@ -1162,17 +939,19 @@ static void printAvailableAttr(const AvailableAttr *Attr, ASTPrinter &Printer,
 
   if (!Attr->Rename.empty()) {
     Printer << ", renamed: \"" << Attr->Rename << "\"";
-  } else if (Attr->RenameDecl) {
-    Printer << ", renamed: \"";
-    if (auto *Accessor = dyn_cast<AccessorDecl>(Attr->RenameDecl)) {
-      SmallString<32> Name;
-      llvm::raw_svector_ostream OS(Name);
-      Accessor->printUserFacingName(OS);
-      Printer << Name.str();
-    } else {
-      Printer << Attr->RenameDecl->getName();
+  } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (auto *renamedDecl = VD->getRenamedDecl(Attr)) {
+      Printer << ", renamed: \"";
+      if (auto *Accessor = dyn_cast<AccessorDecl>(renamedDecl)) {
+        SmallString<32> Name;
+        llvm::raw_svector_ostream OS(Name);
+        Accessor->printUserFacingName(OS);
+        Printer << Name.str();
+      } else {
+        Printer << renamedDecl->getName();
+      }
+      Printer << "\"";
     }
-    Printer << "\"";
   }
 
   // If there's no message, but this is specifically an imported
@@ -1181,8 +960,7 @@ static void printAvailableAttr(const AvailableAttr *Attr, ASTPrinter &Printer,
   if (!Attr->Message.empty()) {
     Printer << ", message: ";
     Printer.printEscapedStringLiteral(Attr->Message);
-  } else if (Attr->getPlatformAgnosticAvailability() ==
-             PlatformAgnosticAvailabilityKind::UnavailableInSwift)
+  } else if (Domain.isSwiftLanguage() && Attr->isUnconditionallyUnavailable())
     Printer << ", message: \"Not available in Swift\"";
 }
 
@@ -1289,18 +1067,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       // Use @_functionBuilder in Swift interfaces to maintain backward
       // compatibility.
       Printer.printSimpleAttr("_functionBuilder", /*needAt=*/true);
+    } else if (getKind() == DeclAttrKind::MainType && Options.PrintForSIL) {
+      // Don't print into SIL. Necessary bits have already been generated.
+      return false;
     } else {
       Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
     }
     return true;
-
-  case DeclAttrKind::MainType: {
-    // Don't print into SIL. Necessary bits have already been generated.
-    if (Options.PrintForSIL)
-      return false;
-    Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
-    return true;
-  }
 
   case DeclAttrKind::SetterAccess:
     Printer.printKeyword(getAttrName(), Options, "(set)");
@@ -1371,7 +1144,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto Attr = cast<AvailableAttr>(this);
     if (Options.SuppressNoAsyncAvailabilityAttr && Attr->isNoAsync())
       return false;
-    if (Options.printPublicInterface() && Attr->IsSPI) {
+    if (Options.printPublicInterface() && Attr->isSPI()) {
       assert(Attr->hasPlatform());
       assert(Attr->Introduced.has_value());
       Printer.printAttrName("@available");
@@ -1380,14 +1153,21 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << ", unavailable)";
       break;
     }
-    if (Attr->IsSPI) {
+    if (Attr->isForEmbedded()) {
+      std::string atUnavailableInEmbedded =
+          (llvm::Twine("@") + UNAVAILABLE_IN_EMBEDDED_ATTRNAME).str();
+      Printer.printAttrName(atUnavailableInEmbedded);
+      break;
+    }
+
+    if (Attr->isSPI()) {
       std::string atSPI = (llvm::Twine("@") + SPI_AVAILABLE_ATTRNAME).str();
       Printer.printAttrName(atSPI);
     } else {
       Printer.printAttrName("@available");
     }
     Printer << "(";
-    printAvailableAttr(Attr, Printer, Options);
+    printAvailableAttr(D, Attr, Printer, Options);
     Printer << ")";
     break;
   }
@@ -1486,12 +1266,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << "availability: ";
       auto numAttrs = availAttrs.size();
       if (numAttrs == 1) {
-        printAvailableAttr(availAttrs[0], Printer, Options);
+        printAvailableAttr(D, availAttrs[0], Printer, Options);
         Printer << "; ";
       } else {
         SmallVector<const DeclAttribute *, 8> tmp(availAttrs.begin(),
                                                   availAttrs.end());
-        printShortFormAvailable(tmp, Printer, Options,
+        printShortFormAvailable(D, tmp, Printer, Options,
                                 true /*forAtSpecialize*/);
         Printer << "; ";
       }
@@ -1814,13 +1594,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DeclAttrKind::Lifetime: {
     auto *attr = cast<LifetimeAttr>(this);
-    bool firstElem = true;
-    Printer << "@lifetime(";
-    for (auto entry : attr->getLifetimeEntries()) {
-      if (!firstElem) {
-        Printer << ", ";
-      }
-      Printer << entry.getParamString();
+    Printer << attr->getLifetimeEntry()->getString();
+    break;
+  }
+
+  case DeclAttrKind::Safe: {
+    auto *attr = cast<SafeAttr>(this);
+    Printer.printAttrName("@safe");
+    Printer << "(unchecked";
+    if (!attr->message.empty()) {
+      Printer << ", message: ";
+      Printer.printEscapedStringLiteral(attr->message);
     }
     Printer << ")";
     break;
@@ -1890,8 +1674,6 @@ StringRef DeclAttribute::getAttrName() const {
     if (cast<ObjCImplementationAttr>(this)->isEarlyAdopter())
       return "_objcImplementation";
     return "implementation";
-  case DeclAttrKind::MainType:
-    return "main";
   case DeclAttrKind::DynamicReplacement:
     return "_dynamicReplacement";
   case DeclAttrKind::TypeEraser:
@@ -1959,7 +1741,8 @@ StringRef DeclAttribute::getAttrName() const {
     AccessLevel access = cast<AbstractAccessControlAttr>(this)->getAccess();
     return getAccessLevelSpelling(access);
   }
-
+  case DeclAttrKind::Safe:
+    return "safe";
   case DeclAttrKind::SPIAccessControl:
     return "_spi";
   case DeclAttrKind::ReferenceOwnership:
@@ -2134,9 +1917,9 @@ ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
 
 PrivateImportAttr::PrivateImportAttr(SourceLoc atLoc, SourceRange baseRange,
                                      StringRef sourceFile,
-                                     SourceRange parenRange)
-    : DeclAttribute(DeclAttrKind::PrivateImport, atLoc, baseRange,
-                    /*Implicit=*/false),
+                                     SourceRange parenRange,
+                                     bool implicit)
+    : DeclAttribute(DeclAttrKind::PrivateImport, atLoc, baseRange, implicit),
       SourceFile(sourceFile) {}
 
 PrivateImportAttr *PrivateImportAttr::create(ASTContext &Ctxt, SourceLoc AtLoc,
@@ -2251,6 +2034,37 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
                            ErrorType::get(ctx));
 }
 
+#define INIT_VER_TUPLE(X) X(X.empty() ? std::optional<llvm::VersionTuple>() : X)
+
+AvailableAttr::AvailableAttr(
+    SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
+    StringRef Message, StringRef Rename,
+    const llvm::VersionTuple &Introduced, SourceRange IntroducedRange,
+    const llvm::VersionTuple &Deprecated, SourceRange DeprecatedRange,
+    const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
+    PlatformAgnosticAvailabilityKind PlatformAgnostic, bool Implicit,
+    bool IsSPI, bool IsForEmbedded)
+    : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
+      Message(Message), Rename(Rename),
+      INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
+      INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
+      INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange) {
+  Bits.AvailableAttr.Platform = static_cast<uint8_t>(Platform);
+  Bits.AvailableAttr.PlatformAgnostic = static_cast<uint8_t>(PlatformAgnostic);
+  Bits.AvailableAttr.HasComputedRenamedDecl = false;
+  Bits.AvailableAttr.HasRenamedDecl = false;
+  Bits.AvailableAttr.IsSPI = IsSPI;
+
+  if (IsForEmbedded) {
+    // FIXME: The IsForEmbedded bit should be removed when library availability
+    // conditions are implemented (rdar://138802876)
+    Bits.AvailableAttr.IsForEmbedded = true;
+    assert(getPlatform() == PlatformKind::none);
+  }
+}
+
+#undef INIT_VER_TUPLE
+
 AvailableAttr *
 AvailableAttr::createPlatformAgnostic(ASTContext &C,
                                    StringRef Message,
@@ -2263,26 +2077,14 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
     assert(!Obsoleted.empty());
   }
   return new (C) AvailableAttr(
-    SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename, nullptr,
-    NoVersion, SourceRange(),
-    NoVersion, SourceRange(),
-    Obsoleted, SourceRange(),
-    Kind, /* isImplicit */ false, /*SPI*/false);
-}
-
-AvailableAttr *AvailableAttr::createForAlternative(
-    ASTContext &C, AbstractFunctionDecl *AsyncFunc) {
-  llvm::VersionTuple NoVersion;
-  return new (C) AvailableAttr(
-    SourceLoc(), SourceRange(), PlatformKind::none, "", "", AsyncFunc,
-    NoVersion, SourceRange(),
-    NoVersion, SourceRange(),
-    NoVersion, SourceRange(),
-    PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true, /*SPI*/false);
+      SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
+      /*Introduced=*/NoVersion, SourceRange(), /*Deprecated=*/NoVersion,
+      SourceRange(), Obsoleted, SourceRange(), Kind, /*Implicit=*/false,
+      /*SPI=*/false);
 }
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
-  return isPlatformActive(Platform, ctx.LangOpts);
+  return isPlatformActive(getPlatform(), ctx.LangOpts);
 }
 
 bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
@@ -2291,18 +2093,16 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 }
 
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
-  return new (C) AvailableAttr(implicit ? SourceLoc() : AtLoc,
-                               implicit ? SourceRange() : getRange(),
-                               Platform, Message, Rename, RenameDecl,
-                               Introduced ? *Introduced : llvm::VersionTuple(),
-                               implicit ? SourceRange() : IntroducedRange,
-                               Deprecated ? *Deprecated : llvm::VersionTuple(),
-                               implicit ? SourceRange() : DeprecatedRange,
-                               Obsoleted ? *Obsoleted : llvm::VersionTuple(),
-                               implicit ? SourceRange() : ObsoletedRange,
-                               PlatformAgnostic,
-                               implicit,
-                               IsSPI);
+  return new (C) AvailableAttr(
+      implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
+      getPlatform(), Message, Rename,
+      Introduced ? *Introduced : llvm::VersionTuple(),
+      implicit ? SourceRange() : IntroducedRange,
+      Deprecated ? *Deprecated : llvm::VersionTuple(),
+      implicit ? SourceRange() : DeprecatedRange,
+      Obsoleted ? *Obsoleted : llvm::VersionTuple(),
+      implicit ? SourceRange() : ObsoletedRange,
+      getPlatformAgnosticAvailability(), implicit, isSPI(), isForEmbedded());
 }
 
 std::optional<OriginallyDefinedInAttr::ActiveVersion>
@@ -2334,10 +2134,10 @@ OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,
 }
 
 bool AvailableAttr::isLanguageVersionSpecific() const {
-  if (PlatformAgnostic ==
+  if (getPlatformAgnosticAvailability() ==
       PlatformAgnosticAvailabilityKind::SwiftVersionSpecific)
     {
-      assert(Platform == PlatformKind::none &&
+      assert(getPlatform() == PlatformKind::none &&
              (Introduced.has_value() ||
               Deprecated.has_value() ||
               Obsoleted.has_value()));
@@ -2347,10 +2147,10 @@ bool AvailableAttr::isLanguageVersionSpecific() const {
 }
 
 bool AvailableAttr::isPackageDescriptionVersionSpecific() const {
-  if (PlatformAgnostic ==
+  if (getPlatformAgnosticAvailability() ==
       PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific)
     {
-      assert(Platform == PlatformKind::none &&
+      assert(getPlatform() == PlatformKind::none &&
              (Introduced.has_value() ||
               Deprecated.has_value() ||
               Obsoleted.has_value()));
@@ -2360,7 +2160,7 @@ bool AvailableAttr::isPackageDescriptionVersionSpecific() const {
 }
 
 bool AvailableAttr::isUnconditionallyUnavailable() const {
-  switch (PlatformAgnostic) {
+  switch (getPlatformAgnosticAvailability()) {
   case PlatformAgnosticAvailabilityKind::None:
   case PlatformAgnosticAvailabilityKind::Deprecated:
   case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
@@ -2377,7 +2177,7 @@ bool AvailableAttr::isUnconditionallyUnavailable() const {
 }
 
 bool AvailableAttr::isUnconditionallyDeprecated() const {
-  switch (PlatformAgnostic) {
+  switch (getPlatformAgnosticAvailability()) {
   case PlatformAgnosticAvailabilityKind::None:
   case PlatformAgnosticAvailabilityKind::Unavailable:
   case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
@@ -2394,7 +2194,8 @@ bool AvailableAttr::isUnconditionallyDeprecated() const {
 }
 
 bool AvailableAttr::isNoAsync() const {
-  return PlatformAgnostic == PlatformAgnosticAvailabilityKind::NoAsync;
+  return getPlatformAgnosticAvailability() ==
+         PlatformAgnosticAvailabilityKind::NoAsync;
 }
 
 llvm::VersionTuple AvailableAttr::getActiveVersion(const ASTContext &ctx) const {
@@ -2451,25 +2252,6 @@ AvailableVersionComparison AvailableAttr::getVersionAvailability(
   return AvailableVersionComparison::Available;
 }
 
-const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
-  ASTContext &ctx = D->getASTContext();
-  if (auto attr = D->getAttrs().getUnavailable(ctx))
-    return attr;
-
-  // If D is an extension member, check if the extension is unavailable.
-  //
-  // Skip decls imported from Clang, they could be associated to the wrong
-  // extension and inherit undesired unavailability. The ClangImporter
-  // associates Objective-C protocol members to the first category where the
-  // protocol is directly or indirectly adopted, no matter its availability
-  // and the availability of other categories. rdar://problem/53956555
-  if (!D->getClangNode())
-    if (auto ext = dyn_cast<ExtensionDecl>(D->getDeclContext()))
-        return AvailableAttr::isUnavailable(ext);
-
-  return nullptr;
-}
-
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                TrailingWhereClause *clause, bool exported,
                                SpecializationKind kind,
@@ -2505,11 +2287,27 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        DeclNameRef targetFunctionName,
                                        ArrayRef<Identifier> spiGroups,
                                        ArrayRef<AvailableAttr *> availableAttrs,
-                                       size_t typeErasedParamsCount,
                                        GenericSignature specializedSignature) {
+  size_t typeErasedParamsCount = 0;
+  if (Ctx.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
+    if (clause != nullptr) {
+      for (auto &req : clause->getRequirements()) {
+        if (req.getKind() == RequirementReprKind::LayoutConstraint) {
+          if (auto *attributedTy =
+                  dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
+            if (attributedTy->has(TypeAttrKind::NoMetadata)) {
+              typeErasedParamsCount += 1;
+            }
+          }
+        }
+      }
+    }
+  }
+
   unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *, Type>(
       spiGroups.size(), availableAttrs.size(), typeErasedParamsCount);
   void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
+
   return new (mem)
       SpecializeAttr(atLoc, range, clause, exported, kind, specializedSignature,
                      targetFunctionName, spiGroups, availableAttrs, typeErasedParamsCount);
@@ -2861,7 +2659,7 @@ ProtocolDecl *ImplementsAttr::getProtocol(DeclContext *dc) const {
 }
 
 CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
-                       PatternBindingInitializer *initContext,
+                       CustomAttributeInitializer *initContext,
                        ArgumentList *argList, bool implicit)
     : DeclAttribute(DeclAttrKind::Custom, atLoc, range, implicit),
       typeExpr(type), argList(argList), initContext(initContext) {
@@ -2870,7 +2668,7 @@ CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
 }
 
 CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
-                               PatternBindingInitializer *initContext,
+                               CustomAttributeInitializer *initContext,
                                ArgumentList *argList, bool implicit) {
   assert(type);
   SourceRange range(atLoc, type->getSourceRange().End);
@@ -2932,8 +2730,8 @@ MacroRoleAttr::MacroRoleAttr(SourceLoc atLoc, SourceRange range,
                              MacroSyntax syntax, SourceLoc lParenLoc,
                              MacroRole role,
                              ArrayRef<MacroIntroducedDeclName> names,
-                             ArrayRef<TypeExpr *> conformances,
-                             SourceLoc rParenLoc, bool implicit)
+                             ArrayRef<Expr *> conformances, SourceLoc rParenLoc,
+                             bool implicit)
     : DeclAttribute(DeclAttrKind::MacroRole, atLoc, range, implicit),
       syntax(syntax), role(role), numNames(names.size()),
       numConformances(conformances.size()), lParenLoc(lParenLoc),
@@ -2941,20 +2739,19 @@ MacroRoleAttr::MacroRoleAttr(SourceLoc atLoc, SourceRange range,
   auto *trailingNamesBuffer = getTrailingObjects<MacroIntroducedDeclName>();
   std::uninitialized_copy(names.begin(), names.end(), trailingNamesBuffer);
 
-  auto *trailingConformancesBuffer = getTrailingObjects<TypeExpr *>();
+  auto *trailingConformancesBuffer = getTrailingObjects<Expr *>();
   std::uninitialized_copy(conformances.begin(), conformances.end(),
                           trailingConformancesBuffer);
 }
 
-MacroRoleAttr *
-MacroRoleAttr::create(ASTContext &ctx, SourceLoc atLoc, SourceRange range,
-                      MacroSyntax syntax, SourceLoc lParenLoc, MacroRole role,
-                      ArrayRef<MacroIntroducedDeclName> names,
-                      ArrayRef<TypeExpr *> conformances,
-                      SourceLoc rParenLoc, bool implicit) {
-  unsigned size =
-      totalSizeToAlloc<MacroIntroducedDeclName, TypeExpr *>(
-          names.size(), conformances.size());
+MacroRoleAttr *MacroRoleAttr::create(ASTContext &ctx, SourceLoc atLoc,
+                                     SourceRange range, MacroSyntax syntax,
+                                     SourceLoc lParenLoc, MacroRole role,
+                                     ArrayRef<MacroIntroducedDeclName> names,
+                                     ArrayRef<Expr *> conformances,
+                                     SourceLoc rParenLoc, bool implicit) {
+  unsigned size = totalSizeToAlloc<MacroIntroducedDeclName, Expr *>(
+      names.size(), conformances.size());
   auto *mem = ctx.Allocate(size, alignof(MacroRoleAttr));
   return new (mem) MacroRoleAttr(atLoc, range, syntax, lParenLoc, role, names,
                                  conformances, rParenLoc, implicit);
@@ -2967,11 +2764,12 @@ ArrayRef<MacroIntroducedDeclName> MacroRoleAttr::getNames() const {
   };
 }
 
-ArrayRef<TypeExpr *> MacroRoleAttr::getConformances() const {
-  return {
-    getTrailingObjects<TypeExpr *>(),
-    numConformances
-  };
+ArrayRef<Expr *> MacroRoleAttr::getConformances() const {
+  return {getTrailingObjects<Expr *>(), numConformances};
+}
+
+MutableArrayRef<Expr *> MacroRoleAttr::getConformances() {
+  return {getTrailingObjects<Expr *>(), numConformances};
 }
 
 bool MacroRoleAttr::hasNameKind(MacroIntroducedDeclNameKind kind) const {
@@ -3055,20 +2853,10 @@ AllowFeatureSuppressionAttr *AllowFeatureSuppressionAttr::create(
       AllowFeatureSuppressionAttr(atLoc, range, implicit, inverted, features);
 }
 
-LifetimeAttr::LifetimeAttr(SourceLoc atLoc, SourceRange baseRange,
-                           bool implicit, ArrayRef<LifetimeEntry> entries)
-    : DeclAttribute(DeclAttrKind::Lifetime, atLoc, baseRange, implicit),
-      NumEntries(entries.size()) {
-  std::copy(entries.begin(), entries.end(),
-            getTrailingObjects<LifetimeEntry>());
-}
-
 LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
                                    SourceRange baseRange, bool implicit,
-                                   ArrayRef<LifetimeEntry> entries) {
-  unsigned size = totalSizeToAlloc<LifetimeEntry>(entries.size());
-  void *mem = context.Allocate(size, alignof(LifetimeEntry));
-  return new (mem) LifetimeAttr(atLoc, baseRange, implicit, entries);
+                                   LifetimeEntry *entry) {
+  return new (context) LifetimeAttr(atLoc, baseRange, implicit, entry);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {

@@ -112,6 +112,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
           .Case("swift-api-digester", DriverKind::APIDigester)
           .Case("swift-cache-tool", DriverKind::CacheTool)
           .Case("swift-parse-test", DriverKind::ParseTest)
+          .Case("swift-synthesize-interface", DriverKind::SynthesizeInterface)
           .Default(std::nullopt);
 
   if (Kind.has_value())
@@ -519,6 +520,7 @@ createStatsReporter(const llvm::opt::InputArgList *ArgList,
                                                  A->getValue(),
                                                  nullptr,
                                                  nullptr,
+                                                 false,
                                                  false,
                                                  false,
                                                  false,
@@ -1158,6 +1160,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_RawSIL;
       break;
 
+    case options::OPT_emit_lowered_sil:
+      OI.CompilerOutputType = file_types::TY_LoweredSIL;
+      break;
+
     case options::OPT_emit_sib:
       OI.CompilerOutputType = file_types::TY_SIB;
       break;
@@ -1224,7 +1230,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
     case options::OPT_print_ast:
-    case options::OPT_dump_type_refinement_contexts:
+    case options::OPT_dump_availability_scopes:
     case options::OPT_dump_scope_maps:
     case options::OPT_dump_interface_hash:
     case options::OPT_dump_type_info:
@@ -1617,6 +1623,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       switch (InputType) {
       case file_types::TY_Swift:
       case file_types::TY_SIL:
+      case file_types::TY_LoweredSIL:
       case file_types::TY_SIB: {
         // Source inputs always need to be compiled.
         assert(file_types::isPartOfSwiftCompilation(InputType));
@@ -1684,6 +1691,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_PCH:
       case file_types::TY_ImportedModules:
       case file_types::TY_ModuleTrace:
+      case file_types::TY_FineModuleTrace:
       case file_types::TY_YAMLOptRecord:
       case file_types::TY_BitstreamOptRecord:
       case file_types::TY_SwiftModuleInterfaceFile:
@@ -1700,6 +1708,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_SwiftFixIt:
       case file_types::TY_ModuleSemanticInfo:
       case file_types::TY_CachedDiagnostics:
+      case file_types::TY_SymbolGraphFile:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -3121,6 +3130,7 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::APIDigester:
   case DriverKind::CacheTool:
   case DriverKind::ParseTest:
+  case DriverKind::SynthesizeInterface:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

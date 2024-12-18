@@ -5,6 +5,9 @@
 // RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify -disable-availability-checking -swift-version 5 -I %t -enable-upcoming-feature RegionBasedIsolation -enable-upcoming-feature IsolatedDefaultValues -enable-upcoming-feature StrictConcurrency
 
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_IsolatedDefaultValues
+// REQUIRES: swift_feature_RegionBasedIsolation
+// REQUIRES: swift_feature_StrictConcurrency
 
 import SerializedDefaultArguments
 

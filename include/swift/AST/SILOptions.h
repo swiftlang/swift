@@ -160,6 +160,9 @@ public:
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
+  /// Verify ownership after every pass.
+  bool VerifyOwnershipAll = false;
+
   /// If true, no SIL verification is done at all.
   bool VerifyNone = false;
 
@@ -187,6 +190,10 @@ public:
   ///
   /// If this is disabled we do not serialize in OSSA form when optimizing.
   bool EnableOSSAModules = false;
+
+  /// Allow recompilation of a non-OSSA module to an OSSA module when imported
+  /// from another OSSA module.
+  bool EnableRecompilationToOSSAModule = false;
 
   /// If set to true, compile with the SIL Opaque Values enabled.
   bool EnableSILOpaqueValues = false;
@@ -317,6 +324,10 @@ public:
   /// Are there any options that indicate that functions should not be preserved
   /// for the debugger?
   bool ShouldFunctionsBePreservedToDebugger = true;
+
+  /// Block expanding and register promotion more aggressively throughout the
+  /// optimizer.
+  bool UseAggressiveReg2MemForCodeSize = true;
 
   SILOptions() {}
 

@@ -57,14 +57,6 @@ bool canOpcodeForwardInnerGuaranteedValues(SILValue value);
 /// the operation may be trivially rewritten with Guaranteed ownership.
 bool canOpcodeForwardInnerGuaranteedValues(Operand *use);
 
-bool computeIsScoped(SILArgument *arg);
-
-bool computeIsReborrow(SILArgument *arg);
-
-// This is the use-def equivalent of use->getOperandOwnership() ==
-// OperandOwnership::GuaranteedForwarding.
-bool computeIsGuaranteedForwarding(SILValue value);
-
 /// Is the opcode that produces \p value capable of forwarding owned values?
 ///
 /// This may be true even if the current instance of the instruction is not a
@@ -625,6 +617,12 @@ struct BorrowedValue {
   /// NOTE: To determine if a scope is a local scope, call
   /// BorrowScopeIntroducingValue::isLocalScope().
   bool visitLocalScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
+
+  /// Returns false if the value has no scope-ending uses because all control flow
+  /// paths end in dead-end blocks.
+  bool hasLocalScopeEndingUses() const {
+    return !visitLocalScopeEndingUses([](Operand *) { return false; });
+  }
 
   bool isLocalScope() const { return kind.isLocalScope(); }
 
@@ -1403,6 +1401,10 @@ bool isNestedLexicalBeginBorrow(BeginBorrowInst *bbi);
 /// - escaping
 /// then the move_value is redundant.
 bool isRedundantMoveValue(MoveValueInst *mvi);
+
+/// Sets the reborrow flags for all transitively incoming phi-arguments of
+/// `forEndBorrowValue`, which is the operand value of an `end_borrow`.
+void updateReborrowFlags(SILValue forEndBorrowValue);
 
 } // namespace swift
 

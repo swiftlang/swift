@@ -67,7 +67,7 @@ bool CodeCompletionDiagnostics::getDiagnostics(
     typename swift::detail::PassArgument<ArgTypes>::type... VArgs) {
   DiagID id = ID.ID;
   std::vector<DiagnosticArgument> DiagArgs{std::move(VArgs)...};
-  auto format = Engine.diagnosticStringFor(id, PrintDiagnosticNamesMode::None);
+  auto format = Engine.diagnosticStringFor(id);
   DiagnosticEngine::formatDiagnosticText(Out, format, DiagArgs);
   severity = getSeverity(Engine.declaredDiagnosticKindFor(id));
 
@@ -78,9 +78,9 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
     const ValueDecl *D, CodeCompletionDiagnosticSeverity &severity,
     llvm::raw_ostream &Out) {
   bool isSoftDeprecated = false;
-  const AvailableAttr *Attr = D->getAttrs().getDeprecated(Ctx);
+  const AvailableAttr *Attr = D->getDeprecatedAttr();
   if (!Attr) {
-    Attr = D->getAttrs().getSoftDeprecated(Ctx);
+    Attr = D->getSoftDeprecatedAttr();
     isSoftDeprecated = true;
   }
   if (!Attr)

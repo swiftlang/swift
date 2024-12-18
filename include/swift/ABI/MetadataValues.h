@@ -1704,6 +1704,9 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t RelativeProtocolWitnessTable = 0xb830; // = 47152
 
   const uint16_t TypeLayoutString = 0x8b65; // = 35685
+
+  /// Isolated deinit body function pointer
+  const uint16_t DeinitWorkFunction = 0x8438; // = 33848
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -2654,6 +2657,13 @@ public:
     Task_EnqueueJob                               = 12,
     Task_AddPendingGroupTaskUnconditionally       = 13,
     Task_IsDiscardingTask                         = 14,
+
+    /// The task function is consumed by calling it (@callee_owned).
+    /// The context pointer should be treated as opaque and non-copyable;
+    /// in particular, it should not be retained or released.
+    ///
+    /// Supported starting in Swift 6.1.
+    Task_IsTaskFunctionConsumed                       = 15,
   };
 
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
@@ -2683,6 +2693,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsDiscardingTask,
                                 isDiscardingTask,
                                 setIsDiscardingTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsTaskFunctionConsumed,
+                                isTaskFunctionConsumed,
+                                setIsTaskFunctionConsumed)
 };
 
 /// Flags for schedulable jobs.

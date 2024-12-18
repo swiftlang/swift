@@ -22,6 +22,7 @@
 #ifndef SWIFT_AST_ASTDEMANGLER_H
 #define SWIFT_AST_ASTDEMANGLER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/NamespaceMacros.h"
@@ -53,6 +54,7 @@ TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
 /// just finds and builds things in the AST.
 class ASTBuilder {
   ASTContext &Ctx;
+  Mangle::ManglingFlavor ManglingFlavor;
   Demangle::NodeFactory Factory;
 
   /// The notional context in which we're writing and type-checking code.
@@ -67,6 +69,15 @@ class ASTBuilder {
 
   /// For saving and restoring generic parameters.
   llvm::SmallVector<decltype(ParameterPacks), 2> ParameterPackStack;
+
+  /// The depth and index of each value parameter in the current generic
+  /// signature. We need this becasue the mangling for a type parameter
+  /// doesn't record whether it is a value or not; we find the correct
+  /// depth and index in this array, and use its value-ness.
+  llvm::SmallVector<std::tuple<std::pair<unsigned, unsigned>, Type>, 1> ValueParameters;
+
+  /// For saving and restoring generic parameters.
+  llvm::SmallVector<decltype(ValueParameters), 1> ValueParametersStack;
 
   /// This builder doesn't perform "on the fly" substitutions, so we preserve
   /// all pack expansions. We still need an active expansion stack though,
@@ -88,15 +99,25 @@ public:
 
   static constexpr bool needsToPrecomputeParentGenericContextShapes = false;
 
-  explicit ASTBuilder(ASTContext &ctx, GenericSignature genericSig)
-    : Ctx(ctx) {
+  explicit ASTBuilder(ASTContext &ctx, GenericSignature genericSig) : Ctx(ctx) {
+    ManglingFlavor = ctx.LangOpts.hasFeature(Feature::Embedded)
+                 ? Mangle::ManglingFlavor::Embedded
+                 : Mangle::ManglingFlavor::Default;
+
     for (auto *paramTy : genericSig.getGenericParams()) {
       if (paramTy->isParameterPack())
         ParameterPacks.emplace_back(paramTy->getDepth(), paramTy->getIndex());
+
+      if (paramTy->isValue()) {
+        auto pair = std::make_pair(paramTy->getDepth(), paramTy->getIndex());
+        auto tuple = std::make_tuple(pair, paramTy->getValueType());
+        ValueParameters.emplace_back(tuple);
+      }
     }
   }
 
   ASTContext &getASTContext() { return Ctx; }
+  Mangle::ManglingFlavor getManglingFlavor() { return ManglingFlavor; }
   DeclContext *getNotionalDC();
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
@@ -229,11 +250,11 @@ public:
 
   Type createDictionaryType(Type key, Type value);
 
-  Type createParenType(Type base);
-
   Type createIntegerType(intptr_t value);
 
   Type createNegativeIntegerType(intptr_t value);
+
+  Type createBuiltinFixedArrayType(Type size, Type element);
 
   BuiltGenericSignature
   createGenericSignature(ArrayRef<BuiltType> params,

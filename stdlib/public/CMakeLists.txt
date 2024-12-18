@@ -171,6 +171,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
       "armv6    armv6-apple-none-macho    armv6-apple-none-macho"
       "armv6m   armv6m-apple-none-macho   armv6m-apple-none-macho"
       "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
+      "armv7m   armv7m-apple-none-macho   armv7m-apple-none-macho"
       "armv7em  armv7em-apple-none-macho  armv7em-apple-none-macho"
     )
   endif()
@@ -178,6 +179,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
       "arm64e   arm64e-apple-none-macho   arm64e-apple-none-macho"
+      "arm64    arm64-apple-ios           arm64-apple-ios18"
+      "arm64e   arm64e-apple-ios          arm64e-apple-ios18"
     )
   endif()
 

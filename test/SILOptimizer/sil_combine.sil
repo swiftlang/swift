@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine -enable-experimental-feature ValueGenerics | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -sil-combine -enable-experimental-feature ValueGenerics | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_ValueGenerics
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -3781,6 +3782,22 @@ bb0(%0 : $B):
   strong_retain %0 : $B
   %1 = enum $Optional<Int>, #Optional.none!enumelt
   %2 = mark_dependence %0 : $B on %1 : $Optional<Int>
+  return %2 : $B
+}
+
+// CHECK-LABEL: sil @mark_dependence_trivial_address_base :
+// CHECK: bb0(
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: alloc_stack $Int
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'mark_dependence_trivial_address_base'
+sil @mark_dependence_trivial_address_base : $@convention(thin) (@guaranteed B) -> @owned B {
+bb0(%0 : $B):
+  strong_retain %0 : $B
+  %1 = alloc_stack $Int
+  %2 = mark_dependence %0 : $B on %1 : $*Int
+  dealloc_stack %1 : $*Int
   return %2 : $B
 }
 

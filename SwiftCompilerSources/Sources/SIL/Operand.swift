@@ -13,7 +13,7 @@
 import SILBridging
 
 /// An operand of an instruction.
-public struct Operand : CustomStringConvertible, NoReflectionChildren {
+public struct Operand : CustomStringConvertible, NoReflectionChildren, Equatable {
   public let bridged: BridgedOperand
 
   public init(bridged: BridgedOperand) {
@@ -186,6 +186,19 @@ extension Operand {
       return true
     case let apply as FullApplySite:
       return apply.isIndirectResult(operand: self)
+    default:
+      return false
+    }
+  }
+}
+
+extension Operand {
+  /// A scope ending use is a consuming use for normal borrow scopes, but it also applies to intructions that end the
+  /// scope of an address (end_access) or a token (end_apply, abort_apply),
+  public var isScopeEndingUse: Bool {
+    switch instruction {
+    case is EndBorrowInst, is EndAccessInst, is EndApplyInst, is AbortApplyInst:
+      return true
     default:
       return false
     }

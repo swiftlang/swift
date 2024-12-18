@@ -62,6 +62,7 @@ class ArgumentList;
 class AssociatedTypeDecl;
 class ASTContext;
 enum BufferPointerTypeKind : unsigned;
+struct BuiltinNameStringLiteral;
 class BuiltinTupleDecl;
 class ClassDecl;
 class ClangModuleLoader;
@@ -83,6 +84,7 @@ enum class ReferenceCounting : uint8_t;
 enum class ResilienceExpansion : unsigned;
 class SILModule;
 class SILType;
+class SourceLoc;
 class TypeAliasDecl;
 class TypeDecl;
 class NominalTypeDecl;
@@ -425,8 +427,6 @@ protected:
     HasCachedType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(ParenType, SugarType);
-
   SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
@@ -524,14 +524,14 @@ protected:
     GenericArgCount : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+1,
+  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+1+30,
     : NumPadBits,
 
     /// Whether we have a parent type.
     HasParent : 1,
 
-    /// Whether we have a substitution map.
-    HasSubstitutionMap : 1
+    /// The number of generic arguments.
+    GenericArgCount : 31
   );
 
   SWIFT_INLINE_BITFIELD_FULL(IntegerType, TypeBase, 1,
@@ -675,6 +675,9 @@ public:
   /// Is this an existential containing only marker protocols?
   bool isMarkerExistential();
 
+  /// Is this `any Sendable` type?
+  bool isSendableExistential();
+
   bool isPlaceholder();
 
   /// Returns true if this contextual type does not satisfy a conformance to
@@ -686,9 +689,6 @@ public:
 
   /// Returns true if this contextual type is (Escapable && !isNoEscape).
   bool mayEscape() { return !isNoEscape() && isEscapable(); }
-
-  /// Does the type have outer parenthesis?
-  bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
 
   /// Are values of this type essentially just class references,
   /// possibly with some sort of additional information?
@@ -1287,9 +1287,6 @@ public:
   /// argument labels removed.
   Type removeArgumentLabels(unsigned numArgumentLabels);
 
-  /// Retrieve the type without any parentheses around it.
-  Type getWithoutParens();
-
   /// Replace the base type of the result type of the given function
   /// type with a new result type, as per a DynamicSelf or other
   /// covariant return transformation.  The optionality of the
@@ -1508,6 +1505,9 @@ public:
   /// return `None`.
   std::optional<TangentSpace>
   getAutoDiffTangentSpace(LookupConformanceFn lookupConformance);
+
+  /// Return the kind of generic parameter that this type can be matched to.
+  GenericTypeParamKind getMatchingParamKind();
 };
 
 /// AnyGenericType - This abstract class helps types ensure that fields
@@ -1648,8 +1648,9 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnresolvedType, Type)
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {
 protected:
-  BuiltinType(TypeKind kind, const ASTContext &canTypeCtx)
-  : TypeBase(kind, &canTypeCtx, RecursiveTypeProperties()) {}
+  BuiltinType(TypeKind kind, const ASTContext &canTypeCtx,
+              RecursiveTypeProperties properties = {})
+  : TypeBase(kind, &canTypeCtx, properties) {}
 public:
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_BuiltinType &&
@@ -1671,6 +1672,113 @@ public:
   bool isBitwiseCopyable() const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinType, Type)
+
+/// BuiltinUnboundGenericType - the base declaration of a generic builtin type
+/// that has not yet had generic parameters applied.
+///
+/// Referring to an unbound generic type by itself is invalid, but this
+/// representation is used as an intermediate during type resolution when
+/// resolving a type reference such as `Builtin.Int<31>`. Applying
+/// the generic parameters produces the actual builtin type based on the
+/// kind of the base.
+class BuiltinUnboundGenericType : public BuiltinType {
+  friend class ASTContext;
+  TypeKind BoundGenericTypeKind;
+  
+  BuiltinUnboundGenericType(const ASTContext &C,
+                            TypeKind genericTypeKind)
+    : BuiltinType(TypeKind::BuiltinUnboundGeneric, C),
+      BoundGenericTypeKind(genericTypeKind)
+  {}
+    
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinUnboundGeneric;
+  }
+  
+  /// Produce the unqualified name of the type.
+  BuiltinNameStringLiteral getBuiltinTypeName() const;
+  StringRef getBuiltinTypeNameString() const;
+  
+  static BuiltinUnboundGenericType *get(TypeKind genericTypeKind,
+                                        const ASTContext &C);
+
+  /// Get the generic signature with which to substitute this type.
+  GenericSignature getGenericSignature() const;
+
+  /// Get the type that results from binding the generic parameters of this
+  /// builtin to the given substitutions.
+  ///
+  /// Produces an ErrorType if the substitution is invalid.
+  Type getBound(SubstitutionMap subs) const;
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnboundGenericType, BuiltinType)
+
+/// BuiltinFixedArrayType - The builtin type representing N values stored
+/// inline contiguously.
+///
+/// All elements of a value of this type must be fully initialized any time the
+/// value may be copied, moved, or destroyed.
+class BuiltinFixedArrayType : public BuiltinType, public llvm::FoldingSetNode {
+  friend class ASTContext;
+  
+  CanType Size;
+  CanType ElementType;
+  
+  static RecursiveTypeProperties
+  getRecursiveTypeProperties(CanType Size, CanType Element) {
+    RecursiveTypeProperties properties;
+    properties |= Size->getRecursiveProperties();
+    properties |= Element->getRecursiveProperties();
+    return properties;
+  }
+  
+  BuiltinFixedArrayType(CanType Size,
+                        CanType ElementType)
+    : BuiltinType(TypeKind::BuiltinFixedArray, ElementType->getASTContext(),
+                  getRecursiveTypeProperties(Size, ElementType)),
+        Size(Size),
+        ElementType(ElementType)
+  {}
+  
+public:
+  /// Arrays with more elements than this are always treated as in-memory values.
+  ///
+  /// (4096 is the hardcoded limit above which we refuse to import C arrays
+  /// as tuples. From first principles, a much lower threshold would probably
+  /// make sense, but we don't want to break the type lowering of C types
+  /// as they appear in existing Swift code.)
+  static constexpr const uint64_t MaximumLoadableSize = 4096;
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinFixedArray;
+  }
+  
+  static BuiltinFixedArrayType *get(CanType Size,
+                                    CanType ElementType);
+                       
+  /// Get the integer generic parameter representing the number of elements.
+  CanType getSize() const { return Size; }
+  
+  /// Get the fixed integer number of elements if known and zero or greater.
+  std::optional<uint64_t> getFixedInhabitedSize() const;
+  
+  /// True if the type is statically negative-sized (and therefore uninhabited).
+  bool isFixedNegativeSize() const;
+  
+  /// Get the element type.
+  CanType getElementType() const { return ElementType; }
+  
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, getSize(), getElementType());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      CanType Size, CanType ElementType) {
+    ID.AddPointer(Size.getPointer());
+    ID.AddPointer(ElementType.getPointer());
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFixedArrayType, BuiltinType)
 
 /// BuiltinRawPointerType - The builtin raw (and dangling) pointer type.  This
 /// pointer is completely unmanaged and is equivalent to i8* in LLVM IR.
@@ -2148,7 +2256,7 @@ public:
 /// set of substitutions to apply to make the type concrete.
 class TypeAliasType final
   : public SugarType, public llvm::FoldingSetNode,
-    llvm::TrailingObjects<TypeAliasType, Type, SubstitutionMap>
+    llvm::TrailingObjects<TypeAliasType, Type>
 {
   TypeAliasDecl *typealias;
 
@@ -2156,29 +2264,25 @@ class TypeAliasType final
   friend TrailingObjects;
 
   TypeAliasType(TypeAliasDecl *typealias, Type parent,
-                SubstitutionMap substitutions, Type underlying,
+                ArrayRef<Type> genericArgs, Type underlying,
                 RecursiveTypeProperties properties);
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return Bits.TypeAliasType.HasParent ? 1 : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const {
-    return Bits.TypeAliasType.HasSubstitutionMap ? 1 : 0;
+    return (Bits.TypeAliasType.HasParent ? 1 : 0) +
+           Bits.TypeAliasType.GenericArgCount;
   }
 
 public:
   /// Retrieve the generic signature used for substitutions.
-  GenericSignature getGenericSignature() const {
-    return getSubstitutionMap().getGenericSignature();
-  }
+  GenericSignature getGenericSignature() const;
 
-  static TypeAliasType *get(TypeAliasDecl *typealias, Type parent,
-                            SubstitutionMap substitutions, Type underlying);
+  static TypeAliasType *get(TypeAliasDecl *typealias,
+                            Type parent,
+                            ArrayRef<Type> genericArgs,
+                            Type underlying);
 
   /// Returns the declaration that declares this type.
   TypeAliasDecl *getDecl() const {
-    // Avoid requiring the definition of TypeAliasDecl.
     return typealias;
   }
 
@@ -2191,17 +2295,17 @@ public:
 
   /// Retrieve the substitution map applied to the declaration's underlying
   /// to produce the described type.
-  SubstitutionMap getSubstitutionMap() const {
-    if (!Bits.TypeAliasType.HasSubstitutionMap)
-      return SubstitutionMap();
-
-    return *getTrailingObjects<SubstitutionMap>();
-  }
+  SubstitutionMap getSubstitutionMap() const;
 
   /// Get the direct generic arguments, which correspond to the generic
   /// arguments that are directly applied to the typealias declaration
   /// this type references.
-  ArrayRef<Type> getDirectGenericArgs() const;
+  ArrayRef<Type> getDirectGenericArgs() const {
+    return ArrayRef<Type>(
+        getTrailingObjects<Type>() +
+        (Bits.TypeAliasType.HasParent ? 1 : 0),
+        Bits.TypeAliasType.GenericArgCount);
+  }
 
   SmallVector<Type, 2> getExpandedGenericArgs();
 
@@ -2209,12 +2313,34 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) const;
 
   static void Profile(llvm::FoldingSetNodeID &id, TypeAliasDecl *typealias,
-                      Type parent, SubstitutionMap substitutions,
+                      Type parent, ArrayRef<Type> genericArgs,
                       Type underlying);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::TypeAlias;
+  }
+};
+
+/// A type has been introduced at some fixed location in the AST.
+class LocatableType final : public SugarType, public llvm::FoldingSetNode {
+  SourceLoc Loc;
+
+  LocatableType(SourceLoc loc, Type underlying,
+                RecursiveTypeProperties properties);
+
+public:
+  SourceLoc getLoc() const { return Loc; }
+
+  static LocatableType *get(SourceLoc loc, Type underlying);
+
+  void Profile(llvm::FoldingSetNodeID &id) const;
+
+  static void Profile(llvm::FoldingSetNodeID &id, SourceLoc loc,
+                      Type underlying);
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Locatable;
   }
 };
 
@@ -2261,7 +2387,8 @@ class ParameterTypeFlags {
     Isolated = 1 << 7,
     CompileTimeConst = 1 << 8,
     Sending = 1 << 9,
-    NumBits = 10
+    Addressable = 1 << 10,
+    NumBits = 11
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits <= 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -2276,20 +2403,21 @@ public:
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
                      ParamSpecifier specifier, bool isolated, bool noDerivative,
-                     bool compileTimeConst, bool isSending)
+                     bool compileTimeConst, bool isSending, bool isAddressable)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(specifier) << SpecifierShift | (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
               (compileTimeConst ? CompileTimeConst : 0) |
-              (isSending ? Sending : 0)) {}
+              (isSending ? Sending : 0) |
+              (isAddressable ? Addressable : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ParamSpecifier ownership,
                     bool isolated, bool isNoDerivative, bool compileTimeConst,
-                    bool isSending);
+                    bool isSending, bool isAddressable);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -2302,6 +2430,7 @@ public:
   bool isCompileTimeConst() const { return value.contains(CompileTimeConst); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
   bool isSending() const { return value.contains(Sending); }
+  bool isAddressable() const { return value.contains(Addressable); }
 
   /// Get the spelling of the parameter specifier used on the parameter.
   ParamSpecifier getOwnershipSpecifier() const {
@@ -2368,6 +2497,12 @@ public:
     return ParameterTypeFlags(withSending
                                   ? value | ParameterTypeFlags::Sending
                                   : value - ParameterTypeFlags::Sending);
+  }
+
+  ParameterTypeFlags withAddressable(bool withAddressable) const {
+    return ParameterTypeFlags(withAddressable
+                                  ? value | ParameterTypeFlags::Addressable
+                                  : value - ParameterTypeFlags::Addressable);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -2463,7 +2598,8 @@ public:
                               /*nonEphemeral*/ false, getOwnershipSpecifier(),
                               /*isolated*/ false, /*noDerivative*/ false,
                               /*compileTimeConst*/ false,
-                              /*is sending*/ false);
+                              /*is sending*/ false,
+                              /*is addressable*/ false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -2475,21 +2611,6 @@ public:
   }
 
   uint8_t toRaw() const { return value.toRaw(); }
-};
-
-/// ParenType - A paren type is a type that's been written in parentheses.
-class ParenType : public SugarType {
-  ParenType(Type UnderlyingType, RecursiveTypeProperties properties);
-
-public:
-  static ParenType *get(const ASTContext &C, Type underlying);
-
-  Type getUnderlyingType() const { return getSinglyDesugaredType(); }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Paren;
-  }
 };
 
 /// TupleTypeElt - This represents a single element of a tuple.
@@ -3274,6 +3395,8 @@ public:
 
     /// Whether the parameter is marked '@noDerivative'.
     bool isNoDerivative() const { return Flags.isNoDerivative(); }
+    
+    bool isAddressable() const { return Flags.isAddressable(); }
 
     /// Whether the parameter might be a semantic result for autodiff purposes.
     /// This includes inout parameters.
@@ -4304,6 +4427,10 @@ public:
     Sending = 0x2,
 
     /// Set if the given parameter is isolated.
+    ///
+    /// This means that the value provides the functions isolation. This implies
+    /// that the parameter must be an Optional actor or something that conforms
+    /// to AnyActor.
     Isolated = 0x4,
   };
 
@@ -4823,11 +4950,18 @@ enum class SILCoroutineKind : uint8_t {
   /// It must not have normal results and may have arbitrary yield results.
   YieldOnce,
 
+  /// This function is a yield-once coroutine (used by read and modify
+  /// accessors).  It has the following differences from YieldOnce:
+  /// - it does not observe errors thrown by its caller (unless the feature
+  /// CoroutineAccessorsUnwindOnCallerError is enabled)
+  /// - it uses the callee-allocated ABI
+  YieldOnce2,
+
   /// This function is a yield-many coroutine (used by e.g. generators).
   /// It must not have normal results and may have arbitrary yield results.
   YieldMany,
 };
-  
+
 class SILFunctionConventions;
 
 
@@ -5039,6 +5173,17 @@ public:
   SILCoroutineKind getCoroutineKind() const {
     return SILCoroutineKind(Bits.SILFunctionType.CoroutineKind);
   }
+  /// Whether this coroutine's ABI is callee-allocated.
+  bool isCalleeAllocatedCoroutine() const {
+    switch (getCoroutineKind()) {
+    case SILCoroutineKind::None:
+    case SILCoroutineKind::YieldOnce:
+    case SILCoroutineKind::YieldMany:
+      return false;
+    case SILCoroutineKind::YieldOnce2:
+      return true;
+    }
+  }
 
   bool isSendable() const { return getExtInfo().isSendable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
@@ -5235,6 +5380,18 @@ public:
   /// a method.
   SILParameterInfo getSelfParameter() const {
     return getParameters().back();
+  }
+
+  /// Return SILParameterInfo for the isolated parameter in this SILFunctionType
+  /// if one exists. Returns None otherwise.
+  std::optional<SILParameterInfo> maybeGetIsolatedParameter() const {
+    for (auto param : getParameters()) {
+      if (param.hasOption(SILParameterInfo::Isolated)) {
+        return param;
+      }
+    }
+
+    return {};
   }
 
   struct IndirectMutatingParameterFilter {
@@ -7946,7 +8103,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
     ParamSpecifier ownership, bool isolated, bool isNoDerivative,
-    bool compileTimeConst, bool isSending) {
+    bool compileTimeConst, bool isSending, bool isAddressable) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -7957,7 +8114,8 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     ownership = ParamSpecifier::InOut;
   }
   return {isVariadic, isAutoClosure,  isNonEphemeral,   ownership,
-          isolated,   isNoDerivative, compileTimeConst, isSending};
+          isolated,   isNoDerivative, compileTimeConst, isSending,
+          isAddressable};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

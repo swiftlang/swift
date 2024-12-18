@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -disable-availability-checking
+// RUN: %target-swift-emit-silgen %s -target %target-swift-5.1-abi-triple
 
 protocol P {}
 class C {

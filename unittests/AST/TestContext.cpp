@@ -36,18 +36,18 @@ static Decl *createOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
 TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
     : Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
                            ClangImporterOpts, SymbolGraphOpts, CASOpts,
-                           SourceMgr, Diags)) {
+                           SerializationOpts, SourceMgr, Diags)) {
   registerParseRequestFunctions(Ctx.evaluator);
   registerTypeCheckerRequestFunctions(Ctx.evaluator);
   registerClangImporterRequestFunctions(Ctx.evaluator);
   auto stdlibID = Ctx.getIdentifier(STDLIB_NAME);
-  auto *module = ModuleDecl::create(stdlibID, Ctx);
-  Ctx.addLoadedModule(module);
-
-  auto bufferID = Ctx.SourceMgr.addMemBufferCopy("// nothing\n");
-  FileForLookups = new (Ctx) SourceFile(*module, SourceFileKind::Library,
-                                        bufferID);
-  module->addFile(*FileForLookups);
+  auto *M = ModuleDecl::create(stdlibID, Ctx, [&](ModuleDecl *M, auto addFile) {
+    auto bufferID = Ctx.SourceMgr.addMemBufferCopy("// nothing\n");
+    FileForLookups =
+        new (Ctx) SourceFile(*M, SourceFileKind::Library, bufferID);
+    addFile(FileForLookups);
+  });
+  Ctx.addLoadedModule(M);
 
   if (optionals == DeclareOptionalTypes) {
     SmallVector<ASTNode, 2> optionalTypes;

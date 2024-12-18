@@ -14,6 +14,7 @@ import CxxStdlibShim
 
 extension std.chrono.seconds {
   @available(SwiftStdlib 5.7, *)
+  @_alwaysEmitIntoClient
   public init(_ duration: Duration) {
     let (seconds, _) = duration.components
     self = __swift_interopMakeChronoSeconds(seconds)
@@ -22,6 +23,7 @@ extension std.chrono.seconds {
 
 extension std.chrono.milliseconds {
   @available(SwiftStdlib 5.7, *)
+  @_alwaysEmitIntoClient
   public init(_ duration: Duration) {
     let (seconds, attoseconds) = duration.components
     self = __swift_interopMakeChronoMilliseconds(
@@ -32,6 +34,7 @@ extension std.chrono.milliseconds {
 
 extension std.chrono.microseconds {
   @available(SwiftStdlib 5.7, *)
+  @_alwaysEmitIntoClient
   public init(_ duration: Duration) {
     let (seconds, attoseconds) = duration.components
     self = __swift_interopMakeChronoMicroseconds(
@@ -42,6 +45,7 @@ extension std.chrono.microseconds {
 
 extension std.chrono.nanoseconds {
   @available(SwiftStdlib 5.7, *)
+  @_alwaysEmitIntoClient
   public init(_ duration: Duration) {
     let (seconds, attoseconds) = duration.components
     self = __swift_interopMakeChronoNanoseconds(
@@ -52,18 +56,22 @@ extension std.chrono.nanoseconds {
 
 @available(SwiftStdlib 5.7, *)
 extension Duration {
+  @_alwaysEmitIntoClient
   public init(_ seconds: std.chrono.seconds) {
     self = Duration.seconds(seconds.count())
   }
 
+  @_alwaysEmitIntoClient
   public init(_ milliseconds: std.chrono.milliseconds) {
     self = Duration.milliseconds(milliseconds.count())
   }
 
+  @_alwaysEmitIntoClient
   public init(_ microseconds: std.chrono.microseconds) {
     self = Duration.microseconds(microseconds.count())
   }
 
+  @_alwaysEmitIntoClient
   public init(_ nanoseconds: std.chrono.nanoseconds) {
     self = Duration.nanoseconds(nanoseconds.count())
   }

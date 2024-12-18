@@ -106,7 +106,10 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
 
   let outlinedGlobal = context.createGlobalVariable(
         name: context.mangleOutlinedVariable(from: allocRef.parentFunction),
-        type: allocRef.type, isPrivate: true)
+        type: allocRef.type, linkage: .private,
+        // Only if it's a COW object we can be sure that the object allocated in the global is not mutated.
+        // If someone wants to mutate it, it has to be copied first.
+        isLet: endOfInitInst is EndCOWMutationInst)
 
   constructObject(of: allocRef, inInitializerOf: outlinedGlobal, storesToClassFields, storesToTailElements, context)
   context.erase(instructions: storesToClassFields)
@@ -503,14 +506,6 @@ private extension AllocRefInstBase {
   }
 }
 
-private extension FunctionPassContext {
-  func erase(instructions: [Instruction]) {
-    for inst in instructions {
-      erase(instruction: inst)
-    }
-  }
-}
-
 private func optimizeFindStringCall(stringArray: GlobalValueInst, _ context: FunctionPassContext) {
   if stringArray.numArrayElements > 16,
      let findStringCall = findFindStringCall(stringArray: stringArray),
@@ -562,7 +557,7 @@ private func replace(findStringCall: ApplyInst,
 
   // Create an "opaque" global variable which is passed as inout to
   // _findStringSwitchCaseWithCache and into which the function stores the "cache".
-  let cacheVar = context.createGlobalVariable(name: name, type: cacheType, isPrivate: true)
+  let cacheVar = context.createGlobalVariable(name: name, type: cacheType, linkage: .private, isLet: false)
 
   let varBuilder = Builder(staticInitializerOf: cacheVar, context)
   let zero = varBuilder.createIntegerLiteral(0, type: wordTy)

@@ -1,0 +1,180 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -module-name coroutines -emit-sorted-sil | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil [ossa] @begin_apply : {{.*}} {
+// CHECK:       bb0(
+// CHECK-SAME:      [[INT:%[^,]+]] :
+// CHECK-SAME:      [[FLOAT:%[^,]+]] :
+// CHECK-SAME:  ):
+// CHECK:         [[YIELD:%[^,]+]] = function_ref @yield : $@yield_once @convention(thin)
+// CHECK:         ({{%[^,]+}}, {{%[^,]+}}, [[TOKEN:%[^,]+]]) = begin_apply [[YIELD]]([[INT]], [[FLOAT]])
+// CHECK:         {{%[^,]+}} = end_apply [[TOKEN]]
+// CHECK-LABEL: } // end sil function 'begin_apply'
+sil [ossa] @begin_apply : $(Int, Float) -> () {
+bb0(%0 : $Int, %1 : $Float):
+  %coro = function_ref @yield : $@convention(thin) @yield_once (Int, Float) -> (@yields Int, @yields Float)
+  (%int, %float, %token) = begin_apply %coro(%0, %1) : $@convention(thin) @yield_once (Int, Float) -> (@yields Int, @yields Float)
+
+  end_apply %token as $()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @begin_apply_2 : {{.*}} {
+// CHECK:       bb0(
+// CHECK-SAME:      [[INT:%[^,]+]] :
+// CHECK-SAME:      [[FLOAT:%[^,]+]] :
+// CHECK-SAME:  ):
+// CHECK:         [[YIELD:%[^,]+]] = function_ref @yield_2 : $@yield_once_2 @convention(thin)
+// CHECK:         ({{%[^,]+}}, {{%[^,]+}}, [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]+]]) = begin_apply [[YIELD]]([[INT]], [[FLOAT]])
+// CHECK:         {{%[^,]+}} = end_apply [[TOKEN]]
+// CHECK:         dealloc_stack [[ALLOCATION]]
+// CHECK-LABEL: } // end sil function 'begin_apply_2'
+sil [ossa] @begin_apply_2 : $(Int, Float) -> () {
+bb0(%0 : $Int, %1 : $Float):
+  %coro = function_ref @yield_2 : $@convention(thin) @yield_once_2 (Int, Float) -> (@yields Int, @yields Float)
+  (%int, %float, %token, %allocation) = begin_apply %coro(%0, %1) : $@convention(thin) @yield_once_2 (Int, Float) -> (@yields Int, @yields Float)
+
+  end_apply %token as $()
+  dealloc_stack %allocation : $*Builtin.SILToken
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @many_signature :
+// CHECK-SAME:      $@yield_many
+// CHECK-SAME:      @convention(thin)
+// CHECK-SAME:      ()
+// CHECK-SAME:      ->
+// CHECK-SAME:      (@yields Int, @yields Float)
+sil @many_signature : $@yield_many () -> (@yields Int, @yields Float) {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil @once_2_signature :
+// CHECK-SAME:      $@yield_once_2
+// CHECK-SAME:      @convention(thin)
+// CHECK-SAME:      ()
+// CHECK-SAME:      ->
+// CHECK-SAME:      (@yields Int, @yields Float)
+sil @once_2_signature : $@yield_once_2 () -> (@yields Int, @yields Float) {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil @once_signature :
+// CHECK-SAME:      $@yield_once
+// CHECK-SAME:      @convention(thin)
+// CHECK-SAME:      ()
+// CHECK-SAME:      ->
+// CHECK-SAME:      (@yields Int, @yields Float)
+sil @once_signature : $@yield_once () -> (@yields Int, @yields Float) {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @yield : {{.*}} {
+// CHECK:       bb0(
+// CHECK-SAME:      [[INT:%[^,]+]] :
+// CHECK-SAME:      [[FLOAT:%[^,]+]] :
+// CHECK-SAME:  ):
+// CHECK:         yield ([[INT]] : $Int, [[FLOAT]] : $Float),
+// CHECK-SAME:        resume [[RESUME_BB:bb[0-9]+]],
+// CHECK-SAME:        unwind [[UNWIND_BB:bb[0-9]+]]
+// CHECK:         [[UNWIND_BB]]:
+// CHECK:           unwind
+// CHECK:         [[RESUME_BB]]:
+// CHECK:           return
+// CHECK-LABEL: } // end sil function 'yield'
+sil [ossa] @yield : $@yield_once (Int, Float) -> (@yields Int, @yields Float) {
+bb0(%0 : $Int, %1 : $Float):
+  yield (%0 : $Int, %1 : $Float), resume bb1, unwind bb2
+
+bb1:
+  %r = tuple ()
+  return %r : $()
+
+bb2:
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @yield_2 : {{.*}} {
+// CHECK:       bb0(
+// CHECK-SAME:      [[INT:%[^,]+]] :
+// CHECK-SAME:      [[FLOAT:%[^,]+]] :
+// CHECK-SAME:  ):
+// CHECK:         yield ([[INT]] : $Int, [[FLOAT]] : $Float),
+// CHECK-SAME:        resume [[RESUME_BB:bb[0-9]+]],
+// CHECK-SAME:        unwind [[UNWIND_BB:bb[0-9]+]]
+// CHECK:         [[UNWIND_BB]]:
+// CHECK:           unwind
+// CHECK:         [[RESUME_BB]]:
+// CHECK:           return
+// CHECK-LABEL: } // end sil function 'yield_2'
+sil [ossa] @yield_2 : $@yield_once_2 (Int, Float) -> (@yields Int, @yields Float) {
+bb0(%0 : $Int, %1 : $Float):
+  yield (%0 : $Int, %1 : $Float), resume bb1, unwind bb2
+
+bb1:
+  %r = tuple ()
+  return %r : $()
+
+bb2:
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @yield_many : {{.*}} {
+// CHECK:       bb0(
+// CHECK-SAME:      [[INT:%[^,]+]] :
+// CHECK-SAME:      [[FLOAT:%[^,]+]] :
+// CHECK-SAME:  ):
+// CHECK:         yield (%0 : $Int, %1 : $Float),
+// CHECK:             resume [[RESUME_BLOCK_1:bb[0-9]+]],
+// CHECK:             unwind [[UNWIND_BLOCK_1:bb[0-9]+]]
+// CHECK:       [[UNWIND_BLOCK_1]]:
+// CHECK:         br [[UNWIND_BLOCK:bb[0-9]+]]
+// CHECK:       [[RESUME_BLOCK_1]]:
+// CHECK:         yield (%0 : $Int, %1 : $Float),
+// CHECK:             resume [[RESUME_BLOCK_2:bb[0-9]+]],
+// CHECK:             unwind [[UNWIND_BLOCK_2:bb[0-9]+]]
+// CHECK:       [[UNWIND_BLOCK_2]]:
+// CHECK:         br [[UNWIND_BLOCK:bb[0-9]+]]
+// CHECK:       [[UNWIND_BLOCK]]:
+// CHECK:         unwind
+// CHECK:       [[RESUME_BLOCK_2]]:
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'yield_many'
+sil [ossa] @yield_many : $@yield_many (Int, Float) -> (@yields Int, @yields Float) {
+bb0(%0 : $Int, %1 : $Float):
+  yield (%0 : $Int, %1 : $Float), resume bb1, unwind bb3
+
+bb1:
+  yield (%0 : $Int, %1 : $Float), resume bb2, unwind bb4
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+
+bb3:
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  unwind
+}
+

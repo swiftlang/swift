@@ -1117,6 +1117,50 @@ void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
   }
 }
 
+void SILIsolationInfo::printForCodeDiagnostic(llvm::raw_ostream &os) const {
+  switch (Kind(*this)) {
+  case Unknown:
+    llvm::report_fatal_error("Printing unknown for code diagnostic?!");
+    return;
+  case Disconnected:
+    llvm::report_fatal_error("Printing disconnected for code diagnostic?!");
+    return;
+  case Actor:
+    if (auto instance = getActorInstance()) {
+      switch (instance.getKind()) {
+      case ActorInstance::Kind::Value: {
+        SILValue value = instance.getValue();
+        if (auto name = VariableNameInferrer::inferName(value)) {
+          os << "'" << *name << "'-isolated code";
+          return;
+        }
+        break;
+      }
+      case ActorInstance::Kind::ActorAccessorInit:
+        os << "'self'-isolated code";
+        return;
+      case ActorInstance::Kind::CapturedActorSelf:
+        os << "'self'-isolated code";
+        return;
+      }
+    }
+
+    if (getActorIsolation().getKind() == ActorIsolation::ActorInstance) {
+      if (auto *vd = getActorIsolation().getActorInstance()) {
+        os << "'" << vd->getBaseIdentifier() << "'-isolated code";
+        return;
+      }
+    }
+
+    getActorIsolation().printForDiagnostics(os);
+    os << " code";
+    return;
+  case Task:
+    os << "code in the current task";
+    return;
+  }
+}
+
 void SILIsolationInfo::printForOneLineLogging(llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
   case Unknown:

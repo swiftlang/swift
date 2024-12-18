@@ -317,9 +317,10 @@ void ParentConditionalConformance::diagnoseConformanceStack(
 
 namespace {
 /// Produce any additional syntactic diagnostics for a SyntacticElementTarget.
-class SyntacticDiagnosticWalker final : public ASTWalker {
+class SyntacticDiagnosticWalker final : public BaseDiagnosticWalker {
   const SyntacticElementTarget &Target;
   bool IsTopLevelExprStmt;
+  unsigned ExprDepth = 0;
 
   SyntacticDiagnosticWalker(const SyntacticElementTarget &target,
                             bool isExprStmt)
@@ -331,23 +332,28 @@ public:
     target.walk(walker);
   }
 
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    // We only want to call the diagnostic logic for the top-level expression,
+    // since the underlying logic will visit each sub-expression. We want to
+    // continue walking however to diagnose any child statements in e.g
+    // closures.
+    if (ExprDepth == 0) {
+      auto isExprStmt = (E == Target.getAsExpr()) ? IsTopLevelExprStmt : false;
+      performSyntacticExprDiagnostics(E, Target.getDeclContext(), isExprStmt);
+    }
+    ExprDepth += 1;
+    return Action::Continue(E);
   }
 
-  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-    auto isExprStmt = (expr == Target.getAsExpr()) ? IsTopLevelExprStmt : false;
-    performSyntacticExprDiagnostics(expr, Target.getDeclContext(), isExprStmt);
-    return Action::SkipNode(expr);
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    assert(ExprDepth > 0);
+    ExprDepth -= 1;
+    return Action::Continue(E);
   }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
     performStmtDiagnostics(stmt, Target.getDeclContext());
     return Action::Continue(stmt);
-  }
-
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
   }
 
   PreWalkAction walkToTypeReprPre(TypeRepr *typeRepr) override {
@@ -386,19 +392,21 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 // instead of each individual syntactic element types.
 std::optional<SyntacticElementTarget>
 TypeChecker::typeCheckExpression(SyntacticElementTarget &target,
-                                 TypeCheckExprOptions options) {
+                                 TypeCheckExprOptions options,
+                                 DiagnosticTransaction *diagnosticTransaction) {
   DeclContext *dc = target.getDeclContext();
   auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr",
                                   target.getAsExpr());
   PrettyStackTraceExpr stackTrace(Context, "type-checking", target.getAsExpr());
 
-  return typeCheckTarget(target, options);
+  return typeCheckTarget(target, options, diagnosticTransaction);
 }
 
 std::optional<SyntacticElementTarget>
 TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
-                             TypeCheckExprOptions options) {
+                             TypeCheckExprOptions options,
+                             DiagnosticTransaction *diagnosticTransaction) {
   auto errorResult = [&]() -> std::optional<SyntacticElementTarget> {
     // Fill in ErrorTypes for the target if we can.
     if (!options.contains(TypeCheckExprFlags::AvoidInvalidatingAST))
@@ -435,7 +443,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   if (options.contains(TypeCheckExprFlags::DisableMacroExpansions))
     csOptions |= ConstraintSystemFlags::DisableMacroExpansions;
 
-  ConstraintSystem cs(dc, csOptions);
+  ConstraintSystem cs(dc, csOptions, diagnosticTransaction);
 
   if (auto *expr = target.getAsExpr()) {
     // Tell the constraint system what the contextual type is.  This informs
@@ -461,7 +469,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // Apply this solution to the constraint system.
   // FIXME: This shouldn't be necessary.
   auto &solution = (*viable)[0];
-  cs.applySolution(solution);
+  cs.replaySolution(solution);
 
   // Apply the solution to the expression.
   auto resultTarget = cs.applySolution(solution, target);
@@ -523,7 +531,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     // First, let's try to type-check default expression using
     // archetypes, which guarantees that it would work for any
     // substitution of the generic parameter (if they are involved).
-    if (auto result = typeCheckExpression(defaultExprTarget, options)) {
+    if (auto result = typeCheckExpression(
+            defaultExprTarget, options, &diagnostics)) {
       defaultValue = result->getAsExpr();
       return defaultValue->getType();
     }
@@ -554,7 +563,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   // If both of aforementioned conditions are true, let's attempt
   // to open generic parameter and infer the type of this default
   // expression.
-  OpenedTypeMap genericParameters;
+  SmallVector<OpenedType, 4> genericParameters;
 
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::AllowFixes;
@@ -565,8 +574,13 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       defaultValue, LocatorPathElt::ContextualType(
                         defaultExprTarget.getExprContextualTypePurpose()));
 
-  auto getCanonicalGenericParamTy = [](GenericTypeParamType *GP) {
-    return cast<GenericTypeParamType>(GP->getCanonicalType());
+  auto findParam = [&](GenericTypeParamType *GP) -> TypeVariableType * {
+    for (auto pair : genericParameters) {
+      if (pair.first->isEqual(GP))
+        return pair.second;
+    }
+
+    return nullptr;
   };
 
   // Find and open all of the generic parameters used by the parameter
@@ -575,29 +589,29 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     assert(!type->is<UnboundGenericType>());
 
     if (auto *GP = type->getAs<GenericTypeParamType>()) {
-      auto openedVar = genericParameters.find(getCanonicalGenericParamTy(GP));
-      if (openedVar != genericParameters.end()) {
-        return openedVar->second;
-      }
-      return cs.openGenericParameter(DC->getParent(), GP, genericParameters,
-                                     locator);
+      if (auto *typeVar = findParam(GP))
+        return typeVar;
+
+      auto *typeVar = cs.openGenericParameter(GP, locator);
+      genericParameters.emplace_back(GP, typeVar);
+
+      return typeVar;
     }
     return std::nullopt;
   });
 
-  auto containsTypes = [&](Type type, OpenedTypeMap &toFind) {
-    return type.findIf([&](Type nested) {
+  auto containsTypes = [&](Type type) {
+    return type.findIf([&](Type nested) -> bool {
       if (auto *GP = nested->getAs<GenericTypeParamType>())
-        return toFind.count(getCanonicalGenericParamTy(GP)) > 0;
+        return findParam(GP);
       return false;
     });
   };
 
-  auto containsGenericParamsExcluding = [&](Type type,
-                                            OpenedTypeMap &exclusions) -> bool {
-    return type.findIf([&](Type type) {
+  auto containsGenericParamsExcluding = [&](Type type) -> bool {
+    return type.findIf([&](Type type) -> bool {
       if (auto *GP = type->getAs<GenericTypeParamType>())
-        return !exclusions.count(getCanonicalGenericParamTy(GP));
+        return !findParam(GP);
       return false;
     });
   };
@@ -618,7 +632,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     for (unsigned i : indices(anchorTy->getParams())) {
       const auto &param = anchorTy->getParams()[i];
 
-      if (containsTypes(param.getPlainType(), genericParameters))
+      if (containsTypes(param.getPlainType()))
         affectedParams.push_back(i);
     }
 
@@ -685,8 +699,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
         auto rhsTy = requirement.getSecondType();
 
         // Unrelated requirement.
-        if (!containsTypes(lhsTy, genericParameters) &&
-            !containsTypes(rhsTy, genericParameters))
+        if (!containsTypes(lhsTy) &&
+            !containsTypes(rhsTy))
           continue;
 
         // If both sides are dependent members, that's okay because types
@@ -697,8 +711,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
         // Allow a subset of generic same-type requirements that only mention
         // "in scope" generic parameters e.g. `T.X == Int` or `T == U.Z`
-        if (!containsGenericParamsExcluding(lhsTy, genericParameters) &&
-            !containsGenericParamsExcluding(rhsTy, genericParameters)) {
+        if (!containsGenericParamsExcluding(lhsTy) &&
+            !containsGenericParamsExcluding(rhsTy)) {
           recordRequirement(reqIdx, requirement, requirementBaseLocator);
           continue;
         }
@@ -718,12 +732,12 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
         auto adheringTy = requirement.getFirstType();
 
         // Unrelated requirement.
-        if (!containsTypes(adheringTy, genericParameters))
+        if (!containsTypes(adheringTy))
           continue;
 
         // If adhering type has a mix or in- and out-of-scope parameters
         // mentioned we need to diagnose.
-        if (containsGenericParamsExcluding(adheringTy, genericParameters)) {
+        if (containsGenericParamsExcluding(adheringTy)) {
           diagnoseInvalidRequirement(requirement);
           return Type();
         }
@@ -731,7 +745,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
         if (requirement.getKind() == RequirementKind::Superclass) {
           auto superclassTy = requirement.getSecondType();
 
-          if (containsGenericParamsExcluding(superclassTy, genericParameters)) {
+          if (containsGenericParamsExcluding(superclassTy)) {
             diagnoseInvalidRequirement(requirement);
             return Type();
           }
@@ -753,7 +767,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
   auto &solution = (*viable)[0];
 
-  cs.applySolution(solution);
+  cs.replaySolution(solution);
 
   if (auto result = cs.applySolution(solution, defaultExprTarget)) {
     // Perform syntactic diagnostics on the type-checked target.
@@ -1106,7 +1120,7 @@ TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
         setType(E, getType(FVE->getSubExpr())->getOptionalObjectType());
 
       if (auto *PE = dyn_cast<ParenExpr>(E))
-        setType(E, ParenType::get(Ctx, getType(PE->getSubExpr())));
+        setType(E, getType(PE->getSubExpr()));
 
       return Action::Continue(E);
     }
@@ -1153,7 +1167,7 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
   if (auto paren = dyn_cast<IdentityExpr>(expr)) {
     auto sub =  coerceToRValue(Context, paren->getSubExpr(), getType, setType);
     paren->setSubExpr(sub);
-    setType(paren, ParenType::get(Context, getType(sub)));
+    setType(paren, getType(sub));
     return paren;
   }
 
@@ -1506,15 +1520,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
       constraint.print(out, &getASTContext().SourceMgr);
       out << "\n";
     }
-  }
-
-  if (solverState && solverState->hasRetiredConstraints()) {
-    out.indent(indent) << "Retired Constraints:\n";
-    solverState->forEachRetired([&](Constraint &constraint) {
-      out.indent(indent + 2);
-      constraint.print(out, &getASTContext().SourceMgr);
-      out << "\n";
-    });
   }
 
   if (!ResolvedOverloads.empty()) {

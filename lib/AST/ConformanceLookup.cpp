@@ -406,11 +406,22 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
                                  ProtocolDecl *protocol) {
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {
-    // All builtin types are Sendable, Copyable, and Escapable.
     case KnownProtocolKind::Sendable:
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable: {
       ASTContext &ctx = protocol->getASTContext();
+
+      // FixedArray is Sendable, Copyable, or Escapable if its element type is.
+      if (auto bfa = dyn_cast<BuiltinFixedArrayType>(builtinType)) {
+        if (lookupConformance(bfa->getElementType(), protocol)) {
+          return ProtocolConformanceRef(
+            ctx.getBuiltinConformance(type, protocol,
+                                      BuiltinConformanceKind::Synthesized));
+        }
+        break;
+      }
+    
+      // All other builtin types are Sendable, Copyable, and Escapable.
       return ProtocolConformanceRef(
           ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
@@ -498,7 +509,7 @@ LookupConformanceInModuleRequest::evaluate(
 
     for (auto ap : archetype->getConformsTo()) {
       if (ap == protocol || ap->inheritsFrom(protocol))
-        return ProtocolConformanceRef(protocol);
+        return ProtocolConformanceRef::forAbstract(archetype, protocol);
     }
 
     return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
@@ -516,17 +527,17 @@ LookupConformanceInModuleRequest::evaluate(
 
   // Type parameters have trivial conformances.
   if (type->isTypeParameter())
-    return ProtocolConformanceRef(protocol);
+    return ProtocolConformanceRef::forAbstract(type, protocol);
 
   // Type variables have trivial conformances.
   if (type->isTypeVariableOrMember())
-    return ProtocolConformanceRef(protocol);
+    return ProtocolConformanceRef::forAbstract(type, protocol);
 
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the
   // intended type might have. Same goes for PlaceholderType.
   if (type->is<UnresolvedType>() || type->is<PlaceholderType>())
-    return ProtocolConformanceRef(protocol);
+    return ProtocolConformanceRef::forAbstract(type, protocol);
 
   // Pack types can conform to protocols.
   if (auto packType = type->getAs<PackType>()) {
@@ -838,6 +849,10 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
   //  just pretend it it conforms.
   if (type->is<SILPackType>())
     return true;
+
+  if (type->is<SILTokenType>()) {
+    return true;
+  }
 
   // The SIL types in the AST do not have real conformances, and should have
   // been handled in SILType instead.

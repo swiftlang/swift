@@ -2,6 +2,7 @@
 // are not allowed non-production compilers.
 
 // REQUIRES: no_asserts
+// REQUIRES: swift_feature_AccessLevelOnImport
 
 // 'AccessLevelOnImport' is allowed in production
 // RUN: %target-swift-frontend -typecheck %s -enable-experimental-feature AccessLevelOnImport -verify

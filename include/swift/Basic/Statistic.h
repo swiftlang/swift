@@ -175,6 +175,9 @@ private:
   /// record any additional stats until we've finished.
   bool IsFlushingTracesAndProfiles;
 
+  /// Whether we are printing all stats even if they are zero.
+  bool IsPrintingZeroStats;
+
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(raw_ostream &OS);
 
@@ -186,7 +189,8 @@ private:
                        bool FineGrainedTimers,
                        bool TraceEvents,
                        bool ProfileEvents,
-                       bool ProfileEntities);
+                       bool ProfileEntities,
+                       bool PrintZeroStats);
 public:
   UnifiedStatsReporter(StringRef ProgramName,
                        StringRef ModuleName,
@@ -200,7 +204,8 @@ public:
                        bool FineGrainedTimers,
                        bool TraceEvents,
                        bool ProfileEvents,
-                       bool ProfileEntities);
+                       bool ProfileEntities,
+                       bool PrintZeroStats);
   ~UnifiedStatsReporter();
 
   bool fineGrainedTimers() const { return FineGrainedTimers; }

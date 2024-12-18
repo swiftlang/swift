@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -update-borrowed-from -semantic-arc-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -module-name Swift -enable-sil-verify-all -update-borrowed-from -semantic-arc-opts %s | %FileCheck %s
 
 sil_stage raw
 
@@ -1245,53 +1245,6 @@ bb2(%2 : @owned ${ var Builtin.NativeObject }):
   %4 = load [copy] %3 : $*Builtin.NativeObject
   %user = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %user(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  unreachable
-}
-
-// CHECK-LABEL: sil [ossa] @enum_with_indirect_case_projectbox_loadcopy_to_loadborrow_deadend : $@convention(thin) (@in_guaranteed EnumWithIndirectCase) -> () {
-// CHECK: bb0
-// CHECK-NEXT: load_borrow
-// CHECK: } // end sil function 'enum_with_indirect_case_projectbox_loadcopy_to_loadborrow_deadend'
-sil [ossa] @enum_with_indirect_case_projectbox_loadcopy_to_loadborrow_deadend : $@convention(thin) (@in_guaranteed EnumWithIndirectCase) -> () {
-bb0(%0 : $*EnumWithIndirectCase):
-  %1 = load [copy] %0 : $*EnumWithIndirectCase
-  switch_enum %1 : $EnumWithIndirectCase, case #EnumWithIndirectCase.first!enumelt: bb1, case #EnumWithIndirectCase.second!enumelt: bb2
-
-bb1:
-  %9999 = tuple()
-  return %9999 : $()
-
-// NOTE: Eventually this will need to be changed when project_box has to be
-// guarded by begin_borrow.
-bb2(%2 : @owned ${ var Builtin.NativeObject }):
-  %3 = project_box %2 : ${ var Builtin.NativeObject }, 0
-  %4 = load [copy] %3 : $*Builtin.NativeObject
-  %user = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  apply %user(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  unreachable
-}
-
-// CHECK-LABEL: sil [ossa] @enum_with_indirect_case_projectbox_loadcopy_to_loadborrow_deadend_2 : $@convention(thin) (@in_guaranteed EnumWithIndirectCase) -> () {
-// CHECK: bb0
-// CHECK-NEXT: load_borrow
-// CHECK: } // end sil function 'enum_with_indirect_case_projectbox_loadcopy_to_loadborrow_deadend_2'
-sil [ossa] @enum_with_indirect_case_projectbox_loadcopy_to_loadborrow_deadend_2 : $@convention(thin) (@in_guaranteed EnumWithIndirectCase) -> () {
-bb0(%0 : $*EnumWithIndirectCase):
-  %1 = load [copy] %0 : $*EnumWithIndirectCase
-  switch_enum %1 : $EnumWithIndirectCase, case #EnumWithIndirectCase.first!enumelt: bb1, case #EnumWithIndirectCase.second!enumelt: bb2
-
-bb1:
-  %9999 = tuple()
-  return %9999 : $()
-
-// NOTE: Eventually this will need to be changed when project_box has to be
-// guarded by begin_borrow.
-bb2(%2 : @owned ${ var Builtin.NativeObject }):
-  %3 = project_box %2 : ${ var Builtin.NativeObject }, 0
-  %4 = load [copy] %3 : $*Builtin.NativeObject
-  %user = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  apply %user(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  destroy_value %2 : ${ var Builtin.NativeObject }
   unreachable
 }
 

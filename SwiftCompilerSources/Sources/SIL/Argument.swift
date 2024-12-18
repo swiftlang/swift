@@ -24,13 +24,15 @@ public class Argument : Value, Hashable {
     return bridged.getParent().block
   }
 
-  var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
-  
+  public var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
+
   public var index: Int {
     return parentBlock.arguments.firstIndex(of: self)!
   }
 
   public var isReborrow: Bool { bridged.isReborrow() }
+
+  public var isLexical: Bool { false }
 
   public var varDecl: VarDecl? { bridged.getVarDecl().getAs(VarDecl.self) }
 
@@ -48,6 +50,10 @@ public class Argument : Value, Hashable {
 final public class FunctionArgument : Argument {
   public var convention: ArgumentConvention {
     parentFunction.argumentConventions[index]
+  }
+
+  public override var isLexical: Bool {
+    bridged.FunctionArgument_isLexical()
   }
 
   public var isSelf: Bool {
@@ -163,6 +169,18 @@ public struct Phi {
       }
     }
     return nil
+  }
+
+  // Returns true if the phi has an end_borrow or a re-borrowing branch as user.
+  // This should be consistent with the `isReborrow` flag.
+  public var hasBorrowEndingUse: Bool {
+    let phiValue: Value = borrowedFrom ?? value
+    return phiValue.uses.contains {
+      switch $0.ownership {
+        case .endBorrow, .reborrow: return true
+        default:                    return false
+      }
+    }
   }
 
   public static func ==(lhs: Phi, rhs: Phi) -> Bool {

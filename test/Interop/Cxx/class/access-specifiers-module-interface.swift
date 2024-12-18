@@ -1,7 +1,7 @@
 // Test module interface produced for C++ access specifiers test.
 // In particular, we don't want any of the private members showing up here.
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=AccessSpecifiers -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=AccessSpecifiers -access-filter-public -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK:      struct PublicPrivate {
 // CHECK-NEXT:   init()
@@ -11,7 +11,7 @@
 // CHECK-NEXT:   struct PublicStruct {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
-// CHECK-NEXT:   struct PublicEnum : Equatable, RawRepresentable {
+// CHECK-NEXT:   struct PublicEnum : Hashable, Equatable, RawRepresentable {
 // CHECK-NEXT:     init(_ rawValue: [[ENUM_UNDERLYING_TYPE:Int32|UInt32]])
 // CHECK-NEXT:     init(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     var rawValue: [[ENUM_UNDERLYING_TYPE]]

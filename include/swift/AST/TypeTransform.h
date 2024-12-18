@@ -94,19 +94,16 @@ private:
 
 public:
   Type doIt(Type t, TypePosition pos) {
-    if (!isa<ParenType>(t.getPointer())) {
-      // Transform this type node.
-      if (std::optional<Type> transformed = asDerived().transform(t.getPointer(), pos))
-        return *transformed;
-
-      // Recur.
-    }
+    // Transform this type node.
+    if (std::optional<Type> transformed =
+            asDerived().transform(t.getPointer(), pos))
+      return *transformed;
 
     // Recur into children of this type.
     TypeBase *base = t.getPointer();
 
     switch (base->getKind()) {
-#define BUILTIN_TYPE(Id, Parent) \
+#define BUILTIN_CONCRETE_TYPE(Id, Parent) \
 case TypeKind::Id:
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
@@ -119,6 +116,31 @@ case TypeKind::Id:
     case TypeKind::BuiltinTuple:
     case TypeKind::Integer:
       return t;
+
+    case TypeKind::BuiltinFixedArray: {
+      auto bfaTy = cast<BuiltinFixedArrayType>(base);
+      
+      Type transSize = doIt(bfaTy->getSize(),
+                            TypePosition::Invariant);
+      if (!transSize) {
+        return Type();
+      }
+      
+      Type transElement = doIt(bfaTy->getElementType(),
+                               TypePosition::Invariant);
+      if (!transElement) {
+        return Type();
+      }
+      
+      CanType canTransSize = transSize->getCanonicalType();
+      CanType canTransElement = transElement->getCanonicalType();
+      if (canTransSize != bfaTy->getSize()
+          || canTransElement != bfaTy->getElementType()) {
+        return BuiltinFixedArrayType::get(canTransSize, canTransElement);
+      }
+      
+      return bfaTy;
+    }
 
     case TypeKind::PrimaryArchetype:
     case TypeKind::PackArchetype: {
@@ -471,56 +493,62 @@ case TypeKind::Id:
       if (newParentType && newParentType->isExistentialType())
         return newUnderlyingTy;
 
-      auto oldSubMap = alias->getSubstitutionMap();
-      SubstitutionMap newSubMap;
+      RecursiveTypeProperties substProps;
+      if (newParentType)
+        substProps = newParentType->getRecursiveProperties();
 
-      // We leave the old behavior behind for ConstraintSystem::openType(), where
-      // preserving sugar introduces a performance penalty.
-      if (asDerived().shouldDesugarTypeAliases()) {
-        for (auto oldReplacementType : oldSubMap.getReplacementTypes()) {
-          Type newReplacementType = doIt(oldReplacementType, TypePosition::Invariant);
-          if (!newReplacementType)
-            return Type();
+      SmallVector<Type, 4> substArgs;
+      bool anyChanged = false;
 
-          // If anything changed with the replacement type, we lose the sugar.
-          if (newReplacementType.getPointer() != oldReplacementType.getPointer())
-            return newUnderlyingTy;
-        }
+      const auto transformGenArg = [&](Type arg) -> bool {
+        Type substArg = doIt(arg, TypePosition::Invariant);
+        if (!substArg)
+          return true;
+        substProps |= substArg->getRecursiveProperties();
+        substArgs.push_back(substArg);
+        if (substArg.getPointer() != arg.getPointer())
+          anyChanged = true;
 
-        newSubMap = oldSubMap;
-      } else {
-        newSubMap = asDerived().transformSubMap(oldSubMap);
-        if (oldSubMap && !newSubMap)
+        return false;
+      };
+
+      for (auto arg : alias->getDirectGenericArgs()) {
+        if (transformGenArg(arg))
           return Type();
       }
 
       if (oldParentType.getPointer() == newParentType.getPointer() &&
           oldUnderlyingTy.getPointer() == newUnderlyingTy.getPointer() &&
-          oldSubMap == newSubMap)
+          !anyChanged)
         return t;
+
+      // We leave the old behavior behind for ConstraintSystem::openType(), where
+      // preserving sugar introduces a performance penalty.
+      if (asDerived().shouldDesugarTypeAliases())
+        return newUnderlyingTy;
 
       // Don't leave local archetypes and type variables behind in sugar
       // if they don't appear in the underlying type, to avoid confusion.
-      auto props = newSubMap.getRecursiveProperties();
-      if (props.hasLocalArchetype() && !newUnderlyingTy->hasLocalArchetype())
+      if (substProps.hasLocalArchetype() != newUnderlyingTy->hasLocalArchetype())
         return newUnderlyingTy;
-      if (props.hasTypeVariable() && !newUnderlyingTy->hasTypeVariable())
+      if (substProps.hasTypeVariable() != newUnderlyingTy->hasTypeVariable())
         return newUnderlyingTy;
 
-      return TypeAliasType::get(alias->getDecl(), newParentType, newSubMap,
+      return TypeAliasType::get(alias->getDecl(), newParentType, substArgs,
                                 newUnderlyingTy);
     }
 
-    case TypeKind::Paren: {
-      auto paren = cast<ParenType>(base);
-      Type underlying = doIt(paren->getUnderlyingType(), pos);
-      if (!underlying)
+    case TypeKind::Locatable: {
+      auto locatable = cast<LocatableType>(base);
+      Type oldUnderlyingTy = Type(locatable->getSinglyDesugaredType());
+      Type newUnderlyingTy = doIt(oldUnderlyingTy, pos);
+      if (!newUnderlyingTy)
         return Type();
 
-      if (underlying.getPointer() == paren->getUnderlyingType().getPointer())
+      if (oldUnderlyingTy.getPointer() == newUnderlyingTy.getPointer())
         return t;
 
-      return ParenType::get(ctx, underlying);
+      return LocatableType::get(locatable->getLoc(), newUnderlyingTy);
     }
 
     case TypeKind::ErrorUnion: {

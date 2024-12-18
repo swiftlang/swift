@@ -32,6 +32,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/StringExtras.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallString.h"
@@ -98,6 +99,7 @@ DEF_COLOR(ExprModifier, CYAN, false)
 DEF_COLOR(DeclModifier, CYAN, false)
 DEF_COLOR(ArgModifier, CYAN, false)
 DEF_COLOR(ClosureModifier, CYAN, false)
+DEF_COLOR(DeclAttribute, CYAN, false)
 DEF_COLOR(FieldLabel, CYAN, false)
 DEF_COLOR(Location, CYAN, false)
 
@@ -180,7 +182,7 @@ public:
 
 private:
   virtual void write_impl(const char *Ptr, size_t Size) override {
-    base_os.write_escaped(StringRef(Ptr, Size), /*UseHexEscapes=*/true);
+    writeEscaped(StringRef(Ptr, Size), base_os);
   }
 
   virtual uint64_t current_pos() const override {
@@ -407,9 +409,6 @@ static StringRef getDumpString(MagicIdentifierLiteralExpr::Kind kind) {
 static StringRef getDumpString(ObjectLiteralExpr::LiteralKind kind) {
   return ObjectLiteralExpr::getLiteralKindPlainName(kind);
 }
-static StringRef getDumpString(FunctionRefKind kind) {
-  return getFunctionRefKindStr(kind);
-}
 static StringRef getDumpString(ParamSpecifier specifier) {
   return ParamDecl::getSpecifierSpelling(specifier);
 }
@@ -427,7 +426,9 @@ static StringRef getDumpString(ValueOwnership ownership) {
 
   llvm_unreachable("Unhandled ValueOwnership in switch.");
 }
-
+static StringRef getDumpString(PlatformKind kind) {
+  return platformString(kind);
+}
 static StringRef getDumpString(ForeignErrorConvention::IsOwned_t owned) {
   switch (owned) {
   case swift::ForeignErrorConvention::IsNotOwned:
@@ -449,6 +450,82 @@ static StringRef getDumpString(RequirementKind kind) {
 
   llvm_unreachable("Unhandled RequirementKind in switch.");
 }
+static StringRef getDumpString(ClangImporterSynthesizedTypeAttr::Kind kind) {
+  switch (kind) {
+  case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapper:
+    return "NSErrorWrapper";
+  case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon:
+    return "NSErrorWrapperAnon";
+  }
+  llvm_unreachable("unhandled ClangImporterSynthesizedTypeAttr::Kind");
+}
+static StringRef getDumpString(ExternKind kind) {
+  switch (kind) {
+  case ExternKind::C:
+    return "C";
+  case ExternKind::Wasm:
+    return "Wasm";
+  }
+  llvm_unreachable("unhandled ExternKind");
+}
+static StringRef getDumpString(InlineKind kind) {
+  switch (kind) {
+  case InlineKind::Always:
+    return "always";
+  case InlineKind::Never:
+    return "never";
+  }
+  llvm_unreachable("unhandled InlineKind");
+}
+static StringRef getDumpString(MacroRole role) {
+  return getMacroRoleString(role);
+}
+static StringRef getDumpString(EffectsKind kind) {
+  switch (kind) {
+  case EffectsKind::ReadNone:
+    return "ReadNone";
+  case EffectsKind::ReadOnly:
+    return "ReadOnly";
+  case EffectsKind::ReleaseNone:
+    return "ReleaseNone";
+  case EffectsKind::ReadWrite:
+    return "ReadWrite";
+  case EffectsKind::Unspecified:
+    return "Unspecified";
+  case EffectsKind::Custom:
+    return "Custom";
+  }
+  llvm_unreachable("unhandled EffectsKind");
+}
+static StringRef getDumpString(ExclusivityAttr::Mode mode) {
+  switch (mode) {
+  case ExclusivityAttr::Mode::Checked:
+    return "checked";
+  case ExclusivityAttr::Mode::Unchecked:
+    return "unchecked";
+  }
+  llvm_unreachable("unhandled ExclusivityAttr::Mode");
+}
+static StringRef getDumpString(OptimizationMode mode) {
+  switch (mode) {
+  case OptimizationMode::NotSet:
+    return "<not set>";
+  case OptimizationMode::NoOptimization:
+    return "NoOptimization";
+  case OptimizationMode::ForSpeed:
+    return "ForSpeed";
+  case OptimizationMode::ForSize:
+    return "ForSize";
+  }
+}
+static StringRef getDumpString(NonSendableKind kind) {
+  switch (kind) {
+  case NonSendableKind::Assumed:
+    return "Assumed";
+  case NonSendableKind::Specific:
+    return "Specific";
+  }
+}
 static StringRef getDumpString(StringRef s) {
   return s;
 }
@@ -459,6 +536,8 @@ static size_t getDumpString(size_t value) {
   return value;
 }
 static void *getDumpString(void *value) { return value; }
+
+static StringRef getDumpString(Identifier ident) { return ident.str(); }
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
@@ -536,6 +615,10 @@ namespace {
 
     /// Print a type as a child node.
     void printRec(Type ty, StringRef label = "");
+
+    /// Print an attribute as a child node.
+    void printRec(const DeclAttribute *Attr, const ASTContext *Ctx,
+                  StringRef label = "");
 
     /// Print an \c ASTNode as a child node.
     void printRec(const ASTNode &Elt, const ASTContext *Ctx,
@@ -1157,6 +1240,7 @@ namespace {
         printFlag("unresolved_type", TypeColor);
       }
       printWhereRequirements(TAD);
+      printAttributes(TAD);
 
       printFoot();
     }
@@ -1170,10 +1254,7 @@ namespace {
            << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
 
       }, "opaque_interface", TypeColor);
-
-      if (auto underlyingSubs = OTD->getUniqueUnderlyingTypeSubstitutions()) {
-        printRec(*underlyingSubs);
-      }
+      printAttributes(OTD);
 
       printFoot();
     }
@@ -1194,6 +1275,7 @@ namespace {
         printField((StringRef)"value", "param_kind");
         break;
       }
+      printAttributes(decl);
 
       printFoot();
     }
@@ -1218,6 +1300,7 @@ namespace {
         }, "overridden");
       }
 
+      printAttributes(decl);
       printFoot();
     }
 
@@ -1246,6 +1329,12 @@ namespace {
       printFieldQuotedRaw([&](raw_ostream &OS) {
         Params->print(OS);
       }, "", TypeColor);
+    }
+
+    void printAttributes(const Decl *D) {
+      ASTContext *Ctx = &D->getASTContext();
+      for (auto *attr : D->getAttrs())
+        printRec(attr, Ctx);
     }
 
     void printCommon(ValueDecl *VD, const char *Name, StringRef Label,
@@ -1322,6 +1411,8 @@ namespace {
         break;
       }
 
+      printAttributes(IDC->getDecl());
+
       auto members = ParseIfNeeded ? IDC->getMembers()
                                    : IDC->getCurrentMembersWithoutLoading();
       for (Decl *D : members) {
@@ -1375,8 +1466,9 @@ namespace {
         }
       }
 
+      printAttributes(VD);
       printAccessors(VD);
-      
+
       printFoot();
     }
 
@@ -1445,6 +1537,8 @@ namespace {
       printFlag(PD->getAttrs().hasAttribute<KnownToBeLocalAttr>(),
                 "known_to_be_local", DeclModifierColor);
 
+      printAttributes(PD);
+
       if (auto init = PD->getStructuralDefaultExpr()) {
         printRec(init, "expression");
       }
@@ -1474,6 +1568,7 @@ namespace {
       if (auto *paramList = EED->getParameterList()) {
         printRec(paramList);
       }
+      printAttributes(EED);
       printFoot();
     }
 
@@ -1500,6 +1595,7 @@ namespace {
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD, StringRef label) {
       printCommon(PBD, "pattern_binding_decl", label);
+      printAttributes(PBD);
 
       for (auto idx : range(PBD->getNumPatternEntries())) {
         printRec(PBD->getPattern(idx));
@@ -1516,6 +1612,7 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *SD, StringRef label) {
       printCommon(SD, "subscript_decl", label);
       printStorageImpl(SD);
+      printAttributes(SD);
       printAccessors(SD);
       printFoot();
     }
@@ -1539,6 +1636,7 @@ namespace {
     }
 
     void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
+      printAttributes(D);
       if (auto *P = D->getImplicitSelfDecl()) {
         printRec(P);
       }
@@ -1693,6 +1791,7 @@ namespace {
     void visitModuleDecl(ModuleDecl *MD, StringRef label) {
       printCommon(MD, "module", label);
       printFlag(MD->isNonSwiftModule(), "non_swift");
+      printAttributes(MD);
       printFoot();
     }
 
@@ -1709,7 +1808,11 @@ namespace {
 
     void visitMacroDecl(MacroDecl *MD, StringRef label) {
       printCommon(MD, "macro_decl", label);
-      // TODO: Fill this in?
+      printAttributes(MD);
+      printRec(MD->getParameterList(), &MD->getASTContext());
+      if (MD->resultType.getTypeRepr())
+        printRec(MD->resultType.getTypeRepr(), "result");
+      printRec(MD->definition, "definition");
       printFoot();
     }
 
@@ -1809,17 +1912,7 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::Initializer:
-    switch (cast<Initializer>(dc)->getInitializerKind()) {
-    case InitializerKind::PatternBinding:
-      os << "pattern binding initializer";
-      break;
-    case InitializerKind::DefaultArgument:
-      os << "default argument initializer";
-      break;
-    case InitializerKind::PropertyWrapper:
-      os << "property wrapper initializer";
-      break;
-    }
+    simple_display(os, cast<Initializer>(dc));
     break;
 
   case DeclContextKind::TopLevelCodeDecl:
@@ -2280,8 +2373,8 @@ public:
   }
   void visitRegexLiteralExpr(RegexLiteralExpr *E, StringRef label) {
     printCommon(E, "regex_literal_expr", label);
-    
-    printFieldQuoted(E->getRegexText(), "text", LiteralValueColor);
+
+    printFieldQuoted(E->getParsedRegexText(), "text", LiteralValueColor);
     printInitializerField(E->getInitializer(), "initializer");
 
     printFoot();
@@ -2310,8 +2403,8 @@ public:
     printDeclRefField(E->getDeclRef(), "decl");
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       printFlag(getDumpString(E->getAccessSemantics()), AccessLevelColor);
-    printField(E->getFunctionRefKind(), "function_ref",
-               ExprModifierColor);
+    printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
+                  "function_ref", ExprModifierColor);
 
     printFoot();
   }
@@ -2342,7 +2435,8 @@ public:
 
     printFieldQuoted(E->getDecls()[0]->getBaseName(), "name", IdentifierColor);
     printField(E->getDecls().size(), "number_of_decls", ExprModifierColor);
-    printField(E->getFunctionRefKind(), "function_ref", ExprModifierColor);
+    printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
+                  "function_ref", ExprModifierColor);
 
     if (!E->isForOperator()) {
       for (auto D : E->getDecls()) {
@@ -2360,7 +2454,8 @@ public:
     printCommon(E, "unresolved_decl_ref_expr", label);
 
     printFieldQuoted(E->getName(), "name", IdentifierColor);
-    printField(E->getFunctionRefKind(), "function_ref", ExprModifierColor);
+    printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
+                  "function_ref", ExprModifierColor);
 
     printFoot();
   }
@@ -2401,7 +2496,8 @@ public:
     printCommon(E, "unresolved_member_expr", label);
 
     printFieldQuoted(E->getName(), "name", ExprModifierColor);
-    printField(E->getFunctionRefKind(), "function_ref", ExprModifierColor);
+    printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
+                  "function_ref", ExprModifierColor);
     printFoot();
   }
   void visitDotSelfExpr(DotSelfExpr *E, StringRef label) {
@@ -2524,7 +2620,8 @@ public:
     printCommon(E, "unresolved_dot_expr", label);
 
     printFieldQuoted(E->getName(), "field");
-    printField(E->getFunctionRefKind(), "function_ref", ExprModifierColor);
+    printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
+                  "function_ref", ExprModifierColor);
 
     if (E->getBase()) {
       printRec(E->getBase());
@@ -2733,6 +2830,12 @@ public:
   void visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
                                       StringRef label) {
     printCommon(E, "actor_isolation_erasure_expr", label);
+    printRec(E->getSubExpr());
+    printFoot();
+  }
+
+  void visitUnsafeCastExpr(UnsafeCastExpr *E, StringRef label) {
+    printCommon(E, "unsafe_cast_expr", label);
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -3576,13 +3679,12 @@ public:
   void visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T,
                                       StringRef label) {
     printCommon("type_lifetime_dependent_return", label);
-    for (auto &dep : T->getLifetimeDependencies()) {
-      printFieldRaw(
-          [&](raw_ostream &out) {
-            out << " " << dep.getDependsOnString() << " ";
-          },
-          "");
-    }
+
+    printFieldRaw(
+        [&](raw_ostream &out) {
+          out << " " << T->getLifetimeEntry()->getString() << " ";
+        },
+        "");
     printRec(T->getBase());
     printFoot();
   }
@@ -3598,6 +3700,544 @@ public:
     printFoot();
   }
 };
+} // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
+// Dumping for DeclAttributes
+//===----------------------------------------------------------------------===//
+
+namespace {
+class PrintAttribute : public AttributeVisitor<PrintAttribute, void, StringRef>,
+                       public PrintBase {
+  const ASTContext *Ctx;
+
+public:
+  PrintAttribute(
+      raw_ostream &os, const ASTContext *ctx, unsigned indent = 0,
+      bool parseIfNeeded = false,
+      llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
+      llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
+      llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+          getTypeOfKeyPathComponent = defaultGetTypeOfKeyPathComponent)
+      : PrintBase(os, indent, parseIfNeeded, getTypeOfExpr, getTypeOfTypeRepr,
+                  getTypeOfKeyPathComponent),
+        Ctx(ctx) {}
+
+  void printCommon(DeclAttribute *Attr, StringRef name, StringRef label) {
+    printHead(name, DeclAttributeColor, label);
+    printFlag(Attr->isImplicit(), "implicit");
+    printFlag(Attr->isInvalid(), "invalid");
+    printFlag(Attr->getAddedByAccessNote(), "added_by_access_note");
+    printSourceRange(Attr->Range, Ctx);
+  }
+
+  /// Deleting this ensures that all attributes are covered by the
+  /// visitor below.
+  void visitDeclAttribute(DeclAttribute *A) = delete;
+
+#define TRIVIAL_ATTR_PRINTER(Class, Name)                                      \
+  void visit##Class##Attr(Class##Attr *Attr, StringRef label) {                \
+    printCommon(Attr, #Name "_attr", label);                                   \
+    printFoot();                                                               \
+  }
+
+  TRIVIAL_ATTR_PRINTER(Actor, actor)
+  TRIVIAL_ATTR_PRINTER(AddressableSelf, _addressableSelf)
+  TRIVIAL_ATTR_PRINTER(AlwaysEmitConformanceMetadata,
+                       always_emit_conformance_metadata)
+  TRIVIAL_ATTR_PRINTER(AlwaysEmitIntoClient, always_emit_into_client)
+  TRIVIAL_ATTR_PRINTER(Async, async)
+  TRIVIAL_ATTR_PRINTER(AtReasync, at_reasync)
+  TRIVIAL_ATTR_PRINTER(AtRethrows, at_rethrows)
+  TRIVIAL_ATTR_PRINTER(Borrowed, borrowed)
+  TRIVIAL_ATTR_PRINTER(Borrowing, borrowing)
+  TRIVIAL_ATTR_PRINTER(CompileTimeConst, compile_time_const)
+  TRIVIAL_ATTR_PRINTER(CompilerInitialized, compiler_initialized)
+  TRIVIAL_ATTR_PRINTER(Consuming, consuming)
+  TRIVIAL_ATTR_PRINTER(Convenience, convenience)
+  TRIVIAL_ATTR_PRINTER(DiscardableResult, discardable_result)
+  TRIVIAL_ATTR_PRINTER(DisfavoredOverload, disfavored_overload)
+  TRIVIAL_ATTR_PRINTER(DistributedActor, distributed_actor)
+  TRIVIAL_ATTR_PRINTER(Dynamic, dynamic)
+  TRIVIAL_ATTR_PRINTER(DynamicCallable, dynamic_callable)
+  TRIVIAL_ATTR_PRINTER(DynamicMemberLookup, dynamic_member_lookup)
+  TRIVIAL_ATTR_PRINTER(EagerMove, eager_move)
+  TRIVIAL_ATTR_PRINTER(EmitAssemblyVisionRemarks, emit_assembly_vision_remarks)
+  TRIVIAL_ATTR_PRINTER(Exported, exported)
+  TRIVIAL_ATTR_PRINTER(ExtractConstantsFromMembers,
+                       extract_constants_from_members)
+  TRIVIAL_ATTR_PRINTER(Final, final)
+  TRIVIAL_ATTR_PRINTER(FixedLayout, fixed_layout)
+  TRIVIAL_ATTR_PRINTER(ForbidSerializingReference, forbid_serializing_reference)
+  TRIVIAL_ATTR_PRINTER(Frozen, frozen)
+  TRIVIAL_ATTR_PRINTER(GKInspectable, gk_inspectable)
+  TRIVIAL_ATTR_PRINTER(GlobalActor, global_actor)
+  TRIVIAL_ATTR_PRINTER(HasInitialValue, has_initial_value)
+  TRIVIAL_ATTR_PRINTER(HasMissingDesignatedInitializers,
+                       has_missing_designated_initializers)
+  TRIVIAL_ATTR_PRINTER(HasStorage, has_storage)
+  TRIVIAL_ATTR_PRINTER(IBAction, ib_action)
+  TRIVIAL_ATTR_PRINTER(IBDesignable, ib_designable)
+  TRIVIAL_ATTR_PRINTER(IBInspectable, ib_inspectable)
+  TRIVIAL_ATTR_PRINTER(IBOutlet, ib_outlet)
+  TRIVIAL_ATTR_PRINTER(IBSegueAction, ib_segue_action)
+  TRIVIAL_ATTR_PRINTER(ImplementationOnly, implementation_only)
+  TRIVIAL_ATTR_PRINTER(ImplicitSelfCapture, implicit_self_capture)
+  TRIVIAL_ATTR_PRINTER(Indirect, indirect)
+  TRIVIAL_ATTR_PRINTER(Infix, infix)
+  TRIVIAL_ATTR_PRINTER(InheritActorContext, inherit_actor_context)
+  TRIVIAL_ATTR_PRINTER(InheritsConvenienceInitializers,
+                       inherits_convenience_initializers)
+  TRIVIAL_ATTR_PRINTER(Inlinable, inlinable)
+  TRIVIAL_ATTR_PRINTER(Isolated, isolated)
+  TRIVIAL_ATTR_PRINTER(KnownToBeLocal, known_to_be_local)
+  TRIVIAL_ATTR_PRINTER(LLDBDebuggerFunction, lldb_debugger_function)
+  TRIVIAL_ATTR_PRINTER(Lazy, lazy)
+  TRIVIAL_ATTR_PRINTER(LegacyConsuming, legacy_consuming)
+  TRIVIAL_ATTR_PRINTER(LexicalLifetimes, lexical_lifetimes)
+  TRIVIAL_ATTR_PRINTER(MainType, main_type)
+  TRIVIAL_ATTR_PRINTER(Marker, marker)
+  TRIVIAL_ATTR_PRINTER(MoveOnly, move_only)
+  TRIVIAL_ATTR_PRINTER(Mutating, mutating)
+  TRIVIAL_ATTR_PRINTER(NSApplicationMain, ns_application_main)
+  TRIVIAL_ATTR_PRINTER(NSCopying, ns_copying)
+  TRIVIAL_ATTR_PRINTER(NSManaged, ns_managed)
+  TRIVIAL_ATTR_PRINTER(NoAllocation, no_allocation)
+  TRIVIAL_ATTR_PRINTER(NoDerivative, no_derivative)
+  TRIVIAL_ATTR_PRINTER(NoEagerMove, no_eager_move)
+  TRIVIAL_ATTR_PRINTER(NoExistentials, no_existentials)
+  TRIVIAL_ATTR_PRINTER(NoImplicitCopy, no_implicit_copy)
+  TRIVIAL_ATTR_PRINTER(NoLocks, no_locks)
+  TRIVIAL_ATTR_PRINTER(NoMetadata, no_metadata)
+  TRIVIAL_ATTR_PRINTER(NoObjCBridging, no_objc_bridging)
+  TRIVIAL_ATTR_PRINTER(NoRuntime, no_runtime)
+  TRIVIAL_ATTR_PRINTER(NonEphemeral, non_ephemeral)
+  TRIVIAL_ATTR_PRINTER(NonEscapable, non_escapable)
+  TRIVIAL_ATTR_PRINTER(NonMutating, non_mutating)
+  TRIVIAL_ATTR_PRINTER(NonObjC, non_objc)
+  TRIVIAL_ATTR_PRINTER(NonOverride, non_override)
+  TRIVIAL_ATTR_PRINTER(ObjCMembers, objc_members)
+  TRIVIAL_ATTR_PRINTER(ObjCNonLazyRealization, objc_non_lazy_realization)
+  TRIVIAL_ATTR_PRINTER(Optional, optional)
+  TRIVIAL_ATTR_PRINTER(Override, override)
+  TRIVIAL_ATTR_PRINTER(Postfix, postfix)
+  TRIVIAL_ATTR_PRINTER(PreInverseGenerics, pre_inverse_generics)
+  TRIVIAL_ATTR_PRINTER(Preconcurrency, preconcurrency)
+  TRIVIAL_ATTR_PRINTER(Prefix, prefix)
+  TRIVIAL_ATTR_PRINTER(PropertyWrapper, property_wrapper)
+  TRIVIAL_ATTR_PRINTER(Reasync, reasync)
+  TRIVIAL_ATTR_PRINTER(Required, required)
+  TRIVIAL_ATTR_PRINTER(RequiresStoredPropertyInits,
+                       requires_stored_property_inits)
+  TRIVIAL_ATTR_PRINTER(ResultBuilder, result_builder)
+  TRIVIAL_ATTR_PRINTER(Rethrows, rethrows)
+  TRIVIAL_ATTR_PRINTER(SPIOnly, spi_only)
+  TRIVIAL_ATTR_PRINTER(Sendable, sendable)
+  TRIVIAL_ATTR_PRINTER(Sensitive, sensitive)
+  TRIVIAL_ATTR_PRINTER(ShowInInterface, show_in_interface)
+  TRIVIAL_ATTR_PRINTER(SpecializeExtension, specialize_extension)
+  TRIVIAL_ATTR_PRINTER(StaticExclusiveOnly, static_exclusive_only)
+  TRIVIAL_ATTR_PRINTER(StaticInitializeObjCMetadata,
+                       static_initialize_objc_metadata)
+  TRIVIAL_ATTR_PRINTER(Testable, testable)
+  TRIVIAL_ATTR_PRINTER(Transparent, transparent)
+  TRIVIAL_ATTR_PRINTER(UIApplicationMain, ui_application_main)
+  TRIVIAL_ATTR_PRINTER(Unsafe, unsafe)
+  TRIVIAL_ATTR_PRINTER(UnsafeInheritExecutor, unsafe_inherit_executor)
+  TRIVIAL_ATTR_PRINTER(UnsafeNoObjCTaggedPointer, unsafe_no_objc_tagged_pointer)
+  TRIVIAL_ATTR_PRINTER(UnsafeNonEscapableResult, unsafe_non_escapable_result)
+  TRIVIAL_ATTR_PRINTER(UsableFromInline, usable_from_inline)
+  TRIVIAL_ATTR_PRINTER(Used, used)
+  TRIVIAL_ATTR_PRINTER(WarnUnqualifiedAccess, warn_unqualified_access)
+  TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
+
+#undef TRIVIAL_ATTR_PRINTER
+
+  void visitAccessControlAttr(AccessControlAttr *Attr, StringRef label) {
+    printCommon(Attr, "access_control_attr", label);
+    printField(Attr->getAccess(), "access_level");
+    printFoot();
+  }
+  void visitAlignmentAttr(AlignmentAttr *Attr, StringRef label) {
+    printCommon(Attr, "alignment_attr", label);
+    printField(Attr->getValue(), "value");
+    printFoot();
+  }
+  void visitAllowFeatureSuppressionAttr(AllowFeatureSuppressionAttr *Attr,
+                                        StringRef label) {
+    printCommon(Attr, "allow_feature_suppression_attr", label);
+    printFieldQuotedRaw(
+        [&](auto &out) {
+          llvm::interleave(Attr->getSuppressedFeatures(), out, ",");
+        },
+        "features");
+    printFoot();
+  }
+  void visitAvailableAttr(AvailableAttr *Attr, StringRef label) {
+    printCommon(Attr, "available_attr", label);
+    printField(Attr->getPlatform(), "platform");
+    if (!Attr->Message.empty())
+      printFieldQuoted(Attr->Message, "message");
+    if (!Attr->Rename.empty())
+      printFieldQuoted(Attr->Rename, "rename");
+    if (Attr->Introduced.has_value())
+      printFieldRaw(
+          [&](auto &out) { out << Attr->Introduced.value().getAsString(); },
+          "introduced");
+    if (Attr->Deprecated.has_value())
+      printFieldRaw(
+          [&](auto &out) { out << Attr->Deprecated.value().getAsString(); },
+          "deprecated");
+    if (Attr->Obsoleted.has_value())
+      printFieldRaw(
+          [&](auto &out) { out << Attr->Obsoleted.value().getAsString(); },
+          "obsoleted");
+    printFoot();
+  }
+  void visitBackDeployedAttr(BackDeployedAttr *Attr, StringRef label) {
+    printCommon(Attr, "back_deployed_attr", label);
+    printField(Attr->Platform, "platform");
+    printFieldRaw([&](auto &out) { out << Attr->Version.getAsString(); },
+                  "version");
+    printFoot();
+  }
+  void visitCDeclAttr(CDeclAttr *Attr, StringRef label) {
+    printCommon(Attr, "cdecl_attr", label);
+    printFieldQuoted(Attr->Name, "name");
+    printFoot();
+  }
+  void
+  visitClangImporterSynthesizedTypeAttr(ClangImporterSynthesizedTypeAttr *Attr,
+                                        StringRef label) {
+    printCommon(Attr, "clang_importer_synthesized_type_attr", label);
+    printField(Attr->getKind(), "kind");
+    printField(Attr->originalTypeName, "original_type_name");
+    printFoot();
+  }
+  void visitCustomAttr(CustomAttr *Attr, StringRef label) {
+    printCommon(Attr, "custom_attr", label);
+    printRec(Attr->getTypeRepr());
+    if (Attr->getArgs())
+      printRec(Attr->getArgs());
+    printFoot();
+  }
+  void visitDerivativeAttr(DerivativeAttr *Attr, StringRef label) {
+    printCommon(Attr, "derivative_attr", label);
+    printRec(Attr->getBaseTypeRepr());
+    printFieldRaw(
+        [&](auto &out) { Attr->getOriginalFunctionName().Name.print(out); },
+        "original_function_name");
+    // TODO: Print parameters.
+    printFoot();
+  }
+  void visitDifferentiableAttr(DifferentiableAttr *Attr, StringRef label) {
+    printCommon(Attr, "differentiable_attr", label);
+    // TODO: Implement.
+    printFoot();
+  }
+  void visitDocumentationAttr(DocumentationAttr *Attr, StringRef label) {
+    printCommon(Attr, "documentation_attr", label);
+    printFieldQuoted(Attr->Metadata, "metadata");
+    if (Attr->Visibility.has_value())
+      printField(Attr->Visibility.value(), "visibility");
+    printFoot();
+  }
+  void visitDynamicReplacementAttr(DynamicReplacementAttr *Attr,
+                                   StringRef label) {
+    printCommon(Attr, "dynamic_replacement_attr", label);
+    printFieldRaw(
+        [&](auto &out) { Attr->getReplacedFunctionName().print(out); },
+        "replaced_function_name");
+    printFoot();
+  }
+  void visitEffectsAttr(EffectsAttr *Attr, StringRef label) {
+    printCommon(Attr, "effects_attr", label);
+    printField(Attr->getKind(), "kind");
+    if (Attr->getKind() == EffectsKind::Custom) {
+      printFieldQuoted(Attr->getCustomString(), "custom");
+    }
+    printFoot();
+  }
+  void visitExclusivityAttr(ExclusivityAttr *Attr, StringRef label) {
+    printCommon(Attr, "exclusivity_attr", label);
+    printField(Attr->getMode(), "mode");
+    printFoot();
+  }
+  void visitExposeAttr(ExposeAttr *Attr, StringRef label) {
+    printCommon(Attr, "expose_attr", label);
+    printFieldQuoted(Attr->Name, "name");
+    printFoot();
+  }
+  void visitExternAttr(ExternAttr *Attr, StringRef label) {
+    printCommon(Attr, "extern_attr", label);
+    printField(Attr->getExternKind(), "kind");
+    if (Attr->ModuleName.has_value())
+      printField(Attr->ModuleName.value(), "module");
+    printFieldQuoted(Attr->Name, "name");
+    printFoot();
+  }
+  void visitImplementsAttr(ImplementsAttr *Attr, StringRef label) {
+    printCommon(Attr, "implements_attr", label);
+    printRec(Attr->getProtocolTypeRepr(), "protocol");
+    printFieldRaw([&](auto &out) { Attr->getMemberName().print(out); },
+                  "member");
+    printFoot();
+  }
+  void visitInlineAttr(InlineAttr *Attr, StringRef label) {
+    printCommon(Attr, "inline_attr", label);
+    printField(Attr->getKind(), "kind");
+    printFoot();
+  }
+  void visitLifetimeAttr(LifetimeAttr *Attr, StringRef label) {
+    printCommon(Attr, "lifetime_attr", label);
+    // TODO: Implement.
+    printFoot();
+  }
+  void visitMacroRoleAttr(MacroRoleAttr *Attr, StringRef label) {
+    printCommon(Attr, "macro_role_attr", label);
+    switch (Attr->getMacroSyntax()) {
+    case MacroSyntax::Attached:
+      printFlag("attached");
+      break;
+    case MacroSyntax::Freestanding:
+      printFlag("freestanding");
+      break;
+    }
+    printField(Attr->getMacroRole(), "role");
+    printFieldQuotedRaw(
+        [&](auto &out) {
+          llvm::interleave(
+              Attr->getNames(), out,
+              [&](const MacroIntroducedDeclName &name) {
+                out << getMacroIntroducedDeclNameString(name.getKind());
+                if (macroIntroducedNameRequiresArgument(name.getKind())) {
+                  out << "(";
+                  name.getName().print(out);
+                  out << ")";
+                }
+              },
+              ",");
+        },
+        "names");
+    printRecRange(Attr->getConformances(), "conformances");
+
+    printFoot();
+  }
+  void visitNonSendableAttr(NonSendableAttr *Attr, StringRef label) {
+    printCommon(Attr, "non_sendable_attr", label);
+    printField(Attr->Specificity, "specificity");
+    printFoot();
+  }
+  void visitNonisolatedAttr(NonisolatedAttr *Attr, StringRef label) {
+    printCommon(Attr, "nonisolated_attr", label);
+    printFlag(Attr->isUnsafe(), "unsafe");
+    printFoot();
+  }
+  void visitObjCAttr(ObjCAttr *Attr, StringRef label) {
+    printCommon(Attr, "objc_attr", label);
+    if (Attr->hasName())
+      printFieldQuoted(Attr->getName(), "name");
+    printFlag(Attr->isNameImplicit(), "is_name_implicit");
+    printFoot();
+  }
+  void visitObjCBridgedAttr(ObjCBridgedAttr *Attr, StringRef label) {
+    printCommon(Attr, "objc_bridged_attr", label);
+    printDeclRefField(Attr->getObjCClass(), "objc_class");
+    printFoot();
+  }
+  void visitObjCImplementationAttr(ObjCImplementationAttr *Attr,
+                                   StringRef label) {
+    printCommon(Attr, "objc_implementation_attr", label);
+    if (!Attr->CategoryName.empty())
+      printField(Attr->CategoryName, "category");
+    printFlag(Attr->isEarlyAdopter(), "is_early_adopter");
+    printFlag(Attr->isCategoryNameInvalid(), "is_category_name_invalid");
+    printFlag(Attr->hasInvalidImplicitLangAttrs(),
+              "has_invalid_implicit_lang_attrs");
+    printFoot();
+  }
+  void visitObjCRuntimeNameAttr(ObjCRuntimeNameAttr *Attr, StringRef label) {
+    printCommon(Attr, "objc_runtime_name_attr", label);
+    printField(Attr->Name, "name");
+    printFoot();
+  }
+  void visitOptimizeAttr(OptimizeAttr *Attr, StringRef label) {
+    printCommon(Attr, "optimize_attr", label);
+    printField(Attr->getMode(), "mode");
+    printFoot();
+  }
+  void visitOriginallyDefinedInAttr(OriginallyDefinedInAttr *Attr,
+                                    StringRef label) {
+    printCommon(Attr, "originally_defined_in_attr", label);
+    printField(Attr->OriginalModuleName, "original_module");
+    printField(Attr->Platform, "platform");
+    printFieldRaw([&](auto &out) { out << Attr->MovedVersion.getAsString(); },
+                  "moved_version");
+    printFoot();
+  }
+  void visitPrivateImportAttr(PrivateImportAttr *Attr, StringRef label) {
+    printCommon(Attr, "prinvate_import_attr", label);
+    printFieldQuoted(Attr->getSourceFile(), "source_file");
+    printFoot();
+  }
+  void visitProjectedValuePropertyAttr(ProjectedValuePropertyAttr *Attr,
+                                       StringRef label) {
+    printCommon(Attr, "projected_value_property_attr", label);
+    printField(Attr->ProjectionPropertyName, "name");
+    printFoot();
+  }
+  void visitRawDocCommentAttr(RawDocCommentAttr *Attr, StringRef label) {
+    printCommon(Attr, "raw_doc_comment_attr", label);
+    printFieldRaw(
+        [&](auto &out) { Attr->getCommentRange().print(out, Ctx->SourceMgr); },
+        "comment_range");
+    printFoot();
+  }
+  void visitRawLayoutAttr(RawLayoutAttr *Attr, StringRef label) {
+    printCommon(Attr, "raw_layout_attr", label);
+    if (auto *tyR = Attr->getScalarLikeType()) {
+      printFlag("scalar_like");
+      printRec(tyR);
+    } else if (auto typeAndCount = Attr->getArrayLikeTypeAndCount()) {
+      printFlag("array_like");
+      printRec(typeAndCount->first);
+      printRec(typeAndCount->second);
+    } else if (auto sizeAndAlignment = Attr->getSizeAndAlignment()) {
+      printField(sizeAndAlignment->first, "size");
+      printField(sizeAndAlignment->second, "alignment");
+    }
+    printFoot();
+  }
+  void visitReferenceOwnershipAttr(ReferenceOwnershipAttr *Attr,
+                                   StringRef label) {
+    printCommon(Attr, "reference_ownership_attr", label);
+    printFlag(keywordOf(Attr->get()));
+    printFoot();
+  }
+  void visitRestatedObjCConformanceAttr(RestatedObjCConformanceAttr *Attr,
+                                        StringRef label) {
+    printCommon(Attr, "restated_objc_conformance_attr", label);
+    if (Attr->Proto) {
+      printFieldRaw([&](auto &out) { Attr->Proto->dumpRef(out); }, "");
+    }
+    printFoot();
+  }
+  void visitSafeAttr(SafeAttr *Attr, StringRef label) {
+    printCommon(Attr, "safe_attr", label);
+    printFieldQuoted(Attr->message, "message");
+    printFoot();
+  }
+  void visitSILGenNameAttr(SILGenNameAttr *Attr, StringRef label) {
+    printCommon(Attr, "silgen_name_attr", label);
+    printFlag(Attr->Raw, "raw");
+    printFieldQuoted(Attr->Name, "");
+    printFoot();
+  }
+  void visitSPIAccessControlAttr(SPIAccessControlAttr *Attr, StringRef label) {
+    printCommon(Attr, "spi_access_control_attr", label);
+    printFieldQuotedRaw(
+        [&](auto &out) { llvm::interleave(Attr->getSPIGroups(), out, ","); },
+        "groups");
+    printFoot();
+  }
+  void visitSectionAttr(SectionAttr *Attr, StringRef label) {
+    printCommon(Attr, "section_attr", label);
+    printFieldQuoted(Attr->Name, "name");
+    printFoot();
+  }
+  void visitSemanticsAttr(SemanticsAttr *Attr, StringRef label) {
+    printCommon(Attr, "semantics_attr", label);
+    printFieldQuoted(Attr->Value, "value");
+    printFoot();
+  }
+  void visitSetterAccessAttr(SetterAccessAttr *Attr, StringRef label) {
+    printCommon(Attr, "setter_access_attr", label);
+    printField(Attr->getAccess(), "access");
+    printFoot();
+  }
+  void visitSpecializeAttr(SpecializeAttr *Attr, StringRef label) {
+    printCommon(Attr, "specialize_attr", label);
+    printFlag(Attr->isExported(), "exported");
+    printFlag(Attr->isFullSpecialization(), "full");
+    printFlag(Attr->isPartialSpecialization(), "partial");
+    if (Attr->getTargetFunctionName()) {
+      printFieldQuotedRaw(
+          [&](auto &out) { Attr->getTargetFunctionName().print(out); },
+          "target");
+    }
+    if (!Attr->getSPIGroups().empty()) {
+      printFieldQuotedRaw(
+          [&](auto &out) { llvm::interleave(Attr->getSPIGroups(), out, ","); },
+          "spi");
+    }
+    if (Attr->getTrailingWhereClause()) {
+      printFieldQuotedRaw(
+          [&](auto &out) {
+            Attr->getTrailingWhereClause()->print(out,
+                                                  /*printWhereKeyword=*/false);
+          },
+          "requirements");
+    }
+    for (auto *availableAttr : Attr->getAvailableAttrs()) {
+      printRec(availableAttr, Ctx);
+    }
+    printFoot();
+  }
+  void visitStorageRestrictionsAttr(StorageRestrictionsAttr *Attr,
+                                    StringRef label) {
+    printCommon(Attr, "storage_restrictions_attr", label);
+    if (!Attr->getInitializesNames().empty()) {
+      printFieldQuotedRaw(
+          [&](auto &out) {
+            llvm::interleave(Attr->getInitializesNames(), out, ",");
+          },
+          "initializes");
+    }
+    if (!Attr->getAccessesNames().empty()) {
+      printFieldQuotedRaw(
+          [&](auto &out) {
+            llvm::interleave(Attr->getAccessesNames(), out, ",");
+          },
+          "accesses");
+    }
+    printFoot();
+  }
+  void visitSwiftNativeObjCRuntimeBaseAttr(SwiftNativeObjCRuntimeBaseAttr *Attr,
+                                           StringRef label) {
+    printCommon(Attr, "swift_native_objc_runtime_base", label);
+    printFieldQuoted(Attr->BaseClassName, "base_class_name");
+    printFoot();
+  }
+  void visitSynthesizedProtocolAttr(SynthesizedProtocolAttr *Attr,
+                                    StringRef label) {
+    printCommon(Attr, "synthesized_protocol_attr", label);
+    printFlag(Attr->isUnchecked(), "unchecked");
+    printFieldQuotedRaw([&](auto &out) { Attr->getProtocol()->dumpRef(out); },
+                        "protocol");
+    printFoot();
+  }
+  void visitTransposeAttr(TransposeAttr *Attr, StringRef label) {
+    printCommon(Attr, "transpose_attr", label);
+    // TODO: Implement.
+    printFoot();
+  }
+  void visitTypeEraserAttr(TypeEraserAttr *Attr, StringRef label) {
+    printCommon(Attr, "type_eraser_attr", label);
+    printFieldQuoted(Attr->getTypeWithoutResolving(), "type");
+    printRec(Attr->getParsedTypeEraserTypeRepr(), "parsed_type_repr");
+    printFoot();
+  }
+  void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *Attr,
+                                     StringRef label) {
+    printCommon(Attr, "unavailable_from_async_attr", label);
+    if (Attr->hasMessage()) {
+      printFieldQuoted(Attr->Message, "message");
+    }
+    printFoot();
+  }
+};
+
+} // end anonymous namespace
 
 void PrintBase::printRec(Decl *D, StringRef label) {
   printRecArbitrary([&](StringRef label) {
@@ -3659,9 +4299,21 @@ void PrintBase::printRec(const Pattern *P, StringRef label) {
     }
   }, label);
 }
-
-
-} // end anonymous namespace
+void PrintBase::printRec(const DeclAttribute *Attr, const ASTContext *Ctx,
+                         StringRef label) {
+  printRecArbitrary(
+      [&](StringRef label) {
+        if (!Attr) {
+          printHead("<null attribute>", DeclAttributeColor, label);
+          printFoot();
+        } else {
+          PrintAttribute(OS, Ctx, Indent, ParseIfNeeded, GetTypeOfExpr,
+                         GetTypeOfTypeRepr, GetTypeOfKeyPathComponent)
+              .visit(const_cast<DeclAttribute *>(Attr), label);
+        }
+      },
+      label);
+}
 
 void TypeRepr::dump() const {
   dump(llvm::errs());
@@ -4064,6 +4716,21 @@ namespace {
       printRec(T->getElementType());
       printFoot();
     }
+    
+    void visitBuiltinUnboundGenericType(BuiltinUnboundGenericType *T,
+                                        StringRef label) {
+      printCommon("builtin_unbound_generic_type", label);
+      printField(T->getBuiltinTypeNameString(), "name");
+      printFoot();
+    }
+    
+    void visitBuiltinFixedArrayType(BuiltinFixedArrayType *T,
+                                    StringRef label) {
+      printCommon("builtin_fixed_array_type", label);
+      printRec(T->getSize());
+      printRec(T->getElementType());
+      printFoot();
+    }
 
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
       printCommon("type_alias_type", label);
@@ -4081,6 +4748,18 @@ namespace {
       for (auto arg : T->getDirectGenericArgs())
         printRec(arg);
 
+      printFoot();
+    }
+
+    void visitLocatableType(LocatableType *T, StringRef label) {
+      printCommon("locatable_type", label);
+      printFieldQuotedRaw(
+          [&](raw_ostream &OS) {
+            auto &C = T->getASTContext();
+            T->getLoc().print(OS, C.SourceMgr);
+          },
+          "loc");
+      printRec(T->getSinglyDesugaredType(), "underlying");
       printFoot();
     }
 
@@ -4122,14 +4801,6 @@ namespace {
       printField(T->getLevel(), "level");
 
       printRec(T->getPackType(), "pack");
-
-      printFoot();
-    }
-
-    void visitParenType(ParenType *T, StringRef label) {
-      printCommon("paren_type", label);
-
-      printRec(T->getUnderlyingType());
 
       printFoot();
     }

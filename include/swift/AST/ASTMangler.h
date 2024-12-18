@@ -13,8 +13,10 @@
 #ifndef SWIFT_AST_ASTMANGLER_H
 #define SWIFT_AST_ASTMANGLER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
+#include "swift/AST/SILThunkKind.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/TaggedUnion.h"
@@ -43,6 +45,7 @@ enum class DestructorKind {
 /// The mangler for AST declarations.
 class ASTMangler : public Mangler {
 protected:
+  const ASTContext &Context;
   ModuleDecl *Mod = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
@@ -185,12 +188,17 @@ public:
   };
 
   /// lldb overrides the defaulted argument to 'true'.
-  ASTMangler(bool DWARFMangling = false) {
+  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false) : Context(Ctx) {
     if (DWARFMangling) {
       DWARFMangling = true;
       RespectOriginallyDefinedIn = false;
     }
+    Flavor = Ctx.LangOpts.hasFeature(Feature::Embedded)
+                 ? ManglingFlavor::Embedded
+                 : ManglingFlavor::Default;
   }
+
+  const ASTContext &getASTContext() { return Context; }
 
   void addTypeSubstitution(Type type, GenericSignature sig) {
     type = dropProtocolsFromAssociatedTypes(type, sig);
@@ -314,6 +322,9 @@ public:
                                                 DifferentiabilityKind kind,
                                                 const AutoDiffConfig &config);
 
+  std::string mangleSILThunkKind(StringRef originalName,
+                                 SILThunkKind thunkKind);
+
   /// Mangle the AutoDiff generated declaration for the given:
   /// - Generated declaration kind: linear map struct or branching trace enum.
   /// - Mangled original function name.
@@ -390,7 +401,9 @@ public:
   std::string mangleAttachedMacroExpansion(
       const Decl *decl, CustomAttr *attr, MacroRole role);
 
-  void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC);
+  void appendMacroExpansion(const FreestandingMacroExpansion *expansion);
+  void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC,
+                                   const FreestandingMacroExpansion *expansion);
   void appendMacroExpansionOperator(
       StringRef macroName, MacroRole role, unsigned discriminator);
 

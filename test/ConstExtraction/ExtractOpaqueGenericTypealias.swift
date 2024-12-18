@@ -36,6 +36,20 @@ struct Foo<L : Hashable> : myProto {
 // CHECK-NEXT:       "Swift.Sendable",
 // CHECK-NEXT:       "Swift.BitwiseCopyable"
 // CHECK-NEXT:     ],
+// CHECK-NEXT:     "allConformances": [
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "ExtractOpaqueGenericTypealias.myProto",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractOpaqueGenericTypealias"
+// CHECK-NEXT:       },
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "Swift.Sendable",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractOpaqueGenericTypealias"
+// CHECK-NEXT:       },
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "Swift.BitwiseCopyable",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractOpaqueGenericTypealias"
+// CHECK-NEXT:       }
+// CHECK-NEXT:     ],
 // CHECK-NEXT:     "associatedTypeAliases": [
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "typeAliasName": "T",

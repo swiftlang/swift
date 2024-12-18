@@ -202,6 +202,7 @@ BASELINE_LANGUAGE_FEATURE(BorrowingSwitch, 432, "Noncopyable type pattern matchi
 CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
+LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -234,8 +235,7 @@ EXPERIMENTAL_FEATURE(MacrosOnImports, true)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
-EXPERIMENTAL_FEATURE(GlobalActorInferenceCutoff, false)
-EXPERIMENTAL_FEATURE(KeyPathWithStaticMembers, false)
+EXPERIMENTAL_FEATURE(Span, true)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
@@ -301,11 +301,6 @@ EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 /// Swift parser.
 EXPERIMENTAL_FEATURE(ParserValidation, false)
 
-/// Whether to emit diagnostics from the new parser first, and only emit
-/// diagnostics from the existing parser when there are none from the new
-/// parser.
-EXPERIMENTAL_FEATURE(ParserDiagnostics, false)
-
 /// Enables implicit some while also enabling existential `any`
 EXPERIMENTAL_FEATURE(ImplicitSome, false)
 
@@ -360,9 +355,11 @@ EXPERIMENTAL_FEATURE(SuppressedAssociatedTypes, true)
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
-/// Enable non-escapable type attributes and function attributes that support
-/// lifetime-dependent results.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NonescapableTypes, true)
+/// Enable returning non-escapable types from functions.
+EXPERIMENTAL_FEATURE(LifetimeDependence, true)
+
+/// Enable LifetimeDependence diagnostics for trivial types.
+EXPERIMENTAL_FEATURE(LifetimeDependenceDiagnoseTrivial, false)
 
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
@@ -412,8 +409,15 @@ EXPERIMENTAL_FEATURE(WarnUnsafe, true)
 /// Import unsafe C and C++ constructs as @unsafe.
 EXPERIMENTAL_FEATURE(SafeInterop, true)
 
+// Import bounds safety and lifetime attributes from interop headers to
+// generate Swift wrappers with safe pointer types.
+EXPERIMENTAL_FEATURE(SafeInteropWrappers, false)
+
+/// Ignore resilience errors due to C++ types.
+EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
+
 // Isolated deinit
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedDeinit, true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 
 // Enable values in generic signatures, e.g. <let N: Int>
 EXPERIMENTAL_FEATURE(ValueGenerics, true)
@@ -423,6 +427,17 @@ EXPERIMENTAL_FEATURE(UnspecifiedMeansMainActorIsolated, false)
 
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
+
+/// modify/read single-yield coroutines always execute code post-yield code
+EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
+
+/// modify/read coroutines use the callee-allocated ABI
+EXPERIMENTAL_FEATURE(CoroutineAccessorsAllocateInCallee, false)
+
+// When a parameter has unspecified isolation, infer it as main actor isolated.
+EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
+
+EXPERIMENTAL_FEATURE(AddressableParameters, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

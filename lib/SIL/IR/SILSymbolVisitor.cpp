@@ -152,7 +152,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
         config.parameterIndices,
         original->getInterfaceType()->castTo<AnyFunctionType>());
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(original->getASTContext());
     AutoDiffConfig silConfig{
         loweredParamIndices, config.resultIndices,
         autodiff::getDifferentiabilityWitnessGenericSignature(
@@ -207,7 +207,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
         autodiff::getDifferentiabilityWitnessGenericSignature(
             original->getGenericSignature(), derivativeGenericSignature)};
 
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(original->getASTContext());
     auto mangledName = mangler.mangleSILDifferentiabilityWitness(
         originalMangledName, kind, config);
 
@@ -735,6 +735,9 @@ public:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     auto nominal = ED->getExtendedNominal();
+    if (!nominal)
+      return;
+
     if (canSkipNominal(nominal))
       return;
 
@@ -819,6 +822,11 @@ public:
           if (Resilient || WitnessMethodElimination) {
             Visitor.addDispatchThunk(declRef);
             Visitor.addMethodDescriptor(declRef);
+          }
+          auto *decl =
+              llvm::dyn_cast_or_null<AbstractFunctionDecl>(declRef.getDecl());
+          if (decl && decl->hasBody()) {
+            Visitor.addFunction(declRef);
           }
         }
 

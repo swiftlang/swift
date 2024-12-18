@@ -1650,6 +1650,21 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
   }
 }
 
+// Strip access markers and casts that preserve the address type.
+//
+// Consider using RelativeAccessStorageWithBase::compute().
+inline SILValue stripAccessAndIdentityCasts(SILValue v) {
+  if (auto *bai = dyn_cast<BeginAccessInst>(v)) {
+    return stripAccessAndIdentityCasts(bai->getOperand());
+  }
+  if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
+    if (isAccessStorageIdentityCast(svi)) {
+      return stripAccessAndIdentityCasts(svi->getAllOperands()[0].get());
+    }
+  }
+  return v;
+}
+
 /// An address, pointer, or box cast that occurs outside of the formal
 /// access. These convert the base of accessed storage without affecting the
 /// AccessPath. Useful for both use-def and def-use traversal. The source

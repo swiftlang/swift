@@ -8,6 +8,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: CPU=arm64e
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN header.h
 
@@ -36,7 +37,7 @@ public func mainfunc(x: UnsafePointer<MyStruct>) {
     test2(x: x)
 }
 
-// CHECK: define {{.*}}@"$s4Main5test11xySPySo8MyStructVG_tF"
+// CHECK: define {{.*}}@"$e4Main5test11xySPySo8MyStructVG_tF"
 // CHECK:   call {{.*}}[ "ptrauth"(i32 0, i64 0) ]
-// CHECK: define {{.*}}@"$s4Main5test21xySPySo8MyStructVG_tF"
+// CHECK: define {{.*}}@"$e4Main5test21xySPySo8MyStructVG_tF"
 // CHECK:   call {{.*}}[ "ptrauth"(i32 0, i64 16962) ]

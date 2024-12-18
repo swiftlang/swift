@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 894; // ThunkInst
+const uint16_t SWIFTMODULE_VERSION_MINOR = 908; // debug scopes and source locs
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -311,7 +311,8 @@ using SILFunctionTypeRepresentationField = BCFixed<5>;
 enum class SILCoroutineKind : uint8_t {
   None = 0,
   YieldOnce = 1,
-  YieldMany = 2,
+  YieldOnce2 = 2,
+  YieldMany = 3,
 };
 using SILCoroutineKindField = BCFixed<2>;
 
@@ -693,6 +694,7 @@ enum class PluginSearchOptionKind : uint8_t {
   ExternalPluginPath,
   LoadPluginLibrary,
   LoadPluginExecutable,
+  ResolvedPluginConfig,
 };
 using PluginSearchOptionKindField = BCFixed<3>;
 
@@ -965,6 +967,7 @@ namespace options_block {
     SERIALIZE_PACKAGE_ENABLED,
     CXX_STDLIB_KIND,
     PUBLIC_MODULE_NAME,
+    SWIFT_INTERFACE_COMPILER_VERSION,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1065,6 +1068,11 @@ namespace options_block {
     PUBLIC_MODULE_NAME,
     BCBlob
   >;
+
+    using SwiftInterfaceCompilerVersionLayout = BCRecordLayout<
+    SWIFT_INTERFACE_COMPILER_VERSION,
+    BCBlob // version tuple
+  >;
 }
 
 /// The record types within the input block.
@@ -1150,7 +1158,8 @@ namespace input_block {
 
   using ModuleInterfaceLayout = BCRecordLayout<
     MODULE_INTERFACE_PATH,
-    BCBlob // file path
+    BCFixed<1>, // SDK-relative?
+    BCBlob      // file path
   >;
 
 }
@@ -1229,13 +1238,19 @@ namespace decls_block {
     TypeIDField  // canonical type (a fallback)
   );
 
+  TYPE_LAYOUT(BuiltinFixedArrayTypeLayout,
+    BUILTIN_FIXED_ARRAY_TYPE,
+    TypeIDField, // count
+    TypeIDField  // element type
+  );
+
   TYPE_LAYOUT(TypeAliasTypeLayout,
     NAME_ALIAS_TYPE,
     DeclIDField,           // typealias decl
+    TypeIDField,           // original underlying type
+    TypeIDField,           // substituted underlying type
     TypeIDField,           // parent type
-    TypeIDField,           // underlying type
-    TypeIDField,           // substituted type
-    SubstitutionMapIDField // substitution map
+    BCArray<TypeIDField>   // generic arguments
   );
 
   TYPE_LAYOUT(GenericTypeParamTypeLayout,
@@ -1257,11 +1272,6 @@ namespace decls_block {
     NOMINAL_TYPE,
     DeclIDField, // decl
     TypeIDField  // parent
-  );
-
-  TYPE_LAYOUT(ParenTypeLayout,
-    PAREN_TYPE,
-    TypeIDField // inner type
   );
 
   TYPE_LAYOUT(TupleTypeLayout,
@@ -1303,7 +1313,8 @@ namespace decls_block {
                      BCFixed<1>,              // isolated
                      BCFixed<1>,              // noDerivative?
                      BCFixed<1>,              // compileTimeConst
-                     BCFixed<1>               // sending
+                     BCFixed<1>,              // sending
+                     BCFixed<1>               // addressable
                      >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
@@ -2260,6 +2271,12 @@ namespace decls_block {
                      BCArray<BCFixed<1>> // concatenated param indices
                      >;
 
+  using SafeDeclAttrLayout = BCRecordLayout<
+    Safe_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCBlob      // message
+  >;
+
   using AbstractClosureExprLayout = BCRecordLayout<
     ABSTRACT_CLOSURE_EXPR_CONTEXT,
     TypeIDField, // type
@@ -2338,11 +2355,11 @@ namespace decls_block {
     BCFixed<1>, // is unavailable from async?
     BCFixed<1>, // is this PackageDescription version-specific kind?
     BCFixed<1>, // is SPI?
+    BCFixed<1>, // is for Embedded
     BC_AVAIL_TUPLE, // Introduced
     BC_AVAIL_TUPLE, // Deprecated
     BC_AVAIL_TUPLE, // Obsoleted
     BCVBR<5>,    // platform
-    DeclIDField, // rename declaration (if any)
     BCVBR<5>,    // number of bytes in message string
     BCVBR<5>,    // number of bytes in rename string
     BCBlob       // message, followed by rename

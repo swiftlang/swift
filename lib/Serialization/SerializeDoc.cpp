@@ -233,7 +233,7 @@ public:
 
     // Source order.
     dataLength += numLen;
-    endian::Writer writer(out, little);
+    endian::Writer writer(out, llvm::endianness::little);
     writer.write<uint32_t>(keyLength);
     writer.write<uint32_t>(dataLength);
     return { keyLength, dataLength };
@@ -245,7 +245,7 @@ public:
 
   void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                 unsigned len) {
-    endian::Writer writer(out, little);
+    endian::Writer writer(out, llvm::endianness::little);
     writer.write<uint32_t>(data.Brief.size());
     out << data.Brief;
     writer.write<uint32_t>(data.Raw.Comments.size());
@@ -301,7 +301,7 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
                             ArrayRef<StringRef> Names) {
   llvm::SmallString<32> Blob;
   llvm::raw_svector_ostream BlobStream(Blob);
-  endian::Writer Writer(BlobStream, little);
+  endian::Writer Writer(BlobStream, llvm::endianness::little);
   Writer.write<uint32_t>(Names.size());
   for (auto N : Names) {
     Writer.write<uint32_t>(N.size());
@@ -448,7 +448,7 @@ static void writeDeclCommentTable(
   {
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = Writer.generator.Emit(blobStream);
   }
 
@@ -520,7 +520,7 @@ public:
     const unsigned numLen = 4;
     uint32_t keyLength = key.size();
     uint32_t dataLength = numLen;
-    endian::Writer writer(out, little);
+    endian::Writer writer(out, llvm::endianness::little);
     writer.write<uint32_t>(keyLength);
     return { keyLength, dataLength };
   }
@@ -531,7 +531,7 @@ public:
 
   void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                 unsigned len) {
-    endian::Writer writer(out, little);
+    endian::Writer writer(out, llvm::endianness::little);
     writer.write<uint32_t>(data);
   }
 };
@@ -561,7 +561,7 @@ public:
     {
       llvm::raw_svector_ostream blobStream(hashTableBlob);
       // Make sure that no bucket is at offset 0
-      endian::write<uint32_t>(blobStream, 0, little);
+      endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
       tableOffset = generator.Emit(blobStream);
     }
     USRsList.emit(scratch, tableOffset, hashTableBlob);
@@ -638,7 +638,7 @@ public:
     }
 
     llvm::raw_svector_ostream OS(Buffer);
-    endian::Writer Writer(OS, little);
+    endian::Writer Writer(OS, llvm::endianness::little);
     Writer.write<uint32_t>(DocRanges.size());
     for (const auto &DocRange : DocRanges) {
       writeRawLoc(DocRange.first, Writer, Strings);
@@ -720,7 +720,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     llvm::sys::fs::make_absolute(AbsolutePath);
 
     llvm::raw_svector_ostream Out(Buffer);
-    endian::Writer Writer(Out, little);
+    endian::Writer Writer(Out, llvm::endianness::little);
     Writer.write<uint32_t>(FWriter.getTextOffset(AbsolutePath.str()));
     Writer.write<uint32_t>(
         DocWriter.getDocRangesOffset(D, llvm::ArrayRef(RawLocs->DocRanges)));
@@ -783,7 +783,7 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
                            .count();
 
       llvm::raw_svector_ostream out(Buffer);
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       // FilePath.
       writer.write<uint32_t>(fileID);
 

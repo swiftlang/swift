@@ -4,7 +4,7 @@
 // Temporarily disabled because forward-mode is not at feature parity with reverse-mode.
 // UN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
 
-// RUN: %target-swift-frontend -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null -module-name null 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null -module-name null 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test
 

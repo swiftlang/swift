@@ -46,6 +46,12 @@ public struct Bat {
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractCalls.MyProto"
 // CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractCalls.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractCalls"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
@@ -115,8 +121,8 @@ public struct Bat {
 // CHECK-NEXT:              "name": "adder",
 // CHECK-NEXT:              "arguments": [
 // CHECK-NEXT:                {
-// CHECK-NEXT:                  "label": "",
-// CHECK-NEXT:                  "type": "Swift.Int",
+// CHECK-NEXT:                   "label": "",
+// CHECK-NEXT:                   "type": "Swift.Int",
 // CHECK-NEXT:                   "valueKind": "RawLiteral",
 // CHECK-NEXT:                   "value": "2"
 // CHECK-NEXT:                 },

@@ -603,6 +603,10 @@ public:
     return Core->UserModuleVersion;
   }
 
+  version::Version getSwiftInterfaceCompilerVersion() const {
+    return Core->SwiftInterfaceCompilerVersion;
+  }
+
   ArrayRef<StringRef> getAllowableClientNames() const {
     return Core->AllowableClientNames;
   }

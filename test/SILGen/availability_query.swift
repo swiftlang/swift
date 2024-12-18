@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-sil %s -target %target-cpu-apple-macosx10.50 -verify
-// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx10.50 | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types %s -target %target-cpu-apple-macosx10.50 -verify
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -target %target-cpu-apple-macosx10.50 | %FileCheck %s
 
 // REQUIRES: OS=macosx
 

@@ -64,6 +64,7 @@ SIMPLE_TYPE_ATTR(_local, Local)
 SIMPLE_TYPE_ATTR(_noMetadata, NoMetadata)
 TYPE_ATTR(_opaqueReturnTypeOf, OpaqueReturnTypeOf)
 TYPE_ATTR(isolated, Isolated)
+SIMPLE_TYPE_ATTR(_addressable, Addressable)
 
 // SIL-specific attributes
 SIMPLE_SIL_TYPE_ATTR(async, Async)
@@ -101,6 +102,7 @@ SIMPLE_SIL_TYPE_ATTR(pseudogeneric, Pseudogeneric)
 SIMPLE_SIL_TYPE_ATTR(unimplementable, Unimplementable)
 SIMPLE_SIL_TYPE_ATTR(yields, Yields)
 SIMPLE_SIL_TYPE_ATTR(yield_once, YieldOnce)
+SIMPLE_SIL_TYPE_ATTR(yield_once_2, YieldOnce2)
 SIMPLE_SIL_TYPE_ATTR(yield_many, YieldMany)
 SIMPLE_SIL_TYPE_ATTR(captures_generics, CapturesGenerics)
 // Used at the SIL level to mark a type as moveOnly.

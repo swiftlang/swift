@@ -153,6 +153,12 @@ extension MutatingContext {
     erase(instruction: inst)
   }
 
+  func erase<S: Sequence>(instructions: S) where S.Element: Instruction {
+    for inst in instructions {
+      erase(instruction: inst)
+    }
+  }
+
   func erase(instructionIncludingDebugUses inst: Instruction) {
     precondition(inst.results.allSatisfy { $0.uses.ignoreDebugUses.isEmpty })
     erase(instructionIncludingAllUsers: inst)
@@ -225,6 +231,14 @@ extension MutatingContext {
     if let instAfterInling = instAfterInling {
       notifyNewInstructions(from: apply, to: instAfterInling)
     }
+  }
+
+  func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
+    if function.isDefinition {
+      return true
+    }
+    _bridged.loadFunction(function.bridged, loadCalleesRecursively)
+    return function.isDefinition
   }
 
   private func notifyNewInstructions(from: Instruction, to: Instruction) {
@@ -305,14 +319,6 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
-    if function.isDefinition {
-      return true
-    }
-    _bridged.loadFunction(function.bridged, loadCalleesRecursively)
-    return function.isDefinition
-  }
-
   /// Looks up a function in the `Swift` module.
   /// The `name` is the source name of the function and not the mangled name.
   /// Returns nil if no such function or multiple matching functions are found.
@@ -391,9 +397,9 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func createGlobalVariable(name: String, type: Type, isPrivate: Bool) -> GlobalVariable {
+  func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool) -> GlobalVariable {
     let gv = name._withBridgedStringRef {
-      _bridged.createGlobalVariable($0, type.bridged, isPrivate)
+      _bridged.createGlobalVariable($0, type.bridged, linkage.bridged, isLet)
     }
     return gv.globalVar
   }
@@ -421,6 +427,14 @@ struct FunctionPassContext : MutatingContext {
       defer { _bridged.deinitializedNestedPassContext() }
 
       return buildFn(specializedFunction, nestedFunctionPassContext)
+  }
+
+  /// Makes sure that the lifetime of `value` ends at all control flow paths, even in dead-end blocks.
+  /// Inserts destroys in dead-end blocks if those are missing.
+  func completeLifetime(of value: Value) {
+    if _bridged.completeLifetime(value.bridged) {
+      notifyInstructionsChanged()
+    }
   }
 }
 
@@ -620,6 +634,13 @@ extension BasicBlock {
   }
 }
 
+extension Argument {
+  func set(reborrow: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.setReborrow(reborrow)
+  }
+}
+
 extension AllocRefInstBase {
   func setIsStackAllocatable(_ context: some MutatingContext) {
     context.notifyInstructionsChanged()
@@ -639,6 +660,12 @@ extension Sequence where Element == Operand {
 extension Operand {
   func set(to value: Value, _ context: some MutatingContext) {
     instruction.setOperand(at: index, to: value, context)
+  }
+
+  func changeOwnership(from: Ownership, to: Ownership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.changeOwnership(from._bridged, to._bridged)
+    context.notifyInstructionChanged(instruction)
   }
 }
 

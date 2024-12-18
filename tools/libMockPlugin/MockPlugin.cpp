@@ -203,7 +203,7 @@ int TestRunner::run() {
 
     // Read request data.
     auto request_size = llvm::support::endian::byte_swap(
-        request_header, llvm::support::endianness::little);
+        request_header, llvm::endianness::little);
     llvm::SmallVector<char, 0> request_data;
     request_data.assign(request_size, 0);
     ioSize = fread(request_data.data(), request_size, 1, stdin);
@@ -240,8 +240,9 @@ int TestRunner::run() {
     llvm::SmallVector<char, 0> response_data;
     llvm::raw_svector_ostream(response_data) << response;
     auto response_size = response_data.size();
-    auto response_header = llvm::support::endian::byte_swap<
-        uint64_t, llvm::support::endianness::little>(response_size);
+    auto response_header =
+        llvm::support::endian::byte_swap<uint64_t, llvm::endianness::little>(
+            response_size);
     ioSize = fwrite(&response_header, sizeof(response_header), 1, stdout);
     if (!ioSize) {
       llvm::errs() << "failed to write response header\n";

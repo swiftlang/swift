@@ -103,7 +103,6 @@ UNINTERESTING_FEATURE(OpaqueTypeErasure)
 UNINTERESTING_FEATURE(PackageCMO)
 UNINTERESTING_FEATURE(ParserRoundTrip)
 UNINTERESTING_FEATURE(ParserValidation)
-UNINTERESTING_FEATURE(ParserDiagnostics)
 UNINTERESTING_FEATURE(ImplicitSome)
 UNINTERESTING_FEATURE(ParserASTGen)
 UNINTERESTING_FEATURE(BuiltinMacros)
@@ -197,8 +196,8 @@ UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
-UNINTERESTING_FEATURE(GlobalActorInferenceCutoff)
-UNINTERESTING_FEATURE(KeyPathWithStaticMembers)
+UNINTERESTING_FEATURE(GenerateForceToMainActorThunks)
+UNINTERESTING_FEATURE(Span)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
@@ -250,6 +249,21 @@ static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureLifetimeDependence(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<LifetimeAttr>()) {
+    return true;
+  }
+  auto *afd = dyn_cast<AbstractFunctionDecl>(decl);
+  if (!afd) {
+    return false;
+  }
+  return afd->getInterfaceType()
+      ->getAs<AnyFunctionType>()
+      ->hasLifetimeDependencies();
+}
+
+UNINTERESTING_FEATURE(LifetimeDependenceDiagnoseTrivial)
+
 UNINTERESTING_FEATURE(DynamicActorIsolation)
 UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)
@@ -278,6 +292,24 @@ static bool usesFeatureIsolatedAny(Decl *decl) {
   });
 }
 
+static bool usesFeatureAddressableParameters(Decl *d) {
+  if (d->getAttrs().hasAttribute<AddressableSelfAttr>()) {
+    return true;
+  }
+
+  auto fd = dyn_cast<AbstractFunctionDecl>(d);
+  if (!fd) {
+    return false;
+  }
+  
+  for (auto pd : *fd->getParameters()) {
+    if (pd->isAddressable()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)
@@ -295,6 +327,10 @@ static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
 
 UNINTERESTING_FEATURE(WarnUnsafe)
 UNINTERESTING_FEATURE(SafeInterop)
+UNINTERESTING_FEATURE(SafeInteropWrappers)
+UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
+UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
+UNINTERESTING_FEATURE(CoroutineAccessorsAllocateInCallee)
 
 bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   if (auto cd = dyn_cast<ClassDecl>(decl)) {

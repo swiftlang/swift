@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
 
-// RUN: %target-swift-frontend -I %t -emit-sil -strict-concurrency=complete -disable-availability-checking -verify %s -o /dev/null
+// RUN: %target-swift-frontend -I %t -emit-sil -strict-concurrency=complete -target %target-swift-5.7-abi-triple -verify %s -o /dev/null
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

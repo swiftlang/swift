@@ -26,7 +26,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
-#include "swift/AST/FunctionRefKind.h"
+#include "swift/AST/FunctionRefInfo.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/ThrownErrorDestination.h"
 #include "swift/AST/TypeAlignments.h"
@@ -71,6 +71,7 @@ namespace swift {
   class KeyPathExpr;
   class CaptureListExpr;
   class ThenStmt;
+  class ReturnStmt;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -192,16 +193,16 @@ protected:
     LiteralCapacity : 32
   );
 
-  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2+1+1,
+  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+3+1+1,
     Semantics : 2, // an AccessSemantics
-    FunctionRefKind : 2,
+    FunctionRefInfo : 3,
     IsImplicitlyAsync : 1,
     IsImplicitlyThrows : 1
   );
 
-  SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+2,
+  SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+3,
     DeclRefKind : 2,
-    FunctionRefKind : 2
+    FunctionRefInfo : 3
   );
 
   SWIFT_INLINE_BITFIELD(MemberRefExpr, LookupExpr, 2,
@@ -224,8 +225,8 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD(UnresolvedDotExpr, Expr, 2,
-    FunctionRefKind : 2
+  SWIFT_INLINE_BITFIELD(UnresolvedDotExpr, Expr, 3,
+    FunctionRefInfo : 3
   );
 
   SWIFT_INLINE_BITFIELD_FULL(SubscriptExpr, LookupExpr, 2,
@@ -234,12 +235,12 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicSubscriptExpr, DynamicLookupExpr);
 
-  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 2,
-    FunctionRefKind : 2
+  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 3,
+    FunctionRefInfo : 3
   );
 
-  SWIFT_INLINE_BITFIELD(OverloadSetRefExpr, Expr, 2,
-    FunctionRefKind : 2
+  SWIFT_INLINE_BITFIELD(OverloadSetRefExpr, Expr, 3,
+    FunctionRefInfo : 3
   );
 
   SWIFT_INLINE_BITFIELD(BooleanLiteralExpr, LiteralExpr, 1,
@@ -550,6 +551,10 @@ public:
   /// If the expression has an argument list, returns it. Otherwise, returns
   /// \c nullptr.
   ArgumentList *getArgs() const;
+
+  /// If the expression has a DeclNameLoc, returns it. Otherwise, returns
+  /// an nullp DeclNameLoc.
+  DeclNameLoc getNameLoc() const;
 
   /// Produce a mapping from each subexpression to its parent
   /// expression, with the provided expression serving as the root of
@@ -991,41 +996,81 @@ public:
   }
 };
 
-/// A regular expression literal e.g '(a|c)*'.
-class RegexLiteralExpr : public LiteralExpr {
-  SourceLoc Loc;
-  StringRef RegexText;
-  unsigned Version;
-  ArrayRef<uint8_t> SerializedCaptureStructure;
-
-  RegexLiteralExpr(SourceLoc loc, StringRef regexText, unsigned version,
-                   ArrayRef<uint8_t> serializedCaps,
-                   bool isImplicit)
-      : LiteralExpr(ExprKind::RegexLiteral, isImplicit), Loc(loc),
-        RegexText(regexText), Version(version),
-        SerializedCaptureStructure(serializedCaps) {}
+/// The opaque kind of a RegexLiteralExpr feature, which should only be
+/// interpreted by the compiler's regex parsing library.
+class RegexLiteralPatternFeatureKind final {
+  unsigned RawValue;
 
 public:
-  static RegexLiteralExpr *createParsed(
-      ASTContext &ctx, SourceLoc loc, StringRef regexText, unsigned version,
-      ArrayRef<uint8_t> serializedCaptureStructure);
+  RegexLiteralPatternFeatureKind(unsigned rawValue) : RawValue(rawValue) {}
 
-  typedef uint16_t CaptureStructureSerializationVersion;
+  unsigned getRawValue() const { return RawValue; }
 
-  static unsigned getCaptureStructureSerializationAllocationSize(
-      unsigned regexLength) {
-    return sizeof(CaptureStructureSerializationVersion) + regexLength + 1;
+  AvailabilityRange getAvailability(ASTContext &ctx) const;
+  StringRef getDescription(ASTContext &ctx) const;
+
+  friend llvm::hash_code
+  hash_value(const RegexLiteralPatternFeatureKind &kind) {
+    return llvm::hash_value(kind.getRawValue());
   }
 
-  /// Retrieve the raw regex text.
-  StringRef getRegexText() const { return RegexText; }
+  friend bool operator==(const RegexLiteralPatternFeatureKind &lhs,
+                         const RegexLiteralPatternFeatureKind &rhs) {
+    return lhs.getRawValue() == rhs.getRawValue();
+  }
+
+  friend bool operator!=(const RegexLiteralPatternFeatureKind &lhs,
+                         const RegexLiteralPatternFeatureKind &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+/// A specific feature used in a RegexLiteralExpr, needed for availability
+/// diagnostics.
+class RegexLiteralPatternFeature final {
+  RegexLiteralPatternFeatureKind Kind;
+  CharSourceRange Range;
+
+public:
+  RegexLiteralPatternFeature(RegexLiteralPatternFeatureKind kind,
+                             CharSourceRange range)
+      : Kind(kind), Range(range) {}
+
+  RegexLiteralPatternFeatureKind getKind() const { return Kind; }
+  CharSourceRange getRange() const { return Range; }
+};
+
+/// A regular expression literal e.g '(a|c)*'.
+class RegexLiteralExpr : public LiteralExpr {
+  ASTContext *Ctx;
+  SourceLoc Loc;
+  StringRef ParsedRegexText;
+
+  RegexLiteralExpr(ASTContext *ctx, SourceLoc loc, StringRef parsedRegexText,
+                   bool isImplicit)
+      : LiteralExpr(ExprKind::RegexLiteral, isImplicit), Ctx(ctx), Loc(loc),
+        ParsedRegexText(parsedRegexText) {}
+
+public:
+  static RegexLiteralExpr *createParsed(ASTContext &ctx, SourceLoc loc,
+                                        StringRef regexText);
+
+  ASTContext &getASTContext() const { return *Ctx; }
+
+  /// Retrieve the raw parsed regex text.
+  StringRef getParsedRegexText() const { return ParsedRegexText; }
+
+  /// Retrieve the regex pattern to emit.
+  StringRef getRegexToEmit() const;
+
+  /// Retrieve the computed type for the regex.
+  Type getRegexType() const;
 
   /// Retrieve the version of the regex string.
-  unsigned getVersion() const { return Version; }
+  unsigned getVersion() const;
 
-  ArrayRef<uint8_t> getSerializedCaptureStructure() {
-    return SerializedCaptureStructure;
-  }
+  /// Retrieve any features used in the regex pattern.
+  ArrayRef<RegexLiteralPatternFeature> getPatternFeatures() const;
 
   SourceRange getSourceRange() const { return Loc; }
 
@@ -1189,12 +1234,10 @@ public:
               Type Ty = Type())
     : Expr(ExprKind::DeclRef, Implicit, Ty), D(D), Loc(Loc),
       implicitActorHopTarget(ActorIsolation::forUnspecified()) {
-    Bits.DeclRefExpr.Semantics = (unsigned) semantics;
-    Bits.DeclRefExpr.FunctionRefKind =
-      static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
-                                             : FunctionRefKind::Unapplied);
+    Bits.DeclRefExpr.Semantics = (unsigned)semantics;
     Bits.DeclRefExpr.IsImplicitlyAsync = false;
     Bits.DeclRefExpr.IsImplicitlyThrows = false;
+    setFunctionRefInfo(FunctionRefInfo::unapplied(Loc));
   }
 
   /// Retrieve the declaration to which this expression refers.
@@ -1259,13 +1302,14 @@ public:
   DeclNameLoc getNameLoc() const { return Loc; }
 
   /// Retrieve the kind of function reference.
-  FunctionRefKind getFunctionRefKind() const {
-    return static_cast<FunctionRefKind>(Bits.DeclRefExpr.FunctionRefKind);
+  FunctionRefInfo getFunctionRefInfo() const {
+    return FunctionRefInfo::fromOpaque(Bits.DeclRefExpr.FunctionRefInfo);
   }
 
   /// Set the kind of function reference.
-  void setFunctionRefKind(FunctionRefKind refKind) {
-    Bits.DeclRefExpr.FunctionRefKind = static_cast<unsigned>(refKind);
+  void setFunctionRefInfo(FunctionRefInfo refKind) {
+    Bits.DeclRefExpr.FunctionRefInfo = refKind.getOpaqueValue();
+    ASSERT(refKind == getFunctionRefInfo() && "FunctionRefInfo truncated");
   }
 
   static bool classof(const Expr *E) {
@@ -1465,10 +1509,9 @@ class OverloadSetRefExpr : public Expr {
 
 protected:
   OverloadSetRefExpr(ExprKind Kind, ArrayRef<ValueDecl*> decls,
-                     FunctionRefKind functionRefKind, bool Implicit, Type Ty)
+                     FunctionRefInfo functionRefInfo, bool Implicit, Type Ty)
       : Expr(Kind, Implicit, Ty), Decls(decls) {
-    Bits.OverloadSetRefExpr.FunctionRefKind =
-      static_cast<unsigned>(functionRefKind);
+    setFunctionRefInfo(functionRefInfo);
   }
 
 public:
@@ -1488,14 +1531,14 @@ public:
   bool hasBaseObject() const;
 
   /// Retrieve the kind of function reference.
-  FunctionRefKind getFunctionRefKind() const {
-    return static_cast<FunctionRefKind>(
-             Bits.OverloadSetRefExpr.FunctionRefKind);
+  FunctionRefInfo getFunctionRefInfo() const {
+    return FunctionRefInfo::fromOpaque(Bits.OverloadSetRefExpr.FunctionRefInfo);
   }
 
   /// Set the kind of function reference.
-  void setFunctionRefKind(FunctionRefKind refKind) {
-    Bits.OverloadSetRefExpr.FunctionRefKind = static_cast<unsigned>(refKind);
+  void setFunctionRefInfo(FunctionRefInfo refKind) {
+    Bits.OverloadSetRefExpr.FunctionRefInfo = refKind.getOpaqueValue();
+    ASSERT(refKind == getFunctionRefInfo() && "FunctionRefInfo truncated");
   }
 
   static bool classof(const Expr *E) {
@@ -1511,9 +1554,9 @@ class OverloadedDeclRefExpr final : public OverloadSetRefExpr {
 
 public:
   OverloadedDeclRefExpr(ArrayRef<ValueDecl*> Decls, DeclNameLoc Loc,
-                        FunctionRefKind functionRefKind,
+                        FunctionRefInfo functionRefInfo,
                         bool Implicit, Type Ty = Type())
-      : OverloadSetRefExpr(ExprKind::OverloadedDeclRef, Decls, functionRefKind,
+      : OverloadSetRefExpr(ExprKind::OverloadedDeclRef, Decls, functionRefInfo,
                            Implicit, Ty),
         Loc(Loc) {
   }
@@ -1543,9 +1586,7 @@ public:
       : Expr(ExprKind::UnresolvedDeclRef, /*Implicit=*/loc.isInvalid()),
         Name(name), Loc(loc) {
     Bits.UnresolvedDeclRefExpr.DeclRefKind = static_cast<unsigned>(refKind);
-    Bits.UnresolvedDeclRefExpr.FunctionRefKind =
-      static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
-                                             : FunctionRefKind::Unapplied);
+    setFunctionRefInfo(FunctionRefInfo::unapplied(loc));
   }
 
   static UnresolvedDeclRefExpr *createImplicit(
@@ -1575,14 +1616,15 @@ public:
   }
 
   /// Retrieve the kind of function reference.
-  FunctionRefKind getFunctionRefKind() const {
-    return static_cast<FunctionRefKind>(
-             Bits.UnresolvedDeclRefExpr.FunctionRefKind);
+  FunctionRefInfo getFunctionRefInfo() const {
+    return FunctionRefInfo::fromOpaque(
+        Bits.UnresolvedDeclRefExpr.FunctionRefInfo);
   }
 
   /// Set the kind of function reference.
-  void setFunctionRefKind(FunctionRefKind refKind) {
-    Bits.UnresolvedDeclRefExpr.FunctionRefKind = static_cast<unsigned>(refKind);
+  void setFunctionRefInfo(FunctionRefInfo refKind) {
+    Bits.UnresolvedDeclRefExpr.FunctionRefInfo = refKind.getOpaqueValue();
+    ASSERT(refKind == getFunctionRefInfo() && "FunctionRefInfo truncated");
   }
 
   DeclNameLoc getNameLoc() const { return Loc; }
@@ -1860,19 +1902,7 @@ public:
                        bool implicit)
     : Expr(ExprKind::UnresolvedMember, implicit), DotLoc(dotLoc),
       NameLoc(nameLoc), Name(name) {
-    // FIXME: Really, we should be setting this to `FunctionRefKind::Compound`
-    // if `NameLoc` is compound, but this would be a source break for cases like
-    // ```
-    // struct S {
-    //   static func makeS(_: Int) -> S! { S() }
-    // }
-    //
-    // let s: S = .makeS(_:)(0)
-    // ```
-    // Instead, we should store compound-ness as a separate bit from applied/
-    // unapplied.
-    Bits.UnresolvedMemberExpr.FunctionRefKind =
-        static_cast<unsigned>(FunctionRefKind::Unapplied);
+    setFunctionRefInfo(FunctionRefInfo::unapplied(nameLoc));
   }
 
   DeclNameRef getName() const { return Name; }
@@ -1885,16 +1915,17 @@ public:
   SourceLoc getEndLoc() const { return NameLoc.getSourceRange().End; }
 
   /// Retrieve the kind of function reference.
-  FunctionRefKind getFunctionRefKind() const {
-    return static_cast<FunctionRefKind>(
-        Bits.UnresolvedMemberExpr.FunctionRefKind);
+  FunctionRefInfo getFunctionRefInfo() const {
+    return FunctionRefInfo::fromOpaque(
+        Bits.UnresolvedMemberExpr.FunctionRefInfo);
   }
 
   /// Set the kind of function reference.
-  void setFunctionRefKind(FunctionRefKind refKind) {
-    Bits.UnresolvedMemberExpr.FunctionRefKind = static_cast<unsigned>(refKind);
+  void setFunctionRefInfo(FunctionRefInfo refKind) {
+    Bits.UnresolvedMemberExpr.FunctionRefInfo = refKind.getOpaqueValue();
+    ASSERT(refKind == getFunctionRefInfo() && "FunctionRefInfo truncated");
   }
-  
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedMember;
   }
@@ -2586,9 +2617,7 @@ public:
       : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr),
         DotLoc(dotloc), NameLoc(nameloc), Name(name),
         OuterAlternatives(outerAlternatives) {
-    Bits.UnresolvedDotExpr.FunctionRefKind =
-      static_cast<unsigned>(NameLoc.isCompound() ? FunctionRefKind::Compound
-                                                 : FunctionRefKind::Unapplied);
+    setFunctionRefInfo(FunctionRefInfo::unapplied(nameloc));
   }
 
   static UnresolvedDotExpr *createImplicit(
@@ -2651,13 +2680,14 @@ public:
   }
 
   /// Retrieve the kind of function reference.
-  FunctionRefKind getFunctionRefKind() const {
-    return static_cast<FunctionRefKind>(Bits.UnresolvedDotExpr.FunctionRefKind);
+  FunctionRefInfo getFunctionRefInfo() const {
+    return FunctionRefInfo::fromOpaque(Bits.UnresolvedDotExpr.FunctionRefInfo);
   }
 
   /// Set the kind of function reference.
-  void setFunctionRefKind(FunctionRefKind refKind) {
-    Bits.UnresolvedDotExpr.FunctionRefKind = static_cast<unsigned>(refKind);
+  void setFunctionRefInfo(FunctionRefInfo refKind) {
+    Bits.UnresolvedDotExpr.FunctionRefInfo = refKind.getOpaqueValue();
+    ASSERT(refKind == getFunctionRefInfo() && "FunctionRefInfo truncated");
   }
 
   static bool classof(const Expr *E) {
@@ -3570,6 +3600,24 @@ public:
   }
 };
 
+/// UnsafeCastExpr - A special kind of conversion that performs an unsafe
+/// bitcast from one type to the other.
+///
+/// Note that this is an unsafe operation and type-checker is allowed to
+/// use this only in a limited number of cases like: `any Sendable` -> `Any`
+/// conversions in some positions, covariant conversions of function and
+/// function result types.
+class UnsafeCastExpr : public ImplicitConversionExpr {
+public:
+  UnsafeCastExpr(Expr *subExpr, Type type)
+      : ImplicitConversionExpr(ExprKind::UnsafeCast, subExpr, type) {
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnsafeCast;
+  }
+};
+
 /// Extracts the isolation of a dynamically isolated function value.
 class ExtractFunctionIsolationExpr : public Expr {
   /// The function value expression from which to extract the
@@ -4051,6 +4099,18 @@ public:
   /// returns nullptr if the closure doesn't have a body
   BraceStmt *getBody() const;
 
+  /// Returns a boolean value indicating whether the body, if any, contains
+  /// an explicit `return` statement.
+  ///
+  /// \returns `true` if the body contains an explicit `return` statement,
+  /// `false` otherwise.
+  bool bodyHasExplicitReturnStmt() const;
+
+  /// Finds occurrences of explicit `return` statements within the body, if any.
+  ///
+  /// \param results An out container to which the results are added.
+  void getExplicitReturnStmts(SmallVectorImpl<ReturnStmt *> &results) const;
+
   ActorIsolation getActorIsolation() const {
     return actorIsolation;
   }
@@ -4231,7 +4291,8 @@ public:
   }
 
   /// Whether this closure should implicitly inherit the actor context from
-  /// where it was formed. This only affects @Sendable async closures.
+  /// where it was formed. This only affects @Sendable and sendable async
+  /// closures.
   bool inheritsActorContext() const {
     return Bits.ClosureExpr.InheritActorContext;
   }
@@ -6545,9 +6606,8 @@ void simple_display(llvm::raw_ostream &out, const ClosureExpr *CE);
 void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
 void simple_display(llvm::raw_ostream &out, const Expr *expr);
 
-SourceLoc extractNearestSourceLoc(const DefaultArgumentExpr *expr);
-SourceLoc extractNearestSourceLoc(const MacroExpansionExpr *expr);
 SourceLoc extractNearestSourceLoc(const ClosureExpr *expr);
+SourceLoc extractNearestSourceLoc(const Expr *expr);
 
 } // end namespace swift
 

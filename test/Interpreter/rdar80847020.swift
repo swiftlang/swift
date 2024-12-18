@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang %S/Inputs/rdar80847020.m -I %S/Inputs -c -o %t/rdar80847020.o
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -import-objc-header %S/Inputs/rdar80847020.h -Xlinker %t/rdar80847020.o -parse-as-library %s -o %t/a.out
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -import-objc-header %S/Inputs/rdar80847020.h -Xlinker %t/rdar80847020.o -parse-as-library %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 

@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -strict-concurrency=complete -disable-availability-checking -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 
 ////////////////////////
 // MARK: Declarations //
@@ -238,7 +238,7 @@ func asyncLetReabstractionThunkTest() async {
 func asyncLetReabstractionThunkTest2() async {
   // We emit the error here since we are returning a main actor isolated value.
   async let newValue: NonSendableKlass = await getMainActorValueAsync()
-  // expected-warning @-1 {{non-sendable result type 'NonSendableKlass' cannot be sent from main actor-isolated context in call to global function 'getMainActorValueAsync()'}}
+  // expected-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to nonisolated context}}
 
   let _ = await newValue
 
@@ -261,7 +261,7 @@ func asyncLetReabstractionThunkTest2() async {
 @MainActor func asyncLetReabstractionThunkTestGlobalActor2() async {
   // We emit the error here since we are returning a main actor isolated value.
   async let newValue: NonSendableKlass = await getMainActorValueAsync()
-  // expected-warning @-1 {{non-sendable result type 'NonSendableKlass' cannot be sent from main actor-isolated context in call to global function 'getMainActorValueAsync()'}}
+  // expected-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to nonisolated context}}
 
   let _ = await newValue
 

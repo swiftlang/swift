@@ -17,15 +17,23 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginRegistry.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/Basic/SourceManager.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/IDE/SourceEntityWalker.h"
 
+#include "clang/AST/DeclObjC.h"
+#include "clang/AST/ObjCMethodReferenceInfo.h"
 #include "clang/Basic/Module.h"
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/FileUtilities.h"
@@ -808,5 +816,153 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                         loadedModuleTracePath, toString(std::move(err)));
     return true;
   }
+  return false;
+}
+
+class ObjcMethodReferenceCollector: public SourceEntityWalker {
+  unsigned CurrentFileID;
+  llvm::DenseMap<const clang::ObjCMethodDecl*, unsigned> results;
+  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
+                          Type T, ReferenceMetaData Data) override {
+    if (!Range.isValid())
+      return true;
+    if (auto *clangD = dyn_cast_or_null<clang::ObjCMethodDecl>(D->getClangDecl()))
+      Info.References[CurrentFileID].push_back(clangD);
+    return true;
+  }
+
+  clang::ObjCMethodReferenceInfo Info;
+
+public:
+  ObjcMethodReferenceCollector(ModuleDecl *MD) {
+    Info.ToolName = "swift-compiler-version";
+    Info.ToolVersion =
+      getSwiftInterfaceCompilerVersionForCurrentCompiler(MD->getASTContext());
+    auto &Opts = MD->getASTContext().LangOpts;
+    Info.Target = Opts.Target.str();
+    Info.TargetVariant = Opts.TargetVariant.has_value() ?
+      Opts.TargetVariant->str() : "";
+  }
+  void setFileBeforeVisiting(SourceFile *SF) {
+    assert(SF && "need to visit actual source files");
+    Info.FilePaths.push_back(SF->getFilename().str());
+    CurrentFileID = Info.FilePaths.size();
+  }
+  void serializeAsJson(llvm::raw_ostream &OS) {
+    clang::serializeObjCMethodReferencesAsJson(Info, OS);
+  }
+};
+
+static void createFineModuleTraceFile(CompilerInstance &instance,
+                                      const InputFile &input) {
+  StringRef tracePath = input.getFineModuleTracePath();
+  if (tracePath.empty()) {
+    // we basically rely on the passing down of module trace file path
+    // as an indicator that this job needs to emit an ObjC message trace file.
+    // FIXME: add a separate swift-frontend flag for ObjC message trace path
+    // specifically.
+    return;
+  }
+  ModuleDecl *MD = instance.getMainModule();
+  auto &ctx = MD->getASTContext();
+  // Write output via atomic append.
+  llvm::vfs::OutputConfig config;
+  config.setAppend().setAtomicWrite();
+  auto outputFile = ctx.getOutputBackend().createFile(tracePath, config);
+  if (!outputFile) {
+    ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output, tracePath,
+                       toString(outputFile.takeError()));
+    return;
+  }
+  ObjcMethodReferenceCollector collector(MD);
+  instance.forEachFileToTypeCheck([&](SourceFile& SF) {
+    collector.setFileBeforeVisiting(&SF);
+    collector.walk(SF);
+    return false;
+  });
+
+  // print this json line.
+  std::string stringBuffer;
+  {
+    llvm::raw_string_ostream memoryBuffer(stringBuffer);
+    collector.serializeAsJson(memoryBuffer);
+  }
+  stringBuffer += "\n";
+
+  // Write output via atomic append.
+  *outputFile << stringBuffer;
+  if (auto err = outputFile->keep()) {
+    ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                       tracePath, toString(std::move(err)));
+    return;
+  }
+}
+
+static bool shouldActionTypeEmitFineModuleTrace(FrontendOptions::ActionType action) {
+  // Only full compilation jobs should emit fine module tracing file.
+  // Other partial compilation jobs, such as emitting modules, only typecheck partially
+  // so walking into every function bodies may be risky.
+  switch(action) {
+  case swift::FrontendOptions::ActionType::Typecheck:
+  case swift::FrontendOptions::ActionType::EmitSILGen:
+  case swift::FrontendOptions::ActionType::EmitSIL:
+  case swift::FrontendOptions::ActionType::EmitAssembly:
+  case swift::FrontendOptions::ActionType::EmitLoweredSIL:
+  case swift::FrontendOptions::ActionType::EmitIRGen:
+  case swift::FrontendOptions::ActionType::EmitIR:
+  case swift::FrontendOptions::ActionType::EmitBC:
+  case swift::FrontendOptions::ActionType::EmitObject:
+    return true;
+  case swift::FrontendOptions::ActionType::NoneAction:
+  case swift::FrontendOptions::ActionType::Parse:
+  case swift::FrontendOptions::ActionType::ResolveImports:
+  case swift::FrontendOptions::ActionType::DumpParse:
+  case swift::FrontendOptions::ActionType::DumpInterfaceHash:
+  case swift::FrontendOptions::ActionType::DumpAST:
+  case swift::FrontendOptions::ActionType::PrintAST:
+  case swift::FrontendOptions::ActionType::PrintASTDecl:
+  case swift::FrontendOptions::ActionType::DumpScopeMaps:
+  case swift::FrontendOptions::ActionType::DumpAvailabilityScopes:
+  case swift::FrontendOptions::ActionType::EmitImportedModules:
+  case swift::FrontendOptions::ActionType::EmitPCH:
+  case swift::FrontendOptions::ActionType::EmitModuleOnly:
+  case swift::FrontendOptions::ActionType::MergeModules:
+  case swift::FrontendOptions::ActionType::CompileModuleFromInterface:
+  case swift::FrontendOptions::ActionType::TypecheckModuleFromInterface:
+  case swift::FrontendOptions::ActionType::EmitSIBGen:
+  case swift::FrontendOptions::ActionType::EmitSIB:
+  case swift::FrontendOptions::ActionType::Immediate:
+  case swift::FrontendOptions::ActionType::REPL:
+  case swift::FrontendOptions::ActionType::DumpTypeInfo:
+  case swift::FrontendOptions::ActionType::EmitPCM:
+  case swift::FrontendOptions::ActionType::DumpPCM:
+  case swift::FrontendOptions::ActionType::ScanDependencies:
+  case swift::FrontendOptions::ActionType::PrintVersion:
+  case swift::FrontendOptions::ActionType::PrintFeature:
+    return false;
+  }
+}
+
+bool swift::emitFineModuleTraceIfNeeded(CompilerInstance &Instance,
+                                        const FrontendOptions &opts) {
+  if (opts.DisableFineModuleTracing) {
+    return false;
+  }
+  if (!shouldActionTypeEmitFineModuleTrace(opts.RequestedAction)) {
+    return false;
+  }
+  ModuleDecl *mainModule = Instance.getMainModule();
+  ASTContext &ctxt = mainModule->getASTContext();
+  if (ctxt.blockListConfig.hasBlockListAction(mainModule->getNameStr(),
+      BlockListKeyKind::ModuleName, BlockListAction::SkipEmittingFineModuleTrace))
+    return false;
+  assert(!ctxt.hadError() &&
+         "We should've already exited earlier if there was an error.");
+
+  opts.InputsAndOutputs.forEachInput([&](const InputFile &input) {
+    createFineModuleTraceFile(Instance, input);
+    return true;
+  });
   return false;
 }

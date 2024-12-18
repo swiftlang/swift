@@ -309,6 +309,11 @@ ERROR(incorrect_explicit_closure_result_vs_return_type,none,
       "declared closure result %0 is incompatible with return type %1",
       (Type, Type))
 
+ERROR(addressable_not_enabled,none,
+      "@_addressable is an experimental feature", ())
+ERROR(addressableSelf_not_on_method,none,
+      "@_addressableSelf cannot be applied to non-member declarations", ())
+
 ERROR(unsupported_closure_attr,none,
       "%select{attribute |}0 '%1' is not supported on a closure",
       (bool, StringRef))
@@ -666,6 +671,13 @@ ERROR(expr_keypath_mutating_getter,none,
 ERROR(expr_keypath_static_member,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to static member %0",
       (const ValueDecl *, bool))
+ERROR(keypath_static_member_access_from_unsupported_module,none,
+     "%select{key path|dynamic key path member lookup}3 cannot refer "
+     "to static member %1 of type %0 from module %2",
+      (Type, const ValueDecl *, const ModuleDecl *, bool))
+NOTE(keypath_static_member_access_from_unsupported_module_note,none,
+     "rebuild %0 to enable static member use in key paths",
+     (const ModuleDecl *))
 ERROR(expr_keypath_enum_case,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to enum case %0",
       (const ValueDecl *, bool))
@@ -901,6 +913,9 @@ ERROR(serialization_target_too_new_repl,none,
       "deployment target of %0 %3: %4",
       (StringRef, llvm::VersionTuple, Identifier, llvm::VersionTuple,
        StringRef))
+ERROR(serialization_non_ossa_module_incompatible, Fatal,
+      "cannot import non-OSSA module into an OSSA module",
+      (Identifier))
 
 ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
@@ -1824,6 +1839,10 @@ ERROR(attr_implementation_category_goes_on_objc_attr,none,
       "'@implementation'",
       ())
 
+ERROR(attr_not_allowed_in_c_functions,none,
+      "attribute %0 is not allowed in C function conventions",
+      (StringRef))
+
 WARNING(objc_implementation_will_become_objc,none,
         "%kind0 will become implicitly '@objc' after adopting '@objc "
         "@implementation'; add '%select{@nonobjc|final}1' to keep the current "
@@ -2086,6 +2105,8 @@ ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
       "Swift %kind0 cannot be represented in C++", (ValueDecl *))
+ERROR(expose_zero_size_to_cxx,none,
+      "%0 is a zero sized value type, it cannot be exposed to C++ yet", (ValueDecl *))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -2777,6 +2798,9 @@ ERROR(types_not_inherited_decl,none,
 ERROR(types_not_inherited_in_decl_ref,none,
       "referencing %kind0 on %1 requires that %2 inherit from %3",
       (const ValueDecl *, Type, Type, Type))
+ERROR(cannot_reference_conditional_member_on_base_multiple_mismatches,none,
+      "cannot reference %kind0 on %1",
+      (const ValueDecl *, Type))
 NOTE(where_requirement_failure_one_subst,none,
      "where %0 = %1", (Type, Type))
 NOTE(where_requirement_failure_both_subst,none,
@@ -4641,6 +4665,8 @@ ERROR(cannot_explicitly_specialize_function,none,
       "cannot explicitly specialize %kind0", (ValueDecl *))
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
+ERROR(invalid_generic_builtin_type,none,
+      "invalid generic arguments to builtin type %0", (Type))
 ERROR(not_a_generic_macro,none,
       "cannot specialize a non-generic external macro %0", (const ValueDecl *))
 ERROR(protocol_declares_unknown_primary_assoc_type,none,
@@ -5091,7 +5117,8 @@ ERROR(unknown_case_must_be_last,none,
       "'@unknown' can only be applied to the last case in a switch", ())
 
 WARNING(where_on_one_item, none,
-        "'where' only applies to the second pattern match in this case", ())
+        "'where' only applies to the second pattern match in this "
+        "'%select{case|catch}0'", (bool))
 
 NOTE(add_where_newline, none,
      "disambiguate by adding a line break between them if this is desired", ())
@@ -5935,7 +5962,7 @@ ERROR(async_decl_must_be_available_from_async,none,
 ERROR(async_named_decl_must_be_available_from_async,none,
         "asynchronous %kind0 must be available from asynchronous contexts",
         (const ValueDecl *))
-ERROR(async_unavailable_decl,none,
+GROUPED_ERROR(async_unavailable_decl,DeclarationUnavailableFromAsynchronousContext,none,
       "%kindbase0 is unavailable from asynchronous contexts%select{|; %1}1",
       (const ValueDecl *, StringRef))
 
@@ -5945,9 +5972,9 @@ ERROR(isolated_deinit_no_isolation,none,
 ERROR(isolated_deinit_on_value_type,none,
       "only classes and actors can have isolated deinit",
       ())
-ERROR(isolated_deinit_experimental,none,
-      "'isolated' deinit requires frontend flag -enable-experimental-feature IsolatedDeinit "
-      "to enable the usage of this language feature", ())
+ERROR(isolated_deinit_unavailable,none,
+      "isolated deinit is only available in %0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
 
 //------------------------------------------------------------------------------
 // MARK: String Processing
@@ -5959,6 +5986,10 @@ ERROR(string_processing_lib_missing,none,
 ERROR(regex_capture_types_failed_to_decode,none,
       "failed to decode capture types for regular expression literal; this may "
       "be a compiler bug", ())
+
+ERROR(regex_feature_unavailable, none,
+      "%0 is only available in %1 %2 or newer",
+      (StringRef, StringRef, llvm::VersionTuple))
 
 ERROR(must_import_regex_builder_module,none,
       "regex builder requires the 'RegexBuilder' module be imported'", ())
@@ -7072,6 +7103,10 @@ WARNING(variable_never_mutated, none,
         "variable %0 was never mutated; "
         "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
         (Identifier, bool))
+WARNING(variable_tuple_elt_never_mutated, none,
+        "variable %0 was never mutated; "
+        "consider changing the pattern to 'case (..., let %1, ...)'",
+        (Identifier, StringRef))
 WARNING(variable_never_read, none,
         "variable %0 was written to, but never read",
         (Identifier))
@@ -7765,9 +7800,6 @@ NOTE(note_inverse_preventing_conformance,none,
 NOTE(note_inverse_preventing_conformance_explicit,none,
      "%kind0 has '~%1' constraint preventing '%1' conformance",
      (const ValueDecl *, StringRef))
-ERROR(escapable_requires_feature_flag,none,
-      "type 'Escapable' requires -enable-experimental-feature NonescapableTypes",
-      ())
 ERROR(non_bitwise_copyable_type_class,none,
       "class cannot conform to 'BitwiseCopyable'", ())
 ERROR(non_bitwise_copyable_type_indirect_enum,none,
@@ -7891,8 +7923,9 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
 
-ERROR(nonescapable_types_attr_disabled,none,
-      "attribute requires '-enable-experimental-feature NonescapableTypes'", ())
+ERROR(span_requires_feature_flag,none,
+      "'%0' requires -enable-experimental-feature Span",
+      (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors
@@ -7948,9 +7981,9 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_invalid_param_name, none,
-      "invalid parameter name specified %0", (Identifier))
+      "invalid parameter name specified '%0'", (StringRef))
 ERROR(lifetime_dependence_invalid_param_index, none,
-      "invalid parameter index specified %0", (unsigned))
+      "invalid parameter index specified '%0'", (unsigned))
 ERROR(lifetime_dependence_invalid_self_in_static, none,
       "invalid lifetime dependence specifier on non-existent self", ())
 ERROR(lifetime_dependence_invalid_self_in_init, none,
@@ -7992,7 +8025,7 @@ ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
        "Escapable",
        ())
 ERROR(lifetime_dependence_immortal_conflict_name, none,
-      "conflict between the parameter name and immortal keyword", ())
+      "conflict between the parameter name and 'immortal' contextual keyword", ())
 ERROR(lifetime_dependence_function_type, none,
       "lifetime dependencies on function types are not supported",
       ())
@@ -8005,6 +8038,12 @@ ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
 ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
       "invalid use of borrow dependence with consuming ownership",
       ())
+ERROR(lifetime_dependence_duplicate_target, none,
+      "invalid duplicate target lifetime dependencies on function", ())
+
+ERROR(lifetime_dependence_feature_required, none,
+      "returning ~Escapable type requires '-enable-experimental-feature "
+      "LifetimeDependence'", ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Sending
@@ -8033,28 +8072,40 @@ NOTE(sending_function_result_with_sending_param_note, none,
 //------------------------------------------------------------------------------
 ERROR(unsafe_attr_disabled,none,
       "attribute requires '-enable-experimental-feature AllowUnsafeAttribute'", ())
-WARNING(override_safe_withunsafe,none,
+GROUPED_WARNING(override_safe_withunsafe,Unsafe,none,
       "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
-WARNING(witness_unsafe,none,
+GROUPED_WARNING(witness_unsafe,Unsafe,none,
      "unsafe %0 %1 cannot satisfy safe requirement",
       (DescriptiveDeclKind, DeclName))
-WARNING(type_witness_unsafe,none,
+GROUPED_WARNING(type_witness_unsafe,Unsafe,none,
       "unsafe type %0 cannot satisfy safe associated type %1",
       (Type, DeclName))
-WARNING(unchecked_conformance_is_unsafe,none,
+GROUPED_WARNING(unchecked_conformance_is_unsafe,Unsafe,none,
       "@unchecked conformance involves unsafe code", ())
-WARNING(unowned_unsafe_is_unsafe,none,
+GROUPED_WARNING(unowned_unsafe_is_unsafe,Unsafe,none,
       "unowned(unsafe) involves unsafe code", ())
-WARNING(nonisolated_unsafe_is_unsafe,none,
+GROUPED_WARNING(nonisolated_unsafe_is_unsafe,Unsafe,none,
       "nonisolated(unsafe) involves unsafe code", ())
-WARNING(reference_to_unsafe_decl,none,
+GROUPED_WARNING(reference_to_unsafe_decl,Unsafe,none,
       "%select{reference|call}0 to unsafe %kindbase1",
       (bool, const ValueDecl *))
-WARNING(reference_to_unsafe_typed_decl,none,
+GROUPED_WARNING(reference_to_unsafe_typed_decl,Unsafe,none,
       "%select{reference|call}0 to %kindbase1 involves unsafe type %2",
       (bool, const ValueDecl *, Type))
 NOTE(unsafe_decl_here,none,
      "unsafe %kindbase0 declared here", (const ValueDecl *))
+NOTE(encapsulate_unsafe_in_enclosing_context,none,
+     "make %kindbase0 @safe(unchecked) to allow it to use unsafe constructs in its definition",
+     (const Decl *))
+NOTE(make_enclosing_context_unsafe,none,
+     "make %kindbase0 @unsafe to indicate that its use is not memory-safe",
+     (const Decl *))
+NOTE(make_subclass_unsafe,none,
+     "make class %0 @unsafe to allow unsafe overrides of safe superclass methods",
+     (DeclName))
+NOTE(make_conforming_context_unsafe,none,
+     "make the enclosing %0 @unsafe to allow unsafe conformance to protocol %1",
+     (DescriptiveDeclKind, DeclName))
 
 //===----------------------------------------------------------------------===//
 // MARK: Value Generics

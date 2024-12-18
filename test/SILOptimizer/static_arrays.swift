@@ -17,7 +17,7 @@
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: outlined variable #0 of arrayLookup(_:)
-// CHECK-NEXT:  sil_global private @{{.*}}arrayLookup{{.*}} = {
+// CHECK-NEXT:  sil_global private [let] @{{.*}}arrayLookup{{.*}} = {
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 10
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 11
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 12
@@ -25,41 +25,41 @@
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: outlined variable #0 of returnArray()
-// CHECK-NEXT:  sil_global private @{{.*}}returnArray{{.*}} = {
+// CHECK-NEXT:  sil_global private [let] @{{.*}}returnArray{{.*}} = {
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 20
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 21
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}}, {{[^,]*}})
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: outlined variable #0 of returnStaticStringArray()
-// CHECK-NEXT:  sil_global private @{{.*}}returnStaticStringArray{{.*}} = {
+// CHECK-NEXT:  sil_global private [let] @{{.*}}returnStaticStringArray{{.*}} = {
 // CHECK-DAG:     string_literal utf8 "a"
 // CHECK-DAG:     string_literal utf8 "b"
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}}, {{[^,]*}})
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: outlined variable #0 of passArray()
-// CHECK-NEXT:  sil_global private @{{.*}}passArray{{.*}} = {
+// CHECK-NEXT:  sil_global private [let] @{{.*}}passArray{{.*}} = {
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 27
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 28
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}}, {{[^,]*}})
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: outlined variable #1 of passArray()
-// CHECK-NEXT:  sil_global private @{{.*}}passArray{{.*}} = {
+// CHECK-NEXT:  sil_global private [let] @{{.*}}passArray{{.*}} = {
 // CHECK:         integer_literal $Builtin.Int{{[0-9]+}}, 29
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}})
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: outlined variable #0 of storeArray()
-// CHECK-NEXT:  sil_global private @{{.*}}storeArray{{.*}} = {
+// CHECK-NEXT:  sil_global private [let] @{{.*}}storeArray{{.*}} = {
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 227
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 228
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}}, {{[^,]*}})
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: outlined variable #0 of functionArray()
-// CHECK-NEXT:  sil_global private @{{.*functionArray.*}} = {
+// CHECK-NEXT:  sil_global private [let] @{{.*functionArray.*}} = {
 // CHECK:         function_ref
 // CHECK:         thin_to_thick_function
 // CHECK:         convert_function
@@ -70,7 +70,7 @@
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: outlined variable #0 of returnDictionary()
-// CHECK-NEXT:  sil_global private @{{.*}}returnDictionary{{.*}} = {
+// CHECK-NEXT:  sil_global private [let] @{{.*}}returnDictionary{{.*}} = {
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 5
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 4
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 2
@@ -81,11 +81,11 @@
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: outlined variable #0 of returnStringDictionary()
-// CHECK-NEXT:  sil_global private @{{.*}}returnStringDictionary{{.*}} = {
+// CHECK-NEXT:  sil_global private [let] @{{.*}}returnStringDictionary{{.*}} = {
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems]
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: sil_global private @{{.*}}main{{.*}} = {
+// CHECK-LABEL: sil_global private [let] @{{.*}}main{{.*}} = {
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 100
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 101
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 102

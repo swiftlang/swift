@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -parse-stdlib %s -module-name main -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -563,6 +563,16 @@ if #available(SwiftStdlib 6.0, *) {
 
     // throws(Never) -> non-throwing
     expectEqual(getFnTypeWithThrownError(Never.self), _typeByName("ySic")!)
+  }
+}
+
+if #available(SwiftStdlib 6.1, *) {
+  DemangleToMetadataTests.test("NUL-terminated name, excessive length value") {
+    let t = _typeByName("4main1SV\0random stuff here")
+    expectNotNil(t)
+    if let t {
+      expectEqual(type(of: S()), t)
+    }
   }
 }
 

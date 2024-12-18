@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -Xllvm -sil-disable-pass=redundant-load-elimination -emit-sil  -primary-file %s | %FileCheck %s --check-prefix=TESTSIL
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -Xllvm -sil-disable-pass=redundant-load-elimination -Xllvm -sil-print-types -emit-sil  -primary-file %s | %FileCheck %s --check-prefix=TESTSIL
 // REQUIRES: optimized_stdlib,asserts
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: PTRSIZE=64

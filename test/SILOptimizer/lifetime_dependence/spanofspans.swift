@@ -2,10 +2,8 @@
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
-// RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -module-name test
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
 // REQUIRES: rdar132874319

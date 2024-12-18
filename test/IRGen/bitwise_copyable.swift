@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend                           \
 // RUN:     -primary-file %s                             \
 // RUN:     -emit-ir                                     \
-// RUN:     -disable-availability-checking               \
+// RUN:     -target %target-swift-5.9-abi-triple         \
 // RUN:     -enable-builtin-module
 
 // REQUIRES: asserts

@@ -5438,7 +5438,10 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     SubstitutionMap &interfaceSubs,
     CanType &dynamicSelfType,
     bool withoutActuallyEscaping) {
-  return buildSILFunctionThunkType(&F, sourceType, expectedType, inputSubstType, outputSubstType, genericEnv, interfaceSubs, dynamicSelfType, withoutActuallyEscaping);
+  return buildSILFunctionThunkType(
+      &F, sourceType, expectedType, inputSubstType, outputSubstType,
+      genericEnv, interfaceSubs, dynamicSelfType,
+      withoutActuallyEscaping);
 }
 
 static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
@@ -5905,7 +5908,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   // Get the thunk name.
   auto fromInterfaceType = fromType->mapTypeOutOfContext()->getCanonicalType();
   auto toInterfaceType = toType->mapTypeOutOfContext()->getCanonicalType();
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   std::string name;
   // If `self` is being reordered, it is an AD-specific self-reordering
   // reabstraction thunk.
@@ -6269,7 +6272,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       LookUpConformanceInModule(), derivativeCanGenSig);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   auto name = getASTContext()
       .getIdentifier(
           mangler.mangleAutoDiffDerivativeFunction(originalAFD, kind, config))
@@ -6821,12 +6824,16 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     break;
   }
 
-  case SILCoroutineKind::YieldOnce: {
+  case SILCoroutineKind::YieldOnce:
+  case SILCoroutineKind::YieldOnce2: {
     SmallVector<SILValue, 4> derivedYields;
-    auto tokenAndCleanup =
-        emitBeginApplyWithRethrow(loc, derivedRef,
-                                  SILType::getPrimitiveObjectType(derivedFTy),
-                                  subs, args, derivedYields);
+    auto tokenAndCleanups = emitBeginApplyWithRethrow(
+        loc, derivedRef, SILType::getPrimitiveObjectType(derivedFTy), subs,
+        args, derivedYields);
+    auto token = std::get<0>(tokenAndCleanups);
+    auto abortCleanup = std::get<1>(tokenAndCleanups);
+    auto allocation = std::get<2>(tokenAndCleanups);
+    auto deallocCleanup = std::get<3>(tokenAndCleanups);
     auto overrideSubs = SubstitutionMap::getOverrideSubstitutions(
         base.getDecl(), derived.getDecl()).subst(subs);
 
@@ -6836,10 +6843,13 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     translateYields(*this, loc, derivedYields, derivedYieldInfo, baseYieldInfo);
 
     // Kill the abort cleanup without emitting it.
-    Cleanups.setCleanupState(tokenAndCleanup.second, CleanupState::Dead);
+    Cleanups.setCleanupState(abortCleanup, CleanupState::Dead);
+    if (allocation) {
+      Cleanups.setCleanupState(deallocCleanup, CleanupState::Dead);
+    }
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, tokenAndCleanup.first);
+    emitEndApplyWithRethrow(loc, token, allocation);
 
     result = B.createTuple(loc, {});
     break;
@@ -7209,23 +7219,29 @@ void SILGenFunction::emitProtocolWitness(
     break;
   }
 
-  case SILCoroutineKind::YieldOnce: {
+  case SILCoroutineKind::YieldOnce:
+  case SILCoroutineKind::YieldOnce2: {
     SmallVector<SILValue, 4> witnessYields;
-    auto tokenAndCleanup =
-      emitBeginApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs,
-                                args, witnessYields);
+    auto tokenAndCleanups = emitBeginApplyWithRethrow(
+        loc, witnessFnRef, witnessSILTy, witnessSubs, args, witnessYields);
+    auto token = std::get<0>(tokenAndCleanups);
+    auto abortCleanup = std::get<1>(tokenAndCleanups);
+    auto allocation = std::get<2>(tokenAndCleanups);
+    auto deallocCleanup = std::get<3>(tokenAndCleanups);
 
     YieldInfo witnessYieldInfo(SGM, witness, witnessFTy, witnessSubs);
-    YieldInfo reqtYieldInfo(SGM, requirement, thunkTy,
-                            reqtSubs.subst(getForwardingSubstitutionMap()));
+    YieldInfo reqtYieldInfo(SGM, requirement, thunkTy, reqtSubs);
 
     translateYields(*this, loc, witnessYields, witnessYieldInfo, reqtYieldInfo);
 
     // Kill the abort cleanup without emitting it.
-    Cleanups.setCleanupState(tokenAndCleanup.second, CleanupState::Dead);
+    Cleanups.setCleanupState(abortCleanup, CleanupState::Dead);
+    if (allocation) {
+      Cleanups.setCleanupState(deallocCleanup, CleanupState::Dead);
+    }
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, tokenAndCleanup.first);
+    emitEndApplyWithRethrow(loc, token, allocation);
 
     reqtResultValue = B.createTuple(loc, {});
     break;

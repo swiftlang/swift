@@ -108,6 +108,8 @@ public typealias CLongDouble = Double
 #elseif os(OpenBSD)
 #if arch(x86_64)
 public typealias CLongDouble = Float80
+#elseif arch(arm64)
+public typealias CLongDouble = Double
 #else
 #error("CLongDouble needs to be defined for this OpenBSD architecture")
 #endif

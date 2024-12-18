@@ -111,6 +111,8 @@ private:
     TRIVIAL_CASE(BuiltinIntegerType)
     TRIVIAL_CASE(BuiltinFloatType)
     TRIVIAL_CASE(BuiltinVectorType)
+    TRIVIAL_CASE(BuiltinUnboundGenericType)
+    TRIVIAL_CASE(BuiltinFixedArrayType)
     TRIVIAL_CASE(IntegerType)
 #define SINGLETON_TYPE(SHORT_ID, ID) TRIVIAL_CASE(ID##Type)
 #include "swift/AST/TypeNodes.def"

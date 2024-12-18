@@ -280,21 +280,21 @@ DeclContext *DeclContext::getInnermostSkippedFunctionContext() {
   return nullptr;
 }
 
-ClosureExpr *DeclContext::getInnermostClosureForSelfCapture() {
-  auto dc = this;
-  if (auto closure = dyn_cast<ClosureExpr>(dc)) {
-    return closure;
-  }
+ClosureExpr *DeclContext::getInnermostClosureForCaptures() {
+  auto *DC = this;
+  do {
+    if (auto *CE = dyn_cast<ClosureExpr>(DC))
+      return CE;
 
-  // Stop searching if we find a type decl, since types always
-  // redefine what 'self' means, even when nested inside a closure.
-  if (dc->isTypeContext()) {
-    return nullptr;
-  }
-
-  if (auto parent = dc->getParent()) {
-    return parent->getInnermostClosureForSelfCapture();
-  }
+    // Autoclosures and AbstractFunctionDecls can propagate captures.
+    switch (DC->getContextKind()) {
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::AbstractFunctionDecl:
+      continue;
+    default:
+      return nullptr;
+    }
+  } while ((DC = DC->getParent()));
 
   return nullptr;
 }
@@ -869,6 +869,9 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
       }
       break;
     }
+    case InitializerKind::CustomAttribute:
+      OS << " CustomAttribute";
+      break;
     }
     break;
   }
@@ -1534,15 +1537,22 @@ bool DeclContext::isAlwaysAvailableConformanceContext() const {
   if (ext == nullptr)
     return true;
 
-  if (AvailableAttr::isUnavailable(ext))
+  if (ext->isUnavailable())
     return false;
 
   auto &ctx = getASTContext();
 
   AvailabilityRange conformanceAvailability{
-      AvailabilityInference::availableRange(ext, ctx)};
+      AvailabilityInference::availableRange(ext)};
 
   auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
 
   return deploymentTarget.isContainedIn(conformanceAvailability);
+}
+
+bool DeclContext::allowsUnsafe() const {
+  if (auto decl = getAsDecl())
+    return decl->allowsUnsafe();
+
+  return false;
 }

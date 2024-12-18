@@ -22,6 +22,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -996,6 +997,8 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
       return BI->getArguments().size() > 0
         ? MemoryBehavior::MayWrite
         : MemoryBehavior::None;
+    } else if (BInfo.ID == BuiltinValueKind::WillThrow) {
+      return MemoryBehavior::MayRead;
     }
     if (BInfo.ID != BuiltinValueKind::None)
       return BInfo.isReadNone() ? MemoryBehavior::None
@@ -1187,6 +1190,7 @@ bool SILInstruction::mayRelease() const {
     if (auto Kind = BI->getBuiltinKind()) {
       switch (Kind.value()) {
         case BuiltinValueKind::CopyArray:
+        case BuiltinValueKind::WillThrow:
           return false;
         default:
           break;
@@ -1283,6 +1287,10 @@ bool SILInstruction::isAllocatingStack() const {
       && !PA->getFunction()->hasOwnership();
   }
 
+  if (auto *BAI = dyn_cast<BeginApplyInst>(this)) {
+    return BAI->isCalleeAllocated();
+  }
+
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     if (BI->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
         BI->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc) {
@@ -1291,6 +1299,17 @@ bool SILInstruction::isAllocatingStack() const {
   }
 
   return false;
+}
+
+SILValue SILInstruction::getStackAllocation() const {
+  if (!isAllocatingStack()) {
+    return {};
+  }
+
+  if (auto *bai = dyn_cast<BeginApplyInst>(this)) {
+    return bai->getCalleeAllocationResult();
+  }
+  return cast<SingleValueInstruction>(this);
 }
 
 bool SILInstruction::isDeallocatingStack() const {
@@ -1464,12 +1483,31 @@ bool SILInstruction::isTriviallyDuplicatable() const {
       isa<GetAsyncContinuationInst>(this))
     return false;
 
+  // Bail if there are any begin-borrow instructions which have no corresponding
+  // end-borrow uses. This is the case if the control flow ends in a dead-end block.
+  // After duplicating such a block, the re-borrow flags cannot be recomputed
+  // correctly for inserted phi arguments.
+  if (auto *svi  = dyn_cast<SingleValueInstruction>(this)) {
+    if (auto bv = BorrowedValue(lookThroughBorrowedFromDef(svi))) {
+      if (!bv.hasLocalScopeEndingUses())
+        return false;
+    }
+  }
+
   // If you add more cases here, you should also update SILLoop:canDuplicate.
 
   return true;
 }
 
 bool SILInstruction::mayTrap() const {
+  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
+    if (auto Kind = BI->getBuiltinKind()) {
+      if (Kind.value() == BuiltinValueKind::WillThrow) {
+        // We don't want willThrow instructions to be removed.
+        return true;
+      }
+    }
+  }
   switch(getKind()) {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
@@ -1957,6 +1995,26 @@ UncheckedTakeEnumDataAddrInst::isDestructive(EnumDecl *forEnum, SILModule &M) {
   }
   
   return false;
+}
+
+SILInstructionContext SILInstructionContext::forFunctionInModule(SILFunction *F,
+                                                                 SILModule &M) {
+  if (F) {
+    assert(&F->getModule() == &M);
+    return forFunction(*F);
+  }
+  return forModule(M);
+}
+
+SILFunction *SILInstructionContext::getFunction() {
+  return *storage.dyn_cast<SILFunction *>();
+}
+
+SILModule &SILInstructionContext::getModule() {
+  if (auto *m = storage.dyn_cast<SILModule *>()) {
+    return **m;
+  }
+  return storage.get<SILFunction *>()->getModule();
 }
 
 #ifndef NDEBUG

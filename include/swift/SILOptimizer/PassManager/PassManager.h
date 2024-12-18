@@ -69,6 +69,8 @@ class SwiftPassInvocation {
   SILAnalysis::InvalidationKind changeNotifications =
       SILAnalysis::InvalidationKind::Nothing;
 
+  bool functionTablesChanged = false;
+
   /// All slabs, allocated by the pass.
   SILModule::SlabList allocatedSlabs;
 
@@ -140,6 +142,8 @@ public:
 
   /// Called by the pass when changes are made to the SIL.
   void notifyChanges(SILAnalysis::InvalidationKind invalidationKind);
+
+  void notifyFunctionTablesChanged();
 
   /// Called by the pass manager before the pass starts running.
   void startModulePassRun(SILModuleTransform *transform);
@@ -512,6 +516,9 @@ inline void SwiftPassInvocation::
 notifyChanges(SILAnalysis::InvalidationKind invalidationKind) {
     changeNotifications = (SILAnalysis::InvalidationKind)
         (changeNotifications | invalidationKind);
+}
+inline void SwiftPassInvocation::notifyFunctionTablesChanged() {
+  functionTablesChanged = true;
 }
 
 } // end namespace swift

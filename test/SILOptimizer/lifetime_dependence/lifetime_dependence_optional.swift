@@ -2,15 +2,18 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature LifetimeDependenceDiagnoseTrivial
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 // Simply test that it is possible for a module to define a pseudo-Optional type without triggering any compiler errors.
 
 public protocol ExpressibleByNilLiteral: ~Copyable & ~Escapable {
-  init(nilLiteral: ()) -> dependsOn(immortal) Self
+  @lifetime(immortal)
+  init(nilLiteral: ()) 
 }
 
 @frozen
@@ -29,7 +32,8 @@ extension Nillable: BitwiseCopyable where Wrapped: BitwiseCopyable { }
 
 extension Nillable: ExpressibleByNilLiteral where Wrapped: ~Copyable & ~Escapable {
   @_transparent
-  public init(nilLiteral: ()) -> dependsOn(immortal) Self {
+  @lifetime(immortal)
+  public init(nilLiteral: ()) {
     self = .none
   }
 }

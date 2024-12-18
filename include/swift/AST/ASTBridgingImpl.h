@@ -13,15 +13,81 @@
 #ifndef SWIFT_AST_ASTBRIDGINGIMPL_H
 #define SWIFT_AST_ASTBRIDGINGIMPL_H
 
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/ArgumentList.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/IfConfigClauseRangeInfo.h"
+#include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/Fingerprint.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedIdentifier
+//===----------------------------------------------------------------------===//
+
+BridgedIdentifier::BridgedIdentifier(swift::Identifier ident)
+    : Raw(ident.getAsOpaquePointer()) {}
+
+swift::Identifier BridgedIdentifier::unbridged() const {
+  return swift::Identifier::getFromOpaquePointer(Raw);
+}
+
+SWIFT_NAME("getter:BridgedIdentifier.isOperator(self:)")
+bool BridgedIdentifier_isOperator(const BridgedIdentifier ident) {
+  return ident.unbridged().isOperator();
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedDeclBaseName
+//===----------------------------------------------------------------------===//
+
+BridgedDeclBaseName::BridgedDeclBaseName(swift::DeclBaseName baseName)
+  : Ident(baseName.Ident) {}
+
+swift::DeclBaseName BridgedDeclBaseName::unbridged() const {
+  return swift::DeclBaseName(Ident.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedDeclNameRef
+//===----------------------------------------------------------------------===//
+
+BridgedDeclNameRef::BridgedDeclNameRef()
+    : BridgedDeclNameRef(swift::DeclNameRef()) {}
+
+BridgedDeclNameRef::BridgedDeclNameRef(swift::DeclNameRef name)
+  : opaque(name.getOpaqueValue()) {}
+
+swift::DeclNameRef BridgedDeclNameRef::unbridged() const {
+  return swift::DeclNameRef::getFromOpaqueValue(opaque);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedDeclNameLoc
+//===----------------------------------------------------------------------===//
+
+BridgedDeclNameLoc::BridgedDeclNameLoc(swift::DeclNameLoc loc)
+    : LocationInfo(loc.LocationInfo),
+      NumArgumentLabels(loc.NumArgumentLabels) {}
+
+swift::DeclNameLoc BridgedDeclNameLoc::unbridged() const {
+  return swift::DeclNameLoc(LocationInfo, NumArgumentLabels);
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedASTContext
 //===----------------------------------------------------------------------===//
+
+BridgedASTContext::BridgedASTContext(swift::ASTContext &ctx) : Ctx(&ctx) {}
+
+swift::ASTContext &BridgedASTContext::unbridged() const { return *Ctx; }
 
 void * _Nonnull BridgedASTContext_raw(BridgedASTContext bridged) {
   return &bridged.unbridged();
@@ -29,6 +95,37 @@ void * _Nonnull BridgedASTContext_raw(BridgedASTContext bridged) {
 
 BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr) {
   return *static_cast<swift::ASTContext *>(ptr);
+}
+
+BRIDGED_INLINE
+void *_Nullable BridgedASTContext_allocate(BridgedASTContext bridged,
+                                           size_t size, size_t alignment) {
+  return bridged.unbridged().Allocate(size, alignment);
+}
+
+BridgedStringRef BridgedASTContext_allocateCopyString(BridgedASTContext bridged,
+                                                      BridgedStringRef cStr) {
+  return bridged.unbridged().AllocateCopy(cStr.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedDeclContext
+//===----------------------------------------------------------------------===//
+
+bool BridgedDeclContext_isLocalContext(BridgedDeclContext dc) {
+  return dc.unbridged()->isLocalContext();
+}
+
+bool BridgedDeclContext_isTypeContext(BridgedDeclContext dc) {
+  return dc.unbridged()->isTypeContext();
+}
+
+bool BridgedDeclContext_isModuleScopeContext(BridgedDeclContext dc) {
+  return dc.unbridged()->isModuleScopeContext();
+}
+
+BridgedASTContext BridgedDeclContext_getASTContext(BridgedDeclContext dc) {
+  return dc.unbridged()->getASTContext();
 }
 
 //===----------------------------------------------------------------------===//
@@ -76,6 +173,81 @@ BridgedASTType BridgedDeclObj::Class_getSuperclass() const {
   return {getAs<swift::ClassDecl>()->getSuperclass().getPointer()};
 }
 
+BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
+  return {getAs<swift::ClassDecl>()->getDestructor()};
+}
+
+bool BridgedDeclObj::Destructor_isIsolated() const {
+  auto dd = getAs<swift::DestructorDecl>();
+  auto ai = swift::getActorIsolation(dd);
+  return ai.isActorIsolated();
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedASTNode
+//===----------------------------------------------------------------------===//
+
+swift::ASTNode BridgedASTNode::unbridged() const {
+  switch (Kind) {
+  case ASTNodeKindExpr:
+    return swift::ASTNode(static_cast<swift::Expr *>(Raw));
+  case ASTNodeKindStmt:
+    return swift::ASTNode(static_cast<swift::Stmt *>(Raw));
+  case ASTNodeKindDecl:
+    return swift::ASTNode(static_cast<swift::Decl *>(Raw));
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Diagnostic Engine
+//===----------------------------------------------------------------------===//
+
+BridgedDiagnosticArgument::BridgedDiagnosticArgument(const swift::DiagnosticArgument &arg) {
+  *reinterpret_cast<swift::DiagnosticArgument *>(&storage) = arg;
+}
+
+const swift::DiagnosticArgument &BridgedDiagnosticArgument::unbridged() const {
+  return *reinterpret_cast<const swift::DiagnosticArgument *>(&storage);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedDeclAttributes
+//===----------------------------------------------------------------------===//
+
+BridgedDeclAttributes::BridgedDeclAttributes(swift::DeclAttributes attrs)
+    : chain(attrs.getRawAttributeChain()) {}
+
+swift::DeclAttributes BridgedDeclAttributes::unbridged() const {
+  swift::DeclAttributes attrs;
+  attrs.setRawAttributeChain(chain.unbridged());
+  return attrs;
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedParamDecl
+//===----------------------------------------------------------------------===//
+
+swift::ParamSpecifier unbridge(BridgedParamSpecifier specifier) {
+  switch (specifier) {
+#define CASE(ID)                                                               \
+  case BridgedParamSpecifier##ID:                                              \
+    return swift::ParamSpecifier::ID;
+    CASE(Default)
+    CASE(InOut)
+    CASE(Borrowing)
+    CASE(Consuming)
+    CASE(LegacyShared)
+    CASE(LegacyOwned)
+    CASE(ImplicitlyCopyableConsuming)
+#undef CASE
+  }
+}
+
+void BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
+                                   BridgedParamSpecifier cSpecifier) {
+  cDecl.unbridged()->setSpecifier(unbridge(cSpecifier));
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedSubscriptDecl
 //===----------------------------------------------------------------------===//
@@ -92,6 +264,23 @@ BridgedSubscriptDecl_asAbstractStorageDecl(BridgedSubscriptDecl decl) {
 BridgedAbstractStorageDecl
 BridgedVarDecl_asAbstractStorageDecl(BridgedVarDecl decl) {
   return decl.unbridged();
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedCallArgument
+//===----------------------------------------------------------------------===//
+
+swift::Argument BridgedCallArgument::unbridged() const {
+  return swift::Argument(labelLoc.unbridged(), label.unbridged(),
+                         argExpr.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedLabeledStmtInfo
+//===----------------------------------------------------------------------===//
+
+swift::LabeledStmtInfo BridgedLabeledStmtInfo::unbridged() const {
+  return {Name.unbridged(), Loc.unbridged()};
 }
 
 //===----------------------------------------------------------------------===//
@@ -155,6 +344,13 @@ BridgedASTType BridgedCanType::getType() const {
 
 static_assert(sizeof(BridgedConformance) == sizeof(swift::ProtocolConformanceRef));
 
+BridgedConformance::BridgedConformance(swift::ProtocolConformanceRef conformance)
+    : opaqueValue(conformance.getOpaqueValue()) {}
+
+swift::ProtocolConformanceRef BridgedConformance::unbridged() const {
+  return swift::ProtocolConformanceRef::getFromOpaqueValue(opaqueValue);
+}
+
 bool BridgedConformance::isConcrete() const {
   return unbridged().isConcrete();
 }
@@ -191,7 +387,48 @@ BridgedSubstitutionMap BridgedConformance::getSpecializedSubstitutions() const {
 }
 
 BridgedConformance BridgedConformanceArray::getAt(SwiftInt index) const {
-  return unbridged()[index];
+  return pcArray.unbridged<swift::ProtocolConformanceRef>()[index];
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Macros
+//===----------------------------------------------------------------------===//
+
+swift::MacroRole unbridge(BridgedMacroRole cRole) {
+  switch (cRole) {
+#define MACRO_ROLE(Name, Description)                                          \
+  case BridgedMacroRole##Name:                                                 \
+    return swift::MacroRole::Name;
+#include "swift/Basic/MacroRoles.def"
+  case BridgedMacroRoleNone:
+    break;
+  }
+  llvm_unreachable("invalid macro role");
+}
+
+swift::MacroIntroducedDeclNameKind
+unbridge(BridgedMacroIntroducedDeclNameKind kind) {
+  switch (kind) {
+#define CASE(ID)                                                               \
+  case BridgedMacroIntroducedDeclNameKind##ID:                                 \
+    return swift::MacroIntroducedDeclNameKind::ID;
+    CASE(Named)
+    CASE(Overloaded)
+    CASE(Prefixed)
+    CASE(Suffixed)
+    CASE(Arbitrary)
+#undef CASE
+  }
+}
+
+bool BridgedMacroRole_isAttached(BridgedMacroRole role) {
+  return isAttachedMacro(unbridge(role));
+}
+
+swift::MacroIntroducedDeclName
+BridgedMacroIntroducedDeclName::unbridged() const {
+  return swift::MacroIntroducedDeclName(unbridge(kind),
+                                        name.unbridged().getFullName());
 }
 
 //===----------------------------------------------------------------------===//
@@ -206,8 +443,8 @@ swift::SubstitutionMap BridgedSubstitutionMap::unbridged() const {
   return *reinterpret_cast<const swift::SubstitutionMap *>(&storage);
 }
 
-BridgedSubstitutionMap::BridgedSubstitutionMap() : BridgedSubstitutionMap(swift::SubstitutionMap()) {
-}
+BridgedSubstitutionMap::BridgedSubstitutionMap()
+  : BridgedSubstitutionMap(swift::SubstitutionMap()) {}
 
 bool BridgedSubstitutionMap::isEmpty() const {
   return unbridged().empty();
@@ -224,6 +461,86 @@ SwiftInt BridgedSubstitutionMap::getNumConformances() const {
 BridgedConformance BridgedSubstitutionMap::getConformance(SwiftInt index) const {
   return unbridged().getConformances()[index];
 }
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedFingerprint
+//===----------------------------------------------------------------------===//
+
+swift::Fingerprint BridgedFingerprint::unbridged() const {
+  return swift::Fingerprint(swift::Fingerprint::Core{this->v1, this->v2});
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedIfConfigClauseRangeInfo
+//===----------------------------------------------------------------------===//
+
+swift::IfConfigClauseRangeInfo BridgedIfConfigClauseRangeInfo::unbridged() const {
+  swift::IfConfigClauseRangeInfo::ClauseKind clauseKind;
+  switch (kind) {
+  case IfConfigActive:
+    clauseKind = swift::IfConfigClauseRangeInfo::ActiveClause;
+    break;
+
+  case IfConfigInactive:
+    clauseKind = swift::IfConfigClauseRangeInfo::InactiveClause;
+    break;
+
+  case IfConfigEnd:
+    clauseKind = swift::IfConfigClauseRangeInfo::EndDirective;
+    break;
+  }
+
+  return swift::IfConfigClauseRangeInfo(directiveLoc.unbridged(),
+                                        bodyLoc.unbridged(),
+                                        endLoc.unbridged(),
+                                        clauseKind);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedRegexLiteralPatternFeature
+//===----------------------------------------------------------------------===//
+
+BridgedRegexLiteralPatternFeatureKind::BridgedRegexLiteralPatternFeatureKind(
+    SwiftInt rawValue)
+    : RawValue(rawValue) {
+  ASSERT(rawValue >= 0);
+  ASSERT(rawValue == RawValue);
+}
+
+BridgedRegexLiteralPatternFeatureKind::BridgedRegexLiteralPatternFeatureKind(
+    UnbridgedTy kind)
+    : RawValue(kind.getRawValue()) {}
+
+BridgedRegexLiteralPatternFeatureKind::UnbridgedTy
+BridgedRegexLiteralPatternFeatureKind::unbridged() const {
+  return UnbridgedTy(RawValue);
+}
+
+BridgedRegexLiteralPatternFeature::BridgedRegexLiteralPatternFeature(
+    UnbridgedTy feature)
+    : Range(feature.getRange()), Kind(feature.getKind()) {}
+
+BridgedRegexLiteralPatternFeature::UnbridgedTy
+BridgedRegexLiteralPatternFeature::unbridged() const {
+  return UnbridgedTy(Kind.unbridged(), Range.unbridged());
+}
+
+BridgedRegexLiteralPatternFeatures::UnbridgedTy
+BridgedRegexLiteralPatternFeatures::unbridged() const {
+  return UnbridgedTy(Data, Count);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedStmtConditionElement
+//===----------------------------------------------------------------------===//
+
+BridgedStmtConditionElement::BridgedStmtConditionElement(swift::StmtConditionElement elem)
+    : Raw(elem.getOpaqueValue()) {}
+
+swift::StmtConditionElement BridgedStmtConditionElement::unbridged() const {
+  return swift::StmtConditionElement::fromOpaqueValue(Raw);
+}
+
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

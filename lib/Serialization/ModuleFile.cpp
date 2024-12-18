@@ -11,15 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "ModuleFile.h"
-#include "ModuleFileCoreTableInfo.h"
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
+#include "ModuleFileCoreTableInfo.h"
 #include "ModuleFormat.h"
-#include "swift/Serialization/SerializationOptions.h"
-#include "swift/Subsystems.h"
-#include "swift/AST/DiagnosticsSema.h"
+#include "SerializationFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -28,7 +27,9 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -313,7 +314,8 @@ ModuleFile::getTransitiveLoadingBehavior(const Dependency &dependency,
 
   return Core->getTransitiveLoadingBehavior(
       dependency.Core, ctx.LangOpts.ImportNonPublicDependencies,
-      isPartialModule, ctx.LangOpts.PackageName, forTestable);
+      isPartialModule, ctx.LangOpts.PackageName,
+      ctx.SearchPathOpts.ResolveInPackageModuleDependencies, forTestable);
 }
 
 bool ModuleFile::mayHaveDiagnosticsPointingAtBuffer() const {
@@ -671,7 +673,7 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
     }
   } else {
     std::string mangledName =
-        Mangle::ASTMangler().mangleNominalType(nominal);
+        Mangle::ASTMangler(nominal->getASTContext()).mangleNominalType(nominal);
     for (auto item : *iter) {
       if (item.first != mangledName)
         continue;
@@ -700,7 +702,7 @@ void ModuleFile::loadObjCMethods(
     return;
   }
 
-  std::string ownerName = Mangle::ASTMangler().mangleNominalType(typeDecl);
+  std::string ownerName = Mangle::ASTMangler(typeDecl->getASTContext()).mangleNominalType(typeDecl);
   auto results = *known;
   for (const auto &result : results) {
     // If the method is the wrong kind (instance vs. class), skip it.
@@ -712,8 +714,15 @@ void ModuleFile::loadObjCMethods(
       continue;
 
     // Deserialize the method and add it to the list.
+    // Drop methods with errors.
+    auto funcOrError = getDeclChecked(std::get<2>(result));
+    if (!funcOrError) {
+      diagnoseAndConsumeError(funcOrError.takeError());
+      continue;
+    }
+
     if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(
-                      getDecl(std::get<2>(result)))) {
+                      funcOrError.get())) {
       methods.push_back(func);
     }
   }
@@ -725,7 +734,7 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
   if (!Core->DerivativeFunctionConfigurations)
     return;
   auto &ctx = originalAFD->getASTContext();
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(ctx);
   auto mangledName = Mangler.mangleDeclAsUSR(originalAFD, "");
   auto configs = Core->DerivativeFunctionConfigurations->find(mangledName);
   if (configs == Core->DerivativeFunctionConfigurations->end())
@@ -1114,7 +1123,7 @@ void ModuleFile::collectBasicSourceFileInfo(
   auto *End = Core->SourceFileListData.bytes_end();
   while (Cursor < End) {
     // FilePath (byte offset in 'SourceLocsTextData').
-    auto fileID = endian::readNext<uint32_t, little, unaligned>(Cursor);
+    auto fileID = readNext<uint32_t>(Cursor);
 
     // InterfaceHashIncludingTypeMembers (fixed length string).
     auto fpStrIncludingTypeMembers = StringRef{reinterpret_cast<const char *>(Cursor),
@@ -1127,9 +1136,9 @@ void ModuleFile::collectBasicSourceFileInfo(
     Cursor += Fingerprint::DIGEST_LENGTH;
 
     // LastModified (nanoseconds since epoch).
-    auto timestamp = endian::readNext<uint64_t, little, unaligned>(Cursor);
+    auto timestamp = readNext<uint64_t>(Cursor);
     // FileSize (num of bytes).
-    auto fileSize = endian::readNext<uint64_t, little, unaligned>(Cursor);
+    auto fileSize = readNext<uint64_t>(Cursor);
 
     assert(fileID < Core->SourceLocsTextData.size());
     auto filePath = Core->SourceLocsTextData.substr(fileID);
@@ -1159,8 +1168,7 @@ void ModuleFile::collectBasicSourceFileInfo(
 }
 
 static StringRef readLocString(const char *&Data, StringRef StringData) {
-  auto Str =
-      StringData.substr(endian::readNext<uint32_t, little, unaligned>(Data));
+  auto Str = StringData.substr(readNext<uint32_t>(Data));
   size_t TerminatorOffset = Str.find('\0');
   assert(TerminatorOffset != StringRef::npos && "unterminated string data");
   return Str.slice(0, TerminatorOffset);
@@ -1168,13 +1176,13 @@ static StringRef readLocString(const char *&Data, StringRef StringData) {
 
 static void readRawLoc(ExternalSourceLocs::RawLoc &Loc, const char *&Data,
                        StringRef StringData) {
-  Loc.Offset = endian::readNext<uint32_t, little, unaligned>(Data);
-  Loc.Line = endian::readNext<uint32_t, little, unaligned>(Data);
-  Loc.Column = endian::readNext<uint32_t, little, unaligned>(Data);
+  Loc.Offset = readNext<uint32_t>(Data);
+  Loc.Line = readNext<uint32_t>(Data);
+  Loc.Column = readNext<uint32_t>(Data);
 
-  Loc.Directive.Offset = endian::readNext<uint32_t, little, unaligned>(Data);
-  Loc.Directive.LineOffset = endian::readNext<int32_t, little, unaligned>(Data);
-  Loc.Directive.Length = endian::readNext<uint32_t, little, unaligned>(Data);
+  Loc.Directive.Offset = readNext<uint32_t>(Data);
+  Loc.Directive.LineOffset = readNext<int32_t>(Data);
+  Loc.Directive.Length = readNext<uint32_t>(Data);
   Loc.Directive.Name = readLocString(Data, StringData);
 }
 
@@ -1219,19 +1227,18 @@ ModuleFile::getExternalRawLocsForDecl(const Decl *D) const {
   ExternalSourceLocs::RawLocs Result;
   Result.SourceFilePath = readLocString(Record, Core->SourceLocsTextData);
 
-  const auto DocRangesOffset =
-      endian::readNext<uint32_t, little, unaligned>(Record);
+  const auto DocRangesOffset = readNext<uint32_t>(Record);
   if (DocRangesOffset) {
     assert(!Core->DocRangesData.empty());
     const auto *Data = Core->DocRangesData.data() + DocRangesOffset;
-    const auto NumLocs = endian::readNext<uint32_t, little, unaligned>(Data);
+    const auto NumLocs = readNext<uint32_t>(Data);
     assert(NumLocs);
 
     for (uint32_t I = 0; I < NumLocs; ++I) {
       auto &Range =
           Result.DocRanges.emplace_back(ExternalSourceLocs::RawLoc(), 0);
       readRawLoc(Range.first, Data, Core->SourceLocsTextData);
-      Range.second = endian::readNext<uint32_t, little, unaligned>(Data);
+      Range.second = readNext<uint32_t>(Data);
     }
   }
 
@@ -1408,4 +1415,8 @@ StringRef SerializedASTFile::getExportedModuleName() const {
 
 StringRef SerializedASTFile::getPublicModuleName() const {
   return File.getPublicModuleName();
+}
+
+version::Version SerializedASTFile::getSwiftInterfaceCompilerVersion() const {
+  return File.getSwiftInterfaceCompilerVersion();
 }

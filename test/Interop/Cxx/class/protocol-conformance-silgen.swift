@@ -1,6 +1,6 @@
 // Tests that a C++ class can conform to a Swift protocol.
 
-// RUN: %target-swift-emit-silgen -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
 
 import ProtocolConformance
 

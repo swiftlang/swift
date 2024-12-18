@@ -235,6 +235,11 @@ public:
     return false;
   }
 
+  bool parseASTTypeOrValue(CanType &result,
+                           GenericSignature genericSig = GenericSignature(),
+                           GenericParamList *genericParams = nullptr,
+                           bool forceContextualType = false);
+
   std::optional<StringRef>
   parseOptionalAttribute(ArrayRef<StringRef> expected) {
     // We parse here @ <identifier>.

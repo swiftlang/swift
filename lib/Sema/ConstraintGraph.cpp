@@ -50,18 +50,16 @@ ConstraintGraph::~ConstraintGraph() {
 
 #pragma mark Graph accessors
 
-std::pair<ConstraintGraphNode &, unsigned>
-ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
+void ConstraintGraph::addTypeVariable(TypeVariableType *typeVar) {
   // Check whether we've already created a node for this type variable.
   auto &impl = typeVar->getImpl();
-  if (auto nodePtr = impl.getGraphNode()) {
-    assert(impl.getGraphIndex() < TypeVariables.size() && "Out-of-bounds index");
-    assert(TypeVariables[impl.getGraphIndex()] == typeVar && 
-           "Type variable mismatch");
-    ASSERT(nodePtr->TypeVar == typeVar &&
-           "Use-after-free");
-    return { *nodePtr, impl.getGraphIndex() };
-  }
+
+  // ComponentStep::Scope re-introduces type variables that are already
+  // in the graph, but not in ConstraintSystem::TypeVariables.
+  if (impl.getGraphNode())
+    return;
+
+  ASSERT(!impl.hasRepresentativeOrFixed());
 
   // Allocate the new node.
   ConstraintGraphNode *nodePtr;
@@ -79,35 +77,39 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   // Record this type variable.
   TypeVariables.push_back(typeVar);
 
-  // Record the change, if there are active scopes. Note that we specifically
-  // check CS.solverState and not CS.isRecordingChanges(), because we want
-  // recordChange() to assert if there's an active undo. It is not valid to
-  // create new nodes during an undo.
   if (CS.solverState)
     CS.recordChange(SolverTrail::Change::AddedTypeVariable(typeVar));
+}
 
-  // If this type variable is not the representative of its equivalence class,
-  // add it to its representative's set of equivalences.
-  auto typeVarRep = CS.getRepresentative(typeVar);
-  if (typeVar != typeVarRep)
-    mergeNodes(typeVar, typeVarRep);
-  else if (auto fixed = CS.getFixedType(typeVarRep)) {
-    // Bind the type variable.
-    bindTypeVariable(typeVar, fixed);
+ConstraintGraphNode &
+ConstraintGraph::operator[](TypeVariableType *typeVar) {
+  // Check whether we've already created a node for this type variable.
+  auto &impl = typeVar->getImpl();
+  auto *nodePtr = impl.getGraphNode();
+  if (!nodePtr) {
+    llvm::errs() << "Type variable $T" << impl.getID() << " not in constraint graph\n";
+    abort();
   }
-
-  return { *nodePtr, index };
+  ASSERT(nodePtr->TypeVar == typeVar && "Use-after-free");
+  DEBUG_ASSERT(impl.getGraphIndex() < TypeVariables.size() && "Out-of-bounds index");
+  DEBUG_ASSERT(TypeVariables[impl.getGraphIndex()] == typeVar &&
+               "Type variable mismatch");
+  return *nodePtr;
 }
 
 void ConstraintGraphNode::reset() {
-  ASSERT(TypeVar);
+  if (CONDITIONAL_ASSERT_enabled()) {
+    ASSERT(TypeVar);
+    ASSERT(Constraints.empty());
+    ASSERT(ConstraintIndex.empty());
+    ASSERT(ReferencedBy.empty());
+    ASSERT(References.empty());
+    ASSERT(EquivalenceClass.size() <= 1);
+  }
+
   TypeVar = nullptr;
-  Bindings.reset();
-  Constraints.clear();
-  ConstraintIndex.clear();
-  ReferencedBy.clear();
-  References.clear();
   EquivalenceClass.clear();
+  Bindings.reset();
 }
 
 bool ConstraintGraphNode::forRepresentativeVar() const {
@@ -177,7 +179,9 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   Constraints.pop_back();
 }
 
-void ConstraintGraphNode::notifyReferencingVars() const {
+void ConstraintGraphNode::notifyReferencingVars(
+    llvm::function_ref<void(ConstraintGraphNode &,
+                            Constraint *)> notification) const {
   SmallVector<TypeVariableType *, 4> stack;
 
   stack.push_back(TypeVar);
@@ -199,7 +203,7 @@ void ConstraintGraphNode::notifyReferencingVars() const {
             affectedVar->getImpl().getRepresentative(/*record=*/nullptr);
 
         if (!repr->getImpl().getFixedType(/*record=*/nullptr))
-          CG[repr].reintroduceToInference(constraint);
+          notification(CG[repr], constraint);
       }
     }
   };
@@ -236,7 +240,7 @@ void ConstraintGraphNode::notifyReferencingVars() const {
 }
 
 void ConstraintGraphNode::notifyReferencedVars(
-    llvm::function_ref<void(ConstraintGraphNode &)> notification) {
+    llvm::function_ref<void(ConstraintGraphNode &)> notification) const {
   for (auto *fixedBinding : getReferencedVars()) {
     notification(CG[fixedBinding]);
   }
@@ -249,25 +253,6 @@ void ConstraintGraphNode::addToEquivalenceClass(
   if (EquivalenceClass.empty())
     EquivalenceClass.push_back(getTypeVariable());
   EquivalenceClass.append(typeVars.begin(), typeVars.end());
-
-  {
-    for (auto *newMember : typeVars) {
-      auto &node = CG[newMember];
-
-      for (auto *constraint : node.getConstraints()) {
-        introduceToInference(constraint);
-
-        if (!isUsefulForReferencedVars(constraint))
-          continue;
-
-        notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
-          referencedVar.introduceToInference(constraint);
-        });
-      }
-
-      node.notifyReferencingVars();
-    }
-  }
 }
 
 void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
@@ -311,19 +296,11 @@ void ConstraintGraphNode::removeReferencedBy(TypeVariableType *typeVar) {
   }
 }
 
-inference::PotentialBindings &ConstraintGraphNode::getCurrentBindings() {
-  assert(forRepresentativeVar());
-
-  if (!Bindings)
-    Bindings.emplace(CG.getConstraintSystem(), TypeVar);
-  return *Bindings;
-}
-
 void ConstraintGraphNode::introduceToInference(Constraint *constraint) {
   if (forRepresentativeVar()) {
     auto fixedType = TypeVar->getImpl().getFixedType(/*record=*/nullptr);
     if (!fixedType)
-      getCurrentBindings().infer(constraint);
+      getCurrentBindings().infer(CG.getConstraintSystem(), TypeVar, constraint);
   } else {
     auto *repr =
         getTypeVariable()->getImpl().getRepresentative(/*record=*/nullptr);
@@ -335,7 +312,7 @@ void ConstraintGraphNode::retractFromInference(Constraint *constraint) {
   if (forRepresentativeVar()) {
     auto fixedType = TypeVar->getImpl().getFixedType(/*record=*/nullptr);
     if (!fixedType)
-      getCurrentBindings().retract(constraint);
+      getCurrentBindings().retract(CG.getConstraintSystem(), TypeVar,constraint);
   } else {
     auto *repr =
         getTypeVariable()->getImpl().getRepresentative(/*record=*/nullptr);
@@ -343,19 +320,17 @@ void ConstraintGraphNode::retractFromInference(Constraint *constraint) {
   }
 }
 
-void ConstraintGraphNode::reintroduceToInference(Constraint *constraint) {
-  retractFromInference(constraint);
-  introduceToInference(constraint);
-}
-
-void ConstraintGraphNode::introduceToInference(Type fixedType) {
+void ConstraintGraphNode::updateFixedType(
+    Type fixedType,
+    llvm::function_ref<void (ConstraintGraphNode &,
+                             Constraint *)> notification) const {
   // Notify all of the type variables that reference this one.
   //
   // Since this type variable has been replaced with a fixed type
   // all of the concrete types that reference it are going to change,
   // which means that all of the not-yet-attempted bindings should
   // change as well.
-  notifyReferencingVars();
+  notifyReferencingVars(notification);
 
   if (!fixedType->hasTypeVariable())
     return;
@@ -371,9 +346,25 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
     // all of the constraints that reference bound type variable.
     for (auto *constraint : getConstraints()) {
       if (isUsefulForReferencedVars(constraint))
-        node.reintroduceToInference(constraint);
+        notification(node, constraint);
     }
   }
+}
+
+void ConstraintGraphNode::retractFromInference(Type fixedType) {
+  return updateFixedType(
+      fixedType,
+      [](ConstraintGraphNode &node, Constraint *constraint) {
+        node.retractFromInference(constraint);
+      });
+}
+
+void ConstraintGraphNode::introduceToInference(Type fixedType) {
+  return updateFixedType(
+      fixedType,
+      [](ConstraintGraphNode &node, Constraint *constraint) {
+        node.introduceToInference(constraint);
+      });
 }
 
 #pragma mark Graph mutation
@@ -399,7 +390,7 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   auto referencedTypeVars = constraint->getTypeVariables();
   for (auto typeVar : referencedTypeVars) {
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::AddedConstraint(typeVar, constraint));
 
     addConstraint(typeVar, constraint);
@@ -419,7 +410,7 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
   // track it as such.
   if (referencedTypeVars.empty()) {
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::AddedConstraint(nullptr, constraint));
 
     addConstraint(nullptr, constraint);
@@ -454,7 +445,7 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
     }
 
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::RemovedConstraint(typeVar, constraint));
 
     removeConstraint(typeVar, constraint);
@@ -463,7 +454,7 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
   // If this is an orphaned constraint, remove it from the list.
   if (referencedTypeVars.empty()) {
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::RemovedConstraint(nullptr, constraint));
 
     removeConstraint(nullptr, constraint);
@@ -486,31 +477,60 @@ void ConstraintGraph::removeConstraint(TypeVariableType *typeVar,
   OrphanedConstraints.pop_back();
 }
 
+void ConstraintGraph::mergeNodesPre(TypeVariableType *typeVar2) {
+  // Merge equivalence class from the non-representative type variable.
+  auto &nonRepNode = (*this)[typeVar2];
+
+  for (auto *newMember : nonRepNode.getEquivalenceClassUnsafe()) {
+    auto &node = (*this)[newMember];
+
+    node.notifyReferencingVars(
+      [&](ConstraintGraphNode &node, Constraint *constraint) {
+        node.retractFromInference(constraint);
+      });
+  }
+}
+
 void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
                                  TypeVariableType *typeVar2) {
-  assert(CS.getRepresentative(typeVar1) == CS.getRepresentative(typeVar2) &&
-         "type representatives don't match");
-  
   // Retrieve the node for the representative that we're merging into.
-  auto typeVarRep = CS.getRepresentative(typeVar1);
-  auto &repNode = (*this)[typeVarRep];
+  ASSERT(CS.getRepresentative(typeVar1) == typeVar1);
 
-  // Retrieve the node for the non-representative.
-  assert((typeVar1 == typeVarRep || typeVar2 == typeVarRep) &&
-         "neither type variable is the new representative?");
-  auto typeVarNonRep = typeVar1 == typeVarRep? typeVar2 : typeVar1;
+  auto &repNode = (*this)[typeVar1];
 
   // Record the change, if there are active scopes.
-  if (CS.isRecordingChanges()) {
+  if (CS.solverState) {
     CS.recordChange(
       SolverTrail::Change::ExtendedEquivalenceClass(
-                        typeVarRep,
+                        typeVar1,
                         repNode.getEquivalenceClass().size()));
   }
 
   // Merge equivalence class from the non-representative type variable.
-  auto &nonRepNode = (*this)[typeVarNonRep];
-  repNode.addToEquivalenceClass(nonRepNode.getEquivalenceClassUnsafe());
+  auto &nonRepNode = (*this)[typeVar2];
+
+  auto typeVars = nonRepNode.getEquivalenceClassUnsafe();
+  repNode.addToEquivalenceClass(typeVars);
+
+  for (auto *newMember : typeVars) {
+    auto &node = (*this)[newMember];
+
+    for (auto *constraint : node.getConstraints()) {
+      repNode.introduceToInference(constraint);
+
+      if (!isUsefulForReferencedVars(constraint))
+        continue;
+
+      repNode.notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
+        referencedVar.introduceToInference(constraint);
+      });
+    }
+
+    node.notifyReferencingVars(
+      [&](ConstraintGraphNode &node, Constraint *constraint) {
+        node.introduceToInference(constraint);
+      });
+  }
 }
 
 void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
@@ -532,9 +552,13 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
     node.addReferencedVar(otherTypeVar);
 
     // Record the change, if there are active scopes.
-    if (CS.isRecordingChanges())
+    if (CS.solverState)
       CS.recordChange(SolverTrail::Change::RelatedTypeVariables(typeVar, otherTypeVar));
   }
+}
+
+void ConstraintGraph::retractFromInference(TypeVariableType *typeVar, Type fixed) {
+  (*this)[typeVar].retractFromInference(fixed);
 }
 
 void ConstraintGraph::introduceToInference(TypeVariableType *typeVar, Type fixed) {
@@ -552,12 +576,12 @@ void ConstraintGraph::unrelateTypeVariables(TypeVariableType *typeVar,
 
 void ConstraintGraph::inferBindings(TypeVariableType *typeVar,
                                     Constraint *constraint) {
-  (*this)[typeVar].getCurrentBindings().infer(constraint);
+  (*this)[typeVar].getCurrentBindings().infer(CS, typeVar, constraint);
 }
 
 void ConstraintGraph::retractBindings(TypeVariableType *typeVar,
                                       Constraint *constraint) {
-  (*this)[typeVar].getCurrentBindings().retract(constraint);
+  (*this)[typeVar].getCurrentBindings().retract(CS, typeVar, constraint);
 }
 
 #pragma mark Algorithms
@@ -722,6 +746,10 @@ namespace {
     mutable llvm::SmallDenseMap<TypeVariableType *, TypeVariableType *>
         representatives;
 
+    // Figure out which components have unbound type variables and/or
+    // constraints. These are the only components we want to report.
+    llvm::SmallDenseSet<TypeVariableType *> validComponents;
+
     /// The complete set of constraints that were visited while computing
     /// connected components.
     llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
@@ -764,29 +792,20 @@ namespace {
 
     /// Retrieve the set of components.
     SmallVector<Component, 1> getComponents() const {
-      // Figure out which components have unbound type variables and/or
-      // constraints. These are the only components we want to report.
-      llvm::SmallDenseSet<TypeVariableType *> validComponents;
-      auto &cs = cg.getConstraintSystem();
-      for (auto typeVar : typeVars) {
-        // If this type variable has a fixed type, skip it.
-        if (cs.getFixedType(typeVar))
-          continue;
+      // The final return value.
+      SmallVector<Component, 1> flatComponents;
 
-        auto rep = findRepresentative(typeVar);
-        validComponents.insert(rep);
-      }
 
-      for (auto &constraint : cs.getConstraints()) {
-        for (auto typeVar : constraint.getTypeVariables()) {
-          auto rep = findRepresentative(typeVar);
-          validComponents.insert(rep);
-        }
-      }
+      // We don't actually need to partition the graph into components if
+      // there are fewer than 2.
+      if (validComponents.size() < 2 && cg.getOrphanedConstraints().empty())
+        return flatComponents;
 
-      // Capture the type variables of each component.
+      // Mapping from representatives to components.
       llvm::SmallDenseMap<TypeVariableType *, Component> components;
       SmallVector<TypeVariableType *, 4> representativeTypeVars;
+
+      // Capture the type variables of each component.
       for (auto typeVar : typeVars) {
         // Find the representative. If we aren't creating a type variable
         // for this component, skip it.
@@ -794,17 +813,13 @@ namespace {
         if (validComponents.count(rep) == 0)
           continue;
 
-        // If this type variable is the representative, add it to the list of
-        // representatives.
-        if (rep == typeVar) {
+        auto pair = components.insert({rep, Component(components.size())});
+        if (pair.second)
           representativeTypeVars.push_back(rep);
-        }
 
         // Record this type variable in the set of type variables for its
         // component.
-        auto &component = components.insert(
-            {rep, Component(components.size())}).first->second;
-        component.typeVars.push_back(typeVar);
+        pair.first->second.typeVars.push_back(typeVar);
       }
 
       // Retrieve the component for the given representative type variable.
@@ -813,6 +828,8 @@ namespace {
         assert(component != components.end());
         return component->second;
       };
+
+      auto &cs = cg.getConstraintSystem();
 
       // Assign each constraint to its appropriate component.
       // Note: we use the inactive constraints so that we maintain the
@@ -848,8 +865,7 @@ namespace {
                   });
         
         representativeTypeVars =
-            computeOneWayComponentOrdering(representativeTypeVars,
-                                           validComponents);
+            computeOneWayComponentOrdering(representativeTypeVars);
 
         // Fill in one-way dependency information for all of the components.
         for (auto typeVar : representativeTypeVars) {
@@ -869,7 +885,6 @@ namespace {
       }
 
       // Flatten the set of components.
-      SmallVector<Component, 1> flatComponents;
       flatComponents.reserve(
           representativeTypeVars.size() + cg.getOrphanedConstraints().size());
       for (auto rep: representativeTypeVars) {
@@ -934,10 +949,13 @@ namespace {
 
       // Reparent the type variable with the higher ID. The actual choice doesn't
       // matter, but this makes debugging easier.
-      if (rep1->getID() < rep2->getID())
+      if (rep1->getID() < rep2->getID()) {
+        validComponents.erase(rep2);
         representatives[rep2] = rep1;
-      else
+      } else {
+        validComponents.erase(rep1);
         representatives[rep1] = rep2;
+      }
       return true;
     }
 
@@ -947,6 +965,8 @@ namespace {
     /// \returns the set of one-way constraints that were skipped.
     TinyPtrVector<Constraint *> connectedComponents() {
       TinyPtrVector<Constraint *> oneWayConstraints;
+
+      auto &cs = cg.getConstraintSystem();
 
       // Perform a depth-first search from each type variable to identify
       // what component it is in.
@@ -966,6 +986,10 @@ namespace {
               assert((inserted.second || inserted.first->second == typeVar) &&
                      "Wrong component?");
 
+              if (inserted.second)
+                if (!cs.getFixedType(found))
+                  validComponents.insert(typeVar);
+
               return inserted.second;
             },
             [&](Constraint *constraint) {
@@ -978,6 +1002,17 @@ namespace {
               return true;
             },
             visitedConstraints);
+      }
+
+      for (auto &constraint : cs.getConstraints()) {
+        if (constraint.getKind() == ConstraintKind::Disjunction ||
+            constraint.getKind() == ConstraintKind::Conjunction) {
+          for (auto typeVar : constraint.getTypeVariables()) {
+            auto rep = findRepresentative(typeVar);
+            if (validComponents.insert(rep).second)
+              ASSERT(cs.getFixedType(typeVar));
+          }
+        }
       }
 
       return oneWayConstraints;
@@ -1196,8 +1231,7 @@ namespace {
     /// solved after the components for type variables on the right-hand
     /// side of that constraint.
     SmallVector<TypeVariableType *, 4> computeOneWayComponentOrdering(
-        ArrayRef<TypeVariableType *> representativeTypeVars,
-        llvm::SmallDenseSet<TypeVariableType *> &validComponents) const {
+        ArrayRef<TypeVariableType *> representativeTypeVars) const {
       SmallVector<TypeVariableType *, 4> orderedReps;
       orderedReps.reserve(representativeTypeVars.size());
       SmallPtrSet<TypeVariableType *, 4> visited;
@@ -1282,7 +1316,7 @@ bool ConstraintGraph::contractEdges() {
         continue;
 
       // This closure is not currently in scope.
-      if (!CS.TypeVariables.count(paramTy))
+      if (!CS.isActiveTypeVariable(paramTy))
         break;
 
       // Nothing to contract here since outside parameter
