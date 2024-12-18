@@ -163,6 +163,17 @@ bool TypeBase::isMarkerExistential() {
   return true;
 }
 
+bool TypeBase::isSendableExistential() {
+  Type constraint = this;
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+
+  if (!constraint->isConstraintType())
+    return false;
+
+  return constraint->getKnownProtocol() == KnownProtocolKind::Sendable;
+}
+
 bool TypeBase::isPlaceholder() {
   return is<PlaceholderType>();
 }

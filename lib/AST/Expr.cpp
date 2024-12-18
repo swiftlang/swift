@@ -444,6 +444,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(UnderlyingToOpaque, getSubExpr);
   PASS_THROUGH_REFERENCE(Unreachable, getSubExpr);
   PASS_THROUGH_REFERENCE(ActorIsolationErasure, getSubExpr);
+  PASS_THROUGH_REFERENCE(UnsafeCast, getSubExpr);
   NO_REFERENCE(Coerce);
   NO_REFERENCE(ForcedCheckedCast);
   NO_REFERENCE(ConditionalCheckedCast);
@@ -813,6 +814,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::UnderlyingToOpaque:
   case ExprKind::Unreachable:
   case ExprKind::ActorIsolationErasure:
+  case ExprKind::UnsafeCast:
   case ExprKind::TypeValue:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
@@ -1043,6 +1045,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::CurrentContextIsolation:
   case ExprKind::ActorIsolationErasure:
   case ExprKind::ExtractFunctionIsolation:
+  case ExprKind::UnsafeCast:
     return false;
   }
 

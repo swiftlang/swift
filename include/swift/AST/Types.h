@@ -675,6 +675,9 @@ public:
   /// Is this an existential containing only marker protocols?
   bool isMarkerExistential();
 
+  /// Is this `any Sendable` type?
+  bool isSendableExistential();
+
   bool isPlaceholder();
 
   /// Returns true if this contextual type does not satisfy a conformance to
