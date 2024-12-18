@@ -195,13 +195,13 @@ extern "C" char **_environ;
 // On Android, also try loading runtime debug env variables from system props.
 static void platformInitialize(void *context) {
   (void)context;
-  char propValueString[PROP_VALUE_MAX] = "";
+  char buffer[PROP_VALUE_MAX] = "";
 #define SYSPROP_PREFIX "debug.org.swift.runtime."
-#define VARIABLE(name, type, defaultValue, help)                      \
-  if (__system_property_get(SYSPROP_PREFIX #name, propValueString)) { \
-    swift::runtime::environment::name##_isSet_variable = true;        \
-    swift::runtime::environment::name##_variable =                    \
-        parse_##type(#name, propValueString, defaultValue);           \
+#define VARIABLE(name, type, defaultValue, help)                \
+  if (__system_property_get(SYSPROP_PREFIX #name, buffer)) {    \
+    swift::runtime::environment::name##_isSet_variable = true;  \
+    swift::runtime::environment::name##_variable =              \
+        parse_##type(#name, buffer, defaultValue);              \
   }
 #include "EnvironmentVariables.def"
 #undef VARIABLE
