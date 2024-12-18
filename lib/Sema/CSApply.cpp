@@ -1005,8 +1005,14 @@ namespace {
       auto *env = record.Archetype->getGenericEnvironment();
 
       if (resultTy->hasLocalArchetypeFromEnvironment(env)) {
-        Type erasedTy = typeEraseOpenedArchetypesFromEnvironment(
-            resultTy, env);
+        Type erasedTy = typeEraseOpenedArchetypesFromEnvironment(resultTy, env);
+        ASSERT(erasedTy.getPointer() != resultTy.getPointer());
+
+        // We currently cannot keep lvalueness if the object type changed.
+        if (auto *lvalueTy = dyn_cast<LValueType>(erasedTy.getPointer())) {
+          erasedTy = lvalueTy->getObjectType();
+        }
+
         auto range = result->getSourceRange();
         result = coerceToType(result, erasedTy, locator);
         // FIXME: Implement missing tuple-to-tuple conversion
