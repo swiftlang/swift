@@ -944,7 +944,6 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
   SmallVector<OutputEntry> OutputProxies;
   std::optional<llvm::cas::ObjectProxy> DiagnosticsOutput;
   bool UseCASBackend = Invocation.getIRGenOptions().UseCASBackend;
-  std::string ObjFile;
 
   swift::cas::CachedResultLoader Loader(CAS, Comp.Output);
   if (auto Err = Loader.replay(
@@ -957,9 +956,6 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
             auto Proxy = CAS.getProxy(Ref);
             if (!Proxy)
               return Proxy.takeError();
-
-            if (Kind == file_types::ID::TY_Object && UseCASBackend)
-              ObjFile = OutputPath->second;
 
             if (Kind == file_types::ID::TY_CachedDiagnostics) {
               assert(!DiagnosticsOutput && "more than 1 diagnostics found");
@@ -1008,7 +1004,7 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
     auto File = Backend.createFile(Output.Path);
     if (!File)
       return File.takeError();
-    if (UseCASBackend && Output.Path == ObjFile) {
+    if (UseCASBackend && Output.Kind == file_types::ID::TY_Object) {
       auto Schema = std::make_unique<llvm::mccasformats::v1::MCSchema>(CAS);
       if (auto E = Schema->serializeObjectFile(Output.Proxy, *File))
         Inst.getDiags().diagnose(SourceLoc(), diag::error_mccas,
