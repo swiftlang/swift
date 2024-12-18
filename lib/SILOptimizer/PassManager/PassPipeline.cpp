@@ -1091,7 +1091,11 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // Finally perform some small transforms.
   P.startPipeline("Rest of Onone");
-  P.addUsePrespecialized();
+
+  // There are not pre-specialized parts of the stdlib in embedded mode.
+  if (!Options.EmbeddedSwift) {
+    P.addUsePrespecialized();
+  }
 
   // Has only an effect if the -assume-single-thread option is specified.
   if (P.getOptions().AssumeSingleThreaded) {
