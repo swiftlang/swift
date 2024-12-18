@@ -8678,7 +8678,7 @@ public:
   ~SwiftifyInfoPrinter() { out << ")"; }
 
   void printCountedBy(const clang::CountAttributedType *CAT,
-                      size_t pointerIndex) {
+                      ssize_t pointerIndex) {
     printSeparator();
     clang::Expr *countExpr = CAT->getCountExpr();
     bool isSizedBy = CAT->isCountInBytes();
@@ -8687,7 +8687,9 @@ public:
       out << "sizedBy";
     else
       out << "countedBy";
-    out << "(pointer: " << pointerIndex + 1 << ", ";
+    out << "(pointer: ";
+    printParamOrReturn(pointerIndex);
+    out << ", ";
     if (isSizedBy)
       out << "size";
     else
@@ -8723,6 +8725,13 @@ private:
     } else {
       firstParam = false;
     }
+  }
+
+  void printParamOrReturn(ssize_t pointerIndex) {
+    if (pointerIndex == -1)
+      out << ".return";
+    else
+      out << ".param(" << pointerIndex + 1 << ")";
   }
 };
 } // namespace
@@ -8786,6 +8795,10 @@ void ClangImporter::Implementation::importBoundsAttributes(
       if (auto CAT = param->getType()->getAs<clang::CountAttributedType>()) {
         printer.printCountedBy(CAT, index);
       }
+    }
+    if (auto CAT =
+            ClangDecl->getReturnType()->getAs<clang::CountAttributedType>()) {
+      printer.printCountedBy(CAT, -1);
     }
   }
 

@@ -2329,7 +2329,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
                        : ImportTypeKind::Result),
       ImportDiagnosticAdder(*this, clangDecl, clangDecl->getLocation()),
       allowNSUIntegerAsInt, Bridgeability::Full, getImportTypeAttrs(clangDecl),
-      OptionalityOfReturn, isBoundsAnnotated);
+      OptionalityOfReturn, true, std::nullopt, isBoundsAnnotated);
 }
 
 static Type

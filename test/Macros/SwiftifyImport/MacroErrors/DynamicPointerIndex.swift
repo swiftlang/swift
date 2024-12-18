@@ -4,6 +4,6 @@
 
 let pointerIndex = 1
 // expected-error@+1{{expected integer literal, got 'pointerIndex'}}
-@_SwiftifyImport(.countedBy(pointer: pointerIndex, count: "len"))
+@_SwiftifyImport(.countedBy(pointer: .param(pointerIndex), count: "len"))
 func myFunc(_ ptr: UnsafePointer<CInt>, _ len: String) {
 }
