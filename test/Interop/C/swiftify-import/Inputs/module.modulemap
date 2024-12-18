@@ -2,4 +2,8 @@ module CountedByClang {
     header "counted-by.h"
     export *
 }
+module SizedByClang {
+    header "sized-by.h"
+    export *
+}
 
