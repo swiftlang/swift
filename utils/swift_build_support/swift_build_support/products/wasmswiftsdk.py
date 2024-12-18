@@ -140,7 +140,7 @@ class WasmSwiftSDK(product.Product):
         swift_run = os.path.join(toolchain_path, 'bin', 'swift-run')
 
         swift_version = os.environ.get('TOOLCHAIN_VERSION',
-                                       'swift-DEVELOPMENT-SNAPSHOT').lstrip('swift-')
+                                       'swift-DEVELOPMENT-SNAPSHOT')
         run_args = [
             swift_run,
             '--package-path', self.source_dir,
