@@ -130,7 +130,13 @@ ConstraintSystem::ConstraintSystem(DeclContext *dc,
     Options |= ConstraintSystemFlags::UseClangFunctionTypes;
 }
 
-ConstraintSystem::~ConstraintSystem() {}
+ConstraintSystem::~ConstraintSystem() {
+  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
+    auto &impl = TypeVariables[i]->getImpl();
+    delete impl.getGraphNode();
+    impl.setGraphNode(nullptr);
+  }
+}
 
 void ConstraintSystem::startExpressionTimer(ExpressionTimer::AnchorType anchor) {
   ASSERT(!Timer);
