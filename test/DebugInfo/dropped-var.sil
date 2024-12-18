@@ -1,7 +1,5 @@
- // RUN: %target-sil-opt --diagnose-unreachable -o - %s -sil-stats-lost-variables --target=aarch64-apple-darwin 2>&1 | %FileCheck %s
+ // RUN: %target-sil-opt --diagnose-unreachable -o - %s -sil-stats-lost-variables 2>&1 | %FileCheck %s
  // REQUIRES:CPU=aarch64
-
- // REQUIRES: rdar141272451
 
  // CHECK: function, lostvars, Pass List Pipeline, DiagnoseUnreachable, 1, 1, {{[0-9]+}}, $s4test3bar1yS2i_tF
 
