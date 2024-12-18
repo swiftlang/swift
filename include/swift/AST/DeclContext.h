@@ -810,6 +810,18 @@ class IterableDeclContext {
   /// while skipping the body of this context.
   unsigned HasDerivativeDeclarations : 1;
 
+  /// Members of a decl are deserialized lazily. This is set when
+  /// deserialization of all members is done, regardless of errors.
+  unsigned DeserializedMembers : 1;
+
+  /// Deserialization errors are attempted to be recovered later or
+  /// silently dropped due to `EnableDeserializationRecovery` being
+  /// on by default. The following flag is set when deserializing
+  /// members fails regardless of the `EnableDeserializationRecovery`
+  /// value and is used to prevent decl containing such members from
+  /// being accessed non-resiliently.
+  unsigned HasDeserializeMemberError : 1;
+
   template<class A, class B, class C>
   friend struct ::llvm::CastInfo;
 
@@ -828,6 +840,8 @@ public:
     HasDerivativeDeclarations = 0;
     HasNestedClassDeclarations = 0;
     InFreestandingMacroArgument = 0;
+    DeserializedMembers = 0;
+    HasDeserializeMemberError = 0;
   }
 
   /// Determine the kind of iterable context we have.
@@ -836,6 +850,16 @@ public:
   }
 
   bool hasUnparsedMembers() const;
+
+  void setDeserializedMembers(bool deserialized) { DeserializedMembers = deserialized; }
+  bool didDeserializeMembers() const { return DeserializedMembers; }
+
+  void setHasDeserializeMemberError(bool hasError) { HasDeserializeMemberError = hasError; }
+  bool hasDeserializeMemberError() const { return HasDeserializeMemberError; }
+
+  /// This recursively checks whether types of this decl's members
+  /// were deserialized correctly.
+  void checkDeserializeMemberErrorRecursively();
 
   bool maybeHasOperatorDeclarations() const {
     return HasOperatorDeclarations;
