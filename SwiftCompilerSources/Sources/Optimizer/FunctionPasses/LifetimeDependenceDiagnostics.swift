@@ -61,8 +61,8 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
     if let markDep = instruction as? MarkDependenceInst, markDep.isUnresolved {
       if let lifetimeDep = LifetimeDependence(markDep, context) {
         if analyze(dependence: lifetimeDep, context) {
-          // Note: This promotes the mark_dependence flag but does not invalidate SIL; preserving analyses is good,
-          // but the change won't appear in -sil-print-function. Ideally, we could notify context of a flag change
+          // Note: This promotes the mark_dependence flag but does not invalidate analyses; preserving analyses is good,
+          // although the change won't appear in -sil-print-function. Ideally, we could notify context of a flag change
           // without invalidating analyses.
           lifetimeDep.resolve(context)
           continue
