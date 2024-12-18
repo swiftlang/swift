@@ -182,22 +182,22 @@ func f4(a: NonTrivial) -> Float {
 }
 
 // CHECK-LABEL: sil private [ossa] @$s19pullback_generation2f41aSfAA10NonTrivialV_tFTJpSpSr : $@convention(thin) (Float, @guaranteed Builtin.NativeObject) -> @owned NonTrivial {
-// CHECK: bb5(%67 : @owned $NonTrivial, %68 : $Float, %69 : @owned $(predecessor: _AD__$s19pullback_generation2f41aSfAA10NonTrivialV_tF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (@inout Float) -> Float)):
-// CHECK: %88 = alloc_stack $NonTrivial
+// CHECK: bb5(%[[#ARG0:]] : @owned $NonTrivial, %[[#]] : $Float, %[[#]] : @owned $(predecessor: _AD__$s19pullback_generation2f41aSfAA10NonTrivialV_tF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (@inout Float) -> Float)):
+// CHECK: %[[#T0:]] = alloc_stack $NonTrivial
 
 // Non-trivial value must be copied or there will be a
 // double consume when all owned parameters are destroyed 
 // at the end of the basic block.
-// CHECK: %89 = copy_value %67 : $NonTrivial              
+// CHECK: %[[#T1:]] = copy_value %[[#ARG0]] : $NonTrivial
 
-// CHECK: store %89 to [init] %88 : $*NonTrivial          
-// CHECK: %91 = struct_element_addr %88 : $*NonTrivial, #NonTrivial.x 
-// CHECK: %92 = alloc_stack $Float                        
-// CHECK: store %86 to [trivial] %92 : $*Float            
-// CHECK: %94 = witness_method $Float, #AdditiveArithmetic."+=" : <Self where Self : AdditiveArithmetic> (Self.Type) -> (inout Self, Self) -> () : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> () 
-// CHECK: %95 = metatype $@thick Float.Type               
-// CHECK: %96 = apply %94<Float>(%91, %92, %95) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()
-// CHECK: destroy_value %67 : $NonTrivial
+// CHECK: store %[[#T1]] to [init] %[[#T0]] : $*NonTrivial
+// CHECK: %[[#T2:]] = struct_element_addr %[[#T0]] : $*NonTrivial, #NonTrivial.x
+// CHECK: %[[#T3:]] = alloc_stack $Float
+// CHECK: store %[[#T4:]] to [trivial] %[[#T3]] : $*Float
+// CHECK: %[[#T5:]] = witness_method $Float, #AdditiveArithmetic."+=" : <Self where Self : AdditiveArithmetic> (Self.Type) -> (inout Self, Self) -> () : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()
+// CHECK: %[[#T6:]] = metatype $@thick Float.Type
+// CHECK: %[[#]] = apply %[[#T5]]<Float>(%[[#T2]], %[[#T3]], %[[#T6]]) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()
+// CHECK: destroy_value %[[#ARG0]] : $NonTrivial
 
 @differentiable(reverse)
 func move_value(x: Float) -> Float {
@@ -218,5 +218,5 @@ func move_value(x: Float) -> Float {
 // CHECK:         %[[#]] = apply %[[#T2]]<Float>(%[[#T1]], %[[#T3]]) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:         %[[#T4:]] = load [trivial] %[[#T1]]
 // CHECK:         dealloc_stack %[[#T1]]
-// CHECK:       bb4(%113 : $Builtin.RawPointer):
+// CHECK:       bb4(%[[#]] : $Builtin.RawPointer):
 // CHECK:         br bb5(%[[#]] : $Float, %[[#]] : $Float, %[[#T4]] : $Float, %[[#]] : $(predecessor: _AD__$s19pullback_generation10move_value1xS2f_tF_bb2__Pred__src_0_wrt_0))
