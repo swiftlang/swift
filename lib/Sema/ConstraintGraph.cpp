@@ -38,11 +38,13 @@ using namespace constraints;
 ConstraintGraph::ConstraintGraph(ConstraintSystem &cs) : CS(cs) { }
 
 ConstraintGraph::~ConstraintGraph() {
-  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
-    auto &impl = TypeVariables[i]->getImpl();
-    delete impl.getGraphNode();
-    impl.setGraphNode(nullptr);
+#ifndef NDEBUG
+  for (unsigned i = 0, n = CS.TypeVariables.size(); i != n; ++i) {
+    auto &impl = CS.TypeVariables[i]->getImpl();
+    ASSERT(impl.getGraphNode() == nullptr);
   }
+#endif
+
   for (auto *node : FreeList) {
     delete node;
   }
@@ -70,12 +72,7 @@ void ConstraintGraph::addTypeVariable(TypeVariableType *typeVar) {
     FreeList.pop_back();
     nodePtr->initTypeVariable(typeVar);
   }
-  unsigned index = TypeVariables.size();
   impl.setGraphNode(nodePtr);
-  impl.setGraphIndex(index);
-
-  // Record this type variable.
-  TypeVariables.push_back(typeVar);
 
   if (CS.solverState)
     CS.recordChange(SolverTrail::Change::AddedTypeVariable(typeVar));
@@ -83,17 +80,8 @@ void ConstraintGraph::addTypeVariable(TypeVariableType *typeVar) {
 
 ConstraintGraphNode &
 ConstraintGraph::operator[](TypeVariableType *typeVar) {
-  // Check whether we've already created a node for this type variable.
-  auto &impl = typeVar->getImpl();
-  auto *nodePtr = impl.getGraphNode();
-  if (!nodePtr) {
-    llvm::errs() << "Type variable $T" << impl.getID() << " not in constraint graph\n";
-    abort();
-  }
+  auto *nodePtr = typeVar->getImpl().getGraphNode();
   ASSERT(nodePtr->TypeVar == typeVar && "Use-after-free");
-  DEBUG_ASSERT(impl.getGraphIndex() < TypeVariables.size() && "Out-of-bounds index");
-  DEBUG_ASSERT(TypeVariables[impl.getGraphIndex()] == typeVar &&
-               "Type variable mismatch");
   return *nodePtr;
 }
 
@@ -372,17 +360,10 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
 void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
   // Remove this node.
   auto &impl = typeVar->getImpl();
-  unsigned index = impl.getGraphIndex();
   auto *node = impl.getGraphNode();
   node->reset();
   FreeList.push_back(node);
   impl.setGraphNode(nullptr);
-
-  // Remove this type variable from the list.
-  unsigned lastIndex = TypeVariables.size()-1;
-  if (index < lastIndex)
-    TypeVariables[index] = TypeVariables[lastIndex];
-  TypeVariables.pop_back();
 }
 
 void ConstraintGraph::addConstraint(Constraint *constraint) {
@@ -1648,7 +1629,7 @@ void ConstraintGraph::verify() {
   // Verify that the type variables are either representatives or represented
   // within their representative's equivalence class.
   // FIXME: Also check to make sure the equivalence classes aren't too large?
-  for (auto typeVar : TypeVariables) {
+  for (auto typeVar : CS.TypeVariables) {
     auto typeVarRep = CS.getRepresentative(typeVar);
     auto &repNode = (*this)[typeVarRep];
     if (typeVar != typeVarRep) {
@@ -1669,24 +1650,15 @@ void ConstraintGraph::verify() {
     }
   }
 
-  // Verify that our type variable map/vector are in sync.
-  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
-    auto typeVar = TypeVariables[i];
-    auto &impl = typeVar->getImpl();
-    requireSameValue(impl.getGraphIndex(), i, "wrong graph node index");
-    require(impl.getGraphNode(), "null graph node");
-  }
-
   // Verify consistency of all of the nodes in the graph.
-  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
-    auto typeVar = TypeVariables[i];
+  for (auto typeVar : CS.TypeVariables) {
     auto &impl = typeVar->getImpl();
     impl.getGraphNode()->verify(*this);
   }
 
   // Collect all of the constraints known to the constraint graph.
   llvm::SmallPtrSet<Constraint *, 4> knownConstraints;
-  for (auto typeVar : getTypeVariables()) {
+  for (auto typeVar : CS.TypeVariables) {
     for (auto constraint : (*this)[typeVar].getConstraints())
       knownConstraints.insert(constraint);
   }
