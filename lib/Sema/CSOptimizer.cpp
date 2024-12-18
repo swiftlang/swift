@@ -490,6 +490,7 @@ static void determineBestChoicesInContext(
       OnParam = 0x01,
       Literal = 0x02,
       ExactOnly = 0x04,
+      DisableCGFloatDoubleConversion = 0x08,
     };
 
     using MatchOptions = OptionSet<MatchFlag>;
@@ -518,13 +519,20 @@ static void determineBestChoicesInContext(
         return a->getDesugaredType()->isEqual(b->getDesugaredType());
       };
 
+      auto isCGFloatDoubleConversionSupported = [&options]() {
+        // CGFloat <-> Double conversion is supposed only while
+        // match argument candidates to parameters.
+        return options.contains(MatchFlag::OnParam) &&
+               !options.contains(MatchFlag::DisableCGFloatDoubleConversion);
+      };
+
       // Allow CGFloat -> Double widening conversions between
       // candidate argument types and parameter types. This would
       // make sure that Double is always preferred over CGFloat
       // when using literals and ranking supported disjunction
       // choices. Narrowing conversion (Double -> CGFloat) should
       // be delayed as much as possible.
-      if (options.contains(MatchFlag::OnParam)) {
+      if (isCGFloatDoubleConversionSupported()) {
         if (candidateType->isCGFloat() && paramType->isDouble()) {
           return options.contains(MatchFlag::Literal) ? 0.2 : 0.9;
         }
@@ -853,6 +861,16 @@ static void determineBestChoicesInContext(
                 options |= MatchFlag::Literal;
               if (favorExactMatchesOnly)
                 options |= MatchFlag::ExactOnly;
+
+              // Disable CGFloat -> Double conversion for unary operators.
+              //
+              // Some of the unary operators, i.e. prefix `-`, don't have
+              // CGFloat variants and expect generic `FloatingPoint` overload
+              // to match CGFloat type. Let's not attempt `CGFloat` -> `Double`
+              // conversion for unary operators because it always leads
+              // to a worse solutions vs. generic overloads.
+              if (n == 1 && decl->isOperator())
+                options |= MatchFlag::DisableCGFloatDoubleConversion;
 
               auto candidateScore = scoreCandidateMatch(
                   genericSig, candidateType, paramType, options);
