@@ -33,6 +33,7 @@
 #include "swift/Option/Options.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/Frontend/CompileJobCacheResult.h"
+#include "clang/Frontend/FrontendOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
@@ -933,6 +934,7 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
         Outputs.try_emplace(ID, File);
       });
   Outputs.try_emplace(file_types::TY_CachedDiagnostics, "<cached-diagnostics>");
+  Outputs.try_emplace(file_types::ID::TY_SymbolGraphFile, "<symbol-graph>");
 
   // Load all the output buffer.
   bool Remarks = Instance.Invocation.getCASOptions().EnableCachingRemarks;
@@ -944,6 +946,8 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
   SmallVector<OutputEntry> OutputProxies;
   std::optional<llvm::cas::ObjectProxy> DiagnosticsOutput;
   bool UseCASBackend = Invocation.getIRGenOptions().UseCASBackend;
+  const FrontendOptions &FrontendOpts =
+      Inst.getInvocation().getFrontendOptions();
 
   swift::cas::CachedResultLoader Loader(CAS, Comp.Output);
   if (auto Err = Loader.replay(
@@ -960,6 +964,32 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
             if (Kind == file_types::ID::TY_CachedDiagnostics) {
               assert(!DiagnosticsOutput && "more than 1 diagnostics found");
               DiagnosticsOutput = std::move(*Proxy);
+            } else if (Kind == file_types::ID::TY_SymbolGraphFile &&
+                       !FrontendOpts.SymbolGraphOutputDir.empty()) {
+              auto Err = Proxy->forEachReference([&](llvm::cas::ObjectRef Ref)
+                                                     -> llvm::Error {
+                auto Proxy = CAS.getProxy(Ref);
+                if (!Proxy)
+                  return Proxy.takeError();
+                auto PathRef = Proxy->getReference(0);
+                auto ContentRef = Proxy->getReference(1);
+                auto Path = CAS.getProxy(PathRef);
+                auto Content = CAS.getProxy(ContentRef);
+                if (!Path)
+                  return Path.takeError();
+                if (!Content)
+                  return Content.takeError();
+
+                SmallString<128> OutputPath(FrontendOpts.SymbolGraphOutputDir);
+                llvm::sys::path::append(OutputPath, Path->getData());
+
+                OutputProxies.emplace_back(OutputEntry{
+                    std::string(OutputPath), std::move(*Content), Kind});
+
+                return Error::success();
+              });
+              if (Err)
+                return Err;
             } else
               OutputProxies.emplace_back(
                   OutputEntry{OutputPath->second, std::move(*Proxy), Kind});
@@ -1010,10 +1040,9 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
         Inst.getDiags().diagnose(SourceLoc(), diag::error_mccas,
                                  toString(std::move(E)));
     } else if (Output.Kind == file_types::ID::TY_Dependencies) {
-      if (emitMakeDependenciesFromSerializedBuffer(
-              Output.Proxy.getData(), *File,
-              Inst.getInvocation().getFrontendOptions(), Input,
-              Inst.getDiags()))
+      if (emitMakeDependenciesFromSerializedBuffer(Output.Proxy.getData(),
+                                                   *File, FrontendOpts, Input,
+                                                   Inst.getDiags()))
         Inst.getDiags().diagnose(SourceLoc(), diag::cache_replay_failed,
                       "failed to emit dependency file");
     } else
