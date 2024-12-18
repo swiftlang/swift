@@ -76,6 +76,7 @@ FEATURE(InitRawStructMetadata,                          (6, 0))
 
 FEATURE(LayoutStringValueWitnesses,                     (6, 1))
 FEATURE(CreateTaskWithConsumedFunction,                 (6, 1))
+FEATURE(IsolatedDeinit,                                 (6, 1))
 
 FEATURE(TaskExecutor,                                   FUTURE)
 FEATURE(Differentiation,                                FUTURE)

@@ -410,7 +410,7 @@ EXPERIMENTAL_FEATURE(SafeInterop, true)
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 
 // Isolated deinit
-EXPERIMENTAL_FEATURE(IsolatedDeinit, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(IsolatedDeinit, false)
 
 // Enable values in generic signatures, e.g. <let N: Int>
 EXPERIMENTAL_FEATURE(ValueGenerics, true)
