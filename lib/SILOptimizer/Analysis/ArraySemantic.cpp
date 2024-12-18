@@ -496,6 +496,10 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
                              ->begin());
       } else {
         NewArrayProps = IsNative.copyTo(InsertBefore, DT);
+        ArraySemanticsCall NewIsNative(NewArrayProps);
+        if (NewIsNative.getSelf() != HoistedSelf) {
+          NewIsNative.getSelfOperand().set(HoistedSelf);
+        }
       }
 
       // Replace all uses of the check subscript call by a use of the empty
