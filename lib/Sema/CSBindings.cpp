@@ -31,6 +31,12 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
+/// Check whether there exists a type that could be implicitly converted
+/// to a given type i.e. is the given type is Double or Optional<..> this
+/// function is going to return true because CGFloat could be converted
+/// to a Double and non-optional value could be injected into an optional.
+static bool hasConversions(Type);
+
 static std::optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
                                               Type type);
 
@@ -1209,7 +1215,31 @@ bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
     if (!existingNTD || NTD != existingNTD)
       continue;
 
-    // FIXME: What is going on here needs to be thoroughly re-evaluated.
+    // What is going on in this method needs to be thoroughly re-evaluated!
+    //
+    // This logic aims to skip dropping bindings if
+    // collection type has conversions i.e. in situations like:
+    //
+    // [$T1] conv $T2
+    // $T2 conv [(Int, String)]
+    // $T2.Element equal $T5.Element
+    //
+    // `$T1` could be bound to `(i: Int, v: String)` after
+    // `$T2` is bound to `[(Int, String)]` which is is a problem
+    // because it means that `$T2` was attempted to early
+    // before the solver had a chance to discover all viable
+    // bindings.
+    //
+    // Let's say existing binding is `[(Int, String)]` and
+    // relation is "exact", in this case there is no point
+    // tracking `[$T1]` because upcasts are only allowed for
+    // subtype and other conversions.
+    if (existing->Kind != AllowedBindingKind::Exact) {
+      if (existingType->isKnownStdlibCollectionType() &&
+          hasConversions(existingType)) {
+        continue;
+      }
+    }
 
     // If new type has a type variable it shouldn't
     // be considered  viable.
@@ -2417,17 +2447,35 @@ bool TypeVarBindingProducer::computeNext() {
     if (binding.Kind == BindingKind::Subtypes || CS.shouldAttemptFixes()) {
       // If we were unsuccessful solving for T?, try solving for T.
       if (auto objTy = type->getOptionalObjectType()) {
-        // If T is a type variable, only attempt this if both the
-        // type variable we are trying bindings for, and the type
-        // variable we will attempt to bind, both have the same
-        // polarity with respect to being able to bind lvalues.
-        if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
-          if (TypeVar->getImpl().canBindToLValue() ==
-              otherTypeVar->getImpl().canBindToLValue()) {
-            addNewBinding(binding.withSameSource(objTy, binding.Kind));
+        // TODO: This could be generalized in the future to cover all patterns
+        // that have an intermediate type variable in subtype/conversion chain.
+        //
+        // Let's not perform $T? -> $T for closure result types to avoid having
+        // to re-discover solutions that differ only in location of optional
+        // injection.
+        //
+        // The pattern with such type variables is:
+        //
+        // $T_body <conv/subtype> $T_result <conv/subtype> $T_contextual_result
+        //
+        // When $T_contextual_result is Optional<$U>, the optional injection
+        // can either happen from $T_body or from $T_result (if `return`
+        // expression is non-optional), if we allow  both the solver would
+        // find two solutions that differ only in location of optional
+        // injection.
+        if (!TypeVar->getImpl().isClosureResultType()) {
+          // If T is a type variable, only attempt this if both the
+          // type variable we are trying bindings for, and the type
+          // variable we will attempt to bind, both have the same
+          // polarity with respect to being able to bind lvalues.
+          if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
+            if (TypeVar->getImpl().canBindToLValue() ==
+                otherTypeVar->getImpl().canBindToLValue()) {
+              addNewBinding(binding.withType(objTy));
+            }
+          } else {
+            addNewBinding(binding.withType(objTy));
           }
-        } else {
-          addNewBinding(binding.withSameSource(objTy, binding.Kind));
         }
       }
     }
