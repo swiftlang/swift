@@ -7165,9 +7165,9 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
     return;
   // Dig out the Objective-C superclass.
   SmallVector<ValueDecl *, 4> results;
-  superDecl->lookupQualified(superDecl, DeclNameRef(decl->getName()),
-                             decl->getLoc(), NL_QualifiedDefault,
-                             results);
+  superDecl->lookupQualified(
+      superDecl, DeclNameRef(decl->getName()), decl->getLoc(),
+      NL_QualifiedDefault | NL_IgnoreMissingImports, results);
   for (auto member : results) {
     if (member->getKind() != decl->getKind() ||
         member->isInstanceMember() != decl->isInstanceMember() ||
