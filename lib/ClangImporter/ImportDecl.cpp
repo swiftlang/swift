@@ -25,11 +25,11 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -49,6 +49,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/CXXMethodBridging.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
@@ -65,6 +66,7 @@
 #include "clang/Sema/Lookup.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
@@ -3548,19 +3550,20 @@ namespace {
       return true;
     }
 
-    static bool
-    implicitObjectParamIsLifetimeBound(const clang::FunctionDecl *FD) {
+    template <typename T>
+    static const T *
+    getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
       const clang::TypeSourceInfo *TSI = FD->getTypeSourceInfo();
       if (!TSI)
-        return false;
+        return nullptr;
       clang::AttributedTypeLoc ATL;
       for (clang::TypeLoc TL = TSI->getTypeLoc();
            (ATL = TL.getAsAdjusted<clang::AttributedTypeLoc>());
            TL = ATL.getModifiedLoc()) {
-        if (ATL.getAttrAs<clang::LifetimeBoundAttr>())
-          return true;
+        if (auto attr = ATL.getAttrAs<T>())
+          return attr;
       }
-      return false;
+      return nullptr;
     }
 
     Decl *importFunctionDecl(
@@ -3872,7 +3875,8 @@ namespace {
           if (selfIsInOut)
             func->setSelfAccessKind(SelfAccessKind::Mutating);
           else {
-            if (implicitObjectParamIsLifetimeBound(decl))
+            if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
+                    decl))
               func->setSelfAccessKind(SelfAccessKind::Borrowing);
             else
               func->setSelfAccessKind(SelfAccessKind::NonMutating);
@@ -3964,26 +3968,68 @@ namespace {
       auto swiftParams = result->getParameters();
       bool hasSelf =
           result->hasImplicitSelfDecl() && !isa<ConstructorDecl>(result);
-      SmallBitVector inheritLifetimeParamIndicesForReturn(swiftParams->size() +
-                                                          hasSelf);
-      SmallBitVector scopedLifetimeParamIndicesForReturn(swiftParams->size() +
-                                                         hasSelf);
-      for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
-        if (param->hasAttr<clang::LifetimeBoundAttr>()) {
-          warnForEscapableReturnType();
-          if (swiftParams->get(idx)->getInterfaceType()->isEscapable())
-            scopedLifetimeParamIndicesForReturn[idx] = true;
-          else
-            inheritLifetimeParamIndicesForReturn[idx] = true;
-        }
-      }
-      if (implicitObjectParamIsLifetimeBound(decl)) {
+      const auto dependencyVecSize = swiftParams->size() + hasSelf;
+      SmallBitVector inheritLifetimeParamIndicesForReturn(dependencyVecSize);
+      SmallBitVector scopedLifetimeParamIndicesForReturn(dependencyVecSize);
+      std::map<unsigned, SmallBitVector> inheritedArgDependences;
+      auto processLifetimeBound = [&](unsigned idx, Type ty) {
         warnForEscapableReturnType();
-        auto idx = result->getSelfIndex();
-        if (result->getImplicitSelfDecl()->getInterfaceType()->isEscapable())
+        if (ty->isEscapable())
           scopedLifetimeParamIndicesForReturn[idx] = true;
         else
           inheritLifetimeParamIndicesForReturn[idx] = true;
+      };
+      auto processLifetimeCaptureBy =
+          [&](const clang::LifetimeCaptureByAttr *attr, unsigned idx, Type ty) {
+            // FIXME: support scoped lifetimes. This is not straightforward as
+            // const T& is imported as taking a value
+            //        and we assume the address of T would not escape. An
+            //        annotation in this case contradicts our assumptions. We
+            //        should diagnose that, and support this for the non-const
+            //        case.
+            if (ty->isEscapable())
+              return;
+            for (auto param : attr->params()) {
+              // FIXME: Swift assumes no escaping to globals. We should diagnose
+              // this.
+              if (param == clang::LifetimeCaptureByAttr::GLOBAL ||
+                  param == clang::LifetimeCaptureByAttr::UNKNOWN ||
+                  param == clang::LifetimeCaptureByAttr::INVALID)
+                continue;
+
+              if (isa<clang::CXXMethodDecl>(decl) &&
+                  param == clang::LifetimeCaptureByAttr::THIS) {
+                auto [it, inserted] = inheritedArgDependences.try_emplace(
+                    result->getSelfIndex(), SmallBitVector(dependencyVecSize));
+                it->second[idx] = true;
+              } else {
+                auto [it, inserted] = inheritedArgDependences.try_emplace(
+                    param - isa<clang::CXXMethodDecl>(decl),
+                    SmallBitVector(dependencyVecSize));
+                it->second[idx] = true;
+              }
+            }
+          };
+      for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
+        if (param->hasAttr<clang::LifetimeBoundAttr>())
+          processLifetimeBound(idx, swiftParams->get(idx)->getInterfaceType());
+        if (const auto *attr = param->getAttr<clang::LifetimeCaptureByAttr>())
+          processLifetimeCaptureBy(attr, idx,
+                                   swiftParams->get(idx)->getInterfaceType());
+      }
+      if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
+        processLifetimeBound(result->getSelfIndex(),
+                             result->getImplicitSelfDecl()->getInterfaceType());
+      if (auto attr =
+              getImplicitObjectParamAnnotation<clang::LifetimeCaptureByAttr>(
+                  decl))
+        processLifetimeCaptureBy(
+            attr, result->getSelfIndex(),
+            result->getImplicitSelfDecl()->getInterfaceType());
+
+      for (auto& [idx, inheritedDepVec]: inheritedArgDependences) {
+        lifetimeDependencies.push_back(LifetimeDependenceInfo(inheritedDepVec.any() ? IndexSubset::get(Impl.SwiftContext,
+                                   inheritedDepVec): nullptr, nullptr, idx, /*isImmortal=*/false));
       }
 
       if (inheritLifetimeParamIndicesForReturn.any() ||
