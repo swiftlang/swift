@@ -10,13 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/SIL/LoopInfo.h"
+#include "swift/SIL/StackList.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
-#include "swift/SIL/LoopInfo.h"
 
 using namespace swift;
 
@@ -25,9 +26,11 @@ using namespace swift;
 bool ReachableBlocks::visit(function_ref<bool(SILBasicBlock *)> visitor) {
   // Walk over the CFG, starting at the entry block, until all reachable blocks
   // are visited.
-  SILBasicBlock *entryBB = visited.getFunction()->getEntryBlock();
-  SmallVector<SILBasicBlock *, 8> worklist = {entryBB};
-  visited.insert(entryBB);
+  auto *function = visited.getFunction();
+  auto *entry = function->getEntryBlock();
+  StackList<SILBasicBlock *> worklist(function);
+  worklist.push_back(entry);
+  visited.insert(entry);
   while (!worklist.empty()) {
     SILBasicBlock *bb = worklist.pop_back_val();
     if (!visitor(bb))
