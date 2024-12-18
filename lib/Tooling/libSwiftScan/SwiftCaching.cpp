@@ -28,6 +28,7 @@
 #include "swift/Frontend/CompileJobCacheResult.h"
 #include "swift/Frontend/DiagnosticHelper.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Frontend/MakeStyleDependencies.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Option/Options.h"
 #include "clang/CAS/CASOptions.h"
@@ -938,6 +939,7 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
   struct OutputEntry {
     std::string Path;
     llvm::cas::ObjectProxy Proxy;
+    file_types::ID Kind;
   };
   SmallVector<OutputEntry> OutputProxies;
   std::optional<llvm::cas::ObjectProxy> DiagnosticsOutput;
@@ -964,7 +966,7 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
               DiagnosticsOutput = std::move(*Proxy);
             } else
               OutputProxies.emplace_back(
-                  OutputEntry{OutputPath->second, std::move(*Proxy)});
+                  OutputEntry{OutputPath->second, std::move(*Proxy), Kind});
             return Error::success();
           }))
     return Err;
@@ -1011,6 +1013,13 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
       if (auto E = Schema->serializeObjectFile(Output.Proxy, *File))
         Inst.getDiags().diagnose(SourceLoc(), diag::error_mccas,
                                  toString(std::move(E)));
+    } else if (Output.Kind == file_types::ID::TY_Dependencies) {
+      if (emitMakeDependenciesFromSerializedBuffer(
+              Output.Proxy.getData(), *File,
+              Inst.getInvocation().getFrontendOptions(), Input,
+              Inst.getDiags()))
+        Inst.getDiags().diagnose(SourceLoc(), diag::cache_replay_failed,
+                      "failed to emit dependency file");
     } else
       *File << Output.Proxy.getData();
     if (auto E = File->keep())
