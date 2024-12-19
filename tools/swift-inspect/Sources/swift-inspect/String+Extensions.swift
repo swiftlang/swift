@@ -22,7 +22,11 @@ extension DefaultStringInterpolation {
 
 enum Std {
   struct File: TextOutputStream {
+#if os(Android)
+    var underlying: OpaquePointer
+#else
     var underlying: UnsafeMutablePointer<FILE>
+#endif
 
     mutating func write(_ string: String) {
       fputs(string, underlying)
