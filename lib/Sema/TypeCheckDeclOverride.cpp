@@ -28,6 +28,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
 using namespace swift;
 
@@ -2251,16 +2252,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     bool shouldDiagnose = !overridingClass || !overridingClass->allowsUnsafe();
 
     if (shouldDiagnose) {
-      override->diagnose(diag::override_safe_withunsafe,
-                         base->getDescriptiveKind());
-      if (overridingClass) {
-        overridingClass->diagnose(
-            diag::make_subclass_unsafe, overridingClass->getName()
-        ).fixItInsert(
-            overridingClass->getAttributeInsertionLoc(false), "@unsafe ");
-      }
-
-      base->diagnose(diag::overridden_here);
+      diagnoseUnsafeUse(UnsafeUse::forOverride(override, base));
     }
   }
   /// Check attributes associated with the base; some may need to merged with

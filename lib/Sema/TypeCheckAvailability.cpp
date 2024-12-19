@@ -34,6 +34,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDeclFinder.h"
+#include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -4071,36 +4072,6 @@ private:
 };
 } // end anonymous namespace
 
-static void suggestUnsafeOnEnclosingDecl(
-    SourceRange referenceRange, const DeclContext *referenceDC) {
-  if (referenceRange.isInvalid())
-    return;
-
-  ASTContext &ctx = referenceDC->getASTContext();
-  std::optional<ASTNode> versionCheckNode;
-  const Decl *memberLevelDecl = nullptr;
-  const Decl *typeLevelDecl = nullptr;
-  findAvailabilityFixItNodes(
-                             referenceRange, referenceDC, ctx.SourceMgr,
-      versionCheckNode, memberLevelDecl, typeLevelDecl);
-
-  auto decl = memberLevelDecl ? memberLevelDecl : typeLevelDecl;
-  if (!decl)
-    return;
-
-  if (versionCheckNode.has_value()) {
-    // The unsafe construct is inside the body of the entity, so suggest
-    // @safe(unchecked) on the declaration.
-    decl->diagnose(diag::encapsulate_unsafe_in_enclosing_context, decl)
-      .fixItInsert(decl->getAttributeInsertionLoc(false),
-                   "@safe(unchecked) ");
-  } else {
-    // The unsafe construct is not part of the body, so
-    decl->diagnose(diag::make_enclosing_context_unsafe, decl)
-      .fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
-  }
-}
-
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
@@ -4140,18 +4111,11 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
     auto type = D->getInterfaceType();
     if (auto subs = declRef.getSubstitutions())
       type = type.subst(subs);
-    if (type->isUnsafe()) {
-      diagnoseUnsafeType(
-          ctx, R.Start, type,
-          Where.getAvailability(),
-          [&](Type specificType) {
-            ctx.Diags.diagnose(
-                R.Start, diag::reference_to_unsafe_typed_decl,
-                call != nullptr && !isa<ParamDecl>(D), D,
-                specificType);
-            suggestUnsafeOnEnclosingDecl(R, Where.getDeclContext());
-            D->diagnose(diag::unsafe_decl_here, D);
-          });
+    if (type->isUnsafe() && !Where.getAvailability().allowsUnsafe()) {
+      diagnoseUnsafeUse(
+          UnsafeUse::forReferenceToUnsafe(
+            D, call != nullptr && !isa<ParamDecl>(D), Where.getDeclContext(),
+            type, R.Start));
     }
   }
 
@@ -4235,10 +4199,9 @@ diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
     return;
 
   SourceLoc diagLoc = call ? call->getLoc() : R.Start;
-  ctx.Diags
-    .diagnose(diagLoc, diag::reference_to_unsafe_decl, call != nullptr, D);
-  suggestUnsafeOnEnclosingDecl(R, Where.getDeclContext());
-  D->diagnose(diag::unsafe_decl_here, D);
+  diagnoseUnsafeUse(
+      UnsafeUse::forReferenceToUnsafe(
+        D, call != nullptr, Where.getDeclContext(), Type(), diagLoc));
 }
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
@@ -4965,4 +4928,25 @@ void swift::checkExplicitAvailability(Decl *decl) {
       diag.fixItInsert(InsertLoc, AttrText);
     }
   }
+}
+
+std::pair<const Decl *, bool /*inDefinition*/>
+swift::enclosingContextForUnsafe(
+    SourceLoc referenceLoc, const DeclContext *referenceDC) {
+  if (referenceLoc.isInvalid())
+    return { nullptr, false };
+
+  ASTContext &ctx = referenceDC->getASTContext();
+  std::optional<ASTNode> versionCheckNode;
+  const Decl *memberLevelDecl = nullptr;
+  const Decl *typeLevelDecl = nullptr;
+  findAvailabilityFixItNodes(
+      referenceLoc, referenceDC, ctx.SourceMgr,
+      versionCheckNode, memberLevelDecl, typeLevelDecl);
+
+  auto decl = memberLevelDecl ? memberLevelDecl : typeLevelDecl;
+  if (!decl)
+    return { nullptr, false };
+
+  return { decl, versionCheckNode.has_value() };
 }

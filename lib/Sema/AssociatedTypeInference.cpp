@@ -34,6 +34,7 @@
 #include "DerivedConformances.h"
 #include "TypeAccessScopeChecker.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 
 #include "swift/AST/ConformanceLookup.h"
@@ -47,6 +48,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -363,16 +365,8 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
     SourceLoc loc = typeDecl->getLoc();
     if (loc.isInvalid())
       loc = conformance->getLoc();
-    diagnoseUnsafeType(ctx,
-                       loc,
-                       type,
-                       conformance->getDeclContext(),
-                       [&](Type specificType) {
-      ctx.Diags.diagnose(
-          loc, diag::type_witness_unsafe, specificType, assocType->getName());
-      suggestUnsafeMarkerOnConformance(conformance);
-      assocType->diagnose(diag::decl_declared_here, assocType);
-    });
+    diagnoseUnsafeUse(
+        UnsafeUse::forTypeWitness(assocType, type, conformance, loc));
   }
 
   // Record the type witness.

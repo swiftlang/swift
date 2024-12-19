@@ -42,6 +42,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
@@ -4981,9 +4982,9 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   if (ownershipKind == ReferenceOwnership::Unmanaged &&
       ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
       !var->allowsUnsafe()) {
-    Diags.diagnose(attr->getLocation(), diag::unowned_unsafe_is_unsafe);
-    var->diagnose(diag::make_enclosing_context_unsafe, var)
-      .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
+    diagnoseUnsafeUse(
+        UnsafeUse::forUnownedUnsafe(var, attr->getLocation(),
+                                    var->getDeclContext()));
   }
 
   if (attr->isInvalid())
@@ -7205,11 +7206,8 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       Ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
       Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
       !D->allowsUnsafe()) {
-    Ctx.Diags.diagnose(attr->getLocation(), diag::nonisolated_unsafe_is_unsafe);
-    if (auto var = dyn_cast<VarDecl>(D)) {
-      var->diagnose(diag::make_enclosing_context_unsafe, var)
-        .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
-    }
+    diagnoseUnsafeUse(
+        UnsafeUse::forNonisolatedUnsafe(D, attr->getLocation(), dc));
   }
 
   if (auto var = dyn_cast<VarDecl>(D)) {
