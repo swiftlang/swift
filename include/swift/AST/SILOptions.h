@@ -153,9 +153,11 @@ public:
   /// Enables SIL-level diagnostics for NonescapableTypes.
   bool EnableLifetimeDependenceDiagnostics = true;
 
-  /// Enables SIL-level performance diagnostics (for @noLocks, @noAllocation
-  /// annotations and for Embedded Swift).
-  bool EnablePerformanceDiagnostics = true;
+  /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
+  /// annotations, Embedded Swift, and class specialization). SourceKit is the
+  /// only consumer that has this disabled today (as it disables WMO
+  /// explicitly).
+  bool EnableWMORequiredDiagnostics = true;
 
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
