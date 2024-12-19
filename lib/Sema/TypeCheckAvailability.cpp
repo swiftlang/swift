@@ -3296,10 +3296,13 @@ static bool isObjCProtocolTypeDecl(TypeDecl *D) {
 }
 
 static bool diagnoseNonRuntimeProtocol(SourceLoc Loc, TypeDecl *D) {
-  auto *ClangD = D->getClangDecl() if (!ClangD) return false;
+  auto *ClangD = D->getClangDecl();
+  if (!ClangD)
+    return false;
 
-  auto *proto =
-      dyn_cast<clang::ObjCProtocolDecl>(ClangD) if (!proto) return false;
+  auto *proto = dyn_cast<clang::ObjCProtocolDecl>(ClangD);
+  if (!proto)
+    return false;
 
   if (!proto->isNonRuntimeProtocol())
     return true;
