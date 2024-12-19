@@ -4504,7 +4504,6 @@ public:
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
   [[nodiscard]]
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator,
-                           bool bindPatternVarsOneWay,
                            PatternBindingDecl *patternBinding,
                            unsigned patternIndex);
 
