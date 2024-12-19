@@ -1201,7 +1201,7 @@ function Build-CMakeProject {
     }
 
     if ($UseBuiltCompilers.Contains("Swift")) {
-      $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$(Get-CMarkBinaryCache $Arch)\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
+      $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$(Get-CMarkBinaryCache $BuildArch)\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;$(Get-PinnedToolchainRuntime);${env:Path}"
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
       $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
@@ -1969,7 +1969,7 @@ function Build-FoundationMacros() {
 
   $SwiftSDK = $null
   if ($Build) {
-    $SwiftSDK = $BuildArch.SDKInstallRoot
+    $SwiftSDK = $(Get-PinnedToolchainSDK)
   }
 
   $InstallDir = $null
@@ -2621,7 +2621,7 @@ function Build-TestingMacros() {
 
   $SwiftSDK = $null
   if ($Build) {
-    $SwiftSDK = $BuildArch.SDKInstallRoot
+    $SwiftSDK = $(Get-PinnedToolchainSDK)
   }
 
   $Targets = if ($Build) {
