@@ -56,7 +56,7 @@ private func run<InstType: SILCombineSimplifyable>(_ instType: InstType.Type,
 private func registerForSILCombine<InstType: SILCombineSimplifyable>(
       _ instType: InstType.Type,
       _ runFn: @escaping (@convention(c) (BridgedInstructionPassCtxt) -> ())) {
-  String(describing: instType)._withBridgedStringRef { instClassStr in
+  "\(instType)"._withBridgedStringRef { instClassStr in
     SILCombine_registerInstructionPass(instClassStr, runFn)
   }
 }
