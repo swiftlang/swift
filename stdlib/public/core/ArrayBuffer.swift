@@ -220,7 +220,7 @@ extension _ArrayBuffer {
     bufferIsUnique: Bool,
     minimumCapacity: Int,
     growForAppend: Bool,
-    rangeToNotCopy: Range<Int>
+    rangeToNotCopy hole: Range<Int>
   ) -> _ArrayBuffer {
     let newCapacity = _growArrayCapacity(oldCapacity: capacity,
                                          minimumCapacity: minimumCapacity,
@@ -230,31 +230,29 @@ extension _ArrayBuffer {
     
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: c, minimumCapacity: newCapacity)
-    let dest = newBuffer.mutableFirstElementAddress
-    let offset = MemoryLayout<Element>.stride * rangeToNotCopy.upperBound
+    let destStart = newBuffer.mutableFirstElementAddress
+    let destTailStart = destStart + hole.upperBound
+    let beforeHole = 0 ..< hole.lowerBound
+    let afterHole = hole.upperBound ..< c
 
     if bufferIsUnique {
       // As an optimization, if the original buffer is unique, we can just move
       // the elements instead of copying.
-      if rangeToNotCopy.lowerBound > 0 {
-        dest.moveInitialize(from: firstElementAddress,
-                            count: (0 ..< rangeToNotCopy.lowerBound).count)
+      if !beforeHole.isEmpty {
+        destStart.moveInitialize(from: firstElementAddress,
+                                 count: beforeHole.count)
       }
-      if rangeToNotCopy.upperBound < c {
-        dest.moveInitialize(from: firstElementAddress + offset,
-                            count: (rangeToNotCopy.upperBound ..< c).count)
+      if !afterHole.isEmpty {
+        destStart.moveInitialize(from: destTailStart,
+                                 count: afterHole.count)
       }
       _native.mutableCount = 0
     } else {
-      if rangeToNotCopy.lowerBound > 0 {
-        _copyContents(
-          subRange: 0 ..< rangeToNotCopy.lowerBound,
-          initializing: dest)
+      if !beforeHole.isEmpty {
+        _copyContents(subRange: beforeHole, initializing: destStart)
       }
-      if rangeToNotCopy.upperBound < c {
-        _copyContents(
-          subRange: rangeToNotCopy.upperBound ..< c,
-          initializing: dest + offset)
+      if !afterHole.isEmpty {
+        _copyContents(subRange: afterHole, initializing: destTailStart)
       }
     }
     return _ArrayBuffer(_buffer: newBuffer, shiftedToStartIndex: 0)

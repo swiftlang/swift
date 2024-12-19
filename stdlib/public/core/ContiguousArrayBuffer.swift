@@ -753,6 +753,24 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     _fixLifetime(owner)
     return target + initializedCount
   }
+  
+  @_alwaysEmitIntoClient
+  @discardableResult
+  internal func _moveContents(
+    subRange bounds: Range<Int>,
+    initializing target: UnsafeMutablePointer<Element>
+  ) -> UnsafeMutablePointer<Element> {
+    _internalInvariant(bounds.lowerBound >= 0)
+    _internalInvariant(bounds.upperBound >= bounds.lowerBound)
+    _internalInvariant(bounds.upperBound <= count)
+
+    let initializedCount = bounds.upperBound - bounds.lowerBound
+    target.moveInitialize(
+      from: firstElementAddress + bounds.lowerBound, count: initializedCount)
+    _fixLifetime(owner)
+    return target + initializedCount
+  }
+
 
   @inlinable
   internal __consuming func _copyContents(
@@ -893,7 +911,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     bufferIsUnique: Bool, 
     minimumCapacity: Int,
     growForAppend: Bool,
-    rangeToNotCopy: Range<Int>
+    rangeToNotCopy hole: Range<Int>
   ) -> _ContiguousArrayBuffer {
     let newCapacity = _growArrayCapacity(oldCapacity: capacity,
                                          minimumCapacity: minimumCapacity,
@@ -903,31 +921,29 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: c, minimumCapacity: newCapacity)
-    let dest = newBuffer.mutableFirstElementAddress
-    let offset = MemoryLayout<Element>.stride * rangeToNotCopy.upperBound
+    let destStart = newBuffer.mutableFirstElementAddress
+    let destTailStart = destStart + hole.upperBound
+    let beforeHole = 0 ..< hole.lowerBound
+    let afterHole = hole.upperBound ..< c
 
     if bufferIsUnique {
       // As an optimization, if the original buffer is unique, we can just move
       // the elements instead of copying.
-      if rangeToNotCopy.lowerBound > 0 {
-        dest.moveInitialize(from: firstElementAddress,
-                            count: (0 ..< rangeToNotCopy.lowerBound).count)
+      if !beforeHole.isEmpty {
+        destStart.moveInitialize(from: firstElementAddress,
+                                 count: beforeHole.count)
       }
-      if rangeToNotCopy.upperBound < c {
-        dest.moveInitialize(from: firstElementAddress + offset,
-                            count: (rangeToNotCopy.upperBound ..< c).count)
+      if !afterHole.isEmpty {
+        destStart.moveInitialize(from: destTailStart,
+                                 count: afterHole.count)
       }
       mutableCount = 0
     } else {
-      if rangeToNotCopy.lowerBound > 0 {
-        _copyContents(
-          subRange: 0 ..< rangeToNotCopy.lowerBound,
-          initializing: dest)
+      if !beforeHole.isEmpty {
+        _copyContents(subRange: beforeHole, initializing: destStart)
       }
-      if rangeToNotCopy.upperBound < c {
-        _copyContents(
-          subRange: rangeToNotCopy.upperBound ..< c,
-          initializing: dest + offset)
+      if !afterHole.isEmpty {
+        _copyContents(subRange: afterHole, initializing: destTailStart)
       }
     }
     return newBuffer
