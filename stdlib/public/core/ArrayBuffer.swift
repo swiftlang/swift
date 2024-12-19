@@ -212,6 +212,52 @@ extension _ArrayBuffer {
     }
     return _ArrayBuffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
+  
+  @_alwaysEmitIntoClient
+  @inline(never)
+  @_semantics("optimize.sil.specialize.owned2guarantee.never")
+  internal __consuming func _consumeAndCreateNew(
+    bufferIsUnique: Bool,
+    minimumCapacity: Int,
+    growForAppend: Bool,
+    rangeToNotCopy hole: Range<Int>
+  ) -> _ArrayBuffer {
+    let newCapacity = _growArrayCapacity(oldCapacity: capacity,
+                                         minimumCapacity: minimumCapacity,
+                                         growForAppend: growForAppend)
+    let c = count
+    _internalInvariant(newCapacity >= c)
+    
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: c, minimumCapacity: newCapacity)
+    let destStart = newBuffer.mutableFirstElementAddress
+    let destTailStart = destStart + hole.upperBound
+    let sourceTailStart = firstElementAddress + hole.upperBound
+    let beforeHole = 0 ..< hole.lowerBound
+    let afterHole = hole.upperBound ..< c
+
+    if bufferIsUnique {
+      // As an optimization, if the original buffer is unique, we can just move
+      // the elements instead of copying.
+      if !beforeHole.isEmpty {
+        destStart.moveInitialize(from: firstElementAddress,
+                                 count: beforeHole.count)
+      }
+      if !afterHole.isEmpty {
+        destTailStart.moveInitialize(from: sourceTailStart,
+                                 count: afterHole.count)
+      }
+      _native.mutableCount = 0
+    } else {
+      if !beforeHole.isEmpty {
+        _copyContents(subRange: beforeHole, initializing: destStart)
+      }
+      if !afterHole.isEmpty {
+        _copyContents(subRange: afterHole, initializing: destTailStart)
+      }
+    }
+    return _ArrayBuffer(_buffer: newBuffer, shiftedToStartIndex: 0)
+  }
 
   /// If this buffer is backed by a uniquely-referenced mutable
   /// `_ContiguousArrayBuffer` that can be grown in-place to allow the self
