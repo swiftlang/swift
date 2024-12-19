@@ -331,16 +331,6 @@ StepResult ComponentStep::take(bool prevFailed) {
       CS.replaySolution(*partial);
     }
 
-    // Activate all of the one-way constraints.
-    SmallVector<Constraint *, 4> oneWayConstraints;
-    for (auto &constraint : CS.InactiveConstraints) {
-      if (constraint.isOneWayConstraint())
-        oneWayConstraints.push_back(&constraint);
-    }
-    for (auto constraint : oneWayConstraints) {
-      CS.activateConstraint(constraint);
-    }
-
     // Simplify again.
     if (CS.failedConstraint || CS.simplify())
       return done(/*isSuccess=*/false);
