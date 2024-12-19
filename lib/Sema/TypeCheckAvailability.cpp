@@ -4184,6 +4184,20 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
   return true;
 }
 
+/// Determine whether a reference to the given variable is treated as
+/// nonisolated(unsafe).
+static bool isReferenceToNonisolatedUnsafe(
+    ValueDecl *decl,
+    DeclContext *fromDC
+) {
+  auto isolation = getActorIsolationForReference(decl, fromDC);
+  if (!isolation.isNonisolated())
+    return false;
+
+  auto attr = decl->getAttrs().getAttribute<NonisolatedAttr>();
+  return attr && attr->isUnsafe();
+}
+
 /// Diagnose uses of unsafe declarations.
 static void
 diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
@@ -4192,16 +4206,29 @@ diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
   if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
     return;
 
-  if (!D->isUnsafe())
-    return;
-
   if (Where.getAvailability().allowsUnsafe())
     return;
 
   SourceLoc diagLoc = call ? call->getLoc() : R.Start;
-  diagnoseUnsafeUse(
-      UnsafeUse::forReferenceToUnsafe(
-        D, call != nullptr, Where.getDeclContext(), Type(), diagLoc));
+  if (D->isUnsafe()) {
+    diagnoseUnsafeUse(
+        UnsafeUse::forReferenceToUnsafe(
+          D, call != nullptr, Where.getDeclContext(), Type(), diagLoc));
+    return;
+  }
+
+  if (auto valueDecl = dyn_cast<ValueDecl>(D)) {
+    // Use of a nonisolated(unsafe) declaration is unsafe, but is only
+    // diagnosed as such under strict concurrency.
+    if (ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
+        isReferenceToNonisolatedUnsafe(const_cast<ValueDecl *>(valueDecl),
+                                       Where.getDeclContext())) {
+      diagnoseUnsafeUse(
+          UnsafeUse::forNonisolatedUnsafe(
+          valueDecl, R.Start, Where.getDeclContext()));
+      return;
+    }
+  }
 }
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
