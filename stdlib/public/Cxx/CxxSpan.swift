@@ -18,6 +18,24 @@ internal func unsafeBitCast<T: ~Escapable, U>(
   Builtin.reinterpretCast(x)
 }
 
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` with a lifetime dependency on the caller's
+/// borrow scope of the `source` argument.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(borrow source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, borrowing source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
+
 /// A C++ type that is an object that can refer to a contiguous sequence of objects.
 ///
 /// C++ standard library type `std::span` conforms to this protocol.
@@ -62,12 +80,15 @@ extension CxxSpan {
 @available(SwiftStdlib 6.1, *)
 extension Span {
   @_alwaysEmitIntoClient
-  @lifetime(immortal)
   @unsafe
+  @lifetime(borrow span)
   public init<T: CxxSpan<Element>>(
-    _unsafeCxxSpan span: T,
+    _unsafeCxxSpan span: borrowing T,
   ) {
-    self.init(_unsafeElements: .init(start: span.__dataUnsafe(), count: Int(span.size())))
+    let buffer = UnsafeBufferPointer(start: span.__dataUnsafe(), count: Int(span.size()))
+    let newSpan = Span(_unsafeElements: buffer)
+    // 'self' is limited to the caller's scope of the variable passed to the 'span' argument.
+    self = _overrideLifetime(newSpan, borrowing: span)
   }
 }
 
