@@ -246,8 +246,8 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
 
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
             outputPathBase.str().str(), InPath, compiledCandidatesRefs,
-            ArgsRefs, linkLibraries, PCMArgs, Hash, isFramework, isStatic, {},
-            /*module-cache-key*/ "", UserModVer);
+            ArgsRefs, {}, {}, linkLibraries, PCMArgs, Hash, isFramework,
+            isStatic, {}, /*module-cache-key*/ "", UserModVer);
 
         if (Ctx.CASOpts.EnableCaching) {
           std::vector<std::string> clangDependencyFiles;
