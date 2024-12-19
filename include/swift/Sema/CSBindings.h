@@ -301,6 +301,11 @@ public:
                Constraint *constraint);
 
   void reset();
+
+  void dump(ConstraintSystem &CS,
+            TypeVariableType *TypeVar,
+            llvm::raw_ostream &out,
+            unsigned indent) const;
 };
 
 

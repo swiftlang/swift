@@ -2045,6 +2045,48 @@ void PotentialBindings::reset() {
   AssociatedCodeCompletionToken = ASTNode();
 }
 
+void PotentialBindings::dump(ConstraintSystem &cs,
+                             TypeVariableType *typeVar,
+                             llvm::raw_ostream &out,
+                             unsigned indent) const {
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+
+  out << "Potential bindings for ";
+  typeVar->getImpl().print(out);
+  out << "\n";
+
+  out << "[constraints: ";
+  interleave(Constraints,
+             [&](Constraint *constraint) {
+               constraint->print(out, &cs.getASTContext().SourceMgr, indent,
+                                 /*skipLocator=*/true);
+             },
+             [&out]() { out << ", "; });
+  out << "] ";
+
+  if (!AdjacentVars.empty()) {
+    out << "[adjacent to: ";
+    SmallVector<std::pair<TypeVariableType *, Constraint *>> adjacentVars(
+        AdjacentVars.begin(), AdjacentVars.end());
+    llvm::sort(adjacentVars,
+               [](auto lhs, auto rhs) {
+                   return lhs.first->getID() < rhs.first->getID();
+               });
+    interleave(adjacentVars,
+               [&](std::pair<TypeVariableType *, Constraint *> pair) {
+                 out << pair.first->getString(PO);
+                 if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
+                   out << " (fixed)";
+                 out << " via ";
+                 pair.second->print(out, &cs.getASTContext().SourceMgr, indent,
+                                    /*skipLocator=*/true);
+               },
+               [&out]() { out << ", "; });
+    out << "] ";
+  }
+}
+
 void BindingSet::forEachLiteralRequirement(
     llvm::function_ref<void(KnownProtocolKind)> callback) const {
   for (const auto &literal : Literals) {
@@ -2184,22 +2226,21 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   if (!attributes.empty())
     out << "] ";
 
-  if (involvesTypeVariables()) {
+  if (!AdjacentVars.empty()) {
     out << "[adjacent to: ";
-    if (AdjacentVars.empty()) {
-      out << "<none>";
-    } else {
-      SmallVector<TypeVariableType *> adjacentVars(AdjacentVars.begin(),
-                                                   AdjacentVars.end());
-      llvm::sort(adjacentVars,
-                 [](const TypeVariableType *lhs, const TypeVariableType *rhs) {
+    SmallVector<TypeVariableType *> adjacentVars(AdjacentVars.begin(),
+                                                 AdjacentVars.end());
+    llvm::sort(adjacentVars,
+               [](const TypeVariableType *lhs, const TypeVariableType *rhs) {
                    return lhs->getID() < rhs->getID();
-                 });
-      interleave(
-          adjacentVars,
-          [&](const auto *typeVar) { out << typeVar->getString(PO); },
-          [&out]() { out << ", "; });
-    }
+               });
+    interleave(adjacentVars,
+               [&](auto *typeVar) {
+                 out << typeVar->getString(PO);
+                 if (typeVar->getImpl().getFixedType(/*record=*/nullptr))
+                   out << " (fixed)";
+               },
+               [&out]() { out << ", "; });
     out << "] ";
   }
 
@@ -2212,24 +2253,25 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     enum class BindingKind { Exact, Subtypes, Supertypes, Literal };
     BindingKind Kind;
     Type BindingType;
-    PrintableBinding(BindingKind kind, Type bindingType)
-        : Kind(kind), BindingType(bindingType) {}
+    bool Viable;
+    PrintableBinding(BindingKind kind, Type bindingType, bool viable)
+        : Kind(kind), BindingType(bindingType), Viable(viable) {}
 
   public:
     static PrintableBinding supertypesOf(Type binding) {
-      return PrintableBinding{BindingKind::Supertypes, binding};
+      return PrintableBinding{BindingKind::Supertypes, binding, true};
     }
     
     static PrintableBinding subtypesOf(Type binding) {
-      return PrintableBinding{BindingKind::Subtypes, binding};
+      return PrintableBinding{BindingKind::Subtypes, binding, true};
     }
     
     static PrintableBinding exact(Type binding) {
-      return PrintableBinding{BindingKind::Exact, binding};
+      return PrintableBinding{BindingKind::Exact, binding, true};
     }
     
-    static PrintableBinding literalDefaultType(Type binding) {
-      return PrintableBinding{BindingKind::Literal, binding};
+    static PrintableBinding literalDefaultType(Type binding, bool viable) {
+      return PrintableBinding{BindingKind::Literal, binding, viable};
     }
 
     void print(llvm::raw_ostream &out, const PrintOptions &PO,
@@ -2247,7 +2289,10 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
         out << "(default type of literal) ";
         break;
       }
-      BindingType.print(out, PO);
+      if (BindingType)
+        BindingType.print(out, PO);
+      if (!Viable)
+        out << " [literal not viable]";
     }
   };
 
@@ -2269,10 +2314,11 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     }
   }
   for (const auto &literal : Literals) {
-    if (literal.second.viableAsBinding()) {
-      potentialBindings.push_back(PrintableBinding::literalDefaultType(
-          literal.second.getDefaultType()));
-    }
+    potentialBindings.push_back(PrintableBinding::literalDefaultType(
+        literal.second.hasDefaultType()
+        ? literal.second.getDefaultType()
+        : Type(),
+        literal.second.viableAsBinding()));
   }
   if (potentialBindings.empty()) {
     out << "<none>";
