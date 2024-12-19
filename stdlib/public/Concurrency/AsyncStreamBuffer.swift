@@ -120,44 +120,20 @@ extension AsyncStream {
     }
 
     func yield(_ value: __owned Element) -> Continuation.YieldResult {
-      var result: Continuation.YieldResult
+      let result: Continuation.YieldResult
       lock()
       let limit = state.limit
       let count = state.pending.count
 
       if !state.continuations.isEmpty {
+        // Presence of continuations implies no pending elements.
+        // TODO: which assertion flavor should be used?
+        assert(
+          state.pending.isEmpty,
+          "Continuations should imply no pending elements."
+        )
         let continuation = state.continuations.removeFirst()
-        if count > 0 {
-          if !state.terminal {
-            switch limit {
-            case .unbounded:
-              state.pending.append(value)
-              result = .enqueued(remaining: .max)
-            case .bufferingOldest(let limit):
-              if count < limit {
-                state.pending.append(value)
-                result = .enqueued(remaining: limit - (count + 1))
-              } else {
-                result = .dropped(value)
-              }
-            case .bufferingNewest(let limit):
-              if count < limit {
-                state.pending.append(value)
-                result = .enqueued(remaining: limit - (count + 1))
-              } else if count > 0 {
-                result = .dropped(state.pending.removeFirst())
-                state.pending.append(value)
-              } else {
-                result = .dropped(value)
-              }
-            }
-          } else {
-            result = .terminated
-          }
-          let toSend = state.pending.removeFirst()
-          unlock()
-          continuation.resume(returning: toSend)
-        } else if state.terminal {
+        if state.terminal {
           result = .terminated
           unlock()
           continuation.resume(returning: nil)
@@ -165,12 +141,11 @@ extension AsyncStream {
           switch limit {
           case .unbounded:
             result = .enqueued(remaining: .max)
-          case .bufferingNewest(let limit):
-            result = .enqueued(remaining: limit)
           case .bufferingOldest(let limit):
             result = .enqueued(remaining: limit)
+          case .bufferingNewest(let limit):
+            result = .enqueued(remaining: limit)
           }
-
           unlock()
           continuation.resume(returning: value)
         }
@@ -217,6 +192,11 @@ extension AsyncStream {
         handler?(.finished)
         return
       }
+
+      assert(
+        state.pending.isEmpty,
+        "Continuations should imply no pending elements."
+      )
 
       // Hold on to the continuations to resume outside the lock.
       let continuations = state.continuations
@@ -287,7 +267,7 @@ extension AsyncThrowingStream {
     }
 
     struct State {
-      var continuation: UnsafeContinuation<Element?, Error>?
+      var continuations = [UnsafeContinuation<Element?, Error>]()
       var pending = _Deque<Element>()
       let limit: Continuation.BufferingPolicy
       var onTermination: TerminationHandler?
@@ -349,45 +329,19 @@ extension AsyncThrowingStream {
     }
 
     func yield(_ value: __owned Element) -> Continuation.YieldResult {
-      var result: Continuation.YieldResult
+      let result: Continuation.YieldResult
       lock()
       let limit = state.limit
       let count = state.pending.count
-      if let continuation = state.continuation {
-        if count > 0 {
-          if state.terminal == nil {
-            switch limit {
-            case .unbounded:
-              result = .enqueued(remaining: .max)
-              state.pending.append(value)
-            case .bufferingOldest(let limit):
-              if count < limit {
-                result = .enqueued(remaining: limit - (count + 1))
-                state.pending.append(value)
-              } else {
-                result = .dropped(value)
-              }
-            case .bufferingNewest(let limit):
-              if count < limit {
-                state.pending.append(value)
-                result = .enqueued(remaining: limit - (count + 1))
-              } else if count > 0 {
-                result = .dropped(state.pending.removeFirst())
-                state.pending.append(value)
-              } else {
-                result = .dropped(value)
-              }
-            }
-          } else {
-            result = .terminated
-          }
-          state.continuation = nil
-          let toSend = state.pending.removeFirst()
-          unlock()
-          continuation.resume(returning: toSend)
-        } else if let terminal = state.terminal {
+
+      if !state.continuations.isEmpty {
+        assert(
+          state.pending.isEmpty,
+          "Continuations should imply no pending elements."
+        )
+        let continuation = state.continuations.removeFirst()
+        if let terminal = state.terminal {
           result = .terminated
-          state.continuation = nil
           state.terminal = .finished
           unlock()
           switch terminal {
@@ -405,8 +359,6 @@ extension AsyncThrowingStream {
           case .bufferingNewest(let limit):
             result = .enqueued(remaining: limit)
           }
-
-          state.continuation = nil
           unlock()
           continuation.resume(returning: value)
         }
@@ -446,64 +398,67 @@ extension AsyncThrowingStream {
       lock()
       let handler = state.onTermination
       state.onTermination = nil
-      if state.terminal == nil {
-        if let failure = error {
-          state.terminal = .failed(failure)
-        } else {
-          state.terminal = .finished
-        }
+
+      let terminal: Terminal
+      if let failure = error {
+        terminal = .failed(failure)
+      } else {
+        terminal = .finished
       }
 
-      if let continuation = state.continuation {
-        if state.pending.count > 0 {
-          state.continuation = nil
-          let toSend = state.pending.removeFirst()
+      // Update terminal state if needed
+      if state.terminal == nil {
+        state.terminal = terminal
+      }
+
+      guard !state.continuations.isEmpty else {
           unlock()
           handler?(.finished(error))
-          continuation.resume(returning: toSend)
-        } else if let terminal = state.terminal {
-          state.continuation = nil
-          unlock()
-          handler?(.finished(error))
+          return
+      }
+
+      assert(
+        state.pending.isEmpty,
+        "Continuations should imply no pending elements."
+      )
+
+      // Hold on to the continuations to resume outside the lock.
+      let continuations = state.continuations
+      state.continuations.removeAll()
+
+      unlock()
+      handler?(.finished(error))
+
+      for continuation in continuations {
           switch terminal {
           case .finished:
             continuation.resume(returning: nil)
           case .failed(let error):
             continuation.resume(throwing: error)
           }
-        } else {
-          unlock()
-          handler?(.finished(error))
-        }
-      } else {
-        unlock()
-        handler?(.finished(error))
       }
     }
 
     func next(_ continuation: UnsafeContinuation<Element?, Error>) {
       lock()
-      if state.continuation == nil {
-        if state.pending.count > 0 {
-          let toSend = state.pending.removeFirst()
-          unlock()
-          continuation.resume(returning: toSend)
-        } else if let terminal = state.terminal {
-          state.terminal = .finished
-          unlock()
-          switch terminal {
-          case .finished:
-            continuation.resume(returning: nil)
-          case .failed(let error):
-            continuation.resume(throwing: error)
-          }
-        } else {
-          state.continuation = continuation
-          unlock()
+      state.continuations.append(continuation)
+      if state.pending.count > 0 {
+        let cont = state.continuations.removeFirst()
+        let toSend = state.pending.removeFirst()
+        unlock()
+        cont.resume(returning: toSend)
+      } else if let terminal = state.terminal {
+        state.terminal = .finished
+        let cont = state.continuations.removeFirst()
+        unlock()
+        switch terminal {
+        case .finished:
+          cont.resume(returning: nil)
+        case .failed(let error):
+          cont.resume(throwing: error)
         }
       } else {
         unlock()
-        fatalError("attempt to await next() on more than one task")
       }
     }
 
