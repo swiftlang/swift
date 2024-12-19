@@ -61,35 +61,11 @@ moduleCacheRelativeLookupModuleOutput(const ModuleID &MID, ModuleOutputKind MOK,
   return outputPath.str().str();
 }
 
-// Add search paths.
-// Note: This is handled differently for the Clang importer itself, which
-// adds search paths to Clang's data structures rather than to its
-// command line.
-static void addSearchPathInvocationArguments(
-    std::vector<std::string> &invocationArgStrs, ASTContext &ctx) {
-  SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
-  for (const auto &framepath : searchPathOpts.getFrameworkSearchPaths()) {
-    invocationArgStrs.push_back(framepath.IsSystem ? "-iframework" : "-F");
-    invocationArgStrs.push_back(framepath.Path);
-  }
-
-  for (const auto &path : searchPathOpts.getImportSearchPaths()) {
-    invocationArgStrs.push_back("-I");
-    invocationArgStrs.push_back(path);
-  }
-
-  for (const auto &arg : searchPathOpts.ScannerPrefixMapper) {
-    std::string prefixMapArg = "-fdepscan-prefix-map=" + arg;
-    invocationArgStrs.push_back(prefixMapArg);
-  }
-}
-
 /// Create the command line for Clang dependency scanning.
 static std::vector<std::string> getClangDepScanningInvocationArguments(
     ASTContext &ctx, std::optional<StringRef> sourceFileName = std::nullopt) {
   std::vector<std::string> commandLineArgs =
       ClangImporter::getClangDriverArguments(ctx);
-  addSearchPathInvocationArguments(commandLineArgs, ctx);
 
   auto sourceFilePos = std::find(
       commandLineArgs.begin(), commandLineArgs.end(),
