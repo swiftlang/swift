@@ -101,10 +101,11 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
 private func analyze(dependence: LifetimeDependence, _ context: FunctionPassContext) -> Bool {
   log("Dependence scope:\n\(dependence)")
 
-  // Early versions of Span in the standard library violate trivial lifetimes. Contemporary versions of the compiler
-  // simply ignored dependencies on trivial values.
-  if !context.options.hasFeature(.LifetimeDependenceDiagnoseTrivial) {
-    if dependence.parentValue.type.objectType.isTrivial(in: dependence.function) {
+  // Briefly, some versions of Span in the standard library violated trivial lifetimes; versions of the compiler built
+  // at that time simply ignored dependencies on trivial values. For now, disable trivial dependencies to allow newer
+  // compilers to build against those older standard libraries. This check is only relevant for ~6 mo (until July 2025).
+  if dependence.parentValue.type.objectType.isTrivial(in: dependence.function) {
+    if let sourceFileKind = dependence.function.sourceFileKind, sourceFileKind == .interface {
       return true
     }
   }

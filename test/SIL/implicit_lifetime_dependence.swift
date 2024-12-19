@@ -1,11 +1,9 @@
 // RUN: %target-swift-frontend %s \
 // RUN: -emit-sil  -target %target-swift-5.1-abi-triple \
 // RUN: -enable-experimental-feature LifetimeDependence \
-// RUN: -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 @_unsafeNonescapableResult
 @lifetime(source)

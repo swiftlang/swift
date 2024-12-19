@@ -22,6 +22,7 @@
 #include "SILBridging.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BasicBridging.h"
@@ -922,6 +923,14 @@ BridgedType BridgedFunction::getLoweredType(BridgedType type) const {
 
 swift::SILFunction * _Nullable OptionalBridgedFunction::getFunction() const {
   return static_cast<swift::SILFunction *>(obj);
+}
+
+BridgedFunction::OptionalSourceFileKind BridgedFunction::getSourceFileKind() const {
+  if (auto *dc = getFunction()->getDeclContext()) {
+    if (auto *sourceFile = dc->getParentSourceFile())
+      return (OptionalSourceFileKind)sourceFile->Kind;
+  }
+  return OptionalSourceFileKind::None;
 }
 
 //===----------------------------------------------------------------------===//

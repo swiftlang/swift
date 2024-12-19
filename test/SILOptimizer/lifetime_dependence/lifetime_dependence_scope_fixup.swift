@@ -1,11 +1,9 @@
 // RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil \
 // RUN: -enable-experimental-feature LifetimeDependence \
-// RUN: -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 struct NCContainer : ~Copyable {
   let ptr: UnsafeRawBufferPointer
