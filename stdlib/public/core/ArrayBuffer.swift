@@ -232,6 +232,7 @@ extension _ArrayBuffer {
       _uninitializedCount: c, minimumCapacity: newCapacity)
     let destStart = newBuffer.mutableFirstElementAddress
     let destTailStart = destStart + hole.upperBound
+    let sourceTailStart = firstElementAddress + hole.upperBound
     let beforeHole = 0 ..< hole.lowerBound
     let afterHole = hole.upperBound ..< c
 
@@ -243,7 +244,7 @@ extension _ArrayBuffer {
                                  count: beforeHole.count)
       }
       if !afterHole.isEmpty {
-        destStart.moveInitialize(from: destTailStart,
+        destTailStart.moveInitialize(from: sourceTailStart
                                  count: afterHole.count)
       }
       _native.mutableCount = 0

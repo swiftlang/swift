@@ -923,6 +923,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       _uninitializedCount: c, minimumCapacity: newCapacity)
     let destStart = newBuffer.mutableFirstElementAddress
     let destTailStart = destStart + hole.upperBound
+    let sourceTailStart = firstElementAddress + hole.upperBound
     let beforeHole = 0 ..< hole.lowerBound
     let afterHole = hole.upperBound ..< c
 
@@ -934,7 +935,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
                                  count: beforeHole.count)
       }
       if !afterHole.isEmpty {
-        destStart.moveInitialize(from: destTailStart,
+        destTailStart.moveInitialize(from: sourceTailStart,
                                  count: afterHole.count)
       }
       mutableCount = 0
