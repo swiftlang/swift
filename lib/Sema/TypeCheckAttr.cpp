@@ -2171,10 +2171,12 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (SF && SF->Kind == SourceFileKind::Interface)
     return;
 
-  // The remaining diagnostics are only for attributes that are active for the
-  // current target triple.
-  if (!attr->isActivePlatform(Ctx) && !attr->isLanguageVersionSpecific() &&
-      !attr->isPackageDescriptionVersionSpecific())
+  // The remaining diagnostics are only for attributes that are active.
+  auto semanticAttr = D->getSemanticAvailableAttr(attr);
+  if (!semanticAttr)
+    return;
+
+  if (!semanticAttr->isActive(Ctx))
     return;
 
   // Make sure there isn't a more specific attribute we should be using instead.
@@ -2195,7 +2197,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   }
 
   SourceLoc attrLoc = attr->getLocation();
-  auto versionAvailability = attr->getVersionAvailability(Ctx);
+  auto versionAvailability = semanticAttr->getVersionAvailability(Ctx);
   if (versionAvailability == AvailableVersionComparison::Obsoleted ||
       versionAvailability == AvailableVersionComparison::Unavailable) {
     if (auto cannotBeUnavailable =

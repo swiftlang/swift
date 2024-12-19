@@ -783,12 +783,6 @@ public:
   /// Indicates where the Obsoleted version was specified.
   const SourceRange ObsoletedRange;
 
-  /// Whether this is a language-version-specific entity.
-  bool isLanguageVersionSpecific() const;
-
-  /// Whether this is a PackageDescription version specific entity.
-  bool isPackageDescriptionVersionSpecific() const;
-
   /// Whether this is an unconditionally unavailable entity.
   bool isUnconditionallyUnavailable() const;
 
@@ -831,17 +825,6 @@ public:
 
   /// Returns true if this attribute is active given the current platform.
   bool isActivePlatform(const ASTContext &ctx) const;
-
-  /// Returns the active version from the AST context corresponding to
-  /// the available kind. For example, this will return the effective language
-  /// version for swift version-specific availability kind, PackageDescription
-  /// version for PackageDescription version-specific availability.
-  llvm::VersionTuple getActiveVersion(const ASTContext &ctx) const;
-
-  /// Compare this attribute's version information against the platform or
-  /// language version (assuming the this attribute pertains to the active
-  /// platform).
-  AvailableVersionComparison getVersionAvailability(const ASTContext &ctx) const;
 
   /// Create an AvailableAttr that indicates specific availability
   /// for all platforms.
@@ -3213,6 +3196,34 @@ public:
   /// Returns the platform kind that the attribute applies to, or
   /// `PlatformKind::none` if the attribute is not platform specific.
   PlatformKind getPlatformKind() const { return domain.getPlatformKind(); }
+
+  /// Whether this attribute has an introduced, deprecated, or obsoleted
+  /// version.
+  bool isVersionSpecific() const {
+    return attr->Introduced || attr->Deprecated || attr->Obsoleted;
+  }
+
+  /// Whether this is a language mode specific attribute.
+  bool isSwiftLanguageModeSpecific() const {
+    return domain.isSwiftLanguage() && isVersionSpecific();
+  }
+
+  /// Whether this is a PackageDescription version specific attribute.
+  bool isPackageDescriptionVersionSpecific() const {
+    return domain.isPackageDescription() && isVersionSpecific();
+  }
+
+  /// Returns the active version from the AST context corresponding to
+  /// the available kind. For example, this will return the effective language
+  /// version for swift version-specific availability kind, PackageDescription
+  /// version for PackageDescription version-specific availability.
+  llvm::VersionTuple getActiveVersion(const ASTContext &ctx) const;
+
+  /// Compare this attribute's version information against the platform or
+  /// language version (assuming the this attribute pertains to the active
+  /// platform).
+  AvailableVersionComparison
+  getVersionAvailability(const ASTContext &ctx) const;
 
   /// Returns true if this attribute is considered active in the current
   /// compilation context.

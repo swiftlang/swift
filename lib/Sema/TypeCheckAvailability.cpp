@@ -3067,14 +3067,14 @@ getExplicitUnavailabilityDiagnosticInfo(const Decl *decl,
 
   ASTContext &ctx = decl->getASTContext();
 
-  switch (attr->getVersionAvailability(ctx)) {
+  switch (semanticAttr->getVersionAvailability(ctx)) {
   case AvailableVersionComparison::Available:
   case AvailableVersionComparison::PotentiallyUnavailable:
     llvm_unreachable("These aren't considered unavailable");
 
   case AvailableVersionComparison::Unavailable:
-    if ((attr->isLanguageVersionSpecific() ||
-         attr->isPackageDescriptionVersionSpecific()) &&
+    if ((semanticAttr->isSwiftLanguageModeSpecific() ||
+         semanticAttr->isPackageDescriptionVersionSpecific()) &&
         attr->Introduced.has_value()) {
       return UnavailabilityDiagnosticInfo(
           UnavailabilityDiagnosticInfo::Status::IntroducedInVersion, attr,
@@ -3161,18 +3161,22 @@ swift::getUnsatisfiedAvailabilityConstraint(
     return std::nullopt;
 
   if (auto attr = decl->getUnavailableAttr()) {
+    auto semanticAttr = decl->getSemanticAvailableAttr(attr);
+    if (!semanticAttr)
+      return std::nullopt;
+
     if (isInsideCompatibleUnavailableDeclaration(decl, availabilityContext,
                                                  attr))
       return std::nullopt;
 
-    switch (attr->getVersionAvailability(ctx)) {
+    switch (semanticAttr->getVersionAvailability(ctx)) {
     case AvailableVersionComparison::Available:
     case AvailableVersionComparison::PotentiallyUnavailable:
       llvm_unreachable("Decl should be unavailable");
 
     case AvailableVersionComparison::Unavailable:
-      if ((attr->isLanguageVersionSpecific() ||
-           attr->isPackageDescriptionVersionSpecific()) &&
+      if ((semanticAttr->isSwiftLanguageModeSpecific() ||
+           semanticAttr->isPackageDescriptionVersionSpecific()) &&
           attr->Introduced.has_value())
         return AvailabilityConstraint::forRequiresVersion(attr);
 
