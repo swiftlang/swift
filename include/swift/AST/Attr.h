@@ -3189,6 +3189,18 @@ public:
   const AvailableAttr *getParsedAttr() const { return attr; }
   const AvailabilityDomain getDomain() const { return domain; }
 
+  std::optional<llvm::VersionTuple> getIntroduced() const {
+    return attr->Introduced;
+  }
+
+  std::optional<llvm::VersionTuple> getDeprecated() const {
+    return attr->Deprecated;
+  }
+
+  std::optional<llvm::VersionTuple> getObsoleted() const {
+    return attr->Obsoleted;
+  }
+
   /// Returns the `message:` field of the attribute, or an empty string.
   StringRef getMessage() const { return attr->Message; }
 

@@ -294,20 +294,18 @@ AvailabilityInference::parentDeclForInferredAvailability(const Decl *D) {
 /// Returns true if the introduced version in \p newAttr should be used instead
 /// of the introduced version in \p prevAttr when both are attached to the same
 /// declaration and refer to the active platform.
-static bool isBetterThan(const AvailableAttr *newAttr,
-                         const AvailableAttr *prevAttr) {
-  assert(newAttr);
-
+static bool isBetterThan(const SemanticAvailableAttr &newAttr,
+                         const std::optional<SemanticAvailableAttr> &prevAttr) {
   // If there is no prevAttr, newAttr of course wins.
   if (!prevAttr)
     return true;
 
   // If they belong to the same platform, the one that introduces later wins.
-  if (prevAttr->getPlatform() == newAttr->getPlatform())
-    return prevAttr->Introduced.value() < newAttr->Introduced.value();
+  if (prevAttr->getPlatform() == newAttr.getPlatform())
+    return prevAttr->getIntroduced().value() < newAttr.getIntroduced().value();
 
   // If the new attribute's platform inherits from the old one, it wins.
-  return inheritsAvailabilityFromPlatform(newAttr->getPlatform(),
+  return inheritsAvailabilityFromPlatform(newAttr.getPlatform(),
                                           prevAttr->getPlatform());
 }
 
@@ -433,22 +431,19 @@ bool AvailabilityInference::updateBeforePlatformForFallback(
 
 const AvailableAttr *
 AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D) {
-  const AvailableAttr *bestAvailAttr = nullptr;
+  std::optional<SemanticAvailableAttr> bestAvailAttr;
 
   D = abstractSyntaxDeclForAvailableAttribute(D);
 
-  for (auto semanticAttr :
-       D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto *attr = semanticAttr.getParsedAttr();
-
-    if (!attr->hasPlatform() || !attr->Introduced.has_value())
+  for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (!attr.isPlatformSpecific() || !attr.getIntroduced())
       continue;
 
     if (isBetterThan(attr, bestAvailAttr))
-      bestAvailAttr = attr;
+      bestAvailAttr.emplace(attr);
   }
 
-  return bestAvailAttr;
+  return bestAvailAttr ? bestAvailAttr->getParsedAttr() : nullptr;
 }
 
 std::optional<AvailabilityRange>
@@ -779,25 +774,24 @@ bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
 
 AvailabilityRange AvailabilityInference::annotatedAvailableRangeForAttr(
     const Decl *D, const SpecializeAttr *attr, ASTContext &ctx) {
-
-  const AvailableAttr *bestAvailAttr = nullptr;
+  std::optional<SemanticAvailableAttr> bestAvailAttr;
 
   for (auto *availAttr : attr->getAvailableAttrs()) {
     auto semanticAttr = D->getSemanticAvailableAttr(availAttr);
     if (!semanticAttr)
       continue;
 
-    if (!availAttr->Introduced.has_value() || !semanticAttr->isActive(ctx) ||
+    if (!semanticAttr->getIntroduced() || !semanticAttr->isActive(ctx) ||
         !semanticAttr->isPlatformSpecific()) {
       continue;
     }
 
-    if (isBetterThan(availAttr, bestAvailAttr))
-      bestAvailAttr = availAttr;
+    if (isBetterThan(*semanticAttr, bestAvailAttr))
+      bestAvailAttr.emplace(*semanticAttr);
   }
 
   if (bestAvailAttr)
-    return availableRange(bestAvailAttr, ctx);
+    return availableRange(bestAvailAttr->getParsedAttr(), ctx);
 
   return AvailabilityRange::alwaysAvailable();
 }
