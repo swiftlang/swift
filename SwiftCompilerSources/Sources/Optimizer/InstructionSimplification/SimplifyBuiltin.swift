@@ -129,21 +129,16 @@ private extension BuiltinInst {
   }
 
   func optimizeCanBeClass(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0].canonical.silType else {
-      return
-    }
     let literal: IntegerLiteralInst
-    switch ty.canBeClass {
-    case .IsNot:
+    switch substitutionMap.replacementType.canonical.canBeClass {
+    case .isNot:
       let builder = Builder(before: self, context)
       literal = builder.createIntegerLiteral(0,  type: type)
-    case .Is:
+    case .is:
       let builder = Builder(before: self, context)
       literal = builder.createIntegerLiteral(1,  type: type)
-    case .CanBe:
+    case .canBe:
       return
-    default:
-      fatalError()
     }
     self.replace(with: literal, context)
   }

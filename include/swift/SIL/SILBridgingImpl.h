@@ -421,10 +421,6 @@ bool BridgedType::isEmpty(BridgedFunction f) const {
   return unbridged().isEmpty(*f.getFunction());
 }
 
-BridgedType::TraitResult BridgedType::canBeClass() const {
-  return (TraitResult)unbridged().canBeClass();
-}
-
 bool BridgedType::isMoveOnly() const {
   return unbridged().isMoveOnly();
 }

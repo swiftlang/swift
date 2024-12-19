@@ -327,6 +327,10 @@ BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {
 // MARK: BridgedCanType
 //===----------------------------------------------------------------------===//
 
+static_assert((int)BridgedCanType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
+static_assert((int)BridgedCanType::TraitResult::CanBe == (int)swift::TypeTraitResult::CanBe);
+static_assert((int)BridgedCanType::TraitResult::Is == (int)swift::TypeTraitResult::Is);
+
 BridgedCanType::BridgedCanType(swift::CanType ty) : type(ty.getPointer()) {
 }
 
@@ -336,6 +340,10 @@ swift::CanType BridgedCanType::unbridged() const {
 
 BridgedASTType BridgedCanType::getType() const {
   return {type};
+}
+
+BridgedCanType::TraitResult BridgedCanType::canBeClass() const {
+  return (TraitResult)unbridged()->canBeClass();
 }
 
 //===----------------------------------------------------------------------===//

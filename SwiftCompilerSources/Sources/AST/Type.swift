@@ -46,6 +46,12 @@ public struct Type: CustomStringConvertible, NoReflectionChildren {
 /// A Type that is statically known to be canonical.
 /// For example, typealiases are resolved.
 public struct CanonicalType: CustomStringConvertible, NoReflectionChildren {
+  public enum TraitResult {
+    case isNot
+    case canBe
+    case `is`
+  }
+
   public let bridged: BridgedCanType
 
   public init(bridged: BridgedCanType) { self.bridged = bridged }
@@ -63,6 +69,8 @@ public struct CanonicalType: CustomStringConvertible, NoReflectionChildren {
   public func subst(with substitutionMap: SubstitutionMap) -> CanonicalType {
     return type.subst(with: substitutionMap).canonical
   }
+
+  public var canBeClass: TraitResult { bridged.canBeClass().result }
 }
 
 public struct TypeArray : RandomAccessCollection, CustomReflectable {
@@ -82,5 +90,17 @@ public struct TypeArray : RandomAccessCollection, CustomReflectable {
   public var customMirror: Mirror {
     let c: [Mirror.Child] = map { (label: nil, value: $0) }
     return Mirror(self, children: c)
+  }
+}
+
+extension BridgedCanType.TraitResult {
+  var result: CanonicalType.TraitResult {
+    switch self {
+    case .IsNot: return .isNot
+    case .CanBe: return .canBe
+    case .Is:    return .is
+    default:
+      fatalError("wrong type TraitResult enum case")
+    }
   }
 }

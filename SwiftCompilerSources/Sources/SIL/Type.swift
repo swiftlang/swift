@@ -27,7 +27,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var addressType: Type { bridged.getAddressType().type }
   public var objectType: Type { bridged.getObjectType().type }
 
-  public var canonicalASTType: CanonicalType { CanonicalType(bridged: bridged.getCanType()) }
+  public var astType: CanonicalType { CanonicalType(bridged: bridged.getCanType()) }
 
   public func isTrivial(in function: Function) -> Bool {
     return bridged.isTrivial(function.bridged)
@@ -68,7 +68,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isThickFunction: Bool { bridged.isThickFunction() }
   public var isAsyncFunction: Bool { bridged.isAsyncFunction() }
 
-  public var canBeClass: BridgedType.TraitResult { bridged.canBeClass() }
+  public var canBeClass: CanonicalType.TraitResult { astType.canBeClass }
 
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
 
