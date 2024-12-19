@@ -311,14 +311,6 @@ public:
                     llvm::function_ref<bool(Constraint *)> acceptConstraint =
                         [](Constraint *constraint) { return true; });
 
-  /// Retrieve the type variables that correspond to nodes in the graph.
-  ///
-  /// The subscript operator can be used to retrieve the nodes that
-  /// correspond to these type variables.
-  ArrayRef<TypeVariableType *> getTypeVariables() const {
-    return TypeVariables;
-  }
-
   /// Describes a single component, as produced by the connected components
   /// algorithm.
   struct Component {
@@ -461,9 +453,6 @@ private:
 
   /// The constraint system.
   ConstraintSystem &CS;
-
-  /// The type variables in this graph, in stable order.
-  std::vector<TypeVariableType *> TypeVariables;
 
   /// Constraints that are "orphaned" because they contain no type variables.
   SmallVector<Constraint *, 4> OrphanedConstraints;
