@@ -491,6 +491,7 @@ getActualActorIsolationKind(uint8_t raw) {
   CASE(Unspecified)
   CASE(ActorInstance)
   CASE(Nonisolated)
+  CASE(CallerIsolationInheriting)
   CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
   CASE(Erased)
@@ -4086,6 +4087,10 @@ public:
         isolation = ActorIsolation::forUnspecified();
         break;
 
+      case ActorIsolation::CallerIsolationInheriting:
+        isolation = ActorIsolation::forCallerIsolationInheriting();
+        break;
+
       case ActorIsolation::Erased:
         isolation = ActorIsolation::forErased();
         break;
@@ -6722,6 +6727,11 @@ getActualSILParameterOptions(uint8_t raw) {
   if (options.contains(serialization::SILParameterInfoFlags::Sending)) {
     options -= serialization::SILParameterInfoFlags::Sending;
     result |= SILParameterInfo::Sending;
+  }
+
+  if (options.contains(serialization::SILParameterInfoFlags::ImplicitLeading)) {
+    options -= serialization::SILParameterInfoFlags::ImplicitLeading;
+    result |= SILParameterInfo::ImplicitLeading;
   }
 
   // Check if we have any remaining options and return none if we do. We found

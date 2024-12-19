@@ -402,7 +402,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         // Then see if we have a global actor. This pattern matches the output
         // for doing things like GlobalActor.shared.
         if (nomDecl->isGlobalActor()) {
-          return SILIsolationInfo::getGlobalActorIsolated(SILValue(), nomDecl);
+          return SILIsolationInfo::getGlobalActorIsolated(SILValue(), selfASTType);
         }
 
         // TODO: We really should be doing this based off of an Operand. Then
