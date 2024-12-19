@@ -1802,14 +1802,8 @@ namespace {
     ///
     /// \param locator The locator to use for generated constraints and
     /// type variables.
-    ///
-    /// \param bindPatternVarsOneWay When true, generate fresh type variables
-    /// for the types of each variable declared within the pattern, along
-    /// with a one-way constraint binding that to the type to which the
-    /// variable will be ascribed or inferred.
     Type getTypeForPattern(
        Pattern *pattern, ConstraintLocatorBuilder locator,
-       bool bindPatternVarsOneWay,
        PatternBindingDecl *patternBinding = nullptr,
        unsigned patternBindingIndex = 0) {
       assert(pattern);
@@ -1828,15 +1822,13 @@ namespace {
         auto *subPattern = paren->getSubPattern();
         auto underlyingType = getTypeForPattern(
             subPattern,
-            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-            bindPatternVarsOneWay);
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)));
 
         return setType(underlyingType);
       }
       case PatternKind::Binding: {
         auto *subPattern = cast<BindingPattern>(pattern)->getSubPattern();
-        auto type = getTypeForPattern(subPattern, locator,
-                                      bindPatternVarsOneWay);
+        auto type = getTypeForPattern(subPattern, locator);
         // Var doesn't affect the type.
         return setType(type);
       }
@@ -1932,99 +1924,64 @@ namespace {
                  var->getNameStr().starts_with("$__builder");
         };
 
-        // When we are supposed to bind pattern variables, create a fresh
-        // type variable and a one-way constraint to assign it to either the
-        // deduced type or the externally-imposed type.
-        Type oneWayVarType;
-        if (bindPatternVarsOneWay) {
-          oneWayVarType = CS.createTypeVariable(
-              CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
+        // Otherwise, let's use the type of the pattern. The type
+        // of the declaration has to be r-value, so let's add an
+        // equality constraint if pattern type has any type variables
+        // that are allowed to be l-value.
+        bool foundLValueVars = false;
 
-          // If there is externally-imposed type, and the variable
-          // is marked as `weak`, let's fallthrough and allow the
-          // `one-way` constraint to be fixed in diagnostic mode.
-          //
-          // That would make sure that type of this variable is
-          // recorded in the constraint  system, which would then
-          // be used instead of `getVarType` upon discovering a
-          // reference to this variable in subsequent expression(s).
-          //
-          // If we let constraint generation fail here, it would trigger
-          // interface type request via `var->getType()` that would
-          // attempt to validate `weak` attribute, and produce a
-          // diagnostic in the middle of the solver path.
+        // Note that it wouldn't be always correct to allocate a single type
+        // variable, that disallows l-value types, to use as a declaration
+        // type because equality constraint would drop TVO_CanBindToLValue
+        // from the right-hand side (which is not the case for `OneWayEqual`)
+        // e.g.:
+        //
+        // struct S { var x, y: Int }
+        //
+        // func test(s: S) {
+        //   let (x, y) = (s.x, s.y)
+        // }
+        //
+        // Single type variable approach results in the following constraint:
+        // `$T_x_y = ($T_s_x, $T_s_y)` where both `$T_s_x` and `$T_s_y` have
+        // to allow l-value, but `$T_x_y` does not. Early simplification of `=`
+        // constraint (due to right-hand side being a "concrete" tuple type)
+        // would drop l-value option from `$T_s_x` and `$T_s_y` which leads to
+        // a failure during member lookup because `x` and `y` are both
+        // `@lvalue Int`. To avoid that, declaration type would mimic pattern
+        // type with all l-value options stripped, so the equality constraint
+        // becomes `($T_x, $_T_y) = ($T_s_x, $T_s_y)` which doesn't result in
+        // stripping of l-value flag from the right-hand side since
+        // simplification can only happen when either side is resolved.
+        auto declTy = varType.transformRec([&](Type type) -> std::optional<Type> {
+          if (auto *typeVar = type->getAs<TypeVariableType>()) {
+            if (typeVar->getImpl().canBindToLValue()) {
+              foundLValueVars = true;
 
-          CS.addConstraint(ConstraintKind::OneWayEqual, oneWayVarType,
-                           varType, locator);
+              // Drop l-value from the options but preserve the rest.
+              auto options = typeVar->getImpl().getRawOptions();
+              options &= ~TVO_CanBindToLValue;
 
-          if (useLocatableTypes())
-            oneWayVarType = makeTypeLocatableIfPossible(oneWayVarType);
-        }
-
-        // Ascribe a type to the declaration so it's always available to
-        // constraint system.
-        if (oneWayVarType) {
-          CS.setType(var, oneWayVarType);
-        } else {
-          // Otherwise, let's use the type of the pattern. The type
-          // of the declaration has to be r-value, so let's add an
-          // equality constraint if pattern type has any type variables
-          // that are allowed to be l-value.
-          bool foundLValueVars = false;
-
-          // Note that it wouldn't be always correct to allocate a single type
-          // variable, that disallows l-value types, to use as a declaration
-          // type because equality constraint would drop TVO_CanBindToLValue
-          // from the right-hand side (which is not the case for `OneWayEqual`)
-          // e.g.:
-          //
-          // struct S { var x, y: Int }
-          //
-          // func test(s: S) {
-          //   let (x, y) = (s.x, s.y)
-          // }
-          //
-          // Single type variable approach results in the following constraint:
-          // `$T_x_y = ($T_s_x, $T_s_y)` where both `$T_s_x` and `$T_s_y` have
-          // to allow l-value, but `$T_x_y` does not. Early simplification of `=`
-          // constraint (due to right-hand side being a "concrete" tuple type)
-          // would drop l-value option from `$T_s_x` and `$T_s_y` which leads to
-          // a failure during member lookup because `x` and `y` are both
-          // `@lvalue Int`. To avoid that, declaration type would mimic pattern
-          // type with all l-value options stripped, so the equality constraint
-          // becomes `($T_x, $_T_y) = ($T_s_x, $T_s_y)` which doesn't result in
-          // stripping of l-value flag from the right-hand side since
-          // simplification can only happen when either side is resolved.
-          auto declTy = varType.transformRec([&](Type type) -> std::optional<Type> {
-            if (auto *typeVar = type->getAs<TypeVariableType>()) {
-              if (typeVar->getImpl().canBindToLValue()) {
-                foundLValueVars = true;
-
-                // Drop l-value from the options but preserve the rest.
-                auto options = typeVar->getImpl().getRawOptions();
-                options &= ~TVO_CanBindToLValue;
-
-                return Type(CS.createTypeVariable(typeVar->getImpl().getLocator(),
-                                                  options));
-              }
+              return Type(CS.createTypeVariable(typeVar->getImpl().getLocator(),
+                                                options));
             }
-            return std::nullopt;
-          });
-
-          // If pattern types allows l-value types, let's create an
-          // equality constraint between r-value only declaration type
-          // and l-value pattern type that would take care of looking
-          // through l-values when necessary.
-          if (foundLValueVars) {
-            CS.addConstraint(ConstraintKind::Equal, declTy, varType,
-                             CS.getConstraintLocator(locator));
           }
+          return std::nullopt;
+        });
 
-          if (useLocatableTypes())
-            declTy = makeTypeLocatableIfPossible(declTy);
-
-          CS.setType(var, declTy);
+        // If pattern types allows l-value types, let's create an
+        // equality constraint between r-value only declaration type
+        // and l-value pattern type that would take care of looking
+        // through l-values when necessary.
+        if (foundLValueVars) {
+          CS.addConstraint(ConstraintKind::Equal, declTy, varType,
+                           CS.getConstraintLocator(locator));
         }
+
+        if (useLocatableTypes())
+          declTy = makeTypeLocatableIfPossible(declTy);
+
+        CS.setType(var, declTy);
 
         return setType(varType);
       }
@@ -2053,8 +2010,7 @@ namespace {
         // ascribed type.
         Type subPatternType = getTypeForPattern(
             subPattern,
-            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-            bindPatternVarsOneWay);
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)));
 
         // NOTE: The order here is important! Pattern matching equality is
         // not symmetric (we need to fix that either by using a different
@@ -2082,8 +2038,7 @@ namespace {
           auto *eltPattern = tupleElt.getPattern();
           Type eltTy = getTypeForPattern(
               eltPattern,
-              locator.withPathElement(LocatorPathElt::PatternMatch(eltPattern)),
-              bindPatternVarsOneWay);
+              locator.withPathElement(LocatorPathElt::PatternMatch(eltPattern)));
 
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
         }
@@ -2096,8 +2051,7 @@ namespace {
         // The subpattern must have optional type.
         Type subPatternType = getTypeForPattern(
             subPattern,
-            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-            bindPatternVarsOneWay);
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)));
 
         return setType(OptionalType::get(subPatternType));
       }
@@ -2127,8 +2081,7 @@ namespace {
         if (auto *subPattern = isPattern->getSubPattern()) {
           auto subPatternType = getTypeForPattern(
               subPattern,
-              locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-              bindPatternVarsOneWay);
+              locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)));
 
           // NOTE: The order here is important! Pattern matching equality is
           // not symmetric (we need to fix that either by using a different
@@ -2231,8 +2184,7 @@ namespace {
           // types.
           Type subPatternType = getTypeForPattern(
               subPattern,
-              locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-              bindPatternVarsOneWay);
+              locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)));
 
           SmallVector<AnyFunctionType::Param, 4> params;
           decomposeTuple(subPatternType, params);
@@ -3657,7 +3609,7 @@ static bool generateInitPatternConstraints(ConstraintSystem &cs,
   Type patternType;
   if (auto pattern = target.getInitializationPattern()) {
     patternType = cs.generateConstraints(
-        pattern, locator, target.shouldBindPatternVarsOneWay(),
+        pattern, locator,
         target.getInitializationPatternBindingDecl(),
         target.getInitializationPatternBindingIndex());
   } else {
@@ -3709,7 +3661,6 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 static std::optional<SequenceIterationInfo>
 generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                                ForEachStmt *stmt, Pattern *typeCheckedPattern,
-                               bool shouldBindPatternVarsOneWay,
                                bool ignoreForEachWhereClause) {
   ASTContext &ctx = cs.getASTContext();
   bool isAsync = stmt->getAwaitLoc().isValid();
@@ -3771,8 +3722,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
         ctx, StaticSpellingKind::None, pattern, makeIteratorCall, dc);
 
     auto makeIteratorTarget = SyntacticElementTarget::forInitialization(
-        makeIteratorCall, /*patternType=*/Type(), PB, /*index=*/0,
-        /*shouldBindPatternsOneWay=*/false);
+        makeIteratorCall, /*patternType=*/Type(), PB, /*index=*/0);
 
     ContextualTypeInfo contextInfo(sequenceProto->getDeclaredInterfaceType(),
                                    CTP_ForEachSequence);
@@ -3867,8 +3817,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 
   // Generate constraints for the pattern.
   Type initType =
-      cs.generateConstraints(typeCheckedPattern, elementLocator,
-                             shouldBindPatternVarsOneWay, nullptr, 0);
+      cs.generateConstraints(typeCheckedPattern, elementLocator, nullptr, 0);
   if (!initType)
     return std::nullopt;
 
@@ -3938,8 +3887,7 @@ generateForEachPreambleConstraints(ConstraintSystem &cs,
 
     // Generate constraints for the pattern.
     Type patternType = cs.generateConstraints(
-        pattern, elementLocator, target.shouldBindPatternVarsOneWay(), nullptr,
-        0);
+        pattern, elementLocator, nullptr, 0);
     if (!patternType)
       return std::nullopt;
 
@@ -3957,8 +3905,7 @@ generateForEachPreambleConstraints(ConstraintSystem &cs,
     target.getForEachStmtInfo() = *packIterationInfo;
   } else {
     auto sequenceIterationInfo = generateForEachStmtConstraints(
-        cs, dc, stmt, pattern, target.shouldBindPatternVarsOneWay(),
-        target.ignoreForEachWhereClause());
+        cs, dc, stmt, pattern, target.ignoreForEachWhereClause());
     if (!sequenceIterationInfo) {
       return std::nullopt;
     }
@@ -4115,8 +4062,7 @@ bool ConstraintSystem::generateConstraints(
       }
 
       auto target = init ? SyntacticElementTarget::forInitialization(
-                               init, patternType, patternBinding, index,
-                               /*bindPatternVarsOneWay=*/true)
+                               init, patternType, patternBinding, index)
                          : SyntacticElementTarget::forUninitializedVar(
                                patternBinding, index, patternType);
 
@@ -4148,7 +4094,7 @@ bool ConstraintSystem::generateConstraints(
       // Generate constraints to bind all of the internal declarations
       // and verify the pattern.
       Type patternType = generateConstraints(
-          pattern, locator, /*shouldBindPatternVarsOneWay*/ true,
+          pattern, locator,
           target.getPatternBindingOfUninitializedVar(),
           target.getIndexOfUninitializedVar());
 
@@ -4183,11 +4129,10 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
 
 Type ConstraintSystem::generateConstraints(
     Pattern *pattern, ConstraintLocatorBuilder locator,
-    bool bindPatternVarsOneWay, PatternBindingDecl *patternBinding,
+    PatternBindingDecl *patternBinding,
     unsigned patternIndex) {
   ConstraintGenerator cg(*this, nullptr);
-  auto ty = cg.getTypeForPattern(pattern, locator, bindPatternVarsOneWay,
-                                 patternBinding, patternIndex);
+  auto ty = cg.getTypeForPattern(pattern, locator, patternBinding, patternIndex);
   assert(ty);
 
   // Gather the ExprPatterns, and form a conjunction for their expressions.
@@ -4248,8 +4193,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
         return true;
 
       auto target = SyntacticElementTarget::forInitialization(
-          condElement.getInitializer(), dc, Type(), pattern,
-          /*bindPatternVarsOneWay=*/true);
+          condElement.getInitializer(), dc, Type(), pattern);
       if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
         return true;
 
