@@ -14,8 +14,11 @@ import AST
 import SILBridging
 
 extension CanonicalType {
-  var objectType: Type { BridgedType.createObjectType(bridged).type }
-  var addressType: Type { BridgedType.createAddressType(bridged).type }
+  // This can yield nil if the AST type is not a lowered type.
+  // For example, if the AST type is a `AnyFunctionType` for which the lowered type would be a `SILFunctionType`.
+  public var silType: Type? {
+    BridgedType.createSILType(bridged).typeOrNil
+  }
 }
 
 extension Decl {
@@ -30,7 +33,7 @@ extension NominalTypeDecl {
 
 extension ClassDecl {
   public var superClassType: Type? {
-    self.superClass?.canonical.objectType
+    self.superClass?.canonical.silType!
   }
 }
 
