@@ -257,6 +257,9 @@ private:
       for (const Decl *member : members) {
         if (member->getModuleContext()->isStdlibModule())
           break;
+        auto VD = dyn_cast<ValueDecl>(member);
+        if (!VD || !shouldInclude(VD))
+          continue;
         // TODO: support nested classes.
         if (isa<ClassDecl>(member))
           continue;
