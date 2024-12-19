@@ -39,6 +39,7 @@
 #include "swift/Sema/SolutionResult.h"
 #include "swift/Sema/SyntacticElementTarget.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
@@ -339,21 +340,17 @@ class TypeVariableType::Implementation {
   /// The corresponding node in the constraint graph.
   constraints::ConstraintGraphNode *GraphNode = nullptr;
 
-  ///  Index into the list of type variables, as used by the
-  ///  constraint graph.
-  unsigned GraphIndex;
+  /// Temporary state for ConstraintGraph::computeConnectedComponents(),
+  /// stored inline for performance.
+  llvm::PointerIntPair<TypeVariableType *, 1, unsigned> Component;
 
   friend class constraints::SolverTrail;
 
 public:
   /// Retrieve the type variable associated with this implementation.
-  TypeVariableType *getTypeVariable() {
-    return reinterpret_cast<TypeVariableType *>(this) - 1;
-  }
-
-  /// Retrieve the type variable associated with this implementation.
-  const TypeVariableType *getTypeVariable() const {
-    return reinterpret_cast<const TypeVariableType *>(this) - 1;
+  TypeVariableType *getTypeVariable() const {
+    return reinterpret_cast<TypeVariableType *>(
+        const_cast<Implementation *>(this)) - 1;
   }
 
   explicit Implementation(constraints::ConstraintLocator *locator,
@@ -406,17 +403,6 @@ public:
   void setGraphNode(constraints::ConstraintGraphNode *newNode) { 
     GraphNode = newNode; 
   }
-
-  /// Retrieve the index into the constraint graph's list of type variables.
-  unsigned getGraphIndex() const { 
-    assert(GraphNode && "Graph node isn't set");
-    return GraphIndex;
-  }
-
-  /// Set the index into the constraint graph's list of type variables.
-  void setGraphIndex(unsigned newIndex) {
-    GraphIndex = newIndex;
-  }
   
   /// Check whether this type variable either has a representative that
   /// is not itself or has a fixed type binding.
@@ -428,6 +414,12 @@ public:
     // Check whether the representative is different from our own type
     // variable.
     return ParentOrFixed.get<TypeVariableType *>() != getTypeVariable();
+  }
+
+  /// Low-level accessor; use getRepresentative() or getFixedType() instead.
+  llvm::PointerUnion<TypeVariableType *, TypeBase *>
+  getRepresentativeOrFixed() const {
+    return ParentOrFixed;
   }
 
   /// Record the current type-variable binding.
@@ -645,6 +637,37 @@ public:
       impl.recordBinding(*trail);
 
     impl.getTypeVariable()->Bits.TypeVariableType.Options |= TVO_CanBindToHole;
+  }
+
+  void setComponent(TypeVariableType *parent) {
+    Component.setPointerAndInt(parent, /*valid=*/false);
+  }
+
+  TypeVariableType *getComponent() const {
+    auto *rep = getTypeVariable();
+    while (rep != rep->getImpl().Component.getPointer())
+      rep = rep->getImpl().Component.getPointer();
+
+    // Path compression
+    if (rep != getTypeVariable()) {
+      const_cast<TypeVariableType::Implementation *>(this)
+          ->Component.setPointer(rep);
+    }
+
+    return rep;
+  }
+
+  bool isValidComponent() const {
+    ASSERT(Component.getPointer() == getTypeVariable());
+    return Component.getInt();
+  }
+
+  bool markValidComponent() {
+    if (Component.getInt())
+      return false;
+    ASSERT(Component.getPointer() == getTypeVariable());
+    Component.setInt(1);
+    return true;
   }
 
   /// Print the type variable to the given output stream.
@@ -2339,7 +2362,7 @@ private:
   ConstraintList InactiveConstraints;
 
   /// The constraint graph.
-  ConstraintGraph &CG;
+  ConstraintGraph CG;
 
   /// A mapping from constraint locators to the set of opened types associated
   /// with that locator.
@@ -2707,7 +2730,7 @@ public:
   ~ConstraintSystem();
 
   /// Retrieve the constraint graph associated with this constraint system.
-  ConstraintGraph &getConstraintGraph() const { return CG; }
+  ConstraintGraph &getConstraintGraph() { return CG; }
 
   /// Retrieve the AST context.
   ASTContext &getASTContext() const { return Context; }
