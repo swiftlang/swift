@@ -284,12 +284,11 @@ BridgedType::EnumElementIterator BridgedType::EnumElementIterator::getNext() con
   return bridge(std::next(unbridge(*this)));
 }
 
-BridgedType BridgedType::createObjectType(BridgedCanType canTy) {
-  return swift::SILType::getPrimitiveObjectType(canTy.unbridged());
-}
-
-BridgedType BridgedType::createAddressType(BridgedCanType canTy) {
-  return swift::SILType::getPrimitiveAddressType(canTy.unbridged());
+BridgedType BridgedType::createSILType(BridgedCanType canTy) {
+  auto ty = canTy.unbridged();
+  if (ty->isLegalSILType())
+    return swift::SILType::getPrimitiveObjectType(ty);
+  return swift::SILType();
 }
 
 BridgedOwnedString BridgedType::getDebugDescription() const {

@@ -245,8 +245,7 @@ struct BridgedType {
   BRIDGED_INLINE swift::SILType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanType() const;
 
-  static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType createObjectType(BridgedCanType canTy);
-  static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType createAddressType(BridgedCanType canTy);
+  static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType createSILType(BridgedCanType canTy);
   BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool isNull() const;
   BRIDGED_INLINE bool isAddress() const;
