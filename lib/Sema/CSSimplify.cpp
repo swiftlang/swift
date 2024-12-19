@@ -2180,7 +2180,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::ValueMember:
   case ConstraintKind::ValueWitness:
   case ConstraintKind::BridgingConversion:
-  case ConstraintKind::OneWayEqual:
   case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
@@ -2551,7 +2550,6 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::ValueWitness:
-  case ConstraintKind::OneWayEqual:
   case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
@@ -3195,7 +3193,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::ValueMember:
   case ConstraintKind::ValueWitness:
   case ConstraintKind::BridgingConversion:
-  case ConstraintKind::OneWayEqual:
   case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
@@ -7130,7 +7127,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueMember:
     case ConstraintKind::ValueWitness:
-    case ConstraintKind::OneWayEqual:
     case ConstraintKind::FallbackType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PropertyWrapper:
@@ -11564,38 +11560,6 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyOneWayConstraint(
-    ConstraintKind kind,
-    Type first, Type second, TypeMatchOptions flags,
-    ConstraintLocatorBuilder locator) {
-  // Determine whether the second type can be fully simplified. Only then
-  // will this constraint be resolved.
-  Type secondSimplified = simplifyType(second);
-  if (secondSimplified->hasTypeVariable()) {
-    if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(
-        Constraint::create(*this, kind, first, second,
-                           getConstraintLocator(locator)));
-      return SolutionKind::Solved;
-    }
-
-    return SolutionKind::Unsolved;
-  }
-
-  // Propagate holes through one-way constraints.
-  if (secondSimplified->isPlaceholder()) {
-    recordAnyTypeVarAsPotentialHole(first);
-    return SolutionKind::Solved;
-  }
-
-  // Translate this constraint into an equality or bind-parameter constraint,
-  // as appropriate.
-  ASSERT(kind == ConstraintKind::OneWayEqual);
-  return matchTypes(first, secondSimplified, ConstraintKind::Equal, flags,
-                    locator);
-}
-
-ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyUnresolvedMemberChainBaseConstraint(
     Type first, Type second, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
@@ -15726,9 +15690,6 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::PropertyWrapper:
     return simplifyPropertyWrapperConstraint(first, second, subflags, locator);
 
-  case ConstraintKind::OneWayEqual:
-    return simplifyOneWayConstraint(kind, first, second, subflags, locator);
-
   case ConstraintKind::UnresolvedMemberChainBase:
     return simplifyUnresolvedMemberChainBaseConstraint(first, second, subflags,
                                                        locator);
@@ -16305,12 +16266,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Conjunction:
     // See {Dis, Con}junctionStep class in CSStep.cpp for solving
     return SolutionKind::Unsolved;
-
-  case ConstraintKind::OneWayEqual:
-    return simplifyOneWayConstraint(
-        constraint.getKind(), constraint.getFirstType(),
-        constraint.getSecondType(),
-        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::UnresolvedMemberChainBase:
     return simplifyUnresolvedMemberChainBaseConstraint(
