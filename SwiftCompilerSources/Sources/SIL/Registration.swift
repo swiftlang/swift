@@ -14,7 +14,7 @@ import Basic
 import SILBridging
 
 private func register<T: AnyObject>(_ cl: T.Type) {
-  String(describing: cl)._withBridgedStringRef { nameStr in
+  _typeName(cl, qualified: false)._withBridgedStringRef { nameStr in
     let metatype = unsafeBitCast(cl, to: SwiftMetatype.self)
     registerBridgedClass(nameStr, metatype)
   }
