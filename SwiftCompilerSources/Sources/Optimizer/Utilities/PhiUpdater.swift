@@ -147,8 +147,7 @@ private func addEnclosingValues(
 
   let builder = Builder(before: borrowedFrom, context)
   let newBfi = builder.createBorrowedFrom(borrowedValue: borrowedFrom.borrowedValue, enclosingValues: evs)
-  borrowedFrom.uses.replaceAll(with: newBfi, context)
-  context.erase(instruction: borrowedFrom)
+  borrowedFrom.replace(with: newBfi, context)
   return true
 }
 
@@ -185,8 +184,7 @@ func replacePhiWithIncomingValue(phi: Phi, _ context: some MutatingContext) -> B
     return false
   }
   if let borrowedFrom = phi.borrowedFrom {
-    borrowedFrom.uses.replaceAll(with: uniqueIncomingValue, context)
-    context.erase(instruction: borrowedFrom)
+    borrowedFrom.replace(with: uniqueIncomingValue, context)
   } else {
     phi.value.uses.replaceAll(with: uniqueIncomingValue, context)
   }

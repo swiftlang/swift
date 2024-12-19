@@ -145,8 +145,7 @@ private extension BuiltinInst {
     default:
       fatalError()
     }
-    uses.replaceAll(with: literal, context)
-    context.erase(instruction: self)
+    self.replace(with: literal, context)
   }
 
   func optimizeAssertConfig(_ context: SimplifyContext) {

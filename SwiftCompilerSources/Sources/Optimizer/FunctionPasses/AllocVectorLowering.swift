@@ -250,8 +250,7 @@ private func createOutlinedGlobal(
   let globalAddr = builder.createGlobalAddr(global: outlinedGlobal, dependencyToken: nil)
   let rawVectorPointer = builder.createAddressToPointer(address: globalAddr, pointerType: allocVectorBuiltin.type,
                                                         needStackProtection: false)
-  allocVectorBuiltin.uses.replaceAll(with: rawVectorPointer, context)
-  context.erase(instruction: allocVectorBuiltin)
+  allocVectorBuiltin.replace(with: rawVectorPointer, context)
 }
 
 private func createStackAllocatedVector(
@@ -266,8 +265,7 @@ private func createStackAllocatedVector(
   let rawVectorPointer = builder.createAddressToPointer(address: allocVec, pointerType: allocVectorBuiltin.type,
                                                         needStackProtection: true)
 
-  allocVectorBuiltin.uses.replaceAll(with: rawVectorPointer, context)
-  context.erase(instruction: allocVectorBuiltin)
+  allocVectorBuiltin.replace(with: rawVectorPointer, context)
 
   for endInst in liverange.ends {
     let builder = Builder(after: endInst, context)
