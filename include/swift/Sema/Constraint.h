@@ -155,12 +155,6 @@ enum class ConstraintKind : char {
   /// type). At that point, this constraint will be treated like an `Equal`
   /// constraint.
   OneWayEqual,
-  /// The second type is the type of a function parameter, and the first type
-  /// is the type of a reference to that function parameter within the body.
-  /// Once the second type has been fully determined (and mapped down to a
-  /// concrete type), this constraint will be treated like a 'BindParam'
-  /// constraint.
-  OneWayBindParam,
   /// If there is no contextual info e.g. `_ = { 42 }` default first type
   /// to a second type. This is effectively a `Defaultable` constraint
   /// which one significant difference:
@@ -687,7 +681,6 @@ public:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::OneWayEqual:
-    case ConstraintKind::OneWayBindParam:
     case ConstraintKind::FallbackType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PackElementOf:
@@ -835,8 +828,7 @@ public:
 
   /// Whether this is a one-way constraint.
   bool isOneWayConstraint() const {
-    return Kind == ConstraintKind::OneWayEqual ||
-        Kind == ConstraintKind::OneWayBindParam;
+    return Kind == ConstraintKind::OneWayEqual;
   }
 
   /// Retrieve the overload choice for an overload-binding constraint.

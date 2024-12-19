@@ -75,7 +75,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::BindTupleOfFunctionParams:
@@ -164,7 +163,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::Disjunction:
   case ConstraintKind::Conjunction:
   case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
@@ -398,7 +396,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
   case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;
-  case ConstraintKind::OneWayBindParam: Out << " one-way bind param to "; break;
   case ConstraintKind::FallbackType:
     Out << " can fallback to ";
     break;
@@ -679,7 +676,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:

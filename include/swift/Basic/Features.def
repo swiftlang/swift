@@ -254,7 +254,6 @@ EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
 EXPERIMENTAL_FEATURE(ConsumeSelfInDeinit, true)
 
-EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
