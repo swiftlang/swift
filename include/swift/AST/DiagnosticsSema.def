@@ -4729,6 +4729,11 @@ NOTE(ambiguous_because_of_trailing_closure,none,
      "avoid using a trailing closure}0 to call %1",
      (bool, const ValueDecl *))
 
+// In-package resilience bypassing
+ERROR(cannot_bypass_resilience_due_to_deserialization_error,none,
+      "cannot bypass resilience when accessing %0 because some of its members failed to deserialize",
+      (Identifier))
+
 // Cannot capture inout-ness of a parameter
 // Partial application of foreign functions not supported
 ERROR(partial_application_of_function_invalid,none,
