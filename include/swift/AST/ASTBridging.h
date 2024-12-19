@@ -2293,6 +2293,15 @@ public:
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getType() const;
 };
 
+struct BridgedASTTypeArray {
+  BridgedArrayRef typeArray;
+
+  SwiftInt getCount() const { return SwiftInt(typeArray.Length); }
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedASTType getAt(SwiftInt index) const;
+};
+
 struct BridgedConformance {
   void * _Nullable opaqueValue;
 
@@ -2330,6 +2339,7 @@ struct BridgedSubstitutionMap {
   BRIDGED_INLINE bool hasAnySubstitutableParams() const;
   BRIDGED_INLINE SwiftInt getNumConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getConformance(SwiftInt index) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getReplacementTypes() const;
 };
 
 struct BridgedFingerprint {

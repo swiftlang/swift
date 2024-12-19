@@ -339,6 +339,15 @@ BridgedASTType BridgedCanType::getType() const {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedASTTypeArray
+//===----------------------------------------------------------------------===//
+
+BridgedASTType BridgedASTTypeArray::getAt(SwiftInt index) const {
+  return {typeArray.unbridged<swift::Type>()[index].getPointer()};
+}
+
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedConformance
 //===----------------------------------------------------------------------===//
 
@@ -460,6 +469,10 @@ SwiftInt BridgedSubstitutionMap::getNumConformances() const {
 
 BridgedConformance BridgedSubstitutionMap::getConformance(SwiftInt index) const {
   return unbridged().getConformances()[index];
+}
+
+BridgedASTTypeArray BridgedSubstitutionMap::getReplacementTypes() const {
+  return {unbridged().getReplacementTypes()};
 }
 
 //===----------------------------------------------------------------------===//

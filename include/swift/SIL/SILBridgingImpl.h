@@ -988,24 +988,7 @@ SwiftInt BridgedMultiValueResult::getIndex() const {
 }
 
 //===----------------------------------------------------------------------===//
-//                                BridgedTypeArray
-//===----------------------------------------------------------------------===//
-
-BridgedTypeArray 
-BridgedTypeArray::fromReplacementTypes(BridgedSubstitutionMap substMap) {
-  return {substMap.unbridged().getReplacementTypes()};
-}
-
-BridgedType BridgedTypeArray::getAt(SwiftInt index) const {
-  swift::Type origTy = typeArray.unbridged<swift::Type>()[index];
-  auto ty = origTy->getCanonicalType();
-  if (ty->isLegalSILType())
-    return swift::SILType::getPrimitiveObjectType(ty);
-  return swift::SILType();
-}
-
-//===----------------------------------------------------------------------===//
-//                                BridgedTypeArray
+//                              BridgedSILTypeArray
 //===----------------------------------------------------------------------===//
 
 BridgedType BridgedSILTypeArray::getAt(SwiftInt index) const {

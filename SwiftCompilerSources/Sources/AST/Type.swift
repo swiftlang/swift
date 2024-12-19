@@ -64,3 +64,23 @@ public struct CanonicalType: CustomStringConvertible, NoReflectionChildren {
     return type.subst(with: substitutionMap).canonical
   }
 }
+
+public struct TypeArray : RandomAccessCollection, CustomReflectable {
+  public let bridged: BridgedASTTypeArray
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return bridged.getCount() }
+
+  public init(bridged: BridgedASTTypeArray) {
+    self.bridged = bridged
+  }
+
+  public subscript(_ index: Int) -> Type {
+    Type(bridged: bridged.getAt(index))
+  }
+
+  public var customMirror: Mirror {
+    let c: [Mirror.Child] = map { (label: nil, value: $0) }
+    return Mirror(self, children: c)
+  }
+}

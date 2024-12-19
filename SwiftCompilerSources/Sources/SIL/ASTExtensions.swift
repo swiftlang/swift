@@ -58,9 +58,4 @@ extension SubstitutionMap {
   public func getMethodSubstitutions(for method: Function) -> SubstitutionMap {
     return SubstitutionMap(bridged: method.bridged.getMethodSubstitutions(bridged))
   }
-
-  public var replacementTypes: OptionalTypeArray {
-    let types = BridgedTypeArray.fromReplacementTypes(bridged)
-    return OptionalTypeArray(bridged: types)
-  }
 }

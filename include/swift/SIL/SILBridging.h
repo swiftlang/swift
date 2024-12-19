@@ -614,18 +614,6 @@ struct BridgedMultiValueResult {
   BRIDGED_INLINE SwiftInt getIndex() const;
 };
 
-struct BridgedTypeArray {
-  BridgedArrayRef typeArray;
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-  static BridgedTypeArray fromReplacementTypes(BridgedSubstitutionMap substMap);
-
-  SwiftInt getCount() const { return SwiftInt(typeArray.Length); }
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-  BridgedType getAt(SwiftInt index) const;
-};
-
 struct BridgedSILTypeArray {
   BridgedArrayRef typeArray;
 
