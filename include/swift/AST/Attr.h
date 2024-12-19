@@ -3189,13 +3189,19 @@ public:
   const AvailableAttr *getParsedAttr() const { return attr; }
   const AvailabilityDomain getDomain() const { return domain; }
 
+  /// Returns the `message:` field of the attribute, or an empty string.
+  StringRef getMessage() const { return attr->Message; }
+
+  /// Returns the `rename:` field of the attribute, or an empty string.
+  StringRef getRename() const { return attr->Rename; }
+
   /// Returns the platform kind that the attribute applies to, or
   /// `PlatformKind::none` if the attribute is not platform specific.
   bool isPlatformSpecific() const { return getDomain().isPlatform(); }
 
   /// Returns the platform kind that the attribute applies to, or
   /// `PlatformKind::none` if the attribute is not platform specific.
-  PlatformKind getPlatformKind() const { return getDomain().getPlatformKind(); }
+  PlatformKind getPlatform() const { return getDomain().getPlatformKind(); }
 
   /// Whether this is a `noasync` attribute.
   bool isNoAsync() const { return attr->isNoAsync(); }

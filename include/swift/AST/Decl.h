@@ -1428,7 +1428,7 @@ public:
 
   /// Returns the first @available attribute that indicates this decl is
   /// unavailable from asynchronous contexts, or `nullptr` otherwise.
-  const AvailableAttr *getNoAsyncAttr() const;
+  std::optional<SemanticAvailableAttr> getNoAsyncAttr() const;
 
   /// Returns true if the decl has been marked unavailable in the Swift language
   /// version that is currently active.

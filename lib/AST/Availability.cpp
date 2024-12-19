@@ -581,33 +581,26 @@ const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
   return result;
 }
 
-const AvailableAttr *Decl::getNoAsyncAttr() const {
-  const AvailableAttr *bestAttr = nullptr;
+std::optional<SemanticAvailableAttr> Decl::getNoAsyncAttr() const {
+  std::optional<SemanticAvailableAttr> bestAttr;
 
-  for (auto semanticAttr :
-       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto attr = semanticAttr.getParsedAttr();
-
-    if (!semanticAttr.isNoAsync())
+  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (!attr.isNoAsync())
       continue;
 
     if (!bestAttr) {
-      bestAttr = attr;
-      continue;
-    }
-
-    if (!bestAttr) {
-      // If there is no best attr selected  and the attr either has an active
+      // If there is no best attr selected and the attr either has an active
       // platform, or doesn't have one at all, select it.
-      bestAttr = attr;
-    } else if (bestAttr && attr->hasPlatform() && bestAttr->hasPlatform() &&
-               inheritsAvailabilityFromPlatform(attr->getPlatform(),
+      bestAttr.emplace(attr);
+    } else if (bestAttr && attr.isPlatformSpecific() &&
+               bestAttr->isPlatformSpecific() &&
+               inheritsAvailabilityFromPlatform(attr.getPlatform(),
                                                 bestAttr->getPlatform())) {
       // if they both have a viable platform, use the better one
-      bestAttr = attr;
-    } else if (attr->hasPlatform() && !bestAttr->hasPlatform()) {
+      bestAttr.emplace(attr);
+    } else if (attr.isPlatformSpecific() && !bestAttr->isPlatformSpecific()) {
       // Use the one more specific
-      bestAttr = attr;
+      bestAttr.emplace(attr);
     }
   }
   return bestAttr;
