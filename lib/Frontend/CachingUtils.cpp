@@ -226,7 +226,8 @@ bool replayCachedCompilerOutputs(
                 OutputEntry{OutputPath->second, OutID, Kind, Input, *Proxy});
           return Error::success();
         })) {
-      Diag.diagnose(SourceLoc(), diag::error_cas, toString(std::move(Err)));
+      Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
+                    toString(std::move(Err)));
       return lookupFailed();
     }
   };
@@ -324,8 +325,11 @@ bool replayCachedCompilerOutputs(
       }
     } else if (Output.Kind == file_types::ID::TY_Dependencies) {
       if (emitMakeDependenciesFromSerializedBuffer(
-              Output.Proxy.getData(), *File, Opts, Output.Input, Diag))
+            Output.Proxy.getData(), *File, Opts, Output.Input, Diag)) {
+        Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
+                      "failed to emit dependency file");
         return false;
+      }
     } else
       *File << Output.Proxy.getData();
 
