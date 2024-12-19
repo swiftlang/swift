@@ -56,4 +56,8 @@ public struct SubstitutionMap: CustomStringConvertible {
       return Conformance(bridged: bridgedSubs.getConformance(index))
     }
   }
+
+  public var replacementTypes: TypeArray {
+    TypeArray(bridged: bridged.getReplacementTypes())
+  }
 }

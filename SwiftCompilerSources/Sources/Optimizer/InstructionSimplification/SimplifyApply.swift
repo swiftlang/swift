@@ -56,8 +56,7 @@ private func tryTransformThickToThinCallee(of apply: ApplyInst, _ context: Simpl
                                        isNonThrowing: apply.isNonThrowing,
                                        isNonAsync: apply.isNonAsync,
                                        specializationInfo: apply.specializationInfo)
-    apply.uses.replaceAll(with: newApply, context)
-    context.erase(instruction: apply)
+    apply.replace(with: newApply, context)
     return true
   }
   return false

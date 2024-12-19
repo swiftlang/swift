@@ -413,8 +413,7 @@ private func replace(object allocRef: AllocRefInstBase,
   }
 
   rewriteUses(of: allocRef, context)
-  allocRef.uses.replaceAll(with: globalValue, context)
-  context.erase(instruction: allocRef)
+  allocRef.replace(with: globalValue, context)
   return globalValue
 }
 
@@ -431,13 +430,11 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
       if !beginDealloc.parentFunction.hasOwnership {
         builder.createStrongRelease(operand: beginDealloc.reference)
       }
-      beginDealloc.uses.replaceAll(with: beginDealloc.reference, context)
-      context.erase(instruction: beginDealloc)
+      beginDealloc.replace(with: beginDealloc.reference, context)
     case is EndCOWMutationInst, is EndInitLetRefInst, is MoveValueInst:
       let svi = inst as! SingleValueInstruction
       worklist.pushIfNotVisited(usersOf: svi)
-      svi.uses.replaceAll(with: svi.operands[0].value, context)
-      context.erase(instruction: svi)
+      svi.replace(with: svi.operands[0].value, context)
     case let upCast as UpcastInst:
       worklist.pushIfNotVisited(usersOf: upCast)
     case let refCast as UncheckedRefCastInst:
@@ -454,7 +451,7 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
 
 private extension InstructionWorklist {
   mutating func pushIfNotVisited(usersOf value: Value) {
-    pushIfNotVisited(contentsOf: value.uses.lazy.map { $0.instruction })
+    pushIfNotVisited(contentsOf: value.users)
   }
 }
 
@@ -571,8 +568,7 @@ private func replace(findStringCall: ApplyInst,
                                                 findStringCall.arguments[1],
                                                 cacheAddr])
 
-  findStringCall.uses.replaceAll(with: newCall, context)
-  context.erase(instruction: findStringCall)
+  findStringCall.replace(with: newCall, context)
 }
 
 private extension GlobalValueInst {

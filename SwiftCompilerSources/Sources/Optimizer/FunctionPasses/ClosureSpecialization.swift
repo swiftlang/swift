@@ -301,8 +301,7 @@ private func rewriteApplyInstruction(using specializedCallee: Function, callSite
     }
   }
 
-  oldApply.uses.replaceAll(with: newApply, context)
-  context.erase(instruction: oldApply)
+  oldApply.replace(with: newApply, context)
 }
 
 // ===================== Utility functions and extensions ===================== //

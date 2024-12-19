@@ -33,7 +33,7 @@ extension BuiltinInst : OnoneSimplifyable {
            .Alignof:
         optimizeTargetTypeConst(context)
       case .DestroyArray:
-        if let elementType = substitutionMap.replacementTypes[0],
+        if let elementType = substitutionMap.replacementTypes[0].canonical.silType,
            elementType.isTrivial(in: parentFunction)
         {
           context.erase(instruction: self)
@@ -129,7 +129,7 @@ private extension BuiltinInst {
   }
 
   func optimizeCanBeClass(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0] else {
+    guard let ty = substitutionMap.replacementTypes[0].canonical.silType else {
       return
     }
     let literal: IntegerLiteralInst
@@ -167,7 +167,7 @@ private extension BuiltinInst {
   }
   
   func optimizeTargetTypeConst(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0] else {
+    guard let ty = substitutionMap.replacementTypes[0].canonical.silType else {
       return
     }
     

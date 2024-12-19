@@ -245,8 +245,7 @@ struct BridgedType {
   BRIDGED_INLINE swift::SILType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanType() const;
 
-  static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType createObjectType(BridgedCanType canTy);
-  static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType createAddressType(BridgedCanType canTy);
+  static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType createSILType(BridgedCanType canTy);
   BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool isNull() const;
   BRIDGED_INLINE bool isAddress() const;
@@ -602,18 +601,6 @@ struct BridgedMultiValueResult {
   BRIDGED_INLINE swift::MultipleValueInstructionResult * _Nonnull unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction getParent() const;
   BRIDGED_INLINE SwiftInt getIndex() const;
-};
-
-struct BridgedTypeArray {
-  BridgedArrayRef typeArray;
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-  static BridgedTypeArray fromReplacementTypes(BridgedSubstitutionMap substMap);
-
-  SwiftInt getCount() const { return SwiftInt(typeArray.Length); }
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-  BridgedType getAt(SwiftInt index) const;
 };
 
 struct BridgedSILTypeArray {

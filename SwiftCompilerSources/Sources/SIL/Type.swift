@@ -243,26 +243,6 @@ public struct TypeArray : RandomAccessCollection, CustomReflectable {
   }
 }
 
-public struct OptionalTypeArray : RandomAccessCollection, CustomReflectable {
-  private let bridged: BridgedTypeArray
-
-  public var startIndex: Int { return 0 }
-  public var endIndex: Int { return bridged.getCount() }
-
-  public init(bridged: BridgedTypeArray) {
-    self.bridged = bridged
-  }
-
-  public subscript(_ index: Int) -> Type? {
-    bridged.getAt(index).typeOrNil
-  }
-
-  public var customMirror: Mirror {
-    let c: [Mirror.Child] = map { (label: nil, value: $0 ?? "<invalid>") }
-    return Mirror(self, children: c)
-  }
-}
-
 public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
   fileprivate let type: Type
   fileprivate let function: Function
