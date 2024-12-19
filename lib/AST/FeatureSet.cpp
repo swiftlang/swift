@@ -263,8 +263,6 @@ static bool usesFeatureLifetimeDependence(Decl *decl) {
       ->hasLifetimeDependencies();
 }
 
-UNINTERESTING_FEATURE(LifetimeDependenceDiagnoseTrivial)
-
 UNINTERESTING_FEATURE(DynamicActorIsolation)
 UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)

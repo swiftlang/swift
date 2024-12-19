@@ -2,12 +2,10 @@
 // RUN:   --lifetime-dependence-scope-fixup \
 // RUN:   -sil-verify-all \
 // RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN:   2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 // Test the SIL representation for lifetime dependence scope fixup.
 
