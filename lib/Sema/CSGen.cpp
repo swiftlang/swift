@@ -3163,14 +3163,6 @@ namespace {
       llvm_unreachable("Handled by the walker directly");
     }
 
-    Type visitOneWayExpr(OneWayExpr *expr) {
-      auto locator = CS.getConstraintLocator(expr);
-      auto resultTypeVar = CS.createTypeVariable(locator, 0);
-      CS.addConstraint(ConstraintKind::OneWayEqual, resultTypeVar,
-                       CS.getType(expr->getSubExpr()), locator);
-      return resultTypeVar;
-    }
-
     Type visitTapExpr(TapExpr *expr) {
       DeclContext *varDC = expr->getVar()->getDeclContext();
       ASSERT(varDC != nullptr);
@@ -3333,7 +3325,6 @@ namespace {
                                JoinInout,
                                JoinMeta,
                                JoinNonexistent,
-                               OneWay,
     };
 
     static TypeOperation getTypeOperation(UnresolvedDotExpr *UDE,
@@ -3347,7 +3338,6 @@ namespace {
 
       return llvm::StringSwitch<TypeOperation>(
                  UDE->getName().getBaseIdentifier().str())
-          .Case("one_way", TypeOperation::OneWay)
           .Case("type_join", TypeOperation::Join)
           .Case("type_join_inout", TypeOperation::JoinInout)
           .Case("type_join_meta", TypeOperation::JoinMeta)
@@ -3361,7 +3351,6 @@ namespace {
 
       switch (op) {
       case TypeOperation::None:
-      case TypeOperation::OneWay:
         llvm_unreachable(
             "We should have a valid type operation at this point!");
 
@@ -3558,12 +3547,7 @@ namespace {
           auto typeOperation =
               ConstraintGenerator::getTypeOperation(UDE, CS.getASTContext());
 
-          if (typeOperation == ConstraintGenerator::TypeOperation::OneWay) {
-            // For a one-way constraint, create the OneWayExpr node.
-            auto *unaryArg = apply->getArgs()->getUnlabeledUnaryExpr();
-            assert(unaryArg);
-            expr = new (CS.getASTContext()) OneWayExpr(unaryArg);
-          } else if (typeOperation !=
+          if (typeOperation !=
                          ConstraintGenerator::TypeOperation::None) {
             // Handle the Builtin.type_join* family of calls by replacing
             // them with dot_self_expr of type_expr with the type being the
