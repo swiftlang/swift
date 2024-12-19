@@ -477,6 +477,16 @@ struct BridgedFunction {
     IsSerializedForPackage
   };
 
+  enum class OptionalSourceFileKind {
+    Library,
+    Main,
+    SIL,
+    Interface,
+    MacroExpansion,
+    DefaultArgument, // must match swift::SourceFileKind::DefaultArgument
+    None
+  };
+
   SWIFT_NAME("init(obj:)")
   BridgedFunction(SwiftObject obj) : obj(obj) {}
   BridgedFunction() {}
@@ -529,6 +539,7 @@ struct BridgedFunction {
   bool isAutodiffVJP() const;
   SwiftInt specializationLevel() const;
   SWIFT_IMPORT_UNSAFE BridgedSubstitutionMap getMethodSubstitutions(BridgedSubstitutionMap contextSubs) const;
+  BRIDGED_INLINE OptionalSourceFileKind getSourceFileKind() const;
 
   enum class ParseEffectsMode {
     argumentEffectsFromSource,
