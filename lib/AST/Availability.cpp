@@ -537,7 +537,7 @@ const AvailableAttr *Decl::getDeprecatedAttr() const {
 
     std::optional<llvm::VersionTuple> deprecatedVersion = attr->Deprecated;
 
-    StringRef deprecatedPlatform = attr->prettyPlatformString();
+    StringRef deprecatedPlatform;
     llvm::VersionTuple remappedDeprecatedVersion;
     if (AvailabilityInference::updateDeprecatedPlatformForFallback(
             attr, ctx, deprecatedPlatform, remappedDeprecatedVersion))
@@ -546,7 +546,7 @@ const AvailableAttr *Decl::getDeprecatedAttr() const {
     if (!deprecatedVersion.has_value())
       continue;
 
-    llvm::VersionTuple minVersion = attr->getActiveVersion(ctx);
+    llvm::VersionTuple minVersion = semanticAttr.getActiveVersion(ctx);
 
     // We treat the declaration as deprecated if it is deprecated on
     // all deployment targets.
@@ -573,7 +573,7 @@ const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
     if (!deprecatedVersion.has_value())
       continue;
 
-    llvm::VersionTuple activeVersion = attr->getActiveVersion(ctx);
+    llvm::VersionTuple activeVersion = semanticAttr.getActiveVersion(ctx);
 
     if (deprecatedVersion.value() > activeVersion)
       result = attr;
@@ -618,10 +618,8 @@ bool Decl::isUnavailableInCurrentSwiftVersion() const {
   llvm::VersionTuple vers = getASTContext().LangOpts.EffectiveLanguageVersion;
   for (auto semanticAttr :
        getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto attr = semanticAttr.getParsedAttr();
-    auto domain = semanticAttr.getDomain();
-
-    if (domain.isSwiftLanguage()) {
+    if (semanticAttr.isSwiftLanguageModeSpecific()) {
+      auto attr = semanticAttr.getParsedAttr();
       if (attr->Introduced.has_value() && attr->Introduced.value() > vers)
         return true;
       if (attr->Obsoleted.has_value() && attr->Obsoleted.value() <= vers)
@@ -656,7 +654,7 @@ getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
     if (attr->isUnconditionallyUnavailable())
       return attr;
 
-    switch (attr->getVersionAvailability(ctx)) {
+    switch (semanticAttr.getVersionAvailability(ctx)) {
     case AvailableVersionComparison::Available:
     case AvailableVersionComparison::PotentiallyUnavailable:
       break;

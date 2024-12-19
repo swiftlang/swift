@@ -830,11 +830,10 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
       if (!semanticAttr)
         continue;
 
-      auto domain = semanticAttr->getDomain();
       if (isShortAvailable(*semanticAttr)) {
-        if (domain.isSwiftLanguage())
+        if (semanticAttr->isSwiftLanguageModeSpecific())
           swiftVersionAvailableAttribute.emplace(*semanticAttr);
-        else if (domain.isPackageDescription())
+        else if (semanticAttr->isPackageDescriptionVersionSpecific())
           packageDescriptionVersionAvailableAttribute.emplace(*semanticAttr);
         else
           shortAvailableAttributes.push_back(*semanticAttr);
@@ -2169,32 +2168,6 @@ OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,
       OriginalModuleName, Platform, MovedVersion, implicit);
 }
 
-bool AvailableAttr::isLanguageVersionSpecific() const {
-  if (getPlatformAgnosticAvailability() ==
-      PlatformAgnosticAvailabilityKind::SwiftVersionSpecific)
-    {
-      assert(getPlatform() == PlatformKind::none &&
-             (Introduced.has_value() ||
-              Deprecated.has_value() ||
-              Obsoleted.has_value()));
-      return true;
-    }
-  return false;
-}
-
-bool AvailableAttr::isPackageDescriptionVersionSpecific() const {
-  if (getPlatformAgnosticAvailability() ==
-      PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific)
-    {
-      assert(getPlatform() == PlatformKind::none &&
-             (Introduced.has_value() ||
-              Deprecated.has_value() ||
-              Obsoleted.has_value()));
-      return true;
-    }
-  return false;
-}
-
 bool AvailableAttr::isUnconditionallyUnavailable() const {
   switch (getPlatformAgnosticAvailability()) {
   case PlatformAgnosticAvailabilityKind::None:
@@ -2234,8 +2207,9 @@ bool AvailableAttr::isNoAsync() const {
          PlatformAgnosticAvailabilityKind::NoAsync;
 }
 
-llvm::VersionTuple AvailableAttr::getActiveVersion(const ASTContext &ctx) const {
-  if (isLanguageVersionSpecific()) {
+llvm::VersionTuple
+SemanticAvailableAttr::getActiveVersion(const ASTContext &ctx) const {
+  if (isSwiftLanguageModeSpecific()) {
     return ctx.LangOpts.EffectiveLanguageVersion;
   } else if (isPackageDescriptionVersionSpecific()) {
     return ctx.LangOpts.PackageDescriptionVersion;
@@ -2244,20 +2218,20 @@ llvm::VersionTuple AvailableAttr::getActiveVersion(const ASTContext &ctx) const 
   }
 }
 
-AvailableVersionComparison AvailableAttr::getVersionAvailability(
-  const ASTContext &ctx) const {
+AvailableVersionComparison
+SemanticAvailableAttr::getVersionAvailability(const ASTContext &ctx) const {
 
   // Unconditional unavailability.
-  if (isUnconditionallyUnavailable())
+  if (attr->isUnconditionallyUnavailable())
     return AvailableVersionComparison::Unavailable;
 
   llvm::VersionTuple queryVersion = getActiveVersion(ctx);
-  std::optional<llvm::VersionTuple> ObsoletedVersion = Obsoleted;
+  std::optional<llvm::VersionTuple> ObsoletedVersion = attr->Obsoleted;
 
-  StringRef ObsoletedPlatform = prettyPlatformString();
+  StringRef ObsoletedPlatform;
   llvm::VersionTuple RemappedObsoletedVersion;
   if (AvailabilityInference::updateObsoletedPlatformForFallback(
-      this, ctx, ObsoletedPlatform, RemappedObsoletedVersion))
+          attr, ctx, ObsoletedPlatform, RemappedObsoletedVersion))
     ObsoletedVersion = RemappedObsoletedVersion;
 
   // If this entity was obsoleted before or at the query platform version,
@@ -2265,11 +2239,11 @@ AvailableVersionComparison AvailableAttr::getVersionAvailability(
   if (ObsoletedVersion && *ObsoletedVersion <= queryVersion)
     return AvailableVersionComparison::Obsoleted;
 
-  std::optional<llvm::VersionTuple> IntroducedVersion = Introduced;
-  StringRef IntroducedPlatform = prettyPlatformString();
+  std::optional<llvm::VersionTuple> IntroducedVersion = attr->Introduced;
+  StringRef IntroducedPlatform;
   llvm::VersionTuple RemappedIntroducedVersion;
   if (AvailabilityInference::updateIntroducedPlatformForFallback(
-      this, ctx, IntroducedPlatform, RemappedIntroducedVersion))
+          attr, ctx, IntroducedPlatform, RemappedIntroducedVersion))
     IntroducedVersion = RemappedIntroducedVersion;
 
   // If this entity was introduced after the query version and we're doing a
@@ -2278,7 +2252,7 @@ AvailableVersionComparison AvailableAttr::getVersionAvailability(
   // static requirement, so we treat "introduced later" as just plain
   // unavailable.
   if (IntroducedVersion && *IntroducedVersion > queryVersion) {
-    if (isLanguageVersionSpecific() || isPackageDescriptionVersionSpecific())
+    if (isSwiftLanguageModeSpecific() || isPackageDescriptionVersionSpecific())
       return AvailableVersionComparison::Unavailable;
     else
       return AvailableVersionComparison::PotentiallyUnavailable;
