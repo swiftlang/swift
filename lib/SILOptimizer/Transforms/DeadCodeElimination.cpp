@@ -760,6 +760,7 @@ bool DCE::removeDead() {
                    << "with jump to: BB" << postDom->getDebugID() << "\n");
 
         replaceBranchWithJump(termInst, postDom);
+        ++NumDeletedInsts;
         termInst->eraseFromParent();
         BranchesChanged = true;
         Changed = true;
