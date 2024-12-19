@@ -1411,7 +1411,7 @@ public:
   /// Returns the active platform-specific `@available` attribute for this decl.
   /// There may be multiple `@available` attributes that are relevant to the
   /// current platform, but the returned one has the highest priority.
-  const AvailableAttr *getActiveAvailableAttrForCurrentPlatform(
+  std::optional<SemanticAvailableAttr> getActiveAvailableAttrForCurrentPlatform(
       bool ignoreAppExtensions = false) const;
 
   /// Returns true if the declaration is deprecated at the current deployment

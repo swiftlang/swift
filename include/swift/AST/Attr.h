@@ -3237,6 +3237,14 @@ public:
   /// Returns true if this attribute is considered active in the current
   /// compilation context.
   bool isActive(ASTContext &ctx) const;
+
+  bool operator==(const SemanticAvailableAttr &other) const {
+    return other.attr == attr;
+  }
+
+  bool operator!=(const SemanticAvailableAttr &other) const {
+    return other.attr != attr;
+  }
 };
 
 /// An iterable range of `SemanticAvailableAttr`s.

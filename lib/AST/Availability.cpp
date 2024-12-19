@@ -493,26 +493,23 @@ Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
   return SemanticAvailableAttr(attr, domainForAvailableAttr(attr));
 }
 
-const AvailableAttr *
+std::optional<SemanticAvailableAttr>
 Decl::getActiveAvailableAttrForCurrentPlatform(bool ignoreAppExtensions) const {
-  const AvailableAttr *bestAttr = nullptr;
+  std::optional<SemanticAvailableAttr> bestAttr;
 
-  for (auto semanticAttr :
-       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto attr = semanticAttr.getParsedAttr();
-
-    if (!attr->hasPlatform())
+  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (!attr.isPlatformSpecific())
       continue;
 
     if (ignoreAppExtensions &&
-        isApplicationExtensionPlatform(attr->getPlatform()))
+        isApplicationExtensionPlatform(attr.getPlatform()))
       continue;
 
     // We have an attribute that is active for the platform, but is it more
     // specific than our current best?
     if (!bestAttr || inheritsAvailabilityFromPlatform(
-                         attr->getPlatform(), bestAttr->getPlatform())) {
-      bestAttr = attr;
+                         attr.getPlatform(), bestAttr->getPlatform())) {
+      bestAttr.emplace(attr);
     }
   }
 
@@ -522,13 +519,13 @@ Decl::getActiveAvailableAttrForCurrentPlatform(bool ignoreAppExtensions) const {
 const AvailableAttr *Decl::getDeprecatedAttr() const {
   auto &ctx = getASTContext();
   const AvailableAttr *result = nullptr;
-  const AvailableAttr *bestActive = getActiveAvailableAttrForCurrentPlatform();
+  auto bestActive = getActiveAvailableAttrForCurrentPlatform();
 
   for (auto semanticAttr :
        getSemanticAvailableAttrs(/*includingInactive=*/false)) {
     auto attr = semanticAttr.getParsedAttr();
 
-    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
+    if (attr->hasPlatform() && (!bestActive || semanticAttr != bestActive))
       continue;
 
     // Unconditional deprecated.
@@ -560,13 +557,13 @@ const AvailableAttr *Decl::getDeprecatedAttr() const {
 const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
   auto &ctx = getASTContext();
   const AvailableAttr *result = nullptr;
-  const AvailableAttr *bestActive = getActiveAvailableAttrForCurrentPlatform();
+  auto bestActive = getActiveAvailableAttrForCurrentPlatform();
 
   for (auto semanticAttr :
        getSemanticAvailableAttrs(/*includingInactive=*/false)) {
     auto attr = semanticAttr.getParsedAttr();
 
-    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
+    if (attr->hasPlatform() && (!bestActive || semanticAttr != bestActive))
       continue;
 
     std::optional<llvm::VersionTuple> deprecatedVersion = attr->Deprecated;
@@ -626,7 +623,7 @@ static const AvailableAttr *
 getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
   auto &ctx = D->getASTContext();
   const AvailableAttr *result = nullptr;
-  const AvailableAttr *bestActive =
+  auto bestActive =
       D->getActiveAvailableAttrForCurrentPlatform(ignoreAppExtensions);
 
   for (auto semanticAttr :
@@ -635,7 +632,7 @@ getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
 
     // If this is a platform-specific attribute and it isn't the most
     // specific attribute for the current platform, we're done.
-    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
+    if (attr->hasPlatform() && (!bestActive || semanticAttr != bestActive))
       continue;
 
     if (ignoreAppExtensions &&

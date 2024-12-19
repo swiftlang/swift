@@ -2184,14 +2184,14 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // we're checking an iOS attribute while building for macCatalyst.
   if (attr->getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
-    if (attr != D->getActiveAvailableAttrForCurrentPlatform()) {
+    if (semanticAttr != D->getActiveAvailableAttrForCurrentPlatform()) {
       return;
     }
   }
 
   if (attr->getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
-    if (attr != D->getActiveAvailableAttrForCurrentPlatform()) {
+    if (semanticAttr != D->getActiveAvailableAttrForCurrentPlatform()) {
       return;
     }
   }
