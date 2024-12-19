@@ -915,12 +915,12 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
         public:
           static AvailabilityRange from(const ValueDecl *VD) {
             AvailabilityRange result;
-            for (auto *attr : VD->getAttrs().getAttributes<AvailableAttr>()) {
-              if (attr->isLanguageVersionSpecific()) {
-                if (attr->Introduced)
-                  result.introduced = attr->Introduced;
-                if (attr->Obsoleted)
-                  result.obsoleted = attr->Obsoleted;
+            for (auto semanticAttr : VD->getSemanticAvailableAttrs()) {
+              if (semanticAttr.isSwiftLanguageModeSpecific()) {
+                if (auto introduced = semanticAttr.getParsedAttr()->Introduced)
+                  result.introduced = introduced;
+                if (auto obsoleted = semanticAttr.getParsedAttr()->Obsoleted)
+                  result.obsoleted = obsoleted;
               }
             }
             return result;
