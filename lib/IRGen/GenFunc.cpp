@@ -1188,6 +1188,7 @@ public:
 
       if (resultSchema.requiresIndirect() ||
           errorSchema.shouldReturnTypedErrorIndirectly() ||
+          outConv.hasIndirectSILResults() ||
           outConv.hasIndirectSILErrorResults()) {
         auto *typedErrorResultPtr = origParams.claimNext();
         args.add(typedErrorResultPtr);
@@ -1378,6 +1379,7 @@ public:
 
       if (resultSchema.requiresIndirect() ||
           errorSchema.shouldReturnTypedErrorIndirectly() ||
+          outConv.hasIndirectSILResults() ||
           outConv.hasIndirectSILErrorResults()) {
         auto *typedErrorResultPtr = origParams.claimNext();
         args.add(typedErrorResultPtr);
