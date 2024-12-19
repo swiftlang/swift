@@ -271,7 +271,7 @@ We will see later that constraint types also appear in various other positions, 
 
 \paragraph{Trailing where clauses.} Requirements can also be stated in a \IndexDefinition{where clause@\texttt{where} clause}\index{trailing where clause@trailing \texttt{where} clause|see{\texttt{where} clause}}\texttt{where} clause attached to the generic declaration. This allows generality that cannot be expressed using the inheritance clause of a generic parameter alone.
 
-A \texttt{where} clause entry defines a requirement whose subject type is written explicitly, so that \index{dependent member type!in requirements}dependent member types can be be subject to requirements; here, we state two requirements, $\ConfReq{\rT}{Sequence}$ and $\ConfReq{\rT.Element}{Comparable}$:
+A \texttt{where} clause entry defines a requirement whose subject type is written explicitly, so that \index{dependent member type!in requirements}dependent member types can be be subject to requirements; here, we state two requirements, $\rTSequence$ and $\ConfReq{\rT.Element}{Comparable}$:
 \begin{Verbatim}
 func isSorted<S>(_: S) where S: Sequence, S.Element: Comparable {...}
 \end{Verbatim}
@@ -309,7 +309,7 @@ There are only two kinds of requirement representations, because the ``\texttt{:
 \item A \IndexDefinition{same-type requirement representation}\textbf{same-type requirement representation} ``\texttt{T == U}'', where \tT\ and \tU\ are type representations.
 \end{enumerate}
 
-Recall that a conformance requirement has a protocol type, protocol composition type, or parameterized protocol type on the right-hand side (\SecRef{fundamental types}). In the case of a protocol composition, we decompose the requirement into simpler requirements, one for each member of the composition. For example, if \texttt{MyClass} is a class, the requirement $\ConfReq{\rT}{Sequence~\&~MyClass}$ splits up as $\ConfReq{\rT}{Sequence}$ and $\ConfReq{\rT}{MyClass}$, the latter being a superclass requirement. The empty protocol composition, written \Index{Any@\texttt{Any}}\texttt{Any}, is a trivial case; stating a conformance requirement to \texttt{Any} does nothing in a \texttt{where} clause, but it is allowed. Parameterized protocol types also decompose, as we'll see in~\SecRef{protocols}.
+Recall that a conformance requirement has a protocol type, protocol composition type, or parameterized protocol type on the right-hand side (\SecRef{fundamental types}). In the case of a protocol composition, we decompose the requirement into simpler requirements, one for each member of the composition. For example, if \texttt{MyClass} is a class, the requirement $\ConfReq{\rT}{Sequence~\&~MyClass}$ splits up as $\rTSequence$ and $\ConfReq{\rT}{MyClass}$, the latter being a superclass requirement. The empty protocol composition, written \Index{Any@\texttt{Any}}\texttt{Any}, is a trivial case; stating a conformance requirement to \texttt{Any} does nothing in a \texttt{where} clause, but it is allowed. Parameterized protocol types also decompose, as we'll see in~\SecRef{protocols}.
 
 In the next section, we will introduce a formal system for derived requirements, where we will assume that only conformance requirements to protocol types remain, and that the subject type of a requirement is always a type parameter, and not an arbitrary type. \SecRef{requirement desugaring} will show how we eliminate these unnecessary forms of generality.
 

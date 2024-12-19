@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -access-enforcement-selection -enforce-exclusivity=checked %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -access-enforcement-selection -enforce-exclusivity=checked %s | %FileCheck %s
 
 import Builtin
 import Swift

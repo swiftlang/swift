@@ -1,6 +1,3 @@
-// rdar://119964830 Temporarily disabling in Linux
-// UNSUPPORTED: OS=linux-gnu
-
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 

@@ -30,6 +30,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
@@ -1056,10 +1057,6 @@ bool isStandardLibrary(const llvm::Module &M) {
 }
 }
 
-bool IRGenModule::isStandardLibrary() const {
-  return ::isStandardLibrary(Module);
-}
-
 llvm::FunctionType *swift::getRuntimeFnType(llvm::Module &Module,
                                            llvm::ArrayRef<llvm::Type*> retTypes,
                                            llvm::ArrayRef<llvm::Type*> argTypes) {
@@ -1292,7 +1289,7 @@ IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
     if (NAME)                                                                  \
       return NAME;                                                             \
     NAME = Module.getOrInsertGlobal(SYM, FullExistentialTypeMetadataStructTy); \
-    if (useDllStorage() && !isStandardLibrary())                               \
+    if (!getSwiftModule()->isStdlibModule())                                   \
       ApplyIRLinkage(IRLinkage::ExternalImport)                                \
           .to(cast<llvm::GlobalVariable>(NAME));                               \
     return NAME;                                                               \
@@ -1677,7 +1674,7 @@ void IRGenModule::addLinkLibraries() {
   if (Context.LangOpts.EnableCXXInterop) {
     bool hasStaticCxx = false;
     bool hasStaticCxxStdlib = false;
-    if (const auto *M = Context.getModuleByName("Cxx"))
+    if (const auto *M = Context.getModuleByName(CXX_MODULE_NAME))
       hasStaticCxx = M->isStaticLibrary();
     if (Context.LangOpts.Target.getOS() == llvm::Triple::Win32)
       if (const auto *M = Context.getModuleByName("CxxStdlib"))
@@ -2126,8 +2123,6 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
                          message.toStringRef(buffer));
 }
 
-bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
-
 // In embedded swift features are available independent of deployment and
 // runtime targets because the runtime library is always statically linked
 // to the program.
@@ -2151,9 +2146,9 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
       (Triple.isOSDarwin() || Triple.isOSWindows() ||
        (Triple.isOSLinux() && !(Triple.isARM() && Triple.isArch32Bit())));
-  if (canPrespecializeTarget && isStandardLibrary()) {
+  if (canPrespecializeTarget && getSwiftModule()->isStdlibModule())
     return IRGen.Opts.PrespecializeGenericMetadata;
-  }
+
   auto &context = getSwiftModule()->getASTContext();
   auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(context);
   return IRGen.Opts.PrespecializeGenericMetadata &&

@@ -62,6 +62,9 @@ public:
   bool parseSILCoverageMap(Parser &P) override;
   bool parseSILProperty(Parser &P) override;
   bool parseSILScope(Parser &P) override;
+
+  /// Mark potential zombie functions as zombies.
+  void markZombies();
 };
 
 } // end namespace swift

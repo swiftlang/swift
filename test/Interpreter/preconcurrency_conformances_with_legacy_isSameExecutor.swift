@@ -31,11 +31,11 @@
 // RUN: %target-codesign %t/test4.out
 // RUN: env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/test4.out 2>&1 | %FileCheck %t/src/Test4.swift
 
-// REQUIRES: asserts
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_DynamicActorIsolation
 
 // rdar://123810657
 // UNSUPPORTED: back_deployment_runtime

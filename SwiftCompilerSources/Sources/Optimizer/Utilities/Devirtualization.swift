@@ -43,6 +43,10 @@ private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some 
     guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
       return false
     }
+    if deinitFunc.linkage == .shared && !deinitFunc.isDefinition {
+      // Make sure to not have an external shared function, which is illegal in SIL.
+      _ = context.loadFunction(function: deinitFunc, loadCalleesRecursively: false)
+    }
     destroy.createDeinitCall(to: deinitFunc, context)
     context.erase(instruction: destroy)
     return true

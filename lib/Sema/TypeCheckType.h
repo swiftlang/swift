@@ -24,6 +24,7 @@
 namespace swift {
 
 class ASTContext;
+class AvailabilityContext;
 class QualifiedIdentTypeRepr;
 class TypeRepr;
 class PackElementTypeRepr;
@@ -750,6 +751,13 @@ bool diagnoseMissingOwnership(ParamSpecifier ownership,
 /// If the given type involves an unsafe type, diagnose it by calling the
 /// diagnose function with the most specific unsafe type that can be provided.
 void diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
+                        AvailabilityContext availability,
+                        llvm::function_ref<void(Type)> diagnose);
+
+/// If the given type involves an unsafe type, diagnose it by calling the
+/// diagnose function with the most specific unsafe type that can be provided.
+void diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
+                        const DeclContext *dc,
                         llvm::function_ref<void(Type)> diagnose);
 
 } // end namespace swift

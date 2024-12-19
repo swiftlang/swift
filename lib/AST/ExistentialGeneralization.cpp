@@ -195,35 +195,37 @@ private:
       newArgs.push_back(generalizeComponentType(CanType(origArg)));
     }
 
+    auto origSig = origSubs.getGenericSignature();
+
     // Generalize all of the conformances.
     // TODO: for abstract requirements, we might not generalize all
     // arguments, and we may need to leave corresponding conformances
     // concrete.
     SmallVector<ProtocolConformanceRef, 4> newConformances;
-    auto origConformances = origSubs.getConformances();
-    for (auto origConformance: origConformances) {
+    for (const auto &req : origSig.getRequirements()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
       newConformances.push_back(
-        ProtocolConformanceRef(origConformance.getRequirement()));
+          ProtocolConformanceRef::forAbstract(req.getFirstType(),
+                                              req.getProtocolDecl()));
     }
 
-    auto origSig = origSubs.getGenericSignature();
     auto newSubs = SubstitutionMap::get(origSig, newArgs, newConformances);
 
     // Add any conformance requirements to the generic signature and
     // remember the conformances we generalized.
-    if (!origConformances.empty()) {
-      size_t i = 0;
-      for (auto &origReq: origSig.getRequirements()) {
-        if (origReq.getKind() != RequirementKind::Conformance) continue;
-        auto origConformance = origConformances[i++];
+    auto origConformances = origSubs.getConformances();
+    size_t i = 0;
+    for (auto &origReq: origSig.getRequirements()) {
+      if (origReq.getKind() != RequirementKind::Conformance) continue;
+      auto origConformance = origConformances[i++];
 
-        auto newReq = origReq.subst(newSubs);
-        addedRequirements.push_back(newReq);
+      auto newReq = origReq.subst(newSubs);
+      addedRequirements.push_back(newReq);
 
-        substConformances.insert({{newReq.getFirstType()->getCanonicalType(),
-                                   newReq.getProtocolDecl()},
-                                  origConformance});
-      }
+      substConformances.insert({{newReq.getFirstType()->getCanonicalType(),
+                                 newReq.getProtocolDecl()},
+                                origConformance});
     }
 
     // Build the new type.

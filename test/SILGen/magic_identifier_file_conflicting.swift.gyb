@@ -92,8 +92,8 @@ def fixit_loc(start_col, orig_suffix):
 //
 
 // CHECK-LABEL: // Mappings from '#fileID' to '#filePath':
-// CHECK-NEXT:  //   'Foo/magic_identifier_file_conflicting.swift' => 'BUILD_DIR{{[/\\]}}test-{{[^/]+}}{{[/\\]}}SILGen{{[/\\]}}Output{{[/\\]}}magic_identifier_file_conflicting.swift.gyb.tmp{{[/\\]}}magic_identifier_file_conflicting.swift'
-// CHECK-NEXT:  //   'Foo/magic_identifier_file_conflicting.swift' => 'BUILD_DIR{{[/\\]}}test-{{[^/]+}}{{[/\\]}}SILGen{{[/\\]}}Output{{[/\\]}}magic_identifier_file_conflicting.swift.gyb.tmp{{[/\\]}}other_path_b{{[/\\]}}magic_identifier_file_conflicting.swift' (alternate)
+// CHECK-NEXT:  //   'Foo/magic_identifier_file_conflicting.swift' => 'BUILD_DIR{{.*}}{{[/\\]}}test-{{[^/]+}}{{[/\\]}}SILGen{{[/\\]}}Output{{[/\\]}}magic_identifier_file_conflicting.swift.gyb.tmp{{[/\\]}}magic_identifier_file_conflicting.swift'
+// CHECK-NEXT:  //   'Foo/magic_identifier_file_conflicting.swift' => 'BUILD_DIR{{.*}}{{[/\\]}}test-{{[^/]+}}{{[/\\]}}SILGen{{[/\\]}}Output{{[/\\]}}magic_identifier_file_conflicting.swift.gyb.tmp{{[/\\]}}other_path_b{{[/\\]}}magic_identifier_file_conflicting.swift' (alternate)
 // CHECK-NEXT:  //   'Foo/magic_identifier_file_conflicting.swift' => 'magic_identifier_file_conflicting.swift' (alternate)
 // CHECK-NEXT:  //   'Foo/magic_identifier_file_conflicting_other.swift' => 'SOURCE_DIR{{[/\\]}}test{{[/\\]}}SILGen{{[/\\]}}Inputs{{[/\\]}}magic_identifier_file_conflicting_other.swift'
 // CHECK-NEXT:  //   'Foo/other_file_a.swift' => 'other_file_a.swift'

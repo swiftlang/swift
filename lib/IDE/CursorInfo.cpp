@@ -214,23 +214,6 @@ private:
     return Action::Continue();
   }
 
-  /// Retrieve the name location for an expression that supports cursor info.
-  DeclNameLoc getExprNameLoc(Expr *E) {
-    if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-      return DRE->getNameLoc();
-    
-    if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E))
-      return UDRE->getNameLoc();
-
-    if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(E))
-      return ODRE->getNameLoc();
-
-    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E))
-      return UDE->getNameLoc();
-
-    return DeclNameLoc();
-  }
-
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (auto closure = dyn_cast<ClosureExpr>(E)) {
       DeclContextStack.push_back(closure);
@@ -247,7 +230,7 @@ private:
       }
     }
 
-    if (getExprNameLoc(E).getBaseNameLoc() != LocToResolve)
+    if (E->getNameLoc().getBaseNameLoc() != LocToResolve)
       return Action::Continue(E);
 
     assert(Result == nullptr);

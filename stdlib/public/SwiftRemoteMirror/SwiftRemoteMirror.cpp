@@ -424,7 +424,7 @@ swift_reflection_copyNameForTypeRef(SwiftReflectionContextRef ContextRef,
 
   Demangle::Demangler Dem;
   if (mangled) {
-    auto Mangling = mangleNode(TR->getDemangling(Dem));
+    auto Mangling = mangleNode(TR->getDemangling(Dem), Mangle::ManglingFlavor::Default);
     if (Mangling.isSuccess()) {
       return strdup(Mangling.result().c_str());
     }
@@ -762,7 +762,7 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
     } else {
       TI->dump(std::cout);
       Demangle::Demangler Dem;
-      auto Mangling = mangleNode(TR->getDemangling(Dem));
+      auto Mangling = mangleNode(TR->getDemangling(Dem), Mangle::ManglingFlavor::Default);
       std::string MangledName;
       if (Mangling.isSuccess()) {
         MangledName = Mangling.result();

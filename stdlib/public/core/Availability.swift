@@ -40,6 +40,7 @@ import SwiftShims
 #if os(iOS) && !os(visionOS)
 @_effects(readnone)
 @_transparent
+@_noLocks
 public func _stdlib_isOSVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
@@ -51,6 +52,7 @@ public func _stdlib_isOSVersionAtLeast(
 @_semantics("availability.osversion")
 @_effects(readnone)
 @_unavailableInEmbedded
+@_noLocks
 public func _stdlib_isOSVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
@@ -63,6 +65,7 @@ public func _stdlib_isOSVersionAtLeast(
 @_semantics("availability.osversion")
 @_effects(readnone)
 @_alwaysEmitIntoClient
+@_noLocks
 public func _stdlib_isOSVersionAtLeast_AEIC(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
@@ -107,6 +110,7 @@ public func _stdlib_isOSVersionAtLeast_AEIC(
 @_semantics("availability.osversion")
 @_effects(readnone)
 @available(macOS 10.15, iOS 13.0, *)
+@_noLocks
 public func _stdlib_isVariantOSVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
@@ -149,6 +153,7 @@ public func _stdlib_isVariantOSVersionAtLeast(
 @_semantics("availability.osversion")
 @_effects(readnone)
 @_unavailableInEmbedded
+@_noLocks
 public func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,

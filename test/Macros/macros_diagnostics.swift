@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser, asserts
+// REQUIRES: swift_feature_CodeItemMacros
 
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature CodeItemMacros -module-name MacrosTest
 
@@ -225,3 +226,11 @@ macro multipleFreestandingRoles<T>(_: T) -> Void = #externalMacro(module: "A", t
 @attached(peer)
 macro Foo() = #externalMacro(module: "ThisMacroModuleDoesNotExist", type: "ThisMacroTypeDoesNotExist")
 // expected-warning@-1{{external macro implementation type}}
+
+
+@available(SwiftStdlib 5.1, *)
+func someGlobalNext(
+  isolation actor: isolated (any Actor)? = #isolated // expected-error{{no macro named 'isolated'}}
+) async throws {
+  fatalError()
+}

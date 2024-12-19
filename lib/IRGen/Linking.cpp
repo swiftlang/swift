@@ -106,20 +106,20 @@ LinkEntity LinkEntity::forSILGlobalVariable(SILGlobalVariable *G,
 
 
 /// Mangle this entity into the given buffer.
-void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
+void LinkEntity::mangle(ASTContext &Ctx, SmallVectorImpl<char> &buffer) const {
   llvm::raw_svector_ostream stream(buffer);
-  mangle(stream);
+  mangle(Ctx, stream);
 }
 
 /// Mangle this entity into the given stream.
-void LinkEntity::mangle(raw_ostream &buffer) const {
-  std::string Result = mangleAsString();
+void LinkEntity::mangle(ASTContext &Ctx, raw_ostream &buffer) const {
+  std::string Result = mangleAsString(Ctx);
   buffer.write(Result.data(), Result.size());
 }
 
 /// Mangle this entity as a std::string.
-std::string LinkEntity::mangleAsString() const {
-  IRGenMangler mangler;
+std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
+  IRGenMangler mangler(Ctx);
   switch (getKind()) {
   case Kind::DispatchThunk: {
     auto *func = cast<FuncDecl>(getDecl());
@@ -491,7 +491,7 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
   case Kind::DistributedAccessorAsyncPointer: {
     std::string Result(getUnderlyingEntityForAsyncFunctionPointer()
-        .mangleAsString());
+        .mangleAsString(Ctx));
     Result.append("Tu");
     return Result;
   }
@@ -529,7 +529,7 @@ std::string LinkEntity::mangleAsString() const {
 
     auto thunk = dyn_cast<AbstractFunctionDecl>(DC);
     if (thunk && thunk->isDistributedThunk()) {
-      IRGenMangler mangler;
+      IRGenMangler mangler(Ctx);
       return mangler.mangleDistributedThunkRecord(thunk);
     }
 

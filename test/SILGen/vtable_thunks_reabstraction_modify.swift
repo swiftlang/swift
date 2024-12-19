@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s
 
 public class BaseClass<Input, Result> {

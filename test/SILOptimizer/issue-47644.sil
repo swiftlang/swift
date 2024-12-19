@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -sil-combine | %FileCheck %s
 
 // REQUIRES: PTRSIZE=64
 

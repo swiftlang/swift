@@ -406,9 +406,25 @@ bool GenericSignatureImpl::areReducedTypeParametersEqual(Type type1,
 }
 
 bool GenericSignatureImpl::isRequirementSatisfied(
-    Requirement requirement, bool allowMissing) const {
+    Requirement requirement,
+    bool allowMissing,
+    bool brokenPackBehavior) const {
   if (requirement.getFirstType()->hasTypeParameter()) {
     auto *genericEnv = getGenericEnvironment();
+
+    if (brokenPackBehavior) {
+      // Swift 5.9 shipped with a bug here where this method would return
+      // incorrect results. Maintain the old behavior specifically for two
+      // call sites in the ASTMangler.
+      if ((requirement.getKind() == RequirementKind::SameType ||
+           requirement.getKind() == RequirementKind::Superclass) &&
+          !requirement.getSecondType()->isTypeParameter() &&
+          requirement.getSecondType().findIf([&](Type t) -> bool {
+            return t->is<PackExpansionType>();
+          })) {
+        return false;
+      }
+    }
 
     requirement = requirement.subst(
         QueryInterfaceTypeSubstitutions{genericEnv},

@@ -95,7 +95,7 @@ inline bool isYieldingAccessor(AccessorKind kind) {
   }
 }
 
-inline bool isYieldingDefaultNonmutatingAccessor(AccessorKind kind) {
+inline bool isYieldingImmutableAccessor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Read:
   case AccessorKind::Read2:
@@ -114,7 +114,7 @@ inline bool isYieldingDefaultNonmutatingAccessor(AccessorKind kind) {
   }
 }
 
-inline bool isYieldingDefaultMutatingAccessor(AccessorKind kind) {
+inline bool isYieldingMutableAccessor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Modify:
   case AccessorKind::Modify2:

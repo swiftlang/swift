@@ -59,12 +59,14 @@ class ProtocolConformanceRef {
 
   explicit ProtocolConformanceRef(UnionType value) : Union(value) {}
 
-public:
   /// Create an abstract protocol conformance reference.
   explicit ProtocolConformanceRef(ProtocolDecl *proto) : Union(proto) {
     assert(proto != nullptr &&
            "cannot construct ProtocolConformanceRef with null");
   }
+
+public:
+  ProtocolConformanceRef() : Union() {}
 
   /// Create a concrete protocol conformance reference.
   explicit ProtocolConformanceRef(ProtocolConformance *conf) : Union(conf) {
@@ -77,9 +79,6 @@ public:
     assert(conf != nullptr &&
            "cannot construct ProtocolConformanceRef with null");
   }
-
-  ProtocolConformanceRef(std::nullptr_t = nullptr)
-      : Union((ProtocolDecl *)nullptr) {}
 
   static ProtocolConformanceRef forInvalid() {
     return ProtocolConformanceRef();
@@ -94,10 +93,9 @@ public:
 
   explicit operator bool() const { return !isInvalid(); }
 
-  /// Create either a concrete or an abstract protocol conformance reference,
-  /// depending on whether ProtocolConformance is null.
-  explicit ProtocolConformanceRef(ProtocolDecl *protocol,
-                                  ProtocolConformance *conf);
+  /// Create an abstract conformance for a type parameter or archetype.
+  static ProtocolConformanceRef forAbstract(Type subjectType,
+                                            ProtocolDecl *protocol);
 
   bool isConcrete() const {
     return !isInvalid() && Union.is<ProtocolConformance*>();

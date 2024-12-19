@@ -11,9 +11,8 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen -enable-bare-slash-regex -disable-availability-checking
 
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ParserASTGen
 
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
 // rdar://116686158
 // UNSUPPORTED: asan
 

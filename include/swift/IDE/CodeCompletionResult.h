@@ -204,6 +204,7 @@ enum class CompletionKind : uint8_t {
   TypeSimpleBeginning,
   TypeSimpleWithDot,
   TypeSimpleWithoutDot,
+  TypeSimpleInverted,
   CaseStmtKeyword,
   CaseStmtBeginning,
   NominalMemberBeginning,
@@ -231,9 +232,6 @@ enum class CompletionKind : uint8_t {
   TypeAttrBeginning,
   TypeAttrInheritanceBeginning,
   OptionalBinding,
-
-  /// Completion after `~` in an inheritance clause.
-  WithoutConstraintType
 };
 
 enum class CodeCompletionDiagnosticSeverity : uint8_t {

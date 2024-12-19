@@ -869,7 +869,7 @@ extension Unsafe${Mutable}RawBufferPointer {
         $0.count * MemoryLayout<C.Element>.stride <= self.count,
         "buffer cannot contain every element from source collection."
       )
-      let start = baseAddress?.initializeMemory(
+      let start = baseAddress.unsafelyUnwrapped.initializeMemory(
         as: C.Element.self, from: sourceAddress, count: $0.count
       )
       return .init(start: start, count: $0.count)
@@ -955,7 +955,7 @@ extension Unsafe${Mutable}RawBufferPointer {
       source.count * MemoryLayout<T>.stride <= self.count,
       "buffer cannot contain every element from source."
     )
-    let initialized = baseAddress?.moveInitializeMemory(
+    let initialized = baseAddress.unsafelyUnwrapped.moveInitializeMemory(
       as: T.self, from: sourceAddress, count: source.count
     )
     return .init(start: initialized, count: source.count)

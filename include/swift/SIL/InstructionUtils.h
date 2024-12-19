@@ -236,6 +236,12 @@ bool visitExplodedTupleValue(SILValue value,
 std::pair<SILFunction *, SILWitnessTable *>
 lookUpFunctionInWitnessTable(WitnessMethodInst *wmi, SILModule::LinkingMode linkingMode);
 
+/// True if a type can be expanded without a significant increase to code size.
+///
+/// False if expanding a type is invalid. For example, expanding a
+/// struct-with-deinit drops the deinit.
+bool shouldExpand(SILModule &module, SILType ty);
+
 } // end namespace swift
 
 #endif

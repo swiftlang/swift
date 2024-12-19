@@ -9,7 +9,7 @@
 swift_compiler_sources(Optimizer
   SimplifyAllocRefDynamic.swift
   SimplifyApply.swift
-  SimplifyBeginBorrow.swift
+  SimplifyBeginAndLoadBorrow.swift
   SimplifyBeginCOWMutation.swift
   SimplifyBranch.swift
   SimplifyBuiltin.swift
@@ -22,6 +22,7 @@ swift_compiler_sources(Optimizer
   SimplifyDebugStep.swift
   SimplifyDestroyValue.swift
   SimplifyDestructure.swift
+  SimplifyFixLifetime.swift
   SimplifyGlobalValue.swift
   SimplifyInitEnumDataAddr.swift
   SimplifyKeyPath.swift

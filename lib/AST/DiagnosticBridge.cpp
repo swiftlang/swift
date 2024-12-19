@@ -114,8 +114,8 @@ void *DiagnosticBridge::getSourceFileSyntax(SourceManager &sourceMgr,
 
   auto bufferContents = sourceMgr.getEntireTextForBuffer(bufferID);
   auto sourceFile = swift_ASTGen_parseSourceFile(
-      bufferContents.data(), bufferContents.size(), "module",
-      displayName.str().c_str(), /*ctx*/ nullptr);
+      bufferContents, StringRef{"module"}, displayName,
+      /*declContextPtr=*/nullptr, BridgedGeneratedSourceFileKindNone);
 
   sourceFileSyntax[{&sourceMgr, bufferID}] = sourceFile;
   return sourceFile;

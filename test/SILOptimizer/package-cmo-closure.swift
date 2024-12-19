@@ -6,7 +6,7 @@
 // RUN: -Xfrontend -experimental-package-cmo -Xfrontend -experimental-allow-non-resilient-access \
 // RUN: -O -wmo -enable-library-evolution
 
-// RUN: %target-sil-opt %t/Lib.swiftmodule -sil-verify-all -o %t/Lib.sil
+// RUN: %target-sil-opt -sil-print-types %t/Lib.swiftmodule -sil-verify-all -o %t/Lib.sil
 // RUN: %FileCheck %s --check-prefix=CHECK < %t/Lib.sil
 
 // REQUIRES: swift_in_compiler

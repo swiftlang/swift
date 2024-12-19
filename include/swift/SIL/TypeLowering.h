@@ -280,6 +280,8 @@ public:
     }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
+    void setIsOrContainsRawPointer() { Flags |= HasRawPointerFlag; }
+
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
     void setAddressOnly() { Flags |= AddressOnlyFlag; }
     void setTypeExpansionSensitive(

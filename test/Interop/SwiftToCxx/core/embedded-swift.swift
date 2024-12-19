@@ -4,6 +4,7 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: embedded_stdlib
+// REQUIRES: swift_feature_Embedded
 
 public func id(_ x: Int) -> Int {
     return x

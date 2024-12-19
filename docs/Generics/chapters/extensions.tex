@@ -236,7 +236,7 @@ In the first pass, the extensions of \texttt{Outer.Middle.Inner} and \texttt{Out
 \paragraph{Local types.}
 \index{local type declaration}
 \index{limitation!conditional conformance and local types}
-Because extensions can only appear at the top level of a source file, the extended type must ultimately be visible from the top level. This allows extensions of types nested inside other top-level types, but precludes extensions of local types nested inside of functions or other local contexts, because there is ultimately no way to name a local type from the top level of a source file. (As a curious consequence, local types cannot conditionally conform to protocols, since the only way to declare a conditional conformance is with an extension!)
+Because extensions can only appear at the top level of a source file, the extended type must ultimately be visible from the top level. This allows extensions of types nested inside other top-level types, but precludes extensions of local types nested inside of functions or other local contexts, because there is ultimately no way to name a local type from the top level of a source file. (As a curious consequence, local types cannot conditionally conform to protocols, since the only way to declare a conditional conformance is to write an extension!)
 
 \section{Direct Lookup}\label{direct lookup}
 
@@ -577,7 +577,7 @@ Checking conditional requirements is more subtle than checking for the presence 
 \phantom{{} = \ConfReq{Array<\rT>}{Equatable} \otimes \{} \ConfReq{\rT}{Equatable}\mapsto\text{invalid}}\\
 {} = \ConfReq{Array<AnyObject>}{Equatable}
 \end{gather*}
-However, looking at the substitution map cannot tell us  if other kinds of conditional requirements are unsatisfied, such as \index{same-type requirement!conditional conformance}same-type, \index{superclass requirement!conditional conformance}superclass and \index{layout requirement!conditional conformance}layout requirements. For example, the conformance substitution map of $\ConfReq{Pair<Int, String>}{Diagonal}$ does not contain any invalid conformances, but it does not satisfy the conditional requirement $\SameReq{\rT}{\rU}$:
+However, looking at the substitution map cannot tell us  if other kinds of conditional requirements are unsatisfied, such as \index{same-type requirement!conditional conformance}same-type, \index{superclass requirement!conditional conformance}superclass, and \index{layout requirement!conditional conformance}layout requirements. For example, the conformance substitution map of $\ConfReq{Pair<Int, String>}{Diagonal}$ does not contain any invalid conformances, but it does not satisfy the conditional requirement $\SameReq{\rT}{\rU}$:
 \begin{Verbatim}
 protocol Diagonal {}
 struct Pair<T, U> {}
@@ -618,40 +618,38 @@ The conformance $\ConfReq{Pair}{Derived}$ satisfies the $\ConfReq{Self}{Base}$ a
 
 To each associated requirement, we apply the \index{protocol substitution map}protocol substitution map for the normal conformance, followed by the forwarding substitution map for the generic signature of the conformance. In our example, this gives us the following substituted requirement:
 \[
-\ConfReq{Self}{Base}\otimes\Sigma_{\ConfReq{Pair}{Derived}}\otimes 1_{\EquivClass{G_2}} = \ConfReq{Pair<$\archetype{T}$,Int>}{Base}
+\ConfReq{Self}{Base}\otimes\Sigma_{\ConfReq{Pair}{Derived}}\otimes 1_{\EquivClass{G_2}} = \ConfReq{Pair<$\archetype{T}$, Int>}{Base}
 \]
 
-The next step asks \AlgRef{reqissatisfied} if the substituted requirement is satisfied. This issues a global conformance lookup and proceeds to check its conditional requirements:
-\[\Proto{Base}\otimes \texttt{Pair<$\archetype{T}$,Int>} = \ConfReq{\texttt{Pair<$\archetype{T}$,Int>}}{Base} \]
-Since $\texttt{Pair<$\archetype{T}$,Int>}\in\TypeObj{\EquivClass{G_2}}$, we get $\Proto{Base}\otimes \texttt{Pair<$\archetype{T}$,Int>}\in\ConfObj{\EquivClass{G_2}}$. The conditional requirements of this conformance are the requirements of $G_1$ substituted with the \index{primary archetype}primary archetypes of $G_2$. Knowing if they are satisfied or not determines the validity of the conformance to \texttt{Derived}.
+Next, we ask \AlgRef{reqissatisfied} if the substituted requirement is satisfied. This performs a global conformance lookup and checks its conditional requirements:
+\[
+\Proto{Base}\otimes \texttt{Pair<$\archetype{T}$, Int>} = \ConfReq{\texttt{Pair<$\archetype{T}$, Int>}}{Base}
+\]
+Since $\texttt{Pair<$\archetype{T}$, Int>}\in\TypeObj{\EquivClass{G_2}}$, we get $\Proto{Base}\otimes \texttt{Pair<$\archetype{T}$, Int>}\in\ConfObj{\EquivClass{G_2}}$. The conditional requirements of this conformance are the requirements of $G_1$ substituted with the \index{primary archetype}primary archetypes of $G_2$. We must check if they are satisfied to determine the validity of the conformance to \texttt{Derived}. We now look at three different definitions of the conformance $\ConfReq{Pair}{Base}$, and see how each one impacts the validity of the conformance $\ConfReq{Pair}{Derived}$.
 
-We now look at three different definitions of the conformance $\ConfReq{Pair}{Base}$, and see how each one impacts the validity of the conformance $\ConfReq{Pair}{Derived}$:
-\begin{enumerate}
-\item
-The conditional conformance of \texttt{Pair} to \texttt{Base} might also require that \texttt{T} is \texttt{Int}:
+\Case{1} The conditional requirements of the \texttt{Base} conformance might be identical to those of \texttt{Derived}:
 \begin{Verbatim}
 extension Pair: Base where T == Int {...}
 \end{Verbatim}
-The conditional requirement here is $\SameReq{\rT}{Int}$, the same as in the \texttt{Derived} conformance, and after substitution we get:
+When checking the \texttt{Derived} conformance, we substitute the conditional requirement $\SameReq{\rT}{Int}$ of \texttt{Base}:
 \[\SameReq{\rT}{Int}\otimes \SubstMap{\SubstType{\rT}{Int},\,\SubstType{\rU}{$\archetype{U}$}}=\SameReq{Int}{Int}\]
-This requirement is satisfied by \AlgRef{reqissatisfied}, so the conditional requirements of $\ConfReq{Pair}{Derived}$ imply the conditional requirements of $\ConfReq{Pair}{Base}$, and the conformance to \texttt{Derived} is valid.
+The substituted requirement is satisfied, so the conformance $\ConfReq{Pair}{Derived}$ is valid.
 
-\item Instead, we could conform \texttt{Pair} to \texttt{Base} when \texttt{T} conforms to \texttt{Equatable}:
+\Case{2} The conditional requirements of the \texttt{Base} conformance are allowed to be less  constrained than \texttt{Derived}:
 \begin{Verbatim}
 extension Pair: Base where T: Equatable {...}
 \end{Verbatim}
-Now, $\ConfReq{Pair}{Base}$ has the conditional requirement $\ConfReq{\rT}{Equatable}$, and after substitution we get:
+When checking the \texttt{Derived} conformance, we substitute the conditional requirement $\ConfReq{\rT}{Equatable}$ of \texttt{Base}:
 \[\ConfReq{\rT}{Equatable}\otimes\SubstMap{\SubstType{\rT}{Int},\,\SubstType{\rU}{$\archetype{U}$}}=\ConfReq{Int}{Equatable}\]
-This is also satisfied, so once again our conditional conformance $\ConfReq{Pair}{Derived}$ is valid.
+This is also satisfied, so again the conformance $\ConfReq{Pair}{Derived}$ is valid.
 
-\item Finally consider this, which renders invalid our conformance to \texttt{Derived}:
+\Case{3} However, the conditional requirements of \texttt{Base} are \emph{not} permitted to be \emph{more} constrained than \texttt{Derived}:
 \begin{Verbatim}
 extension Pair: Base where U: Equatable {...}
 \end{Verbatim}
-The conditional requirement $\ConfReq{\rU}{Equatable}$ becomes $\ConfReq{$\archetype{U}$}{Equatable}$ after substitution:
+When checking the \texttt{Derived} conformance, we substitute the conditional requirement $\ConfReq{\rU}{Equatable}$ of \texttt{Base}:
 \[\ConfReq{\rU}{Equatable}\otimes \SubstMap{\SubstType{\rT}{Int},\,\SubstType{\rU}{$\archetype{U}$}}=\ConfReq{$\archetype{U}$}{Equatable}\]
-The archetype $\archetype{U}$ does not conform to \texttt{Equatable} because $\ConfReq{\rU}{Equatable}$ is not a derived requirement of $G_2$, so the conditional requirement $\SameReq{\rT}{Int}$ of $\ConfReq{Pair}{Derived}$ does not imply the conditional requirement $\ConfReq{\rU}{Equatable}$ of $\ConfReq{Pair}{Base}$. For this reason, when $\ConfReq{Pair}{Base}$ is written as above, the compiler rejects our conformance $\ConfReq{Pair}{Derived}$.
-\end{enumerate}
+In the generic signature of the extension where the \texttt{Derived} conformance was declared, the archetype $\archetype{U}$ does \emph{not} conform to \texttt{Equatable}. So if $\ConfReq{Pair}{Base}$ is declared as above, the compiler must reject the conformance $\ConfReq{Pair}{Derived}$.
 
 \paragraph{Termination.}
 Conditional conformances can express \index{non-terminating computation}non-terminating computation at compile time. 
@@ -672,21 +670,16 @@ struct S: Q {
 }
 
 func takesP<T: P>(_: T.Type) {}
-takesP(G<S>.self)
+takesP(G<S>.self)  // called here
 \end{Verbatim}
-The \texttt{takesP()} function has the below generic signature:
-\begin{quote}
-\begin{verbatim}
-<τ_0_0 where τ_0_0: P>
-\end{verbatim}
-\end{quote}
-In the snippet, this function is called with \texttt{G<S>} as the generic argument for \rT. This substitution map for this call also needs to store the conformance $\ConfReq{G<S>}{P}$, but this conformance cannot be constructed. The normal conformance $\ConfReq{G<\rT>}{P}$ is declared on a constrained extension with the following generic signature:
+
+The \texttt{takesP()} function has the generic signature \verb|<τ_0_0 where τ_0_0: P>|. The last line calls this function with \texttt{G<S>} as the generic argument for \rT. This substitution map for this call also needs to store the conformance $\ConfReq{G<S>}{P}$, but this conformance cannot actually be constructed. The normal conformance $\ConfReq{G<\rT>}{P}$ is declared on a constrained extension with the following generic signature:
 \begin{quote}
 \begin{verbatim}
 <τ_0_0 where τ_0_0: Q, τ_0_0.[Q]A: P>
 \end{verbatim}
 \end{quote}
-To construct the specialized conformance $\ConfReq{G<S>}{P}$ from this normal conformance, we must first construct the conformance substitution map. The substitution map should map \rT\ to \texttt{S}, and store a pair of conformances, for the conformance requirements $\ConfReq{\rT}{Q}$ and $\ConfReq{\rT.[Q]A}{P}$:
+To construct the specialized conformance $\ConfReq{G<S>}{P}$ from this normal conformance, we must first construct the conformance substitution map. The substitution map should map \rT\ to \texttt{S}, and store a pair of conformances:
 \begin{align*}
 \Sigma := \SubstMapC{
 &\SubstType{\rT}{S}}{
@@ -695,10 +688,10 @@ To construct the specialized conformance $\ConfReq{G<S>}{P}$ from this normal co
 &\ConfReq{\rT.[Q]A}{P}\mapsto\text{???}
 }
 \end{align*}
-The conforming type of the first conformance should be $\rT\otimes\Sigma=\texttt{S}$, so the first conformance is the normal conformance $\ConfReq{S}{Q}$. The conforming type of the second conformance should be 
-$\AssocType{Q}{A}\otimes\ConfReq{S}{Q}=\texttt{G<S>}$; so the second conformance is exactly $\ConfReq{G<S>}{P}$, the conformance we're in the process of constructing. A substitution map cannot form a cycle with a specialized conformance it contains.
+The conforming type of the first conformance is $\rT\otimes\Sigma=\texttt{S}$, so the first conformance is the normal conformance $\ConfReq{S}{Q}$. The conforming type of the second conformance is 
+$\AssocType{Q}{A}\otimes\ConfReq{S}{Q}=\texttt{G<S>}$; so the second conformance is exactly $\ConfReq{G<S>}{P}$, the specialized conformance we're currently constructing! However, in the current model, a substitution map cannot form a cycle with a specialized conformance it contains.
 
-Now, suppose we could represent a circular substitution map of this kind:
+Now, suppose we \emph{could} represent a circular substitution map of this kind:
 \begin{align*}
 \Sigma := \SubstMapC{&\SubstType{\rT}{S}}{
 \\
@@ -706,31 +699,31 @@ Now, suppose we could represent a circular substitution map of this kind:
 &\ConfReq{\rT.[Q]A}{P}\mapsto\ConfReq{G<\rT>}{P}\otimes\Sigma
 }
 \end{align*}
-Unfortunately, this would still not allow our example to type check. The next problem we would encounter is checking the conditional requirement, $\ConfReq{\rT.[Q]A}{P}$. Applying $\Sigma$ gives us the substituted conditional requirement:
+Unfortunately, this would still not allow our example to type check. The next issue we encounter is checking the conditional requirement, $\ConfReq{\rT.[Q]A}{P}$. Applying~$\Sigma$ gives us the substituted conditional requirement:
 \[\ConfReq{\rT.[Q]A}{P}\otimes\Sigma=\ConfReq{G<S>}{P}\]
 So \texttt{G<S>} conditionally conforms to \texttt{P} if the conditional requirement $\ConfReq{G<S>}{P}$ is satisfied; this conditional requirement is satisfied if \texttt{G<S>} conditionally conforms to \texttt{P}. At this point, we are stuck in a loop, again. For now, the compiler crashes on this example while constructing the conformance substitution map; hopefully a future update to this book will describe the eventual resolution of this bug by imposing an iteration limit.
 
-Our example only encodes an infinite loop, but conditional conformances can actually express arbitrary computation. This is shown for the \index{Rust}Rust programming language, which also has conditional conformances, in \cite{rustturing}. We'll also see another example of non-terminating compile-time computation in \SecRef{recursive conformances}.
+Our example only encodes an infinite loop, but conditional conformances can actually express arbitrary computation. This is shown for the \index{Rust}Rust programming language, which also has conditional conformances, in \cite{rustturing}. We will study a different but related encoding of non-terminating compile-time computation in \SecRef{recursive conformances}.
 
 \paragraph{Soundness.}
-Substitution maps in a valid program should satisfy a certain condition.
+In a valid program, we expect every substitution map to correctly model its input generic signature.
 \begin{definition}\label{valid subst map}
-If $\Sigma$ is a substitution map with \index{input generic signature}input generic signature~$G$ and \index{fully-concrete type}fully-concrete replacement types, then $\Sigma$ is \IndexDefinition{well-formed substitution map}\emph{well-formed} if for each derived requirement~$R$ of~$G$, the \index{substituted requirement}substituted requirement $R\otimes\Sigma$ is satisfied according to \AlgRef{reqissatisfied}.
+Let $\Sigma$ be a substitution map with \index{input generic signature}input generic signature~$G$, and whose replacement types are \index{fully-concrete type}fully concrete, so they do not contain any type parameters. We say that $\Sigma$ is \IndexDefinition{well-formed substitution map}\emph{well-formed}, if for each derived requirement~$R$ of~$G$, the \index{substituted requirement}substituted requirement $R\otimes\Sigma$ is satisfied according to \AlgRef{reqissatisfied}.
+
+(We remark that the restriction on replacement types is not a real limitation; as we saw in \SecRef{checking generic arguments}, we can first compose $\Sigma$ with the \index{forwarding substitution map}forwarding substitution map~$1_{\EquivClass{H}}$ for some generic signature~$H$, to replace type parameters with archetypes.)
 \end{definition}
-(The restriction to fully-concrete replacement types is not a real limitation; as we saw in \SecRef{checking generic arguments}, we can first compose $\Sigma$ with the \index{forwarding substitution map}forwarding substitution map~$1_{\EquivClass{H}}$ for some generic signature~$H$ if necessary).
 
-If $G$ has an \index{generic signature!infinite}infinite theory of derived requirements, we cannot directly check if~$\Sigma$ is well-formed. \AlgRef{check generic arguments algorithm} only checks if $\Sigma$ satisfies each \emph{explicit} requirement of~$G$, and unfortunately, \index{limitation!conditional conformance soundness hole}this is not sufficient.
-
-An immediate counter-example appears when the substituted requirement depends on a conformance that does not satisfy the \index{associated requirement}associated requirements of its protocol. For example, we might declare a \texttt{Bad} type conforming to \texttt{Sequence} whose \texttt{Iterator} \index{type witness}type witness does not conform to \texttt{IteratorProtocol}:
+If $G$ has an \index{generic signature!infinite}infinite theory of derived requirements, we cannot directly check if~$\Sigma$ is well-formed. \AlgRef{check generic arguments algorithm} only checks if $\Sigma$ satisfies each \emph{explicit} requirement of~$G$, and this by itself is not sufficient. An immediate counterexample appears when the substituted requirement depends on a conformance that does not satisfy the \index{associated requirement}associated requirements of its protocol. For example, we might declare a \texttt{Bad} type conforming to \texttt{Sequence} whose \texttt{Iterator} \index{type witness}type witness does not conform to \texttt{IteratorProtocol}:
 \begin{Verbatim}
 struct Bad: Sequence {
   typealias Iterator = Int  // error
 }
 \end{Verbatim}
-The substitution map
-$\Sigma:=\SubstMapC{\SubstType{\rT}{Bad}}{\SubstConf{\rT}{Bad}{Sequence}}$ satisfies all explicit requirements of its generic signature, but it does not satisfy the derived requirement $\ConfReq{\rT.[Sequence]Iterator}{IteratorProtocol}$. However, \emph{this} is not the soundness hole; we diagnose an error when we check the conformance, so the program is invalid.
 
-We now show an example where we can write down a substitution map that is not well-formed, and yet \AlgRef{check generic arguments algorithm} does not produce any diagnostics at all, including from checking conformances. We start with two protocols:
+The substitution map
+$\Sigma:=\SubstMapC{\SubstType{\rT}{Bad}}{\SubstConf{\rT}{Bad}{Sequence}}$ satisfies all of the explicit requirements of its generic signature, but it does not satisfy the derived requirement $\ConfReq{\rT.[Sequence]Iterator}{IteratorProtocol}$. However, this is not a problem, because we still \index{diagnostic!conformance checker}diagnose an error when we \index{conformance checker}check the conformance, so the program is rejected anyway.
+
+Unfortunately, we can write down a substitution map that is not well-formed, and yet \AlgRef{check generic arguments algorithm} does not produce any diagnostics at all, including during conformance checking. This reveals a \index{limitation!conditional conformance soundness hole}soundness hole with conditional conformances that remains unfixed for the time being. We start with two protocols:
 \begin{Verbatim}
 protocol Bar {
   associatedtype Beer
@@ -748,12 +741,12 @@ func both<T: Bar & Pub>(_ t: T) -> (T.Beer, T.Beer) {
   return (t.brew(), t.pour())
 }
 \end{Verbatim}
-Now, we declare a \texttt{BrewPub} struct, and pass an instance of \texttt{BrewPub<Int>} to our function:
+Now, we declare a \texttt{BrewPub} struct, and pass an instance of \texttt{BrewPub<Int>} to \texttt{both()}:
 \begin{Verbatim}
 struct BrewPub<T> {}
 let result = both(BrewPub<Int>())
 \end{Verbatim}
-For this call expression to type check, \texttt{BrewPub} must conform to \texttt{Bar} and \texttt{Pub}; assume for a moment these conformances have already been declared. Let $\Sigma$ be the \index{substitution map}substitution map for the call:
+For this call to type check, \texttt{BrewPub} must conform to \texttt{Bar} and \texttt{Pub}; assume for a moment these conformances already exist. Here is the \index{substitution map}substitution map for the call:
 \begin{align*}
 \Sigma := \SubstMapC{
 &\SubstType{\rT}{BrewPub<Int>}}{\\
@@ -761,7 +754,7 @@ For this call expression to type check, \texttt{BrewPub} must conform to \texttt
 &\SubstConf{\rT}{BrewPub<Int>}{Pub}
 }
 \end{align*}
-Applying $\Sigma$ to \texttt{\rT.[Bar]Beer} and \texttt{\rT.[Pub]Beer} projects the \index{type witness}type witness from each conformance:
+Now, applying $\Sigma$ to \texttt{\rT.[Bar]Beer} and \texttt{\rT.[Pub]Beer} projects the \index{type witness}type witness for \texttt{Beer} from each conformance:
 \begin{gather*}
 \texttt{\rT.[Bar]Beer}\otimes\Sigma = \AssocType{Bar}{Beer}\otimes\ConfReq{BrewPub<Int>}{Bar}\\
 \texttt{\rT.[Pub]Beer}\otimes\Sigma = \AssocType{Pub}{Beer}\otimes\ConfReq{BrewPub<Int>}{Pub}
@@ -792,12 +785,12 @@ extension BrewPub: Pub where T: ExpressibleByIntegerLiteral {
   func pour() -> String { return "" }
 }
 \end{Verbatim}
-When we call our \texttt{both()} function, the caller expects to receive a tuple of two elements both having the same reduced type \texttt{\rT.[Bar]Beer}. Inside the function, the type checker thinks that the calls to \texttt{brew()} and \texttt{pour()} return the same type. However, what actually happens is that one returns a \texttt{Float} while the other returns a \texttt{String}. This quickly results in undefined behavior. This soundness hole remains unfixed at the time of writing. There are two possible approaches to solving this problem:
+Inside the body of \texttt{both()}, we're assuming the calls to \texttt{brew()} and \texttt{pour()} return the same type. However, what actually happens is that one returns a \texttt{Float} while the other returns a \texttt{String}, which results in undefined behavior. There are two potential solutions:
 \begin{enumerate}
-\item We can tighten the rules around redeclarations of type aliases in constrained extensions, requiring that all such type aliases have canonically equal underlying types. This would reject the conditional conformances written above as invalid.
-\item We can extend \AlgRef{check generic arguments algorithm} to look for incompatible conformances in the given substitution map. This would accept the conformances, but reject the call to \texttt{both()} written above.
+\item We could tighten the rules for redeclaration checking of type aliases in constrained extensions, requiring that all such type aliases have canonically equal underlying types. This would \textsl{reject the conditional conformances} above as invalid.
+\item We could extend \AlgRef{check generic arguments algorithm} to detect conformances having incompatible type witnesses in the given substitution map. This would instead \textsl{reject the call} to \texttt{both()} written above as invalid.
 \end{enumerate}
-\SecRef{critical pairs} sketches out a potential implementation of~(2) at the end of \ExRef{two protocols same assoc}.
+The second approach is more desirable, and we will revisit this problem in \ChapRef{rqm minimization}.
 
 \section{Source Code Reference}\label{extensionssourceref}
 

@@ -1,13 +1,11 @@
-// RUN: %target-swift-frontend %s -emit-sil \
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip \
+// RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   2>&1 | %FileCheck %s
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
 
 // Test LifetimeDependenceScopeFixup.
 

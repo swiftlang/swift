@@ -599,6 +599,17 @@ void IRGenFunction::setScopedLocalTypeData(LocalTypeDataKey key,
 
   getOrCreateLocalTypeData().addConcrete(getActiveDominancePoint(),
                                          isConditional, key, value);
+
+  // We query reified types in places so also put a key mapping in for them.
+  auto reified = IGM.getRuntimeReifiedType(key.Type);
+  if (reified != key.Type) {
+    auto reifiedKey = LocalTypeDataKey(reified, key.Kind);
+    if (isConditional) {
+      registerConditionalLocalTypeDataKey(reifiedKey);
+    }
+    getOrCreateLocalTypeData().addConcrete(getActiveDominancePoint(),
+                                           isConditional, reifiedKey, value);
+  }
 }
 
 void IRGenFunction::setUnscopedLocalTypeMetadata(CanType type,
@@ -627,6 +638,15 @@ void IRGenFunction::setUnscopedLocalTypeData(LocalTypeDataKey key,
 
   getOrCreateLocalTypeData().addConcrete(DominancePoint::universal(),
                                          /*conditional*/ false, key, value);
+
+  // We query reified types in places so also put a key mapping in for them.
+  auto reified = IGM.getRuntimeReifiedType(key.Type);
+  if (reified != key.Type) {
+    auto reifiedKey = LocalTypeDataKey(reified, key.Kind);
+    getOrCreateLocalTypeData().addConcrete(DominancePoint::universal(),
+                                           /*conditional*/ false, reifiedKey,
+                                           value);
+  }
 }
 
 void IRGenFunction::bindLocalTypeDataFromTypeMetadata(CanType type,

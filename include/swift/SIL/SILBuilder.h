@@ -941,14 +941,7 @@ public:
     return lowering.emitStore(*this, Loc, Src, DestAddr, Qualifier);
   }
 
-  EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue) {
-    ASSERT(!SILArgument::isTerminatorResult(borrowedValue) &&
-               "terminator results do not have end_borrow");
-    ASSERT(!isa<SILFunctionArgument>(borrowedValue) &&
-           "Function arguments should never have an end_borrow");
-    return insert(new (getModule())
-                      EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
-  }
+  EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue);
 
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
                                      SILAccessKind accessKind,
@@ -2579,6 +2572,12 @@ public:
                     getSILDebugLocation(loc), fnValue, resultType));
   }
 
+  MergeIsolationRegionInst *
+  createMergeIsolationRegion(SILLocation loc, ArrayRef<SILValue> args) {
+    return insert(MergeIsolationRegionInst::create(getSILDebugLocation(loc),
+                                                   args, getModule()));
+  }
+
   //===--------------------------------------------------------------------===//
   // Terminator SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//
@@ -2710,6 +2709,17 @@ public:
         getSILDebugLocation(Loc), Operand, DefaultBB, CaseBBs, getFunction(),
         CaseCounts, DefaultCount, forwardingOwnershipKind));
   }
+
+  /// A convenience function to decompose a scalar optional value with a
+  /// switch_enum.  Returns the object value, which will only be valid
+  /// in `someBB`.  Don't forget to switch insertion blocks after
+  /// calling this.
+  SILPhiArgument *createSwitchOptional(
+      SILLocation loc, SILValue operand,
+      SILBasicBlock *someBB, SILBasicBlock *noneBB,
+      ValueOwnershipKind forwardingOwnershipKind,
+      ProfileCounter someCount = ProfileCounter(),
+      ProfileCounter noneCount = ProfileCounter());
 
   SwitchEnumAddrInst *createSwitchEnumAddr(
       SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,

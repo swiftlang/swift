@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-onone-debuginfo-canonicalizer -enable-sil-verify-all %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-onone-debuginfo-canonicalizer -enable-sil-verify-all %s 2>&1 | %FileCheck %s
 
 sil_stage canonical
 

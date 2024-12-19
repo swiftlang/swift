@@ -808,6 +808,8 @@ public:
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
 
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
+
 public:
   Decl *getDecl() const { return decl; }
 

@@ -115,7 +115,7 @@ static Win32ModuleInfo moduleInfoFromAddress(const void *address) {
       if (pwszFileName != wszBuffer)
         ::free(pwszFileName);
 
-      return { ::strdup("<unknown>"), mi.lpBaseOfDll };
+      return { ::_strdup("<unknown>"), mi.lpBaseOfDll };
     }
 
     const char *result = _swift_win32_copyUTF8FromWide(pwszFileName);
@@ -125,7 +125,7 @@ static Win32ModuleInfo moduleInfoFromAddress(const void *address) {
 
     return { result, mi.lpBaseOfDll };
   } else {
-    return { ::strdup("<unknown>"), nullptr };
+    return { ::_strdup("<unknown>"), nullptr };
   }
 }
 #endif
@@ -156,7 +156,7 @@ std::optional<SymbolInfo> SymbolInfo::lookup(const void *address) {
 
   if (bRet) {
     return SymbolInfo((const void *)package.si.Address,
-                      ::strdup(package.si.Name),
+                      ::_strdup(package.si.Name),
                       moduleInfo.name,
                       moduleInfo.base);
   } else {

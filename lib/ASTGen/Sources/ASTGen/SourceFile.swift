@@ -15,7 +15,7 @@ import SwiftDiagnostics
 import SwiftIfConfig
 @_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftParserDiagnostics
-import SwiftSyntax
+@_spi(Compiler) import SwiftSyntax
 
 /// Describes a source file that has been "exported" to the C++ part of the
 /// compiler, with enough information to interface with the C++ layer.
@@ -31,7 +31,7 @@ public struct ExportedSourceFile {
   public let fileName: String
 
   /// The syntax tree for the complete source file.
-  public let syntax: SourceFileSyntax
+  public let syntax: Syntax
 
   /// A source location converter to convert `AbsolutePosition`s in `syntax` to line/column locations.
   ///
@@ -75,6 +75,7 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
     mapFeature(.TrailingComma, to: .trailingComma)
     mapFeature(.CoroutineAccessors, to: .coroutineAccessors)
+    mapFeature(.ValueGenerics, to: .valueGenerics)
   }
 }
 
@@ -96,31 +97,68 @@ extension Parser.SwiftVersion {
 /// ExportedSourceFile instance.
 @_cdecl("swift_ASTGen_parseSourceFile")
 public func parseSourceFile(
-  buffer: UnsafePointer<UInt8>,
-  bufferLength: Int,
-  moduleName: UnsafePointer<UInt8>,
-  filename: UnsafePointer<UInt8>,
-  ctxPtr: UnsafeMutableRawPointer?
+  buffer: BridgedStringRef,
+  moduleName: BridgedStringRef,
+  filename: BridgedStringRef,
+  declContextPtr: UnsafeMutableRawPointer?,
+  kind: BridgedGeneratedSourceFileKind
 ) -> UnsafeRawPointer {
-  let buffer = UnsafeBufferPointer(start: buffer, count: bufferLength)
+  let buffer = UnsafeBufferPointer(start: buffer.data, count: buffer.count)
+  let dc = declContextPtr.map { BridgedDeclContext(raw: $0) }
+  let ctx = dc?.astContext
 
-  let ctx = ctxPtr.map { BridgedASTContext(raw: $0) }
-  let sourceFile = Parser.parse(
-    source: buffer,
+  var parser = Parser(
+    buffer,
     swiftVersion: Parser.SwiftVersion(from: ctx),
-    experimentalFeatures: .init(from: ctx)
+    experimentalFeatures: Parser.ExperimentalFeatures(from: ctx)
   )
 
+  let parsed: Syntax
+  switch kind {
+  case .none, // Top level source file.
+      .expressionMacroExpansion,
+      .conformanceMacroExpansion,
+      .extensionMacroExpansion,
+      .preambleMacroExpansion,
+      .replacedFunctionBody,
+      .prettyPrinted,
+      .defaultArgument:
+    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+
+  case .declarationMacroExpansion,
+      .codeItemMacroExpansion,
+      .peerMacroExpansion:
+    if let dc, dc.isTypeContext {
+      parsed = Syntax(MemberBlockItemListSyntax.parse(from: &parser))
+    } else {
+      parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+    }
+
+  case .memberMacroExpansion:
+    parsed = Syntax(MemberBlockItemListSyntax.parse(from: &parser))
+
+  case .accessorMacroExpansion:
+    // FIXME: Implement specialized parsing.
+    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+  case .memberAttributeMacroExpansion,
+      .attribute:
+    // FIXME: Implement specialized parsing.
+    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+  case .bodyMacroExpansion:
+    // FIXME: Implement specialized parsing.
+    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+  }
+
   let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)
-  let moduleName = String(cString: moduleName)
-  let fileName = String(cString: filename)
+  let moduleName = String(bridged: moduleName)
+  let fileName = String(bridged: filename)
   exportedPtr.initialize(
     to: .init(
       buffer: buffer,
       moduleName: moduleName,
       fileName: fileName,
-      syntax: sourceFile,
-      sourceLocationConverter: SourceLocationConverter(fileName: fileName, tree: sourceFile)
+      syntax: parsed,
+      sourceLocationConverter: SourceLocationConverter(fileName: fileName, tree: parsed)
     )
   )
 
@@ -260,4 +298,47 @@ public func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   }
 
   return resultSyntax
+}
+
+@_cdecl("swift_ASTGen_virtualFiles")
+@usableFromInline
+func getVirtualFiles(
+  sourceFilePtr: UnsafeMutableRawPointer,
+  cVirtualFilesOut: UnsafeMutablePointer<UnsafeMutablePointer<BridgedVirtualFile>?>
+) -> Int {
+  let sourceFilePtr = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
+  let virtualFiles = sourceFilePtr.pointee.sourceLocationConverter.lineTable.virtualFiles
+  guard !virtualFiles.isEmpty else {
+    cVirtualFilesOut.pointee = nil
+    return 0
+  }
+
+  let cArrayBuf: UnsafeMutableBufferPointer<BridgedVirtualFile> = .allocate(capacity: virtualFiles.count)
+  _ = cArrayBuf.initialize(
+    from: virtualFiles.lazy.map({ virtualFile in
+      BridgedVirtualFile(
+        StartPosition: virtualFile.startPosition.utf8Offset,
+        EndPosition: virtualFile.endPosition.utf8Offset,
+        Name: allocateBridgedString(virtualFile.fileName),
+        LineOffset: virtualFile.lineOffset,
+        NamePosition: virtualFile.fileNamePosition.utf8Offset
+      )
+    })
+  )
+
+  cVirtualFilesOut.pointee = cArrayBuf.baseAddress
+  return cArrayBuf.count
+}
+
+@_cdecl("swift_ASTGen_freeBridgedVirtualFiles")
+func freeVirtualFiles(
+  cVirtualFiles: UnsafeMutablePointer<BridgedVirtualFile>?,
+  numFiles: Int
+) {
+  let buffer = UnsafeMutableBufferPointer<BridgedVirtualFile>(start: cVirtualFiles, count: numFiles)
+  for vFile in buffer {
+    freeBridgedString(bridged: vFile.Name)
+  }
+  buffer.deinitialize()
+  buffer.deallocate()
 }

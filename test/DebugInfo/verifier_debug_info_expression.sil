@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -sil-verify-all -g -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -sil-verify-all -g -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 import Builtin
 import Swift
 

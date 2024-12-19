@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -test-instruction-iteration -o %t/out.sil | %FileCheck --check-prefix=LOG %s
+// RUN: %target-sil-opt -sil-print-types %s -test-instruction-iteration -o %t/out.sil | %FileCheck --check-prefix=LOG %s
 // RUN: %FileCheck %s < %t/out.sil
 
 // Use this testfile to check if the `swift-frontend -sil-opt` option works.
-// RUN: %swift_frontend_plain -sil-opt %s -test-instruction-iteration -o %t/out.sil | %FileCheck --check-prefix=LOG %s
+// RUN: %swift_frontend_plain -sil-opt -sil-print-types %s -test-instruction-iteration -o %t/out.sil | %FileCheck --check-prefix=LOG %s
 // RUN: %FileCheck %s < %t/out.sil
 
 // REQUIRES: swift_in_compiler

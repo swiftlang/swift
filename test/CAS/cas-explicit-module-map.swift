@@ -31,6 +31,12 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib @%t/MyApp.cmd > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json %t/Test.swift > %t/key
 
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-compile-cache-key @%t/key | %FileCheck %s --check-prefix=CACHE-KEY
+// CACHE-KEY: Cache Key llvmcas://
+// CACHE-KEY-NEXT: Swift Compiler Invocation Info:
+// CACHE-KEY-NEXT: command-line
+// CACHE-KEY: Input index: 0
+
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/Foo.swiftinterface -disable-implicit-swift-modules \
 // RUN:   -module-cache-path %t.module-cache -explicit-swift-module-map-file @%t/map.casid  \
 // RUN:   -cache-compile-job -cas-path %t/cas -swift-version 5 -enable-library-evolution \

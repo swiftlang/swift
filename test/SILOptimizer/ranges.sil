@@ -129,22 +129,3 @@ bb3:
   return %r : $()
 }
 
-// CHECK-LABEL:Instruction range in valid_blocks_invalid_instructions:
-// CHECK-NEXT: <invalid>
-// CHECK:      Block range in valid_blocks_invalid_instructions:
-// CHECK-NEXT: begin:     bb0
-// CHECK-NEXT: range:     []
-// CHECK-NEXT: inclrange: [bb0]
-// CHECK-NEXT: ends:      [bb0]
-// CHECK-NEXT: exits:     []
-// CHECK-NEXT: interiors: []
-// CHECK-NEXT: End function valid_blocks_invalid_instructions
-sil @valid_blocks_invalid_instructions : $@convention(thin) () -> () {
-bb0:
-  %0 = string_literal utf8 "end"
-  %1 = string_literal utf8 "begin"
-  %2 = string_literal utf8 "end"
-  %r = tuple()
-  return %r : $()
-}
-

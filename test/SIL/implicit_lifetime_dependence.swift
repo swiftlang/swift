@@ -1,10 +1,17 @@
 // RUN: %target-swift-frontend %s \
 // RUN: -emit-sil  -target %target-swift-5.1-abi-triple \
-// RUN: -enable-experimental-feature NonescapableTypes \
-// RUN: -disable-experimental-parser-round-trip \
+// RUN: -enable-experimental-feature LifetimeDependence \
 // RUN: | %FileCheck %s
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
-// REQUIRES: asserts
+
+// REQUIRES: swift_feature_LifetimeDependence
+
+@_unsafeNonescapableResult
+@lifetime(source)
+func unsafeLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
+  dependent: consuming T, dependsOn source: borrowing U)
+  -> T {
+  dependent
+}
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
@@ -52,7 +59,7 @@ func testBasic() {
     let view = BufferView($0, a.count)
     let derivedView = derive(view)
     let newView = consumeAndCreate(derivedView)
-    use(newView)    
+    use(newView)
   }
 }
 
@@ -135,6 +142,7 @@ struct GenericBufferView<Element> : ~Escapable {
   let count: Int
 
 // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewV11baseAddress5countACyxGSV_SitcfC : $@convention(method) <Element> (UnsafeRawPointer, Int, @thin GenericBufferView<Element>.Type) -> @lifetime(borrow 0) @owned GenericBufferView<Element> {
+  @lifetime(borrow baseAddress)
   init<Storage>(baseAddress: Pointer,
                 count: Int,
                 dependsOn: borrowing Storage) {
@@ -147,7 +155,7 @@ struct GenericBufferView<Element> : ~Escapable {
     precondition(count >= 0, "Count must not be negative")
     self.baseAddress = baseAddress
     self.count = count
-  } 
+  }
   subscript(position: Pointer) -> Element {
     get {
       if _isPOD(Element.self) {
@@ -161,10 +169,13 @@ struct GenericBufferView<Element> : ~Escapable {
 // CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewVyACyxGAA9FakeRangeVySVGcig : $@convention(method) <Element> (FakeRange<UnsafeRawPointer>, @guaranteed GenericBufferView<Element>) -> @lifetime(copy 1) @owned GenericBufferView<Element> {
   subscript(bounds: FakeRange<Pointer>) -> Self {
     get {
-      GenericBufferView(
-        baseAddress: UnsafeRawPointer(bounds.lowerBound),
+      let pointer = UnsafeRawPointer(bounds.lowerBound)
+      let result = GenericBufferView(
+        baseAddress: pointer,
         count: bounds.upperBound.distance(to:bounds.lowerBound) / MemoryLayout<Element>.stride
       )
+      // assuming that bounds is within self
+      return unsafeLifetime(dependent: result, dependsOn: self)
     }
   }
 }
@@ -197,9 +208,8 @@ public struct OuterNE: ~Escapable {
     self.inner1 = InnerNE(owner: owner)
   }
 
-  // Infer a dependence from 'self' on 'value'. We might revoke this rule once we have syntax.
-  //
   // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7OuterNEV8setInner5valueyAC0gE0V_tF : $@convention(method) (@guaranteed OuterNE.InnerNE, @lifetime(copy 0) @inout OuterNE) -> () {
+  @lifetime(self: value)
   mutating func setInner(value: InnerNE) {
     self.inner1 = value
   }

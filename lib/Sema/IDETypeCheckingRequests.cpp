@@ -13,6 +13,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
@@ -257,15 +258,11 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
 TypePair
 RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
                                               SubscriptDecl *subscript) const {
-  if (!isValidKeyPathDynamicMemberLookup(subscript))
-    return TypePair();
-
-  const auto *param = subscript->getIndices()->get(0);
-  auto keyPathType = param->getTypeInContext()->getAs<BoundGenericType>();
+  auto keyPathType = getKeyPathTypeForDynamicMemberLookup(subscript);
   if (!keyPathType)
     return TypePair();
+
   auto genericArgs = keyPathType->getGenericArgs();
-  assert(!genericArgs.empty() && genericArgs.size() == 2 &&
-         "invalid keypath dynamic member");
+  assert(genericArgs.size() == 2 && "invalid keypath dynamic member");
   return TypePair(genericArgs[0], genericArgs[1]);
 }

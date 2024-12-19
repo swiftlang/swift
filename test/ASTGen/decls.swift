@@ -9,13 +9,13 @@
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen -enable-experimental-feature ValueGenerics)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature ParserASTGen -enable-experimental-feature ValueGenerics)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ParserASTGen
+// REQUIRES: swift_feature_ValueGenerics
 
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
 // rdar://116686158
 // UNSUPPORTED: asan
 
@@ -290,3 +290,12 @@ struct ValueStruct<let N: Int> {}
 func genericTest1<T>(_: T) {}
 func genericTest2<each T>(_: repeat each T) {}
 func genericTest4<let T: Int>(_: ValueStruct<T>) {}
+
+func concreteValueTest1(_: ValueStruct<123>) {}
+func concreteValueTest2(_: ValueStruct<-123>) {}
+
+extension ValueStruct where N == 123 {}
+extension ValueStruct where 123 == N {}
+extension ValueStruct where N == -123 {}
+extension ValueStruct where -123 == N {}
+

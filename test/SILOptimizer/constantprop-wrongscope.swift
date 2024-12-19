@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I \
-// RUN:   %S/../ClangImporter/Inputs/custom-modules -emit-sil -o /dev/null \
-// RUN:   -primary-file %s -Xllvm -sil-print-debuginfo -module-name patatino \
-// RUN:   -Onone -Xllvm -sil-print-after=diagnostic-constant-propagation \
+// RUN:   %S/../ClangImporter/Inputs/custom-modules -Xllvm -sil-print-types -emit-sil -o /dev/null \
+// RUN:   -primary-file %s -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo -module-name patatino \
+// RUN:   -Onone -Xllvm -sil-print-types -Xllvm -sil-print-after=diagnostic-constant-propagation \
 // RUN:   2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop

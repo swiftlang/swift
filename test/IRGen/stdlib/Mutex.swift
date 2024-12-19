@@ -3,6 +3,8 @@
 // RUN: %target-swift-frontend -enable-experimental-feature RawLayout -enable-experimental-feature ValueGenerics -emit-ir -disable-availability-checking -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -module-name stdlib %t/Mutex.swift | %FileCheck %t/Mutex.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: synchronization
+// REQUIRES: swift_feature_RawLayout
+// REQUIRES: swift_feature_ValueGenerics
 
 import Synchronization
 

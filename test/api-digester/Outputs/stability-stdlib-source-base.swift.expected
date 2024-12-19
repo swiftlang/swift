@@ -29,23 +29,23 @@ Constructor Mirror.init(_:children:displayStyle:ancestorRepresentation:) has gen
 
 // Generalizations due to typed throws.
 Func AnyBidirectionalCollection.map(_:) has generic signature change from <Element, T> to <Element, T, E where E : Swift.Error>
-Func AnyBidirectionalCollection.map(_:) is now without @rethrows
+Func AnyBidirectionalCollection.map(_:) is now without rethrows
 Func AnyCollection.map(_:) has generic signature change from <Element, T> to <Element, T, E where E : Swift.Error>
-Func AnyCollection.map(_:) is now without @rethrows
+Func AnyCollection.map(_:) is now without rethrows
 Func AnyRandomAccessCollection.map(_:) has generic signature change from <Element, T> to <Element, T, E where E : Swift.Error>
-Func AnyRandomAccessCollection.map(_:) is now without @rethrows
+Func AnyRandomAccessCollection.map(_:) is now without rethrows
 Func AnySequence.map(_:) has generic signature change from <Element, T> to <Element, T, E where E : Swift.Error>
-Func AnySequence.map(_:) is now without @rethrows
+Func AnySequence.map(_:) is now without rethrows
 Func Collection.map(_:) has generic signature change from <Self, T where Self : Swift.Collection> to <Self, T, E where Self : Swift.Collection, E : Swift.Error>
-Func Collection.map(_:) is now without @rethrows
+Func Collection.map(_:) is now without rethrows
 Func Sequence.map(_:) has generic signature change from <Self, T where Self : Swift.Sequence> to <Self, T, E where Self : Swift.Sequence, E : Swift.Error>
-Func Sequence.map(_:) is now without @rethrows
-Func withUnsafeMutablePointer(to:_:) is now without @rethrows
-Func withUnsafePointer(to:_:) is now without @rethrows
-Func withUnsafeBytes(of:_:) is now without @rethrows
-Func withUnsafeMutableBytes(of:_:) is now without @rethrows
+Func Sequence.map(_:) is now without rethrows
+Func withUnsafeMutablePointer(to:_:) is now without rethrows
+Func withUnsafePointer(to:_:) is now without rethrows
+Func withUnsafeBytes(of:_:) is now without rethrows
+Func withUnsafeMutableBytes(of:_:) is now without rethrows
 Func withoutActuallyEscaping(_:do:) has generic signature change from <ClosureType, ResultType> to <ClosureType, ResultType, Failure where Failure : Swift.Error>
-Func withoutActuallyEscaping(_:do:) is now without @rethrows
+Func withoutActuallyEscaping(_:do:) is now without rethrows
 
 Protocol SIMDScalar has generic signature change from <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar> to <Self : Swift.BitwiseCopyable, Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMDMaskScalar == Self.SIMDMaskScalar.SIMDMaskScalar, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar>
 
@@ -317,51 +317,51 @@ Func FixedWidthInteger.&*(_:_:) has been added as a protocol requirement
 Accessor UnsafeBufferPointer.debugDescription.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Accessor UnsafeMutableBufferPointer.debugDescription.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Func ManagedBuffer.withUnsafeMutablePointerToElements(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, Element : ~Copyable, R : ~Copyable>
-Func ManagedBuffer.withUnsafeMutablePointerToElements(_:) is now without @rethrows
+Func ManagedBuffer.withUnsafeMutablePointerToElements(_:) is now without rethrows
 Func ManagedBuffer.withUnsafeMutablePointerToHeader(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, Element : ~Copyable, R : ~Copyable>
-Func ManagedBuffer.withUnsafeMutablePointerToHeader(_:) is now without @rethrows
+Func ManagedBuffer.withUnsafeMutablePointerToHeader(_:) is now without rethrows
 Func ManagedBuffer.withUnsafeMutablePointers(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, Element : ~Copyable, R : ~Copyable>
-Func ManagedBuffer.withUnsafeMutablePointers(_:) is now without @rethrows
+Func ManagedBuffer.withUnsafeMutablePointers(_:) is now without rethrows
 Func ManagedBufferPointer.withUnsafeMutablePointerToElements(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, Element : ~Copyable, R : ~Copyable>
-Func ManagedBufferPointer.withUnsafeMutablePointerToElements(_:) is now without @rethrows
+Func ManagedBufferPointer.withUnsafeMutablePointerToElements(_:) is now without rethrows
 Func ManagedBufferPointer.withUnsafeMutablePointerToHeader(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, Element : ~Copyable, R : ~Copyable>
-Func ManagedBufferPointer.withUnsafeMutablePointerToHeader(_:) is now without @rethrows
+Func ManagedBufferPointer.withUnsafeMutablePointerToHeader(_:) is now without rethrows
 Func ManagedBufferPointer.withUnsafeMutablePointers(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, Element : ~Copyable, R : ~Copyable>
-Func ManagedBufferPointer.withUnsafeMutablePointers(_:) is now without @rethrows
+Func ManagedBufferPointer.withUnsafeMutablePointers(_:) is now without rethrows
 Func Optional.flatMap(_:) has generic signature change from <Wrapped, U> to <Wrapped, E, U where E : Swift.Error, U : ~Copyable>
-Func Optional.flatMap(_:) is now without @rethrows
+Func Optional.flatMap(_:) is now without rethrows
 Func Optional.map(_:) has generic signature change from <Wrapped, U> to <Wrapped, E, U where E : Swift.Error, U : ~Copyable>
-Func Optional.map(_:) is now without @rethrows
+Func Optional.map(_:) is now without rethrows
 Func Result.flatMap(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
 Func Result.flatMapError(_:) has generic signature change from <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error> to <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error, Success : ~Copyable>
 Func Result.flatMapError(_:) has self access kind changing from NonMutating to Consuming
 Func Result.map(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
 Func Result.mapError(_:) has generic signature change from <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error> to <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error, Success : ~Copyable>
 Func UnsafeBufferPointer.withMemoryRebound(to:_:) has generic signature change from <Element, T, Result> to <Element, T, E, Result where E : Swift.Error, Element : ~Copyable, T : ~Copyable, Result : ~Copyable>
-Func UnsafeBufferPointer.withMemoryRebound(to:_:) is now without @rethrows
+Func UnsafeBufferPointer.withMemoryRebound(to:_:) is now without rethrows
 Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has generic signature change from <Element, T, Result> to <Element, T, E, Result where E : Swift.Error, Element : ~Copyable, T : ~Copyable, Result : ~Copyable>
-Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) is now without @rethrows
+Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) is now without rethrows
 Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has generic signature change from <Pointee, T, Result> to <Pointee, T, E, Result where E : Swift.Error, Pointee : ~Copyable, T : ~Copyable, Result : ~Copyable>
-Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) is now without @rethrows
+Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) is now without rethrows
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has generic signature change from <Pointee, T, Result> to <Pointee, T, E, Result where E : Swift.Error, Pointee : ~Copyable, T : ~Copyable, Result : ~Copyable>
-Func UnsafePointer.withMemoryRebound(to:capacity:_:) is now without @rethrows
+Func UnsafePointer.withMemoryRebound(to:capacity:_:) is now without rethrows
 Func withExtendedLifetime(_:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
-Func withExtendedLifetime(_:_:) is now without @rethrows
+Func withExtendedLifetime(_:_:) is now without rethrows
 Func Array.withUnsafeBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
-Func Array.withUnsafeBufferPointer(_:) is now without @rethrows
+Func Array.withUnsafeBufferPointer(_:) is now without rethrows
 Func Array.withUnsafeMutableBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
 Func Array.withUnsafeMutableBufferPointer(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
-Func Array.withUnsafeMutableBufferPointer(_:) is now without @rethrows
+Func Array.withUnsafeMutableBufferPointer(_:) is now without rethrows
 Func ArraySlice.withUnsafeBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
-Func ArraySlice.withUnsafeBufferPointer(_:) is now without @rethrows
+Func ArraySlice.withUnsafeBufferPointer(_:) is now without rethrows
 Func ArraySlice.withUnsafeMutableBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
 Func ArraySlice.withUnsafeMutableBufferPointer(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
-Func ArraySlice.withUnsafeMutableBufferPointer(_:) is now without @rethrows
+Func ArraySlice.withUnsafeMutableBufferPointer(_:) is now without rethrows
 Func ContiguousArray.withUnsafeBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
-Func ContiguousArray.withUnsafeBufferPointer(_:) is now without @rethrows
+Func ContiguousArray.withUnsafeBufferPointer(_:) is now without rethrows
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
-Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without @rethrows
+Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without rethrows
 
 // Adoption of @unsafe
 Func unsafeBitCast(_:to:) is now with @unsafe

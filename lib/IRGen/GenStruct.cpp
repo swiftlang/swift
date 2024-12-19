@@ -368,28 +368,6 @@ namespace {
                                   ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
 
-    template <class Fn>
-    void forEachNonEmptyBase(Fn fn) const {
-      auto &layout = ClangDecl->getASTContext().getASTRecordLayout(ClangDecl);
-
-      if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
-        for (auto base : cxxRecord->bases()) {
-          auto baseType = base.getType().getCanonicalType();
-
-          auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-          auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
-
-          if (baseCxxRecord->isEmpty())
-            continue;
-
-          auto offset = layout.getBaseClassOffset(baseCxxRecord);
-          auto size =
-              ClangDecl->getASTContext().getTypeSizeInChars(baseType);
-          fn(baseType, offset, size);
-        }
-      }
-    }
-
   public:
     LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                                 unsigned explosionSize, llvm::Type *storageType,
@@ -446,10 +424,11 @@ namespace {
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
-      forEachNonEmptyBase([&](clang::QualType type, clang::CharUnits offset,
-                              clang::CharUnits) {
-        lowering.addTypedData(type, offset);
-      });
+      if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
+        for (auto base : getBasesAndOffsets(cxxRecordDecl)) {
+          lowering.addTypedData(base.decl, base.offset.asCharUnits());
+        }
+      }
 
       lowering.addTypedData(ClangDecl, offset.asCharUnits());
     }
@@ -563,36 +542,25 @@ namespace {
     const clang::RecordDecl *ClangDecl;
 
     const clang::CXXConstructorDecl *findCopyConstructor() const {
-      const clang::CXXRecordDecl *cxxRecordDecl =
-          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      for (auto method : cxxRecordDecl->methods()) {
-        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isCopyConstructor() &&
-              ctor->getAccess() == clang::AS_public &&
-              // rdar://106964356
-              // ctor->doesThisDeclarationHaveABody() &&
-              !ctor->isDeleted())
-            return ctor;
-        }
+      for (auto ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isCopyConstructor() &&
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
+          return ctor;
       }
       return nullptr;
     }
 
     const clang::CXXConstructorDecl *findMoveConstructor() const {
-      const clang::CXXRecordDecl *cxxRecordDecl =
-          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      for (auto method : cxxRecordDecl->methods()) {
-        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isMoveConstructor() &&
-              ctor->getAccess() == clang::AS_public &&
-              ctor->doesThisDeclarationHaveABody() &&
-              !ctor->isDeleted())
-            return ctor;
-        }
+      for (auto ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isMoveConstructor() &&
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
+          return ctor;
       }
       return nullptr;
     }
@@ -1395,23 +1363,12 @@ private:
   void collectBases(const clang::RecordDecl *decl) {
     auto &layout = decl->getASTContext().getASTRecordLayout(decl);
     if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(decl)) {
-      for (auto base : cxxRecord->bases()) {
-        if (base.isVirtual())
-          continue;
-
-        auto baseType = base.getType().getCanonicalType();
-
-        auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-        auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
-
-        if (baseCxxRecord->isEmpty())
-          continue;
-
-        auto baseOffset = Size(layout.getBaseClassOffset(baseCxxRecord).getQuantity());
-        SubobjectAdjustment += baseOffset;
-        collectBases(baseCxxRecord);
-        collectStructFields(baseCxxRecord);
-        SubobjectAdjustment -= baseOffset;
+      auto bases = getBasesAndOffsets(cxxRecord);
+      for (auto base : bases) {
+        SubobjectAdjustment += base.offset;
+        collectBases(base.decl);
+        collectStructFields(base.decl);
+        SubobjectAdjustment -= base.offset;
       }
     }
   }
@@ -1423,7 +1380,8 @@ private:
     auto sfi = swiftProperties.begin(), sfe = swiftProperties.end();
     // When collecting fields from the base subobjects, we do not have corresponding swift
     // stored properties.
-    if (decl != ClangDecl)
+    bool isBaseSubobject = decl != ClangDecl;
+    if (isBaseSubobject)
       sfi = swiftProperties.end();
 
     while (cfi != cfe) {
@@ -1475,10 +1433,14 @@ private:
 
     assert(sfi == sfe && "more Swift fields than there were Clang fields?");
 
-    Size objectTotalStride = Size(layout.getSize().getQuantity());
-    // We never take advantage of tail padding, because that would prevent
-    // us from passing the address of the object off to C, which is a pretty
-    // likely scenario for imported C types.
+    auto objectSize = isBaseSubobject ? layout.getDataSize() : layout.getSize();
+    Size objectTotalStride = Size(objectSize.getQuantity());
+    // Unless this is a base subobject of a C++ type, we do not take advantage
+    // of tail padding, because that would prevent us from passing the address
+    // of the object off to C, which is a pretty likely scenario for imported C
+    // types.
+    // In C++, fields of a derived class might get placed into tail padding of a
+    // base class, in which case we should not add extra padding here.
     assert(NextOffset <= SubobjectAdjustment + objectTotalStride);
     assert(SpareBits.size() <= SubobjectAdjustment.getValueInBits() +
                                    objectTotalStride.getValueInBits());

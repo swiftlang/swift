@@ -39,7 +39,7 @@ public protocol Observable { }
 ///        }
 ///     }
 @available(SwiftStdlib 5.9, *)
-@attached(member, names: named(_$observationRegistrar), named(access), named(withMutation))
+@attached(member, names: named(_$observationRegistrar), named(access), named(withMutation), named(shouldNotifyObservers))
 @attached(memberAttribute)
 @attached(extension, conformances: Observable)
 public macro Observable() =
@@ -51,7 +51,7 @@ public macro Observable() =
 /// framework isn't necessary.
 @available(SwiftStdlib 5.9, *)
 @attached(accessor, names: named(init), named(get), named(set), named(_modify))
-@attached(peer, names: prefixed(_))
+@attached(peer, names: prefixed(_), prefixed(_cachedKeypath_))
 public macro ObservationTracked() =
   #externalMacro(module: "ObservationMacros", type: "ObservationTrackedMacro")
 
@@ -61,7 +61,7 @@ public macro ObservationTracked() =
 /// is accessible to the observing object. To prevent observation of an
 /// accessible property, attach the `ObservationIgnored` macro to the property.
 @available(SwiftStdlib 5.9, *)
-@attached(accessor, names: named(willSet))
+@attached(accessor)
 public macro ObservationIgnored() =
   #externalMacro(module: "ObservationMacros", type: "ObservationIgnoredMacro")
 

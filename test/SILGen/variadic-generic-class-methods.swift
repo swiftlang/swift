@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -target %target-swift-5.9-abi-triple %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-swift-5.9-abi-triple %s | %FileCheck %s
 
 public class A<each T> {
   public func f(_ action: (repeat each T) -> ()) {}

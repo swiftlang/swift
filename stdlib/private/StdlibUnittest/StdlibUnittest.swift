@@ -17,25 +17,25 @@ import SwiftPrivateLibcExtras
 
 #if canImport(Darwin)
 #if _runtime(_ObjC)
-import Foundation
+internal import Foundation
 #endif
-import Darwin
-import var Darwin.errno
+internal import Darwin
+internal import var Darwin.errno
 #elseif canImport(Glibc)
-import Glibc
+internal import Glibc
 #elseif canImport(Musl)
-import Musl
+internal import Musl
 #elseif canImport(Android)
-import Android
+internal import Android
 #elseif os(WASI)
-import WASILibc
+internal import WASILibc
 #elseif os(Windows)
-import CRT
-import WinSDK
+internal import CRT
+internal import WinSDK
 #endif
 
 #if _runtime(_ObjC)
-import ObjectiveC
+internal import ObjectiveC
 #endif
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY

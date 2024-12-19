@@ -30,6 +30,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/GenericRequirement.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
@@ -397,7 +398,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
                               const OutliningMetadataCollector &collector) {
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
-    IRGenMangler().mangleOutlinedInitializeWithTakeFunction(manglingBits.first,
+    IRGenMangler(T.getASTContext()).mangleOutlinedInitializeWithTakeFunction(manglingBits.first,
         manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
@@ -418,7 +419,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
                               const OutliningMetadataCollector &collector) {
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
-    IRGenMangler().mangleOutlinedInitializeWithCopyFunction(manglingBits.first,
+    IRGenMangler(T.getASTContext()).mangleOutlinedInitializeWithCopyFunction(manglingBits.first,
         manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
@@ -439,7 +440,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
                               const OutliningMetadataCollector &collector) {
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
-    IRGenMangler().mangleOutlinedAssignWithTakeFunction(manglingBits.first,
+    IRGenMangler(T.getASTContext()).mangleOutlinedAssignWithTakeFunction(manglingBits.first,
         manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
@@ -460,7 +461,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
                               const OutliningMetadataCollector &collector) {
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
-    IRGenMangler().mangleOutlinedAssignWithCopyFunction(manglingBits.first,
+    IRGenMangler(T.getASTContext()).mangleOutlinedAssignWithCopyFunction(manglingBits.first,
         manglingBits.second, collector.IGF.isPerformanceConstraint);
 
   return getOrCreateOutlinedCopyAddrHelperFunction(
@@ -489,6 +490,22 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
   paramTys.push_back(ptrTy);
   collector.addPolymorphicParameterTypes(paramTys);
 
+  IRLinkage *linkage = nullptr;
+  IRLinkage privateLinkage = {
+    llvm::GlobalValue::PrivateLinkage,
+    llvm::GlobalValue::DefaultVisibility,
+    llvm::GlobalValue::DefaultStorageClass,
+  };
+  auto &TL =
+    getSILModule().Types.getTypeLowering(T, TypeExpansionContext::minimal());
+  // Opaque result types might lead to different expansions in different files.
+  // The default hidden linkonce_odr might lead to linking an implementation
+  // from another file that head a different expansion/different
+  // signature/different implementation.
+  if (TL.getRecursiveProperties().isTypeExpansionSensitive()) {
+    linkage = &privateLinkage;
+  }
+
   return getOrCreateHelperFunction(funcName, ptrTy, paramTys,
       [&](IRGenFunction &IGF) {
         auto params = IGF.collectParameters();
@@ -500,7 +517,8 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
       },
       true /*setIsNoInline*/,
       false /*forPrologue*/,
-      collector.IGF.isPerformanceConstraint);
+      collector.IGF.isPerformanceConstraint,
+      linkage);
 }
 
 void TypeInfo::callOutlinedDestroy(IRGenFunction &IGF,
@@ -539,10 +557,26 @@ void OutliningMetadataCollector::emitCallToOutlinedDestroy(
 llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
                               SILType T, const TypeInfo &ti,
                               const OutliningMetadataCollector &collector) {
-  IRGenMangler mangler;
+  IRGenMangler mangler(T.getASTContext());
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName = mangler.mangleOutlinedDestroyFunction(manglingBits.first,
                      manglingBits.second, collector.IGF.isPerformanceConstraint);
+
+  IRLinkage *linkage = nullptr;
+  IRLinkage privateLinkage = {
+    llvm::GlobalValue::PrivateLinkage,
+    llvm::GlobalValue::DefaultVisibility,
+    llvm::GlobalValue::DefaultStorageClass,
+  };
+  auto &TL =
+    getSILModule().Types.getTypeLowering(T, TypeExpansionContext::minimal());
+  // Opaque result types might lead to different expansions in different files.
+  // The default hidden linkonce_odr might lead to linking an implementation
+  // from another file that head a different expansion/different
+  // signature/different implementation.
+  if (TL.getRecursiveProperties().isTypeExpansionSensitive()) {
+    linkage = &privateLinkage;
+  }
 
   auto ptrTy = ti.getStorageType()->getPointerTo();
   llvm::SmallVector<llvm::Type *, 4> paramTys;
@@ -565,7 +599,8 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
       },
       true /*setIsNoInline*/,
       false /*forPrologue*/,
-      collector.IGF.isPerformanceConstraint);
+      collector.IGF.isPerformanceConstraint,
+      linkage);
 }
 
 llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
@@ -573,7 +608,7 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
                                                        llvm::Type *llvmType,
                                                        Atomicity atomicity) {
   auto *loadableTI = cast<LoadableTypeInfo>(&ti);
-  IRGenMangler mangler;
+  IRGenMangler mangler(t.getASTContext());
   auto manglingBits =
     getTypeAndGenericSignatureForManglingOutlineFunction(t);
   auto funcName = mangler.mangleOutlinedRetainFunction(manglingBits.first,
@@ -623,7 +658,7 @@ llvm::Constant *IRGenModule::getOrCreateReleaseFunction(
     const TypeInfo &ti, SILType t, llvm::Type *ptrTy, Atomicity atomicity,
     const OutliningMetadataCollector &collector) {
   auto *loadableTI = cast<LoadableTypeInfo>(&ti);
-  IRGenMangler mangler;
+  IRGenMangler mangler(t.getASTContext());
   auto manglingBits =
     getTypeAndGenericSignatureForManglingOutlineFunction(t);
   auto funcName = mangler.mangleOutlinedReleaseFunction(manglingBits.first,

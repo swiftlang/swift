@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeLayout.h"
+#include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "EnumPayload.h"
 #include "FixedTypeInfo.h"
@@ -70,7 +71,7 @@ public:
     Bridge = 0x08,
     Block = 0x09,
     ObjC = 0x0a,
-    Custom = 0x0b,
+    NativeSwiftObjC = 0x0b,
 
     // reserved
     // Metatype = 0x0c,
@@ -467,7 +468,7 @@ llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty,
   CanType fieldType = ty.getASTType();
 
   auto sig = genericSig.getCanonicalSignature();
-  IRGenMangler mangler;
+  IRGenMangler mangler(IGM.Context);
   std::string symbolName =
       mangler.mangleSymbolNameForMangledMetadataAccessorString(
           "get_type_metadata_for_layout_string", sig,
@@ -504,7 +505,7 @@ llvm::Function *createFixedEnumLoadTag(IRGenModule &IGM,
                                        const EnumTypeLayoutEntry &entry) {
   assert(entry.isFixedSize(IGM));
 
-  IRGenMangler mangler;
+  IRGenMangler mangler(IGM.Context);
   auto symbol = mangler.mangleSymbolNameForMangledGetEnumTagForLayoutString(
       entry.ty.getASTType()->mapTypeOutOfContext()->getCanonicalType());
 
@@ -1293,9 +1294,17 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
   case ScalarKind::BlockReference:
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Block, size);
     break;
-  case ScalarKind::ObjCReference:
+  case ScalarKind::ObjCReference: {
+    if (auto *classDecl = representative.getClassOrBoundGenericClass()) {
+      if (!classDecl->hasClangNode()) {
+        B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeSwiftObjC,
+                      size);
+        break;
+      }
+    }
     B.addRefCount(LayoutStringBuilder::RefCountingKind::ObjC, size);
     break;
+  }
   case ScalarKind::ThickFunc:
     B.addSkip(IGM.getPointerSize().getValue());
     B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeStrong,
@@ -1733,7 +1742,7 @@ AlignedGroupEntry::layoutString(IRGenModule &IGM,
 
   B.result(IGM, SB, genericSig);
 
-  IRGenMangler mangler;
+  IRGenMangler mangler(IGM.Context);
   std::string symbolName =
       mangler.mangleSymbolNameForMangledMetadataAccessorString(
           "type_layout_string", genericSig.getCanonicalSignature(),
@@ -2338,7 +2347,7 @@ EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
 
     B.result(IGM, SB, genericSig);
 
-    IRGenMangler mangler;
+    IRGenMangler mangler(IGM.Context);
     std::string symbolName =
         mangler.mangleSymbolNameForMangledMetadataAccessorString(
             "type_layout_string", genericSig.getCanonicalSignature(),

@@ -215,7 +215,6 @@ InitialTaskExecutorOwnedPreferenceTaskOptionRecord::getExecutorRefFromUnownedTas
     return executorRef;
 }
 
-
 void NullaryContinuationJob::process(Job *_job) {
   auto *job = cast<NullaryContinuationJob>(_job);
 
@@ -347,7 +346,7 @@ void AsyncTask::setTaskId() {
 uint64_t AsyncTask::getTaskId() {
   // Reconstitute a full 64-bit task ID from the 32-bit job ID and the upper
   // 32 bits held in _private().
-  return (uint64_t)Id << _private().Id;
+  return ((uint64_t)_private().Id << 32) | (uint64_t)Id;
 }
 
 SWIFT_CC(swift)
@@ -364,6 +363,8 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   SWIFT_TASK_DEBUG_LOG("Destroyed task %p", task);
   free(task);
 }
+
+#if !SWIFT_CONCURRENCY_EMBEDDED
 
 static SerialExecutorRef executorForEnqueuedJob(Job *job) {
 #if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
@@ -393,7 +394,7 @@ static void jobInvoke(void *obj, void *unused, uint32_t flags) {
 // Magic constant to identify Swift Job vtables to Dispatch.
 static const unsigned long dispatchSwiftObjectType = 1;
 
-FullMetadata<DispatchClassMetadata> swift::jobHeapMetadata = {
+static FullMetadata<DispatchClassMetadata> jobHeapMetadata = {
   {
     {
       /*type layout*/ nullptr,
@@ -432,10 +433,46 @@ static FullMetadata<DispatchClassMetadata> taskHeapMetadata = {
   }
 };
 
+
 const void *const swift::_swift_concurrency_debug_jobMetadata =
     static_cast<Metadata *>(&jobHeapMetadata);
 const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
     static_cast<Metadata *>(&taskHeapMetadata);
+
+const HeapMetadata *swift::jobHeapMetadataPtr =
+    static_cast<HeapMetadata *>(&jobHeapMetadata);
+const HeapMetadata *swift::taskHeapMetadataPtr =
+    static_cast<HeapMetadata *>(&taskHeapMetadata);
+
+#else // SWIFT_CONCURRENCY_EMBEDDED
+
+// This matches the embedded class metadata layout in IRGen and in
+// EmbeddedRuntime.swift.
+typedef struct EmbeddedClassMetadata {
+  void *superclass;
+  HeapObjectDestroyer *__ptrauth_swift_heap_object_destructor destroy;
+  void *ivar_destroyer;
+} EmbeddedHeapObject;
+
+static EmbeddedClassMetadata jobHeapMetadata = {
+  0, &destroyJob, 0,
+};
+
+static EmbeddedClassMetadata taskHeapMetadata = {
+  0, &destroyTask, 0,
+};
+
+const void *const swift::_swift_concurrency_debug_jobMetadata =
+    (Metadata *)(&jobHeapMetadata);
+const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
+    (Metadata *)(&taskHeapMetadata);
+
+const HeapMetadata *swift::jobHeapMetadataPtr =
+    (HeapMetadata *)(&jobHeapMetadata);
+const HeapMetadata *swift::taskHeapMetadataPtr =
+    (HeapMetadata *)(&taskHeapMetadata);
+
+#endif
 
 static void completeTaskImpl(AsyncTask *task,
                              AsyncContext *context,
@@ -546,8 +583,11 @@ SWIFT_CC(swiftasync)
 static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
 
   auto context = static_cast<TaskFutureWaitAsyncContext *>(_context);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
   auto resumeWithError =
       reinterpret_cast<AsyncVoidClosureEntryPoint *>(context->ResumeParent);
+#pragma clang diagnostic pop
   return resumeWithError(context->Parent, context->errorResult);
 }
 
@@ -922,8 +962,11 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
         reinterpret_cast<char *>(allocation) + headerSize -
         sizeof(AsyncContextPrefix));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     asyncContextPrefix->asyncEntryPoint =
         reinterpret_cast<AsyncVoidClosureEntryPoint *>(function);
+#pragma clang diagnostic pop
     asyncContextPrefix->closureContext = closureContext;
     function = non_future_adapter;
     assert(sizeof(AsyncContextPrefix) == 3 * sizeof(void *));
@@ -931,8 +974,11 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
         reinterpret_cast<char *>(allocation) + headerSize -
         sizeof(FutureAsyncContextPrefix));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     asyncContextPrefix->asyncEntryPoint =
         reinterpret_cast<AsyncGenericClosureEntryPoint *>(function);
+#pragma clang diagnostic pop
     function = future_adapter;
     asyncContextPrefix->closureContext = closureContext;
     assert(sizeof(FutureAsyncContextPrefix) == 4 * sizeof(void *));
@@ -959,14 +1005,12 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   if (asyncLet) {
     // Initialize the refcount bits to "immortal", so that
     // ARC operations don't have any effect on the task.
-    task = new(allocation) AsyncTask(&taskHeapMetadata,
-                             InlineRefCounts::Immortal, jobFlags,
-                             function, initialContext,
-                             captureCurrentVoucher);
+    task = new (allocation)
+        AsyncTask(taskHeapMetadataPtr, InlineRefCounts::Immortal, jobFlags,
+                  function, initialContext, captureCurrentVoucher);
   } else {
-    task = new(allocation) AsyncTask(&taskHeapMetadata, jobFlags,
-                                    function, initialContext,
-                                    captureCurrentVoucher);
+    task = new (allocation) AsyncTask(taskHeapMetadataPtr, jobFlags, function,
+                                      initialContext, captureCurrentVoucher);
   }
 
   // Initialize the child fragment if applicable.
@@ -1000,13 +1044,44 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
                        " with parent %p at base pri %zu",
                        task, task->getTaskId(), parent, basePriority);
 
-  // Initialize the task-local allocator.
-  initialContext->ResumeParent =
-      runInlineOption ? &completeInlineTask
-                      : reinterpret_cast<TaskContinuationFunction *>(
-                            asyncLet         ? &completeTask
-                            : closureContext ? &completeTaskWithClosure
-                                             : &completeTaskAndRelease);
+  // Configure the initial context.
+
+  // Initialize the parent context pointer to null.
+  initialContext->Parent = nullptr;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
+  // Initialize the resumption funclet pointer (async return address) to
+  // the final funclet for completing the task.
+
+  // Inline tasks are unmanaged, non-throwing, and use a non-escaping
+  // task function.  The final funclet doesn't expect to get passed an error,
+  // and it doesn't clean up either the function or the task directly.
+  if (runInlineOption) {
+    initialContext->ResumeParent = &completeInlineTask;
+
+  // `async let` tasks are unmanaged and use a non-escaping task function.
+  // The final funclet shouldn't release the task or the task function.
+  } else if (asyncLet) {
+    initialContext->ResumeParent =
+      reinterpret_cast<TaskContinuationFunction*>(&completeTask);
+
+  // If we have a non-null closure context and the task function is not
+  // consumed by calling it, use a final funclet that releases both the
+  // task and the closure context.
+  } else if (closureContext && !taskCreateFlags.isTaskFunctionConsumed()) {
+    initialContext->ResumeParent =
+      reinterpret_cast<TaskContinuationFunction*>(&completeTaskWithClosure);
+
+  // Otherwise, just release the task.
+  } else {
+    initialContext->ResumeParent =
+      reinterpret_cast<TaskContinuationFunction*>(&completeTaskAndRelease);
+  }
+#pragma clang diagnostic pop
+
+  // Initialize the task-local allocator and our other private runtime
+  // state for the task.
   if ((asyncLet || (runInlineOption && runInlineOption->getAllocation())) &&
       initialSlabSize > 0) {
     assert(parent || (runInlineOption && runInlineOption->getAllocation()));
@@ -1047,14 +1122,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
            "locals; unexpected attempt to combine the two!");
     task->_private().Local.initializeLinkParent(task, parent);
   }
-
-  // Configure the initial context.
-  //
-  // FIXME: if we store a null pointer here using the standard ABI for
-  // signed null pointers, then we'll have to authenticate context pointers
-  // as if they might be null, even though the only time they ever might
-  // be is the final hop.  Store a signed null instead.
-  initialContext->Parent = nullptr;
 
   // FIXME: add discarding flag
   // FIXME: add task executor
@@ -1225,10 +1292,13 @@ AsyncTaskAndContext swift::swift_task_create(
             FutureAsyncSignature,
             SpecialPointerAuthDiscriminators::AsyncFutureFunction>(closureEntry);
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     return swift_task_create_common(
         rawTaskCreateFlags, options, futureResultType,
         reinterpret_cast<TaskContinuationFunction *>(taskEntry), closureContext,
         initialContextSize);
+#pragma clang diagnostic pop
   }
 }
 
@@ -1313,7 +1383,10 @@ void swift_task_future_wait_throwingImpl(
   waitingTask->ResumeTask = task_wait_throwing_resume_adapter;
   waitingTask->ResumeContext = callContext;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
   auto resumeFn = reinterpret_cast<TaskContinuationFunction *>(resumeFunction);
+#pragma clang diagnostic pop
 
   // Wait on the future.
   assert(task->isFuture());

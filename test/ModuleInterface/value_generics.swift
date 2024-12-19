@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name ValueGeneric -enable-experimental-feature ValueGenerics -disable-availability-checking -disable-experimental-parser-round-trip
-// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name ValueGeneric -disable-availability-checking -disable-experimental-parser-round-trip
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name ValueGeneric -enable-experimental-feature ValueGenerics -disable-availability-checking
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name ValueGeneric -disable-availability-checking
 // RUN: %FileCheck %s < %t.swiftinterface
+
+// REQUIRES: swift_feature_ValueGenerics
 
 // CHECK: public struct Vector<Element, let N : Swift.Int>
 public struct Vector<Element, let N: Int> {

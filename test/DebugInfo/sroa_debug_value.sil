@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-print-debuginfo -sroa %s | %FileCheck --check-prefix=CHECK-SROA %s
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-print-debuginfo -sroa -mem2reg %s | %FileCheck --check-prefix=CHECK-MEM2REG %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-print-debuginfo -sroa %s | %FileCheck --check-prefix=CHECK-SROA %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-print-debuginfo -sroa -mem2reg %s | %FileCheck --check-prefix=CHECK-MEM2REG %s
 sil_stage canonical
 
 import Builtin

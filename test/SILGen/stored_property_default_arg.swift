@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -primary-file %s | %FileCheck %s
 
 // Currently, this only appears for memberwise initializers.
 

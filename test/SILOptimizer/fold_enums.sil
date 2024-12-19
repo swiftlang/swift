@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
 // Check that the optimizer can detect when an enum (e.g. Optional) is being deconstructed
 // and then recreated in the same form. It should replace it with the original value in

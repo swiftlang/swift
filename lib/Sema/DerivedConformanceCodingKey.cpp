@@ -275,7 +275,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
   for (auto *elt : elements) {
     // Skip the cases that would return unavailable elements since those can't
     // be instantiated at runtime.
-    if (elt->getAttrs().isUnavailable(C))
+    if (elt->isUnavailable())
       continue;
 
     auto *litExpr = new (C) StringLiteralExpr(elt->getNameStr(), SourceRange(),

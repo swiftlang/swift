@@ -117,8 +117,17 @@ namespace swift {
                               bool TokenizeInterpolatedString = true,
                               ArrayRef<Token> SplitTokens = ArrayRef<Token>());
 
+  /// Perform import resolution for the module.
+  void performImportResolution(ModuleDecl *M);
+
   /// This walks the AST to resolve imports.
   void performImportResolution(SourceFile &SF);
+
+  /// Resolve imports for a source file generated to adapt a given
+  /// Clang module.
+  void performImportResolutionForClangMacroBuffer(
+    SourceFile &SF, ModuleDecl *clangModule
+  );
 
   /// Once type-checking is complete, this instruments code with calls to an
   /// intrinsic that record the expected values of local variables so they can
@@ -260,7 +269,10 @@ namespace swift {
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This will include the emission of LLVM IR
   /// if requested (\out is not null).
-  void performLLVMOptimizations(const IRGenOptions &Opts, llvm::Module *Module,
+  void performLLVMOptimizations(const IRGenOptions &Opts,
+                                DiagnosticEngine &Diags,
+                                llvm::sys::Mutex *DiagMutex,
+                                llvm::Module *Module,
                                 llvm::TargetMachine *TargetMachine,
                                 llvm::raw_pwrite_stream *out);
 

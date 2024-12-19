@@ -1267,3 +1267,19 @@ do {
 
 // Currently legal.
 let _: () -> Int = { return fatalError() }
+
+// Make sure that `Void` assigned to closure result doesn't get eagerly propagated into the body
+do {
+  class C {
+    func f(_: Any) -> Int! { fatalError() }
+    static func f(_: Any) -> Int! { fatalError() }
+  }
+
+  class G<T> {
+    func g<U>(_ u: U, _: (U, T) -> ()) {}
+
+    func g<U: C>(_ u: U) {
+        g(u) { $0.f($1) } // expected-warning {{result of call to 'f' is unused}}
+    }
+  }
+}

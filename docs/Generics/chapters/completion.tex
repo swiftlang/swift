@@ -6,9 +6,9 @@
 
 \IndexDefinition{Knuth-Bendix algorithm}%
 \index{completion!z@\igobble|seealso{Knuth-Bendix algorithm}}
-\lettrine{K}{nuth-Bendix completion} is the central algorithm in the Requirement Machine. Completion attempts to construct a \index{convergent rewriting system}convergent rewriting system from a list of rewrite rules, and a convergent rewriting system allows us to decide if two terms have the same normal form in a finite number of steps, solving the word problem. As we saw in the previous chapter, our initial rewrite rules are defined by the explicit requirements of a generic signature and its protocol dependencies. A desirable property of this mapping was given by \ThmRef{derivation to path}: a \emph{derived} requirement defines a rewrite path over these rewrite rules representing explicit requirements. All of this means that completion gives us a \emph{decision procedure} for the \index{derived requirement!decision procedure}derived requirements formalism: the question of whether any given derived requirement is satisfied---that is, if there exists a valid derivation built from explicit requirements---is easily solved by term reduction in a convergent rewriting system. This is the foundation on which we build both \index{generic signature query}generic signature queries and \index{requirement minimization}minimization.
+\lettrine{K}{nuth-Bendix completion} is the central algorithm in the Requirement Machine. Completion attempts to construct a \index{convergent rewriting system}convergent rewriting system from a list of rewrite rules, and a convergent rewriting system allows us to decide if two terms have the same normal form in a finite number of steps, solving the word problem. As we saw in the previous chapter, our initial rewrite rules are defined by the explicit requirements of a generic signature and its protocol dependencies. A desirable property of this mapping was given by a pair of theorems in \SecRef{rqm correctness}: a \emph{derived} requirement defines a rewrite path over these rewrite rules representing explicit requirements. All of this means that completion gives us a \emph{decision procedure} for the \index{derived requirement!decision procedure}derived requirements formalism: the question of whether any given derived requirement is satisfied---that is, if there exists a valid derivation built from explicit requirements---is easily solved by term reduction in a convergent rewriting system. This is the foundation on which we build both \index{generic signature query}generic signature queries and \index{requirement minimization}minimization.
 
-\paragraph{The algorithm.} We'll give a self-contained description first, with much of the rest of the chapter devoted to examples. Our description can be supplemented with any text on rewrite systems, such as \cite{book2012string} or \cite{andallthat}. The algorithm is somewhat clever; to really ``get it'' might require several attempts. \index{Donald~Knuth}Donald~E.~Knuth and \index{Peter Bendix}Peter Bendix described the algorithm for term rewrite systems in a 1970 paper \cite{Knuth1983}; a correctness proof was later given by \index{Gerard Huet@G\'erard Huet}G\'erard Huet in \cite{HUET198111}. In our application, the terms are elements of a free monoid, so we have a string rewrite system; this special case was studied in \cite{narendran}. A survey of related techniques appears in \cite{BUCHBERGER19873}.
+\paragraph{The algorithm.} We'll give a self-contained description first, with much of the rest of the chapter devoted to examples. Our description can be supplemented with any text on the theory of rewriting, such as \cite{book2012string} or \cite{andallthat}. The algorithm is somewhat clever; to really ``get it'' might require several attempts. \index{Donald~Knuth}Donald~E.~Knuth and \index{Peter Bendix}Peter Bendix described the algorithm for term rewriting systems in a 1970 paper \cite{Knuth1983}; a correctness proof was later given by \index{Gerard Huet@G\'erard Huet}G\'erard Huet in \cite{HUET198111}. In our application, the terms are elements of a free monoid, so we have a string rewriting system; this special case was studied in \cite{narendran}. A survey of related techniques appears in \cite{BUCHBERGER19873}.
 
 The entry point into the Knuth-Bendix completion procedure is \AlgRef{knuthbendix}, but we break off four smaller pieces before we get there, so that only the top-level loop remains:
 \begin{itemize}
@@ -27,7 +27,7 @@ To test for local confluence, we ``diverge'' from a term by only one step in two
 \begin{theorem}[Newman's Lemma]
 If a reduction relation $\rightarrow$ is terminating and locally confluent, then $\rightarrow$ is confluent.
 \end{theorem}
-\paragraph{Overlapping rules.} A pair of positive rewrite steps with a common source define a \IndexDefinition{critical pair}\emph{critical pair}. A critical pair shows that some term can be reduced in ``two different ways.'' We can answer if our rewrite rules define a locally confluent reduction relation by inspecting each critical pair. With any non-trivial list of rewrite rules, there are infinitely many such critical pairs, however, all but a finite subset can be disregarded. Suppose we have a rewrite system over an alphabet $A$ with two rules:
+\paragraph{Overlapping rules.} A pair of positive rewrite steps with a common source define a \IndexDefinition{critical pair}\emph{critical pair}. A critical pair shows that some term can be reduced in ``two different ways.'' We can answer if our rewrite rules define a locally confluent reduction relation by inspecting each critical pair. With any non-trivial list of rewrite rules, there are infinitely many such critical pairs, however, all but a finite subset can be disregarded. Suppose we have these two rules over some alphabet $A$:
 \begin{gather*}
 u_1\Rightarrow v_1\\
 u_2\Rightarrow v_2
@@ -93,7 +93,7 @@ v_2&&\\
 \]
 \end{ceqn}
 
-Clearly, in our quest to uncover local \index{confluence violation}confluence violations, we only need to inspect critical pairs that are \emph{not} orthogonal; that is, they must rewrite \emph{overlapping} subterms of their common source term. There are only finitely many such critical pairs, and they are all generated by inspecting the left-hand sides of rewrite rules in our rewrite system. We can completely characterize them with the below definition.
+Clearly, in our quest to uncover local \index{confluence violation}confluence violations, we only need to inspect critical pairs that are \emph{not} orthogonal; that is, they must rewrite \emph{overlapping} subterms of their common source term. There are only finitely many such critical pairs, and they are all generated by inspecting the left-hand sides of our rewrite rules. We can completely characterize them with the below definition.
 \begin{definition}\label{overlappingrules}
 Two rules $(u_1, v_1)$ and $(u_2, v_2)$ \IndexDefinition{overlapping rules}\emph{overlap} if one of the following holds:
 \begin{enumerate}
@@ -247,21 +247,21 @@ We say that $\ell$ is a \IndexDefinition{rewrite loop}\emph{rewrite loop} with \
 Now, we give two algorithms that together form the inner loop of the completion procedure. It is also convenient to view a \index{critical pair}critical pair as a rewrite path of length 2, rather than a pair of rewrite steps with the same source term---we compose the first step with the inverse of the second. In this new formulation, critical pair resolution ``completes'' the critical pair to form a rewrite loop.
 
 \begin{algorithm}[Construct critical pair]\label{critical pair algo}
-Takes two rules $u_1\Rightarrow v_1$ and $u_2\Rightarrow v_2$, together with an overlap position $i$ where $0\leq i<|u_1|$. Returns a triple $(t_1, t_2, p)$ where $t_1$ and $t_2$ are terms, and $p$ is a rewrite path with $\Src(p)=t_1$ and $\Dst(p)=t_2$.
+Takes two rules $(u, v)$ and $(u^\prime, v^\prime)$, together with an overlap position $i$ where $0\leq i<|u|$. Returns a triple $(t_1, t_2, p)$ where $t_1$ and $t_2$ are terms, and $p$ is a rewrite path with $\Src(p)=t_1$ and $\Dst(p)=t_2$.
 \begin{enumerate}
-\item If $i+|u_2|\leq|u_1|$, we have an overlap of the first kind; $u_1=xu_2z$ for some $x$ and $z$.
+\item If $i+|u^\prime|\leq|u|$, we have an overlap of the first kind; $u=xu^\prime z$ for some $x$ and $z$.
 \begin{enumerate}
-\item Let $x:=u_1[:i]$ (the prefix of $u_1$ of length $i$), and $z:=u_1[i+|u_2|:]$ (the suffix of $u_1$ of length $|u_1|-|u_2|-i$).
-\item Set $t_1:=v_1$, the result of rewriting $u_1$ with the first rule.
-\item Set $t_2:=xv_2z$, the result of rewriting $u_1$ with the second rule.
-\item Set $p:=(v_1\Rightarrow u_1)\circ x(u_2\Rightarrow v_2)z$. This is a rewrite path from $t_1$ to $t_2$.
+\item Let $x:=u[:i]$ (the prefix of $u$ of length $i$), and $z:=u[i+|u^\prime|:]$ (the suffix of $u$ of length $|u|-|u^\prime|-i$).
+\item Let $t_1:=v$, the result of rewriting $u$ with the first rule.
+\item Let $t_2:=xv^\prime z$, the result of rewriting $u$ with the second rule.
+\item Let $p:=(v\Rightarrow u)\circ x\WL(u^\prime\Rightarrow v^\prime)\WR z$. This is a rewrite path from $t_1$ to $t_2$.
 \end{enumerate}
-\item Otherwise, we have an overlap of the second kind; $u_1=xy$ and $u_2=yz$ for some $x$, $y$ and $z$.
+\item Otherwise, we have an overlap of the second kind; $u=xy$ and $u^\prime=yz$ for some $x$, $y$ and $z$.
 \begin{enumerate}
-\item Let $x:=u_1[:i]$ (the prefix of $u_1$ of length $i$), $z:=u_2[|u_1|-i:]$ (the suffix of $u_2$ of length $|u_2|-|u_1|+i$). (We don't actually need $y:=u_1[i:]=u_2[:|u_1|-i]$.)
-\item Set $t_1:=v_1z$, the result of rewriting $xyz$ with the first rule.
-\item Set $t_2:=xv_2$, the result of rewriting $xyz$ with the second rule.
-\item Set $p:=(v_1\Rightarrow u_1)z\circ x(u_2\Rightarrow v_2)$.
+\item Let $x:=u[:i]$ (the prefix of $u$ of length $i$), $z:=u^\prime[|u|-i:]$ (the suffix of $u^\prime$ of length $|u^\prime|-|u|+i$). (We don't actually need $y:=u[i:]=u^\prime[:|u|-i]$.)
+\item Let $t_1:=vz$, the result of rewriting $xyz$ with the first rule.
+\item Let $t_2:=xv^\prime$, the result of rewriting $xyz$ with the second rule.
+\item Let $p:=(v\Rightarrow u)\WR z\circ x\WL(u^\prime\Rightarrow v^\prime)$.
 \end{enumerate}
 \item Return the triple $(t_1, t_2, p)$.
 \end{enumerate}
@@ -269,20 +269,20 @@ Takes two rules $u_1\Rightarrow v_1$ and $u_2\Rightarrow v_2$, together with an 
 \begin{algorithm}[Resolve critical pair]\label{add rule derived algo}
 As input, takes terms $u$ and $v$, and a rewrite path $p$ with $\Src(p)=u$ and $\Dst(p)=v$. Records a rewrite loop, and possibly adds a new rule, returning true if a rule was added.
 \begin{enumerate}
-\item (Fast path) If $u=v$, $p$ is already a loop; record it and return false.
-\item (Left) Apply \AlgRef{term reduction trie algo} to $u$, obtaining $\tilde{u}$ and $p_1$.
-\item (Right) Apply \AlgRef{term reduction trie algo} to $v$, obtaining $\tilde{v}$ and $p_2$.
-\item (Compare) Use \AlgRef{rqm reduction order} to compare $\tilde{u}$ with $\tilde{v}$.
-\item (Trivial) \index{trivial critical pair}If $\tilde{u}=\tilde{v}$, record a loop $p_1^{-1}\circ p\circ p_2$ with basepoint $\tilde{u}=\tilde{v}$, and return false.
-\item (Smaller) If $\tilde{v}<\tilde{u}$, add the rule $(\tilde{u}, \tilde{v})$, record a loop $p_2^{-1}\circ p^{-1}\circ p_1\circ (\tilde{u}\Rightarrow \tilde{v})$ with basepoint $\tilde{u}$, and return true.
-\item (Larger) If $\tilde{u}<\tilde{v}$, add the rule $(\tilde{v}, \tilde{u})$, record a loop $p_1^{-1}\circ p \circ p_2 \circ (\tilde{v}\Rightarrow \tilde{u})$ with basepoint $\tilde{v}$, and return true.
-\item (Error) Otherwise, $\tilde{u}$ and $\tilde{v}$ are incomparable; signal an error.
+\item If $u=v$, then $p$ is already a loop; record it and return false.
+\item Compute the normal form of $u$ with \AlgRef{term reduction trie algo}, to get $\tilde{u}$ and $p_1$.
+\item Compute the normal form of $v$ with \AlgRef{term reduction trie algo}, to get $\tilde{v}$ and $p_2$.
+\item Compare $\tilde{u}$ and $\tilde{v}$ with \AlgRef{rqm reduction order}.
+\item \index{trivial critical pair}If $\tilde{u}=\tilde{v}$, record a loop $p_1^{-1}\circ p\circ p_2$ with basepoint $\tilde{u}=\tilde{v}$, and return false.
+\item If $\tilde{v}<\tilde{u}$, record a rule $(\tilde{u}, \tilde{v})$, record a loop $p_2^{-1}\circ p^{-1}\circ p_1\circ (\tilde{u}\Rightarrow \tilde{v})$ with basepoint~$\tilde{u}$, and return true.
+\item If $\tilde{u}<\tilde{v}$, record a rule $(\tilde{v}, \tilde{u})$, record a loop $p_1^{-1}\circ p \circ p_2 \circ (\tilde{v}\Rightarrow \tilde{u})$ with basepoint~$\tilde{v}$, and return true.
+\item If $\tilde{u}$ and $\tilde{v}$ are incomparable, signal an error.
 \end{enumerate}
 \end{algorithm}
 Rewrite loops are not just a theoretical tool; our implementation of the Knuth-Bendix algorithm follows \cite{loggedrewriting} and \cite{homotopicalcompletion} in encoding and recording the rewrite loops that describe resolved critical pairs. This enables the computation of minimal requirements in \SecRef{homotopy reduction}. Only local rules are subject to \index{requirement minimization}minimization, so we only record rewrite loops involving local rules. If a requirement machine instance is only to be used for generic signature queries and not minimization, rewrite loops are not recorded at all.
 
 \paragraph{An optimization.} 
-Now that we know how to process a single overlap and resolve a critical pair, the next chunk of code concerns enumerating all candidate overlaps. In an arbitrary string rewrite system, we must consider all possible combinations: for every rewrite rule $u_1\Rightarrow v_1$, for every rewrite rule $u_2\Rightarrow v_2$, and for every position $i<|u_1|$, we would need to check if the corresponding subterms of $u_1$ and $u_2$ are identical. In our application, the bottom-up construction of a rewrite system from protocol components, and the partition of rewrite rules into \index{imported rule}imported rules and \index{local rule}local rules, enables an optimization where overlaps between certain pairs of rules need not be considered at all:
+Now that we know how to process a single overlap and resolve a critical pair, the next chunk of code concerns enumerating all candidate overlaps. If our rewrite rules were truly arbitrary, we would need to consider all possible combinations: for every rewrite rule $u_1\Rightarrow v_1$, for every rewrite rule $u_2\Rightarrow v_2$, and for every position $i<|u_1|$, we would need to check if the corresponding subterms of $u_1$ and $u_2$ are identical. However, we can do better. The bottom-up construction of a requirement machine from protocol components, and the partition of rewrite rules into \index{imported rule}imported rules and \index{local rule}local rules, enables an optimization where overlaps between certain pairs of rules need not be considered at all:
 \begin{itemize}
 \item We don't need to look for overlaps between imported rules. While an imported rule can overlap with another imported rule, all such critical pairs are trivial and do not need to be resolved again.
 \item We don't need to look for overlaps between an imported rule and a local rule. An imported rule cannot overlap with a local rule.
@@ -317,7 +317,7 @@ The final case similarly implies that \tQ\ is a protocol dependency of \tP:
 &\pQ\cdot\pR
 \end{align*}
 
-Next, we claim that imported rules cannot overlap with local rules. In a generic signature rewrite system, the local rules are precisely those whose left-hand side starts with a \index{generic parameter symbol}generic parameter symbol. The left-hand side of an imported rule cannot start with, or contain, a generic parameter symbol, proving the claim. In a protocol component rewrite system, we can similarly rule out overlap of the first kind between an imported rule and a local rule, because the two rules must start with the same \index{protocol symbol}protocol or \index{associated type symbol}associated type symbol, and thus originate from the same protocol component. Now, suppose a protocol component rewrite system has an overlap of the second kind. We show that if the second rule, the one with left-hand side $\assocsym{Q}{B}\cdot\assocsym{R}{C}$, is a local rule, then the first rule is as well:
+Next, we claim that imported rules cannot overlap with local rules. In a \index{query machine}query machine or \index{minimization machine}minimization machine for a generic signature, both sides of a local rule start with a \index{generic parameter symbol}generic parameter symbol. The left-hand side of an imported rule cannot start with, or contain, a generic parameter symbol, proving the claim. In a \index{protocol machine}requirement machine for a protocol, we can similarly rule out overlap of the first kind between an imported rule and a local rule, because the two rules must start with the same \index{protocol symbol}protocol or \index{associated type symbol}associated type symbol, and thus originate from the same protocol component. Now, suppose a protocol machine has an overlap of the second kind. We show that if the second rule, the one with left-hand side $\assocsym{Q}{B}\cdot\assocsym{R}{C}$, is a local rule, then the first rule is as well:
 \begin{align*}
 \aPA\cdot{}&\assocsym{Q}{B}\\
 &\assocsym{Q}{B}\cdot\assocsym{R}{C}
@@ -325,6 +325,8 @@ Next, we claim that imported rules cannot overlap with local rules. In a generic
 As before, \tQ\ must be a \index{protocol dependency graph}protocol dependency of \tP. But this time, we have the further assumption that \tQ\ belongs to the \emph{current} protocol component, so the appearance of \tP\ means that \tP\ must \emph{also} be a protocol dependency of \tQ. Thus, \tP\ and \tQ\ depend on each other, and are actually part of the same component; therefore both rules are local.
 
 \paragraph{Another optimization.} If we fix a rule and position, we can find all overlaps involving this rule and position by performing a lookup into the \index{rule trie}rule \index{trie}trie, which we previously used to speed up term reduction in \SecRef{term reduction}. This further cuts down the work in enumerating overlaps. While the underlying data structure is the same, the lookup algorithm here differs from that used by term reduction; we must enumerate all matches, instead of stopping after the first one.
+
+\pagebreak
 
 Consider a set of rewrite rules having the terms $a$, $ab$, $bc$, $bd$ and $acd$ as their left-hand sides. The rule with left-hand side $ab$ has overlaps with all other rules except for $acd$. Here is the rule trie, with thick borders denoting nodes associated with rewrite rules:
 \begin{center}
@@ -365,35 +367,38 @@ Takes a term $t$, an offset $i$ such that $0\leq i<|t|$, and a callback. For eac
 \end{enumerate}
 \end{algorithm}
 
-The next algorithm feeds the results of \AlgRef{overlap trie lookup} into \AlgRef{critical pair algo} to build a list of all critical pairs in the rewrite system. After \index{resolving critical pair}resolving these critical pairs, we will have to check for overlaps again, in case there are any involving the newly-added rules. To avoid repeated work,  the below algorithm maintains a set of visited overlaps, so that we can avoid building and resolving a critical pair we already know has been resolved.
+The next algorithm feeds the results of \AlgRef{overlap trie lookup} into \AlgRef{critical pair algo} to build a list of all critical pairs among our rewrite rules. After \index{resolving critical pair}resolving these critical pairs, we will have to check for overlaps again, in case there are any involving the newly-added rules. To avoid repeated work,  the below algorithm maintains a set of visited overlaps, so that we can avoid building and resolving a critical pair we already know has been resolved.
 
 \begin{algorithm}[Find overlapping rules]\label{find overlapping rule algo}
-Takes a list of rewrite rules as input, and outputs a list of critical pairs. Also queries and updates the set of visited overlaps.
+Takes a list of rewrite rules as input, and outputs a list of critical pairs. Also queries and updates a set of visited overlaps~$V$.
 \begin{enumerate}
-\item (Initialize) Set $i:=0$. Let $n$ be the total number of local rules. Initialize an empty output list.
+\item (Initialize) Set $i \leftarrow 0$. Let $n$ be the total number of local rules. Initialize the empty output list.
 \item (Outer check) If $i=n$, we're done. Return the output list.
-\item (Get rule) Denote the $i$th local rule by $(u_1, v_1)$ (the subscript says 1 not $i$). If this rule is marked as \index{left-simplified rule}\textbf{left-simplified}, \index{right-simplified rule}\textbf{right-simplified} or \index{substitution-simplified rule}\textbf{substitution-simplified}, skip it entirely and go to Step~7. Otherwise, let $j:=0$.
-\item (Inner check) If $j=|u_1|$, we're done. Go to Step~9.
-\item (Find overlaps) Use \AlgRef{overlap trie lookup} to find all rules whose left-hand side is a prefix of the symbol range $u_1[j:]$ or vice versa.
-\item (Visit) For each matching rule $(u_2, v_2)$ found above, check if this rule is marked as \textbf{left-simplified}, \textbf{right-simplified} or \textbf{substitution-simplified}. Also, check if $((u_1, v_1),\,(u_2, v_2),\,j)$ is already in the visited set. In either case, move on to the next matching rule.
-\item (Record) Otherwise, insert $((u_1, v_1),\,(u_2, v_2),\,j)$ to the visited set, and build a critical pair for this overlap using \AlgRef{critical pair algo}. This produces a triple $(t_1, t_2, p)$ describing the critical pair; add this critical pair to the output list.
+\item (Get rule) Let $(u,v)$ be the $i$th local rule. If this rule is marked as \index{left-simplified rule}\textbf{left-simplified}, \index{right-simplified rule}\textbf{right-simplified} or \index{substitution-simplified rule}\textbf{substitution-simplified}, skip it entirely and go to Step~7. Otherwise, set $ \leftarrow 0$.
+\item (Inner check) If $j=|u|$, we're done. Go to Step~7.
+\item (Find overlaps) Find all rules whose left-hand side is a prefix of the symbol range $u[j:]$ or vice versa, using \AlgRef{overlap trie lookup}. For each matching rule $(u^\prime, v^\prime)$:
+\begin{enumerate}
+\item If $(u^\prime, v^\prime)$ is marked as \textbf{left-simplified}, \textbf{right-simplified} or \textbf{substitution-simplified}, skip this rule.
+\item If $((u, v),\,(u^\prime, v^\prime),\,j)\in V$, skip this rule.
+\item Otherwise, set $V\leftarrow V \cup \{((u, v),\,(u^\prime, v^\prime),\,j)\}$, and build a critical pair for this overlap with \AlgRef{critical pair algo}. This returns a triple $(t_1, t_2, p)$; add it to the output list.
+\end{enumerate}
 \item (Inner loop) Set $j\leftarrow j+1$, and go back to Step~3.
 \item (Outer loop) Set $i\leftarrow i+1$, and go back to Step~2.
 \end{enumerate}
 \end{algorithm}
 
-We can now describe the main loop of the Knuth-Bendix completion procedure, which repeatedly finds and resolves critical pairs until no more non-trivial critical pairs remain. This process might not terminate, and we might find ourselves discovering new critical pairs and adding new rules to resolve them, forever. To prevent an infinite loop in the case of failure, we implement a termination check; if we think we've done too much work already, we give up on constructing a covergent rewrite system. We already mentioned the \textbf{left-simplified}, \textbf{right-simplified}, and \textbf{substitution-simplified} flags a few times; they are set by the rule simplification passes, with the first two described in \SecRef{rule reduction} and the third one in \SecRef{subst simplification}. These passes are invoked at appropriate times in the main loop below.
+We can now describe the main loop of the Knuth-Bendix completion procedure, which repeatedly finds and resolves critical pairs until no more non-trivial critical pairs remain. This process might not terminate, and we might find ourselves discovering new critical pairs and adding new rules to resolve them, forever. To prevent an infinite loop in the case of failure, we implement a termination check; if we think we've done too much work already, we give up on constructing a covergent rewriting system. We already mentioned the \textbf{left-simplified}, \textbf{right-simplified}, and \textbf{substitution-simplified} flags a few times; they are set by the rule simplification passes, with the first two described in \SecRef{rule reduction} and the third one in \SecRef{subst simplification}. These passes are invoked at appropriate times in the main loop below.
 
-\begin{algorithm}[Knuth-Bendix completion procedure]\label{knuthbendix} Takes a rewrite system as input, and outputs success or failure. On success, the rewrite system is now convergent, with all resolved critical pairs described by recorded rewrite loops. Failure occurs if we encounter a non-orientable rewrite rule, or if we trigger the termination check.
+\begin{algorithm}[Knuth-Bendix completion procedure]\label{knuthbendix} Takes a list of rewrite rules as input. Records new rewrite rules, as well as rewrite loops, and returns success or failure. On success, the rewrite rules define a convergent rewriting system. Failure indicates we got a non-orientable rewrite rule, or we triggered the termination check.
 \begin{enumerate}
-\item (Initialize) Clear the flag.
-\item (Overlaps) Use \AlgRef{find overlapping rule algo} to build a list of critical pairs.
-\item (Left simpify) Invoke \AlgRef{left simplification}.
-\item (Resolve) For each critical pair, invoke \AlgRef{add rule derived algo} and set the flag if any new rewrite rules were added.
-\item (Right simplify) Invoke \AlgRef{right simplification}.
-\item (Substitution simplify) Invoke \AlgRef{subst simplification algo}.
-\item (Termination) If we exceeded the rule count, term length or concrete nesting limits, return failure.
-\item (Repeat) If the flag was set, go back to Step~1. Otherwise, return success.
+\item Clear the flag.
+\item Build a list of critical pairs with \AlgRef{find overlapping rule algo}.
+\item Left-simpify all rewrite rules with \AlgRef{left simplification}.
+\item Resolve each critical pair with \AlgRef{add rule derived algo}, and set the flag if any new rewrite rules were added.
+\item Right-simplify all rewrite rules with \AlgRef{right simplification}.
+\item Substitution-simplify all rewrite rules with \AlgRef{subst simplification algo}.
+\item Check if the rule count, term length, or concrete nesting limits have been exceeded; if so, return failure.
+\item If the flag was set, go back to Step~1. Otherwise, return success.
 \end{enumerate}
 \end{algorithm}
 
@@ -531,7 +536,7 @@ Our justification for the validity of these passes worked from the assumption th
 We previously saw in \SecRef{minimal requirements} that the same-type requirements in a generic signature are subject to similar conditions of being left-reduced and right-reduced. There is a connection here, because as we will see in \SecRef{requirement builder}, the minimal requirements of a generic signature are ultimately constructed from the rules of a reduced rewrite system. However, there are a few notational differences:
 \begin{itemize}
 \item The roles of ``left'' and ``right'' are reversed because requirements use a different convention; in a reduced same-type requirement $\SameReq{U}{V}$, we have $\texttt{U} < \texttt{V}$, whereas in a rewrite rule $(u, v)$ we have $v<u$.
-\item Reduced same-type requirements have the ``shortest'' distance between the left-hand and right-hand side, so if \texttt{T}, \texttt{U} and \texttt{V} are all equivalent and $\texttt{T}<\texttt{U}<\texttt{V}$, the corresponding requirements are $\TU$, $\SameReq{U}{V}$. On the other hand, if we have three terms $t$, $u$ and $v$ with $t<u<v$, then the two corresponding rewrite rules would be $(u, t)$ and $(v, t)$.
+\item Reduced same-type requirements have the ``shortest'' distance between the left-hand and right-hand side, so if \tT, \texttt{U} and \texttt{V} are all equivalent and $\tT<\texttt{U}<\texttt{V}$, the corresponding requirements are $\TU$, $\SameReq{U}{V}$. On the other hand, if we have three terms $t$, $u$ and $v$ with $t<u<v$, then the two corresponding rewrite rules would be $(u, t)$ and $(v, t)$.
 \end{itemize}
 These differences are explained by the original \Index{GenericSignatureBuilder@\texttt{GenericSignatureBuilder}}\texttt{GenericSignatureBuilder} minimization algorithm, described as finding a minimum \index{spanning tree}spanning tree for a graph of connected components. The notion of reduced requirement output by this algorithm became part of the Swift stable \index{ABI}ABI. In \SecRef{requirement builder} we show that a list of rewrite rules in a reduced rewrite system defines a list of reduced requirements via a certain transformation.
  

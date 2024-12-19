@@ -13,7 +13,7 @@
 import SwiftShims
 
 // Macros are disabled when Swift is built without swift-syntax.
-#if $Macros && $DebugDescriptionMacro && hasAttribute(attached)
+#if $Macros && hasAttribute(attached)
 
 /// Converts description definitions to a debugger Type Summary.
 ///

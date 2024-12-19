@@ -7,7 +7,6 @@
 
 @available(SwiftStdlib 5.1, *)
 struct NS1 { }
-// expected-note @-1 {{consider making struct 'NS1' conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable)
@@ -96,7 +95,7 @@ public actor MyActor: MyProto {
     await nonisolatedAsyncFunc1(ns1)
     // expected-tns-warning @-1 {{sending 'ns1' risks causing data races}}
     // expected-tns-note @-2 {{sending 'self'-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and 'self'-isolated uses}}
-    _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable result type 'NS1' cannot be sent from nonisolated context in call to global function 'nonisolatedAsyncFunc2()'}}
+    _ = await nonisolatedAsyncFunc2()
   }
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-swiftxx-frontend -I %S/Inputs -emit-sil %s | %FileCheck %s
+// RUN: %target-swiftxx-frontend -I %S/Inputs -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
 // REQUIRES: OS=macosx
 

@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -o /dev/null -emit-sil %s -verify -strict-concurrency=complete
 // RUN: %target-swift-frontend -o /dev/null -emit-sil %s -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 // This triggers a conformance check with SuppressDiagnostics=true.
 let x = S().f {}

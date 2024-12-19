@@ -117,7 +117,7 @@ static bool shouldProfile(SILDeclRef Constant) {
 
   if (auto *D = DC->getInnermostDeclarationDeclContext()) {
     // Do not profile AST nodes in unavailable contexts.
-    if (D->getSemanticUnavailableAttr()) {
+    if (D->isSemanticallyUnavailable()) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: unavailable context\n");
       return false;
     }

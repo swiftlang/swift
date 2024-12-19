@@ -22,52 +22,82 @@ namespace swift {
 class CanGenericSignature;
 class GenericTypeParamType;
 
-/// Describes the least favorable positions at which a requirement refers
-/// to a given generic parameter in terms of variance, for use in the
-/// is-inheritable and is-available-existential checks.
+/// Stores the variance positions at which a type references a specific
+/// generic parameter.
 class GenericParameterReferenceInfo final {
-  using OptionalTypePosition = OptionalEnum<decltype(TypePosition::Covariant)>;
+  static constexpr unsigned NumTypePositionBits = 4;
+  static_assert(NumTypePositions <= NumTypePositionBits,
+                "Not enough bits to store all cases");
+
+  uint8_t DirectRefs : NumTypePositionBits;
+  uint8_t DepMemberTyRefs : NumTypePositionBits;
+
+  /// Whether there is a reference to the generic parameter at hand in covariant
+  /// result type position. This position is the uncurried interface type of a
+  /// declaration, stipped of any optionality. For example, this is true for
+  /// 'Self' in 'func foo(Int) -> () -> Self?'.
+  bool HasCovariantGenericParamResult;
+
+  GenericParameterReferenceInfo(uint8_t DirectRefs, uint8_t DepMemberTyRefs,
+                                bool HasCovariantGenericParamResult)
+      : DirectRefs(DirectRefs), DepMemberTyRefs(DepMemberTyRefs),
+        HasCovariantGenericParamResult(HasCovariantGenericParamResult) {}
 
 public:
-  /// Whether the uncurried interface type of the declaration, stripped of any
-  /// optionality, is a direct reference to the generic parameter at hand. For
-  /// example, "func foo(x: Int) -> () -> Self?" has a covariant 'Self' result.
-  bool hasCovariantSelfResult;
-
-  OptionalTypePosition selfRef;
-  OptionalTypePosition assocTypeRef;
-
-  /// A reference to 'Self'.
-  static GenericParameterReferenceInfo forSelfRef(TypePosition position) {
-    return GenericParameterReferenceInfo(false, position, std::nullopt);
-  }
-
-  /// A reference to the generic parameter in covariant result position.
-  static GenericParameterReferenceInfo forCovariantResult() {
-    return GenericParameterReferenceInfo(true, TypePosition::Covariant,
-                                         std::nullopt);
-  }
-
-  /// A reference to 'Self' through an associated type.
-  static GenericParameterReferenceInfo forAssocTypeRef(TypePosition position) {
-    return GenericParameterReferenceInfo(false, std::nullopt, position);
-  }
-
-  GenericParameterReferenceInfo &operator|=(const GenericParameterReferenceInfo &other);
-
-  explicit operator bool() const {
-    return hasCovariantSelfResult || selfRef || assocTypeRef;
-  }
-
   GenericParameterReferenceInfo()
-      : hasCovariantSelfResult(false), selfRef(std::nullopt),
-        assocTypeRef(std::nullopt) {}
+      : GenericParameterReferenceInfo(0, 0, false) {}
 
-private:
-  GenericParameterReferenceInfo(bool hasCovariantSelfResult, OptionalTypePosition selfRef,
-                    OptionalTypePosition assocTypeRef)
-      : hasCovariantSelfResult(hasCovariantSelfResult), selfRef(selfRef),
-        assocTypeRef(assocTypeRef) {}
+  /// A direct reference to the generic parameter.
+  static GenericParameterReferenceInfo forDirectRef(TypePosition pos) {
+    return GenericParameterReferenceInfo(pos, 0, false);
+  }
+
+  /// A direct reference to the generic parameter in covariant result type
+  /// position.
+  static GenericParameterReferenceInfo forCovariantGenericParamResult() {
+    return GenericParameterReferenceInfo(TypePosition::Covariant, 0, true);
+  }
+
+  /// A reference to a dependent member type rooted on the generic parameter.
+  static GenericParameterReferenceInfo
+  forDependentMemberTypeRef(TypePosition pos) {
+    return GenericParameterReferenceInfo(0, pos, false);
+  }
+
+  bool hasDirectRef(std::optional<TypePosition> pos = std::nullopt) const {
+    if (!pos) {
+      return DirectRefs;
+    }
+
+    return DirectRefs & pos.value();
+  }
+
+  bool hasDependentMemberTypeRef(
+      std::optional<TypePosition> pos = std::nullopt) const {
+    if (!pos) {
+      return DepMemberTyRefs;
+    }
+
+    return DepMemberTyRefs & pos.value();
+  }
+
+  bool hasRef(std::optional<TypePosition> pos = std::nullopt) const {
+    return hasDirectRef(pos) || hasDependentMemberTypeRef(pos);
+  }
+
+  bool hasNonCovariantRef() const {
+    const uint8_t notCovariant = ~TypePosition::Covariant;
+    return (DirectRefs & notCovariant) || (DepMemberTyRefs & notCovariant);
+  }
+
+  bool hasCovariantGenericParamResult() const {
+    return HasCovariantGenericParamResult;
+  }
+
+  GenericParameterReferenceInfo &
+  operator|=(const GenericParameterReferenceInfo &other);
+
+  explicit operator bool() const { return hasRef(); }
 };
 
 /// Find references to the given generic parameter in the type signature of the
@@ -84,12 +114,23 @@ findGenericParameterReferences(const ValueDecl *value, CanGenericSignature sig,
 /// Find references to 'Self' in the type signature of this declaration.
 GenericParameterReferenceInfo findExistentialSelfReferences(const ValueDecl *value);
 
-/// Determine whether referencing the given member on the
-/// given existential base type is supported. This is the case only if the
-/// type of the member, spelled in the context of \p baseTy, does not contain
-/// 'Self' or 'Self'-rooted dependent member types in non-covariant position.
-bool isMemberAvailableOnExistential(Type baseTy,
-                                    const ValueDecl *member);
+/// Describes the limitation on accessing a protocol member on a value of
+/// existential type.
+enum class ExistentialMemberAccessLimitation : uint8_t {
+  /// The member can be freely accessed on the existential.
+  None,
+  /// The storage member is available only for reads.
+  ReadOnly,
+  /// The storage member is available only for writes.
+  WriteOnly,
+  /// Accessing the member on the existential is not supported.
+  Unsupported,
+};
+
+/// Compute the limitations on accessing the given member on a value of the
+/// given existential base type.
+ExistentialMemberAccessLimitation
+isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member);
 
 /// Flags that should be applied to the existential argument type after
 /// opening.

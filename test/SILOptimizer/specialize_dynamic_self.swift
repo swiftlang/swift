@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name specialize_dynamic_self -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil -O -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name specialize_dynamic_self -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-print-types -emit-sil -O -primary-file %s | %FileCheck %s
 
 protocol P {}
 

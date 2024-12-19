@@ -279,6 +279,7 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   // optimization pipeline.
   SerializationOptions SerializationOpts;
   std::string OutPathStr = OutputPath.str();
+  SerializationOpts.StaticLibrary = FEOpts.Static;
   SerializationOpts.OutputPath = OutPathStr.c_str();
   SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
   SerializationOpts.AutolinkForceLoad =
@@ -290,9 +291,10 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   StringRef SDKPath = Instance.getASTContext().SearchPathOpts.getSDKPath();
 
   auto SDKRelativePath = getRelativeDepPath(InPath, SDKPath);
-  if (SDKRelativePath.has_value())
+  if (SDKRelativePath.has_value()) {
     SerializationOpts.ModuleInterface = SDKRelativePath.value();
-  else
+    SerializationOpts.IsInterfaceSDKRelative = true;
+  } else
     SerializationOpts.ModuleInterface = InPath;
 
   SerializationOpts.SDKName = Instance.getASTContext().LangOpts.SDKName;

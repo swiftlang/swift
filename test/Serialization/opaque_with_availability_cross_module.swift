@@ -39,7 +39,7 @@ public struct Test {
   }
 }
 
-let result = LimitedAvailOpaque.test()
+let result = LimitedAvailOpaque.testAvailableQueryWithUniversalResult()
 result.hello()
 // CHECK: Hello from Empty
 
@@ -47,10 +47,14 @@ Test().sayHello()
 // CHECK: Hello from Empty
 // CHECK: Hello from Tuple
 
-let conditionalR = LimitedAvailOpaque.test_return_from_conditional()
+let conditionalR = LimitedAvailOpaque.testAvailableQueryWithLimitedResult()
 conditionalR.hello()
 // CHECK: Hello from Named
 
-let unavailableTest = LimitedAvailOpaque.testUnavailable()
+let unavailableTest = LimitedAvailOpaque.testUnavailableQueryWithLimitedResult()
 unavailableTest.hello()
 // CHECK: Hello from Tuple
+
+let inactiveTest = LimitedAvailOpaque.testInactiveAvailableQuery()
+inactiveTest.hello()
+// CHECK: Hello from Empty

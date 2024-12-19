@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip
-// FIXME: Remove '-disable-experimental-parser-round-trip'.
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature LifetimeDependence
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct NE : ~Escapable {
   @lifetime(self) // expected-error{{invalid lifetime dependence on self in an initializer}}

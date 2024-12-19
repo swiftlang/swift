@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
 // We want to check two things here:
 // - Correctness

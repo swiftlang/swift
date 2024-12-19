@@ -272,10 +272,9 @@ private:
                                          ->getReferenceStorageReferent();
           if (mapIntoContext)
             valueTy = AD->mapTypeIntoContext(valueTy);
-          YieldTypeFlags flags(
-              isYieldingDefaultMutatingAccessor(AD->getAccessorKind())
-                  ? ParamSpecifier::InOut
-                  : ParamSpecifier::LegacyShared);
+          YieldTypeFlags flags(isYieldingMutableAccessor(AD->getAccessorKind())
+                                   ? ParamSpecifier::InOut
+                                   : ParamSpecifier::LegacyShared);
           buffer.push_back(AnyFunctionType::Yield(valueTy, flags));
           return buffer;
         }

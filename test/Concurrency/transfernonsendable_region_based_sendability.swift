@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -strict-concurrency=complete -target %target-swift-5.1-abi-triple -parse-as-library -emit-sil -o /dev/null -verify -verify-additional-prefix tns- %s -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 
 /*
  This file tests the early features of the flow-sensitive Sendable checking implemented by the TransferNonSendable SIL pass.

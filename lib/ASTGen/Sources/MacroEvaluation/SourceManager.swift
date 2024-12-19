@@ -28,7 +28,7 @@ class SourceManager {
 
   /// The set of source files that have been exported to the C++ code of
   /// the program.
-  var exportedSourceFilesBySyntax: [SourceFileSyntax: UnsafePointer<ExportedSourceFile>] = [:]
+  var exportedSourceFilesBySyntax: [Syntax: UnsafePointer<ExportedSourceFile>] = [:]
 
   /// The set of nodes that have been detached from their parent nodes.
   ///
@@ -46,7 +46,7 @@ extension SourceManager {
   ///   already there.
   @discardableResult
   func insert(_ sourceFile: UnsafePointer<ExportedSourceFile>) -> Bool {
-    let syntax = sourceFile.pointee.syntax
+    let syntax = Syntax(sourceFile.pointee.syntax)
     if exportedSourceFilesBySyntax[syntax] != nil {
       return false
     }
@@ -80,33 +80,20 @@ extension SourceManager {
 
   /// Find the root source file and offset from within that file for the given
   /// syntax node.
-  func rootSourceFile<Node: SyntaxProtocol>(
+  func rootSyntax<Node: SyntaxProtocol>(
     of node: Node
-  ) -> (SourceFileSyntax, AbsolutePosition)? {
-    let root = node.root
-
-    // If the root is a source file, we're done.
-    if let rootSF = root.as(SourceFileSyntax.self) {
-      return (rootSF, node.position)
-    }
+  ) -> (Syntax, AbsolutePosition) {
+    var root = node.root
+    var offset = node.position
 
     // If the root isn't a detached node we know about, there's nothing we
     // can do.
-    guard let (parent, offset) = detachedNodes[root] else {
-      return nil
+    while let (parent, parentOffset) = detachedNodes[root] {
+      root = parent.root
+      offset += SourceLength(utf8Length: parentOffset)
     }
 
-    // Recursively find the root and its offset.
-    guard let (rootSF, parentOffset) = rootSourceFile(of: parent) else {
-      return nil
-    }
-
-    // The position of our node is...
-    let finalPosition =
-      node.position  // Our position relative to its root
-      + SourceLength(utf8Length: offset)  // and that root's offset in its parent
-      + SourceLength(utf8Length: parentOffset.utf8Offset)
-    return (rootSF, finalPosition)
+    return (root, offset)
   }
 
   /// Produce the C++ source location for a given position based on a
@@ -116,13 +103,10 @@ extension SourceManager {
     at position: AbsolutePosition? = nil
   ) -> BridgedSourceLoc {
     // Find the source file and this node's position within it.
-    guard let (sourceFile, rootPosition) = rootSourceFile(of: node) else {
-      return nil
-    }
+    let (rootNode, rootPosition) = rootSyntax(of: node)
 
     // Find the corresponding exported source file.
-    guard let exportedSourceFile = exportedSourceFilesBySyntax[sourceFile]
-    else {
+    guard let exportedSourceFile = exportedSourceFilesBySyntax[rootNode] else {
       return nil
     }
 

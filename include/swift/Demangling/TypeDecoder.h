@@ -720,7 +720,7 @@ protected:
       return decodeMangledType(genericArgs->getChild(0), depth + 1);
     }
     case NodeKind::BuiltinTypeName: {
-      auto mangling = Demangle::mangleNode(Node);
+      auto mangling = Demangle::mangleNode(Node, Builder.getManglingFlavor());
       if (!mangling.isSuccess()) {
         return MAKE_NODE_TYPE_ERROR(Node,
                                     "failed to mangle node (%d:%u)",
@@ -1479,7 +1479,9 @@ protected:
       if (base.isError())
         return base;
 
-      return Builder.createParenType(base.getType());
+      // ParenType has been removed, return the base type for backwards
+      // compatibility.
+      return base.getType();
     }
     case NodeKind::OpaqueType: {
       if (Node->getNumChildren() < 3)

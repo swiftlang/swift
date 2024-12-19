@@ -96,8 +96,8 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 
-#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
@@ -279,8 +279,71 @@ private:
   /// outside the pruned liveness at the time it is discovered.
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
-  /// Visited set for general def-use traversal that prevents revisiting values.
-  GraphNodeWorklist<SILValue, 8> defUseWorklist;
+  class Def {
+    struct Root {
+      SILValue value;
+    };
+    struct Copy {
+      CopyValueInst *cvi;
+    };
+    struct BorrowedFrom {
+      BorrowedFromInst *bfi;
+    };
+    struct Reborrow {
+      SILArgument *argument;
+    };
+    using Payload = TaggedUnion<Root, Copy, BorrowedFrom, Reborrow>;
+    Payload payload;
+    Def(Payload payload) : payload(payload) {}
+
+  public:
+    enum class Kind {
+      Root,
+      Copy,
+      BorrowedFrom,
+      Reborrow,
+    };
+    Kind getKind() const {
+      if (payload.isa<Root>()) {
+        return Kind::Root;
+      }
+      if (payload.isa<Copy>()) {
+        return Kind::Copy;
+      }
+      if (payload.isa<BorrowedFrom>()) {
+        return Kind::BorrowedFrom;
+      }
+      assert(payload.isa<Reborrow>());
+      return Kind::Reborrow;
+    }
+    operator Kind() const { return getKind(); }
+    bool operator==(Def rhs) const {
+      return getKind() == rhs.getKind() && getValue() == rhs.getValue();
+    }
+    static Def root(SILValue value) { return {Root{value}}; }
+    static Def copy(CopyValueInst *cvi) { return {Copy{cvi}}; }
+    static Def borrowedFrom(BorrowedFromInst *bfi) {
+      return {BorrowedFrom{bfi}};
+    }
+    static Def reborrow(SILArgument *argument) { return {Reborrow{argument}}; }
+    SILValue getValue() const {
+      switch (*this) {
+      case Kind::Root:
+        return payload.get<Root>().value;
+      case Kind::Copy:
+        return payload.get<Copy>().cvi;
+      case Kind::BorrowedFrom:
+        return payload.get<BorrowedFrom>().bfi;
+      case Kind::Reborrow:
+        return payload.get<Reborrow>().argument;
+      }
+      llvm_unreachable("covered switch");
+    }
+  };
+  friend llvm::DenseMapInfo<Def>;
+
+  /// The defs derived from currentDef whose uses are added to liveness.
+  SmallVector<Def, 8> discoveredDefs;
 
   /// The blocks that were discovered by PrunedLiveness.
   SmallVector<SILBasicBlock *, 32> discoveredBlocks;

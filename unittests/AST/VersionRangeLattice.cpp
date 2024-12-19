@@ -1,4 +1,4 @@
-#include "swift/AST/TypeRefinementContext.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "gtest/gtest.h"
 
 using namespace swift;

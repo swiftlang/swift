@@ -267,6 +267,7 @@ public:
   void completeTypeSimpleBeginning() override;
   void completeTypeSimpleWithDot(TypeRepr *TR) override;
   void completeTypeSimpleWithoutDot(TypeRepr *TR) override;
+  void completeTypeSimpleInverted() override;
 
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
@@ -305,7 +306,6 @@ public:
   void completeTypeAttrBeginning() override;
   void completeTypeAttrInheritanceBeginning() override;
   void completeOptionalBinding() override;
-  void completeWithoutConstraintType() override;
 
   void doneParsing(SourceFile *SrcFile) override;
 
@@ -509,6 +509,11 @@ void CodeCompletionCallbacksImpl::completeTypeSimpleWithoutDot(TypeRepr *TR) {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeTypeSimpleInverted() {
+  Kind = CompletionKind::TypeSimpleInverted;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeCaseStmtKeyword() {
   Kind = CompletionKind::CaseStmtKeyword;
   CurDeclContext = P.CurDeclContext;
@@ -644,11 +649,6 @@ void CodeCompletionCallbacksImpl::completeForEachPatternBeginning(
 void CodeCompletionCallbacksImpl::completeOptionalBinding() {
   CurDeclContext = P.CurDeclContext;
   Kind = CompletionKind::OptionalBinding;
-}
-
-void CodeCompletionCallbacksImpl::completeWithoutConstraintType() {
-  CurDeclContext = P.CurDeclContext;
-  Kind = CompletionKind::WithoutConstraintType;
 }
 
 void CodeCompletionCallbacksImpl::completeTypeAttrBeginning() {
@@ -993,7 +993,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::TypeAttrBeginning:
   case CompletionKind::TypeAttrInheritanceBeginning:
   case CompletionKind::OptionalBinding:
-  case CompletionKind::WithoutConstraintType:
     break;
 
   case CompletionKind::EffectsSpecifier:
@@ -1066,6 +1065,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     break;
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::TypeSimpleWithDot:
+  case CompletionKind::TypeSimpleInverted:
     break;
 
   case CompletionKind::TypeSimpleWithoutDot:
@@ -1296,9 +1296,9 @@ void swift::ide::postProcessCompletionResults(
         Kind != CompletionKind::TypeSimpleBeginning &&
         Kind != CompletionKind::TypeSimpleWithoutDot &&
         Kind != CompletionKind::TypeSimpleWithDot &&
+        Kind != CompletionKind::TypeSimpleInverted &&
         Kind != CompletionKind::TypeDeclResultBeginning &&
-        Kind != CompletionKind::GenericRequirement &&
-        Kind != CompletionKind::WithoutConstraintType) {
+        Kind != CompletionKind::GenericRequirement) {
       flair |= CodeCompletionFlairBit::RareTypeAtCurrentPosition;
       modified = true;
     }
@@ -1807,6 +1807,11 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     break;
   }
 
+  case CompletionKind::TypeSimpleInverted: {
+    Lookup.getInvertedTypeCompletions();
+    break;
+  }
+
   case CompletionKind::NominalMemberBeginning: {
     CompletionOverrideLookup OverrideLookup(CompletionContext.getResultSink(),
                                             P.Context, CurDeclContext,
@@ -1952,11 +1957,6 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   case CompletionKind::OptionalBinding: {
     SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
     Lookup.getOptionalBindingCompletions(Loc);
-    break;
-  }
-
-  case CompletionKind::WithoutConstraintType: {
-    Lookup.addWithoutConstraintTypes();
     break;
   }
 

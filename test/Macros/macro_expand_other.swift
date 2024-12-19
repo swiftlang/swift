@@ -36,4 +36,9 @@ func testFreestandingExpansionOfOther() {
   #endif
 }
 
+@freestanding(expression)
+macro myLineMacro() -> Int = #line
+
+var thisLine = #myLineMacro
+
 testFreestandingExpansionOfOther()

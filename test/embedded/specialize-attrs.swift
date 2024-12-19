@@ -6,6 +6,7 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 @_semantics("optimize.sil.specialize.generic.never")
 func foo<T>(_ t: T) -> Int {

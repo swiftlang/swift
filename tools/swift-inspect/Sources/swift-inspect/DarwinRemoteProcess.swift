@@ -86,6 +86,8 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     return swift_addr_t(range.location)
   }
 
+  static var Free: FreeFunction? { return nil }
+
   static var ReadBytes: ReadBytesFunction {
     return { (context, address, size, _) in
       let process: DarwinRemoteProcess = DarwinRemoteProcess.fromOpaque(context!)

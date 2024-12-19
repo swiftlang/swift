@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4 -I %S/Inputs -enable-source-import -enable-experimental-feature ReferenceBindings
 
+// REQUIRES: swift_feature_ReferenceBindings
+
 import imported_enums
 
 // TODO: Implement tuple equality in the library.

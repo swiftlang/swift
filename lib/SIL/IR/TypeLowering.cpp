@@ -44,6 +44,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Test.h"
 #include "clang/AST/Type.h"
+#include "clang/AST/Decl.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
@@ -2508,6 +2509,15 @@ namespace {
         properties.setLexical(IsLexical);
       }
 
+      if (auto *clangDecl = D->getClangDecl()) {
+        if (auto *recordDecl = dyn_cast<clang::RecordDecl>(clangDecl)) {
+          // C unions are imported as opaque types. Therefore we have to assume
+          // that a union contains a pointer.
+          if (recordDecl->isOrContainsUnion())
+            properties.setIsOrContainsRawPointer();
+        }
+      }
+
       // [is_or_contains_pack_unsubstituted] Visit the fields of the
       // unsubstituted type to find pack types which would be substituted away.
       for (auto field : D->getStoredProperties()) {
@@ -3000,6 +3010,7 @@ bool TypeConverter::visitAggregateLeaves(
     return isa<SILPackType>(ty) ||
            isa<TupleType>(ty) ||
            isa<PackExpansionType>(ty) ||
+           isa<BuiltinFixedArrayType>(ty) ||
            ty.getEnumOrBoundGenericEnum() ||
            ty.getStructOrBoundGenericStruct();
   };
@@ -3011,6 +3022,9 @@ bool TypeConverter::visitAggregateLeaves(
     std::optional<unsigned> index;
     std::tie(ty, origTy, field, index) = popFromWorklist();
     assert(!field || !index && "both field and index!?");
+    if (auto origEltTy = origTy.getVanishingTupleElementPatternType()) {
+      origTy = *origEltTy;
+    }
     if (isAggregate(ty) && !isLeafAggregate(ty, origTy, field, index)) {
       if (auto packTy = dyn_cast<SILPackType>(ty)) {
         for (auto packIndex : indices(packTy->getElementTypes())) {
@@ -3036,6 +3050,13 @@ bool TypeConverter::visitAggregateLeaves(
         insertIntoWorklist(expansion.getPatternType(),
                            origTy.getPackExpansionPatternType(),
                            field, index);
+      } else if (auto array = dyn_cast<BuiltinFixedArrayType>(ty)) {
+        auto origBFA = origTy.getAs<BuiltinFixedArrayType>();
+        insertIntoWorklist(
+            array->getElementType(),
+            AbstractionPattern(origTy.getGenericSignatureOrNull(),
+                               origBFA->getElementType()),
+            field, index);
       } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
         for (auto *structField : decl->getStoredProperties()) {
           auto subMap = ty->getContextSubstitutionMap();
@@ -5264,6 +5285,16 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
     }
     return;
   }
+
+  if (auto fixedArrayTy = Ty.getAs<BuiltinFixedArrayType>()) {
+    auto fixedSize = fixedArrayTy->getFixedInhabitedSize();
+    if (fixedSize.has_value() && !fixedArrayTy->isFixedNegativeSize() )
+      fieldsCount += *fixedSize;
+    else
+      fieldsCount += 1;
+    return;
+  }
+
   if (auto *enumDecl = Ty.getEnumOrBoundGenericEnum()) {
     if (enumDecl->isIndirect()) {
       return;

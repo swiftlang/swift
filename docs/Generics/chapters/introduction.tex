@@ -43,12 +43,12 @@ While this function declaration is trivial, it illustrates some important concep
   edge from parent path={[->] (\tikzparentnode.south) |- (\tikzchildnode.west)}]
   \node  [class] {\vphantom{p}function declaration: \texttt{identity}}
     child { node [class] {\vphantom{p}generic parameter list: \texttt{<T>}}
-      child { node  [class] {\vphantom{p}generic parameter declaration: \texttt{T}}}}
+      child { node  [class] {\vphantom{p}generic parameter declaration: \tT}}}
     child [missing] {}
     child { node [class] {\vphantom{p}parameter declaration: \texttt{\char`_\ x:\ T}}
-      child { node  [class] {\vphantom{p}type representation: \texttt{T}}}}
+      child { node  [class] {\vphantom{p}type representation: \tT}}}
     child [missing] {}
-    child { node [class] {\vphantom{p}type representation: \texttt{T}}}
+    child { node [class] {\vphantom{p}type representation: \tT}}
     child { node [class] {\vphantom{p}body}
       child { node  [class] {\vphantom{p}statement: \texttt{return x}}
         child { node  [class] {\vphantom{p}expression: \texttt{x}}}}
@@ -69,8 +69,8 @@ While this function declaration is trivial, it illustrates some important concep
 \index{parser}
 \paragraph{Parsing.} \FigRef{identity ast} shows the abstract syntax tree produced by the parser before type checking. The key elements:
 \begin{enumerate}
-\item The \emph{generic parameter list} \texttt{<T>} introduces a single \emph{generic parameter declaration} named \texttt{T}. As its name suggests, this declares the generic parameter type \texttt{T}, scoped to the entire source range of this function.
-\item The \emph{type representation} \texttt{T} appears twice, first in the declaration of the parameter ``\verb|_ x: T|'' and then again, as the return type. A type representation is the purely syntactic form of a type. The parser does not perform name lookup, so the type representation stores the identifier \texttt{T} and does not refer to the generic parameter declaration of \texttt{T} in any way.
+\item The \emph{generic parameter list} \texttt{<T>} introduces a single \emph{generic parameter declaration} named \tT. As its name suggests, this declares the generic parameter type \tT, scoped to the entire source range of this function.
+\item The \emph{type representation} \tT\ appears twice, first in the declaration of the parameter ``\verb|_ x: T|'' and then again, as the return type. A type representation is the purely syntactic form of a type. The parser does not perform name lookup, so the type representation stores the identifier \tT\ and does not refer to the generic parameter declaration of \tT\ in any way.
 \item The function body contains an expression referencing \texttt{x}. Again, the parser does not perform name lookup, so this is just the identifier \texttt{x} and is not associated with the parameter declaration ``\verb|_ x: T|''.
 \end{enumerate}
 
@@ -82,11 +82,11 @@ While this function declaration is trivial, it illustrates some important concep
 \index{generic function type}
 \paragraph{Type checking.} The type checker constructs the \emph{interface type} of the function declaration from the following:
 \begin{enumerate}
-\item A \emph{generic signature}, to introduce the generic parameter type \texttt{T}. In our case, the generic signature has the printed representation \texttt{<T>}. This is the simplest generic signature, apart from the empty generic signature of a non-generic declaration. We'll see more interesting generic signatures soon.
+\item A \emph{generic signature}, to introduce the generic parameter type \tT. In our case, the generic signature has the printed representation \texttt{<T>}. This is the simplest generic signature, apart from the empty generic signature of a non-generic declaration. We'll see more interesting generic signatures soon.
 
-\item The \emph{interface type} of the parameter ``\verb|_ x: T|'', which is declared to be the type representation \texttt{T} in source. The compiler component responsible for resolving this to a semantic type is called \emph{type resolution}. In this case, we perform name lookup inside the lexical scope defined by the function, which finds the generic parameter type~\texttt{T}.
+\item The \emph{interface type} of the parameter ``\verb|_ x: T|'', which is declared to be the type representation \tT\ in source. The compiler component responsible for resolving this to a semantic type is called \emph{type resolution}. In this case, we perform name lookup inside the lexical scope defined by the function, which finds the generic parameter type~\tT.
 
-\item The function's return type, which also resolves to the generic parameter type~\texttt{T}.
+\item The function's return type, which also resolves to the generic parameter type~\tT.
 \end{enumerate}
 All of this is packaged up into a \emph{generic function type} which completely describes the type checking behavior of a reference to this function:
 \begin{quote}
@@ -94,9 +94,9 @@ All of this is packaged up into a \emph{generic function type} which completely 
 <T> (T) -> T
 \end{verbatim}
 \end{quote}
-The name ``\texttt{T}'' is of no semantic consequence beyond name lookup. We will learn that the \emph{canonical type} for the above erases the generic parameter type \texttt{T} to the notation \ttgp{0}{0}. More generally, each generic parameter type is uniquely identified within its lexical scope by its \emph{depth} and \emph{index}.
+The name ``\tT'' is of no semantic consequence beyond name lookup. We will learn that the \emph{canonical type} for the above erases the generic parameter type \tT\ to the notation \ttgp{0}{0}. More generally, each generic parameter type is uniquely identified within its lexical scope by its \emph{depth} and \emph{index}.
 
-Having computed the interface type of the function, the type checker moves on to the function's body. The type of the return statement's expression must match the return type of the function declaration. When we type check the return expression \texttt{x}, we use name lookup to find the parameter declaration ``\verb|_ x: T|''. The interface type of this parameter declaration is the generic parameter type \texttt{T}, which is understood relative to the function's generic signature. The type assigned to the expression, however, is the \index{archetype type}\emph{archetype} corresponding to \texttt{T}, denoted $\archetype{T}$. We will learn later that an archetype is a self-describing form of a type parameter which behaves like a concrete type.
+Having computed the interface type of the function, the type checker moves on to the function's body. The type of the return statement's expression must match the return type of the function declaration. When we type check the return expression \texttt{x}, we use name lookup to find the parameter declaration ``\verb|_ x: T|''. The interface type of this parameter declaration is the generic parameter type \tT, which is understood relative to the function's generic signature. The type assigned to the expression, however, is the \index{archetype type}\emph{archetype} corresponding to \tT, denoted $\archetype{T}$. We will learn later that an archetype is a self-describing form of a type parameter which behaves like a concrete type.
 
 \paragraph{Code generation.}
 We've now successfully type checked our function declaration. How might we generate code for it? Recall the two concrete implementations that we folded into our single generic function:
@@ -142,9 +142,9 @@ The generic signature of \verb|identity(_:)| has a single generic parameter type
 \Sigma_2 := \SubstMap{\SubstType{T}{String}}
 \]
 We can form the return type of a call by taking the function declaration's return type, and applying the corresponding substitution map. We denote this application using the ``$\otimes$'' operator. For now, this simply extracts the concrete type stored therein:
-\[\texttt{T} \otimes \Sigma_1 = \texttt{Int}
+\[\tT \otimes \Sigma_1 = \texttt{Int}
 \qquad
-\texttt{T} \otimes \Sigma_2 = \texttt{String}
+\tT \otimes \Sigma_2 = \texttt{String}
 \]
 
 Substitution maps play a role in code generation. When calling a generic function, the compiler must realize the runtime type metadata for each replacement type in the substitution map of the call. In our example, the types \texttt{Int} and \texttt{String} are \emph{nominal types} defined in the standard library. They are non-generic and have a fixed layout, so their runtime type metadata is accessed by calling a function, exported by the standard library, that returns the address of a constant symbol.
@@ -178,7 +178,7 @@ struct Pair<T> {
 \end{Verbatim}
 A struct declaration is an example of a \emph{nominal type declaration}. A \emph{generic nominal type}, like \texttt{Pair<Int>} or \texttt{Pair<String>} is a reference to a generic nominal type declaration together with a list of \index{generic argument}generic argument types.
 
-The in-memory layout of a struct value is determined by the interface types of its stored properties. Our \texttt{Pair} struct declares two stored properties, \texttt{first} and \texttt{second}, both with interface type \texttt{T}. Thus the layout of a \texttt{Pair} depends on the layout of the generic parameter type~\texttt{T}.
+The in-memory layout of a struct value is determined by the interface types of its stored properties. Our \texttt{Pair} struct declares two stored properties, \texttt{first} and \texttt{second}, both with interface type \tT. Thus the layout of a \texttt{Pair} depends on the layout of the generic parameter type~\tT.
 
 The generic nominal type \texttt{Pair<T>}, formed by taking the generic parameter type as the argument, is called the \emph{declared interface type} of \texttt{Pair}. The type \texttt{Pair<Int>} is a \emph{specialized type} of the declared interface type, \texttt{Pair<T>}. We can obtain \texttt{Pair<Int>} from \texttt{Pair<T>} by applying a substitution map:
 \[\texttt{Pair<T>} \otimes \SubstMap{\SubstType{T}{Int}} = \texttt{Pair<Int>}\]
@@ -188,7 +188,7 @@ This ``factorization'' is our first example of what is in fact an algebraic iden
 let twoIntegers: Pair<Int> = ...
 \end{Verbatim}
 The compiler must allocate storage on the stack for this value. We take the context substitution map, and apply it to the interface type of each stored property:
-\[\texttt{T} \otimes \SubstMap{\SubstType{T}{Int}} = \texttt{Int}\]
+\[\tT \otimes \SubstMap{\SubstType{T}{Int}} = \texttt{Int}\]
 We see that a value of type \texttt{Pair<Int>} stores two consecutive values of type \texttt{Int}, which gives \texttt{Pair<Int>} a size of 16 bytes and alignment of 8 bytes. Since \texttt{Pair<Int>} is trivial, the stack allocation does not require any special cleanup once we exit its scope.
 
 Now, we complete our local variable declaration by writing down an \index{expression}\index{initial value expression}initial value expression which calls the constructor:
@@ -199,10 +199,10 @@ While the value has the type \texttt{Pair<Int>} at the call site, inside the con
 
 \begin{enumerate}
 \item A common prefix present in all runtime type metadata, which includes the total size and alignment of a value, and implementations of the move, copy and destroy operations.
-\item A private area specific to the declaration of \texttt{Pair} itself, which stores the runtime type metadata for \texttt{T}, followed by the \emph{field offset vector}, storing the offset of each stored property of this specialization of \texttt{Pair<T>}.
+\item A private area specific to the declaration of \texttt{Pair} itself, which stores the runtime type metadata for \tT, followed by the \emph{field offset vector}, storing the offset of each stored property of this specialization of \texttt{Pair<T>}.
 \end{enumerate}
 
-The metadata access function for a generic type takes the metadata for each generic argument, and calculates the offset of each stored property, also obtaining the size and alignment of the entire value. The move, copy and destroy operations of the aggregate type delegate to the corresponding operations in the generic argument metadata. The constructor of \texttt{Pair} then uses the runtime type metadata for both \texttt{Pair<T>} and \texttt{T} to correctly initialize the aggregate value from its two constituent parts.
+The metadata access function for a generic type takes the metadata for each generic argument, and calculates the offset of each stored property, also obtaining the size and alignment of the entire value. The move, copy and destroy operations of the aggregate type delegate to the corresponding operations in the generic argument metadata. The constructor of \texttt{Pair} then uses the runtime type metadata for both \texttt{Pair<T>} and \tT\ to correctly initialize the aggregate value from its two constituent parts.
 
 \index{structural type}
 Structural types, such as function types, tuple types and metatypes, are similar to generic nominal types in that we call a metadata access function to obtain runtime type metadata for them, but this time, the metadata access function is part of the Swift runtime. For example, to construct metadata for the tuple type \texttt{(Int, Pair<String>)}, we first call the metadata access function for \texttt{Pair} to get \texttt{Pair<String>}, then call an entry point in the runtime to obtain \texttt{(Int, Pair<String>)}.
@@ -213,9 +213,9 @@ Structural types, such as function types, tuple types and metatypes, are similar
 \item Structural types: \SecRef{more types}
 \end{MoreDetails}
 
-\section{Protocols}
+\section{Protocols}\label{intro protocols}
 
-Our \verb|identity(_:)| and \texttt{Pair} declarations both abstract over arbitrary concrete types, but in turn, this limits their generic parameter \texttt{T} to the common capabilities shared by all types---the move, copy and destroy operations. By stating \emph{generic requirements}, a generic declaration can impose various restrictions on the concrete types used as generic arguments, which in turn endows its generic parameter types with new capabilities provided by those concrete types.
+Our \verb|identity(_:)| and \texttt{Pair} declarations both abstract over arbitrary concrete types, but in turn, this limits their generic parameter \tT\ to the common capabilities shared by all types---the move, copy and destroy operations. By stating \emph{generic requirements}, a generic declaration can impose various restrictions on the concrete types used as generic arguments, which in turn endows its generic parameter types with new capabilities provided by those concrete types.
 
 A \emph{protocol} abstracts over the capabilities of a concrete type. By stating a \index{conformance requirement}\emph{conformance requirement} between a generic parameter type and protocol, a generic declaration can require that its generic argument is a concrete type that \emph{conforms} to this protocol:
 \begin{Verbatim}
@@ -335,7 +335,7 @@ struct Nat: IteratorProtocol {
 \end{Verbatim}
 We say that \texttt{Int} is the \emph{type witness} for \texttt{[IteratorProtocol]Element} in the conformance $\ConfReq{Nat}{IteratorProtocol}$. We can express this in our type substitution algebra, using the type witness \emph{projection} operation on normal conformances:
 \[\AssocType{IteratorProtocol}{Element}\otimes \ConfReq{Nat}{IteratorProtocol} = \texttt{Int}\]
-More accurately, the type witness here is the \texttt{Element} \index{type alias type}\emph{type alias type}, whose \index{underlying type}underlying type is \texttt{Int}. A type alias type is an example of a \index{sugared type}\emph{sugared type}. The \index{optional sugared type}\emph{optional type} \texttt{Int?} is another sugared type, equivalent to \texttt{Optional<Int>}. Finally, we can actually omit the declaration of \texttt{Element} here, and instead rely on \index{associated type inference}\emph{associated type inference}.
+(More accurately, the type witness is the \texttt{Element} \index{type alias type}\emph{type alias type}, which is \emph{canonically equal} to \texttt{Int}.) Finally, we can actually omit the declaration of the \texttt{Element} type alias above, because in this case, \index{associated type inference}\emph{associated type inference} will deduce it for us.
 
 \begin{MoreDetails}
 \item Type witnesses: \SecRef{type witnesses}
@@ -484,7 +484,7 @@ Now consider this generic signature, and call it $G$:
 \end{quote}
 We can informally describe $G$ by looking at its equivalence classes:
 \begin{itemize}
-\item \texttt{T}, which conforms to \texttt{Sequence}.
+\item \tT, which conforms to \texttt{Sequence}.
 \item \texttt{U}, which conforms to \texttt{Sequence}.
 \item \texttt{T.Element}, \texttt{U.Element}, \texttt{T.Iterator.Element} and \texttt{U.Iterator.Element} are all in one equivalence class.
 \item \texttt{T.Iterator}, which conforms to \texttt{IteratorProtocol}.

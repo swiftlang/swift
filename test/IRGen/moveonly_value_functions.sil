@@ -6,6 +6,8 @@
 // RUN: |                                                    \
 // RUN: %IRGenFileCheck %s
 
+// REQUIRES: swift_feature_RawLayout
+
 import Builtin
 import Swift
 

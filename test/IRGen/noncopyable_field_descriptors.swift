@@ -1,13 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %swift-frontend -emit-ir -o - %s -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -parse-as-library \
 // RUN:   -enable-library-evolution \
 // RUN:   -target %target-cpu-apple-macosx15 \
 // RUN:   > %t/test_new.irgen
 
 // RUN: %swift-frontend -emit-ir -o - %s -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -parse-as-library \
 // RUN:   -enable-library-evolution \
 // RUN:   -target %target-cpu-apple-macosx14 \

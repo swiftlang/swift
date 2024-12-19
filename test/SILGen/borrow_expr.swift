@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only -o - -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-move-only -o - -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
 
 final class Klass {
     func useKlass() {}
@@ -403,7 +403,7 @@ extension P {
   // Now with borrow
   // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
   // CHECK: [[FUNC:%.*]] = witness_method $Self, #P.doSomething : <Self where Self : P> (Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  // CHECK: apply [[FUNC]]<(Self)>([[ACCESS]])
+  // CHECK: apply [[FUNC]]<Self>([[ACCESS]])
   // CHECK: end_access [[ACCESS]]
   // CHECK: } // end sil function '$s11borrow_expr1PPAAE27mutatingCallingMethodOnSelfyyF'
   mutating func mutatingCallingMethodOnSelf() {
@@ -457,7 +457,7 @@ extension P {
   // Now with borrow
   // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
   // CHECK: [[FUNC:%.*]] = witness_method $Self, #P.doSomething : <Self where Self : P> (Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  // CHECK: apply [[FUNC]]<(Self)>([[ACCESS]])
+  // CHECK: apply [[FUNC]]<Self>([[ACCESS]])
   // CHECK: end_access [[ACCESS]]
   // CHECK: } // end sil function '$s11borrow_expr1PPAAE38mutatingExtensionPointCallMethodOnSelfyyF'
   mutating func mutatingExtensionPointCallMethodOnSelf() {

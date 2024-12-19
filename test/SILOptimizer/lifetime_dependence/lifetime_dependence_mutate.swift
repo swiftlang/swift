@@ -2,13 +2,12 @@
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
+// RUN:   -disable-access-control \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
+// RUN:   -enable-experimental-feature LifetimeDependence
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct MutableSpan : ~Escapable, ~Copyable {
   let base: UnsafeMutableRawPointer
@@ -59,7 +58,8 @@ extension Array where Element == Int {
   mutating func mutspan() -> /* dependsOn(scoped self) */ MutableSpan {
     /* not the real implementation */
     let p = self.withUnsafeMutableBufferPointer { $0.baseAddress! }
-    return MutableSpan(p, count)
+    let span = MutableSpan(p, count)
+    return _overrideLifetime(span, borrowing: self)
   }
 }
 

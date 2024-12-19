@@ -164,4 +164,22 @@ StdSetTestSuite.test("UnorderedSetOfCInt.erase") {
     expectFalse(s.contains(2))
 }
 
+StdSetTestSuite.test("SetOfCInt.remove") {
+    var s = initSetOfCInt()
+    expectTrue(s.contains(1))
+    expectEqual(s.remove(1), 1)
+    expectFalse(s.contains(1))
+    expectEqual(s.remove(1), nil)
+    expectFalse(s.contains(1))
+}
+
+StdSetTestSuite.test("UnorderedSetOfCInt.remove") {
+    var s = initUnorderedSetOfCInt()
+    expectTrue(s.contains(2))
+    expectEqual(s.remove(2), 2)
+    expectFalse(s.contains(2))
+    expectEqual(s.remove(2), nil)
+    expectFalse(s.contains(2))
+}
+
 runAllTests()

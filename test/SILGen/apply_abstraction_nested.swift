@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
 
 infix operator ~>
 

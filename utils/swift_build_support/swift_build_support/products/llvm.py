@@ -296,7 +296,7 @@ class LLVM(cmake_product.CMakeProduct):
         llvm_cmake_options.define('LLVM_ENABLE_LTO:STRING', self.args.lto_type)
         llvm_cmake_options.define('COMPILER_RT_INTERCEPT_LIBDISPATCH', 'ON')
 
-        if system() == 'Darwin':
+        if self.args.build_embedded_stdlib and system() == "Darwin":
             # Ask for Mach-O cross-compilation builtins (for Embedded Swift)
             llvm_cmake_options.define(
                 'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:STRING',

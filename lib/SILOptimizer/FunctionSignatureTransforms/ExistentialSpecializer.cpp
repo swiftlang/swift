@@ -320,7 +320,7 @@ void ExistentialSpecializer::specializeExistentialArgsInAppliesWithinFunction(
 
       /// Name Mangler for naming the protocol constrained generic method.
       auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
-      Mangle::FunctionSignatureSpecializationMangler Mangler(
+      Mangle::FunctionSignatureSpecializationMangler Mangler(Callee->getASTContext(),
           P, Callee->getSerializedKind(), Callee);
 
       /// Save the arguments in a descriptor.

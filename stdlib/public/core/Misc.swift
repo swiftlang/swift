@@ -234,19 +234,11 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 @_marker public protocol Escapable {}
 
 #if $BitwiseCopyable2
-#if $NonescapableTypes
 @_marker public protocol BitwiseCopyable: ~Escapable { }
-#else
-@_marker public protocol BitwiseCopyable { }
-#endif
 
 @available(*, deprecated, message: "Use BitwiseCopyable")
 public typealias _BitwiseCopyable = BitwiseCopyable
 #else
-#if $NonescapableTypes
 @_marker public protocol _BitwiseCopyable: ~Escapable { }
-#else
-@_marker public protocol _BitwiseCopyable { }
-#endif
 public typealias BitwiseCopyable = _BitwiseCopyable
 #endif

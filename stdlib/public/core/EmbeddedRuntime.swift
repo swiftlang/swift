@@ -99,7 +99,7 @@ public struct HeapObject {
   // to think about supporting (or banning) weak and/or unowned references.
   var refcount: Int
 
-  // Note: The immortalRefCount value is also hard-coded in IRGen in `irgen::emitConstantObject`.
+  // Note: The immortalRefCount value is also hard-coded in IRGen in `irgen::emitConstantObject`, and in HeapObject.h.
 #if _pointerBitWidth(_64)
   static let doNotFreeBit     = Int(bitPattern: 0x8000_0000_0000_0000)
   static let refcountMask     = Int(bitPattern: 0x7fff_ffff_ffff_ffff)

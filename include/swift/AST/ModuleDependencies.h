@@ -180,7 +180,7 @@ public:
                                   ArrayRef<LinkLibrary> linkLibraries,
                                   StringRef moduleCacheKey = "")
       : dependencyKind(dependencyKind), linkLibraries(linkLibraries),
-        moduleCacheKey(moduleCacheKey.str()), resolved(false),
+        moduleCacheKey(moduleCacheKey.str()),
         finalized(false) {}
 
   ModuleDependencyInfoStorageBase(
@@ -191,7 +191,7 @@ public:
       : dependencyKind(dependencyKind), moduleImports(moduleImports),
         optionalModuleImports(optionalModuleImports),
         linkLibraries(linkLibraries), moduleCacheKey(moduleCacheKey.str()),
-        resolved(false), finalized(false) {}
+        finalized(false) {}
 
   virtual ModuleDependencyInfoStorageBase *clone() const = 0;
 
@@ -209,11 +209,13 @@ public:
   /// use this module.
   std::vector<LinkLibrary> linkLibraries;
 
-  /// The set of modules on which this module depends, resolved
-  /// to Module IDs, qualified by module kind: Swift, Clang, etc.
-  std::vector<ModuleDependencyID> resolvedDirectModuleDependencies;
-
-  /// Dependencies comprised of Swift overlay modules of direct and
+  /// All directly-imported Swift module dependencies.
+  std::vector<ModuleDependencyID> importedSwiftModules;
+  /// All directly-imported Clang module dependencies.
+  std::vector<ModuleDependencyID> importedClangModules;
+  /// All cross-import overlay module dependencies.
+  std::vector<ModuleDependencyID> crossImportOverlayModules;
+  /// All dependencies comprised of Swift overlay modules of direct and
   /// transitive Clang dependencies.
   std::vector<ModuleDependencyID> swiftOverlayDependencies;
 
@@ -227,8 +229,6 @@ public:
   /// The macro dependencies.
   std::map<std::string, MacroPluginDependency> macroDependencies;
 
-  /// The direct dependency of the module is resolved by scanner.
-  bool resolved;
   /// ModuleDependencyInfo is finalized (with all transitive dependencies
   /// and inputs).
   bool finalized;
@@ -239,6 +239,8 @@ struct CommonSwiftTextualModuleDependencyDetails {
       ArrayRef<StringRef> extraPCMArgs, ArrayRef<StringRef> buildCommandLine,
       StringRef CASFileSystemRootID)
       : extraPCMArgs(extraPCMArgs.begin(), extraPCMArgs.end()),
+        bridgingHeaderFile(std::nullopt),
+        bridgingSourceFiles(), bridgingModuleDependencies(),
         buildCommandLine(buildCommandLine.begin(), buildCommandLine.end()),
         CASFileSystemRootID(CASFileSystemRootID) {}
 
@@ -254,7 +256,7 @@ struct CommonSwiftTextualModuleDependencyDetails {
   std::vector<std::string> bridgingSourceFiles;
 
   /// (Clang) modules on which the bridging header depends.
-  std::vector<std::string> bridgingModuleDependencies;
+  std::vector<ModuleDependencyID> bridgingModuleDependencies;
 
   /// The Swift frontend invocation arguments to build the Swift module from the
   /// interface.
@@ -426,7 +428,7 @@ public:
   std::vector<std::string> headerSourceFiles;
 
   /// (Clang) modules on which the header inputs depend.
-  std::vector<std::string> headerModuleDependencies;
+  std::vector<ModuleDependencyID> headerModuleDependencies;
 
   /// A flag that indicates this dependency is a framework
   const bool isFramework;
@@ -660,14 +662,7 @@ public:
     return storage->optionalModuleImports;
   }
 
-  /// Retreive the module-level dependencies.
-  const ArrayRef<ModuleDependencyID> getDirectModuleDependencies() const {
-    assert(storage->resolved);
-    return storage->resolvedDirectModuleDependencies;
-  }
-
   std::string getModuleCacheKey() const {
-    assert(storage->resolved);
     return storage->moduleCacheKey;
   }
 
@@ -675,25 +670,95 @@ public:
     storage->moduleCacheKey = key;
   }
 
-  /// Resolve a dependency's set of `imports` with qualified Module IDs
   void
-  resolveDirectDependencies(const ArrayRef<ModuleDependencyID> dependencyIDs) {
-    assert(!storage->resolved && "Resolving an already-resolved dependency");
-    storage->resolved = true;
-    storage->resolvedDirectModuleDependencies.assign(dependencyIDs.begin(),
-                                                     dependencyIDs.end());
+  setImportedSwiftDependencies(const ArrayRef<ModuleDependencyID> dependencyIDs) {
+    assert(isSwiftModule());
+    storage->importedSwiftModules.assign(dependencyIDs.begin(),
+                                         dependencyIDs.end());
+  }
+  const ArrayRef<ModuleDependencyID> getImportedSwiftDependencies() const {
+    return storage->importedSwiftModules;
   }
 
-  /// Set this module's set of Swift Overlay dependencies
   void
-  setOverlayDependencies(const ArrayRef<ModuleDependencyID> dependencyIDs) {
+  setImportedClangDependencies(const ArrayRef<ModuleDependencyID> dependencyIDs) {
+    storage->importedClangModules.assign(dependencyIDs.begin(),
+                                         dependencyIDs.end());
+  }
+  const ArrayRef<ModuleDependencyID> getImportedClangDependencies() const {
+    return storage->importedClangModules;
+  }
+
+  void
+  setHeaderClangDependencies(const ArrayRef<ModuleDependencyID> dependencyIDs) {
+    assert(isSwiftModule());
+    switch (getKind()) {
+    case swift::ModuleDependencyKind::SwiftInterface: {
+      auto swiftInterfaceStorage =
+          cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+      swiftInterfaceStorage->textualModuleDetails.bridgingModuleDependencies.assign(dependencyIDs.begin(),
+                                                                                    dependencyIDs.end());
+      break;
+    }
+    case swift::ModuleDependencyKind::SwiftSource: {
+      auto swiftSourceStorage =
+          cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+      swiftSourceStorage->textualModuleDetails.bridgingModuleDependencies.assign(dependencyIDs.begin(),
+                                                                                 dependencyIDs.end());
+      break;
+    }
+    case swift::ModuleDependencyKind::SwiftBinary: {
+      auto swiftBinaryStorage =
+          cast<SwiftBinaryModuleDependencyStorage>(storage.get());
+      swiftBinaryStorage->headerModuleDependencies.assign(dependencyIDs.begin(),
+                                                          dependencyIDs.end());
+      break;
+    }
+    default: {
+      llvm_unreachable("Unexpected dependency kind");
+    }
+    }
+  }
+  const ArrayRef<ModuleDependencyID> getHeaderClangDependencies() const {
+    switch (getKind()) {
+    case swift::ModuleDependencyKind::SwiftInterface: {
+      auto swiftInterfaceStorage =
+          cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+      return swiftInterfaceStorage->textualModuleDetails.bridgingModuleDependencies;
+    }
+    case swift::ModuleDependencyKind::SwiftSource: {
+      auto swiftSourceStorage =
+          cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+      return swiftSourceStorage->textualModuleDetails.bridgingModuleDependencies;
+    }
+    case swift::ModuleDependencyKind::SwiftBinary: {
+      auto swiftBinaryStorage =
+          cast<SwiftBinaryModuleDependencyStorage>(storage.get());
+      return swiftBinaryStorage->headerModuleDependencies;
+    }
+    default:
+      return {};
+    }
+  }
+
+  void
+  setSwiftOverlayDependencies(const ArrayRef<ModuleDependencyID> dependencyIDs) {
     assert(isSwiftModule());
     storage->swiftOverlayDependencies.assign(dependencyIDs.begin(),
                                              dependencyIDs.end());
   }
-
   const ArrayRef<ModuleDependencyID> getSwiftOverlayDependencies() const {
     return storage->swiftOverlayDependencies;
+  }
+
+  void
+  setCrossImportOverlayDependencies(const ArrayRef<ModuleDependencyID> dependencyIDs) {
+    assert(isSwiftModule());
+    storage->crossImportOverlayModules.assign(dependencyIDs.begin(),
+                                              dependencyIDs.end());
+  }
+  const ArrayRef<ModuleDependencyID> getCrossImportOverlayDependencies() const {
+    return storage->crossImportOverlayModules;
   }
 
   const ArrayRef<LinkLibrary> getLinkLibraries() const {
@@ -720,16 +785,6 @@ public:
       return detail->textualModuleDetails.bridgingSourceFiles;
     if (auto *detail = getAsSwiftBinaryModule())
       return detail->headerSourceFiles;
-    return {};
-  }
-
-  const ArrayRef<std::string> getHeaderDependencies() const {
-    if (auto *detail = getAsSwiftInterfaceModule())
-      return detail->textualModuleDetails.bridgingModuleDependencies;
-    if (auto *detail = getAsSwiftSourceModule())
-      return detail->textualModuleDetails.bridgingModuleDependencies;
-    if (auto *detail = getAsSwiftBinaryModule())
-      return detail->headerModuleDependencies;
     return {};
   }
 
@@ -798,9 +853,8 @@ public:
       llvm_unreachable("Unexpected type");
   }
 
-  bool isResolved() const { return storage->resolved; }
-  void setIsResolved(bool isResolved) { storage->resolved = isResolved; }
-
+  /// Whether explicit input paths of all the module dependencies
+  /// have been specified on the command-line recipe for this module.
   bool isFinalized() const { return storage->finalized; }
   void setIsFinalized(bool isFinalized) { storage->finalized = isFinalized; }
 
@@ -876,10 +930,6 @@ public:
                        const SourceManager *sourceManager = nullptr,
                        SourceLoc sourceLocation = SourceLoc());
 
-  /// Add a kind-qualified module dependency ID to the set of
-  /// module dependencies.
-  void addModuleDependency(ModuleDependencyID dependencyID);
-
   /// Get the bridging header.
   std::optional<std::string> getBridgingHeader() const;
 
@@ -904,10 +954,6 @@ public:
   /// Add source files that the header input depends on.
   void addHeaderSourceFile(StringRef bridgingSourceFile);
 
-  /// Add (Clang) modules on which a non-bridging header input depends.
-  void addHeaderInputModuleDependency(StringRef module,
-                                      llvm::StringSet<> &alreadyAddedModules);
-
   /// Add bridging header include tree.
   void addBridgingHeaderIncludeTree(StringRef ID);
 
@@ -924,10 +970,6 @@ using ModuleDependencyVector =
 using ModuleNameToDependencyMap = llvm::StringMap<ModuleDependencyInfo>;
 using ModuleDependenciesKindMap =
     std::unordered_map<ModuleDependencyKind, ModuleNameToDependencyMap,
-                       ModuleDependencyKindHash>;
-using ModuleDependenciesKindRefMap =
-    std::unordered_map<ModuleDependencyKind,
-                       llvm::StringMap<const ModuleDependencyInfo *>,
                        ModuleDependencyKindHash>;
 
 // MARK: SwiftDependencyTracker
@@ -959,23 +1001,8 @@ private:
 
 // MARK: SwiftDependencyScanningService
 /// A carrier of state shared among possibly multiple invocations of the
-/// dependency scanner. Acts as a global cache of discovered module dependencies
-/// and filesystem state. It is not to be queried directly, but is rather meant
-/// to be wrapped in an instance of `ModuleDependenciesCache`, responsible for
-/// recording new dependencies and answering cache queries in a given scan.
+/// dependency scanner.
 class SwiftDependencyScanningService {
-  /// Global cache contents specific to a specific scanner invocation context
-  struct ContextSpecificGlobalCacheState {
-    /// All cached module dependencies, in the order in which they were
-    /// encountered.
-    std::vector<ModuleDependencyID> AllModules;
-
-    /// Dependencies for modules that have already been computed.
-    /// This maps a dependency kind to a map of a module's name to a Dependency
-    /// object
-    ModuleDependenciesKindMap ModuleDependenciesMap;
-  };
-
   /// The CASOption created the Scanning Service if used.
   std::optional<clang::CASOptions> CASOpts;
 
@@ -1000,26 +1027,8 @@ class SwiftDependencyScanningService {
       clang::tooling::dependencies::DependencyScanningFilesystemSharedCache>
       SharedFilesystemCache;
 
-  /// A map from a String representing the target triple of a scanner invocation
-  /// to the corresponding cached dependencies discovered so far when using this
-  /// triple.
-  llvm::StringMap<std::unique_ptr<ContextSpecificGlobalCacheState>>
-      ContextSpecificCacheMap;
-
-  /// The context hashes used by scanners using this cache, in the order in
-  /// which they were used
-  std::vector<std::string> AllContextHashes;
-
   /// Shared state mutual-exclusivity lock
   mutable llvm::sys::SmartMutex<true> ScanningServiceGlobalLock;
-
-  /// Retrieve the dependencies map that corresponds to the given dependency
-  /// kind.
-  ModuleNameToDependencyMap &getDependenciesMap(ModuleDependencyKind kind,
-                                                StringRef scanContextHash);
-  const ModuleNameToDependencyMap &
-  getDependenciesMap(ModuleDependencyKind kind,
-                     StringRef scanContextHash) const;
 
 public:
   SwiftDependencyScanningService();
@@ -1090,54 +1099,6 @@ private:
   friend class ModuleDependenciesCache;
   friend class ModuleDependencyScanner;
   friend class ModuleDependencyScanningWorker;
-  friend class ModuleDependenciesCacheDeserializer;
-  friend class ModuleDependenciesCacheSerializer;
-
-  /// Configure the current state of the cache to respond to queries
-  /// for the specified scanning context hash.
-  void configureForContextHash(StringRef scanningContextHash);
-
-  /// Return context hashes of all scanner invocations that have used
-  /// this cache instance.
-  const std::vector<std::string> &getAllContextHashes() const {
-    return AllContextHashes;
-  }
-
-  /// Whether we have cached dependency information for the given module.
-  bool hasDependency(StringRef moduleName,
-                     std::optional<ModuleDependencyKind> kind,
-                     StringRef scanContextHash) const;
-
-  /// Return a pointer to the cache state of the specified context hash.
-  ContextSpecificGlobalCacheState *
-  getCacheForScanningContextHash(StringRef scanContextHash) const;
-
-  /// Look for module dependencies for a module with the given name
-  ///
-  /// \returns the cached result, or \c None if there is no cached entry.
-  std::optional<const ModuleDependencyInfo *>
-  findDependency(StringRef moduleName, std::optional<ModuleDependencyKind> kind,
-                 StringRef scanContextHash) const;
-
-  /// Record dependencies for the given module.
-  const ModuleDependencyInfo *
-  recordDependency(StringRef moduleName, ModuleDependencyInfo dependencies,
-                   StringRef scanContextHash);
-
-  /// Update stored dependencies for the given module.
-  const ModuleDependencyInfo *
-  updateDependency(ModuleDependencyID moduleID,
-                   ModuleDependencyInfo dependencies,
-                   StringRef scanContextHash);
-
-  /// Reference the list of all module dependency infos for a given scanning
-  /// context
-  const std::vector<ModuleDependencyID> &
-  getAllModules(StringRef scanningContextHash) const {
-    auto contextSpecificCache =
-        getCacheForScanningContextHash(scanningContextHash);
-    return contextSpecificCache->AllModules;
-  }
 };
 
 // MARK: ModuleDependenciesCache
@@ -1149,11 +1110,10 @@ private:
 class ModuleDependenciesCache {
 private:
   SwiftDependencyScanningService &globalScanningService;
-  /// References to data in the `globalScanningService` for module dependencies
-  ModuleDependenciesKindRefMap ModuleDependenciesMap;
+  /// Discovered dependencies
+  ModuleDependenciesKindMap ModuleDependenciesMap;
   /// Set containing all of the Clang modules that have already been seen.
-  llvm::DenseSet<clang::tooling::dependencies::ModuleID>
-      alreadySeenClangModules;
+  llvm::DenseSet<clang::tooling::dependencies::ModuleID> alreadySeenClangModules;
   /// Name of the module under scan
   std::string mainScanModuleName;
   /// The context hash of the current scanning invocation
@@ -1177,6 +1137,11 @@ public:
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
 
 public:
+  /// Retrieve the dependencies map that corresponds to the given dependency
+  /// kind.
+  ModuleNameToDependencyMap &getDependenciesMap(ModuleDependencyKind kind);
+  const ModuleNameToDependencyMap &getDependenciesMap(ModuleDependencyKind kind) const;
+
   /// Whether we have cached dependency information for the given module.
   bool hasDependency(const ModuleDependencyID &moduleID) const;
   /// Whether we have cached dependency information for the given module.
@@ -1184,6 +1149,8 @@ public:
                      std::optional<ModuleDependencyKind> kind) const;
   /// Whether we have cached dependency information for the given module Name.
   bool hasDependency(StringRef moduleName) const;
+  /// Whether we have cached dependency information for the given Swift module.
+  bool hasSwiftDependency(StringRef moduleName) const;
 
   SwiftDependencyScanningService &getScanService() {
     return globalScanningService;
@@ -1200,17 +1167,29 @@ public:
   }
   std::string getModuleOutputPath() const { return moduleOutputPath; }
 
-  /// Query all dependencies, direct and Swift overlay.
-  std::vector<ModuleDependencyID>
+  /// Query all dependencies
+  ModuleDependencyIDSetVector
   getAllDependencies(const ModuleDependencyID &moduleID) const;
-
-  /// Query only direct import dependencies
+  
+  /// Query all Clang module dependencies.
+  ModuleDependencyIDSetVector
+  getClangDependencies(const ModuleDependencyID &moduleID) const;
+  
+  /// Query all directly-imported Swift dependencies
   llvm::ArrayRef<ModuleDependencyID>
-  getOnlyDirectDependencies(const ModuleDependencyID &moduleID) const;
-
-  /// Query only Swift overlay dependencies
+  getImportedSwiftDependencies(const ModuleDependencyID &moduleID) const;
+  /// Query all directly-imported Clang dependencies
   llvm::ArrayRef<ModuleDependencyID>
-  getOnlyOverlayDependencies(const ModuleDependencyID &moduleID) const;
+  getImportedClangDependencies(const ModuleDependencyID &moduleID) const;
+  /// Query all Clang module dependencies of this module's imported (bridging) header
+  llvm::ArrayRef<ModuleDependencyID>
+  getHeaderClangDependencies(const ModuleDependencyID &moduleID) const;
+  /// Query Swift overlay dependencies
+  llvm::ArrayRef<ModuleDependencyID>
+  getSwiftOverlayDependencies(const ModuleDependencyID &moduleID) const;
+  /// Query all cross-import overlay dependencies
+  llvm::ArrayRef<ModuleDependencyID>
+  getCrossImportOverlayDependencies(const ModuleDependencyID &moduleID) const;
 
   /// Look for module dependencies for a module with the given ID
   ///
@@ -1223,13 +1202,13 @@ public:
   /// \returns the cached result, or \c None if there is no cached entry.
   std::optional<const ModuleDependencyInfo *>
   findDependency(StringRef moduleName,
-                 std::optional<ModuleDependencyKind> kind) const;
+                 std::optional<ModuleDependencyKind> kind = std::nullopt) const;
 
-  /// Look for module dependencies for a module with the given name
+  /// Look for Swift module dependencies for a module with the given name
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
   std::optional<const ModuleDependencyInfo *>
-  findDependency(StringRef moduleName) const;
+  findSwiftDependency(StringRef moduleName) const;
 
   /// Look for known existing dependencies.
   ///
@@ -1246,21 +1225,38 @@ public:
 
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,
-                        ModuleDependencyInfo dependencies);
+                        ModuleDependencyInfo dependencyInfo);
 
-  /// Resolve a dependency module's set of imports
-  /// to a kind-qualified set of module IDs.
+  /// Resolve this module's set of directly-imported Swift module
+  /// dependencies
   void
-  resolveDependencyImports(ModuleDependencyID moduleID,
-                           const ArrayRef<ModuleDependencyID> dependencyIDs);
-
-  /// Resolve a dependency module's set of Swift module dependencies
+  setImportedSwiftDependencies(ModuleDependencyID moduleID,
+                               const ArrayRef<ModuleDependencyID> dependencyIDs);
+  /// Resolve this module's set of directly-imported Clang module
+  /// dependencies
+  void
+  setImportedClangDependencies(ModuleDependencyID moduleID,
+                               const ArrayRef<ModuleDependencyID> dependencyIDs);
+  /// Resolve this module's set of Swift module dependencies
   /// that are Swift overlays of Clang module dependencies.
   void
   setSwiftOverlayDependencies(ModuleDependencyID moduleID,
                               const ArrayRef<ModuleDependencyID> dependencyIDs);
+  /// Resolve this Swift module's imported (bridging) header's
+  /// Clang module dependencies
+  void
+  setHeaderClangDependencies(ModuleDependencyID moduleID,
+                             const ArrayRef<ModuleDependencyID> dependencyIDs);
+  /// Resolve this module's cross-import overlay dependencies
+  void
+  setCrossImportOverlayDependencies(ModuleDependencyID moduleID,
+                                    const ArrayRef<ModuleDependencyID> dependencyIDs);
 
   StringRef getMainModuleName() const { return mainScanModuleName; }
+
+private:
+  friend class ModuleDependenciesCacheDeserializer;
+  friend class ModuleDependenciesCacheSerializer;
 };
 } // namespace swift
 

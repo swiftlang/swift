@@ -604,7 +604,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
 
     // Lifetime endpoints that don't allow the address to escape.
     if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User) ||
-        isa<FixLifetimeInst>(User) || isa<DestroyValueInst>(User)) {
+        isa<FixLifetimeInst>(User) || isa<DestroyValueInst>(User) ||
+        isa<EndBorrowInst>(User)) {
       AllUsers.insert(User);
       continue;
     }
@@ -627,6 +628,13 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     }
     if (auto *MDI = dyn_cast<MarkDependenceInst>(User)) {
       if (!recursivelyCollectInteriorUses(MDI, AddressNode,
+                                          IsInteriorAddress)) {
+        return false;
+      }
+      continue;
+    }
+    if (auto *bb = dyn_cast<BeginBorrowInst>(User)) {
+      if (!recursivelyCollectInteriorUses(bb, AddressNode,
                                           IsInteriorAddress)) {
         return false;
       }

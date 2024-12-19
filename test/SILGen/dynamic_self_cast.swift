@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
 
 public class SelfCasts {
   // CHECK-LABEL: sil [ossa] @$s17dynamic_self_cast9SelfCastsC02toD0yACXDACFZ : $@convention(method) (@guaranteed SelfCasts, @thick SelfCasts.Type) -> @owned SelfCasts {

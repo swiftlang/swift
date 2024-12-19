@@ -3,12 +3,10 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
+// RUN:   -enable-experimental-feature LifetimeDependence
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer
@@ -79,10 +77,11 @@ func bv_incorrect_annotation2(_ w1: borrowing Wrapper, _ w2: borrowing Wrapper) 
 }                                                                                                     // expected-note @-1{{this use causes the lifetime-dependent value to escape}}
 
 let ptr = UnsafeRawPointer(bitPattern: 1)!
-let nc = NC(ptr, 0) // expected-error {{lifetime-dependent variable 'nc' escapes its scope}}
+let nc = NC(ptr, 0)
 
 func bv_global(dummy: BV) -> BV {
-  nc.getBV()
+  nc.getBV()  // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-4{{it depends on the lifetime of variable 'nc'}}
 } // expected-note {{this use causes the lifetime-dependent value to escape}}
 
 func testEmpty(nc: consuming NC) {

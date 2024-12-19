@@ -34,7 +34,7 @@ func testFunction() {
 // CHECK-IDE-TEST: mutating func doOtherThing(_ options: OptionsStruct) -> Float
 
 
-// RUN: %target-swift-frontend -c -enable-experimental-cxx-interop -enable-objc-interop -I %S/Inputs %s -emit-silgen -o - | %FileCheck %s
+// RUN: %target-swift-frontend -c -enable-experimental-cxx-interop -enable-objc-interop -I %S/Inputs %s -Xllvm -sil-print-types -emit-silgen -o - | %FileCheck %s
 
 // CHECK: [[FN1:%[0-9]+]] = function_ref @$sSo19OptionsConsumerObjCC7optionsABSo0A6StructV_tcfC : $@convention(method) (OptionsStruct, @thick OptionsConsumerObjC.Type) -> @owned OptionsConsumerObjC
 // CHECK-NEXT: apply [[FN1]]

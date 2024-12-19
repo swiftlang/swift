@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -O -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -O -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop
 
 import Foundation
 class MyFunkyDictionary: NSDictionary {

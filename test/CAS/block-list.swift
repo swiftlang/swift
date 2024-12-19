@@ -30,6 +30,7 @@
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 
 // RUN: %target-swift-frontend \
+// RUN:   -target %target-future-triple \
 // RUN:   -emit-ir -o - -cache-compile-job -cas-path %t/cas -O \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
@@ -39,6 +40,9 @@
 // RUN:   -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation \
 // RUN:   -cache-replay-prefix-map /^tmp=%t \
 // RUN:   /^tmp/main.swift @%t/MyApp.cmd 2>&1 | %FileCheck %s --check-prefix CHECK-BLOCKED
+
+// REQUIRES: swift_feature_LayoutStringValueWitnesses
+// REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation
 
 // CHECK-BLOCKED: note: Layout string value witnesses have been disabled for module 'Test' through block list entry
 // CHECK-BLOCKED-NOT: type_layout_string

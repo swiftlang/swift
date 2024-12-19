@@ -37,7 +37,7 @@ StringRef getDomain(const AvailableAttr &AvAttr) {
   }
 
   // Platform-specific availability.
-  switch (AvAttr.Platform) {
+  switch (AvAttr.getPlatform()) {
     case swift::PlatformKind::iOS:
       return { "iOS" };
     case swift::PlatformKind::macCatalyst:

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil -O -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil -O -o - | %FileCheck %s
 // RUN: %target-swift-frontend %s -emit-ir -o /dev/null
 
 // rdar://problem/38694450

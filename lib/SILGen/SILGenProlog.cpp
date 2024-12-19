@@ -194,8 +194,15 @@ public:
   ManagedValue handleParam(AbstractionPattern origType, CanType substType,
                            ParamDecl *pd) {
     // Note: inouts of tuples are not exploded, so we bypass visit().
-    if (pd->isInOut())
-      return handleInOut(origType, substType);
+    if (pd->isInOut()) {
+      return handleInOut(origType, substType, pd->isAddressable());
+    }
+    // `@_addressable` also suppresses exploding the parameter.
+    if (pd->isAddressable()) {
+      return handleScalar(claimNextParameter(), origType, substType,
+                          /*emitInto*/ nullptr,
+                          /*inout*/ false, /*addressable*/ true);
+    }
     return visit(substType, origType, /*emitInto*/ nullptr);
   }
 
@@ -213,7 +220,9 @@ public:
     // Handle scalar components.
     if (!isa<PackExpansionType>(substType)) {
       return handleScalar(componentValue, origPatternType, substType,
-                          /*emit into*/ nullptr, substParam.isInOut());
+                          /*emit into*/ nullptr,
+                          substParam.isInOut(),
+                          /*is addressable*/ false);
     }
 
     auto componentPackTy = componentValue.getType().castTo<SILPackType>();
@@ -259,24 +268,33 @@ public:
       }
 
       return handleScalar(input, origPatternType, substEltType,
-                          context.getEmitInto(), /*inout*/ false);
+                          context.getEmitInto(),
+                          /*inout*/ false,
+                          /*addressable*/ false);
     });
   }
 
   ManagedValue visitType(CanType t, AbstractionPattern orig,
                          Initialization *emitInto) {
     auto mv = claimNextParameter();
-    return handleScalar(mv, orig, t, emitInto, /*inout*/ false);
+    return handleScalar(mv, orig, t, emitInto,
+                        /*inout*/ false,
+                        /*addressable*/ false);
   }
 
-  ManagedValue handleInOut(AbstractionPattern orig, CanType t) {
+  ManagedValue handleInOut(AbstractionPattern orig, CanType t,
+                           bool isAddressable) {
     auto mv = claimNextParameter();
-    return handleScalar(mv, orig, t, /*emitInto*/ nullptr, /*inout*/ true);
+    return handleScalar(mv, orig, t, /*emitInto*/ nullptr,
+                        /*inout*/ true,
+                        isAddressable);
   }
 
   ManagedValue handleScalar(ManagedValue mv,
                             AbstractionPattern orig, CanType t,
-                            Initialization *emitInto, bool isInOut) {
+                            Initialization *emitInto,
+                            bool isInOut,
+                            bool isAddressable) {
     assert(!(isInOut && emitInto != nullptr));
 
     auto argType = SGF.getLoweredType(t, mv.getType().getCategory());
@@ -321,20 +339,26 @@ public:
       return mv;
     }
 
-    // This can happen if the value is resilient in the calling convention
-    // but not resilient locally.
-    bool argIsLoadable = argType.isLoadable(SGF.F);
-    if (argIsLoadable) {
-      if (argType.isAddress()) {
-        mv = SGF.B.createLoadWithSameOwnership(loc, mv);
-        argType = argType.getObjectType();
+    // If the parameter is marked `@_addressable`, then we want to defer any
+    // reabstraction of the parameter as received, so that we can use the
+    // original value at its stable address when possible.
+    bool argIsLoadable = false;
+    if (!isAddressable) {
+      argIsLoadable = argType.isLoadable(SGF.F);
+      // This can happen if the value is resilient in the calling convention
+      // but not resilient locally.
+      if (argIsLoadable) {
+        if (argType.isAddress()) {
+          mv = SGF.B.createLoadWithSameOwnership(loc, mv);
+          argType = argType.getObjectType();
+        }
       }
-    }
 
-    assert(argType.getCategory() == mv.getType().getCategory());
-    if (argType.getASTType() != mv.getType().getASTType()) {
-      // Reabstract the value if necessary.
-      mv = SGF.emitOrigToSubstValue(loc, mv.ensurePlusOne(SGF, loc), orig, t);
+      assert(argType.getCategory() == mv.getType().getCategory());
+      if (argType.getASTType() != mv.getType().getASTType()) {
+        // Reabstract the value if necessary.
+        mv = SGF.emitOrigToSubstValue(loc, mv.ensurePlusOne(SGF, loc), orig, t);
+      }
     }
 
     if (parameters.isNoImplicitCopy && !argIsLoadable) {
@@ -538,7 +562,8 @@ public:
         auto eltAddrMV = cloner.clone(eltAddr);
         auto result = handleScalar(eltAddrMV, origPatternType,
                                    substComponentType, componentInit,
-                                   /*inout*/ false);
+                                   /*inout*/ false,
+                                   /*addressable*/ false);
         assert(result.isInContext() == (componentInit != nullptr));
         if (!result.isInContext())
           eltMVs.push_back(result);
@@ -571,7 +596,9 @@ public:
           auto eltAddrMV = cloner.clone(eltAddr);
 
           auto result = handleScalar(eltAddrMV, origPatternType, substEltType,
-                                     eltInit, /*inout*/ false);
+                                     eltInit,
+                                     /*inout*/ false,
+                                     /*addressable*/ false);
           assert(result.isInContext()); (void) result;
         });
       });

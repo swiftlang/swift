@@ -1,9 +1,9 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen %s -primary-file %S/Inputs/vtables_multifile_2.swift | %FileCheck %S/Inputs/vtables_multifile_2.swift
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -primary-file %S/Inputs/vtables_multifile_2.swift | %FileCheck %S/Inputs/vtables_multifile_2.swift
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %s -enable-library-evolution -emit-module-path %t/vtables_multifile.swiftmodule
-// RUN: %target-swift-emit-silgen %S/Inputs/vtables_multifile_3.swift -I %t | %FileCheck %S/Inputs/vtables_multifile_3.swift
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %S/Inputs/vtables_multifile_3.swift -I %t | %FileCheck %S/Inputs/vtables_multifile_3.swift
 
 
 open class Base<T> {

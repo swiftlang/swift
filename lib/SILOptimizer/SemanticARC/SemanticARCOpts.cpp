@@ -177,7 +177,8 @@ struct SemanticARCOpts : SILFunctionTransform {
     // converted to guaranteed, ignoring the phi, try convert those phis to be
     // guaranteed.
     if (tryConvertOwnedPhisToGuaranteedPhis(visitor.ctx)) {
-      updateBorrowedFrom(getPassManager(), &f);
+      updateAllGuaranteedPhis(getPassManager(), &f);
+
       // We return here early to save a little compile time so we do not
       // invalidate analyses redundantly.
       return invalidateAnalysis(
@@ -186,7 +187,7 @@ struct SemanticARCOpts : SILFunctionTransform {
 
     // Otherwise, we only deleted instructions and did not touch phis.
     if (didEliminateARCInsts) {
-      updateBorrowedFrom(getPassManager(), &f);
+      updateAllGuaranteedPhis(getPassManager(), &f);
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }

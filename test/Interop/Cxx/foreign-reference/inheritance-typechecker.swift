@@ -21,3 +21,8 @@ let b: BaseT = BaseT.getBaseT()
 assert(b.isBase)
 let bc: BaseT = cxxCast(b)      // should instantiate I and O both to BaseT
 assert(bc.isBase)
+
+let d = DerivedOutOfOrder.getInstance()
+let _ = d.baseField
+let _ = d.derivedField
+let _ = d.leafField

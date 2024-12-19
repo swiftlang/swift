@@ -311,7 +311,7 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
   bool isQualified = isQualifiedOpt.value();
 
   // Create the constant type string by mangling + demangling.
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(ty->getASTContext());
   std::string mangledTypeName = mangler.mangleTypeForTypeName(ty);
 
   Demangle::DemangleOptions options;
@@ -440,6 +440,8 @@ isStringStoreToIdentifyableObject(SILInstruction *inst) {
       // escape.
       case SILInstructionKind::DeallocStackInst:
       case SILInstructionKind::LoadInst:
+        break;
+      case SILInstructionKind::LoadBorrowInst:
         break;
       case SILInstructionKind::DebugValueInst:
         if (DebugValueInst::hasAddrVal(user))
@@ -579,12 +581,13 @@ StringOptimization::getStringFromStaticLet(SILValue value) {
   //   %ptr_to_global = apply %addressor()
   //   %global_addr = pointer_to_address %ptr_to_global
   //   %value = load %global_addr
-  auto *load = dyn_cast<LoadInst>(value);
-  if (!load)
-    return StringInfo::unknown();
+  if (!isa<LoadInst>(value) && !isa<LoadBorrowInst>(value)) {
+        return StringInfo::unknown();
+  }
+  auto *load = value->getDefiningInstruction();
 
   SILFunction *initializer = nullptr;
-  auto *globalAddr = dyn_cast<GlobalAddrInst>(load->getOperand());
+  auto *globalAddr = dyn_cast<GlobalAddrInst>(load->getOperand(0));
   if (globalAddr) {
     // The global accessor is inlined.
 
@@ -600,7 +603,7 @@ StringOptimization::getStringFromStaticLet(SILValue value) {
   } else {
     // The global accessor is not inlined, yet.
 
-    auto *pta = dyn_cast<PointerToAddressInst>(load->getOperand());
+    auto *pta = dyn_cast<PointerToAddressInst>(load->getOperand(0));
     if (!pta)
       return StringInfo::unknown();
 
@@ -651,7 +654,7 @@ StringOptimization::getStringFromStaticLet(SILValue value) {
   // This check is probably not needed, but let's be on the safe side:
   // it prevents an infinite recursion if the initializer of the global is
   // itself a load of another global, and so on.
-  if (isa<LoadInst>(initVal))
+  if (isa<LoadInst>(initVal) || isa<LoadBorrowInst>(initVal))
     return StringInfo::unknown();
 
   return getStringInfo(initVal);

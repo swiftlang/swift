@@ -635,7 +635,7 @@ void CopyPropagation::run() {
 
   // Invalidate analyses.
   if (changed || deleter.hadCallbackInvocation()) {
-    updateBorrowedFrom(getPassManager(), getFunction());
+    updateAllGuaranteedPhis(getPassManager(), getFunction());
     // Preserves NonLocalAccessBlockAnalysis.
     accessBlockAnalysis->lockInvalidation();
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

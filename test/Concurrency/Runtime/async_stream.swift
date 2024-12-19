@@ -21,12 +21,12 @@ class NotSendable {}
 @MainActor func testWarnings() {
   var x = 0
   _ = AsyncStream {
-    x += 1 // expected-warning {{mutation of captured var 'x' in concurrently-executing code; this is an error in the Swift 6 language mode}}
+    x += 1 // expected-warning {{mutation of captured var 'x' in concurrently-executing code}}
     return 0
   }
 
   _ = AsyncThrowingStream {
-    x += 1 // expected-warning {{mutation of captured var 'x' in concurrently-executing code; this is an error in the Swift 6 language mode}}
+    x += 1 // expected-warning {{mutation of captured var 'x' in concurrently-executing code}}
     return
   }
 }

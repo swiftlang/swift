@@ -1,19 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: not %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-bare-slash-regex -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: not %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-bare-slash-regex > %t/cpp-parser.ast.raw
-
-// Filter out any addresses in the dump, since they can differ.
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/astgen.ast.raw > %t/astgen.ast
-
-// RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
-
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-bare-slash-regex -enable-experimental-feature ParserASTGen
 
 // REQUIRES: swift_swift_parser
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ParserASTGen
 // rdar://116686158
 // UNSUPPORTED: asan
 
@@ -28,3 +18,13 @@ func testEditorPlaceholder() -> Int {
   foo(<#T##x: String##String#>) // expected-error {{editor placeholder in source file}})
   return <#T##Int#> // expected-error {{editor placeholder in source file}}
 }
+
+_ = [(Int) -> async throws Int]()
+// expected-error@-1{{'async throws' must precede '->'}}
+// expected-note@-2{{move 'async throws' in front of '->'}}{{15-21=}} {{21-28=}} {{20-21= }} {{12-12=async }} {{12-12=throws }}
+
+@freestanding // expected-error {{expected arguments for 'freestanding' attribute}}
+func dummy() {}
+
+@_silgen_name("whatever", extra)  // expected-error@:27 {{unexpected arguments in '_silgen_name' attribute}}
+func _whatever()

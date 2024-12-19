@@ -10,6 +10,9 @@
 
 // REQUIRES: executable_test
 
+// This test needs a Swift 5.9 runtime or newer.
+// UNSUPPORTED: back_deployment_runtime
+
 import variadic_generic_opaque_type_other
 import StdlibUnittest
 

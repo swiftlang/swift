@@ -18,8 +18,8 @@
 // RUN: llvm-bcanalyzer -dump %t/inputs/Foo.swiftmodule > %t/Foo.sdk.moduledump.txt
 // RUN: cat %t/Foo.sdk.moduledump.txt | %FileCheck %s -check-prefix CHECK-SDK-FOO
 
-// CHECK-FREESTANDING-FOO: <MODULE_INTERFACE_PATH abbrevid={{[0-9]+}}/> blob data = '{{.*}}{{/|\\}}modules{{/|\\}}Foo.swiftinterface'
-// CHECK-SDK-FOO: <MODULE_INTERFACE_PATH abbrevid={{[0-9]+}}/> blob data = 'usr/lib/Foo.swiftmodule/Foo.swiftinterface'
+// CHECK-FREESTANDING-FOO: <MODULE_INTERFACE_PATH abbrevid={{[0-9]+}} op0=0/> blob data = '{{.*}}{{/|\\}}modules{{/|\\}}Foo.swiftinterface'
+// CHECK-SDK-FOO: <MODULE_INTERFACE_PATH abbrevid={{[0-9]+}} op0=1/> blob data = 'usr/lib/Foo.swiftmodule/Foo.swiftinterface'
 
 //--- modules/Foo.swiftinterface
 // swift-interface-format-version: 1.0

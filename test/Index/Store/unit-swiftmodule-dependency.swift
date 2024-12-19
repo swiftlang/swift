@@ -27,7 +27,7 @@ func test() {
 // CHECK: [[MODB:SwiftModuleB.swiftmodule-[A-Z0-9]*]]
 // CHECK: --------
 // CHECK: has-main: 1
-// CHECK: out-file: {{.*}}/SwiftModuleB.swiftmodule
+// CHECK: out-file: {{.*}}{{/|\\}}SwiftModuleB.swiftmodule
 // CHECK: DEPEND START
 // CHECK: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
 // CHECK: Unit | user | SwiftModuleA | {{.*}}{{/|\\}}SwiftModuleA.swiftmodule

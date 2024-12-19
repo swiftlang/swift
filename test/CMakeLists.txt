@@ -28,6 +28,39 @@ function(swift_configure_lit_site_cfg source_path destination_path installed_nam
   endif()
 endfunction()
 
+function(swift_generate_lit_swift_features_cfg output_path)
+  if(SWIFT_COMPILER_IS_MSVC_LIKE)
+    set(test_lit_swift_features_cmd
+      "${CMAKE_C_COMPILER}" "/P" "/EP" "/I" "${SWIFT_MAIN_INCLUDE_DIR}" "/TC"
+      "/Fi<<<OUTPUT_FILE>>>")
+  else()
+    set(test_lit_swift_features_cmd
+      "${CMAKE_C_COMPILER}" "-E" "-P" "-I${SWIFT_MAIN_INCLUDE_DIR}" "-x" "c" "-o"
+      "<<<OUTPUT_FILE>>>")
+  endif()
+
+  list(
+    TRANSFORM test_lit_swift_features_cmd
+    REPLACE "<<<OUTPUT_FILE>>>" "${output_path}")
+  add_custom_command(
+    OUTPUT "${output_path}"
+    COMMAND
+      ${test_lit_swift_features_cmd}
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.swift-features.cfg.inc"
+    DEPENDS
+      "lit.swift-features.cfg.inc"
+      "${SWIFT_MAIN_INCLUDE_DIR}/swift/Basic/Features.def"
+  )
+
+  # Execute during generation once, so one can run Lit without rebuilding the
+  # test suite dependencies first.
+  execute_process(
+    COMMAND
+      ${test_lit_swift_features_cmd}
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.swift-features.cfg.inc"
+  )
+endfunction()
+
 function(normalize_boolean_spelling var_name)
   if(${var_name})
     set("${var_name}" TRUE PARENT_SCOPE)
@@ -202,6 +235,7 @@ normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
 normalize_boolean_spelling(SWIFT_ENABLE_MACCATALYST)
 normalize_boolean_spelling(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
 normalize_boolean_spelling(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
@@ -304,6 +338,13 @@ foreach(SDK ${SWIFT_SDKS})
           "${validation_test_bin_dir}/lit.site.cfg"
           "validation-test${VARIANT_SUFFIX}.lit.site.cfg")
 
+      swift_generate_lit_swift_features_cfg("${test_bin_dir}/lit.swift-features.cfg")
+      swift_generate_lit_swift_features_cfg("${validation_test_bin_dir}/lit.swift-features.cfg")
+      add_custom_target(lit_swift_features_cfg_${VARIANT_SUFFIX}
+        DEPENDS
+          "${test_bin_dir}/lit.swift-features.cfg"
+          "${validation_test_bin_dir}/lit.swift-features.cfg")
+
       set(test_dependencies)
       get_test_dependencies("${SDK}" test_dependencies)
 
@@ -340,6 +381,9 @@ foreach(SDK ${SWIFT_SDKS})
         "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
       set(validation_test_dependencies)
+
+      list(APPEND test_dependencies lit_swift_features_cfg_${VARIANT_SUFFIX})
+      list(APPEND validation_test_dependencies lit_swift_features_cfg_${VARIANT_SUFFIX})
 
       set(command_upload_stdlib)
       set(command_upload_swift_reflection_test)
@@ -411,6 +455,10 @@ foreach(SDK ${SWIFT_SDKS})
 
         if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
           list(APPEND LIT_ARGS "--param" "string_processing")
+        endif()
+
+        if(SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
+          list(APPEND LIT_ARGS "--param" "pointer_bounds")
         endif()
 
         if(SWIFT_ENABLE_BACKTRACING)

@@ -306,7 +306,7 @@ public:
 
   /// Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
-  
+
   /// Whether we should run LLVM optimizations after IRGen.
   unsigned DisableLLVMOptzns : 1;
 
@@ -377,7 +377,7 @@ public:
   /// Force public linkage for private symbols. Used only by the LLDB
   /// expression evaluator.
   unsigned ForcePublicLinkage : 1;
-  
+
   /// Force lazy initialization of class metadata
   /// Used on Windows to avoid cross-module references.
   unsigned LazyInitializeClassMetadata : 1;
@@ -439,7 +439,7 @@ public:
   /// Whether to disable shadow copies for local variables on the stack. This is
   /// only used for testing.
   unsigned DisableDebuggerShadowCopies : 1;
-  
+
   /// Whether to disable using mangled names for accessing concrete type metadata.
   unsigned DisableConcreteTypeMetadataMangledNameAccessors : 1;
 
@@ -500,6 +500,13 @@ public:
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
 
+  /// Path to the data file to be used for sampling-based PGO,
+  /// or the empty string.
+  std::string UseSampleProfile = "";
+
+  /// Controls whether DWARF discriminators are added to the IR.
+  unsigned DebugInfoForProfiling : 1;
+
   /// List of backend command-line options for -embed-bitcode.
   std::vector<uint8_t> CmdArgs;
 
@@ -517,7 +524,7 @@ public:
   };
 
   TypeInfoDumpFilter TypeInfoFilter;
-  
+
   /// Pull in runtime compatibility shim libraries by autolinking.
   std::optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
   std::optional<llvm::VersionTuple>
@@ -536,13 +543,16 @@ public:
   llvm::CallingConv::ID PlatformCCallingConvention;
 
   /// Use CAS based object format as the output.
-  bool UseCASBackend;
+  bool UseCASBackend = false;
 
   /// The output mode for the CAS Backend.
   llvm::CASBackendMode CASObjMode;
 
   /// Emit a .casid file next to the object file if CAS Backend is used.
-  bool EmitCASIDFile;
+  bool EmitCASIDFile = false;
+
+  /// Paths to the pass plugins registered via -load-pass-plugin.
+  std::vector<std::string> LLVMPassPlugins;
 
   IRGenOptions()
       : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
@@ -583,8 +593,9 @@ public:
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
-        EmitAsyncFramePushPopMetadata(false), EmitYieldOnce2AsYieldOnce(true),
-        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false), CmdArgs(),
+        EmitAsyncFramePushPopMetadata(true), EmitYieldOnce2AsYieldOnce(true),
+        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
+        DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),

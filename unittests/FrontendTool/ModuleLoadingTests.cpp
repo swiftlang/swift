@@ -104,9 +104,10 @@ protected:
     symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
     SILOptions silOpts;
     CASOptions casOpts;
+    SerializationOptions serializationOpts;
     auto ctx = ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts,
                                clangImpOpts, symbolGraphOpts, casOpts,
-                               sourceMgr, diags);
+                               serializationOpts, sourceMgr, diags);
 
     ctx->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(*ctx, cacheDir,

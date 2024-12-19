@@ -65,3 +65,10 @@ import F
 
 /// --------Clang module F
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.pcm",
+// CHECK: "commandLine": [
+// CHECK: "-vfsoverlay",
+// CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay.yaml",
+// CHECK: "-ivfsoverlay",
+// CHECK-NEXT: "-Xcc",
+// CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay.yaml",
+// CHECK: ],

@@ -4,6 +4,7 @@
 import StdlibUnittest
 import EnableIf
 
+
 let x = HasMethodWithEnableIf()
 x.onlyEnabledForBool("a")
-// CHECK: error: could not substitute parameters for C++ function template 'HasMethodWithEnableIf::onlyEnabledForBool': NSString *
+// CHECK: error: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'HasMethodWithEnableIf::onlyEnabledForBool' could not be converted: String

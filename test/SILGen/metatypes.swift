@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib %s | %FileCheck %s
 
 import Swift
 

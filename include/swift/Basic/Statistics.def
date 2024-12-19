@@ -184,9 +184,14 @@ FRONTEND_STATISTIC(Sema, NumCrossImportsChecked)
 /// Number of pairs of modules we've actually found cross-imports for.
 FRONTEND_STATISTIC(Sema, NumCrossImportsFound)
 
+/// Number of steps recorded in the trail while solving expression type
+/// constraints. A rough proxy for "how much work the expression
+/// type checker did".
+FRONTEND_STATISTIC(Sema, NumTrailSteps)
+
 /// Number of constraint-solving scopes created in the typechecker, while
-/// solving expression type constraints. A rough proxy for "how much work the
-/// expression typechecker did".
+/// solving expression type constraints. Another rough proxy for "how much
+/// work the expression type checker did".
 FRONTEND_STATISTIC(Sema, NumConstraintScopes)
 
 /// Number of constraint-solving scopes that were created but which

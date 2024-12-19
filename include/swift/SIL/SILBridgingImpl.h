@@ -22,6 +22,7 @@
 #include "SILBridging.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BasicBridging.h"
@@ -672,6 +673,13 @@ BridgedBasicBlock BridgedArgument::getParent() const {
 }
 
 bool BridgedArgument::isReborrow() const { return getArgument()->isReborrow(); }
+void BridgedArgument::setReborrow(bool reborrow) const {
+  getArgument()->setReborrow(reborrow);
+}
+
+bool BridgedArgument::FunctionArgument_isLexical() const {
+  return llvm::cast<swift::SILFunctionArgument>(getArgument())->getLifetime().isLexical();
+}
 
 OptionalBridgedDeclObj BridgedArgument::getVarDecl() const {
   return {llvm::dyn_cast_or_null<swift::VarDecl>(getArgument()->getDecl())};
@@ -915,6 +923,14 @@ BridgedType BridgedFunction::getLoweredType(BridgedType type) const {
 
 swift::SILFunction * _Nullable OptionalBridgedFunction::getFunction() const {
   return static_cast<swift::SILFunction *>(obj);
+}
+
+BridgedFunction::OptionalSourceFileKind BridgedFunction::getSourceFileKind() const {
+  if (auto *dc = getFunction()->getDeclContext()) {
+    if (auto *sourceFile = dc->getParentSourceFile())
+      return (OptionalSourceFileKind)sourceFile->Kind;
+  }
+  return OptionalSourceFileKind::None;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1382,6 +1398,10 @@ BridgedInstruction::MarkDependenceKind BridgedInstruction::MarkDependenceInst_de
 
 void BridgedInstruction::MarkDependenceInst_resolveToNonEscaping() const {
   getAs<swift::MarkDependenceInst>()->resolveToNonEscaping();
+}
+
+void BridgedInstruction::MarkDependenceInst_settleToEscaping() const {
+  getAs<swift::MarkDependenceInst>()->settleToEscaping();
 }
 
 SwiftInt BridgedInstruction::BeginAccessInst_getAccessKind() const {
@@ -2291,6 +2311,16 @@ BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, Brid
 
 BridgedInstruction BridgedBuilder::createEndAccess(BridgedValue value) const {
   return {unbridged().createEndAccess(regularLoc(), value.getSILValue(), false)};
+}
+
+BridgedInstruction BridgedBuilder::createEndApply(BridgedValue value) const {
+  swift::ASTContext &ctxt = unbridged().getASTContext();
+  return {unbridged().createEndApply(regularLoc(), value.getSILValue(),
+                                     swift::SILType::getEmptyTupleType(ctxt))};
+}
+
+BridgedInstruction BridgedBuilder::createAbortApply(BridgedValue value) const {
+  return {unbridged().createAbortApply(regularLoc(), value.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createConvertFunction(BridgedValue originalFunction, BridgedType resultType, bool withoutActuallyEscaping) const {

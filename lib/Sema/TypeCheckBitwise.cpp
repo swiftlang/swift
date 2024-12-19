@@ -413,13 +413,14 @@ bool swift::checkBitwiseCopyableConformance(ProtocolConformance *conformance,
 
   // If this is an always-unavailable conformance, there's nothing to check.
   if (auto ext = dyn_cast<ExtensionDecl>(conformanceDC)) {
-    if (AvailableAttr::isUnavailable(ext))
+    if (ext->isUnavailable())
       return false;
   }
 
-  // BitwiseCopyable must be added in the same source file.
+  // BitwiseCopyable must be added in the same module or its overlay.
   auto conformanceDecl = conformanceDC->getAsDecl();
-  if (conformanceDecl->getModuleContext() != nominal->getModuleContext()) {
+  if (!conformanceDecl->getModuleContext()->isSameModuleLookingThroughOverlays(
+          nominal->getModuleContext())) {
     conformanceDecl->diagnose(diag::bitwise_copyable_outside_module, nominal);
     return true;
   }

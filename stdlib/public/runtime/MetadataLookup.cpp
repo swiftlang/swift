@@ -1016,7 +1016,7 @@ _findContextDescriptor(Demangle::NodePointer node,
     return nullptr;
 
   auto mangling =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem, Mangle::ManglingFlavor::Default);
 
   if (!mangling.isSuccess())
     return nullptr;
@@ -1195,7 +1195,7 @@ _findProtocolDescriptor(NodePointer node,
   }
 
   auto mangling =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem, Mangle::ManglingFlavor::Default);
 
   if (!mangling.isSuccess())
     return nullptr;
@@ -1829,6 +1829,9 @@ public:
         .getType();
   }
 
+  Mangle::ManglingFlavor getManglingFlavor() { 
+    return Mangle::ManglingFlavor::Default;
+  }
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
   TypeLookupErrorOr<BuiltType>

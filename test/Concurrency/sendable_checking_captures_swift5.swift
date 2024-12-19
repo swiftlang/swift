@@ -51,3 +51,21 @@ do {
     }
   }
 }
+
+class NotSendable {} // expected-complete-note {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+
+@available(*, unavailable)
+extension NotSendable : @unchecked Sendable {}
+
+@preconcurrency func withSendableClosure(_: @Sendable () -> Void) {}
+
+func testPreconcurrencyDowngrade(ns: NotSendable) {
+  var x = 0
+  withSendableClosure {
+    _ = ns
+    // expected-complete-warning@-1 {{capture of 'ns' with non-sendable type 'NotSendable' in a `@Sendable` closure}}
+
+    x += 1
+    // expected-complete-warning@-1 {{mutation of captured var 'x' in concurrently-executing code}}
+  }
+}

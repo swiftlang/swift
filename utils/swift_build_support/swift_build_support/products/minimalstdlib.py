@@ -104,6 +104,8 @@ class MinimalStdlib(cmake_product.CMakeProduct):
             'SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL', 'FALSE')
         self.cmake_options.define(
             'SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL', 'FALSE')
+        self.cmake_options.define(
+            'SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_ENABLE_REFLECTION:BOOL', 'FALSE')
         self.cmake_options.define(
             'SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS:BOOL', 'FALSE')

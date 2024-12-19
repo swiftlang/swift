@@ -221,7 +221,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         // Create a source file.
         unsigned bufferID =
             Ctx.SourceMgr.addNewSourceBuffer(std::move(interfaceBuf.get()));
-        auto moduleDecl = ModuleDecl::create(realModuleName, Ctx);
+        auto moduleDecl = ModuleDecl::createEmpty(realModuleName, Ctx);
 
         SourceFile::ParsingOptions parsingOpts;
         auto sourceFile = new (Ctx) SourceFile(

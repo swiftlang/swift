@@ -199,7 +199,7 @@ Lifetime SILType::getLifetime(const SILFunction &F) const {
 }
 
 std::string SILType::getMangledName() const {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   return mangler.mangleTypeWithoutPrefix(getRawASTType());
 }
 
@@ -778,12 +778,11 @@ bool SILType::hasAbstractionDifference(SILFunctionTypeRepresentation rep,
 
 bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
                            CanType formalType) {
+  formalType =
+      substOpaqueTypesWithUnderlyingTypes(formalType, context)
+        ->getCanonicalType();
+
   SILType loweredType = *this;
-  if (formalType->hasOpaqueArchetype() &&
-      context.shouldLookThroughOpaqueTypeArchetypes() &&
-      loweredType.getASTType() ==
-          Mod.Types.getLoweredRValueType(context, formalType))
-    return true;
 
   // Optional lowers its contained type.
   SILType loweredObjectType = loweredType.getOptionalObjectType();

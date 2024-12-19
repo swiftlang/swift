@@ -19,12 +19,19 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .target(name: "SwiftInspectClient", condition: .when(platforms: [.windows])),
                 .target(name: "SwiftInspectClientInterface", condition: .when(platforms: [.windows])),
+                .target(name: "SwiftInspectLinux", condition: .when(platforms: [.linux])),
             ],
             swiftSettings: [.unsafeFlags(["-parse-as-library"])]),
+        .target(name: "SwiftInspectClient"),
         .target(
-            name: "SwiftInspectClient",
-            // Workaround https://github.com/llvm/llvm-project/issues/40056
-            cxxSettings: [.unsafeFlags(["-Xclang", "-fno-split-cold-code"])]),
+            name: "SwiftInspectLinux",
+            dependencies: ["LinuxSystemHeaders"],
+            path: "Sources/SwiftInspectLinux",
+            exclude: ["SystemHeaders"],
+            cSettings: [.define("_GNU_SOURCE", to: "1")]),
+        .systemLibrary(
+            name: "LinuxSystemHeaders",
+            path: "Sources/SwiftInspectLinux/SystemHeaders"),
         .systemLibrary(
             name: "SwiftInspectClientInterface"),
         .testTarget(

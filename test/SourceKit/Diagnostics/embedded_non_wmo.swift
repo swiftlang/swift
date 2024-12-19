@@ -8,6 +8,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: embedded_stdlib
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 //--- file1.swift
 

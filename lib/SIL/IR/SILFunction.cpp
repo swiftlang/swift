@@ -194,6 +194,14 @@ SILFunction *SILFunction::create(
   else
     M.functions.push_back(fn);
 
+  auto iter = M.pendingSpecializeAttrs.find(name);
+  if (iter != M.pendingSpecializeAttrs.end()) {
+    for (auto *attr : iter->second) {
+      fn->addSpecializeAttr(attr);
+    }
+    M.pendingSpecializeAttrs.erase(iter);
+  }
+
   return fn;
 }
 

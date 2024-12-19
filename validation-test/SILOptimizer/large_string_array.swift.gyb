@@ -18,7 +18,7 @@
 // Check if the optimizer can optimize the whole array into a statically
 // initialized global
 
-// CHECK: sil_global private @{{.*9str_array.*}}WZTv_ : $_ContiguousArrayStorage<String> = {
+// CHECK: sil_global private [let] @{{.*9str_array.*}}WZTv_ : $_ContiguousArrayStorage<String> = {
 // CHECK:   %initval = object $_ContiguousArrayStorage<String>
 
 public let str_array: [String] = [

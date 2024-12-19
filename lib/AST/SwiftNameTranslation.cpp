@@ -63,9 +63,6 @@ getErrorDomainStringForObjC(const EnumDecl *ED) {
   // Should have already been diagnosed as diag::objc_enum_generic.
   assert(!ED->isGenericContext() && "Trying to bridge generic enum error to Obj-C");
 
-  // Clang decls have custom domains, but we shouldn't see them here anyway.
-  assert(!ED->getClangDecl() && "clang decls shouldn't be re-exported");
-
   SmallVector<const NominalTypeDecl *, 4> outerTypes;
   for (const NominalTypeDecl * D = ED;
        D != nullptr;

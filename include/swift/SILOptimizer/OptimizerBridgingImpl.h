@@ -556,9 +556,19 @@ bool BridgedPassContext::enableMoveInoutStackProtection() const {
   return mod->getOptions().EnableMoveInoutStackProtection;
 }
 
+bool BridgedPassContext::useAggressiveReg2MemForCodeSize() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().UseAggressiveReg2MemForCodeSize;
+}
+
 BridgedPassContext::AssertConfiguration BridgedPassContext::getAssertConfiguration() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return (AssertConfiguration)mod->getOptions().AssertConfig;
+}
+
+bool BridgedPassContext::shouldExpand(BridgedType ty) const {
+  swift::SILModule &mod = *invocation->getPassManager()->getModule();
+  return swift::shouldExpand(mod, ty.unbridged());
 }
 
 static_assert((int)BridgedPassContext::SILStage::Raw == (int)swift::SILStage::Raw);

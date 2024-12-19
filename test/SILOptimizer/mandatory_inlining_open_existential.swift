@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O -primary-file %s | %FileCheck %s
 
 // FIXME: Ideally, this should be a sil-opt test, but TypeRepr cannot model
 // types like '(@opened("...", P) Self).Assoc' as of now.

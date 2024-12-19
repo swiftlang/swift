@@ -24,6 +24,11 @@ struct C : P {
   func hello() { print("Hello from C") }
 }
 
+@available(iOS 100, *)
+struct D : P {
+  func hello() { print("Hello from D") }
+}
+
 func test_multiple_single() -> some P {
   if #available(macOS 100.0.1, *) {
     return A()
@@ -47,6 +52,44 @@ func test_multiple_single() -> some P {
 // CHECK-NEXT:   ret ptr {{.*}} @"$s43opaque_result_with_conditional_availability1CVMf"
 // CHECK-NEXT: }
 // CHECK: define private ptr @"get_underlying_witness 43opaque_result_with_conditional_availabilityAA20test_multiple_singleQryFQOxAA1PHC"(ptr %0)
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:  br label %conditional-0
+// CHECK:  conditional-0:                               ; preds = %entry
+// CHECK-NEXT:  br label %cond-0-0
+// CHECK:  cond-0-0:                                         ; preds = %conditional-0
+// CHECK-NEXT:  [[COND_1:%.*]] = call i32 @__isPlatformVersionAtLeast(i32 1, i32 100, i32 0, i32 1)
+// CHECK-NEXT:  [[IS_AT_LEAST:%.*]] = icmp ne i32 [[COND_1]], 0
+// CHECK-NEXT:  br i1 [[IS_AT_LEAST]], label %result-0, label %universal
+// CHECK:  result-0:                                         ; preds = %cond-0-0
+// CHECK-NEXT:  ret ptr @"$s43opaque_result_with_conditional_availability1AVAA1PAAWP"
+// CHECK:  universal:                                   ; preds = %cond-0-0
+// CHECK-NEXT:  ret ptr @"$s43opaque_result_with_conditional_availability1CVAA1PAAWP"
+// CHECK-NEXT: }
+
+func test_multiple_single_multiplatform() -> some P {
+  if #available(macOS 100.0.1, *), #available(iOS 100, *) {
+    return A()
+  }
+
+  return C()
+}
+
+// CHECK: define private ptr @"get_underlying_type_ref 43opaque_result_with_conditional_availabilityAA34test_multiple_single_multiplatformQryFQOQr"(ptr %0)
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   br label %conditional-0
+// CHECK: conditional-0:                               ; preds = %entry
+// CHECK-NEXT:  br label %cond-0-0
+// CHECK: cond-0-0:                                         ; preds = %conditional-0
+// CHECK-NEXT:  [[COND_1:%.*]] = call i32 @__isPlatformVersionAtLeast(i32 1, i32 100, i32 0, i32 1)
+// CHECK-NEXT:  [[IS_AT_LEAST:%.*]] = icmp ne i32 [[COND_1]], 0
+// CHECK-NEXT:  br i1 [[IS_AT_LEAST]], label %result-0, label %universal
+// CHECK: result-0:                                         ; preds = %cond-0-0
+// CHECK-NEXT: ret ptr {{.*}} @"$s43opaque_result_with_conditional_availability1AVMf"
+// CHECK: universal:                                   ; preds = %cond-0-0
+// CHECK-NEXT:   ret ptr {{.*}} @"$s43opaque_result_with_conditional_availability1CVMf"
+// CHECK-NEXT: }
+
+// CHECK: define private ptr @"get_underlying_witness 43opaque_result_with_conditional_availabilityAA34test_multiple_single_multiplatformQryFQOxAA1PHC"(ptr %0)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:  br label %conditional-0
 // CHECK:  conditional-0:                               ; preds = %entry
@@ -208,3 +251,51 @@ func test_cross_module() -> some SomeProtocol {
 // CHECK-NEXT:   [[R0:%.*]] = call ptr @"$s49opaque_result_with_conditional_availability_types12PublicStructVAcA12SomeProtocolAAWl"()
 // CHECK-NEXT:   ret ptr [[R0]]
 // CHECK: }
+
+func test_other_platform_available() -> some P {
+  if #available(iOS 100, *) {
+    return D() // Always executed on macOS
+  }
+
+  return C() // Never executed on macOS
+}
+
+// CHECK: define private ptr @"get_underlying_type_ref 43opaque_result_with_conditional_availabilityAA29test_other_platform_availableQryFQOQr"(ptr %0)
+// CHECK-NEXT: entry:
+// CHECK-NEXT:  br label %universal
+
+// CHECK: universal:
+// CHECK-NEXT:  ret ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s43opaque_result_with_conditional_availability1DVMf", i32 0, i32 2)
+// CHECK-NEXT: }
+
+// CHECK: define private ptr @"get_underlying_witness 43opaque_result_with_conditional_availabilityAA29test_other_platform_availableQryFQOxAA1PHC"(ptr %0)
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   br label %universal
+
+// CHECK: universal:
+// CHECK-NEXT:   ret ptr @"$s43opaque_result_with_conditional_availability1DVAA1PAAWP"
+// CHECK-NEXT: }
+
+func test_other_platform_unavailable() -> some P {
+  if #unavailable(iOS 100) {
+    return C() // Never executed on macOS
+  }
+
+  return D() // Always executed on macOS
+}
+
+// CHECK: define private ptr @"get_underlying_type_ref 43opaque_result_with_conditional_availabilityAA31test_other_platform_unavailableQryFQOQr"(ptr %0)
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   br label %universal
+
+// CHECK: universal:
+// CHECK-NEXT:  ret ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr @"$s43opaque_result_with_conditional_availability1DVMf", i32 0, i32 2)
+// CHECK-NEXT: }
+
+// CHECK: define private ptr @"get_underlying_witness 43opaque_result_with_conditional_availabilityAA31test_other_platform_unavailableQryFQOxAA1PHC"(ptr %0)
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   br label %universal
+
+// CHECK: universal:
+// CHECK-NEXT:   ret ptr @"$s43opaque_result_with_conditional_availability1DVAA1PAAWP"
+// CHECK-NEXT: }

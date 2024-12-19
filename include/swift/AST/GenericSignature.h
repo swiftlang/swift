@@ -400,7 +400,9 @@ public:
   /// checking against global state, if any/all of the types in the requirement
   /// are concrete, not type parameters.
   bool isRequirementSatisfied(
-      Requirement requirement, bool allowMissing = false) const;
+      Requirement requirement,
+      bool allowMissing = false,
+      bool brokenPackBehavior = false) const;
 
   bool isReducedType(Type type) const;
 

@@ -847,6 +847,16 @@ namespace swift {
     /// than this many seconds.
     unsigned ExpressionTimeoutThreshold = 600;
 
+    /// The upper bound, in bytes, of temporary data that can be
+    /// allocated by the constraint solver.
+    unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
+
+    /// The maximum number of scopes we explore before giving up.
+    unsigned SolverScopeThreshold = 1024 * 1024;
+
+    /// The maximum number of trail steps we take before giving up.
+    unsigned SolverTrailThreshold = 64 * 1024 * 1024;
+
     /// If non-zero, abort the switch statement exhaustiveness checker if
     /// the Space::minus function is called more than this many times.
     ///
@@ -895,12 +905,6 @@ namespace swift {
     /// or an identifier reference with any of the provided prefix names. This
     /// is for testing purposes.
     std::vector<std::string> DebugForbidTypecheckPrefixes;
-
-    /// The upper bound, in bytes, of temporary data that can be
-    /// allocated by the constraint solver.
-    unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
-
-    unsigned SolverBindingThreshold = 1024 * 1024;
 
     /// The upper bound to number of sub-expressions unsolved
     /// before termination of the shrink phrase of the constraint solver.

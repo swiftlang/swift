@@ -1,5 +1,6 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes 
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature LifetimeDependence 
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct E {}
 

@@ -11,6 +11,7 @@
 // RUN: %target-swift-frontend -emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -wmo | %FileCheck %s --check-prefix CHECK-B
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 public protocol Player {}
 struct Concrete: Player {}
@@ -21,4 +22,4 @@ public func test() -> any Player {
 }
 
 // CHECK-A: $s4main4testAA6Player_pyF
-// CHECK-B-NOT: $s4main4testAA6Player_pyF
+// CHECK-B-NOT: $e4main4testAA6Player_pyF

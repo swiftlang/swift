@@ -3,10 +3,10 @@
 // Note: This test has been carefully constructed to create the preconditions of
 // a lazy typechecking bug. First, foo() is parsed and typechecked lazily in
 // order to generate SIL for it. Type checking the body of foo() causes the
-// TypeRefinementContext tree to be built for the file, but bar() has not been
+// AvailabilityScope tree to be built for the file, but bar() has not been
 // parsed yet so it gets skipped during construction of the tree. Therefore
-// when generating the SIL for bar() its TRC must be created on-demand in order
-// to emit the correct SIL for the if #available condition.
+// when generating the SIL for bar() its scope must be created on-demand in
+// order to emit the correct SIL for the if #available condition.
 
 // REQUIRES: OS=macosx
 

@@ -563,3 +563,11 @@ func testUselessCastWithInvalidParam(foo: Any?) -> Int {
   if let bar = foo as? Foo { return 42 } // expected-warning {{value 'bar' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{20-23=is}}
   else { return 54 }
 }
+
+// https://github.com/swiftlang/swift/issues/72811
+func testEnumeratedForLoop(a: [Int]) {
+  for var (b, c) in a.enumerated() {  // expected-warning {{variable 'b' was never mutated; consider changing the pattern to 'case (..., let b, ...)'}}
+    c = b
+    let _ = c
+  }
+}

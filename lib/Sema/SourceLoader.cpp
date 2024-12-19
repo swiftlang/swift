@@ -133,17 +133,17 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   importInfo.StdlibKind = Ctx.getStdlibModule() ? ImplicitStdlibKind::Stdlib
                                                 : ImplicitStdlibKind::None;
 
-  auto *importMod = ModuleDecl::create(moduleID.Item, Ctx, importInfo);
+  auto *importMod = ModuleDecl::create(
+      moduleID.Item, Ctx, importInfo, [&](ModuleDecl *importMod, auto addFile) {
+    auto opts = SourceFile::getDefaultParsingOptions(Ctx.LangOpts);
+    addFile(new (Ctx) SourceFile(*importMod, SourceFileKind::Library, bufferID,
+                                 opts));
+  });
   if (EnableLibraryEvolution)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
   Ctx.addLoadedModule(importMod);
 
-  auto *importFile =
-      new (Ctx) SourceFile(*importMod, SourceFileKind::Library, bufferID,
-                           SourceFile::getDefaultParsingOptions(Ctx.LangOpts));
-  importMod->addFile(*importFile);
-  performImportResolution(*importFile);
-  importMod->setHasResolvedImports();
+  performImportResolution(importMod);
   bindExtensions(*importMod);
   return importMod;
 }

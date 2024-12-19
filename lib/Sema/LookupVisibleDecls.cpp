@@ -987,13 +987,13 @@ public:
                         /*skipProtocolExtensionCheck*/true)) {
           FoundConflicting = true;
 
-          if (!AvailableAttr::isUnavailable(VD)) {
+          if (!VD->isUnavailable()) {
             bool preferVD = (
                 // Prefer derived requirements over their witnesses.
                 Reason == DeclVisibilityKind::
                               MemberOfProtocolDerivedByCurrentNominal ||
                 // Prefer available one.
-                AvailableAttr::isUnavailable(OtherVD) ||
+                OtherVD->isUnavailable() ||
                 // Prefer more accessible one.
                 VD->getFormalAccess() > OtherVD->getFormalAccess());
             if (preferVD) {

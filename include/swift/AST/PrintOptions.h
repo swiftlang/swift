@@ -366,6 +366,10 @@ struct PrintOptions {
   OpaqueReturnTypePrintingMode OpaqueReturnTypePrinting =
       OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
 
+  /// If non-null, opaque types that have this naming decl should be printed as
+  /// `some P1` instead of as a stable reference.
+  const ValueDecl *OpaqueReturnTypeNamingDecl = nullptr;
+
   /// Whether to print decl attributes that are only used internally,
   /// such as _silgen_name, transparent, etc.
   bool PrintUserInaccessibleAttrs = true;
@@ -392,9 +396,6 @@ struct PrintOptions {
 
   /// Replace BitwiseCopyable with _BitwiseCopyable.
   bool SuppressBitwiseCopyable = false;
-
-  /// Suppress ~Escapable types and lifetime dependence annotations
-  bool SuppressNonEscapableTypes = false;
 
   /// Suppress modify/read accessors.
   bool SuppressCoroutineAccessors = false;
@@ -530,10 +531,6 @@ struct PrintOptions {
   /// Use aliases when printing references to modules to avoid ambiguities
   /// with types sharing a name with a module.
   bool AliasModuleNames = false;
-
-  /// Print some ABI details for public symbols as comments that can be
-  /// parsed by another tool.
-  bool PrintABIComments = false;
 
   /// Name of the modules that have been aliased in AliasModuleNames mode.
   /// Ideally we would use something other than a string to identify a module,
@@ -725,8 +722,7 @@ struct PrintOptions {
                                               bool useExportedModuleNames,
                                               bool aliasModuleNames,
                                               llvm::SmallSet<StringRef, 4>
-                                                *aliasModuleNamesTargets,
-                                              bool abiComments
+                                                *aliasModuleNamesTargets
                                               );
 
   /// Retrieve the set of options suitable for "Generated Interfaces", which

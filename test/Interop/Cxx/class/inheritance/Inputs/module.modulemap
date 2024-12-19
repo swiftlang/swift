@@ -43,3 +43,8 @@ module FunctionsObjC {
   requires cplusplus
   requires objc
 }
+
+module InheritedLookup {
+  header "inherited-lookup.h"
+  requires cplusplus
+}

@@ -57,9 +57,10 @@ class SwiftCASOutputBackend::Implementation {
 public:
   Implementation(ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
                  const FrontendInputsAndOutputs &InputsAndOutputs,
+                 const FrontendOptions &Opts,
                  FrontendOptions::ActionType Action)
       : CAS(CAS), Cache(Cache), BaseKey(BaseKey),
-        InputsAndOutputs(InputsAndOutputs), Action(Action) {
+        InputsAndOutputs(InputsAndOutputs), Opts(Opts), Action(Action) {
     initBackend(InputsAndOutputs);
   }
 
@@ -67,6 +68,28 @@ public:
   createFileImpl(llvm::StringRef ResolvedPath,
                  std::optional<llvm::vfs::OutputConfig> Config) {
     auto ProducingInput = OutputToInputMap.find(ResolvedPath);
+    if (ProducingInput == OutputToInputMap.end() &&
+        ResolvedPath.starts_with(Opts.SymbolGraphOutputDir)) {
+      return std::make_unique<SwiftCASOutputFile>(
+          ResolvedPath, [this](StringRef Path, StringRef Bytes) -> Error {
+            bool Shortened = Path.consume_front(Opts.SymbolGraphOutputDir);
+            assert(Shortened && "symbol graph path outside output dir");
+            (void)Shortened;
+            std::optional<ObjectRef> PathRef;
+            if (Error E =
+                    CAS.storeFromString(std::nullopt, Path).moveInto(PathRef))
+              return E;
+            std::optional<ObjectRef> BytesRef;
+            if (Error E =
+                    CAS.storeFromString(std::nullopt, Bytes).moveInto(BytesRef))
+              return E;
+            auto Ref = CAS.store({*PathRef, *BytesRef}, {});
+            if (!Ref)
+              return Ref.takeError();
+            SymbolGraphOutputRefs.push_back(*Ref);
+            return Error::success();
+          });
+    }
     assert(ProducingInput != OutputToInputMap.end() && "Unknown output file");
 
     unsigned InputIndex = ProducingInput->second.first;
@@ -97,6 +120,7 @@ private:
   ActionCache &Cache;
   ObjectRef BaseKey;
   const FrontendInputsAndOutputs &InputsAndOutputs;
+  const FrontendOptions &Opts;
   FrontendOptions::ActionType Action;
 
   // Map from output path to the input index and output kind.
@@ -104,14 +128,16 @@ private:
 
   // A vector of output refs where the index is the input index.
   SmallVector<DenseMap<file_types::ID, ObjectRef>> OutputRefs;
+
+  SmallVector<ObjectRef> SymbolGraphOutputRefs;
 };
 
 SwiftCASOutputBackend::SwiftCASOutputBackend(
     ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
-    FrontendOptions::ActionType Action)
+    const FrontendOptions &Opts, FrontendOptions::ActionType Action)
     : Impl(*new SwiftCASOutputBackend::Implementation(
-          CAS, Cache, BaseKey, InputsAndOutputs, Action)) {}
+          CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action)) {}
 
 SwiftCASOutputBackend::~SwiftCASOutputBackend() { delete &Impl; }
 
@@ -122,7 +148,8 @@ bool SwiftCASOutputBackend::isStoredDirectly(file_types::ID Kind) {
 
 IntrusiveRefCntPtr<OutputBackend> SwiftCASOutputBackend::cloneImpl() const {
   return makeIntrusiveRefCnt<SwiftCASOutputBackend>(
-      Impl.CAS, Impl.Cache, Impl.BaseKey, Impl.InputsAndOutputs, Impl.Action);
+      Impl.CAS, Impl.Cache, Impl.BaseKey, Impl.InputsAndOutputs, Impl.Opts,
+      Impl.Action);
 }
 
 Expected<std::unique_ptr<OutputFileImpl>>
@@ -243,6 +270,13 @@ Error SwiftCASOutputBackend::Implementation::finalizeCacheKeysFor(
   llvm::for_each(ProducedOutputs, [&OutputsForInput](auto E) {
     OutputsForInput.emplace_back(E.first, E.second);
   });
+  if (InputIndex == InputsAndOutputs.getIndexOfFirstOutputProducingInput() &&
+      !SymbolGraphOutputRefs.empty()) {
+    auto SGRef = CAS.store(SymbolGraphOutputRefs, {});
+    if (!SGRef)
+      return SGRef.takeError();
+    OutputsForInput.emplace_back(file_types::ID::TY_SymbolGraphFile, *SGRef);
+  }
   // Sort to a stable ordering for deterministic output cache object.
   llvm::sort(OutputsForInput,
              [](auto &LHS, auto &RHS) { return LHS.first < RHS.first; });

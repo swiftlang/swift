@@ -657,7 +657,7 @@ SILModule::lookUpDifferentiabilityWitness(StringRef name) {
 
 SILDifferentiabilityWitness *
 SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   return lookUpDifferentiabilityWitness(
       mangler.mangleSILDifferentiabilityWitness(
           key.originalFunctionName, key.kind, key.config));
@@ -920,7 +920,7 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
   SmallVector<ModuleDecl *, 8> importedModules;
   // Add the Swift module.
   if (!isStdlibModule()) {
-    auto *SwiftStdlib = getASTContext().getStdlibModule(true);
+    auto *SwiftStdlib = getASTContext().getStdlibModule();
     if (SwiftStdlib)
       importedModules.push_back(SwiftStdlib);
   }

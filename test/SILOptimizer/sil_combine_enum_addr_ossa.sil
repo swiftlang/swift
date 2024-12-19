@@ -6,11 +6,11 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: sil [ossa] @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout, @in_guaranteed any CustomStringConvertible) -> ()
-// XHECK-NOT: init_existential_addr
-// XHECK-NOT: inject_enum_addr
-// XHECK-NOT: select_enum_addr
-// XHECK-NOT: unchecked_take_enum_data_addr
-// XHECK: return
+// CHECK-NOT: init_existential_addr
+// CHECK-NOT: inject_enum_addr
+// CHECK-NOT: select_enum_addr
+// CHECK-NOT: unchecked_take_enum_data_addr
+// CHECK: return
 // CHEcK: } // end sil function 'convert_inject_enum_addr_select_enum_addr_into_cond_br'
 sil [ossa] @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout, @in_guaranteed CustomStringConvertible) -> () {
 bb0(%0 : $*Int, %1 : $*_Stdout, %1a : $*CustomStringConvertible):
@@ -48,12 +48,12 @@ bb2:
 
 
 // CHECK-LABEL: sil [ossa] @convert_inject_enum_addr_switch_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout, @in_guaranteed any CustomStringConvertible) -> ()
-// XHECK-NOT: init_existential_addr
-// XHECK-NOT: inject_enum_addr
-// XHECK-NOT: switch_enum_addr
-// XHECK-NOT: unchecked_take_enum_data_addr
-// XHECK: return
-// XHECK: } // end sil function 'convert_inject_enum_addr_switch_enum_addr_into_cond_br'
+// CHECK-NOT: init_existential_addr
+// CHECK-NOT: inject_enum_addr
+// CHECK-NOT: switch_enum_addr
+// CHECK-NOT: unchecked_take_enum_data_addr
+// CHECK: return
+// CHECK: } // end sil function 'convert_inject_enum_addr_switch_enum_addr_into_cond_br'
 sil [ossa] @convert_inject_enum_addr_switch_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout, @in_guaranteed CustomStringConvertible) -> () {
 bb0(%0 : $*Int, %1 : $*_Stdout, %1a : $*CustomStringConvertible):
   %2 = alloc_stack $CustomStringConvertible
@@ -92,14 +92,12 @@ bb3:
 // simplify-cfg that has not been updated yet for ossa.
 //
 // CHECK-LABEL: sil [ossa] @convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
-// XHECK: checked_cast_addr_br
-// XHECK: } // end sil function 'convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br'
-// xXHECK: store
-// xXHECK-NOT: checked_cast_addr_br
-// xXHECK-NOT: bb1
-// xXHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
-// xXHECK: dealloc_stack
-// xXHECK: return
+// CHECK:         store
+// CHECK-NOT:     checked_cast_addr_br
+// CHECK-NOT:   bb1
+// CHECK:         inject_enum_addr %{{.*}}, #Optional.some!enumelt
+// CHECK:         dealloc_stack
+// CHECK:       } // end sil function 'convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br'
 sil [ossa] @convert_checked_cast_addr_br_into_unconditional_checked_cast_addr_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> () {
 bb0(%0 : $*Int, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible
@@ -195,14 +193,12 @@ bb22:
 // yet for OSSA so just validate we don't optimize this.
 //
 // CHECK-LABEL: sil [ossa] @convert_checked_cast_addr_br_with_private_type : $@convention(thin) (@in B, @inout _Stdout) -> ()
-// XHECK: checked_cast_addr_br
-// XHECK: } // end sil function 'convert_checked_cast_addr_br_with_private_type'
-// xXHECK: store
-// xXHECK-NOT: checked_cast_addr_br
-// xXHECK-NOT: bb1
-// xXHECK: inject_enum_addr %{{.*}} : $*Optional<CustomStringConvertible>, #Optional.none!enumelt
-// xXHECK: dealloc_stack
-// xXHECK: return
+// CHECK:         store
+// CHECK-NOT:     checked_cast_addr_br
+// CHECK-NOT:   bb1
+// CHECK:         inject_enum_addr %{{.*}}, #Optional.none!enumelt
+// CHECK:         dealloc_stack
+// CHECK: } // end sil function 'convert_checked_cast_addr_br_with_private_type'
 sil [ossa] @convert_checked_cast_addr_br_with_private_type : $@convention(thin) (@in B, @inout _Stdout) -> () {
 bb0(%0 : $*B, %1 : $*_Stdout):
   %2 = alloc_stack $CustomStringConvertible

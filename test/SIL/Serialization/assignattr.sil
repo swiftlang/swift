@@ -1,8 +1,8 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name assignattr
-// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name assignattr
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name assignattr -emit-sorted-sil | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name assignattr
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.2.sib -module-name assignattr
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -module-name assignattr -emit-sorted-sil | %FileCheck %s
 
 sil_stage raw
 

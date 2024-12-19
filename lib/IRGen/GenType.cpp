@@ -1490,7 +1490,7 @@ bool TypeConverter::readLegacyTypeInfo(llvm::vfs::FileSystem &fs,
 }
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *decl) {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(decl->getASTContext());
   return Mangler.mangleTypeAsContextUSR(decl);
 }
 
@@ -2752,7 +2752,7 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
     type = type.getNominalOrBoundGenericNominal()->getDeclaredType()
                                                  ->getCanonicalType();
 
-  IRGenMangler Mangler;
+  IRGenMangler Mangler(Context);
   std::string typeName = Mangler.mangleTypeForLLVMTypeName(type);
   return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
@@ -2764,7 +2764,7 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
 /// distinguish different cases.
 llvm::StructType *
 IRGenModule::createNominalType(ProtocolCompositionType *type) {
-  IRGenMangler Mangler;
+  IRGenMangler Mangler(Context);
   std::string typeName = Mangler.mangleProtocolForLLVMTypeName(type);
   return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }

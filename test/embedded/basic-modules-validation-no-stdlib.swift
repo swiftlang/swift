@@ -6,7 +6,7 @@
 // RUN: %target-swift-frontend -emit-ir -I %t %t/Main.swift -parse-stdlib -enable-experimental-feature Embedded -wmo
 
 // MyModule is not embedded - error
-// RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -parse-stdlib -wmo
+// RUN: %target-swift-frontend -emit-module -enable-ossa-modules -o %t/MyModule.swiftmodule %t/MyModule.swift -parse-stdlib -wmo
 // RUN: not %target-swift-frontend -emit-ir -I %t %t/Main.swift -parse-stdlib -enable-experimental-feature Embedded -wmo 2>&1 | %FileCheck %s --check-prefix CHECK-A
 
 // main module is not embedded - error
@@ -14,6 +14,7 @@
 // RUN: not %target-swift-frontend -emit-ir -I %t %t/Main.swift -parse-stdlib -wmo 2>&1 | %FileCheck %s --check-prefix CHECK-B
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN MyModule.swift
 

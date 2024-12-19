@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -O -module-name builtin_freeze -enable-experimental-feature BuiltinModule -primary-file %s -emit-ir -o - | %FileCheck %s --check-prefix=CHECK
 
+// REQUIRES: swift_feature_BuiltinModule
+
 import Builtin
 
 func fptosi(_ x: Float) -> Int32 {

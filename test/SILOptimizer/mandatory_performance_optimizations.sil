@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-performance-optimizations | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-performance-optimizations | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

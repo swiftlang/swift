@@ -9,7 +9,7 @@
 // RUN:   -module-name main -I %t -verify
 
 // REQUIRES: objc_interop
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendableCompletionHandlers
 
 //--- Test.h
 #define SWIFT_SENDABLE __attribute__((__swift_attr__("@Sendable")))
@@ -116,13 +116,13 @@ func test_sendable_attr_in_type_context(test: Test) {
 
   // TODO(diagnostics): Duplicate diagnostics
   TestWithSendableID().add(MyValue())
-  // expected-error@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
+  // expected-warning@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
 
   TestWithSendableSuperclass().add(SendableMyValue()) // Ok
 
   // TODO(diagnostics): Duplicate diagnostics
   TestWithSendableSuperclass().add(MyValue())
-  // expected-error@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
+  // expected-warning@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
 }
 
 class TestConformanceWithStripping : InnerSendableTypes {

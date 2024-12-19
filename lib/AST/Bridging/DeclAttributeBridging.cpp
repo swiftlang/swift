@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Assertions.h"
 
@@ -72,7 +73,7 @@ void BridgedDeclAttributes_add(BridgedDeclAttributes *cAttrs,
   *cAttrs = attrs;
 }
 
-static AccessLevel unbridged(BridgedAccessLevel level) {
+static std::optional<AccessLevel> unbridge(BridgedAccessLevel level) {
   switch (level) {
   case BridgedAccessLevelPrivate:
     return AccessLevel::Private;
@@ -86,6 +87,8 @@ static AccessLevel unbridged(BridgedAccessLevel level) {
     return AccessLevel::Public;
   case BridgedAccessLevelOpen:
     return AccessLevel::Open;
+  case BridgedAccessLevelNone:
+    return std::nullopt;
   }
   llvm_unreachable("unhandled BridgedAccessLevel");
 }
@@ -95,7 +98,7 @@ BridgedAccessControlAttr_createParsed(BridgedASTContext cContext,
                                       BridgedSourceRange cRange,
                                       BridgedAccessLevel cAccessLevel) {
   return new (cContext.unbridged()) AccessControlAttr(
-      /*atLoc=*/{}, cRange.unbridged(), unbridged(cAccessLevel));
+      /*atLoc=*/{}, cRange.unbridged(), unbridge(cAccessLevel).value());
 }
 
 BridgedAlignmentAttr
@@ -129,6 +132,16 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                 /*Implicit=*/false);
 }
 
+BridgedCustomAttr BridgedCustomAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc, BridgedTypeRepr cType,
+    BridgedNullableCustomAttributeInitializer cInitContext,
+    BridgedNullableArgumentList cArgumentList) {
+  ASTContext &context = cContext.unbridged();
+  return CustomAttr::create(
+      context, cAtLoc.unbridged(), new (context) TypeExpr(cType.unbridged()),
+      cInitContext.unbridged(), cArgumentList.unbridged());
+}
+
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cAttrNameLoc, BridgedSourceLoc cLParenLoc,
@@ -137,6 +150,15 @@ BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
       cContext.unbridged(), cAtLoc.unbridged(), cAttrNameLoc.unbridged(),
       cLParenLoc.unbridged(), cReplacedFunction.unbridged(),
       cRParenLoc.unbridged());
+}
+
+BridgedDocumentationAttr BridgedDocumentationAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedStringRef cMetadata,
+    BridgedAccessLevel cAccessLevel) {
+  return new (cContext.unbridged()) DocumentationAttr(
+      cAtLoc.unbridged(), cRange.unbridged(), cMetadata.unbridged(),
+      unbridge(cAccessLevel), /*implicit=*/false);
 }
 
 static EffectsKind unbridged(BridgedEffectsKind kind) {
@@ -266,12 +288,61 @@ BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
       InlineAttr(cAtLoc.unbridged(), cRange.unbridged(), unbridged(cKind));
 }
 
-BridgedMainTypeAttr
-BridgedMainTypeAttr_createParsed(BridgedASTContext cContext,
-                                 BridgedSourceLoc cAtLoc,
-                                 BridgedSourceLoc cNameLoc) {
-  return new (cContext.unbridged())
-      MainTypeAttr(cAtLoc.unbridged(), cNameLoc.unbridged());
+BridgedMacroRole BridgedMacroRole_fromString(BridgedStringRef str) {
+  // Match the role string to the known set of roles.
+  auto role =
+      llvm::StringSwitch<std::optional<BridgedMacroRole>>(str.unbridged())
+#define MACRO_ROLE(Name, Description) .Case(Description, BridgedMacroRole##Name)
+#include "swift/Basic/MacroRoles.def"
+          .Default(std::nullopt);
+  return role.has_value() ? *role : BridgedMacroRoleNone;
+}
+
+MacroSyntax unbridge(BridgedMacroSyntax cSyntax) {
+  switch (cSyntax) {
+  case BridgedMacroSyntaxAttached:
+    return MacroSyntax::Attached;
+  case BridgedMacroSyntaxFreestanding:
+    return MacroSyntax::Freestanding;
+  }
+}
+
+BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedMacroSyntax cSyntax,
+    BridgedSourceLoc cLParenLoc, BridgedMacroRole cRole, BridgedArrayRef cNames,
+    BridgedArrayRef cConformances, BridgedSourceLoc cRParenLoc) {
+  SmallVector<MacroIntroducedDeclName, 2> names;
+  for (auto &n : cNames.unbridged<BridgedMacroIntroducedDeclName>())
+    names.push_back(n.unbridged());
+
+  SmallVector<Expr *, 2> conformances;
+  for (auto &t : cConformances.unbridged<BridgedExpr>())
+    conformances.push_back(t.unbridged());
+
+  return MacroRoleAttr::create(
+      cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
+      unbridge(cSyntax), cLParenLoc.unbridged(), unbridge(cRole), names,
+      conformances, cRParenLoc.unbridged(), /*implicit=*/false);
+}
+
+BridgedStorageRestrictionsAttr BridgedStorageRestrictionsAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedArrayRef cInitializes,
+    BridgedArrayRef cAccesses) {
+  ASTContext &context = cContext.unbridged();
+
+  ArrayRef<Identifier> initializes =
+      cContext.unbridged().AllocateTransform<Identifier>(
+          cInitializes.unbridged<BridgedIdentifier>(),
+          [](auto &e) { return e.unbridged(); });
+  ArrayRef<Identifier> accesses =
+      cContext.unbridged().AllocateTransform<Identifier>(
+          cAccesses.unbridged<BridgedIdentifier>(),
+          [](auto &e) { return e.unbridged(); });
+
+  return StorageRestrictionsAttr::create(
+      context, cAtLoc.unbridged(), cRange.unbridged(), initializes, accesses);
 }
 
 BridgedSwiftNativeObjCRuntimeBaseAttr
@@ -299,6 +370,14 @@ BridgedNonSendableAttr BridgedNonSendableAttr_createParsed(
     BridgedSourceRange cRange, BridgedNonSendableKind cKind) {
   return new (cContext.unbridged())
       NonSendableAttr(cAtLoc.unbridged(), cRange.unbridged(), unbridged(cKind));
+}
+
+BridgedNonisolatedAttr
+BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext,
+                                    BridgedSourceLoc cAtLoc,
+                                    BridgedSourceRange cRange, bool isUnsafe) {
+  return new (cContext.unbridged()) NonisolatedAttr(
+      cAtLoc.unbridged(), cRange.unbridged(), isUnsafe, /*implicit=*/false);
 }
 
 BridgedObjCAttr
@@ -334,7 +413,7 @@ BridgedObjCAttr BridgedObjCAttr_createParsedSelector(
 
   return ObjCAttr::createSelector(
       cContext.unbridged(), cAtLoc.unbridged(), cAttrNameLoc.unbridged(),
-      cLParenLoc.unbridged(), nameLocs, names, cLParenLoc.unbridged());
+      cLParenLoc.unbridged(), nameLocs, names, cRParenLoc.unbridged());
 }
 
 BridgedObjCImplementationAttr BridgedObjCImplementationAttr_createParsed(
@@ -439,7 +518,37 @@ BridgedSetterAccessAttr_createParsed(BridgedASTContext cContext,
                                      BridgedSourceRange cRange,
                                      BridgedAccessLevel cAccessLevel) {
   return new (cContext.unbridged()) SetterAccessAttr(
-      /*atLoc=*/{}, cRange.unbridged(), unbridged(cAccessLevel));
+      /*atLoc=*/{}, cRange.unbridged(), unbridge(cAccessLevel).value());
+}
+
+static SpecializeAttr::SpecializationKind
+unbridge(BridgedSpecializationKind kind) {
+  switch (kind) {
+  case BridgedSpecializationKindFull:
+    return SpecializeAttr::SpecializationKind::Full;
+  case BridgedSpecializationKindPartial:
+    return SpecializeAttr::SpecializationKind::Partial;
+  }
+  llvm_unreachable("unhandled kind");
+}
+
+BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedNullableTrailingWhereClause cWhereClause,
+    bool exported, BridgedSpecializationKind cKind,
+    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
+    BridgedArrayRef cAvailableAttrs) {
+  SmallVector<Identifier, 2> spiGroups;
+  for (auto bridging : cSPIGroups.unbridged<BridgedIdentifier>())
+    spiGroups.push_back(bridging.unbridged());
+  SmallVector<AvailableAttr *, 2> availableAttrs;
+  for (auto bridging : cAvailableAttrs.unbridged<BridgedAvailableAttr>())
+    availableAttrs.push_back(bridging.unbridged());
+
+  return SpecializeAttr::create(
+      cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
+      cWhereClause.unbridged(), exported, unbridge(cKind),
+      cTargetFunction.unbridged(), spiGroups, availableAttrs);
 }
 
 BridgedSPIAccessControlAttr BridgedSPIAccessControlAttr_createParsed(
@@ -459,3 +568,10 @@ BridgedSILGenNameAttr BridgedSILGenNameAttr_createParsed(
                      cRange.unbridged(), /*Implicit=*/false);
 }
 
+BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedStringRef cMessage) {
+  return new (cContext.unbridged())
+      UnavailableFromAsyncAttr(cMessage.unbridged(), cAtLoc.unbridged(),
+                               cRange.unbridged(), /*implicit=*/false);
+}

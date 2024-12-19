@@ -13,6 +13,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/AST/Expr.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILGlobalVariable.h"
 
@@ -679,6 +680,36 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
   // If we actually inserted a borrowing operation... insert the end_borrow.
   if (value != original)
     createEndBorrow(loc, value);
+}
+
+EndBorrowInst *SILBuilder::createEndBorrow(SILLocation loc, SILValue borrowedValue) {
+  ASSERT(!SILArgument::isTerminatorResult(borrowedValue) &&
+             "terminator results do not have end_borrow");
+  ASSERT(!isa<SILFunctionArgument>(borrowedValue) &&
+         "Function arguments should never have an end_borrow");
+  updateReborrowFlags(borrowedValue);
+  return insert(new (getModule())
+                    EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
+}
+
+
+SILPhiArgument *SILBuilder::createSwitchOptional(
+                                SILLocation loc, SILValue operand,
+                                SILBasicBlock *someBB, SILBasicBlock *noneBB,
+                                ValueOwnershipKind forwardingOwnershipKind,
+                                ProfileCounter someCount,
+                                ProfileCounter noneCount) {
+  ProfileCounter counts[] = {someCount, noneCount};
+  std::optional<ArrayRef<ProfileCounter>> countsArg = std::nullopt;
+  if (someCount || noneCount) countsArg = counts;
+
+  auto &ctx = getASTContext();
+  auto sei = createSwitchEnum(loc, operand, /*default*/ nullptr,
+                              {{ctx.getOptionalSomeDecl(), someBB},
+                               {ctx.getOptionalNoneDecl(), noneBB}},
+                              countsArg, /*default*/ProfileCounter(),
+                              forwardingOwnershipKind);
+  return sei->createResult(someBB, operand->getType().unwrapOptionalType());
 }
 
 /// Attempt to propagate ownership from \p operand to the returned forwarding

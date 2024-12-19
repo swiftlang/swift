@@ -175,6 +175,11 @@ namespace sil_block {
     SIL_PACK_ELEMENT_SET,
     SIL_TYPE_VALUE,
     SIL_THUNK,
+    SIL_VALUES,
+    SIL_DEBUG_SCOPE,
+    SIL_DEBUG_SCOPE_REF,
+    SIL_SOURCE_LOC,
+    SIL_SOURCE_LOC_REF
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -290,6 +295,39 @@ namespace sil_block {
     BCArray<ValueIDField>       // Parameter and result indices
   >;
 
+  using SILDebugScopeRefLayout = BCRecordLayout<
+    SIL_DEBUG_SCOPE_REF,
+    ValueIDField
+  >;
+
+  using SILDebugScopeLayout = BCRecordLayout<
+    SIL_DEBUG_SCOPE,
+    BCFixed<1>,
+    ValueIDField, /// Parent.
+    ValueIDField, /// InlinedCallSite.
+    ValueIDField, /// SourceLoc Row.
+    ValueIDField, /// Column.
+    ValueIDField, /// FName.
+    TypeIDField,
+    SILTypeCategoryField 
+  >;
+
+  using SourceLocLayout = BCRecordLayout<
+    SIL_SOURCE_LOC,
+    ValueIDField,
+    ValueIDField,
+    ValueIDField,
+    BCFixed<3>, /// LocationKind
+    BCFixed<1> /// Implicit
+  >;
+
+  using SourceLocRefLayout = BCRecordLayout<
+    SIL_SOURCE_LOC_REF,
+    ValueIDField,
+    BCFixed<3>,
+    BCFixed<1> /// Implicit
+  >;
+
   using SILFunctionLayout =
       BCRecordLayout<SIL_FUNCTION, SILLinkageField,
                      BCFixed<1>,  // transparent
@@ -312,6 +350,7 @@ namespace sil_block {
                      BCFixed<1>,  // is distributed
                      BCFixed<1>,  // is runtime accessible
                      BCFixed<1>,  // are lexical lifetimes force-enabled
+                     BCFixed<1>,  // only referenced by debug info
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
@@ -413,6 +452,17 @@ namespace sil_block {
     BCFixed<1>,                   // options
     BCArray<BCFixed<32>>          // operand id and categories.
   >;
+
+  /// A SILInstruction without a result and N operands.
+  using SILValuesLayout = BCRecordLayout<
+    SIL_VALUES,
+    SILInstOpCodeField, // opcode
+    BCArray<BCFixed<32>> // (value, type).
+  >;
+
+  static_assert(sizeof(DeclID) == sizeof(ValueID) &&
+                sizeof(DeclID) == sizeof(TypeID) &&
+                "SILValuesLayout assumes that DeclID is the same as ValueID and TypeID");
 
   enum ApplyKind : unsigned {
     SIL_APPLY = 0,

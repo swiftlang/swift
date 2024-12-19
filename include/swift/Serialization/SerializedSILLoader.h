@@ -42,6 +42,7 @@ class SILDifferentiabilityWitness;
 /// on each SILDeserializer.
 class SerializedSILLoader {
 private:
+  ASTContext &Context;
   std::vector<std::unique_ptr<SILDeserializer>> LoadedSILSections;
 
   explicit SerializedSILLoader(

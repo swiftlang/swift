@@ -227,7 +227,7 @@ private func createOutlinedGlobal(
   let elementType = allocVectorBuiltin.substitutionMap.replacementTypes[0]!
   let outlinedGlobal = context.createGlobalVariable(
         name: context.mangleOutlinedVariable(from: allocVectorBuiltin.parentFunction),
-        type: elementType, isPrivate: true)
+        type: elementType, linkage: .private, isLet: false)
 
   let globalBuilder = Builder(staticInitializerOf: outlinedGlobal, context)
 

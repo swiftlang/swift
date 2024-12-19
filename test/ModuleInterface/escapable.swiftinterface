@@ -9,6 +9,5 @@ import _Concurrency
 import _StringProcessing
 import _SwiftConcurrencyShims
 
-// Allow Escapable to appear without -enable-experimental-feature NonescapableTypes
 public struct S : Swift.Escapable {
 }

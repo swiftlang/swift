@@ -441,6 +441,12 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 //                                  Operand
 //===----------------------------------------------------------------------===//
 
+void Operand::updateReborrowFlags() {
+  if (isa<EndBorrowInst>(getUser())) {
+    swift::updateReborrowFlags(get());
+  }
+}
+
 void Operand::verify() const {
   if (isa<BorrowedFromInst>(getUser()) && getOperandNumber() == 0) {
     assert(isa<SILArgument>(get()) || isa<SILUndef>(get()));

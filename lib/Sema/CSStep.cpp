@@ -360,7 +360,7 @@ StepResult ComponentStep::take(bool prevFailed) {
     }
   });
 
-  auto *disjunction = CS.selectDisjunction();
+  auto disjunction = CS.selectDisjunction();
   auto *conjunction = CS.selectConjunction();
 
   if (CS.isDebugMode()) {
@@ -403,7 +403,8 @@ StepResult ComponentStep::take(bool prevFailed) {
     // Bindings usually happen first, but sometimes we want to prioritize a
     // disjunction or conjunction.
     if (bestBindings) {
-      if (disjunction && !bestBindings->favoredOverDisjunction(disjunction))
+      if (disjunction &&
+          !bestBindings->favoredOverDisjunction(disjunction->first))
         return StepKind::Disjunction;
 
       if (conjunction && !bestBindings->favoredOverConjunction(conjunction))
@@ -426,9 +427,9 @@ StepResult ComponentStep::take(bool prevFailed) {
       return suspend(
           std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
     case StepKind::Disjunction: {
-      CS.retireConstraint(disjunction);
+      CS.retireConstraint(disjunction->first);
       return suspend(
-          std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+          std::make_unique<DisjunctionStep>(CS, *disjunction, Solutions));
     }
     case StepKind::Conjunction: {
       CS.retireConstraint(conjunction);
@@ -737,7 +738,9 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     auto *declA = LastSolvedChoice->first->getOverloadChoice().getDecl();
     auto *declB = static_cast<Constraint *>(choice)->getOverloadChoice().getDecl();
 
-    if (declA->getBaseIdentifier().isArithmeticOperator() &&
+    if ((declA->getBaseIdentifier().isArithmeticOperator() ||
+         declA->getBaseIdentifier().isBitwiseOperator() ||
+         declA->getBaseIdentifier().isShiftOperator()) &&
         TypeChecker::isDeclRefinementOf(declA, declB)) {
       return skip("subtype");
     }
@@ -891,16 +894,18 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   // by dropping all scoring information.
   CS.clearScore();
 
-  // Reset the scope counter to avoid "too complex" failures
-  // when closure has a lot of elements in the body.
-  CS.CountScopes = 0;
+  // Reset the scope and trail counters to avoid "too complex"
+  // failures when closure has a lot of elements in the body.
+  CS.NumSolverScopes = 0;
+  CS.NumTrailSteps = 0;
 
   // If timer is enabled, let's reset it so that each element
   // (expression) gets a fresh time slice to get solved. This
   // is important for closures with large number of statements
   // in them.
   if (CS.Timer) {
-    CS.Timer.emplace(element.getLocator(), CS);
+    CS.Timer.reset();
+    CS.startExpressionTimer(element.getLocator());
   }
 
   auto success = element.attempt(CS);

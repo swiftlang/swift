@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend %s \
-// RUN: -emit-sil -module-name=Lib -package-name Pkg \
+// RUN: -Xllvm -sil-print-types -emit-sil -module-name=Lib -package-name Pkg \
 // RUN: -package-cmo -allow-non-resilient-access \
 // RUN: -O -wmo -enable-library-evolution \
-// RUN: -Xllvm -sil-print-function=s3Lib3fooyS2iF 2>&1 | %FileCheck %s
+// RUN: -Xllvm -sil-print-types -Xllvm -sil-print-function=s3Lib3fooyS2iF 2>&1 | %FileCheck %s
 
 /// TEST that accessing PkgStruct in the following functions gets inlined after perf inlining pass.
 public func bar(_ arg: Int) -> Int {

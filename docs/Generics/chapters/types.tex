@@ -164,7 +164,7 @@ A \IndexDefinition{canonical type}\emph{canonical type} is a type that does not 
 
 The compiler can transform an arbitrary type into a canonical type by the process of \emph{canonicalization}, which recursively replaces sugared types with their desugared form; in this way, \texttt{[(Int?, Void)]} becomes \verb|Array<(Optional<Int>, ())>|. This operation is very cheap; each type caches a pointer to its canonical type, which is computed as needed (so types are not completely immutable, as we said previously; but the mutability cannot be observed from outside).
 
-One notable exception where the type checker does depend on type sugar is the rule for default initialization of variables: if the variable's type is declared as the \index{optional sugared type}sugared optional type \texttt{T?} for some \texttt{T}, the variable's \index{initial value expression}initial value \index{expression}expression is assumed to be \texttt{nil} if none was provided. Spelling the type as \texttt{Optional<T>} avoids the default initialization behavior:
+One notable exception where the type checker does depend on type sugar is the rule for default initialization of variables: if the variable's type is declared as the \index{optional sugared type}sugared optional type \texttt{T?} for some \tT, the variable's \index{initial value expression}initial value \index{expression}expression is assumed to be \texttt{nil} if none was provided. Spelling the type as \texttt{Optional<T>} avoids the default initialization behavior:
 \begin{Verbatim}
 var x: Int?
 print(x)  // prints `nil'
@@ -356,7 +356,7 @@ A \IndexDefinition{dependent member type}dependent member type abstracts over a 
 
 In \ChapRef{typeresolution}, we describe the two stages of type resolution. Unbound dependent member types appear in the \index{structural resolution stage}structural resolution stage, when we resolve the requirements in the \texttt{where} clause to feed into the generic signature construction procedure. Once we have a generic signature, we move on to \index{interface resolution stage}interface resolution stage, and dependent member types written elsewhere are fully resolved into their bound form.
 
-If \texttt{T} is the base type, \texttt{P} is a protocol and \texttt{A} is an associated type declared inside this protocol, we denote the bound dependent member type by \texttt{T.[P]A}, and the unbound dependent member type by \texttt{T.A}. The base type \texttt{T} can be another dependent member type, so we get a recursive structure like \texttt{\ttgp{0}{0}.[P]A.[Q]B}. \FigRef{type params fig} illustrates this with two dependent member types, bound and unbound.
+If \tT\ is the base type, \texttt{P} is a protocol and \texttt{A} is an associated type declared inside this protocol, we denote the bound dependent member type by \texttt{T.[P]A}, and the unbound dependent member type by \texttt{T.A}. The base type \tT\ can be another dependent member type, so we get a recursive structure like \texttt{\ttgp{0}{0}.[P]A.[Q]B}. \FigRef{type params fig} illustrates this with two dependent member types, bound and unbound.
 
 A dependent member type is ``dependent'' in the C++ sense, \emph{not} a \index{dependent type}type  dependent on a value in the \index{lambda cube}``lambda cube'' sense. Generic parameter types and dependent member types are together known as \emph{type parameters}. A type that might contain type parameters but is not necessarily a type parameter itself is called an \IndexDefinition{interface type}\emph{interface type}. The above summary necessarily leaves many questions unanswered, because a significant portion of the rest of the book is devoted to type parameters. Key topics include:
 \begin{itemize}
@@ -369,7 +369,7 @@ A dependent member type is ``dependent'' in the C++ sense, \emph{not} a \index{d
 \paragraph{Archetype types.}
 Type parameters derive their meaning from the requirements of a generic signature; they are only ``names'' of external entities, in a sense. \IndexDefinition{archetype type}Archetypes are an alternate ``self-describing'' representation. Archetypes are instantiated from a \emph{generic environment}, which stores a generic signature together with other information (\ChapRef{genericenv}).
 
-Archetypes occur inside \index{expression}expressions and \index{SIL}SIL instructions. Archetypes also represent references to opaque return types (\SecRef{opaquearchetype}) and the type of the payload inside of an existential (\SecRef{open existential archetypes}). In \index{diagnostic!printing archetype type}diagnostics, an archetype is printed as the type parameter it represents. We will denote by $\archetype{T}$ the archetype for the type parameter \texttt{T} in some generic environment understood from context. A type that might contain archetypes but is not necessarily an archetype itself is called a \index{contextual type}\emph{contextual type}.
+Archetypes occur inside \index{expression}expressions and \index{SIL}SIL instructions. Archetypes also represent references to opaque return types (\SecRef{opaquearchetype}) and the type of the payload inside of an existential (\SecRef{open existential archetypes}). In \index{diagnostic!printing archetype type}diagnostics, an archetype is printed as the type parameter it represents. We will denote by $\archetype{T}$ the archetype for the type parameter \tT\ in some generic environment understood from context. A type that might contain archetypes but is not necessarily an archetype itself is called a \index{contextual type}\emph{contextual type}.
 
 \medskip
 
@@ -426,7 +426,7 @@ Existential types are covered in \ChapRef{existentialtypes}.
 \end{tikzpicture}
 \end{wrapfigure}
 
-\paragraph{Metatype types.} A type \texttt{T} can be the callee in a \index{call expression}call expression, \texttt{T(...)}; this is shorthand for a constructor call \texttt{T.init(...)}. It can serve as the base of a static method call, \texttt{T.foo(...)}, where the type is passed as the \texttt{self} parameter. Finally, it can be directly referenced by the expression \texttt{T.self}. In all cases, the type becomes a \emph{value}, and this value must itself be assigned a type; this type is called a \emph{metatype}. The metatype of a type \texttt{T} is written as \texttt{T.Type}. The type \texttt{T} is the \IndexDefinition{instance type}\emph{instance type} of the metatype. For example, the type of the expression ``\verb|Int.self|'' is the metatype \texttt{Int.Type}, whose instance type is \verb|Int|. Metatypes are sometimes referred to as \IndexDefinition{concrete metatype type}\emph{concrete metatypes}, to distinguish them from existential metatypes, which we introduce below. Most concrete metatypes are singleton types with one value, the instance type itself. One exception is that the class metatype for a non-final class also has all subclasses of the class as values.
+\paragraph{Metatype types.} A type \tT\ can be the callee in a \index{call expression}call expression, \texttt{T(...)}; this is shorthand for a constructor call \texttt{T.init(...)}. It can serve as the base of a static method call, \texttt{T.foo(...)}, where the type is passed as the \texttt{self} parameter. Finally, it can be directly referenced by the expression \texttt{T.self}. In all cases, the type becomes a \emph{value}, and this value must itself be assigned a type; this type is called a \emph{metatype}. The metatype of a type \tT\ is written as \texttt{T.Type}. The type \tT\ is the \IndexDefinition{instance type}\emph{instance type} of the metatype. For example, the type of the expression ``\verb|Int.self|'' is the metatype \texttt{Int.Type}, whose instance type is \verb|Int|. Metatypes are sometimes referred to as \IndexDefinition{concrete metatype type}\emph{concrete metatypes}, to distinguish them from existential metatypes, which we introduce below. Most concrete metatypes are singleton types with one value, the instance type itself. One exception is that the class metatype for a non-final class also has all subclasses of the class as values.
 
 \begin{figure}[b!]\captionabove{Existential metatype and metatype of existential}\label{existential metatype fig}
 \begin{center}
@@ -454,7 +454,7 @@ An \index{existential metatype type}existential metatype is a container for an u
 
 Existential metatypes are not the same as metatypes whose instance type is existential, as we can demonstrate by considering language semantics. If \texttt{P} is a protocol and \texttt{S} is a type conforming to \texttt{P}, then the existential metatype \texttt{any P.Type} can store the value \texttt{S.self}. As the existential type \texttt{any P} does not conform to \texttt{P}, the value \texttt{(any P).self} cannot be stored inside of the existential metatype \texttt{any P.Type}. In fact, the type of this value is the \emph{concrete} metatype \texttt{(any P).Type}. \FigRef{existential metatype fig} compares the recursive structure of \texttt{any P.Type} against \texttt{(any P).Type}.
 
-Prior to the introduction of the \texttt{any} keyword, existential metatypes were written as \texttt{P.Type}, and the concrete metatype of an existential as \texttt{P.Protocol}. This was a source of confusion, because when \texttt{T} is a non-protocol type, \texttt{T.Type} is otherwise always a concrete metatype. The below table compares the old and new syntax:
+Prior to the introduction of the \texttt{any} keyword, existential metatypes were written as \texttt{P.Type}, and the concrete metatype of an existential as \texttt{P.Protocol}. This was a source of confusion, because when \tT\ is a non-protocol type, \texttt{T.Type} is otherwise always a concrete metatype. The below table compares the old and new syntax:
 \begin{center}
 \begin{tabular}{lll}
 \toprule
@@ -485,7 +485,7 @@ Prior to the introduction of the \texttt{any} keyword, existential metatypes wer
 \paragraph{Tuple types.}
 A \IndexDefinition{tuple type}tuple type is a list of element types together with optional labels. If the list of element types is empty, we get the unique empty tuple type \texttt{()}.
 
-An unlabeled one-element tuple type cannot be formed at all; \texttt{(T)} resolves to the same type as \texttt{T}. Labeled one-element tuple types \texttt{(foo:\ T)} are valid in the grammar, but are rejected by type resolution. \index{SILGen}SILGen creates them internally when it materializes the payload of an enum case (for instance, ``\texttt{case person(name:\ String)}''), but they do not appear as the types of expressions.
+An unlabeled one-element tuple type cannot be formed at all; \texttt{(T)} resolves to the same type as \tT. Labeled one-element tuple types \texttt{(foo:\ T)} are valid in the grammar, but are rejected by type resolution. \index{SILGen}SILGen creates them internally when it materializes the payload of an enum case (for instance, ``\texttt{case person(name:\ String)}''), but they do not appear as the types of expressions.
 
 \paragraph{Function types.} A \IndexDefinition{function type}function type is the type of the callee in a \index{call expression}call expression. It contains a parameter list, a return type, and non-type attributes. The attributes include the function's effect, lifetime, and calling convention. The effects are \texttt{throws} and \texttt{async} (part of the \IndexSwift{5.5}Swift~5.5 concurrency model \cite{se0296}). Function values with \index{non-escaping function type}non-escaping lifetime are second-class; they can only be passed to another function, captured by a non-escaping closure, or called. Only \index{escaping function type}escaping functions can be returned or stored inside other values. The four calling conventions are:
 \begin{itemize}
@@ -504,9 +504,9 @@ The \texttt{inout} kind is key to Swift's mutable value type model; the interest
 \item The \textbf{variadic} flag, in which case the parameter type must be an array type.
 
 When type checking a call to function value with a variadic parameter, the type checker collects multiple expressions from the call argument list into an implicit array expression. Otherwise, variadic parameters behave exactly like arrays once we get to \index{SILGen}SILGen and below.
-\item The \IndexDefinition{autoclosure function type}\texttt{@autoclosure} attribute, in which case the parameter type must be another function type of the form \verb|() -> T| for some type \texttt{T}.
+\item The \IndexDefinition{autoclosure function type}\texttt{@autoclosure} attribute, in which case the parameter type must be another function type of the form \verb|() -> T| for some type \tT.
 
-This instructs the type checker to treat the corresponding argument in the caller as if it was a value of type \texttt{T}, rather than a function type \verb|() -> T|. The argument is then wrapped inside an implicit \index{closure expression}closure \index{expression}expression. In the body of the callee, an \texttt{@autoclosure} parameter behaves exactly like an ordinary function value, and can be called to evaluate the expression provided by the caller.
+This instructs the type checker to treat the corresponding argument in the caller as if it was a value of type \tT, rather than a function type \verb|() -> T|. The argument is then wrapped inside an implicit \index{closure expression}closure \index{expression}expression. In the body of the callee, an \texttt{@autoclosure} parameter behaves exactly like an ordinary function value, and can be called to evaluate the expression provided by the caller.
 \end{itemize}
 
 \begin{figure}[b!]\captionabove{Function type with two parameters, or a single tuple parameter}\label{function param tuple fig}
@@ -581,7 +581,7 @@ We finish this section by turning to sugared types. Sugared generic parameter ty
 
 \paragraph{Type alias types.} A \IndexDefinition{type alias type}type alias type represents a reference to a type alias declaration. It contains an optional parent type, a substitution map, and the substituted \IndexDefinition{underlying type}underlying type. The canonical type of a type alias type is the substituted underlying type. The substitution map is formed in type resolution, from any generic arguments applied to the type alias type declaration itself, together with the generic arguments of the parent type (\SecRef{identtyperepr}). Type resolution applies this substitution map to the original underlying type of the type alias declaration to compute the substituted underlying type. The substitution map is preserved for printing, and for requirement inference (\SecRef{requirementinference}).
 
-\paragraph{Optional types.} The \IndexDefinition{optional sugared type}optional type is written as \texttt{T?} for some object type \texttt{T}; its canonical type is \texttt{Optional<T>}.
+\paragraph{Optional types.} The \IndexDefinition{optional sugared type}optional type is written as \texttt{T?} for some object type \tT; its canonical type is \texttt{Optional<T>}.
 
 \paragraph{Array types.} The \IndexDefinition{array sugared type}array type is written as \texttt{[E]} for some element type \texttt{E}; its canonical type is \texttt{Array<E>}.
 
@@ -669,7 +669,7 @@ The utmost care must be taken when working with type variables and the structure
 The printed representation of a type variable is \texttt{\$Tn}, where \texttt{n} is an incrementing integer local to the constraint system. One way to see type variables in action is to pass the \texttt{-Xfrontend~-debug-constraints} compiler flag.
 
 \paragraph{L-value types.}
-An \IndexDefinition{l-value type}l-value type represents the type of an \index{expression}expression appearing on the left hand side of an assignment operator (hence the ``l'' in l-value), or as an argument to an \texttt{inout} parameter in a function call. L-value types wrap an \IndexDefinition{object type}\emph{object type} which is the type of the stored value; they print out as \verb|@lvalue T| where \texttt{T} is the object type, but this is not valid syntax in the language.
+An \IndexDefinition{l-value type}l-value type represents the type of an \index{expression}expression appearing on the left hand side of an assignment operator (hence the ``l'' in l-value), or as an argument to an \texttt{inout} parameter in a function call. L-value types wrap an \IndexDefinition{object type}\emph{object type} which is the type of the stored value; they print out as \verb|@lvalue T| where \tT\ is the object type, but this is not valid syntax in the language.
 
 L-value types appear in type-checked expressions. The reader familiar with C++ might think of an l-value type as somewhat analogous to a C++ mutable reference type ``\verb|T &|''---unlike C++ though, they are not directly visible in the source language. L-value types do not appear in the types of SIL instructions; \index{SILGen}SILGen lowers l-value accesses into accessor calls or direct manipulation of memory.
 
@@ -885,8 +885,8 @@ The \texttt{getCanonicalType()} method outputs a \texttt{CanType} wrapping the \
 
 \paragraph{Utility operations.} These encapsulate frequently-useful patterns.
 \begin{itemize}
-\item \texttt{getOptionalObjectType()} \IndexSource{optional sugared type}returns the type \texttt{T} if the type is some \texttt{Optional<T>}, otherwise it returns the null type.
-\item \texttt{getMetatypeInstanceType()} returns the type \texttt{T} if the type is some \texttt{T.Type}, otherwise it returns \texttt{T}.
+\item \texttt{getOptionalObjectType()} \IndexSource{optional sugared type}returns the type \tT\ if the type is some \texttt{Optional<T>}, otherwise it returns the null type.
+\item \texttt{getMetatypeInstanceType()} returns the type \tT\ if the type is some \texttt{T.Type}, otherwise it returns \tT.
 \item \texttt{mayHaveMembers()} answers if this is a nominal type, archetype, existential type or dynamic Self type.
 \end{itemize}
 
@@ -928,7 +928,7 @@ This is the base class of \texttt{FunctionType} and \texttt{GenericFunctionType}
 \apiref{AnyFunctionType::Param}{class}
 This represents a parameter in a function type's parameter list.
 \begin{itemize}
-\item \texttt{getPlainType()} returns the type of the parameter. If the parameter is variadic (\texttt{T...}), this is the element type \texttt{T}.
+\item \texttt{getPlainType()} returns the type of the parameter. If the parameter is variadic (\texttt{T...}), this is the element type \tT.
 \item \texttt{getParameterType()} same as above, but if the parameter is variadic, returns the type \texttt{Array<T>}.
 \item \texttt{isVariadic()}, \texttt{isAutoClosure()} are the special behaviors.
 \item \texttt{getValueOwnership()} returns an instance of the \texttt{ValueOwnership} enum.

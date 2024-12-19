@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-copy-propagation=false -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -enable-copy-propagation=false -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 // Using -enable-copy-propagation=false to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around

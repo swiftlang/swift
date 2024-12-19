@@ -215,12 +215,17 @@ private:
   //--------------------------------------------------------------------------//
 
   /// Get the type lowering for the given AST type.
+  ///
+  /// Explicitly use minimal type expansion context: in general, differentiation
+  /// happens on function types, so it cannot know if the original function is
+  /// resilient or not.
   const Lowering::TypeLowering &getTypeLowering(Type type) {
     auto pbGenSig =
         getPullback().getLoweredFunctionType()->getSubstGenericSignature();
     Lowering::AbstractionPattern pattern(pbGenSig,
                                          type->getReducedType(pbGenSig));
-    return getPullback().getTypeLowering(pattern, type);
+    return getContext().getTypeConverter().getTypeLowering(
+      pattern, type, TypeExpansionContext::minimal());
   }
 
   /// Remap any archetypes into the current function's context.

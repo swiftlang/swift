@@ -27,9 +27,10 @@ TEST(FileSystem, lookupTypeFromFilename) {
     // no extension, skip.
     if (Entry.first.empty())
       continue;
-    // raw-sil, raw-sib, and raw-llvm-ir do not have unique extensions.
+    // raw-sil, raw-sib, lowered-sil, and raw-llvm-ir do not have unique
+    // extensions.
     if (Entry.second == TY_RawSIL || Entry.second == TY_RawSIB ||
-        Entry.second == TY_RawLLVM_IR)
+        Entry.second == TY_LoweredSIL || Entry.second == TY_RawLLVM_IR)
       continue;
 
     std::string Filename = "Myfile." + Entry.first;

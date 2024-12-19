@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
-// RUN: %target-sil-opt -mandatory-copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
+// RUN: %target-sil-opt -sil-print-types -copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
+// RUN: %target-sil-opt -sil-print-types -mandatory-copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
 
 // Runs CopyPropagation without borrow scope canonicalization.
 

@@ -5,6 +5,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=RISCV
 // REQUIRES: embedded_stdlib_cross_compiling
+// REQUIRES: swift_feature_Embedded
 
 class MyClass {}
 

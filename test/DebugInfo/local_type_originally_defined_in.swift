@@ -1,9 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/local_type_originally_defined_in_other.swiftmodule %S/Inputs/local_type_originally_defined_in_other.swift
-// RUN: %target-swift-frontend -I%t -g -emit-ir %s
+// RUN: %target-swift-frontend -I%t -g -emit-ir %s -o - | %FileCheck %s
+// REQUIRES: OS=macosx
 
 import local_type_originally_defined_in_other
 
+public func definedInOtherModule() {
+  let s = Sheep()
+  // CHECK: DICompositeType(tag: DW_TAG_structure_type, name: "Sheep"{{.*}}identifier: "$s4Barn5SheepCD
+}
 public func localTypeAliasTest(horse: Horse) {
   // The local type mangling for 'A' mentions 'Horse', which must
   // be mangled using it's current module name, and not the
@@ -12,5 +17,22 @@ public func localTypeAliasTest(horse: Horse) {
   typealias A = Int
 
   let info = UnsafeMutablePointer<A>.allocate(capacity: 1)
+  _ = info
+  // CHECK: DIDerivedType(tag: DW_TAG_typedef, name: "$s32local_type_originally_defined_in0A13TypeAliasTest5horsey4Barn5HorseV_tF1AL_aD"
+}
+
+public func localTypeAliasTest() -> Horse {
+  typealias B = Int
+
+  let info = UnsafeMutablePointer<B>.allocate(capacity: 1)
+  _ = info
+  return Horse()
+  // CHECK: DIDerivedType(tag: DW_TAG_typedef, name: "$s32local_type_originally_defined_in0A13TypeAliasTest4Barn5HorseVyF1BL_aD"
+}
+
+public func localTypeAliasTestGeneric<T: Cow>(cow: T) {
+  typealias C = Int
+
+  let info = UnsafeMutablePointer<C>.allocate(capacity: 1)
   _ = info
 }

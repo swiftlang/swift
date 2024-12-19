@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -primary-file %s | %FileCheck %s
 
 // 1. Make sure the wrapped property setter calls the observers
 // 2. Make sure the synthesized _modify coroutine calls the wrapped property setter

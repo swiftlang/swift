@@ -1,3 +1,15 @@
+//===--- bisect_toolchains.swift ------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 import ArgumentParser
 import Foundation
 
@@ -6,7 +18,7 @@ struct BisectToolchains: AsyncParsableCommand {
     commandName: "bisect",
     discussion: """
       Bisects on exit status of attached script. Passes in name of swift as the
-      environment variabless SWIFTC and SWIFT_FRONTEND
+      environment variables \(environmentVariables).
       """)
 
   @Flag var platform: Platform = .osx
@@ -22,8 +34,9 @@ struct BisectToolchains: AsyncParsableCommand {
 
   @Option(
     help: """
-      The script that should be run. The environment variable
-      SWIFT_EXEC is used by the script to know where swift-frontend is
+      The script that should be run. It runs a specific swift compilation and
+      optionally program using the passed in environment variables
+      \(environmentVariables)
       """)
   var script: String
 

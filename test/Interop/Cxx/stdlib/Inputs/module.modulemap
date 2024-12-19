@@ -40,6 +40,12 @@ module StdString {
   export *
 }
 
+module StdStringAndVector {
+  header "std-string-and-vector.h"
+  requires cplusplus
+  export *
+}
+
 module StdStringView {
   header "std-string-view.h"
   requires cplusplus
@@ -66,6 +72,12 @@ module StdUniquePtr {
 
 module StdFunction {
   header "std-function.h"
+  requires cplusplus
+  export *
+}
+
+module NoCXXStdlib {
+  header "no-cxx-stdlib.h"
   requires cplusplus
   export *
 }

@@ -53,6 +53,7 @@ extension DiscontiguousSlice: Hashable where Base.Element: Hashable {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension DiscontiguousSlice: CustomStringConvertible {
   public var description: String {
     _makeCollectionDescription()
@@ -98,6 +99,7 @@ extension DiscontiguousSlice.Index: Comparable {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension DiscontiguousSlice.Index: CustomStringConvertible {
   public var description: String {
     "<base: \(String(reflecting: base)), rangeOffset: \(_rangeOffset)>"

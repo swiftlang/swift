@@ -136,6 +136,8 @@ class BitwiseCopyableTypeInfo
     : public WitnessSizedTypeInfo<BitwiseCopyableTypeInfo> {
   using Self = BitwiseCopyableTypeInfo;
   using Super = WitnessSizedTypeInfo<Self>;
+
+protected:
   BitwiseCopyableTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
       : Super(type, Alignment(1), IsNotTriviallyDestroyable,
               IsNotBitwiseTakable, IsCopyable, abiAccessible) {}

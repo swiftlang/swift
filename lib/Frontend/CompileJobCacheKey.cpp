@@ -15,17 +15,21 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Option/Options.h"
-#include <swift/Frontend/CompileJobCacheKey.h>
-#include <swift/Basic/Version.h>
-#include <llvm/ADT/SmallString.h>
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
+#include "llvm/CAS/TreeEntry.h"
+#include "llvm/CAS/TreeSchema.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
+#include "llvm/Support/Endian.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
+#include <llvm/ADT/SmallString.h>
+#include <swift/Basic/Version.h>
+#include <swift/Frontend/CompileJobCacheKey.h>
 
 using namespace swift;
 
@@ -98,4 +102,53 @@ swift::createCompileJobCacheKeyForOutput(llvm::cas::ObjectStore &CAS,
                                          llvm::endianness::little);
 
   return CAS.storeFromString({BaseKey}, OS.str());
+}
+
+llvm::Error swift::printCompileJobCacheKey(llvm::cas::ObjectStore &CAS,
+                                           llvm::cas::ObjectRef Key,
+                                           llvm::raw_ostream &OS) {
+  auto Proxy = CAS.getProxy(Key);
+  if (!Proxy)
+    return Proxy.takeError();
+
+  if (Proxy->getData().size() != sizeof(uint32_t))
+    return llvm::createStringError("incorrect size for cache key node");
+  if (Proxy->getNumReferences() != 1)
+    return llvm::createStringError("incorrect child number for cache key node");
+
+  uint32_t InputIndex = llvm::support::endian::read<uint32_t>(
+      Proxy->getData().data(), llvm::endianness::little);
+
+  auto Base = Proxy->getReference(0);
+  llvm::cas::TreeSchema Schema(CAS);
+  auto Tree = Schema.load(Base);
+  if (!Tree)
+    return Tree.takeError();
+
+  std::string BaseStr;
+  llvm::raw_string_ostream BaseOS(BaseStr);
+  auto Err = Tree->forEachEntry(
+      [&](const llvm::cas::NamedTreeEntry &Entry) -> llvm::Error {
+        auto Ref = Entry.getRef();
+        auto DataProxy = CAS.getProxy(Ref);
+        if (!DataProxy)
+          return DataProxy.takeError();
+
+        BaseOS.indent(2) << Entry.getName() << "\n";
+        StringRef Line, Remain = DataProxy->getData();
+        while (!Remain.empty()) {
+          std::tie(Line, Remain) = Remain.split(0);
+          BaseOS.indent(4) << Line << "\n";
+        }
+        return llvm::Error::success();
+      });
+  if (Err)
+    return Err;
+
+  llvm::outs() << "Cache Key " << CAS.getID(Key).toString() << "\n";
+  llvm::outs() << "Swift Compiler Invocation Info:\n";
+  llvm::outs() << BaseStr;
+  llvm::outs() << "Input index: " << InputIndex << "\n";
+
+  return llvm::Error::success();
 }

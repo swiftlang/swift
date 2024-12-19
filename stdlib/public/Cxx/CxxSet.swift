@@ -67,10 +67,21 @@ extension CxxSet {
 public protocol CxxUniqueSet<Element>: CxxSet {
   override associatedtype Element
   override associatedtype Size: BinaryInteger
+  associatedtype RawIterator: UnsafeCxxInputIterator
+    where RawIterator.Pointee == Element
   associatedtype RawMutableIterator: UnsafeCxxInputIterator
     where RawMutableIterator.Pointee == Element
   override associatedtype InsertionResult
     where InsertionResult: CxxPair<RawMutableIterator, Bool>
+
+  @discardableResult
+  mutating func __findUnsafe(_ value: Element) -> RawIterator
+
+  @discardableResult
+  mutating func __eraseUnsafe(_ iter: RawIterator) -> RawMutableIterator
+
+  @discardableResult
+  mutating func __endUnsafe() -> RawIterator
 }
 
 extension CxxUniqueSet {
@@ -93,5 +104,20 @@ extension CxxUniqueSet {
     let rawIterator: RawMutableIterator = insertionResult.first
     let inserted: Bool = insertionResult.second
     return (inserted, rawIterator.pointee)
+  }
+
+  /// Removes the given element from the set.
+  ///
+  /// - Parameter member: An element to remove from the set.
+  @discardableResult
+  @inlinable
+  public mutating func remove(_ member: Element) -> Element? {
+    let iter = self.__findUnsafe(member)
+    guard iter != self.__endUnsafe() else {
+      return nil
+    }
+    let value = iter.pointee
+    self.__eraseUnsafe(iter)
+    return value
   }
 }

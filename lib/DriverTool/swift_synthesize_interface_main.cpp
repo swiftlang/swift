@@ -200,11 +200,19 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
     return EXIT_FAILURE;
   }
 
-  StreamPrinter printer(fs);
   PrintOptions printOpts =
       PrintOptions::printModuleInterface(/*printFullConvention=*/true);
-  ide::printModuleInterface(M, /*GroupNames=*/{},
-                            /*TraversalOptions=*/std::nullopt, printer,
+  if (ParsedArgs.hasArg(OPT_print_fully_qualified_types)) {
+    printOpts.FullyQualifiedTypes = true;
+  }
+
+  swift::OptionSet<swift::ide::ModuleTraversal> traversalOpts = std::nullopt;
+  if (ParsedArgs.hasArg(OPT_include_submodules)) {
+    traversalOpts = swift::ide::ModuleTraversal::VisitSubmodules;
+  }
+
+  StreamPrinter printer(fs);
+  ide::printModuleInterface(M, /*GroupNames=*/{}, traversalOpts, printer,
                             printOpts, /*PrintSynthesizedExtensions=*/false);
 
   return EXIT_SUCCESS;

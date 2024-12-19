@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -verify %s | %FileCheck %s
 
 // https://github.com/apple/swift/issues/45680
 

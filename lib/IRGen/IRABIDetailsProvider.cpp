@@ -239,7 +239,7 @@ public:
       return MethodDispatchInfo::thunk(
           LinkEntity::forDispatchThunk(
               SILDeclRef(const_cast<AbstractFunctionDecl *>(funcDecl)))
-              .mangleAsString());
+              .mangleAsString(IGM.Context));
     auto &layout = IGM.getMetadataLayout(parentClass);
     if (!isa<ClassMetadataLayout>(layout))
       return {};
@@ -261,7 +261,7 @@ public:
       return MethodDispatchInfo::indirectVTableRelativeOffset(
           /*offset=*/mi->TheOffset.getRelativeOffset().getValue(),
           /*symbolName=*/
-          LinkEntity::forClassMetadataBaseOffset(parentClass).mangleAsString(),
+          LinkEntity::forClassMetadataBaseOffset(parentClass).mangleAsString(IGM.Context),
           getMethodPointerAuthInfo(funcDecl, silDecl));
     }
     llvm_unreachable("invalid kind");

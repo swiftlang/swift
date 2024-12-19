@@ -54,7 +54,11 @@ static_assert((SwiftJobPriority)swift::JobPriority::Unspecified
 // Job (has additional fields not exposed via SwiftJob)
 static_assert(sizeof(swift::Job) >= sizeof(SwiftJob));
 static_assert(offsetof(swift::Job, metadata) == offsetof(SwiftJob, metadata));
+#if !SWIFT_CONCURRENCY_EMBEDDED
 static_assert(offsetof(swift::Job, refCounts) == offsetof(SwiftJob, refCounts));
+#else
+static_assert(offsetof(swift::Job, embeddedRefcount) == offsetof(SwiftJob, refCounts));
+#endif
 static_assert(offsetof(swift::Job, SchedulerPrivate) == offsetof(SwiftJob, schedulerPrivate));
 static_assert(offsetof(swift::Job, SchedulerPrivate[0]) == offsetof(SwiftJob, schedulerPrivate[0]));
 static_assert(offsetof(swift::Job, SchedulerPrivate[1]) == offsetof(SwiftJob, schedulerPrivate[1]));

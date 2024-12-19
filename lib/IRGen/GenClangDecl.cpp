@@ -22,6 +22,7 @@
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/GlobalDecl.h"
+#include "clang/AST/RecordLayout.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Sema/Sema.h"
@@ -365,4 +366,42 @@ void IRGenModule::ensureImplicitCXXDestructorBodyIsDefined(
   // Make sure we define the destructor so we have something to call.
   auto &sema = Context.getClangModuleLoader()->getClangSema();
   sema.DefineImplicitDestructor(clang::SourceLocation(), destructor);
+}
+
+/// Retrieves the base classes of a C++ struct/class ordered by their offset in
+/// the derived type's memory layout.
+SmallVector<CXXBaseRecordLayout, 1>
+irgen::getBasesAndOffsets(const clang::CXXRecordDecl *decl) {
+  auto &layout = decl->getASTContext().getASTRecordLayout(decl);
+
+  // Collect the offsets and sizes of base classes within the memory layout
+  // of the derived class.
+  SmallVector<CXXBaseRecordLayout, 1> baseOffsetsAndSizes;
+  for (auto base : decl->bases()) {
+    if (base.isVirtual())
+      continue;
+
+    auto baseType = base.getType().getCanonicalType();
+    auto baseRecordType = cast<clang::RecordType>(baseType);
+    auto baseRecord = baseRecordType->getAsCXXRecordDecl();
+    assert(baseRecord && "expected a base C++ record");
+
+    if (baseRecord->isEmpty())
+      continue;
+
+    auto offset = Size(layout.getBaseClassOffset(baseRecord).getQuantity());
+    auto size =
+        Size(decl->getASTContext().getTypeSizeInChars(baseType).getQuantity());
+
+    baseOffsetsAndSizes.push_back({baseRecord, offset, size});
+  }
+
+  // In C++, base classes might get reordered if the primary base was not
+  // the first base type on the declaration of the class.
+  llvm::sort(baseOffsetsAndSizes, [](const CXXBaseRecordLayout &lhs,
+                                     const CXXBaseRecordLayout &rhs) {
+    return lhs.offset < rhs.offset;
+  });
+
+  return baseOffsetsAndSizes;
 }

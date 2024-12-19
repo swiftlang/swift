@@ -1,8 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen -D CONDITION_1
 
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ParserASTGen
 
 postfix operator ++
 postfix func ++ (_: Int) -> Int { 0 }
@@ -42,6 +41,7 @@ func testInvalidContent(baseExpr: MyStruct, otherExpr: Int) {
   baseExpr      // expected-warning {{expression of type 'MyStruct' is unused}}
 #if CONDITION_1
     { print(1) } // expected-error {{closure expression is unused}}
+                 // unexpected-note@-1 {{did you mean to use a 'do' statement?}}
 #endif
 
   baseExpr      // expected-warning {{expression of type 'MyStruct' is unused}}

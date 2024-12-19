@@ -151,12 +151,12 @@ int main() {
 // CHECK-NEXT: create NonTrivialTemplate
 // CHECK-NEXT: call
 // CHECK-NEXT: copy NonTrivialTemplate
-// CHECK-NEXT: copy NonTrivialTemplate
+// CHECK-NEXT: move NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: DoneCall
 // CHECK-NEXT: copy NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
-// CHECK-NEXT: copy NonTrivialTemplate
+// CHECK-NEXT: move NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate

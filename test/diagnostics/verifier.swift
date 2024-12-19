@@ -50,5 +50,5 @@ extension Crap {} // expected-error {{non-nominal type 'Crap' (aka '() -> ()') c
 // CHECK-FIXITS: {
 // CHECK-FIXITS: "file":
 // CHECK-FIXITS: "offset":
-// CHECK-FIXITS: "text": " as! Int",
-// CHECK-FIXITS: },
+// CHECK-FIXITS: "text": " as! Int"
+// CHECK-FIXITS: }

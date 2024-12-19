@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -sil-move-only-object-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
 
+// REQUIRES: swift_feature_MoveOnlyClasses
+
 sil_stage raw
 
 import Swift

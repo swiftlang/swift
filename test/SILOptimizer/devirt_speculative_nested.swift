@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-frontend -module-name devirt_speculative_nested %s -parse-as-library -enable-spec-devirt -O -emit-sil | %FileCheck %s
-// RUN: %target-swift-frontend -module-name devirt_speculative_nested %s -parse-as-library -Osize -emit-sil
+// RUN: %target-swift-frontend -module-name devirt_speculative_nested %s -parse-as-library -enable-spec-devirt -O -Xllvm -sil-print-types -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -module-name devirt_speculative_nested %s -parse-as-library -Osize -Xllvm -sil-print-types -emit-sil
 //
 // Test speculative devirtualization.
 

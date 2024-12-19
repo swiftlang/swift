@@ -37,8 +37,8 @@ bool SILInliner::canInlineBeginApply(BeginApplyInst *BA) {
   // handle this in general, we'd need to separately clone the resume/unwind
   // paths into each end/abort.
   bool hasEndApply = false, hasAbortApply = false;
-  for (auto tokenUse : BA->getTokenResult()->getUses()) {
-    auto user = tokenUse->getUser();
+  for (auto *use : BA->getEndApplyUses()) {
+    auto *user = use->getUser();
     if (isa<EndApplyInst>(user)) {
       if (hasEndApply) return false;
       hasEndApply = true;
@@ -266,7 +266,8 @@ public:
       EndBorrow->eraseFromParent();
 
     if (auto allocation = BeginApply->getCalleeAllocationResult()) {
-      for (auto *user : allocation->getUsers()) {
+      SmallVector<SILInstruction *, 4> users(allocation->getUsers());
+      for (auto *user : users) {
         auto *dsi = cast<DeallocStackInst>(user);
         dsi->eraseFromParent();
       }
@@ -877,6 +878,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BorrowedFromInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::PreviousDynamicFunctionRefInst:
   case SILInstructionKind::DynamicFunctionRefInst:
   case SILInstructionKind::FunctionRefInst:

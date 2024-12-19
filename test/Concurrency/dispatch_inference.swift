@@ -5,7 +5,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 import Dispatch
 

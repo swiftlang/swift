@@ -257,4 +257,5 @@ public func registerSILClasses() {
   register(CheckedCastBranchInst.self)
   register(CheckedCastAddrBranchInst.self)
   register(ThunkInst.self)
+  register(MergeIsolationRegionInst.self)
 }

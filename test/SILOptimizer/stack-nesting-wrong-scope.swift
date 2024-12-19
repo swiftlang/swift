@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -emit-sil %s -Onone -Xllvm \
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s -Onone -Xllvm \
 // RUN:   -sil-print-after=allocbox-to-stack -Xllvm \
 // RUN:   -sil-print-functions=$s3red19ThrowAddrOnlyStructV016throwsOptionalToG0ACyxGSgSi_tcfC \
-// RUN:   -Xllvm -sil-print-debuginfo -o %t -module-name red 2>&1 | %FileCheck %s
+// RUN:   -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo -o %t -module-name red 2>&1 | %FileCheck %s
 
 // CHECK: bb{{[0-9]+}}(%{{[0-9]+}} : @owned $any Error):
 // CHECK:   dealloc_stack %{{[0-9]+}} : $*ThrowAddrOnlyStruct<T>, loc {{.*}}:26:68, scope [[SCOPE:[0-9]+]]

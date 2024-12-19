@@ -5,6 +5,8 @@
 // RUN: %target-swift-frontend -enable-experimental-feature Extern -c -I %t %t/Main.swift -enable-experimental-feature Embedded -o %t/a.o
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_Extern
 
 // BEGIN MyModule.swift
 

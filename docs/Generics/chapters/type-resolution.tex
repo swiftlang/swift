@@ -206,7 +206,7 @@ Note that \texttt{f()} and \texttt{g()} have the same return type, but the two t
 
 Resolving the return type of \texttt{f()}, we find the associated type declaration \texttt{B} of \texttt{Pair}. Type resolution performs a \index{global conformance lookup!type resolution}global conformance lookup to find the concrete conformance $\ConfReq{S}{Pair}$, then projects the type witness for \texttt{B} from this conformance. This evaluates the \Request{type witness request}, which \emph{synthesizes} the type alias \texttt{B} inside \texttt{S}. The declared interface type of \texttt{S.B}, canonically equal to \texttt{String}, is returned as the type witness.
 
-Resolving the return type of \texttt{g()}, we now find the type alias \texttt{S.B} we just synthesized. This shows that associated type inference has a \index{side effect}side effect on the member lookup table of~\texttt{S}, but it effectively acts as a form of lazy caching; the first lookup triggers the synthesis of this member.
+Resolving the return type of \texttt{g()}, we now find the type alias \texttt{S.B} we just synthesized. This shows that associated type inference has a \index{side effect}side effect on the member lookup table of~\texttt{S}, but it effectively acts as a form of lazy caching; the first lookup triggers the synthesis of this member. See \SecRef{associated type inference} for further details about associated type inference.
 
 \paragraph{Modules.}
 A \index{module declaration!type resolution}module declaration is a special kind of type declaration that can only be used as the base of a member type representation. Otherwise a bare module is an error:
@@ -597,8 +597,8 @@ When resolving the underlying type of type alias~\texttt{A}, we form this substi
 \end{align*}
 We apply $\Sigma_a$ to each explicit requirement in the generic signature of \texttt{Concat}:
 \begin{gather*}
-\ConfReq{\rT}{Sequence}\otimes\Sigma_a = \ConfReq{String}{Sequence}\\
-\ConfReq{\rU}{Sequence}\otimes\Sigma_a = \ConfReq{Substring}{Sequence}\\
+\rTSequence\otimes\Sigma_a = \ConfReq{String}{Sequence}\\
+\rUSequence\otimes\Sigma_a = \ConfReq{Substring}{Sequence}\\
 \SameReq{\rT.Element}{\rU.Element}\otimes\Sigma_a = \SameReq{Character}{Character}
 \end{gather*}
 The first two substituted requirements claim their subject types conform to \texttt{Sequence}. We can check these by performing a global conformance lookup, which returns a valid concrete conformance in both cases, so we conclude both requirements are satisfied. The final substituted requirement is a statement that \texttt{Character} and \texttt{Character} are the same type, which also appears to be true. Thus, $\Sigma_a$ satisfies the generic signature of \texttt{Concat}, and we successfully form the resolved type \texttt{Concat<String, Substring>}.
@@ -638,8 +638,8 @@ We build $\Sigma\in\SubMapObj{G}{\EquivClass{H}}$ by mapping our generic argumen
 \end{align*}
 Note that our original requirements contained type parameters of~$G$, but now involve the primary archetypes of $H$ after substitution:
 \begin{gather*}
-\ConfReq{\rT}{Sequence}\otimes\Sigma = \ConfReq{$\archetype{C}$}{Sequence}\\
-\ConfReq{\rU}{Sequence}\otimes\Sigma = \ConfReq{$\archetype{C.SubSequence}$}{Sequence}\\
+\rTSequence\otimes\Sigma = \ConfReq{$\archetype{C}$}{Sequence}\\
+\rUSequence\otimes\Sigma = \ConfReq{$\archetype{C.SubSequence}$}{Sequence}\\
 \SameReq{\rT.Element}{\rU.Element}\otimes\Sigma = \SameReq{$\archetype{C.Element}$}{$\archetype{C.Element}$}
 \end{gather*}
 
@@ -716,14 +716,14 @@ We get the following substitution map; note that it contains an invalid conforma
 &\SubstType{\rU}{Set<Int>}
 }{
 \\
-&\ConfReq{\rT}{Sequence} \mapsto \text{(invalid)},\\
+&\rTSequence \mapsto \text{(invalid)},\\
 &\SubstConf{\rU}{Set<Int>}{Sequence}
 }
 \end{align*}
 We apply this substitution map to each requirement of our generic signature:
 \begin{gather*}
-\ConfReq{\rT}{Sequence}\otimes\Sigma = \ConfReq{Float}{Sequence}\\
-\ConfReq{\rU}{Sequence}\otimes\Sigma = \ConfReq{Set<Int>}{Sequence}\\
+\rTSequence\otimes\Sigma = \ConfReq{Float}{Sequence}\\
+\rUSequence\otimes\Sigma = \ConfReq{Set<Int>}{Sequence}\\
 \SameReq{\rT.Element}{\rU.Element}\otimes\Sigma = \SameReq{<<error type>>}{Int}
 \end{gather*}
 The first conformance requirement is unsatisfied and will be diagnosed. The same-type requirement contains \index{error type}error types after substitution, and does not need to be diagnosed; in fact, its failure is a consequence of the first conformance requirement being unsatisfied.

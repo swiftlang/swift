@@ -63,6 +63,10 @@ using namespace swift;
 
 void ASTWalker::anchor() {}
 
+bool ASTWalker::isDeclInMacroExpansion(Decl *decl) const {
+  return decl->isInMacroExpansionInContext();
+}
+
 namespace {
 
 /// Traversal - This class implements a simple expression/statement
@@ -1540,7 +1544,7 @@ public:
   
   bool shouldSkip(Decl *D) {
     if (!Walker.shouldWalkMacroArgumentsAndExpansion().second &&
-        D->isInMacroExpansionInContext() && !Walker.Parent.isNull())
+        Walker.isDeclInMacroExpansion(D) && !Walker.Parent.isNull())
       return true;
 
     if (auto *VD = dyn_cast<VarDecl>(D)) {

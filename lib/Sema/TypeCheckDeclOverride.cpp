@@ -242,7 +242,7 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
 
 static bool isUnavailableInAllVersions(ValueDecl *decl) {
   ASTContext &ctx = decl->getASTContext();
-  auto *attr = decl->getAttrs().getUnavailable(ctx);
+  auto *attr = decl->getUnavailableAttr();
 
   if (!attr)
     return false;
@@ -377,8 +377,10 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
       return;
 
     // Allow silencing this warning using parens.
-    if (paramTy->hasParenSugar())
-      return;
+    if (auto *TTR = dyn_cast<TupleTypeRepr>(repr)) {
+      if (TTR->isParenType())
+        return;
+    }
 
     diags
         .diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
@@ -442,8 +444,10 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
       return;
 
     // Allow silencing this warning using parens.
-    if (resultTy->hasParenSugar())
-      return;
+    if (auto *TTR = dyn_cast<TupleTypeRepr>(TR)) {
+      if (TTR->isParenType())
+        return;
+    }
 
     diags.diagnose(resultTL.getSourceRange().Start,
                    diag::override_unnecessary_result_IUO,
@@ -1731,6 +1735,9 @@ namespace  {
     UNINTERESTING_ATTR(StaticExclusiveOnly)
     UNINTERESTING_ATTR(PreInverseGenerics)
     UNINTERESTING_ATTR(Lifetime)
+    UNINTERESTING_ATTR(AddressableSelf)
+    UNINTERESTING_ATTR(Unsafe)
+    UNINTERESTING_ATTR(Safe)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1761,17 +1768,6 @@ namespace  {
     }
 
     void visitObjCAttr(ObjCAttr *attr) {}
-
-    void visitUnsafeAttr(UnsafeAttr *attr) {
-      if (!Base->getASTContext().LangOpts.hasFeature(Feature::WarnUnsafe))
-        return;
-
-      if (Override->isUnsafe() && !Base->isUnsafe()) {
-        Diags.diagnose(Override, diag::override_safe_withunsafe,
-                       Base->getDescriptiveKind());
-        Diags.diagnose(Base, diag::overridden_here);
-      }
-    }
   };
 } // end anonymous namespace
 
@@ -1920,7 +1916,7 @@ checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
   if (auto *overrideParent = override->getDeclContext()->getAsDecl()) {
     // If the parent of the override is unavailable, then the unavailability of
     // the override decl is irrelevant.
-    if (overrideParent->getSemanticUnavailableAttr())
+    if (overrideParent->isSemanticallyUnavailable())
       return {OverrideUnavailabilityStatus::Ignored, nullptr};
   }
 
@@ -1942,9 +1938,8 @@ checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
     }
   }
 
-  auto &ctx = override->getASTContext();
-  auto *baseUnavailableAttr = base->getAttrs().getUnavailable(ctx);
-  auto *overrideUnavailableAttr = override->getAttrs().getUnavailable(ctx);
+  auto *baseUnavailableAttr = base->getUnavailableAttr();
+  auto *overrideUnavailableAttr = override->getUnavailableAttr();
 
   if (baseUnavailableAttr && !overrideUnavailableAttr)
     return {OverrideUnavailabilityStatus::BaseUnavailable, baseUnavailableAttr};
@@ -2248,6 +2243,25 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     diagnoseOverrideForAvailability(override, base);
   }
 
+  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
+      override->isUnsafe() && !base->isUnsafe()) {
+    // Don't diagnose @unsafe overrides if the subclass is @unsafe.
+    auto overridingClass = override->getDeclContext()->getSelfClassDecl();
+    bool shouldDiagnose = !overridingClass || !overridingClass->allowsUnsafe();
+
+    if (shouldDiagnose) {
+      override->diagnose(diag::override_safe_withunsafe,
+                         base->getDescriptiveKind());
+      if (overridingClass) {
+        overridingClass->diagnose(
+            diag::make_subclass_unsafe, overridingClass->getName()
+        ).fixItInsert(
+            overridingClass->getAttributeInsertionLoc(false), "@unsafe ");
+      }
+
+      base->diagnose(diag::overridden_here);
+    }
+  }
   /// Check attributes associated with the base; some may need to merged with
   /// or checked against attributes in the overriding declaration.
   AttributeOverrideChecker attrChecker(base, override);

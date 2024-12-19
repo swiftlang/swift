@@ -81,10 +81,10 @@ public:
 
   UserList AggregateAddressUsers;
   UserList StructAddressUsers;
-  SmallVector<LoadInst*, 16> StructLoads;
+  SmallVector<SingleValueInstruction *, 16> StructLoads;
   UserList StructValueUsers;
   UserOperList ElementAddressUsers;
-  SmallVector<std::pair<LoadInst*, Operand*>, 16> ElementLoads;
+  SmallVector<std::pair<SingleValueInstruction *, Operand*>, 16> ElementLoads;
   UserOperList ElementValueUsers;
   VisitedSet Visited;
 
@@ -126,7 +126,7 @@ public:
       return false;
     for (SILInstruction *user : StructAddressUsers) {
       // ignore load users
-      if (isa<LoadInst>(user))
+      if (isa<LoadInst>(user) || isa<LoadBorrowInst>(user))
         continue;
       if (user != use1 && user != use2)
         return false;
@@ -162,8 +162,8 @@ protected:
       if (StructVal) {
         // Found a use of an element.
         assert(AccessPathSuffix.empty() && "should have accessed struct");
-        if (auto *LoadI = dyn_cast<LoadInst>(UseInst)) {
-          ElementLoads.push_back(std::make_pair(LoadI, StructVal));
+        if (isa<LoadInst>(UseInst) || isa<LoadBorrowInst>(UseInst)) {
+          ElementLoads.push_back(std::make_pair(cast<SingleValueInstruction>(UseInst), StructVal));
           continue;
         }
 
@@ -185,9 +185,9 @@ protected:
 
       if (AccessPathSuffix.empty()) {
         // Found a use of the struct at the given access path.
-        if (auto *LoadI = dyn_cast<LoadInst>(UseInst)) {
-          StructLoads.push_back(LoadI);
-          StructAddressUsers.push_back(LoadI);
+        if (isa<LoadInst>(UseInst) || isa<LoadBorrowInst>(UseInst)) {
+          StructLoads.push_back(cast<SingleValueInstruction>(UseInst));
+          StructAddressUsers.push_back(UseInst);
           continue;
         }
 

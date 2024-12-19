@@ -119,6 +119,7 @@ PROTOCOL(Differentiable)
 
 // Distributed Actors
 PROTOCOL(DistributedActor)
+PROTOCOL_(DistributedActorStub)
 PROTOCOL(DistributedActorSystem)
 PROTOCOL(DistributedTargetInvocationEncoder)
 PROTOCOL(DistributedTargetInvocationDecoder)

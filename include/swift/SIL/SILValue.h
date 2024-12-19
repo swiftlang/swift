@@ -1021,7 +1021,9 @@ ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
 class Operand {
 public:
   enum { numCustomBits = 8 };
-  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() >> numCustomBits };
+
+  constexpr static const size_t maxBitfieldID =
+      std::numeric_limits<uint64_t>::max() >> numCustomBits;
 
 private:
   template <class, class> friend class SILBitfield;
@@ -1073,9 +1075,11 @@ public:
     removeFromCurrent();
     TheValue = newValue;
     insertIntoCurrent();
+    updateReborrowFlags();
     verify();
   }
 
+  void updateReborrowFlags();
   void verify() const;
 
   /// Swap the given operand with the current one.

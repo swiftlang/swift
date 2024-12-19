@@ -341,8 +341,9 @@ extension AddressInitializationWalker {
   }
 
   mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
-    // An inout yield is a partial write.
-    return .abortWalk
+    // An inout yield is a partial write. Initialization via coroutine is not supported, so we assume a prior
+    // initialization must dominate the yield.
+    return .continueWalk
   }
 
   mutating func dependentAddressUse(of operand: Operand, into value: Value)
@@ -464,7 +465,7 @@ enum AddressOwnershipLiveRange : CustomStringConvertible {
       }
     case .storeBorrow(let sb):
       return computeValueLiveRange(of: sb.source, context)
-    case .pointer, .unidentified:
+    case .pointer, .index, .unidentified:
       return nil
     }
   }
@@ -563,4 +564,23 @@ extension AddressOwnershipLiveRange {
     }
     return .local(allocation, range)
   }
+}
+
+let addressOwnershipLiveRangeTest = FunctionTest("address_ownership_live_range") {
+  function, arguments, context in
+  let address = arguments.takeValue()
+  print("Address: \(address)")
+  print("Base: \(address.accessBase)")
+  let begin = address.definingInstructionOrTerminator ?? {
+    assert(address is FunctionArgument)
+    return function.instructions.first!
+  }()
+  let localReachabilityCache = LocalVariableReachabilityCache()
+  guard var ownershipRange = AddressOwnershipLiveRange.compute(for: address, at: begin,
+                                                               localReachabilityCache, context) else {
+    print("Error: indeterminate live range")
+    return
+  }
+  defer { ownershipRange.deinitialize() }
+  print(ownershipRange)
 }

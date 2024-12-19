@@ -274,7 +274,7 @@ void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
     if (auto *bai = dyn_cast<BeginApplyInst>(inst)) {
       if (auto *calleeFn = bai->getCalleeFunction()) {
         auto kind = getAccessorKind(calleeFn);
-        if (kind && isYieldingDefaultMutatingAccessor(*kind))
+        if (kind && isYieldingMutableAccessor(*kind))
           for (auto inoutArg : bai->getInoutArguments())
             propagateVariedInwardsThroughProjections(inoutArg, i);
       }
@@ -353,7 +353,7 @@ void DifferentiableActivityInfo::propagateUseful(
     if (auto *bai = dyn_cast<BeginApplyInst>(inst)) {
       if (auto *calleeFn = bai->getCalleeFunction()) {
         auto kind = getAccessorKind(calleeFn);
-        if (kind && isYieldingDefaultMutatingAccessor(*kind))
+        if (kind && isYieldingMutableAccessor(*kind))
           for (auto yield : bai->getYieldedValues())
             setUsefulAndPropagateToOperands(yield, i);
       }

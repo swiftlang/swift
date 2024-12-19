@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -parse-as-library -emit-ir %s -o - | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 struct MyStruct1<T> {
     var a, b: T

@@ -2375,7 +2375,7 @@ namespace {
                                swift::NumGenericMetadataPrivateDataWords);
         auto privateDataInit = llvm::Constant::getNullValue(privateDataTy);
         
-        IRGenMangler mangler;
+        IRGenMangler mangler(IGM.Context);
         auto symbolName =
           mangler.mangleProtocolConformanceInstantiationCache(Conformance);
         
@@ -3648,9 +3648,13 @@ void NecessaryBindings::restore(IRGenFunction &IGF, Address buffer,
                                     metadataState, SubMap);
 }
 
-void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
+void NecessaryBindings::save(IRGenFunction &IGF, Address buffer,
+                std::optional<SubstitutionMap> replacementSubstitutions) const {
+  SubstitutionMap subsToPass = replacementSubstitutions.has_value()
+    ? replacementSubstitutions.value()
+    : SubMap;
   emitInitOfGenericRequirementsBuffer(IGF, getRequirements(), buffer,
-                                      MetadataState::Complete, SubMap,
+                                      MetadataState::Complete, subsToPass,
                                       /*onHeapPacks=*/!NoEscape);
 }
 
@@ -4303,7 +4307,7 @@ static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF
   auto &IGM = IGF.IGM;
   llvm::SmallString<40> fnName;
   auto entity = LinkEntity::forMethodDescriptor(member);
-  auto mangled = entity.mangleAsString();
+  auto mangled = entity.mangleAsString(IGM.Context);
   llvm::raw_svector_ostream(fnName)
     << "__swift_relative_protocol_witness_table_access_"
     << index.forProtocolWitnessTable().getValue()
@@ -4520,7 +4524,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
   if (!signature)
     return nullptr;
 
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   auto symbolName = mangler.mangleSymbolNameForGenericEnvironment(signature);
   return getAddrOfStringForMetadataRef(symbolName, /*alignment=*/0, false,
       [&] (ConstantInitBuilder &builder) -> ConstantInitFuture {

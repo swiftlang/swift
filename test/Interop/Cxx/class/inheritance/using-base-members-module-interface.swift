@@ -1,5 +1,5 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -access-filter-public -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -access-filter-public -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
 
 // CHECK: struct PublicBase {
 // CHECK-NEXT:   init()
@@ -21,6 +21,7 @@
 // CHECK-NEXT: }
 
 // CHECK: struct UsingBaseConstructorWithParam {
+// CHECK-NEXT:   init(consuming _: consuming IntBox)
 // CHECK-NEXT:   init(_: IntBox)
 // CHECK-NEXT:   init(_: UInt32)
 // CHECK-NEXT:   init(_: Int32)
@@ -29,6 +30,7 @@
 
 // CHECK: struct UsingBaseConstructorEmpty {
 // CHECK-NEXT:   init()
+// CHECK-NEXT:   init(consuming _: consuming Empty)
 // CHECK-NEXT:   init(_: Empty)
 // CHECK-NEXT:   var value: Int32
 // CHECK-NEXT: }

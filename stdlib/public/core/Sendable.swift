@@ -132,11 +132,7 @@
 /// ### Sendable Metatypes
 ///
 /// Metatypes such as `Int.Type` implicitly conform to the `Sendable` protocol.
-#if $NonescapableTypes
 @_marker public protocol Sendable: ~Copyable, ~Escapable { }
-#else
-@_marker public protocol Sendable: ~Copyable { }
-#endif
 
 ///
 /// A type whose values can safely be passed across concurrency domains by copying,

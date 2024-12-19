@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -deinit-devirtualizer -module-name=test | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -deinit-devirtualizer -module-name=test | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

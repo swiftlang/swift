@@ -1,0 +1,9 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -enable-library-evolution -swift-version 6 -enable-experimental-feature IsolatedAny -enable-experimental-feature ImplicitOpenExistentials -enable-experimental-feature InferSendableFromCaptures -module-name Test
+
+// RUN: %empty-directory(%t)
+// RUN: cp %s %t/Test.swiftinterface
+// RUN: %target-swift-frontend -compile-module-from-interface -module-name Test -o /dev/null %t/Test.swiftinterface
+// RUN: echo "import Test" | %target-swift-frontend -typecheck - -I %t/
+
+import Swift

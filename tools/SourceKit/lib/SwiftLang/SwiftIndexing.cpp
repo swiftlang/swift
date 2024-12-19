@@ -224,25 +224,33 @@ static void indexModule(llvm::MemoryBuffer *Input,
 
     // FIXME: These APIs allocate memory on the ASTContext, meaning it may not
     // be freed for a long time.
-    Mod = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
-    // Indexing is not using documentation now, so don't open the module
-    // documentation file.
-    // FIXME: refactor the frontend to provide an easy way to figure out the
-    // correct filename here.
-    auto FUnit = Loader->loadAST(*Mod, std::nullopt, /*moduleInterfacePath=*/"",
-                                 /*moduleInterfaceSourcePath=*/"",
-                                 std::move(Buf), nullptr, nullptr,
-                                 /*isFramework=*/false);
+    Mod = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx,
+                             [&](ModuleDecl *Mod, auto addFile) {
+      // Indexing is not using documentation now, so don't open the module
+      // documentation file.
+      // FIXME: refactor the frontend to provide an easy way to figure out
+      // the correct filename here.
+      auto FUnit =
+          Loader->loadAST(*Mod, std::nullopt, /*moduleInterfacePath=*/"",
+                          /*moduleInterfaceSourcePath=*/"", std::move(Buf),
+                          nullptr, nullptr,
+                          /*isFramework=*/false);
 
-    // FIXME: Not knowing what went wrong is pretty bad. loadModule() should be
-    // more modular, rather than emitting diagnostics itself.
-    if (!FUnit) {
+      if (!FUnit) {
+        Mod->setFailedToLoad();
+        return;
+      }
+
+      addFile(FUnit);
+      Mod->setHasResolvedImports();
+    });
+
+    // FIXME: Not knowing what went wrong is pretty bad. loadModule()
+    // should be more modular, rather than emitting diagnostics itself.
+    if (Mod->failedToLoad()) {
       IdxConsumer.failed("failed to load module");
       return;
     }
-
-    Mod->addFile(*FUnit);
-    Mod->setHasResolvedImports();
   }
 
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);

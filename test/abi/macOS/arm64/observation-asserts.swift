@@ -5,6 +5,7 @@
 
 // REQUIRES: swift_stdlib_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-arm64
+// REQUIRES: observation
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
 

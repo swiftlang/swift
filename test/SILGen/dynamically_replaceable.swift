@@ -1,6 +1,6 @@
-// RUN: %target-swift-emit-silgen -swift-version 5 %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -swift-version 5 %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPLICIT
-// RUN: %target-swift-emit-silgen -swift-version 5 %s -disable-previous-implementation-calls-in-dynamic-replacements | %FileCheck %s --check-prefix=NOPREVIOUS
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPLICIT
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -disable-previous-implementation-calls-in-dynamic-replacements | %FileCheck %s --check-prefix=NOPREVIOUS
 
 // IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable6$deferL_yyF
 var x = 10

@@ -13,6 +13,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/SourceManager.h"
+#include <algorithm>
 
 using namespace swift;
 
@@ -34,8 +35,42 @@ void SourceEdits::addEdit(SourceManager &SM, CharSourceRange Range,
 
 void swift::
 writeEditsInJson(const SourceEdits &AllEdits, llvm::raw_ostream &OS) {
-  OS << "[\n";
-  for (auto &Edit : AllEdits.getEdits()) {
+  // Sort the edits so they occur from the last to the first within a given
+  // source file. That's the order in which applying non-overlapping edits
+  // will succeed.
+  std::vector<SourceEdits::Edit> allEdits(AllEdits.getEdits().begin(),
+                                          AllEdits.getEdits().end());
+  std::sort(allEdits.begin(), allEdits.end(),
+            [&](const SourceEdits::Edit &lhs, const SourceEdits::Edit &rhs) {
+    // Sort first based on the path. This keeps the edits for a given
+    // file together.
+    if (lhs.Path < rhs.Path)
+      return true;
+    else if (lhs.Path > rhs.Path)
+      return false;
+
+    // Then sort based on offset, with larger offsets coming earlier.
+    return lhs.Offset > rhs.Offset;
+  });
+
+  // Remove duplicate edits.
+  allEdits.erase(
+      std::unique(allEdits.begin(), allEdits.end(),
+      [&](const SourceEdits::Edit &lhs, const SourceEdits::Edit &rhs) {
+        return lhs.Path == rhs.Path && lhs.Text == rhs.Text &&
+          lhs.Offset == rhs.Offset && lhs.Length == rhs.Length;
+      }),
+      allEdits.end());
+
+  OS << "[";
+  bool first = true;
+  for (auto &Edit : allEdits) {
+    if (first) {
+      first = false;
+    } else {
+      OS << ",";
+    }
+    OS << "\n";
     OS << " {\n";
     OS << "  \"file\": \"";
     OS.write_escaped(Edit.Path) << "\",\n";
@@ -44,9 +79,9 @@ writeEditsInJson(const SourceEdits &AllEdits, llvm::raw_ostream &OS) {
       OS << "  \"remove\": " << Edit.Length << ",\n";
     if (!Edit.Text.empty()) {
       OS << "  \"text\": \"";
-      OS.write_escaped(Edit.Text) << "\",\n";
+      OS.write_escaped(Edit.Text) << "\"\n";
     }
-    OS << " },\n";
+    OS << " }";
   }
-  OS << "]\n";
+  OS << "\n]\n";
 }

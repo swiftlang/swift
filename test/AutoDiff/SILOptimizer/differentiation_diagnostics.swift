@@ -720,12 +720,11 @@ func tupleArrayLiteralInitialization(_ x: Float, _ y: Float) -> Float {
 // Subset parameter differentiation thunks
 //===----------------------------------------------------------------------===//
 
-// FIXME: Non-differentiability diagnostic crash due to invalid source location (https://github.com/apple/swift/issues/55492).
-/*
 func testNoDerivativeParameter(_ f: @differentiable(reverse) (Float, @noDerivative Float) -> Float) -> Float {
+  // expected-error @+2 {{function is not differentiable}}
+  // expected-note @+1 {{cannot differentiate with respect to a '@noDerivative' parameter}}
   return gradient(at: 2) { x in f(x * x, x) }
 }
-*/
 
 // Test parameter subset thunk + partially-applied original function.
 struct TF_675 : Differentiable {

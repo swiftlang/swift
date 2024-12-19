@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s  -Xllvm -sil-print-after=loadable-address -Xllvm -verify-continue-on-failure -c -o %t/t.o 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s  -Xllvm -sil-print-types -Xllvm -sil-print-after=loadable-address -Xllvm -verify-continue-on-failure -c -o %t/t.o 2>&1 | %FileCheck %s
 
 // This used to trigger an assertion due to LoadableByAddress not doing proper mapping of
 // switch_enum arguments during rewriting

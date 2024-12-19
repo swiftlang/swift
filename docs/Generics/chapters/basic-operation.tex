@@ -18,13 +18,13 @@ Let's go. There are two principal entry points into the Requirement Machine:
 
 \item To \textbf{build a new generic signature}, we construct a requirement machine from a list of user-written requirements; we call this a \emph{minimization machine}. We compute the minimal requirements as a side-effect of the construction process.
 \end{itemize}
-In addition, there are two more we call upon when reasoning about protocols:
+In addition, we have two more for when we need to reason about protocols:
 \begin{itemize}
 \item To answer questions about \textbf{a protocol's requirement signature}, we construct a requirement machine from the protocol's requirement signature; we call this a \emph{protocol machine}.
 \item To \textbf{build a new requirement signature} for a protocol written in source, we construct a requirement machine from the list of user-written requirements; we call this a \emph{protocol minimization machine}. We compute the minimal associated requirements as a side-effect of the construction process.
 \end{itemize}
 
-We divide list of rewrite rules in a requirement machine into \IndexDefinition{local rule}\emph{local rules}, corresponding to the initial requirements the machine was built from, and \emph{imported rules}, which as we see shortly, describe associated requirements of protocols referenced by the local rules. We now look at each of the four requirement machine kinds in detail.
+We partition the rewrite rules of a requirement machine into \IndexDefinition{local rule}\emph{local rules}, corresponding to the initial requirements the machine was built from, and \emph{imported rules}, which as we see shortly, describe associated requirements of protocols referenced by the local rules. We now look at each of the four requirement machine kinds in detail.
 
 \paragraph{Query machines.}
 We maintain a table of \IndexDefinition{query machine}\emph{query machine} instances inside a singleton object, called the \IndexDefinition{rewrite context}\emph{rewrite context}. We can use \index{canonical generic signature}\emph{canonical} generic signatures as keys, because the translation of requirements into rewrite rules ignores \index{sugared type!in requirement machine}type sugar. Once built, a query machine remains live for the duration of the compilation session. We build a query machine from a \index{generic signature!query machine}generic signature like so:
@@ -153,9 +153,9 @@ Protocol machines have a global lifetime and are owned by the \index{rewrite con
 \item Completion and property map construction proceed as in the query machine case.
 \end{enumerate}
 
-Usually the user's program will declare an assortment of protocols, with various generic types and functions then stating conformance requirements to those protocols, so that each protocol is mentioned in more than one generic signature. Therefore, requirement machines for different generic signatures often have many rewrite rules in common, because they depend on the same protocols.
+Usually the user's program will declare an assortment of protocols, with various generic types and functions then stating conformance requirements to those protocols, so that each protocol is typically mentioned in several generic signatures. For this reason, it is often the case that requirement machines for different generic signatures often have many rewrite rules in common, because they depend on the same protocols.
 
-The role of protocol machines is to serve as containers for these shared rules. This eliminates the repeated work that would result from repeatedly translating the associated requirements of a protocol, and processing them with the completion procedure, in every requirement machine that contains a conformance requirement to this protocol. Instead, we look up the protocol machine and \emph{import} its rewrite rules when building a requirement machine that depends on a protocol.
+The role of protocol machines is to serve as containers for these shared rules. This eliminates the overhead of translating the associated requirements of each protocol, and processing them with the completion procedure, in every requirement machine that contains a conformance requirement to this protocol. Instead, we look up the protocol machine and \emph{import} its rewrite rules when building a requirement machine that depends on a protocol.
 
 \paragraph{Protocol minimization machines.}
 To actually build the requirement signature of a protocol written in source, we construct a \IndexDefinition{protocol minimization machine}\emph{protocol minimization machine}. A protocol minimization machine has a temporary lifetime, scoped to the \index{requirement signature request}\Request{requirement signature request}. The minimal requirements of the requirement signature are computed as a side-effect of constructing the protocol minimization machine.
@@ -234,7 +234,7 @@ We now take a closer look at how generic signatures and protocols depend on othe
 
 There is an alternative definition of this concept using \index{derived requirement}derived requirements.
 \begin{definition}
-A protocol $\tP$ \emph{depends on} a protocol \tQ\ if we can derive a conformance to \tQ\ from the \index{protocol generic signature}protocol generic signature $\GP$; that is, if $\GP\vdash\ConfReq{Self.U}{Q}$ for some type parameter~\texttt{Self.U}. We write $\tP\prec\tQ$ if this relationship holds. The set of \IndexDefinition{protocol dependency set}\emph{protocol dependencies} of~\tP\ is the set of all protocols \tQ\ such that $\tP\prec\tQ$.
+A protocol $\tP$ \emph{depends on} a protocol \tQ\ if we can derive a conformance to \tQ\ from the \index{protocol generic signature}protocol generic signature $\GP$; that is, if $\GP\vdash\ConfReq{Self.U}{Q}$ for some type parameter~\SelfU. We write $\tP\prec\tQ$ if this relationship holds. The set of \IndexDefinition{protocol dependency set}\emph{protocol dependencies} of~\tP\ is the set of all protocols \tQ\ such that $\tP\prec\tQ$.
 \end{definition}
 
 \begin{proposition}
@@ -243,10 +243,10 @@ The $\prec$ relation is \index{reflexive relation}reflexive and \index{transitiv
 \begin{proof}
 For the first part, let \tP\ be any protocol. We can always derive $\GP\vdash\ConfReq{Self}{P}$ via the explicit requirement $\ConfReq{Self}{P}$ of $\GP$, therefore $\tP\prec\tP$, so $\prec$ is reflexive.
 
-For the second part, let \tP, \tQ\ and \tR\ be protocols such that $\tP\prec\tQ$ and $\tQ\prec\tR$.  By definition, $\GP\vdash\ConfReq{Self.U}{Q}$ and $G_\tQ\vdash\ConfReq{Self.V}{R}$ for some type parameters \texttt{Self.U} and \texttt{Self.V}. By \LemmaRef{subst lemma}, $\GP\vdash\ConfReq{Self.U.V}{R}$, where \texttt{Self.U.V} is the type parameter formed by substituting \tSelf\ with \texttt{Self.U} in \texttt{Self.V}. Therefore, $\tP\prec\tR$.
+For the second part, let \tP, \tQ\ and \tR\ be protocols such that $\tP\prec\tQ$ and $\tQ\prec\tR$.  By definition, $\GP\vdash\ConfReq{Self.U}{Q}$ and $G_\tQ\vdash\ConfReq{Self.V}{R}$ for some type parameters \SelfU\ and \texttt{Self.V}. By \LemmaRef{subst lemma}, $\GP\vdash\ConfReq{Self.U.V}{R}$, where \texttt{Self.U.V} is the type parameter formed by \index{formal substitution}replacing \tSelf\ with \SelfU\ in \texttt{Self.V}. Therefore, $\tP\prec\tR$.
 \end{proof}
 
-In fact, $\prec$ is exactly the \index{reachability relation}reachability relation in the \index{directed graph}protocol dependency graph.
+In fact, $\prec$ is exactly the \index{reachability relation}reachability relation in the protocol dependency graph.
 
 \begin{proposition}
 Let \tP\ and \tQ\ be protocols. Then, $\tP\prec\tQ$ if and only if \tQ\ is reachable from \tP\ by a \index{path}path in the protocol dependency graph.
@@ -254,9 +254,9 @@ Let \tP\ and \tQ\ be protocols. Then, $\tP\prec\tQ$ if and only if \tQ\ is reach
 \begin{proof}
 A non-empty path in the protocol dependency graph is determined by the edges visited, that is, by a sequence of associated conformance requirements. This sequence of requirements has the property that each consecutive associated requirement has to be declared in the protocol named by the previous requirement. Also, when a derivation contains a sequence of consecutive \textsc{AssocConf} steps, the sequence of requirements referenced by each step obeys the same compatibility condition.
 
-$(\Leftarrow)$ Suppose that $\tP\prec\tQ$. By definition, there exists a type parameter~\texttt{Self.U} such that $\GP\vdash\ConfReq{Self.U}{Q}$. By \ThmRef{conformance paths theorem}, we can find a type parameter $\texttt{Self.U}^\prime$ such that $\GP\vdash\SameReq{Self.U}{$\texttt{Self.U}^\prime$}$, and the derivation of $\ConfReq{$\texttt{Self.U}^\prime$}{Q}$ takes a particularly simple form: it begins with a \textsc{Conf} step for the explicit requirement $\ConfReq{Self}{P}$, followed by a series of \IndexStep{AssocConf}\textsc{AssocConf} derivation steps. By the previous remark, this sequence of steps give us a path from \tP\ to \tQ\ in the protocol dependency graph.
+$(\Leftarrow)$ Suppose that $\tP\prec\tQ$. By definition, there exists a type parameter~\SelfU\ such that $\GP\vdash\ConfReq{Self.U}{Q}$. By \ThmRef{conformance paths theorem}, we can find a type parameter $\SelfU^\prime$ such that $\GP\vdash\SameReq{Self.U}{$\SelfU^\prime$}$, and the derivation of $\ConfReq{$\SelfU^\prime$}{Q}$ takes a particularly simple form: it begins with a \textsc{Conf} step for the explicit requirement $\ConfReq{Self}{P}$, followed by a series of \IndexStep{AssocConf}\textsc{AssocConf} derivation steps. By the previous remark, this sequence of steps give us a path from \tP\ to \tQ\ in the protocol dependency graph.
 
-$(\Rightarrow)$ Suppose there is a path from \tP\ to \tQ\ in the protocol dependency graph. Consider the sequence of visited edges. We construct a derivation of a conformance requirement in $\GP$ by starting with a \IndexStep{Conf}\textsc{Conf} step for the explicit requirement $\ConfReq{Self}{P}$, and adding a series of \textsc{AssocConf} steps for each edge visited in our path. By the previous remark, this is a valid derivation. We see that $\GP\vdash\ConfReq{Self.U}{Q}$ for some type parameter \texttt{Self.U}, showing that $\tP\prec\tQ$.
+$(\Rightarrow)$ Suppose there is a path from \tP\ to \tQ\ in the protocol dependency graph. Consider the sequence of visited edges. We construct a derivation of a conformance requirement in $\GP$ by starting with a \IndexStep{Conf}\textsc{Conf} step for the explicit requirement $\ConfReq{Self}{P}$, and adding a series of \textsc{AssocConf} steps for each edge visited in our path. By the previous remark, this is a valid derivation. We see that $\GP\vdash\ConfReq{Self.U}{Q}$ for some type parameter \SelfU, showing that $\tP\prec\tQ$.
 \end{proof}
 
 \begin{wrapfigure}[12]{r}{3.6cm}
@@ -319,14 +319,14 @@ protocol Bot {}
 \end{listing}
 
 \paragraph{Strongly connected components.}
-Suppose $(V, E)$ is any \index{directed graph}directed graph, and $\prec$ is the \index{reachability relation}reachability relation, so $x\prec y$ if there is a path with source $x$ and destination $y$. We say that $x$ and $y$ are \IndexDefinition{strongly connected component}\index{SCC|see{strongly connected component}}\emph{strongly connected} if both $x\prec y$ and $y\prec x$ are true; we denote this relation by $x\equiv y$ in the following. This is an \index{equivalence relation}equivalence relation:
+Suppose $(V, E)$ is any \index{directed graph!strongly connected components}directed graph, and $\prec$ is the \index{reachability relation}reachability relation, so $x\prec y$ if there is a path with source $x$ and destination $y$. We say that $x$ and $y$ are \IndexDefinition{strongly connected component}\index{SCC|see{strongly connected component}}\emph{strongly connected} if both $x\prec y$ and $y\prec x$ are true; we denote this relation by $x\equiv y$ in the following. This is an \index{equivalence relation}equivalence relation:
 \begin{itemize}
 \item \index{reflexive relation}(Reflexivity) If $x\in V$, then $x\prec x$ via the \index{empty path}empty path at $x$, and thus $x\equiv x$.
 \item \index{symmetric relation}(Symmetry) If $x\equiv y$, then $y\equiv x$, by definition of $\equiv$.
 \item \index{transitive relation}(Transitivity) If $x\equiv y$ and $y\equiv z$, then in particular $x\prec y$ and $y\prec z$, so $x\prec z$, because $\prec$ is transitive. By the same argument, we also have $y\prec x$ and $z\prec y$, hence $z\prec x$. Therefore, $x\equiv z$.
 \end{itemize}
 
-The \index{equivalence class}equivalence classes of $\equiv$ are called the \emph{strongly connected components} of $(V, E)$. We can define a graph where each \emph{vertex} is a strongly connected component of the original graph; two components are joined by an edge if and only if some vertex in the first component is joined by a path with another vertex in the second component in the original graph. (This is \index{well-defined}well-defined, because if $x_1\equiv x_2$ and $y_1\equiv y_2$, then $x_1\prec y_1$ if and only if $x_2\prec y_2$.) The graph of strongly connected components is a \index{DAG|see {directed acyclic graph}}\IndexDefinition{directed acyclic graph}\emph{directed acyclic graph} (or DAG); that is, it does not have any non-empty paths with the same source and destination. Furthermore, if the original graph was already acyclic, then each vertex will be in a strongly connected component by itself.
+The \index{equivalence class}equivalence classes of $\equiv$ are called the \emph{strongly connected components} of $(V, E)$. We can define a graph where each \emph{vertex} is a strongly connected component of the original graph; two components are joined by an edge if and only if some vertex in the first component is joined by a path with another vertex in the second component in the original graph. (This is \index{well-defined}well-defined, because if $x_1\equiv x_2$ and $y_1\equiv y_2$, then $x_1\prec y_1$ if and only if $x_2\prec y_2$.) The graph of strongly connected components is always acyclic. Furthermore, when the original graph is acyclic, the graph of stringly connected components is the same as the original graph. we can only have $x\equiv y$ if in fact $x$~and~$y$ are the same vertex, in which case every vertex simply belongs to its own one-element strongly connected component.
 
 \begin{wrapfigure}{l}{3.3cm}
 \begin{tikzpicture}[x=1cm, y=1.3cm]

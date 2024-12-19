@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple  %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 func autoclosureCapture(_: @autoclosure () async throws -> Int) async {}
 func nonescapingCapture(_: () async throws -> Int) {}

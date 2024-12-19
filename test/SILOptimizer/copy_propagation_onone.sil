@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all -opt-mode=none %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
+// RUN: %target-sil-opt -sil-print-types -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all -opt-mode=none %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
 
 class C {}
 

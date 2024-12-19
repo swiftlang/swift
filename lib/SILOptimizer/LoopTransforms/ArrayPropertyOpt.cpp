@@ -837,7 +837,7 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
       if (getFunction()->getModule().getOptions().VerifyAll)
         getFunction()->verifyCriticalEdges();
 
-      updateBorrowedFrom(getPassManager(), Fn);
+      updateAllGuaranteedPhis(getPassManager(), Fn);
 
       // We preserve the dominator tree. Let's invalidate everything
       // else.

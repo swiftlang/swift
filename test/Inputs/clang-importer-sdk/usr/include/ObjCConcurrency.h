@@ -179,7 +179,7 @@ typedef void ( ^ObjCErrorHandler )( NSError * _Nullable inError );
   - (void) myMethod:(NSInteger)value1 foo:(NSInteger)value2;
 @end
 
-@interface GenericObject<T> : NSObject
+@interface GenericObject<T> : NSObject // expected-note {{generic class 'GenericObject' does not conform to the 'Sendable' protocol}}
 - (void)doSomethingWithCompletionHandler:(void (^)(T _Nullable_result, NSError * _Nullable))completionHandler;
 - (void)doAnotherThingWithCompletionHandler:(void (^)(GenericObject<T> *_Nullable))completionHandler;
 @end
@@ -218,7 +218,7 @@ MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor"))) @protocol Tr
 
 SENDABLE @interface SendableClass : NSObject @end
 
-NONSENDABLE @interface NonSendableClass : NSObject @end
+NONSENDABLE @interface NonSendableClass : NSObject @end // expected-note {{class 'NonSendableClass' does not conform to the 'Sendable' protocol}}
 
 ASSUME_NONSENDABLE_BEGIN
 
@@ -232,14 +232,14 @@ SENDABLE @protocol SendableProtocol @end
 typedef NS_ENUM(unsigned, SendableEnum) {
   SendableEnumFoo, SendableEnumBar
 };
-typedef NS_ENUM(unsigned, NonSendableEnum) {
+typedef NS_ENUM(unsigned, NonSendableEnum) { // expected-note {{enum 'NonSendableEnum' does not conform to the 'Sendable' protocol}}
   NonSendableEnumFoo, NonSendableEnumBar
 } NONSENDABLE;
 
 typedef NS_OPTIONS(unsigned, SendableOptions) {
   SendableOptionsFoo = 1 << 0, SendableOptionsBar = 1 << 1
 };
-typedef NS_OPTIONS(unsigned, NonSendableOptions) {
+typedef NS_OPTIONS(unsigned, NonSendableOptions) { // expected-note {{struct 'NonSendableOptions' does not conform to the 'Sendable' protocol}}
   NonSendableOptionsFoo = 1 << 0, NonSendableOptionsBar = 1 << 1
 } NONSENDABLE;
 
@@ -264,10 +264,10 @@ UI_ACTOR
 @end
 
 typedef NSString *SendableStringEnum NS_STRING_ENUM;
-typedef NSString *NonSendableStringEnum NS_STRING_ENUM NONSENDABLE;
+typedef NSString *NonSendableStringEnum NS_STRING_ENUM NONSENDABLE; // expected-note {{struct 'NonSendableStringEnum' does not conform to the 'Sendable' protocol}}
 
 typedef NSString *SendableStringStruct NS_EXTENSIBLE_STRING_ENUM;
-typedef NSString *NonSendableStringStruct NS_EXTENSIBLE_STRING_ENUM NONSENDABLE;
+typedef NSString *NonSendableStringStruct NS_EXTENSIBLE_STRING_ENUM NONSENDABLE; // expected-note {{struct 'NonSendableStringStruct' does not conform to the 'Sendable' protocol}}
 
 SENDABLE
 typedef struct {

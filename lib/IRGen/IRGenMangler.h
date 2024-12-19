@@ -14,6 +14,7 @@
 #define SWIFT_IRGEN_IRGENMANGLER_H
 
 #include "IRGenModule.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ProtocolAssociations.h"
@@ -43,7 +44,7 @@ struct SymbolicMangling {
 /// The mangler for all kind of symbols produced in IRGen.
 class IRGenMangler : public Mangle::ASTMangler {
 public:
-  IRGenMangler() { }
+  IRGenMangler(ASTContext &Ctx) : ASTMangler(Ctx) { }
 
   std::string mangleDispatchThunk(const FuncDecl *func) {
     llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));

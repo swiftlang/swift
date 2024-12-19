@@ -24,11 +24,11 @@ void ClangClassTypePrinter::printClassTypeDecl(
     DeclAndTypePrinter &declAndTypePrinter) {
   auto printCxxImplClassName = ClangValueTypePrinter::printCxxImplClassName;
 
-  ClangSyntaxPrinter printer(os);
+  ClangSyntaxPrinter printer(typeDecl->getASTContext(), os);
 
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredType()->getCanonicalType());
-  std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString();
+  std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString(typeDecl->getASTContext());
 
   printer.printParentNamespaceForNestedTypes(typeDecl, [&](raw_ostream &os) {
     // Print out a forward declaration of the "hidden" _impl class.
@@ -50,9 +50,9 @@ void ClangClassTypePrinter::printClassTypeDecl(
 
     if (auto *parentClass = typeDecl->getSuperclassDecl()) {
       llvm::raw_string_ostream baseNameOS(baseClassName);
-      ClangSyntaxPrinter(baseNameOS).printBaseName(parentClass);
+      ClangSyntaxPrinter(typeDecl->getASTContext(), baseNameOS).printBaseName(parentClass);
       llvm::raw_string_ostream baseQualNameOS(baseClassQualifiedName);
-      ClangSyntaxPrinter(baseQualNameOS)
+      ClangSyntaxPrinter(typeDecl->getASTContext(), baseQualNameOS)
           .printModuleNamespaceQualifiersIfNeeded(
               parentClass->getModuleContext(), typeDecl->getModuleContext());
       baseQualNameOS << baseNameOS.str();
@@ -63,7 +63,7 @@ void ClangClassTypePrinter::printClassTypeDecl(
 
     os << "class";
     declAndTypePrinter.printAvailability(os, typeDecl);
-    ClangSyntaxPrinter(os).printSymbolUSRAttribute(typeDecl);
+    ClangSyntaxPrinter(typeDecl->getASTContext(), os).printSymbolUSRAttribute(typeDecl);
     os << ' ';
     printer.printBaseName(typeDecl);
     if (typeDecl->isFinal())
@@ -117,7 +117,7 @@ void ClangClassTypePrinter::printClassTypeReturnScaffold(
     raw_ostream &os, const ClassDecl *type, const ModuleDecl *moduleContext,
     llvm::function_ref<void(void)> bodyPrinter) {
   os << "  return ";
-  ClangSyntaxPrinter(os).printModuleNamespaceQualifiersIfNeeded(
+  ClangSyntaxPrinter(type->getASTContext(), os).printModuleNamespaceQualifiersIfNeeded(
       type->getModuleContext(), moduleContext);
   os << cxx_synthesis::getCxxImplNamespaceName() << "::";
   ClangValueTypePrinter::printCxxImplClassName(os, type);

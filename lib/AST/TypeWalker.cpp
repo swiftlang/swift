@@ -50,6 +50,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
 
   }
+  bool visitLocatableType(LocatableType *ty) { return false; }
   bool visitSILTokenType(SILTokenType *ty) { return false; }
 
   bool visitPackType(PackType *ty) {
@@ -75,10 +76,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitPackElementType(PackElementType *ty) {
     return doIt(ty->getPackType());
-  }
-
-  bool visitParenType(ParenType *ty) {
-    return doIt(ty->getUnderlyingType());
   }
 
   bool visitTupleType(TupleType *ty) {

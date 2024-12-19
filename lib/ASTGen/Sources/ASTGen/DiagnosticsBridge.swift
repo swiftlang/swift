@@ -262,7 +262,7 @@ public func addQueuedDiagnostic(
   text: UnsafePointer<UInt8>,
   textLength: Int,
   severity: BridgedDiagnosticSeverity,
-  position: BridgedSourceLoc,
+  cLoc: BridgedSourceLoc,
   highlightRangesPtr: UnsafePointer<BridgedSourceLoc>?,
   numHighlightRanges: Int
 ) {
@@ -270,7 +270,7 @@ public func addQueuedDiagnostic(
     to: QueuedDiagnostics.self
   )
 
-  guard let rawPosition = position.getOpaquePointerValue() else {
+  guard let rawPosition = cLoc.getOpaquePointerValue() else {
     return
   }
 
@@ -280,18 +280,33 @@ public func addQueuedDiagnostic(
       return false
     }
 
-    return rawPosition >= baseAddress && rawPosition < baseAddress + sf.buffer.count
+    return rawPosition >= baseAddress && rawPosition <= baseAddress + sf.buffer.count
   }
   guard let sourceFile = sourceFile else {
     // FIXME: Hard to report an error here...
     return
   }
 
-  // Find the token at that offset.
   let sourceFileBaseAddress = UnsafeRawPointer(sourceFile.buffer.baseAddress!)
   let sourceFileEndAddress = sourceFileBaseAddress + sourceFile.buffer.count
   let offset = rawPosition - sourceFileBaseAddress
-  guard let token = sourceFile.syntax.token(at: AbsolutePosition(utf8Offset: offset)) else {
+  let position = AbsolutePosition(utf8Offset: offset)
+
+  // Find the token at that offset.
+  let node: Syntax
+  if let token = sourceFile.syntax.token(at: position) {
+    node = Syntax(token)
+  } else if position == sourceFile.syntax.endPosition {
+    // FIXME: EOF token is not included in '.token(at: position)'
+    // We might want to include it, but want to avoid special handling.
+    // Also 'sourceFile.syntax' is not guaranteed to be 'SourceFileSyntax'.
+    if let token = sourceFile.syntax.lastToken(viewMode: .all) {
+      node = Syntax(token)
+    } else {
+      node = sourceFile.syntax
+    }
+  } else {
+    // position out of range.
     return
   }
 
@@ -346,7 +361,8 @@ public func addQueuedDiagnostic(
 
   let textBuffer = UnsafeBufferPointer(start: text, count: textLength)
   let diagnostic = Diagnostic(
-    node: Syntax(token),
+    node: node,
+    position: position,
     message: SimpleDiagnostic(
       message: String(decoding: textBuffer, as: UTF8.self),
       severity: severity.asSeverity

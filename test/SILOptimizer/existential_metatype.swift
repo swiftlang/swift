@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -emit-sil -parse-as-library | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -Xllvm -sil-print-types -emit-sil -parse-as-library | %FileCheck %s
 protocol SomeP {}
 
 public enum SpecialEnum : SomeP {}

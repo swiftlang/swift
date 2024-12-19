@@ -5,8 +5,8 @@
 // RUN: env %env-LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
 
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
-// RUN: %target-swift-frontend %s -profile-use=%t/default.profdata -emit-sorted-sil -emit-sil -module-name pgo_si_inlinelarge -o - | %FileCheck %s --check-prefix=SIL
-// RUN: %target-swift-frontend %s -profile-use=%t/default.profdata -O -emit-sorted-sil -emit-sil -module-name pgo_si_inlinelarge -o - | %FileCheck %s --check-prefix=SIL-OPT
+// RUN: %target-swift-frontend %s -profile-use=%t/default.profdata -emit-sorted-sil -Xllvm -sil-print-types -emit-sil -module-name pgo_si_inlinelarge -o - | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend %s -profile-use=%t/default.profdata -O -emit-sorted-sil -Xllvm -sil-print-types -emit-sil -module-name pgo_si_inlinelarge -o - | %FileCheck %s --check-prefix=SIL-OPT
 
 // REQUIRES: profile_runtime
 // REQUIRES: executable_test

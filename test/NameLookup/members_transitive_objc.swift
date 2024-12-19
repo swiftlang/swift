@@ -8,6 +8,7 @@
 // RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/MemberImportVisibility -import-objc-header %S/Inputs/MemberImportVisibility/Bridging.h -verify -swift-version 5 -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_MemberImportVisibility
 
 import Categories_B
 import Categories_E
@@ -23,6 +24,7 @@ func test(x: X) {
   x.fromOverlayForC() // expected-member-visibility-error {{instance method 'fromOverlayForC()' is not available due to missing import of defining module 'Categories_C'}}
   x.fromSubmoduleOfD() // expected-member-visibility-error {{instance method 'fromSubmoduleOfD()' is not available due to missing import of defining module 'Categories_D'}}
   x.fromBridgingHeader()
+  x.overridesCategoryMethodOnNSObject()
 }
 
 func testAnyObject(a: AnyObject) {
@@ -36,6 +38,7 @@ func testAnyObject(a: AnyObject) {
   a.fromC() // expected-error {{value of type 'AnyObject' has no member 'fromC'}}
   a.fromOverlayForCObjC() // expected-error {{value of type 'AnyObject' has no member 'fromOverlayForCObjC'}}
   a.fromBridgingHeader()
+  a.overridesCategoryMethodOnNSObject()
 }
 
 extension StructInBridgingHeader {
@@ -45,5 +48,11 @@ extension StructInBridgingHeader {
 
   var wrappedMember: Int32 {
     return member
+  }
+}
+
+extension ObjectInBridgingHeader {
+  func test() {
+    overridesCategoryMethodOnNSObject()
   }
 }

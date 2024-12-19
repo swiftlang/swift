@@ -10,12 +10,16 @@ struct X { }
 
 @freestanding(expression) macro m1() -> X = #externalMacro(module: "A", type: "B") // expected-error{{'X' is only available in macOS 12.0 or newer}}
 // expected-warning@-1{{external macro implementation type 'A.B' could not be found for macro 'm1()'}}
+// expected-note@-2{{add @available attribute to enclosing macro}}
 
 @available(macOS 12.0, *)
 @freestanding(expression) macro m2() -> X = #externalMacro(module: "A", type: "B")
 // expected-warning@-1{{external macro implementation type 'A.B' could not be found for macro 'm2()'}}
 
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+
+@attached(member, names: named(synthesizedMember))
+macro MemberThatCallsCode(_ codeString: String) = #externalMacro(module: "MacroDefinition", type: "MemberThatCallsCodeMacro")
 
 @available(macOS 12.0, *)
 func onlyInMacOS12() { }
@@ -26,4 +30,12 @@ func test() {
         onlyInMacOS12()
       }
     })
+}
+
+@MemberThatCallsCode("""
+  if #available(macOS 12.0, *) {
+    onlyInMacOS12()
+  }
+  """)
+struct HasMembers {
 }

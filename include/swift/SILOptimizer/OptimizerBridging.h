@@ -130,12 +130,13 @@ struct BridgedPostDomTree {
 
 struct BridgedUtilities {
   typedef void (* _Nonnull VerifyFunctionFn)(BridgedPassContext, BridgedFunction);
-  typedef void (* _Nonnull UpdateBorrowedFromFn)(BridgedPassContext, BridgedFunction);
-  typedef void (* _Nonnull UpdateBorrowedFromPhisFn)(BridgedPassContext, BridgedArrayRef);
+  typedef void (* _Nonnull UpdateFunctionFn)(BridgedPassContext, BridgedFunction);
+  typedef void (* _Nonnull UpdatePhisFn)(BridgedPassContext, BridgedArrayRef);
 
   static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
-  static void registerBorrowedFromUpdater(UpdateBorrowedFromFn updateBorrowedFromFn,
-                                          UpdateBorrowedFromPhisFn updateBorrowedFromPhisFn);
+  static void registerPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
+                                 UpdatePhisFn updateBorrowedFromPhisFn,
+                                 UpdatePhisFn replacePhisWithIncomingValuesFn);
 };
 
 struct BridgedBasicBlockSet {
@@ -255,11 +256,13 @@ struct BridgedPassContext {
                                                                BridgedFunction applySiteCallee) const;
 
   SWIFT_IMPORT_UNSAFE BridgedGlobalVar createGlobalVariable(BridgedStringRef name, BridgedType type,
-                                                            bool isPrivate) const;
+                                                            BridgedLinkage linkage, bool isLet) const;
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;
   BRIDGED_INLINE bool optimizeMemoryAccesses(BridgedFunction f) const;
   BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
+
+  BRIDGED_INLINE bool shouldExpand(BridgedType type) const;
 
   // IRGen
 
@@ -372,6 +375,7 @@ struct BridgedPassContext {
     Unchecked = 2
   };
 
+  BRIDGED_INLINE bool useAggressiveReg2MemForCodeSize() const;
   BRIDGED_INLINE bool enableStackProtection() const;
   BRIDGED_INLINE bool hasFeature(BridgedFeature feature) const;
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;

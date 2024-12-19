@@ -453,7 +453,8 @@ static bool visitScopeEndsRequiringInit(
   // Check for yields from a modify coroutine.
   if (auto bai =
           dyn_cast_or_null<BeginApplyInst>(operand->getDefiningInstruction())) {
-    for (auto *inst : bai->getTokenResult()->getUsers()) {
+    for (auto *use : bai->getEndApplyUses()) {
+      auto *inst = use->getUser();
       assert(isa<EndApplyInst>(inst) || isa<AbortApplyInst>(inst) ||
              isa<EndBorrowInst>(inst));
       visit(inst, ScopeRequiringFinalInit::Coroutine);
@@ -3346,6 +3347,9 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
     bool isFinalConsume = consumes.claimConsume(destroyPair.first, bits);
 
     // Remove destroys that are not the final consuming use.
+    // TODO: for C++ types we do not want to remove destroys as the caller is
+    //       still responsible for invoking the dtor for the moved-from object.
+    //       See GH Issue #77894.
     if (!isFinalConsume) {
       destroyPair.first->eraseFromParent();
       continue;

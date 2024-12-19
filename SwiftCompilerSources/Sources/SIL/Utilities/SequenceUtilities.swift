@@ -71,7 +71,7 @@ extension FormattedLikeArray {
 public protocol CollectionLikeSequence : FormattedLikeArray {
 }
 
-public extension CollectionLikeSequence {
+public extension Sequence {
   var isEmpty: Bool { !contains(where: { _ in true }) }
 
   var singleElement: Element? {
@@ -119,7 +119,7 @@ extension LazyFilterSequence : /*@retroactive*/ SIL.CollectionLikeSequence,
 //===----------------------------------------------------------------------===//
 
 public struct SingleInlineArray<Element>: RandomAccessCollection, FormattedLikeArray {
-  private var singleElement: Element?
+  public var singleElement: Element?
   private var multipleElements: [Element] = []
 
   public init() {}

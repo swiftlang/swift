@@ -5,7 +5,7 @@
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
-class NotConcurrent { } // expected-note 13{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
+class NotConcurrent { } // expected-note 12{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 // expected-tns-allow-typechecker-note @-1 {{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 
 // ----------------------------------------------------------------------
@@ -102,7 +102,7 @@ extension A1 {
     _ = other.localLet // expected-warning{{non-sendable type 'NotConcurrent' of property 'localLet' cannot exit actor-isolated context}}
     // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
     // expected-note@-2 {{property access is 'async'}}
-    _ = await other.synchronous() // expected-warning{{non-sendable result type 'NotConcurrent?' cannot be sent from actor-isolated context in call to instance method 'synchronous()'}}
+    _ = await other.synchronous() // expected-tns-warning {{non-Sendable 'NotConcurrent?'-typed result can not be returned from actor-isolated instance method 'synchronous()' to actor-isolated context}}
     _ = await other.asynchronous(nil)
   }
 }
@@ -164,7 +164,7 @@ struct HasSubscript {
   subscript (i: Int) -> NotConcurrent? { nil }
 }
 
-class ClassWithGlobalActorInits { // expected-note 2{{class 'ClassWithGlobalActorInits' does not conform to the 'Sendable' protocol}}
+class ClassWithGlobalActorInits { // expected-tns-note 2{{class 'ClassWithGlobalActorInits' does not conform to the 'Sendable' protocol}}
   @SomeGlobalActor
   init(_: NotConcurrent) { }
 
@@ -182,10 +182,10 @@ func globalTestMain(nc: NotConcurrent) async {
   // expected-tns-note @-1 {{sending global actor 'SomeGlobalActor'-isolated 'a' to global actor 'SomeGlobalActor'-isolated global function 'globalAsync' risks causing data races between global actor 'SomeGlobalActor'-isolated and local main actor-isolated uses}}
   await globalSync(a) // expected-tns-note {{access can happen concurrently}}
   _ = await ClassWithGlobalActorInits(nc)
-  // expected-warning @-1 {{non-sendable result type 'ClassWithGlobalActorInits' cannot be sent from global actor 'SomeGlobalActor'-isolated context in call to initializer 'init(_:)'}}
+  // expected-tns-warning @-1 {{non-Sendable 'ClassWithGlobalActorInits'-typed result can not be returned from global actor 'SomeGlobalActor'-isolated initializer 'init(_:)' to main actor-isolated context}}
   // expected-tns-warning @-2 {{sending 'nc' risks causing data races}}
   // expected-tns-note @-3 {{sending main actor-isolated 'nc' to global actor 'SomeGlobalActor'-isolated initializer 'init(_:)' risks causing data races between global actor 'SomeGlobalActor'-isolated and main actor-isolated uses}}
-  _ = await ClassWithGlobalActorInits() // expected-warning{{non-sendable result type 'ClassWithGlobalActorInits' cannot be sent from global actor 'SomeGlobalActor'-isolated context in call to initializer 'init()'}}
+  _ = await ClassWithGlobalActorInits() // expected-tns-warning {{non-Sendable 'ClassWithGlobalActorInits'-typed result can not be returned from global actor 'SomeGlobalActor'-isolated initializer 'init()' to main actor-isolated context}}
 }
 
 @SomeGlobalActor

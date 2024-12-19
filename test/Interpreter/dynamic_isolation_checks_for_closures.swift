@@ -23,11 +23,11 @@
 // RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash3.out 2>&1 | %FileCheck %t/src/Crash3.swift --check-prefix=LEGACY_CHECK
 // RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash3.out 2>&1 | %FileCheck %t/src/Crash3.swift --check-prefix=SWIFT6_CHECK --dump-input=always
 
-// REQUIRES: asserts
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_DynamicActorIsolation
 
 // rdar://123810657
 // UNSUPPORTED: back_deployment_runtime

@@ -224,3 +224,13 @@ func warnOptionalInStringInterpolationSegment(_ o : Int?) {
   // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{55-55=)}} 
   // expected-note@-3 {{provide a default value to avoid this warning}} {{55-55= ?? <#default value#>}}  
 }
+
+// Make sure we don't double diagnose
+_ = {
+  func foo(_ y: Int?) {
+    let _: Any = y // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
+    // expected-note@-1 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+    // expected-note@-2 {{provide a default value to avoid this warning}}
+    // expected-note@-3 {{force-unwrap the value to avoid this warning}}
+  }
+}

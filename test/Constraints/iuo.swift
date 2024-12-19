@@ -260,3 +260,26 @@ let _: Int? = returnsIUOFn()()
 let _: Int = returnsIUOFn()() // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
 // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
 // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+
+// Make sure it works for compound function references.
+func testCompoundRefs() {
+  func hasArgLabel(x: Int) -> Int! { x }
+  struct S {
+    func hasArgLabel(x: Int) -> Int! { x }
+  }
+  let _ = hasArgLabel(x:)(0)
+  let _: Int? = hasArgLabel(x:)(0)
+  let _: Int = hasArgLabel(x:)(0)
+
+  let _ = S.hasArgLabel(x:)(S())(0)
+  let _: Int? = S.hasArgLabel(x:)(S())(0)
+  let _: Int = S.hasArgLabel(x:)(S())(0)
+
+  let _ = S().hasArgLabel(x:)(0)
+  let _: Int? = S().hasArgLabel(x:)(0)
+  let _: Int = S().hasArgLabel(x:)(0)
+
+  // We still don't allow IUOs for the function itself.
+  let _: (Int) -> Int = hasArgLabel(x:) // expected-error {{cannot convert value of type '(Int) -> Int?' to specified type '(Int) -> Int}}
+  let _: (Int) -> Int? = hasArgLabel(x:)
+}

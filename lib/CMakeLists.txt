@@ -26,7 +26,6 @@ file(GENERATE
 #include \"swift/Basic/BasicBridging.h\"
 #include \"swift/AST/ASTBridging.h\"
 #include \"swift/IDE/IDEBridging.h\"
-#include \"swift/Parse/ParseBridging.h\"
 #include \"swift/SIL/SILBridging.h\"
 #include \"swift/SILOptimizer/OptimizerBridging.h\"
 ")
@@ -76,3 +75,4 @@ add_subdirectory(StaticMirror)
 add_subdirectory(SymbolGraphGen)
 add_subdirectory(SwiftSyntax)
 add_subdirectory(Threading)
+add_subdirectory(Tooling)

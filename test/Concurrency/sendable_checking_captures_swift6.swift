@@ -45,8 +45,8 @@ do {
 
     sendable_preconcurrency {
       test.update()
-      // expected-error@-1 {{capture of 'test' with non-sendable type 'Test' in a `@Sendable` closure}}
-      // expected-error@-2 {{mutable capture of 'inout' parameter 'test' is not allowed in concurrently-executing code}}
+      // expected-warning@-1 {{capture of 'test' with non-sendable type 'Test' in a `@Sendable` closure}}
+      // expected-warning@-2 {{mutable capture of 'inout' parameter 'test' is not allowed in concurrently-executing code}}
     }
   }
 }

@@ -2,7 +2,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift6-
 
 extension Int {
-  func foo() -> Int {} // expected-note 2 {{'foo()' declared here}}
+  func foo() -> Int {} // expected-note 3 {{'foo()' declared here}}
   var bar: Int {
     get {}
   }
@@ -38,6 +38,12 @@ func test(i: Int) {
   let _ = 0.bar<Int>
   // expected-swift5-error@-1 {{cannot specialize non-generic type 'Int'}}
   // expected-swift6-error@-2 {{cannot specialize non-generic type 'Int'}}
+}
+
+func testOptionalChain(i: Int?) {
+  let _ = i?.foo<Int>()
+  // expected-swift5-warning@-1 {{cannot explicitly specialize instance method 'foo()'}}
+  // expected-swift6-error@-2 {{cannot explicitly specialize instance method 'foo()'}}
 }
 
 extension Bool {

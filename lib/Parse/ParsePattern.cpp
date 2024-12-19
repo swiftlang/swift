@@ -631,6 +631,8 @@ mapParsedParameters(Parser &parser,
             // or typealias with underlying function type.
             if (ATR->has(TypeAttrKind::Autoclosure))
               param->setAutoClosure(true);
+            if (ATR->has(TypeAttrKind::Addressable))
+              param->setAddressable(true);
 
             unwrappedType = ATR->getTypeRepr();
             continue;

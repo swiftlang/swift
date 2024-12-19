@@ -26,7 +26,7 @@ using namespace swift;
 
 SerializedSILLoader::SerializedSILLoader(
     ASTContext &Ctx, SILModule *SILMod,
-    DeserializationNotificationHandlerSet *callbacks) {
+    DeserializationNotificationHandlerSet *callbacks) : Context(Ctx) {
 
   // Get a list of SerializedModules from ASTContext.
   // FIXME: Iterating over LoadedModules is not a good way to do this.
@@ -98,7 +98,7 @@ bool SerializedSILLoader::hasSILFunction(StringRef Name,
 }
 
 SILVTable *SerializedSILLoader::lookupVTable(const ClassDecl *C) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(C->getASTContext());
   std::string mangledClassName = mangler.mangleNominalType(C);
 
   for (auto &Des : LoadedSILSections) {
@@ -110,7 +110,7 @@ SILVTable *SerializedSILLoader::lookupVTable(const ClassDecl *C) {
 
 SILMoveOnlyDeinit *
 SerializedSILLoader::lookupMoveOnlyDeinit(const NominalTypeDecl *nomDecl) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(nomDecl->getASTContext());
   std::string mangledClassName = mangler.mangleNominalType(nomDecl);
 
   for (auto &des : LoadedSILSections) {
@@ -138,7 +138,7 @@ lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
 SILDifferentiabilityWitness *
 SerializedSILLoader::lookupDifferentiabilityWitness(
     SILDifferentiabilityWitnessKey key) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(Context);
   auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
      key.originalFunctionName, key.kind, key.config);
   // It is possible that one module has a declaration of a

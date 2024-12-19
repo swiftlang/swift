@@ -53,7 +53,7 @@ void KeyPathTypeCheckCompletionCallback::sawSolutionImpl(
             return Entry.first->getImpl().getLocator() == RootLocator;
           });
       if (BaseVariableTypeBinding != S.typeBindings.end()) {
-        BaseType = S.simplifyType(BaseVariableTypeBinding->getSecond());
+        BaseType = S.simplifyType(BaseVariableTypeBinding->second);
       }
     }
   } else {

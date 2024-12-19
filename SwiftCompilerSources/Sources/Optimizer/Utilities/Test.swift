@@ -154,6 +154,7 @@ public func registerOptimizerTests() {
   // Register each test.
   registerFunctionTests(
     getAccessBaseTest,
+    addressOwnershipLiveRangeTest,
     argumentConventionsTest,
     borrowIntroducersTest,
     enclosingValuesTest,

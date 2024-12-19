@@ -327,9 +327,6 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
       CCArgs.push_back("-iquote");
       CCArgs.push_back(Entry.Path);
       break;
-    case clang::frontend::IndexHeaderMap:
-      CCArgs.push_back("-index-header-map");
-      LLVM_FALLTHROUGH;
     case clang::frontend::Angled: {
       std::string Flag;
       if (Entry.IsFramework)

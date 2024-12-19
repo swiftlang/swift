@@ -4,6 +4,7 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 public struct MyInterpolation : StringInterpolationProtocol {
     public typealias StringLiteralType = StaticString

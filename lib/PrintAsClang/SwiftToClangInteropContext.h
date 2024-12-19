@@ -13,6 +13,8 @@
 #ifndef SWIFT_PRINTASCLANG_SWIFTTOCLANGINTEROPCONTEXT_H
 #define SWIFT_PRINTASCLANG_SWIFTTOCLANGINTEROPCONTEXT_H
 
+#include "swift/AST/ASTAllocated.h"
+#include "swift/AST/Module.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
@@ -39,6 +41,7 @@ public:
   ~SwiftToClangInteropContext();
 
   IRABIDetailsProvider &getIrABIDetails();
+  const ASTContext &getASTContext() { return mod.getASTContext(); }
 
   // Runs the given function if we haven't emitted some context-specific stub
   // for the given concrete stub name.

@@ -238,12 +238,12 @@ endif()
 swift_install_in_component(DIRECTORY "${clang_headers_location}/"
                            DESTINATION "lib/swift/clang"
                            COMPONENT clang-builtin-headers
-                           PATTERN "*.h")
+                           REGEX "\.(h|modulemap)$")
 
 swift_install_in_component(DIRECTORY "${clang_headers_location}/"
   DESTINATION "lib/swift_static/clang"
   COMPONENT clang-builtin-headers
-  PATTERN "*.h")
+  REGEX "\.(h|modulemap)$")
 
 if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG)
   # This will still link against the Swift-forked clang headers if the Swift
@@ -274,4 +274,4 @@ file(TO_CMAKE_PATH "${LLVM_LIBRARY_OUTPUT_INTDIR}"
 swift_install_in_component(DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_LIB_BUILD}/clang"
                            DESTINATION "lib"
                            COMPONENT clang-builtin-headers-in-clang-resource-dir
-                           PATTERN "*.h")
+                           REGEX "\.(h|modulemap)$")

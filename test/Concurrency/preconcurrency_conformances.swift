@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -enable-upcoming-feature DynamicActorIsolation -strict-concurrency=complete -verify-additional-prefix complete-tns-
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_DynamicActorIsolation
 
 protocol Q {
 }

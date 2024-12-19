@@ -355,7 +355,7 @@ SILFunction *IdentityLowering::createThunk() const {
   auto thunkType =
       getThunkFunctionType(ti->getThunkKind(), inputFuncType, ti->getModule());
 
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(ti->getModule().getASTContext());
   auto name = mangler.mangleSILThunkKind(ti->getFunction()->getName(),
                                          ThunkInst::Kind::Identity);
 
@@ -504,7 +504,7 @@ SILFunction *HopToMainActorIfNeededLowering::createThunk() const {
   auto thunkType =
       getThunkFunctionType(ti->getThunkKind(), inputFuncType, ti->getModule());
 
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(ti->getModule().getASTContext());
   auto name = mangler.mangleSILThunkKind(
       ti->getFunction()->getName(), ThunkInst::Kind::HopToMainActorIfNeeded);
 

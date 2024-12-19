@@ -48,7 +48,8 @@ class ContinuationAsyncContext;
 // _swift_concurrency_debug_internal_layout_version and add a comment describing
 // the new version.
 
-extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
+extern const HeapMetadata *jobHeapMetadataPtr;
+extern const HeapMetadata *taskHeapMetadataPtr;
 
 /// A schedulable job.
 class alignas(2 * alignof(void*)) Job :
@@ -106,14 +107,14 @@ public:
   };
 
   Job(JobFlags flags, JobInvokeFunction *invoke,
-      const HeapMetadata *metadata = &jobHeapMetadata)
+      const HeapMetadata *metadata = jobHeapMetadataPtr)
       : HeapObject(metadata), Flags(flags), RunJob(invoke) {
     Voucher = voucher_copy();
     assert(!isAsyncTask() && "wrong constructor for a task");
   }
 
   Job(JobFlags flags, TaskContinuationFunction *invoke,
-      const HeapMetadata *metadata = &jobHeapMetadata,
+      const HeapMetadata *metadata = jobHeapMetadataPtr,
       bool captureCurrentVoucher = true)
       : HeapObject(metadata), Flags(flags), ResumeTask(invoke) {
     if (captureCurrentVoucher)

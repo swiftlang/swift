@@ -1,3 +1,4 @@
+
 //===--- Decl.cpp - Swift Language Decl ASTs ------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -557,7 +558,7 @@ std::optional<llvm::VersionTuple>
 Decl::getIntroducedOSVersion(PlatformKind Kind) const {
   for (auto *attr: getAttrs()) {
     if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-      if (ava->Platform == Kind && ava->Introduced) {
+      if (ava->getPlatform() == Kind && ava->Introduced) {
         return ava->Introduced;
       }
     }
@@ -978,7 +979,7 @@ const ExternalSourceLocs *Decl::getSerializedLocs() const {
 StringRef Decl::getAlternateModuleName() const {
   for (auto *Att: Attrs) {
     if (auto *OD = dyn_cast<OriginallyDefinedInAttr>(Att)) {
-      if (OD->isActivePlatform(getASTContext())) {
+      if (!OD->isInvalid() && OD->isActivePlatform(getASTContext())) {
         return OD->OriginalModuleName;
       }
     }
@@ -1011,6 +1012,7 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
     return getLocFromSource();
   switch(File->getKind()) {
   case FileUnitKind::Source:
+  case FileUnitKind::ClangModule:
     return getLocFromSource();
   case FileUnitKind::SerializedAST: {
     if (!SerializedOK)
@@ -1019,7 +1021,6 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   }
   case FileUnitKind::Builtin:
   case FileUnitKind::Synthesized:
-  case FileUnitKind::ClangModule:
   case FileUnitKind::DWARFModule:
     return SourceLoc();
   }
@@ -1076,6 +1077,10 @@ bool Decl::isUnsafe() const {
       getASTContext().evaluator,
       IsUnsafeRequest{const_cast<Decl *>(this)},
       false);
+}
+
+bool Decl::allowsUnsafe() const {
+  return isUnsafe();
 }
 
 Type AbstractFunctionDecl::getThrownInterfaceType() const {
@@ -1299,8 +1304,7 @@ bool Decl::isAlwaysWeakImported() const {
 
   // FIXME: Weak linking on Windows is not yet supported
   // https://github.com/apple/swift/issues/53303
-  if (getSemanticUnavailableAttr() &&
-      !getASTContext().LangOpts.Target.isOSWindows())
+  if (isUnavailable() && !getASTContext().LangOpts.Target.isOSWindows())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
@@ -2061,8 +2065,17 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
     // FIXME: We ought to reconsider this since it won't recontextualize any
     // closures/decls present in the initialization expr. This currently should
     // only affect implicit code though.
-    if (!initContext && !Parent->isLocalContext())
+    if (!initContext && !Parent->isLocalContext()) {
       initContext = PatternBindingInitializer::create(Parent);
+    }
+
+    // Set up the custom attribute contexts for each variable in this pattern.
+    PBD->getPattern(idx)->forEachVariable([&](VarDecl *var) {
+      for (auto custom : var->getAttrs().getAttributes<CustomAttr>()) {
+        if (auto attributeInit = custom->getInitContext())
+          attributeInit->setEnclosingInitializer(initContext);
+      }
+    });
 
     // We need to call setPattern to ensure the VarDecls in the pattern have
     // the PatternBindingDecl set as their parent. We also need to call
@@ -2819,7 +2832,8 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
 }
 
 static AccessStrategy
-getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch);
+getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch,
+                            bool useOldABI);
 static AccessStrategy
 getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch);
 
@@ -2834,7 +2848,7 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
     // If the storage isDynamic (and not @objc) use the accessors.
     if (storage->shouldUseNativeDynamicDispatch())
       return AccessStrategy::getMaterializeToTemporary(
-          getOpaqueReadAccessStrategy(storage, false),
+          getOpaqueReadAccessStrategy(storage, false, false),
           getOpaqueWriteAccessStrategy(storage, false));
     return AccessStrategy::getStorage();
   }
@@ -2872,7 +2886,13 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
 }
 
 static AccessStrategy
-getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) {
+getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch,
+                            bool useOldABI) {
+  if (useOldABI) {
+    assert(storage->requiresOpaqueRead2Coroutine());
+    assert(storage->requiresOpaqueReadCoroutine());
+    return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
+  }
   if (storage->requiresOpaqueRead2Coroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read2, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
@@ -2889,35 +2909,39 @@ getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) 
 
 static AccessStrategy
 getOpaqueReadWriteAccessStrategy(const AbstractStorageDecl *storage,
-                                 bool dispatch) {
+                                 bool dispatch, bool useOldABI) {
+  if (useOldABI) {
+    assert(storage->requiresOpaqueModify2Coroutine());
+    assert(storage->requiresOpaqueModifyCoroutine());
+    return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
+  }
   if (storage->requiresOpaqueModify2Coroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify2, dispatch);
   if (storage->requiresOpaqueModifyCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
   return AccessStrategy::getMaterializeToTemporary(
-           getOpaqueReadAccessStrategy(storage, dispatch),
-           getOpaqueWriteAccessStrategy(storage, dispatch));
+      getOpaqueReadAccessStrategy(storage, dispatch, false),
+      getOpaqueWriteAccessStrategy(storage, dispatch));
 }
 
 static AccessStrategy
 getOpaqueAccessStrategy(const AbstractStorageDecl *storage,
-                        AccessKind accessKind, bool dispatch) {
+                        AccessKind accessKind, bool dispatch, bool useOldABI) {
   switch (accessKind) {
   case AccessKind::Read:
-    return getOpaqueReadAccessStrategy(storage, dispatch);
+    return getOpaqueReadAccessStrategy(storage, dispatch, useOldABI);
   case AccessKind::Write:
+    assert(!useOldABI);
     return getOpaqueWriteAccessStrategy(storage, dispatch);
   case AccessKind::ReadWrite:
-    return getOpaqueReadWriteAccessStrategy(storage, dispatch);
+    return getOpaqueReadWriteAccessStrategy(storage, dispatch, useOldABI);
   }
   llvm_unreachable("bad access kind");
 }
 
-AccessStrategy
-AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
-                                       AccessKind accessKind,
-                                       ModuleDecl *module,
-                                       ResilienceExpansion expansion) const {
+AccessStrategy AbstractStorageDecl::getAccessStrategy(
+    AccessSemantics semantics, AccessKind accessKind, ModuleDecl *module,
+    ResilienceExpansion expansion, bool useOldABI) const {
   switch (semantics) {
   case AccessSemantics::DirectToStorage:
     assert(hasStorage() || getASTContext().Diags.hadAnyError());
@@ -2933,10 +2957,12 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       // If the property is defined in a non-final class or a protocol, the
       // accessors are dynamically dispatched, and we cannot do direct access.
       if (isPolymorphic(this))
-        return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ true);
+        return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ true,
+                                       useOldABI);
 
       if (shouldUseNativeDynamicDispatch())
-        return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false);
+        return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false,
+                                       useOldABI);
 
       // If the storage is resilient from the given module and resilience
       // expansion, we cannot use direct access.
@@ -2958,7 +2984,8 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
         resilient = isResilient();
 
       if (resilient)
-        return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false);
+        return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false,
+                                       useOldABI);
     }
 
     LLVM_FALLTHROUGH;
@@ -3050,10 +3077,8 @@ bool AbstractStorageDecl::requiresOpaqueModify2Coroutine() const {
       false);
 }
 
-AccessorDecl *AbstractStorageDecl::getSynthesizedAccessor(AccessorKind kind) const {
-  if (auto *accessor = getAccessor(kind))
-    return accessor;
-
+AccessorDecl *
+AbstractStorageDecl::getSynthesizedAccessor(AccessorKind kind) const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
     SynthesizeAccessorRequest{const_cast<AbstractStorageDecl *>(this), kind},
@@ -3887,21 +3912,6 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
-  if (getOpaqueResultTypeRepr() == nullptr) {
-    if (!isa<VarDecl>(this) &&
-        !isa<FuncDecl>(this) &&
-        !isa<SubscriptDecl>(this))
-      return nullptr;
-    auto file = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
-    // Don't look up when the decl is from source, otherwise a cycle will happen.
-    if (file->getKind() == FileUnitKind::SerializedAST) {
-      Mangle::ASTMangler mangler;
-      auto name = mangler.mangleOpaqueTypeDecl(this);
-      return file->lookupOpaqueResultType(name);
-    }
-    return nullptr;
-  }
-
   return evaluateOrDefault(getASTContext().evaluator,
     OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)},
     nullptr);
@@ -4234,6 +4244,19 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
   return false;
 }
 
+ValueDecl *ValueDecl::getRenamedDecl(const AvailableAttr *attr) const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           RenamedDeclRequest{this, attr}, nullptr);
+}
+
+void ValueDecl::setRenamedDecl(const AvailableAttr *attr,
+                               ValueDecl *renameDecl) const {
+  // This is only designed to be used with decls synthesized by ClangImporter.
+  assert(hasClangNode());
+  getASTContext().evaluator.cacheNonEmptyOutput(RenamedDeclRequest{this, attr},
+                                                std::move(renameDecl));
+}
+
 SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   // Some decls have a parent/child split where the introducer keyword is on the
   // parent, but the attributes are on the children. If this is a child in such
@@ -4312,7 +4335,14 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
     return SourceLoc();
 
   SourceLoc resultLoc = getAttrs().getStartLoc(forModifier);
-  return resultLoc.isValid() ? resultLoc : introDecl->getStartLoc();
+  if (resultLoc.isInvalid())
+    return introDecl->getStartLoc();
+
+  SourceLoc startLoc = introDecl->getStartLoc();
+  if (!forModifier && getASTContext().SourceMgr.isBefore(startLoc, resultLoc))
+    return startLoc;
+
+  return resultLoc;
 }
 
 /// Returns true if \p VD needs to be treated as publicly-accessible
@@ -4359,30 +4389,6 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
-bool ValueDecl::isInterfacePackageEffectivelyPublic() const {
-  // A package decl with @usableFromInline (or other inlinable
-  // attributes) is essentially public, and can be printed in
-  // public (or private) interface file without package-name;
-  // it can be referenced by another module (without package-name)
-  // importing such interface module.
-  auto isCandidate = getFormalAccess() == AccessLevel::Package &&
-                     isUsableFromInline() &&
-                     getModuleContext()->getPackageName().empty();
-  if (!isCandidate)
-    return false;
-
-  // Treat the decl as public (1) if it's contained in an interface
-  // file, e.g. when running -typecheck-module-from-interface or
-  // -compile-module-from-interface.
-  isCandidate = false;
-  if (auto srcFile = getDeclContext()->getParentSourceFile()) {
-    isCandidate = srcFile->Kind == SourceFileKind::Interface;
-  }
-  // Or (2) if the decl being referenced in a client file is defined
-  // in an interface module.
-  return isCandidate || getModuleContext()->isBuiltFromInterface();
-}
-
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
   if (isPrivateSystemDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
@@ -4391,7 +4397,7 @@ bool ValueDecl::shouldHideFromEditor() const {
       getAttrs().hasAttribute<ShowInInterfaceAttr>())
     return true;
 
-  if (AvailableAttr::isUnavailable(this))
+  if (isUnavailable())
     return true;
 
   // Hide 'swift_private' clang decls. They are imported with '__' prefix.
@@ -4474,9 +4480,6 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
   // access level of the current declaration to be as open as possible.
   if (useDC && VD->getASTContext().isAccessControlDisabled())
     return getMaximallyOpenAccessFor(VD);
-
-  if (VD->isInterfacePackageEffectivelyPublic())
-    return AccessLevel::Public;
 
   if (treatUsableFromInlineAsPublic &&
       access < AccessLevel::Public &&
@@ -4660,11 +4663,9 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Package: {
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
-      if (VD->isInterfacePackageEffectivelyPublic())
-        return AccessScope::getPublic();
-
-      // If reached here, should be treated as internal.
-      return AccessScope(resultDC->getParentModule());
+      // Instead of reporting and failing early, return the scope of resultDC to
+      // allow continuation (should still non-zero exit later if in script mode)
+      return AccessScope(resultDC);
     } else {
       return AccessScope(pkg);
     }
@@ -4795,9 +4796,6 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return false;
 
   if (VD->getASTContext().isAccessControlDisabled())
-    return true;
-
-  if (VD->isInterfacePackageEffectivelyPublic())
     return true;
 
   auto access = getAccessLevel();
@@ -6221,7 +6219,7 @@ ClassDecl::MetaclassKind ClassDecl::getMetaclassKind() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
-    Mangle::ASTMangler Mangler;
+    Mangle::ASTMangler Mangler(nominal->getASTContext());
     std::string MangledName = Mangler.mangleObjCRuntimeName(nominal);
 
     buffer.clear();
@@ -6898,7 +6896,7 @@ bool ProtocolDecl::hasCircularInheritedProtocols() const {
 
 /// Returns a descriptive name for the given accessor/addressor kind.
 StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
-                                              bool article) {
+                                              bool article, bool underscored) {
   switch (accessorKind) {
   case AccessorKind::Get:
     return article ? "a getter" : "getter";
@@ -6911,9 +6909,17 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::MutableAddress:
     return article ? "a mutable addressor" : "mutable addressor";
   case AccessorKind::Read:
+    if (underscored)
+      return article ? "a '_read' accessor" : "'_read' accessor";
+    // Fall through to the non-underscored spelling.
+    LLVM_FALLTHROUGH;
   case AccessorKind::Read2:
     return article ? "a 'read' accessor" : "'read' accessor";
   case AccessorKind::Modify:
+    if (underscored)
+      return article ? "a '_modify' accessor" : "'_modify' accessor";
+    // Fall through to the non-underscored spelling.
+    LLVM_FALLTHROUGH;
   case AccessorKind::Modify2:
     return article ? "a 'modify' accessor" : "'modify' accessor";
   case AccessorKind::WillSet:
@@ -6927,9 +6933,12 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
 }
 
 StringRef swift::getAccessorNameForDiagnostic(AccessorDecl *accessor,
-                                              bool article) {
-  return getAccessorNameForDiagnostic(accessor->getAccessorKind(),
-                                      article);
+                                              bool article,
+                                              std::optional<bool> underscored) {
+  return getAccessorNameForDiagnostic(
+      accessor->getAccessorKind(), article,
+      underscored.value_or(accessor->getASTContext().LangOpts.hasFeature(
+          Feature::CoroutineAccessors)));
 }
 
 bool AbstractStorageDecl::hasStorage() const {
@@ -7159,7 +7168,10 @@ void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
 void
 AbstractStorageDecl::setSynthesizedAccessor(AccessorKind kind,
                                             AccessorDecl *accessor) {
-  assert(!getAccessor(kind) && "accessor already exists");
+  if (auto *current = getAccessor(kind)) {
+    assert(current == accessor && "different accessor of this kind exists");
+    return;
+  }
   assert(accessor->getAccessorKind() == kind);
 
   auto accessors = Accessors.getPointer();
@@ -8584,7 +8596,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
-      isSending());
+      isSending(), isAddressable());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
@@ -9261,29 +9273,26 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
   if (hasAsync())
     return nullptr;
 
-  const AvailableAttr *avAttr = nullptr;
+  // Prefer the first availability attribute with no platform and a valid
+  // rename target, falling back to the first with a rename. Note that
+  // `getAttrs` is in reverse source order, so the last attribute is the
+  // first in source.
+  AbstractFunctionDecl *alternative = nullptr;
   for (const auto *attr : getAttrs().getAttributes<AvailableAttr>()) {
-    // If there's an attribute with an already-resolved rename decl, use it
-    if (attr->RenameDecl) {
-      avAttr = attr;
-      break;
-    }
+    if (attr->isNoAsync())
+      continue;
 
-    // Otherwise prefer the first availability attribute with no platform and
-    // rename parameter, falling back to the first with a rename. Note that
-    // `getAttrs` is in reverse source order, so the last attribute is the
-    // first in source
-    if (!attr->Rename.empty() &&
-        (attr->Platform == PlatformKind::none || !avAttr) && !attr->isNoAsync()) {
-      avAttr = attr;
+    if (attr->getPlatform() != PlatformKind::none && alternative != nullptr)
+      continue;
+
+    if (auto *renamedDecl = getRenamedDecl(attr)) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(renamedDecl)) {
+        if (afd->hasAsync())
+          alternative = afd;
+      }
     }
   }
 
-  auto *renamedDecl = evaluateOrDefault(
-      getASTContext().evaluator, RenamedDeclRequest{this, avAttr}, nullptr);
-  auto *alternative = dyn_cast_or_null<AbstractFunctionDecl>(renamedDecl);
-  if (!alternative || !alternative->hasAsync())
-    return nullptr;
   return alternative;
 }
 
@@ -9949,6 +9958,9 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
   *selfDecl = new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
                                   getLoc(), ctx.Id_self, this);
   (*selfDecl)->setImplicit();
+  if (getAttrs().hasAttribute<AddressableSelfAttr>()) {
+    (*selfDecl)->setAddressable(true);
+  }
   return *selfDecl;
 }
 
@@ -10001,16 +10013,17 @@ OpaqueTypeDecl *OpaqueTypeDecl::get(
       OpaqueReturnTypeReprs);
 }
 
-bool OpaqueTypeDecl::isOpaqueReturnTypeOfFunction(
-                                       const AbstractFunctionDecl *func) const {
-  // Either the function is declared with its own opaque return type...
-  if (getNamingDecl() == func)
+bool OpaqueTypeDecl::isOpaqueReturnTypeOf(const Decl *ownerDecl) const {
+  if (getNamingDecl() == ownerDecl)
     return true;
 
-  // ...or the function is a getter for a property or subscript with an
-  // opaque return type.
-  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+  if (auto accessor = dyn_cast<AccessorDecl>(ownerDecl)) {
     return accessor->isGetter() && getNamingDecl() == accessor->getStorage();
+  }
+
+  if (auto patternBinding = dyn_cast<PatternBindingDecl>(ownerDecl)) {
+    if (auto *varDecl = dyn_cast<VarDecl>(getNamingDecl()))
+      return varDecl->getParentPatternBinding() == patternBinding;
   }
 
   return false;
@@ -10078,7 +10091,7 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
   SmallString<64> mangleBuf;
   {
     llvm::raw_svector_ostream os(mangleBuf);
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(getASTContext());
     os << mangler.mangleOpaqueTypeDecl(this);
   }
 
@@ -12096,6 +12109,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     return origDC;
   }
 }

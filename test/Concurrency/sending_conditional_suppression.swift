@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-
 // RUN: %target-swift-frontend -enable-upcoming-feature SendingArgsAndResults -swift-version 5 -enable-library-evolution -module-name test -emit-module -o %t/test.swiftmodule -emit-module-interface-path - -target %target-swift-5.1-abi-triple -Xllvm -swift-ast-printer-number-suppression-checks %s | %FileCheck %s
 
+// REQUIRES: swift_feature_SendingArgsAndResults
 // REQUIRES: asserts
 
 public class NonSendableKlass {}
@@ -103,9 +103,9 @@ public struct TestInStruct {
   public func testFunctionArg(_ x: () -> sending NonSendableKlass) { fatalError() }
 
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
-  // CHECK-NEXT: public func testFunctionResult() -> (() -> sending test.NonSendableKlass)
+  // CHECK-NEXT: public func testFunctionResult() -> () -> sending test.NonSendableKlass
   // CHECK-NEXT: #else
-  // CHECK-NEXT: public func testFunctionResult() -> (() -> test.NonSendableKlass)
+  // CHECK-NEXT: public func testFunctionResult() -> () -> test.NonSendableKlass
   // CHECK-NEXT: #endif
   public func testFunctionResult() -> (() -> sending NonSendableKlass) { fatalError() }
 
@@ -150,10 +150,10 @@ public struct TestInStruct {
 
   // CHECK-LABEL: #if compiler(>=5.3) && $SendingArgsAndResults
   // CHECK-NEXT: @usableFromInline
-  // CHECK-NEXT: internal func testUsableFromInlineFunctionResult() -> (() -> sending test.NonSendableKlass)
+  // CHECK-NEXT: internal func testUsableFromInlineFunctionResult() -> () -> sending test.NonSendableKlass
   // CHECK-NEXT: #else
   // CHECK-NEXT: @usableFromInline
-  // CHECK-NEXT: internal func testUsableFromInlineFunctionResult() -> (() -> test.NonSendableKlass)
+  // CHECK-NEXT: internal func testUsableFromInlineFunctionResult() -> () -> test.NonSendableKlass
   // CHECK-NEXT: #endif
   @usableFromInline
   func testUsableFromInlineFunctionResult() -> (() -> sending NonSendableKlass) { fatalError() }

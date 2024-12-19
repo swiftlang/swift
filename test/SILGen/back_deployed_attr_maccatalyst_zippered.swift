@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-sil -parse-as-library -module-name back_deploy %s -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi -verify
-// RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -parse-as-library -module-name back_deploy %s -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi -verify
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-as-library -module-name back_deploy %s -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi | %FileCheck %s
 
 // REQUIRES: OS=macosx || OS=maccatalyst
 

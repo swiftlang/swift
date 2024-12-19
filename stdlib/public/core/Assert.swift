@@ -39,6 +39,9 @@
 ///     is called.
 @_transparent
 @_unavailableInEmbedded
+#if $Embedded
+@_disfavoredOverload
+#endif
 public func assert(
   _ condition: @autoclosure () -> Bool,
   _ message: @autoclosure () -> String = String(),
@@ -99,6 +102,9 @@ public func assert(
 ///     `precondition(_:_:file:line:)` is called.
 @_transparent
 @_unavailableInEmbedded
+#if $Embedded
+@_disfavoredOverload
+#endif
 public func precondition(
   _ condition: @autoclosure () -> Bool,
   _ message: @autoclosure () -> String = String(),
@@ -162,6 +168,9 @@ public func precondition(
 @inlinable
 @inline(__always)
 @_unavailableInEmbedded
+#if $Embedded
+@_disfavoredOverload
+#endif
 public func assertionFailure(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
@@ -221,6 +230,9 @@ public func assertionFailure(
 ///     line number where `preconditionFailure(_:file:line:)` is called.
 @_transparent
 @_unavailableInEmbedded
+#if $Embedded
+@_disfavoredOverload
+#endif
 public func preconditionFailure(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
@@ -264,6 +276,9 @@ public func preconditionFailure(
 ///     line number where `fatalError(_:file:line:)` is called.
 @_transparent
 @_unavailableInEmbedded
+#if $Embedded
+@_disfavoredOverload
+#endif
 public func fatalError(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line

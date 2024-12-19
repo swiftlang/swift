@@ -138,6 +138,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
 
   RuntimeErrorDetails::Thread secondaryThread = {
     .description = oldAccess,
+    .threadID = 0,
     .numFrames = 1,
     .frames = &oldPC
   };
@@ -148,7 +149,11 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
     .framesToSkip = framesToSkip,
     .memoryAddress = pointer,
     .numExtraThreads = 1,
-    .threads = &secondaryThread
+    .threads = &secondaryThread,
+    .numFixIts = 0,
+    .fixIts = nullptr,
+    .numNotes = 0,
+    .notes = nullptr,
   };
   _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
 }

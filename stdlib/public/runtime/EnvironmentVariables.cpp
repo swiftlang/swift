@@ -187,7 +187,11 @@ extern "C" char **_environ;
 #endif
 #endif
 
-#ifdef ENVIRON
+#if !SWIFT_STDLIB_HAS_ENVIRON
+void swift::runtime::environment::initialize(void *context) {
+  (void)context;
+}
+#elif defined(ENVIRON)
 void swift::runtime::environment::initialize(void *context) {
   // On platforms where we have an environment variable array available, scan it
   // directly. This optimizes for the common case where no variables are set,
@@ -241,7 +245,7 @@ void swift::runtime::environment::initialize(void *context) {
   if (SWIFT_DEBUG_HELP_variable)
     printHelp(nullptr);
 }
-#elif SWIFT_STDLIB_HAS_ENVIRON
+#else
 void swift::runtime::environment::initialize(void *context) {
   // Emit a getenv call for each variable. This is less efficient but works
   // everywhere.
@@ -258,10 +262,6 @@ void swift::runtime::environment::initialize(void *context) {
   if (parse_bool("SWIFT_DEBUG_HELP", getenv("SWIFT_DEBUG_HELP"), false))
     printHelp("Using getenv to read variables. Unknown SWIFT_DEBUG_ variables "
               "will not be flagged.");
-}
-#else
-void swift::runtime::environment::initialize(void *context) {
-  (void)context;
 }
 #endif
 

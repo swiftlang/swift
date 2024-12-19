@@ -900,6 +900,9 @@ void addStride(ConstantStructBuilder &B, const TypeInfo *TI, IRGenModule &IGM) {
 } // end anonymous namespace
 
 bool irgen::layoutStringsEnabled(IRGenModule &IGM, bool diagnose) {
+  if (!IGM.isLayoutStringValueWitnessesFeatureAvailable(IGM.Context)) {
+    return false;
+  }
   auto moduleName = IGM.getSwiftModule()->getRealName().str();
   if (IGM.Context.blockListConfig.hasBlockListAction(
           moduleName, BlockListKeyKind::ModuleName,
@@ -1393,9 +1396,9 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
                                 bool relativeReference) {
   // Native PE binaries shouldn't reference data symbols across DLLs, so disable
   // this on Windows, unless we're forming a relative indirectable reference.
-  if (IGM.useDllStorage() && !relativeReference)
+  if (useDllStorage(IGM.Triple) && !relativeReference)
     return {};
-  
+
   if (auto nom = type->getAnyNominal()) {
     // TODO: Non-C enums have extra inhabitants and also need additional value
     // witnesses for their tag manipulation (except when they're empty, in

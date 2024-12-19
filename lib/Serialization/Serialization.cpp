@@ -212,7 +212,7 @@ namespace {
 
       auto &mangledName = MangledNameCache[nominal];
       if (mangledName.empty())
-        mangledName = Mangle::ASTMangler().mangleNominalType(nominal);
+        mangledName = Mangle::ASTMangler(nominal->getASTContext()).mangleNominalType(nominal);
 
       assert(llvm::isUInt<31>(mangledName.size()));
       if (dataToWrite)
@@ -958,6 +958,11 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_OPEN_PACK_ELEMENT);
   BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_GET);
   BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_SET);
+  BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE);
+  BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE_REF);
+  BLOCK_RECORD(sil_block, SIL_SOURCE_LOC);
+  BLOCK_RECORD(sil_block, SIL_SOURCE_LOC_REF);
+
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -1140,11 +1145,16 @@ void Serializer::writeHeader() {
         PublicModuleName.emit(ScratchRecord, publicModuleName.str());
       }
 
-      llvm::VersionTuple compilerVersion =
-          M->getSwiftInterfaceCompilerVersion();
-      if (compilerVersion) {
+      version::Version compilerVersion = M->getSwiftInterfaceCompilerVersion();
+      if (!compilerVersion.empty()) {
         options_block::SwiftInterfaceCompilerVersionLayout Version(Out);
-        Version.emit(ScratchRecord, compilerVersion.getAsString());
+
+        SmallString<32> versionBuf;
+        llvm::raw_svector_ostream OS(versionBuf);
+
+        OS << compilerVersion;
+
+        Version.emit(ScratchRecord, OS.str());
       }
 
       if (M->isConcurrencyChecked()) {
@@ -1245,6 +1255,18 @@ void Serializer::writeHeader() {
                 uint8_t(PluginSearchOptionKind::LoadPluginExecutable), optStr);
             continue;
           }
+          case PluginSearchOption::Kind::ResolvedPluginConfig: {
+            auto &opt = elem.get<PluginSearchOption::ResolvedPluginConfig>();
+            std::string optStr =
+                opt.LibraryPath + "#" + opt.ExecutablePath + "#";
+            llvm::interleave(
+                opt.ModuleNames, [&](auto &name) { optStr += name; },
+                [&]() { optStr += ","; });
+            PluginSearchOpt.emit(
+                ScratchRecord,
+                uint8_t(PluginSearchOptionKind::ResolvedPluginConfig), optStr);
+            continue;
+          }
           }
         }
       }
@@ -1333,7 +1355,8 @@ void Serializer::writeInputBlock() {
   }
 
   if (!Options.ModuleInterface.empty())
-    ModuleInterface.emit(ScratchRecord, Options.ModuleInterface);
+    ModuleInterface.emit(ScratchRecord, Options.IsInterfaceSDKRelative,
+                         Options.ModuleInterface);
 
   SmallVector<ExternalMacroPlugin> macros;
   M->getExternalMacros(macros);
@@ -3019,7 +3042,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       ENCODE_VER_TUPLE(Deprecated, theAttr->Deprecated)
       ENCODE_VER_TUPLE(Obsoleted, theAttr->Obsoleted)
 
-      auto renameDeclID = S.addDeclRef(theAttr->RenameDecl);
+      assert(theAttr->Rename.empty() || !theAttr->hasCachedRenamedDecl());
+
       llvm::SmallString<32> blob;
       blob.append(theAttr->Message);
       blob.append(theAttr->Rename);
@@ -3036,8 +3060,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
-          static_cast<unsigned>(theAttr->Platform),
-          renameDeclID,
+          static_cast<unsigned>(theAttr->getPlatform()),
           theAttr->Message.size(),
           theAttr->Rename.size(),
           blob);
@@ -3082,13 +3105,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       ObjCImplementationDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord,
           abbrCode, theAttr->isImplicit(), theAttr->isCategoryNameInvalid(),
           theAttr->isEarlyAdopter(), categoryNameID);
-      return;
-    }
-
-    case DeclAttrKind::MainType: {
-      auto abbrCode = S.DeclTypeAbbrCodes[MainTypeDeclAttrLayout::Code];
-      MainTypeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                         DA->isImplicit());
       return;
     }
 
@@ -3360,6 +3376,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::Safe: {
+      auto *theAttr = cast<SafeAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[SafeDeclAttrLayout::Code];
+      SafeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                     theAttr->isImplicit(),
+                                     theAttr->message);
+      return;
+    }
+
     case DeclAttrKind::MacroRole: {
       auto *theAttr = cast<MacroRoleAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[MacroRoleDeclAttrLayout::Code];
@@ -3385,13 +3410,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       unsigned numNames = introducedDeclNames.size();
 
-      (void)evaluateOrDefault(S.getASTContext().evaluator,
-                              ResolveMacroConformances{theAttr, D}, {});
+      auto conformances =
+          evaluateOrDefault(S.getASTContext().evaluator,
+                            ResolveMacroConformances{theAttr, D}, {});
 
       unsigned numConformances = 0;
-      for (auto conformance : theAttr->getConformances()) {
-        introducedDeclNames.push_back(
-            S.addTypeRef(conformance->getInstanceType()));
+      for (auto conformance : conformances) {
+        introducedDeclNames.push_back(S.addTypeRef(conformance));
         ++numConformances;
       }
 
@@ -5431,6 +5456,10 @@ public:
     llvm_unreachable("error union types do not persist in the AST");
   }
 
+  void visitLocatableType(const LocatableType *) {
+    llvm_unreachable("locatable types do not persist in the AST");
+  }
+
   void visitBuiltinTypeImpl(Type ty) {
     using namespace decls_block;
     TypeAliasDecl *typeAlias =
@@ -5463,17 +5492,21 @@ public:
 
   void visitTypeAliasType(const TypeAliasType *alias) {
     using namespace decls_block;
+
     const TypeAliasDecl *typeAlias = alias->getDecl();
-    auto underlyingType = typeAlias->getUnderlyingType();
+    SmallVector<TypeID, 8> genericArgIDs;
+
+    for (auto next : alias->getDirectGenericArgs())
+      genericArgIDs.push_back(S.addTypeRef(next));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[TypeAliasTypeLayout::Code];
     TypeAliasTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
         S.addDeclRef(typeAlias, /*allowTypeAliasXRef*/true),
-        S.addTypeRef(alias->getParent()),
-        S.addTypeRef(underlyingType),
+        S.addTypeRef(typeAlias->getUnderlyingType()),
         S.addTypeRef(alias->getSinglyDesugaredType()),
-        S.addSubstitutionMapRef(alias->getSubstitutionMap()));
+        S.addTypeRef(alias->getParent()),
+        genericArgIDs);
   }
 
   template <typename Layout>
@@ -5524,11 +5557,6 @@ public:
     SILPackTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                   packTy->isElementAddress(),
                                   variableData);
-  }
-
-  void visitParenType(const ParenType *parenTy) {
-    using namespace decls_block;
-    serializeSimpleWrapper<ParenTypeLayout>(parenTy->getUnderlyingType());
   }
 
   void visitTupleType(const TupleType *tupleTy) {
@@ -5692,7 +5720,8 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeConst(), paramFlags.isSending());
+          paramFlags.isCompileTimeConst(), paramFlags.isSending(),
+          paramFlags.isAddressable());
     }
   }
 
@@ -5715,7 +5744,10 @@ public:
     using namespace decls_block;
 
     auto resultType = S.addTypeRef(fnTy->getResult());
-    auto clangType = S.addClangTypeRef(fnTy->getClangTypeInfo().getType());
+    auto clangType =
+      S.getASTContext().LangOpts.UseClangFunctionTypes
+      ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
+      : ClangTypeID(0);
 
     auto isolation = encodeIsolation(fnTy->getIsolation());
 
@@ -6140,7 +6172,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
   registerDeclTypeAbbr<AssociatedTypeDeclLayout>();
   registerDeclTypeAbbr<NominalTypeLayout>();
-  registerDeclTypeAbbr<ParenTypeLayout>();
   registerDeclTypeAbbr<TupleTypeLayout>();
   registerDeclTypeAbbr<TupleTypeEltLayout>();
   registerDeclTypeAbbr<FunctionTypeLayout>();
@@ -6638,7 +6669,7 @@ static void recordDerivativeFunctionConfig(
     Serializer &S, const AbstractFunctionDecl *AFD,
     Serializer::UniquedDerivativeFunctionConfigTable &derivativeConfigs) {
   auto &ctx = AFD->getASTContext();
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(AFD->getASTContext());
   for (auto *attr : AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
     auto mangledName = ctx.getIdentifier(Mangler.mangleDeclAsUSR(AFD, ""));
     derivativeConfigs[mangledName].insert(
@@ -6676,7 +6707,7 @@ static void collectInterestingNestedDeclarations(
 
       if (auto owningType = func->getDeclContext()->getSelfNominalTypeDecl()) {
         if (func->isObjC()) {
-          Mangle::ASTMangler mangler;
+          Mangle::ASTMangler mangler(func->getASTContext());
           std::string ownerName = mangler.mangleNominalType(owningType);
           assert(!ownerName.empty() && "Mangled type came back empty!");
 
@@ -6850,7 +6881,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         continue;
 
       hasLocalTypes = true;
-      Mangle::ASTMangler Mangler;
 
       std::string MangledName =
           evaluateOrDefault(M->getASTContext().evaluator,
@@ -6882,7 +6912,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         continue;
 
       hasOpaqueReturnTypes = true;
-      Mangle::ASTMangler Mangler;
+      Mangle::ASTMangler Mangler(OTD->getASTContext());
       auto MangledName = Mangler.mangleOpaqueTypeDecl(OTD);
       opaqueReturnTypeGenerator.insert(MangledName, addDeclRef(OTD));
     }
@@ -7017,7 +7047,7 @@ void Serializer::writeToStream(
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
     S.writeHeader();
     S.writeInputBlock();
-    S.writeSIL(SILMod, options.SerializeAllSIL);
+    S.writeSIL(SILMod, options.SerializeAllSIL, options.SerializeDebugInfoSIL);
     S.writeAST(DC);
 
     if (S.hadError)

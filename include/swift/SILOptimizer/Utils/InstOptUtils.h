@@ -417,12 +417,6 @@ ignore_expect_uses(ValueBase *value) {
 /// operations from it. These can be simplified and removed.
 bool simplifyUsers(SingleValueInstruction *inst);
 
-/// True if a type can be expanded without a significant increase to code size.
-///
-/// False if expanding a type is invalid. For example, expanding a
-/// struct-with-deinit drops the deinit.
-bool shouldExpand(SILModule &module, SILType ty);
-
 /// Check if the value of value is computed by means of a simple initialization.
 /// Store the actual SILValue into \p Val and the reversed list of instructions
 /// initializing it in \p Insns.

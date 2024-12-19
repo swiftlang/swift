@@ -142,6 +142,9 @@
 % Text flowing around figures
 \usepackage{wrapfig}
 
+% Fancier tables
+\usepackage{tabularx}
+
 % Set up hyperref link colors.
 \hypersetup{linkcolor=[rgb]{0,0.2,0.6},citecolor=[rgb]{0.5,0,0.5},urlcolor=[rgb]{0,0.4,0.2}}
 
@@ -258,10 +261,12 @@
 \newcommand{\tY}{\texttt{Y}}
 \newcommand{\tC}{\texttt{C}}
 \newcommand{\tSelf}{\texttt{Self}}
+\newcommand{\SelfU}{\texttt{Self.U}}
 \newcommand{\tCollection}{\texttt{Collection}}
 \newcommand{\tSequence}{\texttt{Sequence}}
 \newcommand{\tIterator}{\texttt{IteratorProtocol}}
 \newcommand{\tInt}{\texttt{Int}}
+\newcommand{\tN}{\texttt{N}}
 
 \newcommand{\nA}{\texttt{A}}
 \newcommand{\nB}{\texttt{B}}
@@ -269,11 +274,16 @@
 \newcommand{\nElement}{\texttt{Element}}
 \newcommand{\nIterator}{\texttt{Iterator}}
 
+% Identifiers with '
+\newcommand{\tTp}{\tT^\prime}
+\newcommand{\tUp}{\tU^\prime}
+
 % Declared interface type
 \newcommand{\tXd}{\texttt{X}_d}
 
 % Protocol generic signature
 \newcommand{\GP}{G_\tP}
+\newcommand{\GN}{G_\tN}
 
 %%%
 % Derived requirements
@@ -393,6 +403,10 @@
 \newcommand{\ArrayCollection}{\ConfReq{Array<\rT>}{Collection}}
 \newcommand{\ArrayIntSequence}{\ConfReq{Array<Int>}{Sequence}}
 \newcommand{\ArrayIntCollection}{\ConfReq{Array<Int>}{Collection}}
+\newcommand{\rTSequence}{\ConfReq{\rT}{Sequence}}
+\newcommand{\rTCollection}{\ConfReq{\rT}{Collection}}
+\newcommand{\rUSequence}{\ConfReq{\rU}{Sequence}}
+\newcommand{\rUCollection}{\ConfReq{\rU}{Collection}}
 
 \newcommand{\AssocType}[2]{\langle\texttt{#1}|\texttt{#2}}
 \newcommand{\AssocConf}[2]{\langle\texttt{#1:~#2}]}
@@ -402,8 +416,13 @@
 \newcommand{\AElement}{\AssocType{Sequence}{Element}}
 \newcommand{\AIElement}{\AssocType{IteratorProtocol}{Element}}
 \newcommand{\AIterator}{\AssocType{Sequence}{Iterator}}
+\newcommand{\ASubSequence}{\AssocType{Collection}{SubSequence}}
+\newcommand{\ANA}{\AssocType{N}{A}}
 \newcommand{\APA}{\AssocType{P}{A}}
 \newcommand{\SelfUQ}{\AssocConf{Self.U}{Q}}
+\newcommand{\SelfIterator}{\AssocConf{Self.Iterator}{IteratorProtocol}}
+\newcommand{\SelfSequence}{\AssocConf{Self}{Sequence}}
+\newcommand{\SelfSubSequence}{\AssocConf{Self.SubSequence}{Collection}}
 
 \newcommand{\SigObj}{\textsc{Sig}}
 \newcommand{\ProtoObj}{\textsc{Proto}}
@@ -475,6 +494,7 @@
 %%%
 % Math helpers
 %%%
+\newcommand{\Case}[1]{\smallskip\par($\bigstar$ Case #1.)}
 \newcommand{\BaseCase}{\smallskip\par\emph{Base case.}\ }
 \newcommand{\InductiveStep}{\smallskip\par\emph{Inductive step.}\ }
 

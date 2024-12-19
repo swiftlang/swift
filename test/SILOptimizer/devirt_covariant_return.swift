@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name devirt_covariant_return -Xllvm -sil-full-demangle -enable-spec-devirt -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=ObjectOutliner -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -module-name devirt_covariant_return -Xllvm -sil-full-demangle -enable-spec-devirt -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -Xllvm -sil-print-types -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=ObjectOutliner -sil-verify-all | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

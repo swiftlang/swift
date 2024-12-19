@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name switch %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name switch %s | %FileCheck %s
 
 //////////////////
 // Declarations //
