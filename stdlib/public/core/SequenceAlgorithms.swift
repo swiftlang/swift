@@ -662,12 +662,11 @@ extension Sequence {
   ///   the result is `initialResult`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @inlinable
-  public func reduce<Result>(
+  @_alwaysEmitIntoClient
+  public func reduce<Result, E: Error>(
     _ initialResult: Result,
-    _ nextPartialResult:
-      (_ partialResult: Result, Element) throws -> Result
-  ) rethrows -> Result {
+    _ nextPartialResult: (Result, Element) throws(E) -> Result
+  ) throws(E) -> Result {
     var accumulator = initialResult
     for element in self {
       accumulator = try nextPartialResult(accumulator, element)
@@ -719,12 +718,11 @@ extension Sequence {
   ///   the result is `initialResult`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @inlinable
-  public func reduce<Result>(
+  @_alwaysEmitIntoClient
+  public func reduce<Result, E: Error>(
     into initialResult: __owned Result,
-    _ updateAccumulatingResult:
-      (_ partialResult: inout Result, Element) throws -> ()
-  ) rethrows -> Result {
+    _ updateAccumulatingResult: (inout Result, Element) throws(E) -> ()
+  ) throws(E) -> Result {
     var accumulator = initialResult
     for element in self {
       try updateAccumulatingResult(&accumulator, element)
