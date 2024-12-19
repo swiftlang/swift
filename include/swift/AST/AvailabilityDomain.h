@@ -22,6 +22,7 @@
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
+class ASTContext;
 
 /// Represents a dimension of availability (e.g. macOS platform or Swift
 /// language mode).
@@ -83,10 +84,11 @@ public:
   bool isPackageDescription() const { return kind == Kind::PackageDescription; }
 
   /// Returns the platform kind for this domain if applicable.
-  PlatformKind getPlatformKind() const {
-    assert(kind == Kind::Platform);
-    return platform;
-  }
+  PlatformKind getPlatformKind() const { return platform; }
+
+  /// Returns true if this domain is considered active in the current
+  /// compilation context.
+  bool isActive(ASTContext &ctx) const;
 
   /// Returns the string to use in diagnostics to identify the domain. May
   /// return an empty string.

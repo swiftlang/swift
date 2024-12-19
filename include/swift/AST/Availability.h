@@ -380,7 +380,8 @@ public:
   annotatedAvailableRange(const Decl *D);
 
   static AvailabilityRange
-  annotatedAvailableRangeForAttr(const SpecializeAttr *attr, ASTContext &ctx);
+  annotatedAvailableRangeForAttr(const Decl *D, const SpecializeAttr *attr,
+                                 ASTContext &ctx);
 
   /// For the attribute's introduction version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.

@@ -341,9 +341,6 @@ struct PrintOptions {
   /// Whether to print the internal layout name instead of AnyObject, etc.
   bool PrintInternalLayoutName = false;
 
-  /// Suppress emitting @available(*, noasync)
-  bool SuppressNoAsyncAvailabilityAttr = false;
-
   /// Suppress emitting isolated or async deinit, and emit open containing class
   /// as public
   bool SuppressIsolatedDeinit = false;

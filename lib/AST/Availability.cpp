@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -432,22 +433,19 @@ bool AvailabilityInference::updateBeforePlatformForFallback(
 
 const AvailableAttr *
 AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D) {
-  ASTContext &Ctx = D->getASTContext();
   const AvailableAttr *bestAvailAttr = nullptr;
 
   D = abstractSyntaxDeclForAvailableAttribute(D);
 
-  for (auto Attr : D->getAttrs()) {
-    auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
-    if (AvailAttr == nullptr || !AvailAttr->Introduced.has_value() ||
-        !AvailAttr->isActivePlatform(Ctx) ||
-        AvailAttr->isLanguageVersionSpecific() ||
-        AvailAttr->isPackageDescriptionVersionSpecific()) {
-      continue;
-    }
+  for (auto semanticAttr :
+       D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto *attr = semanticAttr.getParsedAttr();
 
-    if (isBetterThan(AvailAttr, bestAvailAttr))
-      bestAvailAttr = AvailAttr;
+    if (!attr->hasPlatform() || !attr->Introduced.has_value())
+      continue;
+
+    if (isBetterThan(attr, bestAvailAttr))
+      bestAvailAttr = attr;
   }
 
   return bestAvailAttr;
@@ -466,14 +464,44 @@ bool Decl::isAvailableAsSPI() const {
   return AvailabilityInference::isAvailableAsSPI(this);
 }
 
+SemanticAvailableAttributes
+Decl::getSemanticAvailableAttrs(bool includeInactive) const {
+  return SemanticAvailableAttributes(getAttrs(), this, includeInactive);
+}
+
+std::optional<SemanticAvailableAttr>
+Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
+  auto domainForAvailableAttr = [](const AvailableAttr *attr) {
+    if (attr->hasPlatform())
+      return AvailabilityDomain::forPlatform(attr->getPlatform());
+
+    switch (attr->getPlatformAgnosticAvailability()) {
+    case PlatformAgnosticAvailabilityKind::Deprecated:
+    case PlatformAgnosticAvailabilityKind::Unavailable:
+    case PlatformAgnosticAvailabilityKind::NoAsync:
+    case PlatformAgnosticAvailabilityKind::None:
+      return AvailabilityDomain::forUniversal();
+
+    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+      return AvailabilityDomain::forSwiftLanguage();
+
+    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
+      return AvailabilityDomain::forPackageDescription();
+    }
+  };
+  return SemanticAvailableAttr(attr, domainForAvailableAttr(attr));
+}
+
 const AvailableAttr *
 Decl::getActiveAvailableAttrForCurrentPlatform(bool ignoreAppExtensions) const {
-  auto &ctx = getASTContext();
   const AvailableAttr *bestAttr = nullptr;
 
-  for (auto attr :
-       getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
-    if (!attr->hasPlatform() || !attr->isActivePlatform(ctx))
+  for (auto semanticAttr :
+       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto attr = semanticAttr.getParsedAttr();
+
+    if (!attr->hasPlatform())
       continue;
 
     if (ignoreAppExtensions &&
@@ -493,17 +521,14 @@ Decl::getActiveAvailableAttrForCurrentPlatform(bool ignoreAppExtensions) const {
 
 const AvailableAttr *Decl::getDeprecatedAttr() const {
   auto &ctx = getASTContext();
-  auto attrs = getAttrs();
   const AvailableAttr *result = nullptr;
   const AvailableAttr *bestActive = getActiveAvailableAttrForCurrentPlatform();
 
-  for (auto attr :
-       attrs.getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
-    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
-      continue;
+  for (auto semanticAttr :
+       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto attr = semanticAttr.getParsedAttr();
 
-    if (!attr->isActivePlatform(ctx) && !attr->isLanguageVersionSpecific() &&
-        !attr->isPackageDescriptionVersionSpecific())
+    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
       continue;
 
     // Unconditional deprecated.
@@ -512,7 +537,7 @@ const AvailableAttr *Decl::getDeprecatedAttr() const {
 
     std::optional<llvm::VersionTuple> deprecatedVersion = attr->Deprecated;
 
-    StringRef deprecatedPlatform = attr->prettyPlatformString();
+    StringRef deprecatedPlatform;
     llvm::VersionTuple remappedDeprecatedVersion;
     if (AvailabilityInference::updateDeprecatedPlatformForFallback(
             attr, ctx, deprecatedPlatform, remappedDeprecatedVersion))
@@ -521,7 +546,7 @@ const AvailableAttr *Decl::getDeprecatedAttr() const {
     if (!deprecatedVersion.has_value())
       continue;
 
-    llvm::VersionTuple minVersion = attr->getActiveVersion(ctx);
+    llvm::VersionTuple minVersion = semanticAttr.getActiveVersion(ctx);
 
     // We treat the declaration as deprecated if it is deprecated on
     // all deployment targets.
@@ -534,24 +559,21 @@ const AvailableAttr *Decl::getDeprecatedAttr() const {
 
 const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
   auto &ctx = getASTContext();
-  auto attrs = getAttrs();
   const AvailableAttr *result = nullptr;
   const AvailableAttr *bestActive = getActiveAvailableAttrForCurrentPlatform();
 
-  for (auto attr :
-       attrs.getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
-    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
-      continue;
+  for (auto semanticAttr :
+       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto attr = semanticAttr.getParsedAttr();
 
-    if (!attr->isActivePlatform(ctx) && !attr->isLanguageVersionSpecific() &&
-        !attr->isPackageDescriptionVersionSpecific())
+    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
       continue;
 
     std::optional<llvm::VersionTuple> deprecatedVersion = attr->Deprecated;
     if (!deprecatedVersion.has_value())
       continue;
 
-    llvm::VersionTuple activeVersion = attr->getActiveVersion(ctx);
+    llvm::VersionTuple activeVersion = semanticAttr.getActiveVersion(ctx);
 
     if (deprecatedVersion.value() > activeVersion)
       result = attr;
@@ -560,17 +582,14 @@ const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
 }
 
 const AvailableAttr *Decl::getNoAsyncAttr() const {
-  auto &ctx = getASTContext();
   const AvailableAttr *bestAttr = nullptr;
 
-  for (auto attr :
-       getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
+  for (auto semanticAttr :
+       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto attr = semanticAttr.getParsedAttr();
 
     if (attr->getPlatformAgnosticAvailability() !=
         PlatformAgnosticAvailabilityKind::NoAsync)
-      continue;
-
-    if (attr->hasPlatform() && !attr->isActivePlatform(ctx))
       continue;
 
     if (!bestAttr) {
@@ -597,9 +616,10 @@ const AvailableAttr *Decl::getNoAsyncAttr() const {
 
 bool Decl::isUnavailableInCurrentSwiftVersion() const {
   llvm::VersionTuple vers = getASTContext().LangOpts.EffectiveLanguageVersion;
-  for (auto attr :
-       getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
-    if (attr->isLanguageVersionSpecific()) {
+  for (auto semanticAttr :
+       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (semanticAttr.isSwiftLanguageModeSpecific()) {
+      auto attr = semanticAttr.getParsedAttr();
       if (attr->Introduced.has_value() && attr->Introduced.value() > vers)
         return true;
       if (attr->Obsoleted.has_value() && attr->Obsoleted.value() <= vers)
@@ -617,16 +637,13 @@ getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
   const AvailableAttr *bestActive =
       D->getActiveAvailableAttrForCurrentPlatform(ignoreAppExtensions);
 
-  for (auto attr :
-       D->getAttrs().getAttributes<AvailableAttr, /*AllowInvalid=*/false>()) {
+  for (auto semanticAttr :
+       D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto attr = semanticAttr.getParsedAttr();
+
     // If this is a platform-specific attribute and it isn't the most
     // specific attribute for the current platform, we're done.
     if (attr->hasPlatform() && (!bestActive || attr != bestActive))
-      continue;
-
-    // If this attribute doesn't apply to the active platform, we're done.
-    if (!attr->isActivePlatform(ctx) && !attr->isLanguageVersionSpecific() &&
-        !attr->isPackageDescriptionVersionSpecific())
       continue;
 
     if (ignoreAppExtensions &&
@@ -637,7 +654,7 @@ getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
     if (attr->isUnconditionallyUnavailable())
       return attr;
 
-    switch (attr->getVersionAvailability(ctx)) {
+    switch (semanticAttr.getVersionAvailability(ctx)) {
     case AvailableVersionComparison::Available:
     case AvailableVersionComparison::PotentiallyUnavailable:
       break;
@@ -772,15 +789,17 @@ bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
 }
 
 AvailabilityRange AvailabilityInference::annotatedAvailableRangeForAttr(
-    const SpecializeAttr *attr, ASTContext &ctx) {
+    const Decl *D, const SpecializeAttr *attr, ASTContext &ctx) {
 
   const AvailableAttr *bestAvailAttr = nullptr;
 
   for (auto *availAttr : attr->getAvailableAttrs()) {
-    if (availAttr == nullptr || !availAttr->Introduced.has_value() ||
-        !availAttr->isActivePlatform(ctx) ||
-        availAttr->isLanguageVersionSpecific() ||
-        availAttr->isPackageDescriptionVersionSpecific()) {
+    auto semanticAttr = D->getSemanticAvailableAttr(availAttr);
+    if (!semanticAttr)
+      continue;
+
+    if (!availAttr->Introduced.has_value() || !semanticAttr->isActive(ctx) ||
+        !semanticAttr->isPlatformSpecific()) {
       continue;
     }
 
