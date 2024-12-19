@@ -23,12 +23,29 @@
 // RUN:   -parse-stdlib -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/main.swift -o %t/Test.swiftmodule -swift-version 5 -cache-compile-job -cas-path %t/cas -I %t/include \
 // RUN:   -emit-symbol-graph -emit-symbol-graph-dir %t/symbol-graph2 \
-// RUN:   -emit-module @%t/Test.cmd -Rcache-compile-job 2>&1 | %FileCheck %s --check-prefix=CACHE-MISS
+// RUN:   -emit-module @%t/Test.cmd -Rcache-compile-job 2>&1 | %FileCheck %s --check-prefix=CACHE-HIT
 
 // CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}symbol-graph2{{/|\\}}Test.symbols.json': key 'llvmcas://{{.*}}'
 // CACHE-HIT: remark: replay output file '{{.*}}{{/|\\}}symbol-graph2{{/|\\}}Test@A.symbols.json': key 'llvmcas://{{.*}}'
 
 // RUN: diff -r -u %t/symbol-graph1 %t/symbol-graph2
+
+/// Test replay from driver interface
+// RUN: %swift-scan-test -action compute_cache_key_from_index -cas-path %t/cas -input 0 -- \
+// RUN:   %target-swift-frontend -module-name Test -module-cache-path %t/clang-module-cache -O \
+// RUN:   -parse-stdlib -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN:   %t/main.swift -o %t/Test.swiftmodule -swift-version 5 -cache-compile-job -cas-path %t/cas -I %t/include \
+// RUN:   -emit-symbol-graph -emit-symbol-graph-dir %t/symbol-graph3 \
+// RUN:   -emit-module @%t/Test.cmd -Rcache-compile-job > %t/key.casid
+
+// RUN: %swift-scan-test -action replay_result -cas-path %t/cas -id @%t/key.casid -- \
+// RUN:   %target-swift-frontend -module-name Test -module-cache-path %t/clang-module-cache -O \
+// RUN:   -parse-stdlib -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN:   %t/main.swift -o %t/Test.swiftmodule -swift-version 5 -cache-compile-job -cas-path %t/cas -I %t/include \
+// RUN:   -emit-symbol-graph -emit-symbol-graph-dir %t/symbol-graph3 \
+// RUN:   -emit-module @%t/Test.cmd -Rcache-compile-job
+
+// RUN: diff -r -u %t/symbol-graph1 %t/symbol-graph3
 
 //--- include/A.swiftinterface
 // swift-interface-format-version: 1.0

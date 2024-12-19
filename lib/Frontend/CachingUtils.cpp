@@ -325,8 +325,11 @@ bool replayCachedCompilerOutputs(
       }
     } else if (Output.Kind == file_types::ID::TY_Dependencies) {
       if (emitMakeDependenciesFromSerializedBuffer(
-              Output.Proxy.getData(), *File, Opts, Output.Input, Diag))
+            Output.Proxy.getData(), *File, Opts, Output.Input, Diag)) {
+        Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
+                      "failed to emit dependency file");
         return false;
+      }
     } else
       *File << Output.Proxy.getData();
 
