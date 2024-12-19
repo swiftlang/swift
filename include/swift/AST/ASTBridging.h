@@ -101,21 +101,6 @@ struct BridgedLocatedIdentifier {
   BridgedSourceLoc NameLoc;
 };
 
-struct BridgedConsumedLookupResult {
-  SWIFT_NAME("name")
-  BridgedIdentifier Name;
-
-  SWIFT_NAME("nameLoc")
-  BridgedSourceLoc NameLoc;
-
-  SWIFT_NAME("flag")
-  SwiftInt Flag;
-
-  BRIDGED_INLINE BridgedConsumedLookupResult(swift::Identifier name,
-                                             swift::SourceLoc sourceLoc,
-                                             SwiftInt flag);
-};
-
 class BridgedDeclBaseName {
   BridgedIdentifier Ident;
 

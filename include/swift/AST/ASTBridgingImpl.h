@@ -56,15 +56,6 @@ swift::DeclBaseName BridgedDeclBaseName::unbridged() const {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: BridgedDeclBaseName
-//===----------------------------------------------------------------------===//
-
-BridgedConsumedLookupResult::BridgedConsumedLookupResult(
-    swift::Identifier name, swift::SourceLoc sourceLoc, SwiftInt flag)
-    : Name(BridgedIdentifier(name)), NameLoc(BridgedSourceLoc(sourceLoc)),
-      Flag(flag) {}
-
-//===----------------------------------------------------------------------===//
 // MARK: BridgedDeclNameRef
 //===----------------------------------------------------------------------===//
 
