@@ -822,4 +822,5 @@ Func _SliceBuffer.withUnsafeMutableBufferPointer(_:) has mangled name changing f
 
 Struct String.Index has added a conformance to an existing protocol CustomDebugStringConvertible
 
+Enum _SwiftifyInfo is a new API without @available attribute
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

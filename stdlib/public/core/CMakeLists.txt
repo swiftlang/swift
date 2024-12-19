@@ -230,6 +230,7 @@ split_embedded_sources(
   EMBEDDED Int128.swift
   EMBEDDED Mirror.swift
     NORMAL PlaygroundDisplay.swift
+  EMBEDDED SwiftifyImport.swift
     NORMAL CommandLine.swift
   EMBEDDED SliceBuffer.swift
   EMBEDDED StaticBigInt.swift
@@ -261,11 +262,6 @@ if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
 
   list(APPEND SWIFTLIB_EMBEDDED_SOURCES SIMDVector.swift)
   list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
-endif()
-
-if (SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
-  list(APPEND SWIFTLIB_SOURCES PointerBounds.swift)
-  list(APPEND SWIFTLIB_EMBEDDED_SOURCES PointerBounds.swift)
 endif()
 
 # Freestanding and Linux/Android builds both have failures to resolve.
