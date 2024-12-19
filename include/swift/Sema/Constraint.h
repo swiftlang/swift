@@ -820,11 +820,6 @@ public:
   /// from the rest of the constraint system.
   bool isIsolated() const { return IsIsolated; }
 
-  /// Whether this is a one-way constraint.
-  bool isOneWayConstraint() const {
-    return false;
-  }
-
   /// Retrieve the overload choice for an overload-binding constraint.
   OverloadChoice getOverloadChoice() const {
     assert(Kind == ConstraintKind::BindOverload);
