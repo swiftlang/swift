@@ -317,6 +317,11 @@ ImportPaths("I", llvm::cl::desc("add a directory to the import search path"),
             llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
+SystemImportPaths("isystem",
+                  llvm::cl::desc("add a directory to the system import search path"),
+                  llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
 FrameworkPaths("F",
                llvm::cl::desc("add a directory to the framework search path"),
                llvm::cl::cat(Category));
@@ -4514,8 +4519,15 @@ int main(int argc, char *argv[]) {
   }
   InitInvok.getClangImporterOptions().PrecompiledHeaderOutputDir =
     options::PCHOutputDir;
-  InitInvok.setImportSearchPaths(options::ImportPaths);
-  std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
+  std::vector<SearchPathOptions::SearchPath> ImportPaths;
+  for (const auto &path : options::ImportPaths) {
+    ImportPaths.push_back({path, /*isSystem=*/false});
+  }
+  for (const auto &path : options::SystemImportPaths) {
+    ImportPaths.push_back({path, /*isSystem=*/true});
+  }
+  InitInvok.setImportSearchPaths(ImportPaths);
+  std::vector<SearchPathOptions::SearchPath> FramePaths;
   for (const auto &path : options::FrameworkPaths) {
     FramePaths.push_back({path, /*isSystem=*/false});
   }
