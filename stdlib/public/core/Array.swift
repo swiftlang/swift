@@ -1878,15 +1878,13 @@ extension Array {
     let insertCount = newElements.count
     let growth = insertCount - eraseCount
 
-    let punchedHole = _reserveCapacityImplForReplaceSubrange(
+    _reserveCapacityImpl(
       minimumCapacity: self.count + growth,
-      growForAppend: growth > 0,
-      rangeToNotCopy: subrange)
+      growForAppend: true)
     _buffer.replaceSubrange(
       subrange,
       with: insertCount,
-      elementsOf: newElements,
-      holeAlreadyPunched: punchedHole)
+      elementsOf: newElements)
     _endMutation()
   }
 }
