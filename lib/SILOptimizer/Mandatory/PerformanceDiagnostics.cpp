@@ -792,7 +792,7 @@ private:
     // Skip all performance/embedded diagnostics if asked. This is used from
     // SourceKit to avoid reporting false positives when WMO is turned off for
     // indexing purposes.
-    if (!module->getOptions().EnablePerformanceDiagnostics) return;
+    if (!module->getOptions().EnableWMORequiredDiagnostics) return;
 
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 

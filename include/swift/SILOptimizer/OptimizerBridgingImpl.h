@@ -506,7 +506,7 @@ bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedInstruction i
 }
 
 BridgedPassContext BridgedPassContext::initializeNestedPassContext(BridgedFunction newFunction) const {
-  return { invocation->initializeNestedSwiftPassInvocation(newFunction.getFunction()) }; 
+  return { invocation->initializeNestedSwiftPassInvocation(newFunction.getFunction()) };
 }
 
 void BridgedPassContext::deinitializedNestedPassContext() const {
@@ -569,6 +569,11 @@ BridgedPassContext::AssertConfiguration BridgedPassContext::getAssertConfigurati
 bool BridgedPassContext::shouldExpand(BridgedType ty) const {
   swift::SILModule &mod = *invocation->getPassManager()->getModule();
   return swift::shouldExpand(mod, ty.unbridged());
+}
+
+bool BridgedPassContext::enableWMORequiredDiagnostics() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().EnableWMORequiredDiagnostics;
 }
 
 static_assert((int)BridgedPassContext::SILStage::Raw == (int)swift::SILStage::Raw);
