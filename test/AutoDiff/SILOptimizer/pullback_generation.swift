@@ -198,3 +198,25 @@ func f4(a: NonTrivial) -> Float {
 // CHECK: %95 = metatype $@thick Float.Type               
 // CHECK: %96 = apply %94<Float>(%91, %92, %95) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()
 // CHECK: destroy_value %67 : $NonTrivial
+
+@differentiable(reverse)
+func move_value(x: Float) -> Float {
+  var result = x
+  repeat {
+    let temp = result
+    result = temp
+  } while 0 == 1
+  return result
+}
+
+// CHECK-LABEL: sil private [ossa] @$s19pullback_generation10move_value1xS2f_tFTJpSpSr : $@convention(thin) (Float, @guaranteed Builtin.NativeObject) -> Float {
+// CHECK:       bb3(%[[#]] : $Float, %[[#]] : $Float, %[[#]] : $Float, %[[#]] : $(predecessor: _AD__$s19pullback_generation10move_value1xS2f_tF_bb1__Pred__src_0_wrt_0)):
+// CHECK:         %[[#]] = witness_method $Float, #AdditiveArithmetic."+=" : <Self where Self : AdditiveArithmetic> (Self.Type) -> (inout Self, Self) -> () : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()
+// CHECK:         %[[#T1:]] = alloc_stack $Float
+// CHECK:         %[[#T2:]] = witness_method $Float, #AdditiveArithmetic.zero!getter : <Self where Self : AdditiveArithmetic> (Self.Type) -> () -> Self : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:         %[[#T3:]] = metatype $@thick Float.Type
+// CHECK:         %[[#]] = apply %[[#T2]]<Float>(%[[#T1]], %[[#T3]]) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:         %[[#T4:]] = load [trivial] %[[#T1]]
+// CHECK:         dealloc_stack %[[#T1]]
+// CHECK:       bb4(%113 : $Builtin.RawPointer):
+// CHECK:         br bb5(%[[#]] : $Float, %[[#]] : $Float, %[[#T4]] : $Float, %[[#]] : $(predecessor: _AD__$s19pullback_generation10move_value1xS2f_tF_bb2__Pred__src_0_wrt_0))
