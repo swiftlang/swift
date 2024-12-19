@@ -892,9 +892,9 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     if bufferIsUnique {
       // As an optimization, if the original buffer is unique, we can just move
       // the elements instead of copying.
-      let dest = newBuffer.mutableFirstElementAddress
-      dest.moveInitialize(from: firstElementAddress,
-                          count: c)
+      _moveContents(
+        subRange: 0..<c,
+        initializing: newBuffer.mutableFirstElementAddress)
       mutableCount = 0
     } else {
       _copyContents(
@@ -923,7 +923,6 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       _uninitializedCount: c, minimumCapacity: newCapacity)
     let destStart = newBuffer.mutableFirstElementAddress
     let destTailStart = destStart + hole.upperBound
-    let sourceTailStart = firstElementAddress + hole.upperBound
     let beforeHole = 0 ..< hole.lowerBound
     let afterHole = hole.upperBound ..< c
 
@@ -931,12 +930,10 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       // As an optimization, if the original buffer is unique, we can just move
       // the elements instead of copying.
       if !beforeHole.isEmpty {
-        destStart.moveInitialize(from: firstElementAddress,
-                                 count: beforeHole.count)
+        _moveContents(subRange: beforeHole, initializing: destStart)
       }
       if !afterHole.isEmpty {
-        destTailStart.moveInitialize(from: sourceTailStart,
-                                 count: afterHole.count)
+        _moveContents(subRange: afterHole, initializing: destTailStart)
       }
       mutableCount = 0
     } else {

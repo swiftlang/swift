@@ -35,6 +35,7 @@ fileprivate let destSizes = [(10_000, "lg"), (99, "sm")]
 
 // We're currently only testing non-uniquely-referenced Arrays of
 // refcounted objects to cut down on the excessive number of subtests.
+// Revert 3362243cd6f1b6c16dc8d10dd27c8f3e881ecbc7 if you want the full thing
 fileprivate func configs() -> [BenchmarkInfo] {
   var configs: [BenchmarkInfo] = []
   for (sourceCount, sourceName) in sourceSizes {

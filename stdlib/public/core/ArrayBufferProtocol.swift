@@ -156,7 +156,7 @@ extension _ArrayBufferProtocol {
     self = Self( _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
   }
   
-  @inlinable
+  @inlinable @_alwaysEmitIntoClient
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,
