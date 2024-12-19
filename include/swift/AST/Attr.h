@@ -3191,11 +3191,11 @@ public:
 
   /// Returns the platform kind that the attribute applies to, or
   /// `PlatformKind::none` if the attribute is not platform specific.
-  bool isPlatformSpecific() const { return domain.isPlatform(); }
+  bool isPlatformSpecific() const { return getDomain().isPlatform(); }
 
   /// Returns the platform kind that the attribute applies to, or
   /// `PlatformKind::none` if the attribute is not platform specific.
-  PlatformKind getPlatformKind() const { return domain.getPlatformKind(); }
+  PlatformKind getPlatformKind() const { return getDomain().getPlatformKind(); }
 
   /// Whether this attribute has an introduced, deprecated, or obsoleted
   /// version.
@@ -3205,12 +3205,12 @@ public:
 
   /// Whether this is a language mode specific attribute.
   bool isSwiftLanguageModeSpecific() const {
-    return domain.isSwiftLanguage() && isVersionSpecific();
+    return getDomain().isSwiftLanguage() && isVersionSpecific();
   }
 
   /// Whether this is a PackageDescription version specific attribute.
   bool isPackageDescriptionVersionSpecific() const {
-    return domain.isPackageDescription() && isVersionSpecific();
+    return getDomain().isPackageDescription() && isVersionSpecific();
   }
 
   /// Returns the active version from the AST context corresponding to
