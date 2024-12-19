@@ -116,6 +116,7 @@ swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
   case PlatformKind::tvOS:
   case PlatformKind::watchOS:
   case PlatformKind::visionOS:
+  case PlatformKind::FreeBSD:
   case PlatformKind::OpenBSD:
   case PlatformKind::Windows:
   case PlatformKind::none:
@@ -160,6 +161,8 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
       return Target.isXROS();
     case PlatformKind::OpenBSD:
       return Target.isOSOpenBSD();
+    case PlatformKind::FreeBSD:
+      return Target.isOSFreeBSD();
     case PlatformKind::Windows:
       return Target.isOSWindows();
     case PlatformKind::none:
@@ -278,6 +281,7 @@ bool swift::isPlatformSPI(PlatformKind Platform) {
   case PlatformKind::visionOS:
   case PlatformKind::visionOSApplicationExtension:
   case PlatformKind::OpenBSD:
+  case PlatformKind::FreeBSD:
   case PlatformKind::Windows:
   case PlatformKind::none:
     return false;
