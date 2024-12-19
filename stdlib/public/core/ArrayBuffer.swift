@@ -244,7 +244,7 @@ extension _ArrayBuffer {
                                  count: beforeHole.count)
       }
       if !afterHole.isEmpty {
-        destTailStart.moveInitialize(from: sourceTailStart
+        destTailStart.moveInitialize(from: sourceTailStart,
                                  count: afterHole.count)
       }
       _native.mutableCount = 0
