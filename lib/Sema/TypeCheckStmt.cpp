@@ -2949,6 +2949,8 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
     TypeChecker::checkFunctionEffects(AFD);
   }
 
+  diagnoseUnsafeUsesIn(AFD);
+
   return hadError ? errorBody() : body;
 }
 

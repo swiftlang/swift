@@ -274,7 +274,12 @@ std::pair<const Decl *, bool /*inDefinition*/>
 enclosingContextForUnsafe(SourceLoc referenceLoc, const DeclContext *referenceDC);
 
 /// Diagnose the given unsafe use right now.
-void diagnoseUnsafeUse(const UnsafeUse &use);
+void diagnoseUnsafeUse(const UnsafeUse &use, bool asNote = false);
+
+/// Diagnose any unsafe uses within the signature or definition of the given
+/// declaration, if there are any.
+void diagnoseUnsafeUsesIn(const Decl *decl);
+
 
 } // namespace swift
 

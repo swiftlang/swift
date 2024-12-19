@@ -67,6 +67,7 @@ private:
 
     struct {
       NormalProtocolConformance *conformance;
+      DeclContext *declContext;
       const void *location;
     } conformance;
 
@@ -139,9 +140,11 @@ public:
   }
 
   static UnsafeUse forConformance(NormalProtocolConformance *conformance,
-                                  SourceLoc location) {
+                                  SourceLoc location,
+                                  DeclContext *dc) {
     UnsafeUse result(UnsafeConformance);
     result.storage.conformance.conformance = conformance;
+    result.storage.conformance.declContext = dc;
     result.storage.conformance.location = location.getOpaquePointerValue();
     return result;
   }
@@ -230,10 +233,14 @@ public:
       return storage.entity.declContext;
 
     case Override:
+      return getDecl()->getDeclContext();
+
     case Witness:
     case TypeWitness:
+      return getConformance()->getDeclContext();
+
     case UnsafeConformance:
-      return nullptr;
+      return storage.conformance.declContext;
     }
   }
 

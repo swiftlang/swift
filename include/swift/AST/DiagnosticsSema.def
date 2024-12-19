@@ -8072,6 +8072,19 @@ NOTE(sending_function_result_with_sending_param_note, none,
 //------------------------------------------------------------------------------
 ERROR(unsafe_attr_disabled,none,
       "attribute requires '-enable-experimental-feature AllowUnsafeAttribute'", ())
+
+GROUPED_WARNING(decl_involves_unsafe,Unsafe,none,
+      "%kindbase0 involves unsafe code; "
+      "use %select{'@unsafe' to indicate that its use is not memory-safe|"
+      "'@safe(unchecked)' to assert that the code is memory-safe}1",
+      (const Decl *, bool))
+NOTE(note_reference_to_unsafe_decl,none,
+      "%select{reference|call}0 to unsafe %kind1",
+      (bool, const ValueDecl *))
+NOTE(note_reference_to_unsafe_typed_decl,none,
+     "%select{reference|call}0 to %kind1 involves unsafe type %2",
+     (bool, const ValueDecl *, Type))
+
 GROUPED_WARNING(override_safe_withunsafe,Unsafe,none,
       "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
 GROUPED_WARNING(witness_unsafe,Unsafe,none,

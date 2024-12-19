@@ -2469,7 +2469,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
 
     if (!conformance->getDeclContext()->allowsUnsafe()) {
       diagnoseUnsafeUse(
-          UnsafeUse::forConformance(conformance, ComplainLoc));
+          UnsafeUse::forConformance(conformance, ComplainLoc,
+                                    conformance->getDeclContext()));
     }
   }
 

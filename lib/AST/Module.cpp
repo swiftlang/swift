@@ -41,6 +41,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/SourceFileExtras.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -1173,6 +1174,17 @@ ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
     return nullptr;
 
   return ASTNode::getFromOpaqueValue(getGeneratedSourceFileInfo()->astNode);
+}
+
+SourceFileExtras &SourceFile::getExtras() const {
+  if (!extras) {
+    const_cast<SourceFile *>(this)->extras = new SourceFileExtras();
+    getASTContext().addCleanup([extras=this->extras] {
+      delete extras;
+    });
+  }
+
+  return *extras;
 }
 
 void ModuleDecl::lookupClassMember(ImportPath::Access accessPath,

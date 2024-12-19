@@ -10,11 +10,11 @@
 func iAmUnsafe() { }
 
 @unsafe
-struct UnsafeType { } // expected-note{{unsafe struct 'UnsafeType' declared here}}
+struct UnsafeType { }
 
-// expected-warning@+1{{reference to unsafe struct 'UnsafeType' [Unsafe]}}
+// expected-note@+1{{reference to unsafe struct 'UnsafeType'}}
 func iAmImpliedUnsafe() -> UnsafeType? { nil }
-// expected-note@-1{{make global function 'iAmImpliedUnsafe' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+// expected-warning@-1{{global function 'iAmImpliedUnsafe' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe [Unsafe]}}{{1-1=@unsafe }}
 
 @unsafe
 func labeledUnsafe(_: UnsafeType) {

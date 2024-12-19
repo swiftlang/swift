@@ -61,8 +61,8 @@ struct SuperHolder {
 // -----------------------------------------------------------------------
 // Inheritance of @unsafe
 // -----------------------------------------------------------------------
-@unsafe class UnsafeSuper { // expected-note 5{{'UnsafeSuper' declared here}}
-  func f() { } // expected-note{{unsafe instance method 'f' declared here}}
+@unsafe class UnsafeSuper { // expected-note 4{{'UnsafeSuper' declared here}}
+  func f() { }
 };
 
 class UnsafeSub: UnsafeSuper { } // expected-warning{{reference to unsafe class 'UnsafeSuper'}}
@@ -71,22 +71,20 @@ class UnsafeSub: UnsafeSuper { } // expected-warning{{reference to unsafe class 
 // -----------------------------------------------------------------------
 // Declaration references
 // -----------------------------------------------------------------------
-@unsafe func unsafeF() { } // expected-note{{unsafe global function 'unsafeF' declared here}}
-@unsafe var unsafeVar: Int = 0 // expected-note{{'unsafeVar' declared here}}
+@unsafe func unsafeF() { }
+@unsafe var unsafeVar: Int = 0
 
-// expected-note@+2 5{{make global function 'testMe' @safe(unchecked) to allow it to use unsafe constructs in its definition}}{{1-1=@safe(unchecked) }}
-// expected-note@+1 2{{make global function 'testMe' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+// expected-warning@+1{{global function 'testMe' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe [Unsafe]}}{{1-1=@unsafe }}
 func testMe(
-  _ pointer: PointerType, // expected-warning{{reference to unsafe struct 'PointerType'}}
-  _ unsafeSuper: UnsafeSuper // expected-warning{{reference to unsafe class 'UnsafeSuper'}}
-  // expected-note@-1{{'unsafeSuper' declared here}}
+  _ pointer: PointerType, // expected-note{{reference to unsafe struct 'PointerType'}}
+  _ unsafeSuper: UnsafeSuper // expected-note{{reference to unsafe class 'UnsafeSuper'}}
 ) { 
-  unsafeF() // expected-warning{{call to unsafe global function 'unsafeF'}}
-  _ = unsafeVar // expected-warning{{reference to unsafe var 'unsafeVar'}}
-  unsafeSuper.f() // expected-warning{{call to unsafe instance method 'f'}}
-  // expected-warning@-1{{reference to parameter 'unsafeSuper' involves unsafe type 'UnsafeSuper'}}
+  unsafeF() // expected-note{{call to unsafe global function 'unsafeF()'}}
+  _ = unsafeVar // expected-note{{reference to unsafe var 'unsafeVar'}}
+  unsafeSuper.f() // expected-note{{call to unsafe instance method 'f()'}}
+  // expected-note@-1{{reference to parameter 'unsafeSuper' involves unsafe type 'UnsafeSuper'}}
 
-  _ = getPointers() // expected-warning{{call to global function 'getPointers' involves unsafe type 'PointerType'}}
+  _ = getPointers() // expected-note{{call to global function 'getPointers()' involves unsafe type 'PointerType'}}
 }
 
 // -----------------------------------------------------------------------

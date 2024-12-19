@@ -17,10 +17,39 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/AST/SourceFileExtras.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 
 using namespace swift;
+
+static std::pair<const Decl *, bool /*inDefinition*/>
+enclosingContextForUnsafe(const UnsafeUse &use) {
+  return swift::enclosingContextForUnsafe(use.getLocation(),
+                                          use.getDeclContext());
+}
+
+/// Whether this particular unsafe use occurs within the definition of an
+/// entity, but not in its signature, meaning that the unsafety could be
+/// encapsulated.
+static bool isUnsafeUseInDefinition(const UnsafeUse &use) {
+  switch (use.getKind()) {
+  case UnsafeUse::Override:
+  case UnsafeUse::Witness:
+  case UnsafeUse::TypeWitness:
+  case UnsafeUse::UnsafeConformance:
+  case UnsafeUse::UnownedUnsafe:
+  case UnsafeUse::NonisolatedUnsafe:
+    // Never part of the definition. These are always part of the interface.
+    return false;
+
+  case UnsafeUse::ReferenceToUnsafe:
+  case UnsafeUse::CallToUnsafe:
+    return enclosingContextForUnsafe(use).second;
+  }
+}
+
 
 static void suggestUnsafeOnEnclosingDecl(
     SourceLoc referenceLoc, const DeclContext *referenceDC) {
@@ -58,7 +87,39 @@ static void suggestUnsafeMarkerOnConformance(
   ).fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
 }
 
-void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
+static bool shouldDeferUnsafeUseIn(const Decl *decl) {
+  if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(decl)) {
+    if (func->hasBody()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// Retrieve the extra information
+static SourceFileExtras &getSourceFileExtrasFor(const Decl *decl) {
+  auto dc = decl->getDeclContext();
+  return dc->getOutermostParentSourceFile()->getExtras();
+}
+
+void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
+  if (!asNote) {
+    // If we can associate this unsafe use within a particular declaration, do so.
+    // It will be diagnosed later, along with all other unsafe uses within this
+    // same declaration.
+    if (use.getKind() == UnsafeUse::ReferenceToUnsafe ||
+        use.getKind() == UnsafeUse::CallToUnsafe) {
+      auto [enclosingDecl, _] = enclosingContextForUnsafe(
+          use.getLocation(), use.getDeclContext());
+      if (enclosingDecl && shouldDeferUnsafeUseIn(enclosingDecl)) {
+        getSourceFileExtrasFor(enclosingDecl).unsafeUses[enclosingDecl]
+          .push_back(use);
+        return;
+      }
+    }
+  }
+
   switch (use.getKind()) {
   case UnsafeUse::Override: {
     auto override = use.getDecl();
@@ -142,18 +203,52 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
           use.getDeclContext(),
           [&](Type specificType) {
             ctx.Diags.diagnose(
-                loc, diag::reference_to_unsafe_typed_decl, isCall, decl,
-                specificType);
+                loc,
+                asNote ? diag::note_reference_to_unsafe_typed_decl
+                       : diag::reference_to_unsafe_typed_decl,
+                isCall, decl, specificType);
           });
-      suggestUnsafeOnEnclosingDecl(loc, use.getDeclContext());
-      decl->diagnose(diag::unsafe_decl_here, decl);
     } else {
-      ctx.Diags
-        .diagnose(loc, diag::reference_to_unsafe_decl, isCall, decl);
+      ctx.Diags.diagnose(
+          loc,
+          asNote ? diag::note_reference_to_unsafe_decl
+                 : diag::reference_to_unsafe_decl,
+          isCall, decl);
+    }
+
+    if (!asNote) {
       suggestUnsafeOnEnclosingDecl(loc, use.getDeclContext());
       decl->diagnose(diag::unsafe_decl_here, decl);
     }
+
     return;
   }
+  }
+}
+
+void swift::diagnoseUnsafeUsesIn(const Decl *decl) {
+  auto &extras = getSourceFileExtrasFor(decl);
+  auto known = extras.unsafeUses.find(decl);
+  if (known == extras.unsafeUses.end())
+    return;
+
+  // Take the unsafe uses.
+  auto unsafeUses = std::move(known->second);
+  extras.unsafeUses.erase(known);
+  if (unsafeUses.empty())
+    return;
+
+  // Determine whether all of the uses are in the definition.
+  bool canEncapsulateUnsafety = std::all_of(
+      unsafeUses.begin(), unsafeUses.end(), isUnsafeUseInDefinition);
+  StringRef fixItStr = canEncapsulateUnsafety
+      ? "@safe(unchecked) "
+      : "@unsafe ";
+  decl->diagnose(diag::decl_involves_unsafe, decl, canEncapsulateUnsafety)
+    .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/false),
+                 fixItStr);
+
+  for (const auto &unsafeUse : unsafeUses) {
+    diagnoseUnsafeUse(unsafeUse, /*asNote=*/true);
   }
 }
