@@ -571,20 +571,17 @@ void ConstraintGraph::retractBindings(TypeVariableType *typeVar,
 ///
 /// \param cg The constraint graph.
 /// \param typeVar The type variable we're searching from.
-/// \param preVisitNode Called before traversing a node. Must return \c
-/// false when the node has already been visited.
-/// \param visitConstraint Called before considering a constraint. If it
-/// returns \c false, that constraint will be skipped.
+/// \param visitConstraint Called before considering a constraint.
 /// \param visitedConstraints Set of already-visited constraints, used
 /// internally to avoid duplicated work.
 static void depthFirstSearch(
     ConstraintGraph &cg,
     TypeVariableType *typeVar,
-    llvm::function_ref<bool(TypeVariableType *)> preVisitNode,
-    llvm::function_ref<bool(Constraint *)> visitConstraint,
+    llvm::function_ref<void(Constraint *)> visitConstraint,
+    llvm::SmallPtrSet<TypeVariableType *, 4> &typeVars,
     llvm::SmallPtrSet<Constraint *, 8> &visitedConstraints) {
   // Visit this node. If we've already seen it, bail out.
-  if (!preVisitNode(typeVar))
+  if (!typeVars.insert(typeVar).second)
     return;
 
   // Local function to visit adjacent type variables.
@@ -594,21 +591,18 @@ static void depthFirstSearch(
         continue;
 
       // Recurse into this node.
-      depthFirstSearch(cg, adj, preVisitNode, visitConstraint,
-                       visitedConstraints);
+      depthFirstSearch(cg, adj, visitConstraint, typeVars, visitedConstraints);
     }
   };
 
-  // Walk all of the constraints associated with this node to find related
-  // nodes.
+  // Walk all of the constraints associated with this node.
   auto &node = cg[typeVar];
   for (auto constraint : node.getConstraints()) {
     // If we've already seen this constraint, skip it.
     if (!visitedConstraints.insert(constraint).second)
       continue;
 
-    if (visitConstraint(constraint))
-      visitAdjacencies(constraint->getTypeVariables());
+    visitConstraint(constraint);
   }
 
   // Visit all of the other nodes in the equivalence class.
@@ -639,17 +633,11 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     // constraints involving both it and its fixed bindings.
     depthFirstSearch(
         *this, typeVar,
-        [&](TypeVariableType *typeVar) {
-          return typeVars.insert(typeVar).second;
-        },
         [&](Constraint *constraint) {
           if (acceptConstraintFn(constraint))
             constraints.push_back(constraint);
-
-          // Don't recurse into the constraint's type variables.
-          return false;
         },
-        visitedConstraints);
+        typeVars, visitedConstraints);
     return constraints;
   }
 
