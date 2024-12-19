@@ -728,9 +728,17 @@ bool DCE::removeDead() {
           endLifetimeOfLiveValue(predOp, insertPt);
         }
       }
-      erasePhiArgument(&BB, i, /*cleanupDeadPhiOps=*/true,
-                       InstModCallbacks().onCreateNewInst(
-                           [&](auto *inst) { markInstructionLive(inst); }));
+      erasePhiArgument(
+          &BB, i, /*cleanupDeadPhiOps=*/true,
+          InstModCallbacks()
+              .onCreateNewInst([&](auto *inst) { markInstructionLive(inst); })
+              .onDelete([&](auto *inst) {
+                inst->replaceAllUsesOfAllResultsWithUndef();
+                if (isa<ApplyInst>(inst))
+                  CallsChanged = true;
+                ++NumDeletedInsts;
+                inst->eraseFromParent();
+              }));
       Changed = true;
       BranchesChanged = true;
     }
