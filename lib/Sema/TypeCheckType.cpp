@@ -449,16 +449,17 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
       for (auto *parentDC = fromDC; !parentDC->isModuleScopeContext();
            parentDC = parentDC->getParentForLookup()) {
         auto *parentNominal = parentDC->getSelfNominalTypeDecl();
+        if (!parentNominal) {
+          continue;
+        }
+
         if (parentNominal == nominalType)
           return parentDC->getDeclaredInterfaceType();
-        if (isa<ExtensionDecl>(parentDC)) {
-          auto *extendedType = parentNominal;
-          while (extendedType != nullptr) {
-            if (extendedType == nominalType)
-              return extendedType->getDeclaredInterfaceType();
-            extendedType = extendedType->getParent()->getSelfNominalTypeDecl();
-          }
-        }
+
+        // `parentDC` is either a nominal or an extension thereof. Either way,
+        // continue climbing up the nominal. Do not to climb up an extension
+        // because they are not allowed to be nested.
+        parentDC = parentNominal;
       }
     }
 
