@@ -1361,7 +1361,6 @@ private:
   }
 
   void collectBases(const clang::RecordDecl *decl) {
-    auto &layout = decl->getASTContext().getASTRecordLayout(decl);
     if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(decl)) {
       auto bases = getBasesAndOffsets(cxxRecord);
       for (auto base : bases) {
