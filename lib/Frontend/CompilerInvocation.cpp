@@ -2143,13 +2143,16 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     return std::string(fullPath.str());
   };
 
-  std::vector<std::string> ImportSearchPaths(Opts.getImportSearchPaths());
-  for (const Arg *A : Args.filtered(OPT_I)) {
-    ImportSearchPaths.push_back(resolveSearchPath(A->getValue()));
+  std::vector<SearchPathOptions::SearchPath> ImportSearchPaths(
+      Opts.getImportSearchPaths());
+  for (const Arg *A : Args.filtered(OPT_I, OPT_Isystem)) {
+    ImportSearchPaths.push_back(
+        {resolveSearchPath(A->getValue()),
+         /*isSystem=*/A->getOption().getID() == OPT_Isystem});
   }
   Opts.setImportSearchPaths(ImportSearchPaths);
 
-  std::vector<SearchPathOptions::FrameworkSearchPath> FrameworkSearchPaths(
+  std::vector<SearchPathOptions::SearchPath> FrameworkSearchPaths(
       Opts.getFrameworkSearchPaths());
   for (const Arg *A : Args.filtered(OPT_F, OPT_Fsystem)) {
     FrameworkSearchPaths.push_back(
