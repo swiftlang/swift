@@ -1,11 +1,11 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature IsolatedDeinit -target %target-swift-5.1-abi-triple -parse-stdlib -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature IsolatedDeinit -target %target-future-triple -parse-stdlib -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
 // REQUIRES: concurrency_runtime
-// REQUIRES: swift_feature_IsolatedDeinit
 // UNSUPPORTED: back_deployment_runtime
+// REQUIRES: swift_feature_IsolatedDeinit
 
 // Compiler crashes because builtin "ifdef_SWIFT_STDLIB_PRINT_DISABLED"() gets lowered as "i32 0",
 // which triggers assertion in LLVM, which expects it to be i1
