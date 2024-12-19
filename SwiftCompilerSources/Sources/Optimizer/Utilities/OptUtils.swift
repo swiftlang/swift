@@ -311,6 +311,14 @@ extension Value {
   }
 }
 
+extension SingleValueInstruction {
+  /// Replaces all uses with `replacement` and then erases the instruction.
+  func replace(with replacement: Value, _ context: some MutatingContext) {
+    uses.replaceAll(with: replacement, context)
+    context.erase(instruction: self)
+  }
+}
+
 extension Instruction {
   var isTriviallyDead: Bool {
     if results.contains(where: { !$0.uses.isEmpty }) {
@@ -521,7 +529,7 @@ extension LoadInst {
         elements.append(splitLoad)
       }
       let newStruct = builder.createStruct(type: self.type, elements: elements)
-      self.uses.replaceAll(with: newStruct, context)
+      self.replace(with: newStruct, context)
     } else if type.isTuple {
       var elements = [Value]()
       let builder = Builder(before: self, context)
@@ -531,11 +539,8 @@ extension LoadInst {
         elements.append(splitLoad)
       }
       let newTuple = builder.createTuple(type: self.type, elements: elements)
-      self.uses.replaceAll(with: newTuple, context)
-    } else {
-      return
+      self.replace(with: newTuple, context)
     }
-    context.erase(instruction: self)
   }
 
   private func splitOwnership(for fieldValue: Value) -> LoadOwnership {
@@ -624,8 +629,7 @@ extension SimplifyContext {
       }
     }
 
-    second.uses.replaceAll(with: replacement, self)
-    erase(instruction: second)
+    second.replace(with: replacement, self)
 
     if canEraseFirst {
       erase(instructionIncludingDebugUses: first)
@@ -741,8 +745,7 @@ extension GlobalVariable {
     for initInst in initInsts {
       switch initInst {
       case let beginAccess as BeginAccessInst:
-        beginAccess.uses.replaceAll(with: beginAccess.address, context)
-        context.erase(instruction: beginAccess)
+        beginAccess.replace(with: beginAccess.address, context)
       case let endAccess as EndAccessInst:
         context.erase(instruction: endAccess)
       default:

@@ -59,9 +59,8 @@ extension LoadBorrowInst : Simplifyable, SILCombineSimplifyable {
     }
     let builder = Builder(before: self, context)
     let loadCopy = builder.createLoad(fromAddress: address, ownership: .copy)
-    let forwardedOwnedValue = replace(guaranteedValue: self, withOwnedValue: loadCopy, context)
-    copy.uses.replaceAll(with: forwardedOwnedValue, context)
-    context.erase(instruction: copy)
+    let forwardedOwnedValue = replaceGuaranteed(value: self, withOwnedValue: loadCopy, context)
+    copy.replace(with: forwardedOwnedValue, context)
     context.erase(instructionIncludingAllUsers: self)
   }
 }
@@ -118,9 +117,8 @@ private func tryReplaceCopy(
   }
   let builder = Builder(before: beginBorrow, context)
   let copiedOperand = builder.createCopyValue(operand: beginBorrow.borrowedValue)
-  let forwardedOwnedValue = replace(guaranteedValue: beginBorrow, withOwnedValue: copiedOperand, context)
-  copy.uses.replaceAll(with: forwardedOwnedValue, context)
-  context.erase(instruction: copy)
+  let forwardedOwnedValue = replaceGuaranteed(value: beginBorrow, withOwnedValue: copiedOperand, context)
+  copy.replace(with: forwardedOwnedValue, context)
   context.erase(instructionIncludingAllUsers: beginBorrow)
   return true
 }
@@ -140,7 +138,7 @@ private func tryReplaceCopy(
 ///   destroy_value %2
 /// ```
 private func convertAllUsesToOwned(of beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
-  let forwardedOwnedValue = replace(guaranteedValue: beginBorrow, withOwnedValue: beginBorrow.borrowedValue, context)
+  let forwardedOwnedValue = replaceGuaranteed(value: beginBorrow, withOwnedValue: beginBorrow.borrowedValue, context)
   beginBorrow.borrowedValue.replaceAllDestroys(with: forwardedOwnedValue, context)
   context.erase(instructionIncludingAllUsers: beginBorrow)
 }
@@ -216,21 +214,21 @@ private extension ForwardingInstruction {
 ///
 /// Returns the last owned value in a forwarding-chain or `ownedValue` if `guaranteedValue` has
 /// no forwarding uses.
-private func replace(guaranteedValue: Value, withOwnedValue ownedValue: Value, _ context: SimplifyContext) -> Value {
+private func replaceGuaranteed(value: Value, withOwnedValue ownedValue: Value, _ context: SimplifyContext) -> Value {
   var result = ownedValue
   var numForwardingUses = 0
-  for use in guaranteedValue.uses {
+  for use in value.uses {
 
     switch use.instruction {
     case let tei as TupleExtractInst:
       numForwardingUses += 1
       let dti = Builder(before: tei, context).createDestructureTuple(tuple: ownedValue)
-      result = replace(guaranteedValue: tei, withOwnedValue: dti.results[tei.fieldIndex], context)
+      result = replaceGuaranteed(value: tei, withOwnedValue: dti.results[tei.fieldIndex], context)
       context.erase(instruction: tei)
     case let sei as StructExtractInst:
       numForwardingUses += 1
       let dsi = Builder(before: sei, context).createDestructureStruct(struct: ownedValue)
-      result = replace(guaranteedValue: sei, withOwnedValue: dsi.results[sei.fieldIndex], context)
+      result = replaceGuaranteed(value: sei, withOwnedValue: dsi.results[sei.fieldIndex], context)
       context.erase(instruction: sei)
     case let fwdInst as (SingleValueInstruction & ForwardingInstruction) where
          fwdInst.isSingleForwardedOperand(use):
@@ -238,7 +236,7 @@ private func replace(guaranteedValue: Value, withOwnedValue ownedValue: Value, _
       numForwardingUses += 1
       use.set(to: ownedValue, context)
       fwdInst.setForwardingOwnership(to: .owned, context)
-      result = replace(guaranteedValue: fwdInst, withOwnedValue: fwdInst, context)
+      result = replaceGuaranteed(value: fwdInst, withOwnedValue: fwdInst, context)
     case is EndBorrowInst:
       break
     default:
