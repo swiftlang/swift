@@ -91,7 +91,7 @@ class NonSendable { }
 
 
 @unsafe
-struct UnsafeOuter { // expected-note{{unsafe struct 'UnsafeOuter' declared here}}
+struct UnsafeOuter {
   func f(_: UnsafeType) { } // okay
 
   @unsafe func g(_ y: UnsafeType) {
@@ -100,8 +100,8 @@ struct UnsafeOuter { // expected-note{{unsafe struct 'UnsafeOuter' declared here
   }
 }
 
-// expected-note@+1{{make extension of struct 'UnsafeOuter' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
-extension UnsafeOuter { // expected-warning{{reference to unsafe struct 'UnsafeOuter' [Unsafe]}}
+// expected-warning@+1{{extension of struct 'UnsafeOuter' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+extension UnsafeOuter { // expected-note{{reference to unsafe struct 'UnsafeOuter'}}
   func h(_: UnsafeType) { }
 }
 

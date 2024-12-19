@@ -61,12 +61,12 @@ struct SuperHolder {
 // -----------------------------------------------------------------------
 // Inheritance of @unsafe
 // -----------------------------------------------------------------------
-@unsafe class UnsafeSuper { // expected-note 4{{'UnsafeSuper' declared here}}
+@unsafe class UnsafeSuper { // expected-note{{'UnsafeSuper' declared here}}
   func f() { }
 };
 
-class UnsafeSub: UnsafeSuper { } // expected-warning{{reference to unsafe class 'UnsafeSuper'}}
-// expected-note@-1{{make class 'UnsafeSub' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+class UnsafeSub: UnsafeSuper { } // expected-warning{{class 'UnsafeSub' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+// expected-note@-1{{reference to unsafe class 'UnsafeSuper'}}
 
 // -----------------------------------------------------------------------
 // Declaration references
@@ -90,13 +90,13 @@ func testMe(
 // -----------------------------------------------------------------------
 // Various declaration kinds
 // -----------------------------------------------------------------------
-// expected-note@+1{{make type alias 'SuperUnsafe' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
-typealias SuperUnsafe = UnsafeSuper // expected-warning{{reference to unsafe class 'UnsafeSuper' [Unsafe]}}
+// expected-warning@+1{{type alias 'SuperUnsafe' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+typealias SuperUnsafe = UnsafeSuper // expected-note{{reference to unsafe class 'UnsafeSuper'}}
 @unsafe typealias SuperUnsafe2 = UnsafeSuper
 
 enum HasUnsafeThings {
-// expected-note@+1{{make enum case 'one' @unsafe to indicate that its use is not memory-safe}}
-case one(UnsafeSuper) // expected-warning{{reference to unsafe class 'UnsafeSuper' [Unsafe]}}
+// expected-warning@+1{{enum case 'one' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+case one(UnsafeSuper) // expected-note{{reference to unsafe class 'UnsafeSuper'}}
 
 @unsafe case two(UnsafeSuper)
 }

@@ -87,16 +87,6 @@ static void suggestUnsafeMarkerOnConformance(
   ).fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
 }
 
-static bool shouldDeferUnsafeUseIn(const Decl *decl) {
-  if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(decl)) {
-    if (func->hasBody()) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 /// Retrieve the extra information
 static SourceFileExtras &getSourceFileExtrasFor(const Decl *decl) {
   auto dc = decl->getDeclContext();
@@ -112,7 +102,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
         use.getKind() == UnsafeUse::CallToUnsafe) {
       auto [enclosingDecl, _] = enclosingContextForUnsafe(
           use.getLocation(), use.getDeclContext());
-      if (enclosingDecl && shouldDeferUnsafeUseIn(enclosingDecl)) {
+      if (enclosingDecl) {
         getSourceFileExtrasFor(enclosingDecl).unsafeUses[enclosingDecl]
           .push_back(use);
         return;

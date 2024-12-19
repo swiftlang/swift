@@ -280,7 +280,6 @@ void diagnoseUnsafeUse(const UnsafeUse &use, bool asNote = false);
 /// declaration, if there are any.
 void diagnoseUnsafeUsesIn(const Decl *decl);
 
-
 } // namespace swift
 
 #endif // SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
