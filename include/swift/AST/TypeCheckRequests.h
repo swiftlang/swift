@@ -3548,7 +3548,7 @@ public:
 class CheckRedeclarationRequest
     : public SimpleRequest<
           CheckRedeclarationRequest,
-          evaluator::SideEffect(ValueDecl *, NominalTypeDecl *),
+          evaluator::SideEffect(ValueDecl *),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySource |
               RequestFlags::DependencySink> {
 public:
@@ -3561,8 +3561,7 @@ public:
   /// \p SelfNominalType is \c VD->getDeclContext()->getSelfNominalType().
   /// Passed as a parameter in here so this request doesn't tigger self nominal
   /// type computation.
-  evaluator::SideEffect evaluate(Evaluator &evaluator, ValueDecl *VD,
-                                 NominalTypeDecl *SelfNominalType) const;
+  evaluator::SideEffect evaluate(Evaluator &evaluator, ValueDecl *VD) const;
 
 public:
   // Separate caching.
