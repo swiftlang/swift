@@ -1399,12 +1399,12 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
           baseObjTy, value, locator, isDynamicLookup) &&
       // If there are no type variables, there were no references to 'Self'.
       type->hasTypeVariable()) {
-    auto selfGP = outerDC->getSelfInterfaceType();
-    ASSERT(selfGP->isEqual(replacements[0].first));
-    auto openedTypeVar = replacements[0].second;
+    auto *openedArchetype = getOpenedExistentialType(locator);
 
-    type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar,
-                                               TypePosition::Covariant);
+    type = simplifyType(type);
+    type = typeEraseCovariantOpenedArchetypesFromEnvironment(
+        type, openedArchetype->getGenericEnvironment(),
+        /*initialPosition=*/TypePosition::Covariant);
   }
 
   // Construct an idealized parameter type of the initializer associated

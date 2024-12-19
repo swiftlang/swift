@@ -603,6 +603,27 @@ void TypeBase::getTypeVariables(
          "Did not find type variables!");
 }
 
+Type TypeBase::getDependentMemberRoot() {
+  Type t(this);
+
+  while (auto *dmt = t->getAs<DependentMemberType>())
+    t = dmt->getBase();
+
+  return t;
+}
+
+bool TypeBase::isTypeVariableOrMember() {
+  return getDependentMemberRoot()->is<TypeVariableType>();
+}
+
+bool TypeBase::isTypeParameter() {
+  return getDependentMemberRoot()->is<GenericTypeParamType>();
+}
+
+GenericTypeParamType *TypeBase::getRootGenericParam() {
+  return getDependentMemberRoot()->castTo<GenericTypeParamType>();
+}
+
 static bool isLegalSILType(CanType type);
 
 static bool isLegalSILTypeOrPackExpansion(CanType type) {

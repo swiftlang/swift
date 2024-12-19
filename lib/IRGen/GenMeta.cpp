@@ -2758,15 +2758,10 @@ ProtocolDecl *irgen::opaqueTypeRequiresWitnessTable(
 
   // The type itself must be anchored on one of the generic parameters of
   // the opaque type (not an outer context).
-  Type subject = req.getFirstType();
-  while (auto depMember = subject->getAs<DependentMemberType>()) {
-    subject = depMember->getBase();
-  }
-
-  if (auto genericParam = subject->getAs<GenericTypeParamType>()) {
-    unsigned opaqueDepth = opaque->getOpaqueGenericParams().front()->getDepth();
-    if (genericParam->getDepth() == opaqueDepth)
-      return proto;
+  auto *genericParam = req.getFirstType()->getRootGenericParam();
+  unsigned opaqueDepth = opaque->getOpaqueGenericParams().front()->getDepth();
+  if (genericParam->getDepth() == opaqueDepth) {
+    return proto;
   }
 
   return nullptr;

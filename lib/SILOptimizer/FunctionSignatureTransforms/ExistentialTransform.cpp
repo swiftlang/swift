@@ -435,8 +435,8 @@ void ExistentialTransform::populateThunkBody() {
       ExistentialTransformArgumentDescriptor &ETAD = it->second;
       auto OrigOperand = ThunkBody->getArgument(ArgDesc.Index);
       auto SwiftType = ArgDesc.Arg->getType().getASTType();
-      auto OpenedType = OpenedArchetypeType::getAny(SwiftType)
-              ->getCanonicalType();
+      auto OpenedType = OpenedArchetypeType::openAnyExistentialType(SwiftType)
+                            ->getCanonicalType();
       auto OpenedSILType = NewF->getLoweredType(OpenedType);
       SILValue archetypeValue;
       auto ExistentialRepr =

@@ -820,7 +820,9 @@ static Type typeEraseOpenedArchetypes(Type type) {
   if (!env)
     return type;
 
-  return typeEraseOpenedArchetypesFromEnvironment(type, env);
+  return typeEraseCovariantOpenedArchetypesFromEnvironment(
+      type, env,
+      /*initialPosition*/ TypePosition::Covariant);
 }
 
 /// A type expressing the result of classifying whether a call or function

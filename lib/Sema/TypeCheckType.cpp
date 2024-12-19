@@ -532,6 +532,14 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
   assert(foundDC);
 
+  // Protocols cannot be nested in generic contexts. Use the declared interface
+  // type, which won't have a parent.
+  if (auto *proto = dyn_cast<ProtocolDecl>(typeDecl)) {
+    if (proto->isUnsupportedNestedProtocol()) {
+      return typeDecl->getDeclaredInterfaceType();
+    }
+  }
+
   // selfType is the self type of the context, unless the
   // context is a protocol type, in which case we might have
   // to use the existential type or superclass bound as a
