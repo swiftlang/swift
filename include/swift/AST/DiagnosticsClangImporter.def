@@ -272,6 +272,8 @@ ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
       "SWIFT_RETURNS_UNRETAINED because it is not returning "
       "a SWIFT_SHARED_REFERENCE type",
       (const clang::NamedDecl *))
+ERROR(redundant_conformance_protocol,none,
+      "redundant conformance of %0 to protocol %1", (Type, StringRef))
 
 // TODO: make this case an error in next cxx-interop versions rdar://138806722
 WARNING(no_returns_retained_returns_unretained, none,
