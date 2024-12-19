@@ -8901,7 +8901,7 @@ void ClangImporter::Implementation::importAttributes(
 
       if (!deprecated.empty()) {
         if (platformAvailability.treatDeprecatedAsUnavailable(
-                ClangDecl, deprecated, isAsync)) {
+                ClangDecl, deprecated, isAsync, avail->isImplicit())) {
           AnyUnavailable = true;
           PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
           if (message.empty()) {
