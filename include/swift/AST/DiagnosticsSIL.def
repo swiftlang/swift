@@ -790,6 +790,11 @@ NOTE(box_to_stack_cannot_promote_box_to_stack_due_to_escape_location, none,
 
 WARNING(semantic_function_improper_nesting, none, "'@_semantics' function calls non-'@_semantics' function with nested '@_semantics' calls", ())
 
+// SDK mismatch diagnostics
+ERROR(missing_deinit_on_executor_function, none,
+      "Missing 'swift_task_deinitOnExecutor' function! "
+      "This is likely due to an outdated/incompatible SDK.", ())
+
 // Capture promotion diagnostics
 WARNING(capturepromotion_concurrentcapture_mutation, none,
         "'%0' mutated after capture by sendable closure", (StringRef))
