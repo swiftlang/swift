@@ -799,12 +799,12 @@ Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
-// _PointerParam enum for _SwiftifyImports macro
-Added: _$ss13_PointerParamO11nonescapingyABSi_tcABmFWC
-Added: _$ss13_PointerParamO7endedByyABSi_SitcABmFWC
-Added: _$ss13_PointerParamO7sizedByyABSi_SStcABmFWC
-Added: _$ss13_PointerParamO9countedByyABSi_SStcABmFWC
-Added: _$ss13_PointerParamOMa
-Added: _$ss13_PointerParamOMn
-Added: _$ss13_PointerParamON
+// _SwiftifyInfo enum for _SwiftifyImports macro
+Added: _$ss13_SwiftifyInfoO11nonescapingyABSi_tcABmFWC
+Added: _$ss13_SwiftifyInfoO7endedByyABSi_SitcABmFWC
+Added: _$ss13_SwiftifyInfoO7sizedByyABSi_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO9countedByyABSi_SStcABmFWC
+Added: _$ss13_SwiftifyInfoOMa
+Added: _$ss13_SwiftifyInfoOMn
+Added: _$ss13_SwiftifyInfoON
 

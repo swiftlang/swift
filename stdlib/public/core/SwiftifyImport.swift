@@ -3,7 +3,11 @@
 /// __must__ be string literals, because their contents are parsed by the `@_SwiftifyImport` macro.
 /// Only 1 instance of `countedBy`, `sizedBy` or `endedBy` can refer to each pointer index, however
 /// `nonescaping` is orthogonal to the rest and can (and should) overlap with other annotations.
-public enum _PointerParam {
+///
+/// This is not marked @available, because _SwiftifyImport is available for any target. Instances
+/// of _SwiftifyInfo should ONLY be passed as arguments directly to _SwiftifyImport, so they should
+/// not affect linkage since there are never any instances at runtime.
+public enum _SwiftifyInfo {
     /// Corresponds to the C `__counted_by(count)` attribute.
     /// Parameter pointer: index of pointer in function parameter list. Must be of type
     /// `Unsafe[Mutable]Pointer<T>[?]`, i.e. not an `UnsafeRawPointer`.
@@ -40,5 +44,5 @@ public enum _PointerParam {
 /// Parameter paramInfo: information about how the function uses the pointer passed to it. The
 /// safety of the generated wrapper function depends on this info being extensive and accurate.
 @attached(peer, names: overloaded)
-public macro _SwiftifyImport(_ paramInfo: _PointerParam...) =
+public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")

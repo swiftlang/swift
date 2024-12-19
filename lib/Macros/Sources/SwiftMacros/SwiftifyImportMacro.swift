@@ -466,7 +466,7 @@ public struct SwiftifyImportMacro: PeerMacro {
     guard let calledExpr = enumConstructorExpr.calledExpression.as(MemberAccessExprSyntax.self)
     else {
       throw DiagnosticError(
-        "expected _PointerParam enum literal as argument, got '\(enumConstructorExpr)'",
+        "expected _SwiftifyInfo enum literal as argument, got '\(enumConstructorExpr)'",
         node: enumConstructorExpr)
     }
     return calledExpr.declName.baseName.text
@@ -564,7 +564,7 @@ public struct SwiftifyImportMacro: PeerMacro {
     let paramExpr = paramAST.expression
     guard let enumConstructorExpr = paramExpr.as(FunctionCallExprSyntax.self) else {
       throw DiagnosticError(
-        "expected _PointerParam enum literal as argument, got '\(paramExpr)'", node: paramExpr)
+        "expected _SwiftifyInfo enum literal as argument, got '\(paramExpr)'", node: paramExpr)
     }
     let enumName = try parseEnumName(enumConstructorExpr)
     switch enumName {
@@ -627,7 +627,7 @@ public struct SwiftifyImportMacro: PeerMacro {
       }
       if argByIndex[i] != nil {
         throw DiagnosticError(
-          "multiple _PointerParams referring to parameter with index "
+          "multiple _SwiftifyInfos referring to parameter with index "
             + "\(i): \(pointerArg) and \(argByIndex[i]!)", node: pointerArg.original)
       }
       argByIndex[i] = pointerArg
