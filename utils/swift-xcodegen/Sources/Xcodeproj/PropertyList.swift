@@ -51,33 +51,12 @@ extension PropertyList {
     writePlistRepresentation(to: &writer)
     return Data(writer.bytes)
   }
-
-  /// Escapes the string for plist.
-  /// Finds the instances of quote (") and backward slash (\) and prepends
-  /// the escape character backward slash (\).
-  static func escape(string: String) -> String {
-    func needsEscape(_ char: UInt8) -> Bool {
-      return char == UInt8(ascii: "\\") || char == UInt8(ascii: "\"")
-    }
-
-    guard let pos = string.utf8.firstIndex(where: needsEscape) else {
-      return string
-    }
-    var newString = String(string[..<pos])
-    for char in string.utf8[pos...] {
-      if needsEscape(char) {
-        newString += "\\"
-      }
-      newString += String(UnicodeScalar(char))
-    }
-    return newString
-  }
 }
 
 fileprivate extension PropertyList {
   struct UTF8Writer {
-    var level: Int = 0
-    var bytes: [UInt8] = []
+    private(set) var level: Int = 0
+    private(set) var bytes: [UInt8] = []
     init() {
       self += "// !$*UTF8*$!\n"
     }
@@ -86,6 +65,10 @@ fileprivate extension PropertyList {
       level += 1
       body(&self)
       level -= 1
+    }
+
+    mutating func append(_ byte: UInt8) {
+      bytes.append(byte)
     }
 
     static func += (writer: inout UTF8Writer, str: StaticString) {
@@ -104,6 +87,17 @@ fileprivate extension PropertyList {
         self += "   "
       }
     }
+
+    /// Appends the given string, with instances of quote (") and backward slash
+    /// (\) characters escaped with a backslash.
+    mutating func appendEscaped(_ string: String) {
+      for char in string.utf8 {
+        if char == UInt8(ascii: "\\") || char == UInt8(ascii: "\"") {
+          append(UInt8(ascii: "\\"))
+        }
+        append(char)
+      }
+    }
   }
 
   /// Private function to generate OPENSTEP-style plist representation.
@@ -116,7 +110,7 @@ fileprivate extension PropertyList {
 
     case .string(let string):
       writer += "\""
-      writer += PropertyList.escape(string: string)
+      writer.appendEscaped(string)
       writer += "\""
 
     case .array(let array):
