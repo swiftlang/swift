@@ -3200,7 +3200,7 @@ namespace {
 
     Expr *visitTypeValueExpr(TypeValueExpr *expr) {
       auto toType = simplifyType(cs.getType(expr));
-      assert(toType->isEqual(expr->getParamType()->getValueType()));
+      ASSERT(toType->isEqual(expr->getValueType()));
       cs.setType(expr, toType);
       return expr;
     }
