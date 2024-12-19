@@ -105,7 +105,7 @@ class SwiftPM(product.Product):
 
         helper_cmd.extend(additional_params)
 
-        shell.call(helper_cmd)
+        shell.call(helper_cmd, echo=True)
 
     def build(self, host_target):
         self.run_bootstrap_script('build', host_target, ["--reconfigure"])
