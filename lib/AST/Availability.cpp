@@ -588,8 +588,7 @@ const AvailableAttr *Decl::getNoAsyncAttr() const {
        getSemanticAvailableAttrs(/*includingInactive=*/false)) {
     auto attr = semanticAttr.getParsedAttr();
 
-    if (attr->getPlatformAgnosticAvailability() !=
-        PlatformAgnosticAvailabilityKind::NoAsync)
+    if (!semanticAttr.isNoAsync())
       continue;
 
     if (!bestAttr) {

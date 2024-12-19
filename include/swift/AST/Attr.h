@@ -3197,6 +3197,9 @@ public:
   /// `PlatformKind::none` if the attribute is not platform specific.
   PlatformKind getPlatformKind() const { return getDomain().getPlatformKind(); }
 
+  /// Whether this is a `noasync` attribute.
+  bool isNoAsync() const { return attr->isNoAsync(); }
+
   /// Whether this attribute has an introduced, deprecated, or obsoleted
   /// version.
   bool isVersionSpecific() const {
