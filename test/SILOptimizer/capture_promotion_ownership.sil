@@ -1,11 +1,9 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -capture-promotion \
 // RUN: -enable-experimental-feature LifetimeDependence \
-// RUN: -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN: -module-name Swift \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 // Check to make sure that the process of promoting closure captures results in
 // a correctly cloned and modified closure function body. This test
