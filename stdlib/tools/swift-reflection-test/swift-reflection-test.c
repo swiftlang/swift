@@ -816,6 +816,38 @@ int reflectAsyncTask(SwiftReflectionContextRef RC,
   return 1;
 }
 
+bool IsKnownRealizedClass(void *Context, swift_reflection_ptr_t Ptr) {
+  // The tests will use NSObject as the only known realized class, so just check
+  // for that.
+  swift_addr_t NSObjectAddress = *(swift_addr_t *)Context;
+  return Ptr == NSObjectAddress;
+}
+
+int reflectMaybeUnrealizedObjCClass(SwiftReflectionContextRef RC,
+                                    PipeMemoryReader *Reader) {
+  uintptr_t MaybeClass = PipeMemoryReader_receiveInstanceAddress(Reader);
+  printf("Maybe unrealized ObjC class %#" PRIx64 "\n", (uint64_t)MaybeClass);
+
+  const char *NSObjectName = "OBJC_CLASS_$_NSObject";
+  swift_addr_t NSObjectAddress = PipeMemoryReader_getSymbolAddress(
+      Reader, NSObjectName, strlen(NSObjectName));
+
+  int IsUnrealizedObjCClass = -1;
+  const char *error = swift_reflection_pointerIsUnrealizedObjCClass(
+      RC, MaybeClass, IsKnownRealizedClass, &NSObjectAddress,
+      &IsUnrealizedObjCClass);
+  if (error) {
+    printf("  error: %s\n", error);
+  } else {
+    printf("  Is unrealized ObjC class: %s\n",
+           IsUnrealizedObjCClass ? "true" : "false");
+  }
+
+  printf("\n\n");
+  PipeMemoryReader_sendDoneMessage(Reader);
+  fflush(stdout);
+  return 1;
+}
 
 int doDumpHeapInstance(const char *BinaryFilename, PipeMemoryReader *Reader) {
 #if defined(_WIN32)
@@ -925,6 +957,12 @@ int doDumpHeapInstance(const char *BinaryFilename, PipeMemoryReader *Reader) {
         case AsyncTask: {
           printf("Reflecting an async task.\n");
           if (!reflectAsyncTask(RC, Reader))
+            return EXIT_SUCCESS;
+          break;
+        }
+        case MaybeUnrealizedObjCClass: {
+          printf("Reflecting a potential unrealized ObjC class.\n");
+          if (!reflectMaybeUnrealizedObjCClass(RC, Reader))
             return EXIT_SUCCESS;
           break;
         }

@@ -284,6 +284,12 @@ protected:
   }
 
 public:
+  /// The raw storage for the Kind field. Class metadata may have a value here
+  /// which is not a MetadataKind. Use with caution.
+  StoredPointer getRawKind() const {
+    return Kind;
+  }
+
   /// Is this a class object--the metadata record for a Swift class (which also
   /// serves as the class object), or the class object for an ObjC class (which
   /// is not metadata)?
