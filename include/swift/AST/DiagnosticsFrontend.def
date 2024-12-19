@@ -511,6 +511,7 @@ REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (Str
 
 // CAS related diagnostics
 ERROR(error_cas, none, "CAS error encountered: %0", (StringRef))
+WARNING(cache_replay_failed, none, "cache replay failed: %0", (StringRef))
 
 ERROR(error_failed_cached_diag, none, "failed to serialize cached diagnostics: %0", (StringRef))
 ERROR(error_replay_cached_diag, none, "failed to replay cached diagnostics: %0", (StringRef))

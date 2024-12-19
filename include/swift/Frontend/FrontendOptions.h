@@ -137,9 +137,6 @@ public:
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
-  /// Emit a .casid file next to the object file if CAS Backend is used.
-  bool EmitCASIDFile = false;
-
   /// CacheReplay PrefixMap.
   std::vector<std::string> CacheReplayPrefixMap;
 
@@ -389,7 +386,7 @@ public:
   /// are errors. The resulting serialized AST may include errors types and
   /// skip nodes entirely, depending on the errors involved.
   bool AllowModuleWithCompilerErrors = false;
-  
+
   /// Whether or not the compiler must be strict in ensuring that implicit downstream
   /// module dependency build tasks must inherit the parent compiler invocation's context,
   /// such as `-Xcc` flags, etc.
@@ -519,7 +516,7 @@ public:
 
   /// Whether we're configured to track system intermodule dependencies.
   bool shouldTrackSystemDependencies() const;
-  
+
   /// Whether we are configured with -typecheck or -typecheck-module-from-interface actuin
   bool isTypeCheckAction() const;
 
@@ -535,7 +532,7 @@ public:
   ///
   /// \sa SymbolGraphASTWalker
   std::string SymbolGraphOutputDir;
-  
+
   /// Whether to emit doc comment information in symbol graphs for symbols
   /// which are inherited through classes or default implementations.
   bool SkipInheritedDocs = false;
