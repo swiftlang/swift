@@ -528,7 +528,7 @@ struct BridgedFunction {
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;
   BRIDGED_INLINE void setIsPerformanceConstraint(bool isPerfConstraint) const;
   BRIDGED_INLINE bool isResilientNominalDecl(BridgedDeclObj decl) const;
-  BRIDGED_INLINE BridgedType getLoweredType(BridgedASTType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getLoweredType(BridgedASTType type, bool maximallyAbstracted) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getLoweredType(BridgedType type) const;
   BRIDGED_INLINE BridgedLinkage getLinkage() const;
   BRIDGED_INLINE void setLinkage(BridgedLinkage linkage) const;

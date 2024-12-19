@@ -912,7 +912,10 @@ bool BridgedFunction::isResilientNominalDecl(BridgedDeclObj decl) const {
                                                            getFunction()->getResilienceExpansion());
 }
 
-BridgedType BridgedFunction::getLoweredType(BridgedASTType type) const {
+BridgedType BridgedFunction::getLoweredType(BridgedASTType type, bool maximallyAbstracted) const {
+  if (maximallyAbstracted) {
+    return BridgedType(getFunction()->getLoweredType(swift::Lowering::AbstractionPattern::getOpaque(), type.type));
+  }
   return BridgedType(getFunction()->getLoweredType(type.type));
 }
 
