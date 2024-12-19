@@ -3044,6 +3044,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       assert(theAttr->Rename.empty() || !theAttr->hasCachedRenamedDecl());
 
+      bool isPackageDescriptionVersionSpecific =
+          theAttr->getPlatformAgnosticAvailability() ==
+          PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific;
+
       llvm::SmallString<32> blob;
       blob.append(theAttr->Message);
       blob.append(theAttr->Rename);
@@ -3054,7 +3058,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isUnconditionallyUnavailable(),
           theAttr->isUnconditionallyDeprecated(),
           theAttr->isNoAsync(),
-          theAttr->isPackageDescriptionVersionSpecific(),
+          isPackageDescriptionVersionSpecific,
           theAttr->isSPI(),
           theAttr->isForEmbedded(),
           LIST_VER_TUPLE_PIECES(Introduced),

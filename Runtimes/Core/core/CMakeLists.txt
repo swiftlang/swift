@@ -148,6 +148,8 @@ add_library(swiftCore
   Slice.swift
   SmallString.swift
   Sort.swift
+  Span/Span.swift
+  Span/RawSpan.swift
   StaticString.swift
   StaticPrint.swift
   Stride.swift
