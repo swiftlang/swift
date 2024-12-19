@@ -236,7 +236,7 @@ extension Value {
   -> Bool {
     var users = InstructionSet(context)
     defer { users.deinitialize() }
-    uses.lazy.map({ $0.instruction }).forEach { users.insert($0) }
+    users.insert(contentsOf: self.users)
 
     var worklist = InstructionWorklist(context)
     defer { worklist.deinitialize() }

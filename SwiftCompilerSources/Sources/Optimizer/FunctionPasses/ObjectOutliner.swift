@@ -454,7 +454,7 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
 
 private extension InstructionWorklist {
   mutating func pushIfNotVisited(usersOf value: Value) {
-    pushIfNotVisited(contentsOf: value.uses.lazy.map { $0.instruction })
+    pushIfNotVisited(contentsOf: value.users)
   }
 }
 
