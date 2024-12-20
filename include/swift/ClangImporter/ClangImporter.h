@@ -676,6 +676,8 @@ public:
       const clang::Decl *candidateDecl) override;
 
   SourceLoc importSourceLocation(clang::SourceLocation loc) override;
+
+  SourceRange importSourceRange(clang::SourceRange range) override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

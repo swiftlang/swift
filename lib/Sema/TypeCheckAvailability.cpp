@@ -38,12 +38,17 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
+#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
+
 using namespace swift;
 
 static const Decl *
@@ -3291,6 +3296,26 @@ static bool diagnoseTypedThrowsAvailability(
       ReferenceDC);
 }
 
+static void diagnoseNonRuntimeProtocol(SourceLoc Loc, TypeDecl *D) {
+  if (auto *ClangD = D->getClangDecl()){
+    auto *proto = dyn_cast<clang::ObjCProtocolDecl>(ClangD);
+    if (!proto || !proto->isNonRuntimeProtocol())
+      return;
+    auto *clangImporter =
+        static_cast<ClangImporter *>(D->getASTContext().getClangModuleLoader());
+    assert(clangImporter && "Must have a clang importer");
+
+    auto &Diags = D->getASTContext().Diags;
+    Diags.diagnose(Loc, diag::non_runtime_objc_protocol_metadata_not_available,
+                   D->getNameStr());
+    Diags
+        .diagnose(clangImporter->importSourceLocation(proto->getLocation()),
+                  diag::clang_decl_declared_here, proto)
+        .highlight(clangImporter->importSourceRange(
+            proto->getAttr<clang::ObjCNonRuntimeProtocolAttr>()->getRange()));
+  }
+}
+
 /// Make sure the generic arguments conform to all known invertible protocols.
 /// Runtimes prior to NoncopyableGenerics do not check if any of the
 /// generic arguments conform to Copyable/Escapable during dynamic casts.
@@ -4640,6 +4665,8 @@ public:
     // already checked on the TypeRepr.
     if (Where.mustOnlyReferenceExportedDecls())
       TypeChecker::diagnoseDeclRefExportability(Loc, decl, Where);
+
+    diagnoseNonRuntimeProtocol(Loc, decl);
   }
 
   Action visitNominalType(NominalType *ty) override {
