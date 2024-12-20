@@ -4109,11 +4109,12 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   // If the declaration itself is "safe" but we don't disallow unsafe uses,
   // check whether it traffics in unsafe types.
   ASTContext &ctx = D->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) && !D->isUnsafe()) {
+  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) && !D->isUnsafe() &&
+      !Where.getAvailability().allowsUnsafe()) {
     auto type = D->getInterfaceType();
     if (auto subs = declRef.getSubstitutions())
       type = type.subst(subs);
-    if (type->isUnsafe() && !Where.getAvailability().allowsUnsafe()) {
+    if (type->isUnsafe()) {
       diagnoseUnsafeUse(
           UnsafeUse::forReferenceToUnsafe(
             D, call != nullptr && !isa<ParamDecl>(D), Where.getDeclContext(),
@@ -4764,6 +4765,23 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       diagnoseMissingConformance(loc, builtinConformance->getType(),
                                  builtinConformance->getProtocol(), DC,
                                  preconcurrency);
+    }
+  }
+
+  // Strict memory safety checking.
+  if (!where.getAvailability().allowsUnsafe()) {
+    if (auto normalConf = dyn_cast<NormalProtocolConformance>(rootConf)) {
+      // @unchecked Sendable conformances are considered unsafe when complete
+      // checking is enabled.
+      if (normalConf->isUnchecked() &&
+          normalConf->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+          normalConf->getProtocol()->getASTContext()
+            .LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
+        diagnoseUnsafeUse(
+            UnsafeUse::forConformance(
+              concreteConf->getType(), conformance, loc,
+              where.getDeclContext()));
+      }
     }
   }
 

@@ -4,13 +4,15 @@
 // REQUIRES: swift_feature_StrictConcurrency
 // REQUIRES: swift_feature_WarnUnsafe
 
-// expected-note@+2{{@unchecked conformance of 'C' to protocol 'Sendable' involves unsafe code}}
-// expected-warning@+1{{class 'C' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
 class C: @unchecked Sendable {
   var counter: Int = 0
 }
 
 nonisolated(unsafe) var globalCounter = 0
+
+func acceptSendable<T: Sendable>(_: T) { }
+
+typealias RequiresSendable<T> = T where T: Sendable
 
 @available(SwiftStdlib 5.1, *)
 func f() async { // expected-warning{{global function 'f' involves unsafe code; use '@safe(unchecked)' to assert that the code is memory-safe}}
@@ -21,4 +23,9 @@ func f() async { // expected-warning{{global function 'f' involves unsafe code; 
   counter += 1 // expected-note{{reference to nonisolated(unsafe) var 'counter' is unsafe in concurrently-executing code}}
   print(counter) // expected-note{{reference to nonisolated(unsafe) var 'counter' is unsafe in concurrently-executing code}}
   print(globalCounter) // expected-note{{reference to nonisolated(unsafe) var 'globalCounter' is unsafe in concurrently-executing code}}
+
+  acceptSendable(C()) // expected-note{{@unchecked conformance of 'C' to protocol 'Sendable' involves unsafe code}}
 }
+
+// expected-warning@+1{{type alias 'WeirdC' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}
+typealias WeirdC = RequiresSendable<C> // expected-note{{@unchecked conformance of 'C' to protocol 'Sendable' involves unsafe code}}

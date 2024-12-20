@@ -2462,20 +2462,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
-  // @unchecked conformances are considered unsafe in strict concurrency mode.
-  if (conformance->isUnchecked() &&
-      Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      Context.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
-
-    if (!conformance->getDeclContext()->allowsUnsafe()) {
-      diagnoseUnsafeUse(
-          UnsafeUse::forConformance(conformance->getType(),
-                                    ProtocolConformanceRef(conformance),
-                                    ComplainLoc,
-                                    conformance->getDeclContext()));
-    }
-  }
-
   bool allowImpliedConditionalConformance = false;
   if (Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     // In -swift-version 5 mode, a conditional conformance to a protocol can imply

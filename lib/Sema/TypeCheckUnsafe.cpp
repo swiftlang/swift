@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SourceFileExtras.h"
 #include "TypeCheckAvailability.h"
@@ -85,6 +86,48 @@ static void suggestUnsafeMarkerOnConformance(
       decl->getDescriptiveKind(),
       conformance->getProtocol()->getName()
   ).fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
+}
+
+/// Enumerate all of the unsafe conformances within this conformance,
+/// returning `true` and aborting the search if any callback returns `true`.
+static bool forEachUnsafeConformance(
+    ProtocolConformanceRef conformance,
+    llvm::function_ref<bool(ProtocolConformance *conformance)> fn) {
+  if (conformance.isInvalid() || conformance.isAbstract())
+    return false;
+
+  if (conformance.isPack()) {
+    for (auto packedConformance :
+             conformance.getPack()->getPatternConformances()) {
+      if (forEachUnsafeConformance(packedConformance, fn))
+        return true;
+    }
+
+    return false;
+  }
+
+  // Is this an unsafe conformance?
+  ProtocolConformance *concreteConf = conformance.getConcrete();
+  RootProtocolConformance *rootConf = concreteConf->getRootConformance();
+  if (auto normalConf = dyn_cast<NormalProtocolConformance>(rootConf)) {
+    // @unchecked Sendable conformances are considered unsafe when complete
+    // checking is enabled.
+    if (normalConf->isUnchecked() &&
+        normalConf->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+        normalConf->getProtocol()->getASTContext()
+          .LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)
+      if (fn(concreteConf))
+        return true;
+  }
+
+  // Check conformances that are part of this conformance.
+  auto subMap = concreteConf->getSubstitutionMap();
+  for (auto conformance : subMap.getConformances()) {
+    if (forEachUnsafeConformance(conformance, fn))
+      return true;
+  }
+
+  return false;
 }
 
 /// Retrieve the extra information

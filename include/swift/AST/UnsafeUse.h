@@ -143,6 +143,7 @@ public:
                                   ProtocolConformanceRef conformance,
                                   SourceLoc location,
                                   DeclContext *dc) {
+    assert(subjectType);
     UnsafeUse result(UnsafeConformance);
     result.storage.conformance.type = subjectType.getPointer();
     result.storage.conformance.conformanceRef = conformance.getOpaqueValue();
