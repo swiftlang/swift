@@ -309,14 +309,16 @@ extension RawSpan {
   ///   - span: An existing `Span<T>`, which will define both this
   ///           `RawSpan`'s lifetime and the memory it represents.
   @_alwaysEmitIntoClient
-  @lifetime(borrow span)
+  @lifetime(span)
   public init<Element: BitwiseCopyable>(
-    _elements span: borrowing Span<Element>
+    _elements span: Span<Element>
   ) {
-    unsafe self.init(
-      _unchecked: span._pointer,
+    let pointer = span._pointer
+    let rawSpan = unsafe RawSpan(
+      _unchecked: pointer,
       byteCount: span.count &* MemoryLayout<Element>.stride
     )
+    self = unsafe _overrideLifetime(rawSpan, copying: span)
   }
 }
 

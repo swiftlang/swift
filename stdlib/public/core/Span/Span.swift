@@ -493,6 +493,19 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
+extension Span where Element: BitwiseCopyable {
+
+  public var bytes: RawSpan {
+    @lifetime(self)
+    @_alwaysEmitIntoClient
+    get {
+      let rawSpan = RawSpan(_elements: self)
+      return _overrideLifetime(rawSpan, copying: self)
+    }
+  }
+}
+
 // MARK: sub-spans
 @available(SwiftStdlib 6.2, *)
 extension Span where Element: ~Copyable {
