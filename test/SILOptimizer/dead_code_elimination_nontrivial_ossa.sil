@@ -1429,17 +1429,17 @@ sil [ossa] @uncompletedDeadStrings : $@convention(thin) () -> () {
   cond_br undef, nope, yep
 
 nope:
-  destroy_value %first
+  destroy_value %first : $String
   %second_ptr = string_literal utf8 "second"
   %second_len = integer_literal $Builtin.Word, 6
   %second = apply %makeString(%second_ptr, %second_len) : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
-  br this(%second)
+  br this(%second : $String)
 
 yep:
-  br this(%first)
+  br this(%first : $String)
 
 this(%string : @owned $String):
-  destroy_value %string
+  destroy_value %string : $String
   %retval = tuple ()
-  return %retval
+  return %retval : $()
 }
