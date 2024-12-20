@@ -1546,6 +1546,9 @@ enum class CreateTaskOptions {
 
   /// The builtin has a non-optional TaskExecutor argument.
   TaskExecutor = 0x8,
+
+  /// The builtin has a non-optional TaskExecutor argument.
+  TaskName = 0x10,
 };
 
 /// Emit SIL for the various createAsyncTask builtins.
@@ -1625,6 +1628,17 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     }
   }();
 
+  ManagedValue taskName = [&] {
+    if (options & CreateTaskOptions::OptionalEverything) {
+      return nextArg().getAsSingleValue(SGF);
+    } else if (options & CreateTaskOptions::TaskName) {
+      return emitOptionalSome(nextArg());
+    } else {
+      return emitOptionalNone(ctx.getUnsafeRawBufferPointerType()
+                                  ->getCanonicalType());
+    }
+  }();
+
   auto functionValue = [&] {
     // No reabstraction required.
     if (options & CreateTaskOptions::Discarding) {
@@ -1682,6 +1696,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     taskGroup.getUnmanagedValue(),
     taskExecutorDeprecated.getUnmanagedValue(),
     taskExecutorConsuming.forward(SGF),
+    taskName.forward(SGF),
     functionValue.forward(SGF)
   };
 
