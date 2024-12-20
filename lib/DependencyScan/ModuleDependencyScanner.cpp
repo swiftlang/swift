@@ -1161,13 +1161,13 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
 
   // Construct a dummy main to resolve the newly discovered cross import
   // overlays.
-  StringRef dummyMainName = "DummyMainModuleForResolvingCrossImportOverlays";
+  StringRef dummyMainName = "MainModuleCrossImportOverlays";
   auto dummyMainID = ModuleDependencyID{dummyMainName.str(),
                                         ModuleDependencyKind::SwiftSource};
   auto actualMainID = ModuleDependencyID{mainModuleName.str(),
                                          ModuleDependencyKind::SwiftSource};
   auto dummyMainDependencies =
-     ModuleDependencyInfo::forSwiftSourceModule({}, {}, {}, {}, {}, {});
+     ModuleDependencyInfo::forSwiftSourceModule();
   std::for_each(newOverlays.begin(), newOverlays.end(),
                 [&](Identifier modName) {
                   dummyMainDependencies.addModuleImport(modName.str());

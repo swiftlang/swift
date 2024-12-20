@@ -475,6 +475,17 @@ swiftscan_source_location_get_line_number(swiftscan_source_location_t source_loc
 SWIFTSCAN_PUBLIC int64_t
 swiftscan_source_location_get_column_number(swiftscan_source_location_t source_location);
 
+//=== Scanner Cache Operations --------------------------------------------===//
+// The following operations expose an implementation detail of the dependency
+// scanner: its module dependencies cache. This is done in order
+// to allow clients to perform incremental dependency scans by having the
+// scanner's state be serializable and re-usable.
+
+/// For the specified \c scanner instance, reset its internal state, ensuring subsequent
+/// scanning queries are done "from-scratch".
+SWIFTSCAN_PUBLIC void
+swiftscan_scanner_cache_reset(swiftscan_scanner_t scanner);
+
 /// An entry point to invoke the compiler via a library call.
 SWIFTSCAN_PUBLIC int invoke_swift_compiler(int argc, const char **argv);
 

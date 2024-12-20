@@ -784,7 +784,7 @@ ModuleDependenciesCache::findDependency(
     auto dep = optionalDep.value();
     if (dep->getAsSwiftSourceModule() &&
         moduleName != mainScanModuleName &&
-        moduleName != "DummyMainModuleForResolvingCrossImportOverlays") {
+        moduleName != "MainModuleCrossImportOverlays") {
       return std::nullopt;
     }
   }
