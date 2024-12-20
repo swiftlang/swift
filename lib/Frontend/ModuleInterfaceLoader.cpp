@@ -454,7 +454,7 @@ public:
      : ctx(ctx),
        fs(*ctx.SourceMgr.getFileSystem()),
        requiresOSSAModules(requiresOSSAModules) {}
-
+  
   // Check if all the provided file dependencies are up-to-date compared to
   // what's currently on disk.
   bool dependenciesAreUpToDate(StringRef modulePath,
@@ -524,7 +524,7 @@ public:
     moduleBuffer = std::move(*OutBuf);
     return serializedASTBufferIsUpToDate(modulePath, *moduleBuffer, rebuildInfo, AllDeps);
   }
-
+  
   enum class DependencyStatus {
     UpToDate,
     OutOfDate,
@@ -1513,8 +1513,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
 static bool readSwiftInterfaceVersionAndArgs(
     SourceManager &SM, DiagnosticEngine &Diags, llvm::StringSaver &ArgSaver,
     SwiftInterfaceInfo &interfaceInfo, StringRef interfacePath,
-    SourceLoc diagnosticLoc, llvm::Triple preferredTarget,
-    std::optional<llvm::Triple> preferredTargetVariant) {
+    SourceLoc diagnosticLoc, llvm::Triple preferredTarget) {
   llvm::vfs::FileSystem &fs = *SM.getFileSystem();
   auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
   if (!FileOrError) {
@@ -1538,8 +1537,7 @@ static bool readSwiftInterfaceVersionAndArgs(
 
   if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver,
                                         interfaceInfo.Arguments,
-                                        preferredTarget,
-                                        preferredTargetVariant)) {
+                                        preferredTarget)) {
     InterfaceSubContextDelegateImpl::diagnose(
         interfacePath, diagnosticLoc, SM, &Diags,
         diag::error_extracting_version_from_module_interface);
@@ -1594,7 +1592,7 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
     StringRef outputPath, bool ShouldSerializeDeps,
     ArrayRef<std::string> CompiledCandidates,
     DependencyTracker *tracker) {
-
+  
   if (!Instance.getInvocation().getIRGenOptions().AlwaysCompile) {
     // First, check if the expected output already exists and possibly
     // up-to-date w.r.t. all of the dependencies it was built with. If so, early
@@ -1615,7 +1613,7 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
       return false;
     }
   }
-
+  
   // Read out the compiler version.
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver ArgSaver(alloc);
@@ -1623,8 +1621,7 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
   readSwiftInterfaceVersionAndArgs(
       Instance.getSourceMgr(), Instance.getDiags(), ArgSaver, InterfaceInfo,
       interfacePath, SourceLoc(),
-      Instance.getInvocation().getLangOptions().Target,
-      Instance.getInvocation().getLangOptions().TargetVariant);
+      Instance.getInvocation().getLangOptions().Target);
 
   auto Builder = ExplicitModuleInterfaceBuilder(
       Instance, &Instance.getDiags(), Instance.getSourceMgr(),
@@ -1671,15 +1668,6 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     // So the Swift interface should know that as well to load these PCMs properly.
     GenericArgs.push_back("-clang-target");
     GenericArgs.push_back(triple);
-  }
-
-  if (LangOpts.TargetVariant.has_value()) {
-    genericSubInvocation.getLangOptions().TargetVariant = LangOpts.TargetVariant;
-    auto variantTriple = ArgSaver.save(genericSubInvocation.getLangOptions().TargetVariant->str());
-    if (!variantTriple.empty()) {
-      GenericArgs.push_back("-target-variant");
-      GenericArgs.push_back(variantTriple);
-    }
   }
 
   // Inherit the target SDK name and version
@@ -1821,8 +1809,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
     StringRef interfacePath, SourceLoc diagnosticLoc) {
   if (readSwiftInterfaceVersionAndArgs(SM, *Diags, ArgSaver, interfaceInfo,
                                        interfacePath, diagnosticLoc,
-                                       subInvocation.getLangOptions().Target,
-                                       subInvocation.getLangOptions().TargetVariant))
+                                       subInvocation.getLangOptions().Target))
     return true;
 
   // Prior to Swift 5.9, swiftinterfaces were always built (accidentally) with
@@ -2014,12 +2001,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     GenericArgs.push_back(blocklist);
   }
 
-  // For now, we only inherit the C++ interoperability mode in
-  // Explicit Module Builds.
-  if (langOpts.EnableCXXInterop &&
-      (frontendOpts.DisableImplicitModules ||
-       LoaderOpts.requestedAction ==
-           FrontendOptions::ActionType::ScanDependencies)) {
+  // Inherit the C++ interoperability mode.
+  if (langOpts.EnableCXXInterop) {
     // Modelled after a reverse of validateCxxInteropCompatibilityMode
     genericSubInvocation.getLangOptions().EnableCXXInterop = true;
     genericSubInvocation.getLangOptions().cxxInteropCompatVersion =
@@ -2207,6 +2190,19 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInvocation.setModuleName(moduleName);
   BuildArgs.push_back("-module-name");
   BuildArgs.push_back(moduleName);
+
+  // FIXME: Hack for Darwin.swiftmodule, which cannot be rebuilt with C++
+  // interop enabled by the Swift CI because it uses an old host SDK.
+  if (moduleName == "Darwin") {
+    subInvocation.getLangOptions().EnableCXXInterop = false;
+    subInvocation.getLangOptions().cxxInteropCompatVersion = {};
+    BuildArgs.erase(llvm::remove_if(BuildArgs,
+                                    [](StringRef arg) -> bool {
+                                      return arg.starts_with(
+                                          "-cxx-interoperability-mode=");
+                                    }),
+                    BuildArgs.end());
+  }
 
   // Calculate output path of the module.
   llvm::SmallString<256> buffer;

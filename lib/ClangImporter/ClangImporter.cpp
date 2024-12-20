@@ -2007,6 +2007,9 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   if (FrontendOpts.CASIncludeTreeID.empty())
     FrontendOpts.Inputs.clear();
 
+  // Share the CASOption and the underlying CAS.
+  invocation->setCASOption(Impl.Invocation->getCASOptsPtr());
+
   auto clonedInstance = std::make_unique<clang::CompilerInstance>(
     Impl.Instance->getPCHContainerOperations(),
     &Impl.Instance->getModuleCache());

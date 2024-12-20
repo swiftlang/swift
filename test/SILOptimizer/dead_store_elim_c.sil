@@ -1,0 +1,42 @@
+// RUN: %target-sil-opt %s -dead-store-elimination -I %S/Inputs/include | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+import CUnion
+
+
+sil [noinline] @modify_U : $@convention(thin) (@inout U) -> () {
+[%0: read v**]
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+}
+
+// CHECK-LABEL: sil @pointer_escape_via_c_union :
+// CHECK:         store %0 to %1
+// CHECK:       } // end sil function 'pointer_escape_via_c_union'
+sil @pointer_escape_via_c_union : $@convention(thin) (S) -> () {
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+bb0(%0 : $S):
+  %1 = alloc_stack [var_decl] $S, var, name "vs"
+  store %0 to %1 : $*S
+  %3 = address_to_pointer [stack_protection] %1 : $*S to $Builtin.RawPointer
+  %4 = struct $UnsafeMutablePointer<S> (%3 : $Builtin.RawPointer)
+  %5 = alloc_stack [var_decl] $U, var, name "u"
+  %6 = enum $Optional<UnsafeMutablePointer<S>>, #Optional.some!enumelt, %4 : $UnsafeMutablePointer<S>
+  %7 = alloc_stack [var_decl] $U
+  %8 = address_to_pointer %7 : $*U to $Builtin.RawPointer
+  %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*Optional<UnsafeMutablePointer<S>>
+  store %6 to %9 : $*Optional<UnsafeMutablePointer<S>>
+  %11 = load %7 : $*U
+  dealloc_stack %7 : $*U
+  store %11 to %5 : $*U
+  %14 = function_ref @modify_U : $@convention(thin) (@inout U) -> ()
+  %15 = apply %14(%5) : $@convention(thin) (@inout U) -> ()
+  dealloc_stack %5 : $*U
+  dealloc_stack %1 : $*S
+  %18 = tuple ()
+  return %18 : $()
+}
+

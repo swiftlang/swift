@@ -497,6 +497,7 @@ namespace {
     RValue visitCovariantReturnConversionExpr(
              CovariantReturnConversionExpr *E,
              SGFContext C);
+    RValue visitUnsafeCastExpr(UnsafeCastExpr *E, SGFContext C);
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
     RValue visitAnyHashableErasureExpr(AnyHashableErasureExpr *E, SGFContext C);
     RValue visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
@@ -2129,6 +2130,24 @@ RValue RValueEmitter::visitExtractFunctionIsolationExpr(
   auto arg = SGF.emitRValue(E->getFunctionExpr());
   auto result = SGF.emitExtractFunctionIsolation(
       E, ArgumentSource(E, std::move(arg)), C);
+  return RValue(SGF, E, result);
+}
+
+RValue RValueEmitter::visitUnsafeCastExpr(UnsafeCastExpr *E, SGFContext C) {
+  ManagedValue original = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  SILType resultType = SGF.getLoweredType(E->getType());
+
+  if (resultType == original.getType())
+    return RValue(SGF, E, original);
+
+  ManagedValue result;
+  if (original.getType().isAddress()) {
+    ASSERT(resultType.isAddress());
+    result = SGF.B.createUncheckedAddrCast(E, original, resultType);
+  } else {
+    result = SGF.B.createUncheckedForwardingCast(E, original, resultType);
+  }
+
   return RValue(SGF, E, result);
 }
 
