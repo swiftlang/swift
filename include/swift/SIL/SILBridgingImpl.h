@@ -1132,6 +1132,10 @@ BridgedInstruction::IntrinsicID BridgedInstruction::BuiltinInst_getIntrinsicID()
   }
 }
 
+BridgedStringRef BridgedInstruction::BuiltinInst_getName() const {
+  return getAs<swift::BuiltinInst>()->getName().str();
+}
+
 BridgedSubstitutionMap BridgedInstruction::BuiltinInst_getSubstitutionMap() const {
   return getAs<swift::BuiltinInst>()->getSubstitutions();
 }

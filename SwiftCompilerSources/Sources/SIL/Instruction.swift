@@ -658,12 +658,20 @@ final public class BuiltinInst : SingleValueInstruction {
     return bridged.BuiltinInst_getID()
   }
 
+  public var name: StringRef {
+    return StringRef(bridged: bridged.BuiltinInst_getName())
+  }
+
   public var intrinsicID: BridgedInstruction.IntrinsicID {
     return bridged.BuiltinInst_getIntrinsicID()
   }
 
   public var substitutionMap: SubstitutionMap {
     SubstitutionMap(bridged: bridged.BuiltinInst_getSubstitutionMap())
+  }
+
+  public var arguments: LazyMapSequence<OperandArray, Value> {
+    operands.values
   }
 }
 

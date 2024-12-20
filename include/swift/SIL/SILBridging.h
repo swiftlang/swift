@@ -718,6 +718,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool LoadBorrowInst_isUnchecked() const ;
   BRIDGED_INLINE BuiltinValueKind BuiltinInst_getID() const;
   BRIDGED_INLINE IntrinsicID BuiltinInst_getIntrinsicID() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef BuiltinInst_getName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap BuiltinInst_getSubstitutionMap() const;
   BRIDGED_INLINE bool PointerToAddressInst_isStrict() const;
   BRIDGED_INLINE bool PointerToAddressInst_isInvariant() const;
