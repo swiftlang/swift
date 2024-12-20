@@ -1411,24 +1411,24 @@ public:
   /// Returns the active platform-specific `@available` attribute for this decl.
   /// There may be multiple `@available` attributes that are relevant to the
   /// current platform, but the returned one has the highest priority.
-  const AvailableAttr *getActiveAvailableAttrForCurrentPlatform(
+  std::optional<SemanticAvailableAttr> getActiveAvailableAttrForCurrentPlatform(
       bool ignoreAppExtensions = false) const;
 
   /// Returns true if the declaration is deprecated at the current deployment
   /// target.
-  bool isDeprecated() const { return getDeprecatedAttr() != nullptr; }
+  bool isDeprecated() const { return getDeprecatedAttr().has_value(); }
 
   /// Returns the first `@available` attribute that indicates that this decl
   /// is deprecated on current deployment target, or `nullptr` otherwise.
-  const AvailableAttr *getDeprecatedAttr() const;
+  std::optional<SemanticAvailableAttr> getDeprecatedAttr() const;
 
   /// Returns the first `@available` attribute that indicates that this decl
   /// will be deprecated in the future, or `nullptr` otherwise.
-  const AvailableAttr *getSoftDeprecatedAttr() const;
+  std::optional<SemanticAvailableAttr> getSoftDeprecatedAttr() const;
 
   /// Returns the first @available attribute that indicates this decl is
   /// unavailable from asynchronous contexts, or `nullptr` otherwise.
-  const AvailableAttr *getNoAsyncAttr() const;
+  std::optional<SemanticAvailableAttr> getNoAsyncAttr() const;
 
   /// Returns true if the decl has been marked unavailable in the Swift language
   /// version that is currently active.
@@ -1443,12 +1443,12 @@ public:
   ///
   /// Note that this query only considers the attributes that are attached
   /// directly to this decl (or the extension it is declared in, if applicable).
-  bool isUnavailable() const { return getUnavailableAttr() != nullptr; }
+  bool isUnavailable() const { return getUnavailableAttr().has_value(); }
 
   /// If the decl is always unavailable in the current compilation
   /// context, returns the attribute attached to the decl (or its parent
   /// extension) that makes it unavailable.
-  const AvailableAttr *
+  std::optional<SemanticAvailableAttr>
   getUnavailableAttr(bool ignoreAppExtensions = false) const;
 
   /// Returns true if the decl is effectively always unavailable in the current

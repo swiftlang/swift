@@ -3189,13 +3189,44 @@ public:
   const AvailableAttr *getParsedAttr() const { return attr; }
   const AvailabilityDomain getDomain() const { return domain; }
 
-  /// Returns the platform kind that the attribute applies to, or
-  /// `PlatformKind::none` if the attribute is not platform specific.
-  bool isPlatformSpecific() const { return domain.isPlatform(); }
+  std::optional<llvm::VersionTuple> getIntroduced() const {
+    return attr->Introduced;
+  }
+
+  std::optional<llvm::VersionTuple> getDeprecated() const {
+    return attr->Deprecated;
+  }
+
+  std::optional<llvm::VersionTuple> getObsoleted() const {
+    return attr->Obsoleted;
+  }
+
+  /// Returns the `message:` field of the attribute, or an empty string.
+  StringRef getMessage() const { return attr->Message; }
+
+  /// Returns the `rename:` field of the attribute, or an empty string.
+  StringRef getRename() const { return attr->Rename; }
 
   /// Returns the platform kind that the attribute applies to, or
   /// `PlatformKind::none` if the attribute is not platform specific.
-  PlatformKind getPlatformKind() const { return domain.getPlatformKind(); }
+  bool isPlatformSpecific() const { return getDomain().isPlatform(); }
+
+  /// Returns the platform kind that the attribute applies to, or
+  /// `PlatformKind::none` if the attribute is not platform specific.
+  PlatformKind getPlatform() const { return getDomain().getPlatformKind(); }
+
+  /// Whether this is attribute indicates unavailability in all versions.
+  bool isUnconditionallyUnavailable() const {
+    return attr->isUnconditionallyUnavailable();
+  }
+
+  /// Whether this is attribute indicates deprecation in all versions.
+  bool isUnconditionallyDeprecated() const {
+    return attr->isUnconditionallyDeprecated();
+  }
+
+  /// Whether this is a `noasync` attribute.
+  bool isNoAsync() const { return attr->isNoAsync(); }
 
   /// Whether this attribute has an introduced, deprecated, or obsoleted
   /// version.
@@ -3205,13 +3236,16 @@ public:
 
   /// Whether this is a language mode specific attribute.
   bool isSwiftLanguageModeSpecific() const {
-    return domain.isSwiftLanguage() && isVersionSpecific();
+    return getDomain().isSwiftLanguage() && isVersionSpecific();
   }
 
   /// Whether this is a PackageDescription version specific attribute.
   bool isPackageDescriptionVersionSpecific() const {
-    return domain.isPackageDescription() && isVersionSpecific();
+    return getDomain().isPackageDescription() && isVersionSpecific();
   }
+
+  /// Whether this attribute was spelled `@_unavailableInEmbedded`.
+  bool isEmbeddedSpecific() const { return attr->isForEmbedded(); }
 
   /// Returns the active version from the AST context corresponding to
   /// the available kind. For example, this will return the effective language
@@ -3228,6 +3262,14 @@ public:
   /// Returns true if this attribute is considered active in the current
   /// compilation context.
   bool isActive(ASTContext &ctx) const;
+
+  bool operator==(const SemanticAvailableAttr &other) const {
+    return other.attr == attr;
+  }
+
+  bool operator!=(const SemanticAvailableAttr &other) const {
+    return other.attr != attr;
+  }
 };
 
 /// An iterable range of `SemanticAvailableAttr`s.

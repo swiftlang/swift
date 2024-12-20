@@ -242,18 +242,14 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
 
 static bool isUnavailableInAllVersions(ValueDecl *decl) {
   ASTContext &ctx = decl->getASTContext();
-  auto *attr = decl->getUnavailableAttr();
+  auto attr = decl->getUnavailableAttr();
   if (!attr)
-    return false;
-
-  auto semanticAttr = decl->getSemanticAvailableAttr(attr);
-  if (!semanticAttr)
     return false;
 
   if (attr->isUnconditionallyUnavailable())
     return true;
 
-  return semanticAttr->getVersionAvailability(ctx) ==
+  return attr->getVersionAvailability(ctx) ==
          AvailableVersionComparison::Unavailable;
 }
 
@@ -1942,11 +1938,12 @@ checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
     }
   }
 
-  auto *baseUnavailableAttr = base->getUnavailableAttr();
-  auto *overrideUnavailableAttr = override->getUnavailableAttr();
+  auto baseUnavailableAttr = base->getUnavailableAttr();
+  auto overrideUnavailableAttr = override->getUnavailableAttr();
 
   if (baseUnavailableAttr && !overrideUnavailableAttr)
-    return {OverrideUnavailabilityStatus::BaseUnavailable, baseUnavailableAttr};
+    return {OverrideUnavailabilityStatus::BaseUnavailable,
+            baseUnavailableAttr->getParsedAttr()};
 
   return {OverrideUnavailabilityStatus::Compatible, nullptr};
 }

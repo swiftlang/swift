@@ -55,6 +55,11 @@ public:
                  llvm::raw_ostream &Out, Diag<ArgTypes...> ID,
                  typename swift::detail::PassArgument<ArgTypes>::type... VArgs);
 
+  bool getDiagnosticForDeprecated(const ValueDecl *D, const AvailableAttr *Attr,
+                                  bool isSoftDeprecated,
+                                  CodeCompletionDiagnosticSeverity &severity,
+                                  llvm::raw_ostream &Out);
+
   bool getDiagnosticForDeprecated(const ValueDecl *D,
                                   CodeCompletionDiagnosticSeverity &severity,
                                   llvm::raw_ostream &Out);
@@ -75,16 +80,9 @@ bool CodeCompletionDiagnostics::getDiagnostics(
 }
 
 bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
-    const ValueDecl *D, CodeCompletionDiagnosticSeverity &severity,
-    llvm::raw_ostream &Out) {
-  bool isSoftDeprecated = false;
-  const AvailableAttr *Attr = D->getDeprecatedAttr();
-  if (!Attr) {
-    Attr = D->getSoftDeprecatedAttr();
-    isSoftDeprecated = true;
-  }
-  if (!Attr)
-    return true;
+    const ValueDecl *D, const AvailableAttr *Attr, bool isSoftDeprecated,
+    CodeCompletionDiagnosticSeverity &severity, llvm::raw_ostream &Out) {
+  assert(Attr);
 
   // FIXME: Code completion doesn't offer accessors. It only emits 'VarDecl's.
   // So getter/setter specific availability doesn't work in code completion.
@@ -142,6 +140,20 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
     }
   }
   return false;;
+}
+
+bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
+    const ValueDecl *D, CodeCompletionDiagnosticSeverity &severity,
+    llvm::raw_ostream &Out) {
+  if (auto attr = D->getDeprecatedAttr())
+    return getDiagnosticForDeprecated(D, attr->getParsedAttr(), false, severity,
+                                      Out);
+
+  if (auto attr = D->getSoftDeprecatedAttr())
+    return getDiagnosticForDeprecated(D, attr->getParsedAttr(), true, severity,
+                                      Out);
+
+  return true;
 }
 
 } // namespace

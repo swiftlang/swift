@@ -9276,16 +9276,14 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
   // `getAttrs` is in reverse source order, so the last attribute is the
   // first in source.
   AbstractFunctionDecl *alternative = nullptr;
-  for (auto semanticAttr : getSemanticAvailableAttrs()) {
-    auto attr = semanticAttr.getParsedAttr();
-
-    if (attr->isNoAsync())
+  for (auto attr : getSemanticAvailableAttrs()) {
+    if (attr.isNoAsync())
       continue;
 
-    if (attr->getPlatform() != PlatformKind::none && alternative != nullptr)
+    if (attr.isPlatformSpecific() && alternative != nullptr)
       continue;
 
-    if (auto *renamedDecl = getRenamedDecl(attr)) {
+    if (auto *renamedDecl = getRenamedDecl(attr.getParsedAttr())) {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(renamedDecl)) {
         if (afd->hasAsync())
           alternative = afd;

@@ -13,7 +13,7 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 #define SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 
-#include "swift/AST/AttrKind.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/DeclContext.h"
@@ -26,7 +26,6 @@
 
 namespace swift {
   class ApplyExpr;
-  class AvailableAttr;
   class Expr;
   class ClosureExpr;
   class InFlightDiagnostic;
@@ -198,7 +197,8 @@ public:
   /// is not also unavailable in the same way, then this returns the specific
   /// `@available` attribute that makes the decl unavailable. Otherwise, returns
   /// nullptr.
-  const AvailableAttr *shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
+  std::optional<SemanticAvailableAttr>
+  shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
 };
 
 /// Check if a declaration is exported as part of a module's external interface.
