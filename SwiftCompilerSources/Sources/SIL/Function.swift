@@ -275,6 +275,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case .MacroExpansion: return .macroExpansion
     case .DefaultArgument: return .defaultArgument
     case .None: return nil
+    @unknown default:
+      fatalError("unknown enum case")
     }
   }
 }
