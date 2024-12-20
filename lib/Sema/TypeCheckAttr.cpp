@@ -2184,14 +2184,14 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // we're checking an iOS attribute while building for macCatalyst.
   if (attr->getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
-    if (attr != D->getActiveAvailableAttrForCurrentPlatform()) {
+    if (semanticAttr != D->getActiveAvailableAttrForCurrentPlatform()) {
       return;
     }
   }
 
   if (attr->getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
-    if (attr != D->getActiveAvailableAttrForCurrentPlatform()) {
+    if (semanticAttr != D->getActiveAvailableAttrForCurrentPlatform()) {
       return;
     }
   }
@@ -4833,10 +4833,10 @@ void AttributeChecker::checkBackDeployedAttrs(
         // Find the attribute that makes the declaration unavailable.
         const Decl *attrDecl = D;
         do {
-          if (auto *unavailableAttr = attrDecl->getUnavailableAttr()) {
-            diagnose(unavailableAttr->AtLoc,
+          if (auto unavailableAttr = attrDecl->getUnavailableAttr()) {
+            diagnose(unavailableAttr->getParsedAttr()->AtLoc,
                      diag::availability_marked_unavailable, VD)
-                .highlight(unavailableAttr->getRange());
+                .highlight(unavailableAttr->getParsedAttr()->getRange());
             break;
           }
 

@@ -294,20 +294,18 @@ AvailabilityInference::parentDeclForInferredAvailability(const Decl *D) {
 /// Returns true if the introduced version in \p newAttr should be used instead
 /// of the introduced version in \p prevAttr when both are attached to the same
 /// declaration and refer to the active platform.
-static bool isBetterThan(const AvailableAttr *newAttr,
-                         const AvailableAttr *prevAttr) {
-  assert(newAttr);
-
+static bool isBetterThan(const SemanticAvailableAttr &newAttr,
+                         const std::optional<SemanticAvailableAttr> &prevAttr) {
   // If there is no prevAttr, newAttr of course wins.
   if (!prevAttr)
     return true;
 
   // If they belong to the same platform, the one that introduces later wins.
-  if (prevAttr->getPlatform() == newAttr->getPlatform())
-    return prevAttr->Introduced.value() < newAttr->Introduced.value();
+  if (prevAttr->getPlatform() == newAttr.getPlatform())
+    return prevAttr->getIntroduced().value() < newAttr.getIntroduced().value();
 
   // If the new attribute's platform inherits from the old one, it wins.
-  return inheritsAvailabilityFromPlatform(newAttr->getPlatform(),
+  return inheritsAvailabilityFromPlatform(newAttr.getPlatform(),
                                           prevAttr->getPlatform());
 }
 
@@ -433,22 +431,19 @@ bool AvailabilityInference::updateBeforePlatformForFallback(
 
 const AvailableAttr *
 AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D) {
-  const AvailableAttr *bestAvailAttr = nullptr;
+  std::optional<SemanticAvailableAttr> bestAvailAttr;
 
   D = abstractSyntaxDeclForAvailableAttribute(D);
 
-  for (auto semanticAttr :
-       D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto *attr = semanticAttr.getParsedAttr();
-
-    if (!attr->hasPlatform() || !attr->Introduced.has_value())
+  for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (!attr.isPlatformSpecific() || !attr.getIntroduced())
       continue;
 
     if (isBetterThan(attr, bestAvailAttr))
-      bestAvailAttr = attr;
+      bestAvailAttr.emplace(attr);
   }
 
-  return bestAvailAttr;
+  return bestAvailAttr ? bestAvailAttr->getParsedAttr() : nullptr;
 }
 
 std::optional<AvailabilityRange>
@@ -493,122 +488,107 @@ Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
   return SemanticAvailableAttr(attr, domainForAvailableAttr(attr));
 }
 
-const AvailableAttr *
+std::optional<SemanticAvailableAttr>
 Decl::getActiveAvailableAttrForCurrentPlatform(bool ignoreAppExtensions) const {
-  const AvailableAttr *bestAttr = nullptr;
+  std::optional<SemanticAvailableAttr> bestAttr;
 
-  for (auto semanticAttr :
-       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto attr = semanticAttr.getParsedAttr();
-
-    if (!attr->hasPlatform())
+  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (!attr.isPlatformSpecific())
       continue;
 
     if (ignoreAppExtensions &&
-        isApplicationExtensionPlatform(attr->getPlatform()))
+        isApplicationExtensionPlatform(attr.getPlatform()))
       continue;
 
     // We have an attribute that is active for the platform, but is it more
     // specific than our current best?
     if (!bestAttr || inheritsAvailabilityFromPlatform(
-                         attr->getPlatform(), bestAttr->getPlatform())) {
-      bestAttr = attr;
+                         attr.getPlatform(), bestAttr->getPlatform())) {
+      bestAttr.emplace(attr);
     }
   }
 
   return bestAttr;
 }
 
-const AvailableAttr *Decl::getDeprecatedAttr() const {
+std::optional<SemanticAvailableAttr> Decl::getDeprecatedAttr() const {
   auto &ctx = getASTContext();
-  const AvailableAttr *result = nullptr;
-  const AvailableAttr *bestActive = getActiveAvailableAttrForCurrentPlatform();
+  std::optional<SemanticAvailableAttr> result;
+  auto bestActive = getActiveAvailableAttrForCurrentPlatform();
 
-  for (auto semanticAttr :
-       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto attr = semanticAttr.getParsedAttr();
-
-    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
+  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
       continue;
 
     // Unconditional deprecated.
-    if (attr->isUnconditionallyDeprecated())
+    if (attr.isUnconditionallyDeprecated())
       return attr;
 
-    std::optional<llvm::VersionTuple> deprecatedVersion = attr->Deprecated;
+    auto deprecatedVersion = attr.getDeprecated();
 
     StringRef deprecatedPlatform;
     llvm::VersionTuple remappedDeprecatedVersion;
     if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-            attr, ctx, deprecatedPlatform, remappedDeprecatedVersion))
+            attr.getParsedAttr(), ctx, deprecatedPlatform,
+            remappedDeprecatedVersion))
       deprecatedVersion = remappedDeprecatedVersion;
 
     if (!deprecatedVersion.has_value())
       continue;
 
-    llvm::VersionTuple minVersion = semanticAttr.getActiveVersion(ctx);
+    llvm::VersionTuple minVersion = attr.getActiveVersion(ctx);
 
     // We treat the declaration as deprecated if it is deprecated on
     // all deployment targets.
     if (deprecatedVersion.value() <= minVersion) {
-      result = attr;
+      result.emplace(attr);
     }
   }
   return result;
 }
 
-const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
+std::optional<SemanticAvailableAttr> Decl::getSoftDeprecatedAttr() const {
   auto &ctx = getASTContext();
-  const AvailableAttr *result = nullptr;
-  const AvailableAttr *bestActive = getActiveAvailableAttrForCurrentPlatform();
+  std::optional<SemanticAvailableAttr> result;
+  auto bestActive = getActiveAvailableAttrForCurrentPlatform();
 
-  for (auto semanticAttr :
-       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto attr = semanticAttr.getParsedAttr();
-
-    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
+  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
       continue;
 
-    std::optional<llvm::VersionTuple> deprecatedVersion = attr->Deprecated;
+    // FIXME: This needs to do a version remap.
+    auto deprecatedVersion = attr.getDeprecated();
     if (!deprecatedVersion.has_value())
       continue;
 
-    llvm::VersionTuple activeVersion = semanticAttr.getActiveVersion(ctx);
+    llvm::VersionTuple activeVersion = attr.getActiveVersion(ctx);
 
     if (deprecatedVersion.value() > activeVersion)
-      result = attr;
+      result.emplace(attr);
   }
   return result;
 }
 
-const AvailableAttr *Decl::getNoAsyncAttr() const {
-  const AvailableAttr *bestAttr = nullptr;
+std::optional<SemanticAvailableAttr> Decl::getNoAsyncAttr() const {
+  std::optional<SemanticAvailableAttr> bestAttr;
 
-  for (auto semanticAttr :
-       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto attr = semanticAttr.getParsedAttr();
-
-    if (attr->getPlatformAgnosticAvailability() !=
-        PlatformAgnosticAvailabilityKind::NoAsync)
+  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (!attr.isNoAsync())
       continue;
 
     if (!bestAttr) {
-      bestAttr = attr;
-      continue;
-    }
-
-    if (!bestAttr) {
-      // If there is no best attr selected  and the attr either has an active
+      // If there is no best attr selected and the attr either has an active
       // platform, or doesn't have one at all, select it.
-      bestAttr = attr;
-    } else if (bestAttr && attr->hasPlatform() && bestAttr->hasPlatform() &&
-               inheritsAvailabilityFromPlatform(attr->getPlatform(),
+      bestAttr.emplace(attr);
+    } else if (bestAttr && attr.isPlatformSpecific() &&
+               bestAttr->isPlatformSpecific() &&
+               inheritsAvailabilityFromPlatform(attr.getPlatform(),
                                                 bestAttr->getPlatform())) {
       // if they both have a viable platform, use the better one
-      bestAttr = attr;
-    } else if (attr->hasPlatform() && !bestAttr->hasPlatform()) {
+      bestAttr.emplace(attr);
+    } else if (attr.isPlatformSpecific() && !bestAttr->isPlatformSpecific()) {
       // Use the one more specific
-      bestAttr = attr;
+      bestAttr.emplace(attr);
     }
   }
   return bestAttr;
@@ -630,45 +610,43 @@ bool Decl::isUnavailableInCurrentSwiftVersion() const {
   return false;
 }
 
-static const AvailableAttr *
+std::optional<SemanticAvailableAttr>
 getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
   auto &ctx = D->getASTContext();
-  const AvailableAttr *result = nullptr;
-  const AvailableAttr *bestActive =
+  std::optional<SemanticAvailableAttr> result;
+  auto bestActive =
       D->getActiveAvailableAttrForCurrentPlatform(ignoreAppExtensions);
 
-  for (auto semanticAttr :
-       D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto attr = semanticAttr.getParsedAttr();
-
+  for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
     // If this is a platform-specific attribute and it isn't the most
     // specific attribute for the current platform, we're done.
-    if (attr->hasPlatform() && (!bestActive || attr != bestActive))
+    if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
       continue;
 
     if (ignoreAppExtensions &&
-        isApplicationExtensionPlatform(attr->getPlatform()))
+        isApplicationExtensionPlatform(attr.getPlatform()))
       continue;
 
     // Unconditional unavailable.
-    if (attr->isUnconditionallyUnavailable())
+    if (attr.isUnconditionallyUnavailable())
       return attr;
 
-    switch (semanticAttr.getVersionAvailability(ctx)) {
+    switch (attr.getVersionAvailability(ctx)) {
     case AvailableVersionComparison::Available:
     case AvailableVersionComparison::PotentiallyUnavailable:
       break;
 
     case AvailableVersionComparison::Obsoleted:
     case AvailableVersionComparison::Unavailable:
-      result = attr;
+      result.emplace(attr);
       break;
     }
   }
   return result;
 }
 
-const AvailableAttr *Decl::getUnavailableAttr(bool ignoreAppExtensions) const {
+std::optional<SemanticAvailableAttr>
+Decl::getUnavailableAttr(bool ignoreAppExtensions) const {
   if (auto attr = getDeclUnavailableAttr(this, ignoreAppExtensions))
     return attr;
 
@@ -683,7 +661,7 @@ const AvailableAttr *Decl::getUnavailableAttr(bool ignoreAppExtensions) const {
     if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext()))
       return ext->getUnavailableAttr(ignoreAppExtensions);
 
-  return nullptr;
+  return std::nullopt;
 }
 
 static bool isDeclCompletelyUnavailable(const Decl *decl) {
@@ -691,8 +669,7 @@ static bool isDeclCompletelyUnavailable(const Decl *decl) {
   if (isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext()))
     return false;
 
-  auto *unavailableAttr =
-      decl->getUnavailableAttr(/*ignoreAppExtensions=*/true);
+  auto unavailableAttr = decl->getUnavailableAttr(/*ignoreAppExtensions=*/true);
   if (!unavailableAttr)
     return false;
 
@@ -790,25 +767,24 @@ bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
 
 AvailabilityRange AvailabilityInference::annotatedAvailableRangeForAttr(
     const Decl *D, const SpecializeAttr *attr, ASTContext &ctx) {
-
-  const AvailableAttr *bestAvailAttr = nullptr;
+  std::optional<SemanticAvailableAttr> bestAvailAttr;
 
   for (auto *availAttr : attr->getAvailableAttrs()) {
     auto semanticAttr = D->getSemanticAvailableAttr(availAttr);
     if (!semanticAttr)
       continue;
 
-    if (!availAttr->Introduced.has_value() || !semanticAttr->isActive(ctx) ||
+    if (!semanticAttr->getIntroduced() || !semanticAttr->isActive(ctx) ||
         !semanticAttr->isPlatformSpecific()) {
       continue;
     }
 
-    if (isBetterThan(availAttr, bestAvailAttr))
-      bestAvailAttr = availAttr;
+    if (isBetterThan(*semanticAttr, bestAvailAttr))
+      bestAvailAttr.emplace(*semanticAttr);
   }
 
   if (bestAvailAttr)
-    return availableRange(bestAvailAttr, ctx);
+    return availableRange(bestAvailAttr->getParsedAttr(), ctx);
 
   return AvailabilityRange::alwaysAvailable();
 }
