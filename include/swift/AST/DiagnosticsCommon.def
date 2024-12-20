@@ -218,6 +218,9 @@ WARNING(warn_scanner_deserialize_failed, none,
 REMARK(remark_reuse_cache, none,
        "Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
 
+REMARK(remark_scanner_uncached_lookups, none,
+       "Module Dependency Scanner queries executed: '%0'.", (unsigned))
+
 REMARK(remark_save_cache, none,
        "Serializing module scanning dependency cache to: '%0'.", (StringRef))
 

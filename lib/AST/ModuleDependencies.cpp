@@ -44,16 +44,17 @@ bool ModuleDependencyInfo::isTextualSwiftModule() const {
   return isSwiftInterfaceModule() || isSwiftSourceModule();
 }
 
-ModuleDependencyKind &operator++(ModuleDependencyKind &e) {
-  if (e == ModuleDependencyKind::LastKind) {
-    llvm_unreachable(
-        "Attempting to increment last enum value on ModuleDependencyKind");
+namespace {
+  ModuleDependencyKind &operator++(ModuleDependencyKind &e) {
+    if (e == ModuleDependencyKind::LastKind) {
+      llvm_unreachable(
+                       "Attempting to increment last enum value on ModuleDependencyKind");
+    }
+    e = ModuleDependencyKind(
+                             static_cast<std::underlying_type<ModuleDependencyKind>::type>(e) + 1);
+    return e;
   }
-  e = ModuleDependencyKind(
-      static_cast<std::underlying_type<ModuleDependencyKind>::type>(e) + 1);
-  return e;
 }
-
 bool ModuleDependencyInfo::isSwiftInterfaceModule() const {
   return isa<SwiftInterfaceModuleDependenciesStorage>(storage.get());
 }
@@ -783,7 +784,7 @@ ModuleDependenciesCache::findDependency(
     auto dep = optionalDep.value();
     if (dep->getAsSwiftSourceModule() &&
         moduleName != mainScanModuleName &&
-        moduleName != "DummyMainModuleForResolvingCrossImportOverlays") {
+        moduleName != "MainModuleCrossImportOverlays") {
       return std::nullopt;
     }
   }
