@@ -3660,8 +3660,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 /// expression that conforms to `Swift.Sequence`.
 static std::optional<SequenceIterationInfo>
 generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
-                               ForEachStmt *stmt, Pattern *typeCheckedPattern,
-                               bool ignoreForEachWhereClause) {
+                               ForEachStmt *stmt, Pattern *typeCheckedPattern) {
   ASTContext &ctx = cs.getASTContext();
   bool isAsync = stmt->getAwaitLoc().isValid();
   auto *sequenceExpr = stmt->getParsedSequence();
@@ -3835,24 +3834,6 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                      elementLocator);
   }
 
-  // Generate constraints for the "where" expression, if there is one.
-  auto *whereExpr = stmt->getWhere();
-  if (whereExpr && !ignoreForEachWhereClause) {
-    Type boolType = dc->getASTContext().getBoolType();
-    if (!boolType)
-      return std::nullopt;
-
-    SyntacticElementTarget whereTarget(whereExpr, dc, CTP_Condition, boolType,
-                                       /*isDiscarded=*/false);
-    if (cs.generateConstraints(whereTarget, FreeTypeVariableBinding::Disallow))
-      return std::nullopt;
-
-    cs.setTargetFor(whereExpr, whereTarget);
-
-    ContextualTypeInfo contextInfo(boolType, CTP_Condition);
-    cs.setContextualInfo(whereExpr, contextInfo);
-  }
-
   // Populate all of the information for a for-each loop.
   sequenceIterationInfo.elementType = elementType;
   sequenceIterationInfo.initType = initType;
@@ -3904,8 +3885,8 @@ generateForEachPreambleConstraints(ConstraintSystem &cs,
 
     target.getForEachStmtInfo() = *packIterationInfo;
   } else {
-    auto sequenceIterationInfo = generateForEachStmtConstraints(
-        cs, dc, stmt, pattern, target.ignoreForEachWhereClause());
+    auto sequenceIterationInfo =
+        generateForEachStmtConstraints(cs, dc, stmt, pattern);
     if (!sequenceIterationInfo) {
       return std::nullopt;
     }
