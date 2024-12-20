@@ -201,14 +201,57 @@ extension _ArrayBuffer {
     if bufferIsUnique {
       // As an optimization, if the original buffer is unique, we can just move
       // the elements instead of copying.
-      let dest = newBuffer.firstElementAddress
-      dest.moveInitialize(from: mutableFirstElementAddress,
-                          count: c)
+      _moveContents(
+        subRange: 0..<c,
+        initializing: newBuffer.mutableFirstElementAddress)
       _native.mutableCount = 0
     } else {
       _copyContents(
         subRange: 0..<c,
         initializing: newBuffer.mutableFirstElementAddress)
+    }
+    return _ArrayBuffer(_buffer: newBuffer, shiftedToStartIndex: 0)
+  }
+  
+  @_alwaysEmitIntoClient
+  @inline(never)
+  @_semantics("optimize.sil.specialize.owned2guarantee.never")
+  internal __consuming func _consumeAndCreateNew(
+    bufferIsUnique: Bool,
+    minimumCapacity: Int,
+    growForAppend: Bool,
+    rangeToNotCopy hole: Range<Int>
+  ) -> _ArrayBuffer {
+    let newCapacity = _growArrayCapacity(oldCapacity: capacity,
+                                         minimumCapacity: minimumCapacity,
+                                         growForAppend: growForAppend)
+    let c = count
+    _internalInvariant(newCapacity >= c)
+    
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: c, minimumCapacity: newCapacity)
+    let destStart = newBuffer.mutableFirstElementAddress
+    let destTailStart = destStart + hole.upperBound
+    let beforeHole = 0 ..< hole.lowerBound
+    let afterHole = hole.upperBound ..< c
+
+    if bufferIsUnique {
+      // As an optimization, if the original buffer is unique, we can just move
+      // the elements instead of copying.
+      if !beforeHole.isEmpty {
+        _moveContents(subRange: beforeHole, initializing: destStart)
+      }
+      if !afterHole.isEmpty {
+        _moveContents(subRange: afterHole, initializing: destTailStart)
+      }
+      _native.mutableCount = 0
+    } else {
+      if !beforeHole.isEmpty {
+        _copyContents(subRange: beforeHole, initializing: destStart)
+      }
+      if !afterHole.isEmpty {
+        _copyContents(subRange: afterHole, initializing: destTailStart)
+      }
     }
     return _ArrayBuffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
@@ -294,6 +337,27 @@ extension _ArrayBuffer {
         _typeCheckSlowPath(i)
       }
     }
+  }
+  
+  /// Move the elements in `bounds` from this buffer into uninitialized
+  /// memory starting at `target`.  Return a pointer "past the end" of the
+  /// just-initialized memory.
+  @inlinable @_alwaysEmitIntoClient
+  @discardableResult
+  __consuming internal func _moveContents(
+    subRange bounds: Range<Int>,
+    initializing target: UnsafeMutablePointer<Element>
+  ) -> UnsafeMutablePointer<Element> {
+    _typeCheck(bounds)
+    if _fastPath(_isNative) {
+      return _native._moveContents(subRange: bounds, initializing: target)
+    }
+    let buffer = UnsafeMutableRawPointer(target)
+      .assumingMemoryBound(to: AnyObject.self)
+    let result = _nonNative._copyContents(
+      subRange: bounds,
+      initializing: buffer)
+    return UnsafeMutableRawPointer(result).assumingMemoryBound(to: Element.self)
   }
 
   /// Copy the elements in `bounds` from this buffer into uninitialized
