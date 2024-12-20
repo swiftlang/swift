@@ -633,6 +633,13 @@ public:
             extraPCMArgs));
   }
 
+  static ModuleDependencyInfo
+  forSwiftSourceModule() {
+    return ModuleDependencyInfo(
+        std::make_unique<SwiftSourceModuleDependenciesStorage>(
+            "", {}, {}, {}, {}, {}));
+  }
+
   /// Describe the module dependencies for a Clang module that can be
   /// built from a module map and headers.
   static ModuleDependencyInfo forClangModule(
