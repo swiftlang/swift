@@ -5561,19 +5561,13 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
       properties));
 }
 
-CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
-                                                std::optional<UUID> knownID) {
+CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential) {
   auto &ctx = existential->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(existential);
 
-  if (!knownID)
-    knownID = UUID::fromTime();
-
   auto *genericEnv = GenericEnvironment::forOpenedExistential(
-      existentialSig.OpenedSig,
-      existentialSig.Shape,
-      existentialSig.Generalization,
-      *knownID);
+      existentialSig.OpenedSig, existentialSig.Shape,
+      existentialSig.Generalization, UUID::fromTime());
 
   return cast<OpenedArchetypeType>(
     genericEnv->mapTypeIntoContext(existentialSig.SelfType)
