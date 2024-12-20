@@ -161,7 +161,7 @@ public:
   bool VerifyAll = false;
 
   /// Verify ownership after every pass.
-  bool VerifyOwnershipAll = false;
+  bool VerifyOwnershipAll = true;
 
   /// If true, no SIL verification is done at all.
   bool VerifyNone = false;
