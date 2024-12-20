@@ -48,7 +48,6 @@ namespace {
     SILValue visitEnumInst(EnumInst *EI);
     SILValue visitSelectEnumInst(SelectEnumInst *SEI);
     SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
-    SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
     SILValue visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
     SILValue
     visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
@@ -282,16 +281,6 @@ SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
   if (auto *PTAI = dyn_cast<PointerToAddressInst>(ATPI->getOperand()))
     if (PTAI->getType() == ATPI->getOperand()->getType())
       return PTAI->getOperand();
-
-  return SILValue();
-}
-
-SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
-  // If this address is not strict, then it cannot be replaced by an address
-  // that may be strict.
-  if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand()))
-    if (ATPI->getOperand()->getType() == PTAI->getType() && PTAI->isStrict())
-      return ATPI->getOperand();
 
   return SILValue();
 }
