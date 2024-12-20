@@ -1376,3 +1376,39 @@ bb3:
   %res = tuple ()
   return %res : $()
 }
+
+
+// Ensure no verification error
+sil [ossa] @dce_borrowedfromuser : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Klass>):
+  %1 = copy_value %0 : $FakeOptional<Klass>
+  %2 = begin_borrow %1 : $FakeOptional<Klass>
+  %3 = begin_borrow %1 : $FakeOptional<Klass>
+  br bb1(%2 : $FakeOptional<Klass>, %3 : $FakeOptional<Klass>)
+
+bb1(%5 : @reborrow $FakeOptional<Klass>, %6 : @reborrow $FakeOptional<Klass>):
+  %7 = borrowed %6 : $FakeOptional<Klass> from (%1 : $FakeOptional<Klass>)
+  %8 = borrowed %5 : $FakeOptional<Klass> from (%1 : $FakeOptional<Klass>)
+  switch_enum %7 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb2, case #FakeOptional.none!enumelt: bb3
+
+bb2(%10 : @guaranteed $Klass):
+  %11 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  br bb5(%8 : $FakeOptional<Klass>, %7 : $FakeOptional<Klass>)
+
+bb5(%16 : @reborrow $FakeOptional<Klass>, %17 : @reborrow $FakeOptional<Klass>):
+  %18 = borrowed %17 : $FakeOptional<Klass> from (%1 : $FakeOptional<Klass>)
+  %19 = borrowed %16 : $FakeOptional<Klass> from (%1 : $FakeOptional<Klass>)
+  end_borrow %19 : $FakeOptional<Klass>
+  end_borrow %18 : $FakeOptional<Klass>
+  destroy_value %1 : $FakeOptional<Klass>
+  %23 = tuple ()
+  return %23 : $()
+}
+
