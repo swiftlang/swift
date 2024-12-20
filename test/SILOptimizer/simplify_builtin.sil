@@ -615,3 +615,54 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %3 = builtin "destroyArray"<Int>(%2 : $@thin Int.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
   return %0 : $Builtin.RawPointer
 }
+
+// CHECK-LABEL: sil @remove_trivial_destroy_metatype_array :
+// CHECK-NOT:     builtin
+// CHECK:       } // end sil function 'remove_trivial_destroy_metatype_array'
+sil @remove_trivial_destroy_metatype_array : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thin Int.Type.Type
+  %3 = builtin "destroyArray"<Int.Type>(%2 : $@thin Int.Type.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @sizeof_concrete_type :
+// CHECK:         %0 = integer_literal $Builtin.Word, 4
+// CHECK:         return %0
+// CHECK:       } // end sil function 'sizeof_concrete_type'
+sil @sizeof_concrete_type : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = builtin "sizeof"<Int32>() : $Builtin.Word
+  return %0
+}
+
+// CHECK-LABEL: sil @sizeof_generic_type :
+// CHECK:         %1 = builtin
+// CHECK:         return %1
+// CHECK:       } // end sil function 'sizeof_generic_type'
+sil @sizeof_generic_type : $@convention(thin) <T> (@thick T.Type) -> Builtin.Word {
+bb0(%0 : $@thick T.Type):
+  %1 = builtin "sizeof"<T>() : $Builtin.Word
+  return %1
+}
+
+// CHECK-LABEL: sil @sizeof_metatype :
+// CHECK:         %0 = integer_literal $Builtin.Word, {{(4|8)}}
+// CHECK:         return %0
+// CHECK:       } // end sil function 'sizeof_metatype'
+sil @sizeof_metatype : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = builtin "sizeof"<Bool.Type>() : $Builtin.Word
+  return %0
+}
+
+// CHECK-LABEL: sil @sizeof_function_type :
+// CHECK:         %0 = integer_literal $Builtin.Word, {{(8|16)}}
+// CHECK:         return %0
+// CHECK:       } // end sil function 'sizeof_function_type'
+sil @sizeof_function_type : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = builtin "sizeof"<()->()>() : $Builtin.Word
+  return %0
+}
+

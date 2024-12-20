@@ -27,7 +27,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var addressType: Type { bridged.getAddressType().type }
   public var objectType: Type { bridged.getObjectType().type }
 
-  public var canonicalASTType: CanonicalType { CanonicalType(bridged: bridged.getCanType()) }
+  public var astType: CanonicalType { CanonicalType(bridged: bridged.getCanType()) }
 
   public func isTrivial(in function: Function) -> Bool {
     return bridged.isTrivial(function.bridged)
@@ -68,7 +68,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isThickFunction: Bool { bridged.isThickFunction() }
   public var isAsyncFunction: Bool { bridged.isAsyncFunction() }
 
-  public var canBeClass: BridgedType.TraitResult { bridged.canBeClass() }
+  public var canBeClass: CanonicalType.TraitResult { astType.canBeClass }
 
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
 
@@ -239,26 +239,6 @@ public struct TypeArray : RandomAccessCollection, CustomReflectable {
 
   public var customMirror: Mirror {
     let c: [Mirror.Child] = map { (label: nil, value: $0) }
-    return Mirror(self, children: c)
-  }
-}
-
-public struct OptionalTypeArray : RandomAccessCollection, CustomReflectable {
-  private let bridged: BridgedTypeArray
-
-  public var startIndex: Int { return 0 }
-  public var endIndex: Int { return bridged.getCount() }
-
-  public init(bridged: BridgedTypeArray) {
-    self.bridged = bridged
-  }
-
-  public subscript(_ index: Int) -> Type? {
-    bridged.getAt(index).typeOrNil
-  }
-
-  public var customMirror: Mirror {
-    let c: [Mirror.Child] = map { (label: nil, value: $0 ?? "<invalid>") }
     return Mirror(self, children: c)
   }
 }

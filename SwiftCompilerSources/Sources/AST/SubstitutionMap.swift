@@ -56,4 +56,14 @@ public struct SubstitutionMap: CustomStringConvertible {
       return Conformance(bridged: bridgedSubs.getConformance(index))
     }
   }
+
+  public var replacementTypes: TypeArray {
+    TypeArray(bridged: bridged.getReplacementTypes())
+  }
+
+  /// The single replacement type if it's guarnateed that the substitution map has a single replacement type.
+  public var replacementType: Type {
+    assert(replacementTypes.count == 1)
+    return replacementTypes[0]
+  }
 }

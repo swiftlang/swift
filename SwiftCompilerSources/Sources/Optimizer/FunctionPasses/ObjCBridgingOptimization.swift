@@ -152,8 +152,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
     let replacement = builder.createUncheckedEnumData(enum: optionalReplacement,
                                                       caseIndex: someCase,
                                                       resultType: bridgeToObjcCall.type)
-    bridgeToObjcCall.uses.replaceAll(with: replacement, context)
-    context.erase(instruction: bridgeToObjcCall)
+    bridgeToObjcCall.replace(with: replacement, context)
     return true
   }
 
@@ -219,8 +218,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
   
   // Now replace the bridged value with the original value in the destination block.
   let replacement = s.makeAvailable(in: bridgeToObjcCall.parentBlock, context)
-  bridgeToObjcCall.uses.replaceAll(with: replacement, context)
-  context.erase(instruction: bridgeToObjcCall)
+  bridgeToObjcCall.replace(with: replacement, context)
   return true
 }
 

@@ -224,9 +224,10 @@ private func createOutlinedGlobal(
     return
   }
 
-  let elementType = allocVectorBuiltin.substitutionMap.replacementTypes[0]!
+  let function = allocVectorBuiltin.parentFunction
+  let elementType = allocVectorBuiltin.substitutionMap.replacementTypes[0].loweredType(in: function)
   let outlinedGlobal = context.createGlobalVariable(
-        name: context.mangleOutlinedVariable(from: allocVectorBuiltin.parentFunction),
+        name: context.mangleOutlinedVariable(from: function),
         type: elementType, linkage: .private, isLet: false)
 
   let globalBuilder = Builder(staticInitializerOf: outlinedGlobal, context)
@@ -249,8 +250,7 @@ private func createOutlinedGlobal(
   let globalAddr = builder.createGlobalAddr(global: outlinedGlobal, dependencyToken: nil)
   let rawVectorPointer = builder.createAddressToPointer(address: globalAddr, pointerType: allocVectorBuiltin.type,
                                                         needStackProtection: false)
-  allocVectorBuiltin.uses.replaceAll(with: rawVectorPointer, context)
-  context.erase(instruction: allocVectorBuiltin)
+  allocVectorBuiltin.replace(with: rawVectorPointer, context)
 }
 
 private func createStackAllocatedVector(
@@ -259,13 +259,13 @@ private func createStackAllocatedVector(
   _ context: FunctionPassContext
 ) {
   let builder = Builder(before: allocVectorBuiltin, context)
-  let elementType = allocVectorBuiltin.substitutionMap.replacementTypes[0]!
+  let function = allocVectorBuiltin.parentFunction
+  let elementType = allocVectorBuiltin.substitutionMap.replacementTypes[0].loweredType(in: function)
   let allocVec = builder.createAllocVector(capacity: allocVectorBuiltin.operands[1].value, elementType: elementType)
   let rawVectorPointer = builder.createAddressToPointer(address: allocVec, pointerType: allocVectorBuiltin.type,
                                                         needStackProtection: true)
 
-  allocVectorBuiltin.uses.replaceAll(with: rawVectorPointer, context)
-  context.erase(instruction: allocVectorBuiltin)
+  allocVectorBuiltin.replace(with: rawVectorPointer, context)
 
   for endInst in liverange.ends {
     let builder = Builder(after: endInst, context)

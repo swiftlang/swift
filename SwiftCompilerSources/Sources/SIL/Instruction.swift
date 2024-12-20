@@ -1248,6 +1248,10 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
   public var debugVariable: DebugVariable {
     return bridged.AllocStack_getVarInfo()
   }
+
+  public var deallocations: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
+    uses.users(ofType: DeallocStackInst.self)
+  }
 }
 
 final public class AllocVectorInst : SingleValueInstruction, Allocation, UnaryInstruction {
@@ -1317,7 +1321,7 @@ extension Instruction {
   /// Return the sequence of use points of any instruction.
   public var endInstructions: EndInstructions {
     if let scopedInst = self as? ScopedInstruction {
-      return .scoped(scopedInst.endOperands.map({ $0.instruction }))
+      return .scoped(scopedInst.endOperands.users)
     }
     return .single(self)
   }
@@ -1365,6 +1369,10 @@ final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction,
       dest = mark.operand.value
     }
     return dest as! AllocStackInst
+  }
+
+  public var endBorrows: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
+    uses.users(ofType: EndBorrowInst.self)
   }
 }
 
