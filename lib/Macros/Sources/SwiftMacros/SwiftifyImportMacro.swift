@@ -235,8 +235,8 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
         return pointerArgs[i] ?? ExprSyntax(declref)
       }
     let labels: [TokenSyntax?] = base.signature.parameterClause.parameters.map { param in
-      let firstName = param.firstName
-      if firstName.trimmed.text == "_" {
+      let firstName = param.firstName.trimmed
+      if firstName.text == "_" {
         return nil
       }
       return firstName
@@ -247,7 +247,8 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
       if i < args.count - 1 {
         comma = .commaToken()
       }
-      return LabeledExprSyntax(label: label, expression: arg, trailingComma: comma)
+      let colon: TokenSyntax? = label != nil ? .colonToken() : nil
+      return LabeledExprSyntax(label: label, colon: colon, expression: arg, trailingComma: comma)
     }
     return ExprSyntax(
       FunctionCallExprSyntax(
