@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature WarnUnsafe -enable-experimental-feature StrictConcurrency
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_AllowUnsafeAttribute
 // REQUIRES: swift_feature_StrictConcurrency
 // REQUIRES: swift_feature_WarnUnsafe
 
