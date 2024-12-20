@@ -39,13 +39,13 @@ static bool isUnsafeUseInDefinition(const UnsafeUse &use) {
   case UnsafeUse::Witness:
   case UnsafeUse::TypeWitness:
   case UnsafeUse::UnsafeConformance:
-  case UnsafeUse::UnownedUnsafe:
     // Never part of the definition. These are always part of the interface.
     return false;
 
   case UnsafeUse::ReferenceToUnsafe:
   case UnsafeUse::CallToUnsafe:
   case UnsafeUse::NonisolatedUnsafe:
+  case UnsafeUse::UnownedUnsafe:
     return enclosingContextForUnsafe(use).second;
   }
 }
@@ -100,7 +100,8 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     // same declaration.
     if (use.getKind() == UnsafeUse::ReferenceToUnsafe ||
         use.getKind() == UnsafeUse::CallToUnsafe ||
-        use.getKind() == UnsafeUse::NonisolatedUnsafe) {
+        use.getKind() == UnsafeUse::NonisolatedUnsafe ||
+        use.getKind() == UnsafeUse::UnownedUnsafe) {
       auto [enclosingDecl, _] = enclosingContextForUnsafe(
           use.getLocation(), use.getDeclContext());
       if (enclosingDecl) {
@@ -164,9 +165,16 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
 
   case UnsafeUse::UnownedUnsafe: {
     auto var = cast<VarDecl>(use.getDecl());
-    var->diagnose(diag::unowned_unsafe_is_unsafe);
-    var->diagnose(diag::make_enclosing_context_unsafe, var)
-      .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
+    ASTContext &ctx = var->getASTContext();
+    ctx.Diags.diagnose(
+        use.getLocation(),
+        asNote ? diag::note_reference_unowned_unsafe
+               : diag::reference_unowned_unsafe,
+        var);
+    if (!asNote) {
+      var->diagnose(diag::make_enclosing_context_unsafe, var)
+        .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
+    }
     return;
   }
 

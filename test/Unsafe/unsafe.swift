@@ -54,8 +54,18 @@ class Sub: Super { // expected-note{{make class 'Sub' @unsafe to allow unsafe ov
 // -----------------------------------------------------------------------
 struct SuperHolder {
   unowned var s1: Super
-  unowned(unsafe) var s2: Super // expected-warning{{unowned(unsafe) involves unsafe code}}
-  // expected-note@-1{{make property 's2' @unsafe to indicate that its use is not memory-safe}}{{3-3=@unsafe }}
+  unowned(unsafe) var s2: Super
+
+  // expected-warning@+1{{instance method 'getSuper2' involves unsafe code; use '@safe(unchecked)' to assert that the code is memory-safe}}
+  func getSuper2() -> Super {
+    return s2 // expected-note{{reference to unowned(unsafe) property 's2' is unsafe}}
+  }
+
+  // FIXME: We should be able to identify this as being inside the function
+  // expected-warning@+1{{instance method 'getSuper2b' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}
+  func getSuper2b() -> Super {
+    s2 // expected-note{{reference to unowned(unsafe) property 's2' is unsafe}}
+  }
 }
 
 // -----------------------------------------------------------------------

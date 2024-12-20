@@ -42,7 +42,6 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
@@ -4976,15 +4975,6 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
                ownershipKind);
       attr->setInvalid();
     }
-  }
-
-  // unowned(unsafe) is unsafe (duh).
-  if (ownershipKind == ReferenceOwnership::Unmanaged &&
-      ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      !var->allowsUnsafe()) {
-    diagnoseUnsafeUse(
-        UnsafeUse::forUnownedUnsafe(var, attr->getLocation(),
-                                    var->getDeclContext()));
   }
 
   if (attr->isInvalid())

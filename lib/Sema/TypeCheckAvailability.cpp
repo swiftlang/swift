@@ -4228,6 +4228,19 @@ diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
           valueDecl, R.Start, Where.getDeclContext()));
       return;
     }
+
+    if (auto var = dyn_cast<VarDecl>(valueDecl)) {
+      // unowned(unsafe) is unsafe (duh).
+      if (auto ownershipAttr =
+              var->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+        if (ownershipAttr->get() == ReferenceOwnership::Unmanaged) {
+          diagnoseUnsafeUse(
+              UnsafeUse::forUnownedUnsafe(var, R.Start,
+                                          Where.getDeclContext()));
+          return;
+        }
+      }
+    }
   }
 }
 
