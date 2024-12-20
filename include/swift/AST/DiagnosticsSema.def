@@ -7570,13 +7570,17 @@ ERROR(cannot_convert_default_value_type_to_argument_type, none,
 // MARK: Back deployment
 //------------------------------------------------------------------------------
 
-ERROR(attr_incompatible_with_back_deploy,none,
-      "'%0' cannot be applied to a back deployed %1",
-      (DeclAttribute, DescriptiveDeclKind))
+ERROR(attr_incompatible_with_back_deployed,none,
+      "'%0' cannot be applied to a back deployed %kind1",
+      (DeclAttribute, const Decl *))
 
-WARNING(backdeployed_opaque_result_not_supported,none,
-      "'%0' is unsupported on a %1 with a 'some' return type",
-      (DeclAttribute, DescriptiveDeclKind))
+WARNING(back_deployed_opaque_result_not_supported,none,
+      "'%0' cannot be applied to %kind1 because it has a 'some' return type",
+      (DeclAttribute, const ValueDecl *))
+
+ERROR(back_deployed_requires_body,none,
+      "'%0' requires that %kind1 have a body",
+      (DeclAttribute, const ValueDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: Implicit opening of existential types
