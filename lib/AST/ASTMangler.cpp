@@ -717,7 +717,7 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, GenericSignature sig) {
                                         Ty);
 
   DWARFMangling = true;
-  RespectOriginallyDefinedIn = true;
+  RespectOriginallyDefinedIn = false;
   OptimizeProtocolNames = false;
   beginMangling();
 
