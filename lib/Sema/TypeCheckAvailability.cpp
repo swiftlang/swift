@@ -3417,7 +3417,6 @@ static bool checkTypeMetadataAvailabilityInternal(CanType type,
       if (isObjCProtocolTypeDecl(nominalType->getDecl()))
         return diagnoseNonRuntimeProtocol(refLoc.Start, nominalType->getDecl());
     }
-
     return false;
   });
 }
@@ -3446,13 +3445,7 @@ static bool checkTypeMetadataAvailabilityForConverted(Type refType,
   // existential in such a position.  We necessarily have type metadata
   // for the dynamic type of the existential, so there's nothing to check
   // there.
-  if (type.isAnyExistentialType()) {
-    if (auto nominalType = dyn_cast<NominalType>(type)) {
-      if (isObjCProtocolTypeDecl(nominalType))
-        return diagnoseNonRuntimeProtocol(refLoc.Start, nominalType->getDecl());
-    }
-    return false;
-  }
+  if (type.isAnyExistentialType()) return false;
 
   if (checkTypeMetadataAvailabilityInternal(type, refLoc, refDC))
     return true;
