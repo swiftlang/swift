@@ -61,8 +61,7 @@ struct SuperHolder {
     return s2 // expected-note{{reference to unowned(unsafe) property 's2' is unsafe}}
   }
 
-  // FIXME: We should be able to identify this as being inside the function
-  // expected-warning@+1{{instance method 'getSuper2b' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}
+  // expected-warning@+1{{instance method 'getSuper2b' involves unsafe code; use '@safe(unchecked)' to assert that the code is memory-safe}}
   func getSuper2b() -> Super {
     s2 // expected-note{{reference to unowned(unsafe) property 's2' is unsafe}}
   }

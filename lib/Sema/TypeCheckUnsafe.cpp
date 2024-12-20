@@ -88,9 +88,13 @@ static void suggestUnsafeMarkerOnConformance(
 }
 
 /// Retrieve the extra information
-static SourceFileExtras &getSourceFileExtrasFor(const Decl *decl) {
+static SourceFileExtras *getSourceFileExtrasFor(const Decl *decl) {
   auto dc = decl->getDeclContext();
-  return dc->getOutermostParentSourceFile()->getExtras();
+  auto sf = dc->getOutermostParentSourceFile();
+  if (!sf)
+    return nullptr;
+
+  return &sf->getExtras();
 }
 
 void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
@@ -105,8 +109,9 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
       auto [enclosingDecl, _] = enclosingContextForUnsafe(
           use.getLocation(), use.getDeclContext());
       if (enclosingDecl) {
-        getSourceFileExtrasFor(enclosingDecl).unsafeUses[enclosingDecl]
-          .push_back(use);
+        if (auto extras = getSourceFileExtrasFor(enclosingDecl)) {
+          extras->unsafeUses[enclosingDecl].push_back(use);
+        }
         return;
       }
     }
@@ -232,14 +237,17 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
 }
 
 void swift::diagnoseUnsafeUsesIn(const Decl *decl) {
-  auto &extras = getSourceFileExtrasFor(decl);
-  auto known = extras.unsafeUses.find(decl);
-  if (known == extras.unsafeUses.end())
+  auto *extras = getSourceFileExtrasFor(decl);
+  if (!extras)
+    return;
+
+  auto known = extras->unsafeUses.find(decl);
+  if (known == extras->unsafeUses.end())
     return;
 
   // Take the unsafe uses.
   auto unsafeUses = std::move(known->second);
-  extras.unsafeUses.erase(known);
+  extras->unsafeUses.erase(known);
   if (unsafeUses.empty())
     return;
 
