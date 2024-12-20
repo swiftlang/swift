@@ -317,6 +317,7 @@ extension SerialExecutor {
 /// different objects, the executor must be referenced strongly by the
 /// actor.
 @available(SwiftStdlib 5.1, *)
+@unsafe
 @frozen
 public struct UnownedSerialExecutor: Sendable {
   @usableFromInline
