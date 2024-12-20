@@ -824,8 +824,8 @@ ASTContext::ASTContext(
 #include "swift/AST/KnownIdentifiers.def"
 
   // Record the initial set of search paths.
-  for (StringRef path : SearchPathOpts.getImportSearchPaths())
-    getImpl().SearchPathsSet[path] |= SearchPathKind::Import;
+  for (const auto &path : SearchPathOpts.getImportSearchPaths())
+    getImpl().SearchPathsSet[path.Path] |= SearchPathKind::Import;
   for (const auto &framepath : SearchPathOpts.getFrameworkSearchPaths())
     getImpl().SearchPathsSet[framepath.Path] |= SearchPathKind::Framework;
 
@@ -2095,10 +2095,10 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
   loaded |= kind;
 
   if (isFramework) {
-    SearchPathOpts.addFrameworkSearchPath({searchPath, isSystem},
+    SearchPathOpts.addFrameworkSearchPath({searchPath, /*isFramework=*/true, isSystem},
                                           SourceMgr.getFileSystem().get());
   } else {
-    SearchPathOpts.addImportSearchPath(searchPath,
+    SearchPathOpts.addImportSearchPath({searchPath, /*isFramework=*/false, isSystem},
                                        SourceMgr.getFileSystem().get());
   }
 
@@ -2169,7 +2169,7 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
 
 namespace {
   static StringRef
-  pathStringFromFrameworkSearchPath(const SearchPathOptions::FrameworkSearchPath &next) {
+  pathStringFromSearchPath(const SearchPathOptions::SearchPath &next) {
     return next.Path;
   }
 }
@@ -2183,15 +2183,17 @@ const {
 llvm::StringSet<> ASTContext::getAllModuleSearchPathsSet()
 const {
   llvm::StringSet<> result;
-  auto ImportSearchPaths = SearchPathOpts.getImportSearchPaths();
-  result.insert(ImportSearchPaths.begin(), ImportSearchPaths.end());
 
-  // Framework paths are "special", they contain more than path strings,
-  // but path strings are all we care about here.
-  using FrameworkPathView = ArrayRefView<SearchPathOptions::FrameworkSearchPath,
+  // Import and framework paths are "special", they contain more than path strings, but path strings are all we care about here.
+  using SearchPathView = ArrayRefView<SearchPathOptions::SearchPath,
                                          StringRef,
-                                         pathStringFromFrameworkSearchPath>;
-  FrameworkPathView frameworkPathsOnly{
+                                         pathStringFromSearchPath>;
+
+  SearchPathView importPathsOnly{
+      SearchPathOpts.getImportSearchPaths()};
+  result.insert(importPathsOnly.begin(), importPathsOnly.end());
+
+  SearchPathView frameworkPathsOnly{
       SearchPathOpts.getFrameworkSearchPaths()};
   result.insert(frameworkPathsOnly.begin(), frameworkPathsOnly.end());
 
