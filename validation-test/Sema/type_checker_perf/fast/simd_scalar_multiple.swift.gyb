@@ -1,6 +1,9 @@
 // RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s
 
-// REQUIRES: no_asan
+// REQUIRES: asserts,no_asan
+
+// Flaky is some simulator configurations
+// REQUIRES: OS=macosx
 
 func f(c: Float, a: SIMD2<Float>) -> SIMD2<Float> {
   return (c * a)
