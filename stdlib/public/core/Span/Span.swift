@@ -474,6 +474,14 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
+@available(SwiftStdlib 6.1, *)
+extension Span where Element: BitwiseCopyable {
+
+  public var bytes: RawSpan {
+    RawSpan(_elements: self)
+  }
+}
+
 //MARK: sub-spans
 @available(SwiftStdlib 6.1, *)
 extension Span where Element: ~Copyable {
