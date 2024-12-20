@@ -2386,8 +2386,21 @@ public:
             { });
       }
     }
+
+    // Diagnose any uses of unsafe constructs within this declaration.
+    if (!hasUnsafeCheckingOutsideOfPrimary(decl))
+      diagnoseUnsafeUsesIn(decl);
   }
 
+  /// Determine whether @unsafe checking for this declaration occurs outside
+  /// of "primary" declaration checking, e.g., with the request that
+  /// type-checks a function body.
+  static bool hasUnsafeCheckingOutsideOfPrimary(const Decl *decl) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+      return func->hasBody();
+
+    return false;
+  }
 
   //===--------------------------------------------------------------------===//
   // Visit Methods.

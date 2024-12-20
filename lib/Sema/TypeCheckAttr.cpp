@@ -5131,15 +5131,6 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     }
   }
 
-  // unowned(unsafe) is unsafe (duh).
-  if (ownershipKind == ReferenceOwnership::Unmanaged &&
-      ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      !var->allowsUnsafe()) {
-    Diags.diagnose(attr->getLocation(), diag::unowned_unsafe_is_unsafe);
-    var->diagnose(diag::make_enclosing_context_unsafe, var)
-      .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
-  }
-
   if (attr->isInvalid())
     return type;
 
@@ -7353,18 +7344,6 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // 'nonisolated' can be applied to global and static/class variables
   // that do not have storage.
   auto dc = D->getDeclContext();
-
-  // nonisolated(unsafe) is unsafe, but only under strict concurrency.
-  if (attr->isUnsafe() &&
-      Ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-      !D->allowsUnsafe()) {
-    Ctx.Diags.diagnose(attr->getLocation(), diag::nonisolated_unsafe_is_unsafe);
-    if (auto var = dyn_cast<VarDecl>(D)) {
-      var->diagnose(diag::make_enclosing_context_unsafe, var)
-        .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
-    }
-  }
 
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.

@@ -7,7 +7,7 @@
 func unsafeFunction() { }
 
 @unsafe
-struct UnsafeType { } // expected-note 3{{unsafe struct 'UnsafeType' declared here}}
+struct UnsafeType { }
 
 @safe(unchecked)
 func f() {
@@ -19,18 +19,18 @@ func g() {
   unsafeFunction()
 }
 
-// expected-note@+2{{make global function 'h' @unsafe to indicate that its use is not memory-safe}}
+// expected-warning@+2{{global function 'h' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe [Unsafe]}}
 @safe(unchecked, message: "I was careful")
-func h(_: UnsafeType) { // expected-warning{{reference to unsafe struct 'UnsafeType' [Unsafe]}}
+func h(_: UnsafeType) { // expected-note{{reference to unsafe struct 'UnsafeType'}}
   unsafeFunction()
 }
 
-// expected-note@+1 {{make global function 'rethrowing' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
-func rethrowing(body: (UnsafeType) throws -> Void) rethrows { } // expected-warning{{reference to unsafe struct 'UnsafeType' [Unsafe]}}
+// expected-warning@+1 {{global function 'rethrowing' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+func rethrowing(body: (UnsafeType) throws -> Void) rethrows { } // expected-note{{reference to unsafe struct 'UnsafeType'}}
 
 class HasStatics {
-  // expected-note@+1{{make static method 'f' @unsafe to indicate that its use is not memory-safe}}{{3-3=@unsafe }}
-  static internal func f(_: UnsafeType) { } // expected-warning{{reference to unsafe struct 'UnsafeType' [Unsafe]}}
+  // expected-warning@+1{{static method 'f' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe [Unsafe]}}{{3-3=@unsafe }}
+  static internal func f(_: UnsafeType) { } // expected-note{{reference to unsafe struct 'UnsafeType'}}
 
   
 }

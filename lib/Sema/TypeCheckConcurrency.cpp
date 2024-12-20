@@ -1645,9 +1645,6 @@ ReferencedActor ReferencedActor::forGlobalActor(VarDecl *actor,
   return ReferencedActor(actor, isPotentiallyIsolated, kind, globalActor);
 }
 
-static ActorIsolation getActorIsolationForReference(
-    ValueDecl *decl, const DeclContext *fromDC);
-
 bool ReferencedActor::isKnownToBeLocal() const {
   switch (kind) {
   case GlobalActor:
@@ -7161,7 +7158,7 @@ bool swift::isPotentiallyIsolatedActor(
 
 /// Determine the actor isolation used when we are referencing the given
 /// declaration.
-static ActorIsolation getActorIsolationForReference(ValueDecl *decl,
+ActorIsolation swift::getActorIsolationForReference(ValueDecl *decl,
                                                     const DeclContext *fromDC) {
   auto declIsolation = getActorIsolation(decl);
 

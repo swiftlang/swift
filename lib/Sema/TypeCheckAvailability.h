@@ -36,6 +36,7 @@ namespace swift {
   class SubstitutionMap;
   class Type;
   class TypeRepr;
+  class UnsafeUse;
   class ValueDecl;
 
 enum class DeclAvailabilityFlag : uint8_t {
@@ -265,6 +266,19 @@ bool checkTypeMetadataAvailability(Type type, SourceRange loc,
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);
+
+/// Determine the enclosing context that allows for some use of an unsafe
+/// construct, and whether that reference is in the definition (true) vs.
+/// in the interface (false) of that context.
+std::pair<const Decl *, bool /*inDefinition*/>
+enclosingContextForUnsafe(SourceLoc referenceLoc, const DeclContext *referenceDC);
+
+/// Diagnose the given unsafe use right now.
+void diagnoseUnsafeUse(const UnsafeUse &use, bool asNote = false);
+
+/// Diagnose any unsafe uses within the signature or definition of the given
+/// declaration, if there are any.
+void diagnoseUnsafeUsesIn(const Decl *decl);
 
 } // namespace swift
 
