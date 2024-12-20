@@ -11192,6 +11192,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                               functionRefInfo, locator,
                               /*includeInaccessibleMembers*/ true);
 
+      if (result.OverallResult == MemberLookupResult::Unsolved)
+        return formUnsolved();
+
       // If unwrapped type still couldn't find anything for a given name,
       // let's fallback to a "not such member" fix.
       if (result.ViableCandidates.empty() && result.UnviableCandidates.empty())
