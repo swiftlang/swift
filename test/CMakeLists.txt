@@ -457,10 +457,6 @@ foreach(SDK ${SWIFT_SDKS})
           list(APPEND LIT_ARGS "--param" "string_processing")
         endif()
 
-        if(SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
-          list(APPEND LIT_ARGS "--param" "pointer_bounds")
-        endif()
-
         if(SWIFT_ENABLE_BACKTRACING)
           list(APPEND LIT_ARGS "--param" "backtracing")
         endif()
