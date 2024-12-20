@@ -32,6 +32,7 @@
 #include "swift/AST/StorageImpl.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/EnumTraits.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -490,6 +491,8 @@ public:
 
   LLVM_READNONE
   static bool canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK);
+
+  static std::optional<Feature> getRequiredFeature(DeclAttrKind DK);
 
   /// Returns the source name of the attribute, without the @ or any arguments.
   StringRef getAttrName() const;
@@ -2875,6 +2878,12 @@ template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
       return cast<ATTR>(Attr);
     return std::nullopt;
   }
+
+  std::optional<ATTR *> operator()(DeclAttribute *Attr) {
+    if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
+      return cast<ATTR>(Attr);
+    return std::nullopt;
+  }
 };
 
 /// The @_allowFeatureSuppression(Foo, Bar) attribute.  The feature
@@ -2906,6 +2915,31 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(AllowFeatureSuppressionAttr)
+};
+
+/// Defines the @abi attribute.
+class ABIAttr : public DeclAttribute {
+public:
+  ABIAttr(Decl *abiDecl, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+      : DeclAttribute(DeclAttrKind::ABI, AtLoc, Range, Implicit),
+        abiDecl(abiDecl)
+  { }
+
+  ABIAttr(Decl *abiDecl, bool Implicit)
+      : ABIAttr(abiDecl, SourceLoc(), SourceRange(), Implicit) {}
+
+  /// The declaration which will be used to compute a mangled name.
+  ///
+  /// \note For a \c VarDecl with a parent \c PatternBindingDecl , this should
+  /// point to the parent \c PatternBindingDecl . (That accommodates the way
+  /// sibling \c VarDecl s share attributes.)
+  Decl *abiDecl;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::ABI;
+  }
+
+  UNIMPLEMENTED_CLONE(ABIAttr)
 };
 
 /// Attributes that may be applied to declarations.
@@ -3047,17 +3081,25 @@ public:
   }
 
 public:
-  template <typename ATTR, bool AllowInvalid>
+  template <typename ATTR, typename Iterator, bool AllowInvalid>
   using AttributeKindRange =
-      OptionalTransformRange<iterator_range<const_iterator>,
+      OptionalTransformRange<iterator_range<Iterator>,
                              ToAttributeKind<ATTR, AllowInvalid>,
-                             const_iterator>;
+                             Iterator>;
 
   /// Return a range with all attributes in DeclAttributes with AttrKind
   /// ATTR.
   template <typename ATTR, bool AllowInvalid = false>
-  AttributeKindRange<ATTR, AllowInvalid> getAttributes() const {
-    return AttributeKindRange<ATTR, AllowInvalid>(
+  AttributeKindRange<ATTR, const_iterator, AllowInvalid> getAttributes() const {
+    return AttributeKindRange<ATTR, const_iterator, AllowInvalid>(
+        make_range(begin(), end()), ToAttributeKind<ATTR, AllowInvalid>());
+  }
+
+  /// Return a range with all attributes in DeclAttributes with AttrKind
+  /// ATTR.
+  template <typename ATTR, bool AllowInvalid = false>
+  AttributeKindRange<ATTR, iterator, AllowInvalid> getAttributes() {
+    return AttributeKindRange<ATTR, iterator, AllowInvalid>(
         make_range(begin(), end()), ToAttributeKind<ATTR, AllowInvalid>());
   }
 

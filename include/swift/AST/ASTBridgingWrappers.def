@@ -68,7 +68,7 @@
 
 // Some of the base classes need to be nullable to allow them to be used as
 // optional parameters.
-AST_BRIDGING_WRAPPER_NONNULL(Decl)
+AST_BRIDGING_WRAPPER_NULLABLE(Decl)
 AST_BRIDGING_WRAPPER_NONNULL(DeclContext)
 AST_BRIDGING_WRAPPER_NONNULL(SourceFile)
 AST_BRIDGING_WRAPPER_NULLABLE(Stmt)

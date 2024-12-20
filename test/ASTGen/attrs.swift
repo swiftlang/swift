@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature Extern -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature Extern -enable-experimental-move-only > %t/cpp-parser.ast.raw
+// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature ABIAttribute -enable-experimental-feature Extern -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
+// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature ABIAttribute -enable-experimental-feature Extern -enable-experimental-move-only > %t/cpp-parser.ast.raw
 
 // Filter out any addresses in the dump, since they can differ.
 // RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
@@ -8,13 +8,14 @@
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature Extern -enable-experimental-move-only -enable-experimental-feature ParserASTGen 
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature ABIAttribute -enable-experimental-feature Extern -enable-experimental-move-only -enable-experimental-feature ParserASTGen
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_SymbolLinkageMarkers
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_ParserASTGen
+// REQUIRES: swift_feature_ABIAttribute
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -62,7 +63,10 @@ struct S4 {}
 @implementation extension ObjCClass1 {} // expected-error {{cannot find type 'ObjCClass1' in scope}}
 @implementation(Category) extension ObjCClass1 {} // expected-error {{cannot find type 'ObjCClass1' in scope}}
 
-@_alignment(8) struct AnyAlignment {} 
+@abi(func fn_abi()) // expected-error {{cannot give global function 'fn' the ABI of a global function with a different number of low-level parameters}}
+func fn(_: Int) {}
+
+@_alignment(8) struct AnyAlignment {}
 
 @_allowFeatureSuppression(IsolatedAny) public func testFeatureSuppression(fn: @isolated(any) @Sendable () -> ()) {}
 

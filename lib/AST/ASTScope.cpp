@@ -67,6 +67,11 @@ void ASTScope::lookupEnclosingMacroScope(
   return ASTScopeImpl::lookupEnclosingMacroScope(sourceFile, loc, body);
 }
 
+ABIAttr *ASTScope::lookupEnclosingABIAttributeScope(
+    SourceFile *sourceFile, SourceLoc loc) {
+  return ASTScopeImpl::lookupEnclosingABIAttributeScope(sourceFile, loc);
+}
+
 CatchNode ASTScope::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
   return ASTScopeImpl::lookupCatchNode(module, loc);
 }

@@ -67,6 +67,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class ABIAttr;
   class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
