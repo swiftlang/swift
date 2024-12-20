@@ -3326,12 +3326,6 @@ public:
     printFoot();
   }
 
-  void visitOneWayExpr(OneWayExpr *E, StringRef label) {
-    printCommon(E, "one_way_expr", label);
-    printRec(E->getSubExpr());
-    printFoot();
-  }
-
   void visitTapExpr(TapExpr *E, StringRef label) {
     printCommon(E, "tap_expr", label);
     printDeclRefField(E->getVar(), "var");

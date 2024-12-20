@@ -863,8 +863,6 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::NoImplicitCopy);
     Opts.enableFeature(Feature::OldOwnershipOperatorSpellings);
   }
-  if (Args.hasArg(OPT_experimental_one_way_closure_params))
-    Opts.enableFeature(Feature::OneWayClosureParameters);
   if (Args.hasArg(OPT_enable_experimental_forward_mode_differentiation))
     Opts.enableFeature(Feature::ForwardModeDifferentiation);
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))

@@ -5469,11 +5469,6 @@ namespace {
       llvm_unreachable("Handled by the walker directly");
     }
 
-    Expr *visitOneWayExpr(OneWayExpr *E) {
-      auto type = simplifyType(cs.getType(E));
-      return coerceToType(E->getSubExpr(), type, cs.getConstraintLocator(E));
-    }
-
     Expr *visitTapExpr(TapExpr *E) {
       auto type = simplifyType(cs.getType(E));
 
