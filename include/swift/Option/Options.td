@@ -792,11 +792,6 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
-def enable_experimental_bounds_safety_interop :
-  Flag<["-"], "enable-experimental-bounds-safety-interop">,
-  Flags<[NoDriverOption, FrontendOption, HelpHidden, ModuleInterfaceOption]>,
-  HelpText<"Enable experimental C bounds safety interop code generation and config directives">;
-
 def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
   Flags<[NoDriverOption, FrontendOption, HelpHidden]>,

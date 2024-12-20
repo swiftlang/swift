@@ -8673,16 +8673,16 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
 }
 
 namespace {
-class PointerParamInfoPrinter {
+class SwiftifyInfoPrinter {
 public:
   clang::ASTContext &ctx;
   llvm::raw_ostream &out;
   bool firstParam = true;
-  PointerParamInfoPrinter(clang::ASTContext &ctx, llvm::raw_ostream &out)
+  SwiftifyInfoPrinter(clang::ASTContext &ctx, llvm::raw_ostream &out)
       : ctx(ctx), out(out) {
-    out << "@PointerBounds(";
+    out << "@_SwiftifyImport(";
   }
-  ~PointerParamInfoPrinter() { out << ")"; }
+  ~SwiftifyInfoPrinter() { out << ")"; }
 
   void printCountedBy(const clang::CountAttributedType *CAT,
                       size_t pointerIndex) {
@@ -8725,7 +8725,7 @@ void ClangImporter::Implementation::importBoundsAttributes(
   {
     llvm::raw_svector_ostream out(MacroString);
 
-    PointerParamInfoPrinter printer(getClangASTContext(), out);
+    SwiftifyInfoPrinter printer(getClangASTContext(), out);
     for (auto [index, param] : llvm::enumerate(ClangDecl->parameters())) {
       if (auto CAT = param->getType()->getAs<clang::CountAttributedType>()) {
         printer.printCountedBy(CAT, index);
