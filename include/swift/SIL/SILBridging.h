@@ -228,12 +228,6 @@ struct BridgedType {
     ObjC
   };
 
-  enum class TraitResult {
-    IsNot,
-    CanBe,
-    Is
-  };
-
   struct EnumElementIterator {
     uint64_t storage[4];
 
@@ -245,8 +239,7 @@ struct BridgedType {
   BRIDGED_INLINE swift::SILType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanType() const;
 
-  static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType createObjectType(BridgedCanType canTy);
-  static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType createAddressType(BridgedCanType canTy);
+  static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType createSILType(BridgedCanType canTy);
   BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool isNull() const;
   BRIDGED_INLINE bool isAddress() const;
@@ -278,7 +271,6 @@ struct BridgedType {
   BRIDGED_INLINE bool isAsyncFunction() const;
   BRIDGED_INLINE bool isVoid() const;
   BRIDGED_INLINE bool isEmpty(BridgedFunction f) const;
-  BRIDGED_INLINE TraitResult canBeClass() const;
   BRIDGED_INLINE bool isMoveOnly() const;
   BRIDGED_INLINE bool isEscapable(BridgedFunction f) const;
   BRIDGED_INLINE bool isOrContainsObjectiveCClass() const;
@@ -529,7 +521,7 @@ struct BridgedFunction {
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;
   BRIDGED_INLINE void setIsPerformanceConstraint(bool isPerfConstraint) const;
   BRIDGED_INLINE bool isResilientNominalDecl(BridgedDeclObj decl) const;
-  BRIDGED_INLINE BridgedType getLoweredType(BridgedASTType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getLoweredType(BridgedASTType type, bool maximallyAbstracted) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getLoweredType(BridgedType type) const;
   BRIDGED_INLINE BridgedLinkage getLinkage() const;
   BRIDGED_INLINE void setLinkage(BridgedLinkage linkage) const;
@@ -613,18 +605,6 @@ struct BridgedMultiValueResult {
   BRIDGED_INLINE swift::MultipleValueInstructionResult * _Nonnull unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction getParent() const;
   BRIDGED_INLINE SwiftInt getIndex() const;
-};
-
-struct BridgedTypeArray {
-  BridgedArrayRef typeArray;
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-  static BridgedTypeArray fromReplacementTypes(BridgedSubstitutionMap substMap);
-
-  SwiftInt getCount() const { return SwiftInt(typeArray.Length); }
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-  BridgedType getAt(SwiftInt index) const;
 };
 
 struct BridgedSILTypeArray {
