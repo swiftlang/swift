@@ -7408,6 +7408,58 @@ RValue SILGenFunction::emitRValueForKeyPathMethod(
   return emission.apply(C);
 }
 
+/// Emit a call to an unapplied keypath method.
+RValue SILGenFunction::emitUnappliedKeyPathMethod(
+    SILLocation loc, ManagedValue base, CanType baseType,
+    AbstractFunctionDecl *method, Type methodTy, PreparedArguments &&methodArgs,
+    SubstitutionMap subs, SGFContext C) {
+  FormalEvaluationScope writebackScope(*this);
+
+  RValue selfRValue(*this, loc, baseType, base);
+  ArgumentSource selfArg(loc, std::move(selfRValue));
+
+  std::optional<Callee> callee =
+      Callee::formCallee(*this, method, selfArg.getSubstRValueType(),
+                         SILDeclRef(method), subs, loc);
+
+  SILValue methodRef;
+  if (callee) {
+    SILDeclRef calleeMethod = callee->getMethodName();
+    auto &constantInfo =
+        SGM.Types.getConstantInfo(F.getTypeExpansionContext(), calleeMethod);
+    SILType methodTy = constantInfo.getSILType();
+
+    switch (callee->kind) {
+    case Callee::Kind::StandaloneFunction: {
+      SILFunction *silMethod = SGM.getFunction(calleeMethod, NotForDefinition);
+      methodRef = B.createFunctionRef(loc, silMethod);
+      break;
+    }
+    case Callee::Kind::ClassMethod: {
+      methodRef =
+          B.createClassMethod(loc, base.getValue(), calleeMethod, methodTy);
+      break;
+    }
+    case Callee::Kind::WitnessMethod: {
+      CanType protocolSelfType = baseType->getCanonicalType();
+      ProtocolDecl *protocol = cast<ProtocolDecl>(method->getDeclContext());
+      ProtocolConformanceRef conformance =
+          subs.lookupConformance(protocolSelfType, protocol);
+      methodRef = B.createWitnessMethod(loc, protocolSelfType, conformance,
+                                        calleeMethod, methodTy);
+      break;
+    }
+    default:
+      llvm_unreachable("Unhandled callee kind for unapplied key path method.");
+    }
+  }
+
+  auto partialMV = B.createPartialApply(loc, methodRef, subs, base,
+                                        ParameterConvention::Direct_Guaranteed);
+  CanType partialType = methodTy->getCanonicalType();
+  return RValue(*this, loc, partialType, partialMV);
+}
+
 /// Emit a call to an addressor.
 ///
 /// Returns an l-value managed value.
