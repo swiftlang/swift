@@ -696,25 +696,22 @@ extension ContiguousArray: RangeReplaceableCollection {
   internal mutating func _reserveCapacityImpl(
     minimumCapacity: Int, growForAppend: Bool
   ) {
-    let isUnique = _buffer.beginCOWMutation()
-    if _slowPath(!isUnique || _buffer.mutableCapacity < minimumCapacity) {
-      _createNewBuffer(bufferIsUnique: isUnique,
-                       minimumCapacity: Swift.max(minimumCapacity, _buffer.count),
-                       growForAppend: growForAppend)
-    }
-    _internalInvariant(_buffer.mutableCapacity >= minimumCapacity)
-    _internalInvariant(_buffer.mutableCapacity == 0 || _buffer.isUniquelyReferenced())
+    _ = _reserveCapacityImpl(
+      minimumCapacity: minimumCapacity,
+      growForAppend: growForAppend,
+      rangeToNotCopy: 0..<0
+    )
   }
-  
+
   @_alwaysEmitIntoClient
-  internal mutating func _reserveCapacityImplForReplaceSubrange(
+  internal mutating func _reserveCapacityImpl(
     minimumCapacity: Int,
     growForAppend: Bool,
     rangeToNotCopy: Range<Int>
   ) -> Bool {
     let isUnique = _buffer.beginCOWMutation()
     if _slowPath(!isUnique || _buffer.mutableCapacity < minimumCapacity) {
-      _createNewBufferForReplaceSubrange(
+      _createNewBuffer(
         bufferIsUnique: isUnique,
         minimumCapacity: Swift.max(minimumCapacity, _buffer.count),
         growForAppend: growForAppend,
@@ -734,19 +731,19 @@ extension ContiguousArray: RangeReplaceableCollection {
   /// If `growForAppend` is true, the new capacity is calculated using
   /// `_growArrayCapacity`.
   @_alwaysEmitIntoClient
-  @inline(never)
   internal mutating func _createNewBuffer(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) {
-    _internalInvariant(!bufferIsUnique || _buffer.isUniquelyReferenced())
-    _buffer = _buffer._consumeAndCreateNew(bufferIsUnique: bufferIsUnique,
-                                           minimumCapacity: minimumCapacity,
-                                           growForAppend: growForAppend)
+    _createNewBuffer(
+      bufferIsUnique: bufferIsUnique,
+      minimumCapacity: minimumCapacity,
+      growForAppend: growForAppend,
+      rangeToNotCopy: 0..<0
+    )
   }
-  
+
   @_alwaysEmitIntoClient
-  @inline(never)
-  internal mutating func _createNewBufferForReplaceSubrange(
+  internal mutating func _createNewBuffer(
     bufferIsUnique: Bool,
     minimumCapacity: Int,
     growForAppend: Bool,
@@ -1398,9 +1395,9 @@ extension ContiguousArray {
     let insertCount = newElements.count
     let growth = insertCount - eraseCount
 
-    let punchedHole = _reserveCapacityImplForReplaceSubrange(
+    let punchedHole = _reserveCapacityImpl(
       minimumCapacity: self.count + growth,
-      growForAppend: growth > 0,
+      growForAppend: true,
       rangeToNotCopy: subrange)
     _buffer.replaceSubrange(
       subrange,
