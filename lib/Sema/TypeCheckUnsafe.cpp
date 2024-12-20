@@ -39,6 +39,7 @@ static bool isUnsafeUseInDefinition(const UnsafeUse &use) {
   case UnsafeUse::Override:
   case UnsafeUse::Witness:
   case UnsafeUse::TypeWitness:
+    case UnsafeUse::PreconcurrencyImport:
     // Never part of the definition. These are always part of the interface.
     return false;
 
@@ -86,48 +87,6 @@ static void suggestUnsafeMarkerOnConformance(
       decl->getDescriptiveKind(),
       conformance->getProtocol()->getName()
   ).fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
-}
-
-/// Enumerate all of the unsafe conformances within this conformance,
-/// returning `true` and aborting the search if any callback returns `true`.
-static bool forEachUnsafeConformance(
-    ProtocolConformanceRef conformance,
-    llvm::function_ref<bool(ProtocolConformance *conformance)> fn) {
-  if (conformance.isInvalid() || conformance.isAbstract())
-    return false;
-
-  if (conformance.isPack()) {
-    for (auto packedConformance :
-             conformance.getPack()->getPatternConformances()) {
-      if (forEachUnsafeConformance(packedConformance, fn))
-        return true;
-    }
-
-    return false;
-  }
-
-  // Is this an unsafe conformance?
-  ProtocolConformance *concreteConf = conformance.getConcrete();
-  RootProtocolConformance *rootConf = concreteConf->getRootConformance();
-  if (auto normalConf = dyn_cast<NormalProtocolConformance>(rootConf)) {
-    // @unchecked Sendable conformances are considered unsafe when complete
-    // checking is enabled.
-    if (normalConf->isUnchecked() &&
-        normalConf->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable) &&
-        normalConf->getProtocol()->getASTContext()
-          .LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)
-      if (fn(concreteConf))
-        return true;
-  }
-
-  // Check conformances that are part of this conformance.
-  auto subMap = concreteConf->getSubstitutionMap();
-  for (auto conformance : subMap.getConformances()) {
-    if (forEachUnsafeConformance(conformance, fn))
-      return true;
-  }
-
-  return false;
 }
 
 /// Retrieve the extra information
@@ -278,6 +237,14 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
       decl->diagnose(diag::unsafe_decl_here, decl);
     }
 
+    return;
+  }
+
+  case UnsafeUse::PreconcurrencyImport: {
+    auto importDecl = cast<ImportDecl>(use.getDecl());
+    importDecl->diagnose(diag::preconcurrency_import_unsafe)
+      .fixItInsert(importDecl->getAttributeInsertionLoc(false),
+                   "@safe(unchecked) ");
     return;
   }
   }

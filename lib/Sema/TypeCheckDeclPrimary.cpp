@@ -54,6 +54,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -2461,6 +2462,15 @@ public:
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
+    }
+
+    // Preconcurrency imports aren't strictly memory-safe when we have strict
+    // concurrency checking enabled.
+    if (ID->preconcurrency() &&
+        Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
+        Ctx.LangOpts.hasFeature(Feature::WarnUnsafe) && !
+        ID->getAttrs().hasAttribute<SafeAttr>()) {
+      diagnoseUnsafeUse(UnsafeUse::forPreconcurrencyImport(ID));
     }
   }
 

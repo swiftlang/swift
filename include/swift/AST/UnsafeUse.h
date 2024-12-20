@@ -45,6 +45,8 @@ public:
     ReferenceToUnsafe,
     /// A call to an unsafe declaration.
     CallToUnsafe,
+    /// A @preconcurrency import.
+    PreconcurrencyImport,
   };
 
 private:
@@ -77,6 +79,8 @@ private:
       TypeBase *type;
       const void *location;
     } entity;
+
+    const ImportDecl *importDecl;
   } storage;
 
   UnsafeUse(Kind kind) : kind(kind) { }
@@ -173,6 +177,12 @@ public:
                         decl, type, location);
   }
 
+  static UnsafeUse forPreconcurrencyImport(const ImportDecl *importDecl) {
+    UnsafeUse result(PreconcurrencyImport);
+    result.storage.importDecl = importDecl;
+    return result;
+  }
+
   Kind getKind() const { return kind; }
 
   /// The location at which this use will be diagnosed.
@@ -198,6 +208,9 @@ public:
     case CallToUnsafe:
       return SourceLoc(
           llvm::SMLoc::getFromPointer((const char *)storage.entity.location));
+
+    case PreconcurrencyImport:
+      return storage.importDecl->getLoc();
     }
   }
 
@@ -219,6 +232,9 @@ public:
 
     case UnsafeConformance:
       return nullptr;
+
+    case PreconcurrencyImport:
+      return storage.importDecl;
     }
   }
 
@@ -246,6 +262,9 @@ public:
 
     case UnsafeConformance:
       return storage.conformance.declContext;
+
+    case PreconcurrencyImport:
+      return storage.importDecl->getDeclContext();
     }
   }
 
@@ -264,6 +283,7 @@ public:
     case ReferenceToUnsafe:
     case CallToUnsafe:
     case UnsafeConformance:
+    case PreconcurrencyImport:
       return nullptr;
     }
   }
@@ -273,6 +293,7 @@ public:
     switch (getKind()) {
     case Override:
     case Witness:
+    case PreconcurrencyImport:
       return nullptr;
 
     case UnsafeConformance:
@@ -307,6 +328,7 @@ public:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
     case CallToUnsafe:
+    case PreconcurrencyImport:
       return ProtocolConformanceRef::forInvalid();
     }
   }

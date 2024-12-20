@@ -8119,6 +8119,10 @@ GROUPED_WARNING(reference_to_unsafe_decl,Unsafe,none,
 GROUPED_WARNING(reference_to_unsafe_typed_decl,Unsafe,none,
       "%select{reference|call}0 to %kindbase1 involves unsafe type %2",
       (bool, const ValueDecl *, Type))
+GROUPED_WARNING(preconcurrency_import_unsafe,Unsafe,none,
+      "@preconcurrency import is not memory-safe because it can silently "
+      "introduce data races; use '@safe(unchecked)' to assert that the "
+      "code is memory-safe", ())
 NOTE(unsafe_decl_here,none,
      "unsafe %kindbase0 declared here", (const ValueDecl *))
 NOTE(encapsulate_unsafe_in_enclosing_context,none,
