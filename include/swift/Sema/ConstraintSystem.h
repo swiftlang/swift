@@ -3277,10 +3277,15 @@ public:
   ConstraintLocator *getOpenOpaqueLocator(
       ConstraintLocatorBuilder locator, OpaqueTypeDecl *opaqueDecl);
 
-  /// Open the given existential type, recording the opened type in the
-  /// constraint system and returning both it and the root opened archetype.
-  std::pair<Type, OpenedArchetypeType *> openExistentialType(
-      Type type, ConstraintLocator *locator);
+  /// Open the given existential type or existential metatype, recording the
+  /// opened archetype in the constraint system and returning both the opened
+  /// type and opened archetype.
+  std::pair<Type, OpenedArchetypeType *>
+  openAnyExistentialType(Type type, ConstraintLocator *locator);
+
+  /// Returns the opened archetype tied to the given locator.
+  OpenedArchetypeType *
+  getOpenedExistentialType(ConstraintLocator *locator) const;
 
   /// Update OpenedExistentials and record a change in the trail.
   void recordOpenedExistentialType(ConstraintLocator *locator,

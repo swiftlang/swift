@@ -1441,8 +1441,7 @@ public:
   }
 };
 
-static std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
-                                Type, OpenedExistentialAdjustments>>
+static std::optional<std::pair<TypeVariableType *, Type>>
 shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                   Type paramTy, Type argTy, Expr *argExpr,
                                   ConstraintSystem &cs) {
@@ -1475,8 +1474,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator,
     std::optional<TrailingClosureMatching> trailingClosureMatching,
-    SmallVectorImpl<std::pair<TypeVariableType *, OpenedArchetypeType *>>
-        &openedExistentials) {
+    SmallVectorImpl<OpenedArchetypeType *> &openedExistentials) {
   assert(subKind == ConstraintKind::OperatorArgumentConversion ||
          subKind == ConstraintKind::ArgumentConversion);
   auto *loc = cs.getConstraintLocator(locator);
@@ -1807,36 +1805,41 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       // the opened existentials.
       if (!openedExistentials.empty() && paramTy->hasTypeVariable() &&
           !cs.isArgumentGenericFunction(argTy, argExpr)) {
-        for (const auto &opened : openedExistentials) {
-          paramTy = typeEraseOpenedExistentialReference(
-              paramTy, opened.second->getExistentialType(), opened.first,
-              TypePosition::Contravariant);
+        for (auto *opened : openedExistentials) {
+          paramTy = cs.simplifyType(paramTy);
+          paramTy = typeEraseCovariantOpenedArchetypesFromEnvironment(
+              paramTy, opened->getGenericEnvironment(),
+              /*initialPosition=*/TypePosition::Contravariant);
         }
       }
 
       // If the argument is an existential type and the parameter is generic,
       // consider opening the existential type.
-      if (auto existentialArg = shouldOpenExistentialCallArgument(
+      if (auto typeVarAndBinding = shouldOpenExistentialCallArgument(
               callee, paramIdx, paramTy, argTy, argExpr, cs)) {
         // My kingdom for a decent "if let" in C++.
-        GenericTypeParamType *openedGenericParam;
-        TypeVariableType *openedTypeVar;
-        Type existentialType;
-        OpenedExistentialAdjustments adjustments;
-        std::tie(openedGenericParam, openedTypeVar, existentialType,
-                 adjustments) = *existentialArg;
+        TypeVariableType *typeVar;
+        Type bindingTy;
+        std::tie(typeVar, bindingTy) = *typeVarAndBinding;
 
-        OpenedArchetypeType *opened;
-        std::tie(argTy, opened) = cs.openExistentialType(
-            existentialType, cs.getConstraintLocator(loc));
+        OpenedArchetypeType *openedTy;
+        // Open the binding type.
+        std::tie(bindingTy, openedTy) =
+            cs.openAnyExistentialType(bindingTy, cs.getConstraintLocator(loc));
 
-        if (adjustments.contains(OpenedExistentialAdjustmentFlags::LValue))
-          argTy = LValueType::get(argTy);
+        // Open the argument type to the same archetype.
+        argTy = argTy.transformRec([&](TypeBase *t) -> std::optional<Type> {
+          if (t->isAnyExistentialType()) {
+            return OpenedArchetypeType::openAnyExistentialType(t, openedTy);
+          }
 
-        if (adjustments.contains(OpenedExistentialAdjustmentFlags::InOut))
-          argTy = InOutType::get(argTy);
+          return std::nullopt;
+        });
 
-        openedExistentials.push_back({openedTypeVar, opened});
+        openedExistentials.push_back(openedTy);
+
+        // Bind the type variable to the opened binding type.
+        cs.addConstraint(ConstraintKind::Bind, typeVar, bindingTy, loc);
       }
 
       // If we have a compound function reference (e.g `fn($x:)`), respect
@@ -8649,7 +8652,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (type->isExistentialType()) {
       if (auto elt = loc->getLastElementAs<LocatorPathElt::ContextualType>()) {
         if (elt->getPurpose() == CTP_ForEachSequence) {
-          type = openExistentialType(type, loc).first;
+          type = openAnyExistentialType(type, loc).first;
         }
       }
     }
@@ -12432,8 +12435,8 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
   if (type2->isAnyExistentialType()) {
     // We have the existential side. Produce an opened archetype and bind
     // type1 to it.
-    Type openedTy = openExistentialType(type2, getConstraintLocator(locator))
-        .first;
+    Type openedTy =
+        openAnyExistentialType(type2, getConstraintLocator(locator)).first;
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
   }
   if (!type2->isTypeVariableOrMember())
@@ -13219,8 +13222,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
     auto *argumentList = getArgumentList(argumentsLoc);
     // The argument type must be convertible to the input type.
-    SmallVector<std::pair<TypeVariableType *, OpenedArchetypeType *>, 2>
-        openedExistentials;
+    SmallVector<OpenedArchetypeType *, 2> openedExistentials;
     auto matchCallResult = ::matchCallArguments(
         *this, func2, argumentList, func1->getParams(), func2->getParams(),
         subKind, argumentsLoc, trailingClosureMatching, openedExistentials);
@@ -13335,15 +13337,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     // Erase all of the opened existentials.
     Type result2 = func2->getResult();
     if (result2->hasTypeVariable() && !openedExistentials.empty()) {
-      for (const auto &opened : openedExistentials) {
+      result2 = simplifyType(result2);
+
+      for (auto *opened : openedExistentials) {
         auto originalTy = result2;
         if (auto *lvalueTy = dyn_cast<LValueType>(originalTy.getPointer())) {
           originalTy = lvalueTy->getObjectType();
         }
 
-        const auto erasedTy = typeEraseOpenedExistentialReference(
-            originalTy, opened.second->getExistentialType(), opened.first,
-            TypePosition::Covariant);
+        const auto erasedTy = typeEraseCovariantOpenedArchetypesFromEnvironment(
+            originalTy, opened->getGenericEnvironment(),
+            /*initialPosition=*/TypePosition::Covariant);
 
         if (originalTy.getPointer() != erasedTy.getPointer()) {
           // We currently cannot keep lvalueness if the object type changed.

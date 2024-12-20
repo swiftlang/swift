@@ -2138,8 +2138,8 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
   
   // Existentials use the encoding of the enclosed dynamic type.
   if (type->isAnyExistentialType()) {
-    return getIsaEncodingForType(
-        IGM, OpenedArchetypeType::getAny(type)->getCanonicalType());
+    auto openedType = OpenedArchetypeType::openAnyExistentialType(type);
+    return getIsaEncodingForType(IGM, openedType->getCanonicalType());
   }
 
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
