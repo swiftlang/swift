@@ -1507,7 +1507,7 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
 #endif
     }
 
-    
+
     return true;
   }();
 
@@ -1901,7 +1901,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   std::unique_ptr<CompilerInstance> Instance =
     std::make_unique<CompilerInstance>();
 
-  DiagnosticHelper DH = DiagnosticHelper::create(*Instance);
+  CompilerInvocation Invocation;
+
+  DiagnosticHelper DH = DiagnosticHelper::create(*Instance, Invocation, Args);
 
   // Hopefully we won't trigger any LLVM-level fatal errors, but if we do try
   // to route them through our usual textual diagnostics before crashing.
@@ -1946,8 +1948,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
-  CompilerInvocation Invocation;
-
   SmallString<128> workingDirectory;
   llvm::sys::fs::current_path(workingDirectory);
 
@@ -1970,7 +1970,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
       FrontendOptions::ActionType::Immediate) {
     llvm::setBugReportMsg(nullptr);
   }
-  
+
   PrettyStackTraceFrontend frontendTrace(Invocation);
 
   // Make an array of PrettyStackTrace objects to dump the configuration files
@@ -2029,13 +2029,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
-  DH.initDiagConsumers(Invocation);
-
   if (Invocation.getFrontendOptions().PrintStats) {
     llvm::EnableStatistics();
   }
 
-  DH.beginMessage(Invocation, Args);
+  DH.beginMessage();
 
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;

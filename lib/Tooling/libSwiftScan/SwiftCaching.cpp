@@ -30,10 +30,8 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/MakeStyleDependencies.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/Option/Options.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/Frontend/CompileJobCacheResult.h"
-#include "clang/Frontend/FrontendOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
@@ -41,7 +39,6 @@
 #include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
-#include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/Error.h"
@@ -909,7 +906,8 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
   const auto &Input = AllInputs[Comp.InputIndex];
 
   // Setup DiagnosticsConsumers.
-  DiagnosticHelper DH = DiagnosticHelper::create(Inst, Err, /*QuasiPID=*/true);
+  DiagnosticHelper DH = DiagnosticHelper::create(
+      Inst, Invocation, Instance.Args, Err, /*QuasiPID=*/true);
 
   std::string InstanceSetupError;
   if (Inst.setupForReplay(Instance.Invocation, InstanceSetupError,
@@ -920,141 +918,23 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
   assert(CDP && "CachingDiagnosticsProcessor needs to be setup for replay");
   // No diags are captured in replay instance.
   CDP->endDiagnosticCapture();
-
-  // Collect the file that needs to write.
-  DenseMap<file_types::ID, std::string> Outputs;
-  if (!Input.outputFilename().empty())
-    Outputs.try_emplace(InputsAndOutputs.getPrincipalOutputType(),
-                        Input.outputFilename());
-  Input.getPrimarySpecificPaths().SupplementaryOutputs.forEachSetOutputAndType(
-      [&](const std::string &File, file_types::ID ID) {
-        if (file_types::isProducedFromDiagnostics(ID))
-          return;
-
-        Outputs.try_emplace(ID, File);
-      });
-  Outputs.try_emplace(file_types::TY_CachedDiagnostics, "<cached-diagnostics>");
-  Outputs.try_emplace(file_types::ID::TY_SymbolGraphFile, "<symbol-graph>");
-
-  // Load all the output buffer.
+  // Replay settings.
   bool Remarks = Instance.Invocation.getCASOptions().EnableCachingRemarks;
-  struct OutputEntry {
-    std::string Path;
-    llvm::cas::ObjectProxy Proxy;
-    file_types::ID Kind;
-  };
-  SmallVector<OutputEntry> OutputProxies;
-  std::optional<llvm::cas::ObjectProxy> DiagnosticsOutput;
   bool UseCASBackend = Invocation.getIRGenOptions().UseCASBackend;
-  const FrontendOptions &FrontendOpts =
-      Inst.getInvocation().getFrontendOptions();
-
-  swift::cas::CachedResultLoader Loader(CAS, Comp.Output);
-  if (auto Err = Loader.replay(
-          [&](file_types::ID Kind, llvm::cas::ObjectRef Ref) -> Error {
-            auto OutputPath = Outputs.find(Kind);
-            if (OutputPath == Outputs.end())
-              return createStringError(
-                  inconvertibleErrorCode(),
-                  "unexpected output kind in the cached output");
-            auto Proxy = CAS.getProxy(Ref);
-            if (!Proxy)
-              return Proxy.takeError();
-
-            if (Kind == file_types::ID::TY_CachedDiagnostics) {
-              assert(!DiagnosticsOutput && "more than 1 diagnostics found");
-              DiagnosticsOutput = std::move(*Proxy);
-            } else if (Kind == file_types::ID::TY_SymbolGraphFile &&
-                       !FrontendOpts.SymbolGraphOutputDir.empty()) {
-              auto Err = Proxy->forEachReference([&](llvm::cas::ObjectRef Ref)
-                                                     -> llvm::Error {
-                auto Proxy = CAS.getProxy(Ref);
-                if (!Proxy)
-                  return Proxy.takeError();
-                auto PathRef = Proxy->getReference(0);
-                auto ContentRef = Proxy->getReference(1);
-                auto Path = CAS.getProxy(PathRef);
-                auto Content = CAS.getProxy(ContentRef);
-                if (!Path)
-                  return Path.takeError();
-                if (!Content)
-                  return Content.takeError();
-
-                SmallString<128> OutputPath(FrontendOpts.SymbolGraphOutputDir);
-                llvm::sys::path::append(OutputPath, Path->getData());
-
-                OutputProxies.emplace_back(OutputEntry{
-                    std::string(OutputPath), std::move(*Content), Kind});
-
-                return Error::success();
-              });
-              if (Err)
-                return Err;
-            } else
-              OutputProxies.emplace_back(
-                  OutputEntry{OutputPath->second, std::move(*Proxy), Kind});
-            return Error::success();
-          }))
-    return Err;
-
-  // Replay diagnostics first.
-  // FIXME: Currently, the diagnostics is replay from the first file.
-  if (DiagnosticsOutput) {
-    DH.initDiagConsumers(Invocation);
-    DH.beginMessage(Invocation, Instance.Args);
-
-    if (auto E = CDP->replayCachedDiagnostics(DiagnosticsOutput->getData())) {
-      DH.endMessage(/*ReturnCode=*/1);
-      Inst.getDiags().finishProcessing();
-      return E;
-    }
-
-    if (Remarks)
-      Inst.getDiags().diagnose(SourceLoc(), diag::replay_output,
-                               "<cached-diagnostics>",
-                               CAS.getID(Comp.Key).toString());
-  } else {
-    // Don't write anything when parseable output is requested.
-    if (Invocation.getFrontendOptions().FrontendParseableOutput)
-      DH.setSuppressOutput(true);
-  }
-
-  SWIFT_DEFER {
-    if (DiagnosticsOutput) {
-      DH.endMessage(0);
-      Inst.getDiags().finishProcessing();
-    }
-  };
 
   // OutputBackend for replay.
   ReplayOutputBackend Backend(
       makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>(), Out);
 
-  for (auto &Output : OutputProxies) {
-    auto File = Backend.createFile(Output.Path);
-    if (!File)
-      return File.takeError();
-    if (UseCASBackend && Output.Kind == file_types::ID::TY_Object) {
-      auto Schema = std::make_unique<llvm::mccasformats::v1::MCSchema>(CAS);
-      if (auto E = Schema->serializeObjectFile(Output.Proxy, *File))
-        Inst.getDiags().diagnose(SourceLoc(), diag::error_mccas,
-                                 toString(std::move(E)));
-    } else if (Output.Kind == file_types::ID::TY_Dependencies) {
-      if (emitMakeDependenciesFromSerializedBuffer(Output.Proxy.getData(),
-                                                   *File, FrontendOpts, Input,
-                                                   Inst.getDiags()))
-        Inst.getDiags().diagnose(SourceLoc(), diag::cache_replay_failed,
-                      "failed to emit dependency file");
-    } else
-      *File << Output.Proxy.getData();
-    if (auto E = File->keep())
-      return E;
-
-    if (Remarks)
-      Inst.getDiags().diagnose(SourceLoc(), diag::replay_output, Output.Path,
-                               CAS.getID(Comp.Key).toString());
+  if (!replayCachedCompilerOutputsForInput(
+          CAS, Comp.Output, Input, Comp.InputIndex, Inst.getDiags(), DH,
+          Backend, Instance.Invocation.getFrontendOptions(), *CDP, Remarks,
+          UseCASBackend)) {
+    Inst.getDiags().diagnose(SourceLoc(), diag::cache_replay_failed,
+                             "failed to load all outputs");
   }
 
+  Inst.getDiags().finishProcessing();
   return llvm::Error::success();
 }
 

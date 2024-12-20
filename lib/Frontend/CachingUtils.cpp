@@ -12,20 +12,22 @@
 
 #include "swift/Frontend/CachingUtils.h"
 
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/CASOutputBackends.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/CompileJobCacheResult.h"
+#include "swift/Frontend/DiagnosticHelper.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/MakeStyleDependencies.h"
 #include "swift/Option/Options.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/Frontend/CompileJobCacheResult.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
 #include "llvm/CAS/CASFileSystem.h"
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
@@ -40,8 +42,8 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputBackends.h"
-#include "llvm/Support/VirtualOutputFile.h"
 #include <memory>
 
 #define DEBUG_TYPE "cache-util"
@@ -133,10 +135,19 @@ lookupCacheKey(ObjectStore &CAS, ActionCache &Cache, ObjectRef CacheKey) {
   return CAS.getReference(**Lookup);
 }
 
-bool replayCachedCompilerOutputs(
-    ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
-    DiagnosticEngine &Diag, const FrontendOptions &Opts,
-    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend) {
+namespace {
+struct CacheInputEntry {
+  const InputFile &Input;
+  unsigned Index;
+  ObjectRef OutputRef;
+};
+} // namespace
+
+static bool replayCachedCompilerOutputsImpl(
+    ArrayRef<CacheInputEntry> Inputs, ObjectStore &CAS, DiagnosticEngine &Diag,
+    const FrontendOptions &Opts, CachingDiagnosticsProcessor &CDP,
+    DiagnosticHelper *DiagHelper, OutputBackend &Backend, bool CacheRemarks,
+    bool UseCASBackend) {
   bool CanReplayAllOutput = true;
   struct OutputEntry {
     std::string Path;
@@ -151,34 +162,11 @@ bool replayCachedCompilerOutputs(
   auto replayOutputsForInputFile = [&](const InputFile &Input,
                                        const std::string &InputPath,
                                        unsigned InputIndex,
+                                       ObjectRef OutputRef,
                                        const DenseMap<file_types::ID,
                                                       std::string> &Outputs) {
-    auto lookupFailed = [&CanReplayAllOutput] { CanReplayAllOutput = false; };
-    auto OutputKey =
-        createCompileJobCacheKeyForOutput(CAS, BaseKey, InputIndex);
-
-    if (!OutputKey) {
-      Diag.diagnose(SourceLoc(), diag::error_cas,
-                    toString(OutputKey.takeError()));
-      return lookupFailed();
-    }
-
-    auto OutID = CAS.getID(*OutputKey);
-    auto OutputRef = lookupCacheKey(CAS, Cache, *OutputKey);
-    if (!OutputRef) {
-      Diag.diagnose(SourceLoc(), diag::error_cas,
-                    toString(OutputRef.takeError()));
-      return lookupFailed();
-    }
-
-    if (!*OutputRef) {
-      if (CacheRemarks)
-        Diag.diagnose(SourceLoc(), diag::output_cache_miss, InputPath,
-                      OutID.toString());
-      return lookupFailed();
-    }
-
-    CachedResultLoader Loader(CAS, **OutputRef);
+    CachedResultLoader Loader(CAS, OutputRef);
+    auto OutID = CAS.getID(OutputRef);
     LLVM_DEBUG(llvm::dbgs() << "DEBUG: lookup cache key \'" << OutID.toString()
                             << "\' for input \'" << InputPath << "\n";);
     if (auto Err = Loader.replay([&](file_types::ID Kind,
@@ -228,12 +216,12 @@ bool replayCachedCompilerOutputs(
         })) {
       Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
                     toString(std::move(Err)));
-      return lookupFailed();
+      CanReplayAllOutput = false;
     }
   };
 
   auto replayOutputFromInput = [&](const InputFile &Input,
-                                   unsigned InputIndex) {
+                                   unsigned InputIndex, ObjectRef OutputRef) {
     auto InputPath = Input.getFileName();
     DenseMap<file_types::ID, std::string> Outputs;
     if (!Input.outputFilename().empty())
@@ -251,8 +239,11 @@ bool replayCachedCompilerOutputs(
 
     // If this input doesn't produce any outputs, don't try to look up cache.
     // This can be a standalone emitModule action that only one input produces
-    // output.
-    if (Outputs.empty())
+    // output. The input can be skipped if it is not the first output producing
+    // input, where it can have diagnostics and symbol graphs attached.
+    if (Outputs.empty() &&
+        InputIndex !=
+            Opts.InputsAndOutputs.getIndexOfFirstOutputProducingInput())
       return;
 
     // Add cached diagnostic entry for lookup. Output path doesn't matter here.
@@ -262,44 +253,34 @@ bool replayCachedCompilerOutputs(
     // Add symbol graph entry for lookup. Output path doesn't matter here.
     Outputs.try_emplace(file_types::ID::TY_SymbolGraphFile, "<symbol-graph>");
 
-    return replayOutputsForInputFile(Input, InputPath, InputIndex, Outputs);
+    return replayOutputsForInputFile(Input, InputPath, InputIndex, OutputRef,
+                                     Outputs);
   };
 
-  auto AllInputs = Opts.InputsAndOutputs.getAllInputs();
-  // If there are primary inputs, look up only the primary input files.
-  // Otherwise, prepare to do cache lookup for all inputs.
-  for (unsigned Index = 0; Index < AllInputs.size(); ++Index) {
-    const auto &Input = AllInputs[Index];
-    if (Opts.InputsAndOutputs.hasPrimaryInputs() && !Input.isPrimary())
-      continue;
-
-    replayOutputFromInput(Input, Index);
-  }
+  for (auto In : Inputs)
+    replayOutputFromInput(In.Input, In.Index, In.OutputRef);
 
   if (!CanReplayAllOutput)
     return false;
 
-  // If there is not diagnostic output, this is a job that produces no output
-  // and only diagnostics, like `typecheck-module-from-interface`, look up
-  // diagnostics from first file.
-  if (!DiagnosticsOutput)
-    replayOutputsForInputFile(
-        Opts.InputsAndOutputs.getFirstOutputProducingInput(),
-        "<cached-diagnostics>",
-        Opts.InputsAndOutputs.getIndexOfFirstOutputProducingInput(),
-        {{file_types::ID::TY_CachedDiagnostics, "<cached-diagnostics>"}});
-
-  // Check again to make sure diagnostics is fetched successfully.
-  if (!CanReplayAllOutput)
+  auto failedReplay = [DiagHelper]() {
+    if (DiagHelper)
+      DiagHelper->endMessage(/*retCode=*/1);
     return false;
+  };
 
   // Replay Diagnostics first so the output failures comes after.
   // Also if the diagnostics replay failed, proceed to re-compile.
-  if (auto E = CDP.replayCachedDiagnostics(
-          DiagnosticsOutput->Proxy.getData())) {
-    Diag.diagnose(SourceLoc(), diag::error_replay_cached_diag,
-                  toString(std::move(E)));
-    return false;
+  if (DiagnosticsOutput) {
+    // Only starts message if there are diagnostics.
+    if (DiagHelper)
+      DiagHelper->beginMessage();
+    if (auto E =
+            CDP.replayCachedDiagnostics(DiagnosticsOutput->Proxy.getData())) {
+      Diag.diagnose(SourceLoc(), diag::error_replay_cached_diag,
+                    toString(std::move(E)));
+      return failedReplay();
+    }
   }
 
   if (CacheRemarks)
@@ -307,8 +288,6 @@ bool replayCachedCompilerOutputs(
                   DiagnosticsOutput->Key.toString());
 
   // Replay the result only when everything is resolved.
-  // Use on disk output backend directly here to write to disk.
-  llvm::vfs::OnDiskOutputBackend Backend;
   for (auto &Output : OutputProxies) {
     auto File = Backend.createFile(Output.Path);
     if (!File) {
@@ -321,14 +300,14 @@ bool replayCachedCompilerOutputs(
       auto Schema = std::make_unique<llvm::mccasformats::v1::MCSchema>(CAS);
       if (auto E = Schema->serializeObjectFile(Output.Proxy, *File)) {
         Diag.diagnose(SourceLoc(), diag::error_mccas, toString(std::move(E)));
-        return false;
+        return failedReplay();
       }
     } else if (Output.Kind == file_types::ID::TY_Dependencies) {
       if (emitMakeDependenciesFromSerializedBuffer(
             Output.Proxy.getData(), *File, Opts, Output.Input, Diag)) {
         Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
                       "failed to emit dependency file");
-        return false;
+        return failedReplay();
       }
     } else
       *File << Output.Proxy.getData();
@@ -343,7 +322,81 @@ bool replayCachedCompilerOutputs(
                     Output.Key.toString());
   }
 
+  if (DiagHelper)
+    DiagHelper->endMessage(/*retCode=*/0);
   return true;
+}
+
+bool replayCachedCompilerOutputs(
+    ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
+    DiagnosticEngine &Diag, const FrontendOptions &Opts,
+    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend) {
+  // Compute all the inputs need replay.
+  llvm::SmallVector<CacheInputEntry> Inputs;
+  auto AllInputs = Opts.InputsAndOutputs.getAllInputs();
+  auto lookupEntry = [&](unsigned InputIndex,
+                         StringRef InputPath) -> std::optional<ObjectRef> {
+    auto OutputKey =
+        createCompileJobCacheKeyForOutput(CAS, BaseKey, InputIndex);
+
+    if (!OutputKey) {
+      Diag.diagnose(SourceLoc(), diag::error_cas,
+                    toString(OutputKey.takeError()));
+      return std::nullopt;
+    }
+
+    auto OutID = CAS.getID(*OutputKey);
+    auto OutputRef = lookupCacheKey(CAS, Cache, *OutputKey);
+    if (!OutputRef) {
+      Diag.diagnose(SourceLoc(), diag::error_cas,
+                    toString(OutputRef.takeError()));
+      return std::nullopt;
+    }
+
+    if (!*OutputRef) {
+      if (CacheRemarks)
+        Diag.diagnose(SourceLoc(), diag::output_cache_miss, InputPath,
+                      OutID.toString());
+      return std::nullopt;
+    }
+
+    return *OutputRef;
+  };
+
+  // If there are primary inputs, look up only the primary input files.
+  // Otherwise, prepare to do cache lookup for all inputs.
+  for (unsigned Index = 0; Index < AllInputs.size(); ++Index) {
+    const auto &Input = AllInputs[Index];
+    if (Opts.InputsAndOutputs.hasPrimaryInputs() && !Input.isPrimary())
+      continue;
+
+    if (Input.outputFilename().empty() &&
+        Input.getPrimarySpecificPaths().SupplementaryOutputs.empty() &&
+        Index != Opts.InputsAndOutputs.getIndexOfFirstOutputProducingInput())
+      continue;
+
+    if (auto OutputRef = lookupEntry(Index, Input.getFileName()))
+      Inputs.push_back({Input, Index, *OutputRef});
+    else
+      return false;
+  }
+
+  // Use on disk output backend directly here to write to disk.
+  llvm::vfs::OnDiskOutputBackend Backend;
+  return replayCachedCompilerOutputsImpl(Inputs, CAS, Diag, Opts, CDP,
+                                         /*DiagHelper=*/nullptr, Backend,
+                                         CacheRemarks, UseCASBackend);
+}
+
+bool replayCachedCompilerOutputsForInput(
+    ObjectStore &CAS, ObjectRef OutputRef, const InputFile &Input,
+    unsigned InputIndex, DiagnosticEngine &Diag, DiagnosticHelper &DiagHelper,
+    OutputBackend &OutBackend, const FrontendOptions &Opts,
+    CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend) {
+  llvm::SmallVector<CacheInputEntry> Inputs = {{Input, InputIndex, OutputRef}};
+  return replayCachedCompilerOutputsImpl(Inputs, CAS, Diag, Opts, CDP,
+                                         &DiagHelper, OutBackend, CacheRemarks,
+                                         UseCASBackend);
 }
 
 std::unique_ptr<llvm::MemoryBuffer>
