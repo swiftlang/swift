@@ -7393,6 +7393,23 @@ RValue SILGenFunction::emitRValueForKeyPathMethod(
   return emission.apply(C);
 }
 
+/// Emit a call to an unapplied keypath method.
+RValue SILGenFunction::emitUnappliedKeyPathMethod(
+    SILLocation loc, ManagedValue base, CanType baseType,
+    AbstractFunctionDecl *method, Type methodTy, PreparedArguments &&methodArgs,
+    SubstitutionMap subs, SGFContext C) {
+  FormalEvaluationScope writebackScope(*this);
+
+  SILFunction *silMethod =
+      SGM.getFunction(SILDeclRef(method), NotForDefinition);
+  FunctionRefInst *methodRef = B.createFunctionRef(loc, silMethod);
+  auto partialMV = B.createPartialApply(loc, methodRef, subs, base,
+                                        ParameterConvention::Direct_Guaranteed);
+
+  CanType partialType = methodTy->getCanonicalType();
+  return RValue(*this, loc, partialType, partialMV);
+}
+
 /// Emit a call to an addressor.
 ///
 /// Returns an l-value managed value.
