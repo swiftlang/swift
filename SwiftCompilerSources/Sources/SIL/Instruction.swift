@@ -736,23 +736,27 @@ class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {
   }
 }
 
-final public
-class IndexAddrInst : SingleValueInstruction {
+public protocol IndexingInstruction: SingleValueInstruction {
+  var base: Value { get }
+  var index: Value { get }
+}
+
+extension IndexingInstruction {
   public var base: Value { operands[0].value }
   public var index: Value { operands[1].value }
-  
+}
+
+final public
+class IndexAddrInst : SingleValueInstruction, IndexingInstruction {
   public var needsStackProtection: Bool {
     bridged.IndexAddrInst_needsStackProtection()
   }
 }
 
-final public class IndexRawPointerInst : SingleValueInstruction {}
+final public class IndexRawPointerInst : SingleValueInstruction, IndexingInstruction {}
 
 final public
-class TailAddrInst : SingleValueInstruction {
-  public var base: Value { operands[0].value }
-  public var index: Value { operands[1].value }
-}
+class TailAddrInst : SingleValueInstruction, IndexingInstruction {}
 
 final public
 class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {
