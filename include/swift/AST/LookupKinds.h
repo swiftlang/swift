@@ -64,6 +64,10 @@ enum NLOptions : unsigned {
   /// from a module that has not been imported.
   NL_IgnoreMissingImports = 1 << 9,
 
+  /// If @abi attributes are present, return the decls representing the ABI,
+  /// not the API.
+  NL_ABIProviding = 1 << 10,
+
   /// The default set of options used for qualified name lookup.
   ///
   /// FIXME: Eventually, add NL_ProtocolMembers to this, once all of the
@@ -97,6 +101,9 @@ void simple_display(llvm::raw_ostream &out, NLOptions options);
 enum class ModuleLookupFlags : unsigned {
   /// Exclude names introduced by macro expansions in the top-level module.
   ExcludeMacroExpansions = 1 << 0,
+  /// If @abi attributes are present, return the decls representing the ABI,
+  /// not the API.
+  ABIProviding = 1 << 1,
 };
 
 } // end namespace swift
