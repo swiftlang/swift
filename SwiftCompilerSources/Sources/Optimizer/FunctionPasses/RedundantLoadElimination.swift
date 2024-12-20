@@ -279,8 +279,7 @@ private func replace(load: LoadInst, with availableValues: [AvailableValue], _ c
     //
     newValue = ssaUpdater.getValue(inMiddleOf: load.parentBlock)
   }
-  load.uses.replaceAll(with: newValue, context)
-  context.erase(instruction: load)
+  load.replace(with: newValue, context)
 }
 
 private func provideValue(
