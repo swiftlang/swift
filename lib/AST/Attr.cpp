@@ -2899,30 +2899,6 @@ LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
   return new (context) LifetimeAttr(atLoc, baseRange, implicit, entry);
 }
 
-void ASTContext::recordABIAttr(ABIAttr *attr, Decl *owner) {
-  // The ABIAttr on a VarDecl ought to point to its PBD.
-  if (auto VD = dyn_cast<VarDecl>(owner)) {
-    if (auto PBD = VD->getParentPatternBinding()) {
-      owner = PBD;
-    }
-  }
-
-  auto recordABIDecl = [&](Decl *decl) {
-    ABIDeclCounterparts.insert({ decl, owner });
-  };
-
-  if (auto abiPBD = dyn_cast<PatternBindingDecl>(attr->abiDecl)) {
-    // Add to *every* VarDecl in the ABI PBD, even ones that don't properly
-    // match anything in the API PBD.
-    for (auto i : range(abiPBD->getNumPatternEntries())) {
-      abiPBD->getPattern(i)->forEachVariable(recordABIDecl);
-    }
-    return;
-  }
-
-  recordABIDecl(attr->abiDecl);
-}
-
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
   if (attr)
     attr->print(out);

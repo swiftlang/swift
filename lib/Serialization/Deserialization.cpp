@@ -6513,7 +6513,7 @@ llvm::Error DeclDeserializer::finishRecursiveAttrs(Decl *decl, DeclAttribute *at
     if (!abiDeclOrError)
       return abiDeclOrError.takeError();
     unresolvedABIAttr->first->abiDecl = abiDeclOrError.get();
-    ctx.recordABIAttr(unresolvedABIAttr->first, decl);
+    decl->recordABIAttr(unresolvedABIAttr->first);
   }
   if (ABIDeclCounterpartID != 0) {
     // This decl is the `abiDecl` of an `ABIAttr`. Force the decl that `ABIAttr`

@@ -416,7 +416,7 @@ void Decl::attachParsedAttrs(DeclAttributes attrs) {
   for (auto *attr : attrs.getAttributes<DerivativeAttr>())
     attr->setOriginalDeclaration(this);
   for (auto attr : attrs.getAttributes<ABIAttr, /*AllowInvalid=*/true>())
-    this->getASTContext().recordABIAttr(attr, this);
+    recordABIAttr(attr);
 
   getAttrs() = attrs;
 }
@@ -4271,10 +4271,47 @@ void ValueDecl::setRenamedDecl(const AvailableAttr *attr,
                                                 std::move(renameDecl));
 }
 
-abi_role_detail::Storage abi_role_detail::computeStorage(Decl *decl) {
-  ASSERT(decl);
+void Decl::recordABIAttr(ABIAttr *attr) {
+  Decl *owner = this;
 
-  auto &ctx = decl->getASTContext();
+  // The ABIAttr on a VarDecl ought to point to its PBD.
+  if (auto VD = dyn_cast<VarDecl>(owner)) {
+    if (auto PBD = VD->getParentPatternBinding()) {
+      owner = PBD;
+    }
+  }
+
+  auto record = [&](Decl *decl) {
+    auto &evaluator = owner->getASTContext().evaluator;
+    DeclABIRoleInfoRequest(decl).recordABIOnly(evaluator, owner);
+  };
+
+  if (auto abiPBD = dyn_cast<PatternBindingDecl>(attr->abiDecl)) {
+    // Add to *every* VarDecl in the ABI PBD, even ones that don't properly
+    // match anything in the API PBD.
+    for (auto i : range(abiPBD->getNumPatternEntries())) {
+      abiPBD->getPattern(i)->forEachVariable(record);
+    }
+    return;
+  }
+
+  record(attr->abiDecl);
+}
+
+void DeclABIRoleInfoRequest::recordABIOnly(Evaluator &evaluator,
+                                           Decl *counterpart) {
+  if (evaluator.hasCachedResult(*this))
+    return;
+  DeclABIRoleInfoResult result{counterpart, ABIRole::ProvidesABI};
+  evaluator.cacheOutput(*this, std::move(result));
+}
+
+DeclABIRoleInfoResult
+DeclABIRoleInfoRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
+  // NOTE: ABI decl -> API decl is manually cached through `recordABIOnly()`,
+  // so this code does not have to handle that case.
+
+  ASSERT(decl);
 
   Decl *counterpartDecl = decl;
   ABIRole::Value flags = ABIRole::Either;
@@ -4282,10 +4319,20 @@ abi_role_detail::Storage abi_role_detail::computeStorage(Decl *decl) {
   if (auto attr = decl->getAttrs().getAttribute<ABIAttr>()) {
     flags = ABIRole::ProvidesAPI;
     counterpartDecl = attr->abiDecl;
-  } else if (auto inverse = ctx.ABIDeclCounterparts.lookup(decl)) {
-    flags = ABIRole::ProvidesABI;
-    counterpartDecl = inverse;
   }
+
+  return DeclABIRoleInfoResult(counterpartDecl, (uint8_t)flags);
+}
+
+abi_role_detail::Storage abi_role_detail::computeStorage(Decl *decl) {
+  ASSERT(decl);
+
+  auto &ctx = decl->getASTContext();
+
+  auto result = evaluateOrDefault(ctx.evaluator, DeclABIRoleInfoRequest{decl},
+                                  { decl, ABIRole::Either });
+  Decl *counterpartDecl = result.storage.getPointer();
+  auto flags = (ABIRole::Value)result.storage.getInt();
 
   // If we did find an `@abi` attribute, resolve PBD pointers to their VarDecl.
   if (flags != ABIRole::Either) {

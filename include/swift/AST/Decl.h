@@ -1023,6 +1023,12 @@ public:
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
 
+  /// Register the relationship between \c this and \p attr->abiDecl , assuming
+  /// that \p attr is attached to \c this . This is necessary for
+  /// \c ABIRoleInfo::ABIRoleInfo() to determine that \c attr->abiDecl
+  /// is ABI-only and locate its API counterpart.
+  void recordABIAttr(ABIAttr *attr);
+
   /// Set this declaration's attributes to the specified attribute list,
   /// applying any post-processing logic appropriate for attributes parsed
   /// from source code.
