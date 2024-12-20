@@ -81,10 +81,10 @@ func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer)
 func useCfType(x: CFArray) {
 }
 
-// expected-note@+1{{make global function 'useCppSpan' @unsafe to indicate that its use is not memory-safe}}
-func useCppSpan(x: SpanOfInt) { // expected-warning{{reference to unsafe type alias 'SpanOfInt'}}
+// expected-warning@+1{{global function 'useCppSpan' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}
+func useCppSpan(x: SpanOfInt) { // expected-note{{reference to unsafe type alias 'SpanOfInt'}}
 }
 
-// expected-note@+1{{make global function 'useCppSpan2' @unsafe to indicate that its use is not memory-safe}}
-func useCppSpan2(x: SpanOfIntAlias) { // expected-warning{{reference to unsafe type alias 'SpanOfIntAlias'}}
+// expected-warning@+1{{global function 'useCppSpan2' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}
+func useCppSpan2(x: SpanOfIntAlias) { // expected-note{{reference to unsafe type alias 'SpanOfIntAlias'}}
 }
