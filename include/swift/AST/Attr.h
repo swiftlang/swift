@@ -3244,6 +3244,9 @@ public:
     return getDomain().isPackageDescription() && isVersionSpecific();
   }
 
+  /// Whether this attribute was spelled `@_unavailableInEmbedded`.
+  bool isEmbeddedSpecific() const { return attr->isForEmbedded(); }
+
   /// Returns the active version from the AST context corresponding to
   /// the available kind. For example, this will return the effective language
   /// version for swift version-specific availability kind, PackageDescription

@@ -1443,12 +1443,12 @@ public:
   ///
   /// Note that this query only considers the attributes that are attached
   /// directly to this decl (or the extension it is declared in, if applicable).
-  bool isUnavailable() const { return getUnavailableAttr() != nullptr; }
+  bool isUnavailable() const { return getUnavailableAttr().has_value(); }
 
   /// If the decl is always unavailable in the current compilation
   /// context, returns the attribute attached to the decl (or its parent
   /// extension) that makes it unavailable.
-  const AvailableAttr *
+  std::optional<SemanticAvailableAttr>
   getUnavailableAttr(bool ignoreAppExtensions = false) const;
 
   /// Returns true if the decl is effectively always unavailable in the current

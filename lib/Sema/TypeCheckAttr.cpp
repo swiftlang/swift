@@ -4833,10 +4833,10 @@ void AttributeChecker::checkBackDeployedAttrs(
         // Find the attribute that makes the declaration unavailable.
         const Decl *attrDecl = D;
         do {
-          if (auto *unavailableAttr = attrDecl->getUnavailableAttr()) {
-            diagnose(unavailableAttr->AtLoc,
+          if (auto unavailableAttr = attrDecl->getUnavailableAttr()) {
+            diagnose(unavailableAttr->getParsedAttr()->AtLoc,
                      diag::availability_marked_unavailable, VD)
-                .highlight(unavailableAttr->getRange());
+                .highlight(unavailableAttr->getParsedAttr()->getRange());
             break;
           }
 

@@ -610,45 +610,43 @@ bool Decl::isUnavailableInCurrentSwiftVersion() const {
   return false;
 }
 
-static const AvailableAttr *
+std::optional<SemanticAvailableAttr>
 getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
   auto &ctx = D->getASTContext();
-  const AvailableAttr *result = nullptr;
+  std::optional<SemanticAvailableAttr> result;
   auto bestActive =
       D->getActiveAvailableAttrForCurrentPlatform(ignoreAppExtensions);
 
-  for (auto semanticAttr :
-       D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto attr = semanticAttr.getParsedAttr();
-
+  for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
     // If this is a platform-specific attribute and it isn't the most
     // specific attribute for the current platform, we're done.
-    if (attr->hasPlatform() && (!bestActive || semanticAttr != bestActive))
+    if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
       continue;
 
     if (ignoreAppExtensions &&
-        isApplicationExtensionPlatform(attr->getPlatform()))
+        isApplicationExtensionPlatform(attr.getPlatform()))
       continue;
 
     // Unconditional unavailable.
-    if (attr->isUnconditionallyUnavailable())
+    if (attr.isUnconditionallyUnavailable())
       return attr;
 
-    switch (semanticAttr.getVersionAvailability(ctx)) {
+    switch (attr.getVersionAvailability(ctx)) {
     case AvailableVersionComparison::Available:
     case AvailableVersionComparison::PotentiallyUnavailable:
       break;
 
     case AvailableVersionComparison::Obsoleted:
     case AvailableVersionComparison::Unavailable:
-      result = attr;
+      result.emplace(attr);
       break;
     }
   }
   return result;
 }
 
-const AvailableAttr *Decl::getUnavailableAttr(bool ignoreAppExtensions) const {
+std::optional<SemanticAvailableAttr>
+Decl::getUnavailableAttr(bool ignoreAppExtensions) const {
   if (auto attr = getDeclUnavailableAttr(this, ignoreAppExtensions))
     return attr;
 
@@ -663,7 +661,7 @@ const AvailableAttr *Decl::getUnavailableAttr(bool ignoreAppExtensions) const {
     if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext()))
       return ext->getUnavailableAttr(ignoreAppExtensions);
 
-  return nullptr;
+  return std::nullopt;
 }
 
 static bool isDeclCompletelyUnavailable(const Decl *decl) {
@@ -671,8 +669,7 @@ static bool isDeclCompletelyUnavailable(const Decl *decl) {
   if (isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext()))
     return false;
 
-  auto *unavailableAttr =
-      decl->getUnavailableAttr(/*ignoreAppExtensions=*/true);
+  auto unavailableAttr = decl->getUnavailableAttr(/*ignoreAppExtensions=*/true);
   if (!unavailableAttr)
     return false;
 
