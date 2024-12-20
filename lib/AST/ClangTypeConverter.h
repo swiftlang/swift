@@ -108,6 +108,12 @@ private:
 
   clang::QualType convertClangDecl(Type type, const clang::Decl *decl);
 
+  clang::QualType convertOptionalType(BoundGenericType *type);
+
+  clang::QualType convertSIMDType(BoundGenericType *type, bool templateArgument);
+
+  clang::QualType convertPointerType(BoundGenericType *type, bool templateArgument);
+
   void registerExportedClangDecl(Decl *swiftDecl,
                                  const clang::Decl *clangDecl);
 
@@ -123,7 +129,7 @@ private:
   clang::QualType visitProtocolType(ProtocolType *type);
   clang::QualType visitClassType(ClassType *type);
   clang::QualType visitBoundGenericClassType(BoundGenericClassType *type);
-  clang::QualType visitBoundGenericType(BoundGenericType *type, bool templateArgument=false);
+  clang::QualType visitBoundGenericType(BoundGenericType *type);
   clang::QualType visitEnumType(EnumType *type);
   clang::QualType visitFunctionType(FunctionType *type);
   clang::QualType visitProtocolCompositionType(ProtocolCompositionType *type);
