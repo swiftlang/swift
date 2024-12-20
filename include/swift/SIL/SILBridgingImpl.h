@@ -1140,6 +1140,23 @@ bool BridgedInstruction::PointerToAddressInst_isStrict() const {
   return getAs<swift::PointerToAddressInst>()->isStrict();
 }
 
+bool BridgedInstruction::PointerToAddressInst_isInvariant() const {
+  return getAs<swift::PointerToAddressInst>()->isInvariant();
+}
+
+uint64_t BridgedInstruction::PointerToAddressInst_getAlignment() const {
+  auto maybeAlign = getAs<swift::PointerToAddressInst>()->alignment();
+  if (maybeAlign.has_value()) {
+    assert(maybeAlign->value() != 0);
+    return maybeAlign->value();
+  }
+  return 0;
+}
+
+void BridgedInstruction::PointerToAddressInst_setAlignment(uint64_t alignment) const {
+  getAs<swift::PointerToAddressInst>()->setAlignment(llvm::MaybeAlign(alignment));
+}
+
 bool BridgedInstruction::AddressToPointerInst_needsStackProtection() const {
   return getAs<swift::AddressToPointerInst>()->needsStackProtection();
 }

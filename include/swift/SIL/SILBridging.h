@@ -720,6 +720,9 @@ struct BridgedInstruction {
   BRIDGED_INLINE IntrinsicID BuiltinInst_getIntrinsicID() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap BuiltinInst_getSubstitutionMap() const;
   BRIDGED_INLINE bool PointerToAddressInst_isStrict() const;
+  BRIDGED_INLINE bool PointerToAddressInst_isInvariant() const;
+  BRIDGED_INLINE uint64_t PointerToAddressInst_getAlignment() const;
+  BRIDGED_INLINE void PointerToAddressInst_setAlignment(uint64_t alignment) const;
   BRIDGED_INLINE bool AddressToPointerInst_needsStackProtection() const;
   BRIDGED_INLINE bool IndexAddrInst_needsStackProtection() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialRefInst_getConformances() const;

@@ -717,6 +717,15 @@ final public
 class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {
   public var pointer: Value { operand.value }
   public var isStrict: Bool { bridged.PointerToAddressInst_isStrict() }
+  public var isInvariant: Bool { bridged.PointerToAddressInst_isInvariant() }
+
+  public var alignment: Int? {
+    let maybeAlign = bridged.PointerToAddressInst_getAlignment()
+    if maybeAlign == 0 {
+      return nil
+    }
+    return Int(exactly: maybeAlign)
+  }
 }
 
 final public
