@@ -1950,8 +1950,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     break;
   }
 
-  case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam: {
+  case ConstraintKind::OneWayEqual:{
     // Don't produce any bindings if this type variable is on the left-hand
     // side of a one-way binding.
     auto firstType = constraint->getFirstType();
