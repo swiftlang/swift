@@ -465,11 +465,17 @@ public:
     /// It may be invalid if no box was made for the value (e.g., because it was
     /// an inout value, or constant emitted to an alloc_stack).
     SILValue box;
+    
+    /// True if the `value` represents the memory location of a value that is
+    /// stable for the lifetimes of any dependencies on that value.
+    bool addressable;
 
-    static VarLoc get(SILValue value, SILValue box = SILValue()) {
+    static VarLoc get(SILValue value, SILValue box = SILValue(),
+                      bool addressable = false) {
       VarLoc Result;
       Result.value = value;
       Result.box = box;
+      Result.addressable = addressable;
       return Result;
     }
   };

@@ -191,6 +191,7 @@ extension ASTGenVisitor {
 
       // Simple attributes.
       case .addressableSelf,
+        .addressableForDependencies,
         .alwaysEmitConformanceMetadata,
         .alwaysEmitIntoClient,
         .atReasync,

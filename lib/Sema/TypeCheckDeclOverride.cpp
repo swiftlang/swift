@@ -1740,6 +1740,7 @@ namespace  {
     UNINTERESTING_ATTR(AddressableSelf)
     UNINTERESTING_ATTR(Unsafe)
     UNINTERESTING_ATTR(Safe)
+    UNINTERESTING_ATTR(AddressableForDependencies)
 #undef UNINTERESTING_ATTR
 
     void visitABIAttr(ABIAttr *attr) {
