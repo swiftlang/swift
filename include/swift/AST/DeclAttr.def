@@ -514,14 +514,18 @@ DECL_ATTR(lifetime, Lifetime,
   161)
 
 SIMPLE_DECL_ATTR(_addressableSelf, AddressableSelf,
-  OnAccessor | OnConstructor | OnFunc | OnSubscript | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | UserInaccessible,
+  OnAccessor | OnConstructor | OnFunc | OnSubscript | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UserInaccessible,
   162)
+
+SIMPLE_DECL_ATTR(_addressableForDependencies, AddressableForDependencies,
+  OnNominalType | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UserInaccessible,
+  163)
 
 DECL_ATTR(safe, Safe,
   OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType |
   OnExtension | OnTypeAlias | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
-  163)
+  164)
 
 LAST_DECL_ATTR(Safe)
 

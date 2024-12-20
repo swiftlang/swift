@@ -1649,6 +1649,72 @@ AbstractionPattern::getFunctionParamFlags(unsigned index) const {
            .getParameterFlags();
 }
 
+bool
+AbstractionPattern::isFunctionParamAddressable(TypeConverter &TC,
+                                               unsigned index) const {
+  switch (getKind()) {
+  case Kind::Invalid:
+  case Kind::Tuple:
+    llvm_unreachable("not any kind of function!");
+  case Kind::Opaque:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    // If the function abstraction pattern is completely opaque, assume we
+    // may need to preserve the address for dependencies.
+    return true;
+
+  case Kind::ClangType:
+  case Kind::ObjCCompletionHandlerArgumentsType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::Type:
+  case Kind::Discard: {
+    auto type = getType();
+    
+    if (type->isTypeParameter() || type->is<ArchetypeType>()) {
+      // If the function abstraction pattern is completely opaque, assume we
+      // may need to preserve the address for dependencies.
+      return true;    
+    }
+  
+    auto fnTy = cast<AnyFunctionType>(getType());
+  
+    // The parameter might directly be marked addressable.
+    if (fnTy.getParams()[index].getParameterFlags().isAddressable()) {
+      return true;
+    }
+    
+    // The parameter could be of a type that is addressable for dependencies,
+    // in which case it becomes addressable when a return has a scoped
+    // dependency on it.
+    for (auto &dep : fnTy->getLifetimeDependencies()) {
+      auto scoped = dep.getScopeIndices();
+      if (!scoped) {
+        continue;
+      }
+      
+      if (scoped->contains(index)) {
+        auto paramTy = getFunctionParamType(index);
+        
+        return TC.getTypeLowering(paramTy, paramTy.getType(),
+                                  TypeExpansionContext::minimal())
+          .getRecursiveProperties().isAddressableForDependencies();
+      }
+    }
+    
+    return false;
+  }
+  }
+  llvm_unreachable("bad kind");
+}
+
 unsigned AbstractionPattern::getNumFunctionParams() const {
   return cast<AnyFunctionType>(getType()).getParams().size();
 }

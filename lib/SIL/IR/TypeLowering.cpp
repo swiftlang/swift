@@ -314,6 +314,12 @@ namespace {
     }
 
     RecursiveProperties
+    getTrivialOpaqueRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
+      return mergeIsTypeExpansionSensitive(isSensitive,
+                                           RecursiveProperties::forTrivial());
+    }
+
+    RecursiveProperties
     getReferenceRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
       return mergeIsTypeExpansionSensitive(isSensitive,
                                            RecursiveProperties::forReference());
@@ -740,11 +746,11 @@ namespace {
       if (LayoutInfo) {
         if (LayoutInfo->isFixedSizeTrivial()) {
           return asImpl().handleTrivial(
-              type, getTrivialRecursiveProperties(isSensitive));
+              type, getTrivialOpaqueRecursiveProperties(isSensitive));
         }
 
         if (LayoutInfo->isAddressOnlyTrivial()) {
-          auto properties = getTrivialRecursiveProperties(isSensitive);
+          auto properties = getTrivialOpaqueRecursiveProperties(isSensitive);
           properties.setAddressOnly();
           return asImpl().handleAddressOnly(type, properties);
         }

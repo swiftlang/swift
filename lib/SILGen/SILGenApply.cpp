@@ -3445,6 +3445,7 @@ public:
   // origParamType is a parameter type.
   void
   emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType,
+                bool addressable,
                 std::optional<AnyFunctionType::Param> param = std::nullopt) {
     // If this is delayed default argument, prepare to emit the default argument
     // generator later.
@@ -3460,7 +3461,7 @@ public:
       maybeEmitForeignArgument();
       return;
     }
-    emit(std::move(arg), origParamType, param);
+    emit(std::move(arg), origParamType, addressable, param);
     maybeEmitForeignArgument();
   }
 
@@ -3486,7 +3487,9 @@ public:
       // single argument.
       if (!origFormalParamType.isPackExpansion()) {
         emitSingleArg(std::move(argSources[nextArgSourceIndex]),
-                      origFormalParamType, params[nextArgSourceIndex]);
+                    origFormalParamType,
+                    origFormalType.isFunctionParamAddressable(SGF.SGM.Types, i),
+                    params[nextArgSourceIndex]);
         ++nextArgSourceIndex;
         // Otherwise we need to emit a pack argument.
       } else {
@@ -3505,20 +3508,24 @@ public:
 
 private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType,
+            bool isAddressable,
             std::optional<AnyFunctionType::Param> origParam = std::nullopt) {
-    if (origParam && origParam->isAddressable()) {
+    if (isAddressable && origParam) {
       // If the function takes an addressable parameter, and its argument is
       // a reference to an addressable declaration with compatible ownership,
       // forward the address along in-place.
       if (arg.isExpr()) {
-        auto expr = std::move(arg).asKnownExpr();
+        arg.dump();
+        auto origExpr = std::move(arg).asKnownExpr();
+        auto expr = origExpr;
         
         if (auto le = dyn_cast<LoadExpr>(expr)) {
           expr = le->getSubExpr();
         }
         if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
           if (auto param = dyn_cast<ParamDecl>(dre->getDecl())) {
-            if (param->isAddressable()
+            if (SGF.VarLocs.count(param)
+              && SGF.VarLocs[param].addressable
               && param->getValueOwnership() == origParam->getValueOwnership()) {
               auto addr = SGF.VarLocs[param].value;
               claimNextParameters(1);
@@ -3527,7 +3534,9 @@ private:
             }
           }
         }
-        arg = ArgumentSource(expr);
+        llvm::errs() << "couldn't lower as addressable\n";
+        arg = ArgumentSource(origExpr);
+        arg.dump();
       }
     }
             
@@ -3656,7 +3665,8 @@ private:
       if (!origElt.isOrigPackExpansion()) {
         expander.withElement(origElt.getSubstIndex(),
                              [&](ArgumentSource &&eltSource) {
-          emit(std::move(eltSource), origElt.getOrigType());
+          emit(std::move(eltSource), origElt.getOrigType(),
+               /*addressable*/ false);
         });
         return;
       }
@@ -4459,7 +4469,8 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                  info.paramsToEmit, loweredArgs, delayedArgs, ForeignInfo{});
 
   emitter.emitSingleArg(ArgumentSource(info.loc, std::move(value)),
-                        info.origResultType);
+                        info.origResultType,
+                        /*addressable*/ false);
   assert(delayedArgs.empty());
   
   // Splice the emitted default argument into the argument list.
@@ -6106,7 +6117,8 @@ void SILGenFunction::emitYield(SILLocation loc,
                      yieldArgs, delayedArgs, ForeignInfo{});
 
   for (auto i : indices(valueSources)) {
-    emitter.emitSingleArg(std::move(valueSources[i]), origTypes[i]);
+    emitter.emitSingleArg(std::move(valueSources[i]), origTypes[i],
+                          /*addressable*/ false);
   }
 
   if (!delayedArgs.empty())

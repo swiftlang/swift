@@ -1567,14 +1567,16 @@ class DestructureInputs {
   std::optional<ForeignSelfInfo> ForeignSelf;
   AbstractionPattern TopLevelOrigType = AbstractionPattern::getInvalid();
   SmallVectorImpl<SILParameterInfo> &Inputs;
+  ArrayRef<LifetimeDependenceInfo> Dependencies;
   unsigned NextOrigParamIndex = 0;
 
 public:
   DestructureInputs(TypeExpansionContext expansion, TypeConverter &TC,
                     const Conventions &conventions, const ForeignInfo &foreign,
-                    SmallVectorImpl<SILParameterInfo> &inputs)
+                    SmallVectorImpl<SILParameterInfo> &inputs,
+                    ArrayRef<LifetimeDependenceInfo> dependencies)
       : expansion(expansion), TC(TC), Convs(conventions), Foreign(foreign),
-        Inputs(inputs) {}
+        Inputs(inputs), Dependencies(dependencies) {}
 
   void destructure(AbstractionPattern origType,
                    CanAnyFunctionType::CanParamArrayRef params,
@@ -1640,7 +1642,17 @@ private:
     // of the sequence.  visit() will add foreign parameters that are
     // positioned after any parameters it adds.
     maybeAddForeignParameters();
-
+    
+    // Parameters may lower differently when the function returns values that
+    // depends on them.
+    SmallBitVector paramsWithScopedDependencies(params.size(), false);
+    for (auto &depInfo : Dependencies) {
+      if (auto scopeIndices = depInfo.getScopeIndices()) {
+        paramsWithScopedDependencies
+          |= depInfo.getScopeIndices()->getBitVector();
+      }
+    }
+    
     // Process all the non-self parameters.
     origType.forEachFunctionParam(params.drop_back(hasSelf ? 1 : 0),
                                   /*ignore final orig param*/ hasSelf,
@@ -1668,13 +1680,14 @@ private:
         addPackParameter(packTy, origFlags.getValueOwnership(), origFlags);
         return;
       }
-
+      
       // If the parameter is not a pack expansion, just pull off the
       // next parameter and destructure it in parallel with the abstraction
       // pattern for the type.
       if (!param.isOrigPackExpansion()) {
         visit(param.getOrigType(), param.getSubstParams()[0],
-              /*forSelf*/false);
+              /*forSelf*/false,
+              paramsWithScopedDependencies[param.getSubstIndex()]);
         return;
       }
 
@@ -1704,7 +1717,8 @@ private:
     if (hasSelf && !hasForeignSelf) {
       auto origParamType = origType.getFunctionParamType(numOrigParams - 1);
       auto substParam = params.back();
-      visit(origParamType, substParam, /*forSelf*/true);
+      visit(origParamType, substParam, /*forSelf*/true,
+            paramsWithScopedDependencies[params.size() - 1]);
     }
 
     TopLevelOrigType = AbstractionPattern::getInvalid();
@@ -1712,7 +1726,7 @@ private:
   }
 
   void visit(AbstractionPattern origType, AnyFunctionType::Param substParam,
-             bool forSelf) {
+             bool forSelf, bool hasScopedDependency) {
     // FIXME: we should really be using the flags from the original
     // parameter here, right?
     auto flags = substParam.getParameterFlags();
@@ -1731,18 +1745,30 @@ private:
       return addPackParameter(packTy, flags.getValueOwnership(), flags);
     }
 
-    visit(flags.getValueOwnership(), forSelf, origType, substType, flags);
+    visit(flags.getValueOwnership(), forSelf, hasScopedDependency,
+          origType, substType, flags);
   }
 
-  void visit(ValueOwnership ownership, bool forSelf,
+  void visit(ValueOwnership ownership, bool forSelf, bool hasScopedDependency,
              AbstractionPattern origType, CanType substType,
              ParameterTypeFlags origFlags) {
     assert(!isa<InOutType>(substType));
 
-    // If the parameter is marked addressable, lower it with maximal
-    // abstraction.
-    if (origFlags.isAddressable()) {
-      origType = AbstractionPattern::getOpaque();
+    if (TC.Context.LangOpts.hasFeature(Feature::AddressableTypes)
+        || TC.Context.LangOpts.hasFeature(Feature::AddressableParameters)) {
+      // If the parameter is marked addressable, lower it with maximal
+      // abstraction.
+      if (origFlags.isAddressable()) {
+        origType = AbstractionPattern::getOpaque();
+      } else if (hasScopedDependency) {
+        // If there is a scoped dependency on this parameter, and the parameter
+        // is addressable-for-dependencies, then lower it with maximal abstraction
+        // as well.
+        auto &initialSubstTL = TC.getTypeLowering(origType, substType, expansion);
+        if (initialSubstTL.getRecursiveProperties().isAddressableForDependencies()) {
+          origType = AbstractionPattern::getOpaque();
+        }
+      }
     }
 
     // Tuples get expanded unless they're inout.
@@ -1790,7 +1816,8 @@ private:
 
     origType.forEachTupleElement(substType, [&](TupleElementGenerator &elt) {
       if (!elt.isOrigPackExpansion()) {
-        visit(ownership, forSelf, elt.getOrigType(), elt.getSubstTypes()[0],
+        visit(ownership, forSelf, /*scoped dependency*/ false,
+              elt.getOrigType(), elt.getSubstTypes()[0],
               oldFlags);
         return;
       }
@@ -1889,7 +1916,8 @@ private:
     if (ForeignSelf) {
       // This is a "self", but it's not a Swift self, we handle it differently.
       visit(ForeignSelf->SubstSelfParam.getValueOwnership(),
-            /*forSelf=*/false, ForeignSelf->OrigSelfParam,
+            /*forSelf=*/false, /*scoped dependency=*/false,
+            ForeignSelf->OrigSelfParam,
             ForeignSelf->SubstSelfParam.getParameterType(), {});
     }
     return true;
@@ -2462,11 +2490,22 @@ static CanSILFunctionType getSILFunctionType(
   updateResultTypeForForeignInfo(foreignInfo, genericSig, origResultType,
                                  substFormalResultType);
 
+  // Lifetime dependencies can influence parameter lowering if there are
+  // address dependencies.
+  ArrayRef<LifetimeDependenceInfo> dependencies = {};
+  if (constant) {
+    if (auto afd = dyn_cast_or_null<AbstractFunctionDecl>(constant->getDecl())){
+      if (auto declDependencies = afd->getLifetimeDependencies()) {
+        dependencies = *declDependencies;
+      }
+    }
+  }
+
   // Destructure the input tuple type.
   SmallVector<SILParameterInfo, 8> inputs;
   {
     DestructureInputs destructurer(expansionContext, TC, conventions,
-                                   foreignInfo, inputs);
+                                   foreignInfo, inputs, dependencies);
     destructurer.destructure(origType, substFnInterfaceType.getParams(),
                              extInfoBuilder, unimplementable);
   }
@@ -2555,7 +2594,7 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
     bool unimplementable = false;
     ForeignInfo foreignInfo;
     DestructureInputs destructurer(context, TC, conventions, foreignInfo,
-                                   inputs);
+                                   inputs, {});
     destructurer.destructure(
         origType, substAccessorType.getParams(),
         extInfoBuilder.withRepresentation(SILFunctionTypeRepresentation::Thin),
