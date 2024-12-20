@@ -4107,6 +4107,10 @@ clang::ASTContext &ClangImporter::getClangASTContext() const {
   return Impl.getClangASTContext();
 }
 
+bool ClangImporter::hasClangASTContext() const {
+  return Impl.hasClangASTContext();
+}
+
 clang::Preprocessor &ClangImporter::getClangPreprocessor() const {
   return Impl.getClangPreprocessor();
 }
