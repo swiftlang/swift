@@ -5162,10 +5162,8 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   // If `decl` is a nested type, find the parent type.
   Type ParentTy;
   DeclContext *dc = decl->getDeclContext();
-  bool isUnsupportedNestedProtocol =
-    isa<ProtocolDecl>(decl) && decl->getParent()->isGenericContext();
 
-  if (!isUnsupportedNestedProtocol && dc->isTypeContext()) {
+  if (!decl->isUnsupportedNestedProtocol() && dc->isTypeContext()) {
     switch (kind) {
     case DeclTypeKind::DeclaredType: {
       if (auto *nominal = dc->getSelfNominalTypeDecl())

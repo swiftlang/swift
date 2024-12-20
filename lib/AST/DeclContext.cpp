@@ -306,7 +306,7 @@ DeclContext *DeclContext::getParentForLookup() const {
     // outer types.
     return getModuleScopeContext();
   }
-  if (isa<ProtocolDecl>(this) && getParent()->isGenericContext()) {
+  if (isUnsupportedNestedProtocol()) {
     // Protocols in generic contexts must not look in to their parents,
     // as the parents may contain types with inferred implicit
     // generic parameters not present in the protocol's generic signature.
@@ -1530,6 +1530,10 @@ static bool isSpecializeExtensionContext(const DeclContext *dc) {
 
 bool DeclContext::isInSpecializeExtensionContext() const {
    return isSpecializeExtensionContext(this);
+}
+
+bool DeclContext::isUnsupportedNestedProtocol() const {
+  return isa<ProtocolDecl>(this) && getParent()->isGenericContext();
 }
 
 bool DeclContext::isAlwaysAvailableConformanceContext() const {

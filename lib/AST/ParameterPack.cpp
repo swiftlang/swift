@@ -177,12 +177,7 @@ void TypeBase::getTypeParameterPacks(
 }
 
 bool TypeBase::isParameterPack() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->isRootParameterPack();
+  return getDependentMemberRoot()->isRootParameterPack();
 }
 
 bool TypeBase::isRootParameterPack() {
