@@ -54,51 +54,58 @@ class Sub: Super { // expected-note{{make class 'Sub' @unsafe to allow unsafe ov
 // -----------------------------------------------------------------------
 struct SuperHolder {
   unowned var s1: Super
-  unowned(unsafe) var s2: Super // expected-warning{{unowned(unsafe) involves unsafe code}}
-  // expected-note@-1{{make property 's2' @unsafe to indicate that its use is not memory-safe}}{{3-3=@unsafe }}
+  unowned(unsafe) var s2: Super
+
+  // expected-warning@+1{{instance method 'getSuper2' involves unsafe code; use '@safe(unchecked)' to assert that the code is memory-safe}}
+  func getSuper2() -> Super {
+    return s2 // expected-note{{reference to unowned(unsafe) property 's2' is unsafe}}
+  }
+
+  // expected-warning@+1{{instance method 'getSuper2b' involves unsafe code; use '@safe(unchecked)' to assert that the code is memory-safe}}
+  func getSuper2b() -> Super {
+    s2 // expected-note{{reference to unowned(unsafe) property 's2' is unsafe}}
+  }
 }
 
 // -----------------------------------------------------------------------
 // Inheritance of @unsafe
 // -----------------------------------------------------------------------
-@unsafe class UnsafeSuper { // expected-note 5{{'UnsafeSuper' declared here}}
-  func f() { } // expected-note{{unsafe instance method 'f' declared here}}
+@unsafe class UnsafeSuper { // expected-note{{'UnsafeSuper' declared here}}
+  func f() { }
 };
 
-class UnsafeSub: UnsafeSuper { } // expected-warning{{reference to unsafe class 'UnsafeSuper'}}
-// expected-note@-1{{make class 'UnsafeSub' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+class UnsafeSub: UnsafeSuper { } // expected-warning{{class 'UnsafeSub' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+// expected-note@-1{{reference to unsafe class 'UnsafeSuper'}}
 
 // -----------------------------------------------------------------------
 // Declaration references
 // -----------------------------------------------------------------------
-@unsafe func unsafeF() { } // expected-note{{unsafe global function 'unsafeF' declared here}}
-@unsafe var unsafeVar: Int = 0 // expected-note{{'unsafeVar' declared here}}
+@unsafe func unsafeF() { }
+@unsafe var unsafeVar: Int = 0
 
-// expected-note@+2 5{{make global function 'testMe' @safe(unchecked) to allow it to use unsafe constructs in its definition}}{{1-1=@safe(unchecked) }}
-// expected-note@+1 2{{make global function 'testMe' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+// expected-warning@+1{{global function 'testMe' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe [Unsafe]}}{{1-1=@unsafe }}
 func testMe(
-  _ pointer: PointerType, // expected-warning{{reference to unsafe struct 'PointerType'}}
-  _ unsafeSuper: UnsafeSuper // expected-warning{{reference to unsafe class 'UnsafeSuper'}}
-  // expected-note@-1{{'unsafeSuper' declared here}}
+  _ pointer: PointerType, // expected-note{{reference to unsafe struct 'PointerType'}}
+  _ unsafeSuper: UnsafeSuper // expected-note{{reference to unsafe class 'UnsafeSuper'}}
 ) { 
-  unsafeF() // expected-warning{{call to unsafe global function 'unsafeF'}}
-  _ = unsafeVar // expected-warning{{reference to unsafe var 'unsafeVar'}}
-  unsafeSuper.f() // expected-warning{{call to unsafe instance method 'f'}}
-  // expected-warning@-1{{reference to parameter 'unsafeSuper' involves unsafe type 'UnsafeSuper'}}
+  unsafeF() // expected-note{{call to unsafe global function 'unsafeF()'}}
+  _ = unsafeVar // expected-note{{reference to unsafe var 'unsafeVar'}}
+  unsafeSuper.f() // expected-note{{call to unsafe instance method 'f()'}}
+  // expected-note@-1{{reference to parameter 'unsafeSuper' involves unsafe type 'UnsafeSuper'}}
 
-  _ = getPointers() // expected-warning{{call to global function 'getPointers' involves unsafe type 'PointerType'}}
+  _ = getPointers() // expected-note{{call to global function 'getPointers()' involves unsafe type 'PointerType'}}
 }
 
 // -----------------------------------------------------------------------
 // Various declaration kinds
 // -----------------------------------------------------------------------
-// expected-note@+1{{make type alias 'SuperUnsafe' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
-typealias SuperUnsafe = UnsafeSuper // expected-warning{{reference to unsafe class 'UnsafeSuper' [Unsafe]}}
+// expected-warning@+1{{type alias 'SuperUnsafe' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+typealias SuperUnsafe = UnsafeSuper // expected-note{{reference to unsafe class 'UnsafeSuper'}}
 @unsafe typealias SuperUnsafe2 = UnsafeSuper
 
 enum HasUnsafeThings {
-// expected-note@+1{{make enum case 'one' @unsafe to indicate that its use is not memory-safe}}
-case one(UnsafeSuper) // expected-warning{{reference to unsafe class 'UnsafeSuper' [Unsafe]}}
+// expected-warning@+1{{enum case 'one' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+case one(UnsafeSuper) // expected-note{{reference to unsafe class 'UnsafeSuper'}}
 
 @unsafe case two(UnsafeSuper)
 }

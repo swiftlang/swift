@@ -1,7 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -enable-experimental-feature StrictConcurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature WarnUnsafe -enable-experimental-feature StrictConcurrency
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_AllowUnsafeAttribute
 // REQUIRES: swift_feature_StrictConcurrency
 // REQUIRES: swift_feature_WarnUnsafe
 
@@ -11,15 +10,15 @@ class C: @unchecked Sendable {
   var counter: Int = 0
 }
 
+nonisolated(unsafe) var globalCounter = 0
+
 @available(SwiftStdlib 5.1, *)
-func f() async {
-  // expected-warning@+2{{nonisolated(unsafe) involves unsafe code}}
-  // expected-note@+1{{make var 'counter' @unsafe to indicate that its use is not memory-safe}}
+func f() async { // expected-warning{{global function 'f' involves unsafe code; use '@safe(unchecked)' to assert that the code is memory-safe}}
   nonisolated(unsafe) var counter = 0
   Task.detached {
-    counter += 1
+    counter += 1 // expected-note{{reference to nonisolated(unsafe) var 'counter' is unsafe in concurrently-executing code}}
   }
-  counter += 1
-  print(counter)
+  counter += 1 // expected-note{{reference to nonisolated(unsafe) var 'counter' is unsafe in concurrently-executing code}}
+  print(counter) // expected-note{{reference to nonisolated(unsafe) var 'counter' is unsafe in concurrently-executing code}}
+  print(globalCounter) // expected-note{{reference to nonisolated(unsafe) var 'globalCounter' is unsafe in concurrently-executing code}}
 }
-
