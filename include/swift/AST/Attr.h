@@ -3215,6 +3215,16 @@ public:
   /// `PlatformKind::none` if the attribute is not platform specific.
   PlatformKind getPlatform() const { return getDomain().getPlatformKind(); }
 
+  /// Whether this is attribute indicates unavailability in all versions.
+  bool isUnconditionallyUnavailable() const {
+    return attr->isUnconditionallyUnavailable();
+  }
+
+  /// Whether this is attribute indicates deprecation in all versions.
+  bool isUnconditionallyDeprecated() const {
+    return attr->isUnconditionallyDeprecated();
+  }
+
   /// Whether this is a `noasync` attribute.
   bool isNoAsync() const { return attr->isNoAsync(); }
 

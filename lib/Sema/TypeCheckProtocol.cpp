@@ -4452,8 +4452,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             auto &ctx = witness->getASTContext();
             auto &diags = ctx.Diags;
             SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-            auto *attr = witness->getDeprecatedAttr();
-            EncodedDiagnosticMessage EncodedMessage(attr->Message);
+            auto attr = witness->getDeprecatedAttr();
+            EncodedDiagnosticMessage EncodedMessage(attr->getMessage());
             diags.diagnose(diagLoc, diag::witness_deprecated,
                            witness, conformance->getProtocol()->getName(),
                            EncodedMessage.Message);

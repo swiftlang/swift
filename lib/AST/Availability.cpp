@@ -511,64 +511,60 @@ Decl::getActiveAvailableAttrForCurrentPlatform(bool ignoreAppExtensions) const {
   return bestAttr;
 }
 
-const AvailableAttr *Decl::getDeprecatedAttr() const {
+std::optional<SemanticAvailableAttr> Decl::getDeprecatedAttr() const {
   auto &ctx = getASTContext();
-  const AvailableAttr *result = nullptr;
+  std::optional<SemanticAvailableAttr> result;
   auto bestActive = getActiveAvailableAttrForCurrentPlatform();
 
-  for (auto semanticAttr :
-       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto attr = semanticAttr.getParsedAttr();
-
-    if (attr->hasPlatform() && (!bestActive || semanticAttr != bestActive))
+  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
       continue;
 
     // Unconditional deprecated.
-    if (attr->isUnconditionallyDeprecated())
+    if (attr.isUnconditionallyDeprecated())
       return attr;
 
-    std::optional<llvm::VersionTuple> deprecatedVersion = attr->Deprecated;
+    auto deprecatedVersion = attr.getDeprecated();
 
     StringRef deprecatedPlatform;
     llvm::VersionTuple remappedDeprecatedVersion;
     if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-            attr, ctx, deprecatedPlatform, remappedDeprecatedVersion))
+            attr.getParsedAttr(), ctx, deprecatedPlatform,
+            remappedDeprecatedVersion))
       deprecatedVersion = remappedDeprecatedVersion;
 
     if (!deprecatedVersion.has_value())
       continue;
 
-    llvm::VersionTuple minVersion = semanticAttr.getActiveVersion(ctx);
+    llvm::VersionTuple minVersion = attr.getActiveVersion(ctx);
 
     // We treat the declaration as deprecated if it is deprecated on
     // all deployment targets.
     if (deprecatedVersion.value() <= minVersion) {
-      result = attr;
+      result.emplace(attr);
     }
   }
   return result;
 }
 
-const AvailableAttr *Decl::getSoftDeprecatedAttr() const {
+std::optional<SemanticAvailableAttr> Decl::getSoftDeprecatedAttr() const {
   auto &ctx = getASTContext();
-  const AvailableAttr *result = nullptr;
+  std::optional<SemanticAvailableAttr> result;
   auto bestActive = getActiveAvailableAttrForCurrentPlatform();
 
-  for (auto semanticAttr :
-       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    auto attr = semanticAttr.getParsedAttr();
-
-    if (attr->hasPlatform() && (!bestActive || semanticAttr != bestActive))
+  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
       continue;
 
-    std::optional<llvm::VersionTuple> deprecatedVersion = attr->Deprecated;
+    // FIXME: This needs to do a version remap.
+    auto deprecatedVersion = attr.getDeprecated();
     if (!deprecatedVersion.has_value())
       continue;
 
-    llvm::VersionTuple activeVersion = semanticAttr.getActiveVersion(ctx);
+    llvm::VersionTuple activeVersion = attr.getActiveVersion(ctx);
 
     if (deprecatedVersion.value() > activeVersion)
-      result = attr;
+      result.emplace(attr);
   }
   return result;
 }

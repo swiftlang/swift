@@ -1416,15 +1416,15 @@ public:
 
   /// Returns true if the declaration is deprecated at the current deployment
   /// target.
-  bool isDeprecated() const { return getDeprecatedAttr() != nullptr; }
+  bool isDeprecated() const { return getDeprecatedAttr().has_value(); }
 
   /// Returns the first `@available` attribute that indicates that this decl
   /// is deprecated on current deployment target, or `nullptr` otherwise.
-  const AvailableAttr *getDeprecatedAttr() const;
+  std::optional<SemanticAvailableAttr> getDeprecatedAttr() const;
 
   /// Returns the first `@available` attribute that indicates that this decl
   /// will be deprecated in the future, or `nullptr` otherwise.
-  const AvailableAttr *getSoftDeprecatedAttr() const;
+  std::optional<SemanticAvailableAttr> getSoftDeprecatedAttr() const;
 
   /// Returns the first @available attribute that indicates this decl is
   /// unavailable from asynchronous contexts, or `nullptr` otherwise.
