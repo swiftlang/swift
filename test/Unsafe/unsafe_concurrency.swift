@@ -4,8 +4,8 @@
 // REQUIRES: swift_feature_StrictConcurrency
 // REQUIRES: swift_feature_WarnUnsafe
 
-// expected-warning@+2{{@unchecked conformance involves unsafe code}}
-// expected-note@+1{{make the enclosing class @unsafe to allow unsafe conformance to protocol 'Sendable'}}{{1-1=@unsafe }}
+// expected-note@+2{{@unchecked conformance of 'C' to protocol 'Sendable' involves unsafe code}}
+// expected-warning@+1{{class 'C' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
 class C: @unchecked Sendable {
   var counter: Int = 0
 }

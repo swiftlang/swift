@@ -8093,6 +8093,9 @@ NOTE(note_reference_to_nonisolated_unsafe,none,
      (const ValueDecl *))
 NOTE(note_reference_unowned_unsafe,none,
      "reference to unowned(unsafe) %kind0 is unsafe", (const ValueDecl *))
+NOTE(note_use_of_unchecked_conformance_is_unsafe,none,
+     "@unchecked conformance of %0 to %kind1 involves unsafe code",
+     (Type, const ValueDecl *))
 
 GROUPED_WARNING(override_safe_withunsafe,Unsafe,none,
       "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
@@ -8102,8 +8105,9 @@ GROUPED_WARNING(witness_unsafe,Unsafe,none,
 GROUPED_WARNING(type_witness_unsafe,Unsafe,none,
       "unsafe type %0 cannot satisfy safe associated type %1",
       (Type, DeclName))
-GROUPED_WARNING(unchecked_conformance_is_unsafe,Unsafe,none,
-      "@unchecked conformance involves unsafe code", ())
+GROUPED_WARNING(use_of_unchecked_conformance_is_unsafe,Unsafe,none,
+      "@unchecked conformance of %0 to %kind1 involves unsafe code",
+       (Type, const ValueDecl *))
 GROUPED_WARNING(reference_unowned_unsafe,Unsafe,none,
       "reference to unowned(unsafe) %kind0 is unsafe", (const ValueDecl *))
 GROUPED_WARNING(reference_to_nonisolated_unsafe,Unsafe,none,

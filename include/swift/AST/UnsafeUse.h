@@ -15,13 +15,12 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Unreachable.h"
 
 namespace swift {
-
-class NormalProtocolConformance;
 
 /// Describes a use of an unsafe construct.
 ///
@@ -66,7 +65,8 @@ private:
     } typeWitness;
 
     struct {
-      NormalProtocolConformance *conformance;
+      TypeBase *type;
+      void *conformanceRef;
       DeclContext *declContext;
       const void *location;
     } conformance;
@@ -139,11 +139,13 @@ public:
     return result;
   }
 
-  static UnsafeUse forConformance(NormalProtocolConformance *conformance,
+  static UnsafeUse forConformance(Type subjectType,
+                                  ProtocolConformanceRef conformance,
                                   SourceLoc location,
                                   DeclContext *dc) {
     UnsafeUse result(UnsafeConformance);
-    result.storage.conformance.conformance = conformance;
+    result.storage.conformance.type = subjectType.getPointer();
+    result.storage.conformance.conformanceRef = conformance.getOpaqueValue();
     result.storage.conformance.declContext = dc;
     result.storage.conformance.location = location.getOpaquePointerValue();
     return result;
@@ -180,7 +182,9 @@ public:
       return getDecl()->getLoc();
 
     case UnsafeConformance:
-      return getConformance()->getLoc();
+      return SourceLoc(
+          llvm::SMLoc::getFromPointer(
+            (const char *)storage.conformance.location));
 
     case TypeWitness:
       return SourceLoc(
@@ -237,7 +241,7 @@ public:
 
     case Witness:
     case TypeWitness:
-      return getConformance()->getDeclContext();
+      return getConformance().getConcrete()->getDeclContext();
 
     case UnsafeConformance:
       return storage.conformance.declContext;
@@ -268,8 +272,10 @@ public:
     switch (getKind()) {
     case Override:
     case Witness:
-    case UnsafeConformance:
       return nullptr;
+
+    case UnsafeConformance:
+      return storage.conformance.type;
 
     case TypeWitness:
       return storage.typeWitness.type;
@@ -283,23 +289,24 @@ public:
   }
 
   /// Get the protocol conformance, if there is one.
-  NormalProtocolConformance *getConformance() const {
+  ProtocolConformanceRef getConformance() const {
     switch (getKind()) {
     case UnsafeConformance:
-      return storage.conformance.conformance;
+      return ProtocolConformanceRef::getFromOpaqueValue(
+          storage.conformance.conformanceRef);
 
     case Witness:
-      return storage.polymorphic.conformance;
+      return ProtocolConformanceRef(storage.polymorphic.conformance);
 
     case TypeWitness:
-      return storage.typeWitness.conformance;
+      return ProtocolConformanceRef(storage.typeWitness.conformance);
 
     case Override:
     case UnownedUnsafe:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
     case CallToUnsafe:
-      return nullptr;
+      return ProtocolConformanceRef::forInvalid();
     }
   }
 };

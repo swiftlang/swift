@@ -38,7 +38,6 @@ static bool isUnsafeUseInDefinition(const UnsafeUse &use) {
   case UnsafeUse::Override:
   case UnsafeUse::Witness:
   case UnsafeUse::TypeWitness:
-  case UnsafeUse::UnsafeConformance:
     // Never part of the definition. These are always part of the interface.
     return false;
 
@@ -46,6 +45,7 @@ static bool isUnsafeUseInDefinition(const UnsafeUse &use) {
   case UnsafeUse::CallToUnsafe:
   case UnsafeUse::NonisolatedUnsafe:
   case UnsafeUse::UnownedUnsafe:
+  case UnsafeUse::UnsafeConformance:
     return enclosingContextForUnsafe(use).second;
   }
 }
@@ -74,7 +74,7 @@ static void suggestUnsafeOnEnclosingDecl(
 }
 
 static void suggestUnsafeMarkerOnConformance(
-    NormalProtocolConformance *conformance) {
+    ProtocolConformance *conformance) {
   auto dc = conformance->getDeclContext();
   auto decl = dc->getAsDecl();
   if (!decl)
@@ -105,7 +105,8 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     if (use.getKind() == UnsafeUse::ReferenceToUnsafe ||
         use.getKind() == UnsafeUse::CallToUnsafe ||
         use.getKind() == UnsafeUse::NonisolatedUnsafe ||
-        use.getKind() == UnsafeUse::UnownedUnsafe) {
+        use.getKind() == UnsafeUse::UnownedUnsafe ||
+        use.getKind() == UnsafeUse::UnsafeConformance) {
       auto [enclosingDecl, _] = enclosingContextForUnsafe(
           use.getLocation(), use.getDeclContext());
       if (enclosingDecl) {
@@ -137,7 +138,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     witness->diagnose(diag::witness_unsafe,
                       witness->getDescriptiveKind(),
                       witness->getName());
-    suggestUnsafeMarkerOnConformance(use.getConformance());
+    suggestUnsafeMarkerOnConformance(use.getConformance().getConcrete());
     return;
   }
 
@@ -145,7 +146,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     auto assocType = use.getAssociatedType();
     auto loc = use.getLocation();
     auto type = use.getType();
-    auto conformance = use.getConformance();
+    auto conformance = use.getConformance().getConcrete();
     ASTContext &ctx = assocType->getASTContext();
 
     diagnoseUnsafeType(ctx, loc, type, conformance->getDeclContext(),
@@ -161,10 +162,13 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
 
   case UnsafeUse::UnsafeConformance: {
     auto conformance = use.getConformance();
-    ASTContext &ctx = conformance->getProtocol()->getASTContext();
+    ASTContext &ctx = conformance.getRequirement()->getASTContext();
     ctx.Diags.diagnose(
-        use.getLocation(), diag::unchecked_conformance_is_unsafe);
-    suggestUnsafeMarkerOnConformance(conformance);
+        use.getLocation(),
+        asNote ? diag::note_use_of_unchecked_conformance_is_unsafe
+               : diag::use_of_unchecked_conformance_is_unsafe,
+        use.getType(),
+        conformance.getRequirement());
     return;
   }
 
