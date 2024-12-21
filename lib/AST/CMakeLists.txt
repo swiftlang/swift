@@ -171,4 +171,9 @@ target_link_libraries(swiftAST
   PUBLIC swiftBasic
   PRIVATE swiftMarkup)
 
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftAST
+    PRIVATE swiftASTGen)
+endif()
+
 set_swift_llvm_is_available(swiftAST)
