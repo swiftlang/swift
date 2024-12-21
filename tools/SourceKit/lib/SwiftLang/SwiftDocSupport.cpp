@@ -691,6 +691,7 @@ static void reportAttributes(ASTContext &Ctx,
   static UIdent PlatformOSXAppExt("source.availability.platform.osx_app_extension");
   static UIdent PlatformtvOSAppExt("source.availability.platform.tvos_app_extension");
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
+  static UIdent PlatformFreeBSD("source.availability.platform.freebsd");
   static UIdent PlatformOpenBSD("source.availability.platform.openbsd");
   static UIdent PlatformWindows("source.availability.platform.windows");
   std::vector<const DeclAttribute*> Scratch;
@@ -727,6 +728,8 @@ static void reportAttributes(ASTContext &Ctx,
       case PlatformKind::visionOSApplicationExtension:
         // FIXME: Formal platform support in SourceKit is needed.
         PlatformUID = UIdent(); break;
+      case PlatformKind::FreeBSD:
+        PlatformUID = PlatformFreeBSD; break;
       case PlatformKind::OpenBSD:
         PlatformUID = PlatformOpenBSD; break;
       case PlatformKind::Windows:
