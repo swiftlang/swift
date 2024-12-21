@@ -46,6 +46,14 @@ extension Context {
 
   var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
 
+  /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
+  /// annotations, Embedded Swift, and class specialization). SourceKit is the
+  /// only consumer that has this disabled today (as it disables WMO
+  /// explicitly).
+  var enableWMORequiredDiagnostics: Bool {
+    _bridged.enableWMORequiredDiagnostics()
+  }
+
   func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
     _bridged.canMakeStaticObjectReadOnly(objectType.bridged)
   }

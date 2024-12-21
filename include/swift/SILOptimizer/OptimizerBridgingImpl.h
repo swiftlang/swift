@@ -571,6 +571,11 @@ bool BridgedPassContext::shouldExpand(BridgedType ty) const {
   return swift::shouldExpand(mod, ty.unbridged());
 }
 
+bool BridgedPassContext::enableWMORequiredDiagnostics() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().EnableWMORequiredDiagnostics;
+}
+
 static_assert((int)BridgedPassContext::SILStage::Raw == (int)swift::SILStage::Raw);
 static_assert((int)BridgedPassContext::SILStage::Canonical == (int)swift::SILStage::Canonical);
 static_assert((int)BridgedPassContext::SILStage::Lowered == (int)swift::SILStage::Lowered);
