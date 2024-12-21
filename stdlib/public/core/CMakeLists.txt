@@ -157,6 +157,8 @@ split_embedded_sources(
   EMBEDDED Sort.swift
   EMBEDDED Span/RawSpan.swift
   EMBEDDED Span/Span.swift
+  EMBEDDED Span/Properties/ArrayTypeExtensions.swift
+  EMBEDDED Span/Properties/UnsafeBufferPointerExtensions.swift
   EMBEDDED StaticString.swift
   EMBEDDED StaticPrint.swift
   EMBEDDED Stride.swift
