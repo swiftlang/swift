@@ -35,6 +35,7 @@ extension Function {
       for inst in block.instructions {
 
         inst.checkForwardingConformance()
+        inst.checkGuaranteedResults()
 
         if let verifiableInst = inst as? VerifiableInstruction {
           verifiableInst.verify(context)
@@ -50,6 +51,13 @@ private extension Instruction {
       require(self is ForwardingInstruction, "instruction \(self)\nshould conform to ForwardingInstruction")
     } else {
       require(!(self is ForwardingInstruction), "instruction \(self)\nshould not conform to ForwardingInstruction")
+    }
+  }
+
+  func checkGuaranteedResults() {
+    for result in results where result.ownership == .guaranteed {
+      require(BeginBorrowValue(result) != nil || self is ForwardingInstruction,
+              "\(result) must either be a BeginBorrowValue or a ForwardingInstruction")
     }
   }
 }
