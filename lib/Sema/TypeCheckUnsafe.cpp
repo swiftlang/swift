@@ -75,20 +75,6 @@ static void suggestUnsafeOnEnclosingDecl(
   }
 }
 
-static void suggestUnsafeMarkerOnConformance(
-    ProtocolConformance *conformance) {
-  auto dc = conformance->getDeclContext();
-  auto decl = dc->getAsDecl();
-  if (!decl)
-    return;
-
-  decl->diagnose(
-      diag::make_conforming_context_unsafe,
-      decl->getDescriptiveKind(),
-      conformance->getProtocol()->getName()
-  ).fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
-}
-
 /// Retrieve the extra information
 static SourceFileExtras *getSourceFileExtrasFor(const Decl *decl) {
   auto dc = decl->getDeclContext();
@@ -136,15 +122,16 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
   }
 
   case UnsafeUse::Witness: {
+    assert(asNote && "Can only be diagnosed with a note");
     auto witness = cast<ValueDecl>(use.getDecl());
-    witness->diagnose(diag::witness_unsafe,
+    witness->diagnose(diag::note_witness_unsafe,
                       witness->getDescriptiveKind(),
                       witness->getName());
-    suggestUnsafeMarkerOnConformance(use.getConformance().getConcrete());
     return;
   }
 
   case UnsafeUse::TypeWitness: {
+    assert(asNote && "Can only be diagnosed with a note");
     auto assocType = use.getAssociatedType();
     auto loc = use.getLocation();
     auto type = use.getType();
@@ -154,21 +141,31 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     diagnoseUnsafeType(ctx, loc, type, conformance->getDeclContext(),
                        [&](Type specificType) {
       ctx.Diags.diagnose(
-          loc, diag::type_witness_unsafe, specificType, assocType->getName());
+          loc, diag::note_type_witness_unsafe, specificType,
+          assocType->getName());
     });
-    suggestUnsafeMarkerOnConformance(conformance);
-    assocType->diagnose(diag::decl_declared_here, assocType);
-
     return;
   }
 
   case UnsafeUse::UnsafeConformance: {
     auto conformance = use.getConformance();
     ASTContext &ctx = conformance.getRequirement()->getASTContext();
+
+    // Figure out whether to diagnose @unchecked or @unsafe.
+    bool isUnsafe = true;
+    if (conformance.isConcrete()) {
+      if (auto normal =
+              conformance.getConcrete()->getRootNormalConformance()){
+        if (normal->isUnchecked() && !normal->isUnsafe())
+          isUnsafe = false;
+      }
+    }
+
     ctx.Diags.diagnose(
         use.getLocation(),
         asNote ? diag::note_use_of_unchecked_conformance_is_unsafe
                : diag::use_of_unchecked_conformance_is_unsafe,
+        isUnsafe,
         use.getType(),
         conformance.getRequirement());
     return;

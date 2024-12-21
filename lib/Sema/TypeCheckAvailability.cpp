@@ -4783,6 +4783,14 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
               concreteConf->getType(), conformance, loc,
               where.getDeclContext()));
       }
+
+      // @unsafe conformances are considered... unsafe.
+      if (normalConf->isUnsafe()) {
+        diagnoseUnsafeUse(
+            UnsafeUse::forConformance(
+              concreteConf->getType(), conformance, loc,
+              where.getDeclContext()));
+      }
     }
   }
 

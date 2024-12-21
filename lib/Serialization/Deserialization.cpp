@@ -976,16 +976,14 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, conformanceCount, isUnchecked,
-      isPreconcurrency;
+  unsigned valueCount, typeCount, conformanceCount;
+  unsigned rawOptions;
   ArrayRef<uint64_t> rawIDs;
 
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
                                               valueCount, conformanceCount,
-                                              isUnchecked,
-                                              isPreconcurrency,
-                                              rawIDs);
+                                              rawOptions, rawIDs);
 
   auto doOrError = MF.getDeclContextChecked(contextID);
   if (!doOrError)
@@ -1007,7 +1005,7 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   auto conformance = ctx.getNormalConformance(
       conformingType, proto, SourceLoc(), dc,
       ProtocolConformanceState::Incomplete,
-      isUnchecked, isPreconcurrency);
+      ProtocolConformanceOptions(rawOptions));
 
   if (conformance->isConformanceOfProtocol()) {
     auto &C = dc->getASTContext();
@@ -3301,13 +3299,11 @@ class DeclDeserializer {
       bool isSuppressed = rawID & 0x01;
       rawID = rawID >> 1;
 
-      // The second low bit indicates "@preconcurrency".
-      bool isPreconcurrency = rawID & 0x01;
-      rawID = rawID >> 1;
-
-      // The third low bit indicates "@unchecked".
-      bool isUnchecked = rawID & 0x01;
-      rawID = rawID >> 1;
+      // The next bits are the protocol conformance options.
+      // Update the mask below whenever this changes.
+      static_assert(NumProtocolConformanceOptions == 5);
+      ProtocolConformanceOptions options(rawID & 0x1F);
+      rawID = rawID >> NumProtocolConformanceOptions;
 
       TypeID typeID = rawID;
       auto maybeType = MF.getTypeChecked(typeID);
@@ -3316,8 +3312,7 @@ class DeclDeserializer {
         continue;
       }
       inheritedTypes.push_back(InheritedEntry(
-          TypeLoc::withoutLoc(maybeType.get()), isUnchecked,
-          /*isRetroactive=*/false, isPreconcurrency, isSuppressed));
+          TypeLoc::withoutLoc(maybeType.get()), options, isSuppressed));
     }
 
     auto inherited = ctx.AllocateCopy(inheritedTypes);
@@ -8574,8 +8569,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, conformanceCount, isUnchecked,
-      isPreconcurrency;
+  unsigned valueCount, typeCount, conformanceCount, rawOptions;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -8587,7 +8581,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   NormalProtocolConformanceLayout::readRecord(
       scratch, protoID, contextID, typeCount, valueCount, conformanceCount,
-      isUnchecked, isPreconcurrency, rawIDs);
+      rawOptions, rawIDs);
 
   // Read requirement signature conformances.
   SmallVector<ProtocolConformanceRef, 4> reqConformances;
