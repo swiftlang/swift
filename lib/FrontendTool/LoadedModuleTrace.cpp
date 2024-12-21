@@ -876,11 +876,17 @@ static void createFineModuleTraceFile(CompilerInstance &instance,
     return;
   }
   ObjcMethodReferenceCollector collector(MD);
-  instance.forEachFileToTypeCheck([&](SourceFile& SF) {
-    collector.setFileBeforeVisiting(&SF);
-    collector.walk(SF);
-    return false;
-  });
+
+  auto blocklisted = ctx.blockListConfig.hasBlockListAction(MD->getNameStr(),
+    BlockListKeyKind::ModuleName, BlockListAction::SkipEmittingFineModuleTrace);
+
+  if (!blocklisted) {
+    instance.forEachFileToTypeCheck([&](SourceFile& SF) {
+      collector.setFileBeforeVisiting(&SF);
+      collector.walk(SF);
+      return false;
+    });
+  }
 
   // print this json line.
   std::string stringBuffer;
@@ -903,9 +909,6 @@ bool swift::emitFineModuleTraceIfNeeded(CompilerInstance &Instance,
                                         const FrontendOptions &opts) {
   ModuleDecl *mainModule = Instance.getMainModule();
   ASTContext &ctxt = mainModule->getASTContext();
-  if (ctxt.blockListConfig.hasBlockListAction(mainModule->getNameStr(),
-      BlockListKeyKind::ModuleName, BlockListAction::SkipEmittingFineModuleTrace))
-    return false;
   assert(!ctxt.hadError() &&
          "We should've already exited earlier if there was an error.");
 
