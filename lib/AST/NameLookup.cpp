@@ -3940,18 +3940,23 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   SourceLoc loc;
   SourceLoc uncheckedLoc;
   SourceLoc preconcurrencyLoc;
+  SourceLoc unsafeLoc;
+  SourceRange safeRange;
   auto inheritedTypes = InheritedTypes(decl);
   bool isSuppressed = inheritedTypes.getEntry(i).isSuppressed();
   if (TypeRepr *typeRepr = inheritedTypes.getTypeRepr(i)) {
     loc = typeRepr->getLoc();
     uncheckedLoc = typeRepr->findAttrLoc(TypeAttrKind::Unchecked);
     preconcurrencyLoc = typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency);
+    unsafeLoc = typeRepr->findAttrLoc(TypeAttrKind::Unsafe);
+    safeRange = typeRepr->findAttrLoc(TypeAttrKind::Safe);
   }
 
   // Form the result.
   for (auto nominal : nominalTypes) {
     result.push_back(
-        {nominal, loc, uncheckedLoc, preconcurrencyLoc, isSuppressed});
+        {nominal, loc, uncheckedLoc, preconcurrencyLoc, unsafeLoc,
+          safeRange, isSuppressed});
   }
 }
 
@@ -3983,7 +3988,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
     auto loc = attr->getLocation();
     result.push_back(
         {attr->getProtocol(), loc, attr->isUnchecked() ? loc : SourceLoc(),
-         /*preconcurrencyLoc=*/SourceLoc(), /*isSuppressed=*/false});
+         /*preconcurrencyLoc=*/SourceLoc(), SourceLoc(), SourceLoc(),
+         /*isSuppressed=*/false});
   }
 
   // Else we have access to this information on the where clause.
@@ -3994,7 +4000,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
   // the source location.
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, SourceLoc(), SourceLoc(), SourceLoc(),
+    result.emplace_back(inheritedNominal, SourceLoc(), SourceLoc(),
+                        SourceLoc(), SourceLoc(), SourceLoc(),
                         /*isSuppressed=*/false);
 
   return result;
