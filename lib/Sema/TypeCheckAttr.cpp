@@ -744,7 +744,8 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
   }
   // Verify that we don't have a static function.
   if (FD->isStatic())
-    diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
+    diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating, attrModifier);
+    diagnose(attr->getLocation(), diag::static_functions_not_mutating_detail, attrModifier);
 }
 
 void AttributeChecker::visitDynamicAttr(DynamicAttr *attr) {
