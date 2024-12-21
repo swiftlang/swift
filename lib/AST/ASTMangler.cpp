@@ -2677,15 +2677,9 @@ void ASTMangler::appendModule(const ModuleDecl *module,
   StringRef ModName = module->getRealName().str();
 
   // If RespectOriginallyDefinedIn is not set, ignore the ABI name only for
-  // _Concurrency and swift-syntax (which adds "Compiler" as a prefix when
-  // building swift-syntax as part of the compiler).
-  // TODO: Mangling for the debugger should respect originally defined in, but
-  // as of right now there is not enough information in the mangled name to
-  // reconstruct AST types from mangled names when using that attribute.
+  // _Concurrency.
   if ((RespectOriginallyDefinedIn ||
-       (module->getName().str() != SWIFT_CONCURRENCY_NAME &&
-        !module->getABIName().str().starts_with(
-            SWIFT_MODULE_ABI_NAME_PREFIX))) &&
+       module->getName().str() != SWIFT_CONCURRENCY_NAME) &&
       module->getABIName() != module->getName())
     ModName = module->getABIName().str();
 
