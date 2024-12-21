@@ -1768,14 +1768,16 @@ public:
 /// The @_implements attribute, which treats a decl as the implementation for
 /// some named protocol requirement (but otherwise not-visible by that name).
 class ImplementsAttr : public DeclAttribute {
-  TypeRepr *TyR;
+  /// If constructed by the \c create() variant with a TypeRepr, the TypeRepr;
+  /// if constructed by the \c create() variant with a DeclContext and
+  /// ProtocolDecl, the DeclContext.
+  llvm::PointerUnion<TypeRepr *, DeclContext *> TyROrDC;
   DeclName MemberName;
   DeclNameLoc MemberNameLoc;
 
   ImplementsAttr(SourceLoc atLoc, SourceRange Range,
-                 TypeRepr *TyR,
-                 DeclName MemberName,
-                 DeclNameLoc MemberNameLoc);
+                 llvm::PointerUnion<TypeRepr *, DeclContext *> TyROrDC,
+                 DeclName MemberName, DeclNameLoc MemberNameLoc);
 
 public:
   static ImplementsAttr *create(ASTContext &Ctx, SourceLoc atLoc,
@@ -1795,7 +1797,9 @@ public:
   /// otherwise `nullopt`. This should only be used for dumping.
   std::optional<ProtocolDecl *> getCachedProtocol(DeclContext *dc) const;
 
-  TypeRepr *getProtocolTypeRepr() const { return TyR; }
+  TypeRepr *getProtocolTypeRepr() const {
+    return TyROrDC.dyn_cast<TypeRepr *>();
+  }
 
   DeclName getMemberName() const { return MemberName; }
   DeclNameLoc getMemberNameLoc() const { return MemberNameLoc; }
@@ -1806,8 +1810,12 @@ public:
 
   /// Create a copy of this attribute.
   ImplementsAttr *clone(ASTContext &ctx) const {
-    return new (ctx) ImplementsAttr(
-        AtLoc, Range, TyR, getMemberName(), getMemberNameLoc());
+    if (auto tyR = getProtocolTypeRepr()) {
+      return create(ctx, AtLoc, Range, tyR, getMemberName(),
+                    getMemberNameLoc());
+    }
+    auto dc = TyROrDC.dyn_cast<DeclContext *>();
+    return create(dc, getProtocol(dc), getMemberName());
   }
 };
 

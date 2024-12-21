@@ -2712,11 +2712,12 @@ StorageRestrictionsAttr::create(
                                            /*implicit=*/false);
 }
 
-ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
-                               TypeRepr *TyR, DeclName MemberName,
-                               DeclNameLoc MemberNameLoc)
+ImplementsAttr::
+ImplementsAttr(SourceLoc atLoc, SourceRange range,
+               llvm::PointerUnion<TypeRepr *, DeclContext *> TyROrDC,
+               DeclName MemberName, DeclNameLoc MemberNameLoc)
     : DeclAttribute(DeclAttrKind::Implements, atLoc, range, /*Implicit=*/false),
-      TyR(TyR), MemberName(MemberName), MemberNameLoc(MemberNameLoc) {}
+      TyROrDC(TyROrDC), MemberName(MemberName), MemberNameLoc(MemberNameLoc) {}
 
 ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
@@ -2733,9 +2734,8 @@ ImplementsAttr *ImplementsAttr::create(DeclContext *DC,
                                        DeclName MemberName) {
   auto &ctx = DC->getASTContext();
   void *mem = ctx.Allocate(sizeof(ImplementsAttr), alignof(ImplementsAttr));
-  auto *attr = new (mem) ImplementsAttr(
-      SourceLoc(), SourceRange(), nullptr,
-      MemberName, DeclNameLoc());
+  auto *attr = new (mem) ImplementsAttr(SourceLoc(), SourceRange(), DC,
+                                        MemberName, DeclNameLoc());
   ctx.evaluator.cacheOutput(ImplementsAttrProtocolRequest{attr, DC},
                             std::move(Proto));
   return attr;
