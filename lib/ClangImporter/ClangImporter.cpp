@@ -206,20 +206,6 @@ namespace {
       return std::make_unique<HeaderParsingASTConsumer>(Impl);
     }
     bool BeginSourceFileAction(clang::CompilerInstance &CI) override {
-      // Prefer frameworks over plain headers.
-      // We add search paths here instead of when building the initial invocation
-      // so that (a) we use the same code as search paths for imported modules,
-      // and (b) search paths are always added after -Xcc options.
-      SearchPathOptions &searchPathOpts = Ctx.SearchPathOpts;
-      for (const auto &framepath : searchPathOpts.getFrameworkSearchPaths()) {
-        Importer.addSearchPath(framepath.Path, /*isFramework*/true,
-                               framepath.IsSystem);
-      }
-
-      for (const auto &path : searchPathOpts.getImportSearchPaths()) {
-        Importer.addSearchPath(path, /*isFramework*/false, /*isSystem=*/false);
-      }
-
       auto PCH =
           Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash, /*Cached=*/true);
       if (PCH.has_value()) {
@@ -890,19 +876,19 @@ importer::addCommonInvocationArguments(
     }
   }
 
-  if (std::optional<StringRef> R = ctx.SearchPathOpts.getWinSDKRoot()) {
+  if (std::optional<StringRef> R = searchPathOpts.getWinSDKRoot()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-windows-sdk-root");
     invocationArgStrs.emplace_back(*R);
   }
-  if (std::optional<StringRef> V = ctx.SearchPathOpts.getWinSDKVersion()) {
+  if (std::optional<StringRef> V = searchPathOpts.getWinSDKVersion()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-windows-sdk-version");
     invocationArgStrs.emplace_back(*V);
   }
-  if (std::optional<StringRef> R = ctx.SearchPathOpts.getVCToolsRoot()) {
+  if (std::optional<StringRef> R = searchPathOpts.getVCToolsRoot()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-visualc-tools-root");
     invocationArgStrs.emplace_back(*R);
   }
-  if (std::optional<StringRef> V = ctx.SearchPathOpts.getVCToolsVersion()) {
+  if (std::optional<StringRef> V = searchPathOpts.getVCToolsVersion()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-visualc-tools-version");
     invocationArgStrs.emplace_back(*V);
   }
@@ -947,6 +933,24 @@ importer::addCommonInvocationArguments(
 
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
+  }
+
+  for (const auto &framepath : searchPathOpts.getFrameworkSearchPaths()) {
+    if (framepath.IsSystem) {
+      invocationArgStrs.push_back("-iframework");
+      invocationArgStrs.push_back(framepath.Path);
+    } else {
+      invocationArgStrs.push_back("-F" + framepath.Path);
+    }
+  }
+
+  for (const auto &path : searchPathOpts.getImportSearchPaths()) {
+    if (path.IsSystem) {
+      invocationArgStrs.push_back("-isystem");
+      invocationArgStrs.push_back(path.Path);
+    } else {
+      invocationArgStrs.push_back("-I" + path.Path);
+    }
   }
 }
 
