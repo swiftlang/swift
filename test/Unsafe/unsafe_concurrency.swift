@@ -37,3 +37,10 @@ func f() async { // expected-warning{{global function 'f' involves unsafe code; 
 
 // expected-warning@+1{{type alias 'WeirdC' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}
 typealias WeirdC = RequiresSendable<C> // expected-note{{@unchecked conformance of 'C' to protocol 'Sendable' involves unsafe code}}
+
+
+@available(SwiftStdlib 5.9, *)
+final class MyExecutor: SerialExecutor {
+  func enqueue(_ job: consuming ExecutorJob) { fatalError("boom") }
+  @unsafe func asUnownedSerialExecutor() -> UnownedSerialExecutor { fatalError("boom") }
+}
