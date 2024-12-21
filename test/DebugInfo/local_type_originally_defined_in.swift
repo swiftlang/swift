@@ -21,6 +21,19 @@ public func localTypeAliasTest(horse: Horse) {
   // CHECK: DIDerivedType(tag: DW_TAG_typedef, name: "$s32local_type_originally_defined_in0A13TypeAliasTest5horsey4Barn5HorseV_tF1AL_aD"
 }
 
+
+public func localTypeTest(horse: Horse) {
+  // The local type mangling for 'A' mentions 'Horse', which must
+  // be mangled using it's current module name, and not the
+  // original module name, for consistency with the debug info
+  // mangling.
+  struct LocalStruct {}
+
+  let info = UnsafeMutablePointer<LocalStruct>.allocate(capacity: 1)
+  _ = info
+  // CHECK: DICompositeType(tag: DW_TAG_structure_type, name: "$s32local_type_originally_defined_in0A8TypeTest5horsey4Barn5HorseV_tF11LocalStructL_VD"
+}
+
 public func localTypeAliasTest() -> Horse {
   typealias B = Int
 
