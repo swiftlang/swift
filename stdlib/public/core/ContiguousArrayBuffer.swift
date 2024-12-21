@@ -753,6 +753,24 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     _fixLifetime(owner)
     return target + initializedCount
   }
+  
+  @_alwaysEmitIntoClient
+  @discardableResult
+  internal func _moveContents(
+    subRange bounds: Range<Int>,
+    initializing target: UnsafeMutablePointer<Element>
+  ) -> UnsafeMutablePointer<Element> {
+    _internalInvariant(bounds.lowerBound >= 0)
+    _internalInvariant(bounds.upperBound >= bounds.lowerBound)
+    _internalInvariant(bounds.upperBound <= count)
+
+    let initializedCount = bounds.upperBound - bounds.lowerBound
+    target.moveInitialize(
+      from: firstElementAddress + bounds.lowerBound, count: initializedCount)
+    _fixLifetime(owner)
+    return target + initializedCount
+  }
+
 
   @inlinable
   internal __consuming func _copyContents(
@@ -842,7 +860,8 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   internal __consuming func _consumeAndCreateNew() -> _ContiguousArrayBuffer {
     return _consumeAndCreateNew(bufferIsUnique: false,
                                 minimumCapacity: count,
-                                growForAppend: false)
+                                growForAppend: false,
+                                rangeToNotCopy: 0..<0)
   }
 
   /// Creates and returns a new uniquely referenced buffer which is a copy of
@@ -860,7 +879,10 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @inline(never)
   @_semantics("optimize.sil.specialize.owned2guarantee.never")
   internal __consuming func _consumeAndCreateNew(
-    bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
+    bufferIsUnique: Bool, 
+    minimumCapacity: Int,
+    growForAppend: Bool,
+    rangeToNotCopy hole: Range<Int>
   ) -> _ContiguousArrayBuffer {
     let newCapacity = _growArrayCapacity(oldCapacity: capacity,
                                          minimumCapacity: minimumCapacity,
@@ -870,18 +892,28 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: c, minimumCapacity: newCapacity)
+    let destStart = newBuffer.mutableFirstElementAddress
+    let destTailStart = destStart + hole.upperBound
+    let beforeHole = 0 ..< hole.lowerBound
+    let afterHole = hole.upperBound ..< c
 
     if bufferIsUnique {
       // As an optimization, if the original buffer is unique, we can just move
       // the elements instead of copying.
-      let dest = newBuffer.mutableFirstElementAddress
-      dest.moveInitialize(from: firstElementAddress,
-                          count: c)
+      if !beforeHole.isEmpty {
+        _moveContents(subRange: beforeHole, initializing: destStart)
+      }
+      if !afterHole.isEmpty {
+        _moveContents(subRange: afterHole, initializing: destTailStart)
+      }
       mutableCount = 0
     } else {
-      _copyContents(
-        subRange: 0..<c,
-        initializing: newBuffer.mutableFirstElementAddress)
+      if !beforeHole.isEmpty {
+        _copyContents(subRange: beforeHole, initializing: destStart)
+      }
+      if !afterHole.isEmpty {
+        _copyContents(subRange: afterHole, initializing: destTailStart)
+      }
     }
     return newBuffer
   }
