@@ -4769,7 +4769,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   }
 
   // Strict memory safety checking.
-  if (!where.getAvailability().allowsUnsafe()) {
+  if (!where.getAvailability().allowsUnsafe() &&
+      ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
     if (auto normalConf = dyn_cast<NormalProtocolConformance>(rootConf)) {
       // @unchecked Sendable conformances are considered unsafe when complete
       // checking is enabled.
