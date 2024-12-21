@@ -200,7 +200,9 @@
   ],
   "Span": [
     "RawSpan.swift",
-    "Span.swift"
+    "Span.swift",
+    "ArrayTypeExtensions.swift",
+    "UnsafeBufferPointerExtensions.swift"
   ],
   "Protocols": [
     "CompilerProtocols.swift",
