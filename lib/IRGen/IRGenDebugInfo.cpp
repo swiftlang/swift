@@ -25,6 +25,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -34,6 +35,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
@@ -65,6 +67,7 @@
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -2343,18 +2346,21 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
       if (visitedOriginallyDefinedIn)
         return TypeWalker::Action::Stop;
 
-      // A typealias inside a function used that function's signature as part of
+      DeclContext *D = nullptr;
+      if (auto *TAT = llvm::dyn_cast<TypeAliasType>(T))
+        D = TAT->getDecl()->getDeclContext();
+      else if (auto *NT = llvm::dyn_cast<NominalOrBoundGenericNominalType>(T))
+        D = NT->getDecl()->getDeclContext();
+
+      // A type inside a function uses that function's signature as part of
       // its mangling, so check if any types in the generic signature are
       // annotated with @_originallyDefinedIn.
-      if (auto *TAT = llvm::dyn_cast<TypeAliasType>(T)) {
-        auto D = TAT->getDecl()->getDeclContext();
-        if (auto AFD = llvm::dyn_cast<AbstractFunctionDecl>(D)) {
-          OriginallyDefinedInFinder InnerWalker;
-          AFD->getInterfaceType().walk(InnerWalker);
-          if (InnerWalker.visitedOriginallyDefinedIn) {
-            visitedOriginallyDefinedIn = true;
-            return TypeWalker::Action::Stop;
-          }
+      if (auto AFD = llvm::dyn_cast_or_null<AbstractFunctionDecl>(D)) {
+        OriginallyDefinedInFinder InnerWalker;
+        AFD->getInterfaceType().walk(InnerWalker);
+        if (InnerWalker.visitedOriginallyDefinedIn) {
+          visitedOriginallyDefinedIn = true;
+          return TypeWalker::Action::Stop;
         }
       }
 
