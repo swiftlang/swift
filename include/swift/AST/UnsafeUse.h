@@ -15,13 +15,12 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Unreachable.h"
 
 namespace swift {
-
-class NormalProtocolConformance;
 
 /// Describes a use of an unsafe construct.
 ///
@@ -46,6 +45,8 @@ public:
     ReferenceToUnsafe,
     /// A call to an unsafe declaration.
     CallToUnsafe,
+    /// A @preconcurrency import.
+    PreconcurrencyImport,
   };
 
 private:
@@ -66,7 +67,8 @@ private:
     } typeWitness;
 
     struct {
-      NormalProtocolConformance *conformance;
+      TypeBase *type;
+      void *conformanceRef;
       DeclContext *declContext;
       const void *location;
     } conformance;
@@ -77,6 +79,8 @@ private:
       TypeBase *type;
       const void *location;
     } entity;
+
+    const ImportDecl *importDecl;
   } storage;
 
   UnsafeUse(Kind kind) : kind(kind) { }
@@ -139,11 +143,14 @@ public:
     return result;
   }
 
-  static UnsafeUse forConformance(NormalProtocolConformance *conformance,
+  static UnsafeUse forConformance(Type subjectType,
+                                  ProtocolConformanceRef conformance,
                                   SourceLoc location,
                                   DeclContext *dc) {
+    assert(subjectType);
     UnsafeUse result(UnsafeConformance);
-    result.storage.conformance.conformance = conformance;
+    result.storage.conformance.type = subjectType.getPointer();
+    result.storage.conformance.conformanceRef = conformance.getOpaqueValue();
     result.storage.conformance.declContext = dc;
     result.storage.conformance.location = location.getOpaquePointerValue();
     return result;
@@ -170,6 +177,12 @@ public:
                         decl, type, location);
   }
 
+  static UnsafeUse forPreconcurrencyImport(const ImportDecl *importDecl) {
+    UnsafeUse result(PreconcurrencyImport);
+    result.storage.importDecl = importDecl;
+    return result;
+  }
+
   Kind getKind() const { return kind; }
 
   /// The location at which this use will be diagnosed.
@@ -180,7 +193,9 @@ public:
       return getDecl()->getLoc();
 
     case UnsafeConformance:
-      return getConformance()->getLoc();
+      return SourceLoc(
+          llvm::SMLoc::getFromPointer(
+            (const char *)storage.conformance.location));
 
     case TypeWitness:
       return SourceLoc(
@@ -193,6 +208,9 @@ public:
     case CallToUnsafe:
       return SourceLoc(
           llvm::SMLoc::getFromPointer((const char *)storage.entity.location));
+
+    case PreconcurrencyImport:
+      return storage.importDecl->getLoc();
     }
   }
 
@@ -214,6 +232,9 @@ public:
 
     case UnsafeConformance:
       return nullptr;
+
+    case PreconcurrencyImport:
+      return storage.importDecl;
     }
   }
 
@@ -237,10 +258,13 @@ public:
 
     case Witness:
     case TypeWitness:
-      return getConformance()->getDeclContext();
+      return getConformance().getConcrete()->getDeclContext();
 
     case UnsafeConformance:
       return storage.conformance.declContext;
+
+    case PreconcurrencyImport:
+      return storage.importDecl->getDeclContext();
     }
   }
 
@@ -259,6 +283,7 @@ public:
     case ReferenceToUnsafe:
     case CallToUnsafe:
     case UnsafeConformance:
+    case PreconcurrencyImport:
       return nullptr;
     }
   }
@@ -268,8 +293,11 @@ public:
     switch (getKind()) {
     case Override:
     case Witness:
-    case UnsafeConformance:
+    case PreconcurrencyImport:
       return nullptr;
+
+    case UnsafeConformance:
+      return storage.conformance.type;
 
     case TypeWitness:
       return storage.typeWitness.type;
@@ -283,23 +311,25 @@ public:
   }
 
   /// Get the protocol conformance, if there is one.
-  NormalProtocolConformance *getConformance() const {
+  ProtocolConformanceRef getConformance() const {
     switch (getKind()) {
     case UnsafeConformance:
-      return storage.conformance.conformance;
+      return ProtocolConformanceRef::getFromOpaqueValue(
+          storage.conformance.conformanceRef);
 
     case Witness:
-      return storage.polymorphic.conformance;
+      return ProtocolConformanceRef(storage.polymorphic.conformance);
 
     case TypeWitness:
-      return storage.typeWitness.conformance;
+      return ProtocolConformanceRef(storage.typeWitness.conformance);
 
     case Override:
     case UnownedUnsafe:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
     case CallToUnsafe:
-      return nullptr;
+    case PreconcurrencyImport:
+      return ProtocolConformanceRef::forInvalid();
     }
   }
 };

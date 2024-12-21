@@ -34,6 +34,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeAnnotation.h"
+#include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/StorageImpl.h"
@@ -1782,14 +1783,8 @@ public:
 /// An entry in the "inherited" list of a type or extension.
 struct InheritedEntry : public TypeLoc {
 private:
-  /// Whether there was an @unchecked attribute.
-  bool IsUnchecked : 1;
-
-  /// Whether there was an @retroactive attribute.
-  bool IsRetroactive : 1;
-
-  /// Whether there was an @preconcurrency attribute.
-  bool IsPreconcurrency : 1;
+  /// Options on a protocol conformance that are expressed as attributes.
+  unsigned RawOptions: 8;
 
   /// Whether there was a ~ indicating suppression.
   ///
@@ -1799,16 +1794,37 @@ private:
 public:
   InheritedEntry(const TypeLoc &typeLoc);
 
-  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive,
-                 bool isPreconcurrency, bool isSuppressed = false)
-      : TypeLoc(typeLoc), IsUnchecked(isUnchecked),
-        IsRetroactive(isRetroactive), IsPreconcurrency(isPreconcurrency),
+  InheritedEntry(const TypeLoc &typeLoc, ProtocolConformanceOptions options,
+                 bool isSuppressed = false)
+      : TypeLoc(typeLoc), RawOptions(options.toRaw()),
         IsSuppressed(isSuppressed) {}
 
-  bool isUnchecked() const { return IsUnchecked; }
-  bool isRetroactive() const { return IsRetroactive; }
-  bool isPreconcurrency() const { return IsPreconcurrency; }
+  ProtocolConformanceOptions getOptions() const {
+    return ProtocolConformanceOptions(RawOptions);
+  }
+
+  bool isUnchecked() const {
+    return getOptions().contains(ProtocolConformanceFlags::Unchecked);
+  }
+  bool isRetroactive() const {
+    return getOptions().contains(ProtocolConformanceFlags::Retroactive);
+  }
+  bool isPreconcurrency() const {
+    return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
+  }
+  bool isUnsafe() const {
+    return getOptions().contains(ProtocolConformanceFlags::Unsafe);
+  }
+
+  bool isSafe() const {
+    return getOptions().contains(ProtocolConformanceFlags::Safe);
+  }
+
   bool isSuppressed() const { return IsSuppressed; }
+
+  void setOption(ProtocolConformanceFlags flag) {
+    RawOptions = (getOptions() | flag).toRaw();
+  }
 
   void setSuppressed() {
     assert(!IsSuppressed && "setting suppressed again!?");
