@@ -309,11 +309,13 @@ private:
   llvm::Error handleSwiftInterfaceModuleDependency(
       ModuleDependencyID depModuleID,
       const SwiftInterfaceModuleDependenciesStorage &interfaceDepDetails) {
-    auto &path = interfaceDepDetails.moduleCacheKey.empty()
-                     ? interfaceDepDetails.moduleOutputPath
-                     : interfaceDepDetails.moduleCacheKey;
-    commandline.push_back("-swift-module-file=" + depModuleID.ModuleName + "=" +
-                          path);
+    if (!resolvingDepInfo.isSwiftSourceModule()) {
+      auto &path = interfaceDepDetails.moduleCacheKey.empty()
+                       ? interfaceDepDetails.moduleOutputPath
+                       : interfaceDepDetails.moduleCacheKey;
+      commandline.push_back("-swift-module-file=" + depModuleID.ModuleName +
+                            "=" + path);
+    }
     addMacroDependencies(depModuleID, interfaceDepDetails);
     return llvm::Error::success();
   }
@@ -321,24 +323,27 @@ private:
   llvm::Error handleSwiftBinaryModuleDependency(
       ModuleDependencyID depModuleID,
       const SwiftBinaryModuleDependencyStorage &binaryDepDetails) {
-    auto &path = binaryDepDetails.moduleCacheKey.empty()
-                     ? binaryDepDetails.compiledModulePath
-                     : binaryDepDetails.moduleCacheKey;
-    commandline.push_back("-swift-module-file=" + depModuleID.ModuleName + "=" +
-                          path);
-    // If this binary module was built with a header, the header's module
-    // dependencies must also specify a .modulemap to the compilation, in
-    // order to resolve the header's own header include directives.
-    for (const auto &bridgingHeaderDepID :
-         binaryDepDetails.headerModuleDependencies) {
-      auto optionalBridgingHeaderDepModuleInfo = cache.findKnownDependency(
-          bridgingHeaderDepID);
-      const auto bridgingHeaderDepModuleDetails =
-          optionalBridgingHeaderDepModuleInfo.getAsClangModule();
-      commandline.push_back("-Xcc");
-      commandline.push_back("-fmodule-map-file=" +
-                            cache.getScanService().remapPath(
-                                bridgingHeaderDepModuleDetails->moduleMapFile));
+    if (!resolvingDepInfo.isSwiftSourceModule()) {
+      auto &path = binaryDepDetails.moduleCacheKey.empty()
+                       ? binaryDepDetails.compiledModulePath
+                       : binaryDepDetails.moduleCacheKey;
+      commandline.push_back("-swift-module-file=" + depModuleID.ModuleName +
+                            "=" + path);
+      // If this binary module was built with a header, the header's module
+      // dependencies must also specify a .modulemap to the compilation, in
+      // order to resolve the header's own header include directives.
+      for (const auto &bridgingHeaderDepID :
+           binaryDepDetails.headerModuleDependencies) {
+        auto optionalBridgingHeaderDepModuleInfo =
+            cache.findKnownDependency(bridgingHeaderDepID);
+        const auto bridgingHeaderDepModuleDetails =
+            optionalBridgingHeaderDepModuleInfo.getAsClangModule();
+        commandline.push_back("-Xcc");
+        commandline.push_back(
+            "-fmodule-map-file=" +
+            cache.getScanService().remapPath(
+                bridgingHeaderDepModuleDetails->moduleMapFile));
+      }
     }
     addMacroDependencies(depModuleID, binaryDepDetails);
     return llvm::Error::success();
@@ -347,26 +352,29 @@ private:
   llvm::Error handleSwiftPlaceholderModuleDependency(
       ModuleDependencyID depModuleID,
       const SwiftPlaceholderModuleDependencyStorage &placeholderDetails) {
-    commandline.push_back("-swift-module-file=" + depModuleID.ModuleName + "=" +
-                          placeholderDetails.compiledModulePath);
+    if (!resolvingDepInfo.isSwiftSourceModule())
+      commandline.push_back("-swift-module-file=" + depModuleID.ModuleName +
+                            "=" + placeholderDetails.compiledModulePath);
     return llvm::Error::success();
   }
 
   llvm::Error handleClangModuleDependency(
       ModuleDependencyID depModuleID,
       const ClangModuleDependencyStorage &clangDepDetails) {
-    if (!resolvingDepInfo.isClangModule()) {
-      commandline.push_back("-Xcc");
-      commandline.push_back("-fmodule-file=" + depModuleID.ModuleName + "=" +
-                            clangDepDetails.mappedPCMPath);
-    }
-    if (!clangDepDetails.moduleCacheKey.empty()) {
-      commandline.push_back("-Xcc");
-      commandline.push_back("-fmodule-file-cache-key");
-      commandline.push_back("-Xcc");
-      commandline.push_back(clangDepDetails.mappedPCMPath);
-      commandline.push_back("-Xcc");
-      commandline.push_back(clangDepDetails.moduleCacheKey);
+    if (!resolvingDepInfo.isSwiftSourceModule()) {
+      if (!resolvingDepInfo.isClangModule()) {
+        commandline.push_back("-Xcc");
+        commandline.push_back("-fmodule-file=" + depModuleID.ModuleName + "=" +
+                              clangDepDetails.mappedPCMPath);
+      }
+      if (!clangDepDetails.moduleCacheKey.empty()) {
+        commandline.push_back("-Xcc");
+        commandline.push_back("-fmodule-file-cache-key");
+        commandline.push_back("-Xcc");
+        commandline.push_back(clangDepDetails.mappedPCMPath);
+        commandline.push_back("-Xcc");
+        commandline.push_back(clangDepDetails.moduleCacheKey);
+      }
     }
 
     // Collect CAS deppendencies from clang modules.
@@ -1304,7 +1312,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
       *service, instance.getMainModule()->getNameStr().str(),
       instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
       instance.getInvocation().getModuleScanningHash());
-  
+
   if (opts.ReuseDependencyScannerCache)
     deserializeDependencyCache(instance, cache);
 
@@ -1391,7 +1399,7 @@ bool swift::dependencies::batchScanDependencies(
     return true;
 
   auto batchScanResults = performBatchModuleScan(
-      instance, /*DependencyScanDiagnosticCollector*/ nullptr, 
+      instance, /*DependencyScanDiagnosticCollector*/ nullptr,
       cache, /*versionedPCMInstanceCache*/ nullptr, saver,
       *batchInput);
 
@@ -1652,7 +1660,7 @@ swift::dependencies::performBatchModuleScan(
           }
           allDependencies = scanner.performDependencyScan(moduleID, cache);
         }
-        
+
         batchScanResult.push_back(
             generateFullDependencyGraph(instance, diagnosticCollector, cache,
                                         allDependencies));
