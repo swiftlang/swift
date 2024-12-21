@@ -4873,13 +4873,13 @@ void AttributeChecker::checkBackDeployedAttrs(
   // back deployment, which is to use the ABI version of the declaration when it
   // is available.
   if (auto *AEICA = D->getAttrs().getAttribute<AlwaysEmitIntoClientAttr>()) {
-    diagnoseAndRemoveAttr(AEICA, diag::attr_incompatible_with_back_deployed,
-                          AEICA, D);
+    diagnoseAndRemoveAttr(AEICA, diag::attr_incompatible_with_back_deploy,
+                          AEICA, D->getDescriptiveKind());
   }
 
   if (auto *TA = D->getAttrs().getAttribute<TransparentAttr>()) {
-    diagnoseAndRemoveAttr(TA, diag::attr_incompatible_with_back_deployed, TA,
-                          D);
+    diagnoseAndRemoveAttr(TA, diag::attr_incompatible_with_back_deploy, TA,
+                          D->getDescriptiveKind());
   }
 
   // Only functions, methods, computed properties, and subscripts are
@@ -4931,9 +4931,19 @@ void AttributeChecker::checkBackDeployedAttrs(
       continue;
     }
 
+    if (auto *VarD = dyn_cast<VarDecl>(D)) {
+      // There must be a function body to back deploy so for vars we require
+      // that they be computed in order to allow back deployment.
+      if (VarD->hasStorageOrWrapsStorage()) {
+        diagnoseAndRemoveAttr(Attr, diag::attr_not_on_stored_properties, Attr);
+        continue;
+      }
+    }
+
     if (VD->getOpaqueResultTypeDecl()) {
-      diagnoseAndRemoveAttr(
-          Attr, diag::back_deployed_opaque_result_not_supported, Attr, VD)
+      diagnoseAndRemoveAttr(Attr,
+                            diag::backdeployed_opaque_result_not_supported,
+                            Attr, D->getDescriptiveKind())
           .warnInSwiftInterface(D->getDeclContext());
       continue;
     }
@@ -4950,29 +4960,12 @@ void AttributeChecker::checkBackDeployedAttrs(
       continue;
     }
 
-    // The remaining diagnostics can only be diagnosed for attributes that
-    // apply to the active platform.
-    if (Attr != ActiveAttr)
+    if (Ctx.LangOpts.DisableAvailabilityChecking)
       continue;
 
-    if (auto *VarD = dyn_cast<VarDecl>(D)) {
-      // There must be a function body to back deploy so for vars we require
-      // that they be computed in order to allow back deployment.
-      if (VarD->hasStorageOrWrapsStorage()) {
-        diagnoseAndRemoveAttr(Attr, diag::attr_not_on_stored_properties, Attr);
-        continue;
-      }
-    }
-
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (!AFD->hasBody()) {
-        diagnoseAndRemoveAttr(Attr, diag::back_deployed_requires_body, Attr,
-                              VD);
-        continue;
-      }
-    }
-
-    if (Ctx.LangOpts.DisableAvailabilityChecking)
+    // Availability conflicts can only be diagnosed for attributes that apply
+    // to the active platform.
+    if (Attr != ActiveAttr)
       continue;
 
     auto availability =
