@@ -2797,10 +2797,12 @@ namespace {
       // Force-unwrap an optional of type T? to produce a T.
       auto locator = CS.getConstraintLocator(expr);
 
-      auto objectTy = CS.createTypeVariable(locator,
-                                            TVO_PrefersSubtypeBinding |
-                                            TVO_CanBindToLValue |
-                                            TVO_CanBindToNoEscape);
+      auto options = TVO_CanBindToLValue | TVO_CanBindToNoEscape;
+
+      if (isExpr<UnresolvedDotExpr>(expr->getSubExpr()))
+        options |= TVO_PrefersSubtypeBinding;
+
+      auto objectTy = CS.createTypeVariable(locator, options);
 
       auto *valueExpr = expr->getSubExpr();
       // It's invalid to force unwrap `nil` literal e.g. `_ = nil!` or
