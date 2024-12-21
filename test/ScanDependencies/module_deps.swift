@@ -5,6 +5,10 @@
 // Check the contents of the JSON output
 // RUN: %validate-json %t/deps.json | %FileCheck -check-prefix CHECK_NO_CLANG_TARGET %s
 
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json deps | %FileCheck --check-prefix CHECK-NO-MODULES %s --allow-empty
+// CHECK-NO-MODULES-NOT: -swift-module-file
+// CHECK-NO-MODULES-NOT: -fmodule-file
+
 // Check the contents of the JSON output
 // RUN: %validate-json %t/deps.json | %FileCheck %s -check-prefix CHECK-NO-SEARCH-PATHS
 
