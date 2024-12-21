@@ -36,6 +36,11 @@ def index_unit_output_path_filelist : Separate<["-"], "index-unit-output-path-fi
 def emit_module_doc_path
   : Separate<["-"], "emit-module-doc-path">, MetaVarName<"<path>">,
     HelpText<"Output module documentation file <path>">;
+def emit_variant_module_doc_path
+  : Separate<["-"], "emit-variant-module-doc-path">, MetaVarName<"<path>">,
+    Flags<[NewDriverOnlyOption]>,
+    HelpText<"Output module documentation file for the target variant to <path>">;
+
 def emit_dependencies_path
   : Separate<["-"], "emit-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output basic Make-compatible dependencies file to <path>">;
@@ -49,6 +54,11 @@ def emit_fixits_path
 def emit_abi_descriptor_path
   : Separate<["-"], "emit-abi-descriptor-path">, MetaVarName<"<path>">,
     HelpText<"Output the ABI descriptor of current module to <path>">;
+def emit_variant_abi_descriptor_path
+  : Separate<["-"], "emit-variant-abi-descriptor-path">, MetaVarName<"<path>">,
+    Flags<[NewDriverOnlyOption]>,
+    HelpText<"Output the ABI descriptor of current target variant module to <path>">;
+
 def emit_module_semantic_info_path
   : Separate<["-"], "emit-module-semantic-info-path">, MetaVarName<"<path>">,
     HelpText<"Output semantic info of current module to <path>">;
