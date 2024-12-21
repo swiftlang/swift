@@ -32,11 +32,10 @@ func f() async { // expected-warning{{global function 'f' involves unsafe code; 
   print(counter) // expected-note{{reference to nonisolated(unsafe) var 'counter' is unsafe in concurrently-executing code}}
   print(globalCounter) // expected-note{{reference to nonisolated(unsafe) var 'globalCounter' is unsafe in concurrently-executing code}}
 
-  acceptSendable(C()) // expected-note{{@unchecked conformance of 'C' to protocol 'Sendable' involves unsafe code}}
+  acceptSendable(C()) // okay
 }
 
-// expected-warning@+1{{type alias 'WeirdC' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}
-typealias WeirdC = RequiresSendable<C> // expected-note{{@unchecked conformance of 'C' to protocol 'Sendable' involves unsafe code}}
+typealias WeirdC = RequiresSendable<C> // okay
 
 
 @available(SwiftStdlib 5.9, *)

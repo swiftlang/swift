@@ -8090,9 +8090,9 @@ NOTE(note_reference_to_nonisolated_unsafe,none,
      (const ValueDecl *))
 NOTE(note_reference_unowned_unsafe,none,
      "reference to unowned(unsafe) %kind0 is unsafe", (const ValueDecl *))
-NOTE(note_use_of_unchecked_conformance_is_unsafe,none,
-     "%select{@unchecked|@unsafe}0 conformance of %1 to %kind2 involves unsafe code",
-     (bool, Type, const ValueDecl *))
+NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
+     "@unsafe conformance of %0 to %kind1 involves unsafe code",
+     (Type, const ValueDecl *))
 GROUPED_WARNING(conformance_involves_unsafe,Unsafe,none,
      "conformance of %0 to %kind1 involves unsafe code; use '@unsafe' to "
      "indicate that the conformance is not memory-safe",
@@ -8106,9 +8106,9 @@ NOTE(note_type_witness_unsafe,none,
 
 GROUPED_WARNING(override_safe_withunsafe,Unsafe,none,
       "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
-GROUPED_WARNING(use_of_unchecked_conformance_is_unsafe,Unsafe,none,
-      "%select{@unchecked|@unsafe}0 conformance of %1 to %kind2 involves unsafe code",
-       (bool, Type, const ValueDecl *))
+GROUPED_WARNING(use_of_unsafe_conformance_is_unsafe,Unsafe,none,
+      "@unsafe conformance of %0 to %kind1 involves unsafe code",
+       (Type, const ValueDecl *))
 GROUPED_WARNING(reference_unowned_unsafe,Unsafe,none,
       "reference to unowned(unsafe) %kind0 is unsafe", (const ValueDecl *))
 GROUPED_WARNING(reference_to_nonisolated_unsafe,Unsafe,none,
@@ -8124,8 +8124,6 @@ GROUPED_WARNING(preconcurrency_import_unsafe,Unsafe,none,
       "@preconcurrency import is not memory-safe because it can silently "
       "introduce data races; use '@safe(unchecked)' to assert that the "
       "code is memory-safe", ())
-NOTE(unsafe_decl_here,none,
-     "unsafe %kindbase0 declared here", (const ValueDecl *))
 NOTE(encapsulate_unsafe_in_enclosing_context,none,
      "make %kindbase0 @safe(unchecked) to allow it to use unsafe constructs in its definition",
      (const Decl *))

@@ -87,7 +87,7 @@ struct SuperHolder {
 // -----------------------------------------------------------------------
 // Inheritance of @unsafe
 // -----------------------------------------------------------------------
-@unsafe class UnsafeSuper { // expected-note 2{{'UnsafeSuper' declared here}}
+@unsafe class UnsafeSuper {
   func f() { }
 };
 

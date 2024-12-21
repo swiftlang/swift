@@ -150,22 +150,10 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
   case UnsafeUse::UnsafeConformance: {
     auto conformance = use.getConformance();
     ASTContext &ctx = conformance.getRequirement()->getASTContext();
-
-    // Figure out whether to diagnose @unchecked or @unsafe.
-    bool isUnsafe = true;
-    if (conformance.isConcrete()) {
-      if (auto normal =
-              conformance.getConcrete()->getRootNormalConformance()){
-        if (normal->isUnchecked() && !normal->isUnsafe())
-          isUnsafe = false;
-      }
-    }
-
     ctx.Diags.diagnose(
         use.getLocation(),
-        asNote ? diag::note_use_of_unchecked_conformance_is_unsafe
-               : diag::use_of_unchecked_conformance_is_unsafe,
-        isUnsafe,
+        asNote ? diag::note_use_of_unsafe_conformance_is_unsafe
+               : diag::use_of_unsafe_conformance_is_unsafe,
         use.getType(),
         conformance.getRequirement());
     return;
@@ -231,7 +219,6 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
 
     if (!asNote) {
       suggestUnsafeOnEnclosingDecl(loc, use.getDeclContext());
-      decl->diagnose(diag::unsafe_decl_here, decl);
     }
 
     return;

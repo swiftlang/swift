@@ -4772,18 +4772,6 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   if (!where.getAvailability().allowsUnsafe() &&
       ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
     if (auto normalConf = dyn_cast<NormalProtocolConformance>(rootConf)) {
-      // @unchecked Sendable conformances are considered unsafe when complete
-      // checking is enabled.
-      if (normalConf->isUnchecked() &&
-          normalConf->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable) &&
-          normalConf->getProtocol()->getASTContext()
-            .LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
-        diagnoseUnsafeUse(
-            UnsafeUse::forConformance(
-              concreteConf->getType(), conformance, loc,
-              where.getDeclContext()));
-      }
-
       // @unsafe conformances are considered... unsafe.
       if (normalConf->isUnsafe()) {
         diagnoseUnsafeUse(

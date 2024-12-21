@@ -6699,12 +6699,6 @@ void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
   });
 
   diagnose(specificType ? specificType : type);
-
-  if (specificType) {
-    if (auto specificTypeDecl = specificType->getAnyNominal()) {
-      specificTypeDecl->diagnose(diag::unsafe_decl_here, specificTypeDecl);
-    }
-  }
 }
 
 void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
