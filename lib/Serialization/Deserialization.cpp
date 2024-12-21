@@ -8363,9 +8363,12 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   ArrayRef<uint64_t> rawMemberIDs;
   decls_block::MembersLayout::readRecord(memberIDBuffer, rawMemberIDs);
 
-  if (rawMemberIDs.empty())
+  if (rawMemberIDs.empty()) {
+    // No members; set the state of member deserialization to done.
+    if (!IDC->didDeserializeMembers())
+      IDC->setDeserializedMembers(true);
     return;
-
+  }
   SmallVector<Decl *, 16> members;
   members.reserve(rawMemberIDs.size());
   for (DeclID rawID : rawMemberIDs) {
@@ -8381,8 +8384,16 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
           getContext(), container, next.takeError());
       if (suppliedMissingMember)
         members.push_back(suppliedMissingMember);
+
+      // Not all members can be discovered as missing
+      // members as checked above, so set the error bit
+      // here.
+      IDC->setHasDeserializeMemberError(true);
     }
   }
+  // Set the status of member deserialization to Done.
+  if (!IDC->didDeserializeMembers())
+    IDC->setDeserializedMembers(true);
 
   for (auto member : members)
     IDC->addMember(member);
