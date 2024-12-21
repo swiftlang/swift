@@ -1082,7 +1082,7 @@ mergeAccesses(SILFunction *F, PostDominanceInfo *postDomTree,
       continue;
 
     if (!extendOwnership(parentIns, childIns, deleter, deBlocks))
-      return false;
+      continue;
 
     LLVM_DEBUG(llvm::dbgs()
                << "Merging " << *childIns << " into " << *parentIns << "\n");
