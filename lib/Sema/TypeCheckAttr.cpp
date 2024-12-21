@@ -127,6 +127,14 @@ public:
           return;
         }
       }
+
+      TypeChecker::checkAvailability(
+          attr->getRange(), C.getIsolatedDeinitAvailability(),
+          D->getDeclContext(),
+          [&](StringRef platformName, llvm::VersionTuple version) {
+            return diagnoseAndRemoveAttr(
+                attr, diag::isolated_deinit_unavailable, platformName, version);
+          });
     }
   }
 
