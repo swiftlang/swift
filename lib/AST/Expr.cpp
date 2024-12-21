@@ -461,7 +461,6 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
   PASS_THROUGH_REFERENCE(CurrentContextIsolation, getActor);
-  PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
   NO_REFERENCE(TypeJoin);
   SIMPLE_REFERENCE(MacroExpansion, getMacroRef);
@@ -662,7 +661,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::Error:
   case ExprKind::CodeCompletion:
   case ExprKind::LazyInitializer:
-  case ExprKind::OneWay:
     return false;
 
   case ExprKind::NilLiteral:
@@ -1037,7 +1035,6 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::ObjCSelector:
   case ExprKind::KeyPath:
   case ExprKind::KeyPathDot:
-  case ExprKind::OneWay:
   case ExprKind::Tap:
   case ExprKind::SingleValueStmt:
   case ExprKind::TypeJoin:

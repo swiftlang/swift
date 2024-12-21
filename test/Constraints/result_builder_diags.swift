@@ -9,15 +9,15 @@ enum Either<T,U> {
 // expected-note @+1 2 {{struct 'TupleBuilder' declared here}}
 @resultBuilder struct TupleBuilder {
   static func buildBlock() -> () { }
-  
+
   static func buildBlock<T1>(_ t1: T1) -> T1 {
     return t1
   }
-  
+
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
-  
+
   static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
       -> (T1, T2, T3) {
     return (t1, t2, t3)
@@ -51,15 +51,15 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   // expected-note@-2{{add 'buildEither(first:)' and 'buildEither(second:)' to the result builder 'TupleBuilderWithoutIf' to add support for 'if'-'else' and 'switch'}}
   // expected-note@-3{{add 'buildArray(_:)' to the result builder 'TupleBuilderWithoutIf' to add support for 'for'..'in' loops}}
   static func buildBlock() -> () { }
-  
+
   static func buildBlock<T1>(_ t1: T1) -> T1 {
     return t1
   }
-  
+
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
-  
+
   static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
       -> (T1, T2, T3) {
     return (t1, t2, t3)
@@ -152,7 +152,7 @@ func overloadedTuplify<T>(_ cond: Bool, @TupleBuilderWithoutIf body: (Bool) -> T
 func testOverloading(name: String) {
   let a1 = overloadedTuplify(true) { b in
     if b {
-      "Hello, \(name)" 
+      "Hello, \(name)"
     }
   }
 
@@ -171,7 +171,7 @@ func testOverloading(name: String) {
       $0 ? "Hello, \(name)" : "Goodbye"
       42
       if $0 {
-        "Hello, \(name)" 
+        "Hello, \(name)"
       }
     }
   }
@@ -271,7 +271,7 @@ func erroneous_53751(x: Int) {
       if b {
         acceptInt(0) { }
       }
-    }).domap(0) // expected-error{{value of type '()?' has no member 'domap'}}
+    }).domap(0) // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
   }
 }
 
@@ -543,15 +543,15 @@ func testCaseVarTypes(e: E3) {
 @resultBuilder
 struct WrapperBuilder {
   static func buildBlock() -> () { }
-  
+
   static func buildBlock<T1>(_ t1: T1) -> T1 {
     return t1
   }
-  
+
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
-  
+
   static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
       -> (T1, T2, T3) {
     return (t1, t2, t3)
