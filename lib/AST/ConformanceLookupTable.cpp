@@ -53,6 +53,18 @@ DeclContext *ConformanceLookupTable::ConformanceSource::getDeclContext() const {
   llvm_unreachable("Unhandled ConformanceEntryKind in switch.");
 }
 
+bool ConformanceLookupTable::ConformanceSource::isUnsafeContext(DeclContext *dc) {
+  if (auto enclosingNominal = dc->getSelfNominalTypeDecl())
+    if (enclosingNominal->isUnsafe())
+      return true;
+
+  if (auto ext = dyn_cast<ExtensionDecl>(dc))
+    if (ext->getAttrs().hasAttribute<UnsafeAttr>())
+      return true;
+
+  return false;
+}
+
 ProtocolDecl *ConformanceLookupTable::ConformanceEntry::getProtocol() const {
   if (auto protocol = Conformance.dyn_cast<ProtocolDecl *>())
     return protocol;
@@ -315,7 +327,9 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
             if (!found.isSuppressed) {
               addProtocol(proto, found.Loc,
                           source.withUncheckedLoc(found.uncheckedLoc)
-                                .withPreconcurrencyLoc(found.preconcurrencyLoc));
+                                .withPreconcurrencyLoc(found.preconcurrencyLoc)
+                                .withUnsafeLoc(found.unsafeLoc)
+                                .withSafeRange(found.safeRange));
             }
           }
 
@@ -981,8 +995,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     auto normalConf = ctx.getNormalConformance(
         conformingType, protocol, conformanceLoc, conformingDC,
         ProtocolConformanceState::Incomplete,
-        entry->Source.getUncheckedLoc().isValid(),
-        entry->Source.getPreconcurrencyLoc().isValid(),
+        entry->Source.getOptions(),
         entry->Source.getPreconcurrencyLoc());
     // Invalid code may cause the getConformance call below to loop, so break
     // the infinite recursion by setting this eagerly to shortcircuit with the

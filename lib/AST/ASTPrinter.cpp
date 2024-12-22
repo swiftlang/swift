@@ -2873,6 +2873,10 @@ void PrintAST::printInherited(const Decl *decl) {
         Printer << "@retroactive ";
       if (inherited.isPreconcurrency())
         Printer << "@preconcurrency ";
+      if (inherited.isUnsafe())
+        Printer << "@unsafe ";
+      if (inherited.isSafe())
+        Printer << "@safe(unchecked) ";
       if (inherited.isSuppressed())
         Printer << "~";
     });
@@ -7805,8 +7809,7 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
   if (auto superclassTy = genericSig->getSuperclassBound(
         proto->getSelfInterfaceType())) {
     Results.emplace_back(TypeLoc::withoutLoc(superclassTy),
-                         /*isUnchecked=*/false,
-                         /*isRetroactive=*/false,
+                         ProtocolConformanceOptions(),
                          /*isPreconcurrency=*/false);
   }
 
@@ -7825,9 +7828,7 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
     }
 
     Results.emplace_back(TypeLoc::withoutLoc(inherited->getDeclaredInterfaceType()),
-                         /*isUnchecked=*/false,
-                         /*isRetroactive=*/false,
-                         /*isPreconcurrency=*/false);
+                      ProtocolConformanceOptions());
   }
 
   for (auto ip : inverses) {
@@ -7838,9 +7839,7 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
         ctx, ArrayRef<Type>(), singleton,
         /*hasExplicitAnyObject=*/false);
     Results.emplace_back(TypeLoc::withoutLoc(inverseTy),
-                         /*isUnchecked=*/false,
-                         /*isRetroactive=*/false,
-                         /*isPreconcurrency=*/false);
+                         ProtocolConformanceOptions());
   }
 }
 
@@ -7954,10 +7953,11 @@ swift::getInheritedForPrinting(
     if (proto->getInvertibleProtocolKind())
       continue;
 
+    ProtocolConformanceOptions options;
+    if (isUnchecked)
+      options |= ProtocolConformanceFlags::Unchecked;
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                       isUnchecked,
-                       /*isRetroactive=*/false,
-                       /*isPreconcurrency=*/false});
+                       options});
   }
 }
 

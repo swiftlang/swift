@@ -42,23 +42,23 @@ protocol P {
 }
 
 struct S1: P {
-  // expected-note@-1{{make the enclosing struct @unsafe to allow unsafe conformance to protocol 'P'}}{{1-1=@unsafe }}
+  // expected-warning@-1{{conformance of 'S1' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{12-12=@unsafe }}
   @unsafe
-  func protoMethod() { } // expected-warning{{unsafe instance method 'protoMethod()' cannot satisfy safe requirement}}
+  func protoMethod() { } // expected-note{{unsafe instance method 'protoMethod()' cannot satisfy safe requirement}}
 }
 
 @unsafe
 struct S2: P {
-  @unsafe // okay
+  @unsafe
   func protoMethod() { }
 }
 
 struct S3 { }
 
 extension S3: P {
-  // expected-note@-1{{make the enclosing extension @unsafe to allow unsafe conformance to protocol 'P'}}{{1-1=@unsafe }}
+  // expected-warning@-1{{conformance of 'S3' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{15-15=@unsafe }}
   @unsafe
-  func protoMethod() { } // expected-warning{{unsafe instance method 'protoMethod()' cannot satisfy safe requirement}}
+  func protoMethod() { } // expected-note{{unsafe instance method 'protoMethod()' cannot satisfy safe requirement}}
 }
 
 struct S4 { }
