@@ -411,6 +411,51 @@ SupplementaryOutputPathsComputer::getSupplementaryFilenamesFromArguments(
   return std::nullopt;
 }
 
+static bool shouldEmitFineModuleTrace(FrontendOptions::ActionType action) {
+  // Only full compilation jobs should emit fine module tracing file.
+  // Other partial compilation jobs, such as emitting modules, only typecheck partially
+  // so walking into every function bodies may be risky.
+  switch(action) {
+  case swift::FrontendOptions::ActionType::Typecheck:
+  case swift::FrontendOptions::ActionType::EmitSILGen:
+  case swift::FrontendOptions::ActionType::EmitSIL:
+  case swift::FrontendOptions::ActionType::EmitAssembly:
+  case swift::FrontendOptions::ActionType::EmitLoweredSIL:
+  case swift::FrontendOptions::ActionType::EmitIRGen:
+  case swift::FrontendOptions::ActionType::EmitIR:
+  case swift::FrontendOptions::ActionType::EmitBC:
+  case swift::FrontendOptions::ActionType::EmitObject:
+    return true;
+  case swift::FrontendOptions::ActionType::NoneAction:
+  case swift::FrontendOptions::ActionType::Parse:
+  case swift::FrontendOptions::ActionType::ResolveImports:
+  case swift::FrontendOptions::ActionType::DumpParse:
+  case swift::FrontendOptions::ActionType::DumpInterfaceHash:
+  case swift::FrontendOptions::ActionType::DumpAST:
+  case swift::FrontendOptions::ActionType::PrintAST:
+  case swift::FrontendOptions::ActionType::PrintASTDecl:
+  case swift::FrontendOptions::ActionType::DumpScopeMaps:
+  case swift::FrontendOptions::ActionType::DumpAvailabilityScopes:
+  case swift::FrontendOptions::ActionType::EmitImportedModules:
+  case swift::FrontendOptions::ActionType::EmitPCH:
+  case swift::FrontendOptions::ActionType::EmitModuleOnly:
+  case swift::FrontendOptions::ActionType::MergeModules:
+  case swift::FrontendOptions::ActionType::CompileModuleFromInterface:
+  case swift::FrontendOptions::ActionType::TypecheckModuleFromInterface:
+  case swift::FrontendOptions::ActionType::EmitSIBGen:
+  case swift::FrontendOptions::ActionType::EmitSIB:
+  case swift::FrontendOptions::ActionType::Immediate:
+  case swift::FrontendOptions::ActionType::REPL:
+  case swift::FrontendOptions::ActionType::DumpTypeInfo:
+  case swift::FrontendOptions::ActionType::EmitPCM:
+  case swift::FrontendOptions::ActionType::DumpPCM:
+  case swift::FrontendOptions::ActionType::ScanDependencies:
+  case swift::FrontendOptions::ActionType::PrintVersion:
+  case swift::FrontendOptions::ActionType::PrintFeature:
+    return false;
+  }
+}
+
 std::optional<SupplementaryOutputPaths>
 SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
     StringRef outputFile, const SupplementaryOutputPaths &pathsFromArguments,
@@ -461,7 +506,9 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   // SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH.
   // FIXME: we probably need to move this to a frontend argument.
   llvm::SmallString<128> FineModuleTracePath;
-  if (!loadedModuleTracePath.empty()) {
+  if (!loadedModuleTracePath.empty() &&
+      shouldEmitFineModuleTrace(RequestedAction) &&
+      !Args.hasArg(OPT_disable_fine_module_tracing)) {
     if (const char *P = ::getenv("SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH")) {
       StringRef FilePath = P;
       llvm::sys::path::append(FineModuleTracePath, FilePath);

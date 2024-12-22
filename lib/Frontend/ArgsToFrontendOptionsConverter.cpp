@@ -392,7 +392,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
 
   Opts.DisableSandbox = Args.hasArg(OPT_disable_sandbox);
-  Opts.DisableFineModuleTracing = Args.hasArg(OPT_disable_fine_module_tracing);
   return false;
 }
 

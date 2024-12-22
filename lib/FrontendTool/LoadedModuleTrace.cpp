@@ -876,11 +876,17 @@ static void createFineModuleTraceFile(CompilerInstance &instance,
     return;
   }
   ObjcMethodReferenceCollector collector(MD);
-  instance.forEachFileToTypeCheck([&](SourceFile& SF) {
-    collector.setFileBeforeVisiting(&SF);
-    collector.walk(SF);
-    return false;
-  });
+
+  auto blocklisted = ctx.blockListConfig.hasBlockListAction(MD->getNameStr(),
+    BlockListKeyKind::ModuleName, BlockListAction::SkipEmittingFineModuleTrace);
+
+  if (!blocklisted) {
+    instance.forEachFileToTypeCheck([&](SourceFile& SF) {
+      collector.setFileBeforeVisiting(&SF);
+      collector.walk(SF);
+      return false;
+    });
+  }
 
   // print this json line.
   std::string stringBuffer;
@@ -899,64 +905,10 @@ static void createFineModuleTraceFile(CompilerInstance &instance,
   }
 }
 
-static bool shouldActionTypeEmitFineModuleTrace(FrontendOptions::ActionType action) {
-  // Only full compilation jobs should emit fine module tracing file.
-  // Other partial compilation jobs, such as emitting modules, only typecheck partially
-  // so walking into every function bodies may be risky.
-  switch(action) {
-  case swift::FrontendOptions::ActionType::Typecheck:
-  case swift::FrontendOptions::ActionType::EmitSILGen:
-  case swift::FrontendOptions::ActionType::EmitSIL:
-  case swift::FrontendOptions::ActionType::EmitAssembly:
-  case swift::FrontendOptions::ActionType::EmitLoweredSIL:
-  case swift::FrontendOptions::ActionType::EmitIRGen:
-  case swift::FrontendOptions::ActionType::EmitIR:
-  case swift::FrontendOptions::ActionType::EmitBC:
-  case swift::FrontendOptions::ActionType::EmitObject:
-    return true;
-  case swift::FrontendOptions::ActionType::NoneAction:
-  case swift::FrontendOptions::ActionType::Parse:
-  case swift::FrontendOptions::ActionType::ResolveImports:
-  case swift::FrontendOptions::ActionType::DumpParse:
-  case swift::FrontendOptions::ActionType::DumpInterfaceHash:
-  case swift::FrontendOptions::ActionType::DumpAST:
-  case swift::FrontendOptions::ActionType::PrintAST:
-  case swift::FrontendOptions::ActionType::PrintASTDecl:
-  case swift::FrontendOptions::ActionType::DumpScopeMaps:
-  case swift::FrontendOptions::ActionType::DumpAvailabilityScopes:
-  case swift::FrontendOptions::ActionType::EmitImportedModules:
-  case swift::FrontendOptions::ActionType::EmitPCH:
-  case swift::FrontendOptions::ActionType::EmitModuleOnly:
-  case swift::FrontendOptions::ActionType::MergeModules:
-  case swift::FrontendOptions::ActionType::CompileModuleFromInterface:
-  case swift::FrontendOptions::ActionType::TypecheckModuleFromInterface:
-  case swift::FrontendOptions::ActionType::EmitSIBGen:
-  case swift::FrontendOptions::ActionType::EmitSIB:
-  case swift::FrontendOptions::ActionType::Immediate:
-  case swift::FrontendOptions::ActionType::REPL:
-  case swift::FrontendOptions::ActionType::DumpTypeInfo:
-  case swift::FrontendOptions::ActionType::EmitPCM:
-  case swift::FrontendOptions::ActionType::DumpPCM:
-  case swift::FrontendOptions::ActionType::ScanDependencies:
-  case swift::FrontendOptions::ActionType::PrintVersion:
-  case swift::FrontendOptions::ActionType::PrintFeature:
-    return false;
-  }
-}
-
 bool swift::emitFineModuleTraceIfNeeded(CompilerInstance &Instance,
                                         const FrontendOptions &opts) {
-  if (opts.DisableFineModuleTracing) {
-    return false;
-  }
-  if (!shouldActionTypeEmitFineModuleTrace(opts.RequestedAction)) {
-    return false;
-  }
   ModuleDecl *mainModule = Instance.getMainModule();
   ASTContext &ctxt = mainModule->getASTContext();
-  if (ctxt.blockListConfig.hasBlockListAction(mainModule->getNameStr(),
-      BlockListKeyKind::ModuleName, BlockListAction::SkipEmittingFineModuleTrace))
-    return false;
   assert(!ctxt.hadError() &&
          "We should've already exited earlier if there was an error.");
 
