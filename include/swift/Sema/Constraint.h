@@ -150,11 +150,6 @@ enum class ConstraintKind : char {
   /// The key path type is chosen based on the selection of overloads for the
   /// member references along the path.
   KeyPath,
-  /// The first type will be equal to the second type, but only when the
-  /// second type has been fully determined (and mapped down to a concrete
-  /// type). At that point, this constraint will be treated like an `Equal`
-  /// constraint.
-  OneWayEqual,
   /// If there is no contextual info e.g. `_ = { 42 }` default first type
   /// to a second type. This is effectively a `Defaultable` constraint
   /// which one significant difference:
@@ -680,7 +675,6 @@ public:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
-    case ConstraintKind::OneWayEqual:
     case ConstraintKind::FallbackType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PackElementOf:
@@ -825,11 +819,6 @@ public:
   /// Determine whether this constraint should be solved in isolation
   /// from the rest of the constraint system.
   bool isIsolated() const { return IsIsolated; }
-
-  /// Whether this is a one-way constraint.
-  bool isOneWayConstraint() const {
-    return Kind == ConstraintKind::OneWayEqual;
-  }
 
   /// Retrieve the overload choice for an overload-binding constraint.
   OverloadChoice getOverloadChoice() const {

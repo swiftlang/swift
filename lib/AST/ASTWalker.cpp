@@ -1332,18 +1332,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
-  Expr *visitOneWayExpr(OneWayExpr *E) {
-    if (auto oldSubExpr = E->getSubExpr()) {
-      if (auto subExpr = doIt(oldSubExpr)) {
-        E->setSubExpr(subExpr);
-      } else {
-        return nullptr;
-      }
-    }
-
-    return E;
-  }
-
   Expr *visitTapExpr(TapExpr *E) {
     if (auto oldSubExpr = E->getSubExpr()) {
       if (auto subExpr = doIt(oldSubExpr)) {
