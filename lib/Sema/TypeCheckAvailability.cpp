@@ -39,12 +39,17 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
+#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
+
 using namespace swift;
 
 static const Decl *
@@ -3284,6 +3289,41 @@ static bool diagnoseTypedThrowsAvailability(
       ReferenceDC);
 }
 
+static bool isObjCProtocolTypeDecl(TypeDecl *D) {
+  if (auto *ClangD = D->getClangDecl()){
+    return dyn_cast<clang::ObjCProtocolDecl>(ClangD);
+  }
+  return false;
+}
+
+static bool diagnoseNonRuntimeProtocol(SourceLoc Loc, TypeDecl *D) {
+  auto *ClangD = D->getClangDecl();
+  if (!ClangD)
+    return false;
+
+  auto *proto = dyn_cast<clang::ObjCProtocolDecl>(ClangD);
+  if (!proto)
+    return false;
+
+  if (!proto->isNonRuntimeProtocol())
+    return true;
+
+  auto *clangImporter =
+      static_cast<ClangImporter *>(D->getASTContext().getClangModuleLoader());
+  assert(clangImporter && "Must have a clang importer");
+
+  auto &Diags = D->getASTContext().Diags;
+  Diags.diagnose(Loc, diag::non_runtime_objc_protocol_metadata_not_available,
+                 D->getNameStr());
+  Diags
+      .diagnose(clangImporter->importSourceLocation(proto->getLocation()),
+                diag::clang_decl_declared_here, proto)
+      .highlight(clangImporter->importSourceRange(
+          proto->getAttr<clang::ObjCNonRuntimeProtocolAttr>()->getRange()));
+
+  return false;
+}
+
 /// Make sure the generic arguments conform to all known invertible protocols.
 /// Runtimes prior to NoncopyableGenerics do not check if any of the
 /// generic arguments conform to Copyable/Escapable during dynamic casts.
@@ -3374,6 +3414,9 @@ static bool checkTypeMetadataAvailabilityInternal(CanType type,
         return diagnoseIsolatedAnyAvailability(refLoc, refDC);
       if (fnType.getThrownError())
         return diagnoseTypedThrowsAvailability(refLoc, refDC);
+    } else if (auto nominalType = dyn_cast<NominalType>(type)) {
+      if (isObjCProtocolTypeDecl(nominalType->getDecl()))
+        return diagnoseNonRuntimeProtocol(refLoc.Start, nominalType->getDecl());
     }
     return false;
   });
