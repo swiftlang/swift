@@ -610,6 +610,10 @@ namespace swift {
     /// from source.
     bool AllowNonResilientAccess = false;
 
+    /// If true, fails and emits a diag on member deserialization error to prevent
+    /// direct access to modules with package-cmo enabled.
+    bool FailOnDeserializationErrorForPackageCMO = false;
+
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 

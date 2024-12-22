@@ -1354,6 +1354,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.FailOnDeserializationErrorForPackageCMO = Args.hasArg(OPT_ExperimentalPackageCMOFailOnDeserializationError);
   Opts.AllowNonResilientAccess =
       Args.hasArg(OPT_experimental_allow_non_resilient_access) ||
       Args.hasArg(OPT_allow_non_resilient_access) ||
