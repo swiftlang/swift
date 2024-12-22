@@ -648,7 +648,7 @@ private enum ImmutableScope {
           self = .borrow(singleBorrowIntroducer)
         case .functionArgument:
           self = .wholeFunction
-        case .beginApply:
+        case .beginApply, .uncheckOwnershipConversion:
           return nil
         }
       }

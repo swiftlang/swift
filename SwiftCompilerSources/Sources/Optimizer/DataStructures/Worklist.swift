@@ -79,7 +79,7 @@ typealias ValueWorklist = Worklist<ValueSet>
 typealias OperandWorklist = Worklist<OperandSet>
 
 extension InstructionWorklist {
-  mutating func pushPredecessors(of inst: Instruction, ignoring ignoreInst: SingleValueInstruction) {
+  mutating func pushPredecessors(of inst: Instruction, ignoring ignoreInst: Instruction) {
     if let prev = inst.previous {
       if prev != ignoreInst {
         pushIfNotVisited(prev)
