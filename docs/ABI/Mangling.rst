@@ -259,6 +259,8 @@ types where the metadata itself has unknown layout.)
   global ::= from-type to-type generic-signature? 'Tr'  // obsolete mangling for reabstraction thunk
   global ::= entity generic-signature? type type* 'TK' // key path getter
   global ::= entity generic-signature? type type* 'Tk' // key path setter
+  global ::= entity generic-signature? type type* 'Tkmu' // key path unapplied method
+  global ::= entity generic-signature? type type* 'TkMA' // key path applied method
   global ::= type generic-signature 'TH' // key path equality
   global ::= type generic-signature 'Th' // key path hasher
   global ::= global generic-signature? 'TJ' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' // autodiff function

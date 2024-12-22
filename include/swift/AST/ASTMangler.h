@@ -346,16 +346,20 @@ public:
                                      AutoDiffLinearMapKind linearMapKind,
                                      const AutoDiffConfig &config);
 
-  std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
-                                             GenericSignature signature,
-                                             CanType baseType,
-                                             SubstitutionMap subs,
-                                             ResilienceExpansion expansion);
+  std::string mangleKeyPathGetterThunkHelper(
+      const AbstractStorageDecl *property, GenericSignature signature,
+      CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion);
   std::string mangleKeyPathSetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature signature,
                                              CanType baseType,
                                              SubstitutionMap subs,
                                              ResilienceExpansion expansion);
+  std::string mangleKeyPathUnappliedMethodThunkHelper(
+      const AbstractFunctionDecl *method, GenericSignature signature,
+      CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion);
+  std::string mangleKeyPathAppliedMethodThunkHelper(
+      const AbstractFunctionDecl *method, GenericSignature signature,
+      CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion);
   std::string mangleKeyPathEqualsHelper(ArrayRef<CanType> indices,
                                         GenericSignature signature,
                                         ResilienceExpansion expansion);
