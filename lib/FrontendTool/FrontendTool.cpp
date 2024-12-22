@@ -192,10 +192,6 @@ printModuleInterfaceIfNeeded(llvm::vfs::OutputBackend &outputBackend,
                    diag::warn_unsupported_module_interface_swift_version,
                    LangOpts.isSwiftVersionAtLeast(4, 2) ? "4.2" : "4");
   }
-  if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
-    diags.diagnose(SourceLoc(),
-                   diag::warn_unsupported_module_interface_library_evolution);
-  }
   return withOutputPath(diags, outputBackend, outputPath,
                         [M, Opts](raw_ostream &out) -> bool {
                           return swift::emitSwiftInterface(out, Opts, M);
