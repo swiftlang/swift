@@ -15,15 +15,30 @@ module _complex [system] {
   export *
 }
 
+module _errno [system] {
+  header "errno.h"
+  export *
+}
+
+module _math [system] {
+  header "math.h"
+  export *
+}
+
+module _stdlib [system] {
+  header "stdlib.h"
+  export *
+}
+
+module _stddef [system] {
+  header "stddef.h"
+  export *
+}
+
 module ucrt [system] {
   module C {
     module ctype {
       header "ctype.h"
-      export *
-    }
-
-    module errno {
-      header "errno.h"
       export *
     }
 
@@ -47,20 +62,11 @@ module ucrt [system] {
       export *
     }
 
-    module math {
-      header "math.h"
-      export *
-    }
-
     module signal {
       header "signal.h"
       export *
     }
 
-    module stddef {
-      header "stddef.h"
-      export *
-    }
 
     module stdio {
       header "stdio.h"
@@ -74,10 +80,6 @@ module ucrt [system] {
       link "legacy_stdio_definitions"
     }
 
-    module stdlib {
-      header "stdlib.h"
-      export *
-    }
 
     module string {
       header "string.h"
