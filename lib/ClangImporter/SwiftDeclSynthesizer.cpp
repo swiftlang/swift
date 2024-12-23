@@ -2499,6 +2499,8 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
       ImporterImpl.ImportedHeaderUnit);
   funcDecl->setBodySynthesizer(synthesizeDefaultArgumentBody, (void *)param);
   funcDecl->setAccess(AccessLevel::Public);
+  funcDecl->getAttrs().add(new (ctx)
+                               AlwaysEmitIntoClientAttr(/*IsImplicit*/ true));
 
   ImporterImpl.defaultArgGenerators[param] = funcDecl;
 
