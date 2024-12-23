@@ -3284,7 +3284,7 @@ SILValue PullbackCloner::Implementation::getAdjointProjection(
     auto adjSource = getAdjointBuffer(origBB, source);
     if (!adjSource->getType().is<TupleType>())
       return adjSource;
-    auto origTupleTy = source->getType().castTo<TupleType>();
+    auto origTupleTy = remapType(source->getType()).castTo<TupleType>();
     unsigned adjIndex = 0;
     for (unsigned i : range(teai->getFieldIndex())) {
       if (getTangentSpace(
