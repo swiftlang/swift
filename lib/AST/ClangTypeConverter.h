@@ -104,9 +104,20 @@ private:
   clang::QualType convertMemberType(NominalTypeDecl *DC,
                                     StringRef memberName);
 
+  clang::QualType convertTemplateArgument(Type type);
+
+  clang::QualType convertClangDecl(Type type, const clang::Decl *decl);
+
+  clang::QualType convertOptionalType(BoundGenericType *type);
+
+  clang::QualType convertSIMDType(BoundGenericType *type, bool templateArgument);
+
+  clang::QualType convertPointerType(BoundGenericType *type, bool templateArgument);
+
   void registerExportedClangDecl(Decl *swiftDecl,
                                  const clang::Decl *clangDecl);
 
+  clang::QualType reverseImportedTypeMapping(StructType *type);
   clang::QualType reverseBuiltinTypeMapping(StructType *type);
 
   friend TypeVisitor<ClangTypeConverter, clang::QualType>;
