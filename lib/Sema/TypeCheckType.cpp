@@ -5907,6 +5907,10 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
       diagnose(repr->getLoc(), diag::incorrect_optional_any,
                constraintType)
         .fixItReplace(repr->getSourceRange(), fix);
+
+      // Recover by returning the intended type, but mark the type
+      // representation as invalid to prevent it from being diagnosed elsewhere.
+      repr->setInvalid();
       return constraintType;
     }
     
@@ -6345,13 +6349,6 @@ private:
       // Look through parens, inverses, metatypes, and compositions.
       if ((*it)->isParenType() || isa<InverseTypeRepr>(*it) ||
           isa<CompositionTypeRepr>(*it) || isa<MetatypeTypeRepr>(*it)) {
-        continue;
-      }
-
-      // Look through '?' and '!' too; `any P?` et al. is diagnosed in the
-      // type resolver.
-      if (isa<OptionalTypeRepr>(*it) ||
-          isa<ImplicitlyUnwrappedOptionalTypeRepr>(*it)) {
         continue;
       }
 
