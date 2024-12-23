@@ -1,5 +1,10 @@
 // RUN: %target-swift-frontend %s  -Xllvm -sil-print-types -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o 2>&1 | %FileCheck %s
 
+// wasm currently disables aggressive reg2mem
+// UNSUPPORTED: wasm
+// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: CPU=wasm32
+
 sil_stage canonical
 
 import Builtin
