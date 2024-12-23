@@ -32,17 +32,19 @@ public enum _SwiftifyInfo {
     case nonescaping(pointer: Int)
 }
 
-/// Generates a bounds safe wrapper for function with Unsafe[Mutable][Raw]Pointer[?] arguments.
+/// Generates a safe wrapper for function with Unsafe[Mutable][Raw]Pointer[?] or std::span arguments.
 /// Intended to be automatically attached to function declarations imported by ClangImporter.
 /// The wrapper function will replace Unsafe[Mutable][Raw]Pointer[?] parameters with
 /// [Mutable][Raw]Span[?] or Unsafe[Mutable][Raw]BufferPointer[?] if they have bounds information
 /// attached. Where possible "count" parameters will be elided from the wrapper signature, instead
 /// fetching the count from the buffer pointer. In these cases the bounds check is also skipped.
+/// It will replace some std::span arguments with Swift's Span type when sufficient information is
+/// available.
 ///
 /// Currently not supported: return pointers, nested pointers, pointee "count" parameters, endedBy.
 ///
 /// Parameter paramInfo: information about how the function uses the pointer passed to it. The
 /// safety of the generated wrapper function depends on this info being extensive and accurate.
 @attached(peer, names: overloaded)
-public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...) =
+public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo..., typeMappings: [String: String] = [:]) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
