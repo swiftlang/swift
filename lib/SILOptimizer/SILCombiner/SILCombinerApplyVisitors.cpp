@@ -1320,10 +1320,6 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
 SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
                                                     WitnessMethodInst *WMI) {
-  // We do not perform this optimization in OSSA. In OSSA, we will have opaque
-  // values we will redo this.
-  if (WMI->getFunction()->hasOwnership())
-    return nullptr;
 
   // Check if it is legal to perform the propagation.
   if (WMI->getConformance().isConcrete())
@@ -1403,9 +1399,6 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
 /// ==> apply %f<C : P>(%ref)
 SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply) {
-  if (Apply.getFunction()->hasOwnership())
-    return nullptr;
-
   // This optimization requires a generic argument.
   if (!Apply.hasSubstitutions())
     return nullptr;
