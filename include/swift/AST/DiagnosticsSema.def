@@ -1723,7 +1723,10 @@ ERROR(functions_mutating_and_not,none,
       "method must not be declared both %0 and %1",
       (SelfAccessKind, SelfAccessKind))
 ERROR(static_functions_not_mutating,none,
-      "static functions must not be declared mutating", ())
+      "%0 modifier cannot be used on static functions",
+      (SelfAccessKind))
+NOTE(static_functions_not_mutating_detail,none,
+      "%0 modifier cannot access instance properties or self", (SelfAccessKind))
 
 ERROR(readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,none,
       "%0 cannot be %1 when "
