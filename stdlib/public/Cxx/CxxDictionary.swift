@@ -165,7 +165,7 @@ extension CxxDictionary {
   @inlinable
   @discardableResult
   public mutating func removeValue(forKey key: Key) -> Value? {
-    var iter = self.__findMutatingUnsafe(key)
+    let iter = self.__findMutatingUnsafe(key)
     guard iter != self.__endMutatingUnsafe() else { return nil }
 
     let value = iter.pointee.second
