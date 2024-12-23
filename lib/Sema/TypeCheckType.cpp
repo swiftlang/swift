@@ -907,11 +907,15 @@ static Type applyGenericArguments(Type type,
     auto parameterized =
         ParameterizedProtocolType::get(ctx, protoType, argTys);
 
+    // FIXME: Can this not be done in ExistentialTypeSyntaxChecker?
     if (resolution.getOptions().isConstraintImplicitExistential() &&
         !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-      diags.diagnose(loc, diag::existential_requires_any, parameterized,
-                     ExistentialType::get(parameterized),
-                     /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
+      diags
+          .diagnose(loc, diag::existential_requires_any, parameterized,
+                    ExistentialType::get(parameterized),
+                    /*isAlias=*/isa<TypeAliasType>(type.getPointer()))
+          .warnUntilSwiftVersion(7);
+
       return ErrorType::get(ctx);
     }
 
@@ -6173,16 +6177,13 @@ class ExistentialTypeSyntaxChecker : public ASTWalker {
   ASTContext &Ctx;
   const bool checkStatements;
   bool hitTopStmt;
-  bool warnUntilSwift7;
 
   unsigned exprCount = 0;
   llvm::SmallVector<TypeRepr *, 4> reprStack;
     
 public:
-  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements,
-                               bool warnUntilSwift7 = false)
-      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false),
-        warnUntilSwift7(warnUntilSwift7) {}
+  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements)
+      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) {}
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::ArgumentsAndExpansion;
@@ -6381,6 +6382,11 @@ private:
       return false;
     }
 
+    // A missing `any` or `some` is always diagnosed if this feature is enabled.
+    if (ctx.LangOpts.hasFeature(Feature::ExistentialAny)) {
+      return true;
+    }
+
     // If the type is inverted, a missing `any` or `some` is always diagnosed.
     if (isInverted) {
       return true;
@@ -6398,7 +6404,7 @@ private:
     // a missing `any` or `some` is always diagnosed.
     auto layout = constraintTy->getExistentialLayout();
     for (auto *protoDecl : layout.getProtocols()) {
-      if (protoDecl->existentialRequiresAny()) {
+      if (protoDecl->hasSelfOrAssociatedTypeRequirements()) {
         return true;
       }
     }
@@ -6470,7 +6476,7 @@ private:
                                       /*isAlias=*/isa<TypeAliasDecl>(decl)));
     }
 
-    diag->warnUntilSwiftVersionIf(warnUntilSwift7, 7);
+    diag->warnUntilSwiftVersion(7);
     emitInsertAnyFixit(*diag, T);
   }
 
@@ -6545,14 +6551,7 @@ void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt,
   if (DC->isInSwiftinterface())
     return;
 
-  // Previously we missed this diagnostic on 'catch' statements, downgrade
-  // to a warning until Swift 7.
-  auto downgradeUntilSwift7 = false;
-  if (auto *CS = dyn_cast<CaseStmt>(stmt))
-    downgradeUntilSwift7 = CS->getParentKind() == CaseParentKind::DoCatch;
-
-  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true,
-                                       downgradeUntilSwift7);
+  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true);
   stmt->walk(checker);
 }
 
