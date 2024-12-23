@@ -771,32 +771,6 @@ public func fragileDifferentiable(_ x: Float) -> Float {
   implicitlyDifferentiableFromFragile(x)
 }
 
-
-// FIXME: Differentiable curry thunk RequirementMachine error (rdar://87429620, https://github.com/apple/swift/issues/54819).
-#if false
-// TF-1208: Test curry thunk differentiation regression.
-public struct Struct_54819<Scalar> {
-  var x: Scalar
-}
-extension Struct_54819: Differentiable where Scalar: Differentiable {
-  @differentiable(reverse)
-  public static func id(x: Self) -> Self {
-    return x
-  }
-}
-@differentiable(reverse, wrt: x)
-public func f_54819<Scalar: Differentiable>(
-  _ x: Struct_54819<Scalar>,
-  // NOTE(TF-1208): This diagnostic is unexpected because `Struct_54819.id` is marked `@differentiable`.
-  // xpected-error @+3 2 {{function is not differentiable}}
-  // xpected-note @+2 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'; this is not possible with a closure, make a top-level function instead}}
-  // xpected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
-  reduction: @differentiable(reverse) (Struct_54819<Scalar>) -> Struct_54819<Scalar> = Struct_54819.id
-) -> Struct_54819<Scalar> {
-  reduction(x)
-}
-#endif
-
 //===----------------------------------------------------------------------===//
 // Coroutines (SIL function yields, `begin_apply`) (not yet supported)
 //===----------------------------------------------------------------------===//
