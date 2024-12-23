@@ -1014,31 +1014,27 @@ const HeapObject *swift_getKeyPath(const void *pattern, const void *arguments);
 
 // For some reason, MSVC doesn't accept these declarations outside of
 // swiftCore.  TODO: figure out a reasonable way to declare them.
-#if defined(swiftCore_EXPORTS)
 
 /// Given a pointer to a borrowed value of type `Root` and a
 /// `KeyPath<Root, Value>`, project a pointer to a borrowed value of type
 /// `Value`.
 SWIFT_RUNTIME_EXPORT
-YieldOnceCoroutine<const OpaqueValue* (const OpaqueValue *root,
-                                       void *keyPath)>::type
-swift_readAtKeyPath;
+YieldOnceResult<const OpaqueValue*>
+swift_readAtKeyPath(YieldOnceBuffer *buffer, const OpaqueValue *root, void *keyPath);
 
 /// Given a pointer to a mutable value of type `Root` and a
 /// `WritableKeyPath<Root, Value>`, project a pointer to a mutable value
 /// of type `Value`.
 SWIFT_RUNTIME_EXPORT
-YieldOnceCoroutine<OpaqueValue* (OpaqueValue *root, void *keyPath)>::type
-swift_modifyAtWritableKeyPath;
+YieldOnceResult<OpaqueValue*>
+swift_modifyAtWritableKeyPath(YieldOnceBuffer *buffer, OpaqueValue *root, void *keyPath);
 
 /// Given a pointer to a borrowed value of type `Root` and a
 /// `ReferenceWritableKeyPath<Root, Value>`, project a pointer to a
 /// mutable value of type `Value`.
 SWIFT_RUNTIME_EXPORT
-YieldOnceCoroutine<OpaqueValue* (const OpaqueValue *root, void *keyPath)>::type
-swift_modifyAtReferenceWritableKeyPath;
-
-#endif // swiftCore_EXPORTS
+YieldOnceResult<OpaqueValue*>
+swift_modifyAtReferenceWritableKeyPath(YieldOnceBuffer *buffer, const OpaqueValue *root, void *keyPath);
 
 SWIFT_RUNTIME_EXPORT
 void swift_enableDynamicReplacementScope(const DynamicReplacementScope *scope);
