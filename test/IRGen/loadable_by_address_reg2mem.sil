@@ -1,5 +1,10 @@
 // RUN: %target-swift-frontend %s  -Xllvm -sil-print-types -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o 2>&1 | %FileCheck %s
 
+// wasm currently disables aggressive reg2mem
+// UNSUPPORTED: wasm
+// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: CPU=wasm32
+
 sil_stage canonical
 
 import Builtin
@@ -396,4 +401,26 @@ bb3(%4 : $X):
   dealloc_stack %2 : $*X
   %t = tuple ()
   return %t : $()
+}
+
+sil @usei8 : $@convention(thin) (UInt8) -> ()
+
+// CHECK: sil @test16
+// CHECK: bb0(%0 : $member_id_t):
+// CHECK:   [[T0:%.*]] = alloc_stack $member_id_t
+// CHECK:   store %0 to [[T0]] : $*member_id_t
+// CHECK:   struct_element_addr [[T0]]
+// CHECK:} // end sil function 'test16'
+
+sil @test16 : $@convention(thin) (member_id_t) -> () {
+bb0(%0 : $member_id_t):
+  %2 = alloc_stack $X
+  %44 = struct_extract %0 : $member_id_t, #member_id_t.member_value // user: %45
+  %45 = unchecked_trivial_bit_cast %44 : $member_id_t.__Unnamed_union_member_value to $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+  %46 = tuple_extract %45 : $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), 0
+  %11 = function_ref @usei8 : $@convention(thin) (UInt8) -> ()
+  %12 = apply %11(%46) : $@convention(thin) (UInt8) -> ()
+  dealloc_stack %2 : $*X
+  %13 = tuple ()
+  return %13 : $()
 }
