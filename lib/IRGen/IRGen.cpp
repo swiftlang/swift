@@ -148,6 +148,9 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())
     TargetOpts.ThreadModel = llvm::ThreadModel::Single;
 
+  if (Clang->getTargetInfo().getTriple().hasDefaultEmulatedTLS())
+    TargetOpts.EmulatedTLS = true;
+
   if (Opts.EnableGlobalISel) {
     TargetOpts.EnableGlobalISel = true;
     TargetOpts.GlobalISelAbort = GlobalISelAbortMode::DisableWithDiag;
