@@ -2,6 +2,11 @@ public enum _SwiftifyExpr {
     case param(_ index: Int)
     case `return`
 }
+
+public enum _DependenceType {
+    case borrow
+    case copy
+}
 /// Different ways to annotate pointer parameters using the `@_SwiftifyImport` macro.
 /// All indices into parameter lists start at 1. Indices __must__ be integer literals, and strings
 /// __must__ be string literals, because their contents are parsed by the `@_SwiftifyImport` macro.
@@ -34,6 +39,9 @@ public enum _SwiftifyInfo {
     /// object past the lifetime of the function.
     /// Parameter pointer: index of pointer in function parameter list.
     case nonescaping(pointer: _SwiftifyExpr)
+    /// Can express lifetime dependencies between inputs and outputs of a function.
+    /// 'dependsOn' is the input on which the output 'pointer' depends.
+    case lifetimeDependence(dependsOn: Int, pointer: _SwiftifyExpr, type: _DependenceType)
 }
 
 /// Generates a safe wrapper for function with Unsafe[Mutable][Raw]Pointer[?] or std::span arguments.
