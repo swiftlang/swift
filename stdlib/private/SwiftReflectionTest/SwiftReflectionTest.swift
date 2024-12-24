@@ -209,6 +209,7 @@ public enum InstanceKind: UInt8 {
   case Enum
   case EnumValue
   case AsyncTask
+  case MaybeUnrealizedObjCClass
 }
 
 /// Represents a section in a loaded image in this process.
@@ -640,6 +641,12 @@ public func reflect(function: @escaping (Int, String, AnyObject?) -> Void) {
 /// Reflect an AsyncTask.
 public func reflect(asyncTask: UInt) {
   reflect(instanceAddress: asyncTask, kind: .AsyncTask)
+}
+
+// Reflect a potential unrealized ObjC class.
+public func reflect(maybeUnrealizedObjCClass: UnsafeRawPointer) {
+  reflect(instanceAddress: UInt(bitPattern: maybeUnrealizedObjCClass),
+          kind: .MaybeUnrealizedObjCClass);
 }
 
 /// Call this function to indicate to the parent that there are

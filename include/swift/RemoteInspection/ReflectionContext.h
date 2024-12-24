@@ -139,6 +139,7 @@ class ReflectionContext
   typename super::StoredPointer target_task_wait_throwing_resume_adapter = 0;
   typename super::StoredPointer target_task_future_wait_resume_adapter = 0;
   bool supportsPriorityEscalation = false;
+  typename super::StoredPointer target_objc_empty_cache = 0;
 
 public:
   using super::getBuilder;
@@ -1687,6 +1688,67 @@ public:
     return JobObj->SchedulerPrivate[0] & ~StoredPointer(0x3);
   }
 
+  std::pair<std::optional<std::string>, bool> isUnrealizedObjCClass(
+      StoredPointer Ptr,
+      llvm::function_ref<bool(StoredPointer)> IsKnownRealizedClass,
+      unsigned RecursionDepth = 512) {
+    if (!Runtime::ObjCInterop)
+      return {std::nullopt, false};
+
+    // We'll perform the following checks, which will have no false negatives
+    // and should have just about no chance of false positives.
+    // 1. Are the isa and superclass pointers plausible, i.e. properly aligned
+    //    and unused high bits are clear?
+    // 2. Does the cache field point to _objc_empty_cache? (Any class with a
+    //    different method cache pointer must have been realized.)
+    // 3. If we chase the superclass chain, do we encounter classes that also
+    //    meet these criteria, or eventually reach a known realized class?
+
+    auto candidate = readObj<TargetAnyClassMetadataObjCInterop<Runtime>>(Ptr);
+
+    // We'll treat a memory read failure as just a "no," since that should mean
+    // the memory is unmapped and therefore that pointer is definitely not an
+    // unrealized ObjC class.
+    if (!candidate)
+      return {std::nullopt, false};
+
+    // Helper to check if a pointer value is a reasonable-looking class pointer.
+    auto isPlausibleClassPointer = [&](StoredPointer Ptr) {
+      // Class pointers are aligned to the pointer size.
+      if (Ptr & (sizeof(StoredPointer) - 1))
+        return false;
+
+      // We won't check high bits for now, as which high bits are guaranteed to
+      // be clear is complicated to work out.
+      return true;
+    };
+
+    // Are the isa and superclass pointers reasonable?
+    // The class's isa field corresponds to the Kind field.
+    auto isa = candidate->getRawKind();
+    auto superclass = stripSignedPointer(candidate->Superclass);
+    if (!isPlausibleClassPointer(isa) || !isPlausibleClassPointer(superclass))
+      return {std::nullopt, false};
+
+    // Does the cache pointer point to _objc_empty_cache?
+    loadTargetPointers();
+    if (candidate->CacheData[0] != target_objc_empty_cache)
+      return {std::nullopt, false};
+
+    // If the superclass is a known realized class, then we've passed all the
+    // tests and return true.
+    if (IsKnownRealizedClass(superclass))
+      return {std::nullopt, true};
+
+    // If we've hit our recursion depth then return an error.
+    if (RecursionDepth == 0)
+      return {"recursion depth reached", false};
+
+    // This class looks good, this is an unrealized class if the superclass is.
+    return isUnrealizedObjCClass(superclass, IsKnownRealizedClass,
+                                 RecursionDepth - 1);
+  }
+
 private:
   void setIsRunning(
       AsyncTaskInfo &Info,
@@ -1940,6 +2002,8 @@ private:
       getReader().readInteger(supportsPriorityEscalationAddr,
                               &supportsPriorityEscalation);
     }
+    target_objc_empty_cache =
+        getReader().getSymbolAddress("_objc_empty_cache").getAddressData();
 
     setupTargetPointers = true;
   }
