@@ -110,6 +110,7 @@ void PlaceholderSwiftModuleScanner::parsePlaceholderModuleMap(
     StringRef fileName) {
   ExplicitModuleMapParser parser(Allocator);
   llvm::StringMap<ExplicitClangModuleInputInfo> ClangDependencyModuleMap;
+  llvm::StringMap<std::string> ModuleAliases;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
       llvm::MemoryBuffer::getFile(fileName);
   if (!fileBufOrErr) {
@@ -119,7 +120,7 @@ void PlaceholderSwiftModuleScanner::parsePlaceholderModuleMap(
   }
   auto result = parser.parseSwiftExplicitModuleMap(
       (*fileBufOrErr)->getMemBufferRef(), PlaceholderDependencyModuleMap,
-      ClangDependencyModuleMap);
+      ClangDependencyModuleMap, ModuleAliases);
   if (result == std::errc::invalid_argument) {
     Ctx.Diags.diagnose(SourceLoc(),
                        diag::placeholder_dependency_module_map_corrupted,

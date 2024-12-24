@@ -444,9 +444,9 @@ void printWithCompatibilityFeatureChecks(ASTPrinter &printer,
                                          Decl *decl,
                                          llvm::function_ref<void()> printBody);
 
-/// Determine whether we need to escape the given keyword within the
-/// given context, by wrapping it in backticks.
-bool escapeKeywordInContext(StringRef keyword, PrintNameContext context);
+/// Determine whether we need to escape the given name within the given
+/// context, by wrapping it in backticks.
+bool escapeIdentifierInContext(Identifier name, PrintNameContext context);
 
 } // namespace swift
 
