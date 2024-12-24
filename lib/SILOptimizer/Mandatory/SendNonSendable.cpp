@@ -1647,12 +1647,12 @@ bool SentNeverSendableDiagnosticInferrer::initForSendingPartialApply(
   for (auto capture : ce->getCaptureInfo().getCaptures()) {
     auto *decl = capture.getDecl();
     auto type = decl->getInterfaceType()->getCanonicalType();
-    auto silType = SILType::getPrimitiveObjectType(type);
-    if (!SILIsolationInfo::isNonSendableType(silType, pai->getFunction()))
+    type = pai->getFunction()->mapTypeIntoContext(type)->getCanonicalType();
+    if (!SILIsolationInfo::isNonSendableType(type, pai->getFunction()))
       continue;
 
     auto *fromDC = decl->getInnermostDeclContext();
-    auto *nom = silType.getNominalOrBoundGenericNominal();
+    auto *nom = type.getNominalOrBoundGenericNominal();
     if (nom && fromDC) {
       if (auto diagnosticBehavior =
               getConcurrencyDiagnosticBehaviorLimit(nom, fromDC)) {
