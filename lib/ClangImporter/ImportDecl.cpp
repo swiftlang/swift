@@ -3376,7 +3376,11 @@ namespace {
 
     /// Emit diagnostics for incorrect usage of SWIFT_RETURNS_RETAINED and
     /// SWIFT_RETURNS_UNRETAINED
-    void checkBridgingAttrs(const clang::FunctionDecl *decl) {
+    void checkBridgingAttrs(const clang::NamedDecl *decl) {
+      assert(isa<clang::FunctionDecl>(decl) ||
+             isa<clang::ObjCMethodDecl>(decl) &&
+                 "checkBridgingAttrs called with a clang::NamedDecl which is "
+                 "neither clang::FunctionDecl nor clang::ObjCMethodDecl");
       bool returnsRetainedAttrIsPresent = false;
       bool returnsUnretainedAttrIsPresent = false;
       if (decl->hasAttrs()) {
@@ -3392,14 +3396,19 @@ namespace {
       }
 
       HeaderLoc loc(decl->getLocation());
-      if (isForeignReferenceTypeWithoutImmortalAttrs(decl->getReturnType())) {
+      const auto retType =
+          isa<clang::FunctionDecl>(decl)
+              ? cast<clang::FunctionDecl>(decl)->getReturnType()
+              : cast<clang::ObjCMethodDecl>(decl)->getReturnType();
+      if (isForeignReferenceTypeWithoutImmortalAttrs(retType)) {
         if (returnsRetainedAttrIsPresent && returnsUnretainedAttrIsPresent) {
           Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
                         decl);
         } else if (!returnsRetainedAttrIsPresent &&
                    !returnsUnretainedAttrIsPresent) {
-          bool unannotatedCxxAPIWarningNeeded = false;
-          if (!isa<clang::CXXDeductionGuideDecl>(decl)) {
+          bool unannotatedAPIWarningNeeded = false;
+          if (isa<clang::FunctionDecl>(decl) &&
+              !isa<clang::CXXDeductionGuideDecl>(decl)) {
             if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
               // FIXME: In the future we should support SWIFT_RETURNS_RETAINED
               // and SWIFT_RETURNS_UNRETAINED for overloaded C++ operators
@@ -3409,15 +3418,17 @@ namespace {
                   !methodDecl->isOverloadedOperator() &&
                   methodDecl->isUserProvided()) {
                 // normal c++ member method
-                unannotatedCxxAPIWarningNeeded = true;
+                unannotatedAPIWarningNeeded = true;
               }
             } else {
-              // global or top-level function
-              unannotatedCxxAPIWarningNeeded = true;
+              // global or top-level C/C++ function
+              unannotatedAPIWarningNeeded = true;
             }
+          } else if (isa<clang::ObjCMethodDecl>(decl)) {
+            unannotatedAPIWarningNeeded = true;
           }
 
-          if (unannotatedCxxAPIWarningNeeded) {
+          if (unannotatedAPIWarningNeeded) {
             HeaderLoc loc(decl->getLocation());
             Impl.diagnose(loc, diag::no_returns_retained_returns_unretained,
                           decl);
@@ -4559,6 +4570,8 @@ namespace {
       auto dc = Impl.importDeclContextOf(decl, decl->getDeclContext());
       if (!dc)
         return nullptr;
+
+      checkBridgingAttrs(decl);
 
       // While importing the DeclContext, we might have imported the decl
       // itself.
