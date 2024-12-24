@@ -20,6 +20,7 @@
 #include "TypeCheckEffects.h"
 #include "TypeCheckObjC.h"
 #include "TypeChecker.h"
+#include "TypeCheckUnsafe.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"

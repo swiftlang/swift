@@ -27,6 +27,7 @@
 #include "TypeCheckEffects.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckObjC.h"
+#include "TypeCheckUnsafe.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"

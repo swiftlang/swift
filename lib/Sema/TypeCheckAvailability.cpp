@@ -19,6 +19,7 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
+#include "TypeCheckUnsafe.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilityDomain.h"

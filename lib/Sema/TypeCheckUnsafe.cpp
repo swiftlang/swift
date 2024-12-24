@@ -14,14 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TypeCheckAvailability.h"
+#include "TypeCheckType.h"
+#include "TypeCheckUnsafe.h"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SourceFileExtras.h"
-#include "TypeCheckAvailability.h"
-#include "TypeCheckType.h"
 
 using namespace swift;
 
