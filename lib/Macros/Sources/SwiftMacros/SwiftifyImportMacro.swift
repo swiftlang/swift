@@ -4,11 +4,21 @@ import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 
+enum DependenceType {
+  case borrow, copy
+}
+
+struct LifetimeDependence {
+  let from: Int
+  let type: DependenceType
+}
+
 protocol ParamInfo: CustomStringConvertible {
   var description: String { get }
   var original: SyntaxProtocol { get }
   var pointerIndex: Int { get }
   var nonescaping: Bool { get set }
+  var dependencies: [LifetimeDependence] { get set }
 
   func getBoundsCheckedThunkBuilder(
     _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax,
@@ -19,8 +29,9 @@ protocol ParamInfo: CustomStringConvertible {
 struct CxxSpan: ParamInfo {
   var pointerIndex: Int
   var nonescaping: Bool
-  var original: SyntaxProtocol
+  var dependencies: [LifetimeDependence]
   var typeMappings: [String: String]
+  var original: SyntaxProtocol
 
   var description: String {
     return "std::span(pointer: \(pointerIndex), nonescaping: \(nonescaping))"
@@ -40,6 +51,7 @@ struct CountedBy: ParamInfo {
   var count: ExprSyntax
   var sizedBy: Bool
   var nonescaping: Bool
+  var dependencies: [LifetimeDependence]
   var original: SyntaxProtocol
 
   var description: String {
@@ -67,6 +79,7 @@ struct EndedBy: ParamInfo {
   var pointerIndex: Int
   var endIndex: Int
   var nonescaping: Bool
+  var dependencies: [LifetimeDependence]
   var original: SyntaxProtocol
 
   var description: String {
@@ -132,6 +145,8 @@ func getTypeName(_ type: TypeSyntax) throws -> TokenSyntax {
     return memberType.name
   case .identifierType:
     return type.as(IdentifierTypeSyntax.self)!.name
+  case .attributedType:
+    return try getTypeName(type.as(AttributedTypeSyntax.self)!.baseType)
   default:
     throw DiagnosticError("expected pointer type, got \(type) with kind \(type.kind)", node: type)
   }
@@ -143,6 +158,13 @@ func replaceTypeName(_ type: TypeSyntax, _ name: TokenSyntax) -> TypeSyntax {
   }
   let idType = type.as(IdentifierTypeSyntax.self)!
   return TypeSyntax(idType.with(\.name, name))
+}
+
+func replaceBaseType(_ type: TypeSyntax, _ base: TypeSyntax) -> TypeSyntax {
+  if let attributedType = type.as(AttributedTypeSyntax.self) {
+    return TypeSyntax(attributedType.with(\.baseType, base))
+  }
+  return base
 }
 
 func getPointerMutability(text: String) -> Mutability? {
@@ -299,8 +321,8 @@ struct CxxSpanThunkBuilder: BoundsCheckedThunkBuilder {
     }
 
     let parsedDesugaredType = try TypeSyntax("\(raw: desugaredType)")
-    types[index] = TypeSyntax(IdentifierTypeSyntax(name: "Span",
-      genericArgumentClause: parsedDesugaredType.as(IdentifierTypeSyntax.self)!.genericArgumentClause))
+    types[index] = replaceBaseType(param.type, TypeSyntax(IdentifierTypeSyntax(name: "Span",
+      genericArgumentClause: parsedDesugaredType.as(IdentifierTypeSyntax.self)!.genericArgumentClause)))
     return try base.buildFunctionSignature(types, variant)
   }
 
@@ -578,7 +600,7 @@ public struct SwiftifyImportMacro: PeerMacro {
     }
     return CountedBy(
       pointerIndex: pointerParamIndex, count: unwrappedCountExpr, sizedBy: false,
-      nonescaping: false, original: ExprSyntax(enumConstructorExpr))
+      nonescaping: false, dependencies: [], original: ExprSyntax(enumConstructorExpr))
   }
 
   static func parseSizedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> ParamInfo {
@@ -593,7 +615,7 @@ public struct SwiftifyImportMacro: PeerMacro {
     let unwrappedCountExpr = ExprSyntax(stringLiteral: sizeExprStringLit.representedLiteralValue!)
     return CountedBy(
       pointerIndex: pointerParamIndex, count: unwrappedCountExpr, sizedBy: true, nonescaping: false,
-      original: ExprSyntax(enumConstructorExpr))
+      dependencies: [], original: ExprSyntax(enumConstructorExpr))
   }
 
   static func parseEndedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> ParamInfo {
@@ -606,7 +628,7 @@ public struct SwiftifyImportMacro: PeerMacro {
     let nonescaping = try nonescapingExprArg != nil && getBoolLiteralValue(nonescapingExprArg!)
     return EndedBy(
       pointerIndex: startParamIndex, endIndex: endParamIndex, nonescaping: nonescaping,
-      original: ExprSyntax(enumConstructorExpr))
+      dependencies: [], original: ExprSyntax(enumConstructorExpr))
   }
 
   static func parseNonEscaping(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> Int {
@@ -614,6 +636,28 @@ public struct SwiftifyImportMacro: PeerMacro {
     let pointerParamIndexArg = try getArgumentByName(argumentList, "pointer")
     let pointerParamIndex: Int = try getIntLiteralValue(pointerParamIndexArg)
     return pointerParamIndex
+  }
+
+  static func parseLifetimeDependence(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> (Int, LifetimeDependence) {
+    let argumentList = enumConstructorExpr.arguments
+    let to: Int = try getIntLiteralValue(try getArgumentByName(argumentList, "to"))
+    let from: Int = try getIntLiteralValue(try getArgumentByName(argumentList, "from"))
+    let type = try getArgumentByName(argumentList, "type") 
+    guard let typeLit = type.as(StringLiteralExprSyntax.self) else {
+      throw DiagnosticError(
+        "expected string literal for 'type' parameter, got \(type)", node: type)
+    }
+    let depType: DependenceType
+    switch typeLit.representedLiteralValue! {
+      case "borrow":
+        depType = DependenceType.borrow
+      case "copy":
+        depType = DependenceType.copy
+      default:
+        throw DiagnosticError("expected 'copy' or 'borrow', got '\(typeLit)'", node: typeLit)
+    }
+    let dependence = LifetimeDependence(from: from, type: depType)
+    return (to, dependence)
   }
 
   static func parseTypeMappingParam(_ paramAST: LabeledExprSyntax?) throws -> [String: String]? {
@@ -657,7 +701,7 @@ public struct SwiftifyImportMacro: PeerMacro {
       if let desugaredType = typeMappings[typeName] {
         if desugaredType.starts(with: "span") {
           result.append(CxxSpan(pointerIndex: idx + 1, nonescaping: false,
-            original: param, typeMappings: typeMappings))
+            dependencies: [], typeMappings: typeMappings, original: param))
         }
       }
     }
@@ -666,7 +710,8 @@ public struct SwiftifyImportMacro: PeerMacro {
 
   static func parseMacroParam(
     _ paramAST: LabeledExprSyntax, _ signature: FunctionSignatureSyntax,
-    nonescapingPointers: inout Set<Int>
+    nonescapingPointers: inout Set<Int>,
+    lifetimeDependencies: inout [Int: [LifetimeDependence]]
   ) throws -> ParamInfo? {
     let paramExpr = paramAST.expression
     guard let enumConstructorExpr = paramExpr.as(FunctionCallExprSyntax.self) else {
@@ -682,9 +727,22 @@ public struct SwiftifyImportMacro: PeerMacro {
       let index = try parseNonEscaping(enumConstructorExpr)
       nonescapingPointers.insert(index)
       return nil
+    case "lifetimeDependence":
+      let (idx, dependence) = try parseLifetimeDependence(enumConstructorExpr)
+      lifetimeDependencies[idx, default: []].append(dependence)
+      // We assume pointers annotated with lifetimebound do not escape.
+      if dependence.type == DependenceType.copy {
+        nonescapingPointers.insert(dependence.from)
+      }
+      // The escaping is controlled when a parameter is the target of a lifetimebound.
+      // So we want to do the transformation to Swift's Span.
+      if idx != 0 {
+        nonescapingPointers.insert(idx)
+      }
+      return nil
     default:
       throw DiagnosticError(
-        "expected 'countedBy', 'sizedBy', 'endedBy' or 'nonescaping', got '\(enumName)'",
+        "expected 'countedBy', 'sizedBy', 'endedBy', 'nonescaping' or 'lifetimeDependence', got '\(enumName)'",
         node: enumConstructorExpr)
     }
   }
@@ -742,8 +800,20 @@ public struct SwiftifyImportMacro: PeerMacro {
   }
 
   static func setNonescapingPointers(_ args: inout [ParamInfo], _ nonescapingPointers: Set<Int>) {
+    if args.isEmpty {
+      return
+    }
     for i in 0...args.count - 1 where nonescapingPointers.contains(args[i].pointerIndex) {
       args[i].nonescaping = true
+    }
+  }
+
+  static func setLifetimeDependencies(_ args: inout [ParamInfo], _ lifetimeDependencies: [Int: [LifetimeDependence]]) {
+    if args.isEmpty {
+      return
+    }
+    for i in 0...args.count - 1 where lifetimeDependencies.keys.contains(args[i].pointerIndex) {
+      args[i].dependencies = lifetimeDependencies[args[i].pointerIndex]!
     }
   }
 
@@ -764,11 +834,15 @@ public struct SwiftifyImportMacro: PeerMacro {
         arguments = arguments.dropLast()
       }
       var nonescapingPointers = Set<Int>()
+      var lifetimeDependencies : [Int: [LifetimeDependence]] = [:]
       var parsedArgs = try arguments.compactMap {
-        try parseMacroParam($0, funcDecl.signature, nonescapingPointers: &nonescapingPointers)
+        try parseMacroParam($0, funcDecl.signature, nonescapingPointers: &nonescapingPointers,
+        lifetimeDependencies: &lifetimeDependencies)
       }
       parsedArgs.append(contentsOf: try parseCxxSpanParams(funcDecl.signature, typeMappings))
       setNonescapingPointers(&parsedArgs, nonescapingPointers)
+      setLifetimeDependencies(&parsedArgs, lifetimeDependencies)
+      // We only transform non-escaping spans.
       parsedArgs = parsedArgs.filter {
         !($0 is CxxSpan) || ($0 as! CxxSpan).nonescaping
       }

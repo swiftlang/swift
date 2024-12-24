@@ -30,6 +30,8 @@ public enum _SwiftifyInfo {
     /// object past the lifetime of the function.
     /// Parameter pointer: index of pointer in function parameter list.
     case nonescaping(pointer: Int)
+
+    case lifetimeDependence(from: Int, to: Int, type: String)
 }
 
 /// Generates a safe wrapper for function with Unsafe[Mutable][Raw]Pointer[?] or std::span arguments.
