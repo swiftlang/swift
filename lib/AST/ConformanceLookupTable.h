@@ -21,6 +21,7 @@
 #define SWIFT_AST_CONFORMANCE_LOOKUP_TABLE_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -94,7 +95,13 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// The location of the "preconcurrency" attribute, if there is one.
     SourceLoc preconcurrencyLoc;
 
-    ConformanceSource(void *ptr, ConformanceEntryKind kind) 
+    /// The location of the "unsafe" attribute, if there is one.
+    SourceLoc unsafeLoc;
+
+    /// The range of the "@safe(unchecked)" attribute, if there is one.
+    SourceRange safeRange;
+
+    ConformanceSource(void *ptr, ConformanceEntryKind kind)
       : Storage(ptr), Kind(kind) { }
 
   public:
@@ -153,6 +160,36 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
       return result;
     }
 
+    /// Return a new conformance source with the given location of "@unsafe".
+    ConformanceSource withUnsafeLoc(SourceLoc unsafeLoc) {
+      ConformanceSource result(*this);
+      if (unsafeLoc.isValid())
+        result.unsafeLoc = unsafeLoc;
+      return result;
+    }
+
+    /// Return a new conformance source with the given range of
+    /// "@safe(unchecked)".
+    ConformanceSource withSafeRange(SourceRange safeRange) {
+      ConformanceSource result(*this);
+      if (safeRange.isValid())
+        result.safeRange = safeRange;
+      return result;
+    }
+
+    ProtocolConformanceOptions getOptions() const {
+      ProtocolConformanceOptions options;
+      if (getUncheckedLoc().isValid())
+        options |= ProtocolConformanceFlags::Unchecked;
+      if (getPreconcurrencyLoc().isValid())
+        options |= ProtocolConformanceFlags::Preconcurrency;
+      if (getUnsafeLoc().isValid() || isUnsafeContext(getDeclContext()))
+        options |= ProtocolConformanceFlags::Unsafe;
+      if (getSafeRange().isValid())
+        options |= ProtocolConformanceFlags::Safe;
+      return options;
+    }
+
     /// Retrieve the kind of conformance formed from this source.
     ConformanceEntryKind getKind() const { return Kind; }
 
@@ -200,6 +237,16 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
       return preconcurrencyLoc;
     }
 
+    /// The location of the @unsafe attribute, if any.
+    SourceLoc getUnsafeLoc() const {
+      return unsafeLoc;
+    }
+
+    /// The range of the @safe(unchecked) attribute, if any.
+    SourceRange getSafeRange() const {
+      return safeRange;
+    }
+
     /// For an inherited conformance, retrieve the class declaration
     /// for the inheriting class.
     ClassDecl *getInheritingClass() const {
@@ -236,6 +283,10 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// Get the declaration context that this conformance will be
     /// associated with.
     DeclContext *getDeclContext() const;
+
+  private:
+    /// Whether this declaration context is @unsafe.
+    static bool isUnsafeContext(DeclContext *dc);
   };
 
   /// An entry in the conformance table.

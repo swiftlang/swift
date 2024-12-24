@@ -415,8 +415,11 @@ private:
     /// Whether this module is built with -package-cmo.
     unsigned SerializePackageEnabled : 1;
 
+    /// Whether this module enabled strict memory safety.
+    unsigned StrictMemorySafety : 1;
+
     // Explicitly pad out to the next word boundary.
-    unsigned : 3;
+    unsigned : 2;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -666,6 +669,8 @@ public:
   bool hasSourceInfo() const;
 
   bool isConcurrencyChecked() const { return Bits.IsConcurrencyChecked; }
+
+  bool strictMemorySafety() const { return Bits.StrictMemorySafety; }
 
   /// How should \p dependency be loaded for a transitive import via \c this?
   ///

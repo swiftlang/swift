@@ -20,6 +20,7 @@
 #include "TypeCheckEffects.h"
 #include "TypeCheckObjC.h"
 #include "TypeChecker.h"
+#include "TypeCheckUnsafe.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
@@ -2249,14 +2250,20 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     diagnoseOverrideForAvailability(override, base);
   }
 
-  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      override->isUnsafe() && !base->isUnsafe()) {
-    // Don't diagnose @unsafe overrides if the subclass is @unsafe.
-    auto overridingClass = override->getDeclContext()->getSelfClassDecl();
-    bool shouldDiagnose = !overridingClass || !overridingClass->allowsUnsafe();
+  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+    // If the override is unsafe but the base declaration is not, then the
+    // inheritance itself is unsafe.
+    auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
+    ConcreteDeclRef overrideRef(override);
+    ConcreteDeclRef baseRef(base, subs);
+    if (isUnsafe(overrideRef) && !isUnsafe(baseRef)) {
+      // Don't diagnose @unsafe overrides if the subclass is @unsafe.
+      auto overridingClass = override->getDeclContext()->getSelfClassDecl();
+      bool shouldDiagnose = !overridingClass || !overridingClass->allowsUnsafe();
 
-    if (shouldDiagnose) {
-      diagnoseUnsafeUse(UnsafeUse::forOverride(override, base));
+      if (shouldDiagnose) {
+        diagnoseUnsafeUse(UnsafeUse::forOverride(override, base));
+      }
     }
   }
   /// Check attributes associated with the base; some may need to merged with

@@ -609,6 +609,12 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
   /// The location of the "preconcurrency" attribute if present.
   SourceLoc preconcurrencyLoc;
 
+  /// The location of the "unsafe" attribute if present.
+  SourceLoc unsafeLoc;
+
+  /// The range of the "safe(unchecked)" attribute if present.
+  SourceRange safeRange;
+
   /// Whether this inherited entry was suppressed via "~".
   bool isSuppressed;
 
@@ -616,9 +622,11 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
 
   InheritedNominalEntry(NominalTypeDecl *item, SourceLoc loc,
                         SourceLoc uncheckedLoc, SourceLoc preconcurrencyLoc,
+                        SourceLoc unsafeLoc, SourceRange safeRange,
                         bool isSuppressed)
       : Located(item, loc), uncheckedLoc(uncheckedLoc),
-        preconcurrencyLoc(preconcurrencyLoc), isSuppressed(isSuppressed) {}
+        preconcurrencyLoc(preconcurrencyLoc), unsafeLoc(unsafeLoc),
+        safeRange(safeRange), isSuppressed(isSuppressed) {}
 };
 
 /// Retrieve the set of nominal type declarations that are directly

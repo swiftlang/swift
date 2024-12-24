@@ -1497,6 +1497,8 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setAllowNonResilientAccess();
     if (Invocation.getSILOptions().EnableSerializePackage)
       MainModule->setSerializePackageEnabled();
+    if (Invocation.getLangOptions().hasFeature(Feature::WarnUnsafe))
+      MainModule->setStrictMemorySafety(true);
 
     if (!Invocation.getFrontendOptions()
              .SwiftInterfaceCompilerVersion.empty()) {
