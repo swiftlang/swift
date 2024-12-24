@@ -4221,6 +4221,19 @@ diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
   }
 
   if (auto valueDecl = dyn_cast<ValueDecl>(D)) {
+    // A typealias that is not itself @unsafe but references an unsafe type
+    // is diagnosed separately.
+    if (auto typealias = dyn_cast<TypeAliasDecl>(valueDecl)) {
+      if (Type underlying = typealias->getUnderlyingType()) {
+        if (underlying->isUnsafe()) {
+          diagnoseUnsafeUse(
+              UnsafeUse::forReferenceToUnsafeThroughTypealias(
+                D, Where.getDeclContext(), underlying, diagLoc));
+          return;
+        }
+      }
+    }
+
     // Use of a nonisolated(unsafe) declaration is unsafe, but is only
     // diagnosed as such under strict concurrency.
     if (ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&

@@ -8085,6 +8085,9 @@ NOTE(note_reference_to_unsafe_decl,none,
 NOTE(note_reference_to_unsafe_typed_decl,none,
      "%select{reference|call}0 to %kind1 involves unsafe type %2",
      (bool, const ValueDecl *, Type))
+NOTE(note_reference_to_unsafe_through_typealias,none,
+     "reference to %kind0 whose underlying type involves unsafe type %1",
+     (const ValueDecl *, Type))
 NOTE(note_reference_to_nonisolated_unsafe,none,
      "reference to nonisolated(unsafe) %kind0 is unsafe in concurrently-executing code",
      (const ValueDecl *))
@@ -8120,6 +8123,9 @@ GROUPED_WARNING(reference_to_unsafe_decl,Unsafe,none,
 GROUPED_WARNING(reference_to_unsafe_typed_decl,Unsafe,none,
       "%select{reference|call}0 to %kindbase1 involves unsafe type %2",
       (bool, const ValueDecl *, Type))
+GROUPED_WARNING(reference_to_unsafe_through_typealias,Unsafe,none,
+     "reference to %kind0 whose underlying type involves unsafe type %1",
+     (const ValueDecl *, Type))
 GROUPED_WARNING(preconcurrency_import_unsafe,Unsafe,none,
       "@preconcurrency import is not memory-safe because it can silently "
       "introduce data races; use '@safe(unchecked)' to assert that the "

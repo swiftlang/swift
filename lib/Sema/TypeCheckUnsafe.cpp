@@ -44,6 +44,7 @@ static bool isUnsafeUseInDefinition(const UnsafeUse &use) {
     return false;
 
   case UnsafeUse::ReferenceToUnsafe:
+  case UnsafeUse::ReferenceToUnsafeThroughTypealias:
   case UnsafeUse::CallToUnsafe:
   case UnsafeUse::NonisolatedUnsafe:
   case UnsafeUse::UnownedUnsafe:
@@ -91,6 +92,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     // It will be diagnosed later, along with all other unsafe uses within this
     // same declaration.
     if (use.getKind() == UnsafeUse::ReferenceToUnsafe ||
+        use.getKind() == UnsafeUse::ReferenceToUnsafeThroughTypealias ||
         use.getKind() == UnsafeUse::CallToUnsafe ||
         use.getKind() == UnsafeUse::NonisolatedUnsafe ||
         use.getKind() == UnsafeUse::UnownedUnsafe ||
@@ -188,6 +190,21 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
           .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
       }
     }
+    return;
+  }
+  case UnsafeUse::ReferenceToUnsafeThroughTypealias: {
+    auto typealias = cast<TypeAliasDecl>(use.getDecl());
+    ASTContext &ctx = typealias->getASTContext();
+    diagnoseUnsafeType(
+        ctx, use.getLocation(), use.getType(),
+        use.getDeclContext(),
+        [&](Type specificType) {
+          ctx.Diags.diagnose(
+              use.getLocation(),
+              asNote ? diag::note_reference_to_unsafe_through_typealias
+                     : diag::reference_to_unsafe_through_typealias,
+              typealias, specificType);
+        });
     return;
   }
 

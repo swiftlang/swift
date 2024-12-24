@@ -43,6 +43,9 @@ public:
     NonisolatedUnsafe,
     /// A reference to an unsafe declaration.
     ReferenceToUnsafe,
+    /// A reference to a typealias that is not itself unsafe, but has
+    /// an unsafe underlying type.
+    ReferenceToUnsafeThroughTypealias,
     /// A call to an unsafe declaration.
     CallToUnsafe,
     /// A @preconcurrency import.
@@ -110,6 +113,7 @@ private:
     assert(kind == UnownedUnsafe ||
            kind == NonisolatedUnsafe ||
            kind == ReferenceToUnsafe ||
+           kind == ReferenceToUnsafeThroughTypealias ||
            kind == CallToUnsafe);
 
     UnsafeUse result(kind);
@@ -177,6 +181,14 @@ public:
                         decl, type, location);
   }
 
+  static UnsafeUse forReferenceToUnsafeThroughTypealias(const Decl *decl,
+                                        DeclContext *dc,
+                                        Type type,
+                                        SourceLoc location) {
+    return forReference(ReferenceToUnsafeThroughTypealias, dc,
+                        decl, type, location);
+  }
+
   static UnsafeUse forPreconcurrencyImport(const ImportDecl *importDecl) {
     UnsafeUse result(PreconcurrencyImport);
     result.storage.importDecl = importDecl;
@@ -205,6 +217,7 @@ public:
     case UnownedUnsafe:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return SourceLoc(
           llvm::SMLoc::getFromPointer((const char *)storage.entity.location));
@@ -227,6 +240,7 @@ public:
     case UnownedUnsafe:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return storage.entity.decl;
 
@@ -250,6 +264,7 @@ public:
     case UnownedUnsafe:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return storage.entity.declContext;
 
@@ -281,6 +296,7 @@ public:
     case UnownedUnsafe:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
     case UnsafeConformance:
     case PreconcurrencyImport:
@@ -305,6 +321,7 @@ public:
     case UnownedUnsafe:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return storage.entity.type;
     }
@@ -327,6 +344,7 @@ public:
     case UnownedUnsafe:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
     case PreconcurrencyImport:
       return ProtocolConformanceRef::forInvalid();

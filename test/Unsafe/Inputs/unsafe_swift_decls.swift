@@ -1,5 +1,7 @@
 @unsafe public struct PointerType { } // expected-note{{'PointerType' declared here}}
 
+public typealias UnsafeTypeAlias = PointerType
+
 public func getPointers() -> [PointerType] { [] }
 
 public struct HasAPointerType {
