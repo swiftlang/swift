@@ -970,6 +970,7 @@ namespace options_block {
     CXX_STDLIB_KIND,
     PUBLIC_MODULE_NAME,
     SWIFT_INTERFACE_COMPILER_VERSION,
+    STRICT_MEMORY_SAFETY,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1066,12 +1067,16 @@ namespace options_block {
     SERIALIZE_PACKAGE_ENABLED
   >;
 
+  using StrictMemorySafetyLayout = BCRecordLayout<
+    STRICT_MEMORY_SAFETY
+  >;
+
   using PublicModuleNameLayout = BCRecordLayout<
     PUBLIC_MODULE_NAME,
     BCBlob
   >;
 
-    using SwiftInterfaceCompilerVersionLayout = BCRecordLayout<
+  using SwiftInterfaceCompilerVersionLayout = BCRecordLayout<
     SWIFT_INTERFACE_COMPILER_VERSION,
     BCBlob // version tuple
   >;

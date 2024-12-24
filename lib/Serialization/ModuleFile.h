@@ -704,6 +704,9 @@ public:
   /// \c true if this module was built with complete checking for concurrency.
   bool isConcurrencyChecked() const { return Core->isConcurrencyChecked(); }
 
+  /// \c true if this module was built with strict memory safety.
+  bool strictMemorySafety() const { return Core->strictMemorySafety(); }
+
   /// Associates this module file with the AST node representing it.
   ///
   /// Checks that the file is compatible with the AST module it's being loaded

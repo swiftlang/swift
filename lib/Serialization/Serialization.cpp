@@ -1162,6 +1162,11 @@ void Serializer::writeHeader() {
         IsConcurrencyChecked.emit(ScratchRecord);
       }
 
+      if (M->strictMemorySafety()) {
+        options_block::StrictMemorySafetyLayout StrictMemorySafety(Out);
+        StrictMemorySafety.emit(ScratchRecord);
+      }
+
       if (M->hasCxxInteroperability()) {
         options_block::HasCxxInteroperabilityEnabledLayout
             CxxInteroperabilityEnabled(Out);
