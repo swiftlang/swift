@@ -24,3 +24,12 @@ func testUnsafe(_ ut: UnsafeType) { // expected-note{{reference to unsafe struct
 // expected-warning@+1{{global function 'testUnsafeThroughAlias' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}
 func testUnsafeThroughAlias(_ ut: UnsafeTypeAlias) { // expected-note{{reference to type alias 'UnsafeTypeAlias' whose underlying type involves unsafe type 'PointerType'}}
 }
+
+
+struct ConformsToUnsafeRequirement: HasUnsafeRequirement {
+  @unsafe func f(_: PointerType) { }
+}
+
+class SubclassWithUnsafeMethod: SuperclassWithUnsafeMethod {
+  @unsafe override func implicitlyUnsafe(_: PointerType) { }
+}

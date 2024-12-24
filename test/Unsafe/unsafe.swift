@@ -50,7 +50,7 @@ struct ConformsToMultiP { }
 // expected-warning@+1{{conformance of 'ConformsToMultiP' to protocol 'MultiP' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{29-29=@unsafe }}
 extension ConformsToMultiP: MultiP {
   // expected-note@-1{{unsafe type 'UnsafeSuper' cannot satisfy safe associated type 'Ptr'}}
-  @unsafe func f() -> UnsafeSuper { .init() } // expected-note{{unsafe instance method 'f()' cannot satisfy safe requirement}}
+  @unsafe func f() -> UnsafeSuper { .init() }
 }
 
 // -----------------------------------------------------------------------

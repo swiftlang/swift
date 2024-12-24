@@ -280,6 +280,10 @@ void diagnoseUnsafeUse(const UnsafeUse &use, bool asNote = false);
 /// declaration, if there are any.
 void diagnoseUnsafeUsesIn(const Decl *decl);
 
+/// Determine whether a reference to this declaration is considered unsafe,
+/// either explicitly (@unsafe) or because it references an unsafe type.
+bool isUnsafe(ConcreteDeclRef declRef);
+
 } // namespace swift
 
 #endif // SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H

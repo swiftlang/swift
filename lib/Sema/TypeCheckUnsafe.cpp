@@ -280,3 +280,21 @@ void swift::diagnoseUnsafeUsesIn(const Decl *decl) {
     diagnoseUnsafeUse(unsafeUse, /*asNote=*/true);
   }
 }
+
+bool swift::isUnsafe(ConcreteDeclRef declRef) {
+  auto decl = declRef.getDecl();
+  if (!decl)
+    return false;
+
+  // Is the declaration explicitly @unsafe?
+  if (decl->isUnsafe())
+    return true;
+
+  auto type = decl->getInterfaceType();
+  if (auto subs = declRef.getSubstitutions())
+    type = type.subst(subs);
+  if (type->isUnsafe())
+    return true;
+
+  return false;
+}

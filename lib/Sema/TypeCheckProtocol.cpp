@@ -2577,8 +2577,14 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       if (!valueRequirement)
         continue;
 
+      // If the witness is unsafe and the requirement is not effectively
+      // unsafe, then the conformance must be unsafe.
       if (auto witness = conformance->getWitnessUncached(valueRequirement)) {
-        if (witness.getDecl()->isUnsafe() && !requirement->isUnsafe()) {
+        if (isUnsafe(witness.getDeclRef()) &&
+            !isUnsafe(
+                ConcreteDeclRef(
+                  valueRequirement,
+                  witness.getRequirementToWitnessThunkSubs()))) {
           unsafeUses.push_back(
               UnsafeUse::forWitness(
                 witness.getDecl(), requirement, conformance));

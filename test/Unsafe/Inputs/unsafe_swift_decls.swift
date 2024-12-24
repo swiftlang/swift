@@ -13,3 +13,11 @@ public protocol Ptrable {
 }
 
 extension HasAPointerType: Ptrable { }
+
+public protocol HasUnsafeRequirement {
+  func f(_: PointerType)
+}
+
+open class SuperclassWithUnsafeMethod {
+  open func implicitlyUnsafe(_: PointerType) { }
+}
