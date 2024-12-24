@@ -48,9 +48,9 @@ void ModuleSearchPathLookup::rebuildLookupTable(const SearchPathOptions *Opts,
   clearLookupTable();
 
   for (auto Entry : llvm::enumerate(Opts->getImportSearchPaths())) {
-    addFilesInPathToLookupTable(FS, Entry.value(),
+    addFilesInPathToLookupTable(FS, Entry.value().Path,
                                 ModuleSearchPathKind::Import,
-                                /*isSystem=*/false, Entry.index());
+                                Entry.value().IsSystem, Entry.index());
   }
 
   for (auto Entry : llvm::enumerate(Opts->getFrameworkSearchPaths())) {
@@ -109,9 +109,11 @@ SearchPathOptions::getSDKPlatformPath(llvm::vfs::FileSystem *FS) const {
 }
 
 void SearchPathOptions::dump(bool isDarwin) const {
-  llvm::errs() << "Module import search paths (non system):\n";
+  llvm::errs() << "Module import search paths:\n";
   for (auto Entry : llvm::enumerate(getImportSearchPaths())) {
-    llvm::errs() << "  [" << Entry.index() << "] " << Entry.value() << "\n";
+    llvm::errs() << "  [" << Entry.index() << "] "
+                 << (Entry.value().IsSystem ? "(system) " : "(non-system) ")
+                 << Entry.value().Path << "\n";
   }
 
   llvm::errs() << "Framework search paths:\n";
