@@ -132,19 +132,10 @@ enum class ExistentialMemberAccessLimitation : uint8_t {
 ExistentialMemberAccessLimitation
 isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member);
 
-/// Flags that should be applied to the existential argument type after
-/// opening.
-enum class OpenedExistentialAdjustmentFlags {
-  /// The argument should be made inout after opening.
-  InOut = 0x01,
-  LValue = 0x02,
-};
-
-using OpenedExistentialAdjustments =
-  OptionSet<OpenedExistentialAdjustmentFlags>;
-
-/// Determine whether we should open up the existential argument to the
-/// given parameters.
+/// Determine whether opening an existential argument for a function parameter
+/// is supported.
+/// A necessary condition for this is that the parameter interface type contains
+/// a generic parameter type to which the opened argument can bind.
 ///
 /// \param callee The function or subscript being called.
 /// \param paramIdx The index specifying which function parameter is being
@@ -153,13 +144,9 @@ using OpenedExistentialAdjustments =
 /// system.
 /// \param argTy The type of the argument.
 ///
-/// \returns If the argument type is existential and opening it can bind a
-/// generic parameter in the callee, returns the type variable (from the opened
-/// parameter type) the existential type that needs to be opened (from the
-/// argument type), and the adjustments that need to be applied to the
-/// existential type after it is opened.
-std::optional<
-    std::tuple<TypeVariableType *, Type, OpenedExistentialAdjustments>>
+/// \returns If opening is supported, returns the type variable representing the
+/// generic parameter type, and the unopened type it binds to.
+std::optional<std::pair<TypeVariableType *, Type>>
 canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                Type paramTy, Type argTy);
 
