@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=5
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=11000
 // REQUIRES: tools-release,no_asan
 
 func f(n: Int, a: [Int]) {

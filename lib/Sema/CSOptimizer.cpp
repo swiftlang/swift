@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/Basic/OptionSet.h"
@@ -551,6 +552,30 @@ static void determineBestChoicesInContext(
       if (isCGFloatDoubleConversionSupported()) {
         if (candidateType->isCGFloat() && paramType->isDouble()) {
           return options.contains(MatchFlag::Literal) ? 0.2 : 0.9;
+        }
+      }
+
+      // Match `[...]` to Array<...> and/or `ExpressibleByArrayLiteral`
+      // conforming types.
+      if (options.contains(MatchFlag::OnParam) &&
+          options.contains(MatchFlag::Literal) &&
+          isUnboundArrayType(candidateType)) {
+        // If an exact match is requested favor only `[...]` to `Array<...>`
+        // since everything else is going to increase to score.
+        if (options.contains(MatchFlag::ExactOnly))
+          return paramType->isArrayType() ? 1 : 0;
+
+        Type type = paramType->lookThroughAllOptionalTypes();
+        // Otherwise, check if the other side conforms to
+        // `ExpressibleByArrayLiteral` protocol (in some way).
+        if (auto *nominal = type->getAnyNominal()) {
+          auto &ctx = cs.getASTContext();
+          SmallVector<ProtocolConformance *> conformances;
+
+          nominal->lookupConformance(
+              ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral),
+              conformances);
+          return conformances.empty() ? 0 : 0.3;
         }
       }
 
