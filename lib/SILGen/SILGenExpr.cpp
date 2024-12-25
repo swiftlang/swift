@@ -3244,7 +3244,8 @@ static PreparedArguments loadIndexValuesForKeyPathComponent(
     SILGenFunction &SGF, SILLocation loc, ValueDecl *storage,
     ArrayRef<IndexTypePair> indexes, SILValue pointer) {
   // If not a subscript or method, do nothing.
-  if (!(isa<SubscriptDecl>(storage) || isa<FuncDecl>(storage)))
+  if (!(isa<SubscriptDecl>(storage) || isa<FuncDecl>(storage) ||
+        isa<ConstructorDecl>(storage)))
     return PreparedArguments();
 
   SmallVector<AnyFunctionType::Param, 8> indexParams;
@@ -4279,7 +4280,7 @@ static void lowerKeyPathMemberIndexTypes(
     }
     needsGenericContext |= methodSubstTy->hasArchetype();
     processIndicesOrParameters(method->getParameters(), &sig);
-  }
+  } 
 }
 
 static void lowerKeyPathMemberIndexPatterns(
@@ -4352,8 +4353,16 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
           argPatterns, argEquals, argHash);
     }
 
-    auto representative = SILDeclRef(storage, SILDeclRef::Kind::Func,
-                                     /*isForeign*/ storage->isImportAsMember());
+    SILDeclRef::Kind kind;
+    if (isa<FuncDecl>(storage)) {
+      kind = SILDeclRef::Kind::Func;
+    } else if (isa<ConstructorDecl>(storage)) {
+      kind = SILDeclRef::Kind::Allocator;
+    } else {
+      llvm_unreachable("Unsupported decl kind");
+    }
+    SILDeclRef representative(storage, kind,
+                              /*isForeign*/ storage->isImportAsMember());
     auto id = getFunction(representative, NotForDefinition);
 
     SILFunction *func = nullptr;
@@ -4648,8 +4657,9 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
           /*for descriptor*/ false, /*is applied func*/ isApplied));
       baseTy = loweredComponents.back().getComponentType();
       if ((kind == KeyPathExpr::Component::Kind::Member &&
-           !dyn_cast<FuncDecl>(decl)) ||
-          (dyn_cast<FuncDecl>(decl) && !isApplied))
+           !dyn_cast<FuncDecl>(decl) && !dyn_cast<ConstructorDecl>(decl)) ||
+          ((dyn_cast<FuncDecl>(decl) || dyn_cast<ConstructorDecl>(decl)) &&
+           !isApplied))
         break;
 
       auto loweredArgs = SGF.emitKeyPathOperands(
