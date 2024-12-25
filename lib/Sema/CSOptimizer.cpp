@@ -61,6 +61,12 @@ static bool isFloatType(Type type) {
   return type->isFloat() || type->isDouble() || type->isFloat80();
 }
 
+static bool isUnboundArrayType(Type type) {
+  if (auto *UGT = type->getAs<UnboundGenericType>())
+    return UGT->getDecl() == type->getASTContext().getArrayDecl();
+  return false;
+}
+
 static bool isSupportedOperator(Constraint *disjunction) {
   if (!isOperatorDisjunction(disjunction))
     return false;
@@ -298,9 +304,19 @@ static void determineBestChoicesInContext(
           case ExprKind::Binary:
           case ExprKind::PrefixUnary:
           case ExprKind::PostfixUnary:
-          case ExprKind::UnresolvedDot:
-            recordResult(disjunction, {/*score=*/1.0});
+          case ExprKind::UnresolvedDot: {
+            llvm::SmallVector<Constraint *, 2> favoredChoices;
+            // Favor choices that don't require application.
+            llvm::copy_if(
+                disjunction->getNestedConstraints(),
+                std::back_inserter(favoredChoices), [](Constraint *choice) {
+                  auto *decl = getOverloadChoiceDecl(choice);
+                  return decl &&
+                         !decl->getInterfaceType()->is<AnyFunctionType>();
+                });
+            recordResult(disjunction, {/*score=*/1.0, favoredChoices});
             continue;
+          }
 
           default:
             break;
