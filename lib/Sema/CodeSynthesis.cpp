@@ -331,8 +331,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*ThrownType=*/TypeLoc(), paramList, /*GenericParams=*/nullptr, decl,
-      /*LifetimeDependentTypeRepr*/ nullptr);
+      /*ThrownType=*/TypeLoc(), paramList, /*GenericParams=*/nullptr, decl);
 
   // Mark implicit.
   ctor->setImplicit();
@@ -826,8 +825,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
       /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/superclassCtor->hasThrows(),
       /*ThrowsLoc=*/SourceLoc(), TypeLoc::withoutLoc(thrownType), bodyParams,
-      genericParams, implCtx,
-      /*LifetimeDependentTypeRepr*/ nullptr);
+      genericParams, implCtx);
 
   ctor->setImplicit();
 
