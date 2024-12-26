@@ -17,6 +17,8 @@
 
 namespace swift {
 
+class Witness;
+
 /// Diagnose the given unsafe use right now.
 void diagnoseUnsafeUse(const UnsafeUse &use, bool asNote = false);
 
@@ -28,6 +30,11 @@ void diagnoseUnsafeUsesIn(const Decl *decl);
 /// either explicitly (@unsafe) or because it references an unsafe type.
 bool isUnsafe(ConcreteDeclRef declRef);
 
+/// Whether the given requirement should be considered unsafe for the given
+/// conformance.
+bool isUnsafeInConformance(const ValueDecl *requirement,
+                           const Witness &witness,
+                           NormalProtocolConformance *conformance);
 }
 
 #endif // SWIFT_SEMA_TYPE_CHECK_UNSAFE_H

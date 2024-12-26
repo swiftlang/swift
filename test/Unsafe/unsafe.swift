@@ -53,6 +53,18 @@ extension ConformsToMultiP: MultiP {
   @unsafe func f() -> UnsafeSuper { .init() }
 }
 
+protocol GenericP {
+  associatedtype Ptr
+
+  func f<T>(_: T, _: Ptr)
+}
+
+// expected-warning@+1{{conformance of 'ConformsToGenericP' to protocol 'GenericP' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe}}
+struct ConformsToGenericP: GenericP {
+  typealias Ptr = Int
+  @unsafe func f<T>(_: T, _: Ptr) { } // expected-note{{unsafe instance method 'f' cannot satisfy safe requirement}}
+}
+
 // -----------------------------------------------------------------------
 // Overrides
 // -----------------------------------------------------------------------

@@ -300,3 +300,21 @@ bool swift::isUnsafe(ConcreteDeclRef declRef) {
 
   return false;
 }
+
+bool swift::isUnsafeInConformance(const ValueDecl *requirement,
+                                  const Witness &witness,
+                                  NormalProtocolConformance *conformance) {
+  if (requirement->isUnsafe())
+    return true;
+
+  Type requirementType = requirement->getInterfaceType();
+  Type requirementTypeInContext;
+  auto requirementSubs = witness.getRequirementToWitnessThunkSubs();
+  if (auto genericFnType = requirementType->getAs<GenericFunctionType>()) {
+    requirementTypeInContext =
+        genericFnType->substGenericArgs(requirementSubs);
+  } else {
+    requirementTypeInContext = requirementType.subst(requirementSubs);
+  }
+  return requirementTypeInContext->isUnsafe();
+}
