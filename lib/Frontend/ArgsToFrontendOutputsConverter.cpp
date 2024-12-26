@@ -698,6 +698,16 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
           hadError = true;
         }
         outputPaths.push_back(createFromTypeToPathMap(mapForInput));
+
+        // HACK: -emit-fixits-path is frontend-only, so wire it in explicitly
+        // if it was present on the command line.
+        auto &paths = outputPaths.back();
+        if (auto fixitPath = Args.getLastArg(options::OPT_emit_fixits_path)) {
+          if (paths.FixItsOutputPath.empty()) {
+            paths.FixItsOutputPath = fixitPath->getValue();
+          }
+        }
+
         return false;
       });
   if (hadError)
