@@ -61,17 +61,18 @@ using namespace swift;
 #define DEBUG_TYPE "TypeCheckStmt"
 
 namespace {
-  /// After forming autoclosures, we must re-parent any closure expressions
-  /// nested inside the autoclosure, because the autoclosure introduces a new
-  /// DeclContext.
-  class ContextualizeClosuresAndMacros : public ASTWalker {
+  /// After forming autoclosures and lazy initializer getters, we must update
+  /// the DeclContexts for any AST nodes that store the DeclContext they're
+  /// within. This includes e.g closures and decls, as well as some other
+  /// expressions, statements, and patterns.
+  class ContextualizationWalker : public ASTWalker {
     DeclContext *ParentDC;
 
-    ContextualizeClosuresAndMacros(DeclContext *parent) : ParentDC(parent) {}
+    ContextualizationWalker(DeclContext *parent) : ParentDC(parent) {}
 
   public:
     static void contextualize(ASTNode node, DeclContext *DC) {
-      node.walk(ContextualizeClosuresAndMacros(DC));
+      node.walk(ContextualizationWalker(DC));
     }
 
     MacroWalking getMacroWalkingBehavior() const override {
@@ -85,34 +86,7 @@ namespace {
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (auto CE = dyn_cast<AutoClosureExpr>(E)) {
-        CE->setParent(ParentDC);
-
-        // Recurse into the autoclosure body with the new ParentDC.
-        auto oldParentDC = ParentDC;
-        ParentDC = CE;
-        CE->getBody()->walk(*this);
-        ParentDC = oldParentDC;
-
-        TypeChecker::computeCaptures(CE);
-        return Action::SkipNode(E);
-      } 
-
-      if (auto CapE = dyn_cast<CaptureListExpr>(E)) {
-        // Capture lists need to be reparented to enclosing autoclosures
-        // and/or initializers of property wrapper backing properties
-        // (because they subsume initializers associated with wrapped
-        // properties).
-        if (isa<AutoClosureExpr>(ParentDC) ||
-            isPropertyWrapperBackingPropertyInitContext(ParentDC)) {
-          for (auto &Cap : CapE->getCaptureList()) {
-            Cap.PBD->setDeclContext(ParentDC);
-            Cap.getVar()->setDeclContext(ParentDC);
-          }
-        }
-      }
-
-      if (auto CE = dyn_cast<ClosureExpr>(E)) {
+      if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         CE->setParent(ParentDC);
         contextualize(CE->getBody(), CE);
 
@@ -121,12 +95,13 @@ namespace {
       }
 
       // Caller-side default arguments need their @autoclosures checked.
-      if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E))
+      if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E)) {
         if (DAE->isCallerSide() &&
             (DAE->getParamDecl()->isAutoClosure() ||
              (DAE->getParamDecl()->getDefaultArgumentKind() ==
               DefaultArgumentKind::ExpressionMacro)))
           DAE->getCallerSideDefaultExpr()->walk(*this);
+      }
 
       // Macro expansion expressions require a DeclContext as well.
       if (auto macroExpansion = dyn_cast<MacroExpansionExpr>(E)) {
@@ -136,26 +111,59 @@ namespace {
       return Action::Continue(E);
     }
 
-    /// We don't want to recurse into most local declarations.
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      // But we do want to walk into the initializers of local
-      // variables.
-      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      // A couple of patterns store DeclContexts.
+      if (auto *EP = dyn_cast<ExprPattern>(P))
+        EP->setDeclContext(ParentDC);
+      if (auto *EP = dyn_cast<EnumElementPattern>(P))
+        EP->setDeclContext(ParentDC);
+
+      return Action::Continue(P);
     }
 
-  private:
-    static bool isPropertyWrapperBackingPropertyInitContext(DeclContext *DC) {
-      auto *init = dyn_cast<PatternBindingInitializer>(DC);
-      if (!init)
-        return false;
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      // The ASTWalker doesn't walk the case body variables, contextualize them
+      // ourselves.
+      if (auto *CS = dyn_cast<CaseStmt>(S)) {
+        for (auto *CaseVar : CS->getCaseBodyVariablesOrEmptyArray())
+          CaseVar->setDeclContext(ParentDC);
+      }
+      // A few statements store DeclContexts, update them.
+      if (auto *BS = dyn_cast<BreakStmt>(S))
+        BS->setDeclContext(ParentDC);
+      if (auto *CS = dyn_cast<ContinueStmt>(S))
+        CS->setDeclContext(ParentDC);
+      if (auto *FS = dyn_cast<FallthroughStmt>(S))
+        FS->setDeclContext(ParentDC);
 
-      if (auto *PB = init->getBinding()) {
-        auto *var = PB->getSingleVar();
-        return var && var->getOriginalWrappedProperty(
-                          PropertyWrapperSynthesizedPropertyKind::Backing);
+      return Action::Continue(S);
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      // We may encounter some decls parented outside of a local context, e.g
+      // VarDecls in TopLevelCodeDecls are parented to the file. In such cases,
+      // assume the DeclContext they already have is correct, autoclosures
+      // and lazy var inits cannot be defined in such contexts anyway.
+      if (!D->getDeclContext()->isLocalContext())
+        return Action::SkipNode();
+
+      D->setDeclContext(ParentDC);
+
+      // Auxiliary decls need to have their contexts adjusted too.
+      if (auto *VD = dyn_cast<VarDecl>(D)) {
+        VD->visitAuxiliaryDecls([&](VarDecl *D) {
+          D->setDeclContext(ParentDC);
+        });
       }
 
-      return false;
+      // We don't currently support peer macro declarations in local contexts,
+      // however we don't reject them either; so just to be safe, adjust their
+      // context too.
+      D->visitAuxiliaryDecls([&](Decl *D) {
+        D->setDeclContext(ParentDC);
+      });
+
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
   };
 
@@ -208,12 +216,12 @@ namespace {
 } // end anonymous namespace
 
 void TypeChecker::contextualizeExpr(Expr *E, DeclContext *DC) {
-  ContextualizeClosuresAndMacros::contextualize(E, DC);
+  ContextualizationWalker::contextualize(E, DC);
 }
 
 void TypeChecker::contextualizeTopLevelCode(TopLevelCodeDecl *TLCD) {
   if (auto *body = TLCD->getBody())
-    ContextualizeClosuresAndMacros::contextualize(body, TLCD);
+    ContextualizationWalker::contextualize(body, TLCD);
 }
 
 namespace {
@@ -1036,7 +1044,7 @@ public:
   /// Type-check an entire function body.
   bool typeCheckBody(BraceStmt *&S) {
     bool HadError = typeCheckStmt(S);
-    ContextualizeClosuresAndMacros::contextualize(S, DC);
+    ContextualizationWalker::contextualize(S, DC);
     return HadError;
   }
 
@@ -2918,7 +2926,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
         body = *optBody;
         alreadyTypeChecked = true;
 
-        ContextualizeClosuresAndMacros::contextualize(body, AFD);
+        ContextualizationWalker::contextualize(body, AFD);
       }
     }
   }
