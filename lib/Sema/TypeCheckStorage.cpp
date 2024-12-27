@@ -618,7 +618,7 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
 
   if (auto *initContext = binding->getInitContext(i)) {
     auto *init = binding->getInit(i);
-    TypeChecker::contextualizeInitializer(initContext, init);
+    TypeChecker::contextualizeExpr(init, initContext);
   }
 }
 
@@ -3200,7 +3200,7 @@ static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
   // will be done in visitPatternBindingDecl.
   if (!contextualize)
     return;
-  TypeChecker::contextualizeInitializer(initContext, initializer);
+  TypeChecker::contextualizeExpr(initializer, initContext);
   checkPropertyWrapperActorIsolation(wrappedVar, initializer);
   TypeChecker::checkInitializerEffects(initContext, initializer);
 }

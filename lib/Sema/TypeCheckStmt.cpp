@@ -66,8 +66,13 @@ namespace {
   /// DeclContext.
   class ContextualizeClosuresAndMacros : public ASTWalker {
     DeclContext *ParentDC;
-  public:
+
     ContextualizeClosuresAndMacros(DeclContext *parent) : ParentDC(parent) {}
+
+  public:
+    static void contextualize(ASTNode node, DeclContext *DC) {
+      node.walk(ContextualizeClosuresAndMacros(DC));
+    }
 
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::ArgumentsAndExpansion;
@@ -103,7 +108,7 @@ namespace {
 
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
         CE->setParent(ParentDC);
-        CE->getBody()->walk(ContextualizeClosuresAndMacros(CE));
+        contextualize(CE->getBody(), CE);
 
         TypeChecker::computeCaptures(CE);
         return Action::SkipNode(E);
@@ -196,21 +201,13 @@ namespace {
   };
 } // end anonymous namespace
 
-void TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
-  ContextualizeClosuresAndMacros CC(DC);
-  E->walk(CC);
-}
-
-void TypeChecker::contextualizeCallSideDefaultArgument(DeclContext *DC,
-                                                       Expr *E) {
-  ContextualizeClosuresAndMacros CC(DC);
-  E->walk(CC);
+void TypeChecker::contextualizeExpr(Expr *E, DeclContext *DC) {
+  ContextualizeClosuresAndMacros::contextualize(E, DC);
 }
 
 void TypeChecker::contextualizeTopLevelCode(TopLevelCodeDecl *TLCD) {
-  ContextualizeClosuresAndMacros CC(TLCD);
   if (auto *body = TLCD->getBody())
-    body->walk(CC);
+    ContextualizeClosuresAndMacros::contextualize(body, TLCD);
 }
 
 namespace {
@@ -1033,7 +1030,7 @@ public:
   /// Type-check an entire function body.
   bool typeCheckBody(BraceStmt *&S) {
     bool HadError = typeCheckStmt(S);
-    S->walk(ContextualizeClosuresAndMacros(DC));
+    ContextualizeClosuresAndMacros::contextualize(S, DC);
     return HadError;
   }
 
@@ -2915,7 +2912,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
         body = *optBody;
         alreadyTypeChecked = true;
 
-        body->walk(ContextualizeClosuresAndMacros(AFD));
+        ContextualizeClosuresAndMacros::contextualize(body, AFD);
       }
     }
   }
