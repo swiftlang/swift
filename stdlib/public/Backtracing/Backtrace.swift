@@ -389,7 +389,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   }
 
   #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-  private static func withDyldProcessInfo<T>(for task: task_t,
+  @unsafe private static func withDyldProcessInfo<T>(for task: task_t,
                                              fn: (OpaquePointer?) throws -> T)
     rethrows -> T {
     var kret = kern_return_t(KERN_SUCCESS)
@@ -408,7 +408,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   #endif
 
   #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-  @_spi(Internal)
+  @safe(unchecked) @_spi(Internal)
   public static func captureImages(for process: Any) -> [Image] {
     var images: [Image] = []
     let task = process as! task_t
@@ -579,7 +579,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     #endif
   }
 
-  @_spi(Internal)
+  @safe(unchecked) @_spi(Internal)
   public static func captureSharedCacheInfo(for t: Any) -> SharedCacheInfo? {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
     let task = t as! task_t

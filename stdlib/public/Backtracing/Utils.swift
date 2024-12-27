@@ -51,7 +51,7 @@ func pad<T>(_ value: T, _ width: Int, align: PadAlignment = .left) -> String {
   }
 }
 
-@_spi(Utils)
+@safe(unchecked) @_spi(Utils)
 public func readString(from file: String) -> String? {
   let fd = _swift_open(file, O_RDONLY, 0)
   if fd < 0 {

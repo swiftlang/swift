@@ -45,23 +45,23 @@ internal protocol Image {
   func swapIfRequired<T: ByteSwappable>(array: inout [T])
   func swapIfRequired<T>(array: inout [T])
 
-  func swapIfRequired<T: FixedWidthInteger>(buffer: UnsafeMutableBufferPointer<T>)
-  func swapIfRequired<T: ByteSwappable>(buffer: UnsafeMutableBufferPointer<T>)
-  func swapIfRequired<T>(buffer: UnsafeMutableBufferPointer<T>)
+  @unsafe func swapIfRequired<T: FixedWidthInteger>(buffer: UnsafeMutableBufferPointer<T>)
+  @unsafe func swapIfRequired<T: ByteSwappable>(buffer: UnsafeMutableBufferPointer<T>)
+  @unsafe func swapIfRequired<T>(buffer: UnsafeMutableBufferPointer<T>)
 
-  func swapIfRequired<T: FixedWidthInteger>(pointer: UnsafeMutablePointer<T>)
-  func swapIfRequired<T: ByteSwappable>(pointer: UnsafeMutablePointer<T>)
-  func swapIfRequired<T>(pointer: UnsafeMutablePointer<T>)
+  @unsafe func swapIfRequired<T: FixedWidthInteger>(pointer: UnsafeMutablePointer<T>)
+  @unsafe func swapIfRequired<T: ByteSwappable>(pointer: UnsafeMutablePointer<T>)
+  @unsafe func swapIfRequired<T>(pointer: UnsafeMutablePointer<T>)
 
-  func fetch<T>(from addr: Address,
+  @unsafe func fetch<T>(from addr: Address,
                 into buffer: UnsafeMutableBufferPointer<T>) throws
-  func fetch<T>(from addr: Address, into pointer: UnsafeMutablePointer<T>) throws
+  @unsafe func fetch<T>(from addr: Address, into pointer: UnsafeMutablePointer<T>) throws
   func fetch<T>(from addr: Address, count: Int, as: T.Type) throws -> [T]
   func fetch<T>(from addr: Address, as type: T.Type) throws -> T
 
-  func fetchUnswapped<T>(from addr: Address,
+  @unsafe func fetchUnswapped<T>(from addr: Address,
                          into buffer: UnsafeMutableBufferPointer<T>) throws
-  func fetchUnswapped<T>(from addr: Address,
+  @unsafe func fetchUnswapped<T>(from addr: Address,
                          into pointer: UnsafeMutablePointer<T>) throws
   func fetchUnswapped<T>(from addr: Address, count: Int, as: T.Type) throws -> [T]
   func fetchUnswapped<T>(from addr: Address, as type: T.Type) throws -> T
@@ -102,40 +102,40 @@ extension Image {
     // Nothing to do
   }
 
-  public func swapIfRequired<T: ByteSwappable>(buffer: UnsafeMutableBufferPointer<T>) {
+  @unsafe public func swapIfRequired<T: ByteSwappable>(buffer: UnsafeMutableBufferPointer<T>) {
     if shouldByteSwap {
       buffer.swapBytes()
     }
   }
-  public func swapIfRequired<T: FixedWidthInteger>(buffer: UnsafeMutableBufferPointer<T>) {
+  @unsafe public func swapIfRequired<T: FixedWidthInteger>(buffer: UnsafeMutableBufferPointer<T>) {
     if shouldByteSwap {
       buffer.swapBytes()
     }
   }
-  public func swapIfRequired<T>(buffer: UnsafeMutableBufferPointer<T>) {
+  @unsafe public func swapIfRequired<T>(buffer: UnsafeMutableBufferPointer<T>) {
     // Nothing to do
   }
 
-  public func swapIfRequired<T: ByteSwappable>(pointer: UnsafeMutablePointer<T>) {
+  @unsafe public func swapIfRequired<T: ByteSwappable>(pointer: UnsafeMutablePointer<T>) {
     if shouldByteSwap {
       pointer.pointee = pointer.pointee.byteSwapped
     }
   }
-  public func swapIfRequired<T: FixedWidthInteger>(pointer: UnsafeMutablePointer<T>) {
+  @unsafe public func swapIfRequired<T: FixedWidthInteger>(pointer: UnsafeMutablePointer<T>) {
     if shouldByteSwap {
       pointer.pointee = pointer.pointee.byteSwapped
     }
   }
-  public func swapIfRequired<T>(pointer: UnsafeMutablePointer<T>) {
+  @unsafe public func swapIfRequired<T>(pointer: UnsafeMutablePointer<T>) {
     // Nothing to do
   }
 
 
-  public func fetchUnswapped<T>(from addr: Address,
+  @unsafe public func fetchUnswapped<T>(from addr: Address,
     into buffer: UnsafeMutableBufferPointer<T>) throws {
     return try source.fetch(from: addr, into: buffer)
   }
-  public func fetchUnswapped<T>(from addr: Address,
+  @unsafe public func fetchUnswapped<T>(from addr: Address,
     into pointer: UnsafeMutablePointer<T>) throws {
     return try source.fetch(from: addr, into: pointer)
   }
@@ -146,12 +146,12 @@ extension Image {
     return try source.fetch(from: addr, as: type)
   }
 
-  public func fetch<T>(from addr: Address,
+  @unsafe public func fetch<T>(from addr: Address,
                 into buffer: UnsafeMutableBufferPointer<T>) throws {
     try fetchUnswapped(from: addr, into: buffer)
     swapIfRequired(buffer: buffer)
   }
-  public func fetch<T>(from addr: Address,
+  @unsafe public func fetch<T>(from addr: Address,
                 into pointer: UnsafeMutablePointer<T>) throws {
     try fetchUnswapped(from: addr, into: pointer)
     swapIfRequired(pointer: pointer)

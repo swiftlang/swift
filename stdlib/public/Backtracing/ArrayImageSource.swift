@@ -33,7 +33,7 @@ struct ArrayImageSource<T>: ImageSource {
     return Bounds(base: 0, size: Size(array.count * MemoryLayout<T>.stride))
   }
 
-  public func fetch(from addr: Address,
+  @unsafe public func fetch(from addr: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
     try array.withUnsafeBytes{
       let size = Size($0.count)

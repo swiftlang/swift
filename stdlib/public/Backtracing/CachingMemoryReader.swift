@@ -27,20 +27,20 @@ fileprivate let maxCachedSize = pageSize * 8
 @_spi(MemoryReaders)
 public class CachingMemoryReader<T: MemoryReader>: MemoryReader {
   private var reader: T
-  private var cache: [Address:UnsafeRawBufferPointer]
+  @unsafe private var cache: [Address:UnsafeRawBufferPointer]
 
-  public init(for reader: T) {
+  @safe(unchecked) public init(for reader: T) {
     self.reader = reader
     self.cache = [:]
   }
 
-  deinit {
+  @safe(unchecked) deinit {
     for (_, page) in cache {
       page.deallocate()
     }
   }
 
-  private func getPage(at address: Address) throws -> UnsafeRawBufferPointer {
+  @unsafe private func getPage(at address: Address) throws -> UnsafeRawBufferPointer {
     precondition((address & Address(pageMask)) == 0)
 
     if let page = cache[address] {
@@ -58,7 +58,7 @@ public class CachingMemoryReader<T: MemoryReader>: MemoryReader {
     return result
   }
 
-  public func fetch(from address: Address,
+  @unsafe public func fetch(from address: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
     guard buffer.count <= maxCachedSize else {
       try reader.fetch(from: address, into: buffer)

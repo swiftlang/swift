@@ -70,7 +70,7 @@ extension Array where Self.Element: ByteSwappable {
   }
 }
 
-extension UnsafeMutableBufferPointer where Self.Element: ByteSwappable {
+@unsafe extension UnsafeMutableBufferPointer where Self.Element: ByteSwappable {
   func swapBytes() {
     for n in 0..<self.count {
       self[n] = self[n].byteSwapped
@@ -86,7 +86,7 @@ extension Array where Self.Element: FixedWidthInteger {
   }
 }
 
-extension UnsafeMutableBufferPointer where Self.Element: FixedWidthInteger {
+@unsafe extension UnsafeMutableBufferPointer where Self.Element: FixedWidthInteger {
   func swapBytes() {
     for n in 0..<self.count {
       self[n] = self[n].byteSwapped

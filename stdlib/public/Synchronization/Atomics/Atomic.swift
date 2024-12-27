@@ -18,7 +18,7 @@ import Builtin
 @_rawLayout(like: Value.AtomicRepresentation)
 @_staticExclusiveOnly
 public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
-  @available(SwiftStdlib 6.0, *)
+  @unsafe @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   var _address: UnsafeMutablePointer<Value.AtomicRepresentation> {
@@ -35,7 +35,7 @@ public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
   /// Initializes a value of this atomic with the given initial value.
   ///
   /// - Parameter initialValue: The initial value to set this atomic.
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public init(_ initialValue: consuming Value) {
@@ -44,7 +44,7 @@ public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
 
   // Deinit's can't be marked @_transparent. Do these things need all of these
   // attributes..?
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   deinit {

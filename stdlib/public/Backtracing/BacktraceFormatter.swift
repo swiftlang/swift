@@ -625,7 +625,7 @@ public struct BacktraceFormatter {
   /// Tries to open the file corresponding to the symbol; if successful,
   /// it will return a string containing the specified lines of context,
   /// with the point at which the program crashed highlighted.
-  private func formattedSourceLines(from sourceLocation: SymbolicatedBacktrace.SourceLocation,
+  @safe(unchecked) private func formattedSourceLines(from sourceLocation: SymbolicatedBacktrace.SourceLocation,
                                     indent theIndent: Int = 2) -> String? {
     guard let fp = fopen(sourceLocation.path, "rt") else {
       return nil
