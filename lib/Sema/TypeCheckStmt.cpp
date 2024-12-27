@@ -163,7 +163,10 @@ namespace {
         D->setDeclContext(ParentDC);
       });
 
-      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
+      // Only recurse into decls that aren't themselves DeclContexts. This
+      // allows us to visit e.g initializers for PatternBindingDecls and
+      // accessors for VarDecls.
+      return Action::SkipNodeIf(isa<DeclContext>(D));
     }
   };
 
