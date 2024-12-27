@@ -222,16 +222,16 @@ public struct UnsafePointer<Pointee: ~Copyable>: Copyable {
 @available(*, unavailable)
 extension UnsafePointer: Sendable where Pointee: ~Copyable {}
 
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafePointer: _Pointer where Pointee: ~Copyable {
   /// A type that represents the distance between two pointers.
   public typealias Distance = Int
 }
 
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafePointer: Equatable where Pointee: ~Copyable {}
 
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafePointer: Hashable where Pointee: ~Copyable {
   // Note: This explicit `hashValue` applies @_preInverseGenerics to emulate the
   // original (pre-6.0) compiler-synthesized version.
@@ -240,24 +240,24 @@ extension UnsafePointer: Hashable where Pointee: ~Copyable {
     _hashValue(for: self)
   }
 }
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafePointer: Comparable where Pointee: ~Copyable {}
 
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafePointer: Strideable where Pointee: ~Copyable {}
 
 #if !$Embedded
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafePointer: CustomDebugStringConvertible
 where Pointee: ~Copyable {}
 #endif
 
 #if SWIFT_ENABLE_REFLECTION
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafePointer: CustomReflectable where Pointee: ~Copyable {}
 #endif
 
-extension UnsafePointer where Pointee: ~Copyable {
+@unsafe extension UnsafePointer where Pointee: ~Copyable {
   /// Deallocates the memory block previously allocated at this pointer.
   ///
   /// This pointer must be a pointer to the start of a previously allocated
@@ -274,7 +274,7 @@ extension UnsafePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafePointer where Pointee: ~Copyable {
+@unsafe extension UnsafePointer where Pointee: ~Copyable {
   /// Accesses the instance referenced by this pointer.
   ///
   /// When reading from the `pointee` property, the instance referenced by
@@ -287,7 +287,7 @@ extension UnsafePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafePointer {
+@unsafe extension UnsafePointer {
   // This preserves the ABI of the original (pre-6.0) `pointee` property that
   // used to export a getter. The current one above would export a read
   // accessor, if it wasn't @_alwaysEmitIntoClient.
@@ -300,7 +300,7 @@ extension UnsafePointer {
   }
 }
 
-extension UnsafePointer where Pointee: ~Copyable {
+@unsafe extension UnsafePointer where Pointee: ~Copyable {
   /// Accesses the pointee at the specified offset from this pointer.
   ///
   /// For a pointer `p`, the memory at `p + i` must be initialized.
@@ -316,7 +316,7 @@ extension UnsafePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafePointer {
+@unsafe extension UnsafePointer {
   // This preserves the ABI of the original (pre-6.0) subscript that used to
   // export a getter. The current one above would export a read accessor, if it
   // wasn't @_alwaysEmitIntoClient.
@@ -330,7 +330,7 @@ extension UnsafePointer {
   }
 }
 
-extension UnsafePointer where Pointee: ~Copyable {
+@unsafe extension UnsafePointer where Pointee: ~Copyable {
   /// Executes the given closure while temporarily binding memory to
   /// the specified number of instances of type `T`.
   ///
@@ -414,7 +414,7 @@ extension UnsafePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafePointer {
+@unsafe extension UnsafePointer {
   // This unavailable implementation uses the expected mangled name
   // of `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides
   // an entry point for any binary linked against the stdlib binary
@@ -433,7 +433,7 @@ extension UnsafePointer {
   }
 }
 
-extension UnsafePointer {
+@unsafe extension UnsafePointer {
   /// Obtain a pointer to the stored property referred to by a key path.
   ///
   /// If the key path represents a computed property,
@@ -457,7 +457,7 @@ extension UnsafePointer {
   }
 }
 
-extension UnsafePointer where Pointee: ~Copyable {
+@unsafe extension UnsafePointer where Pointee: ~Copyable {
   @inlinable // unsafe-performance
   @_preInverseGenerics
   internal static var _max: UnsafePointer {
@@ -671,16 +671,16 @@ public struct UnsafeMutablePointer<Pointee: ~Copyable>: Copyable {
 @available(*, unavailable)
 extension UnsafeMutablePointer: Sendable where Pointee: ~Copyable {}
 
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafeMutablePointer: _Pointer where Pointee: ~Copyable {
   /// A type that represents the distance between two pointers.
   public typealias Distance = Int
 }
 
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafeMutablePointer: Equatable where Pointee: ~Copyable {}
 
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafeMutablePointer: Hashable where Pointee: ~Copyable {
   // Note: This explicit `hashValue` applies @_preInverseGenerics to emulate the
   // original (pre-6.0) compiler-synthesized version.
@@ -690,24 +690,24 @@ extension UnsafeMutablePointer: Hashable where Pointee: ~Copyable {
   }
 }
 
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafeMutablePointer: Comparable where Pointee: ~Copyable {}
 
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafeMutablePointer: Strideable where Pointee: ~Copyable {}
 
 #if !$Embedded
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafeMutablePointer: CustomDebugStringConvertible
 where Pointee: ~Copyable {}
 #endif
 
 #if SWIFT_ENABLE_REFLECTION
-@_preInverseGenerics
+@unsafe @_preInverseGenerics
 extension UnsafeMutablePointer: CustomReflectable where Pointee: ~Copyable {}
 #endif
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+@unsafe extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Creates a mutable typed pointer referencing the same memory as the given
   /// immutable pointer.
   ///
@@ -753,7 +753,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+@unsafe extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Allocates uninitialized memory for the specified number of instances of
   /// type `Pointee`.
   ///
@@ -804,7 +804,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+@unsafe extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Deallocates the memory block previously allocated at this pointer.
   ///
   /// This pointer must be a pointer to the start of a previously allocated
@@ -821,7 +821,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+@unsafe extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Reads or updates the instance referenced by this pointer.
   ///
   /// When reading from the `pointee` property, the instance referenced by this
@@ -843,7 +843,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafeMutablePointer {
+@unsafe extension UnsafeMutablePointer {
   // This preserves the ABI of the original (pre-6.0) `pointee` property that
   // used to export a getter. The current one above would export a read
   // accessor, if it wasn't @_alwaysEmitIntoClient.
@@ -860,7 +860,7 @@ extension UnsafeMutablePointer {
 }
 
 
-extension UnsafeMutablePointer {
+@unsafe extension UnsafeMutablePointer {
   /// Initializes this pointer's memory with the specified number of
   /// consecutive copies of the given value.
   ///
@@ -885,7 +885,7 @@ extension UnsafeMutablePointer {
   }
 }
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+@unsafe extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Initializes this pointer's memory with a single instance of the given
   /// value.
   ///
@@ -902,7 +902,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafeMutablePointer {
+@unsafe extension UnsafeMutablePointer {
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal func initialize(to value: Pointee) { // Note: `value` is __shared!
@@ -910,7 +910,7 @@ extension UnsafeMutablePointer {
   }
 }
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+@unsafe extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Retrieves and returns the referenced instance, returning the pointer's
   /// memory to an uninitialized state.
   ///
@@ -934,7 +934,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafeMutablePointer {
+@unsafe extension UnsafeMutablePointer {
   /// Update this pointer's initialized memory with the specified number of
   /// consecutive copies of the given value.
   ///
@@ -964,7 +964,7 @@ extension UnsafeMutablePointer {
   }
 }
 
-extension UnsafeMutablePointer {
+@unsafe extension UnsafeMutablePointer {
   /// Update this pointer's initialized memory with the specified number of
   /// instances, copied from the given pointer's memory.
   ///
@@ -1016,7 +1016,7 @@ extension UnsafeMutablePointer {
   }
 }
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+@unsafe extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Moves instances from initialized source memory into the uninitialized
   /// memory referenced by this pointer, leaving the source memory
   /// uninitialized and the memory referenced by this pointer initialized.
@@ -1065,7 +1065,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafeMutablePointer {
+@unsafe extension UnsafeMutablePointer {
   /// Initializes the memory referenced by this pointer with the values
   /// starting at the given pointer.
   ///
@@ -1099,7 +1099,7 @@ extension UnsafeMutablePointer {
   }
 }
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+@unsafe extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Update this pointer's initialized memory by moving the specified number
   /// of instances the source pointer's memory, leaving the source memory
   /// uninitialized.
@@ -1138,7 +1138,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafeMutablePointer {
+@unsafe extension UnsafeMutablePointer {
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "moveUpdate(from:count:)")
   @_silgen_name("_swift_se0370_UnsafeMutablePointer_moveAssign_from_count")
@@ -1149,7 +1149,7 @@ extension UnsafeMutablePointer {
   }
 }
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+@unsafe extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Deinitializes the specified number of values starting at this pointer.
   ///
   /// The region of memory starting at this pointer and covering `count`
@@ -1173,7 +1173,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+@unsafe extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Executes the given closure while temporarily binding memory to
   /// the specified number of instances of the given type.
   ///
@@ -1255,7 +1255,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafeMutablePointer {
+@unsafe extension UnsafeMutablePointer {
   // This obsolete implementation uses the expected mangled name of
   // `withMemoryRebound<T, Result>(to:capacity:_:)`, and provides an entry point
   // for any binary linked against the stdlib binary for Swift 5.6 and older.
@@ -1273,7 +1273,7 @@ extension UnsafeMutablePointer {
   }
 }
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+@unsafe extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Reads or updates the pointee at the specified offset from this pointer.
   ///
   /// For a pointer `p`, the memory at `p + i` must be initialized when reading
@@ -1300,7 +1300,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-extension UnsafeMutablePointer {
+@unsafe extension UnsafeMutablePointer {
   // This preserves the ABI of the original (pre-6.0) subscript that used to
   // export a getter. The current one above would export a read accessor, if it
   // wasn't @_alwaysEmitIntoClient.
@@ -1318,7 +1318,7 @@ extension UnsafeMutablePointer {
   }
 }
 
-extension UnsafeMutablePointer {
+@unsafe extension UnsafeMutablePointer {
   /// Obtain a pointer to the stored property referred to by a key path.
   ///
   /// If the key path represents a computed property,
@@ -1364,7 +1364,7 @@ extension UnsafeMutablePointer {
   }
 }
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
+@unsafe extension UnsafeMutablePointer where Pointee: ~Copyable {
   @inlinable // unsafe-performance
   @_preInverseGenerics
   internal static var _max: UnsafeMutablePointer {

@@ -9,15 +9,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_silgen_name("_swift_observation_tls_get")
+@unsafe @_silgen_name("_swift_observation_tls_get")
 func _tlsGet() -> UnsafeMutableRawPointer?
 
-@_silgen_name("_swift_observation_tls_set")
+@unsafe @_silgen_name("_swift_observation_tls_set")
 func _tlsSet(_ value: UnsafeMutableRawPointer?)
 
 @available(SwiftStdlib 5.9, *)
 struct _ThreadLocal {
-  static var value: UnsafeMutableRawPointer? {
+  @unsafe static var value: UnsafeMutableRawPointer? {
     get {
       return _tlsGet()
     }

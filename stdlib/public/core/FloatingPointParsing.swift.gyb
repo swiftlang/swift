@@ -161,6 +161,7 @@ extension ${Self}: LosslessStringConvertible {
   /// - Parameter text: An input string to convert to a `${Self}?` instance.
   ///
   @inlinable
+  @safe(unchecked)
   public init?<S: StringProtocol>(_ text: S) {
   %if bits == 16:
     self.init(Substring(text))
@@ -196,6 +197,7 @@ extension ${Self}: LosslessStringConvertible {
   // _swift_stdlib_strtoXYZ_clocale()
   // as ABI to support old compiled code that still requires it.
   @available(SwiftStdlib 5.3, *)
+  @safe(unchecked)
   public init?(_ text: Substring) {
     self = 0.0
     let success = _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in

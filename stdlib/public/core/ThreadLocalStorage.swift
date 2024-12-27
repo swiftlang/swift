@@ -19,18 +19,18 @@ internal class _TLSAtomicInt {
   internal var value: Int
   internal init() { self.value = 0 }
 
-  internal var valuePtr: UnsafeMutablePointer<Int> {
+  @unsafe internal var valuePtr: UnsafeMutablePointer<Int> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: Int.self)
   }
 
-  internal func increment() {
+  @safe(unchecked) internal func increment() {
     _ = _swift_stdlib_atomicFetchAddInt(
       object: valuePtr,
       operand: 1)
   }
 
-  internal func load() -> Int {
+  @safe(unchecked) internal func load() -> Int {
     return _swift_stdlib_atomicLoadInt(object: valuePtr)
   }
 }
@@ -56,7 +56,7 @@ internal struct _ThreadLocalStorage {
 
   // Get the current thread's TLS pointer. On first call for a given thread,
   // creates and initializes a new one.
-  internal static func getPointer()
+  @unsafe internal static func getPointer()
     -> UnsafeMutablePointer<_ThreadLocalStorage>
   {
     return _swift_stdlib_threadLocalStorageGet().assumingMemoryBound(
@@ -66,7 +66,7 @@ internal struct _ThreadLocalStorage {
 
 // Destructor to register with pthreads. Responsible for deallocating any memory
 // owned.
-@_silgen_name("_stdlib_destroyTLS")
+@unsafe @_silgen_name("_stdlib_destroyTLS")
 internal func _destroyTLS(_ ptr: UnsafeMutableRawPointer?) {
   _internalInvariant(ptr != nil,
     "_destroyTLS was called, but with nil...")
@@ -80,7 +80,7 @@ internal func _destroyTLS(_ ptr: UnsafeMutableRawPointer?) {
 #endif
 }
 
-@_silgen_name("_stdlib_createTLS")
+@unsafe @_silgen_name("_stdlib_createTLS")
 internal func _createThreadLocalStorage()
   -> UnsafeMutablePointer<_ThreadLocalStorage>
 {

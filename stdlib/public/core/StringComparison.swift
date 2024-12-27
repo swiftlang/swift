@@ -42,7 +42,7 @@ internal func _stringCompareWithSmolCheck(
   return _stringCompareInternal(lhs, rhs, expecting: expecting)
 }
 
-@inline(never) // Keep `_stringCompareWithSmolCheck` fast-path fast
+@safe(unchecked) @inline(never) // Keep `_stringCompareWithSmolCheck` fast-path fast
 @usableFromInline
 @_effects(readonly)
 internal func _stringCompareInternal(
@@ -75,7 +75,7 @@ internal func _stringCompare(
     lhs, lhsRange, rhs, rhsRange, expecting: expecting)
 }
 
-@usableFromInline
+@safe(unchecked) @usableFromInline
 @_effects(readonly)
 internal func _stringCompareInternal(
   _ lhs: _StringGuts, _ lhsRange: Range<Int>,
@@ -96,7 +96,7 @@ internal func _stringCompareInternal(
   }
 }
 
-@_effects(readonly)
+@unsafe @_effects(readonly)
 private func _stringCompareFastUTF8(
   _ utf8Left: UnsafeBufferPointer<UInt8>,
   _ utf8Right: UnsafeBufferPointer<UInt8>,
@@ -123,7 +123,7 @@ private func _stringCompareFastUTF8(
     utf8Left, utf8Right, expecting: expecting)
 }
 
-@_effects(readonly)
+@unsafe @_effects(readonly)
 private func _stringCompareFastUTF8Abnormal(
   _ utf8Left: UnsafeBufferPointer<UInt8>,
   _ utf8Right: UnsafeBufferPointer<UInt8>,
@@ -198,7 +198,7 @@ private func _stringCompareSlow(
     expecting: expecting)
 }
 
-@_effects(readonly)
+@unsafe @_effects(readonly)
 private func _stringCompareSlow(
   _ leftUTF8: UnsafeBufferPointer<UInt8>,
   _ rightUTF8: UnsafeBufferPointer<UInt8>,
@@ -213,7 +213,7 @@ private func _stringCompareSlow(
 
 // Return the point of binary divergence. If they have no binary difference
 // (even if one is longer), returns nil.
-@_effects(readonly)
+@unsafe @_effects(readonly)
 private func _findDiffIdx(
   _ left: UnsafeBufferPointer<UInt8>, _ right: UnsafeBufferPointer<UInt8>
 ) -> Int? {
@@ -236,7 +236,7 @@ private func _lexicographicalCompare<I: FixedWidthInteger>(
   return expecting == .equal ? lhs == rhs : lhs < rhs
 }
 
-@_effects(readonly)
+@unsafe @_effects(readonly)
 private func _findBoundary(
   _ utf8: UnsafeBufferPointer<UInt8>, before: Int
 ) -> Int {
@@ -293,7 +293,7 @@ internal enum _StringComparisonResult {
 
 // Perform a binary comparison of bytes in memory. Return value is negative if
 // less, 0 if equal, positive if greater.
-@_effects(readonly)
+@unsafe @_effects(readonly)
 internal func _binaryCompare<UInt8>(
   _ lhs: UnsafeBufferPointer<UInt8>, _ rhs: UnsafeBufferPointer<UInt8>
 ) -> Int {
@@ -310,7 +310,7 @@ internal func _binaryCompare<UInt8>(
 
 // Double dispatch functions
 extension _StringGutsSlice {
-  @_effects(readonly)
+  @safe(unchecked) @_effects(readonly)
   internal func compare(
     with other: _StringGutsSlice, expecting: _StringComparisonResult
   ) -> Bool {

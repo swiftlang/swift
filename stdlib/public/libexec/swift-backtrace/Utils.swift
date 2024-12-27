@@ -63,7 +63,7 @@ struct PosixError: Error {
   }
 }
 
-internal func recursiveRemoveContents(_ dir: String) throws {
+@safe(unchecked) internal func recursiveRemoveContents(_ dir: String) throws {
   guard let dirp = opendir(dir) else {
     throw PosixError(errno: errno)
   }
@@ -96,7 +96,7 @@ internal func recursiveRemoveContents(_ dir: String) throws {
   }
 }
 
-internal func recursiveRemove(_ dir: String) throws {
+@safe(unchecked) internal func recursiveRemove(_ dir: String) throws {
   try recursiveRemoveContents(dir)
 
   if rmdir(dir) != 0 {
@@ -104,7 +104,7 @@ internal func recursiveRemove(_ dir: String) throws {
   }
 }
 
-internal func withTemporaryDirectory(pattern: String, shouldDelete: Bool = true,
+@safe(unchecked) internal func withTemporaryDirectory(pattern: String, shouldDelete: Bool = true,
                                      body: (String) throws -> ()) throws {
   var buf = Array<UInt8>(pattern.utf8)
   buf.append(0)
@@ -127,7 +127,7 @@ internal func withTemporaryDirectory(pattern: String, shouldDelete: Bool = true,
   try body(dir)
 }
 
-internal func spawn(_ path: String, args: [String]) throws {
+@safe(unchecked) internal func spawn(_ path: String, args: [String]) throws {
   var cargs = args.map{ strdup($0) }
   cargs.append(nil)
   let result = cargs.withUnsafeBufferPointer{
@@ -144,16 +144,16 @@ internal func spawn(_ path: String, args: [String]) throws {
 #endif // os(macOS)
 
 struct CFileStream: TextOutputStream {
-  var fp: UnsafeMutablePointer<FILE>
+  @unsafe var fp: UnsafeMutablePointer<FILE>
 
-  public func write(_ string: String) {
+  @safe(unchecked) public func write(_ string: String) {
     fputs(string, fp)
   }
 
-  public func flush() {
+  @safe(unchecked) public func flush() {
     fflush(fp)
   }
 }
 
-var standardOutput = CFileStream(fp: stdout)
-var standardError = CFileStream(fp: stderr)
+@safe(unchecked) var standardOutput = CFileStream(fp: stdout)
+@safe(unchecked) var standardError = CFileStream(fp: stderr)

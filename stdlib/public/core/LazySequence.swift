@@ -204,7 +204,7 @@ extension LazySequence: Sequence {
     return _base.underestimatedCount
   }
 
-  @inlinable // lazy-performance
+  @unsafe @inlinable // lazy-performance
   @discardableResult
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>

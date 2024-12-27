@@ -155,7 +155,7 @@ public struct SystemRandomNumberGenerator: RandomNumberGenerator, Sendable {
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
   /// - Returns: An unsigned 64-bit random value.
-  @inlinable
+  @safe(unchecked) @inlinable
   public mutating func next() -> UInt64 {
     var random: UInt64 = 0
     _withUnprotectedUnsafeMutablePointer(to: &random) {

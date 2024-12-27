@@ -18,7 +18,7 @@ internal protocol _AbstractStringStorage: _NSCopying {
   var asString: String { get }
   var count: Int { get }
   var isASCII: Bool { get }
-  var start: UnsafePointer<UInt8> { get }
+  @unsafe var start: UnsafePointer<UInt8> { get }
   var UTF16Length: Int { get }
 }
 
@@ -28,7 +28,7 @@ internal protocol _AbstractStringStorage {
   var asString: String { get }
   var count: Int { get }
   var isASCII: Bool { get }
-  var start: UnsafePointer<UInt8> { get }
+  @unsafe var start: UnsafePointer<UInt8> { get }
 }
 
 #endif
@@ -173,7 +173,7 @@ fileprivate struct _CapacityAndFlags {
 
 // TODO: Migrate this to somewhere it can be shared with Array
 import SwiftShims
-fileprivate func _allocate<T: AnyObject>(
+@safe(unchecked) fileprivate func _allocate<T: AnyObject>(
   numHeaderBytes: Int,        // The size of the class header
   numTailBytes: Int,          // The desired number of tail bytes
   growthFactor: Float? = nil, // Exponential growth factor for large allocs
@@ -300,7 +300,7 @@ final internal class __StringStorage
     _internalInvariantFailure("Use the create method")
   }
 
-  deinit {
+  @safe(unchecked) deinit {
     if hasBreadcrumbs {
       _breadcrumbsAddress.deinitialize(count: 1)
     }
@@ -309,7 +309,7 @@ final internal class __StringStorage
 
 // Creation
 extension __StringStorage {
-  @_effects(releasenone)
+  @safe(unchecked) @_effects(releasenone)
   private static func create(
     codeUnitCapacity capacity: Int, countAndFlags: _CountAndFlags
   ) -> __StringStorage {
@@ -355,7 +355,7 @@ extension __StringStorage {
 
   // The caller is expected to check UTF8 validity and ASCII-ness and update
   // the resulting StringStorage accordingly
-  internal static func create(
+  @unsafe internal static func create(
     uninitializedCodeUnitCapacity capacity: Int,
     initializingUncheckedUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
@@ -383,7 +383,7 @@ extension __StringStorage {
     return storage
   }
 
-  @_effects(releasenone)
+  @unsafe @_effects(releasenone)
   internal static func create(
     initializingFrom bufPtr: UnsafeBufferPointer<UInt8>,
     codeUnitCapacity capacity: Int,
@@ -400,7 +400,7 @@ extension __StringStorage {
     return storage
   }
 
-  @_effects(releasenone)
+  @unsafe @_effects(releasenone)
   internal static func create(
     initializingFrom bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) -> __StringStorage {
@@ -415,32 +415,32 @@ extension __StringStorage {
 extension __StringStorage {
   internal var hasBreadcrumbs: Bool { _capacityAndFlags.hasBreadcrumbs }
 
-  @inline(__always)
+  @unsafe @inline(__always)
   internal var mutableStart: UnsafeMutablePointer<UInt8> {
     UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
   }
-  @inline(__always)
+  @unsafe @inline(__always)
   private var mutableEnd: UnsafeMutablePointer<UInt8> {
      mutableStart + count
   }
 
-  @inline(__always)
+  @unsafe @inline(__always)
   internal var start: UnsafePointer<UInt8> {
      UnsafePointer(mutableStart)
   }
 
-  @inline(__always)
+  @unsafe @inline(__always)
   private final var end: UnsafePointer<UInt8> {
     UnsafePointer(mutableEnd)
   }
 
   // Point to the nul-terminator.
-  @inline(__always)
+  @unsafe @inline(__always)
   internal final var terminator: UnsafeMutablePointer<UInt8> {
     mutableEnd
   }
 
-  @inline(__always)
+  @unsafe @inline(__always)
   internal var codeUnits: UnsafeBufferPointer<UInt8> {
     UnsafeBufferPointer(start: start, count: count)
   }
@@ -458,7 +458,7 @@ extension __StringStorage {
   }
 
   // @opaque
-  fileprivate var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
+  @unsafe fileprivate var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
     _precondition(
       hasBreadcrumbs, "Internal error: string breadcrumbs not present")
     return UnsafeMutablePointer(_realCapacityEnd)
@@ -474,7 +474,7 @@ extension __StringStorage {
   // NOTE: Callers who wish to mutate this storage should enforce nul-termination
   //
   // TODO: Refactoring or removing. Excluding the last byte is awkward.
-  @inline(__always)
+  @unsafe @inline(__always)
   private var unusedStorage: UnsafeMutableBufferPointer<UInt8> {
     UnsafeMutableBufferPointer(
       start: mutableEnd, count: unusedCapacity)
@@ -487,7 +487,7 @@ extension __StringStorage {
   #if !INTERNAL_CHECKS_ENABLED
   @inline(__always) internal func _invariantCheck(initialized: Bool = true) {}
   #else
-  internal func _invariantCheck(initialized: Bool = true) {
+  @safe(unchecked) internal func _invariantCheck(initialized: Bool = true) {
     let rawSelf = UnsafeRawPointer(Builtin.bridgeToRawPointer(self))
     let rawStart = UnsafeRawPointer(start)
     _internalInvariant(unusedCapacity >= 0)
@@ -521,7 +521,7 @@ extension __StringStorage {
 // Appending
 extension __StringStorage {
   // Perform common post-RRC adjustments and invariant enforcement.
-  @_effects(releasenone)
+  @safe(unchecked) @_effects(releasenone)
   internal func _updateCountAndFlags(newCount: Int, newIsASCII: Bool) {
     let countAndFlags = _CountAndFlags(
       mortalCount: newCount, isASCII: newIsASCII)
@@ -543,7 +543,7 @@ extension __StringStorage {
   }
 
   // Perform common post-append adjustments and invariant enforcement.
-  @_effects(releasenone)
+  @safe(unchecked) @_effects(releasenone)
   private func _postAppendAdjust(
     appendedCount: Int, appendedIsASCII isASCII: Bool
   ) {
@@ -553,7 +553,7 @@ extension __StringStorage {
     _internalInvariant(oldTerminator + appendedCount == self.terminator)
   }
 
-  @_effects(releasenone)
+  @unsafe @_effects(releasenone)
   internal func appendInPlace(
     _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) {
@@ -564,7 +564,7 @@ extension __StringStorage {
     _postAppendAdjust(appendedCount: srcCount, appendedIsASCII: isASCII)
   }
 
-  @_effects(releasenone)
+  @safe(unchecked) @_effects(releasenone)
   internal func appendInPlace<Iter: IteratorProtocol>(
     _ other: inout Iter, isASCII: Bool
   ) where Iter.Element == UInt8 {
@@ -584,7 +584,7 @@ extension __StringStorage {
 
 // Removing
 extension __StringStorage {
-  @_effects(releasenone)
+  @safe(unchecked) @_effects(releasenone)
   internal func remove(from lower: Int, to upper: Int) {
     _internalInvariant(lower <= upper)
 
@@ -599,7 +599,7 @@ extension __StringStorage {
 
   // Reposition a tail of this storage from src to dst. Returns the length of
   // the tail.
-  @_effects(releasenone)
+  @unsafe @_effects(releasenone)
   internal func _slideTail(
     src: UnsafeMutablePointer<UInt8>,
     dst: UnsafeMutablePointer<UInt8>
@@ -610,7 +610,7 @@ extension __StringStorage {
     return tailCount
   }
 
-  @_effects(releasenone)
+  @unsafe @_effects(releasenone)
   internal func replace(
     from lower: Int, to upper: Int, with replacement: UnsafeBufferPointer<UInt8>
   ) {
@@ -634,7 +634,7 @@ extension __StringStorage {
   }
 
 
-  @_effects(releasenone)
+  @safe(unchecked) @_effects(releasenone)
   internal func replace<C: Collection>(
     from lower: Int,
     to upper: Int,
@@ -671,7 +671,7 @@ extension __StringStorage {
 final internal class __SharedStringStorage
   : __SwiftNativeNSString, _AbstractStringStorage {
   internal var _owner: AnyObject?
-  internal var start: UnsafePointer<UInt8>
+  @unsafe internal var start: UnsafePointer<UInt8>
 
 #if _pointerBitWidth(_64)
   internal var _countAndFlags: _StringObject.CountAndFlags
@@ -693,7 +693,7 @@ final internal class __SharedStringStorage
 
   internal var count: Int { _countAndFlags.count }
 
-  internal init(
+  @unsafe internal init(
     immortal ptr: UnsafePointer<UInt8>,
     countAndFlags: _StringObject.CountAndFlags
   ) {
@@ -721,7 +721,7 @@ final internal class __SharedStringStorage
     }
   }
 
-  internal init(
+  @unsafe internal init(
     _mortal ptr: UnsafePointer<UInt8>,
     countAndFlags: _StringObject.CountAndFlags
   ) {
@@ -741,7 +741,7 @@ final internal class __SharedStringStorage
     self._invariantCheck()
   }
 
-  deinit {
+  @safe(unchecked) deinit {
     if (_owner == nil) && !immortal {
       start.deallocate()
     }
@@ -774,7 +774,7 @@ extension _StringGuts {
   ///
   /// This returns an unmanaged +0 reference to allow accessing breadcrumbs
   /// without incurring retain/release operations.
-  @_effects(releasenone)
+  @unsafe @_effects(releasenone)
   internal func loadUnmanagedBreadcrumbs() -> Unmanaged<_StringBreadcrumbs> {
     // FIXME: Returning Unmanaged emulates the original implementation (that
     // used to return a nonatomic pointer), but it may be an unnecessary

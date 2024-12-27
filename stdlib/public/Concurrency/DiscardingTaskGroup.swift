@@ -193,7 +193,7 @@ public struct DiscardingTaskGroup {
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
   #endif
@@ -234,7 +234,7 @@ public struct DiscardingTaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
   #endif
@@ -274,7 +274,7 @@ public struct DiscardingTaskGroup {
     return true
   }
 
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTask(
     operation: sending @escaping @isolated(any) () async -> Void
   ) {
@@ -303,7 +303,7 @@ public struct DiscardingTaskGroup {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
 #endif
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
     operation: sending @escaping @isolated(any) () async -> Void
   ) -> Bool {
@@ -627,7 +627,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
 #endif
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTask(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> Void
@@ -651,7 +651,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
 #endif
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> Void

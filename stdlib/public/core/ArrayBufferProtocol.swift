@@ -28,7 +28,7 @@ where Indices == Range<Int> {
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer "past the end" of the
   /// just-initialized memory.
-  @discardableResult
+  @unsafe @discardableResult
   __consuming func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
@@ -78,21 +78,21 @@ where Indices == Range<Int> {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
-  func withUnsafeBufferPointer<R>(
+  @unsafe func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
-  @available(SwiftStdlib 6.1, *)
+  @unsafe @available(SwiftStdlib 6.1, *)
   func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
-  mutating func withUnsafeMutableBufferPointer<R>(
+  @unsafe mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R
 
@@ -100,7 +100,7 @@ where Indices == Range<Int> {
   /// over the underlying contiguous storage.
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
-  @available(SwiftStdlib 6.1, *)
+  @unsafe @available(SwiftStdlib 6.1, *)
   mutating func withUnsafeMutableBufferPointer<R, E>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R
@@ -121,30 +121,30 @@ where Indices == Range<Int> {
   /// A pointer to the first element.
   ///
   /// - Precondition: The elements are known to be stored contiguously.
-  var firstElementAddress: UnsafeMutablePointer<Element> { get }
+  @unsafe var firstElementAddress: UnsafeMutablePointer<Element> { get }
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
-  var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? { get }
+  @unsafe var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? { get }
 
   /// Returns a base address to which you can add an index `i` to get the
   /// address of the corresponding element at `i`.
-  var subscriptBaseAddress: UnsafeMutablePointer<Element> { get }
+  @unsafe var subscriptBaseAddress: UnsafeMutablePointer<Element> { get }
 
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
-  var identity: UnsafeRawPointer { get }
+  @unsafe var identity: UnsafeRawPointer { get }
 }
 
 extension _ArrayBufferProtocol {
-  @inlinable
+  @unsafe @inlinable
   internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
 
   // Make sure the compiler does not inline _copyBuffer to reduce code size.
-  @inline(never)
+  @safe(unchecked) @inline(never)
   @inlinable // This code should be specializable such that copying an array is
              // fast and does not end up in an unspecialized entry point.
   internal init(copying buffer: Self) {
@@ -156,7 +156,7 @@ extension _ArrayBufferProtocol {
     self = Self( _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,

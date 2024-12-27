@@ -163,7 +163,7 @@ public struct ObservationTracking: Sendable {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@safe(unchecked) @available(SwiftStdlib 5.9, *)
 fileprivate func generateAccessList<T>(_ apply: () -> T) -> (T, ObservationTracking._AccessList?) {
   var accessList: ObservationTracking._AccessList?
   let result = withUnsafeMutablePointer(to: &accessList) { ptr in

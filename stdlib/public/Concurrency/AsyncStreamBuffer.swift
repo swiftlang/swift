@@ -42,13 +42,13 @@ func _unlock(_ ptr: UnsafeRawPointer) {
 @_silgen_name("_swift_async_stream_lock_size")
 func _lockWordCount() -> Int
 
-@_silgen_name("_swift_async_stream_lock_init")
+@unsafe @_silgen_name("_swift_async_stream_lock_init")
 func _lockInit(_ ptr: UnsafeRawPointer)
 
-@_silgen_name("_swift_async_stream_lock_lock")
+@unsafe @_silgen_name("_swift_async_stream_lock_lock")
 func _lock(_ ptr: UnsafeRawPointer)
 
-@_silgen_name("_swift_async_stream_lock_unlock")
+@unsafe @_silgen_name("_swift_async_stream_lock_unlock")
 func _unlock(_ ptr: UnsafeRawPointer)
 #endif
 
@@ -58,7 +58,7 @@ extension AsyncStream {
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
 
     struct State {
-      var continuations = [UnsafeContinuation<Element?, Never>]()
+      @unsafe var continuations = [UnsafeContinuation<Element?, Never>]()
       var pending = _Deque<Element>()
       let limit: Continuation.BufferingPolicy
       var onTermination: TerminationHandler?
@@ -79,13 +79,13 @@ extension AsyncStream {
       state.onTermination?(.cancelled)
     }
 
-    private func lock() {
+    @safe(unchecked) private func lock() {
       let ptr =
         UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
       _lock(ptr)
     }
 
-    private func unlock() {
+    @safe(unchecked) private func unlock() {
       let ptr =
         UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
       _unlock(ptr)
@@ -119,7 +119,7 @@ extension AsyncStream {
       finish()
     }
 
-    func yield(_ value: __owned Element) -> Continuation.YieldResult {
+    @safe(unchecked) func yield(_ value: __owned Element) -> Continuation.YieldResult {
       var result: Continuation.YieldResult
       lock()
       let limit = state.limit
@@ -206,7 +206,7 @@ extension AsyncStream {
       return result
     }
 
-    func finish() {
+    @safe(unchecked) func finish() {
       lock()
       let handler = state.onTermination
       state.onTermination = nil
@@ -230,7 +230,7 @@ extension AsyncStream {
       }
     }
 
-    func next(_ continuation: UnsafeContinuation<Element?, Never>) {
+    @unsafe func next(_ continuation: UnsafeContinuation<Element?, Never>) {
       lock()
       state.continuations.append(continuation)
       if state.pending.count > 0 {
@@ -248,7 +248,7 @@ extension AsyncStream {
 
     }
 
-    func next() async -> Element? {
+    @safe(unchecked) func next() async -> Element? {
       await withTaskCancellationHandler {
         await withUnsafeContinuation {
           next($0)
@@ -258,7 +258,7 @@ extension AsyncStream {
       }
     }
 
-    static func create(limit: Continuation.BufferingPolicy) -> _Storage {
+    @safe(unchecked) static func create(limit: Continuation.BufferingPolicy) -> _Storage {
       let minimumCapacity = _lockWordCount()
       let storage = Builtin.allocWithTailElems_1(
         _Storage.self,
@@ -287,7 +287,7 @@ extension AsyncThrowingStream {
     }
 
     struct State {
-      var continuation: UnsafeContinuation<Element?, Error>?
+      @unsafe var continuation: UnsafeContinuation<Element?, Error>?
       var pending = _Deque<Element>()
       let limit: Continuation.BufferingPolicy
       var onTermination: TerminationHandler?
@@ -308,13 +308,13 @@ extension AsyncThrowingStream {
       state.onTermination?(.cancelled)
     }
 
-    private func lock() {
+    @safe(unchecked) private func lock() {
       let ptr =
         UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
       _lock(ptr)
     }
 
-    private func unlock() {
+    @safe(unchecked) private func unlock() {
       let ptr =
         UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
       _unlock(ptr)
@@ -348,7 +348,7 @@ extension AsyncThrowingStream {
       finish()
     }
 
-    func yield(_ value: __owned Element) -> Continuation.YieldResult {
+    @safe(unchecked) func yield(_ value: __owned Element) -> Continuation.YieldResult {
       var result: Continuation.YieldResult
       lock()
       let limit = state.limit
@@ -442,7 +442,7 @@ extension AsyncThrowingStream {
       return result
     }
 
-    func finish(throwing error: __owned Failure? = nil) {
+    @safe(unchecked) func finish(throwing error: __owned Failure? = nil) {
       lock()
       let handler = state.onTermination
       state.onTermination = nil
@@ -481,7 +481,7 @@ extension AsyncThrowingStream {
       }
     }
 
-    func next(_ continuation: UnsafeContinuation<Element?, Error>) {
+    @unsafe func next(_ continuation: UnsafeContinuation<Element?, Error>) {
       lock()
       if state.continuation == nil {
         if state.pending.count > 0 {
@@ -507,7 +507,7 @@ extension AsyncThrowingStream {
       }
     }
 
-    func next() async throws -> Element? {
+    @safe(unchecked) func next() async throws -> Element? {
       try await withTaskCancellationHandler {
         try await withUnsafeThrowingContinuation {
           next($0)
@@ -517,7 +517,7 @@ extension AsyncThrowingStream {
       }
     }
 
-    static func create(limit: Continuation.BufferingPolicy) -> _Storage {
+    @safe(unchecked) static func create(limit: Continuation.BufferingPolicy) -> _Storage {
       let minimumCapacity = _lockWordCount()
       let storage = Builtin.allocWithTailElems_1(
         _Storage.self,
@@ -543,13 +543,13 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     fatalError("_AsyncStreamCriticalStorage must be initialized by create")
   }
 
-  private func lock() {
+  @safe(unchecked) private func lock() {
     let ptr =
       UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
     _lock(ptr)
   }
 
-  private func unlock() {
+  @safe(unchecked) private func unlock() {
     let ptr =
       UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
     _unlock(ptr)
@@ -572,7 +572,7 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     }
   }
 
-  static func create(_ initial: Contents) -> _AsyncStreamCriticalStorage {
+  @safe(unchecked) static func create(_ initial: Contents) -> _AsyncStreamCriticalStorage {
     let minimumCapacity = _lockWordCount()
     let storage = Builtin.allocWithTailElems_1(
       _AsyncStreamCriticalStorage.self,

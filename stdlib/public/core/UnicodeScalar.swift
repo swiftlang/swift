@@ -502,7 +502,7 @@ extension Unicode.Scalar {
 // Access the underlying code units
 extension Unicode.Scalar {
   // Access the scalar as encoded in UTF-16
-  internal func withUTF16CodeUnits<Result>(
+  @unsafe internal func withUTF16CodeUnits<Result>(
     _ body: (UnsafeBufferPointer<UInt16>) throws -> Result
   ) rethrows -> Result {
     var codeUnits: (UInt16, UInt16) = (self.utf16[0], 0)
@@ -519,7 +519,7 @@ extension Unicode.Scalar {
   }
 
   // Access the scalar as encoded in UTF-8
-  @inlinable
+  @unsafe @inlinable
   internal func withUTF8CodeUnits<Result>(
     _ body: (UnsafeBufferPointer<UInt8>) throws -> Result
   ) rethrows -> Result {

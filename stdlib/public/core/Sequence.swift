@@ -413,7 +413,7 @@ public protocol Sequence<Element> {
   ///
   ///    On return, the memory region in `buffer[0 ..< c]` is initialized to
   ///    the first `c` elements in the sequence.
-  __consuming func _copyContents(
+  @unsafe __consuming func _copyContents(
     initializing ptr: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index)
 
@@ -445,7 +445,7 @@ public protocol Sequence<Element> {
   /// - Returns: The value returned from `body`, unless the sequence doesn't
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
-  func withContiguousStorageIfAvailable<R>(
+  @unsafe func withContiguousStorageIfAvailable<R>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?
 }
@@ -1220,14 +1220,14 @@ extension Sequence {
   ///
   ///    On return, the memory region in `buffer[0 ..< c]` is initialized to
   ///    the first `c` elements in the sequence.
-  @inlinable
+  @unsafe @inlinable
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     return _copySequenceContents(initializing: buffer)
   }
 
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   internal __consuming func _copySequenceContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
@@ -1243,7 +1243,7 @@ extension Sequence {
     return (it, buffer.endIndex)
   }
     
-  @inlinable
+  @unsafe @inlinable
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {

@@ -1671,7 +1671,7 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
     return _value as? T
   }
 
-  internal func _downCastConditional<T>(
+  @unsafe internal func _downCastConditional<T>(
     into result: UnsafeMutablePointer<T>
   ) -> Bool {
     guard let value = _value as? T else { return false }

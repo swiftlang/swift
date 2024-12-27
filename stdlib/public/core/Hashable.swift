@@ -153,7 +153,7 @@ public func _hashValue<H: Hashable>(for value: H) -> Int {
 }
 
 // Called by the SwiftValue implementation.
-@_silgen_name("_swift_stdlib_Hashable_isEqual_indirect")
+@unsafe @_silgen_name("_swift_stdlib_Hashable_isEqual_indirect")
 internal func Hashable_isEqual_indirect<T: Hashable>(
   _ lhs: UnsafePointer<T>,
   _ rhs: UnsafePointer<T>
@@ -162,7 +162,7 @@ internal func Hashable_isEqual_indirect<T: Hashable>(
 }
 
 // Called by the SwiftValue implementation.
-@_silgen_name("_swift_stdlib_Hashable_hashValue_indirect")
+@unsafe @_silgen_name("_swift_stdlib_Hashable_hashValue_indirect")
 internal func Hashable_hashValue_indirect<T: Hashable>(
   _ value: UnsafePointer<T>
 ) -> Int {

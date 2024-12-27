@@ -66,7 +66,7 @@ public protocol StringProtocol
   ///
   /// - Parameter nullTerminatedUTF8: A pointer to a sequence of contiguous,
   ///   UTF-8 encoded bytes ending just before the first zero byte.
-  init(cString nullTerminatedUTF8: UnsafePointer<CChar>)
+  @unsafe init(cString nullTerminatedUTF8: UnsafePointer<CChar>)
 
   /// Creates a string from the null-terminated sequence of bytes at the given
   /// pointer.
@@ -77,7 +77,7 @@ public protocol StringProtocol
   ///     before the first zero code unit.
   ///   - sourceEncoding: The encoding in which the code units should be
   ///     interpreted.
-  init<Encoding: Unicode.Encoding>(
+  @unsafe init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type)
 
@@ -94,7 +94,7 @@ public protocol StringProtocol
   ///   `withCString(_:)` method. The pointer argument is valid only for the
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  func withCString<Result>(
+  @unsafe func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result
 
   /// Calls the given closure with a pointer to the contents of the string,
@@ -113,7 +113,7 @@ public protocol StringProtocol
   ///   - targetEncoding: The encoding in which the code units should be
   ///     interpreted.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  func withCString<Result, Encoding: Unicode.Encoding>(
+  @unsafe func withCString<Result, Encoding: Unicode.Encoding>(
     encodedAs targetEncoding: Encoding.Type,
     _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
   ) rethrows -> Result
@@ -209,7 +209,7 @@ extension String {
   ///
   /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
   ///
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   public mutating func withUTF8<R>(
     _ body: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
@@ -275,7 +275,7 @@ extension Substring {
   ///
   /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
   ///
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   public mutating func withUTF8<R>(
     _ body: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {

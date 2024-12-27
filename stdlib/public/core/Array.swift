@@ -438,7 +438,7 @@ extension Array {
 #endif
   }
 
-  @inlinable
+  @unsafe @inlinable
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
     return _buffer.firstElementAddress + index
@@ -493,7 +493,7 @@ extension Array: _ArrayProtocol {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
-  @inlinable
+  @unsafe @inlinable
   public var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? {
     @inline(__always) // FIXME(TODO: JIRA): Hack around test failure
     get { return _buffer.firstElementAddressIfContiguous }
@@ -908,7 +908,7 @@ extension Array: RangeReplaceableCollection {
   ///   - repeatedValue: The element to repeat.
   ///   - count: The number of times to repeat the value passed in the
   ///     `repeating` parameter. `count` must be zero or greater.
-  @inlinable
+  @safe(unchecked) @inlinable
   @_semantics("array.init")
   public init(repeating repeatedValue: Element, count: Int) {
     var p: UnsafeMutablePointer<Element>
@@ -950,7 +950,7 @@ extension Array: RangeReplaceableCollection {
 
   /// Entry point for `Array` literal construction; builds and returns
   /// an Array of `count` uninitialized elements.
-  @inlinable
+  @unsafe @inlinable
   @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
     _ count: Int
@@ -965,7 +965,7 @@ extension Array: RangeReplaceableCollection {
   /// first element.
   ///
   /// - Precondition: `storage is _ContiguousArrayStorage`.
-  @inlinable
+  @unsafe @inlinable
   @_semantics("array.uninitialized")
   @_effects(escaping storage => return.0.value**)
   @_effects(escaping storage.class*.value** => return.0.value**.class*.value**)
@@ -1112,7 +1112,7 @@ extension Array: RangeReplaceableCollection {
   /// Copy the contents of the current buffer to a new unique mutable buffer.
   /// The count of the new buffer is set to `oldCount`, the capacity of the
   /// new buffer is big enough to hold 'oldCount' + 1 elements.
-  @inline(never)
+  @safe(unchecked) @inline(never)
   @inlinable // @specializable
   internal mutating func _copyToNewBuffer(oldCount: Int) {
     let newCount = oldCount &+ 1
@@ -1155,7 +1155,7 @@ extension Array: RangeReplaceableCollection {
     }
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @_semantics("array.mutate_unknown")
   @_effects(notEscaping self.**)
   internal mutating func _appendElementAssumeUniqueAndCapacity(
@@ -1219,7 +1219,7 @@ extension Array: RangeReplaceableCollection {
   /// - Complexity: O(*m*) on average, where *m* is the length of
   ///   `newElements`, over many calls to `append(contentsOf:)` on the same
   ///   array.
-  @inlinable
+  @safe(unchecked) @inlinable
   @_semantics("array.append_contentsOf")
   @_effects(notEscaping self.value**)
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
@@ -1296,7 +1296,7 @@ extension Array: RangeReplaceableCollection {
     _endMutation()
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @_semantics("array.mutate_unknown")
   @_effects(notEscaping self.value**)
   @_effects(escaping self.value**.class*.value** -> return.value**)
@@ -1326,7 +1326,7 @@ extension Array: RangeReplaceableCollection {
   /// - Returns: The element at the specified index.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the array.
-  @inlinable
+  @safe(unchecked) @inlinable
   @discardableResult
   @_semantics("array.mutate_unknown")
   @_effects(notEscaping self.value**)
@@ -1397,7 +1397,7 @@ extension Array: RangeReplaceableCollection {
 
   //===--- algorithms -----------------------------------------------------===//
 
-  @inlinable
+  @unsafe @inlinable
   @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
@@ -1408,7 +1408,7 @@ extension Array: RangeReplaceableCollection {
     }
   }
 
-  @inlinable
+  @unsafe @inlinable
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1418,7 +1418,7 @@ extension Array: RangeReplaceableCollection {
     }
   }
 
-  @inlinable
+  @unsafe @inlinable
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1484,7 +1484,7 @@ extension Array: CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 extension Array {
-  @usableFromInline @_transparent
+  @unsafe @usableFromInline @_transparent
   internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
@@ -1498,7 +1498,7 @@ extension Array {
 extension Array {
   /// Implementation for Array(unsafeUninitializedCapacity:initializingWith:)
   /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
-  @inlinable
+  @unsafe @inlinable
   internal init(
     _unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
@@ -1553,7 +1553,7 @@ extension Array {
   ///       - initializedCount: The count of initialized elements in the array,
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.
-  @_alwaysEmitIntoClient @inlinable
+  @unsafe @_alwaysEmitIntoClient @inlinable
   public init(
     unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
@@ -1567,7 +1567,7 @@ extension Array {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
-  @usableFromInline
+  @unsafe @usableFromInline
   @_disfavoredOverload
   func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -1604,7 +1604,7 @@ extension Array {
   ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
   ///   valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   public func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -1613,7 +1613,7 @@ extension Array {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
-  @_semantics("array.withUnsafeMutableBufferPointer")
+  @unsafe @_semantics("array.withUnsafeMutableBufferPointer")
   @_effects(notEscaping self.value**)
   @usableFromInline
   @inline(__always)
@@ -1678,7 +1678,7 @@ extension Array {
   ///   method. The pointer argument is valid only for the duration of the
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_semantics("array.withUnsafeMutableBufferPointer")
+  @unsafe @_semantics("array.withUnsafeMutableBufferPointer")
   @_effects(notEscaping self.value**)
   @_alwaysEmitIntoClient
   @inline(__always) // Performance: This method should get inlined into the
@@ -1709,7 +1709,7 @@ extension Array {
     return try body(&inoutBufferPointer)
   }
 
-  @inlinable
+  @unsafe @inlinable
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
@@ -1811,7 +1811,7 @@ extension Array: Equatable where Element: Equatable {
   /// - Parameters:
   ///   - lhs: An array to compare.
   ///   - rhs: Another array to compare.
-  @inlinable
+  @safe(unchecked) @inlinable
   public static func ==(lhs: Array<Element>, rhs: Array<Element>) -> Bool {
     let lhsCount = lhs.count
     if lhsCount != rhs.count {
@@ -1894,7 +1894,7 @@ extension Array {
   ///   The argument is valid only for the duration of the closure's
   ///   execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
+  @unsafe @inlinable
   public mutating func withUnsafeMutableBytes<R>(
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
@@ -1930,7 +1930,7 @@ extension Array {
   ///   used as the return value for the `withUnsafeBytes(_:)` method. The
   ///   argument is valid only for the duration of the closure's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
+  @unsafe @inlinable
   public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
@@ -1945,7 +1945,7 @@ extension Array {
   // This allows us to test the `_copyContents` implementation in
   // `_ArrayBuffer`. (It's like `_copyToContiguousArray` but it always makes a
   // copy.)
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public func _copyToNewArray() -> [Element] {
     Array(unsafeUninitializedCapacity: self.count) { buffer, count in
       var (it, c) = self._buffer._copyContents(initializing: buffer)
@@ -2071,7 +2071,7 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
     return _value as? T
   }
 
-  internal func _downCastConditional<T>(
+  @unsafe internal func _downCastConditional<T>(
     into result: UnsafeMutablePointer<T>
   ) -> Bool {
     guard let value = _value as? T else { return false }

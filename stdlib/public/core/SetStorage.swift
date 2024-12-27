@@ -68,7 +68,7 @@ internal class __RawSetStorage: __SwiftNativeNSSet {
 
   /// A raw pointer to the start of the tail-allocated hash buffer holding set
   /// members.
-  @usableFromInline
+  @unsafe @usableFromInline
   @nonobjc
   internal final var _rawElements: UnsafeMutableRawPointer
 
@@ -85,7 +85,7 @@ internal class __RawSetStorage: __SwiftNativeNSSet {
     @inline(__always) get { return 1 &<< _scale }
   }
 
-  @inlinable
+  @unsafe @inlinable
   @nonobjc
   internal final var _metadata: UnsafeMutablePointer<_HashTable.Word> {
     @inline(__always) get {
@@ -121,7 +121,7 @@ internal class __EmptySetSingleton: __RawSetStorage {
 
 #if _runtime(_ObjC)
   @objc
-  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
+  @unsafe internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
     _internalInvariantFailure("This class cannot be directly initialized")
   }
 #endif
@@ -165,7 +165,7 @@ extension __EmptySetSingleton: _NSSetCore {
   //
   // NSSet implementation, assuming Self is the empty singleton
   //
-  @objc(copyWithZone:)
+  @unsafe @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     return self
   }
@@ -185,7 +185,7 @@ extension __EmptySetSingleton: _NSSetCore {
     return __SwiftEmptyNSEnumerator()
   }
 
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
@@ -214,7 +214,7 @@ final internal class _SetStorage<Element: Hashable>
     _internalInvariantFailure("This class cannot be directly initialized")
   }
 
-  deinit {
+  @safe(unchecked) deinit {
     guard _count > 0 else { return }
     if !_isPOD(Element.self) {
       let elements = _elements
@@ -225,7 +225,7 @@ final internal class _SetStorage<Element: Hashable>
     _fixLifetime(self)
   }
 
-  @inlinable
+  @unsafe @inlinable
   final internal var _elements: UnsafeMutablePointer<Element> {
     @inline(__always)
     get {
@@ -239,11 +239,11 @@ final internal class _SetStorage<Element: Hashable>
 
 #if _runtime(_ObjC)
   @objc
-  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
+  @unsafe internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
     _internalInvariantFailure("don't call this designated initializer")
   }
 
-  @objc(copyWithZone:)
+  @unsafe @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     return self
   }
@@ -258,7 +258,7 @@ final internal class _SetStorage<Element: Hashable>
     return _SwiftSetNSEnumerator<Element>(asNative)
   }
 
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
@@ -298,7 +298,7 @@ final internal class _SetStorage<Element: Hashable>
     return stored
   }
 
-  @objc(member:)
+  @safe(unchecked) @objc(member:)
   internal func member(_ object: AnyObject) -> AnyObject? {
     guard let native = _conditionallyBridgeFromObjectiveC(object, Element.self)
     else { return nil }
@@ -351,7 +351,7 @@ extension _SetStorage {
   }
 #endif
 
-  static internal func allocate(
+  @safe(unchecked) static internal func allocate(
     scale: Int8,
     age: Int32?,
     seed: Int?

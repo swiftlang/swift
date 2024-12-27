@@ -26,7 +26,7 @@ where Indices == Range<Int> {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
-  var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? { get }
+  @unsafe var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? { get }
 
   //===--- basic mutations ------------------------------------------------===//
 

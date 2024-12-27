@@ -61,7 +61,7 @@ internal func _decodeUTF8(
   return Unicode.Scalar(_unchecked: value)
 }
 
-@inlinable
+@unsafe @inlinable
 internal func _decodeScalar(
   _ utf8: UnsafeBufferPointer<UInt8>, startingAt i: Int
 ) -> (Unicode.Scalar, scalarLength: Int) {
@@ -83,7 +83,7 @@ internal func _decodeScalar(
   }
 }
 
-@inlinable
+@unsafe @inlinable
 internal func _decodeScalar(
   _ utf8: UnsafeBufferPointer<UInt8>, endingAt i: Int
 ) -> (Unicode.Scalar, scalarLength: Int) {
@@ -101,7 +101,7 @@ internal func _utf8ScalarLength(_ x: UInt8) -> Int {
   return (~x).leadingZeroBitCount
 }
 
-@inlinable @inline(__always)
+@unsafe @inlinable @inline(__always)
 internal func _utf8ScalarLength(
   _ utf8: UnsafeBufferPointer<UInt8>, endingAt i: Int
   ) -> Int {
@@ -119,7 +119,7 @@ internal func _continuationPayload(_ x: UInt8) -> UInt32 {
   return UInt32(x & 0x3F)
 }
 
-@inlinable
+@unsafe @inlinable
 internal func _scalarAlign(
   _ utf8: UnsafeBufferPointer<UInt8>, _ idx: Int
 ) -> Int {
@@ -155,7 +155,7 @@ extension _StringGuts {
     return result
   }
 
-  @inline(never) // slow-path
+  @safe(unchecked) @inline(never) // slow-path
   @_alwaysEmitIntoClient // Swift 5.1
   @_effects(releasenone)
   internal func scalarAlignSlow(_ idx: Index) -> Index {
@@ -183,7 +183,7 @@ extension _StringGuts {
     )
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   internal func fastUTF8ScalarLength(startingAt i: Int) -> Int {
     _internalInvariant(isFastUTF8)
     let len = _utf8ScalarLength(self.withFastUTF8 { $0[_unchecked: i] })
@@ -191,7 +191,7 @@ extension _StringGuts {
     return len
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   internal func fastUTF8ScalarLength(endingAt i: Int) -> Int {
     _internalInvariant(isFastUTF8)
 
@@ -207,7 +207,7 @@ extension _StringGuts {
     }
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   internal func fastUTF8Scalar(startingAt i: Int) -> Unicode.Scalar {
     _internalInvariant(isFastUTF8)
     return self.withFastUTF8 { _decodeScalar($0, startingAt: i).0 }
@@ -219,7 +219,7 @@ extension _StringGuts {
     isOnUnicodeScalarBoundary(String.Index(_encodedOffset: offset))
   }
 
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   @_effects(releasenone)
   internal func isOnUnicodeScalarBoundary(_ i: String.Index) -> Bool {
     _internalInvariant(i._encodedOffset <= count)
@@ -366,7 +366,7 @@ extension _StringGuts {
     return String.Index(_encodedOffset: idx._encodedOffset &- 1)._scalarAligned
   }
 
-  @usableFromInline @inline(never)
+  @safe(unchecked) @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func foreignErrorCorrectedGrapheme(
     startingAt start: Int, endingAt end: Int
@@ -405,7 +405,7 @@ extension _StringGuts {
 // result is the sole operation done by a caller, otherwise it's always more
 // efficient to use `withFastUTF8` in the caller.
 extension _StringGuts {
-  @inlinable @inline(__always)
+  @safe(unchecked) @inlinable @inline(__always)
   internal func errorCorrectedScalar(
     startingAt i: Int
   ) -> (Unicode.Scalar, scalarLength: Int) {
@@ -415,7 +415,7 @@ extension _StringGuts {
     return foreignErrorCorrectedScalar(
       startingAt: String.Index(_encodedOffset: i))
   }
-  @inlinable @inline(__always)
+  @safe(unchecked) @inlinable @inline(__always)
   internal func errorCorrectedCharacter(
     startingAt start: Int, endingAt end: Int
   ) -> Character {

@@ -418,7 +418,7 @@ extension String.UTF8View {
   ///
   /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]`
   ///   are initialized.
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   public func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Iterator.Element>.Index) {
@@ -575,7 +575,7 @@ extension String.Index {
 }
 
 extension String.UTF8View {
-  @inlinable
+  @unsafe @inlinable
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {

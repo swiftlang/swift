@@ -30,7 +30,7 @@
 ///                         references
 /// - Parameter visitedItems: the dictionary for keeping track of visited
 ///                           objects
-internal func _collectAllReferencesInsideObjectImpl(
+@unsafe internal func _collectAllReferencesInsideObjectImpl(
   _ value: Any,
   references: inout [UnsafeRawPointer],
   visitedItems: inout [ObjectIdentifier: Int]
@@ -99,13 +99,13 @@ struct _RuntimeFunctionCounters {
   public typealias RuntimeFunctionCountersUpdateHandler =
     @convention(c) (_ object: UnsafeRawPointer, _ functionId: Int) -> Void
 #else
-  public typealias RuntimeFunctionCountersUpdateHandler =
+  @unsafe public typealias RuntimeFunctionCountersUpdateHandler =
     @convention(c) (_ object: UnsafeRawPointer, _ functionId: Int64) -> Void
 #endif
 
   public static let runtimeFunctionNames =
     getRuntimeFunctionNames()
-  public static let runtimeFunctionCountersOffsets =
+  @unsafe public static let runtimeFunctionCountersOffsets =
     _RuntimeFunctionCounters.getRuntimeFunctionCountersOffsets()
   public static let numRuntimeFunctionCounters =
     Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())
@@ -114,11 +114,11 @@ struct _RuntimeFunctionCounters {
 
   /// Get the names of all runtime functions whose calls are being
   /// tracked.
-  @_silgen_name("_swift_getRuntimeFunctionNames")
+  @unsafe @_silgen_name("_swift_getRuntimeFunctionNames")
   public static func _getRuntimeFunctionNames() ->
     UnsafePointer<UnsafePointer<CChar>>
 
-  public static func getRuntimeFunctionNames() -> [String] {
+  @safe(unchecked) public static func getRuntimeFunctionNames() -> [String] {
     let names = _RuntimeFunctionCounters._getRuntimeFunctionNames()
     let numRuntimeFunctionCounters =
       Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())
@@ -133,7 +133,7 @@ struct _RuntimeFunctionCounters {
 
   /// Get the offsets of the collected runtime function counters inside
   /// the state.
-  @_silgen_name("_swift_getRuntimeFunctionCountersOffsets")
+  @unsafe @_silgen_name("_swift_getRuntimeFunctionCountersOffsets")
   public static func getRuntimeFunctionCountersOffsets() ->
     UnsafePointer<UInt16>
 
@@ -146,14 +146,14 @@ struct _RuntimeFunctionCounters {
   @_silgen_name("_swift_dumpObjectsRuntimeFunctionPointers")
   public static func dumpObjectsRuntimeFunctionPointers()
 
-  @discardableResult
+  @unsafe @discardableResult
   @_silgen_name("_swift_setGlobalRuntimeFunctionCountersUpdateHandler")
   public static func setGlobalRuntimeFunctionCountersUpdateHandler(
     handler: RuntimeFunctionCountersUpdateHandler?
   ) -> RuntimeFunctionCountersUpdateHandler?
 
   /// Collect all references inside the object using Mirrors.
-  public static func collectAllReferencesInsideObject(_ value: Any) ->
+  @unsafe public static func collectAllReferencesInsideObject(_ value: Any) ->
     [UnsafeRawPointer] {
     var visited: [ObjectIdentifier: Int] = [:]
     var references: [UnsafeRawPointer] = []
@@ -316,7 +316,7 @@ internal struct _RuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
 }
 
 extension _RuntimeFunctionCounters {
-  @_silgen_name("_swift_getObjectRuntimeFunctionCounters")
+  @unsafe @_silgen_name("_swift_getObjectRuntimeFunctionCounters")
   internal static func getObjectRuntimeFunctionCounters(
     _ object: UnsafeRawPointer, _ result: inout _RuntimeFunctionCountersState)
 
@@ -328,7 +328,7 @@ extension _RuntimeFunctionCounters {
   internal static func setGlobalRuntimeFunctionCounters(
     _ state: inout _RuntimeFunctionCountersState)
 
-  @_silgen_name("_swift_setObjectRuntimeFunctionCounters")
+  @unsafe @_silgen_name("_swift_setObjectRuntimeFunctionCounters")
   internal static func setObjectRuntimeFunctionCounters(
     _ object: UnsafeRawPointer,
     _ state: inout _RuntimeFunctionCountersState)
@@ -373,7 +373,7 @@ extension _RuntimeFunctionCounters {
 
 extension _RuntimeFunctionCountersStats {
   typealias Counters = _RuntimeFunctionCounters
-  @inline(never)
+  @safe(unchecked) @inline(never)
   public // @testable
   func dump<T: TextOutputStream>(skipUnchanged: Bool, to: inout T) {
     for i in 0..<Counters.numRuntimeFunctionCounters {
@@ -388,7 +388,7 @@ extension _RuntimeFunctionCountersStats {
     }
   }
 
-  @inline(never)
+  @safe(unchecked) @inline(never)
   public // @testable
   func dumpDiff<T: TextOutputStream>(
     _ after: Self, skipUnchanged: Bool, to: inout T
@@ -463,18 +463,18 @@ struct _ObjectRuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
   var state = _RuntimeFunctionCountersState()
 
   // Initialize with the counters for a given object.
-  public init(_ p: UnsafeRawPointer) {
+  @unsafe public init(_ p: UnsafeRawPointer) {
     getObjectRuntimeFunctionCounters(p)
   }
 
   public init() {
   }
 
-  mutating public func getObjectRuntimeFunctionCounters(_ o: UnsafeRawPointer) {
+  @unsafe mutating public func getObjectRuntimeFunctionCounters(_ o: UnsafeRawPointer) {
     _RuntimeFunctionCounters.getObjectRuntimeFunctionCounters(o, &state)
   }
 
-  mutating public func setObjectRuntimeFunctionCounters(_ o: UnsafeRawPointer) {
+  @unsafe mutating public func setObjectRuntimeFunctionCounters(_ o: UnsafeRawPointer) {
     _RuntimeFunctionCounters.setObjectRuntimeFunctionCounters(o, &state)
   }
 
@@ -500,7 +500,7 @@ struct _ObjectRuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
 /// Collects all references inside an object.
 /// Runtime counters tracking is disabled for the duration of this operation
 /// so that it does not affect those counters.
-public // @testable
+@unsafe public // @testable
 func _collectReferencesInsideObject(_ value: Any) -> [UnsafeRawPointer] {
   let savedMode = _RuntimeFunctionCounters.disableRuntimeFunctionCountersUpdates()
   // Collect all references inside the object
@@ -513,7 +513,7 @@ func _collectReferencesInsideObject(_ value: Any) -> [UnsafeRawPointer] {
 /// were changed during execution of a closure provided as a parameter.
 /// Returns counter diffs for global counters and for the object-specific
 /// counters related to a given object.
-public // @testable
+@unsafe public // @testable
 func _measureRuntimeFunctionCountersDiffs(
   objects: [UnsafeRawPointer], _ body: () -> Void) ->
   (_GlobalRuntimeFunctionCountersState, [_ObjectRuntimeFunctionCountersState]) {

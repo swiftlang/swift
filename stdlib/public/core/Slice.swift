@@ -221,7 +221,7 @@ extension Slice: Collection {
     _base._failEarlyRangeCheck(range, bounds: bounds)
   }
 
-  @_alwaysEmitIntoClient @inlinable
+  @unsafe @_alwaysEmitIntoClient @inlinable
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -235,7 +235,7 @@ extension Slice: Collection {
 }
 
 extension Slice {
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   public __consuming func _copyContents(
       initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
@@ -292,7 +292,7 @@ extension Slice: MutableCollection where Base: MutableCollection {
     }
   }
 
-  @_alwaysEmitIntoClient @inlinable
+  @unsafe @_alwaysEmitIntoClient @inlinable
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {

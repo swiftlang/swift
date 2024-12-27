@@ -14,7 +14,7 @@ import Swift
 
 // TODO(swift): rename the file to ExecutorJob.swift eventually, we don't use PartialTask terminology anymore
 
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_job_run")
 @usableFromInline
 internal func _swiftJobRun(_ job: UnownedJob,
@@ -28,7 +28,7 @@ internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
                                          _ executor: UnownedTaskExecutor) -> ()
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 6.0, *)
+@unsafe @available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_job_run_on_serial_and_task_executor")
 @usableFromInline
 internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
@@ -85,7 +85,7 @@ public struct UnownedJob: Sendable {
   }
 
   /// Deprecated API to run a job on a specific executor.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @inlinable
   @available(*, deprecated, renamed: "ExecutorJob.runSynchronously(on:)")
   public func _runSynchronously(on executor: UnownedSerialExecutor) {
@@ -102,7 +102,7 @@ public struct UnownedJob: Sendable {
   /// and should be the same executor as the one semantically calling the `runSynchronously` method.
   ///
   /// - Parameter executor: the executor this job will be semantically running on.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @inlinable
   public func runSynchronously(on executor: UnownedSerialExecutor) {
     _swiftJobRun(self, executor)
@@ -154,7 +154,7 @@ public struct UnownedJob: Sendable {
   ///
   /// - SeeAlso: ``runSynchronously(on:)``
   @_unavailableInEmbedded
-  @available(SwiftStdlib 6.0, *)
+  @unsafe @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
@@ -247,7 +247,7 @@ extension Job {
   /// as a job can only ever be run once, and must not be accessed after it has been run.
   ///
   /// - Parameter executor: the executor this job will be semantically running on.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @inlinable
   __consuming public func runSynchronously(on executor: UnownedSerialExecutor) {
     _swiftJobRun(UnownedJob(self), executor)
@@ -315,7 +315,7 @@ extension ExecutorJob {
   /// as a job can only ever be run once, and must not be accessed after it has been run.
   ///
   /// - Parameter executor: the executor this job will be semantically running on.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @inlinable
   __consuming public func runSynchronously(on executor: UnownedSerialExecutor) {
     _swiftJobRun(UnownedJob(self), executor)
@@ -362,7 +362,7 @@ extension ExecutorJob {
   ///
   /// - SeeAlso: ``runSynchronously(on:)``
   @_unavailableInEmbedded
-  @available(SwiftStdlib 6.0, *)
+  @unsafe @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   __consuming public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
@@ -555,7 +555,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   }
 }
 
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 extension UnsafeContinuation {
   /// Resume the task that's awaiting the continuation
   /// by returning or throwing the given result value.
@@ -628,7 +628,7 @@ extension UnsafeContinuation {
 #if _runtime(_ObjC)
 
 // Intrinsics used by SILGen to resume or fail continuations.
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeContinuation<T>(
   _ continuation: UnsafeContinuation<T, Never>,
@@ -637,7 +637,7 @@ internal func _resumeUnsafeContinuation<T>(
   continuation.resume(returning: value)
 }
 
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeThrowingContinuation<T>(
   _ continuation: UnsafeContinuation<T, Error>,
@@ -646,7 +646,7 @@ internal func _resumeUnsafeThrowingContinuation<T>(
   continuation.resume(returning: value)
 }
 
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeThrowingContinuationWithError<T>(
   _ continuation: UnsafeContinuation<T, Error>,
@@ -733,7 +733,7 @@ public func withUnsafeThrowingContinuation<T>(
 // Note: hack to stage out @_unsafeInheritExecutor forms of various functions
 // in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
 // to the type checker.
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @_unsafeInheritExecutor
 public func _unsafeInheritExecutor_withUnsafeContinuation<T>(
@@ -747,7 +747,7 @@ public func _unsafeInheritExecutor_withUnsafeContinuation<T>(
 // Note: hack to stage out @_unsafeInheritExecutor forms of various functions
 // in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
 // to the type checker.
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @_unsafeInheritExecutor
 public func _unsafeInheritExecutor_withUnsafeThrowingContinuation<T>(

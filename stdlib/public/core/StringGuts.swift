@@ -50,7 +50,7 @@ extension _StringGuts {
     self.init(_StringObject(smol))
   }
 
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   internal init(_ bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
     self.init(_StringObject(immortal: bufPtr, isASCII: isASCII))
   }
@@ -157,7 +157,7 @@ extension _StringGuts {
      return _slowPath(_object.isForeign)
   }
 
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   internal func withFastUTF8<R>(
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
@@ -169,7 +169,7 @@ extension _StringGuts {
     return try f(_object.fastUTF8)
   }
 
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   internal func withFastUTF8<R>(
     range: Range<Int>,
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
@@ -179,7 +179,7 @@ extension _StringGuts {
     }
   }
 
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   internal func withFastCChar<R>(
     _ f: (UnsafeBufferPointer<CChar>) throws -> R
   ) rethrows -> R {
@@ -217,7 +217,7 @@ extension _StringGuts {
 
 // C String interop
 extension _StringGuts {
-  @inlinable @inline(__always) // fast-path: already C-string compatible
+  @unsafe @inlinable @inline(__always) // fast-path: already C-string compatible
   internal func withCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
@@ -230,7 +230,7 @@ extension _StringGuts {
     }
   }
 
-  @inline(never) // slow-path
+  @unsafe @inline(never) // slow-path
   @usableFromInline
   internal func _slowWithCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
@@ -246,7 +246,7 @@ extension _StringGuts {
 extension _StringGuts {
   // Copy UTF-8 contents. Returns number written or nil if not enough space.
   // Contents of the buffer are unspecified if nil is returned.
-  @inlinable
+  @unsafe @inlinable
   internal func copyUTF8(into mbp: UnsafeMutableBufferPointer<UInt8>) -> Int? {
     let ptr = mbp.baseAddress._unsafelyUnwrappedUnchecked
     if _fastPath(self.isFastUTF8) {
@@ -261,7 +261,7 @@ extension _StringGuts {
 
     return _foreignCopyUTF8(into: mbp)
   }
-  @_effects(releasenone)
+  @unsafe @_effects(releasenone)
   @usableFromInline @inline(never) // slow-path
   internal func _foreignCopyUTF8(
     into mbp: UnsafeMutableBufferPointer<UInt8>
@@ -431,7 +431,7 @@ extension _StringGuts {
   }
 
   // FIXME: Mark as obsoleted. Still used by swift-corelibs-foundation.
-  @available(*, deprecated)
+  @unsafe @available(*, deprecated)
   public var startASCII: UnsafeMutablePointer<UInt8> {
     return UnsafeMutablePointer(mutating: _object.fastUTF8.baseAddress!)
   }
@@ -444,7 +444,7 @@ extension _StringGuts {
 }
 
 // FIXME: Previously used by swift-corelibs-foundation. Aging for removal.
-@available(*, unavailable)
+@safe(unchecked) @available(*, unavailable)
 public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   guard let s = p else { return nil }
   let bytesToCopy = UTF8._nullCodeUnitOffset(in: s) + 1 // +1 for the terminating NUL

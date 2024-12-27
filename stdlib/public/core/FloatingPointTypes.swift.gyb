@@ -130,6 +130,7 @@ extension ${Self}: CustomDebugStringConvertible {
 
 ${Availability(bits)}
 extension ${Self}: TextOutputStreamable {
+  @safe(unchecked)
   public func write<Target>(to target: inout Target) where Target: TextOutputStream {
     var (buffer, length) = _float${bits}ToString(self, debug: true)
     buffer.withBytes { (bufferPtr) in
@@ -369,6 +370,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable
+  @safe(unchecked)
   public init(sign: FloatingPointSign,
               exponentBitPattern: UInt,
               significandBitPattern: UInt64) {
@@ -1352,6 +1354,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
     return _value as? T
   }
 
+  @unsafe
   internal func _downCastConditional<T>(
     into result: UnsafeMutablePointer<T>
   ) -> Bool {

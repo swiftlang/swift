@@ -88,7 +88,7 @@ public protocol _ObjectiveCBridgeable {
 // Note: This function is not intended to be called from Swift.  The
 // availability information here is perfunctory; this function isn't considered
 // part of the Stdlib's Swift ABI.
-@available(SwiftStdlib 5.2, *)
+@unsafe @available(SwiftStdlib 5.2, *)
 @_cdecl("_SwiftCreateBridgedArray")
 @usableFromInline
 internal func _SwiftCreateBridgedArray_DoNotCall(
@@ -103,7 +103,7 @@ internal func _SwiftCreateBridgedArray_DoNotCall(
 // Note: This function is not intended to be called from Swift.  The
 // availability information here is perfunctory; this function isn't considered
 // part of the Stdlib's Swift ABI.
-@available(SwiftStdlib 5.2, *)
+@unsafe @available(SwiftStdlib 5.2, *)
 @_cdecl("_SwiftCreateBridgedMutableArray")
 @usableFromInline
 internal func _SwiftCreateBridgedMutableArray_DoNotCall(
@@ -204,7 +204,7 @@ extension _BridgeableMetatype: Sendable {}
 ///   the boxed value, but is otherwise opaque.
 ///
 // COMPILER_INTRINSIC
-@inlinable
+@safe(unchecked) @inlinable
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, to: AnyObject.self)
@@ -323,7 +323,7 @@ internal func _bridgeNonVerbatimFromObjectiveCToAny(
 }
 
 /// Helper stub to upcast to Optional on the C++ runtime's behalf.
-@_silgen_name("_bridgeNonVerbatimBoxedValue")
+@unsafe @_silgen_name("_bridgeNonVerbatimBoxedValue")
 internal func _bridgeNonVerbatimBoxedValue<NativeType>(
     _ x: UnsafePointer<NativeType>,
     _ result: inout NativeType?
@@ -485,7 +485,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @_transparent
+  @unsafe @_transparent
   public init<U>(@_nonEphemeral _ from: UnsafeMutablePointer<U>) {
    self._rawValue = from._rawValue
   }
@@ -500,7 +500,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @_transparent
+  @unsafe @_transparent
   public init?<U>(@_nonEphemeral _ from: UnsafeMutablePointer<U>?) {
    guard let unwrapped = from else { return nil }
    self.init(unwrapped)
@@ -513,7 +513,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @usableFromInline @_transparent
+  @unsafe @usableFromInline @_transparent
   internal init<U>(
     @_nonEphemeral _ from: UnsafePointer<U>
   ) {
@@ -529,7 +529,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @usableFromInline @_transparent
+  @unsafe @usableFromInline @_transparent
   internal init?<U>(
     @_nonEphemeral _ from: UnsafePointer<U>?
   ) {
@@ -538,7 +538,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   }
 }
 
-extension UnsafeMutableRawPointer {
+@unsafe extension UnsafeMutableRawPointer {
   /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
   /// instance.
   ///
@@ -564,7 +564,7 @@ extension UnsafeMutableRawPointer {
   }
 }
 
-extension UnsafeRawPointer {
+@unsafe extension UnsafeRawPointer {
   /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
   /// instance.
   ///
@@ -595,29 +595,29 @@ extension AutoreleasingUnsafeMutablePointer: Sendable { }
 
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
-  internal var _item0: UnsafeRawPointer?
-  internal var _item1: UnsafeRawPointer?
-  internal var _item2: UnsafeRawPointer?
-  internal var _item3: UnsafeRawPointer?
-  internal var _item4: UnsafeRawPointer?
-  internal var _item5: UnsafeRawPointer?
-  internal var _item6: UnsafeRawPointer?
-  internal var _item7: UnsafeRawPointer?
-  internal var _item8: UnsafeRawPointer?
-  internal var _item9: UnsafeRawPointer?
-  internal var _item10: UnsafeRawPointer?
-  internal var _item11: UnsafeRawPointer?
-  internal var _item12: UnsafeRawPointer?
-  internal var _item13: UnsafeRawPointer?
-  internal var _item14: UnsafeRawPointer?
-  internal var _item15: UnsafeRawPointer?
+  @unsafe internal var _item0: UnsafeRawPointer?
+  @unsafe internal var _item1: UnsafeRawPointer?
+  @unsafe internal var _item2: UnsafeRawPointer?
+  @unsafe internal var _item3: UnsafeRawPointer?
+  @unsafe internal var _item4: UnsafeRawPointer?
+  @unsafe internal var _item5: UnsafeRawPointer?
+  @unsafe internal var _item6: UnsafeRawPointer?
+  @unsafe internal var _item7: UnsafeRawPointer?
+  @unsafe internal var _item8: UnsafeRawPointer?
+  @unsafe internal var _item9: UnsafeRawPointer?
+  @unsafe internal var _item10: UnsafeRawPointer?
+  @unsafe internal var _item11: UnsafeRawPointer?
+  @unsafe internal var _item12: UnsafeRawPointer?
+  @unsafe internal var _item13: UnsafeRawPointer?
+  @unsafe internal var _item14: UnsafeRawPointer?
+  @unsafe internal var _item15: UnsafeRawPointer?
 
   @_transparent
   internal var count: Int {
     return 16
   }
 
-  internal init() {
+  @safe(unchecked) internal init() {
     _item0 = nil
     _item1 = _item0
     _item2 = _item0
@@ -644,7 +644,7 @@ internal struct _CocoaFastEnumerationStackBuf {
 ///
 /// This is used by the Foundation overlays. The compiler will error if the
 /// passed-in type is generic or not representable in Objective-C
-@_transparent
+@unsafe @_transparent
 public func _getObjCTypeEncoding<T>(_ type: T.Type) -> UnsafePointer<Int8> {
   // This must be `@_transparent` because `Builtin.getObjCTypeEncoding` is
   // only supported by the compiler for concrete types that are representable

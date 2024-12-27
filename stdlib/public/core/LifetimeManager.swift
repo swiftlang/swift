@@ -96,7 +96,7 @@ public func _fixLifetime<T: ~Copyable>(_ x: borrowing T) {
 ///     The pointer argument is valid only for the duration of the function's
 ///     execution.
 /// - Returns: The return value, if any, of the `body` closure.
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 public func withUnsafeMutablePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
@@ -106,7 +106,7 @@ public func withUnsafeMutablePointer<
   try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@safe(unchecked) @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss24withUnsafeMutablePointer2to_q_xz_q_SpyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_se0413_withUnsafeMutablePointer<T, Result>(
@@ -120,7 +120,7 @@ internal func __abi_se0413_withUnsafeMutablePointer<T, Result>(
 ///
 /// This function is similar to `withUnsafeMutablePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 public func _withUnprotectedUnsafeMutablePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
@@ -155,7 +155,7 @@ public func _withUnprotectedUnsafeMutablePointer<
 ///     type. If you need to mutate the argument through the pointer, use
 ///     `withUnsafeMutablePointer(to:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   to value: borrowing T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
@@ -166,7 +166,7 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows, expressed as "throws",
 /// which is ABI-compatible with "rethrows".
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@safe(unchecked) @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss17withUnsafePointer2to_q_x_q_SPyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_withUnsafePointer<T, Result>(
@@ -201,7 +201,7 @@ internal func __abi_withUnsafePointer<T, Result>(
 ///     type. If you need to mutate the argument through the pointer, use
 ///     `withUnsafeMutablePointer(to:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
@@ -211,7 +211,7 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
-@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@safe(unchecked) @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss17withUnsafePointer2to_q_xz_q_SPyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_se0413_withUnsafePointer<T, Result>(
@@ -225,7 +225,7 @@ internal func __abi_se0413_withUnsafePointer<T, Result>(
 ///
 /// This function is similar to `withUnsafePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 public func _withUnprotectedUnsafePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
@@ -243,7 +243,7 @@ public func _withUnprotectedUnsafePointer<
 ///
 /// This function is similar to `withUnsafePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 public func _withUnprotectedUnsafePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
@@ -267,7 +267,7 @@ extension String {
   ///   `withCString(_:)` method. The pointer argument is valid only for the
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // fast-path: already C-string compatible
+  @unsafe @inlinable // fast-path: already C-string compatible
   public func withCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {

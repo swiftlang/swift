@@ -12,7 +12,7 @@
 // String Creation Helpers
 //===----------------------------------------------------------------------===//
 
-internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
+@unsafe internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   if input.isEmpty { return true }
 
   // NOTE: Avoiding for-in syntax to avoid bounds checks
@@ -71,7 +71,7 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
 
 extension String {
 
-  internal static func _uncheckedFromASCII(
+  @unsafe internal static func _uncheckedFromASCII(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String {
     if let smol = _SmallString(input) {
@@ -82,7 +82,7 @@ extension String {
     return storage.asString
   }
 
-  @usableFromInline
+  @unsafe @usableFromInline
   internal static func _fromASCII(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String {
@@ -90,7 +90,7 @@ extension String {
     return _uncheckedFromASCII(input)
   }
 
-  internal static func _fromASCIIValidating(
+  @unsafe internal static func _fromASCIIValidating(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String? {
     if _fastPath(_allASCII(input)) {
@@ -99,7 +99,7 @@ extension String {
     return nil
   }
 
-  public // SPI(Foundation)
+  @unsafe public // SPI(Foundation)
   static func _tryFromUTF8(_ input: UnsafeBufferPointer<UInt8>) -> String? {
     guard case .success(let extraInfo) = validateUTF8(input) else {
       return nil
@@ -108,7 +108,7 @@ extension String {
     return String._uncheckedFromUTF8(input, isASCII: extraInfo.isASCII)
   }
 
-  @usableFromInline
+  @unsafe @usableFromInline
   internal static func _fromUTF8Repairing(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> (result: String, repairsMade: Bool) {
@@ -122,7 +122,7 @@ extension String {
     }
   }
 
-  internal static func _fromLargeUTF8Repairing(
+  @unsafe internal static func _fromLargeUTF8Repairing(
     uninitializedCapacity capacity: Int,
     initializingWith initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
@@ -146,14 +146,14 @@ extension String {
     }
   }
 
-  @usableFromInline
+  @unsafe @usableFromInline
   internal static func _uncheckedFromUTF8(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String {
     return _uncheckedFromUTF8(input, isASCII: _allASCII(input))
   }
 
-  @usableFromInline
+  @unsafe @usableFromInline
   internal static func _uncheckedFromUTF8(
     _ input: UnsafeBufferPointer<UInt8>,
     isASCII: Bool
@@ -168,7 +168,7 @@ extension String {
   }
 
   // If we've already pre-scanned for ASCII, just supply the result
-  @usableFromInline
+  @unsafe @usableFromInline
   internal static func _uncheckedFromUTF8(
     _ input: UnsafeBufferPointer<UInt8>, asciiPreScanResult: Bool
   ) -> String {
@@ -182,7 +182,7 @@ extension String {
     return storage.asString
   }
 
-  @usableFromInline
+  @unsafe @usableFromInline
   internal static func _uncheckedFromUTF16(
     _ input: UnsafeBufferPointer<UInt16>
   ) -> String {
@@ -203,7 +203,7 @@ extension String {
     return contents.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
   }
 
-  @inline(never) // slow path
+  @safe(unchecked) @inline(never) // slow path
   private static func _slowFromCodeUnits<
     Input: Collection,
     Encoding: Unicode.Encoding
@@ -231,7 +231,7 @@ extension String {
     return (str, repaired)
   }
 
-  @usableFromInline @inline(never) // can't be inlined w/out breaking ABI
+  @safe(unchecked) @usableFromInline @inline(never) // can't be inlined w/out breaking ABI
   @_specialize(
     where Input == UnsafeBufferPointer<UInt8>, Encoding == Unicode.ASCII)
   @_specialize(
@@ -285,7 +285,7 @@ extension String {
       })
   }
 
-  public // @testable
+  @unsafe public // @testable
   static func _fromInvalidUTF16(
     _ utf16: UnsafeBufferPointer<UInt16>
   ) -> String {
@@ -308,7 +308,7 @@ extension String {
   internal static func _copying(_ str: String) -> String {
     return String._copying(str[...])
   }
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @inline(never) // slow-path
   internal static func _copying(_ str: Substring) -> String {
     if _fastPath(str._wholeGuts.isFastUTF8) {
@@ -321,7 +321,7 @@ extension String {
     }
   }
 
-  @usableFromInline
+  @unsafe @usableFromInline
   @available(SwiftStdlib 6.0, *)
   internal static func _validate<Encoding: Unicode.Encoding>(
     _ input: UnsafeBufferPointer<Encoding.CodeUnit>,

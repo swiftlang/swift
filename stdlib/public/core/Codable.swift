@@ -4012,111 +4012,111 @@ internal final class _KeyedEncodingContainerBox<
     return concrete.codingPath
   }
 
-  override internal func encodeNil<K: CodingKey>(forKey key: K) throws {
+  @safe(unchecked) override internal func encodeNil<K: CodingKey>(forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeNil(forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: Bool, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: Bool, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: String, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: String, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: Double, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: Double, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: Float, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: Float, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: Int, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: Int, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: Int8, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: Int8, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: Int16, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: Int16, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: Int32, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: Int32, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: Int64, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: Int64, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
   
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   override internal func encode<K: CodingKey>(_ value: Int128, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: UInt, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: UInt, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: UInt8, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: UInt8, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: UInt16, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: UInt16, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: UInt32, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: UInt32, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<K: CodingKey>(_ value: UInt64, forKey key: K) throws {
+  @safe(unchecked) override internal func encode<K: CodingKey>(_ value: UInt64, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
   
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   override internal func encode<K: CodingKey>(_ value: UInt128, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encode<T: Encodable, K: CodingKey>(
+  @safe(unchecked) override internal func encode<T: Encodable, K: CodingKey>(
     _ value: T,
     forKey key: K
   ) throws {
@@ -4125,7 +4125,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encodeConditional<T: AnyObject & Encodable, K: CodingKey>(
+  @safe(unchecked) override internal func encodeConditional<T: AnyObject & Encodable, K: CodingKey>(
     _ object: T,
     forKey key: K
   ) throws {
@@ -4134,7 +4134,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeConditional(object, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: Bool?,
     forKey key: K
   ) throws {
@@ -4143,7 +4143,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: String?,
     forKey key: K
   ) throws {
@@ -4152,7 +4152,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: Double?,
     forKey key: K
   ) throws {
@@ -4161,7 +4161,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: Float?,
     forKey key: K
   ) throws {
@@ -4170,7 +4170,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: Int?,
     forKey key: K
   ) throws {
@@ -4179,7 +4179,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: Int8?,
     forKey key: K
   ) throws {
@@ -4188,7 +4188,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: Int16?,
     forKey key: K
   ) throws {
@@ -4197,7 +4197,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: Int32?,
     forKey key: K
   ) throws {
@@ -4206,7 +4206,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: Int64?,
     forKey key: K
   ) throws {
@@ -4215,7 +4215,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
   
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   override internal func encodeIfPresent<K: CodingKey>(
     _ value: Int128?,
     forKey key: K
@@ -4225,7 +4225,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: UInt?,
     forKey key: K
   ) throws {
@@ -4234,7 +4234,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: UInt8?,
     forKey key: K
   ) throws {
@@ -4243,7 +4243,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: UInt16?,
     forKey key: K
   ) throws {
@@ -4252,7 +4252,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: UInt32?,
     forKey key: K
   ) throws {
@@ -4261,7 +4261,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<K: CodingKey>(
     _ value: UInt64?,
     forKey key: K
   ) throws {
@@ -4270,7 +4270,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
   
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   override internal func encodeIfPresent<K: CodingKey>(
     _ value: UInt128?,
     forKey key: K
@@ -4280,7 +4280,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func encodeIfPresent<T: Encodable, K: CodingKey>(
+  @safe(unchecked) override internal func encodeIfPresent<T: Encodable, K: CodingKey>(
     _ value: T?,
     forKey key: K
   ) throws {
@@ -4289,7 +4289,7 @@ internal final class _KeyedEncodingContainerBox<
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  override internal func nestedContainer<NestedKey, K: CodingKey>(
+  @safe(unchecked) override internal func nestedContainer<NestedKey, K: CodingKey>(
     keyedBy keyType: NestedKey.Type,
     forKey key: K
   ) -> KeyedEncodingContainer<NestedKey> {
@@ -4298,7 +4298,7 @@ internal final class _KeyedEncodingContainerBox<
     return concrete.nestedContainer(keyedBy: NestedKey.self, forKey: key)
   }
 
-  override internal func nestedUnkeyedContainer<K: CodingKey>(
+  @safe(unchecked) override internal func nestedUnkeyedContainer<K: CodingKey>(
     forKey key: K
   ) -> UnkeyedEncodingContainer {
     _internalInvariant(K.self == Key.self)
@@ -4310,7 +4310,7 @@ internal final class _KeyedEncodingContainerBox<
     return concrete.superEncoder()
   }
 
-  override internal func superEncoder<K: CodingKey>(forKey key: K) -> Encoder {
+  @safe(unchecked) override internal func superEncoder<K: CodingKey>(forKey key: K) -> Encoder {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return concrete.superEncoder(forKey: key)
@@ -4621,19 +4621,19 @@ internal final class _KeyedDecodingContainerBox<
     return concrete.allKeys
   }
 
-  override internal func contains<K: CodingKey>(_ key: K) -> Bool {
+  @safe(unchecked) override internal func contains<K: CodingKey>(_ key: K) -> Bool {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return concrete.contains(key)
   }
 
-  override internal func decodeNil<K: CodingKey>(forKey key: K) throws -> Bool {
+  @safe(unchecked) override internal func decodeNil<K: CodingKey>(forKey key: K) throws -> Bool {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeNil(forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: Bool.Type,
     forKey key: K
   ) throws -> Bool {
@@ -4642,7 +4642,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(Bool.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: String.Type,
     forKey key: K
   ) throws -> String {
@@ -4651,7 +4651,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(String.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: Double.Type,
     forKey key: K
   ) throws -> Double {
@@ -4660,7 +4660,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(Double.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: Float.Type,
     forKey key: K
   ) throws -> Float {
@@ -4669,7 +4669,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(Float.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: Int.Type,
     forKey key: K
   ) throws -> Int {
@@ -4678,7 +4678,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(Int.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: Int8.Type,
     forKey key: K
   ) throws -> Int8 {
@@ -4687,7 +4687,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(Int8.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: Int16.Type,
     forKey key: K
   ) throws -> Int16 {
@@ -4696,7 +4696,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(Int16.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: Int32.Type,
     forKey key: K
   ) throws -> Int32 {
@@ -4705,7 +4705,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(Int32.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: Int64.Type,
     forKey key: K
   ) throws -> Int64 {
@@ -4714,7 +4714,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(Int64.self, forKey: key)
   }
   
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   override internal func decode<K: CodingKey>(
     _ type: Int128.Type,
     forKey key: K
@@ -4724,7 +4724,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(Int128.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: UInt.Type,
     forKey key: K
   ) throws -> UInt {
@@ -4733,7 +4733,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(UInt.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: UInt8.Type,
     forKey key: K
   ) throws -> UInt8 {
@@ -4742,7 +4742,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(UInt8.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: UInt16.Type,
     forKey key: K
   ) throws -> UInt16 {
@@ -4751,7 +4751,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(UInt16.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: UInt32.Type,
     forKey key: K
   ) throws -> UInt32 {
@@ -4760,7 +4760,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(UInt32.self, forKey: key)
   }
 
-  override internal func decode<K: CodingKey>(
+  @safe(unchecked) override internal func decode<K: CodingKey>(
     _ type: UInt64.Type,
     forKey key: K
   ) throws -> UInt64 {
@@ -4769,7 +4769,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(UInt64.self, forKey: key)
   }
   
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   override internal func decode<K: CodingKey>(
     _ type: UInt128.Type,
     forKey key: K
@@ -4779,7 +4779,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(UInt128.self, forKey: key)
   }
 
-  override internal func decode<T: Decodable, K: CodingKey>(
+  @safe(unchecked) override internal func decode<T: Decodable, K: CodingKey>(
     _ type: T.Type,
     forKey key: K
   ) throws -> T {
@@ -4788,7 +4788,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decode(T.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: Bool.Type,
     forKey key: K
   ) throws -> Bool? {
@@ -4797,7 +4797,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(Bool.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: String.Type,
     forKey key: K
   ) throws -> String? {
@@ -4806,7 +4806,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(String.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: Double.Type,
     forKey key: K
   ) throws -> Double? {
@@ -4815,7 +4815,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(Double.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: Float.Type,
     forKey key: K
   ) throws -> Float? {
@@ -4824,7 +4824,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(Float.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: Int.Type,
     forKey key: K
   ) throws -> Int? {
@@ -4833,7 +4833,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(Int.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: Int8.Type,
     forKey key: K
   ) throws -> Int8? {
@@ -4842,7 +4842,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(Int8.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: Int16.Type,
     forKey key: K
   ) throws -> Int16? {
@@ -4851,7 +4851,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(Int16.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: Int32.Type,
     forKey key: K
   ) throws -> Int32? {
@@ -4860,7 +4860,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(Int32.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: Int64.Type,
     forKey key: K
   ) throws -> Int64? {
@@ -4869,7 +4869,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(Int64.self, forKey: key)
   }
   
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   override internal func decodeIfPresent<K: CodingKey>(
     _ type: Int128.Type,
     forKey key: K
@@ -4879,7 +4879,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(Int128.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: UInt.Type,
     forKey key: K
   ) throws -> UInt? {
@@ -4888,7 +4888,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(UInt.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: UInt8.Type,
     forKey key: K
   ) throws -> UInt8? {
@@ -4897,7 +4897,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(UInt8.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: UInt16.Type,
     forKey key: K
   ) throws -> UInt16? {
@@ -4906,7 +4906,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(UInt16.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: UInt32.Type,
     forKey key: K
   ) throws -> UInt32? {
@@ -4915,7 +4915,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(UInt32.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<K: CodingKey>(
     _ type: UInt64.Type,
     forKey key: K
   ) throws -> UInt64? {
@@ -4924,7 +4924,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(UInt64.self, forKey: key)
   }
   
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   override internal func decodeIfPresent<K: CodingKey>(
     _ type: UInt128.Type,
     forKey key: K
@@ -4934,7 +4934,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(UInt128.self, forKey: key)
   }
 
-  override internal func decodeIfPresent<T: Decodable, K: CodingKey>(
+  @safe(unchecked) override internal func decodeIfPresent<T: Decodable, K: CodingKey>(
     _ type: T.Type,
     forKey key: K
   ) throws -> T? {
@@ -4943,7 +4943,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.decodeIfPresent(T.self, forKey: key)
   }
 
-  override internal func nestedContainer<NestedKey, K: CodingKey>(
+  @safe(unchecked) override internal func nestedContainer<NestedKey, K: CodingKey>(
     keyedBy type: NestedKey.Type,
     forKey key: K
   ) throws -> KeyedDecodingContainer<NestedKey> {
@@ -4952,7 +4952,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.nestedContainer(keyedBy: NestedKey.self, forKey: key)
   }
 
-  override internal func nestedUnkeyedContainer<K: CodingKey>(
+  @safe(unchecked) override internal func nestedUnkeyedContainer<K: CodingKey>(
     forKey key: K
   ) throws -> UnkeyedDecodingContainer {
     _internalInvariant(K.self == Key.self)
@@ -4964,7 +4964,7 @@ internal final class _KeyedDecodingContainerBox<
     return try concrete.superDecoder()
   }
 
-  override internal func superDecoder<K: CodingKey>(forKey key: K) throws -> Decoder {
+  @safe(unchecked) override internal func superDecoder<K: CodingKey>(forKey key: K) throws -> Decoder {
     _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.superDecoder(forKey: key)

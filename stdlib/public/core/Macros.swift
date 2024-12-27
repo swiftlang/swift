@@ -60,7 +60,7 @@ public macro column<T: ExpressibleByIntegerLiteral>() -> T =
   Builtin.ColumnMacro
 
 /// Produces the shared object handle for the macro expansion location.
-@freestanding(expression)
+@unsafe @freestanding(expression)
 public macro dsohandle() -> UnsafeRawPointer = Builtin.DSOHandleMacro
 
 /// Produce the given warning message during compilation.

@@ -89,7 +89,7 @@ extension _Deque._Storage {
 
   internal typealias _UnsafeHandle = _Deque._UnsafeHandle
 
-  internal func read<R>(_ body: (_UnsafeHandle) throws -> R) rethrows -> R {
+  @safe(unchecked) internal func read<R>(_ body: (_UnsafeHandle) throws -> R) rethrows -> R {
     try _buffer.withUnsafeMutablePointers { header, elements in
       let handle = _UnsafeHandle(header: header,
                                  elements: elements,
@@ -98,7 +98,7 @@ extension _Deque._Storage {
     }
   }
 
-  internal func update<R>(_ body: (_UnsafeHandle) throws -> R) rethrows -> R {
+  @safe(unchecked) internal func update<R>(_ body: (_UnsafeHandle) throws -> R) rethrows -> R {
     try _buffer.withUnsafeMutablePointers { header, elements in
       let handle = _UnsafeHandle(header: header,
                                  elements: elements,

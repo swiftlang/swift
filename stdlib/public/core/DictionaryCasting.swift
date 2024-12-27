@@ -58,7 +58,7 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 }
 
 /// Called by the casting machinery.
-@_silgen_name("_swift_dictionaryDownCastIndirect")
+@unsafe @_silgen_name("_swift_dictionaryDownCastIndirect")
 @_unavailableInEmbedded
 internal func _dictionaryDownCastIndirect<SourceKey, SourceValue,
                                           TargetKey, TargetValue>(
@@ -113,7 +113,7 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
 }
 
 /// Called by the casting machinery.
-@_silgen_name("_swift_dictionaryDownCastConditionalIndirect")
+@unsafe @_silgen_name("_swift_dictionaryDownCastConditionalIndirect")
 @_unavailableInEmbedded
 internal func _dictionaryDownCastConditionalIndirect<SourceKey, SourceValue,
                                                      TargetKey, TargetValue>(

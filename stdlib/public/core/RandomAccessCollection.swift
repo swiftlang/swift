@@ -290,7 +290,7 @@ where Index: Strideable,
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
-  @inlinable
+  @safe(unchecked) @inlinable
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests for the trap.
     _failEarlyRangeCheck(
@@ -303,7 +303,7 @@ where Index: Strideable,
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
-  @inlinable // protocol-only
+  @safe(unchecked) @inlinable // protocol-only
   public func index(before i: Index) -> Index {
     let result = i.advanced(by: -1)
     // FIXME: swift-3-indexing-model: tests for the trap.
@@ -335,7 +335,7 @@ where Index: Strideable,
   ///   `index(before:)`.
   ///
   /// - Complexity: O(1)
-  @inlinable
+  @safe(unchecked) @inlinable
   public func index(_ i: Index, offsetBy distance: Index.Stride) -> Index {
     let result = i.advanced(by: distance)
     // This range check is not precise, tighter bounds exist based on `n`.
@@ -357,7 +357,7 @@ where Index: Strideable,
   /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(1)
-  @inlinable
+  @safe(unchecked) @inlinable
   public func distance(from start: Index, to end: Index) -> Index.Stride {
     // FIXME: swift-3-indexing-model: tests for traps.
     _failEarlyRangeCheck(

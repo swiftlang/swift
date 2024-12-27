@@ -136,25 +136,25 @@ extension Error {
 #if _runtime(_ObjC)
 // Helper functions for the C++ runtime to have easy access to embedded error,
 // domain, code, and userInfo as Objective-C values.
-@_silgen_name("")
+@unsafe @_silgen_name("")
 internal func _getErrorDomainNSString<T: Error>(_ x: UnsafePointer<T>)
 -> AnyObject {
   return x.pointee._domain._bridgeToObjectiveCImpl()
 }
 
-@_silgen_name("")
+@unsafe @_silgen_name("")
 internal func _getErrorCode<T: Error>(_ x: UnsafePointer<T>) -> Int {
   return x.pointee._code
 }
 
-@_silgen_name("")
+@unsafe @_silgen_name("")
 internal func _getErrorUserInfoNSDictionary<T: Error>(_ x: UnsafePointer<T>)
 -> AnyObject? {
   return x.pointee._userInfo.map { $0 }
 }
 
 // Called by the casting machinery to extract an NSError from an Error value.
-@_silgen_name("")
+@unsafe @_silgen_name("")
 internal func _getErrorEmbeddedNSErrorIndirect<T: Error>(
     _ x: UnsafePointer<T>) -> AnyObject? {
   return x.pointee._getEmbeddedNSError()

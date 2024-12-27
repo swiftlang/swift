@@ -348,7 +348,7 @@ extension Collection {
 }
 
 
-extension UnsafeMutablePointer {
+@unsafe extension UnsafeMutablePointer {
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "initialize(repeating:count:)")
   public func initialize(to newValue: Pointee, count: Int = 1) { 
     initialize(repeating: newValue, count: count)
@@ -387,7 +387,7 @@ extension UnsafeMutablePointer {
   }
 }
 
-extension UnsafeMutableRawPointer {
+@unsafe extension UnsafeMutableRawPointer {
   @available(*, unavailable, renamed: "init(mutating:)")
   public init(@_nonEphemeral _ from: UnsafeRawPointer) { Builtin.unreachable() }
 
@@ -401,7 +401,7 @@ extension UnsafeMutableRawPointer {
   public init?<T>(@_nonEphemeral _ from: UnsafePointer<T>?) { Builtin.unreachable() }
 }
 
-extension UnsafeRawPointer: _CustomPlaygroundQuickLookable {
+@unsafe extension UnsafeRawPointer: _CustomPlaygroundQuickLookable {
   internal var summary: String {
     let ptrValue = UInt64(
       bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
@@ -416,7 +416,7 @@ extension UnsafeRawPointer: _CustomPlaygroundQuickLookable {
   }
 }
 
-extension UnsafeMutableRawPointer: _CustomPlaygroundQuickLookable {
+@unsafe extension UnsafeMutableRawPointer: _CustomPlaygroundQuickLookable {
   private var summary: String {
     let ptrValue = UInt64(
       bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
@@ -431,7 +431,7 @@ extension UnsafeMutableRawPointer: _CustomPlaygroundQuickLookable {
   }
 }
 
-extension UnsafePointer: _CustomPlaygroundQuickLookable {
+@unsafe extension UnsafePointer: _CustomPlaygroundQuickLookable {
   private var summary: String {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return ptrValue == 0 
@@ -445,7 +445,7 @@ extension UnsafePointer: _CustomPlaygroundQuickLookable {
   }
 }
 
-extension UnsafeMutablePointer: _CustomPlaygroundQuickLookable {
+@unsafe extension UnsafeMutablePointer: _CustomPlaygroundQuickLookable {
   private var summary: String {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return ptrValue == 0 
@@ -466,7 +466,7 @@ public typealias UnsafeRawBufferPointerIterator<T> = UnsafeBufferPointer<T>.Iter
 @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "UnsafeRawBufferPointer.Iterator")
 public typealias UnsafeMutableRawBufferPointerIterator<T> = UnsafeBufferPointer<T>.Iterator
 
-extension UnsafeMutableRawPointer {
+@unsafe extension UnsafeMutableRawPointer {
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "allocate(byteCount:alignment:)")
   public static func allocate(
     bytes size: Int, alignedTo alignment: Int
@@ -509,7 +509,7 @@ extension UnsafeMutableRawPointer {
   }
 }
 
-extension UnsafeMutableRawBufferPointer {
+@unsafe extension UnsafeMutableRawBufferPointer {
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "allocate(byteCount:alignment:)")
   public static func allocate(count: Int) -> UnsafeMutableRawBufferPointer { 
     return UnsafeMutableRawBufferPointer.allocate(

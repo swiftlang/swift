@@ -394,7 +394,7 @@ extension MutableCollection where Self: BidirectionalCollection {
   ///   equal to the collection's `endIndex`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @inlinable
+  @safe(unchecked) @inlinable
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {

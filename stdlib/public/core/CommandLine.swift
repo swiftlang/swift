@@ -14,7 +14,7 @@ import SwiftShims
 
 #if SWIFT_STDLIB_HAS_COMMANDLINE
 
-@_silgen_name("_swift_stdlib_getUnsafeArgvArgc")
+@unsafe @_silgen_name("_swift_stdlib_getUnsafeArgvArgc")
 internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>)
   -> UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
 
@@ -33,7 +33,7 @@ extension CommandLine {
   ///
   /// Care must be taken to ensure that `_swift_stdlib_getUnsafeArgvArgc` is
   /// not invoked more times than is necessary (at most once).
-  @usableFromInline
+  @unsafe @usableFromInline
   internal static var _unsafeArgv:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
       = _swift_stdlib_getUnsafeArgvArgc(&_argc)
@@ -66,7 +66,7 @@ extension CommandLine {
   ///
   /// - Note: Accessing the argument vector through this pointer is unsafe.
   ///   Where possible, use ``arguments`` instead.
-  public static var unsafeArgv:
+  @unsafe public static var unsafeArgv:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>?> {
     return _unsafeArgv
   }
@@ -74,7 +74,7 @@ extension CommandLine {
   // This is extremely unsafe and allows for concurrent writes with no
   // synchronization to the underlying data. In a future version of Swift you
   // will not be able to write to 'CommandLine.arguments'.
-  static nonisolated(unsafe) var _arguments: [String] = (0 ..< Int(argc)).map {
+  @safe(unchecked) static nonisolated(unsafe) var _arguments: [String] = (0 ..< Int(argc)).map {
     String(cString: _unsafeArgv[$0]!)
   }
 

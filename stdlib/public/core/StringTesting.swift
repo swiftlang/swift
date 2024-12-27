@@ -61,7 +61,7 @@ extension String {
   func _classify() -> _StringRepresentation { return _guts._classify() }
 
 #if !$Embedded
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   public // @testable
   func _deconstructUTF8<ToPointer: _Pointer>(
     scratch: UnsafeMutableRawBufferPointer?
@@ -78,7 +78,7 @@ extension String {
 }
 
 extension _StringGuts {
-  internal func _classify() -> _StringRepresentation {
+  @safe(unchecked) internal func _classify() -> _StringRepresentation {
     var result = _StringRepresentation(
       _isASCII: self.isASCII,
       _count: self.count,
@@ -140,7 +140,7 @@ extension _StringGuts {
 └────────────────────╨───────────────────────┴─────────────────────┴─────────────┴─────────────────┘
 
 */
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   internal // TODO: figure out if this works as a compiler intrinsic
   func _deconstructUTF8<ToPointer: _Pointer>(
     scratch: UnsafeMutableRawBufferPointer?
@@ -188,7 +188,7 @@ extension _StringGuts {
       allocatedMemory: true)
   }
 
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @inline(never) // slow path
   internal
   func _allocateForDeconstruct() -> (

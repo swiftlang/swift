@@ -132,7 +132,7 @@ extension OSLogArguments {
   /// Append an (autoclosured) interpolated expression of Double type, passed to
   /// `OSLogMessage.appendInterpolation`, to the array of closures tracked
   /// by this instance.
-  @_semantics("constant_evaluable")
+  @safe(unchecked) @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
   internal mutating func append(_ value: @escaping () -> Double) {
@@ -153,7 +153,7 @@ internal func doubleSizeInBytes() -> Int {
 
 /// Serialize a double at the buffer location that `position` points to and
 /// increment `position` by the byte size of the double.
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 @inline(__always)
 internal func serialize(
   _ value: Double,

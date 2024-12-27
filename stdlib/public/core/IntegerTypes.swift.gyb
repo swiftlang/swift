@@ -820,6 +820,7 @@ internal struct _IntegerAnyHashableBox<
     return _value as? T
   }
 
+  @unsafe
   internal func _downCastConditional<T>(
     into result: UnsafeMutablePointer<T>
   ) -> Bool {

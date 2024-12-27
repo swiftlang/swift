@@ -13,26 +13,26 @@
 @_silgen_name("_swift_observation_lock_size")
 func _lockSize() -> Int
 
-@_silgen_name("_swift_observation_lock_init")
+@unsafe @_silgen_name("_swift_observation_lock_init")
 func _lockInit(_: UnsafeRawPointer)
 
-@_silgen_name("_swift_observation_lock_lock")
+@unsafe @_silgen_name("_swift_observation_lock_lock")
 func _lockLock(_: UnsafeRawPointer)
 
-@_silgen_name("_swift_observation_lock_unlock")
+@unsafe @_silgen_name("_swift_observation_lock_unlock")
 func _lockUnlock(_: UnsafeRawPointer)
 
 @available(SwiftStdlib 5.9, *)
 internal struct _ManagedCriticalState<State> {
-  final private class LockedBuffer: ManagedBuffer<State, UnsafeRawPointer> { }
+  @unsafe final private class LockedBuffer: ManagedBuffer<State, UnsafeRawPointer> { }
 
-  private let buffer: ManagedBuffer<State, UnsafeRawPointer>
+  @unsafe private let buffer: ManagedBuffer<State, UnsafeRawPointer>
 
-  internal init(_ buffer: ManagedBuffer<State, UnsafeRawPointer>) {
+  @unsafe internal init(_ buffer: ManagedBuffer<State, UnsafeRawPointer>) {
     self.buffer = buffer
   }
   
-  internal init(_ initial: State) {
+  @safe(unchecked) internal init(_ initial: State) {
     let roundedSize = (_lockSize() + MemoryLayout<UnsafeRawPointer>.size - 1) / MemoryLayout<UnsafeRawPointer>.size 
     self.init(LockedBuffer.create(minimumCapacity: Swift.max(roundedSize, 1)) { buffer in
       buffer.withUnsafeMutablePointerToElements { _lockInit(UnsafeRawPointer($0)) }
@@ -40,7 +40,7 @@ internal struct _ManagedCriticalState<State> {
     })
   }
 
-  internal func withCriticalRegion<R>(
+  @safe(unchecked) internal func withCriticalRegion<R>(
     _ critical: (inout State) throws -> R
   ) rethrows -> R {
     try buffer.withUnsafeMutablePointers { header, lock in

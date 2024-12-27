@@ -187,7 +187,7 @@ public struct UnsafeRawPointer: _Pointer {
 @available(*, unavailable)
 extension UnsafeRawPointer: Sendable {}
 
-extension UnsafeRawPointer {
+@unsafe extension UnsafeRawPointer {
   /// Creates a new raw pointer from the given typed pointer.
   ///
   /// Use this initializer to explicitly convert `other` to an
@@ -217,7 +217,7 @@ extension UnsafeRawPointer {
   }
 }
 
-extension UnsafeRawPointer {
+@unsafe extension UnsafeRawPointer {
   /// Creates a new raw pointer from the given mutable raw pointer.
   ///
   /// Use this initializer to explicitly convert `other` to an
@@ -245,7 +245,7 @@ extension UnsafeRawPointer {
   }
 }
 
-extension UnsafeRawPointer {
+@unsafe extension UnsafeRawPointer {
   /// Creates a new raw pointer from the given typed pointer.
   ///
   /// Use this initializer to explicitly convert `other` to an
@@ -532,7 +532,7 @@ extension UnsafeRawPointer {
   }
 }
 
-extension UnsafeRawPointer: Strideable {
+@unsafe extension UnsafeRawPointer: Strideable {
   // custom version for raw pointers
   @_transparent
   public func advanced(by n: Int) -> UnsafeRawPointer {
@@ -540,7 +540,7 @@ extension UnsafeRawPointer: Strideable {
   }
 }
 
-extension UnsafeRawPointer {
+@unsafe extension UnsafeRawPointer {
   /// Obtain the next pointer properly aligned to store a value of type `T`.
   ///
   /// If `self` is properly aligned for accessing `T`,
@@ -793,7 +793,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
 @available(*, unavailable)
 extension UnsafeMutableRawPointer: Sendable {}
 
-extension UnsafeMutableRawPointer {
+@unsafe extension UnsafeMutableRawPointer {
   /// Creates a new raw pointer from the given typed pointer.
   ///
   /// Use this initializer to explicitly convert `other` to an
@@ -1529,7 +1529,7 @@ extension UnsafeMutableRawPointer {
   }
 }
 
-extension UnsafeMutableRawPointer: Strideable {
+@unsafe extension UnsafeMutableRawPointer: Strideable {
   // custom version for raw pointers
   @_transparent
   public func advanced(by n: Int) -> UnsafeMutableRawPointer {
@@ -1538,7 +1538,7 @@ extension UnsafeMutableRawPointer: Strideable {
   }
 }
 
-extension UnsafeMutableRawPointer {
+@unsafe extension UnsafeMutableRawPointer {
   /// Obtain the next pointer properly aligned to store a value of type `T`.
   ///
   /// If `self` is properly aligned for accessing `T`,
@@ -1620,7 +1620,7 @@ extension UnsafeMutableRawPointer {
   }
 }
 
-extension OpaquePointer {
+@unsafe extension OpaquePointer {
   @_transparent
   public init(@_nonEphemeral _ from: UnsafeMutableRawPointer) {
     self._rawValue = from._rawValue

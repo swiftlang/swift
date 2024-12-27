@@ -290,7 +290,7 @@ extension Executor {
 
 @available(SwiftStdlib 5.9, *)
 extension SerialExecutor {
-  @available(SwiftStdlib 5.9, *)
+  @unsafe @available(SwiftStdlib 5.9, *)
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: self)
   }
@@ -394,7 +394,7 @@ public struct UnownedTaskExecutor: Sendable {
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
 extension UnownedTaskExecutor: Equatable {
-  @inlinable
+  @safe(unchecked) @inlinable
   public static func == (_ lhs: UnownedTaskExecutor, _ rhs: UnownedTaskExecutor) -> Bool {
     unsafeBitCast(lhs.executor, to: (Int, Int).self) == unsafeBitCast(rhs.executor, to: (Int, Int).self)
   }
@@ -422,7 +422,7 @@ extension UnownedTaskExecutor: Equatable {
 @_silgen_name("swift_task_isOnExecutor") // This function will CRASH rather than return `false`!
 public func _taskIsOnExecutor<Executor: SerialExecutor>(_ executor: Executor) -> Bool
 
-@_spi(ConcurrencyExecutors)
+@unsafe @_spi(ConcurrencyExecutors)
 @available(SwiftStdlib 5.9, *)
 @_silgen_name("swift_executor_isComplexEquality")
 public func _executor_isComplexEquality(_ executor: UnownedSerialExecutor) -> Bool
@@ -469,7 +469,7 @@ internal func _task_serialExecutor_checkIsolated<E>(executor: E)
 
 /// Obtain the executor ref by calling the executor's `asUnownedSerialExecutor()`.
 /// The obtained executor ref will have all the user-defined flags set on the executor.
-@available(SwiftStdlib 5.9, *)
+@safe(unchecked) @available(SwiftStdlib 5.9, *)
 @_silgen_name("_task_serialExecutor_getExecutorRef")
 internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.Executor
     where E: SerialExecutor {
@@ -536,7 +536,7 @@ internal final class DispatchQueueShim: @unchecked Sendable, SerialExecutor {
     _enqueueOnDispatchQueue(job, queue: self)
   }
 
-  func asUnownedSerialExecutor() -> UnownedSerialExecutor {
+  @unsafe func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     return UnownedSerialExecutor(ordinary: self)
   }
 }

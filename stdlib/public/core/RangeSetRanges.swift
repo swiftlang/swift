@@ -31,7 +31,7 @@ extension RangeSet {
       _storage = ContiguousArray(_ranges)
     }
 
-    @usableFromInline
+    @safe(unchecked) @usableFromInline
     internal init(_unorderedRanges: [Range<Bound>]) {
       _storage = ContiguousArray(_unorderedRanges)
       _storage.sort {

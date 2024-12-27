@@ -33,7 +33,7 @@ extension Task where Success == Never, Failure == Never {
 
   /// The type of continuation used in the implementation of
   /// sleep(nanoseconds:).
-  typealias SleepContinuation = UnsafeContinuation<(), Error>
+  @unsafe typealias SleepContinuation = UnsafeContinuation<(), Error>
 
   /// Describes the state of a sleep() operation.
   enum SleepState {
@@ -41,7 +41,7 @@ extension Task where Success == Never, Failure == Never {
     case notStarted
 
     // The sleep continuation has been created and is available here.
-    case activeContinuation(SleepContinuation)
+    @unsafe case activeContinuation(SleepContinuation)
 
     /// The sleep has finished.
     case finished
@@ -53,7 +53,7 @@ extension Task where Success == Never, Failure == Never {
     case cancelledBeforeStarted
 
     /// Decode sleep state from the word of storage.
-    init(word: Builtin.Word) {
+    @safe(unchecked) init(word: Builtin.Word) {
       switch UInt(word) & 0x03 {
       case 0:
         let continuationBits = UInt(word) & ~0x03
@@ -80,7 +80,7 @@ extension Task where Success == Never, Failure == Never {
     }
 
     /// Decode sleep state by loading from the given pointer
-    init(loading wordPtr: UnsafeMutablePointer<Builtin.Word>) {
+    @unsafe init(loading wordPtr: UnsafeMutablePointer<Builtin.Word>) {
       self.init(word: Builtin.atomicload_seqcst_Word(wordPtr._rawValue))
     }
 
@@ -112,23 +112,23 @@ extension Task where Success == Never, Failure == Never {
   /// _unsafe_ because the owner must manually deallocate the token once it is no
   /// longer needed.
   struct UnsafeSleepStateToken: @unchecked Sendable {
-    let wordPtr: UnsafeMutablePointer<Builtin.Word>
+    @unsafe let wordPtr: UnsafeMutablePointer<Builtin.Word>
 
     /// Allocates the underlying storage and sets the value to `.notStarted`.
-    init() {
+    @safe(unchecked) init() {
       wordPtr = .allocate(capacity: 1)
       Builtin.atomicstore_seqcst_Word(
           wordPtr._rawValue, SleepState.notStarted.word._builtinWordValue)
     }
 
     /// Atomically loads the current state.
-    func load() -> SleepState {
+    @safe(unchecked) func load() -> SleepState {
       return SleepState(word: Builtin.atomicload_seqcst_Word(wordPtr._rawValue))
     }
 
     /// Attempts to atomically set the stored value to `desired` if the current
     /// value is equal to `expected`. Returns true if the exchange was successful.
-    func exchange(expected: SleepState, desired: SleepState) -> Bool {
+    @safe(unchecked) func exchange(expected: SleepState, desired: SleepState) -> Bool {
       let (_, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
           wordPtr._rawValue,
           expected.word._builtinWordValue,
@@ -137,14 +137,14 @@ extension Task where Success == Never, Failure == Never {
     }
 
     /// Deallocates the underlying storage.
-    func deallocate() {
+    @safe(unchecked) func deallocate() {
       wordPtr.deallocate()
     }
   }
 
   /// Called when the sleep(nanoseconds:) operation woke up without being
   /// canceled.
-  static func onSleepWake(_ token: UnsafeSleepStateToken) {
+  @safe(unchecked) static func onSleepWake(_ token: UnsafeSleepStateToken) {
     while true {
       let state = token.load()
       switch state {
@@ -182,7 +182,7 @@ extension Task where Success == Never, Failure == Never {
 
   /// Called when the sleep(nanoseconds:) operation has been canceled before
   /// the sleep completed.
-  static func onSleepCancel(_ token: UnsafeSleepStateToken) {
+  @safe(unchecked) static func onSleepCancel(_ token: UnsafeSleepStateToken) {
     while true {
       let state = token.load()
       switch state {
@@ -223,7 +223,7 @@ extension Task where Success == Never, Failure == Never {
   /// this function throws `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.
-  public static func sleep(nanoseconds duration: UInt64) async throws {
+  @safe(unchecked) public static func sleep(nanoseconds duration: UInt64) async throws {
     // Create a token which will initially have the value "not started", which
     // means the continuation has neither been created nor completed.
     let token = UnsafeSleepStateToken()

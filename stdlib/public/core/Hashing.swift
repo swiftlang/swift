@@ -41,13 +41,13 @@ internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bo
 /// memory accesses. The memory remains bound to managed AnyObjects.
 internal struct _UnmanagedAnyObjectArray {
   /// Underlying pointer.
-  internal var value: UnsafeMutableRawPointer
+  @unsafe internal var value: UnsafeMutableRawPointer
 
-  internal init(_ up: UnsafeMutablePointer<AnyObject>) {
+  @unsafe internal init(_ up: UnsafeMutablePointer<AnyObject>) {
     self.value = UnsafeMutableRawPointer(up)
   }
 
-  internal init?(_ up: UnsafeMutablePointer<AnyObject>?) {
+  @unsafe internal init?(_ up: UnsafeMutablePointer<AnyObject>?) {
     guard let unwrapped = up else { return nil }
     self.init(unwrapped)
   }
@@ -86,7 +86,7 @@ final internal class __SwiftEmptyNSEnumerator
     return nil
   }
 
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
@@ -128,7 +128,7 @@ internal final class __BridgingHashBuffer
     }
   }
 
-  internal static func allocate(
+  @safe(unchecked) internal static func allocate(
     owner: AnyObject,
     hashTable: _HashTable
   ) -> __BridgingHashBuffer {
@@ -138,7 +138,7 @@ internal final class __BridgingHashBuffer
     return unsafeDowncast(buffer, to: __BridgingHashBuffer.self)
   }
 
-  deinit {
+  @safe(unchecked) deinit {
     for bucket in header.hashTable {
       (firstElementAddress + bucket.offset).deinitialize(count: 1)
     }
@@ -153,7 +153,7 @@ internal final class __BridgingHashBuffer
     }
   }
 
-  @inline(__always)
+  @safe(unchecked) @inline(__always)
   internal func initialize(at bucket: _HashTable.Bucket, to object: AnyObject) {
     _internalInvariant(header.hashTable.isOccupied(bucket))
     (firstElementAddress + bucket.offset).initialize(to: object)

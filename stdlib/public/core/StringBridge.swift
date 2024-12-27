@@ -31,20 +31,20 @@ internal typealias _CocoaString = AnyObject
   @objc(characterAtIndex:)
   func character(at offset: Int) -> UInt16
 
-  @objc(getCharacters:range:)
+  @unsafe @objc(getCharacters:range:)
   func getCharacters(
    _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
   )
 
-  @objc(_fastCStringContents:)
+  @unsafe @objc(_fastCStringContents:)
   func _fastCStringContents(
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>?
 
-  @objc(_fastCharacterContents)
+  @unsafe @objc(_fastCharacterContents)
   func _fastCharacterContents() -> UnsafePointer<UInt16>?
 
-  @objc(getBytes:maxLength:usedLength:encoding:options:range:remainingRange:)
+  @unsafe @objc(getBytes:maxLength:usedLength:encoding:options:range:remainingRange:)
   func getBytes(_ buffer: UnsafeMutableRawPointer?,
    maxLength maxBufferCount: Int,
   usedLength usedBufferCount: UnsafeMutablePointer<Int>?,
@@ -59,7 +59,7 @@ internal typealias _CocoaString = AnyObject
                range: _SwiftNSRange,
                locale: AnyObject?) -> Int
 
-  @objc(newTaggedNSStringWithASCIIBytes_:length_:)
+  @unsafe @objc(newTaggedNSStringWithASCIIBytes_:length_:)
   func createTaggedString(bytes: UnsafePointer<UInt8>,
                           count: Int) -> AnyObject?
 }
@@ -74,12 +74,12 @@ internal typealias _CocoaString = AnyObject
  because any refcounting @_effects on 'a' will be lost when _objc breaks ARC's
  knowledge that the _CocoaString and _StringSelectorHolder are the same object.
  */
-@inline(__always)
+@safe(unchecked) @inline(__always)
 private func _objc(_ str: _CocoaString) -> _StringSelectorHolder {
   return unsafeBitCast(str, to: _StringSelectorHolder.self)
 }
 
-@_effects(releasenone)
+@safe(unchecked) @_effects(releasenone)
 private func _copyNSString(_ str: _StringSelectorHolder) -> _CocoaString {
   return str.copy(with: nil)
 }
@@ -110,12 +110,12 @@ internal func _isNSString(_ str:AnyObject) -> Bool {
   return _swift_stdlib_isNSString(str) != 0
 }
 
-@_effects(readonly)
+@unsafe @_effects(readonly)
 private func _NSStringCharactersPtr(_ str: _StringSelectorHolder) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
   return UnsafeMutablePointer(mutating: str._fastCharacterContents())
 }
 
-@usableFromInline // @testable
+@unsafe @usableFromInline // @testable
 @_effects(readonly)
 internal func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
@@ -123,7 +123,7 @@ internal func _stdlib_binary_CFStringGetCharactersPtr(
   return _NSStringCharactersPtr(_objc(source))
 }
 
-@_effects(releasenone)
+@unsafe @_effects(releasenone)
 private func _NSStringGetCharacters(
   from source: _StringSelectorHolder,
   range: Range<Int>,
@@ -137,7 +137,7 @@ private func _NSStringGetCharacters(
 
 /// Copies a slice of a _CocoaString into contiguous storage of sufficient
 /// capacity.
-@_effects(releasenone)
+@unsafe @_effects(releasenone)
 internal func _cocoaStringCopyCharacters(
   from source: _CocoaString,
   range: Range<Int>,
@@ -160,7 +160,7 @@ internal func _cocoaStringSubscript(
   return _NSStringGetCharacter(_objc(target), position)
 }
 
-@_effects(releasenone)
+@unsafe @_effects(releasenone)
 private func _NSStringCopyBytes(
   _ o: _StringSelectorHolder,
   encoding: UInt,
@@ -185,7 +185,7 @@ private func _NSStringCopyBytes(
   return nil
 }
 
-@_effects(releasenone)
+@unsafe @_effects(releasenone)
 internal func _cocoaStringCopyUTF8(
   _ target: _CocoaString,
   into bufPtr: UnsafeMutableRawBufferPointer
@@ -197,7 +197,7 @@ internal func _cocoaStringCopyUTF8(
   )
 }
 
-@_effects(releasenone)
+@unsafe @_effects(releasenone)
 internal func _cocoaStringCopyASCII(
   _ target: _CocoaString,
   into bufPtr: UnsafeMutableRawBufferPointer
@@ -209,7 +209,7 @@ internal func _cocoaStringCopyASCII(
   )
 }
 
-@_effects(readonly)
+@safe(unchecked) @_effects(readonly)
 private func _NSStringUTF8Count(
   _ o: _StringSelectorHolder,
   range: Range<Int>
@@ -263,7 +263,7 @@ internal func _cocoaHashString(
   return _swift_stdlib_CFStringHashNSString(string)
 }
 
-@_effects(readonly)
+@unsafe @_effects(readonly)
 internal func _cocoaHashASCIIBytes(
   _ bytes: UnsafePointer<UInt8>, length: Int
 ) -> UInt {
@@ -273,14 +273,14 @@ internal func _cocoaHashASCIIBytes(
 // These "trampolines" are effectively objc_msgSend_super.
 // They bypass our implementations to use NSString's.
 
-@_effects(readonly)
+@unsafe @_effects(readonly)
 internal func _cocoaCStringUsingEncodingTrampoline(
   _ string: _CocoaString, _ encoding: UInt
 ) -> UnsafePointer<UInt8>? {
   return _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
 }
 
-@_effects(releasenone)
+@unsafe @_effects(releasenone)
 internal func _cocoaGetCStringTrampoline(
   _ string: _CocoaString,
   _ buffer: UnsafeMutablePointer<UInt8>,
@@ -311,7 +311,7 @@ internal enum _KnownCocoaString {
   case tagged
 #endif
 
-  @inline(__always)
+  @safe(unchecked) @inline(__always)
   init(_ str: _CocoaString) {
 
 #if _pointerBitWidth(_64)
@@ -337,7 +337,7 @@ internal enum _KnownCocoaString {
 // The Foundation overlay takes care of bridging tagged pointer strings before
 // they reach us, but this may still be called by older code, or by strings
 // entering our domain via the arguments to -isEqual:, etc...
-@_effects(releasenone) // @opaque
+@unsafe @_effects(releasenone) // @opaque
 internal func _bridgeTagged(
   _ cocoa: _CocoaString,
   intoUTF8 bufPtr: UnsafeMutableRawBufferPointer
@@ -346,7 +346,7 @@ internal func _bridgeTagged(
   return _cocoaStringCopyUTF8(cocoa, into: bufPtr)
 }
 
-@_effects(releasenone) // @opaque
+@unsafe @_effects(releasenone) // @opaque
 internal func _bridgeTaggedASCII(
   _ cocoa: _CocoaString,
   intoUTF8 bufPtr: UnsafeMutableRawBufferPointer
@@ -356,20 +356,20 @@ internal func _bridgeTaggedASCII(
 }
 #endif
 
-@_effects(readonly)
+@unsafe @_effects(readonly)
 private func _NSStringASCIIPointer(_ str: _StringSelectorHolder) -> UnsafePointer<UInt8>? {
   //TODO(String bridging): Unconditionally asking for nul-terminated contents is
   // overly conservative and hurts perf with some NSStrings
   return str._fastCStringContents(1)?._asUInt8
 }
 
-@_effects(readonly)
+@unsafe @_effects(readonly)
 private func _NSStringUTF8Pointer(_ str: _StringSelectorHolder) -> UnsafePointer<UInt8>? {
   //We don't have a way to ask for UTF8 here currently
   return _NSStringASCIIPointer(str)
 }
 
-@_effects(readonly)
+@unsafe @_effects(readonly)
 internal func _getNSCFConstantStringContentsPointer(
   _ cocoa: AnyObject
 ) -> UnsafePointer<UInt8> {
@@ -379,7 +379,7 @@ internal func _getNSCFConstantStringContentsPointer(
   ).pointee.str
 }
 
-@_effects(readonly) // @opaque
+@unsafe @_effects(readonly) // @opaque
 private func _withCocoaASCIIPointer<R>(
   _ str: _CocoaString,
   requireStableAddress: Bool,
@@ -404,7 +404,7 @@ private func _withCocoaASCIIPointer<R>(
   return nil
 }
 
-@_effects(readonly) // @opaque
+@unsafe @_effects(readonly) // @opaque
 private func _withCocoaUTF8Pointer<R>(
   _ str: _CocoaString,
   requireStableAddress: Bool,
@@ -429,7 +429,7 @@ private func _withCocoaUTF8Pointer<R>(
   return nil
 }
 
-@_effects(readonly) // @opaque
+@unsafe @_effects(readonly) // @opaque
 internal func withCocoaASCIIPointer<R>(
   _ str: _CocoaString,
   work: (UnsafePointer<UInt8>) -> R?
@@ -437,7 +437,7 @@ internal func withCocoaASCIIPointer<R>(
   return _withCocoaASCIIPointer(str, requireStableAddress: false, work: work)
 }
 
-@_effects(readonly) // @opaque
+@unsafe @_effects(readonly) // @opaque
 internal func withCocoaUTF8Pointer<R>(
   _ str: _CocoaString,
   work: (UnsafePointer<UInt8>) -> R?
@@ -445,26 +445,26 @@ internal func withCocoaUTF8Pointer<R>(
   return _withCocoaUTF8Pointer(str, requireStableAddress: false, work: work)
 }
 
-@_effects(readonly)
+@unsafe @_effects(readonly)
 internal func stableCocoaASCIIPointer(_ str: _CocoaString)
   -> UnsafePointer<UInt8>? {
   return _withCocoaASCIIPointer(str, requireStableAddress: true, work: { $0 })
 }
 
-@_effects(readonly)
+@unsafe @_effects(readonly)
 internal func stableCocoaUTF8Pointer(_ str: _CocoaString)
   -> UnsafePointer<UInt8>? {
   return _withCocoaUTF8Pointer(str, requireStableAddress: true, work: { $0 })
 }
 
 private enum CocoaStringPointer {
-  case ascii(UnsafePointer<UInt8>)
-  case utf8(UnsafePointer<UInt8>)
-  case utf16(UnsafePointer<UInt16>)
+  @unsafe case ascii(UnsafePointer<UInt8>)
+  @unsafe case utf8(UnsafePointer<UInt8>)
+  @unsafe case utf16(UnsafePointer<UInt16>)
   case none
 }
 
-@_effects(readonly)
+@safe(unchecked) @_effects(readonly)
 private func _getCocoaStringPointer(
   _ cfImmutableValue: _CocoaString
 ) -> CocoaStringPointer {
@@ -477,7 +477,7 @@ private func _getCocoaStringPointer(
 }
 
 #if !$Embedded
-@usableFromInline
+@safe(unchecked) @usableFromInline
 @_effects(releasenone) // @opaque
 internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   switch _KnownCocoaString(cocoaString) {
@@ -567,7 +567,7 @@ extension String {
 }
 #endif
 
-@_effects(releasenone)
+@unsafe @_effects(releasenone)
 private func _createNSString(
   _ receiver: _StringSelectorHolder,
   _ ptr: UnsafePointer<UInt8>,
@@ -577,7 +577,7 @@ private func _createNSString(
   return receiver.createTaggedString(bytes: ptr, count: count)
 }
 
-@_effects(releasenone)
+@unsafe @_effects(releasenone)
 private func _createCFString(
   _ ptr: UnsafePointer<UInt8>,
   _ count: Int,
@@ -593,7 +593,7 @@ private func _createCFString(
 
 #if !$Embedded
 extension String {
-  @_effects(releasenone)
+  @safe(unchecked) @_effects(releasenone)
   public // SPI(Foundation)
   func _bridgeToObjectiveCImpl() -> AnyObject {
 
@@ -640,7 +640,7 @@ extension String {
 // Note: This function is not intended to be called from Swift.  The
 // availability information here is perfunctory; this function isn't considered
 // part of the Stdlib's Swift ABI.
-@available(SwiftStdlib 5.2, *)
+@unsafe @available(SwiftStdlib 5.2, *)
 @_cdecl("_SwiftCreateBridgedString")
 @usableFromInline
 internal func _SwiftCreateBridgedString_DoNotCall(
@@ -683,7 +683,7 @@ public func _getDescription<T>(_ x: T) -> AnyObject {
   return String(reflecting: x)._bridgeToObjectiveCImpl()
 }
 
-@_silgen_name("swift_stdlib_NSStringFromUTF8")
+@unsafe @_silgen_name("swift_stdlib_NSStringFromUTF8")
 @usableFromInline //this makes the symbol available to the runtime :(
 @available(SwiftStdlib 5.2, *)
 internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
@@ -721,7 +721,7 @@ extension StringProtocol {
     return self.utf16.index(self.utf16.startIndex, offsetBy: offset)
   }
 
-  public // SPI(Foundation)
+  @safe(unchecked) public // SPI(Foundation)
   func _toUTF16Offsets(_ indices: Range<Index>) -> Range<Int> {
     if Self.self == String.self {
       let s = unsafeBitCast(self, to: String.self)
@@ -736,7 +736,7 @@ extension StringProtocol {
     return Range(uncheckedBounds: (lower: startOffset, upper: endOffset))
   }
 
-  public // SPI(Foundation)
+  @safe(unchecked) public // SPI(Foundation)
   func _toUTF16Indices(_ range: Range<Int>) -> Range<Index> {
     if Self.self == String.self {
       let s = unsafeBitCast(self, to: String.self)
@@ -753,7 +753,7 @@ extension StringProtocol {
 }
 
 extension String {
-  public // @testable / @benchmarkable
+  @unsafe public // @testable / @benchmarkable
   func _copyUTF16CodeUnits(
     into buffer: UnsafeMutableBufferPointer<UInt16>,
     range: Range<Int>
