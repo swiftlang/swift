@@ -2926,6 +2926,13 @@ namespace {
       return MacroWalking::Expansion;
     }
 
+    LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
+      // We want to walk lazy initializers as part of their implicit getters
+      // since we're interested in querying capture information, and captures
+      // for lazy inits are computed as part of type-checking the accessor.
+      return LazyInitializerWalking::InAccessor;
+    }
+
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
       // Walking into patterns leads to nothing good because then we
       // end up visiting the AccessorDecls of a top-level

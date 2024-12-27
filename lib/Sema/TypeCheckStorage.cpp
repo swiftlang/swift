@@ -1679,6 +1679,7 @@ namespace {
       // If we find a closure, update its declcontext and do *not* walk into it.
       if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
         CE->setParent(NewDC);
+        TypeChecker::computeCaptures(CE);
         return Action::SkipNode(E);
       }
 

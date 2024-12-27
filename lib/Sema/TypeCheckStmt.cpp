@@ -78,6 +78,12 @@ namespace {
       return MacroWalking::ArgumentsAndExpansion;
     }
 
+    LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
+      // Don't walk lazy initializers, we contextualize the getter body
+      // specially when synthesizing.
+      return LazyInitializerWalking::None;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (auto CE = dyn_cast<AutoClosureExpr>(E)) {
         CE->setParent(ParentDC);
