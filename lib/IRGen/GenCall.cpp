@@ -5451,7 +5451,7 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   // Use the pointer/pointer and pointer/int casts if we can.
   if (toTy->isPointerTy()) {
     if (fromTy->isPointerTy())
-      return Builder.CreateBitCast(value, toTy);
+      return Builder.CreatePointerBitCastOrAddrSpaceCast(value, toTy);
     if (fromTy == IGM.IntPtrTy)
       return Builder.CreateIntToPtr(value, toTy);
   } else if (fromTy->isPointerTy()) {
