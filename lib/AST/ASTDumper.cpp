@@ -607,14 +607,174 @@ namespace {
     StringRef text() const { return Text; }
   };
 
+  /// Defines the interface for low-level printing operations that take place
+  /// when dumping a Swift AST.
+  class PrintWriterBase {
+  protected:
+    /// Only used by the S-expression writer to change the dumper to use
+    /// single quotes when printing substitution maps in full.
+    char Quote = '\"';
+
+  public:
+    virtual ~PrintWriterBase() {}
+
+    char quote() const { return Quote; }
+    void setQuote(char quote) { Quote = quote; }
+
+    /// Call `body` in a context where the printer is ready for a child to be
+    /// printed.
+    virtual void printRecArbitrary(std::function<void(Label)> body,
+                                   Label label) = 0;
+
+    /// Print a range of nodes as a single "array" child node.
+    virtual void printRecRange(std::function<void(Label)> body,
+                               Label label) = 0;
+
+    /// Call `body` in a context where the printer is ready for a list of
+    /// children to be printed.
+    virtual void printListArbitrary(std::function<void()> body, Label label) = 0;
+
+    /// Print the beginning of a new node, including its type and an optional
+    /// label for it.
+    virtual void printHead(StringRef name, TerminalColor color, Label label) = 0;
+
+    /// Print the end of a new node.
+    virtual void printFoot() = 0;
+
+    /// Print a field with a short keyword-style value, printing the value by
+    /// passing a closure that takes a \c raw_ostream.
+    virtual void printFieldRaw(std::function<void(llvm::raw_ostream &)> body,
+                               Label label, TerminalColor color) = 0;
+
+    /// Print a field with a long value that will be automatically quoted and
+    /// escaped, printing the value by passing a closure that takes a
+    /// \c raw_ostream.
+    virtual void printFieldQuotedRaw(
+        std::function<void(llvm::raw_ostream &)> body, Label name,
+        TerminalColor color) = 0;
+
+    /// Print a simple boolean value, printing the value by passing a closure
+    /// that takes a \c raw_ostream.
+    virtual void printFlagRaw(std::function<void(llvm::raw_ostream &)> body,
+                              TerminalColor color) = 0;
+
+    /// Print a field containing a node's source location.
+    virtual void printSourceLoc(const SourceLoc L, const ASTContext *Ctx,
+                                Label label) = 0;
+
+    /// Print a field containing a node's source range.
+    virtual void printSourceRange(const SourceRange R,
+                                  const ASTContext *Ctx) = 0;
+
+    virtual bool hasNonStandardOutput() const = 0;
+
+    /// Indicates whether the output format is meant to be parsable. Parsable
+    /// output should use structure rather than stringification to convey
+    /// detailed information, and generally provides more information than the
+    /// non-parsable formats, which are usually meant for human debugging.
+    virtual bool isParsable() const = 0;
+  };
+
+  /// Implements the default (pseudo-S-expression) output format for `-dump-ast`.
+  class DefaultWriter : public PrintWriterBase {
+    raw_ostream &OS;
+    unsigned Indent;
+
+  public:
+    DefaultWriter(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {}
+
+    void printRecArbitrary(std::function<void(Label)> body,
+                           Label label) override {
+      Indent += 2;
+      OS << '\n';
+      body(label);
+      Indent -= 2;
+    }
+
+    void printRecRange(std::function<void(Label)> body,
+                       Label label) override {
+      printRecArbitrary([&](Label label) {
+        printHead("array", ASTNodeColor, label);
+        body(label);
+        printFoot();
+      }, label);
+    }
+
+    void printListArbitrary(std::function<void()> body, Label label) override {
+      // This writer ignores the label and simply prints the list directly
+      // underneath its parent.
+      body();
+    }
+
+    void printHead(StringRef name, TerminalColor color, Label label) override {
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
+      if (!label.isOptional() && !label.empty()) {
+        PrintWithColorRAII(OS, FieldLabelColor) << label.text();
+        OS << "=";
+      }
+      PrintWithColorRAII(OS, color) << name;
+    }
+
+    void printFoot() override {
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void printFieldRaw(std::function<void(llvm::raw_ostream &)> body,
+                       Label label, TerminalColor color) override {
+      OS << " ";
+      if (!label.isOptional() && !label.empty())
+        PrintWithColorRAII(OS, color) << label.text() << "=";
+      std::string value;
+      llvm::raw_string_ostream SOS(value);
+      body(SOS);
+      PrintWithColorRAII(OS, color) << value;
+    }
+
+    void printFieldQuotedRaw(std::function<void(llvm::raw_ostream &)> body,
+                             Label name, TerminalColor color) override {
+      printFieldRaw([&](raw_ostream &OS) {
+        OS << Quote;
+        { escaping_ostream escOS(OS); body(escOS); }
+        OS << Quote;
+      }, name, color);
+    }
+
+    void printFlagRaw(std::function<void(llvm::raw_ostream &)> body,
+                      TerminalColor color) override {
+      printFieldRaw(body, Label::always(""), color);
+    }
+
+    void printSourceLoc(const SourceLoc L, const ASTContext *Ctx,
+                        Label label) override {
+      printFieldRaw([&](raw_ostream &OS) {
+        escaping_ostream escOS(OS);
+        L.print(escOS, Ctx->SourceMgr);
+      }, label, LocationColor);
+    }
+
+    void printSourceRange(const SourceRange R,
+                          const ASTContext *Ctx) override {
+      printFieldRaw([&](raw_ostream &OS) {
+        escaping_ostream escOS(OS);
+        R.print(escOS, Ctx->SourceMgr, /*PrintText=*/false);
+      }, Label::always("range"), RangeColor);
+    }
+
+    bool hasNonStandardOutput() const override {
+      return &OS != &llvm::errs() && &OS != &llvm::dbgs();
+    }
+
+    bool isParsable() const override { return false; }
+  };
+
   /// PrintBase - Base type for recursive structured dumps of AST nodes.
   ///
   /// Please keep direct I/O, especially of structural elements like
   /// parentheses and quote marks, confined to this base class. This will help
   /// if we eventually support alternate output formats for AST dumps.
   class PrintBase {
-    raw_ostream &OS;
-    unsigned Indent;
+    PrintWriterBase &Writer;
   public:
     bool ParseIfNeeded;
     llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
@@ -624,26 +784,23 @@ namespace {
     char quote = '"';
 
     explicit PrintBase(
-        raw_ostream &os, unsigned indent = 0, bool parseIfNeeded = false,
+        PrintWriterBase &writer, bool parseIfNeeded = false,
         llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
         llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
         llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
             getTypeOfKeyPathComponent = defaultGetTypeOfKeyPathComponent)
-        : OS(os), Indent(indent), ParseIfNeeded(parseIfNeeded),
+        : Writer(writer), ParseIfNeeded(parseIfNeeded),
           GetTypeOfExpr(getTypeOfExpr), GetTypeOfTypeRepr(getTypeOfTypeRepr),
           GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) {}
 
     bool hasNonStandardOutput() {
-      return &OS != &llvm::errs() && &OS != &llvm::dbgs();
+      return Writer.hasNonStandardOutput();
     }
 
-    /// Call `Body` in a context where the printer is ready for a child to be printed.
-    template <typename Fn>
-    void printRecArbitrary(Fn Body, Label label) {
-      Indent += 2;
-      OS << '\n';
-      Body(label);
-      Indent -= 2;
+    /// Call `Body` in a context where the printer is ready for a child to be
+    /// printed.
+    void printRecArbitrary(std::function<void(Label)> body, Label label) {
+      Writer.printRecArbitrary(body, label);
     }
 
     /// Print a declaration as a child node.
@@ -723,10 +880,11 @@ namespace {
               auto plat = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
               printHead("platform_version_constraint_availability_spec",
                         PatternColor, label);
-              printField(platformString(plat->getPlatform()), "platform");
+              printField(platformString(plat->getPlatform()),
+                         Label::always("platform"));
               printFieldRaw(
                   [&](llvm::raw_ostream &OS) { OS << plat->getVersion(); },
-                  "version");
+                  Label::always("version"));
               printFoot();
               break;
             }
@@ -740,10 +898,10 @@ namespace {
               printField(agnostic->isLanguageVersionSpecific()
                              ? "swift"
                              : "package_description",
-                         "kind");
+                         Label::always("kind"));
               printFieldRaw(
                   [&](llvm::raw_ostream &OS) { OS << agnostic->getVersion(); },
-                  "version");
+                  Label::always("version"));
               printFoot();
               break;
             }
@@ -759,42 +917,33 @@ namespace {
     /// Print a range of nodes as a single "array" child node.
     template <typename NodeRange>
     void printRecRange(const NodeRange &range, Label topLabel) {
-      printRecArbitrary([&](Label topLabel) {
-        printHead("array", ASTNodeColor, topLabel);
+      Writer.printRecRange([&](Label topLabel) {
         for (auto node : range) {
-          printRec(node, Label::always(""));
+          printRec(node, Label::optional(""));
         }
-        printFoot();
       }, topLabel);
     }
 
     /// Print a range of nodes as a single "array" child node.
     template <typename NodeRange>
-    void printRecRange(const NodeRange &range, const ASTContext *Ctx, Label topLabel) {
-      printRecArbitrary([&](Label topLabel) {
-        printHead("array", ASTNodeColor, topLabel);
+    void printRecRange(const NodeRange &range, const ASTContext *Ctx,
+                       Label topLabel) {
+      Writer.printRecRange([&](Label topLabel) {
         for (auto node : range) {
-          printRec(node, Ctx, Label::always(""));
+          printRec(node, Ctx, Label::optional(""));
         }
-        printFoot();
       }, topLabel);
     }
 
-    /// Print the beginning of a new node, including its type and an optional label for it.
+    /// Print the beginning of a new node, including its type and an optional
+    /// label for it.
     void printHead(StringRef Name, TerminalColor Color, Label label) {
-      OS.indent(Indent);
-      PrintWithColorRAII(OS, ParenthesisColor) << '(';
-      if (!label.isOptional() && !label.empty()) {
-        PrintWithColorRAII(OS, FieldLabelColor) << label.text();
-        OS << "=";
-      }
-
-      PrintWithColorRAII(OS, Color) << Name;
+      Writer.printHead(Name, Color, label);
     }
 
     /// Print the end of a new node.
     void printFoot() {
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      Writer.printFoot();
     }
 
     /// Print a single argument as a child node.
@@ -804,7 +953,7 @@ namespace {
 
         auto label = arg.getLabel();
         if (!label.empty()) {
-          printFieldQuoted(label.str(), "label", ArgumentsColor);
+          printFieldQuoted(label.str(), Label::always("label"), ArgumentsColor);
         }
         printFlag(arg.isInOut(), "inout", ArgModifierColor);
 
@@ -832,7 +981,7 @@ namespace {
             auto label = arg.getLabel();
             OS << (label.empty() ? "_" : label.str()) << ":";
           }
-        }, "labels", ArgumentsColor);
+        }, Label::always("labels"), ArgumentsColor);
       }
 
       printList(*argList, [&](auto arg, Label label) {
@@ -916,17 +1065,18 @@ namespace {
 
       printFieldQuotedRaw([&](raw_ostream &out) {
         requirement.getFirstType().print(out, opts);
-      }, "");
+      }, Label::optional("first_type"));
 
-      printField(requirement.getKind(), "");
+      printField(requirement.getKind(), Label::optional("kind"));
 
       if (requirement.getKind() != RequirementKind::Layout
             && requirement.getSecondType())
         printFieldQuotedRaw([&](raw_ostream &out) {
           requirement.getSecondType().print(out, opts);
-        }, "");
+        }, Label::optional("second_type"));
       else if (requirement.getLayoutConstraint())
-        printFieldQuoted(requirement.getLayoutConstraint(), "");
+        printFieldQuoted(requirement.getLayoutConstraint(),
+                         Label::optional("layout"));
 
       printFoot();
     }
@@ -941,54 +1091,47 @@ namespace {
     /// Print a field with a short keyword-style value, printing the value by
     /// passing a closure that takes a \c raw_ostream.
     template<typename Fn>
-    void printFieldRaw(Fn body, StringRef name,
+    void printFieldRaw(Fn body, Label label,
                        TerminalColor color = FieldLabelColor) {
-      OS << " ";
-      if (!name.empty())
-        PrintWithColorRAII(OS, color) << name << "=";
-      body(PrintWithColorRAII(OS, color).getOS());
+      Writer.printFieldRaw([&](raw_ostream &OS) { body(OS); }, label, color);
     }
 
     /// Print a field with a short keyword-style value. The value will be
     /// formatted using a \c getDumpString() overload.
     template<typename T>
-    void printField(const T &value, StringRef name,
+    void printField(const T &value, Label label,
                     TerminalColor color = FieldLabelColor) {
       printFieldRaw([&](raw_ostream &OS) { OS << getDumpString(value); },
-                    name, color);
+                    label, color);
     }
 
     /// Print a field with a long value that will be automatically quoted and
     /// escaped, printing the value by passing a closure that takes a
     /// \c raw_ostream.
     template<typename Fn>
-    void printFieldQuotedRaw(Fn body, StringRef name,
-                                  TerminalColor color = FieldLabelColor) {
-      printFieldRaw([&](raw_ostream &OS) {
-        OS << quote;
-        { escaping_ostream escOS(OS); body(escOS); }
-        OS << quote;
-      }, name, color);
+    void printFieldQuotedRaw(Fn body, Label label,
+                             TerminalColor color = FieldLabelColor) {
+      Writer.printFieldQuotedRaw(body, label, color);
     }
 
     /// Print a field with a long value that will be automatically quoted and
     /// escaped.
     template<typename T>
-    void printFieldQuoted(const T &value, StringRef name,
+    void printFieldQuoted(const T &value, Label label,
                                   TerminalColor color = FieldLabelColor) {
-      printFieldQuotedRaw([&](raw_ostream &OS) { OS << value; }, name, color);
+      printFieldQuotedRaw([&](raw_ostream &OS) { OS << value; }, label, color);
     }
 
     /// Print a simple boolean value, printing the value by passing a closure
     /// that takes a \c raw_ostream.
     template<typename Fn>
     void printFlagRaw(Fn body, TerminalColor color = FieldLabelColor) {
-      printFieldRaw(body, "", color);
+      Writer.printFlagRaw(body, color);
     }
 
     /// Print a simple boolean value unconditionally.
     void printFlag(StringRef name, TerminalColor color = FieldLabelColor) {
-      printFieldRaw([&](raw_ostream &OS) { OS << name; }, "", color);
+      printFlagRaw([&](raw_ostream &OS) { OS << name; }, color);
     }
 
     /// Print a simple boolean value.
@@ -998,14 +1141,22 @@ namespace {
         printFlag(name, color);
     }
 
+    /// Prints any structure necessary to render a list of items, calling
+    /// the given function to produce the contents of the list.
+    void printListArbitrary(Label label, std::function<void()> body) {
+      Writer.printListArbitrary(body, label);
+    }
+
     /// Prints a list of values.
     template <typename T, typename F>
     void printList(T &&list, F fn, Label label) {
       if (list.begin() == list.end())
         return;
-      for (const auto &elem : list) {
-        fn(elem, label);
-      }
+      Writer.printListArbitrary([&]{
+        for (const auto &elem : list) {
+          fn(elem, label);
+        }
+      }, label);
     }
 
     /// Print a field containing a node's source location.
@@ -1013,71 +1164,58 @@ namespace {
                         Label label = Label::always("location")) {
       if (!L.isValid() || !Ctx)
         return;
-
-      printFieldRaw([&](raw_ostream &OS) {
-        escaping_ostream escOS(OS);
-        L.print(escOS, Ctx->SourceMgr);
-      }, label.text(), LocationColor);
+      Writer.printSourceLoc(L, Ctx, label);
     }
 
     /// Print a field containing a node's source range.
     void printSourceRange(const SourceRange R, const ASTContext *Ctx) {
       if (!R.isValid() || !Ctx)
         return;
-
-      printFieldRaw([&](raw_ostream &OS) {
-        escaping_ostream escOS(OS);
-        R.print(escOS, Ctx->SourceMgr, /*PrintText=*/false);
-      }, "range", RangeColor);
+      Writer.printSourceRange(R, Ctx);
     }
 
     /// Print a field containing a node's name, printing the node's name by
     /// passing a closure that takes a \c raw_ostream.
     template <typename Fn>
-    void printNameRaw(Fn body, bool leadingSpace = true) {
-      if (leadingSpace)
-        OS << ' ';
-      PrintWithColorRAII colored(OS, IdentifierColor);
-      OS << quote;
-      {
-        escaping_ostream escaping_os(OS);
-        body(escaping_os);
+    void printNameRaw(Fn body, Label label) {
+      if (label.empty()) {
+        // If we were given an empty name, make sure we have a suitable default
+        // fallback for parsable output formats.
+        label = Label::optional("name");
       }
-      OS << quote;
+      printFieldQuotedRaw([&](raw_ostream &OS) { body(OS); }, label,
+                          IdentifierColor);
     }
 
     /// Print a field containing a node's name.
-    void printName(DeclName name, bool leadingSpace = true) {
+    void printName(DeclName name, Label label) {
       printNameRaw([&](raw_ostream &OS) {
         ::printName(OS, name);
-      }, leadingSpace);
+      }, label);
     }
 
     /// Print an unnamed field containing a node's name, read from a declaration.
-    void printDeclName(const Decl *D, bool leadingSpace = true) {
+    void printDeclName(const Decl *D, Label label) {
       auto VD = dyn_cast<ValueDecl>(D);
       if (VD && VD->getName()) {
-        printName(VD->getName(), leadingSpace);
+        printName(VD->getName(), label);
       } else {
-        if (leadingSpace)
-          OS << ' ';
-        PrintWithColorRAII(OS, IdentifierColor)
-          << "<anonymous @ " << (const void*)D << '>';
+        if (label.empty()) {
+          // If we were given an empty name, make sure we have a suitable default
+          // fallback for parsable output formats.
+          label = Label::optional("name");
+        }
+        printFieldRaw([&](raw_ostream &OS) {
+          OS << "<anonymous @ " << (const void*)D << '>';
+        }, label, IdentifierColor);
       }
-    }
-
-    /// Print a field containing a node's name, read from a declaration.
-    void printDeclNameField(const Decl *D, StringRef name) {
-      printFieldRaw([&](raw_ostream &os) {
-        printDeclName(D, /*leadingSpace=*/false);
-      }, name);
     }
 
     /// Print a field containing a concrete reference to a declaration.
     void printDeclRefField(ConcreteDeclRef declRef, Label label,
                            TerminalColor Color = DeclColor) {
       printFieldQuotedRaw([&](raw_ostream &OS) { declRef.dump(OS); },
-                          label.text(), Color);
+                          label, Color);
       printFlag(!ABIRoleInfo(declRef.getDecl()).providesAPI(), "abi_only_decl");
     }
 
@@ -1120,7 +1258,7 @@ namespace {
       printFlag(P->isImplicit(), "implicit", ExprModifierColor);
 
       if (P->hasType()) {
-        printFieldQuoted(P->getType(), "type", TypeColor);
+        printFieldQuoted(P->getType(), Label::always("type"), TypeColor);
       }
     }
 
@@ -1138,7 +1276,7 @@ namespace {
                      auto name = elt.getLabel();
                      OS << (name.empty() ? "''" : name.str());
                    }, ",");
-      }, "names");
+      }, Label::always("names"));
 
       printList(P->getElements(), [&](auto &elt, Label label) {
         printRec(elt.getPattern(), label);
@@ -1147,7 +1285,7 @@ namespace {
     }
     void visitNamedPattern(NamedPattern *P, Label label) {
       printCommon(P, "pattern_named", label);
-      printDeclName(P->getDecl());
+      printDeclName(P->getDecl(), Label::optional("name"));
       printFoot();
     }
     void visitAnyPattern(AnyPattern *P, Label label) {
@@ -1168,8 +1306,8 @@ namespace {
 
     void visitIsPattern(IsPattern *P, Label label) {
       printCommon(P, "pattern_is", label);
-      printField(P->getCastKind(), "cast_kind");
-      printFieldQuoted(P->getCastType(), "cast_to", TypeColor);
+      printField(P->getCastKind(), Label::always("cast_kind"));
+      printFieldQuoted(P->getCastType(), Label::always("cast_to"), TypeColor);
       if (auto sub = P->getSubPattern()) {
         printRec(sub, Label::optional("subpattern"));
       }
@@ -1182,15 +1320,15 @@ namespace {
         break;
       case ValueOwnership::Shared:
         printFieldRaw([](llvm::raw_ostream &os) { os << "borrowing"; },
-                      "ownership");
+                      Label::always("ownership"));
         break;
       case ValueOwnership::InOut:
         printFieldRaw([](llvm::raw_ostream &os) { os << "mutating"; },
-                      "ownership");
+                      Label::always("ownership"));
         break;
       case ValueOwnership::Owned:
         printFieldRaw([](llvm::raw_ostream &os) { os << "consuming"; },
-                      "ownership");
+                      Label::always("ownership"));
         break;
       }
       if (auto m = P->getCachedMatchExpr())
@@ -1201,7 +1339,7 @@ namespace {
     }
     void visitBindingPattern(BindingPattern *P, Label label) {
       printCommon(P, "pattern_binding", label);
-      printField(P->getIntroducerStringRef(), "kind");
+      printField(P->getIntroducerStringRef(), Label::always("kind"));
       printRec(P->getSubPattern(), Label::optional("subpattern"));
       printFoot();
     }
@@ -1212,7 +1350,7 @@ namespace {
         P->getParentType().print(PrintWithColorRAII(OS, TypeColor).getOS());
         OS << '.';
         PrintWithColorRAII(OS, IdentifierColor) << P->getName();
-      }, "element");
+      }, Label::always("element"));
 
       if (P->hasSubPattern()) {
         printRec(P->getSubPattern(), Label::optional("subpattern"));
@@ -1226,7 +1364,7 @@ namespace {
     }
     void visitBoolPattern(BoolPattern *P, Label label) {
       printCommon(P, "pattern_bool", label);
-      printField(P->getValue(), "value");
+      printField(P->getValue(), Label::always("value"));
       printFoot();
     }
 
@@ -1246,7 +1384,7 @@ namespace {
         if (Where) {
           printFieldQuotedRaw([&](raw_ostream &OS) {
             Where->print(OS, /*printWhereKeyword*/ false);
-          }, "where_requirements");
+          }, Label::always("where_requirements"));
         }
       };
 
@@ -1271,7 +1409,7 @@ namespace {
         if (implAttr->CategoryName.empty())
           printFlag(label);
         else
-          printFieldQuoted(implAttr->CategoryName.str(), label);
+          printFieldQuoted(implAttr->CategoryName.str(), Label::always(label));
       }
 
       printFlag(!ABIRoleInfo(D).providesAPI(), "abi_only");
@@ -1288,7 +1426,7 @@ namespace {
         interleave(Inherited.getEntries(), OS,
                    [&](InheritedEntry Super) { Super.getType().print(OS); },
                    ", ");
-      }, "inherits");
+      }, Label::always("inherits"));
     }
 
   public:
@@ -1297,7 +1435,7 @@ namespace {
 
       printFlag(ID->isExported(), "exported");
       if (ID->getImportKind() != ImportKind::Module)
-        printField(ID->getImportKind(), "kind");
+        printField(ID->getImportKind(), Label::always("kind"));
 
       printFieldQuotedRaw([&](raw_ostream &OS) {
         // Check if module aliasing was used for the given imported module; for
@@ -1305,7 +1443,7 @@ namespace {
         // 'import Foo', its corresponding real module name 'Bar' should be printed.
         ImportPath::Builder scratch;
         ID->getRealImportPath(scratch).print(OS);
-      }, "module", IdentifierColor);
+      }, Label::always("module"), IdentifierColor);
 
       printFoot();
     }
@@ -1318,7 +1456,7 @@ namespace {
           ED->getExtendedType().print(OS);
         else
           ED->getExtendedTypeRepr()->print(OS);
-      });
+      }, Label::optional("extended_type"));
       printCommonPost(ED);
     }
 
@@ -1326,7 +1464,7 @@ namespace {
       printCommon(TAD, "typealias", label);
 
       if (auto underlying = TAD->getCachedUnderlyingType()) {
-        printFieldQuoted(underlying, "type", TypeColor);
+        printFieldQuoted(underlying, Label::always("type"), TypeColor);
       } else {
         printFlag("unresolved_type", TypeColor);
       }
@@ -1339,12 +1477,12 @@ namespace {
     void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD, Label label) {
       printCommon(OTD, "opaque_type", label);
 
-      printDeclNameField(OTD->getNamingDecl(), "naming_decl");
+      printDeclName(OTD->getNamingDecl(), Label::always("naming_decl"));
       printFieldQuotedRaw([&](raw_ostream &OS) {
         OS << OTD->getDeclaredInterfaceType() << " in "
            << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
 
-      }, "opaque_interface", TypeColor);
+      }, Label::always("opaque_interface"), TypeColor);
       printAttributes(OTD);
 
       printFoot();
@@ -1352,19 +1490,19 @@ namespace {
 
     void visitGenericTypeParamDecl(GenericTypeParamDecl *decl, Label label) {
       printCommon(decl, "generic_type_param", label);
-      printField(decl->getDepth(), "depth");
-      printField(decl->getIndex(), "index");
+      printField(decl->getDepth(), Label::always("depth"));
+      printField(decl->getIndex(), Label::always("index"));
 
       switch (decl->getParamKind()) {
       case GenericTypeParamKind::Type:
-        printField((StringRef)"type", "param_kind");
+        printField((StringRef)"type", Label::always("param_kind"));
         break;
       case GenericTypeParamKind::Pack:
-        printField((StringRef)"pack", "param_kind");
+        printField((StringRef)"pack", Label::always("param_kind"));
         break;
       case GenericTypeParamKind::Value:
-        printField((StringRef)"value", "param_kind");
-        printRec(decl->getValueType(), "value_type");
+        printField((StringRef)"value", Label::always("param_kind"));
+        printRec(decl->getValueType(), Label::always("value_type"));
         break;
       }
       printAttributes(decl);
@@ -1375,7 +1513,7 @@ namespace {
     void visitAssociatedTypeDecl(AssociatedTypeDecl *decl, Label label) {
       printCommon(decl, "associated_type_decl", label);
 
-      StringRef fieldName("default");
+      Label fieldName = Label::always("default");
       if (auto defaultDef = decl->getCachedDefaultDefinitionType()) {
         printFieldQuoted(*defaultDef, fieldName);
       } else {
@@ -1389,7 +1527,7 @@ namespace {
                      [&](AssociatedTypeDecl *overridden) {
                        OS << overridden->getProtocol()->getName();
                      }, ", ");
-        }, "overridden");
+        }, Label::always("overridden"));
       }
 
       printAttributes(decl);
@@ -1406,7 +1544,7 @@ namespace {
         llvm::raw_string_ostream out(reqSigStr);
         reqSig.print(PD, out);
 
-        printFieldQuoted(out.str(), "requirement_signature");
+        printFieldQuoted(out.str(), Label::always("requirement_signature"));
       } else {
         printFlag("uncomputed_requirement_signature");
       }
@@ -1420,7 +1558,7 @@ namespace {
 
       printFieldQuotedRaw([&](raw_ostream &OS) {
         Params->print(OS);
-      }, "", TypeColor);
+      }, Label::always(""), TypeColor);
     }
 
     void printAttributes(const Decl *D) {
@@ -1434,7 +1572,7 @@ namespace {
                      TerminalColor Color = DeclColor) {
       printCommon((Decl*)VD, Name, label, Color);
 
-      printDeclName(VD);
+      printDeclName(VD, Label::optional("name"));
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
         printGenericParameters(AFD->getParsedGenericParams());
       if (auto *GTD = dyn_cast<GenericTypeDecl>(VD))
@@ -1443,12 +1581,13 @@ namespace {
         printGenericParameters(MD->getParsedGenericParams());
 
       if (VD->hasInterfaceType()) {
-        printFieldQuoted(VD->getInterfaceType(), "interface type",
+        printFieldQuoted(VD->getInterfaceType(), Label::always("interface type"),
                          InterfaceTypeColor);
       }
 
       if (VD->hasAccess()) {
-        printField(VD->getFormalAccess(), "access", AccessLevelColor);
+        printField(VD->getFormalAccess(), Label::always("access"),
+                   AccessLevelColor);
       }
 
       if (VD->overriddenDeclsComputed()) {
@@ -1459,7 +1598,7 @@ namespace {
                        [&](ValueDecl *overridden) {
                          overridden->dumpRef(OS);
                        }, ", ");
-          }, "override", OverrideColor);
+          }, Label::always("override"), OverrideColor);
         }
       }
 
@@ -1522,7 +1661,7 @@ namespace {
       printHead("source_file", ASTNodeColor, Label::optional("source_file"));
       printNameRaw([&](raw_ostream &OS) {
         OS << SF.getFilename();
-      });
+      }, Label::optional("filename"));
 
       auto items =
           ParseIfNeeded ? SF.getTopLevelItems() : SF.getCachedTopLevelItems();
@@ -1574,12 +1713,14 @@ namespace {
 
       if (D->hasInterfaceType()) {
         auto impl = D->getImplInfo();
-        printField(impl.getReadImpl(), "readImpl", DeclModifierColor);
+        printField(impl.getReadImpl(), Label::always("readImpl"),
+                   DeclModifierColor);
         if (!impl.supportsMutation()) {
           printFlag("immutable", DeclModifierColor);
         } else {
-          printField(impl.getWriteImpl(), "writeImpl", DeclModifierColor);
-          printField(impl.getReadWriteImpl(), "readWriteImpl",
+          printField(impl.getWriteImpl(), Label::always("writeImpl"),
+                     DeclModifierColor);
+          printField(impl.getReadWriteImpl(), Label::always("readWriteImpl"),
                      DeclModifierColor);
         }
       }
@@ -1594,12 +1735,13 @@ namespace {
     void visitParamDecl(ParamDecl *PD, Label label) {
       printHead("parameter", ParameterColor, label);
 
-      printDeclName(PD);
+      printDeclName(PD, Label::optional("name"));
       if (!PD->getArgumentName().empty())
-        printFieldQuoted(PD->getArgumentName(), "apiName", IdentifierColor);
+        printFieldQuoted(PD->getArgumentName(), Label::always("apiName"),
+                         IdentifierColor);
       if (PD->hasInterfaceType()) {
-        printFieldQuoted(PD->getInterfaceType(), "interface type",
-                         InterfaceTypeColor);
+        printFieldQuoted(PD->getInterfaceType(),
+                         Label::always("interface type"), InterfaceTypeColor);
       }
 
       if (auto specifier = PD->getCachedSpecifier()) {
@@ -1621,14 +1763,14 @@ namespace {
       printFlag(PD->isNoImplicitCopy(), "noImplicitCopy");
 
       if (PD->getDefaultArgumentKind() != DefaultArgumentKind::None) {
-        printField(PD->getDefaultArgumentKind(), "default_arg");
+        printField(PD->getDefaultArgumentKind(), Label::always("default_arg"));
       }
       if (PD->hasDefaultExpr() &&
           PD->getCachedDefaultArgumentCaptureInfo() &&
           !PD->getCachedDefaultArgumentCaptureInfo()->isTrivial()) {
         printFieldRaw([&](raw_ostream &OS) {
           PD->getCachedDefaultArgumentCaptureInfo()->print(OS);
-        }, "", CapturesColor);
+        }, Label::optional(""), CapturesColor);
       }
       
       printFlag(PD->getAttrs().hasAttribute<KnownToBeLocalAttr>(),
@@ -1757,11 +1899,12 @@ namespace {
         printRecArbitrary([&](Label label) {
           printHead("foreign_async_convention", ASTNodeColor, label);
           if (auto type = fac->completionHandlerType())
-            printFieldQuoted(type, "completion_handler_type", TypeColor);
+            printFieldQuoted(type, Label::always("completion_handler_type"),
+                             TypeColor);
           printField(fac->completionHandlerParamIndex(),
-                     "completion_handler_param");
+                     Label::always("completion_handler_param"));
           if (auto errorParamIndex = fac->completionHandlerErrorParamIndex())
-            printField(*errorParamIndex, "error_param");
+            printField(*errorParamIndex, Label::always("error_param"));
           printFoot();
         }, Label::optional("foreign_async_convention"));
       }
@@ -1769,7 +1912,7 @@ namespace {
       if (auto fec = D->getForeignErrorConvention()) {
         printRecArbitrary([&](Label label) {
           printHead("foreign_error_convention", ASTNodeColor, label);
-          printField(fec->getKind(), "kind");
+          printField(fec->getKind(), Label::always("kind"));
 
           bool wantResultType = (
             fec->getKind() == ForeignErrorConvention::ZeroResult ||
@@ -1777,10 +1920,11 @@ namespace {
 
           printFlag(getDumpString(fec->isErrorOwned()));
 
-          printField(fec->getErrorParameterIndex(), "param");
-          printFieldQuoted(fec->getErrorParameterType(), "paramtype");
+          printField(fec->getErrorParameterIndex(), Label::always("param"));
+          printFieldQuoted(fec->getErrorParameterType(),
+                           Label::always("paramtype"));
           if (wantResultType)
-            printFieldQuoted(fec->getResultType(), "resulttype");
+            printFieldQuoted(fec->getResultType(), Label::always("resulttype"));
           printFoot();
         }, Label::optional("foreign_error_convention"));
       }
@@ -1805,7 +1949,7 @@ namespace {
     void visitAccessorDecl(AccessorDecl *AD, Label label) {
       printCommonFD(AD, "accessor_decl", label);
       printFlag(getDumpString(AD->getAccessorKind()));
-      printDeclNameField(AD->getStorage(), "for");
+      printDeclName(AD->getStorage(), Label::always("for"));
       printAbstractFunctionDecl(AD);
       printFoot();
     }
@@ -1817,7 +1961,8 @@ namespace {
       if (CD->isFailable())
         printField((CD->isImplicitlyUnwrappedOptional()
                          ? "ImplicitlyUnwrappedOptional"
-                         : "Optional"), "failable", DeclModifierColor);
+                         : "Optional"), Label::always("failable"),
+                   DeclModifierColor);
       printAbstractFunctionDecl(CD);
       printFoot();
     }
@@ -1839,16 +1984,16 @@ namespace {
 
     void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD, Label label) {
       printCommon(PDD, "pound_diagnostic_decl", label);
-      printField(PDD->isError() ? "error" : "warning", "kind");
+      printField(PDD->isError() ? "error" : "warning", Label::always("kind"));
       printRec(PDD->getMessage(), Label::optional("message"));
       printFoot();
     }
 
     void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD, Label label) {
       printCommon(PGD, "precedence_group_decl", label);
-      printName(PGD->getName());
-      printField(PGD->getAssociativity(), "associativity");
-      printField(PGD->isAssignment(), "assignment");
+      printName(PGD->getName(), Label::optional("name"));
+      printField(PGD->getAssociativity(), Label::always("associativity"));
+      printField(PGD->isAssignment(), Label::always("assignment"));
 
       auto printRelationsRec =
           [&](ArrayRef<PrecedenceGroupDecl::Relation> rels, StringRef name) {
@@ -1868,22 +2013,22 @@ namespace {
 
     void visitInfixOperatorDecl(InfixOperatorDecl *IOD, Label label) {
       printCommon(IOD, "infix_operator_decl", label);
-      printName(IOD->getName());
+      printName(IOD->getName(), Label::optional("name"));
       if (!IOD->getPrecedenceGroupName().empty())
         printFieldQuoted(IOD->getPrecedenceGroupName(),
-                         "precedence_group_name");
+                         Label::always("precedence_group_name"));
       printFoot();
     }
 
     void visitPrefixOperatorDecl(PrefixOperatorDecl *POD, Label label) {
       printCommon(POD, "prefix_operator_decl", label);
-      printName(POD->getName());
+      printName(POD->getName(), Label::optional("name"));
       printFoot();
     }
 
     void visitPostfixOperatorDecl(PostfixOperatorDecl *POD, Label label) {
       printCommon(POD, "postfix_operator_decl", label);
-      printName(POD->getName());
+      printName(POD->getName(), Label::optional("name"));
       printFoot();
     }
 
@@ -1901,7 +2046,7 @@ namespace {
 
     void visitMissingMemberDecl(MissingMemberDecl *MMD, Label label) {
       printCommon(MMD, "missing_member_decl ", label);
-      printName(MMD->getName());
+      printName(MMD->getName(), Label::optional("name"));
       printFoot();
     }
 
@@ -1918,7 +2063,7 @@ namespace {
 
     void visitMacroExpansionDecl(MacroExpansionDecl *MED, Label label) {
       printCommon(MED, "macro_expansion_decl", label);
-      printName(MED->getMacroName().getFullName());
+      printName(MED->getMacroName().getFullName(), Label::optional("name"));
       printRec(MED->getArgs(), Label::optional("args"));
       printFoot();
     }
@@ -1931,7 +2076,8 @@ void ParameterList::dump() const {
 }
 
 void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintDecl(OS, Indent)
+  DefaultWriter writer(OS, Indent);
+  PrintDecl(writer)
       .visitParameterList(const_cast<ParameterList *>(this),
                           Label::optional(""));
 }
@@ -1952,7 +2098,8 @@ void Decl::dump(const char *filename) const {
 }
 
 void Decl::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintDecl(OS, Indent).visit(const_cast<Decl *>(this), Label::optional(""));
+  DefaultWriter writer(OS, Indent);
+  PrintDecl(writer).visit(const_cast<Decl *>(this), Label::optional(""));
   OS << '\n';
 }
 
@@ -2085,7 +2232,8 @@ void SourceFile::dump() const {
 }
 
 void SourceFile::dump(llvm::raw_ostream &OS, bool parseIfNeeded) const {
-  PrintDecl(OS, /*indent*/ 0, parseIfNeeded).visitSourceFile(*this);
+  DefaultWriter writer(OS, /*indent=*/ 0);
+  PrintDecl(writer, parseIfNeeded).visitSourceFile(*this);
   llvm::errs() << '\n';
 }
 
@@ -2094,8 +2242,9 @@ void Pattern::dump() const {
 }
 
 void Pattern::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintPattern(OS, Indent).visit(const_cast<Pattern*>(this),
-                                 Label::optional(""));
+  DefaultWriter writer(OS, Indent);
+  PrintPattern(writer).visit(const_cast<Pattern*>(this),
+                              Label::optional(""));
   OS << '\n';
 }
 
@@ -2112,13 +2261,12 @@ public:
   const ASTContext *Ctx;
 
   PrintStmt(
-      raw_ostream &os, const ASTContext *ctx, unsigned indent = 0,
-      bool parseIfNeeded = false,
+      PrintWriterBase &writer, const ASTContext *ctx, bool parseIfNeeded = false,
       llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
       llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
       llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
           getTypeOfKeyPathComponent = defaultGetTypeOfKeyPathComponent)
-      : PrintBase(os, indent, parseIfNeeded, getTypeOfExpr, getTypeOfTypeRepr,
+      : PrintBase(writer, parseIfNeeded, getTypeOfExpr, getTypeOfTypeRepr,
                   getTypeOfKeyPathComponent),
         Ctx(ctx) {}
 
@@ -2275,15 +2423,15 @@ public:
             break;
           case ValueOwnership::Shared:
             printFieldRaw([](llvm::raw_ostream &os) { os << "borrowing"; },
-                          "ownership");
+                          Label::always("ownership"));
             break;
           case ValueOwnership::InOut:
             printFieldRaw([](llvm::raw_ostream &os) { os << "mutating"; },
-                          "ownership");
+                          Label::always("ownership"));
             break;
           case ValueOwnership::Owned:
             printFieldRaw([](llvm::raw_ostream &os) { os << "consuming"; },
-                          "ownership");
+                          Label::always("ownership"));
             break;
           }
           printRec(CasePattern, Label::optional("pattern"));
@@ -2318,7 +2466,7 @@ public:
 
   void visitPoundAssertStmt(PoundAssertStmt *S, Label label) {
     printCommon(S, "pound_assert", label);
-    printFieldQuoted(S->getMessage(), "message");
+    printFieldQuoted(S->getMessage(), Label::always("message"));
     printRec(S->getCondition(), Label::optional("condition"));
     printFoot();
   }
@@ -2340,7 +2488,8 @@ void Stmt::dump() const {
 }
 
 void Stmt::dump(raw_ostream &OS, const ASTContext *Ctx, unsigned Indent) const {
-  PrintStmt(OS, Ctx, Indent).visit(const_cast<Stmt*>(this), Label::optional(""));
+  DefaultWriter writer(OS, Indent);
+  PrintStmt(writer, Ctx).visit(const_cast<Stmt*>(this), Label::optional(""));
 }
 
 //===----------------------------------------------------------------------===//
@@ -2363,7 +2512,8 @@ public:
     printHead(C, ExprColor, label);
 
     printFlag(E->isImplicit(), "implicit", ExprModifierColor);
-    printFieldQuoted(GetTypeOfExpr(E).getString(PO), "type", TypeColor);
+    printFieldQuoted(GetTypeOfExpr(E).getString(PO), Label::always("type"),
+                     TypeColor);
 
     // If we have a source range and an ASTContext, print the source range.
     if (auto Ty = GetTypeOfExpr(E)) {
@@ -2398,7 +2548,7 @@ public:
 
   void printInitializerField(ConcreteDeclRef declRef, Label label) {
     printFieldQuotedRaw([&](raw_ostream &OS) { declRef.dump(OS); },
-                        label.text(), ExprModifierColor);
+                        label, ExprModifierColor);
   }
 
   void visitNilLiteralExpr(NilLiteralExpr *E, Label label) {
@@ -2413,9 +2563,10 @@ public:
     printFlag(E->isNegative(), "negative", LiteralValueColor);
     Type T = GetTypeOfExpr(E);
     if (T.isNull() || !T->is<BuiltinIntegerType>())
-      printFieldQuoted(E->getDigitsText(), "value", LiteralValueColor);
+      printFieldQuoted(E->getDigitsText(), Label::always("value"),
+                       LiteralValueColor);
     else
-      printFieldQuoted(E->getValue(), "value", LiteralValueColor);
+      printFieldQuoted(E->getValue(), Label::always("value"), LiteralValueColor);
     printInitializerField(E->getBuiltinInitializer(),
                           Label::always("builtin_initializer"));
     printInitializerField(E->getInitializer(), Label::always("initializer"));
@@ -2426,12 +2577,14 @@ public:
     printCommon(E, "float_literal_expr", label);
     
     printFlag(E->isNegative(), "negative", LiteralValueColor);
-    printFieldQuoted(E->getDigitsText(), "value", LiteralValueColor);
+    printFieldQuoted(E->getDigitsText(), Label::always("value"),
+                     LiteralValueColor);
     printInitializerField(E->getBuiltinInitializer(),
                           Label::always("builtin_initializer"));
     printInitializerField(E->getInitializer(), Label::always("initializer"));
     if (!E->getBuiltinType().isNull()) {
-      printFieldQuoted(E->getBuiltinType(), "builtin_type", ExprModifierColor);
+      printFieldQuoted(E->getBuiltinType(), Label::always("builtin_type"),
+                       ExprModifierColor);
     }
     
     printFoot();
@@ -2440,7 +2593,7 @@ public:
   void visitBooleanLiteralExpr(BooleanLiteralExpr *E, Label label) {
     printCommon(E, "boolean_literal_expr", label);
     
-    printField(E->getValue(), "value", LiteralValueColor);
+    printField(E->getValue(), Label::always("value"), LiteralValueColor);
     printInitializerField(E->getBuiltinInitializer(),
                           Label::always("builtin_initializer"));
     printInitializerField(E->getInitializer(), Label::always("initializer"));
@@ -2451,8 +2604,8 @@ public:
   void visitStringLiteralExpr(StringLiteralExpr *E, Label label) {
     printCommon(E, "string_literal_expr", label);
     
-    printField(E->getEncoding(), "encoding", ExprModifierColor);
-    printFieldQuoted(E->getValue(), "value", LiteralValueColor);
+    printField(E->getEncoding(), Label::always("encoding"), ExprModifierColor);
+    printFieldQuoted(E->getValue(), Label::always("value"), LiteralValueColor);
     printInitializerField(E->getBuiltinInitializer(),
                           Label::always("builtin_initializer"));
     printInitializerField(E->getInitializer(), Label::always("initializer"));
@@ -2462,8 +2615,9 @@ public:
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E, Label label) {
     printCommon(E, "interpolated_string_literal_expr", label);
 
-    printField(E->getLiteralCapacity(), "literal_capacity", ExprModifierColor);
-    printField(E->getInterpolationCount(), "interpolation_count",
+    printField(E->getLiteralCapacity(), Label::always("literal_capacity"),
+               ExprModifierColor);
+    printField(E->getInterpolationCount(), Label::always("interpolation_count"),
                ExprModifierColor);
     printInitializerField(E->getBuilderInit(), Label::always("builder_init"));
     printInitializerField(E->getInitializer(), Label::always("result_init"));
@@ -2475,10 +2629,11 @@ public:
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, Label label) {
     printCommon(E, "magic_identifier_literal_expr", label);
     
-    printField(E->getKind(), "kind", ExprModifierColor);
+    printField(E->getKind(), Label::always("kind"), ExprModifierColor);
 
     if (E->isString()) {
-      printField(E->getStringEncoding(), "encoding", ExprModifierColor);
+      printField(E->getStringEncoding(), Label::always("encoding"),
+                 ExprModifierColor);
     }
     printInitializerField(E->getBuiltinInitializer(),
                           Label::always("builtin_initializer"));
@@ -2489,7 +2644,8 @@ public:
   void visitRegexLiteralExpr(RegexLiteralExpr *E, Label label) {
     printCommon(E, "regex_literal_expr", label);
 
-    printFieldQuoted(E->getParsedRegexText(), "text", LiteralValueColor);
+    printFieldQuoted(E->getParsedRegexText(), Label::always("text"),
+                     LiteralValueColor);
     printInitializerField(E->getInitializer(), Label::always("initializer"));
 
     printFoot();
@@ -2498,7 +2654,7 @@ public:
   void visitObjectLiteralExpr(ObjectLiteralExpr *E, Label label) {
     printCommon(E, "object_literal", label);
 
-    printField(E->getLiteralKind(), "kind");
+    printField(E->getLiteralKind(), Label::always("kind"));
     printInitializerField(E->getInitializer(), Label::always("initializer"));
 
     printRec(E->getArgs(), Label::optional("args"));
@@ -2519,7 +2675,7 @@ public:
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       printFlag(getDumpString(E->getAccessSemantics()), AccessLevelColor);
     printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
-                  "function_ref", ExprModifierColor);
+                  Label::always("function_ref"), ExprModifierColor);
 
     printFoot();
   }
@@ -2533,7 +2689,7 @@ public:
 
     if (E->getTypeRepr())
       printFieldQuotedRaw([&](raw_ostream &OS) { E->getTypeRepr()->print(OS); },
-                          "typerepr", TypeReprColor);
+                          Label::always("typerepr"), TypeReprColor);
     else
       printFlag("null_typerepr");
 
@@ -2548,16 +2704,19 @@ public:
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E, Label label) {
     printCommon(E, "overloaded_decl_ref_expr", label);
 
-    printFieldQuoted(E->getDecls()[0]->getBaseName(), "name", IdentifierColor);
-    printField(E->getDecls().size(), "number_of_decls", ExprModifierColor);
+    printFieldQuoted(E->getDecls()[0]->getBaseName(), Label::always("name"),
+                     IdentifierColor);
+    printField(E->getDecls().size(), Label::always("number_of_decls"),
+               ExprModifierColor);
     printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
-                  "function_ref", ExprModifierColor);
+                  Label::always("function_ref"), ExprModifierColor);
 
     if (!E->isForOperator()) {
       printList(E->getDecls(), [&](auto D, Label label) {
         printRecArbitrary([&](Label label) {
           printHead("candidate_decl", DeclModifierColor, label);
-          printNameRaw([&](raw_ostream &OS) { D->dumpRef(OS); });
+          printNameRaw([&](raw_ostream &OS) { D->dumpRef(OS); },
+                       Label::optional("name"));
           printFoot();
         }, Label::optional("decl"));
       }, Label::optional("decls"));
@@ -2568,9 +2727,9 @@ public:
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E, Label label) {
     printCommon(E, "unresolved_decl_ref_expr", label);
 
-    printFieldQuoted(E->getName(), "name", IdentifierColor);
+    printFieldQuoted(E->getName(), Label::always("name"), IdentifierColor);
     printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
-                  "function_ref", ExprModifierColor);
+                  Label::always("function_ref"), ExprModifierColor);
 
     printFoot();
   }
@@ -2610,9 +2769,9 @@ public:
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E, Label label) {
     printCommon(E, "unresolved_member_expr", label);
 
-    printFieldQuoted(E->getName(), "name", ExprModifierColor);
+    printFieldQuoted(E->getName(), Label::always("name"), ExprModifierColor);
     printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
-                  "function_ref", ExprModifierColor);
+                  Label::always("function_ref"), ExprModifierColor);
     printFoot();
   }
   void visitDotSelfExpr(DotSelfExpr *E, Label label) {
@@ -2665,7 +2824,7 @@ public:
                      OS << (name.empty()?"''":name.str());
                    },
                    ",");
-      }, "names", IdentifierColor);
+      }, Label::always("names"), IdentifierColor);
     }
 
     printList(range(E->getNumElements()), [&](unsigned i, Label label) {
@@ -2739,9 +2898,9 @@ public:
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E, Label label) {
     printCommon(E, "unresolved_dot_expr", label);
 
-    printFieldQuoted(E->getName(), "field");
+    printFieldQuoted(E->getName(), Label::always("field"));
     printFieldRaw([&](auto &os) { E->getFunctionRefInfo().dump(os); },
-                  "function_ref", ExprModifierColor);
+                  Label::always("function_ref"), ExprModifierColor);
 
     if (E->getBase()) {
       printRec(E->getBase(), Label::optional("base"));
@@ -2752,7 +2911,7 @@ public:
   void visitTupleElementExpr(TupleElementExpr *E, Label label) {
     printCommon(E, "tuple_element_expr", label);
 
-    printField(E->getFieldNumber(), "field #");
+    printField(E->getFieldNumber(), Label::always("field #"));
 
     printRec(E->getBase(), Label::optional("base"));
 
@@ -3002,7 +3161,8 @@ public:
 
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
-    printFieldQuoted(E->getThrownError().getString(PO), "thrown_error", TypeColor);
+    printFieldQuoted(E->getThrownError().getString(PO),
+                     Label::always("thrown_error"), TypeColor);
 
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
@@ -3013,7 +3173,8 @@ public:
 
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
-    printFieldQuoted(E->getThrownError().getString(PO), "thrown_error", TypeColor);
+    printFieldQuoted(E->getThrownError().getString(PO),
+                     Label::always("thrown_error"), TypeColor);
 
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
@@ -3051,7 +3212,8 @@ public:
     if (hasNonStandardOutput())
       (void)E->getDiscriminator();
 
-    printField(E->getRawDiscriminator(), "discriminator", DiscriminatorColor);
+    printField(E->getRawDiscriminator(), Label::always("discriminator"),
+               DiscriminatorColor);
 
     switch (auto isolation = E->getActorIsolation()) {
     case ActorIsolation::Unspecified:
@@ -3072,12 +3234,12 @@ public:
 
     case ActorIsolation::ActorInstance:
       printFieldQuoted(isolation.getActorInstance()->printRef(),
-                       "actor_isolated", CapturesColor);
+                       Label::always("actor_isolated"), CapturesColor);
       break;
 
     case ActorIsolation::GlobalActor:
       printFieldQuoted(isolation.getGlobalActor().getString(),
-                       "global_actor_isolated", CapturesColor);
+                       Label::always("global_actor_isolated"), CapturesColor);
       break;
     }
 
@@ -3085,7 +3247,7 @@ public:
       if (!captureInfo->isTrivial()) {
         printFieldRaw([&](raw_ostream &OS) {
           captureInfo->print(OS);
-        }, "", CapturesColor);
+        }, Label::optional(""), CapturesColor);
       }
     }
     // Printing a function type doesn't indicate whether it's escaping because it doesn't 
@@ -3137,7 +3299,8 @@ public:
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E, Label label) {
     printCommon(E, "opaque_value_expr", label);
-    printNameRaw([&](raw_ostream &OS) { OS << (void*)E; });
+    printNameRaw([&](raw_ostream &OS) { OS << (void*)E; },
+                 Label::optional("identity"));
     printFoot();
   }
 
@@ -3162,7 +3325,7 @@ public:
     printCommon(E, "default_argument_expr", label);
     printDeclRefField(E->getDefaultArgsOwner(),
                       Label::always("default_args_owner"));
-    printField(E->getParamIndex(), "param");
+    printField(E->getParamIndex(), Label::always("param"));
     printFoot();
   }
 
@@ -3182,7 +3345,7 @@ public:
       } else {
         OS << "none";
       }
-    }, "isolation_crossing", ExprModifierColor);
+    }, Label::always("isolation_crossing"), ExprModifierColor);
 
     printRec(E->getFn(), Label::optional("fn"));
     printRec(E->getArgs(), Label::optional("args"));
@@ -3225,7 +3388,7 @@ public:
         GetTypeOfTypeRepr(E->getCastTypeRepr()).print(OS);
       else
         E->getCastType().print(OS);
-    }, "written_type", TypeReprColor);
+    }, Label::always("written_type"), TypeReprColor);
 
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
@@ -3273,7 +3436,7 @@ public:
   }
   void visitEnumIsCaseExpr(EnumIsCaseExpr *E, Label label) {
     printCommon(E, "enum_is_case_expr", label);
-    printName(E->getEnumElement()->getBaseIdentifier());
+    printName(E->getEnumElement()->getBaseIdentifier(), Label::optional("name"));
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
   }
@@ -3284,7 +3447,7 @@ public:
   }
   void visitBindOptionalExpr(BindOptionalExpr *E, Label label) {
     printCommon(E, "bind_optional_expr", label);
-    printField(E->getDepth(), "depth");
+    printField(E->getDepth(), Label::always("depth"));
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
   }
@@ -3339,7 +3502,7 @@ public:
   void visitObjCSelectorExpr(ObjCSelectorExpr *E, Label label) {
     printCommon(E, "objc_selector_expr", label);
 
-    printField(E->getSelectorKind(), "kind");
+    printField(E->getSelectorKind(), Label::always("kind"));
     printDeclRefField(E->getMethod(), Label::always("decl"));
 
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
@@ -3386,8 +3549,8 @@ public:
 
           case KeyPathExpr::Component::Kind::UnresolvedProperty:
             printHead("unresolved_property", ASTNodeColor, label);
-            printFieldQuoted(component.getUnresolvedDeclName(), "decl_name",
-                             IdentifierColor);
+            printFieldQuoted(component.getUnresolvedDeclName(),
+                             Label::always("decl_name"), IdentifierColor);
             break;
 
           case KeyPathExpr::Component::Kind::UnresolvedSubscript:
@@ -3399,18 +3562,20 @@ public:
 
           case KeyPathExpr::Component::Kind::TupleElement:
             printHead("tuple_element", ASTNodeColor, label);
-            printField(component.getTupleIndex(), "index", DiscriminatorColor);
+            printField(component.getTupleIndex(), Label::always("index"),
+                       DiscriminatorColor);
             break;
           case KeyPathExpr::Component::Kind::DictionaryKey:
             printHead("dict_key", ASTNodeColor, label);
-            printFieldQuoted(component.getUnresolvedDeclName(), "key",
-                             IdentifierColor);
+            printFieldQuoted(component.getUnresolvedDeclName(),
+                             Label::always("key"), IdentifierColor);
             break;
           case KeyPathExpr::Component::Kind::CodeCompletion:
             printHead("completion", ASTNodeColor, label);
             break;
           }
-          printFieldQuoted(GetTypeOfKeyPathComponent(E, i), "type");
+          printFieldQuoted(GetTypeOfKeyPathComponent(E, i),
+                           Label::always("type"));
           if (auto *args = component.getSubscriptArgs()) {
             printRec(args, Label::optional("subscript_args"));
           }
@@ -3486,8 +3651,9 @@ public:
   void visitMacroExpansionExpr(MacroExpansionExpr *E, Label label) {
     printCommon(E, "macro_expansion_expr", label);
 
-    printFieldQuoted(E->getMacroName(), "name", IdentifierColor);
-    printField(E->getRawDiscriminator(), "discriminator", DiscriminatorColor);
+    printFieldQuoted(E->getMacroName(), Label::always("name"), IdentifierColor);
+    printField(E->getRawDiscriminator(), Label::always("discriminator"),
+               DiscriminatorColor);
 
     if (E->getArgs()) {
       printRec(E->getArgs(), Label::optional("args"));
@@ -3504,8 +3670,8 @@ public:
 
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
-    printFieldQuoted(Type(E->getParamType()).getString(PO), "param_type",
-                     TypeColor);
+    printFieldQuoted(Type(E->getParamType()).getString(PO),
+                     Label::always("param_type"), TypeColor);
 
     printFoot();
   }
@@ -3523,7 +3689,8 @@ void Expr::dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
                 llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
                     getTypeOfKeyPathComponent,
                 unsigned Indent) const {
-  PrintExpr(OS, Indent, /*parseIfNeeded*/ false, getTypeOfExpr,
+  DefaultWriter writer(OS, Indent);
+  PrintExpr(writer, /*parseIfNeeded*/ false, getTypeOfExpr,
             getTypeOfTypeRepr, getTypeOfKeyPathComponent)
       .visit(const_cast<Expr *>(this), Label::optional(""));
 }
@@ -3547,7 +3714,8 @@ void ArgumentList::dump() const {
 }
 
 void ArgumentList::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintBase(OS, Indent).visitArgumentList(this, Label::optional(""));
+  DefaultWriter writer(OS, Indent);
+  PrintBase(writer).visitArgumentList(this, Label::optional(""));
 }
 
 //===----------------------------------------------------------------------===//
@@ -3570,7 +3738,8 @@ public:
 
   void visitAttributedTypeRepr(AttributedTypeRepr *T, Label label) {
     printCommon("type_attributed", label);
-    printFieldQuotedRaw([&](raw_ostream &OS) { T->printAttrs(OS); }, "attrs");
+    printFieldQuotedRaw([&](raw_ostream &OS) { T->printAttrs(OS); },
+                        Label::always("attrs"));
     printRec(T->getTypeRepr(), Label::optional("type_repr"));
   }
 
@@ -3579,9 +3748,9 @@ public:
                                                  : "type_qualified_ident",
                 label);
 
-    printFieldQuoted(T->getNameRef(), "id", IdentifierColor);
+    printFieldQuoted(T->getNameRef(), Label::always("id"), IdentifierColor);
     if (T->isBound())
-      printFieldQuoted(T->getBoundDecl()->printRef(), "bind");
+      printFieldQuoted(T->getBoundDecl()->printRef(), Label::always("bind"));
     else
       printFlag("unbound");
 
@@ -3666,7 +3835,7 @@ public:
           else
             OS << (name.empty() ? "''" : name.str());
         }, ",");
-      }, "names");
+      }, Label::always("names"));
     }
 
     printList(T->getElements(), [&](auto elem, Label label) {
@@ -3811,7 +3980,7 @@ public:
         [&](raw_ostream &out) {
           out << " " << T->getLifetimeEntry()->getString() << " ";
         },
-        "");
+        Label::optional(""));
     printRec(T->getBase(), Label::optional("base"));
     printFoot();
   }
@@ -3823,7 +3992,7 @@ public:
       printCommon("is_negative", label);
     }
 
-    printFieldQuoted(T->getValue(), "value", IdentifierColor);
+    printFieldQuoted(T->getValue(), Label::always("value"), IdentifierColor);
     printFoot();
   }
 };
@@ -3840,13 +4009,12 @@ class PrintAttribute : public AttributeVisitor<PrintAttribute, void, Label>,
 
 public:
   PrintAttribute(
-      raw_ostream &os, const ASTContext *ctx, unsigned indent = 0,
-      bool parseIfNeeded = false,
+      PrintWriterBase &writer, const ASTContext *ctx, bool parseIfNeeded = false,
       llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
       llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
       llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
           getTypeOfKeyPathComponent = defaultGetTypeOfKeyPathComponent)
-      : PrintBase(os, indent, parseIfNeeded, getTypeOfExpr, getTypeOfTypeRepr,
+      : PrintBase(writer, parseIfNeeded, getTypeOfExpr, getTypeOfTypeRepr,
                   getTypeOfKeyPathComponent),
         Ctx(ctx) {}
 
@@ -3993,12 +4161,12 @@ public:
   }
   void visitAccessControlAttr(AccessControlAttr *Attr, Label label) {
     printCommon(Attr, "access_control_attr", label);
-    printField(Attr->getAccess(), "access_level");
+    printField(Attr->getAccess(), Label::always("access_level"));
     printFoot();
   }
   void visitAlignmentAttr(AlignmentAttr *Attr, Label label) {
     printCommon(Attr, "alignment_attr", label);
-    printField(Attr->getValue(), "value");
+    printField(Attr->getValue(), Label::always("value"));
     printFoot();
   }
   void visitAllowFeatureSuppressionAttr(AllowFeatureSuppressionAttr *Attr,
@@ -4008,14 +4176,14 @@ public:
         [&](auto &out) {
           llvm::interleave(Attr->getSuppressedFeatures(), out, ",");
         },
-        "features");
+        Label::always("features"));
     printFoot();
   }
   void visitAvailableAttr(AvailableAttr *Attr, Label label) {
     printCommon(Attr, "available_attr", label);
 
     if (auto domain = Attr->getCachedDomain())
-      printField(domain->getNameForAttributePrinting(), "platform");
+      printField(domain->getNameForAttributePrinting(), Label::always("platform"));
 
     switch (Attr->getKind()) {
     case swift::AvailableAttr::Kind::Default:
@@ -4032,37 +4200,37 @@ public:
     }
     if (auto introduced = Attr->getRawIntroduced())
       printFieldRaw([&](auto &out) { out << introduced.value().getAsString(); },
-                    "introduced");
+                    Label::always("introduced"));
     if (auto deprecated = Attr->getRawDeprecated())
       printFieldRaw([&](auto &out) { out << deprecated.value().getAsString(); },
-                    "deprecated");
+                    Label::always("deprecated"));
     if (auto obsoleted = Attr->getRawObsoleted())
       printFieldRaw([&](auto &out) { out << obsoleted.value().getAsString(); },
-                    "obsoleted");
+                    Label::always("obsoleted"));
     if (!Attr->getMessage().empty())
-      printFieldQuoted(Attr->getMessage(), "message");
+      printFieldQuoted(Attr->getMessage(), Label::always("message"));
     if (!Attr->getRename().empty())
-      printFieldQuoted(Attr->getRename(), "rename");
+      printFieldQuoted(Attr->getRename(), Label::always("rename"));
     printFoot();
   }
   void visitBackDeployedAttr(BackDeployedAttr *Attr, Label label) {
     printCommon(Attr, "back_deployed_attr", label);
-    printField(Attr->Platform, "platform");
+    printField(Attr->Platform, Label::always("platform"));
     printFieldRaw([&](auto &out) { out << Attr->Version.getAsString(); },
-                  "version");
+                  Label::always("version"));
     printFoot();
   }
   void visitCDeclAttr(CDeclAttr *Attr, Label label) {
     printCommon(Attr, "cdecl_attr", label);
-    printFieldQuoted(Attr->Name, "name");
+    printFieldQuoted(Attr->Name, Label::always("name"));
     printFoot();
   }
   void
   visitClangImporterSynthesizedTypeAttr(ClangImporterSynthesizedTypeAttr *Attr,
                                         Label label) {
     printCommon(Attr, "clang_importer_synthesized_type_attr", label);
-    printField(Attr->getKind(), "kind");
-    printField(Attr->originalTypeName, "original_type_name");
+    printField(Attr->getKind(), Label::always("kind"));
+    printField(Attr->originalTypeName, Label::always("original_type_name"));
     printFoot();
   }
   void visitCustomAttr(CustomAttr *Attr, Label label) {
@@ -4077,7 +4245,7 @@ public:
     printRec(Attr->getBaseTypeRepr(), Label::optional("base_type_repr"));
     printFieldRaw(
         [&](auto &out) { Attr->getOriginalFunctionName().Name.print(out); },
-        "original_function_name");
+        Label::always("original_function_name"));
     // TODO: Print parameters.
     printFoot();
   }
@@ -4088,9 +4256,9 @@ public:
   }
   void visitDocumentationAttr(DocumentationAttr *Attr, Label label) {
     printCommon(Attr, "documentation_attr", label);
-    printFieldQuoted(Attr->Metadata, "metadata");
+    printFieldQuoted(Attr->Metadata, Label::always("metadata"));
     if (Attr->Visibility.has_value())
-      printField(Attr->Visibility.value(), "visibility");
+      printField(Attr->Visibility.value(), Label::always("visibility"));
     printFoot();
   }
   void visitDynamicReplacementAttr(DynamicReplacementAttr *Attr,
@@ -4098,45 +4266,45 @@ public:
     printCommon(Attr, "dynamic_replacement_attr", label);
     printFieldRaw(
         [&](auto &out) { Attr->getReplacedFunctionName().print(out); },
-        "replaced_function_name");
+        Label::always("replaced_function_name"));
     printFoot();
   }
   void visitEffectsAttr(EffectsAttr *Attr, Label label) {
     printCommon(Attr, "effects_attr", label);
-    printField(Attr->getKind(), "kind");
+    printField(Attr->getKind(), Label::always("kind"));
     if (Attr->getKind() == EffectsKind::Custom) {
-      printFieldQuoted(Attr->getCustomString(), "custom");
+      printFieldQuoted(Attr->getCustomString(), Label::always("custom"));
     }
     printFoot();
   }
   void visitExclusivityAttr(ExclusivityAttr *Attr, Label label) {
     printCommon(Attr, "exclusivity_attr", label);
-    printField(Attr->getMode(), "mode");
+    printField(Attr->getMode(), Label::always("mode"));
     printFoot();
   }
   void visitExposeAttr(ExposeAttr *Attr, Label label) {
     printCommon(Attr, "expose_attr", label);
-    printFieldQuoted(Attr->Name, "name");
+    printFieldQuoted(Attr->Name, Label::always("name"));
     printFoot();
   }
   void visitExternAttr(ExternAttr *Attr, Label label) {
     printCommon(Attr, "extern_attr", label);
-    printField(Attr->getExternKind(), "kind");
+    printField(Attr->getExternKind(), Label::always("kind"));
     if (Attr->ModuleName.has_value())
-      printField(Attr->ModuleName.value(), "module");
-    printFieldQuoted(Attr->Name, "name");
+      printField(Attr->ModuleName.value(), Label::always("module"));
+    printFieldQuoted(Attr->Name, Label::always("name"));
     printFoot();
   }
   void visitImplementsAttr(ImplementsAttr *Attr, Label label) {
     printCommon(Attr, "implements_attr", label);
     printRec(Attr->getProtocolTypeRepr(), Label::always("protocol"));
     printFieldRaw([&](auto &out) { Attr->getMemberName().print(out); },
-                  "member");
+                  Label::always("member"));
     printFoot();
   }
   void visitInlineAttr(InlineAttr *Attr, Label label) {
     printCommon(Attr, "inline_attr", label);
-    printField(Attr->getKind(), "kind");
+    printField(Attr->getKind(), Label::always("kind"));
     printFoot();
   }
   void visitLifetimeAttr(LifetimeAttr *Attr, Label label) {
@@ -4154,7 +4322,7 @@ public:
       printFlag("freestanding");
       break;
     }
-    printField(Attr->getMacroRole(), "role");
+    printField(Attr->getMacroRole(), Label::always("role"));
     printFieldQuotedRaw(
         [&](auto &out) {
           llvm::interleave(
@@ -4169,14 +4337,14 @@ public:
               },
               ",");
         },
-        "names");
+        Label::always("names"));
     printRecRange(Attr->getConformances(), Label::always("conformances"));
 
     printFoot();
   }
   void visitNonSendableAttr(NonSendableAttr *Attr, Label label) {
     printCommon(Attr, "non_sendable_attr", label);
-    printField(Attr->Specificity, "specificity");
+    printField(Attr->Specificity, Label::always("specificity"));
     printFoot();
   }
   void visitNonisolatedAttr(NonisolatedAttr *Attr, Label label) {
@@ -4187,7 +4355,7 @@ public:
   void visitObjCAttr(ObjCAttr *Attr, Label label) {
     printCommon(Attr, "objc_attr", label);
     if (Attr->hasName())
-      printFieldQuoted(Attr->getName(), "name");
+      printFieldQuoted(Attr->getName(), Label::always("name"));
     printFlag(Attr->isNameImplicit(), "is_name_implicit");
     printFoot();
   }
@@ -4200,7 +4368,7 @@ public:
                                    Label label) {
     printCommon(Attr, "objc_implementation_attr", label);
     if (!Attr->CategoryName.empty())
-      printField(Attr->CategoryName, "category");
+      printField(Attr->CategoryName, Label::always("category"));
     printFlag(Attr->isEarlyAdopter(), "is_early_adopter");
     printFlag(Attr->isCategoryNameInvalid(), "is_category_name_invalid");
     printFlag(Attr->hasInvalidImplicitLangAttrs(),
@@ -4209,39 +4377,39 @@ public:
   }
   void visitObjCRuntimeNameAttr(ObjCRuntimeNameAttr *Attr, Label label) {
     printCommon(Attr, "objc_runtime_name_attr", label);
-    printField(Attr->Name, "name");
+    printField(Attr->Name, Label::always("name"));
     printFoot();
   }
   void visitOptimizeAttr(OptimizeAttr *Attr, Label label) {
     printCommon(Attr, "optimize_attr", label);
-    printField(Attr->getMode(), "mode");
+    printField(Attr->getMode(), Label::always("mode"));
     printFoot();
   }
   void visitOriginallyDefinedInAttr(OriginallyDefinedInAttr *Attr,
                                     Label label) {
     printCommon(Attr, "originally_defined_in_attr", label);
-    printField(Attr->OriginalModuleName, "original_module");
-    printField(Attr->Platform, "platform");
+    printField(Attr->OriginalModuleName, Label::always("original_module"));
+    printField(Attr->Platform, Label::always("platform"));
     printFieldRaw([&](auto &out) { out << Attr->MovedVersion.getAsString(); },
-                  "moved_version");
+                  Label::always("moved_version"));
     printFoot();
   }
   void visitPrivateImportAttr(PrivateImportAttr *Attr, Label label) {
     printCommon(Attr, "prinvate_import_attr", label);
-    printFieldQuoted(Attr->getSourceFile(), "source_file");
+    printFieldQuoted(Attr->getSourceFile(), Label::always("source_file"));
     printFoot();
   }
   void visitProjectedValuePropertyAttr(ProjectedValuePropertyAttr *Attr,
                                        Label label) {
     printCommon(Attr, "projected_value_property_attr", label);
-    printField(Attr->ProjectionPropertyName, "name");
+    printField(Attr->ProjectionPropertyName, Label::always("name"));
     printFoot();
   }
   void visitRawDocCommentAttr(RawDocCommentAttr *Attr, Label label) {
     printCommon(Attr, "raw_doc_comment_attr", label);
     printFieldRaw(
         [&](auto &out) { Attr->getCommentRange().print(out, Ctx->SourceMgr); },
-        "comment_range");
+        Label::always("comment_range"));
     printFoot();
   }
   void visitRawLayoutAttr(RawLayoutAttr *Attr, Label label) {
@@ -4254,8 +4422,8 @@ public:
       printRec(typeAndCount->first, Label::optional("type_repr"));
       printRec(typeAndCount->second, Label::optional("count"));
     } else if (auto sizeAndAlignment = Attr->getSizeAndAlignment()) {
-      printField(sizeAndAlignment->first, "size");
-      printField(sizeAndAlignment->second, "alignment");
+      printField(sizeAndAlignment->first, Label::always("size"));
+      printField(sizeAndAlignment->second, Label::always("alignment"));
     }
     printFoot();
   }
@@ -4269,36 +4437,37 @@ public:
                                         Label label) {
     printCommon(Attr, "restated_objc_conformance_attr", label);
     if (Attr->Proto) {
-      printFieldRaw([&](auto &out) { Attr->Proto->dumpRef(out); }, "");
+      printFieldRaw([&](auto &out) { Attr->Proto->dumpRef(out); },
+                    Label::optional("proto"));
     }
     printFoot();
   }
   void visitSILGenNameAttr(SILGenNameAttr *Attr, Label label) {
     printCommon(Attr, "silgen_name_attr", label);
     printFlag(Attr->Raw, "raw");
-    printFieldQuoted(Attr->Name, "");
+    printFieldQuoted(Attr->Name, Label::optional("name"));
     printFoot();
   }
   void visitSPIAccessControlAttr(SPIAccessControlAttr *Attr, Label label) {
     printCommon(Attr, "spi_access_control_attr", label);
     printFieldQuotedRaw(
         [&](auto &out) { llvm::interleave(Attr->getSPIGroups(), out, ","); },
-        "groups");
+        Label::always("groups"));
     printFoot();
   }
   void visitSectionAttr(SectionAttr *Attr, Label label) {
     printCommon(Attr, "section_attr", label);
-    printFieldQuoted(Attr->Name, "name");
+    printFieldQuoted(Attr->Name, Label::always("name"));
     printFoot();
   }
   void visitSemanticsAttr(SemanticsAttr *Attr, Label label) {
     printCommon(Attr, "semantics_attr", label);
-    printFieldQuoted(Attr->Value, "value");
+    printFieldQuoted(Attr->Value, Label::always("value"));
     printFoot();
   }
   void visitSetterAccessAttr(SetterAccessAttr *Attr, Label label) {
     printCommon(Attr, "setter_access_attr", label);
-    printField(Attr->getAccess(), "access");
+    printField(Attr->getAccess(), Label::always("access"));
     printFoot();
   }
   void visitSpecializeAttr(SpecializeAttr *Attr, Label label) {
@@ -4309,12 +4478,12 @@ public:
     if (Attr->getTargetFunctionName()) {
       printFieldQuotedRaw(
           [&](auto &out) { Attr->getTargetFunctionName().print(out); },
-          "target");
+          Label::always("target"));
     }
     if (!Attr->getSPIGroups().empty()) {
       printFieldQuotedRaw(
           [&](auto &out) { llvm::interleave(Attr->getSPIGroups(), out, ","); },
-          "spi");
+          Label::always("spi"));
     }
     if (Attr->getTrailingWhereClause()) {
       printFieldQuotedRaw(
@@ -4322,7 +4491,7 @@ public:
             Attr->getTrailingWhereClause()->print(out,
                                                   /*printWhereKeyword=*/false);
           },
-          "requirements");
+          Label::always("requirements"));
     }
     printList(Attr->getAvailableAttrs(), [&](auto *availableAttr, Label label) {
       printRec(availableAttr, Ctx, label);
@@ -4337,21 +4506,21 @@ public:
           [&](auto &out) {
             llvm::interleave(Attr->getInitializesNames(), out, ",");
           },
-          "initializes");
+          Label::always("initializes"));
     }
     if (!Attr->getAccessesNames().empty()) {
       printFieldQuotedRaw(
           [&](auto &out) {
             llvm::interleave(Attr->getAccessesNames(), out, ",");
           },
-          "accesses");
+          Label::always("accesses"));
     }
     printFoot();
   }
   void visitSwiftNativeObjCRuntimeBaseAttr(SwiftNativeObjCRuntimeBaseAttr *Attr,
                                            Label label) {
     printCommon(Attr, "swift_native_objc_runtime_base", label);
-    printFieldQuoted(Attr->BaseClassName, "base_class_name");
+    printFieldQuoted(Attr->BaseClassName, Label::always("base_class_name"));
     printFoot();
   }
   void visitSynthesizedProtocolAttr(SynthesizedProtocolAttr *Attr,
@@ -4359,7 +4528,7 @@ public:
     printCommon(Attr, "synthesized_protocol_attr", label);
     printFlag(Attr->isUnchecked(), "unchecked");
     printFieldQuotedRaw([&](auto &out) { Attr->getProtocol()->dumpRef(out); },
-                        "protocol");
+                        Label::always("protocol"));
     printFoot();
   }
   void visitTransposeAttr(TransposeAttr *Attr, Label label) {
@@ -4369,7 +4538,7 @@ public:
   }
   void visitTypeEraserAttr(TypeEraserAttr *Attr, Label label) {
     printCommon(Attr, "type_eraser_attr", label);
-    printFieldQuoted(Attr->getTypeWithoutResolving(), "type");
+    printFieldQuoted(Attr->getTypeWithoutResolving(), Label::always("type"));
     printRec(Attr->getParsedTypeEraserTypeRepr(),
              Label::always("parsed_type_repr"));
     printFoot();
@@ -4378,7 +4547,7 @@ public:
                                      Label label) {
     printCommon(Attr, "unavailable_from_async_attr", label);
     if (Attr->hasMessage()) {
-      printFieldQuoted(Attr->Message, "message");
+      printFieldQuoted(Attr->Message, Label::always("message"));
     }
     printFoot();
   }
@@ -4392,7 +4561,7 @@ void PrintBase::printRec(Decl *D, Label label) {
       printHead("<null decl>", DeclColor, label);
       printFoot();
     } else {
-      PrintDecl(OS, Indent, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
+      PrintDecl(Writer, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
                 GetTypeOfKeyPathComponent)
           .visit(D, label);
     }
@@ -4404,7 +4573,7 @@ void PrintBase::printRec(Expr *E, Label label) {
       printHead("<null expr>", ExprColor, label);
       printFoot();
     } else {
-      PrintExpr(OS, Indent, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
+      PrintExpr(Writer, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
                 GetTypeOfKeyPathComponent)
           .visit(E, label);
     }
@@ -4416,7 +4585,7 @@ void PrintBase::printRec(Stmt *S, const ASTContext *Ctx, Label label) {
       printHead("<null stmt>", ExprColor, label);
       printFoot();
     } else {
-      PrintStmt(OS, Ctx, Indent, ParseIfNeeded, GetTypeOfExpr,
+      PrintStmt(Writer, Ctx, ParseIfNeeded, GetTypeOfExpr,
                 GetTypeOfTypeRepr, GetTypeOfKeyPathComponent)
           .visit(S, label);
     }
@@ -4428,7 +4597,7 @@ void PrintBase::printRec(TypeRepr *T, Label label) {
       printHead("<null typerepr>", TypeReprColor, label);
       printFoot();
     } else {
-      PrintTypeRepr(OS, Indent, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
+      PrintTypeRepr(Writer, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
                     GetTypeOfKeyPathComponent)
           .visit(T, label);
     }
@@ -4440,7 +4609,7 @@ void PrintBase::printRec(const Pattern *P, Label label) {
       printHead("<null pattern>", PatternColor, label);
       printFoot();
     } else {
-      PrintPattern(OS, Indent, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
+      PrintPattern(Writer, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
                    GetTypeOfKeyPathComponent)
           .visit(const_cast<Pattern *>(P), label);
     }
@@ -4454,7 +4623,7 @@ void PrintBase::printRec(const DeclAttribute *Attr, const ASTContext *Ctx,
           printHead("<null attribute>", DeclAttributeColor, label);
           printFoot();
         } else {
-          PrintAttribute(OS, Ctx, Indent, ParseIfNeeded, GetTypeOfExpr,
+          PrintAttribute(Writer, Ctx, ParseIfNeeded, GetTypeOfExpr,
                          GetTypeOfTypeRepr, GetTypeOfKeyPathComponent)
               .visit(const_cast<DeclAttribute *>(Attr), label);
         }
@@ -4467,7 +4636,8 @@ void TypeRepr::dump() const {
   llvm::errs() << '\n';
 }
 void TypeRepr::dump(raw_ostream &os, unsigned indent) const {
-  PrintTypeRepr(os, indent).visit(const_cast<TypeRepr*>(this),
+  DefaultWriter writer(os, indent);
+  PrintTypeRepr(writer).visit(const_cast<TypeRepr*>(this),
                                   Label::optional(""));
 }
 
@@ -4491,7 +4661,8 @@ public:
       assert(conformance.isAbstract());
 
       printHead("abstract_conformance", ASTNodeColor, label);
-      printFieldQuoted(conformance.getAbstract()->getName(), "protocol");
+      printFieldQuoted(conformance.getAbstract()->getName(),
+                       Label::always("protocol"));
       printFoot();
     }
   }
@@ -4505,8 +4676,9 @@ public:
 
     auto printCommon = [&](StringRef kind) {
       printHead(kind, ASTNodeColor, label);
-      printFieldQuoted(conformance->getType(), "type");
-      printFieldQuoted(conformance->getProtocol()->getName(), "protocol");
+      printFieldQuoted(conformance->getType(), Label::always("type"));
+      printFieldQuoted(conformance->getProtocol()->getName(),
+                       Label::always("protocol"));
       printFlag(!shouldPrintDetails, "<details printed above>");
     };
 
@@ -4526,8 +4698,9 @@ public:
                                          const TypeDecl *) -> bool {
             printRecArbitrary([&](Label label) {
               printHead("assoc_type", ASTNodeColor, label);
-              printFieldQuoted(req->getName(), "req");
-              printFieldQuoted(Type(ty->getDesugaredType()), "type", TypeColor);
+              printFieldQuoted(req->getName(), Label::always("req"));
+              printFieldQuoted(Type(ty->getDesugaredType()),
+                               Label::always("type"), TypeColor);
               printFoot();
             }, Label::optional("type_witness"));
             return false;
@@ -4537,7 +4710,7 @@ public:
                                           Witness witness) {
             printRecArbitrary([&](Label label) {
               printHead("value", ASTNodeColor, label);
-              printFieldQuoted(req->getName(), "req");
+              printFieldQuoted(req->getName(), Label::always("req"));
               if (!witness)
                 printFlag("no_witness");
               else if (witness.getDecl() == req)
@@ -4545,7 +4718,7 @@ public:
               else
                 printFieldQuotedRaw([&](raw_ostream &out) {
                   witness.getDecl()->dumpRef(out);
-                }, "witness");
+                }, Label::always("witness"));
               printFoot();
             }, Label::optional("value_witness"));
           });
@@ -4554,8 +4727,8 @@ public:
               [&](Type t, ProtocolDecl *proto, unsigned index) {
                 printRecArbitrary([&](Label label) {
                   printHead("assoc_conformance", ASTNodeColor, label);
-                  printFieldQuoted(t, "type", TypeColor);
-                  printFieldQuoted(proto->getName(), "proto");
+                  printFieldQuoted(t, Label::always("type"), TypeColor);
+                  printFieldQuoted(proto->getName(), Label::always("proto"));
                   printRec(normal->getAssociatedConformance(t, proto), visited,
                            Label::optional("conformance"));
                   printFoot();
@@ -4630,8 +4803,9 @@ public:
                             VisitedConformances &visited, Label label) {
     printHead("pack_conformance", ASTNodeColor, label);
 
-    printFieldQuoted(Type(conformance->getType()), "type");
-    printFieldQuoted(conformance->getProtocol()->getName(), "protocol");
+    printFieldQuoted(Type(conformance->getType()), Label::always("type"));
+    printFieldQuoted(conformance->getProtocol()->getName(),
+                     Label::always("protocol"));
 
     printList(conformance->getPatternConformances(), [&](auto conformanceRef, Label label) {
       printRec(conformanceRef, visited, label);
@@ -4659,7 +4833,7 @@ public:
     }
 
     printFieldRaw([&](raw_ostream &out) { genericSig->print(out); },
-                  "generic_signature");
+                  Label::always("generic_signature"));
 
     auto genericParams = genericSig.getGenericParams();
     auto replacementTypes =
@@ -4670,14 +4844,14 @@ public:
           genericParams[i]->print(out);
           out << " -> ";
           out << replacementTypes[i];
-        }, "");
+        }, Label::optional(""));
       } else {
         printRecArbitrary([&](Label label) {
           printHead("substitution", ASTNodeColor, label);
           printFieldRaw([&](raw_ostream &out) {
             genericParams[i]->print(out);
             out << " -> ";
-          }, "");
+          }, Label::optional(""));
           printRec(replacementTypes[i], label);
           printFoot();
         }, Label::optional("replacement"));
@@ -4696,7 +4870,7 @@ public:
 
       printRecArbitrary([&](Label label) {
         printHead("conformance", ASTNodeColor, label);
-        printFieldQuoted(req.getFirstType(), "type");
+        printFieldQuoted(req.getFirstType(), Label::always("type"));
         printRec(conformances.front(), visited, Label::optional("conformance"));
         printFoot();
       }, Label::optional("req"));
@@ -4708,7 +4882,7 @@ public:
 void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited,
                          Label label) {
   printRecArbitrary([&](Label label) {
-    PrintConformance(OS, Indent)
+    PrintConformance(Writer)
         .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full, visited,
                               label);
   }, label);
@@ -4717,7 +4891,7 @@ void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited,
 void PrintBase::printRec(const ProtocolConformanceRef &ref,
                          VisitedConformances &visited, Label label) {
   printRecArbitrary([&](Label label) {
-    PrintConformance(OS, Indent)
+    PrintConformance(Writer)
           .visitProtocolConformanceRef(ref, visited, label);
   }, label);
 }
@@ -4725,7 +4899,7 @@ void PrintBase::printRec(const ProtocolConformanceRef &ref,
 void PrintBase::printRec(const ProtocolConformance *conformance,
                          VisitedConformances &visited, Label label) {
   printRecArbitrary([&](Label label) {
-    PrintConformance(OS, Indent)
+    PrintConformance(Writer)
         .visitProtocolConformance(conformance, visited, label);
   }, label);
 }
@@ -4743,13 +4917,15 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out, unsigned indent,
   if (!details && isConcrete())
     visited.insert(getConcrete());
 
-  PrintConformance(out, indent).visitProtocolConformanceRef(*this, visited,
-                                                            Label::optional(""));
+  DefaultWriter writer(out, indent);
+  PrintConformance(writer).visitProtocolConformanceRef(*this, visited,
+                                                       Label::optional(""));
 }
 
 void ProtocolConformanceRef::print(llvm::raw_ostream &out) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  PrintConformance(out, 0).visitProtocolConformanceRef(*this, visited,
+  DefaultWriter writer(out, /*indent=*/ 0);
+  PrintConformance(writer).visitProtocolConformanceRef(*this, visited,
                                                        Label::optional(""));
 }
 
@@ -4761,21 +4937,24 @@ void ProtocolConformance::dump() const {
 
 void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  PrintConformance(out, indent).visitProtocolConformance(this, visited,
-                                                         Label::optional(""));
+  DefaultWriter writer(out, indent);
+  PrintConformance(writer).visitProtocolConformance(this, visited,
+                                                    Label::optional(""));
 }
 
 void PackConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  PrintConformance(out, indent).visitPackConformance(this, visited,
-                                                     Label::optional(""));
+  DefaultWriter writer(out, indent);
+  PrintConformance(writer).visitPackConformance(this, visited,
+                                                Label::optional(""));
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out, DumpStyle style,
                            unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  PrintConformance(out, indent).visitSubstitutionMap(*this, style, visited,
-                                                     Label::optional(""));
+  DefaultWriter writer(out, indent);
+  PrintConformance(writer).visitSubstitutionMap(*this, style, visited,
+                                                Label::optional(""));
 }
 
 void SubstitutionMap::dump() const {
@@ -4825,8 +5004,8 @@ namespace {
       if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
         printRec(typeVar, Label::always("type_variable"));
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
-        printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); }, "",
-                            DeclColor);
+        printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); },
+                            Label::optional("originating_var"), DeclColor);
       } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
         printFlag("error_expr");
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
@@ -4842,7 +5021,7 @@ namespace {
     void visitBuiltinIntegerType(BuiltinIntegerType *T, Label label) {
       printCommon("builtin_integer_type", label);
       if (T->isFixedWidth())
-        printField(T->getFixedWidth(), "bit_width");
+        printField(T->getFixedWidth(), Label::always("bit_width"));
       else
         printFlag("word_sized");
       printFoot();
@@ -4850,7 +5029,7 @@ namespace {
 
     void visitBuiltinFloatType(BuiltinFloatType *T, Label label) {
       printCommon("builtin_float_type", label);
-      printField(T->getBitWidth(), "bit_width");
+      printField(T->getBitWidth(), Label::always("bit_width"));
       printFoot();
     }
 
@@ -4869,7 +5048,7 @@ namespace {
 
     void visitBuiltinVectorType(BuiltinVectorType *T, Label label) {
       printCommon("builtin_vector_type", label);
-      printField(T->getNumElements(), "num_elements");
+      printField(T->getNumElements(), Label::always("num_elements"));
       printRec(T->getElementType(), Label::optional("element_type"));
       printFoot();
     }
@@ -4877,7 +5056,7 @@ namespace {
     void visitBuiltinUnboundGenericType(BuiltinUnboundGenericType *T,
                                         Label label) {
       printCommon("builtin_unbound_generic_type", label);
-      printField(T->getBuiltinTypeNameString(), "name");
+      printField(T->getBuiltinTypeNameString(), Label::always("name"));
       printFoot();
     }
     
@@ -4892,7 +5071,7 @@ namespace {
     void visitTypeAliasType(TypeAliasType *T, Label label) {
       printCommon("type_alias_type", label);
 
-      printFieldQuoted(T->getDecl()->printRef(), "decl");
+      printFieldQuoted(T->getDecl()->printRef(), Label::always("decl"));
       if (auto underlying = T->getSinglyDesugaredType()) {
         printRec(underlying, Label::always("underlying"));
       } else {
@@ -4916,7 +5095,7 @@ namespace {
             auto &C = T->getASTContext();
             T->getLoc().print(OS, C.SourceMgr);
           },
-          "loc");
+          Label::always("loc"));
       printRec(T->getSinglyDesugaredType(), Label::always("underlying"));
       printFoot();
     }
@@ -4924,7 +5103,7 @@ namespace {
     void visitPackType(PackType *T, Label label) {
       printCommon("pack_type", label);
 
-      printField(T->getNumElements(), "num_elements");
+      printField(T->getNumElements(), Label::always("num_elements"));
 
       printList(T->getElementTypes(), [&](Type elt, Label label) {
         printRec(elt, label);
@@ -4936,8 +5115,8 @@ namespace {
     void visitSILPackType(SILPackType *T, Label label) {
       printCommon("sil_pack_type", label);
 
-      printField(T->isElementAddress(), "element_is_address");
-      printField(T->getNumElements(), "num_elements");
+      printField(T->isElementAddress(), Label::always("element_is_address"));
+      printField(T->getNumElements(), Label::always("num_elements"));
 
       printList(T->getElementTypes(), [&](Type elt, Label label) {
         printRec(elt, label);
@@ -4956,7 +5135,7 @@ namespace {
     void visitPackElementType(PackElementType *T, Label label) {
       printCommon("element_type", label);
 
-      printField(T->getLevel(), "level");
+      printField(T->getLevel(), Label::always("level"));
 
       printRec(T->getPackType(), Label::always("pack"));
 
@@ -4966,13 +5145,13 @@ namespace {
     void visitTupleType(TupleType *T, Label label) {
       printCommon("tuple_type", label);
 
-      printField(T->getNumElements(), "num_elements");
+      printField(T->getNumElements(), Label::always("num_elements"));
 
       printList(T->getElements(), [&](const auto &elt, Label label) {
         printRecArbitrary([&](Label label) {
           printHead("tuple_type_elt", FieldLabelColor, label);
           if (elt.hasName())
-            printFieldQuoted(elt.getName().str(), "name");
+            printFieldQuoted(elt.getName().str(), Label::always("name"));
           printRec(elt.getType(), Label::optional("type"));
           printFoot();
         }, label);
@@ -4993,7 +5172,7 @@ namespace {
     void visit##TypeClass(TypeClass *T, Label label) { \
       printCommon(#Name, label);                           \
                                                            \
-      printFieldQuoted(T->getDecl()->printRef(), "decl");  \
+      printFieldQuoted(T->getDecl()->printRef(), Label::always("decl"));  \
       printFlag(T->getDecl()->hasClangNode(), "foreign");  \
                                                            \
       if (T->getParent())                                  \
@@ -5026,7 +5205,7 @@ namespace {
 
     void visitBuiltinTupleType(BuiltinTupleType *T, Label label) {
       printCommon("builtin_tuple_type", label);
-      printFieldQuoted(T->getDecl()->printRef(), "decl");
+      printFieldQuoted(T->getDecl()->printRef(), Label::always("decl"));
       printFoot();
     }
 
@@ -5055,7 +5234,7 @@ namespace {
 
     void visitModuleType(ModuleType *T, Label label) {
       printCommon("module_type", label);
-      printDeclNameField(T->getModule(), "module");
+      printDeclNameField(T->getModule(), Label::always("module"));
       printFlag(T->getModule()->isNonSwiftModule(), "foreign");
       printFoot();
     }
@@ -5071,15 +5250,15 @@ namespace {
                               Label label) {
       printCommon(className, label);
 
-      printField(static_cast<void *>(T), "address");
+      printField(static_cast<void *>(T), Label::always("address"));
       printFlag(T->requiresClass(), "class");
       if (auto layout = T->getLayoutConstraint()) {
         printFieldRaw([&](raw_ostream &OS) {
           layout->print(OS);
-        }, "layout");
+        }, Label::always("layout"));
       }
       for (auto proto : T->getConformsTo())
-        printFieldQuoted(proto->printRef(), "conforms_to");
+        printFieldQuoted(proto->printRef(), Label::always("conforms_to"));
     }
 
     void printArchetypeCommonRec(ArchetypeType *T) {
@@ -5091,7 +5270,7 @@ namespace {
     void visitPrimaryArchetypeType(PrimaryArchetypeType *T, Label label) {
       printArchetypeCommon(T, "primary_archetype_type", label);
 
-      printFieldQuoted(T->getFullName(), "name");
+      printFieldQuoted(T->getFullName(), Label::always("name"));
 
       printArchetypeCommonRec(T);
 
@@ -5101,7 +5280,8 @@ namespace {
       printArchetypeCommon(T, "opened_archetype_type", label);
 
       auto *env = T->getGenericEnvironment();
-      printFieldQuoted(env->getOpenedExistentialUUID(), "opened_existential_id");
+      printFieldQuoted(env->getOpenedExistentialUUID(),
+                       Label::always("opened_existential_id"));
 
       printArchetypeCommonRec(T);
       printRec(env->getOpenedExistentialType(),
@@ -5115,7 +5295,8 @@ namespace {
                                       Label label) {
       printArchetypeCommon(T, "opaque_type", label);
 
-      printFieldQuoted(T->getDecl()->getNamingDecl()->printRef(), "decl");
+      printFieldQuoted(T->getDecl()->getNamingDecl()->printRef(),
+                       Label::always("decl"));
 
       printArchetypeCommonRec(T);
       if (!T->getSubstitutions().empty()) {
@@ -5126,32 +5307,33 @@ namespace {
     }
     void visitPackArchetypeType(PackArchetypeType *T, Label label) {
       printArchetypeCommon(T, "pack_archetype_type", label);
-      printFieldQuoted(T->getFullName(), "name");
+      printFieldQuoted(T->getFullName(), Label::always("name"));
       printArchetypeCommonRec(T);
       printFoot();
     }
     void visitElementArchetypeType(ElementArchetypeType *T, Label label) {
       printArchetypeCommon(T, "element_archetype_type", label);
-      printFieldQuoted(T->getOpenedElementID(), "opened_element_id");
+      printFieldQuoted(T->getOpenedElementID(),
+                       Label::always("opened_element_id"));
       printFoot();
     }
 
     void visitGenericTypeParamType(GenericTypeParamType *T, Label label) {
       printCommon("generic_type_param_type", label);
-      printField(T->getDepth(), "depth");
-      printField(T->getIndex(), "index");
+      printField(T->getDepth(), Label::always("depth"));
+      printField(T->getIndex(), Label::always("index"));
       if (!T->isCanonical())
-        printFieldQuoted(T->getName(), "name");
+        printFieldQuoted(T->getName(), Label::always("name"));
 
       switch (T->getParamKind()) {
       case GenericTypeParamKind::Type:
-        printField((StringRef)"type", "param_kind");
+        printField((StringRef)"type", Label::always("param_kind"));
         break;
       case GenericTypeParamKind::Pack:
-        printField((StringRef)"pack", "param_kind");
+        printField((StringRef)"pack", Label::always("param_kind"));
         break;
       case GenericTypeParamKind::Value:
-        printField((StringRef)"value", "param_kind");
+        printField((StringRef)"value", Label::always("param_kind"));
         printRec(T->getValueType(), Label::always("value_type"));
       }
 
@@ -5162,9 +5344,9 @@ namespace {
       printCommon("dependent_member_type", label);
 
       if (auto assocType = T->getAssocType()) {
-        printFieldQuoted(assocType->printRef(), "assoc_type");
+        printFieldQuoted(assocType->printRef(), Label::always("assoc_type"));
       } else {
-        printFieldQuoted(T->getName(), "name");
+        printFieldQuoted(T->getName(), Label::always("name"));
       }
 
       printRec(T->getBase(), Label::always("base"));
@@ -5177,15 +5359,16 @@ namespace {
       printRecArbitrary([&](Label label) {
         printCommon("function_params", FieldLabelColor, label);
 
-        printField(params.size(), "num_params");
+        printField(params.size(), Label::always("num_params"));
         printList(params, [&](const auto &param, Label label) {
           printRecArbitrary([&](Label label) {
             printHead("param", FieldLabelColor, label);
 
             if (param.hasLabel())
-              printFieldQuoted(param.getLabel().str(), "name");
+              printFieldQuoted(param.getLabel().str(), Label::always("name"));
             if (param.hasInternalLabel())
-              printFieldQuoted(param.getInternalLabel().str(), "internal_name");
+              printFieldQuoted(param.getInternalLabel().str(),
+                               Label::always("internal_name"));
             dumpParameterFlags(param.getParameterFlags());
 
             printRec(param.getPlainType(), Label::optional("plain_type"));
@@ -5206,7 +5389,7 @@ namespace {
           printNameRaw([&](raw_ostream &OS) {
             auto &clangCtx = ctx.getClangModuleLoader()->getClangASTContext();
             info.dump(OS, clangCtx);
-          });
+          }, Label::optional("clang_type_info"));
           printFoot();
         }, label);
       }
@@ -5221,7 +5404,7 @@ namespace {
             T->getExtInfo().getSILRepresentation();
 
         if (representation != SILFunctionType::Representation::Thick) {
-          printField(representation, "representation");
+          printField(representation, Label::always("representation"));
         }
         printFlag(!T->isNoEscape(), "escaping");
         printFlag(T->isSendable(), "Sendable");
@@ -5230,7 +5413,7 @@ namespace {
         printFlag(T->hasSendingResult(), "sending_result");
       }
       if (Type globalActor = T->getGlobalActor()) {
-        printFieldQuoted(globalActor.getString(), "global_actor");
+        printFieldQuoted(globalActor.getString(), Label::always("global_actor"));
       }
 
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext(),
@@ -5252,7 +5435,8 @@ namespace {
       // FIXME: generic signature dumping needs improvement
       printRecArbitrary([&](Label label) {
         printHead("generic_sig", TypeColor, label);
-        printFieldQuoted(T->getGenericSignature()->getAsString(), "");
+        printFieldQuoted(T->getGenericSignature()->getAsString(),
+                         Label::optional(""));
         printFoot();
       }, Label::optional("generic_sig"));
       printFoot();
@@ -5260,7 +5444,7 @@ namespace {
 
     void visitSILFunctionType(SILFunctionType *T, Label label) {
       printCommon("sil_function_type", label);
-      printFieldQuoted(T->getString(), "type");
+      printFieldQuoted(T->getString(), Label::always("type"));
 
       printList(T->getParameters(), [&](auto param, Label label) {
         printRec(param.getInterfaceType(), label);
@@ -5300,7 +5484,7 @@ namespace {
     void visitSILBoxType(SILBoxType *T, Label label) {
       printCommon("sil_box_type", label);
       // FIXME: Print the structure of the type.
-      printFieldQuoted(T->getString(), "type");
+      printFieldQuoted(T->getString(), Label::always("type"));
       printFoot();
     }
 
@@ -5385,7 +5569,7 @@ namespace {
 
     void visitUnboundGenericType(UnboundGenericType *T, Label label) {
       printCommon("unbound_generic_type", label);
-      printFieldQuoted(T->getDecl()->printRef(), "decl");
+      printFieldQuoted(T->getDecl()->printRef(), Label::always("decl"));
       if (T->getParent())
         printRec(T->getParent(), Label::always("parent"));
       printFoot();
@@ -5393,7 +5577,7 @@ namespace {
 
     void visitTypeVariableType(TypeVariableType *T, Label label) {
       printCommon("type_variable_type", label);
-      printField(T->getID(), "id");
+      printField(T->getID(), Label::always("id"));
       printFoot();
     }
 
@@ -5408,7 +5592,7 @@ namespace {
     void visitIntegerType(IntegerType *T, Label label) {
       printCommon("integer_type", label);
       printFlag(T->isNegative(), "is_negative");
-      printFieldQuoted(T->getValue(), "value", LiteralValueColor);
+      printFieldQuoted(T->getValue(), Label::always("value"), LiteralValueColor);
       printFoot();
     }
 
@@ -5421,7 +5605,7 @@ namespace {
         printHead("<null type>", DeclColor, label);
         printFoot();
       } else {
-        PrintType(OS, Indent, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
+        PrintType(Writer, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
                   GetTypeOfKeyPathComponent)
             .visit(type, label);
       }
@@ -5434,7 +5618,8 @@ void Type::dump() const {
 }
 
 void Type::dump(raw_ostream &os, unsigned indent) const {
-  PrintType(os, indent).visit(*this, Label::optional(""));
+  DefaultWriter writer(os, indent);
+  PrintType(writer).visit(*this, Label::optional(""));
   os << "\n";
 }
 
@@ -5546,7 +5731,8 @@ void Requirement::dump() const {
   llvm::errs() << '\n';
 }
 void Requirement::dump(raw_ostream &out) const {
-  PrintBase(out, 0).visitRequirement(*this, Label::optional(""));
+  DefaultWriter writer(out, /*indent=*/ 0);
+  PrintBase(writer).visitRequirement(*this, Label::optional(""));
 }
 
 void SILParameterInfo::dump() const {
