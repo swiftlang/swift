@@ -3903,14 +3903,6 @@ bool MissingCallFailure::diagnoseAsError() {
       return true;
     }
 
-    case ConstraintLocator::FunctionResult: {
-      path = path.drop_back();
-      if (path.back().getKind() != ConstraintLocator::AutoclosureResult)
-        break;
-
-      LLVM_FALLTHROUGH;
-    }
-
     case ConstraintLocator::AutoclosureResult: {
       auto loc = getConstraintLocator(getRawAnchor(), path.drop_back());
       AutoClosureForwardingFailure failure(getSolution(), loc);

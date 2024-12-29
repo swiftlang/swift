@@ -3389,8 +3389,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
-    case ConstraintLocator::ApplyFunction:
-    case ConstraintLocator::FunctionResult:
+    case ConstraintLocator::ApplyFunction: {
       // Extract application function.
       if (auto applyExpr = getAsExpr<ApplyExpr>(anchor)) {
         anchor = applyExpr->getFn();
@@ -3412,7 +3411,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       }
 
       break;
-
+    }
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::LValueConversion:
     case ConstraintLocator::DynamicType:
@@ -3677,6 +3676,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::SynthesizedArgument:
       break;
 
+    case ConstraintLocator::FunctionResult:
     case ConstraintLocator::DynamicLookupResult:
     case ConstraintLocator::KeyPathComponentResult:
       break;
