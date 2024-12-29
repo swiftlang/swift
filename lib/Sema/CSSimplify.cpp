@@ -15254,12 +15254,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return result;
   }
 
-  case FixKind::AutoClosureForwarding: {
-    if (recordFix(fix))
-      return SolutionKind::Error;
-    return matchTypes(type1, type2, matchKind, subflags, locator);
-  }
-
   case FixKind::AllowTupleTypeMismatch: {
     if (fix->getAs<AllowTupleTypeMismatch>()->isElementMismatch()) {
       auto *locator = fix->getLocator();
