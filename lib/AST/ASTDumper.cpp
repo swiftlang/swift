@@ -696,21 +696,9 @@ namespace {
       case StmtConditionElement::CK_Availability:
         printRecArbitrary([&](Label label) {
           printHead("#available", PatternColor, label);
-          for (auto *Query : C.getAvailability()->getQueries()) {
-            OS << '\n';
-            switch (Query->getKind()) {
-            case AvailabilitySpecKind::PlatformVersionConstraint:
-              cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
-              break;
-            case AvailabilitySpecKind::LanguageVersionConstraint:
-            case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-              cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
-              break;
-            case AvailabilitySpecKind::OtherPlatform:
-              cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
-              break;
-            }
-          }
+          printList(C.getAvailability()->getQueries(),
+                    [&](auto *query, Label label) { printRec(query, label); },
+                    Label::optional("queries"));
           printFoot();
         }, label);
         break;
@@ -724,6 +712,48 @@ namespace {
         }, label);
         break;
       }
+    }
+
+    /// Print an availability spec as a child node.
+    void printRec(AvailabilitySpec *Spec, Label label) {
+      printRecArbitrary(
+          [&](Label label) {
+            switch (Spec->getKind()) {
+            case AvailabilitySpecKind::PlatformVersionConstraint: {
+              auto plat = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
+              printHead("platform_version_constraint_availability_spec",
+                        PatternColor, label);
+              printField(platformString(plat->getPlatform()), "platform");
+              printFieldRaw(
+                  [&](llvm::raw_ostream &OS) { OS << plat->getVersion(); },
+                  "version");
+              printFoot();
+              break;
+            }
+            case AvailabilitySpecKind::LanguageVersionConstraint:
+            case AvailabilitySpecKind::PackageDescriptionVersionConstraint: {
+              auto agnostic =
+                  cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec);
+              printHead("platform_agnostic_version_constraint_"
+                        "availability_spec",
+                        PatternColor, label);
+              printField(agnostic->isLanguageVersionSpecific()
+                             ? "swift"
+                             : "package_description",
+                         "kind");
+              printFieldRaw(
+                  [&](llvm::raw_ostream &OS) { OS << agnostic->getVersion(); },
+                  "version");
+              printFoot();
+              break;
+            }
+            case AvailabilitySpecKind::OtherPlatform:
+              printHead("other_constraint_availability_spec", PatternColor,
+                        label);
+              printFoot();
+              break;
+            }
+          }, label);
     }
 
     /// Print a range of nodes as a single "array" child node.
