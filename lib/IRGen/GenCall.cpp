@@ -599,7 +599,14 @@ namespace {
 
     /// Add a pointer to the given type as the next parameter.
     void addPointerParameter(llvm::Type *storageType) {
-      ParamIRTypes.push_back(storageType->getPointerTo());
+      if (isa<llvm::FunctionType>(storageType)) {
+        // read the program data space from the target data layout
+        ParamIRTypes.push_back(storageType->getPointerTo(IGM.DataLayout.getProgramAddressSpace()));
+      } else {
+        ParamIRTypes.push_back(storageType->getPointerTo());
+      }
+
+      // ParamIRTypes.push_back(storageType->getPointerTo());
     }
 
     void addCoroutineContextParameter();
