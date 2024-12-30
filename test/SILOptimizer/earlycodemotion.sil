@@ -522,6 +522,36 @@ bb3(%12 : $Bool):
   return %12 : $Bool
 }
 
+// CHECK-LABEL: sil [ossa] @sink_struct_ossa :
+// CHECK:       bb0({{.*}}):
+// CHECK:         switch_enum
+// CHECK:       bb1({{.*}}):
+// CHECK:         integer_literal $Builtin.Int1, -1
+// CHECK:         br bb3({{.*}} : $Builtin.Int1)
+// CHECK:       bb2:
+// CHECK:         integer_literal $Builtin.Int1, 0
+// CHECK:         br bb3({{.*}} : $Builtin.Int1)
+// CHECK:       bb3({{.*}} : $Builtin.Int1):
+// CHECK:         struct $Bool
+// CHECK:       } // end sil function 'sink_struct_ossa'
+sil [ossa] @sink_struct_ossa : $@convention(thin) (Optional<Builtin.Int32>) -> Bool {
+bb0(%0 : $Optional<Builtin.Int32>):
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%2 : $Builtin.Int32):
+  %6 = integer_literal $Builtin.Int1, -1
+  %7 = struct $Bool (%6 : $Builtin.Int1)
+  br bb3(%7 : $Bool)
+
+bb2:
+  %9 = integer_literal $Builtin.Int1, 0
+  %10 = struct $Bool (%9 : $Builtin.Int1)
+  br bb3(%10 : $Bool)
+
+bb3(%12 : $Bool):
+  return %12 : $Bool
+}
+
 // Sink retain down the successors so we can pair up retain with release on the
 // fast path.
 class Test {
@@ -1399,6 +1429,26 @@ bb2:
 bb3(%z1 : $Builtin.RawPointer):
   //CHECK: string_literal utf8 "0"
   //CHECK-NEXT: return
+  return %z1 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil [ossa] @sink_literals_through_arguments_ossa :
+// CHECK:         string_literal utf8 "0"
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'sink_literals_through_arguments_ossa'
+sil [ossa] @sink_literals_through_arguments_ossa : $@convention(thin) (Builtin.Int1) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %x1 = string_literal utf8 "0"
+  br bb3(%x1 : $Builtin.RawPointer)
+
+bb2:
+  %y1 = string_literal utf8 "0"
+  br bb3(%y1 : $Builtin.RawPointer)
+
+bb3(%z1 : $Builtin.RawPointer):
   return %z1 : $Builtin.RawPointer
 }
 

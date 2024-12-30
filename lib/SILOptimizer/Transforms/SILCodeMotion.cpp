@@ -27,6 +27,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -917,6 +918,8 @@ static const int SinkSearchWindow = 6;
 
 /// Returns True if we can sink this instruction to another basic block.
 static bool canSinkInstruction(SILInstruction *Inst) {
+  if (hasOwnershipOperandsOrResults(Inst))
+    return false;
   return !Inst->hasUsesOfAnyResult() && !isa<TermInst>(Inst);
 }
 
@@ -1176,6 +1179,9 @@ static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, un
 
   // We only move instructions with a single use.
   if (!FSI || !hasOneNonDebugUse(FSI))
+    return false;
+
+  if (hasOwnershipOperandsOrResults(FSI))
     return false;
 
   // The list of identical instructions.
@@ -1743,38 +1749,43 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     LLVM_DEBUG(llvm::dbgs() << "    Merging predecessors!\n");
     State.mergePredecessorStates();
 
-    // If our predecessors cover any of our enum values, attempt to hoist
-    // releases up the CFG onto enum payloads or sink retains out of switch
-    // regions.
-    LLVM_DEBUG(llvm::dbgs() << "    Attempting to move releases into "
-                               "predecessors!\n");
+    if (!F->hasOwnership()) {
+      // If our predecessors cover any of our enum values, attempt to hoist
+      // releases up the CFG onto enum payloads or sink retains out of switch
+      // regions.
+      LLVM_DEBUG(llvm::dbgs() << "    Attempting to move releases into "
+                                 "predecessors!\n");
 
-    // Perform a relatively local forms of retain sinking and release hoisting
-    // regarding switch regions and SILargument. This are not handled by retain
-    // release code motion.
-    if (HoistReleases) {
-      Changed |= State.hoistDecrementsIntoSwitchRegions(AA);
+      // Perform a relatively local forms of retain sinking and release hoisting
+      // regarding switch regions and SILargument. This are not handled by retain
+      // release code motion.
+      if (HoistReleases) {
+        Changed |= State.hoistDecrementsIntoSwitchRegions(AA);
+      }
+
+      // Sink switch related retains.
+      Changed |= sinkIncrementsIntoSwitchRegions(State.getBB(), AA, RCIA);
+      Changed |= State.sinkIncrementsOutOfSwitchRegions(AA, RCIA);
+
+      // Then attempt to sink code from predecessors. This can include retains
+      // which is why we always attempt to move releases up the CFG before sinking
+      // code from predecessors. We will never sink the hoisted releases from
+      // predecessors since the hoisted releases will be on the enum payload
+      // instead of the enum itself.
+      Changed |= canonicalizeRefCountInstrs(State.getBB());
     }
-
-    // Sink switch related retains.
-    Changed |= sinkIncrementsIntoSwitchRegions(State.getBB(), AA, RCIA);
-    Changed |= State.sinkIncrementsOutOfSwitchRegions(AA, RCIA);
-
-    // Then attempt to sink code from predecessors. This can include retains
-    // which is why we always attempt to move releases up the CFG before sinking
-    // code from predecessors. We will never sink the hoisted releases from
-    // predecessors since the hoisted releases will be on the enum payload
-    // instead of the enum itself.
-    Changed |= canonicalizeRefCountInstrs(State.getBB());
     Changed |= sinkCodeFromPredecessors(BBToStateMap, State.getBB());
     Changed |= sinkArgumentsFromPredecessors(BBToStateMap, State.getBB());
     Changed |= sinkLiteralsFromPredecessors(State.getBB());
-    // Try to hoist release of a SILArgument to predecessors.
-    Changed |= hoistSILArgumentReleaseInst(State.getBB());
 
-    // Then perform the dataflow.
-    LLVM_DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");
-    Changed |= State.process();
+    if (!F->hasOwnership()) {
+      // Try to hoist release of a SILArgument to predecessors.
+      Changed |= hoistSILArgumentReleaseInst(State.getBB());
+
+      // Then perform the dataflow.
+      LLVM_DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");
+      Changed |= State.process();
+    }
   }
 
   return Changed;
@@ -1791,9 +1802,6 @@ public:
   /// The entry point to the transformation.
   void run() override {
     auto *F = getFunction();
-    // Skip functions with ownership for now.
-    if (F->hasOwnership())
-      return;
 
     auto *AA = getAnalysis<AliasAnalysis>(F);
     auto *PO = getAnalysis<PostOrderAnalysis>()->get(F);
