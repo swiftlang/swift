@@ -6086,7 +6086,7 @@ Signature irgen::emitCastOfFunctionPointer(IRGenFunction &IGF,
                             : IGF.IGM.getSignature(fnType);
 
   // Emit the cast.
-  fnPtr = IGF.Builder.CreateBitCast(fnPtr, sig.getType()->getPointerTo());
+  fnPtr = IGF.Builder.CreateBitCast(fnPtr, sig.getType()->getPointerTo(IGF.IGM.DataLayout.getProgramAddressSpace()));
 
   // Return the information.
   return sig;
@@ -6219,7 +6219,7 @@ FunctionPointer FunctionPointer::forExplosionValue(IRGenFunction &IGF,
                                                    llvm::Value *fnPtr,
                                                    CanSILFunctionType fnType) {
   // Bitcast out of an opaque pointer type.
-  assert(fnPtr->getType() == IGF.IGM.Int8PtrTy);
+  assert(fnPtr->getType() == IGF.IGM.Int8ProgramSpacePtrTy);
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, fnType);
   auto authInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, fnType);
 
@@ -6238,7 +6238,7 @@ FunctionPointer::getExplosionValue(IRGenFunction &IGF,
   }
 
   // Bitcast to an opaque pointer type.
-  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
+  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8ProgramSpacePtrTy);
 
   return fnPtr;
 }
