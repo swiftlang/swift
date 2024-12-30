@@ -2517,7 +2517,8 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM, LinkInfo &linkInfo,
   }
 
   llvm::Function *fn =
-    llvm::Function::Create(signature.getType(), linkInfo.getLinkage(), name);
+    llvm::Function::Create(signature.getType(), linkInfo.getLinkage(),
+     /*addrspace*/IGM.DataLayout.getProgramAddressSpace(), name);
   fn->setCallingConv(signature.getCallingConv());
 
   if (insertBefore) {
