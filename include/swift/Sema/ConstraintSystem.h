@@ -1652,7 +1652,11 @@ public:
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
-  Type simplifyType(Type type) const;
+  ///
+  /// \param wantInterfaceType If true, maps the resulting type out of context,
+  /// and replaces type variables for opened generic parameters with the
+  /// generic parameter types. Should only be used for diagnostic logic.
+  Type simplifyType(Type type, bool wantInterfaceType = false) const;
 
   // To aid code completion, we need to attempt to convert type placeholders
   // back into underlying generic parameters if possible, since type

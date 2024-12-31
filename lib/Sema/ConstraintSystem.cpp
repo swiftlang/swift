@@ -1721,14 +1721,29 @@ void Solution::recordSingleArgMatchingChoice(ConstraintLocator *locator) {
        MatchCallArgumentResult::forArity(1)});
 }
 
-Type Solution::simplifyType(Type type) const {
+Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
+  // If we've been asked for an interface type, start by mapping any archetypes
+  // out of context.
+  if (wantInterfaceType)
+    type = type->mapTypeOutOfContext();
+
   if (!(type->hasTypeVariable() || type->hasPlaceholder()))
     return type;
 
   // Map type variables to fixed types from bindings.
   auto &cs = getConstraintSystem();
-  auto resolvedType = cs.simplifyTypeImpl(
-      type, [&](TypeVariableType *tvt) -> Type { return getFixedType(tvt); });
+  auto resolvedType =
+      cs.simplifyTypeImpl(type, [&](TypeVariableType *tvt) -> Type {
+        // If we want the interface type, use the generic parameter if we
+        // have one, otherwise map the fixed type out of context.
+        if (wantInterfaceType) {
+          if (auto *gp = tvt->getImpl().getGenericParameter())
+            return gp;
+          return getFixedType(tvt)->mapTypeOutOfContext();
+        }
+        return getFixedType(tvt);
+      });
+  ASSERT(!(wantInterfaceType && resolvedType->hasPrimaryArchetype()));
 
   // Placeholders shouldn't be reachable through a solution, they are only
   // useful to determine what went wrong exactly.
@@ -4008,29 +4023,7 @@ ASTNode ConstraintSystem::includingParentApply(ASTNode node) {
 }
 
 Type Solution::resolveInterfaceType(Type type) const {
-  auto resolvedType = type.transformRec([&](Type type) -> std::optional<Type> {
-    if (auto *tvt = type->getAs<TypeVariableType>()) {
-      // If this type variable is for a generic parameter, return that.
-      if (auto *gp = tvt->getImpl().getGenericParameter())
-        return gp;
-
-      // Otherwise resolve its fixed type, mapped out of context.
-      auto fixed = simplifyType(tvt);
-      return resolveInterfaceType(fixed->mapTypeOutOfContext());
-    }
-    if (auto *dmt = type->getAs<DependentMemberType>()) {
-      // For a dependent member, first resolve the base.
-      auto newBase = resolveInterfaceType(dmt->getBase());
-
-      // Then reconstruct using its associated type.
-      assert(dmt->getAssocType());
-      return DependentMemberType::get(newBase, dmt->getAssocType());
-    }
-    return std::nullopt;
-  });
-
-  assert(!resolvedType->hasArchetype());
-  return resolvedType;
+  return simplifyType(type, /*wantInterfaceType*/ true);
 }
 
 std::optional<FunctionArgApplyInfo>
