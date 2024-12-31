@@ -94,6 +94,9 @@ def _apply_default_arguments(args):
     if args.foundation_build_variant is None:
         args.foundation_build_variant = args.build_variant
 
+    if args.foundation_tests_build_variant is None:
+        args.foundation_tests_build_variant = args.build_variant
+
     if args.libdispatch_build_variant is None:
         args.libdispatch_build_variant = args.build_variant
 
@@ -954,6 +957,12 @@ def create_argument_parser():
     option('--debug-foundation', store('foundation_build_variant'),
            const='Debug',
            help='build the Debug variant of Foundation')
+
+    option('--foundation-tests-build-type', store('foundation_tests_build_variant'),
+           choices=['Debug', 'Release'],
+           default=None,
+           help='build the Foundation tests in a certain variant '
+                '(Debug builds much faster)')
 
     option('--debug-libdispatch', store('libdispatch_build_variant'),
            const='Debug',
