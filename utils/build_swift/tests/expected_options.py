@@ -201,6 +201,7 @@ EXPECTED_DEFAULTS = {
     'swift_debuginfo_non_lto_args': None,
     'force_optimized_typechecker': False,
     'foundation_build_variant': 'Debug',
+    'foundation_tests_build_variant': 'Debug',
     'host_cc': None,
     'host_cxx': None,
     'host_libtool': None,
@@ -783,6 +784,8 @@ EXPECTED_OPTIONS = [
                   choices=['false', 'not-merged', 'merged']),
     ChoicesOption('--android-arch',
                   choices=['armv7', 'aarch64', 'x86_64']),
+    ChoicesOption('--foundation-tests-build-type',
+                  dest='foundation_tests_build_variant', choices=['Debug', 'Release']),
 
     StrOption('--android-api-level'),
     StrOption('--build-args'),
