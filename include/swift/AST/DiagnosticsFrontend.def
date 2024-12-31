@@ -603,5 +603,8 @@ GROUPED_WARNING(command_line_conflicts_with_strict_safety,Unsafe,none,
       "'%0' is not memory-safe and should not be combined with "
       "strict memory safety checking", (StringRef))
 
+ERROR(zlib_not_supported,none,
+       "this compiler was not built with zlib compression support enabled", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

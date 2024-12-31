@@ -32,6 +32,8 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/APFloat.h"
@@ -39,6 +41,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
@@ -766,6 +769,111 @@ namespace {
     }
 
     bool isParsable() const override { return false; }
+  };
+
+  /// Implements JSON formatted output for `-ast-dump`.
+  class JSONWriter : public PrintWriterBase {
+    llvm::json::OStream OS;
+    std::vector<bool> InObjectStack;
+
+  public:
+    JSONWriter(raw_ostream &os, unsigned indent = 0) : OS(os, indent) {}
+
+    void printRecArbitrary(std::function<void(Label)> body,
+                           Label label) override {
+      // The label is ignored if we're not printing inside an object (meaning
+      // we must be in an array).
+      if (InObjectStack.back()) {
+        OS.attributeBegin(label.text());
+        body(Label::optional(""));
+        OS.attributeEnd();
+      } else {
+        body(label);
+      }
+    }
+
+    void printRecRange(std::function<void(Label)> body, Label label) override {
+      printListArbitrary([&]{ body(label); }, label);
+    }
+
+    void printListArbitrary(std::function<void()> body, Label label) override {
+      OS.attributeBegin(label.text());
+      OS.arrayBegin();
+      InObjectStack.push_back(false);
+      body();
+      InObjectStack.pop_back();
+      OS.arrayEnd();
+      OS.attributeEnd();
+    }
+
+    void printHead(StringRef name, TerminalColor color, Label label) override {
+      OS.objectBegin();
+      InObjectStack.push_back(true);
+      OS.attribute(label.empty() ? "_kind" : label.text(), name);
+    }
+
+    void printFoot() override {
+      InObjectStack.pop_back();
+      OS.objectEnd();
+    }
+
+    void printFieldRaw(std::function<void(llvm::raw_ostream &)> body,
+                       Label label, TerminalColor color) override {
+      std::string value;
+      llvm::raw_string_ostream SOS(value);
+      body(SOS);
+      // The label is ignored if we're not printing inside an object (meaning
+      // we must be in an array).
+      if (InObjectStack.back()) {
+        OS.attribute(label.text(), value);
+      } else {
+        OS.value(value);
+      }
+    }
+
+    void printFieldQuotedRaw(std::function<void(llvm::raw_ostream &)> body,
+                             Label label, TerminalColor color) override {
+      // No need to do special quoting for complex values; the JSON output
+      // stream will do this for us.
+      printFieldRaw(body, label, color);
+    }
+
+    void printFlagRaw(std::function<void(llvm::raw_ostream &)> body,
+                      TerminalColor color) override {
+      std::string flag;
+      llvm::raw_string_ostream SOS(flag);
+      body(SOS);
+      OS.attribute(flag, true);
+    }
+
+    void printSourceLoc(const SourceLoc L, const ASTContext *Ctx,
+                        Label label) override {
+      // For compactness, we only print source ranges in JSON, since they
+      // provide a superset of this information.
+    }
+
+    void printSourceRange(const SourceRange R,
+                          const ASTContext *Ctx) override {
+      OS.attributeBegin("range");
+      OS.objectBegin();
+
+      SourceManager &srcMgr = Ctx->SourceMgr;
+      unsigned startBufferID = srcMgr.findBufferContainingLoc(R.Start);
+      unsigned startOffset = srcMgr.getLocOffsetInBuffer(R.Start,
+                                                         startBufferID);
+      OS.attribute("start", startOffset);
+
+      unsigned endBufferID = srcMgr.findBufferContainingLoc(R.End);
+      unsigned endOffset = srcMgr.getLocOffsetInBuffer(R.End, endBufferID);
+      OS.attribute("end", endOffset);
+
+      OS.objectEnd();
+      OS.attributeEnd();
+    }
+
+    bool hasNonStandardOutput() const override { return true; }
+
+    bool isParsable() const override { return true; }
   };
 
   /// PrintBase - Base type for recursive structured dumps of AST nodes.
@@ -2235,6 +2343,11 @@ void SourceFile::dump(llvm::raw_ostream &OS, bool parseIfNeeded) const {
   DefaultWriter writer(OS, /*indent=*/ 0);
   PrintDecl(writer, parseIfNeeded).visitSourceFile(*this);
   llvm::errs() << '\n';
+}
+
+void SourceFile::dumpJSON(llvm::raw_ostream &OS) const {
+  JSONWriter writer(OS, /*indent*/ 2);
+  PrintDecl(writer, /*parseIfNeeded*/ true).visitSourceFile(*this);
 }
 
 void Pattern::dump() const {
