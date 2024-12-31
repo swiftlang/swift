@@ -1793,10 +1793,6 @@ public:
   /// "resolved" concrete type.
   Type getResolvedType(ASTNode node) const;
 
-  /// Resolve type variables present in the raw type, using generic parameter
-  /// types where possible.
-  Type resolveInterfaceType(Type type) const;
-
   Type getContextualType(ASTNode anchor) const {
     for (const auto &entry : contextualTypes) {
       if (entry.first == anchor) {

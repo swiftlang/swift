@@ -4022,10 +4022,6 @@ ASTNode ConstraintSystem::includingParentApply(ASTNode node) {
   return node;
 }
 
-Type Solution::resolveInterfaceType(Type type) const {
-  return simplifyType(type, /*wantInterfaceType*/ true);
-}
-
 std::optional<FunctionArgApplyInfo>
 Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // It's only valid to use `&` in argument positions, but we need
@@ -4118,13 +4114,12 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto *callee = choice ? choice->getDeclOrNull() : nullptr;
   if (callee && callee->hasInterfaceType()) {
     // If we have a callee with an interface type, we can use it. This is
-    // preferable to resolveInterfaceType, as this will allow us to get a
-    // GenericFunctionType for generic decls.
+    // preferable to simplifyType for the function, as this will allow us to get
+    // a GenericFunctionType for generic decls.
     //
     // Note that it's possible to find a callee without an interface type. This
     // can happen for example with closure parameters, where the interface type
-    // isn't set until the solution is applied. In that case, use
-    // resolveInterfaceType.
+    // isn't set until the solution is applied. In that case, use simplifyType.
     fnInterfaceType = callee->getInterfaceType();
 
     // Strip off the curried self parameter if necessary.
@@ -4145,7 +4140,7 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     }
 #endif
   } else {
-    fnInterfaceType = resolveInterfaceType(rawFnType);
+    fnInterfaceType = simplifyType(rawFnType, /*wantInterfaceType*/ true);
   }
 
   auto argIdx = applyArgElt->getArgIdx();
