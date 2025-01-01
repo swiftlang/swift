@@ -213,10 +213,18 @@ fileprivate final class ProjectGenerator {
     _ name: String, at parentPath: RelativePath?, canUseBuildableFolder: Bool,
     productType: Xcode.Target.ProductType?, includeInAllTarget: Bool
   ) -> Xcode.Target? {
-    guard targets[name] == nil else {
-      log.warning("Duplicate target '\(name)', skipping")
-      return nil
-    }
+    let name = {
+      // If we have a same-named target, disambiguate.
+      if targets[name] == nil {
+        return name
+      }
+      var i = 2
+      var newName: String { "\(name)\(i)" }
+      while targets[newName] != nil {
+        i += 1
+      }
+      return newName
+    }()
     var buildableFolder: Xcode.FileReference?
     if let parentPath, !parentPath.components.isEmpty {
       // If we've been asked to use buildable folders, see if we can create
@@ -747,12 +755,7 @@ fileprivate final class ProjectGenerator {
       let target = try buildDir.getClangTarget(
         for: targetSource, knownUnbuildables: spec.knownUnbuildables
       )
-      guard var target else { continue }
-      // We may have a Swift target with the same name, disambiguate.
-      // FIXME: We ought to be able to support mixed-source targets.
-      if targets[target.name] != nil {
-        target.name = "\(target.name)-clang"
-      }
+      guard let target else { continue }
       try generateClangTarget(target)
     }
 
