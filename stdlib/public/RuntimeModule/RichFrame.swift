@@ -17,7 +17,7 @@
 import Swift
 
 @_spi(Internal)
-public enum RichFrame<T: FixedWidthInteger>: CustomStringConvertible {
+public enum RichFrame<T: FixedWidthInteger>: CustomStringConvertible, Equatable {
   public typealias Address = T
 
   /// A program counter value.

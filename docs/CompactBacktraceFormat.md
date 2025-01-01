@@ -54,6 +54,7 @@ The following instructions are currently defined
 | `0010axxx` | `ra`     | A return address value follows            |
 | `0011axxx` | `async`  | An async resume point follows             |
 | `01xxxxxx` | `omit`   | Indicates frames have been omitted        |
+| `1000xxxx` | `rep`    | Repeat the previous frame                 |
 | `1xxxxxxx` | reserved | Reserved for future expansion             |
 
 ### `end`/`trunc`
@@ -139,3 +140,24 @@ machine word length) that are zero-extended to machine word length and
 that represent a count of the number of frames that were omitted.
 
 If `x` is `0`, `count + 1` is the number of frames that were omitted.
+
+### `rep`
+
+#### Encoding
+
+~~~
+   7   6   5   4   3   2   1   0
+ ┌────────────────┬───┬──────────┐
+ │ 1   0   0   0  │ x │ count    │ repeat
+ └────────────────┴───┴──────────┘
+~~~
+
+#### Meaning
+
+Repeat the previous frame.
+
+If `x` is `1`, the instruction is followed by `count + 1` bytes that are zero
+extended to machine word length and that represent a count of the number of
+times to repeat the preceding frame.
+
+If `x` is `0`, the previous frame should be repeated `count + 1` times.
