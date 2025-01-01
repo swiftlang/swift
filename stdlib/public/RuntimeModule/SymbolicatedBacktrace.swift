@@ -213,8 +213,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
         if stringLen > 0 {
           return demangled.withMemoryRebound(to: UInt8.self,
                                              capacity: stringLen) {
-            let demangledBytes = UnsafeBufferPointer(start: $0,
-                                                     count: stringLen)
+            let demangledBytes = UnsafeBufferPointer<UInt8>(start: $0,
+                                                            count: stringLen)
             return String(decoding: demangledBytes, as: UTF8.self)
           }
         }

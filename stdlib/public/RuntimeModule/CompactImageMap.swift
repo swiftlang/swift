@@ -250,7 +250,7 @@ public enum CompactImageMapFormat {
       }
     }
 
-    public mutating func decode() -> ImageMap? {
+    mutating func decode() -> ([ImageMap.Image], ImageMap.WordSize)? {
       // Check the version and decode the size
       guard let infoByte = iterator.next() else {
         return nil
@@ -375,7 +375,7 @@ public enum CompactImageMapFormat {
           wsMap = .sixtyFourBit
       }
 
-      return ImageMap(images: images, wordSize: wsMap)
+      return (images, wsMap)
     }
   }
 

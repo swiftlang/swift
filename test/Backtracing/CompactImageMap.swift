@@ -39,8 +39,7 @@ struct ImageMapTest {
     }
     print("")
 
-    var decoder = CompactImageMapFormat.Decoder(encoded)
-    guard let decodedMap = decoder.decode() else {
+    guard let decodedMap = ImageMap(compactImageMapData: encoded) else {
       print("Unable to decode")
       return
     }
@@ -62,5 +61,3 @@ struct ImageMapTest {
     // CHECK: Maps match
   }
 }
-
-

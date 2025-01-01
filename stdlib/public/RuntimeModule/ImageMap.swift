@@ -57,6 +57,22 @@ public struct ImageMap: Collection, Sendable, Hashable {
   /// The size of words used when capturing.
   var wordSize: WordSize
 
+  /// Construct an ImageMap.
+  init(images: [Image], wordSize: WordSize) {
+    self.images = images
+    self.wordSize = wordSize
+  }
+
+  /// Construct an ImageMap from CompactImageMap data {
+  @_spi(Internal)
+  public init?(compactImageMapData: some Sequence<UInt8>) {
+    var decoder = CompactImageMapFormat.Decoder(compactImageMapData)
+    guard let (images, wordSize) = decoder.decode() else {
+      return nil
+    }
+    self.init(images: images, wordSize: wordSize)
+  }
+
   /// The position of the first element in a non-empty collection.
   public var startIndex: Self.Index {
     return 0

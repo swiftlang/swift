@@ -26,6 +26,7 @@ import Runtime
 @_spi(MemoryReaders) import Runtime
 
 internal import BacktracingImpl.OS.Darwin
+internal import BacktracingImpl.Runtime
 
 #if arch(x86_64)
 typealias MContext = darwin_x86_64_mcontext

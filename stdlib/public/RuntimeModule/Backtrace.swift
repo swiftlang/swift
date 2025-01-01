@@ -232,7 +232,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   public var architecture: String
 
   /// The actual backtrace data, stored in Compact Backtrace Format.
-  private var representation: [UInt8]
+  var representation: [UInt8]
 
   /// A list of captured frame information.
   @available(macOS 10.15, *)
