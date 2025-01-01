@@ -154,8 +154,9 @@ fileprivate final class ProjectGenerator {
     guard let path else { return true }
 
     // Not very efficient, but excludedPaths should be small in practice.
-    guard let excluded = spec.excludedPaths.first(where: { path.hasPrefix($0.path) })
-    else {
+    guard let excluded = spec.excludedPaths.first(
+      where: { path.starts(with: $0.path) }
+    ) else {
       return true
     }
     if let description, let reason = excluded.reason {
@@ -238,7 +239,9 @@ fileprivate final class ProjectGenerator {
               group(for: repoRelativePath.appending(parentPath)) != nil else {
         // If this isn't a child of an explicitly added reference, something
         // has probably gone wrong.
-        if !spec.referencesToAdd.contains(where: { parentPath.hasPrefix($0.path) }) {
+        if !spec.referencesToAdd.contains(
+          where: { parentPath.starts(with: $0.path) }
+        ) {
           log.warning("""
             Target '\(name)' at '\(repoRelativePath.appending(parentPath))' is \
             nested in a folder reference; skipping. This is likely an xcodegen bug.
