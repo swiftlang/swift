@@ -34,7 +34,7 @@ fileprivate final class ProjectGenerator {
   private var groups: [RelativePath: CachedGroup] = [:]
   private var files: [RelativePath: Xcode.FileReference] = [:]
   private var targets: [String: Xcode.Target] = [:]
-  private var unbuildableSources: [ClangTarget.Source] = []
+  private var unbuildableSources: [RelativePath] = []
   private var runnableBuildTargets: [RunnableTarget: Xcode.Target] = [:]
 
   /// The group in which external files are stored.
@@ -321,12 +321,11 @@ fileprivate final class ProjectGenerator {
       return false
     }
     let parent = clangTarget.parentPath
-    let sources = clangTarget.sources.map(\.path)
-    let hasConsistentArgs = try sources.allSatisfy {
+    let hasConsistentArgs = try clangTarget.sources.allSatisfy {
       try !buildDir.clangArgs.hasUniqueArgs(for: $0, parent: parent)
     }
     guard hasConsistentArgs else { return false }
-    return try canUseBuildableFolder(at: parent, sources: sources)
+    return try canUseBuildableFolder(at: parent, sources: clangTarget.sources)
   }
 
   func canUseBuildableFolder(
@@ -394,15 +393,14 @@ fileprivate final class ProjectGenerator {
     let sourcesToBuild = target.addSourcesBuildPhase()
 
     for source in targetInfo.sources {
-      let sourcePath = source.path
-      guard let sourceRef = getOrCreateRepoRef(.file(sourcePath)) else {
+      guard let sourceRef = getOrCreateRepoRef(.file(source)) else {
         continue
       }
       let buildFile = sourcesToBuild.addBuildFile(fileRef: sourceRef)
 
       // Add any per-file settings.
       var fileArgs = try buildDir.clangArgs.getUniqueArgs(
-        for: sourcePath, parent: targetPath, infer: source.inferArgs
+        for: source, parent: targetPath, infer: spec.inferArgs
       )
       if !fileArgs.isEmpty {
         applyBaseSubstitutions(to: &fileArgs)
