@@ -802,17 +802,6 @@ GenericArgumentsMismatch *GenericArgumentsMismatch::create(
       GenericArgumentsMismatch(cs, actual, required, mismatches, locator);
 }
 
-bool AutoClosureForwarding::diagnose(const Solution &solution,
-                                     bool asNote) const {
-  AutoClosureForwardingFailure failure(solution, getLocator());
-  return failure.diagnose(asNote);
-}
-
-AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
-                                                     ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
-}
-
 bool AllowAutoClosurePointerConversion::diagnose(const Solution &solution,
                                                  bool asNote) const {
   AutoClosurePointerConversionFailure failure(solution, getFromType(),

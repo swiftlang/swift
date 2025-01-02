@@ -125,15 +125,13 @@ documentation, please create a thread on the Swift forums under the
     Describes how to maintain compatibility when changing the serialization
     format.
 - SIL and SIL Optimizations:
-  - [SILFunctionConventions.md](/docs/SILFunctionConventions.md):
-  - [SILMemoryAccess.md](/docs/SILMemoryAccess.md):
-  - [SILProgrammersManual.md](/docs/SILProgrammersManual.md):
-    Provides an overview of the implementation of SIL in the compiler.
+  - [SILFunctionConventions.md](/docs/SIL/SILFunctionConventions.md):
+  - [SILMemoryAccess.md](/docs/SIL/SILMemoryAccess.md):
   - [OptimizerDesign.md](/docs/OptimizerDesign.md):
     Describes the design of the optimizer pipeline.
   - [HighLevelSILOptimizations.rst](/docs/HighLevelSILOptimizations.rst):
     Describes how the optimizer understands the semantics of high-level
-    operations on [currency](/docs/Lexicon.md#currency-type) data types and 
+    operations on [currency](/docs/Lexicon.md#currency-type) data types and
     optimizes accordingly.
     Includes a thorough discussion of the `@_semantics` attribute.
   - [HowToUpdateDebugInfo.md](/docs/HowToUpdateDebugInfo.md): A guide for SIL
@@ -177,7 +175,7 @@ documentation, please create a thread on the Swift forums under the
   Documents how Swift interoperates with ObjC code and the ObjC runtime.
 - [LibraryEvolution.rst](/docs/LibraryEvolution.rst):
   Specifies what changes can be made without breaking binary compatibility.
-- [SIL.rst](/docs/SIL.rst):
+- [SIL.md](/docs/SIL/SIL.md):
   Documents the Swift Intermediate Language (SIL).
   - [TransparentAttr.md](/docs/TransparentAttr.md):
     Documents the semantics of the `@_transparent` attribute.
@@ -320,7 +318,7 @@ The documents in this section might be worth breaking up into several documents,
 and linking one document from the other. Breaking up into components will
 provide greater clarity to contributors wanting to add new documentation.
 
-- [ARCOptimization.md](/docs/ARCOptimization.md):
+- [ARCOptimization.md](/docs/SIL/ARCOptimization.md):
   Covers how ARC optimization works, with several examples.
   TODO: Not clear if this is intended to be an explanation or a reference guide.
 - [CompilerPerformance.md](/docs/CompilerPerformance.md):
