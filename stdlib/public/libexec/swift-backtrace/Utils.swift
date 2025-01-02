@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #if canImport(Darwin)
-import Darwin.C
+import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)
@@ -143,6 +143,34 @@ internal func spawn(_ path: String, args: [String]) throws {
 
 #endif // os(macOS)
 
+internal func isDir(_ path: String) -> Bool {
+  var st = stat()
+  guard stat(path, &st) == 0 else {
+    return false
+  }
+  return (st.st_mode & S_IFMT) == S_IFDIR
+}
+
+internal func exists(_ path: String) -> Bool {
+  var st = stat()
+  guard stat(path, &st) == 0 else {
+    return false
+  }
+  return true
+}
+
+extension Sequence {
+  /// Return the first element in a Sequence.
+  ///
+  /// This is not, in general, a safe thing to do, because the sequence might
+  /// not be restartable.  For the cases where we're using it here, it's OK
+  /// though.
+  public var unsafeFirst: Element? {
+    var iterator = makeIterator()
+    return iterator.next()
+  }
+}
+
 struct CFileStream: TextOutputStream {
   var fp: UnsafeMutablePointer<FILE>
 
@@ -152,6 +180,10 @@ struct CFileStream: TextOutputStream {
 
   public func flush() {
     fflush(fp)
+  }
+
+  public func close() {
+    fclose(fp)
   }
 }
 
