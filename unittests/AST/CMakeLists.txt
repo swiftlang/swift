@@ -4,6 +4,7 @@ add_swift_unittest(SwiftASTTests
   ASTWalkerTests.cpp
   IndexSubsetTests.cpp
   DiagnosticConsumerTests.cpp
+  DiagnosticGroupsTests.cpp
   SourceLocTests.cpp
   TestContext.cpp
   TypeMatchTests.cpp
