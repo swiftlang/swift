@@ -264,10 +264,10 @@ handle_fatal_signal(int signum,
   if (!run_backtracer(fd)) {
     const char *message = _swift_backtraceSettings.color == OnOffTty::On
       ? " failed\n\n" : " failed ***\n\n";
-    if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
-      write(STDERR_FILENO, message, strlen(message));
-    else
+    if (_swift_backtraceSettings.outputTo == OutputTo::Stdout)
       write(STDOUT_FILENO, message, strlen(message));
+    else
+      write(STDERR_FILENO, message, strlen(message));
   }
 
 #if !MEMSERVER_USE_PROCESS
@@ -930,6 +930,9 @@ run_backtracer(int memserver_fd)
   case OutputTo::Stderr:
     backtracer_argv[30] = "stderr";
     break;
+  case OutputTo::File:
+    backtracer_argv[30] = _swift_backtraceSettings.outputPath;
+    break;
   }
 
   backtracer_argv[28] = trueOrFalse(_swift_backtraceSettings.cache);
@@ -963,4 +966,3 @@ run_backtracer(int memserver_fd)
 } // namespace
 
 #endif // __linux__
-

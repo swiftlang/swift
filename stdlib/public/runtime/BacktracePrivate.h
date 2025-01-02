@@ -94,6 +94,7 @@ enum class OutputTo {
   Auto = -1,
   Stdout = 0,
   Stderr = 2,
+  File = 3
 };
 
 enum class Symbolication {
@@ -120,6 +121,7 @@ struct BacktraceSettings {
   OutputTo         outputTo;
   Symbolication    symbolicate;
   const char      *swiftBacktracePath;
+  const char      *outputPath;
 };
 
 SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings;

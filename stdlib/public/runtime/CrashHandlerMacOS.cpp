@@ -415,6 +415,9 @@ run_backtracer()
   case OutputTo::Stderr:
     backtracer_argv[30] = "stderr";
     break;
+  case OutputTo::File:
+    backtracer_argv[30] = _swift_backtraceSettings.outputPath;
+    break;
   }
 
   backtracer_argv[28] = trueOrFalse(_swift_backtraceSettings.cache);
@@ -450,4 +453,3 @@ run_backtracer()
 #endif // TARGET_OS_OSX || TARGET_OS_MACCATALYST
 
 #endif // __APPLE__
-
