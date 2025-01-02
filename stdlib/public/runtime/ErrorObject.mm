@@ -93,7 +93,7 @@ using namespace swift::hashable_support;
   auto error = (const SwiftError*)self;
   // The domain string should not be nil; if it is, then this error box hasn't
   // been initialized yet as an NSError.
-  auto domain = error->domain.load(SWIFT_MEMORY_ORDER_CONSUME);
+  auto domain = error->domain.load(std::memory_order_consume);
   assert(domain
          && "Error box used as NSError before initialization");
   // Don't need to .retain.autorelease since it's immutable.
@@ -117,12 +117,12 @@ using namespace swift::hashable_support;
 
 - (NSInteger)code {
   auto error = (const SwiftError*)self;
-  return error->code.load(SWIFT_MEMORY_ORDER_CONSUME);
+  return error->code.load(std::memory_order_consume);
 }
 
 - (id /* NSDictionary */)userInfo {
   auto error = (const SwiftError*)self;
-  auto userInfo = error->userInfo.load(SWIFT_MEMORY_ORDER_CONSUME);
+  auto userInfo = error->userInfo.load(std::memory_order_consume);
   assert(userInfo
          && "Error box used as NSError before initialization");
   // Don't need to .retain.autorelease since it's immutable.
@@ -371,7 +371,7 @@ const Metadata *SwiftError::getHashableBaseType() const {
   this->hashableBaseType.compare_exchange_strong(
       expectedType, hashableBaseType ? hashableBaseType
                                      : reinterpret_cast<const Metadata *>(1),
-      std::memory_order_acq_rel);
+      std::memory_order_acq_rel, std::memory_order_relaxed);
   return type;
 }
 
@@ -392,7 +392,7 @@ const HashableWitnessTable *SwiftError::getHashableConformance() const {
           swift_conformsToProtocolCommon(type, &HashableProtocolDescriptor));
   hashableConformance.compare_exchange_strong(
       expectedWT, wt ? wt : reinterpret_cast<const HashableWitnessTable *>(1),
-      std::memory_order_acq_rel);
+      std::memory_order_acq_rel, std::memory_order_relaxed);
   return wt;
 }
 
@@ -497,7 +497,7 @@ swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
   // initialization of the object happens-before the domain initialization so
   // that the domain can be used alone as a flag for the initialization of the
   // object.
-  if (errorObject->domain.load(std::memory_order_acquire)) {
+  if (errorObject->domain.load(std::memory_order_consume)) {
     return ns;
   }
 
@@ -526,7 +526,8 @@ swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
   CFDictionaryRef expectedUserInfo = nullptr;
   if (!errorObject->userInfo.compare_exchange_strong(expectedUserInfo,
                                                      (CFDictionaryRef)userInfo,
-                                                     std::memory_order_acq_rel))
+                                                     std::memory_order_acq_rel,
+                                                     std::memory_order_relaxed))
     objc_release(userInfo);
 
   // We also need to cmpxchg in the domain; if somebody beat us to it,
@@ -537,7 +538,8 @@ swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
   CFStringRef expectedDomain = nullptr;
   if (!errorObject->domain.compare_exchange_strong(expectedDomain,
                                                    (CFStringRef)domain,
-                                                   std::memory_order_acq_rel))
+                                                   std::memory_order_acq_rel,
+                                                   std::memory_order_relaxed))
     objc_release(domain);
 
   return ns;

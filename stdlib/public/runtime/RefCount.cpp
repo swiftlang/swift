@@ -22,7 +22,7 @@ namespace swift {
 template <>
 HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable(bool failIfDeiniting)
 {
-  auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+  auto oldbits = refCounts.load(std::memory_order_consume);
 
   // Preflight failures before allocating a new side table.
   if (oldbits.hasSideTable()) {
