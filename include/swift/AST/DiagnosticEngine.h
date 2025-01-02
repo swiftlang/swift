@@ -21,7 +21,6 @@
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
-#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/PrintDiagnosticNamesMode.h"
 #include "swift/Basic/Statistic.h"
@@ -67,6 +66,8 @@ namespace swift {
   /// Each of the diagnostics described in Diagnostics.def has an entry in
   /// this enumeration type that uniquely identifies it.
   enum class DiagID : uint32_t;
+
+  enum class DiagGroupID : uint16_t;
 
   /// Describes a diagnostic along with its argument types.
   ///
