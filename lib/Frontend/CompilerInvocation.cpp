@@ -3834,6 +3834,13 @@ bool CompilerInvocation::parseArgs(
     }
   }
 
+  if (LangOpts.hasFeature(Feature::WarnUnsafe)) {
+    if (SILOpts.RemoveRuntimeAsserts ||
+        SILOpts.AssertConfig == SILOptions::Unchecked) {
+      Diags.diagnose(SourceLoc(), diag::Ounchecked_with_strict_safety);
+    }
+  }
+
   SILOpts.UseAggressiveReg2MemForCodeSize =
     ParsedArgs.hasFlag(OPT_enable_aggressive_reg2mem,
                        OPT_disable_aggressive_reg2mem,

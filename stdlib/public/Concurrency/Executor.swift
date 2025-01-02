@@ -144,6 +144,7 @@ public protocol SerialExecutor: Executor {
 
   /// Convert this executor value to the optimized form of borrowed
   /// executor references.
+  @unsafe
   func asUnownedSerialExecutor() -> UnownedSerialExecutor
 
   /// If this executor has complex equality semantics, and the runtime needs to

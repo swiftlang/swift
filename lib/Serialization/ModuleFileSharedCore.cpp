@@ -221,6 +221,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::SWIFT_INTERFACE_COMPILER_VERSION:
       extendedInfo.setSwiftInterfaceCompilerVersion(blobData);
       break;
+    case options_block::STRICT_MEMORY_SAFETY:
+      extendedInfo.setStrictMemorySafety(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1497,6 +1500,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.CXXStdlibKind = static_cast<uint8_t>(extInfo.getCXXStdlibKind());
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
+      Bits.StrictMemorySafety = extInfo.strictMemorySafety();
       MiscVersion = info.miscVersion;
       SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();

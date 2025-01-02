@@ -53,6 +53,7 @@ struct SwiftModuleTraceInfo {
   std::string Path;
   bool IsImportedDirectly;
   bool SupportsLibraryEvolution;
+  bool StrictMemorySafety;
 };
 
 struct SwiftMacroTraceInfo {
@@ -65,6 +66,7 @@ struct LoadedModuleTraceFormat {
   unsigned Version;
   Identifier Name;
   std::string Arch;
+  bool StrictMemorySafety;
   std::vector<SwiftModuleTraceInfo> SwiftModules;
   std::vector<SwiftMacroTraceInfo> SwiftMacros;
 };
@@ -80,6 +82,8 @@ template <> struct ObjectTraits<SwiftModuleTraceInfo> {
     out.mapRequired("isImportedDirectly", contents.IsImportedDirectly);
     out.mapRequired("supportsLibraryEvolution",
                     contents.SupportsLibraryEvolution);
+    out.mapRequired("strictMemorySafety",
+                    contents.StrictMemorySafety);
   }
 };
 
@@ -103,6 +107,8 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
     out.mapRequired("name", name);
 
     out.mapRequired("arch", contents.Arch);
+
+    out.mapRequired("strictMemorySafety", contents.StrictMemorySafety);
 
     // The 'swiftmodules' key is kept for backwards compatibility.
     std::vector<std::string> moduleNames;
@@ -643,7 +649,8 @@ static void computeSwiftModuleTraceInfo(
            /*IsImportedDirectly=*/
            isImportedDirectly,
            /*SupportsLibraryEvolution=*/
-           depMod->isResilient()});
+           depMod->isResilient(),
+           depMod->strictMemorySafety()});
       buffer.clear();
 
       continue;
@@ -782,8 +789,9 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   LoadedModuleTraceFormat trace = {
       /*version=*/LoadedModuleTraceFormat::CurrentVersion,
       /*name=*/mainModule->getName(),
-      /*arch=*/ctxt.LangOpts.Target.getArchName().str(), swiftModules,
-      swiftMacros};
+      /*arch=*/ctxt.LangOpts.Target.getArchName().str(),
+      mainModule ? mainModule->strictMemorySafety() : false,
+      swiftModules, swiftMacros};
 
   // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
   // so first write to memory and then dump the buffer to the trace file.

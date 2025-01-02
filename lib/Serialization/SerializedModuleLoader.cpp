@@ -1030,6 +1030,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setPublicModuleName(Ctx.getIdentifier(loadedModuleFile->getPublicModuleName()));
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
+    if (loadedModuleFile->strictMemorySafety())
+      M.setStrictMemorySafety();
     if (loadedModuleFile->hasCxxInteroperability()) {
       M.setHasCxxInteroperability();
       M.setCXXStdlibKind(loadedModuleFile->getCXXStdlibKind());
