@@ -747,6 +747,14 @@ extension LoadInst {
   }
 }
 
+extension PointerToAddressInst {
+  func set(alignment: Int?, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.PointerToAddressInst_setAlignment(UInt64(alignment ?? 0))
+    context.notifyInstructionChanged(self)
+  }
+}
+
 extension TermInst {
   func replaceBranchTarget(from fromBlock: BasicBlock, to toBlock: BasicBlock, _ context: some MutatingContext) {
     context.notifyBranchesChanged()

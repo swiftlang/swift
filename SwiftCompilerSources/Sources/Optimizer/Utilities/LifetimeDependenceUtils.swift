@@ -373,6 +373,9 @@ extension LifetimeDependence.Scope {
       self = .yield(value)
     case let .functionArgument(arg):
       self = .caller(arg)
+    case .uncheckOwnershipConversion:
+      // TODO: is this correct?
+      self = Self(variable: base, context)
     case .reborrow:
       fatalError("reborrows are not supported in diagnostics")
     }
