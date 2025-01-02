@@ -70,7 +70,7 @@ struct SectionNote {
   /// The size of this array must be a multiple of `sizeof(void *)` plus `4` to
   /// ensure correct alignment on 64-bit archs (because `ElfW(Nhdr)` is 12 bytes
   /// long and only 4-byte aligned.)
-  char name[28];
+  char n_name[28];
 
   /// The "payload" of the note.
   struct Bounds {
@@ -85,17 +85,17 @@ struct SectionNote {
   Bounds bounds;
 };
 
-#define DECLARE_NOTE(name)                             \
-  __attribute__((section(".note.swift5.section")))     \
-  static const SectionNote note##name = {              \
-    {                                                  \
-      sizeof(SectionNote::name), /* n_namesz */        \
-      sizeof(Section::Bounds), /* n_descsz */          \
-      0 /* n_type (unused) */                          \
-    },                                                 \
-    #name,                                             \
-    &__start_##name,                                   \
-    &__stop_##name                                     \
+#define DECLARE_NOTE(name)                                   \
+  __attribute__((section(".note.swift5.section"), used))     \
+  static const SectionNote note_##name = {                   \
+    {                                                        \
+      sizeof(SectionNote::n_name), /* n_namesz */            \
+      sizeof(SectionNote::Bounds), /* n_descsz */            \
+      0 /* n_type (unused) */                                \
+    },                                                       \
+    #name,                                                   \
+    &__start_##name,                                         \
+    &__stop_##name                                           \
   };
 #else
 #define DECLARE_NOTE(name)
