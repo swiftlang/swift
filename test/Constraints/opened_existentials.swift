@@ -498,3 +498,43 @@ do {
   // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   foo(&lValueP)
 }
+
+do {
+  do {
+    func foo<T : BitwiseCopyable>(_: T) -> T {}
+
+    let exist: any Any.Type
+    // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+    let result = foo(exist)
+    do {
+      // FIXME: The result type should be 'any Any.Type'
+      // var types = SwiftTypePair(typeOf: result, type2: SwiftType<any Any.Type>.self)
+      var types = SwiftTypePair(typeOf: result, type2: SwiftType<Any>.self)
+      types.assertTypesAreEqual()
+    }
+  }
+
+  do {
+    func foo<T : BitwiseCopyable>(_: T) -> T {}
+
+    let exist: any Any.Type.Type
+    // CHECK-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+    let result = foo(exist)
+    do {
+      var types = SwiftTypePair(typeOf: result, type2: SwiftType<any Any.Type.Type>.self)
+      types.assertTypesAreEqual()
+    }
+  }
+
+  do {
+    func foo<T>(_: T) -> T {}
+
+    let exist: any Any.Type
+    // CHECK-NOT: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+    let result = foo(exist)
+    do {
+      var types = SwiftTypePair(typeOf: result, type2: SwiftType<any Any.Type>.self)
+      types.assertTypesAreEqual()
+    }
+  }
+}
