@@ -1634,3 +1634,34 @@ bb0:
   return %5 : $()
 }
 
+sil [ossa] @callee : $@convention(thin) <Result> (@inout Result, @in_guaranteed Int, Int) -> () {
+bb0(%0 : $*Result, %1 : $*Int, %2 : $Int):
+  unreachable
+}
+
+sil [reabstraction_thunk] [ossa] @thunk : $@convention(thin) <τ_0_0> (@inout τ_0_0, Int, @guaranteed @noescape @callee_guaranteed (@inout τ_0_0, @in_guaranteed Int) -> ()) -> ()
+
+// CHECK-LABEL: sil [ossa] @insert_copy_when_removing_thunk :
+// CHECK:         [[P:%.*]] = partial_apply [callee_guaranteed] [on_stack] %2(%0)
+// CHECK:         [[C:%.*]] = copy_value [[P]]
+// CHECK:         [[V:%.*]] = convert_function [[C]]
+// CHECK:         apply [[V]]
+// CHECK:         destroy_value [[V]]
+// CHECK:         destroy_value [[P]]
+// CHECK:       } // end sil function 'insert_copy_when_removing_thunk'
+sil [ossa] @insert_copy_when_removing_thunk : $@convention(method) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  %2 = function_ref @callee : $@convention(thin) <τ_0_0> (@inout τ_0_0, @in_guaranteed Int, Int) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2<Int>(%0) : $@convention(thin) <τ_0_0> (@inout τ_0_0, @in_guaranteed Int, Int) -> ()
+  %4 = function_ref @thunk : $@convention(thin) <τ_0_0> (@inout τ_0_0, Int, @guaranteed @noescape @callee_guaranteed (@inout τ_0_0, @in_guaranteed Int) -> ()) -> ()
+  %5 = partial_apply [callee_guaranteed] [on_stack] %4<Int>(%3) : $@convention(thin) <τ_0_0> (@inout τ_0_0, Int, @guaranteed @noescape @callee_guaranteed (@inout τ_0_0, @in_guaranteed Int) -> ()) -> ()
+  %6 = convert_function %5 to $@noescape @callee_guaranteed @substituted <τ_0_0> (@inout τ_0_0, Int) -> () for <Int>
+  store %0 to [trivial] %1
+  %8 = apply %6(%1, %0) : $@noescape @callee_guaranteed @substituted <τ_0_0> (@inout τ_0_0, Int) -> () for <Int>
+  destroy_value %6
+  destroy_value %3
+  %11 = load [trivial] %1
+  dealloc_stack %1
+  return %11
+}
