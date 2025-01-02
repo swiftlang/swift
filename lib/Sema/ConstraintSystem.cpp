@@ -1721,14 +1721,29 @@ void Solution::recordSingleArgMatchingChoice(ConstraintLocator *locator) {
        MatchCallArgumentResult::forArity(1)});
 }
 
-Type Solution::simplifyType(Type type) const {
+Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
+  // If we've been asked for an interface type, start by mapping any archetypes
+  // out of context.
+  if (wantInterfaceType)
+    type = type->mapTypeOutOfContext();
+
   if (!(type->hasTypeVariable() || type->hasPlaceholder()))
     return type;
 
   // Map type variables to fixed types from bindings.
   auto &cs = getConstraintSystem();
-  auto resolvedType = cs.simplifyTypeImpl(
-      type, [&](TypeVariableType *tvt) -> Type { return getFixedType(tvt); });
+  auto resolvedType =
+      cs.simplifyTypeImpl(type, [&](TypeVariableType *tvt) -> Type {
+        // If we want the interface type, use the generic parameter if we
+        // have one, otherwise map the fixed type out of context.
+        if (wantInterfaceType) {
+          if (auto *gp = tvt->getImpl().getGenericParameter())
+            return gp;
+          return getFixedType(tvt)->mapTypeOutOfContext();
+        }
+        return getFixedType(tvt);
+      });
+  ASSERT(!(wantInterfaceType && resolvedType->hasPrimaryArchetype()));
 
   // Placeholders shouldn't be reachable through a solution, they are only
   // useful to determine what went wrong exactly.
@@ -4007,32 +4022,6 @@ ASTNode ConstraintSystem::includingParentApply(ASTNode node) {
   return node;
 }
 
-Type Solution::resolveInterfaceType(Type type) const {
-  auto resolvedType = type.transformRec([&](Type type) -> std::optional<Type> {
-    if (auto *tvt = type->getAs<TypeVariableType>()) {
-      // If this type variable is for a generic parameter, return that.
-      if (auto *gp = tvt->getImpl().getGenericParameter())
-        return gp;
-
-      // Otherwise resolve its fixed type, mapped out of context.
-      auto fixed = simplifyType(tvt);
-      return resolveInterfaceType(fixed->mapTypeOutOfContext());
-    }
-    if (auto *dmt = type->getAs<DependentMemberType>()) {
-      // For a dependent member, first resolve the base.
-      auto newBase = resolveInterfaceType(dmt->getBase());
-
-      // Then reconstruct using its associated type.
-      assert(dmt->getAssocType());
-      return DependentMemberType::get(newBase, dmt->getAssocType());
-    }
-    return std::nullopt;
-  });
-
-  assert(!resolvedType->hasArchetype());
-  return resolvedType;
-}
-
 std::optional<FunctionArgApplyInfo>
 Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // It's only valid to use `&` in argument positions, but we need
@@ -4125,13 +4114,12 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto *callee = choice ? choice->getDeclOrNull() : nullptr;
   if (callee && callee->hasInterfaceType()) {
     // If we have a callee with an interface type, we can use it. This is
-    // preferable to resolveInterfaceType, as this will allow us to get a
-    // GenericFunctionType for generic decls.
+    // preferable to simplifyType for the function, as this will allow us to get
+    // a GenericFunctionType for generic decls.
     //
     // Note that it's possible to find a callee without an interface type. This
     // can happen for example with closure parameters, where the interface type
-    // isn't set until the solution is applied. In that case, use
-    // resolveInterfaceType.
+    // isn't set until the solution is applied. In that case, use simplifyType.
     fnInterfaceType = callee->getInterfaceType();
 
     // Strip off the curried self parameter if necessary.
@@ -4152,7 +4140,7 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     }
 #endif
   } else {
-    fnInterfaceType = resolveInterfaceType(rawFnType);
+    fnInterfaceType = simplifyType(rawFnType, /*wantInterfaceType*/ true);
   }
 
   auto argIdx = applyArgElt->getArgIdx();

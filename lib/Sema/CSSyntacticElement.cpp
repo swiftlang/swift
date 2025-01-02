@@ -1989,8 +1989,7 @@ private:
     for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
       assert(expected->hasName());
       auto prev = expected->getParentVarDecl();
-      auto type = solution.resolveInterfaceType(
-          solution.getType(prev)->mapTypeOutOfContext());
+      auto type = solution.getResolvedType(prev)->mapTypeOutOfContext();
       expected->setInterfaceType(type);
     }
   }
