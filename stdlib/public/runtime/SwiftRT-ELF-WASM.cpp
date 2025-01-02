@@ -70,7 +70,7 @@ struct SectionNote {
   /// The size of this array must be a multiple of `sizeof(void *)` plus `4` to
   /// ensure correct alignment on 64-bit archs (because `ElfW(Nhdr)` is 12 bytes
   /// long and only 4-byte aligned.)
-  char n_name[28];
+  char n_name[36];
 
   /// The "payload" of the note.
   struct Bounds {
