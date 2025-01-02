@@ -351,6 +351,18 @@ BacktraceInitializer::BacktraceInitializer() {
     _swift_backtraceSettings.enabled = OnOffTty::Off;
   }
 
+  // If we're outputting to a file, then the defaults are different
+  if (_swift_backtraceSettings.outputTo == OutputTo::File) {
+    if (_swift_backtraceSettings.interactive == OnOffTty::TTY)
+      _swift_backtraceSettings.interactive = OnOffTty::Off;
+    if (_swift_backtraceSettings.color == OnOffTty::TTY)
+      _swift_backtraceSettings.color = OnOffTty::Off;
+
+    // Unlike the other settings, this defaults to on if you specified a file
+    if (_swift_backtraceSettings.enabled == OnOffTty::TTY)
+      _swift_backtraceSettings.enabled = OnOffTty::On;
+  }
+
   if (_swift_backtraceSettings.enabled == OnOffTty::TTY)
     _swift_backtraceSettings.enabled =
       isStdoutATty() ? OnOffTty::On : OnOffTty::Off;
@@ -700,9 +712,15 @@ _swift_processBacktracingSetting(llvm::StringRef key,
     else if (value.equals_insensitive("stderr"))
       _swift_backtraceSettings.outputTo = OutputTo::Stderr;
     else {
-      swift::warning(0,
-                     "swift runtime: unknown output-to setting '%.*s'\n",
-                     static_cast<int>(value.size()), value.data());
+      size_t len = value.size();
+      char *path = (char *)std::malloc(len + 1);
+      std::copy(value.begin(), value.end(), path);
+      path[len] = 0;
+
+      std::free(const_cast<char *>(_swift_backtraceSettings.outputPath));
+
+      _swift_backtraceSettings.outputTo = OutputTo::File;
+      _swift_backtraceSettings.outputPath = path;
     }
   } else if (key.equals_insensitive("symbolicate")) {
     _swift_backtraceSettings.symbolicate = parseSymbolication(value);
@@ -1036,10 +1054,10 @@ _swift_displayCrashMessage(int signum, const void *pc)
 #if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
   return;
 #else
-  int fd = STDOUT_FILENO;
+  int fd = STDERR_FILENO;
 
-  if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
-    fd = STDERR_FILENO;
+  if (_swift_backtraceSettings.outputTo == OutputTo::Stdout)
+    fd = STDOUT_FILENO;
 
   const char *intro;
   if (_swift_backtraceSettings.color == OnOffTty::On) {
