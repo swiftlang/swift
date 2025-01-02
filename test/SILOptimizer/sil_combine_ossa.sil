@@ -5150,9 +5150,9 @@ bb0:
   %borrow = begin_borrow %8 : $KlassWithTailAllocatedElems
   %addr = ref_tail_addr %borrow : $KlassWithTailAllocatedElems, $Builtin.NativeObject
   %1 = address_to_pointer %addr : $*Builtin.NativeObject to $Builtin.RawPointer
-  end_borrow %borrow : $KlassWithTailAllocatedElems
   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.Word
   %3 = load [trivial] %2 : $*Builtin.Word
+  end_borrow %borrow : $KlassWithTailAllocatedElems
   destroy_value %8 : $KlassWithTailAllocatedElems
   return %3 : $Builtin.Word
 }
@@ -5275,16 +5275,13 @@ bb0(%0 : $UnsafePointer<AnyObject>):
 }
 
 // CHECK-LABEL: sil [ossa] @test_pointer_to_address : $@convention(thin) (@owned Klass, Builtin.Word) -> @owned AnyObject {
-// CHECK: bb0(%0 : @owned $Klass, %1 : $Builtin.Word):
-// CHECK:   [[CP1:%.*]] = copy_value %0 : $Klass
-// CHECK:   [[BORROW:%.*]] = begin_borrow [[CP1]] : $Klass
-// CHECK:   ref_tail_addr [[BORROW]] : $Klass, $AnyObject
-// CHECK:   index_addr %{{.*}} : $*AnyObject, %1 : $Builtin.Word
-// CHECK:   index_addr %{{.*}} : $*AnyObject, %1 : $Builtin.Word
-// CHECK:   load [copy] %{{.*}} : $*AnyObject
-// CHECK:   end_borrow [[BORROW]] : $Klass
-// CHECK:   destroy_value [[CP1]] : $Klass
-// CHECK:   fix_lifetime %0 : $Klass
+// CHECK:         [[P:%.*]] = address_to_pointer
+// CHECK:         end_borrow
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         [[I:%.*]] = index_addr [[A]]
+// CHECK-NOT:     address_to_pointer
+// CHECK-NOT:     pointer_to_address
+// CHECK:         load [copy] [[I]]
 // CHECK-LABEL: } // end sil function 'test_pointer_to_address'
 sil [ossa] @test_pointer_to_address : $@convention(thin) (@owned Klass, Builtin.Word) -> @owned AnyObject {
 bb0(%0 : @owned $Klass, %1 : $Builtin.Word):
@@ -5304,17 +5301,13 @@ bb0(%0 : @owned $Klass, %1 : $Builtin.Word):
 }
 
 // CHECK_COPYPROP-LABEL: sil [ossa] @test_pointer_to_address_copyprop : {{.*}} {
-// CHECK_COPYPROP: bb0([[WORD:%[^,]+]] :
-// CHECK_COPYPROP: [[INSTANCE:%[^,]+]] = apply
-// CHECK_COPYPROP-NOT: copy_value
-// CHECK_COPYPROP:   [[BORROW:%.*]] = begin_borrow [[INSTANCE]] : $Klass
-// CHECK_COPYPROP:   ref_tail_addr [[BORROW]] : $Klass, $AnyObject
-// CHECK_COPYPROP:   index_addr %{{.*}} : $*AnyObject, [[WORD]] : $Builtin.Word
-// CHECK_COPYPROP:   index_addr %{{.*}} : $*AnyObject, [[WORD]] : $Builtin.Word
-// CHECK_COPYPROP:   load [copy] %{{.*}} : $*AnyObject
-// CHECK_COPYPROP:   end_borrow [[BORROW]] : $Klass
-// CHECK_COPYPROP:   fix_lifetime [[INSTANCE]] : $Klass
-// CHECK_COPYPROP:   destroy_value [[INSTANCE]] : $Klass
+// CHECK_COPYPROP:         [[P:%.*]] = address_to_pointer
+// CHECK_COPYPROP:         end_borrow
+// CHECK_COPYPROP:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK_COPYPROP:         [[I:%.*]] = index_addr [[A]]
+// CHECK_COPYPROP-NOT:     address_to_pointer
+// CHECK_COPYPROP-NOT:     pointer_to_address
+// CHECK_COPYPROP:         load [copy] [[I]]
 // CHECK_COPYPROP-LABEL: } // end sil function 'test_pointer_to_address_copyprop'
 sil [ossa] @test_pointer_to_address_copyprop : $@convention(thin) (Builtin.Word) -> @owned AnyObject {
 bb0(%1 : $Builtin.Word):

@@ -2,9 +2,10 @@
 //
 // REQUIRES: swift_in_compiler
 
-sil_stage raw
+sil_stage canonical
 
 import Builtin
+import Swift
 
 struct Trivial {
   var value: Builtin.Int32
@@ -430,3 +431,21 @@ bb4(%outer0 : @owned $C, %outer1 : @owned $C, %inner : @guaranteed $C):
   %99 = tuple()
   return %99 : $()
 }
+
+// CHECK-LABEL: Borrow introducers for:   %3 = unchecked_ownership_conversion %2
+// CHECK-NEXT:  %3 = unchecked_ownership_conversion %2
+// CHECK-NEXT:  end running test 1 of 2 on testUncheckedOwnershipConversion: borrow_introducers with: %3
+// CHECK-LABEL: Enclosing values for:   %3 = unchecked_ownership_conversion %2
+// CHECK-NEXT:  end running test 2 of 2 on testUncheckedOwnershipConversion: enclosing_values with: %3
+sil [ossa] @testUncheckedOwnershipConversion : $@convention(thin) (Unmanaged<C>) -> () {
+bb0(%0 : $Unmanaged<C>):
+  %1 = struct_extract %0, #Unmanaged._value
+  %2 = unmanaged_to_ref %1 to $C
+  %3 = unchecked_ownership_conversion %2, @unowned to @guaranteed
+  specify_test "borrow_introducers %3"
+  specify_test "enclosing_values %3"
+  end_borrow %3
+  %8 = tuple ()
+  return %8
+}
+

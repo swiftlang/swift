@@ -718,8 +718,12 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool LoadBorrowInst_isUnchecked() const ;
   BRIDGED_INLINE BuiltinValueKind BuiltinInst_getID() const;
   BRIDGED_INLINE IntrinsicID BuiltinInst_getIntrinsicID() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef BuiltinInst_getName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap BuiltinInst_getSubstitutionMap() const;
   BRIDGED_INLINE bool PointerToAddressInst_isStrict() const;
+  BRIDGED_INLINE bool PointerToAddressInst_isInvariant() const;
+  BRIDGED_INLINE uint64_t PointerToAddressInst_getAlignment() const;
+  BRIDGED_INLINE void PointerToAddressInst_setAlignment(uint64_t alignment) const;
   BRIDGED_INLINE bool AddressToPointerInst_needsStackProtection() const;
   BRIDGED_INLINE bool IndexAddrInst_needsStackProtection() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialRefInst_getConformances() const;
@@ -1063,6 +1067,10 @@ struct BridgedBuilder{
   BRIDGED_INLINE swift::SILBuilder unbridged() const;
   BRIDGED_INLINE swift::SILLocation regularLoc() const;
 
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBuiltin(BridgedStringRef name,
+                                                                      BridgedType type,
+                                                                      BridgedSubstitutionMap subs,
+                                                                      BridgedValueArray arguments) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBuiltinBinaryFunction(BridgedStringRef name,
                                           BridgedType operandType, BridgedType resultType,
                                           BridgedValueArray arguments) const;
@@ -1084,8 +1092,18 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAddressToPointer(BridgedValue address,
                                                                                BridgedType pointerTy,
                                                                                bool needsStackProtection) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createPointerToAddress(BridgedValue pointer,
+                                                                               BridgedType addressTy,
+                                                                               bool isStrict,
+                                                                               bool isInvariant,
+                                                                               uint64_t alignment) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createIndexAddr(BridgedValue base,
+                                                                        BridgedValue index,
+                                                                        bool needsStackProtection) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedRefCast(BridgedValue op,
                                                                                BridgedType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedAddrCast(BridgedValue op,
+                                                                                BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUpcast(BridgedValue op, BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createLoad(BridgedValue op, SwiftInt ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createLoadBorrow(BridgedValue op) const;
