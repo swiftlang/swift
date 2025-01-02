@@ -3213,6 +3213,10 @@ bool IsUnsafeRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
     if (auto enclosingNominal = enclosingDC->getSelfNominalTypeDecl())
       if (enclosingNominal->isUnsafe())
         return true;
+
+    if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC))
+      if (ext->getAttrs().hasAttribute<UnsafeAttr>())
+        return true;
   }
 
   return false;

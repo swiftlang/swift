@@ -19,9 +19,8 @@ protocol P {
   @unsafe func g()
 }
 
-struct XP: P {
-  // expected-note@-1{{make the enclosing struct @unsafe to allow unsafe conformance to protocol 'P'}}{{1-1=@unsafe }}
-  @unsafe func f() { } // expected-warning{{unsafe instance method 'f()' cannot satisfy safe requirement [Unsafe]}}
+struct XP: P { // expected-warning{{conformance of 'XP' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{12-12=@unsafe }}
+  @unsafe func f() { } // expected-note{{unsafe instance method 'f()' cannot satisfy safe requirement}}
   @unsafe func g() { }
 }
 
@@ -30,11 +29,41 @@ struct XP: P {
 // -----------------------------------------------------------------------
 
 protocol Ptrable2 {
-  associatedtype Ptr // expected-note{{'Ptr' declared here}}
+  associatedtype Ptr
 }
 
-extension HasAPointerType: Ptrable2 { } // expected-warning{{unsafe type 'HasAPointerType.Ptr' (aka 'PointerType') cannot satisfy safe associated type 'Ptr'}}
-  // expected-note@-1{{make the enclosing extension @unsafe to allow unsafe conformance to protocol 'Ptrable2'}}{{1-1=@unsafe }}
+extension HasAPointerType: Ptrable2 { } // expected-note{{unsafe type 'HasAPointerType.Ptr' (aka 'PointerType') cannot satisfy safe associated type 'Ptr'}}
+  // expected-warning@-1{{conformance of 'HasAPointerType' to protocol 'Ptrable2' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{28-28=@unsafe }}
+
+struct UnsafeXP: @unsafe P {
+  @unsafe func f() { }
+  @unsafe func g() { }
+}
+
+protocol MultiP {
+  associatedtype Ptr
+  func f() -> Ptr
+}
+
+struct ConformsToMultiP { }
+
+// expected-warning@+1{{conformance of 'ConformsToMultiP' to protocol 'MultiP' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{29-29=@unsafe }}
+extension ConformsToMultiP: MultiP {
+  // expected-note@-1{{unsafe type 'UnsafeSuper' cannot satisfy safe associated type 'Ptr'}}
+  @unsafe func f() -> UnsafeSuper { .init() }
+}
+
+protocol GenericP {
+  associatedtype Ptr
+
+  func f<T>(_: T, _: Ptr)
+}
+
+// expected-warning@+1{{conformance of 'ConformsToGenericP' to protocol 'GenericP' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe}}
+struct ConformsToGenericP: GenericP {
+  typealias Ptr = Int
+  @unsafe func f<T>(_: T, _: Ptr) { } // expected-note{{unsafe instance method 'f' cannot satisfy safe requirement}}
+}
 
 // -----------------------------------------------------------------------
 // Overrides
@@ -70,7 +99,7 @@ struct SuperHolder {
 // -----------------------------------------------------------------------
 // Inheritance of @unsafe
 // -----------------------------------------------------------------------
-@unsafe class UnsafeSuper { // expected-note{{'UnsafeSuper' declared here}}
+@unsafe class UnsafeSuper {
   func f() { }
 };
 

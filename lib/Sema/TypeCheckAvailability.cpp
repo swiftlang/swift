@@ -19,6 +19,7 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
+#include "TypeCheckUnsafe.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilityDomain.h"
@@ -4109,11 +4110,12 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   // If the declaration itself is "safe" but we don't disallow unsafe uses,
   // check whether it traffics in unsafe types.
   ASTContext &ctx = D->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) && !D->isUnsafe()) {
+  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) && !D->isUnsafe() &&
+      !Where.getAvailability().allowsUnsafe()) {
     auto type = D->getInterfaceType();
     if (auto subs = declRef.getSubstitutions())
       type = type.subst(subs);
-    if (type->isUnsafe() && !Where.getAvailability().allowsUnsafe()) {
+    if (type->isUnsafe()) {
       diagnoseUnsafeUse(
           UnsafeUse::forReferenceToUnsafe(
             D, call != nullptr && !isa<ParamDecl>(D), Where.getDeclContext(),
@@ -4220,6 +4222,19 @@ diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
   }
 
   if (auto valueDecl = dyn_cast<ValueDecl>(D)) {
+    // A typealias that is not itself @unsafe but references an unsafe type
+    // is diagnosed separately.
+    if (auto typealias = dyn_cast<TypeAliasDecl>(valueDecl)) {
+      if (Type underlying = typealias->getUnderlyingType()) {
+        if (underlying->isUnsafe()) {
+          diagnoseUnsafeUse(
+              UnsafeUse::forReferenceToUnsafeThroughTypealias(
+                D, Where.getDeclContext(), underlying, diagLoc));
+          return;
+        }
+      }
+    }
+
     // Use of a nonisolated(unsafe) declaration is unsafe, but is only
     // diagnosed as such under strict concurrency.
     if (ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
@@ -4764,6 +4779,20 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       diagnoseMissingConformance(loc, builtinConformance->getType(),
                                  builtinConformance->getProtocol(), DC,
                                  preconcurrency);
+    }
+  }
+
+  // Strict memory safety checking.
+  if (!where.getAvailability().allowsUnsafe() &&
+      ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+    if (auto normalConf = dyn_cast<NormalProtocolConformance>(rootConf)) {
+      // @unsafe conformances are considered... unsafe.
+      if (normalConf->isUnsafe()) {
+        diagnoseUnsafeUse(
+            UnsafeUse::forConformance(
+              concreteConf->getType(), conformance, loc,
+              where.getDeclContext()));
+      }
     }
   }
 

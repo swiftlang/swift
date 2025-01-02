@@ -431,8 +431,8 @@ class InheritedProtocolCollector {
   using OriginallyDefinedInAttrList =
       TinyPtrVector<const OriginallyDefinedInAttr *>;
   using ProtocolAndAvailability =
-      std::tuple<ProtocolDecl *, AvailableAttrList, bool /*isUnchecked*/,
-                 OriginallyDefinedInAttrList>;
+      std::tuple<ProtocolDecl *, AvailableAttrList,
+                 ProtocolConformanceOptions, OriginallyDefinedInAttrList>;
 
   /// Protocols that will be included by the ASTPrinter without any extra work.
   SmallVector<ProtocolDecl *, 8> IncludedProtocols;
@@ -487,10 +487,17 @@ class InheritedProtocolCollector {
     return isPublicOrUsableFromInline(type);
   }
 
-  static bool isUncheckedConformance(ProtocolConformance *conformance) {
+  static ProtocolConformanceOptions filterOptions(ProtocolConformanceOptions options) {
+    options -= ProtocolConformanceFlags::Preconcurrency;
+    options -= ProtocolConformanceFlags::Retroactive;
+    options -= ProtocolConformanceFlags::Safe;
+    return options;
+  }
+
+  static ProtocolConformanceOptions getConformanceOptions(ProtocolConformance *conformance) {
     if (auto normal = dyn_cast<NormalProtocolConformance>(conformance->getRootConformance()))
-      return normal->isUnchecked();
-    return false;
+      return filterOptions(normal->getOptions());
+    return {};
   }
 
   /// For each type in \p directlyInherited, classify the protocols it refers to
@@ -522,7 +529,8 @@ class InheritedProtocolCollector {
         else
           ExtraProtocols.push_back(ProtocolAndAvailability(
               protoDecl, getAvailabilityAttrs(D, availableAttrs),
-              inherited.isUnchecked(), getOriginallyDefinedInAttrList(D)));
+              filterOptions(inherited.getOptions()),
+              getOriginallyDefinedInAttrList(D)));
       }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
@@ -541,7 +549,7 @@ class InheritedProtocolCollector {
           continue;
         ExtraProtocols.push_back(ProtocolAndAvailability(
             conf->getProtocol(), getAvailabilityAttrs(D, availableAttrs),
-            isUncheckedConformance(conf), getOriginallyDefinedInAttrList(D)));
+            getConformanceOptions(conf), getOriginallyDefinedInAttrList(D)));
       }
     }
   }
@@ -763,15 +771,13 @@ public:
 
     auto proto = std::get<0>(protoAndAvailability);
     auto availability = std::get<1>(protoAndAvailability);
-    auto isUnchecked = std::get<2>(protoAndAvailability);
+    auto options = std::get<2>(protoAndAvailability);
     auto originallyDefinedInAttrs = std::get<3>(protoAndAvailability);
 
     // Create a synthesized ExtensionDecl for the conformance.
     ASTContext &ctx = M->getASTContext();
     auto inherits = ctx.AllocateCopy(llvm::ArrayRef(InheritedEntry(
-        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked,
-        /*isRetroactive=*/false,
-        /*isPreconcurrency=*/false)));
+        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), options)));
     auto extension =
         ExtensionDecl::create(ctx, SourceLoc(), nullptr, inherits,
                               nominal->getModuleScopeContext(), nullptr);

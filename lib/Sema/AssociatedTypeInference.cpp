@@ -359,16 +359,6 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
     typeDecl = aliasDecl;
   }
 
-  // If we're disallowing unsafe code, check for an unsafe type witness.
-  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      !assocType->isUnsafe() && type->isUnsafe()) {
-    SourceLoc loc = typeDecl->getLoc();
-    if (loc.isInvalid())
-      loc = conformance->getLoc();
-    diagnoseUnsafeUse(
-        UnsafeUse::forTypeWitness(assocType, type, conformance, loc));
-  }
-
   // Record the type witness.
   conformance->setTypeWitness(assocType, type, typeDecl);
 

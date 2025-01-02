@@ -27,6 +27,7 @@
 #include "TypeCheckEffects.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckObjC.h"
+#include "TypeCheckUnsafe.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
@@ -2462,18 +2463,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
-  // @unchecked conformances are considered unsafe in strict concurrency mode.
-  if (conformance->isUnchecked() &&
-      Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      Context.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
-
-    if (!conformance->getDeclContext()->allowsUnsafe()) {
-      diagnoseUnsafeUse(
-          UnsafeUse::forConformance(conformance, ComplainLoc,
-                                    conformance->getDeclContext()));
-    }
-  }
-
   bool allowImpliedConditionalConformance = false;
   if (Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     // In -swift-version 5 mode, a conditional conformance to a protocol can imply
@@ -2542,19 +2531,74 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
     }
   }
 
-  if (conformance->isComplete())
-    return;
+  if (!conformance->isComplete()) {
+    // Resolve all of the type witnesses.
+    evaluateOrDefault(Context.evaluator,
+                      ResolveTypeWitnessesRequest{conformance},
+                      evaluator::SideEffect());
 
-  // Resolve all of the type witnesses.
-  evaluateOrDefault(Context.evaluator,
-                    ResolveTypeWitnessesRequest{conformance},
-                    evaluator::SideEffect());
+    // Check the requirements from the requirement signature.
+    ensureRequirementsAreSatisfied(Context, conformance);
 
-  // Check the requirements from the requirement signature.
-  ensureRequirementsAreSatisfied(Context, conformance);
+    // Check non-type requirements.
+    conformance->resolveValueWitnesses();
+  }
 
-  // Check non-type requirements.
-  conformance->resolveValueWitnesses();
+  // If we're enforcing strict memory safety and this conformance hasn't
+  // opted out, look for safe/unsafe witness mismatches.
+  if (!conformance->isUnsafe() && !conformance->isSafe() &&
+      Context.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+    // Collect all of the unsafe uses for this conformance.
+    SmallVector<UnsafeUse, 2> unsafeUses;
+    for (auto requirement: Proto->getMembers()) {
+      if (auto typeDecl = dyn_cast<TypeDecl>(requirement)) {
+        // Check whether a type witness is unsafe when its associated type
+        // is not.
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+          TypeWitnessAndDecl typeWitnessAndDecl =
+            conformance->getTypeWitnessAndDecl(assocType);
+          Type typeWitness = typeWitnessAndDecl.getWitnessType();
+          if (!assocType->isUnsafe() && typeWitness && typeWitness->isUnsafe()) {
+            SourceLoc loc;
+            if (auto typeDecl = typeWitnessAndDecl.getWitnessDecl()) {
+              loc = typeDecl->getLoc();
+            }
+            if (loc.isInvalid())
+              loc = conformance->getLoc();
+            unsafeUses.push_back(
+                UnsafeUse::forTypeWitness(
+                  assocType, typeWitness, conformance, loc));
+          }
+        }
+        continue;
+      }
+
+      // Check whether a value witness is unsafe when its requirement is not.
+      auto valueRequirement = dyn_cast<ValueDecl>(requirement);
+      if (!valueRequirement)
+        continue;
+
+      // If the witness is unsafe and the requirement is not effectively
+      // unsafe, then the conformance must be unsafe.
+      if (auto witness = conformance->getWitnessUncached(valueRequirement)) {
+        if (isUnsafe(witness.getDeclRef()) &&
+            !isUnsafeInConformance(valueRequirement, witness, conformance)) {
+          unsafeUses.push_back(
+              UnsafeUse::forWitness(
+                witness.getDecl(), requirement, conformance));
+        }
+      }
+    }
+
+    if (!unsafeUses.empty()) {
+      Context.Diags.diagnose(
+          conformance->getLoc(), diag::conformance_involves_unsafe,
+          conformance->getType(), Proto)
+      .fixItInsert(conformance->getProtocolNameLoc(), "@unsafe ");
+      for (const auto& unsafeUse : unsafeUses)
+        diagnoseUnsafeUse(unsafeUse, /*asNote=*/true);
+    }
+  }
 }
 
 /// Add the next associated type deduction to the string representation
@@ -5146,15 +5190,6 @@ void ConformanceChecker::resolveValueWitnesses() {
             requirement,
             Conformance->getWitnessUncached(requirement)
               .withEnterIsolation(*enteringIsolation));
-      }
-
-      // If we're disallowing unsafe code, check for an unsafe witness to a
-      // safe requirement.
-      if (C.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-          witness->isUnsafe() && !requirement->isUnsafe() &&
-          !witness->getDeclContext()->allowsUnsafe()) {
-        diagnoseUnsafeUse(
-            UnsafeUse::forWitness(witness, requirement, Conformance));
       }
 
       // Objective-C checking for @objc requirements.

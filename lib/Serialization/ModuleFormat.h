@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 909; // @abi attribute
+const uint16_t SWIFTMODULE_VERSION_MINOR = 910; // unsafe conformances
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -73,6 +73,8 @@ using TypeID = DeclID;
 using TypeIDField = DeclIDField;
 
 using TypeIDWithBitField = BCFixed<32>;
+
+using InheritedIDField = BCVBR<16>;
 
 // ClangTypeID must be the same as DeclID because it is stored in the same way.
 using ClangTypeID = TypeID;
@@ -968,6 +970,7 @@ namespace options_block {
     CXX_STDLIB_KIND,
     PUBLIC_MODULE_NAME,
     SWIFT_INTERFACE_COMPILER_VERSION,
+    STRICT_MEMORY_SAFETY,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1064,12 +1067,16 @@ namespace options_block {
     SERIALIZE_PACKAGE_ENABLED
   >;
 
+  using StrictMemorySafetyLayout = BCRecordLayout<
+    STRICT_MEMORY_SAFETY
+  >;
+
   using PublicModuleNameLayout = BCRecordLayout<
     PUBLIC_MODULE_NAME,
     BCBlob
   >;
 
-    using SwiftInterfaceCompilerVersionLayout = BCRecordLayout<
+  using SwiftInterfaceCompilerVersionLayout = BCRecordLayout<
     SWIFT_INTERFACE_COMPILER_VERSION,
     BCBlob // version tuple
   >;
@@ -1555,7 +1562,7 @@ namespace decls_block {
     AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
     BCVBR<4>,               // number of inherited types
-    BCArray<TypeIDField>    // inherited types, followed by dependency types
+    BCArray<InheritedIDField> // inherited types, followed by dependency types
     // Trailed by the generic parameters (if any), the members record, and
     // finally conformance info (if any).
   >;
@@ -1571,7 +1578,7 @@ namespace decls_block {
     AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
     BCVBR<4>,               // number of inherited types
-    BCArray<TypeIDField>    // inherited types, followed by dependency types
+    BCArray<InheritedIDField> // inherited types, followed by dependency types
     // Trailed by the generic parameters (if any), the members record, and
     // finally conformance info (if any).
   >;
@@ -1590,7 +1597,7 @@ namespace decls_block {
     AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
     BCVBR<4>,               // number of inherited types
-    BCArray<TypeIDField>    // inherited types, followed by dependency types
+    BCArray<InheritedIDField> // inherited types, followed by dependency types
     // Trailed by the generic parameters (if any), the members record, and
     // finally conformance info (if any).
   >;
@@ -1891,7 +1898,7 @@ namespace decls_block {
     GenericSignatureIDField,  // generic environment
     BCVBR<4>,    // # of protocol conformances
     BCVBR<4>,    // number of inherited types
-    BCArray<TypeIDField> // inherited types, followed by TypeID dependencies
+    BCArray<InheritedIDField> // inherited types, followed by TypeID dependencies
     // Trailed by the generic parameter lists, members record, and then
     // conformance info (if any).
   >;
@@ -2069,8 +2076,7 @@ namespace decls_block {
     BCVBR<5>, // type mapping count
     BCVBR<5>, // value mapping count
     BCVBR<5>, // requirement signature conformance count
-    BCFixed<1>, // unchecked
-    BCFixed<1>, // preconcurrency
+    BCVBR<5>, // options
     BCArray<DeclIDField>
     // The array contains requirement signature conformances, then
     // type witnesses, then value witnesses.

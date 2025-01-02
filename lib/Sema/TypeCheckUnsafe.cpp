@@ -14,13 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TypeCheckAvailability.h"
+#include "TypeCheckType.h"
+#include "TypeCheckUnsafe.h"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SourceFileExtras.h"
-#include "TypeCheckAvailability.h"
-#include "TypeCheckType.h"
 
 using namespace swift;
 
@@ -38,14 +41,16 @@ static bool isUnsafeUseInDefinition(const UnsafeUse &use) {
   case UnsafeUse::Override:
   case UnsafeUse::Witness:
   case UnsafeUse::TypeWitness:
-  case UnsafeUse::UnsafeConformance:
+    case UnsafeUse::PreconcurrencyImport:
     // Never part of the definition. These are always part of the interface.
     return false;
 
   case UnsafeUse::ReferenceToUnsafe:
+  case UnsafeUse::ReferenceToUnsafeThroughTypealias:
   case UnsafeUse::CallToUnsafe:
   case UnsafeUse::NonisolatedUnsafe:
   case UnsafeUse::UnownedUnsafe:
+  case UnsafeUse::UnsafeConformance:
     return enclosingContextForUnsafe(use).second;
   }
 }
@@ -73,20 +78,6 @@ static void suggestUnsafeOnEnclosingDecl(
   }
 }
 
-static void suggestUnsafeMarkerOnConformance(
-    NormalProtocolConformance *conformance) {
-  auto dc = conformance->getDeclContext();
-  auto decl = dc->getAsDecl();
-  if (!decl)
-    return;
-
-  decl->diagnose(
-      diag::make_conforming_context_unsafe,
-      decl->getDescriptiveKind(),
-      conformance->getProtocol()->getName()
-  ).fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
-}
-
 /// Retrieve the extra information
 static SourceFileExtras *getSourceFileExtrasFor(const Decl *decl) {
   auto dc = decl->getDeclContext();
@@ -103,9 +94,11 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     // It will be diagnosed later, along with all other unsafe uses within this
     // same declaration.
     if (use.getKind() == UnsafeUse::ReferenceToUnsafe ||
+        use.getKind() == UnsafeUse::ReferenceToUnsafeThroughTypealias ||
         use.getKind() == UnsafeUse::CallToUnsafe ||
         use.getKind() == UnsafeUse::NonisolatedUnsafe ||
-        use.getKind() == UnsafeUse::UnownedUnsafe) {
+        use.getKind() == UnsafeUse::UnownedUnsafe ||
+        use.getKind() == UnsafeUse::UnsafeConformance) {
       auto [enclosingDecl, _] = enclosingContextForUnsafe(
           use.getLocation(), use.getDeclContext());
       if (enclosingDecl) {
@@ -133,38 +126,40 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
   }
 
   case UnsafeUse::Witness: {
+    assert(asNote && "Can only be diagnosed with a note");
     auto witness = cast<ValueDecl>(use.getDecl());
-    witness->diagnose(diag::witness_unsafe,
+    witness->diagnose(diag::note_witness_unsafe,
                       witness->getDescriptiveKind(),
                       witness->getName());
-    suggestUnsafeMarkerOnConformance(use.getConformance());
     return;
   }
 
   case UnsafeUse::TypeWitness: {
+    assert(asNote && "Can only be diagnosed with a note");
     auto assocType = use.getAssociatedType();
     auto loc = use.getLocation();
     auto type = use.getType();
-    auto conformance = use.getConformance();
+    auto conformance = use.getConformance().getConcrete();
     ASTContext &ctx = assocType->getASTContext();
 
     diagnoseUnsafeType(ctx, loc, type, conformance->getDeclContext(),
                        [&](Type specificType) {
       ctx.Diags.diagnose(
-          loc, diag::type_witness_unsafe, specificType, assocType->getName());
+          loc, diag::note_type_witness_unsafe, specificType,
+          assocType->getName());
     });
-    suggestUnsafeMarkerOnConformance(conformance);
-    assocType->diagnose(diag::decl_declared_here, assocType);
-
     return;
   }
 
   case UnsafeUse::UnsafeConformance: {
     auto conformance = use.getConformance();
-    ASTContext &ctx = conformance->getProtocol()->getASTContext();
+    ASTContext &ctx = conformance.getRequirement()->getASTContext();
     ctx.Diags.diagnose(
-        use.getLocation(), diag::unchecked_conformance_is_unsafe);
-    suggestUnsafeMarkerOnConformance(conformance);
+        use.getLocation(),
+        asNote ? diag::note_use_of_unsafe_conformance_is_unsafe
+               : diag::use_of_unsafe_conformance_is_unsafe,
+        use.getType(),
+        conformance.getRequirement());
     return;
   }
 
@@ -199,6 +194,21 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     }
     return;
   }
+  case UnsafeUse::ReferenceToUnsafeThroughTypealias: {
+    auto typealias = cast<TypeAliasDecl>(use.getDecl());
+    ASTContext &ctx = typealias->getASTContext();
+    diagnoseUnsafeType(
+        ctx, use.getLocation(), use.getType(),
+        use.getDeclContext(),
+        [&](Type specificType) {
+          ctx.Diags.diagnose(
+              use.getLocation(),
+              asNote ? diag::note_reference_to_unsafe_through_typealias
+                     : diag::reference_to_unsafe_through_typealias,
+              typealias, specificType);
+        });
+    return;
+  }
 
   case UnsafeUse::ReferenceToUnsafe:
   case UnsafeUse::CallToUnsafe: {
@@ -228,9 +238,16 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
 
     if (!asNote) {
       suggestUnsafeOnEnclosingDecl(loc, use.getDeclContext());
-      decl->diagnose(diag::unsafe_decl_here, decl);
     }
 
+    return;
+  }
+
+  case UnsafeUse::PreconcurrencyImport: {
+    auto importDecl = cast<ImportDecl>(use.getDecl());
+    importDecl->diagnose(diag::preconcurrency_import_unsafe)
+      .fixItInsert(importDecl->getAttributeInsertionLoc(false),
+                   "@safe(unchecked) ");
     return;
   }
   }
@@ -264,4 +281,40 @@ void swift::diagnoseUnsafeUsesIn(const Decl *decl) {
   for (const auto &unsafeUse : unsafeUses) {
     diagnoseUnsafeUse(unsafeUse, /*asNote=*/true);
   }
+}
+
+bool swift::isUnsafe(ConcreteDeclRef declRef) {
+  auto decl = declRef.getDecl();
+  if (!decl)
+    return false;
+
+  // Is the declaration explicitly @unsafe?
+  if (decl->isUnsafe())
+    return true;
+
+  auto type = decl->getInterfaceType();
+  if (auto subs = declRef.getSubstitutions())
+    type = type.subst(subs);
+  if (type->isUnsafe())
+    return true;
+
+  return false;
+}
+
+bool swift::isUnsafeInConformance(const ValueDecl *requirement,
+                                  const Witness &witness,
+                                  NormalProtocolConformance *conformance) {
+  if (requirement->isUnsafe())
+    return true;
+
+  Type requirementType = requirement->getInterfaceType();
+  Type requirementTypeInContext;
+  auto requirementSubs = witness.getRequirementToWitnessThunkSubs();
+  if (auto genericFnType = requirementType->getAs<GenericFunctionType>()) {
+    requirementTypeInContext =
+        genericFnType->substGenericArgs(requirementSubs);
+  } else {
+    requirementTypeInContext = requirementType.subst(requirementSubs);
+  }
+  return requirementTypeInContext->isUnsafe();
 }

@@ -5792,22 +5792,19 @@ ERROR(non_sendable_type,none,
 ERROR(sendable_raw_storage,none,
       "struct %0 with @_rawLayout does not conform to the 'Sendable' protocol", (DeclName))
 
+ERROR(typeattr_not_inheritance_clause,none,
+      "'%0' attribute only applies in inheritance clauses", (StringRef))
+ERROR(typeattr_not_existential,none,
+      "'%0' attribute cannot apply to non-protocol type %1", (StringRef, Type))
+
 WARNING(unchecked_conformance_not_special,none,
       "@unchecked conformance to %0 has no meaning", (Type))
 WARNING(restate_unchecked_sendable,none,
         "class %0 must restate inherited '@unchecked Sendable' conformance",
         (DeclName))
-ERROR(unchecked_not_inheritance_clause,none,
-      "'unchecked' attribute only applies in inheritance clauses", ())
-ERROR(unchecked_not_existential,none,
-      "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
 
 WARNING(preconcurrency_conformance_not_used,none,
         "@preconcurrency attribute on conformance to %0 has no effect", (Type))
-ERROR(preconcurrency_not_inheritance_clause,none,
-      "'preconcurrency' attribute only applies in inheritance clauses", ())
-ERROR(preconcurrency_not_existential,none,
-      "'preconcurrency' attribute cannot apply to non-protocol type %0", (Type))
 
 ERROR(redundant_any_in_existential,none,
        "redundant 'any' in type %0",
@@ -8084,22 +8081,33 @@ NOTE(note_reference_to_unsafe_decl,none,
 NOTE(note_reference_to_unsafe_typed_decl,none,
      "%select{reference|call}0 to %kind1 involves unsafe type %2",
      (bool, const ValueDecl *, Type))
+NOTE(note_reference_to_unsafe_through_typealias,none,
+     "reference to %kind0 whose underlying type involves unsafe type %1",
+     (const ValueDecl *, Type))
 NOTE(note_reference_to_nonisolated_unsafe,none,
      "reference to nonisolated(unsafe) %kind0 is unsafe in concurrently-executing code",
      (const ValueDecl *))
 NOTE(note_reference_unowned_unsafe,none,
      "reference to unowned(unsafe) %kind0 is unsafe", (const ValueDecl *))
+NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
+     "@unsafe conformance of %0 to %kind1 involves unsafe code",
+     (Type, const ValueDecl *))
+GROUPED_WARNING(conformance_involves_unsafe,Unsafe,none,
+     "conformance of %0 to %kind1 involves unsafe code; use '@unsafe' to "
+     "indicate that the conformance is not memory-safe",
+     (Type, const ValueDecl *))
+NOTE(note_witness_unsafe,none,
+     "unsafe %0 %1 cannot satisfy safe requirement",
+      (DescriptiveDeclKind, DeclName))
+NOTE(note_type_witness_unsafe,none,
+      "unsafe type %0 cannot satisfy safe associated type %1",
+      (Type, DeclName))
 
 GROUPED_WARNING(override_safe_withunsafe,Unsafe,none,
       "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
-GROUPED_WARNING(witness_unsafe,Unsafe,none,
-     "unsafe %0 %1 cannot satisfy safe requirement",
-      (DescriptiveDeclKind, DeclName))
-GROUPED_WARNING(type_witness_unsafe,Unsafe,none,
-      "unsafe type %0 cannot satisfy safe associated type %1",
-      (Type, DeclName))
-GROUPED_WARNING(unchecked_conformance_is_unsafe,Unsafe,none,
-      "@unchecked conformance involves unsafe code", ())
+GROUPED_WARNING(use_of_unsafe_conformance_is_unsafe,Unsafe,none,
+      "@unsafe conformance of %0 to %kind1 involves unsafe code",
+       (Type, const ValueDecl *))
 GROUPED_WARNING(reference_unowned_unsafe,Unsafe,none,
       "reference to unowned(unsafe) %kind0 is unsafe", (const ValueDecl *))
 GROUPED_WARNING(reference_to_nonisolated_unsafe,Unsafe,none,
@@ -8111,8 +8119,13 @@ GROUPED_WARNING(reference_to_unsafe_decl,Unsafe,none,
 GROUPED_WARNING(reference_to_unsafe_typed_decl,Unsafe,none,
       "%select{reference|call}0 to %kindbase1 involves unsafe type %2",
       (bool, const ValueDecl *, Type))
-NOTE(unsafe_decl_here,none,
-     "unsafe %kindbase0 declared here", (const ValueDecl *))
+GROUPED_WARNING(reference_to_unsafe_through_typealias,Unsafe,none,
+     "reference to %kind0 whose underlying type involves unsafe type %1",
+     (const ValueDecl *, Type))
+GROUPED_WARNING(preconcurrency_import_unsafe,Unsafe,none,
+      "@preconcurrency import is not memory-safe because it can silently "
+      "introduce data races; use '@safe(unchecked)' to assert that the "
+      "code is memory-safe", ())
 NOTE(encapsulate_unsafe_in_enclosing_context,none,
      "make %kindbase0 @safe(unchecked) to allow it to use unsafe constructs in its definition",
      (const Decl *))

@@ -3569,8 +3569,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
       // Create a fake conformance for this type to the given protocol.
       auto conformance = getASTContext().getNormalConformance(
           nominal->getSelfInterfaceType(), protocol, SourceLoc(), nominal,
-          ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
-          /*isPreconcurrency=*/false);
+          ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
 
       // Resolve the conformance to generate fixits.
       evaluateOrDefault(getASTContext().evaluator,
