@@ -126,7 +126,7 @@ private func createBorrowedFrom(for phi: Phi, _ context: some MutatingContext) {
   if !phi.value.uses.contains(where: { $0.forwardingBorrowedFromUser != nil }) {
     let builder = Builder(atBeginOf: phi.value.parentBlock, context)
     let bfi = builder.createBorrowedFrom(borrowedValue: phi.value, enclosingValues: [])
-    phi.value.uses.ignore(user: bfi).replaceAll(with: bfi, context)
+    phi.value.uses.ignoreUsers(ofType: BorrowedFromInst.self).replaceAll(with: bfi, context)
   }
 }
 
