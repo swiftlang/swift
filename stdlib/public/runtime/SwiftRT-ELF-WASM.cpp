@@ -17,9 +17,9 @@
 #include <cstddef>
 #include <new>
 
-#if defined(__ELF__) && __has_include(<elf.h>)
+#if defined(__ELF__) && __has_include(<link.h>)
 #define EMIT_NOTES 1
-#include <elf.h>
+#include <link.h>
 #else
 #define EMIT_NOTES 0
 #endif
