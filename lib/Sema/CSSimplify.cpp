@@ -1441,8 +1441,7 @@ public:
   }
 };
 
-static std::optional<
-    std::tuple<TypeVariableType *, Type, OpenedExistentialAdjustments>>
+static std::optional<std::pair<TypeVariableType *, Type>>
 shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                   Type paramTy, Type argTy, Expr *argExpr,
                                   ConstraintSystem &cs) {
@@ -1816,25 +1815,29 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
 
       // If the argument is an existential type and the parameter is generic,
       // consider opening the existential type.
-      if (auto existentialArg = shouldOpenExistentialCallArgument(
+      if (auto typeVarAndBindingTy = shouldOpenExistentialCallArgument(
               callee, paramIdx, paramTy, argTy, argExpr, cs)) {
         // My kingdom for a decent "if let" in C++.
-        TypeVariableType *openedTypeVar;
-        Type existentialType;
-        OpenedExistentialAdjustments adjustments;
-        std::tie(openedTypeVar, existentialType, adjustments) = *existentialArg;
+        TypeVariableType *typeVar;
+        Type bindingTy;
+        std::tie(typeVar, bindingTy) = *typeVarAndBindingTy;
 
-        OpenedArchetypeType *opened;
-        std::tie(argTy, opened) = cs.openExistentialType(
-            existentialType, cs.getConstraintLocator(loc));
+        OpenedArchetypeType *openedArchetype;
 
-        if (adjustments.contains(OpenedExistentialAdjustmentFlags::LValue))
-          argTy = LValueType::get(argTy);
+        // Open the argument type.
+        argTy = argTy.transformRec([&](TypeBase *t) -> std::optional<Type> {
+          if (t->isAnyExistentialType()) {
+            Type openedTy;
+            std::tie(openedTy, openedArchetype) =
+                cs.openAnyExistentialType(t, cs.getConstraintLocator(loc));
 
-        if (adjustments.contains(OpenedExistentialAdjustmentFlags::InOut))
-          argTy = InOutType::get(argTy);
+            return openedTy;
+          }
 
-        openedExistentials.push_back({openedTypeVar, opened});
+          return std::nullopt;
+        });
+
+        openedExistentials.push_back({typeVar, openedArchetype});
       }
 
       // If we have a compound function reference (e.g `fn($x:)`), respect
@@ -8638,7 +8641,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (type->isExistentialType()) {
       if (auto elt = loc->getLastElementAs<LocatorPathElt::ContextualType>()) {
         if (elt->getPurpose() == CTP_ForEachSequence) {
-          type = openExistentialType(type, loc).first;
+          type = openAnyExistentialType(type, loc).first;
         }
       }
     }
@@ -12421,8 +12424,8 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
   if (type2->isAnyExistentialType()) {
     // We have the existential side. Produce an opened archetype and bind
     // type1 to it.
-    Type openedTy = openExistentialType(type2, getConstraintLocator(locator))
-        .first;
+    Type openedTy =
+        openAnyExistentialType(type2, getConstraintLocator(locator)).first;
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
   }
   if (!type2->isTypeVariableOrMember())
