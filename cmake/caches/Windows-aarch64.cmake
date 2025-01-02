@@ -43,7 +43,7 @@ foreach(target ${LLVM_RUNTIME_TARGETS})
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_XRAY NO CACHE BOOL "")
 endforeach()
 
-set(LLVM_TARGETS_TO_BUILD AArch64 ARM WebAssembly X86 CACHE STRING "")
+set(LLVM_TARGETS_TO_BUILD AArch64 AVR ARM RISCV WebAssembly X86 CACHE STRING "")
 
 # Disable certain targets to reduce the configure time or to avoid configuration
 # differences (and in some cases weird build errors on a complete build).
