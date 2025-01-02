@@ -17,6 +17,13 @@
 #include <cstddef>
 #include <new>
 
+#if defined(__ELF__) && __has_include(<elf.h>)
+#define EMIT_NOTES 1
+#include <elf.h>
+#else
+#define EMIT_NOTES 0
+#endif
+
 #if defined(__ELF__)
 extern "C" const char __dso_handle[];
 #elif defined(__wasm__)
@@ -48,9 +55,56 @@ static const void *__backtraceRef __attribute__((used, retain))
   BOUNDS_VISIBILITY extern const char __start_##name;   \
   BOUNDS_VISIBILITY extern const char __stop_##name;
 
+#if EMIT_NOTES
+/// A structure, compatible with the standard ELF note layout, that describes
+/// the bounds of a section known to Swift.
+///
+/// Sections described by these notes can be looked up at runtime using
+/// `dl_iterate_phdr()` unless an image's notes have been stripped.
+struct SectionNote {
+  /// The standard ELF note header.
+  ElfW(Nhdr) header;
+
+  /// The name of the ELF note.
+  ///
+  /// The size of this array must be a multiple of `sizeof(void *)` plus `4` to
+  /// ensure correct alignment on 64-bit archs (because `ElfW(Nhdr)` is 12 bytes
+  /// long and only 4-byte aligned.)
+  char name[28];
+
+  /// The "payload" of the note.
+  struct Bounds {
+    /// The start address of the section.
+    const void *start;
+
+    /// The end address of the section.
+    const void *end;
+  };
+
+  /// The bounds of the section.
+  Bounds bounds;
+};
+
+#define DECLARE_NOTE(name)                             \
+  __attribute__((section(".note.swift5.section")))     \
+  static const SectionNote note##name = {              \
+    {                                                  \
+      sizeof(SectionNote::name), /* n_namesz */        \
+      sizeof(Section::Bounds), /* n_descsz */          \
+      0 /* n_type (unused) */                          \
+    },                                                 \
+    #name,                                             \
+    &__start_##name,                                   \
+    &__stop_##name                                     \
+  };
+#else
+#define DECLARE_NOTE(name)
+#endif
+
 #define DECLARE_SWIFT_SECTION(name)             \
   DECLARE_EMPTY_METADATA_SECTION(name, "aR")    \
-  DECLARE_BOUNDS(name)
+  DECLARE_BOUNDS(name)                          \
+  DECLARE_NOTE(name)
 
 // These may or may not be present, depending on compiler switches; it's
 // worth calling them out as a result.
