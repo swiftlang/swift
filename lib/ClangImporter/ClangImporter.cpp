@@ -580,7 +580,8 @@ void importer::getNormalInvocationArguments(
     }
   }
 
-  if (LangOpts.hasFeature(Feature::SafeInteropWrappers))
+  if (LangOpts.hasFeature(Feature::SafeInteropWrappers) &&
+      !LangOpts.EnableCXXInterop)
     invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
 
   // Set C language options.
