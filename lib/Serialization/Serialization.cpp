@@ -1550,6 +1550,7 @@ getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
   CASE(Unspecified)
   CASE(ActorInstance)
   CASE(Nonisolated)
+  CASE(CallerIsolationInheriting)
   CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
   CASE(Erased)
@@ -5360,6 +5361,11 @@ getRawSILParameterInfoOptions(swift::SILParameterInfo::Options options) {
   if (options.contains(SILParameterInfo::Sending)) {
     options -= SILParameterInfo::Sending;
     result |= SILParameterInfoFlags::Sending;
+  }
+
+  if (options.contains(SILParameterInfo::ImplicitLeading)) {
+    options -= SILParameterInfo::ImplicitLeading;
+    result |= SILParameterInfoFlags::ImplicitLeading;
   }
 
   // If we still have options left, this code is out of sync... return none.

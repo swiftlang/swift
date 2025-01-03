@@ -7583,6 +7583,11 @@ void SILParameterInfo::print(
     Printer.printLifetimeDependence(*lifetimeDependence);
   }
 
+  if (options.contains(SILParameterInfo::ImplicitLeading)) {
+    options -= SILParameterInfo::ImplicitLeading;
+    Printer << "@sil_implicit_leading_param ";
+  }
+
   // If we did not handle a case in Options, this code was not updated
   // appropriately.
   assert(!bool(options) && "Code not updated for introduced option");

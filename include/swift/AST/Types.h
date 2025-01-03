@@ -83,6 +83,7 @@ class PlaceholderTypeRepr;
 enum class ReferenceCounting : uint8_t;
 enum class ResilienceExpansion : unsigned;
 class SILModule;
+class SILFunction;
 class SILType;
 class SourceLoc;
 class TypeAliasDecl;
@@ -4438,6 +4439,16 @@ public:
     /// that the parameter must be an Optional actor or something that conforms
     /// to AnyActor.
     Isolated = 0x4,
+
+    /// Set if the given parameter is an implicit parameter that is not part of
+    /// the formal type. These are always located after the return values and
+    /// before the main parameters. This is because we want to at the SIL level
+    /// generally treat them as normal parameters... but when working with the
+    /// AST during lowering, we need to handle ignoring them appropriately.
+    ///
+    /// DISCUSSION: These are enforced by the SIL verifier to always be in
+    /// between indirect results and the explicit parameters.
+    ImplicitLeading = 0x8,
   };
 
   using Options = OptionSet<Flag>;
@@ -4464,6 +4475,11 @@ public:
   ///
   /// \c t must refer back to the function type this is a parameter for.
   CanType getArgumentType(SILModule &M, const SILFunctionType *t, TypeExpansionContext context) const;
+
+  /// Helper function that just grabs the module, type, and context out of \arg
+  /// fn and then calls getArgumentType.
+  CanType getArgumentType(SILFunction *fn) const;
+
   ParameterConvention getConvention() const { return convention; }
   // Does this parameter convention require indirect storage? This reflects a
   // SILFunctionType's formal (immutable) conventions, as opposed to the
