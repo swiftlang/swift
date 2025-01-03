@@ -151,8 +151,19 @@ func getPointerMutability(text: String) -> Mutability? {
   case "UnsafeMutablePointer": return .Mutable
   case "UnsafeRawPointer": return .Immutable
   case "UnsafeMutableRawPointer": return .Mutable
+  case "OpaquePointer": return .Immutable
   default:
     return nil
+  }
+}
+
+func isRawPointerType(text: String) -> Bool {
+  switch text {
+  case "UnsafeRawPointer": return true
+  case "UnsafeMutableRawPointer": return true
+  case "OpaquePointer": return true
+  default:
+    return false
   }
 }
 
@@ -180,8 +191,12 @@ func transformType(_ prev: TypeSyntax, _ variant: Variant, _ isSizedBy: Bool) th
   }
   let name = try getTypeName(prev)
   let text = name.text
-  if !isSizedBy && (text == "UnsafeRawPointer" || text == "UnsafeMutableRawPointer") {
+  let isRaw = isRawPointerType(text: text)
+  if isRaw && !isSizedBy {
     throw DiagnosticError("raw pointers only supported for SizedBy", node: name)
+  }
+  if !isRaw && isSizedBy {
+    throw DiagnosticError("SizedBy only supported for raw pointers", node: name)
   }
 
   guard let kind: Mutability = getPointerMutability(text: text) else {
@@ -390,7 +405,7 @@ struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
     var args = argOverrides
     let argExpr = ExprSyntax("\(unwrappedName).baseAddress")
     assert(args[index] == nil)
-    args[index] = unwrapIfNonnullable(argExpr)
+    args[index] = try castPointerToOpaquePointer(unwrapIfNonnullable(argExpr))
     let call = try base.buildFunctionCall(args, variant)
     let ptrRef = unwrapIfNullable(ExprSyntax(DeclReferenceExprSyntax(baseName: name)))
 
@@ -412,7 +427,26 @@ struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
     return ExprSyntax("\(name).\(raw: countName)")
   }
 
-  func getPointerArg() -> ExprSyntax {
+  func peelOptionalType(_ type: TypeSyntax) -> TypeSyntax {
+    if let optType = type.as(OptionalTypeSyntax.self) {
+      return optType.wrappedType
+    }
+    if let impOptType = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
+      return impOptType.wrappedType
+    }
+    return type
+  }
+
+  func castPointerToOpaquePointer(_ baseAddress: ExprSyntax) throws -> ExprSyntax {
+    let i = try getParameterIndexForParamName(signature.parameterClause.parameters, name)
+    let type = peelOptionalType(getParam(signature, i).type)
+    if type.canRepresentBasicType(type: OpaquePointer.self) {
+      return ExprSyntax("OpaquePointer(\(baseAddress))")
+    }
+    return baseAddress
+  }
+
+  func getPointerArg() throws -> ExprSyntax {
     if nullable {
       return ExprSyntax("\(name)?.baseAddress")
     }
@@ -450,7 +484,7 @@ struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
       return unwrappedCall
     }
 
-    args[index] = getPointerArg()
+    args[index] = try castPointerToOpaquePointer(getPointerArg())
     return try base.buildFunctionCall(args, variant)
   }
 }
@@ -499,10 +533,10 @@ func getOptionalArgumentByName(_ argumentList: LabeledExprListSyntax, _ name: St
   })?.expression
 }
 
-func getParameterIndexForDeclRef(
-  _ parameterList: FunctionParameterListSyntax, _ ref: DeclReferenceExprSyntax
+func getParameterIndexForParamName(
+  _ parameterList: FunctionParameterListSyntax, _ tok: TokenSyntax
 ) throws -> Int {
-  let name = ref.baseName.text
+  let name = tok.text
   guard
     let index = parameterList.enumerated().first(where: {
       (_: Int, param: FunctionParameterSyntax) in
@@ -510,9 +544,15 @@ func getParameterIndexForDeclRef(
       return paramenterName.trimmed.text == name
     })?.offset
   else {
-    throw DiagnosticError("no parameter with name '\(name)' in '\(parameterList)'", node: ref)
+    throw DiagnosticError("no parameter with name '\(name)' in '\(parameterList)'", node: tok)
   }
   return index
+}
+
+func getParameterIndexForDeclRef(
+  _ parameterList: FunctionParameterListSyntax, _ ref: DeclReferenceExprSyntax
+) throws -> Int {
+  return try getParameterIndexForParamName((parameterList), ref.baseName)
 }
 
 /// A macro that adds safe(r) wrappers for functions with unsafe pointer types.
