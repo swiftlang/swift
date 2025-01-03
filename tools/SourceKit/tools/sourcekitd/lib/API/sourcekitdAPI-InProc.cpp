@@ -50,6 +50,7 @@ public:
     Int64,
     UID,
     Bool,
+    Double,
     CustomData,
     Error,
   };
@@ -78,6 +79,7 @@ public:
   virtual std::optional<StringRef> getString() const { return std::nullopt; }
   virtual const char *getCString() const { return nullptr; }
   virtual bool getBool() const { return false; }
+  virtual double getDouble() const { return 0.0; }
   virtual const void *getDataPtr() const { return nullptr; }
   virtual size_t getDataSize() const { return 0; }
 };
@@ -234,6 +236,25 @@ public:
   }
 private:
   bool Storage;
+};
+
+class SKDDouble: public SKDObject {
+public:
+  SKDDouble(double Value) : SKDObject(ObjectKind::Double), Storage(Value) {}
+
+  sourcekitd_variant_type_t getVariantType() const override {
+    return SOURCEKITD_VARIANT_TYPE_DOUBLE;
+  }
+
+  double getDouble() const override {
+    return Storage;
+  }
+
+  static bool classof(const SKDObject *O) {
+    return O->getKind() == ObjectKind::Double;
+  }
+private:
+  double Storage;
 };
 
 class SKDCustomData: public SKDObject {
@@ -847,6 +868,10 @@ static bool SKDVar_array_get_bool(sourcekitd_variant_t array, size_t index) {
   return SKD_OBJ(array)->get(index)->getBool();
 }
 
+static double SKDVar_array_get_double(sourcekitd_variant_t array, size_t index) {
+  return SKD_OBJ(array)->get(index)->getDouble();
+}
+
 static size_t SKDVar_array_get_count(sourcekitd_variant_t array) {
   return SKD_OBJ(array)->getCount();
 }
@@ -874,6 +899,10 @@ static bool SKDVar_bool_get_value(sourcekitd_variant_t obj) {
   return SKD_OBJ(obj)->getBool();
 }
 
+static double SKDVar_double_get_value(sourcekitd_variant_t obj) {
+  return SKD_OBJ(obj)->getDouble();
+}
+
 static bool SKDVar_dictionary_apply(
     sourcekitd_variant_t dict,
     llvm::function_ref<bool(sourcekitd_uid_t, sourcekitd_variant_t)> applier) {
@@ -889,6 +918,14 @@ SKDVar_dictionary_get_bool(sourcekitd_variant_t dict, sourcekitd_uid_t key) {
     return Object->getBool();
   }
   return false;
+}
+
+static double
+SKDVar_dictionary_get_double(sourcekitd_variant_t dict, sourcekitd_uid_t key) {
+  if (auto Object = SKD_OBJ(dict)->get(key)) {
+    return Object->getDouble();
+  }
+  return 0.0;
 }
 
 static int64_t
@@ -949,14 +986,17 @@ static VariantFunctions SKDVariantFuncs = {
   SKDVar_get_type,
   SKDVar_array_apply,
   SKDVar_array_get_bool,
+  SKDVar_array_get_double,
   SKDVar_array_get_count,
   SKDVar_array_get_int64,
   SKDVar_array_get_string,
   SKDVar_array_get_uid,
   SKDVar_array_get_value,
   SKDVar_bool_get_value,
+  SKDVar_double_get_value,
   SKDVar_dictionary_apply,
   SKDVar_dictionary_get_bool,
+  SKDVar_dictionary_get_double,
   SKDVar_dictionary_get_int64,
   SKDVar_dictionary_get_string,
   SKDVar_dictionary_get_value,

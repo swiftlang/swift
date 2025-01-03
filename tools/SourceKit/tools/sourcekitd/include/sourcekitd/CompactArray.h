@@ -162,11 +162,11 @@ struct CompactVariantFuncs {
 
   static bool
   dictionary_apply(sourcekitd_variant_t dict,
-                   llvm::function_ref<bool(sourcekitd_uid_t,
-                                           sourcekitd_variant_t)> applier) {
+                   sourcekitd_variant_dictionary_applier_f_t applier,
+                   void *context) {
     void *Buf = (void *)dict.data[1];
     size_t Index = dict.data[2];
-    return T::dictionary_apply(Buf, Index, applier);
+    return T::dictionary_apply(Buf, Index, applier, context);
   }
 
   static VariantFunctions Funcs;
@@ -177,14 +177,17 @@ VariantFunctions CompactVariantFuncs<T>::Funcs = {
   get_type,
   nullptr/*Annot_array_apply*/,
   nullptr/*Annot_array_get_bool*/,
+  nullptr/*Annot_array_get_double*/,
   nullptr/*Annot_array_get_count*/,
   nullptr/*Annot_array_get_int64*/,
   nullptr/*Annot_array_get_string*/,
   nullptr/*Annot_array_get_uid*/,
   nullptr/*Annot_array_get_value*/,
   nullptr/*Annot_bool_get_value*/,
+  nullptr/*Annot_double_get_value*/,
   dictionary_apply,
   nullptr/*Annot_dictionary_get_bool*/,
+  nullptr/*Annot_dictionary_get_double*/,
   nullptr/*Annot_dictionary_get_int64*/,
   nullptr/*Annot_dictionary_get_string*/,
   nullptr/*Annot_dictionary_get_value*/,
@@ -224,14 +227,17 @@ VariantFunctions CompactArrayFuncs<T>::Funcs = {
   get_type,
   nullptr/*AnnotArray_array_apply*/,
   nullptr/*AnnotArray_array_get_bool*/,
+  nullptr/*AnnotArray_array_get_double*/,
   array_get_count,
   nullptr/*AnnotArray_array_get_int64*/,
   nullptr/*AnnotArray_array_get_string*/,
   nullptr/*AnnotArray_array_get_uid*/,
   array_get_value,
   nullptr/*AnnotArray_bool_get_value*/,
+  nullptr/*AnnotArray_double_get_value*/,
   nullptr/*AnnotArray_dictionary_apply*/,
   nullptr/*AnnotArray_dictionary_get_bool*/,
+  nullptr/*AnnotArray_dictionary_get_double*/,
   nullptr/*AnnotArray_dictionary_get_int64*/,
   nullptr/*AnnotArray_dictionary_get_string*/,
   nullptr/*AnnotArray_dictionary_get_value*/,

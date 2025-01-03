@@ -13,6 +13,8 @@
 #ifndef LLVM_SOURCEKITD_INTERNAL_H
 #define LLVM_SOURCEKITD_INTERNAL_H
 
+
+#include "sourcekitd/plugin.h"
 #include "SourceKit/Support/CancellationToken.h"
 #include "sourcekitd/sourcekitd.h"
 #include "llvm/ADT/STLExtras.h"
@@ -33,11 +35,11 @@ namespace SourceKit {
 
 bool sourcekitd_variant_dictionary_apply_impl(
     sourcekitd_variant_t dict,
-    llvm::function_ref<bool(sourcekitd_uid_t, sourcekitd_variant_t)> applier);
+    sourcekitd_variant_dictionary_applier_f_t applier, void *context);
 
 bool sourcekitd_variant_array_apply_impl(
-    sourcekitd_variant_t array,
-    llvm::function_ref<bool(size_t, sourcekitd_variant_t)> applier);
+    sourcekitd_variant_t array, sourcekitd_variant_array_applier_f_t applier,
+    void *context);
 
 namespace sourcekitd {
 
@@ -58,7 +60,8 @@ enum class CustomBufferKind {
   AttributesArray,
   ExpressionTypeArray,
   VariableTypeArray,
-  RawData
+  RawData,
+  CustomBufferKind_End
 };
 
 class ResponseBuilder {
@@ -164,6 +167,10 @@ bool shutdownClient();
 
 void set_interrupted_connection_handler(llvm::function_ref<void()> handler);
 
+/// Register a custom buffer kind. Must be called only during plugin loading.
+void pluginRegisterCustomBufferKind(uint64_t kind,
+                                    sourcekitd_variant_functions_t funcs);
+
 void printRequestObject(sourcekitd_object_t Obj, llvm::raw_ostream &OS);
 void printResponse(sourcekitd_response_t Resp, llvm::raw_ostream &OS);
 
@@ -185,6 +192,11 @@ static inline sourcekitd_variant_t makeIntVariant(int64_t value) {
 static inline sourcekitd_variant_t makeBoolVariant(bool value) {
   return {{ 0, value, SOURCEKITD_VARIANT_TYPE_BOOL }};
 }
+static inline sourcekitd_variant_t makeDoubleVariant(double value) {
+  uint64_t data;
+  std::memcpy(&data, &value, sizeof(double));
+  return {{ 0, data, SOURCEKITD_VARIANT_TYPE_DOUBLE }};
+}
 static inline sourcekitd_variant_t makeStringVariant(const char *value) {
   return {{ 0, (uintptr_t)value, SOURCEKITD_VARIANT_TYPE_STRING }};
 }
@@ -197,33 +209,57 @@ static inline sourcekitd_variant_t makeUIDVariant(sourcekitd_uid_t value) {
 ///
 /// sourcekitd_variant_t contains a pointer to such a structure.
 struct VariantFunctions {
-  sourcekitd_variant_type_t (*get_type)(sourcekitd_variant_t obj);
-  bool (*array_apply)(
-      sourcekitd_variant_t array,
-      llvm::function_ref<bool(size_t, sourcekitd_variant_t)> applier);
-  bool (*array_get_bool)(sourcekitd_variant_t array, size_t index);
-  size_t (*array_get_count)(sourcekitd_variant_t array);
-  int64_t (*array_get_int64)(sourcekitd_variant_t array, size_t index);
-  const char *(*array_get_string)(sourcekitd_variant_t array, size_t index);
-  sourcekitd_uid_t (*array_get_uid)(sourcekitd_variant_t array, size_t index);
-  sourcekitd_variant_t (*array_get_value)(sourcekitd_variant_t array, size_t index);
-  bool (*bool_get_value)(sourcekitd_variant_t obj);
-  bool (*dictionary_apply)(
-      sourcekitd_variant_t dict,
-      llvm::function_ref<bool(sourcekitd_uid_t, sourcekitd_variant_t)> applier);
-  bool (*dictionary_get_bool)(sourcekitd_variant_t dict, sourcekitd_uid_t key);
-  int64_t (*dictionary_get_int64)(sourcekitd_variant_t dict, sourcekitd_uid_t key);
-  const char *(*dictionary_get_string)(sourcekitd_variant_t dict, sourcekitd_uid_t key);
-  sourcekitd_variant_t (*dictionary_get_value)(sourcekitd_variant_t dict, sourcekitd_uid_t key);
-  sourcekitd_uid_t (*dictionary_get_uid)(sourcekitd_variant_t dict, sourcekitd_uid_t key);
-  size_t (*string_get_length)(sourcekitd_variant_t obj);
-  const char *(*string_get_ptr)(sourcekitd_variant_t obj);
-  int64_t (*int64_get_value)(sourcekitd_variant_t obj);
-  sourcekitd_uid_t (*uid_get_value)(sourcekitd_variant_t obj);
-  size_t (*data_get_size)(sourcekitd_variant_t obj);
-  const void *(*data_get_ptr)(sourcekitd_variant_t obj);
+  sourcekitd_variant_functions_get_type_t get_type;
+  sourcekitd_variant_functions_array_apply_t array_apply;
+  sourcekitd_variant_functions_array_get_bool_t array_get_bool;
+  sourcekitd_variant_functions_array_get_double_t array_get_double;
+  sourcekitd_variant_functions_array_get_count_t array_get_count;
+  sourcekitd_variant_functions_array_get_int64_t array_get_int64;
+  sourcekitd_variant_functions_array_get_string_t array_get_string;
+  sourcekitd_variant_functions_array_get_uid_t array_get_uid;
+  sourcekitd_variant_functions_array_get_value_t array_get_value;
+  sourcekitd_variant_functions_bool_get_value_t bool_get_value;
+  sourcekitd_variant_functions_double_get_value_t double_get_value;
+  sourcekitd_variant_functions_dictionary_apply_t dictionary_apply;
+  sourcekitd_variant_functions_dictionary_get_bool_t dictionary_get_bool;
+  sourcekitd_variant_functions_dictionary_get_double_t dictionary_get_double;
+  sourcekitd_variant_functions_dictionary_get_int64_t dictionary_get_int64;
+  sourcekitd_variant_functions_dictionary_get_string_t dictionary_get_string;
+  sourcekitd_variant_functions_dictionary_get_value_t dictionary_get_value;
+  sourcekitd_variant_functions_dictionary_get_uid_t dictionary_get_uid;
+  sourcekitd_variant_functions_string_get_length_t string_get_length;
+  sourcekitd_variant_functions_string_get_ptr_t string_get_ptr;
+  sourcekitd_variant_functions_int64_get_value_t int64_get_value;
+  sourcekitd_variant_functions_uid_get_value_t uid_get_value;
+  sourcekitd_variant_functions_data_get_size_t data_get_size;
+  sourcekitd_variant_functions_data_get_ptr_t data_get_ptr;
 };
 
+// Parameters for plugin initialization.
+struct PluginInitParams {
+  bool isClientOnly;
+  uint64_t customBufferStart = (uint64_t)CustomBufferKind::CustomBufferKind_End;
+  sourcekitd_uid_get_from_cstr_t uidGetFromCstr = sourcekitd_uid_get_from_cstr;
+  sourcekitd_uid_get_string_ptr_t uidGetStringPtr =
+      sourcekitd_uid_get_string_ptr;
+  std::function<void(sourcekitd_cancellable_request_handler_t)>
+      registerRequestHandler;
+  std::function<void(sourcekitd_cancellation_handler_t)>
+      registerCancellationHandler;
+  std::function<void(uint64_t, sourcekitd_variant_functions_t)>
+      registerCustomBuffer;
+  void *opaqueIDEInspectionInstance;
+
+  PluginInitParams(bool isClientOnly,
+                   std::function<void(sourcekitd_cancellable_request_handler_t)>
+                       registerRequestHandler,
+                   std::function<void(sourcekitd_cancellation_handler_t)>
+                       registerCancellationHandler,
+                   void *opaqueIDEInspectionInstance = nullptr);
+};
+
+void loadPlugins(llvm::ArrayRef<std::string> registeredPlugins,
+                 PluginInitParams &pluginParams);
 }
 
 #endif

@@ -71,24 +71,24 @@ public:
 
   static bool
   dictionary_apply(void *buffer, size_t index,
-                   llvm::function_ref<bool(sourcekitd_uid_t,
-                                           sourcekitd_variant_t)> applier) {
+                   sourcekitd_variant_dictionary_applier_f_t applier,
+                   void *context) {
     ExpressionTypeReader reader((char*)buffer);
     auto result = reader.getExpression(index);
 #define APPLY(K, Ty, Field)                              \
   do {                                                   \
-    sourcekitd_uid_t key = SKDUIDFromUIdent(K);          \
+    sourcekitd_uid_t key = SKDUIDFromUIdent(K);  \
     sourcekitd_variant_t var = make##Ty##Variant(Field); \
-    if (!applier(key, var)) return false;                \
+    if (!applier(key, var, context)) return false;                \
   } while (0)
 
 #define APPLY_ARRAY(Kind, Key)                                                 \
   do {                                                                         \
-    sourcekitd_uid_t key = SKDUIDFromUIdent(Key);                              \
+    sourcekitd_uid_t key = SKDUIDFromUIdent(Key);                      \
     sourcekitd_variant_t var = {                                               \
         {(uintptr_t)getVariantFunctionsFor##Kind##Array(), (uintptr_t)buffer,  \
                      index}};                                                  \
-    if (!applier(key, var)) return false;                                      \
+    if (!applier(key, var, context)) return false;                                      \
   } while (0)
 
     APPLY(KeyExpressionOffset, Int, result.ExprOffset);
@@ -131,14 +131,17 @@ VariantFunctions ProtocolListFuncs::Funcs = {
   get_type,
   nullptr /*AnnotArray_array_apply*/,
   nullptr /*AnnotArray_array_get_bool*/,
+  nullptr /*AnnotArray_array_get_double*/,
   array_get_count,
   nullptr /*AnnotArray_array_get_int64*/,
   nullptr /*AnnotArray_array_get_string*/,
   nullptr /*AnnotArray_array_get_uid*/,
   array_get_value,
   nullptr /*AnnotArray_bool_get_value*/,
+  nullptr /*AnnotArray_double_get_value*/,
   nullptr /*AnnotArray_dictionary_apply*/,
   nullptr /*AnnotArray_dictionary_get_bool*/,
+  nullptr /*AnnotArray_dictionary_get_double*/,
   nullptr /*AnnotArray_dictionary_get_int64*/,
   nullptr /*AnnotArray_dictionary_get_string*/,
   nullptr /*AnnotArray_dictionary_get_value*/,
@@ -233,14 +236,17 @@ VariantFunctions ExpressionTypeArrayBuilder::Funcs = {
   Implementation::get_type,
   nullptr /*AnnotArray_array_apply*/,
   nullptr /*AnnotArray_array_get_bool*/,
+  nullptr /*AnnotArray_array_get_double*/,
   Implementation::array_get_count,
   nullptr /*AnnotArray_array_get_int64*/,
   nullptr /*AnnotArray_array_get_string*/,
   nullptr /*AnnotArray_array_get_uid*/,
   Implementation::array_get_value,
   nullptr /*AnnotArray_bool_get_value*/,
+  nullptr /*AnnotArray_double_get_value*/,
   nullptr /*AnnotArray_dictionary_apply*/,
   nullptr /*AnnotArray_dictionary_get_bool*/,
+  nullptr /*AnnotArray_dictionary_get_double*/,
   nullptr /*AnnotArray_dictionary_get_int64*/,
   nullptr /*AnnotArray_dictionary_get_string*/,
   nullptr /*AnnotArray_dictionary_get_value*/,
