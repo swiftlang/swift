@@ -127,6 +127,7 @@ add_compile_options(
   $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
   $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
   $<$<COMPILE_LANGUAGE:CXX>:-funwind-tables>
+  "$<$<AND:$<COMPILE_LANGUAGE:Swift>,$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>>:SHELL:-Xfrontend -disable-objc-interop>"
   "$<$<AND:$<COMPILE_LANGUAGE:Swift>,$<PLATFORM_ID:Windows>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
   $<$<AND:$<COMPILE_LANGUAGE:Swift>,$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>>:-enable-library-evolution>)
 
