@@ -1432,19 +1432,24 @@ public:
 
 class TypeValueExpr : public Expr {
   TypeLoc paramTypeLoc;
+  Type valueType;
 
 public:
   /// Create a \c TypeValueExpr from an underlying parameter \c TypeRepr.
-  TypeValueExpr(TypeRepr *paramRepr) :
-      Expr(ExprKind::TypeValue, /*implicit*/ false), paramTypeLoc(paramRepr) {}
+  TypeValueExpr(TypeRepr *paramRepr, Type valueType) :
+      Expr(ExprKind::TypeValue, /*implicit*/ false), paramTypeLoc(paramRepr),
+      valueType(valueType) {}
 
-  /// Create a \c TypeValueExpr for a given \c TypeDecl at the specified
-  /// location.
-  ///
-  /// The given location must be valid. If it is not, you must use
-  /// \c TypeExpr::createImplicitForDecl instead.
-  static TypeValueExpr *createForDecl(DeclNameLoc Loc, TypeDecl *D,
+  /// Create a \c TypeValueExpr for a given \c GenericTypeParamDecl at the
+  /// specified location.
+  static TypeValueExpr *createForDecl(DeclNameLoc Loc, GenericTypeParamDecl *D,
                                       DeclContext *DC);
+
+  /// Create a \c TypeValueExpr for a member \c GenericTypeParamDecl of the
+  /// given parent \c TypeRepr.
+  static TypeValueExpr *createForMemberDecl(TypeRepr *ParentTR,
+                                            DeclNameLoc NameLoc,
+                                            GenericTypeParamDecl *Decl);
 
   TypeRepr *getParamTypeRepr() const {
     return paramTypeLoc.getTypeRepr();
@@ -1452,14 +1457,20 @@ public:
 
   /// Retrieves the corresponding parameter type of the value referenced by this
   /// expression.
-  ArchetypeType *getParamType() const {
-    return paramTypeLoc.getType()->castTo<ArchetypeType>();
+  Type getParamType() const {
+    return paramTypeLoc.getType();
   }
 
   /// Sets the corresponding parameter type of the value referenced by this
   /// expression.
   void setParamType(Type paramType) {
     paramTypeLoc.setType(paramType);
+  }
+
+  /// Retrieves the underlying value type of the parameter type referenced by
+  /// this expression.
+  Type getValueType() const {
+    return valueType;
   }
 
   SourceRange getSourceRange() const {
