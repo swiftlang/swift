@@ -5656,7 +5656,14 @@ llvm::Constant *
 IRGenModule::getAddrOfValueWitnessTable(CanType concreteType,
                                         ConstantInit definition) {
   LinkEntity entity = LinkEntity::forValueWitnessTable(concreteType);
-  return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
+  llvm::Constant *C = getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
+  if (getSwiftModule()->isStdlibModule() && useDllStorage(Triple))
+    if (IsWellKnownBuiltinOrStructralType(concreteType))
+      ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
+                      llvm::GlobalValue::DefaultVisibility,
+                      llvm::GlobalValue::DefaultStorageClass})
+          .to(cast<llvm::GlobalValue>(C));
+  return C;
 }
 
 static Address getAddrOfSimpleVariable(IRGenModule &IGM,
