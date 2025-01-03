@@ -19,14 +19,12 @@
 // RUN: ls %t/empty.swiftinterface
 
 // CHECK-DAG: warning: module interfaces are only supported with Swift language version 5 or later (currently using -swift-version [[VERSION]])
-// CHECK-DAG: warning: module interfaces are only supported with -enable-library-evolution
 
 // CHECK-VERSION-ONLY-NOT: warning:
 // CHECK-VERSION-ONLY: warning: module interfaces are only supported with Swift language version 5 or later (currently using -swift-version [[VERSION]])
 // CHECK-VERSION-ONLY-NOT: warning:
 
 // CHECK-EVOLUTION-ONLY-NOT: warning:
-// CHECK-EVOLUTION-ONLY: warning: module interfaces are only supported with -enable-library-evolution
 // CHECK-EVOLUTION-ONLY-NOT: warning:
 
 // NEGATIVE-NOT: warning:
