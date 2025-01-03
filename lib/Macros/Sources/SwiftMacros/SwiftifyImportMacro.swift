@@ -156,6 +156,18 @@ func getPointerMutability(text: String) -> Mutability? {
   }
 }
 
+// Remove std. or std.__1. prefix
+func getUnqualifiedStdName(_ type: String) -> String? {
+  if (type.hasPrefix("std.")) {
+    var ty = type.dropFirst(4)
+    if (ty.hasPrefix("__1.")) {
+      ty = ty.dropFirst(4)
+    }
+    return String(ty)
+  }
+  return nil
+}
+
 func getSafePointerName(mut: Mutability, generateSpan: Bool, isRaw: Bool) -> TokenSyntax {
   switch (mut, generateSpan, isRaw) {
   case (.Immutable, true, true): return "RawSpan"
@@ -299,9 +311,10 @@ struct CxxSpanThunkBuilder: BoundsCheckedThunkBuilder {
         "unable to desugar type with name '\(typeName)'", node: node)
     }
 
-    let parsedDesugaredType = try TypeSyntax("\(raw: desugaredType)")
-    types[index] = TypeSyntax(IdentifierTypeSyntax(name: "Span",
-      genericArgumentClause: parsedDesugaredType.as(IdentifierTypeSyntax.self)!.genericArgumentClause))
+    let parsedDesugaredType = try TypeSyntax("\(raw: getUnqualifiedStdName(desugaredType)!)")
+    let genericArg = TypeSyntax(parsedDesugaredType.as(IdentifierTypeSyntax.self)!
+      .genericArgumentClause!.arguments.first!.argument)!
+    types[index] = TypeSyntax("Span<\(raw: try getTypeName(genericArg).text)>")
     return try base.buildFunctionSignature(types, variant)
   }
 
@@ -656,9 +669,11 @@ public struct SwiftifyImportMacro: PeerMacro {
     for (idx, param) in signature.parameterClause.parameters.enumerated() {
       let typeName = try getTypeName(param.type).text;
       if let desugaredType = typeMappings[typeName] {
-        if desugaredType.starts(with: "span") {
-          result.append(CxxSpan(pointerIndex: idx + 1, nonescaping: false,
-            original: param, typeMappings: typeMappings))
+        if let unqualifiedDesugaredType = getUnqualifiedStdName(desugaredType) {
+          if unqualifiedDesugaredType.starts(with: "span<") {
+            result.append(CxxSpan(pointerIndex: idx + 1, nonescaping: false,
+              original: param, typeMappings: typeMappings))
+          }
         }
       }
     }
