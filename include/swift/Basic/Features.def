@@ -254,7 +254,6 @@ EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
 EXPERIMENTAL_FEATURE(ConsumeSelfInDeinit, true)
 
-EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
@@ -358,9 +357,6 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// Enable returning non-escapable types from functions.
 EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 
-/// Enable LifetimeDependence diagnostics for trivial types.
-EXPERIMENTAL_FEATURE(LifetimeDependenceDiagnoseTrivial, false)
-
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
@@ -434,10 +430,17 @@ EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
 /// modify/read coroutines use the callee-allocated ABI
 EXPERIMENTAL_FEATURE(CoroutineAccessorsAllocateInCallee, false)
 
-// When a parameter has unspecified isolation, infer it as main actor isolated.
+/// When a parameter has unspecified isolation, infer it as main actor isolated.
 EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
 
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
+
+/// Allow the @abi attribute.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
+
+/// Functions with nonisolated isolation inherit their isolation from the
+/// calling context.
+EXPERIMENTAL_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

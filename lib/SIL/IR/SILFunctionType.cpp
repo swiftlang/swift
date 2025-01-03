@@ -108,6 +108,11 @@ CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
                               getWitnessMethodConformanceOrInvalid());
 }
 
+CanType SILParameterInfo::getArgumentType(SILFunction *fn) const {
+  return getArgumentType(fn->getModule(), fn->getLoweredFunctionType(),
+                         fn->getTypeExpansionContext());
+}
+
 CanType SILParameterInfo::getArgumentType(SILModule &M,
                                           const SILFunctionType *t,
                                           TypeExpansionContext context) const {
@@ -1298,6 +1303,25 @@ public:
     }
     llvm_unreachable("unhandled ownership");
   }
+
+  // Determines owned/unowned ResultConvention of the returned value based on
+  // returns_retained/returns_unretained attribute.
+  std::optional<ResultConvention>
+  getCxxRefConventionWithAttrs(const TypeLowering &tl,
+                               const clang::Decl *decl) const {
+    if (tl.getLoweredType().isForeignReferenceType() && decl->hasAttrs()) {
+      for (const auto *attr : decl->getAttrs()) {
+        if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+          if (swiftAttr->getAttribute() == "returns_unretained") {
+            return ResultConvention::Unowned;
+          } else if (swiftAttr->getAttribute() == "returns_retained") {
+            return ResultConvention::Owned;
+          }
+        }
+      }
+    }
+    return std::nullopt;
+  }
 };
 
 /// A visitor for breaking down formal result types into a SILResultInfo
@@ -1541,6 +1565,7 @@ class DestructureInputs {
   TypeConverter &TC;
   const Conventions &Convs;
   const ForeignInfo &Foreign;
+  std::optional<ActorIsolation> IsolationInfo;
   struct ForeignSelfInfo {
     AbstractionPattern OrigSelfParam;
     AnyFunctionType::CanParam SubstSelfParam;
@@ -1553,9 +1578,10 @@ class DestructureInputs {
 public:
   DestructureInputs(TypeExpansionContext expansion, TypeConverter &TC,
                     const Conventions &conventions, const ForeignInfo &foreign,
+                    std::optional<ActorIsolation> isolationInfo,
                     SmallVectorImpl<SILParameterInfo> &inputs)
       : expansion(expansion), TC(TC), Convs(conventions), Foreign(foreign),
-        Inputs(inputs) {}
+        IsolationInfo(isolationInfo), Inputs(inputs) {}
 
   void destructure(AbstractionPattern origType,
                    CanAnyFunctionType::CanParamArrayRef params,
@@ -1615,6 +1641,23 @@ private:
         origType.getFunctionParamType(numOrigParams - 1),
         params.back()
       };
+    }
+
+    // If we are an async function that is unspecified or nonisolated, insert an
+    // isolated parameter if NonIsolatedAsyncInheritsIsolationFromContext is
+    // enabled.
+    if (TC.Context.LangOpts.hasFeature(
+            Feature::NonIsolatedAsyncInheritsIsolationFromContext) &&
+        IsolationInfo &&
+        IsolationInfo->getKind() == ActorIsolation::CallerIsolationInheriting &&
+        extInfoBuilder.isAsync()) {
+      auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
+      auto actorType =
+          ExistentialType::get(actorProtocol->getDeclaredInterfaceType());
+      addParameter(CanType(actorType).wrapInOptionalType(),
+                   ParameterConvention::Direct_Guaranteed,
+                   ParameterTypeFlags().withIsolated(true),
+                   true /*implicit leading parameter*/);
     }
 
     // Add any foreign parameters that are positioned at the start
@@ -1798,7 +1841,7 @@ private:
   /// Add a parameter that we derived from deconstructing the
   /// formal type.
   void addParameter(CanType loweredType, ParameterConvention convention,
-                    ParameterTypeFlags origFlags) {
+                    ParameterTypeFlags origFlags, bool isImplicit = false) {
     SILParameterInfo param(loweredType, convention);
 
     if (origFlags.isNoDerivative())
@@ -1807,6 +1850,8 @@ private:
       param = param.addingOption(SILParameterInfo::Sending);
     if (origFlags.isIsolated())
       param = param.addingOption(SILParameterInfo::Isolated);
+    if (isImplicit)
+      param = param.addingOption(SILParameterInfo::ImplicitLeading);
 
     Inputs.push_back(param);
     maybeAddForeignParameters();
@@ -2446,8 +2491,17 @@ static CanSILFunctionType getSILFunctionType(
   // Destructure the input tuple type.
   SmallVector<SILParameterInfo, 8> inputs;
   {
+    std::optional<ActorIsolation> actorIsolation;
+    if (constant) {
+      if (constant->kind == SILDeclRef::Kind::Deallocator) {
+        actorIsolation = ActorIsolation::forNonisolated(false);
+      } else {
+        actorIsolation =
+            getActorIsolationOfContext(constant->getInnermostDeclContext());
+      }
+    }
     DestructureInputs destructurer(expansionContext, TC, conventions,
-                                   foreignInfo, inputs);
+                                   foreignInfo, actorIsolation, inputs);
     destructurer.destructure(origType, substFnInterfaceType.getParams(),
                              extInfoBuilder, unimplementable);
   }
@@ -2535,8 +2589,9 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
   {
     bool unimplementable = false;
     ForeignInfo foreignInfo;
+    std::optional<ActorIsolation> actorIsolation; // For now always null.
     DestructureInputs destructurer(context, TC, conventions, foreignInfo,
-                                   inputs);
+                                   actorIsolation, inputs);
     destructurer.destructure(
         origType, substAccessorType.getParams(),
         extInfoBuilder.withRepresentation(SILFunctionTypeRepresentation::Thin),
@@ -3341,7 +3396,8 @@ public:
       return ResultConvention::Owned;
 
     if (tl.getLoweredType().isForeignReferenceType())
-      return ResultConvention::Unowned;
+      return getCxxRefConventionWithAttrs(tl, Method)
+          .value_or(ResultConvention::Unowned);
 
     return ResultConvention::Autoreleased;
   }
@@ -3380,25 +3436,6 @@ protected:
   CFunctionTypeConventions(ConventionsKind kind,
                            const clang::FunctionType *type)
     : Conventions(kind), FnType(type) {}
-
-  // Determines owned/unowned ResultConvention of the returned value based on
-  // returns_retained/returns_unretained attribute.
-  std::optional<ResultConvention>
-  getForeignReferenceTypeResultConventionWithAttributes(
-      const TypeLowering &tl, const clang::FunctionDecl *decl) const {
-    if (tl.getLoweredType().isForeignReferenceType() && decl->hasAttrs()) {
-      for (const auto *attr : decl->getAttrs()) {
-        if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-          if (swiftAttr->getAttribute() == "returns_unretained") {
-            return ResultConvention::Unowned;
-          } else if (swiftAttr->getAttribute() == "returns_retained") {
-            return ResultConvention::Owned;
-          }
-        }
-      }
-    }
-    return std::nullopt;
-  }
 
 public:
   CFunctionTypeConventions(const clang::FunctionType *type)
@@ -3517,11 +3554,7 @@ public:
       return ResultConvention::Indirect;
     }
 
-    // Explicitly setting the ownership of the returned FRT if the C++
-    // global/free function has either swift_attr("returns_retained") or
-    // ("returns_unretained") attribute.
-    if (auto resultConventionOpt =
-            getForeignReferenceTypeResultConventionWithAttributes(tl, TheDecl))
+    if (auto resultConventionOpt = getCxxRefConventionWithAttrs(tl, TheDecl))
       return *resultConventionOpt;
 
     if (isCFTypedef(tl, TheDecl->getReturnType())) {
@@ -3603,11 +3636,8 @@ public:
       return ResultConvention::Indirect;
     }
 
-    // Explicitly setting the ownership of the returned FRT if the C++ member
-    // method has either swift_attr("returns_retained") or
-    // ("returns_unretained") attribute.
     if (auto resultConventionOpt =
-            getForeignReferenceTypeResultConventionWithAttributes(resultTL, TheDecl))
+            getCxxRefConventionWithAttrs(resultTL, TheDecl))
       return *resultConventionOpt;
 
     if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>() &&

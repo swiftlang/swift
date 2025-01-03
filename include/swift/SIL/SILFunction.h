@@ -1565,6 +1565,17 @@ public:
     }
   }
 
+  /// Populate \p output with every block terminated by an unreachable
+  /// instruction.
+  void visitUnreachableTerminatedBlocks(
+      llvm::function_ref<void(SILBasicBlock &)> visitor) const {
+    for (auto &block : const_cast<SILFunction &>(*this)) {
+      if (isa<UnreachableInst>(block.getTerminator())) {
+        visitor(block);
+      }
+    }
+  }
+
   //===--------------------------------------------------------------------===//
   // Argument Helper Methods
   //===--------------------------------------------------------------------===//

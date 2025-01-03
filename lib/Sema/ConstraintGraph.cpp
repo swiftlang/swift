@@ -38,11 +38,13 @@ using namespace constraints;
 ConstraintGraph::ConstraintGraph(ConstraintSystem &cs) : CS(cs) { }
 
 ConstraintGraph::~ConstraintGraph() {
-  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
-    auto &impl = TypeVariables[i]->getImpl();
-    delete impl.getGraphNode();
-    impl.setGraphNode(nullptr);
+#ifndef NDEBUG
+  for (unsigned i = 0, n = CS.TypeVariables.size(); i != n; ++i) {
+    auto &impl = CS.TypeVariables[i]->getImpl();
+    ASSERT(impl.getGraphNode() == nullptr);
   }
+#endif
+
   for (auto *node : FreeList) {
     delete node;
   }
@@ -70,12 +72,7 @@ void ConstraintGraph::addTypeVariable(TypeVariableType *typeVar) {
     FreeList.pop_back();
     nodePtr->initTypeVariable(typeVar);
   }
-  unsigned index = TypeVariables.size();
   impl.setGraphNode(nodePtr);
-  impl.setGraphIndex(index);
-
-  // Record this type variable.
-  TypeVariables.push_back(typeVar);
 
   if (CS.solverState)
     CS.recordChange(SolverTrail::Change::AddedTypeVariable(typeVar));
@@ -83,17 +80,8 @@ void ConstraintGraph::addTypeVariable(TypeVariableType *typeVar) {
 
 ConstraintGraphNode &
 ConstraintGraph::operator[](TypeVariableType *typeVar) {
-  // Check whether we've already created a node for this type variable.
-  auto &impl = typeVar->getImpl();
-  auto *nodePtr = impl.getGraphNode();
-  if (!nodePtr) {
-    llvm::errs() << "Type variable $T" << impl.getID() << " not in constraint graph\n";
-    abort();
-  }
+  auto *nodePtr = typeVar->getImpl().getGraphNode();
   ASSERT(nodePtr->TypeVar == typeVar && "Use-after-free");
-  DEBUG_ASSERT(impl.getGraphIndex() < TypeVariables.size() && "Out-of-bounds index");
-  DEBUG_ASSERT(TypeVariables[impl.getGraphIndex()] == typeVar &&
-               "Type variable mismatch");
   return *nodePtr;
 }
 
@@ -372,17 +360,10 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
 void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
   // Remove this node.
   auto &impl = typeVar->getImpl();
-  unsigned index = impl.getGraphIndex();
   auto *node = impl.getGraphNode();
   node->reset();
   FreeList.push_back(node);
   impl.setGraphNode(nullptr);
-
-  // Remove this type variable from the list.
-  unsigned lastIndex = TypeVariables.size()-1;
-  if (index < lastIndex)
-    TypeVariables[index] = TypeVariables[lastIndex];
-  TypeVariables.pop_back();
 }
 
 void ConstraintGraph::addConstraint(Constraint *constraint) {
@@ -740,19 +721,9 @@ namespace {
     ConstraintGraph &cg;
     ArrayRef<TypeVariableType *> typeVars;
 
-    /// A mapping from each type variable to its representative in a union-find
-    /// data structure, excluding entries where the type variable is its own
-    /// representative.
-    mutable llvm::SmallDenseMap<TypeVariableType *, TypeVariableType *>
-        representatives;
-
-    // Figure out which components have unbound type variables and/or
-    // constraints. These are the only components we want to report.
-    llvm::SmallDenseSet<TypeVariableType *> validComponents;
-
-    /// The complete set of constraints that were visited while computing
-    /// connected components.
-    llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
+    /// The number of connected components discovered so far. Decremented when
+    /// we merge equivalence classes.
+    unsigned validComponentCount = 0;
 
     /// Describes the one-way incoming and outcoming adjacencies of
     /// a component within the directed graph of one-way constraints.
@@ -795,10 +766,9 @@ namespace {
       // The final return value.
       SmallVector<Component, 1> flatComponents;
 
-
       // We don't actually need to partition the graph into components if
       // there are fewer than 2.
-      if (validComponents.size() < 2 && cg.getOrphanedConstraints().empty())
+      if (validComponentCount < 2 && cg.getOrphanedConstraints().empty())
         return flatComponents;
 
       // Mapping from representatives to components.
@@ -809,8 +779,8 @@ namespace {
       for (auto typeVar : typeVars) {
         // Find the representative. If we aren't creating a type variable
         // for this component, skip it.
-        auto rep = findRepresentative(typeVar);
-        if (validComponents.count(rep) == 0)
+        auto rep = typeVar->getImpl().getComponent();
+        if (!rep->getImpl().isValidComponent())
           continue;
 
         auto pair = components.insert({rep, Component(components.size())});
@@ -848,7 +818,7 @@ namespace {
           typeVar = constraintTypeVars.front();
         }
 
-        auto rep = findRepresentative(typeVar);
+        auto rep = typeVar->getImpl().getComponent();
         getComponent(rep).addConstraint(&constraint);
       }
 
@@ -876,7 +846,7 @@ namespace {
           auto &oneWayComponent = knownOneWayComponent->second;
           auto &component = getComponent(typeVar);
           for (auto inAdj : oneWayComponent.inAdjacencies) {
-            if (validComponents.count(inAdj) == 0)
+            if (!inAdj->getImpl().isValidComponent())
               continue;
 
             component.recordDependency(getComponent(inAdj));
@@ -918,23 +888,6 @@ namespace {
       return flatComponents;
     }
 
-    /// Find the representative for the given type variable within the set
-    /// of representatives in a union-find data structure.
-    TypeVariableType *findRepresentative(TypeVariableType *typeVar) const {
-      // If we don't have a record of this type variable, it is it's own
-      // representative.
-      auto known = representatives.find(typeVar);
-      if (known == representatives.end() || known->second == typeVar)
-        return typeVar;
-
-      // Find the representative of the parent.
-      auto parent = known->second;
-      auto rep = findRepresentative(parent);
-      representatives[typeVar] = rep;
-
-      return rep;
-    }
-
   private:
     /// Perform the union of two type variables in a union-find data structure
     /// used for connected components.
@@ -942,20 +895,27 @@ namespace {
     /// \returns true if the two components were separate and have now been
     /// joined, \c false if they were already in the same set.
     bool unionSets(TypeVariableType *typeVar1, TypeVariableType *typeVar2) {
-      auto rep1 = findRepresentative(typeVar1);
-      auto rep2 = findRepresentative(typeVar2);
+      auto rep1 = typeVar1->getImpl().getComponent();
+      auto rep2 = typeVar2->getImpl().getComponent();
       if (rep1 == rep2)
         return false;
 
       // Reparent the type variable with the higher ID. The actual choice doesn't
       // matter, but this makes debugging easier.
-      if (rep1->getID() < rep2->getID()) {
-        validComponents.erase(rep2);
-        representatives[rep2] = rep1;
-      } else {
-        validComponents.erase(rep1);
-        representatives[rep1] = rep2;
+      if (rep1->getID() > rep2->getID())
+        std::swap(rep1, rep2);
+
+      if (rep2->getImpl().isValidComponent()) {
+        // If both are valid components, decrement the valid component counter
+        // by one. Otherwise, propagate the valid component flag.
+        if (!rep1->getImpl().markValidComponent()) {
+          ASSERT(validComponentCount > 0);
+          --validComponentCount;
+        }
       }
+
+      rep2->getImpl().setComponent(rep1);
+
       return true;
     }
 
@@ -968,51 +928,49 @@ namespace {
 
       auto &cs = cg.getConstraintSystem();
 
-      // Perform a depth-first search from each type variable to identify
-      // what component it is in.
       for (auto typeVar : typeVars) {
-        // If we've already assigned a representative to this type variable,
-        // we're done.
-        if (representatives.count(typeVar) > 0)
-          continue;
+        auto &impl = typeVar->getImpl();
+        if (auto *rep = impl.getRepresentativeOrFixed().dyn_cast<TypeVariableType *>()) {
+          impl.setComponent(rep);
+          if (typeVar == rep) {
+            if (impl.markValidComponent())
+              ++validComponentCount;
+          }
+        } else {
+          impl.setComponent(typeVar);
+        }
+      }
 
-        // Perform a depth-first search to mark those type variables that are
-        // in the same component as this type variable.
-        depthFirstSearch(
-            cg, typeVar,
-            [&](TypeVariableType *found) {
-              // If we have already seen this node, we're done.
-              auto inserted = representatives.insert({found, typeVar});
-              assert((inserted.second || inserted.first->second == typeVar) &&
-                     "Wrong component?");
-
-              if (inserted.second)
-                if (!cs.getFixedType(found))
-                  validComponents.insert(typeVar);
-
-              return inserted.second;
-            },
-            [&](Constraint *constraint) {
-              // Record and skip one-way constraints.
-              if (constraint->isOneWayConstraint()) {
-                oneWayConstraints.push_back(constraint);
-                return false;
-              }
-
-              return true;
-            },
-            visitedConstraints);
+      for (auto typeVar : typeVars) {
+        auto &impl = typeVar->getImpl();
+        if (auto fixedType = impl.getRepresentativeOrFixed().dyn_cast<TypeBase *>()) {
+          auto &node = cg[typeVar];
+          for (auto otherTypeVar : node.getReferencedVars()) {
+            unionSets(typeVar, otherTypeVar);
+          }
+        }
       }
 
       for (auto &constraint : cs.getConstraints()) {
-        if (constraint.getKind() == ConstraintKind::Disjunction ||
-            constraint.getKind() == ConstraintKind::Conjunction) {
-          for (auto typeVar : constraint.getTypeVariables()) {
-            auto rep = findRepresentative(typeVar);
-            if (validComponents.insert(rep).second)
-              ASSERT(cs.getFixedType(typeVar));
-          }
+        if (constraint.isOneWayConstraint()) {
+          oneWayConstraints.push_back(&constraint);
+          auto *typeVar = constraint.getFirstType()->castTo<TypeVariableType>();
+          typeVar = typeVar->getImpl().getComponent();
+          if (typeVar->getImpl().markValidComponent())
+            ++validComponentCount;
+          continue;
         }
+
+        auto typeVars = constraint.getTypeVariables();
+        if (typeVars.empty())
+          continue;
+
+        auto *firstTypeVar = typeVars[0]->getImpl().getComponent();
+        if (firstTypeVar->getImpl().markValidComponent())
+          ++validComponentCount;
+
+        for (auto *otherTypeVar : typeVars.slice(1))
+          unionSets(firstTypeVar, otherTypeVar);
       }
 
       return oneWayConstraints;
@@ -1035,7 +993,7 @@ namespace {
       SmallPtrSet<TypeVariableType *, 2> typeVars;
       type->getTypeVariables(typeVars);
       for (auto typeVar : typeVars) {
-        auto rep = findRepresentative(typeVar);
+        auto rep = typeVar->getImpl().getComponent();
         insertIfUnique(results, rep);
       }
 
@@ -1245,7 +1203,7 @@ namespace {
             rep,
             [&](TypeVariableType *typeVar) -> ArrayRef<TypeVariableType *> {
               // Traverse the outgoing adjacencies for the subcomponent
-              assert(typeVar == findRepresentative(typeVar));
+              assert(typeVar == typeVar->getImpl().getComponent());
               auto oneWayComponent = oneWayDigraph.find(typeVar);
               if (oneWayComponent == oneWayDigraph.end()) {
                 return { };
@@ -1259,7 +1217,7 @@ namespace {
             [&](TypeVariableType *typeVar) {
               // Record this type variable, if it's one of the representative
               // type variables.
-              if (validComponents.count(typeVar) > 0)
+              if (typeVar->getImpl().isValidComponent())
                 orderedReps.push_back(typeVar);
             });
       }
@@ -1648,7 +1606,7 @@ void ConstraintGraph::verify() {
   // Verify that the type variables are either representatives or represented
   // within their representative's equivalence class.
   // FIXME: Also check to make sure the equivalence classes aren't too large?
-  for (auto typeVar : TypeVariables) {
+  for (auto typeVar : CS.TypeVariables) {
     auto typeVarRep = CS.getRepresentative(typeVar);
     auto &repNode = (*this)[typeVarRep];
     if (typeVar != typeVarRep) {
@@ -1669,24 +1627,15 @@ void ConstraintGraph::verify() {
     }
   }
 
-  // Verify that our type variable map/vector are in sync.
-  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
-    auto typeVar = TypeVariables[i];
-    auto &impl = typeVar->getImpl();
-    requireSameValue(impl.getGraphIndex(), i, "wrong graph node index");
-    require(impl.getGraphNode(), "null graph node");
-  }
-
   // Verify consistency of all of the nodes in the graph.
-  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
-    auto typeVar = TypeVariables[i];
+  for (auto typeVar : CS.TypeVariables) {
     auto &impl = typeVar->getImpl();
     impl.getGraphNode()->verify(*this);
   }
 
   // Collect all of the constraints known to the constraint graph.
   llvm::SmallPtrSet<Constraint *, 4> knownConstraints;
-  for (auto typeVar : getTypeVariables()) {
+  for (auto typeVar : CS.TypeVariables) {
     for (auto constraint : (*this)[typeVar].getConstraints())
       knownConstraints.insert(constraint);
   }

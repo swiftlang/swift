@@ -63,6 +63,7 @@
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/LangStandard.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
@@ -5096,8 +5097,6 @@ static const llvm::StringMap<std::vector<int>> STLConditionalEscapableParams{
     {"multimap", {0, 1}},
     {"flat_multimap", {0, 1}},
     {"unordered_multimap", {0, 1}},
-    {"span", {0}},   // TODO: remove when span is non-escapable by default
-    {"mdspan", {0}}, // TODO: remove when mdspan is non-escapable by default
 };
 
 static std::set<StringRef>
@@ -6147,6 +6146,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
   NominalTypeDecl *recordDecl = desc.recordDecl;
   DeclName name = desc.name;
+  bool inherited = desc.inherited;
 
   auto &ctx = recordDecl->getASTContext();
   auto allResults = evaluateOrDefault(
@@ -6200,9 +6200,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           continue;
 
         // Add Clang members that are imported lazily.
-        auto baseResults = evaluateOrDefault(
-            ctx.evaluator,
-            ClangRecordMemberLookup({cast<NominalTypeDecl>(import), name}), {});
+        auto baseResults =
+            evaluateOrDefault(ctx.evaluator,
+                              ClangRecordMemberLookup(
+                                  {cast<NominalTypeDecl>(import), name, true}),
+                              {});
         // Add members that are synthesized eagerly, such as subscripts.
         for (auto member :
              cast<NominalTypeDecl>(import)->getCurrentMembersWithoutLoading()) {
@@ -6221,6 +6223,21 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           // as that would cause an ambiguous lookup.
           if (foundNameArities.count(getArity(foundInBase)))
             continue;
+
+          // Do not importBaseMemberDecl() if this is a recursive lookup into
+          // some class's superclass. importBaseMemberDecl() caches synthesized
+          // members, which does not work if we call it on its result, e.g.:
+          //
+          //    importBaseMemberDecl(importBaseMemberDecl(foundInBase,
+          //    recorDecl), recordDecl)
+          //
+          // Instead, we simply pass on the imported decl (foundInBase) as is,
+          // so that only the top-most request calls importBaseMemberDecl().
+          if (inherited) {
+            result.push_back(foundInBase);
+            continue;
+          }
+
           if (auto newDecl = clangModuleLoader->importBaseMemberDecl(
                   foundInBase, recordDecl)) {
             result.push_back(newDecl);

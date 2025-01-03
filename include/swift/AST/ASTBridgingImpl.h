@@ -327,6 +327,10 @@ BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {
 // MARK: BridgedCanType
 //===----------------------------------------------------------------------===//
 
+static_assert((int)BridgedCanType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
+static_assert((int)BridgedCanType::TraitResult::CanBe == (int)swift::TypeTraitResult::CanBe);
+static_assert((int)BridgedCanType::TraitResult::Is == (int)swift::TypeTraitResult::Is);
+
 BridgedCanType::BridgedCanType(swift::CanType ty) : type(ty.getPointer()) {
 }
 
@@ -337,6 +341,19 @@ swift::CanType BridgedCanType::unbridged() const {
 BridgedASTType BridgedCanType::getType() const {
   return {type};
 }
+
+BridgedCanType::TraitResult BridgedCanType::canBeClass() const {
+  return (TraitResult)unbridged()->canBeClass();
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedASTTypeArray
+//===----------------------------------------------------------------------===//
+
+BridgedASTType BridgedASTTypeArray::getAt(SwiftInt index) const {
+  return {typeArray.unbridged<swift::Type>()[index].getPointer()};
+}
+
 
 //===----------------------------------------------------------------------===//
 // MARK: BridgedConformance
@@ -462,12 +479,16 @@ BridgedConformance BridgedSubstitutionMap::getConformance(SwiftInt index) const 
   return unbridged().getConformances()[index];
 }
 
+BridgedASTTypeArray BridgedSubstitutionMap::getReplacementTypes() const {
+  return {unbridged().getReplacementTypes()};
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedFingerprint
 //===----------------------------------------------------------------------===//
 
 swift::Fingerprint BridgedFingerprint::unbridged() const {
-  return swift::Fingerprint({this->v1, this->v2});
+  return swift::Fingerprint(swift::Fingerprint::Core{this->v1, this->v2});
 }
 
 //===----------------------------------------------------------------------===//

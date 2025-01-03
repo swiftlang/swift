@@ -512,10 +512,33 @@ static bool doesStorageProduceLValue(
   if (!storage->isSetterAccessibleFrom(useDC))
     return false;
 
-  // If there is no base, or the base is an lvalue, then a reference
-  // produces an lvalue.
-  if (!baseType || baseType->is<LValueType>())
+  // This path handles storage that is mutable in the given context.
+
+  if (!baseType) {
     return true;
+  }
+
+  {
+    const auto rValueInstanceTy =
+        baseType->getRValueType()->getMetatypeInstanceType();
+    if (rValueInstanceTy->isExistentialType()) {
+      switch (isMemberAvailableOnExistential(rValueInstanceTy, storage)) {
+      case ExistentialMemberAccessLimitation::Unsupported:
+      case ExistentialMemberAccessLimitation::ReadOnly:
+        // Never an lvalue because the current type system cannot represent the
+        // setter's type out of context.
+        return false;
+
+      case ExistentialMemberAccessLimitation::WriteOnly:
+      case ExistentialMemberAccessLimitation::None:
+        break;
+      }
+    }
+  }
+
+  if (baseType->is<LValueType>()) {
+    return true;
+  }
 
   // The base is an rvalue type. The only way an accessor can
   // produce an lvalue is if we have a property where both the
@@ -1810,11 +1833,15 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           type, var, useDC, GetClosureType{*this},
           ClosureIsolatedByPreconcurrency{*this});
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
-      if (decl->isInstanceMember() &&
-          (!overload.getBaseType() ||
-           (!overload.getBaseType()->getAnyNominal() &&
-            !overload.getBaseType()->is<ExistentialType>())))
-        return Type();
+      if (decl->isInstanceMember()) {
+        auto baseTy = overload.getBaseType();
+        if (!baseTy)
+          return Type();
+
+        baseTy = baseTy->getRValueType();
+        if (!baseTy->getAnyNominal() && !baseTy->is<ExistentialType>())
+          return Type();
+      }
 
       // Cope with 'Self' returns.
       if (!decl->getDeclContext()->getSelfProtocolDecl()) {

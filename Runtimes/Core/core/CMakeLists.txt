@@ -148,6 +148,8 @@ add_library(swiftCore
   Slice.swift
   SmallString.swift
   Sort.swift
+  Span/Span.swift
+  Span/RawSpan.swift
   StaticString.swift
   StaticPrint.swift
   Stride.swift
@@ -346,6 +348,9 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Swift.swiftmodule"
   RENAME "${SwiftCore_MODULE_TRIPLE}.swiftmodule")
 emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)
+
+# Configure plist creation for Darwin platforms.
+generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftCore)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/swiftCore.cmake" OPTIONAL)
 

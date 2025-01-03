@@ -583,60 +583,57 @@ swift::extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc) {
 // so it doesn't break caching for those immediate requests.
 
 /// Exclude macros in the unqualified lookup descriptor if we need to.
-static UnqualifiedLookupDescriptor excludeMacrosIfNeeded(
+static UnqualifiedLookupDescriptor contextualizeOptions(
     UnqualifiedLookupDescriptor descriptor) {
-  if (descriptor.Options.contains(
-          UnqualifiedLookupFlags::ExcludeMacroExpansions))
-    return descriptor;
+  if (!descriptor.Options.contains(
+          UnqualifiedLookupFlags::ExcludeMacroExpansions)
+      && namelookup::isInMacroArgument(
+                         descriptor.DC->getParentSourceFile(), descriptor.Loc))
+    descriptor.Options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
+  if (!descriptor.Options.contains(UnqualifiedLookupFlags::ABIProviding)
+      && namelookup::isInABIAttr(
+                         descriptor.DC->getParentSourceFile(), descriptor.Loc))
+    descriptor.Options |= UnqualifiedLookupFlags::ABIProviding;
 
-  auto isInMacroArgument = namelookup::isInMacroArgument(
-      descriptor.DC->getParentSourceFile(), descriptor.Loc);
-
-  if (!isInMacroArgument)
-    return descriptor;
-
-  descriptor.Options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
   return descriptor;
 }
 
 /// Exclude macros in the direct lookup descriptor if we need to.
-static DirectLookupDescriptor excludeMacrosIfNeeded(
+static DirectLookupDescriptor contextualizeOptions(
     DirectLookupDescriptor descriptor, SourceLoc loc) {
-  if (descriptor.Options.contains(
-          NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions))
-    return descriptor;
-
-  auto isInMacroArgument = namelookup::isInMacroArgument(
-      descriptor.DC->getParentSourceFile(), loc);
-
-  if (!isInMacroArgument)
-    return descriptor;
-
-  descriptor.Options |=
-      NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions;
+  if (!descriptor.Options.contains(
+          NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions)
+      && namelookup::isInMacroArgument(
+                         descriptor.DC->getParentSourceFile(), loc))
+    descriptor.Options |=
+        NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions;
+  if (!descriptor.Options.contains(
+          NominalTypeDecl::LookupDirectFlags::ABIProviding)
+      && namelookup::isInABIAttr(
+                         descriptor.DC->getParentSourceFile(), loc))
+    descriptor.Options |=
+        NominalTypeDecl::LookupDirectFlags::ABIProviding;
 
   return descriptor;
 }
 
 /// Exclude macros in the name lookup options if we need to.
 static NLOptions
-excludeMacrosIfNeeded(const DeclContext *dc, SourceLoc loc,
-                      NLOptions options) {
-  if (options & NL_ExcludeMacroExpansions)
-    return options;
+contextualizeOptions(const DeclContext *dc, SourceLoc loc,
+                     NLOptions options) {
+  if (!(options & NL_ExcludeMacroExpansions)
+      && namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
+    options |= NL_ExcludeMacroExpansions;
+  if (!(options & NL_ABIProviding)
+      && namelookup::isInABIAttr(dc->getParentSourceFile(), loc))
+    options |= NL_ABIProviding;
 
-  auto isInMacroArgument = namelookup::isInMacroArgument(
-      dc->getParentSourceFile(), loc);
-
-  if (!isInMacroArgument)
-    return options;
-
-  return options | NL_ExcludeMacroExpansions;
+  return options;
 }
 
 UnqualifiedLookupRequest::UnqualifiedLookupRequest(
     UnqualifiedLookupDescriptor descriptor
-) : SimpleRequest(excludeMacrosIfNeeded(descriptor)) { }
+) : SimpleRequest(contextualizeOptions(descriptor)) { }
 
 LookupInModuleRequest::LookupInModuleRequest(
       const DeclContext *moduleOrFile, DeclName name, NLKind lookupKind,
@@ -645,13 +642,13 @@ LookupInModuleRequest::LookupInModuleRequest(
       SourceLoc loc, NLOptions options
  ) : SimpleRequest(moduleOrFile, name, lookupKind, resolutionKind,
                    moduleScopeContext,
-                   excludeMacrosIfNeeded(moduleOrFile, loc, options)) { }
+                   contextualizeOptions(moduleOrFile, loc, options)) { }
 
 ModuleQualifiedLookupRequest::ModuleQualifiedLookupRequest(
     const DeclContext *dc, ModuleDecl *module, DeclNameRef name,
     SourceLoc loc, NLOptions options
  ) : SimpleRequest(dc, module, name,
-                   excludeMacrosIfNeeded(dc, loc, options)) { }
+                   contextualizeOptions(dc, loc, options)) { }
 
 QualifiedLookupRequest::QualifiedLookupRequest(
                        const DeclContext *dc,
@@ -659,10 +656,10 @@ QualifiedLookupRequest::QualifiedLookupRequest(
                        DeclNameRef name,
                        SourceLoc loc, NLOptions options
 ) : SimpleRequest(dc, std::move(decls), name,
-                  excludeMacrosIfNeeded(dc, loc, options)) { }
+                  contextualizeOptions(dc, loc, options)) { }
 
 DirectLookupRequest::DirectLookupRequest(DirectLookupDescriptor descriptor, SourceLoc loc)
-    : SimpleRequest(excludeMacrosIfNeeded(descriptor, loc)) { }
+    : SimpleRequest(contextualizeOptions(descriptor, loc)) { }
 
 // Implement the clang importer type zone.
 #define SWIFT_TYPEID_ZONE ClangImporter

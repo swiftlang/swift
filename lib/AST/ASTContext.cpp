@@ -2846,8 +2846,7 @@ ASTContext::getNormalConformance(Type conformingType,
                                  SourceLoc loc,
                                  DeclContext *dc,
                                  ProtocolConformanceState state,
-                                 bool isUnchecked,
-                                 bool isPreconcurrency,
+                                 ProtocolConformanceOptions options,
                                  SourceLoc preconcurrencyLoc) {
   assert(dc->isTypeContext());
 
@@ -2864,7 +2863,7 @@ ASTContext::getNormalConformance(Type conformingType,
   // Build a new normal protocol conformance.
   auto result = new (*this, AllocationArena::Permanent)
       NormalProtocolConformance(conformingType, protocol, loc, dc, state,
-                                isUnchecked, isPreconcurrency, preconcurrencyLoc);
+                                options, preconcurrencyLoc);
   normalConformances.InsertNode(result, insertPos);
 
   return result;
@@ -5561,19 +5560,13 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
       properties));
 }
 
-CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
-                                                std::optional<UUID> knownID) {
+CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential) {
   auto &ctx = existential->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(existential);
 
-  if (!knownID)
-    knownID = UUID::fromTime();
-
   auto *genericEnv = GenericEnvironment::forOpenedExistential(
-      existentialSig.OpenedSig,
-      existentialSig.Shape,
-      existentialSig.Generalization,
-      *knownID);
+      existentialSig.OpenedSig, existentialSig.Shape,
+      existentialSig.Generalization, UUID::fromTime());
 
   return cast<OpenedArchetypeType>(
     genericEnv->mapTypeIntoContext(existentialSig.SelfType)

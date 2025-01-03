@@ -29,13 +29,10 @@ using namespace swift;
 
 GenericParameterReferenceInfo &
 GenericParameterReferenceInfo::operator|=(const GenericParameterReferenceInfo &other) {
-  hasCovariantSelfResult |= other.hasCovariantSelfResult;
-  if (other.selfRef > selfRef) {
-    selfRef = other.selfRef;
-  }
-  if (other.assocTypeRef > assocTypeRef) {
-    assocTypeRef = other.assocTypeRef;
-  }
+  DirectRefs |= other.DirectRefs;
+  DepMemberTyRefs |= other.DepMemberTyRefs;
+  HasCovariantGenericParamResult |= other.HasCovariantGenericParamResult;
+
   return *this;
 }
 
@@ -296,9 +293,9 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
   // A direct reference to 'Self'.
   if (type->is<GenericTypeParamType>()) {
     if (position == TypePosition::Covariant && canBeCovariantResult)
-      return GenericParameterReferenceInfo::forCovariantResult();
+      return GenericParameterReferenceInfo::forCovariantGenericParamResult();
 
-    return GenericParameterReferenceInfo::forSelfRef(position);
+    return GenericParameterReferenceInfo::forDirectRef(position);
   }
 
   if (origParam != openedParam) {
@@ -332,7 +329,7 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
   }
 
   // A reference to an associated type rooted on 'Self'.
-  return GenericParameterReferenceInfo::forAssocTypeRef(position);
+  return GenericParameterReferenceInfo::forDependentMemberTypeRef(position);
 }
 
 GenericParameterReferenceInfo
@@ -393,7 +390,7 @@ bool HasSelfOrAssociatedTypeRequirementsRequest::evaluate(
     // For value members, look at their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
       const auto info = findExistentialSelfReferences(valueMember);
-      if (info.selfRef > TypePosition::Covariant || info.assocTypeRef) {
+      if (info.hasNonCovariantRef() || info.hasDependentMemberTypeRef()) {
         return true;
       }
     }
@@ -516,45 +513,86 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
   return false;
 }
 
-bool swift::isMemberAvailableOnExistential(
-    Type baseTy, const ValueDecl *member) {
+ExistentialMemberAccessLimitation
+swift::isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member) {
+  auto *dc = member->getDeclContext();
+  if (!dc->getSelfProtocolDecl()) {
+    return ExistentialMemberAccessLimitation::None;
+  }
 
   auto &ctx = member->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(baseTy);
 
-  auto *dc = member->getDeclContext();
-  ASSERT(dc->getSelfProtocolDecl());
-
   auto origParam = dc->getSelfInterfaceType()->castTo<GenericTypeParamType>();
   auto openedParam = existentialSig.SelfType->castTo<GenericTypeParamType>();
 
+  // An accessor or non-storage member is not available if its interface type
+  // contains a non-covariant reference to a 'Self'-rooted type parameter in the
+  // context of the base type's existential signature.
   auto info = findGenericParameterReferences(
       member, existentialSig.OpenedSig, origParam, openedParam,
       std::nullopt);
 
-  if (info.selfRef > TypePosition::Covariant ||
-      info.assocTypeRef > TypePosition::Covariant) {
-    return false;
+  auto result = ExistentialMemberAccessLimitation::None;
+  if (!info) {
+    // Nothing to do.
+  } else if (info.hasRef(TypePosition::Invariant)) {
+    // An invariant reference is decisive.
+    result = ExistentialMemberAccessLimitation::Unsupported;
+  } else if (isa<AbstractFunctionDecl>(member)) {
+    // Anything non-covariant is decisive for functions.
+    if (info.hasRef(TypePosition::Contravariant)) {
+      result = ExistentialMemberAccessLimitation::Unsupported;
+    }
+  } else {
+    const auto isGetterUnavailable = info.hasRef(TypePosition::Contravariant);
+    auto isSetterUnavailable = true;
+
+    if (isa<VarDecl>(member)) {
+      // For properties, the setter is unavailable if the interface type has a
+      // covariant reference, which becomes contravariant is the setter.
+      isSetterUnavailable = info.hasRef(TypePosition::Covariant);
+    } else {
+      // For subscripts specifically, we must scan the setter directly because
+      // whether a covariant reference in the interface type becomes
+      // contravariant in the setter depends on the location of the reference
+      // (in the indices or the result type).
+      auto *setter =
+          cast<SubscriptDecl>(member)->getAccessor(AccessorKind::Set);
+      const auto setterInfo = setter ? findGenericParameterReferences(
+                                           setter, existentialSig.OpenedSig,
+                                           origParam, openedParam, std::nullopt)
+                                     : GenericParameterReferenceInfo();
+
+      isSetterUnavailable = setterInfo.hasRef(TypePosition::Contravariant);
+    }
+
+    if (isGetterUnavailable && isSetterUnavailable) {
+      result = ExistentialMemberAccessLimitation::Unsupported;
+    } else if (isGetterUnavailable) {
+      result = ExistentialMemberAccessLimitation::WriteOnly;
+    } else if (isSetterUnavailable) {
+      result = ExistentialMemberAccessLimitation::ReadOnly;
+    }
   }
 
-  // FIXME: Appropriately diagnose assignments instead.
-  if (auto *const storageDecl = dyn_cast<AbstractStorageDecl>(member)) {
-    if (info.hasCovariantSelfResult && storageDecl->supportsMutation())
-      return false;
-  }
+  // If the member access is not supported whatsoever, we are done.
+  if (result == ExistentialMemberAccessLimitation::Unsupported)
+    return result;
 
+  // Before proceeding with the result, see if we find a generic requirement
+  // that cannot be satisfied; if we do, the member is unavailable after all.
   if (doesMemberHaveUnfulfillableConstraintsWithExistentialBase(existentialSig,
                                                                 member)) {
-    return false;
+    return ExistentialMemberAccessLimitation::Unsupported;
   }
 
-  return true;
+  return result;
 }
 
-std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
-                                Type, OpenedExistentialAdjustments>>
+std::optional<std::pair<TypeVariableType *, Type>>
 swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
-	                                  Type paramTy, Type argTy) {
+                                      Type paramTy, Type argTy) {
   if (!callee)
     return std::nullopt;
 
@@ -584,24 +622,6 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (!paramTy->hasTypeVariable())
     return std::nullopt;
 
-  OpenedExistentialAdjustments adjustments;
-
-  // The argument may be a "var" instead of a "let".
-  if (auto lv = argTy->getAs<LValueType>()) {
-    argTy = lv->getObjectType();
-    adjustments |= OpenedExistentialAdjustmentFlags::LValue;
-  }
-
-  // If the argument is inout, strip it off and we can add it back.
-  if (auto inOutArg = argTy->getAs<InOutType>()) {
-    argTy = inOutArg->getObjectType();
-    adjustments |= OpenedExistentialAdjustmentFlags::InOut;
-  }
-
-  // The argument type needs to be an existential type or metatype thereof.
-  if (!argTy->isAnyExistentialType())
-    return std::nullopt;
-
   auto param = getParameterAt(callee, paramIdx);
   if (!param)
     return std::nullopt;
@@ -610,28 +630,40 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (param->isVariadic())
     return std::nullopt;
 
-  // Look through an inout and optional types on the formal type of the
-  // parameter.
-  auto formalParamTy = param->getInterfaceType()->getInOutObjectType()
-      ->lookThroughSingleOptionalType();
-
-  // If the argument is of an existential metatype, look through the
-  // metatype on the parameter.
-  if (argTy->is<AnyMetatypeType>()) {
-    formalParamTy = formalParamTy->getMetatypeInstanceType();
-    paramTy = paramTy->getMetatypeInstanceType();
-  }
-
-  // Look through an inout and optional types on the parameter.
-  paramTy = paramTy->getInOutObjectType()->lookThroughSingleOptionalType();
-
-  // The parameter type must be a type variable.
-  auto paramTypeVar = paramTy->getAs<TypeVariableType>();
-  if (!paramTypeVar)
+  // The rvalue argument type needs to be an existential type or metatype
+  // thereof.
+  const auto rValueArgTy = argTy->getWithoutSpecifierType();
+  if (!rValueArgTy->isAnyExistentialType())
     return std::nullopt;
 
-  auto genericParam = formalParamTy->getAs<GenericTypeParamType>();
-  if (!genericParam)
+  GenericTypeParamType *genericParam;
+  TypeVariableType *typeVar;
+  Type bindingTy;
+
+  std::tie(genericParam, typeVar, bindingTy) = [=] {
+    // Look through an inout and optional type.
+    Type genericParam = param->getInterfaceType()
+                            ->getInOutObjectType()
+                            ->lookThroughSingleOptionalType();
+    Type typeVar =
+        paramTy->getInOutObjectType()->lookThroughSingleOptionalType();
+
+    Type bindingTy = rValueArgTy;
+
+    // Look through a metatype.
+    if (genericParam->is<AnyMetatypeType>()) {
+      genericParam = genericParam->getMetatypeInstanceType();
+      typeVar = typeVar->getMetatypeInstanceType();
+      bindingTy = bindingTy->getMetatypeInstanceType();
+    }
+
+    return std::tuple(genericParam->getAs<GenericTypeParamType>(),
+                      typeVar->getAs<TypeVariableType>(), bindingTy);
+  }();
+
+  // The should have reached a type variable and corresponding generic
+  // parameter.
+  if (!typeVar || !genericParam)
     return std::nullopt;
 
   // Only allow opening the innermost generic parameters.
@@ -644,14 +676,11 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (genericParam->getDepth() < genericSig->getMaxDepth())
     return std::nullopt;
 
-  Type existentialTy;
-  if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
-    existentialTy = existentialMetaTy->getInstanceType();
-  else
-    existentialTy = argTy;
-
-  ASSERT(existentialTy->isAnyExistentialType());
-
+  // The binding could be an existential metatype. Get the instance type for
+  // conformance checks and to build an opened existential signature. If the
+  // instance type is not an existential type, i.e., the metatype is nested,
+  // bail out.
+  const Type existentialTy = bindingTy->getMetatypeInstanceType();
   if (!existentialTy->isExistentialType())
     return std::nullopt;
 
@@ -686,11 +715,10 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
       callee, existentialSig.OpenedSig, genericParam,
       existentialSig.SelfType->castTo<GenericTypeParamType>(),
       /*skipParamIdx=*/paramIdx);
-  if (referenceInfo.selfRef > TypePosition::Covariant ||
-      referenceInfo.assocTypeRef > TypePosition::Covariant)
+  if (referenceInfo.hasNonCovariantRef())
     return std::nullopt;
 
-  return std::make_tuple(genericParam, paramTypeVar, argTy, adjustments);
+  return std::pair(typeVar, bindingTy);
 }
 
 /// For each occurrence of a type **type** in `refTy` that satisfies
@@ -762,20 +790,6 @@ static Type typeEraseExistentialSelfReferences(
               return parameterized->getBaseType();
           }
         }
-        /*
-        if (auto lvalue = dyn_cast<LValueType>(t)) {
-          auto objTy = lvalue->getObjectType();
-          auto erasedTy =
-            typeEraseExistentialSelfReferences(
-              objTy, currPos,
-              containsFn, predicateFn, eraseFn);
-
-          if (erasedTy.getPointer() == objTy.getPointer())
-            return Type(lvalue);
-
-          return erasedTy;
-        }
-        */
 
         if (!predicateFn(t)) {
           // Recurse.

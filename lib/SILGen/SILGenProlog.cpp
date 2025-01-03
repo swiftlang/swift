@@ -98,13 +98,18 @@ struct LoweredParamGenerator {
   ParamDecl *paramDecl = nullptr;
   bool isNoImplicitCopy = false;
   LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None;
+  bool isImplicitParameter = false;
 
   void configureParamData(ParamDecl *paramDecl, bool isNoImplicitCopy,
                           LifetimeAnnotation lifetimeAnnotation) {
     this->paramDecl = paramDecl;
     this->isNoImplicitCopy = isNoImplicitCopy;
     this->lifetimeAnnotation = lifetimeAnnotation;
+    this->isImplicitParameter = false;
   }
+
+  void configureParamDataForImplicitParam() { isImplicitParameter = true; }
+
   void resetParamData() {
     configureParamData(nullptr, false, LifetimeAnnotation::None);
   }
@@ -112,20 +117,27 @@ struct LoweredParamGenerator {
   ManagedValue claimNext() {
     auto parameterInfo = parameterTypes.claimNext();
 
-    // We should only be called without a param decl when pulling
-    // pack parameters out for multiple formal parameters (or a single
-    // formal parameter pack).
+    // We should only be called without a param decl when pulling pack
+    // parameters out for multiple formal parameters (or a single formal
+    // parameter pack) or if we have an implicit parameter.
+    //
     // TODO: preserve the parameters captured by the pack into the SIL
     // representation.
-    bool isFormalParameterPack = (paramDecl == nullptr);
+    bool isFormalParameterPack = (paramDecl == nullptr) && !isImplicitParameter;
     assert(!isFormalParameterPack || parameterInfo.isPack());
 
     auto paramType =
         SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         paramType, paramDecl, isNoImplicitCopy, lifetimeAnnotation,
-        /*isClosureCapture*/ false, isFormalParameterPack);
+        /*isClosureCapture*/ false, isFormalParameterPack, isImplicitParameter);
     return mv;
+  }
+
+  std::optional<SILParameterInfo> peek() const {
+    if (isFinished())
+      return {};
+    return parameterTypes.get();
   }
 
   bool isFinished() const {
@@ -653,6 +665,17 @@ public:
       FormalParamTypes.emplace(SGF.getASTContext(), loweredParams, *origFnType,
                                llvm::ArrayRef(substFormalParams),
                                /*ignore final*/ false);
+    }
+
+    // Go through all of our implicit SIL parameters and emit them. These do not
+    // exist in the AST and always appear in between the results and the
+    // explicit parameters.
+    while (auto param = loweredParams.peek()) {
+      if (!param->hasOption(SILParameterInfo::ImplicitLeading))
+        break;
+      loweredParams.configureParamDataForImplicitParam();
+      loweredParams.advance();
+      loweredParams.resetParamData();
     }
 
     // Emit each of the function's explicit parameters in order.

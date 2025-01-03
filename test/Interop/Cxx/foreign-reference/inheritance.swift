@@ -30,4 +30,11 @@ TemplatingTestSuite.test("BaseT") {
     expectTrue(bc.isBase)
 }
 
+TemplatingTestSuite.test("DerivedOutOfOrder") {
+    let d = DerivedOutOfOrder.getInstance()
+    expectEqual(123, d.baseField)
+    expectEqual(456, d.derivedField)
+    expectEqual(789, d.leafField)
+}
+
 runAllTests()

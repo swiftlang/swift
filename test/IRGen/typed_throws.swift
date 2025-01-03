@@ -265,3 +265,23 @@ func conditionallyCallsThrowError(b: Bool) throws(SmallError) -> Int {
     return 0
   }
 }
+
+func passthroughFixedErrorCall<T>(_ body: () throws(TinyError) -> T) throws(TinyError) -> T {
+  try body()
+}
+
+func passthroughFixedErrorAsync<T>(_ body: () async throws(TinyError) -> T) async throws(TinyError) -> T {
+  try await body()
+}
+
+func callClosureSync<T>(t: T) {
+  _ = try! passthroughFixedErrorCall { () throws(TinyError) -> T in
+    return t
+  }
+}
+
+func callClosureAsync<T>(t: T) async {
+  _ = try! await passthroughFixedErrorAsync { () async throws(TinyError) -> T in
+    return t
+  }
+}

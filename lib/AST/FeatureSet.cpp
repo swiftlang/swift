@@ -88,7 +88,6 @@ UNINTERESTING_FEATURE(OldOwnershipOperatorSpellings)
 UNINTERESTING_FEATURE(MoveOnlyEnumDeinits)
 UNINTERESTING_FEATURE(MoveOnlyTuples)
 UNINTERESTING_FEATURE(MoveOnlyPartialReinitialization)
-UNINTERESTING_FEATURE(OneWayClosureParameters)
 UNINTERESTING_FEATURE(LayoutPrespecialization)
 UNINTERESTING_FEATURE(AccessLevelOnImport)
 UNINTERESTING_FEATURE(AllowNonResilientAccessInPackage)
@@ -121,6 +120,7 @@ UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
+UNINTERESTING_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
@@ -262,8 +262,6 @@ static bool usesFeatureLifetimeDependence(Decl *decl) {
       ->hasLifetimeDependencies();
 }
 
-UNINTERESTING_FEATURE(LifetimeDependenceDiagnoseTrivial)
-
 UNINTERESTING_FEATURE(DynamicActorIsolation)
 UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)
@@ -323,6 +321,20 @@ UNINTERESTING_FEATURE(TrailingComma)
 
 static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<UnsafeAttr>();
+}
+
+static ABIAttr *getABIAttr(Decl *decl) {
+  if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
+    for (auto i : range(pbd->getNumPatternEntries()))
+      if (auto anchorVar = pbd->getAnchoringVarDecl(i))
+        return getABIAttr(anchorVar);
+  // FIXME: EnumCaseDecl/EnumElementDecl
+
+  return decl->getAttrs().getAttribute<ABIAttr>();
+}
+
+static bool usesFeatureABIAttribute(Decl *decl) {
+  return getABIAttr(decl) != nullptr;
 }
 
 UNINTERESTING_FEATURE(WarnUnsafe)
@@ -427,26 +439,38 @@ static bool allowFeatureSuppression(StringRef featureName, Decl *decl) {
 /// Go through all the features used by the given declaration and
 /// either add or remove them to this set.
 void FeatureSet::collectFeaturesUsed(Decl *decl, InsertOrRemove operation) {
+  // Count feature usage in an ABI decl as feature usage by the API, not itself,
+  // since we can't use `#if` inside an @abi attribute.
+  Decl *abiDecl = nullptr;
+  if (auto abiAttr = getABIAttr(decl)) {
+    abiDecl = abiAttr->abiDecl;
+  }
+
+#define CHECK(Function) (Function(decl) || (abiDecl && Function(abiDecl)))
+#define CHECK_ARG(Function, Arg) (Function(Arg, decl) || (abiDecl && Function(Arg, abiDecl)))
+
   // Go through each of the features, checking whether the
   // declaration uses that feature.
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
-  if (usesFeature##FeatureName(decl))                                          \
+  if (CHECK(usesFeature##FeatureName))                                         \
     collectRequiredFeature(Feature::FeatureName, operation);
 #define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
-  if (usesFeature##FeatureName(decl)) {                                        \
-    if (disallowFeatureSuppression(#FeatureName, decl))                        \
+  if (CHECK(usesFeature##FeatureName)) {                                       \
+    if (CHECK_ARG(disallowFeatureSuppression, #FeatureName))                   \
       collectRequiredFeature(Feature::FeatureName, operation);                 \
     else                                                                       \
       collectSuppressibleFeature(Feature::FeatureName, operation);             \
   }
 #define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
-  if (usesFeature##FeatureName(decl)) {                                        \
-    if (allowFeatureSuppression(#FeatureName, decl))                           \
+  if (CHECK(usesFeature##FeatureName)) {                                       \
+    if (CHECK_ARG(allowFeatureSuppression, #FeatureName))                      \
       collectSuppressibleFeature(Feature::FeatureName, operation);             \
     else                                                                       \
       collectRequiredFeature(Feature::FeatureName, operation);                 \
   }
 #include "swift/Basic/Features.def"
+#undef CHECK
+#undef CHECK_ARG
 }
 
 FeatureSet swift::getUniqueFeaturesUsed(Decl *decl) {

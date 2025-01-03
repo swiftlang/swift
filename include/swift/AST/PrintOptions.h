@@ -237,6 +237,10 @@ struct PrintOptions {
   /// Use the original module name to qualify a symbol.
   bool UseOriginallyDefinedInModuleNames = false;
 
+  /// Add a `@_silgen_name` attribute to each function that
+  /// is compatible with one that specifies its mangled name.
+  bool PrintSyntheticSILGenName = false;
+
   /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
   bool SynthesizeSugarOnTypes = false;
@@ -340,9 +344,6 @@ struct PrintOptions {
 
   /// Whether to print the internal layout name instead of AnyObject, etc.
   bool PrintInternalLayoutName = false;
-
-  /// Suppress emitting @available(*, noasync)
-  bool SuppressNoAsyncAvailabilityAttr = false;
 
   /// Suppress emitting isolated or async deinit, and emit open containing class
   /// as public

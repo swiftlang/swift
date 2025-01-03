@@ -285,7 +285,7 @@ struct SwiftTargets {
 
   func getTargets(below path: RelativePath) -> [SwiftTarget] {
     targets.filter { target in
-      guard let parent = target.buildRule?.parentPath, parent.hasPrefix(path) 
+      guard let parent = target.buildRule?.parentPath, parent.starts(with: path) 
       else {
         return false
       }

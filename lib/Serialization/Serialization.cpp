@@ -1162,6 +1162,11 @@ void Serializer::writeHeader() {
         IsConcurrencyChecked.emit(ScratchRecord);
       }
 
+      if (M->strictMemorySafety()) {
+        options_block::StrictMemorySafetyLayout StrictMemorySafety(Out);
+        StrictMemorySafety.emit(ScratchRecord);
+      }
+
       if (M->hasCxxInteroperability()) {
         options_block::HasCxxInteroperabilityEnabledLayout
             CxxInteroperabilityEnabled(Out);
@@ -1545,6 +1550,7 @@ getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
   CASE(Unspecified)
   CASE(ActorInstance)
   CASE(Nonisolated)
+  CASE(CallerIsolationInheriting)
   CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
   CASE(Erased)
@@ -1916,8 +1922,7 @@ void Serializer::writeLocalNormalProtocolConformance(
                                               numTypeWitnesses,
                                               numValueWitnesses,
                                               numSignatureConformances,
-                                              conformance->isUnchecked(),
-                                              conformance->isPreconcurrency(),
+                                              conformance->getOptions().toRaw(),
                                               data);
 }
 
@@ -2885,6 +2890,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   }
 #include "swift/AST/DeclAttr.def"
 
+    case DeclAttrKind::ABI: {
+      auto *theAttr = cast<ABIAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[ABIDeclAttrLayout::Code];
+      auto abiDeclID = S.addDeclRef(theAttr->abiDecl);
+      ABIDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                    theAttr->isImplicit(), abiDeclID);
+      return;
+    }
+
     case DeclAttrKind::SILGenName: {
       auto *theAttr = cast<SILGenNameAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SILGenNameDeclAttrLayout::Code];
@@ -3044,6 +3058,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       assert(theAttr->Rename.empty() || !theAttr->hasCachedRenamedDecl());
 
+      bool isPackageDescriptionVersionSpecific =
+          theAttr->getPlatformAgnosticAvailability() ==
+          PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific;
+
       llvm::SmallString<32> blob;
       blob.append(theAttr->Message);
       blob.append(theAttr->Rename);
@@ -3054,7 +3072,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isUnconditionallyUnavailable(),
           theAttr->isUnconditionallyDeprecated(),
           theAttr->isNoAsync(),
-          theAttr->isPackageDescriptionVersionSpecific(),
+          isPackageDescriptionVersionSpecific,
           theAttr->isSPI(),
           theAttr->isForEmbedded(),
           LIST_VER_TUPLE_PIECES(Introduced),
@@ -3539,7 +3557,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
   size_t addConformances(const IterableDeclContext *declContext,
                          ConformanceLookupKind lookupKind,
-                         SmallVectorImpl<TypeID> &data) {
+                         SmallVectorImpl<uint64_t> &data) {
     size_t count = 0;
     for (auto conformance : declContext->getLocalConformances(lookupKind)) {
       if (S.shouldSkipDecl(conformance->getProtocol()))
@@ -4007,6 +4025,10 @@ public:
 
     writeDeserializationSafety(D);
 
+    auto abiRole = ABIRoleInfo(D);
+    if (!abiRole.providesAPI())
+      writeABIOnlyCounterpart(abiRole.getCounterpartUnchecked());
+
     // Emit attributes (if any).
     for (auto Attr : D->getAttrs())
       writeDeclAttribute(D, Attr);
@@ -4025,6 +4047,13 @@ public:
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[ErrorFlagLayout::Code];
     ErrorFlagLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
+  }
+
+  void writeABIOnlyCounterpart(const Decl *counterpart) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[ABIOnlyCounterpartLayout::Code];
+    ABIOnlyCounterpartLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                         S.addDeclRef(counterpart));
   }
 
   void noteUseOfExportedPrespecialization(const AbstractFunctionDecl *afd) {
@@ -4048,18 +4077,22 @@ public:
   ///
   /// \returns the number of entries added.
   size_t addInherited(InheritedTypes inheritedEntries,
-                      SmallVectorImpl<TypeID> &result) {
+                      SmallVectorImpl<uint64_t> &result) {
     for (const auto &inherited : inheritedEntries.getEntries()) {
       assert(!inherited.getType() || !inherited.getType()->hasArchetype());
-      TypeID typeRef = S.addTypeRef(inherited.getType());
+      uint64_t typeRef = S.addTypeRef(inherited.getType());
+      uint64_t originalTypeRef = typeRef;
 
-      // Encode "unchecked" in the low bit.
-      typeRef = (typeRef << 1) | (inherited.isUnchecked() ? 0x01 : 0x00);
-      // Encode "preconcurrency" in the low bit.
-      typeRef = (typeRef << 1) | (inherited.isPreconcurrency() ? 0x01 : 0x00);
+      // Encode options in the low bits;
+      typeRef = (typeRef << NumProtocolConformanceOptions) |
+                inherited.getOptions().toRaw();
+
       // Encode "suppressed" in the next bit.
       typeRef = (typeRef << 1) | (inherited.isSuppressed() ? 0x01 : 0x00);
 
+      assert(typeRef >> (NumProtocolConformanceOptions+1) == originalTypeRef);
+      (void)originalTypeRef;
+      
       result.push_back(typeRef);
     }
 
@@ -4085,7 +4118,7 @@ public:
     // simpler user model to just always desugar extension types.
     extendedType = extendedType->getCanonicalType();
 
-    SmallVector<TypeID, 8> data;
+    SmallVector<uint64_t, 8> data;
     size_t numConformances =
         addConformances(extension, ConformanceLookupKind::All, data);
     size_t numInherited = addInherited(
@@ -4320,7 +4353,7 @@ public:
 
     auto contextID = S.addDeclContextRef(theStruct->getDeclContext());
 
-    SmallVector<TypeID, 4> data;
+    SmallVector<uint64_t, 4> data;
     size_t numConformances =
         addConformances(theStruct, ConformanceLookupKind::All, data);
     size_t numInherited = addInherited(theStruct->getInherited(), data);
@@ -4360,7 +4393,7 @@ public:
 
     auto contextID = S.addDeclContextRef(theEnum->getDeclContext());
 
-    SmallVector<TypeID, 4> data;
+    SmallVector<uint64_t, 4> data;
     size_t numConformances =
         addConformances(theEnum, ConformanceLookupKind::All, data);
     size_t numInherited = addInherited(theEnum->getInherited(), data);
@@ -4413,7 +4446,7 @@ public:
 
     auto contextID = S.addDeclContextRef(theClass->getDeclContext());
 
-    SmallVector<TypeID, 4> data;
+    SmallVector<uint64_t, 4> data;
     size_t numConformances =
         addConformances(theClass, ConformanceLookupKind::NonInherited, data);
     size_t numInherited = addInherited(theClass->getInherited(), data);
@@ -5330,6 +5363,11 @@ getRawSILParameterInfoOptions(swift::SILParameterInfo::Options options) {
     result |= SILParameterInfoFlags::Sending;
   }
 
+  if (options.contains(SILParameterInfo::ImplicitLeading)) {
+    options -= SILParameterInfo::ImplicitLeading;
+    result |= SILParameterInfoFlags::ImplicitLeading;
+  }
+
   // If we still have options left, this code is out of sync... return none.
   if (bool(options))
     return {};
@@ -6207,6 +6245,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<ErrorFlagLayout>();
   registerDeclTypeAbbr<ErrorTypeLayout>();
+  registerDeclTypeAbbr<ABIOnlyCounterpartLayout>();
 
   registerDeclTypeAbbr<ClangTypeLayout>();
 

@@ -968,8 +968,6 @@ public:
   void fatal_unimplemented(SourceLoc, StringRef Message);
   void error(SourceLoc loc, const Twine &message);
 
-  bool useDllStorage();
-
   bool shouldPrespecializeGenericMetadata();
   
   bool canMakeStaticObjectReadOnly(SILType objectType);
@@ -1510,7 +1508,6 @@ public:
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
   llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
-  bool isStandardLibrary() const;
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -2028,6 +2025,17 @@ public:
 
 /// Workaround to disable thumb-mode until debugger support is there.
 bool shouldRemoveTargetFeature(StringRef);
+
+struct CXXBaseRecordLayout {
+  const clang::CXXRecordDecl *decl;
+  Size offset;
+  Size size;
+};
+
+/// Retrieves the base classes of a C++ struct/class ordered by their offset in
+/// the derived type's memory layout.
+SmallVector<CXXBaseRecordLayout, 1>
+getBasesAndOffsets(const clang::CXXRecordDecl *decl);
 
 } // end namespace irgen
 } // end namespace swift

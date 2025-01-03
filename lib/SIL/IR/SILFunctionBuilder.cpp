@@ -89,9 +89,8 @@ void SILFunctionBuilder::addFunctionAttributes(
     if (hasSPI) {
       spiGroupIdent = spiGroups[0];
     }
-    auto availability =
-      AvailabilityInference::annotatedAvailableRangeForAttr(SA,
-         M.getSwiftModule()->getASTContext());
+    auto availability = AvailabilityInference::annotatedAvailableRangeForAttr(
+        attributedFuncDecl, SA, M.getSwiftModule()->getASTContext());
     auto specializedSignature = SA->getSpecializedSignature(attributedFuncDecl);
     if (targetFunctionDecl) {
       SILDeclRef declRef(targetFunctionDecl, constant.kind, false);

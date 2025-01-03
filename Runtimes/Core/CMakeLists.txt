@@ -28,7 +28,6 @@
 # Catalyst Support
 #   -- Will need shadow invocations to generate swiftmodules for Swift parts
 # Install *.abi.json, swiftdoc, and swiftsourceinfo
-# Pointer bounds (SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
 
 cmake_minimum_required(VERSION 3.26...3.29)
 
@@ -68,6 +67,7 @@ include(DefaultSettings)
 include(EmitSwiftInterface)
 include(PlatformInfo)
 include(gyb)
+include(Plist)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
@@ -86,7 +86,6 @@ defaulted_option(SwiftCore_ENABLE_OVERRIDABLE_RETAIN_RELEASE "Enable override ho
 defaulted_option(SwiftCore_ENABLE_MALLOC_TYPE "Enable malloc type information")
 defaulted_option(SwiftCore_ENABLE_RUNTIME_OS_VERSIONING "Enable runtime OS version detection")
 defaulted_option(SwiftCore_ENABLE_STATIC_PRINT "Disable full print")
-defaulted_option(SwiftCore_ENABLE_UNICODE_DATA "Embed Unicode info in Swift Core")
 defaulted_option(SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS "Resolve absolute function pointer as identity")
 defaulted_option(SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment")
 defaulted_option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime. Assumes the presence of os_log(3) and the os_signpost(3) API.")

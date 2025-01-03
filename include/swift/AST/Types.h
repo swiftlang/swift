@@ -83,6 +83,7 @@ class PlaceholderTypeRepr;
 enum class ReferenceCounting : uint8_t;
 enum class ResilienceExpansion : unsigned;
 class SILModule;
+class SILFunction;
 class SILType;
 class SourceLoc;
 class TypeAliasDecl;
@@ -675,6 +676,9 @@ public:
   /// Is this an existential containing only marker protocols?
   bool isMarkerExistential();
 
+  /// Is this `any Sendable` type?
+  bool isSendableExistential();
+
   bool isPlaceholder();
 
   /// Returns true if this contextual type does not satisfy a conformance to
@@ -818,6 +822,12 @@ public:
   /// type variables referenced by this type.
   void getTypeVariables(SmallPtrSetImpl<TypeVariableType *> &typeVariables);
 
+private:
+  /// If the receiver is a `DependentMemberType`, returns its root. Otherwise,
+  /// returns the receiver.
+  Type getDependentMemberRoot();
+
+public:
   /// Determine whether this type is a type parameter, which is either a
   /// GenericTypeParamType or a DependentMemberType.
   ///
@@ -4429,6 +4439,16 @@ public:
     /// that the parameter must be an Optional actor or something that conforms
     /// to AnyActor.
     Isolated = 0x4,
+
+    /// Set if the given parameter is an implicit parameter that is not part of
+    /// the formal type. These are always located after the return values and
+    /// before the main parameters. This is because we want to at the SIL level
+    /// generally treat them as normal parameters... but when working with the
+    /// AST during lowering, we need to handle ignoring them appropriately.
+    ///
+    /// DISCUSSION: These are enforced by the SIL verifier to always be in
+    /// between indirect results and the explicit parameters.
+    ImplicitLeading = 0x8,
   };
 
   using Options = OptionSet<Flag>;
@@ -4455,6 +4475,11 @@ public:
   ///
   /// \c t must refer back to the function type this is a parameter for.
   CanType getArgumentType(SILModule &M, const SILFunctionType *t, TypeExpansionContext context) const;
+
+  /// Helper function that just grabs the module, type, and context out of \arg
+  /// fn and then calls getArgumentType.
+  CanType getArgumentType(SILFunction *fn) const;
+
   ParameterConvention getConvention() const { return convention; }
   // Does this parameter convention require indirect storage? This reflects a
   // SILFunctionType's formal (immutable) conventions, as opposed to the
@@ -6967,8 +6992,6 @@ class OpenedArchetypeType final : public LocalArchetypeType,
   friend ArchetypeType;
   friend GenericEnvironment;
 
-  UUID ID;
-
   /// Create a new opened archetype in the given environment representing
   /// the interface type.
   ///
@@ -6984,10 +7007,7 @@ public:
   /// of an existential value.
   ///
   /// \param existential The existential type to open.
-  /// \param knownID When non-empty, the known ID of the archetype. When empty,
-  /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType>
-  get(CanType existential, std::optional<UUID> knownID = std::nullopt);
+  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
@@ -7061,8 +7081,6 @@ class ElementArchetypeType final : public LocalArchetypeType,
   friend TrailingObjects;
   friend ArchetypeType;
   friend GenericEnvironment;
-
-  UUID ID;
 
   /// Create a new element archetype in the given environment representing
   /// the interface type.
@@ -7859,36 +7877,9 @@ inline ASTContext &TypeBase::getASTContext() const {
   return *const_cast<ASTContext*>(getCanonicalType()->Context);
 }
 
-inline bool TypeBase::isTypeVariableOrMember() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->is<TypeVariableType>();
-}
-
-inline bool TypeBase::isTypeParameter() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->is<GenericTypeParamType>();
-}
-
 // TODO: This will become redundant once InOutType is removed.
 inline bool TypeBase::isMaterializable() {
   return !(hasLValueType() || is<InOutType>());
-}
-
-inline GenericTypeParamType *TypeBase::getRootGenericParam() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->castTo<GenericTypeParamType>();
 }
 
 inline bool TypeBase::isConstraintType() const {

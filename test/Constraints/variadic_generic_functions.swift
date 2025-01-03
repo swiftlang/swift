@@ -37,7 +37,6 @@ func call() {
   func multipleSequences<each T, each U>(xs: repeat each T, ys: repeat each U) -> (repeat each T) {
     return (repeat each ys)
     // expected-error@-1 {{pack expansion requires that 'each U' and 'each T' have the same shape}}
-    // expected-error@-2 {{cannot convert return expression of type '(repeat each U)' to return type '(repeat each T)'}}
   }
 
   func multipleSequencesWithSameShape<each T, each U>(xs: repeat each T, ys: repeat each U) -> (repeat each T) where (repeat (each T, each U)): Any {

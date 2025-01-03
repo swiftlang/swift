@@ -27,6 +27,7 @@
 #include "TypeCheckEffects.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckObjC.h"
+#include "TypeCheckUnsafe.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
@@ -50,6 +51,7 @@
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -1168,7 +1170,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
         // the default witness for 'Collection.Iterator', which is defined
         // as 'IndexingIterator<Self>'.
         const auto selfRefInfo = findExistentialSelfReferences(req);
-        if (!selfRefInfo.assocTypeRef) {
+        if (!selfRefInfo.hasDependentMemberTypeRef()) {
           covariantSelf = classDecl;
         }
       }
@@ -1366,20 +1368,6 @@ swift::witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
     }
   }
   return false;
-}
-
-void swift::suggestUnsafeMarkerOnConformance(
-    NormalProtocolConformance *conformance) {
-  auto dc = conformance->getDeclContext();
-  auto decl = dc->getAsDecl();
-  if (!decl)
-    return;
-
-  decl->diagnose(
-      diag::make_conforming_context_unsafe,
-      decl->getDescriptiveKind(),
-      conformance->getProtocol()->getName()
-  ).fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
 }
 
 /// Determine whether one requirement match is better than the other.
@@ -2475,18 +2463,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
-  // @unchecked conformances are considered unsafe in strict concurrency mode.
-  if (conformance->isUnchecked() &&
-      Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      Context.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
-
-    if (!conformance->getDeclContext()->allowsUnsafe()) {
-      Context.Diags.diagnose(
-          ComplainLoc, diag::unchecked_conformance_is_unsafe);
-      suggestUnsafeMarkerOnConformance(conformance);
-    }
-  }
-
   bool allowImpliedConditionalConformance = false;
   if (Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     // In -swift-version 5 mode, a conditional conformance to a protocol can imply
@@ -2555,19 +2531,74 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
     }
   }
 
-  if (conformance->isComplete())
-    return;
+  if (!conformance->isComplete()) {
+    // Resolve all of the type witnesses.
+    evaluateOrDefault(Context.evaluator,
+                      ResolveTypeWitnessesRequest{conformance},
+                      evaluator::SideEffect());
 
-  // Resolve all of the type witnesses.
-  evaluateOrDefault(Context.evaluator,
-                    ResolveTypeWitnessesRequest{conformance},
-                    evaluator::SideEffect());
+    // Check the requirements from the requirement signature.
+    ensureRequirementsAreSatisfied(Context, conformance);
 
-  // Check the requirements from the requirement signature.
-  ensureRequirementsAreSatisfied(Context, conformance);
+    // Check non-type requirements.
+    conformance->resolveValueWitnesses();
+  }
 
-  // Check non-type requirements.
-  conformance->resolveValueWitnesses();
+  // If we're enforcing strict memory safety and this conformance hasn't
+  // opted out, look for safe/unsafe witness mismatches.
+  if (!conformance->isUnsafe() && !conformance->isSafe() &&
+      Context.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+    // Collect all of the unsafe uses for this conformance.
+    SmallVector<UnsafeUse, 2> unsafeUses;
+    for (auto requirement: Proto->getMembers()) {
+      if (auto typeDecl = dyn_cast<TypeDecl>(requirement)) {
+        // Check whether a type witness is unsafe when its associated type
+        // is not.
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+          TypeWitnessAndDecl typeWitnessAndDecl =
+            conformance->getTypeWitnessAndDecl(assocType);
+          Type typeWitness = typeWitnessAndDecl.getWitnessType();
+          if (!assocType->isUnsafe() && typeWitness && typeWitness->isUnsafe()) {
+            SourceLoc loc;
+            if (auto typeDecl = typeWitnessAndDecl.getWitnessDecl()) {
+              loc = typeDecl->getLoc();
+            }
+            if (loc.isInvalid())
+              loc = conformance->getLoc();
+            unsafeUses.push_back(
+                UnsafeUse::forTypeWitness(
+                  assocType, typeWitness, conformance, loc));
+          }
+        }
+        continue;
+      }
+
+      // Check whether a value witness is unsafe when its requirement is not.
+      auto valueRequirement = dyn_cast<ValueDecl>(requirement);
+      if (!valueRequirement)
+        continue;
+
+      // If the witness is unsafe and the requirement is not effectively
+      // unsafe, then the conformance must be unsafe.
+      if (auto witness = conformance->getWitnessUncached(valueRequirement)) {
+        if (isUnsafe(witness.getDeclRef()) &&
+            !isUnsafeInConformance(valueRequirement, witness, conformance)) {
+          unsafeUses.push_back(
+              UnsafeUse::forWitness(
+                witness.getDecl(), requirement, conformance));
+        }
+      }
+    }
+
+    if (!unsafeUses.empty()) {
+      Context.Diags.diagnose(
+          conformance->getLoc(), diag::conformance_involves_unsafe,
+          conformance->getType(), Proto)
+      .fixItInsert(conformance->getProtocolNameLoc(), "@unsafe ");
+      for (const auto& unsafeUse : unsafeUses)
+        diagnoseUnsafeUse(unsafeUse, /*asNote=*/true);
+    }
+  }
 }
 
 /// Add the next associated type deduction to the string representation
@@ -4088,9 +4119,9 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   // prevent conformance from succeeding.
   const auto selfRefInfo = findExistentialSelfReferences(requirement);
 
-  if (selfRefInfo.selfRef == TypePosition::Invariant ||
-      (selfRefInfo.selfRef == TypePosition::Covariant &&
-       !selfRefInfo.hasCovariantSelfResult)) {
+  if (selfRefInfo.hasDirectRef(TypePosition::Invariant) ||
+      (selfRefInfo.hasDirectRef(TypePosition::Covariant) &&
+       !selfRefInfo.hasCovariantGenericParamResult())) {
     // References to Self in a position where subclasses cannot do
     // the right thing. Complain if the adoptee is a non-final
     // class.
@@ -4104,7 +4135,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
                        conformance->getType());
         emitDeclaredHereIfNeeded(diags, diagLoc, witness);
       });
-  } else if (selfRefInfo.hasCovariantSelfResult) {
+  } else if (selfRefInfo.hasCovariantGenericParamResult()) {
     // The reference to Self occurs in the result type of a method/subscript
     // or the type of a property. A non-final class can satisfy this requirement
     // by holding onto Self accordingly.
@@ -4170,7 +4201,8 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   // associated types.
   if (isa<FuncDecl>(witness) || isa<SubscriptDecl>(witness)) {
     if (witness->getDeclContext()->getExtendedProtocolDecl()) {
-      if (selfRefInfo.hasCovariantSelfResult && selfRefInfo.assocTypeRef) {
+      if (selfRefInfo.hasCovariantGenericParamResult() &&
+          selfRefInfo.hasDependentMemberTypeRef()) {
         getASTContext().addDelayedConformanceDiag(Conformance, false,
           [witness, requirement](NormalProtocolConformance *conformance) {
             auto proto = conformance->getProtocol();
@@ -4375,7 +4407,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
 
     case CheckKind::Unavailable: {
-      auto *attr = requirement->getUnavailableAttr();
+      auto *attr = requirement->getUnavailableAttr()->getParsedAttr();
       diagnoseOverrideOfUnavailableDecl(witness, requirement, attr);
       break;
     }
@@ -4433,8 +4465,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         [witness, requirement](NormalProtocolConformance *conformance) {
           auto &diags = witness->getASTContext().Diags;
           SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-          auto *attr = witness->getUnavailableAttr();
-          EncodedDiagnosticMessage EncodedMessage(attr->Message);
+          auto attr = witness->getUnavailableAttr();
+          EncodedDiagnosticMessage EncodedMessage(attr->getMessage());
           diags.diagnose(diagLoc, diag::witness_unavailable, witness,
                          conformance->getProtocol(), EncodedMessage.Message);
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
@@ -4451,8 +4483,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             auto &ctx = witness->getASTContext();
             auto &diags = ctx.Diags;
             SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-            auto *attr = witness->getDeprecatedAttr();
-            EncodedDiagnosticMessage EncodedMessage(attr->Message);
+            auto attr = witness->getDeprecatedAttr();
+            EncodedDiagnosticMessage EncodedMessage(attr->getMessage());
             diags.diagnose(diagLoc, diag::witness_deprecated,
                            witness, conformance->getProtocol()->getName(),
                            EncodedMessage.Message);
@@ -4853,7 +4885,7 @@ static bool diagnoseTypeWitnessAvailability(
         conformance, shouldError,
         [witness, assocType, attr](NormalProtocolConformance *conformance) {
           SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
-          EncodedDiagnosticMessage encodedMessage(attr->Message);
+          EncodedDiagnosticMessage encodedMessage(attr->getMessage());
           auto &ctx = conformance->getDeclContext()->getASTContext();
           ctx.Diags
               .diagnose(loc, diag::witness_unavailable, witness,
@@ -5158,17 +5190,6 @@ void ConformanceChecker::resolveValueWitnesses() {
             requirement,
             Conformance->getWitnessUncached(requirement)
               .withEnterIsolation(*enteringIsolation));
-      }
-
-      // If we're disallowing unsafe code, check for an unsafe witness to a
-      // safe requirement.
-      if (C.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-          witness->isUnsafe() && !requirement->isUnsafe() &&
-          !witness->getDeclContext()->allowsUnsafe()) {
-        witness->diagnose(diag::witness_unsafe,
-                          witness->getDescriptiveKind(),
-                          witness->getName());
-        suggestUnsafeMarkerOnConformance(Conformance);
       }
 
       // Objective-C checking for @objc requirements.

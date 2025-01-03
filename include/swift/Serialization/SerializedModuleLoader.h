@@ -573,8 +573,7 @@ public:
 bool extractCompilerFlagsFromInterface(
     StringRef interfacePath, StringRef buffer, llvm::StringSaver &ArgSaver,
     SmallVectorImpl<const char *> &SubArgs,
-    std::optional<llvm::Triple> PreferredTarget = std::nullopt,
-    std::optional<llvm::Triple> PreferredTargetVariant = std::nullopt);
+    std::optional<llvm::Triple> PreferredTarget = std::nullopt);
 
 /// Extract the user module version number from an interface file.
 llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);

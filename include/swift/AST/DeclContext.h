@@ -586,6 +586,10 @@ public:
   /// context.
   bool isInSpecializeExtensionContext() const;
 
+  /// Returns whether this declaration context is a protocol in an unsupported
+  /// context.
+  bool isUnsupportedNestedProtocol() const;
+
   /// Get the most optimal resilience expansion for code in this context.
   /// If the body is able to be inlined into functions in other resilience
   /// domains, this ensures that only sufficiently-conservative access patterns

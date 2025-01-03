@@ -564,6 +564,11 @@ checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
 /// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);
 
+/// Determine the actor isolation used when we are referencing the given
+/// declaration.
+ActorIsolation getActorIsolationForReference(ValueDecl *decl,
+                                             const DeclContext *fromDC);
+
 /// Adjust the type of the variable for concurrency.
 Type adjustVarTypeForConcurrency(
     Type type, VarDecl *var, DeclContext *dc,

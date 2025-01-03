@@ -3600,6 +3600,24 @@ public:
   }
 };
 
+/// UnsafeCastExpr - A special kind of conversion that performs an unsafe
+/// bitcast from one type to the other.
+///
+/// Note that this is an unsafe operation and type-checker is allowed to
+/// use this only in a limited number of cases like: `any Sendable` -> `Any`
+/// conversions in some positions, covariant conversions of function and
+/// function result types.
+class UnsafeCastExpr : public ImplicitConversionExpr {
+public:
+  UnsafeCastExpr(Expr *subExpr, Type type)
+      : ImplicitConversionExpr(ExprKind::UnsafeCast, subExpr, type) {
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnsafeCast;
+  }
+};
+
 /// Extracts the isolation of a dynamically isolated function value.
 class ExtractFunctionIsolationExpr : public Expr {
   /// The function value expression from which to extract the

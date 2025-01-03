@@ -190,7 +190,13 @@ enum class ForeignRepresentableKind : uint8_t {
 /// therefore, the result type is in covariant position relative to the function
 /// type.
 struct TypePosition final {
-  enum : uint8_t { Covariant, Contravariant, Invariant, Shape };
+  enum : uint8_t {
+    Covariant = 1 << 0,
+    Contravariant = 1 << 1,
+    Invariant = 1 << 2,
+    Shape = 1 << 3,
+    Last_Position = Shape,
+  };
 
 private:
   decltype(Covariant) kind;
@@ -212,6 +218,10 @@ public:
   }
 
   operator decltype(kind)() const { return kind; }
+};
+enum : unsigned {
+  NumTypePositions =
+      countBitsUsed(static_cast<unsigned>(TypePosition::Last_Position))
 };
 
 /// Type - This is a simple value object that contains a pointer to a type
