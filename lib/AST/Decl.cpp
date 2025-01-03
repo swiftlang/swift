@@ -6852,13 +6852,6 @@ bool ProtocolDecl::hasSelfOrAssociatedTypeRequirements() const {
                            resultForCycle);
 }
 
-bool ProtocolDecl::existentialRequiresAny() const {
-  if (getASTContext().LangOpts.hasFeature(Feature::ExistentialAny))
-    return true;
-
-  return hasSelfOrAssociatedTypeRequirements();
-}
-
 ArrayRef<AssociatedTypeDecl *>
 ProtocolDecl::getPrimaryAssociatedTypes() const {
   return evaluateOrDefault(getASTContext().evaluator,
