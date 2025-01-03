@@ -1430,6 +1430,11 @@ public:
   std::optional<SemanticAvailableAttr> getActiveAvailableAttrForCurrentPlatform(
       bool ignoreAppExtensions = false) const;
 
+  /// Returns the active platform-specific `@available` attribute that should be
+  /// used to determine the platform introduction version of the decl.
+  std::optional<SemanticAvailableAttr>
+  getAvailableAttrForPlatformIntroduction() const;
+
   /// Returns true if the declaration is deprecated at the current deployment
   /// target.
   bool isDeprecated() const { return getDeprecatedAttr().has_value(); }

@@ -62,10 +62,6 @@ public:
   static AvailabilityRange availableRange(const AvailableAttr *attr,
                                           ASTContext &C);
 
-  /// Returns the attribute that should be used to determine the availability
-  /// range of the given declaration, or nullptr if there is none.
-  static const AvailableAttr *attrForAnnotatedAvailableRange(const Decl *D);
-
   /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration
   /// has no availability annotation.

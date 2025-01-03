@@ -2266,8 +2266,8 @@ static Decl *getEnclosingDeclForDecl(Decl *D) {
 
 static std::optional<std::pair<const AvailableAttr *, const Decl *>>
 getSemanticAvailableRangeDeclAndAttr(const Decl *decl) {
-  if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(decl))
-    return std::make_pair(attr, decl);
+  if (auto attr = decl->getAvailableAttrForPlatformIntroduction())
+    return std::make_pair(attr->getParsedAttr(), decl);
 
   if (auto *parent =
           AvailabilityInference::parentDeclForInferredAvailability(decl))
