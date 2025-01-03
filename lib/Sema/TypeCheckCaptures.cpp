@@ -241,10 +241,9 @@ public:
   }
 
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
-    // We don't want to walk into lazy initializers because they're not
-    // really present at this level.  We'll catch them when processing
-    // the getter.
-    return LazyInitializerWalking::None;
+    // Captures for lazy initializers are computed as part of the parent
+    // accessor.
+    return LazyInitializerWalking::InAccessor;
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
@@ -642,12 +641,6 @@ public:
 
     if (auto *PEE = dyn_cast<PackElementExpr>(E))
       return walkToPackElementExpr(PEE);
-
-    // Look into lazy initializers.
-    if (auto *LIE = dyn_cast<LazyInitializerExpr>(E)) {
-      LIE->getSubExpr()->walk(*this);
-      return Action::Continue(E);
-    }
 
     // When we see a reference to the 'super' expression, capture 'self' decl.
     if (auto *superE = dyn_cast<SuperRefExpr>(E)) {

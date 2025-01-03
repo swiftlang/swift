@@ -773,10 +773,9 @@ void computeCaptures(AbstractClosureExpr *ACE);
 /// Check for invalid captures from stored property initializers.
 void checkPatternBindingCaptures(IterableDeclContext *DC);
 
-/// Change the context of closures in the given initializer
-/// expression to the given context.
-void contextualizeInitializer(Initializer *DC, Expr *init);
-void contextualizeCallSideDefaultArgument(DeclContext *DC, Expr *init);
+/// Update the DeclContexts for AST nodes in a given DeclContext. This is
+/// necessary after type-checking since autoclosures may have been introduced.
+void contextualizeExpr(Expr *E, DeclContext *DC);
 void contextualizeTopLevelCode(TopLevelCodeDecl *TLCD);
 
 /// Retrieve the default type for the given protocol.
