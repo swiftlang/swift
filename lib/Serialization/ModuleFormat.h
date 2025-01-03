@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 910; // unsafe conformances
+const uint16_t SWIFTMODULE_VERSION_MINOR = 911; // caller inheriting isolation
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -413,6 +413,7 @@ enum class SILParameterInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
   Isolated = 0x2,
   Sending = 0x4,
+  ImplicitLeading = 0x8,
 };
 
 using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;
@@ -563,6 +564,7 @@ enum class ActorIsolation : uint8_t {
   GlobalActor,
   GlobalActorUnsafe,
   Erased,
+  CallerIsolationInheriting,
 };
 using ActorIsolationField = BCFixed<3>;
 

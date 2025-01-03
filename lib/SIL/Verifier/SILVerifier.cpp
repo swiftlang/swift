@@ -7230,11 +7230,18 @@ public:
 
   void verifyParentFunctionSILFunctionType(CanSILFunctionType FTy) {
     bool foundIsolatedParameter = false;
+    bool foundExplicitParameter = false;
+
     for (const auto &parameterInfo : FTy->getParameters()) {
+      foundExplicitParameter |=
+          !parameterInfo.hasOption(SILParameterInfo::ImplicitLeading);
+      require(!foundExplicitParameter ||
+                  !parameterInfo.hasOption(SILParameterInfo::ImplicitLeading),
+              "Implicit parameters must be before /all/ explicit parameters");
+
       if (parameterInfo.hasOption(SILParameterInfo::Isolated)) {
-           auto argType = parameterInfo.getArgumentType(F.getModule(),
-                                                     FTy,
-                                                     F.getTypeExpansionContext());
+        auto argType = parameterInfo.getArgumentType(
+            F.getModule(), FTy, F.getTypeExpansionContext());
 
         if (argType->isOptional())
           argType = argType->lookThroughAllOptionalTypes()->getCanonicalType();
@@ -7242,10 +7249,11 @@ public:
         auto genericSig = FTy->getInvocationGenericSignature();
         auto &ctx = F.getASTContext();
         auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
-        auto *distributedProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+        auto *distributedProtocol =
+            ctx.getProtocol(KnownProtocolKind::DistributedActor);
         require(argType->isAnyActorType() ||
-                genericSig->requiresProtocol(argType, actorProtocol) ||
-                genericSig->requiresProtocol(argType, distributedProtocol),
+                    genericSig->requiresProtocol(argType, actorProtocol) ||
+                    genericSig->requiresProtocol(argType, distributedProtocol),
                 "Only any actor types can be isolated");
         require(!foundIsolatedParameter, "Two isolated parameters");
         foundIsolatedParameter = true;
