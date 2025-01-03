@@ -238,7 +238,6 @@ struct ModuleRebuildInfo {
     NotIgnored,
     PublicFramework,
     InterfacePreferred,
-    CompilerHostModule,
     Blocklisted,
     DistributedInterfaceByDefault,
   };
@@ -773,16 +772,6 @@ class ModuleInterfaceLoaderImpl {
     return pathStartsWith(resourceDir, path);
   }
 
-  bool isInResourceHostDir(StringRef path) {
-    StringRef resourceDir = ctx.SearchPathOpts.RuntimeResourcePath;
-    if (resourceDir.empty()) return false;
-
-    SmallString<128> hostPath;
-    llvm::sys::path::append(hostPath,
-                            resourceDir, "host");
-    return pathStartsWith(hostPath, path);
-  }
-
   bool isInSDK(StringRef path) {
     StringRef sdkPath = ctx.SearchPathOpts.getSDKPath();
     if (sdkPath.empty()) return false;
@@ -816,8 +805,7 @@ class ModuleInterfaceLoaderImpl {
       ReasonModuleInterfaceIgnored ignore =
         ReasonModuleInterfaceIgnored::NotIgnored;
 
-      if (!isInSDK(modulePath) &&
-          !isInResourceHostDir(modulePath)) {
+      if (!isInSDK(modulePath)) {
         ignore = ReasonModuleInterfaceIgnored::LocalModule;
       } else if (ctx.blockListConfig.hasBlockListAction(moduleName,
                                      BlockListKeyKind::ModuleName,
@@ -856,10 +844,6 @@ class ModuleInterfaceLoaderImpl {
         shouldLoadAdjacentModule = false;
         rebuildInfo.addIgnoredModule(modulePath,
                                      ReasonIgnored::PublicFramework);
-      } else if (isInResourceHostDir(modulePath)) {
-        shouldLoadAdjacentModule = false;
-        rebuildInfo.addIgnoredModule(modulePath,
-                                     ReasonIgnored::CompilerHostModule);
       }
     }
 
