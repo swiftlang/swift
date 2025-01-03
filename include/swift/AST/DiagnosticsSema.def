@@ -313,6 +313,10 @@ ERROR(addressable_not_enabled,none,
       "@_addressable is an experimental feature", ())
 ERROR(addressableSelf_not_on_method,none,
       "@_addressableSelf cannot be applied to non-member declarations", ())
+ERROR(addressable_types_not_enabled,none,
+      "@_addressableForDependencies is an experimental feature", ())
+ERROR(class_cannot_be_addressable_for_dependencies,none,
+      "a class cannot be @_addressableForDependencies", ())
 
 ERROR(unsupported_closure_attr,none,
       "%select{attribute |}0 '%1' is not supported on a closure",

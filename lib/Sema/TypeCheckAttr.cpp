@@ -529,6 +529,7 @@ public:
   void visitSafeAttr(SafeAttr *attr);
   void visitLifetimeAttr(LifetimeAttr *attr);
   void visitAddressableSelfAttr(AddressableSelfAttr *attr);
+  void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
 };
 
 } // end anonymous namespace
@@ -7929,6 +7930,18 @@ void AttributeChecker::visitAddressableSelfAttr(AddressableSelfAttr *attr) {
   
   if (!D->getDeclContext()->isTypeContext()) {
     Ctx.Diags.diagnose(attr->getLocation(), diag::addressableSelf_not_on_method);
+  }
+}
+
+void
+AttributeChecker::visitAddressableForDependenciesAttr(
+                                         AddressableForDependenciesAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::AddressableTypes)) {
+    Ctx.Diags.diagnose(attr->getLocation(), diag::addressable_types_not_enabled);
+  }
+  
+  if (isa<ClassDecl>(D)) {
+    Ctx.Diags.diagnose(attr->getLocation(), diag::class_cannot_be_addressable_for_dependencies);
   }
 }
 
