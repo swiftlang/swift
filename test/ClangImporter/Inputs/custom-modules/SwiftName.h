@@ -32,6 +32,8 @@ typedef int my_int_t SWIFT_NAME(MyInt);
 void spuriousAPINotedSwiftName(int);
 void poorlyNamedFunction(const char *);
 
+PointType readPoint(const char *path, void **errorOut) SWIFT_NAME(Point.init(path:));
+
 struct BoxForConstants {
   int dummy;
 };
