@@ -73,6 +73,58 @@ void BridgedDeclAttributes_add(BridgedDeclAttributes *cAttrs,
   *cAttrs = attrs;
 }
 
+static AvailableAttr::Kind unbridge(BridgedAvailableAttrKind value) {
+  switch (value) {
+  case BridgedAvailableAttrKindDefault:
+    return AvailableAttr::Kind::Default;
+  case BridgedAvailableAttrKindDeprecated:
+    return AvailableAttr::Kind::Deprecated;
+  case BridgedAvailableAttrKindUnavailable:
+    return AvailableAttr::Kind::Unavailable;
+  case BridgedAvailableAttrKindNoAsync:
+    return AvailableAttr::Kind::NoAsync;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+BridgedAvailableAttr BridgedAvailableAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedAvailabilityDomain cDomain,
+    BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
+    BridgedStringRef cMessage, BridgedStringRef cRenamed,
+    BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
+    BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
+    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange) {
+  return new (cContext.unbridged())
+      AvailableAttr(cAtLoc.unbridged(), cRange.unbridged(), cDomain.unbridged(),
+                    cDomainLoc.unbridged(), unbridge(cKind),
+                    cMessage.unbridged(), cRenamed.unbridged(),
+                    cIntroduced.unbridged(), cIntroducedRange.unbridged(),
+                    cDeprecated.unbridged(), cDeprecatedRange.unbridged(),
+                    cObsoleted.unbridged(), cObsoletedRange.unbridged(),
+                    /*Implicit=*/false,
+                    /*IsSPI=*/false);
+}
+
+BridgedAvailableAttr BridgedAvailableAttr_createParsedStr(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedStringRef cDomainString,
+    BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
+    BridgedStringRef cMessage, BridgedStringRef cRenamed,
+    BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
+    BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
+    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange) {
+  return new (cContext.unbridged())
+      AvailableAttr(cAtLoc.unbridged(), cRange.unbridged(),
+                    cDomainString.unbridged(), cDomainLoc.unbridged(),
+                    unbridge(cKind), cMessage.unbridged(), cRenamed.unbridged(),
+                    cIntroduced.unbridged(), cIntroducedRange.unbridged(),
+                    cDeprecated.unbridged(), cDeprecatedRange.unbridged(),
+                    cObsoleted.unbridged(), cObsoletedRange.unbridged(),
+                    /*Implicit=*/false,
+                    /*IsSPI=*/false);
+}
+
 static std::optional<AccessLevel> unbridge(BridgedAccessLevel level) {
   switch (level) {
   case BridgedAccessLevelPrivate:

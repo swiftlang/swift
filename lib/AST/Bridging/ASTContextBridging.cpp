@@ -13,6 +13,7 @@
 #include "swift/AST/ASTBridging.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilitySpec.h"
 
 using namespace swift;
 
@@ -166,4 +167,10 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
   return cContext.unbridged().canImportModule(
       builder.get(), canImportLoc.unbridged(), version,
       versionKind == CanImportUnderlyingVersion);
+}
+
+BridgedAvailabilityMacroMap
+BridgedASTContext_getAvailabilityMacroMap(BridgedASTContext cContext) {
+  return const_cast<AvailabilityMacroMap *>(
+      &cContext.unbridged().getAvailabilityMacroMap());
 }

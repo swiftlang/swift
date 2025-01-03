@@ -15,6 +15,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ArgumentList.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
@@ -234,6 +235,14 @@ swift::DeclAttributes BridgedDeclAttributes::unbridged() const {
   swift::DeclAttributes attrs;
   attrs.setRawAttributeChain(chain.unbridged());
   return attrs;
+}
+
+BridgedAvailabilityDomain::BridgedAvailabilityDomain(
+    swift::AvailabilityDomain domain)
+    : opaque(domain.getOpaqueValue()) {}
+
+swift::AvailabilityDomain BridgedAvailabilityDomain::unbridged() const {
+  return swift::AvailabilityDomain::fromOpaque(opaque);
 }
 
 //===----------------------------------------------------------------------===//

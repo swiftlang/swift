@@ -1434,8 +1434,9 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   return makeParserResult(Status, result);
 }
 
-ParserStatus
-Parser::parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result) {
+ParserStatus Parser::parseAvailabilityMacroDefinition(
+    std::string &Name, llvm::VersionTuple &Version,
+    SmallVectorImpl<AvailabilitySpec *> &Specs) {
 
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
@@ -1446,23 +1447,23 @@ Parser::parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result) {
     return makeParserError();
   }
 
-  Result.Name = Tok.getText();
+  Name = Tok.getText();
   consumeToken();
 
   if (Tok.isAny(tok::integer_literal, tok::floating_literal)) {
     SourceRange VersionRange;
-    if (parseVersionTuple(Result.Version, VersionRange,
+    if (parseVersionTuple(Version, VersionRange,
                           diag::avail_query_expected_version_number)) {
       return makeParserError();
     }
   }
 
   if (!consumeIf(tok::colon)) {
-    diagnose(Tok, diag::attr_availability_expected_colon_macro, Result.Name);
+    diagnose(Tok, diag::attr_availability_expected_colon_macro, Name);
     return makeParserError();
   }
 
-  return parseAvailabilitySpecList(Result.Specs, AvailabilitySpecSource::Macro);
+  return parseAvailabilitySpecList(Specs, AvailabilitySpecSource::Macro);
 }
 
 ParserStatus
