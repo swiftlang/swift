@@ -33,3 +33,27 @@ extension ArraySlice {
     }
   }
 }
+
+#if _runtime(_ObjC)
+import SwiftShims
+#endif
+
+extension Array {
+
+  @available(SwiftStdlib 6.1, *)
+  public var storage: Span<Element> {
+    get {
+#if _runtime(_ObjC)
+      if _slowPath(!_buffer._isNative) {
+        let buffer = _buffer.getOrAllocateAssociatedObjectBuffer()
+        let (pointer, count) = (buffer.firstElementAddress, buffer.count)
+        let span = Span(_unsafeStart: pointer, count: count)
+        return _overrideLifetime(span, borrowing: self)
+      }
+#endif
+      let (pointer, count) = (_buffer.firstElementAddress, _buffer.count)
+      let span = Span(_unsafeStart: pointer, count: count)
+      return _overrideLifetime(span, borrowing: self)
+    }
+  }
+}
