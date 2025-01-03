@@ -23,12 +23,18 @@ import GenUtils
 // scalar in the line with the various properties. For the purposes of CCC data,
 // we only need the 0 in between the Cc and BN (index 3) which is the raw value
 // for the CCC.
-func getCCCData(from data: String, with dict: inout [UInt32: UInt16]) {
+func parseCCCData(
+  from data: String
+) -> [UInt32: NormData] {
+
+  var result: [UInt32: NormData] = [:]
+
   for line in data.split(separator: "\n") {
+
     let components = line.split(separator: ";", omittingEmptySubsequences: false)
     
-    let ccc = UInt16(components[3])!
-    
+    let ccc = UInt8(components[3])!
+
     // For the most part, CCC 0 is the default case, so we can save much more
     // space by not keeping this information and making it the fallback case.
     if ccc == 0 {
@@ -38,11 +44,8 @@ func getCCCData(from data: String, with dict: inout [UInt32: UInt16]) {
     let scalarStr = components[0]
     let scalar = UInt32(scalarStr, radix: 16)!
 
-    var newValue = dict[scalar, default: 0]
-    
-    // Store our ccc past the 3rd bit.
-    newValue |= ccc << 3
-    
-    dict[scalar] = newValue
+    result[scalar, default: NormData()].ccc = ccc
   }
+
+  return result
 }

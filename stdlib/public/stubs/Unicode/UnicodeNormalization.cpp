@@ -28,11 +28,11 @@
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint16_t _swift_stdlib_getNormData(__swift_uint32_t scalar) {
   // Fast Path: ASCII and some latiny scalars are very basic and have no
-  // normalization properties.
+  // canonical normalization properties.
   if (scalar < 0xC0) {
     return 0;
   }
-  
+
 #if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
   swift::swift_abortDisabledUnicodeSupport();
 #else
@@ -51,12 +51,44 @@ __swift_uint16_t _swift_stdlib_getNormData(__swift_uint32_t scalar) {
 #endif
 }
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_uint16_t _swift_stdlib_getCompatibilityNormData(__swift_uint32_t scalar) {
+  // Fast Path: ASCII and C1 controls have no
+  // compatibility normalization properties.
+  if (scalar < 0xA0) {
+    return 0;
+  }
+
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
+  auto dataIdx = _swift_stdlib_getScalarBitArrayIdx(
+    scalar,
+    _swift_stdlib_normData_compat,
+    _swift_stdlib_normData_compat_ranks
+  );
+
+  // If we don't have an index into the data indices, then this scalar has no
+  // normalization information.
+  if (dataIdx == INTPTR_MAX) {
+    return 0;
+  }
+
+  auto scalarDataIdx = _swift_stdlib_normData_compat_data_indices[dataIdx];
+  return _swift_stdlib_normData_compat_data[scalarDataIdx];
+#endif
+}
+
 #if SWIFT_STDLIB_ENABLE_UNICODE_DATA
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const __swift_uint8_t * const _swift_stdlib_nfd_decompositions = _swift_stdlib_nfd_decomp;
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const __swift_uint8_t * const _swift_stdlib_nfkd_decompositions = _swift_stdlib_nfkd_decomp;
 #else
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const __swift_uint8_t * const _swift_stdlib_nfd_decompositions = nullptr;
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const __swift_uint8_t * const _swift_stdlib_nfkd_decompositions = nullptr;
 #endif
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
@@ -71,6 +103,21 @@ __swift_uint32_t _swift_stdlib_getDecompositionEntry(__swift_uint32_t scalar) {
                                                   _swift_stdlib_nfd_decomp_sizes);
 
   return _swift_stdlib_nfd_decomp_indices[decompIdx];
+#endif
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_uint32_t _swift_stdlib_getCompatibilityDecompositionEntry(__swift_uint32_t scalar) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
+  auto levelCount = NFKD_DECOMP_LEVEL_COUNT;
+  __swift_intptr_t decompIdx = _swift_stdlib_getMphIdx(scalar, levelCount,
+                                                  _swift_stdlib_nfkd_decomp_keys,
+                                                  _swift_stdlib_nfkd_decomp_ranks,
+                                                  _swift_stdlib_nfkd_decomp_sizes);
+
+  return _swift_stdlib_nfkd_decomp_indices[decompIdx];
 #endif
 }
 

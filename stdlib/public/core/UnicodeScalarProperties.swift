@@ -1281,6 +1281,8 @@ extension Unicode.Scalar.Properties {
   }
 }
 
+// Normalization Properties.
+
 extension Unicode {
 
   /// The classification of a scalar used in the Canonical Ordering Algorithm
@@ -1427,10 +1429,68 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Canonical_Combining_Class" property in
   /// the [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var canonicalCombiningClass: Unicode.CanonicalCombiningClass {
-    let normData = Unicode._NormData(_scalar)
-    return Unicode.CanonicalCombiningClass(rawValue: normData.ccc)
+    Unicode._CanonicalNormData(onlyCCCAndNFCQC: _scalar).canonicalCombiningClass
   }
 }
+
+extension Unicode {
+
+  @frozen
+  public enum QuickCheckResult: Equatable, Hashable, Sendable {
+    case yes
+    case no
+    case maybe
+  }
+}
+
+extension Unicode.Scalar.Properties {
+
+  /// The value of the scalar's NFD\_QuickCheck property.
+  ///
+  /// This property reflects whether the scalar may appear
+  /// in NFD-normalized content.
+  ///
+  public var isNFD_QC: Bool {
+    Unicode._CanonicalNormData(_scalar).isNFDQC
+  }
+
+  /// The value of the scalar's NFC\_QuickCheck property.
+  ///
+  /// This property reflects whether the scalar may appear
+  /// in NFC-normalized content.
+  ///
+  public var isNFC_QC: Unicode.QuickCheckResult {
+    switch Unicode._CanonicalNormData(onlyCCCAndNFCQC: _scalar).isNFCQC_Tristate {
+    case .yes: return .yes
+    case .no:  return .no
+    default:   return .maybe
+    }
+  }
+
+  /// The value of the scalar's NFKD\_QuickCheck property.
+  ///
+  /// This property reflects whether the scalar may appear
+  /// in NFKD-normalized content.
+  ///
+  public var isNFKD_QC: Bool {
+    Unicode._CompatibilityNormData(_scalar).isNFKDQC
+  }
+
+  /// The value of the scalar's NFKC\_QuickCheck property.
+  ///
+  /// This property reflects whether the scalar may appear
+  /// in NFKC-normalized content.
+  ///
+  public var isNFKC_QC: Unicode.QuickCheckResult {
+    switch Unicode._CompatibilityNormData(_scalar).isNFKCQC {
+    case .yes: return .yes
+    case .no:  return .no
+    default:   return .maybe
+    }
+  }
+}
+
+// Numeric properties of scalars.
 
 extension Unicode {
 
@@ -1491,7 +1551,6 @@ extension Unicode {
   }
 }
 
-/// Numeric properties of scalars.
 extension Unicode.Scalar.Properties {
 
   /// The numeric type of the scalar.

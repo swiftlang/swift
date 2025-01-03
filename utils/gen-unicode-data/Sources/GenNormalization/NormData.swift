@@ -12,12 +12,50 @@
 
 import GenUtils
 
+struct NormData {
+
+  enum QuickCheckTriState {
+    case yes
+    case no
+    case maybe
+  }
+
+  var ccc: UInt8 = 0
+  var decomposedFormQuickCheck: Bool = true
+  var precomposedFormQuickCheck: QuickCheckTriState = .yes
+
+  var compacted: UInt16 {
+
+    // Layout from stdlib/public/core/UnicodeData.swift:
+    //
+    // 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    // └──── CCC ────┘ └───────┘ └─┘ │
+    //                     │      │  └── decomposed_QC
+    //              Unused ┘      └── precomposed_QC
+    //
+    // - For decomposed:  Yes = 0, No = 1
+    // - For precomposed: Yes = 0, No = 1, Maybe = 2
+
+    var quickCheckFlags: UInt8 = 0
+    if !decomposedFormQuickCheck     { quickCheckFlags |= 0b0000_0001 }
+    switch precomposedFormQuickCheck {
+    case .yes:                         break
+    case .no:                          quickCheckFlags |= 0b0000_0010
+    case .maybe:                       quickCheckFlags |= 0b0000_0100
+    }
+    return (UInt16(ccc) << 8) | UInt16(quickCheckFlags)
+  }
+}
+
 func emitNormData(
-  _ data: [(ClosedRange<UInt32>, UInt16)],
+  _ data: [UInt32: NormData],
+  kind: EquivalenceType,
   into result: inout String
 ) {
-  let uniqueData = Array(Set(data.map { $0.1 }))
-  
+
+  let data = flatten(data.map { ($0.key, $0.value.compacted) })
+  let uniqueData = Set(data.map { $0.1 }).sorted()
+
   // 64 bit arrays * 8 bytes = .512 KB
   var bitArrays: [BitArray] = .init(repeating: .init(size: 64), count: 64)
   
@@ -124,28 +162,34 @@ func emitNormData(
       return ba
     }
   }
-  
+
+  let baseName: String
+  switch kind {
+  case .canonical:     baseName = "_swift_stdlib_normData"
+  case .compatibility: baseName = "_swift_stdlib_normData_compat"
+  }
+
   emitCollection(
     uniqueData,
-    name: "_swift_stdlib_normData_data",
+    name: "\(baseName)_data",
     into: &result
   )
   
   emitCollection(
     dataIndices,
-    name: "_swift_stdlib_normData_data_indices",
+    name: "\(baseName)_data_indices",
     into: &result
   )
   
   emitCollection(
     ranks,
-    name: "_swift_stdlib_normData_ranks",
+    name: "\(baseName)_ranks",
     into: &result
   )
   
   emitCollection(
     bitArrays,
-    name: "_swift_stdlib_normData",
+    name: baseName,
     type: "__swift_uint64_t",
     into: &result
   ) {

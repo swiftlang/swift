@@ -15,6 +15,7 @@
 public // @testable
 struct _StringRepresentation {
   public var _isASCII: Bool
+  public var _isNFC: Bool
   public var _count: Int
   public var _capacity: Int
 
@@ -77,10 +78,16 @@ extension String {
 #endif
 }
 
+extension Character {
+  public // @testable
+  func _classify() -> _StringRepresentation { return _str._classify() }
+}
+
 extension _StringGuts {
   internal func _classify() -> _StringRepresentation {
     var result = _StringRepresentation(
       _isASCII: self.isASCII,
+      _isNFC: self.isNFC,
       _count: self.count,
       _capacity: nativeCapacity ?? 0,
       _form: ._small

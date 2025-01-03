@@ -421,7 +421,9 @@ extension _StringGuts {
   ) -> Character {
     if _fastPath(isFastUTF8) {
       return withFastUTF8(range: start..<end) { utf8 in
-        return Character(unchecked: String._uncheckedFromUTF8(utf8))
+        var c = Character(unchecked: String._uncheckedFromUTF8(utf8))
+        if isNFC { c._str._guts.markIsNFC() }
+        return c
       }
     }
 

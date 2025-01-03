@@ -308,17 +308,25 @@ extension String {
   internal static func _copying(_ str: String) -> String {
     return String._copying(str[...])
   }
+
   @_alwaysEmitIntoClient
   @inline(never) // slow-path
   internal static func _copying(_ str: Substring) -> String {
+    var result: String
     if _fastPath(str._wholeGuts.isFastUTF8) {
-      return str._wholeGuts.withFastUTF8(range: str._offsetRange) {
+      result = str._wholeGuts.withFastUTF8(range: str._offsetRange) {
+        String._uncheckedFromUTF8($0)
+      }
+    } else {
+      result = Array(str.utf8).withUnsafeBufferPointer {
         String._uncheckedFromUTF8($0)
       }
     }
-    return Array(str.utf8).withUnsafeBufferPointer {
-      String._uncheckedFromUTF8($0)
+
+    if str._wholeGuts.isNFC {
+      result._guts.markIsNFC()
     }
+    return result
   }
 
   @usableFromInline

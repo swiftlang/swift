@@ -535,3 +535,91 @@ extension Unicode.Scalar {
     }
   }
 }
+
+extension Unicode.Scalar {
+
+  /// Whether this scalar lacks an assigned interpretation
+  /// in the version of Unicode used by the Swift standard library.
+  ///
+  /// Unicode is a versioned standard and regularly adds characters.
+  /// Scalars which are unassigned in this version of Unicode
+  /// may be meaningful to applications using a later version of the standard.
+  ///
+  // @available(SwiftStdlib 9999, *)
+  public var isUnassigned: Bool {
+
+    // Accurate for Unicode 14.0 and later.
+
+    if _fastPath(_value < 0x1_0000) {
+
+      // BMP.
+
+      // Hoist these checks so the compiler is more likely
+      // to SIMD the simpler range checks in the 'switch'.
+      //
+      // - Testing U+03A2 allows almost all the Greek block to be fast-pathed.
+      // - U+2065 is in the General Punctuation block.
+      // - U+3097, U+3098 are in the Hiragana block.
+
+      guard 
+        _value != 0x03A2,
+        _value != 0x2065,
+        _value != 0x3097, _value != 0x3098
+      else {
+        return self.properties.age == nil
+      }
+
+      switch _value {
+      // Basic Latin, Latin-1 Supplement, Latin Extended-A, Latin Extended-B,
+      // IPA Extensions, Spacing Modifier Letters, Combining Diacritical Marks,
+      // some Greek and Coptic.
+      case 0x0000...0x0377:
+        return false
+      // some Greek and Coptic, Cyrillic, Cyrillic Supplement.
+      case 0x038E...0x052F /* except U+03A2 */:
+        return false
+      // Arabic.
+      case 0x0600...0x06FF:
+        return false
+      // some Arabic Extended-B, Arabic Extended-A, Devanagari, some Bengali.
+      case 0x0898...0x0983:
+        return false
+      // some Georgian, Hangul Jamo, some Ethiopic.
+      case 0x10D0...0x1248:
+        return false
+      // General Punctuation.
+      case 0x2000...0x206F /* except U+2065 */:
+        return false
+      // Hiragana, Katakana.
+      case 0x3041...0x30FF /* except U+3097, U+3098 */:
+        return false
+      // some Enclosed CJK Letters and Months, CJK Compatibility,
+      // CJK Unified Ideographs Extension A, Yijing Hexagram Symbols,
+      // CJK Unified Ideographs, some Yi Syllables.
+      case 0x3220...0xA48C:
+        return false
+      // Hangul Syllables.
+      case 0xAC00...0xD7A3:
+        return false
+      // TODO: Variation selectors? Other common marks?
+      default:
+        return self.properties.age == nil
+      }
+    }
+
+    switch _value {
+    // Miscellaneous Symbols and Pictographs, Emoticons,
+    // Ornamental Dingbats, some Transport and Map Symbols.
+    case 0x1F300...0x1F6D7:
+      return false
+    // Supplemental Symbols and Pictographs.
+    case 0x1F900...0x1F9FF:
+      return false
+    // Symbols and Pictographs Extended-A is filling up.
+    // Will probably be entirely assigned soon.
+    // https://en.wikipedia.org/wiki/Symbols_and_Pictographs_Extended-A
+    default:
+      return self.properties.age == nil
+    }
+  }
+}

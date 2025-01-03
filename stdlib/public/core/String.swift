@@ -738,6 +738,104 @@ extension String {
   }
 }
 
+extension String {
+
+  /// Creates a string with the given Unicode scalars.
+  ///
+  /// - parameters:
+  ///   - scalars: A sequence of Unicode scalar values.
+  ///
+  @inlinable
+  @_alwaysEmitIntoClient
+  public init(_ scalars: consuming some Sequence<Unicode.Scalar>) {
+
+    if let contig = scalars.withContiguousStorageIfAvailable({ String($0) }) {
+      self = contig
+      return
+    }
+
+    // Unicode Scalars encode to a maximum of 4 bytes of UTF-8.
+    var utf8 = [UInt8]()
+    utf8.reserveCapacity(scalars.underestimatedCount * 4)
+    for scalar in (consume scalars) {
+      scalar.withUTF8CodeUnits { utf8.append(contentsOf: $0) }
+    }
+    self = utf8.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
+  }
+
+  /// Creates a string with the given Unicode scalars.
+  ///
+  /// - parameters:
+  ///   - scalars: A collection of Unicode scalar values.
+  ///
+  @inlinable
+  @_alwaysEmitIntoClient
+  public init(
+    _ scalars: borrowing some RandomAccessCollection<Unicode.Scalar>
+  ) {
+    // Unicode Scalars encode to a maximum of 4 bytes of UTF-8.
+    self = _withUnprotectedUnsafeTemporaryAllocation(
+      of: UInt8.self, capacity: scalars.count * 4
+    ) {
+      // FIXME: It is currently not possible to capture 'scalars' as a borrow.
+      // https://forums.swift.org/t/is-it-possible-to-capture-a-borrowing-parameter-in-a-non-escaping-closure/72967
+      [scalars = copy scalars] buffer in
+      var bufferIdx = 0
+      var scalarIdx = scalars.startIndex
+      while scalarIdx < scalars.endIndex {
+        scalars[scalarIdx].withUTF8CodeUnits {
+          bufferIdx = buffer[Range(uncheckedBounds: (bufferIdx, buffer.endIndex))]
+            .initialize(fromContentsOf: $0)
+        }
+        scalars.formIndex(after: &scalarIdx)
+      }
+      return String._uncheckedFromUTF8(
+        UnsafeBufferPointer(
+          rebasing: buffer[Range(uncheckedBounds: (buffer.startIndex, bufferIdx))]
+        )
+      )
+    }
+  }
+
+  /// Creates a string with the given Unicode scalars.
+  ///
+  /// - parameters:
+  ///   - scalars: A sequence of Unicode scalar values.
+  ///
+  @inlinable
+  // @available(SwiftStdlib 9999, *)
+  public init(
+    _ scalars: consuming Unicode.NormalizedScalars<some Sequence>.NFC
+  ) {
+    // Unicode.NormalizedScalars cannot provide a good underestimatedCount.
+    var utf8 = [UInt8]()
+    for scalar in (consume scalars) {
+      scalar.withUTF8CodeUnits { utf8.append(contentsOf: $0) }
+    }
+    self = utf8.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
+    self._guts.markIsNFC()
+  }
+
+  /// Creates a string with the given Unicode scalars.
+  ///
+  /// - parameters:
+  ///   - scalars: A sequence of Unicode scalar values.
+  ///
+  @inlinable
+  // @available(SwiftStdlib 9999, *)
+  public init(
+    _ scalars: consuming Unicode.NormalizedScalars<some Sequence>.NFKC
+  ) {
+    // Unicode.NormalizedScalars cannot provide a good underestimatedCount.
+    var utf8 = [UInt8]()
+    for scalar in (consume scalars) {
+      scalar.withUTF8CodeUnits { utf8.append(contentsOf: $0) }
+    }
+    self = utf8.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
+    self._guts.markIsNFC()
+  }
+}
+
 extension String: _ExpressibleByBuiltinUnicodeScalarLiteral {
   @_effects(readonly)
   @inlinable @inline(__always)
@@ -1097,7 +1195,7 @@ extension _StringGutsSlice {
     _ scalar: Unicode.Scalar,
     _ prevCCC: inout UInt8
   ) -> Bool {
-    let normData = Unicode._NormData(scalar, fastUpperbound: 0x300)
+    let normData = Unicode._CanonicalNormData(onlyCCCAndNFCQC: scalar)
 
     if prevCCC > normData.ccc, normData.ccc != 0 {
       return false
@@ -1154,7 +1252,7 @@ extension _StringGutsSlice {
       }
     }
 
-    for scalar in substring.unicodeScalars._internalNFC {
+    for scalar in substring.unicodeScalars.normalized.nfc {
       try scalar.withUTF8CodeUnits {
         for byte in $0 {
           try f(byte)
