@@ -54,6 +54,7 @@ public:
     CustomData,
     Error,
   };
+
 private:
   ObjectKind Kind;
 protected:
@@ -238,7 +239,7 @@ private:
   bool Storage;
 };
 
-class SKDDouble: public SKDObject {
+class SKDDouble : public SKDObject {
 public:
   SKDDouble(double Value) : SKDObject(ObjectKind::Double), Storage(Value) {}
 
@@ -246,13 +247,12 @@ public:
     return SOURCEKITD_VARIANT_TYPE_DOUBLE;
   }
 
-  double getDouble() const override {
-    return Storage;
-  }
+  double getDouble() const override { return Storage; }
 
   static bool classof(const SKDObject *O) {
     return O->getKind() == ObjectKind::Double;
   }
+
 private:
   double Storage;
 };
@@ -868,7 +868,8 @@ static bool SKDVar_array_get_bool(sourcekitd_variant_t array, size_t index) {
   return SKD_OBJ(array)->get(index)->getBool();
 }
 
-static double SKDVar_array_get_double(sourcekitd_variant_t array, size_t index) {
+static double SKDVar_array_get_double(sourcekitd_variant_t array,
+                                      size_t index) {
   return SKD_OBJ(array)->get(index)->getDouble();
 }
 
@@ -920,8 +921,8 @@ SKDVar_dictionary_get_bool(sourcekitd_variant_t dict, sourcekitd_uid_t key) {
   return false;
 }
 
-static double
-SKDVar_dictionary_get_double(sourcekitd_variant_t dict, sourcekitd_uid_t key) {
+static double SKDVar_dictionary_get_double(sourcekitd_variant_t dict,
+                                           sourcekitd_uid_t key) {
   if (auto Object = SKD_OBJ(dict)->get(key)) {
     return Object->getDouble();
   }
@@ -983,30 +984,30 @@ static size_t SKDVar_data_get_size(sourcekitd_variant_t obj) {
 }
 
 static VariantFunctions SKDVariantFuncs = {
-  SKDVar_get_type,
-  SKDVar_array_apply,
-  SKDVar_array_get_bool,
-  SKDVar_array_get_double,
-  SKDVar_array_get_count,
-  SKDVar_array_get_int64,
-  SKDVar_array_get_string,
-  SKDVar_array_get_uid,
-  SKDVar_array_get_value,
-  SKDVar_bool_get_value,
-  SKDVar_double_get_value,
-  SKDVar_dictionary_apply,
-  SKDVar_dictionary_get_bool,
-  SKDVar_dictionary_get_double,
-  SKDVar_dictionary_get_int64,
-  SKDVar_dictionary_get_string,
-  SKDVar_dictionary_get_value,
-  SKDVar_dictionary_get_uid,
-  SKDVar_string_get_length,
-  SKDVar_string_get_ptr,
-  SKDVar_int64_get_value,
-  SKDVar_uid_get_value,
-  SKDVar_data_get_size,
-  SKDVar_data_get_ptr,
+    SKDVar_get_type,
+    SKDVar_array_apply,
+    SKDVar_array_get_bool,
+    SKDVar_array_get_double,
+    SKDVar_array_get_count,
+    SKDVar_array_get_int64,
+    SKDVar_array_get_string,
+    SKDVar_array_get_uid,
+    SKDVar_array_get_value,
+    SKDVar_bool_get_value,
+    SKDVar_double_get_value,
+    SKDVar_dictionary_apply,
+    SKDVar_dictionary_get_bool,
+    SKDVar_dictionary_get_double,
+    SKDVar_dictionary_get_int64,
+    SKDVar_dictionary_get_string,
+    SKDVar_dictionary_get_value,
+    SKDVar_dictionary_get_uid,
+    SKDVar_string_get_length,
+    SKDVar_string_get_ptr,
+    SKDVar_int64_get_value,
+    SKDVar_uid_get_value,
+    SKDVar_data_get_size,
+    SKDVar_data_get_ptr,
 };
 
 static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object) {

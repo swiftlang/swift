@@ -62,9 +62,10 @@ public:
 
   const char *readPrintedType(unsigned Offset) { return PrintedTypes + Offset; }
 
-  static bool dictionary_apply(
-      void *Buffer, size_t Index,
-      sourcekitd_variant_dictionary_applier_f_t Applier, void *Context) {
+  static bool
+  dictionary_apply(void *Buffer, size_t Index,
+                   sourcekitd_variant_dictionary_applier_f_t Applier,
+                   void *Context) {
     VariableTypeReader Reader((char *)Buffer);
     auto Result = Reader.getVariable(Index);
 #define APPLY(K, Ty, Field)                                                    \

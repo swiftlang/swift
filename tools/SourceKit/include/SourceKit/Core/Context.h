@@ -33,27 +33,28 @@ namespace SourceKit {
   class NotificationCenter;
   class PluginSupport;
 
-class GlobalConfig {
-public:
-  struct Settings {
-    struct IDEInspectionOptions {
+  class GlobalConfig {
+  public:
+    struct Settings {
+      struct IDEInspectionOptions {
 
-      /// Max count of reusing ASTContext for cached IDE inspection.
-      unsigned MaxASTContextReuseCount = 100;
+        /// Max count of reusing ASTContext for cached IDE inspection.
+        unsigned MaxASTContextReuseCount = 100;
 
-      /// Interval second for checking dependencies in cached IDE inspection.
-      unsigned CheckDependencyInterval = 5;
-    } IDEInspectionOpts;
-  };
+        /// Interval second for checking dependencies in cached IDE inspection.
+        unsigned CheckDependencyInterval = 5;
+      } IDEInspectionOpts;
+    };
 
-private:
-  Settings State;
-  mutable llvm::sys::Mutex Mtx;
+  private:
+    Settings State;
+    mutable llvm::sys::Mutex Mtx;
 
-public:
-  Settings update(std::optional<unsigned> IDEInspectionMaxASTContextReuseCount,
-                  std::optional<unsigned> IDEInspectionCheckDependencyInterval);
-  Settings::IDEInspectionOptions getIDEInspectionOpts() const;
+  public:
+    Settings
+    update(std::optional<unsigned> IDEInspectionMaxASTContextReuseCount,
+           std::optional<unsigned> IDEInspectionCheckDependencyInterval);
+    Settings::IDEInspectionOptions getIDEInspectionOpts() const;
 };
 
 /// Keeps track of all requests that are currently in progress and coordinates

@@ -224,9 +224,10 @@ SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL void
         sourcekitd_cancellable_request_handler_t);
 
 /// Adds a function that will be called when a request is cancelled.
-/// The cancellation handler is called even for cancelled requests that are handled by
-/// sourcekitd itself and not the plugin. If the plugin doesn't know the request
-/// handle to be cancelled, it should ignore the cancellation request.
+/// The cancellation handler is called even for cancelled requests that are
+/// handled by sourcekitd itself and not the plugin. If the plugin doesn't know
+/// the request handle to be cancelled, it should ignore the cancellation
+/// request.
 SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL void
     sourcekitd_plugin_initialize_register_cancellation_handler(
         sourcekitd_plugin_initialize_params_t,
@@ -238,8 +239,8 @@ sourcekitd_plugin_initialize_register_custom_buffer(
     sourcekitd_variant_functions_t funcs);
 
 SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL void *
-sourcekitd_plugin_initialize_get_swift_ide_inspection_instance(
-    sourcekitd_plugin_initialize_params_t);
+    sourcekitd_plugin_initialize_get_swift_ide_inspection_instance(
+        sourcekitd_plugin_initialize_params_t);
 
 #endif // SOURCEKITD_HAS_BLOCKS
 

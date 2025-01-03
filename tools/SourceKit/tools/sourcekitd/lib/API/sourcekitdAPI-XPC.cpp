@@ -676,8 +676,9 @@ static std::vector<VariantFunctions *> PluginVariantFunctions;
 VariantFunctions *getPluginVariantFunctions(size_t BufKind) {
   size_t index = BufKind - (size_t)CustomBufferKind::CustomBufferKind_End;
   if (index >= PluginVariantFunctions.size() ||
-        PluginVariantFunctions[index] == nullptr) {
-    llvm::report_fatal_error("unknown custom buffer kind; possible plugin loading failure");
+      PluginVariantFunctions[index] == nullptr) {
+    llvm::report_fatal_error(
+        "unknown custom buffer kind; possible plugin loading failure");
   }
   return PluginVariantFunctions[index];
 }
@@ -706,7 +707,7 @@ static sourcekitd_variant_type_t XPCVar_get_type(sourcekitd_variant_t var) {
 
   if (type == XPC_TYPE_DATA) {
     auto BufKind = (size_t)CUSTOM_BUF_KIND(obj);
-    switch(BufKind) {
+    switch (BufKind) {
     case (size_t)CustomBufferKind::TokenAnnotationsArray:
     case (size_t)CustomBufferKind::DeclarationsArray:
     case (size_t)CustomBufferKind::DocSupportAnnotationArray:
@@ -721,19 +722,18 @@ static sourcekitd_variant_type_t XPCVar_get_type(sourcekitd_variant_t var) {
     case (size_t)CustomBufferKind::RawData:
       return SOURCEKITD_VARIANT_TYPE_DATA;
     default:
-      return getPluginVariantFunctions(BufKind)->get_type(variantFromXPCObject(obj));
+      return getPluginVariantFunctions(BufKind)->get_type(
+          variantFromXPCObject(obj));
     }
   }
 
   llvm::report_fatal_error("sourcekitd object did not resolve to a known type");
 }
 
-static bool XPCVar_array_apply(
-    sourcekitd_variant_t array,
-    sourcekitd_variant_array_applier_f_t applier,
-    void *context) {
-  return xpc_array_apply(XPC_OBJ(array),
-                         ^(size_t index, xpc_object_t obj) {
+static bool XPCVar_array_apply(sourcekitd_variant_t array,
+                               sourcekitd_variant_array_applier_f_t applier,
+                               void *context) {
+  return xpc_array_apply(XPC_OBJ(array), ^(size_t index, xpc_object_t obj) {
     return applier(index, variantFromXPCObject(obj), context);
   });
 }
@@ -742,7 +742,8 @@ static bool XPCVar_array_get_bool(sourcekitd_variant_t array, size_t index) {
   return xpc_array_get_bool(XPC_OBJ(array), index);
 }
 
-static double XPCVar_array_get_double(sourcekitd_variant_t array, size_t index) {
+static double XPCVar_array_get_double(sourcekitd_variant_t array,
+                                      size_t index) {
   return xpc_array_get_double(XPC_OBJ(array), index);
 }
 
@@ -776,14 +777,15 @@ static double XPCVar_double_get_value(sourcekitd_variant_t obj) {
   return xpc_double_get_value(XPC_OBJ(obj));
 }
 
-static bool XPCVar_dictionary_apply(
-    sourcekitd_variant_t dict,
-    sourcekitd_variant_dictionary_applier_f_t applier,
-    void *context) {
-  return xpc_dictionary_apply(XPC_OBJ(dict),
-                              ^(const char *key, xpc_object_t obj) {
-    return applier(sourcekitd_uid_get_from_cstr(key),variantFromXPCObject(obj), context);
-  });
+static bool
+XPCVar_dictionary_apply(sourcekitd_variant_t dict,
+                        sourcekitd_variant_dictionary_applier_f_t applier,
+                        void *context) {
+  return xpc_dictionary_apply(
+      XPC_OBJ(dict), ^(const char *key, xpc_object_t obj) {
+        return applier(sourcekitd_uid_get_from_cstr(key),
+                       variantFromXPCObject(obj), context);
+      });
 }
 
 static bool
@@ -791,8 +793,8 @@ XPCVar_dictionary_get_bool(sourcekitd_variant_t dict, sourcekitd_uid_t key) {
   return xpc_dictionary_get_bool(XPC_OBJ(dict), strFromUID(key));
 }
 
-static double
-XPCVar_dictionary_get_double(sourcekitd_variant_t dict, sourcekitd_uid_t key) {
+static double XPCVar_dictionary_get_double(sourcekitd_variant_t dict,
+                                           sourcekitd_uid_t key) {
   return xpc_dictionary_get_double(XPC_OBJ(dict), strFromUID(key));
 }
 
@@ -842,32 +844,31 @@ static sourcekitd_uid_t XPCVar_uid_get_value(sourcekitd_variant_t obj) {
   return sourcekitd_uid_t(xpc_uint64_get_value(XPC_OBJ(obj)));
 }
 
-
 static VariantFunctions XPCVariantFuncs = {
-  XPCVar_get_type,
-  XPCVar_array_apply,
-  XPCVar_array_get_bool,
-  XPCVar_array_get_double,
-  XPCVar_array_get_count,
-  XPCVar_array_get_int64,
-  XPCVar_array_get_string,
-  XPCVar_array_get_uid,
-  XPCVar_array_get_value,
-  XPCVar_bool_get_value,
-  XPCVar_double_get_value,
-  XPCVar_dictionary_apply,
-  XPCVar_dictionary_get_bool,
-  XPCVar_dictionary_get_double,
-  XPCVar_dictionary_get_int64,
-  XPCVar_dictionary_get_string,
-  XPCVar_dictionary_get_value,
-  XPCVar_dictionary_get_uid,
-  XPCVar_string_get_length,
-  XPCVar_string_get_ptr,
-  XPCVar_int64_get_value,
-  XPCVar_uid_get_value,
-  XPCVar_data_get_size,
-  XPCVar_data_get_ptr,
+    XPCVar_get_type,
+    XPCVar_array_apply,
+    XPCVar_array_get_bool,
+    XPCVar_array_get_double,
+    XPCVar_array_get_count,
+    XPCVar_array_get_int64,
+    XPCVar_array_get_string,
+    XPCVar_array_get_uid,
+    XPCVar_array_get_value,
+    XPCVar_bool_get_value,
+    XPCVar_double_get_value,
+    XPCVar_dictionary_apply,
+    XPCVar_dictionary_get_bool,
+    XPCVar_dictionary_get_double,
+    XPCVar_dictionary_get_int64,
+    XPCVar_dictionary_get_string,
+    XPCVar_dictionary_get_value,
+    XPCVar_dictionary_get_uid,
+    XPCVar_string_get_length,
+    XPCVar_string_get_ptr,
+    XPCVar_int64_get_value,
+    XPCVar_uid_get_value,
+    XPCVar_data_get_size,
+    XPCVar_data_get_ptr,
 };
 
 static sourcekitd_variant_t variantFromXPCObject(xpc_object_t obj) {
@@ -876,7 +877,7 @@ static sourcekitd_variant_t variantFromXPCObject(xpc_object_t obj) {
 
   if (xpc_get_type(obj) == XPC_TYPE_DATA) {
     auto BufKind = (size_t)CUSTOM_BUF_KIND(obj);
-    switch(BufKind) {
+    switch (BufKind) {
     case (size_t)CustomBufferKind::TokenAnnotationsArray:
       return {{ (uintptr_t)getVariantFunctionsForTokenAnnotationsArray(),
                 (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
@@ -986,7 +987,8 @@ void sourcekitd_response_dictionary_set_bool(sourcekitd_response_t dict,
 }
 
 void sourcekitd_response_dictionary_set_double(sourcekitd_response_t dict,
-                                               sourcekitd_uid_t key, double val) {
+                                               sourcekitd_uid_t key,
+                                               double val) {
   xpc_dictionary_set_double(dict, strFromUID(key), val);
 }
 

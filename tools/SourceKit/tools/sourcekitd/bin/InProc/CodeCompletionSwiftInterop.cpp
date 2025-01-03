@@ -136,8 +136,8 @@ swiftide_connection_t swiftide_connection_create(void) {
   return swiftide_connection_create_with_inspection_instance(nullptr);
 }
 
-swiftide_connection_t
-swiftide_connection_create_with_inspection_instance(void *opaqueIDESwiftInspectionInstance) {
+swiftide_connection_t swiftide_connection_create_with_inspection_instance(
+    void *opaqueIDESwiftInspectionInstance) {
   static std::once_flag once;
   std::call_once(
       once, [] { llvm::sys::PrintStackTraceOnErrorSignal("IDESwiftInterop"); });
@@ -146,7 +146,6 @@ swiftide_connection_create_with_inspection_instance(void *opaqueIDESwiftInspecti
 
   return static_cast<swiftide_connection_t>(new Connection(inspectInstance));
 }
-
 
 void swiftide_connection_dispose(swiftide_connection_t conn) {
   assert(conn);
@@ -190,7 +189,9 @@ struct CompletionResult {
 
   bool hasError() const { return !error.empty(); }
 
-  ArrayRef<CodeCompletionResult *> getCompletions() { return resultSink.Results; }
+  ArrayRef<CodeCompletionResult *> getCompletions() {
+    return resultSink.Results;
+  }
 };
 
 struct SwiftInteropCodeCompletionConsumer : public ide::CodeCompletionConsumer {
@@ -214,7 +215,8 @@ struct CompletionRequest {
   bool addInitsToTopLevel = false;
   bool addCallWithNoDefaultArgs = true;
 
-  CompletionRequest(const char *path, unsigned offset, ArrayRef<const char *>args) {
+  CompletionRequest(const char *path, unsigned offset,
+                    ArrayRef<const char *> args) {
     this->path = StringRef(path).copy(allocator);
     this->offset = offset;
     compilerArguments.reserve(args.size());
@@ -234,12 +236,12 @@ void swiftide_cancel_request(swiftide_connection_t _conn,
 }
 
 swiftide_completion_request_t
-swiftide_completion_request_create(const char *path,
-                  uint32_t offset,
-                  char *const *const compiler_args,
-                  uint32_t num_compiler_args) {
+swiftide_completion_request_create(const char *path, uint32_t offset,
+                                   char *const *const compiler_args,
+                                   uint32_t num_compiler_args) {
 
-  return new CompletionRequest(path, offset, llvm::ArrayRef(compiler_args, num_compiler_args));
+  return new CompletionRequest(
+      path, offset, llvm::ArrayRef(compiler_args, num_compiler_args));
 }
 
 void swiftide_completion_request_dispose(swiftide_completion_request_t _req) {
@@ -368,7 +370,8 @@ void Connection::codeComplete(
 
   std::string compilerInvocationError;
   bool creatingInvocationFailed = initCompilerInvocation(
-      invocation, args, FrontendOptions::ActionType::Typecheck, diags, path, fileSystem, swiftExecutablePath, runtimeResourcePath,
+      invocation, args, FrontendOptions::ActionType::Typecheck, diags, path,
+      fileSystem, swiftExecutablePath, runtimeResourcePath,
       diagnosticsDocumentationPath, sessionTimestamp, compilerInvocationError);
   if (creatingInvocationFailed) {
     callback(ResultType::failure(compilerInvocationError));
@@ -682,35 +685,35 @@ swiftide_completion_item_get_associated_kind(swiftide_completion_item_t _item) {
   switch (item.getKind()) {
   case CodeCompletionResultKind::Declaration:
     switch (item.getAssociatedDeclKind()) {
-#define CASE(KIND, VAL) \
-    case swift::ide::CodeCompletionDeclKind::KIND: \
-      return SWIFTIDE_COMPLETION_ITEM_DECL_KIND_##VAL;
+#define CASE(KIND, VAL)                                                        \
+  case swift::ide::CodeCompletionDeclKind::KIND:                               \
+    return SWIFTIDE_COMPLETION_ITEM_DECL_KIND_##VAL;
 
-    CASE(Module, MODULE)
-    CASE(Class, CLASS)
-    CASE(Actor, ACTOR)
-    CASE(Struct, STRUCT)
-    CASE(Enum, ENUM)
-    CASE(EnumElement, ENUMELEMENT)
-    CASE(Protocol, PROTOCOL)
-    CASE(AssociatedType, ASSOCIATEDTYPE)
-    CASE(TypeAlias, TYPEALIAS)
-    CASE(GenericTypeParam, GENERICTYPEPARAM)
-    CASE(Constructor, CONSTRUCTOR)
-    CASE(Destructor, DESTRUCTOR)
-    CASE(Subscript, SUBSCRIPT)
-    CASE(StaticMethod, STATICMETHOD)
-    CASE(InstanceMethod, INSTANCEMETHOD)
-    CASE(PrefixOperatorFunction, PREFIXOPERATORFUNCTION)
-    CASE(PostfixOperatorFunction, POSTFIXOPERATORFUNCTION)
-    CASE(InfixOperatorFunction, INFIXOPERATORFUNCTION)
-    CASE(FreeFunction, FREEFUNCTION)
-    CASE(StaticVar, STATICVAR)
-    CASE(InstanceVar, INSTANCEVAR)
-    CASE(LocalVar, LOCALVAR)
-    CASE(GlobalVar, GLOBALVAR)
-    CASE(PrecedenceGroup, PRECEDENCEGROUP)
-    CASE(Macro, MACRO)
+      CASE(Module, MODULE)
+      CASE(Class, CLASS)
+      CASE(Actor, ACTOR)
+      CASE(Struct, STRUCT)
+      CASE(Enum, ENUM)
+      CASE(EnumElement, ENUMELEMENT)
+      CASE(Protocol, PROTOCOL)
+      CASE(AssociatedType, ASSOCIATEDTYPE)
+      CASE(TypeAlias, TYPEALIAS)
+      CASE(GenericTypeParam, GENERICTYPEPARAM)
+      CASE(Constructor, CONSTRUCTOR)
+      CASE(Destructor, DESTRUCTOR)
+      CASE(Subscript, SUBSCRIPT)
+      CASE(StaticMethod, STATICMETHOD)
+      CASE(InstanceMethod, INSTANCEMETHOD)
+      CASE(PrefixOperatorFunction, PREFIXOPERATORFUNCTION)
+      CASE(PostfixOperatorFunction, POSTFIXOPERATORFUNCTION)
+      CASE(InfixOperatorFunction, INFIXOPERATORFUNCTION)
+      CASE(FreeFunction, FREEFUNCTION)
+      CASE(StaticVar, STATICVAR)
+      CASE(InstanceVar, INSTANCEVAR)
+      CASE(LocalVar, LOCALVAR)
+      CASE(GlobalVar, GLOBALVAR)
+      CASE(PrecedenceGroup, PRECEDENCEGROUP)
+      CASE(Macro, MACRO)
 #undef CASE
     }
     llvm_unreachable("unhandled enum value");
@@ -727,20 +730,20 @@ uint32_t swiftide_completion_item_get_semantic_context(
     swiftide_completion_item_t _item) {
   auto &item = *static_cast<CodeCompletionResult *>(_item);
   switch (item.getSemanticContext()) {
-    case swift::ide::SemanticContextKind::None:
-      return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_NONE;
-    case swift::ide::SemanticContextKind::Local:
-      return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_LOCAL;
-    case swift::ide::SemanticContextKind::CurrentNominal:
-      return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_CURRENTNOMINAL;
-    case swift::ide::SemanticContextKind::Super:
-      return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_SUPER;
-    case swift::ide::SemanticContextKind::OutsideNominal:
-      return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_OUTSIDENOMINAL;
-    case swift::ide::SemanticContextKind::CurrentModule:
-      return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_CURRENTMODULE;
-    case swift::ide::SemanticContextKind::OtherModule:
-      return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_OTHERMODULE;
+  case swift::ide::SemanticContextKind::None:
+    return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_NONE;
+  case swift::ide::SemanticContextKind::Local:
+    return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_LOCAL;
+  case swift::ide::SemanticContextKind::CurrentNominal:
+    return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_CURRENTNOMINAL;
+  case swift::ide::SemanticContextKind::Super:
+    return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_SUPER;
+  case swift::ide::SemanticContextKind::OutsideNominal:
+    return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_OUTSIDENOMINAL;
+  case swift::ide::SemanticContextKind::CurrentModule:
+    return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_CURRENTMODULE;
+  case swift::ide::SemanticContextKind::OtherModule:
+    return SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_OTHERMODULE;
   }
 }
 
@@ -760,7 +763,8 @@ uint32_t swiftide_completion_item_get_flair(swiftide_completion_item_t _item) {
     result |= SWIFTIDE_COMPLETION_FLAIR_RAREKEYWORDATCURRENTPOSITION;
   if (flair.contains(CodeCompletionFlairBit::RareTypeAtCurrentPosition))
     result |= SWIFTIDE_COMPLETION_FLAIR_RARETYPEATCURRENTPOSITION;
-  if (flair.contains(CodeCompletionFlairBit::ExpressionAtNonScriptOrMainFileScope))
+  if (flair.contains(
+          CodeCompletionFlairBit::ExpressionAtNonScriptOrMainFileScope))
     result |= SWIFTIDE_COMPLETION_FLAIR_EXPRESSIONATNONSCRIPTORMAINFILESCOPE;
   return result;
 }
@@ -792,8 +796,7 @@ uint32_t swiftide_completion_item_not_recommended_reason(
   }
 }
 
-bool swiftide_completion_item_has_diagnostic(
-    swiftide_completion_item_t _item) {
+bool swiftide_completion_item_has_diagnostic(swiftide_completion_item_t _item) {
   auto &item = *static_cast<CodeCompletionResult *>(_item);
   return (item.getNotRecommendedReason() != NotRecommendedReason::None);
 }
@@ -854,7 +857,9 @@ swiftide_completion_item_get_type_relation(swiftide_completion_item_t _item) {
       item.getExpectedTypeRelation());
 }
 
-uint32_t swiftide_completion_item_import_depth(swiftide_completion_response_t _response, swiftide_completion_item_t _item) {
+uint32_t
+swiftide_completion_item_import_depth(swiftide_completion_response_t _response,
+                                      swiftide_completion_item_t _item) {
   auto &response = *static_cast<CompletionResult *>(_response);
   auto &item = *static_cast<CodeCompletionResult *>(_item);
   if (item.getSemanticContext() == SemanticContextKind::OtherModule) {

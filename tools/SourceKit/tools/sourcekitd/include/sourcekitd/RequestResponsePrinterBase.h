@@ -89,9 +89,7 @@ public:
     OS << Val;
   }
 
-  void visitDouble(double Val) {
-    OS << Val;
-  }
+  void visitDouble(double Val) { OS << Val; }
 
   void visitString(llvm::StringRef Str) {
     OS << '\"';

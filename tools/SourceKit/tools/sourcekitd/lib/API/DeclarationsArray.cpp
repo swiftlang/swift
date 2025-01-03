@@ -56,11 +56,10 @@ public:
     Reader.readEntries(Index, Kind, Offset, Length, USR);
   }
 
-  static bool
-  apply(sourcekitd_uid_t Kind, unsigned Offset, unsigned Length,
-        const char *USR,
-        sourcekitd_variant_dictionary_applier_f_t applier,
-        void *context) {
+  static bool apply(sourcekitd_uid_t Kind, unsigned Offset, unsigned Length,
+                    const char *USR,
+                    sourcekitd_variant_dictionary_applier_f_t applier,
+                    void *context) {
 
 #define APPLY(K, Ty, Field)                                                    \
   do {                                                                         \
@@ -131,10 +130,10 @@ struct CompactVariantFuncs<DeclarationsArray> {
     return Fn(key, Kind, Offset, Length, USR);
   }
 
-  static bool dictionary_apply(
-      sourcekitd_variant_t dict,
-      sourcekitd_variant_dictionary_applier_f_t applier,
-      void *context) {
+  static bool
+  dictionary_apply(sourcekitd_variant_t dict,
+                   sourcekitd_variant_dictionary_applier_f_t applier,
+                   void *context) {
     void *Buf = (void *)dict.data[1];
     size_t Index = dict.data[2];
 

@@ -13,9 +13,8 @@
 #ifndef LLVM_SOURCEKITD_INTERNAL_H
 #define LLVM_SOURCEKITD_INTERNAL_H
 
-
-#include "sourcekitd/plugin.h"
 #include "SourceKit/Support/CancellationToken.h"
+#include "sourcekitd/plugin.h"
 #include "sourcekitd/sourcekitd.h"
 #include "llvm/ADT/STLExtras.h"
 #include <functional>
@@ -195,7 +194,7 @@ static inline sourcekitd_variant_t makeBoolVariant(bool value) {
 static inline sourcekitd_variant_t makeDoubleVariant(double value) {
   uint64_t data;
   std::memcpy(&data, &value, sizeof(double));
-  return {{ 0, data, SOURCEKITD_VARIANT_TYPE_DOUBLE }};
+  return {{0, data, SOURCEKITD_VARIANT_TYPE_DOUBLE}};
 }
 static inline sourcekitd_variant_t makeStringVariant(const char *value) {
   return {{ 0, (uintptr_t)value, SOURCEKITD_VARIANT_TYPE_STRING }};

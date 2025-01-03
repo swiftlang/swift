@@ -103,8 +103,7 @@ sourcekitd_register_plugin_path(const char *clientPlugin,
 /// clients that cannot call 'sourcekitd_initialize()' should need to call this
 /// directly. Also, all clients must register the same plugins in the same
 /// order.
-SOURCEKITD_PUBLIC void
-sourcekitd_load_client_plugins(void);
+SOURCEKITD_PUBLIC void sourcekitd_load_client_plugins(void);
 
 /// Initializes structures needed across the rest of the sourcekitd API.
 ///
@@ -408,8 +407,7 @@ sourcekitd_variant_dictionary_get_bool(sourcekitd_variant_t dict,
 /// The underlying \c double value for the specified key. 0.0 if the
 /// value for the specified key is not a double value or if there is no
 /// value for the specified key.
-SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL SOURCEKITD_WARN_RESULT
-double
+SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL SOURCEKITD_WARN_RESULT double
 sourcekitd_variant_dictionary_get_double(sourcekitd_variant_t dict,
                                          sourcekitd_uid_t key);
 
@@ -484,8 +482,7 @@ SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
 bool
 sourcekitd_variant_array_get_bool(sourcekitd_variant_t array, size_t index);
 
-SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
-double
+SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT double
 sourcekitd_variant_array_get_double(sourcekitd_variant_t array, size_t index);
 
 SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
@@ -542,8 +539,7 @@ SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
 bool
 sourcekitd_variant_bool_get_value(sourcekitd_variant_t obj);
 
-SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
-double
+SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT double
 sourcekitd_variant_double_get_value(sourcekitd_variant_t obj);
 
 SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT

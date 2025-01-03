@@ -63,7 +63,7 @@ public:
                              const char *,
                              unsigned,
                              unsigned> CompactArrayReaderTy;
-  
+
   static bool
   dictionary_apply(void *Buf, size_t Index,
                    sourcekitd_variant_dictionary_applier_f_t applier,
@@ -83,11 +83,12 @@ public:
                   Offset,
                   Length);
 
-#define APPLY(K, Ty, Field)                              \
-  do {                                                   \
-    sourcekitd_uid_t key = SKDUIDFromUIdent(K);  \
-    sourcekitd_variant_t var = make##Ty##Variant(Field); \
-    if (!applier(key, var, context)) return false;                \
+#define APPLY(K, Ty, Field)                                                    \
+  do {                                                                         \
+    sourcekitd_uid_t key = SKDUIDFromUIdent(K);                                \
+    sourcekitd_variant_t var = make##Ty##Variant(Field);                       \
+    if (!applier(key, var, context))                                           \
+      return false;                                                            \
   } while (0)
 
     APPLY(KeyKind, UID, Kind);

@@ -401,9 +401,9 @@ uint64_t DocStructureArrayReader::getHeaderValue(unsigned index) const {
 
 #define APPLY(K, Ty, Field)                                                    \
   do {                                                                         \
-    sourcekitd_uid_t key = SKDUIDFromUIdent(K);                        \
+    sourcekitd_uid_t key = SKDUIDFromUIdent(K);                                \
     sourcekitd_variant_t var = make##Ty##Variant(Field);                       \
-    if (!applier(key, var, context))                                                    \
+    if (!applier(key, var, context))                                           \
       return false;                                                            \
   } while (0)
 
@@ -504,11 +504,11 @@ struct DocStructureReader {
 
 #define APPLY_ARRAY(Kind, Buf, Key, Off)                                       \
   do {                                                                         \
-    sourcekitd_uid_t key = SKDUIDFromUIdent(Key);                      \
+    sourcekitd_uid_t key = SKDUIDFromUIdent(Key);                              \
     sourcekitd_variant_t var = {                                               \
         {(uintptr_t)getVariantFunctionsFor##Kind##Array(), (uintptr_t)Buf,     \
          Off}};                                                                \
-    if (!applier(key, var, context))                                                    \
+    if (!applier(key, var, context))                                           \
       return false;                                                            \
   } while (0)
 

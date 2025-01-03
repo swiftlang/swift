@@ -69,7 +69,8 @@ namespace {
 
 /// This a near-copy of llvm::function_ref, but that exposes its members
 /// publicly so we can efficiently wrap the applier functions below.
-template <typename Fn> class applier_function_ref;
+template <typename Fn>
+class applier_function_ref;
 
 template <typename Ret, typename... Params>
 class applier_function_ref<Ret(Params...)> {
@@ -126,8 +127,7 @@ public:
       DictMap Dict;
       DictMap &DictRef = Dict;
       variant_dictionary_apply(
-          Obj,
-          [&](sourcekitd_uid_t key, sourcekitd_variant_t value) {
+          Obj, [&](sourcekitd_uid_t key, sourcekitd_variant_t value) {
             DictRef.push_back({UIdentFromSKDUID(key), value});
             return true;
           });
@@ -148,7 +148,8 @@ public:
       return static_cast<ImplClass*>(this)->visitBool(
                                        sourcekitd_variant_bool_get_value(Obj));
     case SOURCEKITD_VARIANT_TYPE_DOUBLE:
-      return static_cast<ImplClass*>(this)->visitDouble(sourcekitd_variant_double_get_value(Obj));
+      return static_cast<ImplClass *>(this)->visitDouble(
+          sourcekitd_variant_double_get_value(Obj));
     case SOURCEKITD_VARIANT_TYPE_STRING: {
       size_t Len = sourcekitd_variant_string_get_length(Obj);
       const char *Ptr = sourcekitd_variant_string_get_ptr(Obj);
@@ -457,16 +458,15 @@ sourcekitd_variant_dictionary_get_bool(sourcekitd_variant_t dict,
              sourcekitd_variant_dictionary_get_value(dict, key));
 }
 
-double
-sourcekitd_variant_dictionary_get_double(sourcekitd_variant_t dict,
-                                         sourcekitd_uid_t key) {
+double sourcekitd_variant_dictionary_get_double(sourcekitd_variant_t dict,
+                                                sourcekitd_uid_t key) {
   if (auto fn = VAR_FN(dict, dictionary_get_double))
     return fn(dict, key);
 
   // Default implementation:
   // Get the value via sourcekitd_variant_dictionary_get_value.
   return sourcekitd_variant_double_get_value(
-             sourcekitd_variant_dictionary_get_value(dict, key));
+      sourcekitd_variant_dictionary_get_value(dict, key));
 }
 
 sourcekitd_uid_t
@@ -559,15 +559,15 @@ sourcekitd_variant_array_get_bool(sourcekitd_variant_t array, size_t index) {
              sourcekitd_variant_array_get_value(array, index));
 }
 
-double
-sourcekitd_variant_array_get_double(sourcekitd_variant_t array, size_t index) {
+double sourcekitd_variant_array_get_double(sourcekitd_variant_t array,
+                                           size_t index) {
   if (auto fn = VAR_FN(array, array_get_double))
     return fn(array, index);
 
   // Default implementation:
   // Get the value via sourcekitd_variant_array_get_value.
   return sourcekitd_variant_double_get_value(
-             sourcekitd_variant_array_get_value(array, index));
+      sourcekitd_variant_array_get_value(array, index));
 }
 
 sourcekitd_uid_t
@@ -640,8 +640,7 @@ sourcekitd_variant_bool_get_value(sourcekitd_variant_t obj) {
   return obj.data[1];
 }
 
-double
-sourcekitd_variant_double_get_value(sourcekitd_variant_t obj) {
+double sourcekitd_variant_double_get_value(sourcekitd_variant_t obj) {
   if (auto fn = VAR_FN(obj, double_get_value))
     return fn(obj);
 

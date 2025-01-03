@@ -124,11 +124,12 @@ public:
     bool NotRecommended = Flags & 0x2;
     bool IsSystem = Flags & 0x1;
 
-#define APPLY(K, Ty, Field)                              \
-  do {                                                   \
-    sourcekitd_uid_t key = SKDUIDFromUIdent(K);  \
-    sourcekitd_variant_t var = make##Ty##Variant(Field); \
-    if (!applier(key, var, context)) return false;                \
+#define APPLY(K, Ty, Field)                                                    \
+  do {                                                                         \
+    sourcekitd_uid_t key = SKDUIDFromUIdent(K);                                \
+    sourcekitd_variant_t var = make##Ty##Variant(Field);                       \
+    if (!applier(key, var, context))                                           \
+      return false;                                                            \
   } while (0)
 
     APPLY(KeyKind, UID, Kind);
