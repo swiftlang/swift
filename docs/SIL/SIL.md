@@ -526,6 +526,82 @@ producers. For example:
 Trivial values are never consumed and therefore don't have any restrictions on
 where they are used on any control flow paths.
 
+### Borrow Scopes
+
+A borrow scope is a liverange of a guaranteed value which keeps its
+[enclosing value](#Borrow-Introducers-and-Enclosing-Values)(s) alive.
+It prevents optimizations from destroying an enclosing value before the borrow
+scope has ended.
+The most common borrow scope is a `begin_borrow`-`end_borrow` pair. But there
+are other instructions which introduce borrow scopes:
+
+#### `begin_borrow`
+
+A [`begin_borrow`](Instructions.md#begin_borrow) defines a borrow scope for its
+operand. The borrow scope ends at an `end_borrow`.
+
+```
+  %2 = begin_borrow %1          -+ borrow scope for %1
+  // ...                         |
+  end_borrow %2                 -+ %1 must be alive until here
+```
+
+Such a borrow scope can also "go through" a phi-argument. In this case the
+overall borrow scope is the combination of multiple borrow lifetimes which are
+"connected" by reborrow phi-arguments (see [Phi arguments](#phi-arguments)).
+
+#### `load_borrow`
+
+A [`load_borrow`](Instructions.md#load_borrow) is similar to `begin_borrow`,
+except that its enclosing value is not an SSA value but a memory location.
+During the scope of a `load_borrow`-`end_borrow` the memory location must not be mutated.
+
+```
+  %2 = load_borrow %addr    -+ borrow scope for memory value at %addr
+  // ...                     |
+  end_borrow %2             -+ memory at %addr must not be mutated until here
+```
+
+#### `store_borrow`
+
+A [`store_borrow`](Instructions.md#store_borrow) is similar to `begin_borrow`,
+except that beside defining a borrow scope it also stores the borrowed value
+to a stack location. During the borrow scope (which ends at an `end_borrow`), the
+borrowed value lives at the stack location.
+
+```
+  %s = alloc_stack $T
+  %2 = store_borrow %1 to %s   -+ borrow scope for %1
+  // ...                        |
+  end_borrow %2                -+ %1 must be alive until here
+  dealloc_stack %s
+```
+
+#### `partial_apply`
+
+A [`partial_apply [on_stack]`](Instructions.md#partial_apply) defines borrow
+scopes for its non-trivial arguments. The scope begins at the `partial_apply`
+and ends at the end of the forward-extended lifetime of the `partial_apply`'s
+result - the non-escaping closure.
+
+```
+  %3 = partial_apply [on_stack] %f(%1, %2)    -+ borrow scope for %1 and %2
+  %4 = convert_function %3 to $SomeFuncType    |
+  destroy_value %4                            -+ %1 and %2 must be alive until here
+```
+ 
+#### `mark_dependence`
+
+A [`mark_dependence [nonescaping]`](Instructions.md#mark_dependence) defines a
+borrow scope for its base operand. The scope begins at the `mark_dependence`
+and ends at the forward-extended lifetime of the `mark_dependence`'s result.
+
+```
+  %3 = mark_dependence %2 on %1   -+ borrow scope for %1
+  %4 = upcast %3 to $C             |
+  destroy_value %4                -+ %1 must be alive until here
+```
+
 ### Borrow Introducers and Enclosing Values
 
 Every guaranteed value has a set of borrow-introducers (usually one), each of
