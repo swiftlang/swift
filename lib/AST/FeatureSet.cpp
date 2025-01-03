@@ -308,6 +308,14 @@ static bool usesFeatureAddressableParameters(Decl *d) {
   return false;
 }
 
+static bool usesFeatureAddressableTypes(Decl *d) {
+  if (d->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
+    return true;
+  }
+  
+  return false;
+}
+
 UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)

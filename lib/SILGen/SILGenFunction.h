@@ -465,11 +465,17 @@ public:
     /// It may be invalid if no box was made for the value (e.g., because it was
     /// an inout value, or constant emitted to an alloc_stack).
     SILValue box;
+    
+    /// True if the `value` represents the memory location of a value that is
+    /// stable for the lifetimes of any dependencies on that value.
+    bool addressable;
 
-    static VarLoc get(SILValue value, SILValue box = SILValue()) {
+    static VarLoc get(SILValue value, SILValue box = SILValue(),
+                      bool addressable = false) {
       VarLoc Result;
       Result.value = value;
       Result.box = box;
+      Result.addressable = addressable;
       return Result;
     }
   };
@@ -1418,6 +1424,16 @@ public:
   ManagedValue manageBufferForExprResult(SILValue buffer,
                                          const TypeLowering &bufferTL,
                                          SGFContext C);
+                                         
+  /// Tries to emit an argument referring to an addressable parameter as the
+  /// stable address of the parameter.
+  ///
+  /// Returns a null ManagedValue if the argument is not a parameter reference,
+  /// the referenced parameter is not addressable, or the requested
+  /// \c ownership is not compatible with the parameter's ownership. \c arg
+  /// is consumed only if the operation succeeds.
+  ManagedValue tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
+                                                    ValueOwnership ownership);
   
   //===--------------------------------------------------------------------===//
   // Type conversions for expr emission and thunks
