@@ -346,7 +346,7 @@ struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
     var args = argOverrides
     let argExpr = ExprSyntax("\(unwrappedName).baseAddress")
     assert(args[index] == nil)
-    args[index] = try castPointerToTargetType(unwrapIfNonnullable(argExpr))
+    args[index] = try castPointerToOpaquePointer(unwrapIfNonnullable(argExpr))
     let call = try base.buildFunctionCall(args, variant)
     let ptrRef = unwrapIfNullable(ExprSyntax(DeclReferenceExprSyntax(baseName: name)))
 
@@ -378,7 +378,7 @@ struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
     return type
   }
 
-  func castPointerToTargetType(_ baseAddress: ExprSyntax) throws -> ExprSyntax {
+  func castPointerToOpaquePointer(_ baseAddress: ExprSyntax) throws -> ExprSyntax {
     let i = try getParameterIndexForParamName(signature.parameterClause.parameters, name)
     let type = peelOptionalType(getParam(signature, i).type)
     if type.canRepresentBasicType(type: OpaquePointer.self) {
@@ -425,7 +425,7 @@ struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
       return unwrappedCall
     }
 
-    args[index] = try castPointerToTargetType(getPointerArg())
+    args[index] = try castPointerToOpaquePointer(getPointerArg())
     return try base.buildFunctionCall(args, variant)
   }
 }
