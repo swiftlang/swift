@@ -16,6 +16,7 @@
 #include "sourcekitd/RequestResponsePrinterBase.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
+#include "swift/Basic/LoadDynamicLibrary.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -26,8 +27,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/YAMLParser.h"
 #include <mutex>
-
-#include <dlfcn.h>
 
 using namespace SourceKit;
 using namespace sourcekitd;
@@ -270,15 +269,15 @@ bool sourcekitd::shutdownClient() {
 }
 
 static void loadPlugin(StringRef plugin, PluginInitParams &pluginParams) {
-
-  auto *handle = dlopen(plugin.str().c_str(), RTLD_FIRST | RTLD_LAZY);
+  std::string err;
+  auto *handle = swift::loadLibrary(plugin.str().c_str(), &err);
   if (!handle) {
     LOG_WARN("plugin-loading",
-             "failed to load plugin '" << plugin << "': " << dlerror());
+             "failed to load plugin '" << plugin << "': " << err);
     return;
   }
 
-  auto *plugin_init = (sourcekitd_plugin_initialize_t)dlsym(
+  auto *plugin_init = (sourcekitd_plugin_initialize_t)swift::getAddressOfSymbol(
       handle, "sourcekitd_plugin_initialize");
   if (!plugin_init) {
     LOG_WARN("plugin-loading",
