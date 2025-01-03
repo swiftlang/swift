@@ -3410,6 +3410,34 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
   return lvExpr;
 }
 
+ManagedValue
+SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
+                                                     ValueOwnership ownership) {
+  // If the function takes an addressable parameter, and its argument is
+  // a reference to an addressable declaration with compatible ownership,
+  // forward the address along in-place.
+  if (arg.isExpr()) {
+    auto origExpr = std::move(arg).asKnownExpr();
+    auto expr = origExpr;
+    
+    if (auto le = dyn_cast<LoadExpr>(expr)) {
+      expr = le->getSubExpr();
+    }
+    if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
+      if (auto param = dyn_cast<ParamDecl>(dre->getDecl())) {
+        if (VarLocs.count(param)
+            && VarLocs[param].addressable
+            && param->getValueOwnership() == ownership) {
+          auto addr = VarLocs[param].value;
+          return ManagedValue::forBorrowedAddressRValue(addr);
+        }
+      }
+    }
+    arg = ArgumentSource(origExpr);
+  }
+  return ManagedValue();
+}
+
 namespace {
 
 class ArgEmitter {
@@ -3515,29 +3543,11 @@ private:
       // If the function takes an addressable parameter, and its argument is
       // a reference to an addressable declaration with compatible ownership,
       // forward the address along in-place.
-      if (arg.isExpr()) {
-        arg.dump();
-        auto origExpr = std::move(arg).asKnownExpr();
-        auto expr = origExpr;
-        
-        if (auto le = dyn_cast<LoadExpr>(expr)) {
-          expr = le->getSubExpr();
-        }
-        if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
-          if (auto param = dyn_cast<ParamDecl>(dre->getDecl())) {
-            if (SGF.VarLocs.count(param)
-              && SGF.VarLocs[param].addressable
-              && param->getValueOwnership() == origParam->getValueOwnership()) {
-              auto addr = SGF.VarLocs[param].value;
-              claimNextParameters(1);
-              Args.push_back(ManagedValue::forBorrowedAddressRValue(addr));
-              return;
-            }
-          }
-        }
-        llvm::errs() << "couldn't lower as addressable\n";
-        arg = ArgumentSource(origExpr);
-        arg.dump();
+      if (auto addr = SGF.tryEmitAddressableParameterAsAddress(std::move(arg),
+                                             origParam->getValueOwnership())) {
+        claimNextParameters(1);
+        Args.push_back(addr);
+        return;
       }
     }
             
