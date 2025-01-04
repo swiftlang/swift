@@ -4888,10 +4888,6 @@ void PrintAST::visitCoerceExpr(CoerceExpr *expr) {
   printType(expr->getCastType());
 }
 
-void PrintAST::visitOneWayExpr(OneWayExpr *expr) {
-  llvm_unreachable("Not representable in source code");
-}
-
 void PrintAST::printClosure(AbstractClosureExpr *closure, CaptureListExpr *captureList) {
   
 }

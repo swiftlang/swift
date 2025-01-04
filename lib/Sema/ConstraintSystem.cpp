@@ -1853,39 +1853,6 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
     return typeVar;
   });
 
-  // Logic to determine the contextual type inside buildBlock result builders:
-  //
-  // When completing inside a result builder, the result builder
-  //   @ViewBuilder var body: some View {
-  //     Text("Foo")
-  //     #^COMPLETE^#
-  //   }
-  // gets rewritten to
-  //   @ViewBuilder var body: some View {
-  //     let $__builder2: Text
-  //     let $__builder0 = Text("Foo")
-  //     let $__builder1 = #^COMPLETE^#
-  //     $__builder2 = ViewBuilder.buildBlock($__builder0, $__builder1)
-  //     return $__builder2
-  //   }
-  // Inside the constraint system
-  //     let $__builder1 = #^COMPLETE^#
-  // gets type checked without context, so we can't know the contextual type for
-  // the code completion token. But we know that $__builder1 (and thus the type
-  // of #^COMPLETE^#) is used as the second argument to ViewBuilder.buildBlock,
-  // so we can extract the contextual type from that call. To do this, figure
-  // out the type variable that is used for $__builder1 in the buildBlock call.
-  // This type variable is connected to the type variable of $__builder1's
-  // definition by a one-way constraint.
-  if (auto TV = Ty->getAs<TypeVariableType>()) {
-    for (auto constraint : CS.getConstraintGraph()[TV].getConstraints()) {
-      if (constraint->getKind() == ConstraintKind::OneWayEqual &&
-          constraint->getSecondType()->isEqual(TV)) {
-        return simplifyTypeForCodeCompletion(constraint->getFirstType());
-      }
-    }
-  }
-
   // Remove any remaining type variables and placeholders
   Ty = simplifyType(Ty);
 
