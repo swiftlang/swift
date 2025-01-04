@@ -246,10 +246,14 @@ void OutliningMetadataCollector::bindPolymorphicParameters(
       auto key = pair.first;
       assert(key.Kind.isAnyTypeMetadata());
       setTypeMetadataName(IGF.IGM, arg, key.Type);
-      IGF.bindLocalTypeDataFromTypeMetadata(key.Type,
-                                            IsExact,
-                                            arg,
-                                            MetadataState::Complete);
+      if (key.Kind == LocalTypeDataKind::forRepresentationTypeMetadata()) {
+        IGF.setUnscopedLocalTypeData(key, MetadataResponse::forComplete(arg));
+      } else {
+        IGF.bindLocalTypeDataFromTypeMetadata(key.Type,
+                                              IsExact,
+                                              arg,
+                                              MetadataState::Complete);
+      }
     }
     return;
   }
