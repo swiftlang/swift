@@ -14,11 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Availability.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/TypeCheckRequests.h"

@@ -17,6 +17,7 @@
 
 #define DEBUG_TYPE "sil-generic-specializer"
 
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
@@ -27,8 +28,8 @@
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/SmallVector.h"
 

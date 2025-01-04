@@ -13,14 +13,14 @@
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AttrKind.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "clang/AST/Mangle.h"
 #include "swift/Basic/Assertions.h"
+#include "clang/AST/Mangle.h"
 
 using namespace swift;
 

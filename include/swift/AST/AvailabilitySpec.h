@@ -18,8 +18,9 @@
 #define SWIFT_AST_AVAILABILITY_SPEC_H
 
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {

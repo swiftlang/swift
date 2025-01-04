@@ -19,8 +19,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
+#include "DerivedConformances.h"
 #include "TypeChecker.h"
-#include "swift/Strings.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
@@ -30,7 +31,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
-#include "DerivedConformances.h"
+#include "swift/Strings.h"
 
 using namespace swift;
 

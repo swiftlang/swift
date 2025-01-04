@@ -19,7 +19,7 @@
 
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/IfConfigClause.h"

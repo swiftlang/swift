@@ -18,7 +18,6 @@
 
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"

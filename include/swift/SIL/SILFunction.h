@@ -18,7 +18,7 @@
 #define SWIFT_SIL_SILFUNCTION_H
 
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"

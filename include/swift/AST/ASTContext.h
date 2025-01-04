@@ -18,7 +18,7 @@
 #define SWIFT_AST_ASTCONTEXT_H
 
 #include "swift/AST/ASTAllocated.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"

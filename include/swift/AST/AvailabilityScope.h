@@ -19,8 +19,8 @@
 #ifndef SWIFT_AVAILABILITYSCOPE_H
 #define SWIFT_AVAILABILITYSCOPE_H
 
-#include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Stmt.h" // for PoundAvailableInfo
 #include "swift/Basic/Debug.h"

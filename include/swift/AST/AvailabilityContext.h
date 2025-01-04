@@ -18,8 +18,9 @@
 #ifndef SWIFT_AST_AVAILABILITY_CONTEXT_H
 #define SWIFT_AST_AVAILABILITY_CONTEXT_H
 
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include <optional>
 
