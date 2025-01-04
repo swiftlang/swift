@@ -551,9 +551,7 @@ void DiagnosticEngine::setWarningsAsErrorsRules(
       if (auto groupID = getDiagGroupIDByName(name);
           groupID && *groupID != DiagGroupID::no_group) {
         getDiagGroupInfoByID(*groupID).traverseDepthFirst([&](auto group) {
-          for (DiagID diagID : group.diagnostics) {
-            state.setWarningAsErrorForDiagID(diagID, isEnabled);
-          }
+          state.setWarningsAsErrorsForDiagGroupID(*groupID, isEnabled);
         });
       } else {
         unknownGroups.push_back(std::string(name));
@@ -1232,7 +1230,7 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
   //   4) If the user substituted a different behavior for this behavior, apply
   //      that change
   if (lvl == DiagnosticBehavior::Warning) {
-    if (getWarningAsErrorForDiagID(diag.getID()))
+    if (getWarningsAsErrorsForDiagGroupID(diag.getGroupID()))
       lvl = DiagnosticBehavior::Error;
     if (suppressWarnings)
       lvl = DiagnosticBehavior::Ignore;
