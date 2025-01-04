@@ -794,16 +794,13 @@ namespace {
           // value packs cannot be referenced without `each` immediately
           // preceding them.
           if (auto *expansionType = knownType->getAs<PackExpansionType>()) {
-            if (auto *parentExpansionExpr = getParentPackExpansionExpr(E);
-                parentExpansionExpr &&
-                !isExpr<PackElementExpr>(CS.getParentExpr(E))) {
+            if (!isExpr<PackElementExpr>(CS.getParentExpr(E))) {
               auto packType = expansionType->getPatternType();
               (void)CS.recordFix(
                   IgnoreMissingEachKeyword::create(CS, packType, locator));
-              auto eltType =
-                  openPackElement(packType, locator, parentExpansionExpr);
-              CS.setType(E, eltType);
-              return eltType;
+
+              return openPackElement(packType, locator,
+                                     getParentPackExpansionExpr(E));
             }
           }
         }

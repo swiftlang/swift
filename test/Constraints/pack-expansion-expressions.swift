@@ -263,12 +263,16 @@ func forwardFunctionPack<each T>(functions: repeat (each T) -> Bool) {
   takesFunctionPack(functions: repeat each functions)
 }
 
-func packOutsideExpansion<each T>(_ t: repeat each T) {
+func packOutsideExpansion<each T>(
+  t: repeat each T,
+  t2: repeat (each T)?,
+  t3: repeat () -> each T
+) {
   _ = t
-  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
+  // expected-error@-1{{value pack 'each T' must be referenced with 'each'}}
 
   forward(t)
-  // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
+  // expected-error@-1{{value pack 'each T' must be referenced with 'each'}}
 
   _ = each t
   // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
@@ -282,6 +286,25 @@ func packOutsideExpansion<each T>(_ t: repeat each T) {
 
   _ = each tuple
   // expected-error@-1{{pack reference 'each T' can only appear in pack expansion}}
+
+  // https://github.com/swiftlang/swift/issues/78393
+  let _ = (t2)
+  // expected-error@-1{{value pack '(each T)?' must be referenced with 'each'}}
+  let _ = t3
+  // expected-error@-1{{value pack '() -> each T' must be referenced with 'each'}}
+}
+
+do {
+  // FIXME: https://github.com/swiftlang/swift/issues/78426
+  func f<each T>(_: (repeat each T) -> (repeat each T)) {}
+  // expected-error@+2 {{cannot infer type of closure parameter 'x' without a type annotation}}
+  // expected-error@+1 {{cannot convert value of type '(Int, Int)' to closure result type '(_: _)'}}
+  f { x in
+    // Once this issue is fixed, verify that 'x' below is diagnosed correctly.
+    // If it is not, please reopen https://github.com/swiftlang/swift/issues/78393.
+    let _ = x
+    return (1, 2)
+  }
 }
 
 func identity<T>(_ t: T) -> T { t }
@@ -722,7 +745,7 @@ do {
 
     init(base: repeat each Base) {
       self.base = base
-      // expected-error@-1 {{pack reference 'each Base' can only appear in pack expansion}}
+      // expected-error@-1 {{value pack 'each Base' must be referenced with 'each'}}
     }
   }
 }
