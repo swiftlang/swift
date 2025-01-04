@@ -1926,6 +1926,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -UseBuiltCompilers ASM,C,CXX,Swift `
         -SwiftSDK:$SDKRoot `
         -Defines (@{
+          CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
           ENABLE_TESTING = "NO";
           FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
           CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
