@@ -166,14 +166,14 @@ if ($null -eq $BuildArchName) { $BuildArchName = $env:PROCESSOR_ARCHITECTURE }
 if ($PinnedBuild -eq "") {
   switch ($BuildArchName) {
     "AMD64" {
-      $PinnedBuild = "https://download.swift.org/swift-5.10.1-release/windows10/swift-5.10.1-RELEASE/swift-5.10.1-RELEASE-windows10.exe"
-      $PinnedSHA256 = "3027762138ACFA1BBE3050FF6613BBE754332E84C9EFA5C23984646009297286"
-      $PinnedVersion = "5.10.1"
+      $PinnedBuild = "https://download.swift.org/swift-6.0.3-release/windows10/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-windows10.exe"
+      $PinnedSHA256 = "AB205D83A38047882DB80E6A88C7D33B651F3BAC96D4515D7CBA5335F37999D3"
+      $PinnedVersion = "6.0.3"
     }
     "ARM64" {
-      $PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-02-a-windows10-arm64.exe"
-      $PinnedSHA256 = "037BDBF9D1A1A99D7156584948870A8A958FD27CC4FF5711691CC0A76F2E88F5"
-      $PinnedVersion = "0.0.0"
+      $PinnedBuild = "https://download.swift.org/swift-6.0.3-release/windows10-arm64/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-windows10-arm64.exe"
+      $PinnedSHA256 = "81474651E59A9955C9E6A389EF53ABD61631FFC62C63A2A02977271019E7C722"
+      $PinnedVersion = "6.0.3"
     }
     default { throw "Unsupported processor architecture" }
   }
@@ -454,6 +454,7 @@ enum HostComponent {
   LMDB
   SymbolKit
   DocC
+  SwiftInspect
 }
 
 function Get-HostProjectBinaryCache([HostComponent]$Project) {
@@ -1182,7 +1183,7 @@ function Build-CMakeProject {
     }
 
     if ($UseBuiltCompilers.Contains("Swift")) {
-      $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$(Get-CMarkBinaryCache $Arch)\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
+      $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$(Get-CMarkBinaryCache $BuildArch)\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;$(Get-PinnedToolchainRuntime);${env:Path}"
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
       $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
@@ -1943,7 +1944,7 @@ function Build-FoundationMacros() {
 
   $SwiftSDK = $null
   if ($Build) {
-    $SwiftSDK = $BuildArch.SDKInstallRoot
+    $SwiftSDK = $(Get-PinnedToolchainSDK)
   }
 
   $InstallDir = $null
@@ -2579,7 +2580,7 @@ function Build-TestingMacros() {
 
   $SwiftSDK = $null
   if ($Build) {
-    $SwiftSDK = $BuildArch.SDKInstallRoot
+    $SwiftSDK = $(Get-PinnedToolchainSDK)
   }
 
   $Targets = if ($Build) {
@@ -2636,18 +2637,19 @@ function Install-HostToolchain() {
 }
 
 function Build-Inspect() {
-  $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath swift-inspect
-  $SDKInstallRoot = (Get-HostSwiftSDK) `
+  $SDKRoot = Get-HostSwiftSDK
 
-  Isolate-EnvVars {
-    $env:SWIFTCI_USE_LOCAL_DEPS=1
-    Build-SPMProject `
-      -Action Build `
-      -Src $SourceCache\swift\tools\swift-inspect `
-      -Bin $OutDir `
-      -Arch $HostArch `
-      -Xcc "-I$SDKInstallRoot\usr\include\swift\SwiftRemoteMirror" -Xlinker "$SDKInstallRoot\usr\lib\swift\windows\$($HostArch.LLVMName)\swiftRemoteMirror.lib"
-  }
+  Build-CMakeProject `
+    -Src $SourceCache\swift\tools\swift-inspect `
+    -Bin (Get-HostProjectBinaryCache SwiftInspect) `
+    -InstallTo "$($HostArch.ToolchainInstallRoot)\usr" `
+    -Arch $HostArch `
+    -UseBuiltCompilers C,CXX,Swift `
+    -SwiftSDK $SDKRoot `
+    -Defines @{
+      CMAKE_Swift_FLAGS = @("-Xcc", "-I$SDKRoot\usr\include\swift\SwiftRemoteMirror");
+      ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
+    }
 }
 
 function Build-DocC() {
@@ -2686,7 +2688,6 @@ function Test-PackageManager() {
 function Build-Installer($Arch) {
   # TODO(hjyamauchi) Re-enable the swift-inspect and swift-docc builds
   # when cross-compiling https://github.com/apple/swift/issues/71655
-  $INCLUDE_SWIFT_INSPECT = if ($IsCrossCompiling) { "false" } else { "true" }
   $INCLUDE_SWIFT_DOCC = if ($IsCrossCompiling) { "false" } else { "true" }
   $ENABLE_MIMALLOC = if ($Allocator -eq "mimalloc" -and $Arch -eq $ArchX64) { "true" } else { "false" }
 
@@ -2694,10 +2695,8 @@ function Build-Installer($Arch) {
     BundleFlavor = "offline";
     DEVTOOLS_ROOT = "$($Arch.ToolchainInstallRoot)\";
     TOOLCHAIN_ROOT = "$($Arch.ToolchainInstallRoot)\";
-    INCLUDE_SWIFT_INSPECT = $INCLUDE_SWIFT_INSPECT;
-    SWIFT_INSPECT_BUILD = "$($Arch.BinaryCache)\swift-inspect\release";
-    INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     ENABLE_MIMALLOC = $ENABLE_MIMALLOC;
+    INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$($Arch.BinaryCache)\swift-docc\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
   }
@@ -2712,7 +2711,7 @@ function Build-Installer($Arch) {
   }
 
   foreach ($SDK in $WindowsSDKArchs) {
-    $Properties["INCLUDE_$($SDK.VSName.ToUpperInvariant())_SDK"] = "true"
+    $Properties["INCLUDE_WINDOWS_$($SDK.VSName.ToUpperInvariant())_SDK"] = "true"
     $Properties["PLATFORM_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.PlatformInstallRoot)\"
     $Properties["SDK_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.SDKInstallRoot)\"
   }
@@ -2723,11 +2722,9 @@ function Build-Installer($Arch) {
 function Stage-BuildArtifacts($Arch) {
   Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\*.cab" "$Stage\"
   Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\*.msi" "$Stage\"
-  Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\rtl.cab" "$Stage\"
-  Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\rtl.msi" "$Stage\"
   foreach ($SDK in $WindowsSDKArchs) {
-    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.$($SDK.VSName).cab" "$Stage\"
-    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.$($SDK.VSName).msi" "$Stage\"
+    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.windows.$($SDK.VSName).cab" "$Stage\"
+    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.windows.$($SDK.VSName).msi" "$Stage\"
     Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\rtl.$($SDK.VSName).msm" "$Stage\"
   }
   Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\installer.exe" "$Stage\"
@@ -2845,6 +2842,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Format $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
+  Invoke-BuildStep Build-Inspect $HostArch
 }
 
 Install-HostToolchain
@@ -2854,7 +2852,6 @@ if (-not $SkipBuild -and $Allocator -eq "mimalloc") {
 }
 
 if (-not $SkipBuild -and -not $IsCrossCompiling) {
-  Invoke-BuildStep Build-Inspect $HostArch
   Invoke-BuildStep Build-DocC $HostArch
 }
 

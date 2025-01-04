@@ -12,7 +12,9 @@
 
 #if defined(_WIN32)
 
+#if SWIFT_PACKAGE
 #pragma comment(lib, "swiftCore.lib")
+#endif
 
 #include "../SwiftInspectClientInterface/SwiftInspectClientInterface.h"
 #include <assert.h>

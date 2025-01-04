@@ -8,12 +8,20 @@ swift-inspect uses the reflection APIs to introspect the live process.  It relie
 
 swift-inspect can be built using [swift-package-manager](https://github.com/swiftlang/swift-package-manager).
 
-##### Windows
+#### Windows
 
 In order to build on Windows, some additional parameters must be passed to the build tool to locate the necessary libraries.
 
 ~~~
 swift build -Xcc -I%SDKROOT%\usr\include\swift\SwiftRemoteMirror -Xlinker %SDKROOT%\usr\lib\swift\windows\x86_64\swiftRemoteMirror.lib
+~~~
+
+#### CMake
+
+In order to build on Windows with CMake, some additional parameters must be passed to the build tool to locate the necessary Swift modules.
+
+~~~
+cmake -B out -G Ninja -S . -D ArgumentParser_DIR=... -D CMAKE_Swift_FLAGS="-Xcc -I%SDKROOT%\usr\include\swift\SwiftRemoteMirror"
 ~~~
 
 ### Using
