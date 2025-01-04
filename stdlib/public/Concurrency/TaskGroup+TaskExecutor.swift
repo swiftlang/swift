@@ -29,7 +29,7 @@ extension TaskGroup {
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTask(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
@@ -79,7 +79,7 @@ extension TaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
@@ -142,7 +142,7 @@ extension ThrowingTaskGroup {
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTask(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
@@ -189,7 +189,7 @@ extension ThrowingTaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
@@ -252,7 +252,7 @@ extension DiscardingTaskGroup {
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTask(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
@@ -304,7 +304,7 @@ extension DiscardingTaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
@@ -367,7 +367,7 @@ extension ThrowingDiscardingTaskGroup {
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTask(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
@@ -419,7 +419,7 @@ extension ThrowingDiscardingTaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,

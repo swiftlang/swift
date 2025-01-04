@@ -134,7 +134,7 @@ public protocol UnicodeCodec: Unicode.Encoding {
   /// Is an equivalent of `strlen` for C-strings.
   ///
   /// - Complexity: O(*n*)
-  static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int
+  @unsafe static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int
 }
 
 /// A codec for translating between Unicode scalar values and UTF-8 code
@@ -299,14 +299,14 @@ extension Unicode.UTF8: UnicodeCodec {
     return byte & 0b11_00__0000 == 0b10_00__0000
   }
 
-  @inlinable
+  @unsafe @inlinable
   public static func _nullCodeUnitOffset(
     in input: UnsafePointer<CodeUnit>
   ) -> Int {
     return Int(_swift_stdlib_strlen_unsigned(input))
   }
   // Support parsing C strings as-if they are UTF8 strings.
-  @inlinable
+  @unsafe @inlinable
   public static func _nullCodeUnitOffset(
     in input: UnsafePointer<CChar>
   ) -> Int {
@@ -644,7 +644,7 @@ extension Unicode.Scalar {
 }
 
 extension UnicodeCodec {
-  @inlinable
+  @unsafe @inlinable
   public static func _nullCodeUnitOffset(
     in input: UnsafePointer<CodeUnit>
   ) -> Int {

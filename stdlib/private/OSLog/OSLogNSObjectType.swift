@@ -98,7 +98,7 @@ extension OSLogArguments {
   /// Append an (autoclosured) interpolated expression of type NSObject, passed to
   /// `OSLogMessage.appendInterpolation`, to the array of closures tracked
   /// by this instance.
-  @_semantics("constant_evaluable")
+  @safe(unchecked) @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
   internal mutating func append(_ value: @escaping () -> NSObject) {
@@ -110,7 +110,7 @@ extension OSLogArguments {
 
 /// Serialize an NSObject pointer at the buffer location pointed by
 /// `bufferPosition`.
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 @inline(__always)
 internal func serialize(
   _ object: NSObject,

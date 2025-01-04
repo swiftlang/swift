@@ -20,7 +20,7 @@ import SwiftShims
 @discardableResult
 func putchar(_: CInt) -> CInt
 
-public func print(_ string: StaticString, terminator: StaticString = "\n") {
+@safe(unchecked) public func print(_ string: StaticString, terminator: StaticString = "\n") {
   var p = string.utf8Start
   while p.pointee != 0 {
     putchar(CInt(p.pointee))
@@ -33,7 +33,7 @@ public func print(_ string: StaticString, terminator: StaticString = "\n") {
   }
 }
 
-@_disfavoredOverload
+@safe(unchecked) @_disfavoredOverload
 public func print(_ string: String, terminator: StaticString = "\n") {
   var string = string
   string.withUTF8 { buf in
@@ -48,7 +48,7 @@ public func print(_ string: String, terminator: StaticString = "\n") {
   }
 }
 
-@_disfavoredOverload
+@safe(unchecked) @_disfavoredOverload
 public func print(_ object: some CustomStringConvertible, terminator: StaticString = "\n") {
   var string = object.description
   string.withUTF8 { buf in
@@ -63,18 +63,18 @@ public func print(_ object: some CustomStringConvertible, terminator: StaticStri
   }
 }
 
-func printCharacters(_ buf: UnsafeRawBufferPointer) {
+@unsafe func printCharacters(_ buf: UnsafeRawBufferPointer) {
   for c in buf {
     putchar(CInt(c))
   }
 }
 
-func printCharacters(_ buf: UnsafeBufferPointer<UInt8>) {
+@unsafe func printCharacters(_ buf: UnsafeBufferPointer<UInt8>) {
   printCharacters(UnsafeRawBufferPointer(buf))
 }
 
 extension BinaryInteger {
-  internal func _toStringImpl(
+  @unsafe internal func _toStringImpl(
     _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
     _ bufferLength: UInt,
     _ radix: Int,
@@ -117,7 +117,7 @@ extension BinaryInteger {
     return count
   }
 
-  func writeToStdout() {
+  @safe(unchecked) func writeToStdout() {
     // Avoid withUnsafeTemporaryAllocation which is not typed-throws ready yet
     let byteCount = 64
     let stackBuffer = Builtin.stackAlloc(byteCount._builtinWordValue,

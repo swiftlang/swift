@@ -122,9 +122,11 @@ public struct Unsafe${Mutable}RawBufferPointer {
 }
 
 @available(*, unavailable)
+@unsafe
 extension Unsafe${Mutable}RawBufferPointer: Sendable {}
 
 %if not mutable:
+@unsafe
 extension UnsafeRawBufferPointer {
   /// An iterator over the bytes viewed by a raw buffer pointer.
   @frozen
@@ -141,8 +143,10 @@ extension UnsafeRawBufferPointer {
 }
 
 @available(*, unavailable)
+@unsafe
 extension UnsafeRawBufferPointer.Iterator: Sendable { }
 
+@unsafe
 extension UnsafeRawBufferPointer.Iterator: IteratorProtocol, Sequence {
   /// Advances to the next byte and returns it, or `nil` if no next byte
   /// exists.
@@ -175,11 +179,13 @@ extension UnsafeRawBufferPointer.Iterator: IteratorProtocol, Sequence {
   }
 }
 %else:
+@unsafe
 extension UnsafeMutableRawBufferPointer {
   public typealias Iterator = UnsafeRawBufferPointer.Iterator
 }
 %end
 
+@unsafe
 extension Unsafe${Mutable}RawBufferPointer: Sequence {
   public typealias SubSequence = Slice<${Self}>
 
@@ -209,6 +215,7 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
   }
 }
 
+@unsafe
 extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   // TODO: Specialize `index` and `formIndex` and
   // `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
@@ -325,8 +332,10 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   }
 }
 
+@unsafe
 extension Unsafe${Mutable}RawBufferPointer: RandomAccessCollection { }
 
+@unsafe
 extension Unsafe${Mutable}RawBufferPointer {
 %  if mutable:
   /// Allocates uninitialized memory with the specified size and alignment.
@@ -1161,6 +1170,7 @@ extension Unsafe${Mutable}RawBufferPointer {
 }
 
 @_unavailableInEmbedded
+@unsafe
 extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
@@ -1169,6 +1179,7 @@ extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {
   }
 }
 
+@unsafe
 extension ${Self} {
   @available(*, unavailable, 
     message: "use 'Unsafe${Mutable}RawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
@@ -1212,6 +1223,7 @@ extension ${Self} {
 ///     of the closure's execution.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
+@unsafe
 public func withUnsafeMutableBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
   of value: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
@@ -1225,6 +1237,7 @@ public func withUnsafeMutableBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss22withUnsafeMutableBytes2of_q_xz_q_SwKXEtKr0_lF")
 @usableFromInline
+@unsafe
 func __abi_se0413_withUnsafeMutableBytes<T, Result>(
   of value: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws -> Result
@@ -1241,6 +1254,7 @@ func __abi_se0413_withUnsafeMutableBytes<T, Result>(
 /// This function is similar to `withUnsafeMutableBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
+@unsafe
 public func _withUnprotectedUnsafeMutableBytes<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
@@ -1279,6 +1293,7 @@ public func _withUnprotectedUnsafeMutableBytes<
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
+@unsafe
 public func withUnsafeBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
   of value: inout T,
   _ body: (UnsafeRawBufferPointer) throws(E) -> Result
@@ -1291,6 +1306,7 @@ public func withUnsafeBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
 /// expressed as "throws", which is ABI-compatible with "rethrows".
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss15withUnsafeBytes2of_q_xz_q_SWKXEtKr0_lF")
+@unsafe
 @usableFromInline
 func __abi_se0413_withUnsafeBytes<T, Result>(
   of value: inout T,
@@ -1307,6 +1323,7 @@ func __abi_se0413_withUnsafeBytes<T, Result>(
 /// This function is similar to `withUnsafeBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
+@unsafe
 public func _withUnprotectedUnsafeBytes<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
@@ -1341,6 +1358,7 @@ public func _withUnprotectedUnsafeBytes<
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
+@unsafe
 public func withUnsafeBytes<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
@@ -1355,6 +1373,7 @@ public func withUnsafeBytes<
 /// expressed as "throws", which is ABI-compatible with "rethrows".
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss15withUnsafeBytes2of_q_x_q_SWKXEtKr0_lF")
+@unsafe
 @usableFromInline
 func __abi_se0413_withUnsafeBytes<T, Result>(
   of value: T,
@@ -1371,6 +1390,7 @@ func __abi_se0413_withUnsafeBytes<T, Result>(
 /// This function is similar to `withUnsafeBytes`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
+@unsafe
 public func _withUnprotectedUnsafeBytes<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(

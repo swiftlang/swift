@@ -127,12 +127,12 @@ public func _specialize<T, U>(_ x: T, for: U.Type) -> U? {
 }
 
 /// `unsafeBitCast` something to `AnyObject`.
-@usableFromInline @_transparent
+@safe(unchecked) @usableFromInline @_transparent
 internal func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
   return unsafeBitCast(x, to: AnyObject.self)
 }
 
-@usableFromInline @_transparent
+@safe(unchecked) @usableFromInline @_transparent
 internal func == (
   lhs: Builtin.NativeObject, rhs: Builtin.NativeObject
 ) -> Bool {
@@ -146,7 +146,7 @@ internal func != (
   return !(lhs == rhs)
 }
 
-@usableFromInline @_transparent
+@safe(unchecked) @usableFromInline @_transparent
 internal func == (
   lhs: Builtin.RawPointer, rhs: Builtin.RawPointer
 ) -> Bool {
@@ -280,7 +280,7 @@ public func _unsafeUncheckedDowncast<T: AnyObject>(_ x: AnyObject, to type: T.Ty
   return Builtin.castReference(x)
 }
 
-@inlinable
+@unsafe @inlinable
 @inline(__always)
 public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
   -> UnsafeMutableRawPointer {
@@ -940,7 +940,7 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 ///
 /// - Parameter value: The value for which to find the dynamic type.
 /// - Returns: The dynamic type, which is a metatype instance.
-@_transparent
+@safe(unchecked) @_transparent
 @_semantics("typechecker.type(of:)")
 public func type<T, Metatype>(of value: T) -> Metatype {
   // This implementation is never used, since calls to `Swift.type(of:)` are
@@ -1032,7 +1032,7 @@ public func type<T, Metatype>(of value: T) -> Metatype {
 ///   - body: A closure that is executed immediately with an escapable copy of
 ///     `closure` as its argument.
 /// - Returns: The return value, if any, of the `body` closure.
-@_alwaysEmitIntoClient
+@safe(unchecked) @_alwaysEmitIntoClient
 @_transparent
 @_semantics("typechecker.withoutActuallyEscaping(_:do:)")
 public func withoutActuallyEscaping<ClosureType, ResultType, Failure>(
@@ -1048,7 +1048,7 @@ public func withoutActuallyEscaping<ClosureType, ResultType, Failure>(
   Builtin.unreachable()
 }
 
-@_silgen_name("$ss23withoutActuallyEscaping_2doq_x_q_xKXEtKr0_lF")
+@safe(unchecked) @_silgen_name("$ss23withoutActuallyEscaping_2doq_x_q_xKXEtKr0_lF")
 @usableFromInline
 func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
   _ closure: ClosureType,
@@ -1063,7 +1063,7 @@ func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
   Builtin.unreachable()
 }
 
-@_alwaysEmitIntoClient
+@safe(unchecked) @_alwaysEmitIntoClient
 @_transparent
 @_semantics("typechecker._openExistential(_:do:)")
 public func _openExistential<ExistentialType, ContainedType, ResultType, Failure>(
@@ -1079,7 +1079,7 @@ public func _openExistential<ExistentialType, ContainedType, ResultType, Failure
   Builtin.unreachable()
 }
 
-@usableFromInline
+@safe(unchecked) @usableFromInline
 @_silgen_name("$ss16_openExistential_2doq0_x_q0_q_KXEtKr1_lF")
 func __abi_openExistential<ExistentialType, ContainedType, ResultType>(
   _ existential: ExistentialType,
@@ -1099,14 +1099,14 @@ func __abi_openExistential<ExistentialType, ContainedType, ResultType>(
 /// This function will trap when it is invoked on strings that are not
 /// constructed from literals or if the construction site of the string is not
 /// in the function containing the call to this SPI.
-@_transparent
+@unsafe @_transparent
 @_alwaysEmitIntoClient
 public // @SPI(OSLog)
 func _getGlobalStringTablePointer(_ constant: String) -> UnsafePointer<CChar> {
   return UnsafePointer<CChar>(Builtin.globalStringTablePointer(constant));
 }
 
-@_transparent
+@unsafe @_transparent
 @_alwaysEmitIntoClient
 public
 func _allocateVector<Element>(elementType: Element.Type, capacity: Int) -> UnsafeMutablePointer<Element> {

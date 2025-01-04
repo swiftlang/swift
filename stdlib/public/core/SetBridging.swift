@@ -16,7 +16,7 @@ import SwiftShims
 
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the
 /// autorelease pool.
-internal func _stdlib_NSSet_allObjects(_ object: AnyObject) -> _BridgingBuffer {
+@safe(unchecked) internal func _stdlib_NSSet_allObjects(_ object: AnyObject) -> _BridgingBuffer {
   let nss = unsafeBitCast(object, to: _NSSet.self)
   let count = nss.count
   let storage = _BridgingBuffer(count)
@@ -25,7 +25,7 @@ internal func _stdlib_NSSet_allObjects(_ object: AnyObject) -> _BridgingBuffer {
 }
 
 extension _NativeSet { // Bridging
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   internal __consuming func bridged() -> AnyObject {
     _connectOrphanedFoundationSubclassesIfNeeded()
     
@@ -110,7 +110,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     return self.bridgedElement(at: bucket)
   }
 
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
@@ -165,7 +165,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
   /// Returns the pointer to the stored property, which contains bridged
   /// Set elements.
-  @nonobjc
+  @unsafe @nonobjc
   private var _bridgedElementsPtr: UnsafeMutablePointer<AnyObject?> {
     return _getUnsafePointerToStoredProperties(self)
       .assumingMemoryBound(to: Optional<AnyObject>.self)
@@ -181,7 +181,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   }
 
   /// Attach a buffer for bridged Set elements.
-  @nonobjc
+  @safe(unchecked) @nonobjc
   private func _initializeBridgedElements(_ storage: __BridgingHashBuffer) {
     _stdlib_atomicInitializeARCRef(
       object: _bridgedElementsPtr,
@@ -208,11 +208,11 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   }
 
   @objc
-  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
+  @unsafe internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
     _internalInvariantFailure("don't call this designated initializer")
   }
 
-  @objc(copyWithZone:)
+  @unsafe @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSSet` type, which is immutable.
@@ -240,7 +240,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     return native.count
   }
 
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?,
@@ -312,7 +312,7 @@ extension __CocoaSet {
     return index.element
   }
 
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   internal func member(for element: AnyObject) -> AnyObject? {
     let nss = unsafeBitCast(object, to: _NSSet.self)
     return nss.member(element)
@@ -397,7 +397,7 @@ extension __CocoaSet: _SetBuffer {
     return nss.count
   }
 
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   internal func contains(_ element: AnyObject) -> Bool {
     let nss = unsafeBitCast(object, to: _NSSet.self)
     return nss.member(element) != nil
@@ -532,13 +532,13 @@ extension __CocoaSet: Sequence {
 
     internal let base: __CocoaSet
 
-    internal var _fastEnumerationStatePtr:
+    @unsafe internal var _fastEnumerationStatePtr:
       UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
       return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
         to: _SwiftNSFastEnumerationState.self)
     }
 
-    internal var _fastEnumerationStackBufPtr:
+    @unsafe internal var _fastEnumerationStackBufPtr:
       UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
       return UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
         .assumingMemoryBound(to: _CocoaFastEnumerationStackBuf.self)
@@ -569,7 +569,7 @@ extension __CocoaSet.Iterator: IteratorProtocol {
   @usableFromInline
   internal typealias Element = AnyObject
 
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   internal func next() -> Element? {
     if itemIndex < 0 {
       return nil

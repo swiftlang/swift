@@ -222,7 +222,7 @@ extension OSLogArguments {
   /// Append an (autoclosured) interpolated expression of integer type, passed to
   /// `OSLogMessage.appendInterpolation`, to the array of closures tracked
   /// by this instance.
-  @_semantics("constant_evaluable")
+  @safe(unchecked) @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
   internal mutating func append<T>(
@@ -248,7 +248,7 @@ internal func sizeForEncoding<T>(
 
 /// Serialize an integer at the buffer location that `position` points to and
 /// increment `position` by the byte size of `T`.
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 @inline(__always)
 internal func serialize<T>(
   _ value: T,

@@ -169,7 +169,7 @@ public struct OpaquePointer {
 @available(*, unavailable)
 extension OpaquePointer: Sendable {}
 
-extension OpaquePointer {
+@unsafe extension OpaquePointer {
   /// Creates a new `OpaquePointer` from the given address, specified as a bit
   /// pattern.
   ///
@@ -193,7 +193,7 @@ extension OpaquePointer {
   }
 }
 
-extension OpaquePointer {
+@unsafe extension OpaquePointer {
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
   @_transparent
   @_preInverseGenerics
@@ -212,7 +212,7 @@ extension OpaquePointer {
   }
 }
 
-extension OpaquePointer {
+@unsafe extension OpaquePointer {
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
   @_transparent
   @_preInverseGenerics
@@ -231,14 +231,14 @@ extension OpaquePointer {
   }
 }
 
-extension OpaquePointer: Equatable {
+@unsafe extension OpaquePointer: Equatable {
   @inlinable // unsafe-performance
   public static func == (lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
   }
 }
 
-extension OpaquePointer: Hashable {
+@unsafe extension OpaquePointer: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
@@ -251,7 +251,7 @@ extension OpaquePointer: Hashable {
 }
 
 @_unavailableInEmbedded
-extension OpaquePointer: CustomDebugStringConvertible {
+@unsafe extension OpaquePointer: CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
@@ -266,7 +266,7 @@ extension Int {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @inlinable // unsafe-performance
+  @unsafe @inlinable // unsafe-performance
   public init(bitPattern pointer: OpaquePointer?) {
     self.init(bitPattern: UnsafeRawPointer(pointer))
   }
@@ -280,7 +280,7 @@ extension UInt {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @inlinable // unsafe-performance
+  @unsafe @inlinable // unsafe-performance
   public init(bitPattern pointer: OpaquePointer?) {
     self.init(bitPattern: UnsafeRawPointer(pointer))
   }
@@ -336,7 +336,7 @@ public struct CVaListPointer {
 }
 
 @_unavailableInEmbedded
-extension CVaListPointer: CustomDebugStringConvertible {
+@unsafe extension CVaListPointer: CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
     return _value.debugDescription
@@ -352,7 +352,7 @@ extension CVaListPointer: Sendable { }
 ///
 /// The memory regions `src..<src + size` and
 /// `dest..<dest + size` should not overlap.
-@inlinable
+@unsafe @inlinable
 internal func _memcpy(
   dest destination: UnsafeMutableRawPointer,
   src: UnsafeRawPointer,
@@ -370,7 +370,7 @@ internal func _memcpy(
 ///
 /// The memory regions `src..<src + size` and
 /// `dest..<dest + size` may overlap.
-@inlinable
+@unsafe @inlinable
 internal func _memmove(
   dest destination: UnsafeMutableRawPointer,
   src: UnsafeRawPointer,

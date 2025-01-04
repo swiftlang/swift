@@ -339,7 +339,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTask(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
@@ -377,7 +377,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///   - operation: The operation to execute as part of the task group.
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
@@ -788,7 +788,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTask(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult
@@ -821,7 +821,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///   - operation: The operation to execute as part of the task group.
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult

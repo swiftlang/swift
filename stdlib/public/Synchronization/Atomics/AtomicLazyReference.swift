@@ -18,16 +18,16 @@
 @frozen
 @_staticExclusiveOnly
 public struct AtomicLazyReference<Instance: AnyObject>: ~Copyable {
-  @usableFromInline
+  @unsafe @usableFromInline
   let storage: Atomic<Unmanaged<Instance>?>
 
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   @inlinable
   public init() {
     storage = Atomic<Unmanaged<Instance>?>(nil)
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   deinit {
     if let unmanaged = storage.load(ordering: .acquiring) {
       unmanaged.release()
@@ -66,7 +66,7 @@ extension AtomicLazyReference {
   /// - Returns: The value of `Instance` that was successfully stored within the
   ///   lazy reference. This may or may not be the same value of `Instance` that
   ///   was passed to this function.
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   public func storeIfNil(_ desired: consuming Instance) -> Instance {
     let desiredUnmanaged = Unmanaged.passRetained(desired)
     let (exchanged, current) = storage.compareExchange(
@@ -92,7 +92,7 @@ extension AtomicLazyReference {
   ///
   /// - Returns: A value of `Instance` if the lazy reference was written to, or
   ///   `nil` if it has not been written to yet.
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   public func load() -> Instance? {
     let value = storage.load(ordering: .acquiring)
     return value?.takeUnretainedValue()

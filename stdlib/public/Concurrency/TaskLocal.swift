@@ -177,7 +177,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// If no current task is available in the context where this call is made,
   /// or if the task-local has no value bound, this will return the `defaultValue`
   /// of the task local.
-  public func get() -> Value {
+  @safe(unchecked) public func get() -> Value {
     guard let rawValue = _taskLocalValueGet(key: key) else {
       return self.defaultValue
     }
@@ -357,7 +357,7 @@ func _taskLocalValuePush<Value>(
 @_silgen_name("swift_task_localValuePop")
 func _taskLocalValuePop()
 
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_localValueGet")
 func _taskLocalValueGet(
   key: Builtin.RawPointer/*Key*/
@@ -371,7 +371,7 @@ func _taskLocalsCopy(
 
 // ==== Checks -----------------------------------------------------------------
 
-@usableFromInline
+@safe(unchecked) @usableFromInline
 @available(SwiftStdlib 5.1, *)
 @available(*, deprecated, message: "The situation diagnosed by this is not handled gracefully rather than by crashing")
 func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) {
@@ -383,7 +383,7 @@ func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) 
   }
 }
 
-@usableFromInline
+@unsafe @usableFromInline
 @available(SwiftStdlib 5.1, *)
 @available(*, deprecated, message: "The situation diagnosed by this is not handled gracefully rather than by crashing")
 @_silgen_name("swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup")

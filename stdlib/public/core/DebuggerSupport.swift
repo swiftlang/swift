@@ -128,7 +128,7 @@ public enum _DebuggerSupport {
       otherwise: { return nil })
   }
 
-  private static func asObjectAddress(_ value: Any) -> String {
+  @safe(unchecked) private static func asObjectAddress(_ value: Any) -> String {
     let address = checkValue(value,
       ifClass: { return unsafeBitCast($0, to: Int.self) },
       otherwise: { return 0 })
@@ -338,7 +338,7 @@ public func _stringForPrintObject(_ value: Any) -> String {
 
 public func _debuggerTestingCheckExpect(_: String, _: String) { }
 
-@_alwaysEmitIntoClient @_transparent
+@unsafe @_alwaysEmitIntoClient @_transparent
 internal func _withHeapObject<R>(
   of object: AnyObject,
   _ body: (UnsafeMutableRawPointer) -> R
@@ -348,27 +348,27 @@ internal func _withHeapObject<R>(
   return body(unmanaged.toOpaque())
 }
 
-@_extern(c, "swift_retainCount") @usableFromInline
+@unsafe @_extern(c, "swift_retainCount") @usableFromInline
 internal func _swift_retainCount(_: UnsafeMutableRawPointer) -> Int
-@_extern(c, "swift_unownedRetainCount") @usableFromInline
+@unsafe @_extern(c, "swift_unownedRetainCount") @usableFromInline
 internal func _swift_unownedRetainCount(_: UnsafeMutableRawPointer) -> Int
-@_extern(c, "swift_weakRetainCount") @usableFromInline
+@unsafe @_extern(c, "swift_weakRetainCount") @usableFromInline
 internal func _swift_weakRetainCount(_: UnsafeMutableRawPointer) -> Int
 
 // Utilities to get refcount(s) of class objects.
-@_alwaysEmitIntoClient
+@safe(unchecked) @_alwaysEmitIntoClient
 public func _getRetainCount(_ object: AnyObject) -> UInt {
   let count = _withHeapObject(of: object) { _swift_retainCount($0) }
   return UInt(bitPattern: count)
 }
 
-@_alwaysEmitIntoClient
+@safe(unchecked) @_alwaysEmitIntoClient
 public func _getUnownedRetainCount(_ object: AnyObject) -> UInt {
   let count = _withHeapObject(of: object) { _swift_unownedRetainCount($0) }
   return UInt(bitPattern: count)
 }
 
-@_alwaysEmitIntoClient
+@safe(unchecked) @_alwaysEmitIntoClient
 public func _getWeakRetainCount(_ object: AnyObject) -> UInt {
   let count = _withHeapObject(of: object) { _swift_weakRetainCount($0) }
   return UInt(bitPattern: count)

@@ -134,7 +134,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     return _uncheckedIndex(before: i)
   }
 
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @inline(__always)
   internal func _uncheckedIndex(before i: Index) -> Index {
     // TODO(String performance): isASCII fast-path

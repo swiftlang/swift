@@ -127,7 +127,7 @@ import Swift
 /// - Throws: if the operation closure throws
 /// - SeeAlso: ``TaskExecutor``
 @_unavailableInEmbedded
-@available(SwiftStdlib 6.0, *)
+@safe(unchecked) @available(SwiftStdlib 6.0, *)
 public func withTaskExecutorPreference<T, Failure>(
   _ taskExecutor: (any TaskExecutor)?,
   isolation: isolated (any Actor)? = #isolation,
@@ -165,7 +165,7 @@ public func withTaskExecutorPreference<T, Failure>(
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
 @_unavailableInEmbedded
-@available(SwiftStdlib 6.0, *)
+@safe(unchecked) @available(SwiftStdlib 6.0, *)
 @_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss26withTaskExecutorPreference_9operationxSch_pSg_xyYaYbKXEtYaKs8SendableRzlF")
 public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
@@ -444,7 +444,7 @@ extension Task where Failure == Error {
 
 // ==== Unsafe Current Task ----------------------------------------------------
 
-@available(SwiftStdlib 6.0, *)
+@unsafe @available(SwiftStdlib 6.0, *)
 @_unavailableInEmbedded
 extension UnsafeCurrentTask {
 
@@ -468,14 +468,14 @@ extension UnsafeCurrentTask {
 @_silgen_name("swift_task_getPreferredTaskExecutor")
 internal func _getPreferredTaskExecutor() -> Builtin.Executor
 
-typealias TaskExecutorPreferenceStatusRecord = UnsafeRawPointer
+@unsafe typealias TaskExecutorPreferenceStatusRecord = UnsafeRawPointer
 
-@available(SwiftStdlib 6.0, *)
+@unsafe @available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_task_pushTaskExecutorPreference")
 internal func _pushTaskExecutorPreference(_ executor: Builtin.Executor)
   -> TaskExecutorPreferenceStatusRecord
 
-@available(SwiftStdlib 6.0, *)
+@unsafe @available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_task_popTaskExecutorPreference")
 internal func _popTaskExecutorPreference(
   record: TaskExecutorPreferenceStatusRecord
@@ -485,7 +485,7 @@ internal func _popTaskExecutorPreference(
 ///
 /// It can be used to compare against, and is semantically equivalent to
 /// "no preference".
-@available(SwiftStdlib 6.0, *)
+@safe(unchecked) @available(SwiftStdlib 6.0, *)
 @usableFromInline
 internal func _getUndefinedTaskExecutor() -> Builtin.Executor {
   // Similar to the `_getGenericSerialExecutor` this method relies

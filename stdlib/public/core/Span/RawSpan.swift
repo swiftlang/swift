@@ -28,10 +28,10 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   /// Otherwise, `_pointer` must point to memory that will remain
   /// valid and not mutated as long as this `Span` exists.
   /// The memory at `_pointer` must consist of `_count` initialized bytes.
-  @usableFromInline
+  @unsafe @usableFromInline
   internal let _pointer: UnsafeRawPointer?
 
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   internal func _start() -> UnsafeRawPointer {
     _pointer._unsafelyUnwrappedUnchecked
   }
@@ -45,7 +45,7 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   internal let _count: Int
 
   /// FIXME: Remove once supported old compilers can recognize lifetime dependence 
-  @_unsafeNonescapableResult
+  @safe(unchecked) @_unsafeNonescapableResult
   @_alwaysEmitIntoClient
   @inline(__always)
   internal init() {
@@ -66,7 +66,7 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized byte.
   ///   - byteCount: the number of initialized bytes in the span.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @inline(__always)
   @lifetime(borrow pointer)
   internal init(
@@ -92,7 +92,7 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: UnsafeRawBufferPointer
@@ -112,7 +112,7 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeRawBufferPointer>
@@ -132,7 +132,7 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
@@ -144,7 +144,7 @@ extension RawSpan {
     self = _overrideLifetime(span, borrowing: buffer)
   }
 
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
@@ -167,7 +167,7 @@ extension RawSpan {
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized byte.
   ///   - byteCount: the number of initialized bytes in the span.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
   public init(
     _unsafeStart pointer: UnsafeRawPointer,
@@ -185,7 +185,7 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init<T: BitwiseCopyable>(
     _unsafeElements buffer: UnsafeBufferPointer<T>
@@ -205,7 +205,7 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init<T: BitwiseCopyable>(
     _unsafeElements buffer: borrowing Slice<UnsafeBufferPointer<T>>
@@ -225,7 +225,7 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init<T: BitwiseCopyable>(
     _unsafeElements buffer: UnsafeMutableBufferPointer<T>
@@ -245,7 +245,7 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init<T: BitwiseCopyable>(
     _unsafeElements buffer: borrowing Slice<UnsafeMutableBufferPointer<T>>
@@ -268,7 +268,7 @@ extension RawSpan {
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized byte.
   ///   - byteCount: the number of initialized bytes in the span.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
   public init<T: BitwiseCopyable>(
     _unsafeStart pointer: UnsafePointer<T>,
@@ -285,7 +285,7 @@ extension RawSpan {
   /// - Parameters:
   ///   - span: An existing `Span<T>`, which will define both this
   ///           `RawSpan`'s lifetime and the memory it represents.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @lifetime(borrow span)
   public init<Element: BitwiseCopyable>(
     _elements span: borrowing Span<Element>
@@ -342,7 +342,7 @@ extension RawSpan {
   /// - Returns: A span over the bytes within `bounds`
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(_ bounds: Range<Int>) -> Self {
     _precondition(
@@ -453,7 +453,7 @@ extension RawSpan {
   ///   The closure's parameter is valid only for the duration of
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
@@ -611,7 +611,7 @@ extension RawSpan {
 extension RawSpan {
   /// Returns a Boolean value indicating whether two `RawSpan` instances
   /// refer to the same region in memory.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public func isIdentical(to other: Self) -> Bool {
     (self._pointer == other._pointer) && (self._count == other._count)
   }
@@ -624,7 +624,7 @@ extension RawSpan {
   /// Parameters:
   /// - span: a subrange of `self`
   /// Returns: A range of offsets within `self`
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public func byteOffsets(of other: borrowing Self) -> Range<Int>? {
     if other._count > _count { return nil }
     guard let spanStart = other._pointer, _count > 0 else {
@@ -657,7 +657,7 @@ extension RawSpan {
   /// - Returns: A span with at most `maxLength` bytes.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
@@ -679,7 +679,7 @@ extension RawSpan {
   /// - Returns: A span leaving off the specified number of bytes at the end.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
@@ -702,7 +702,7 @@ extension RawSpan {
   /// - Returns: A span with at most `maxLength` bytes.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
@@ -728,7 +728,7 @@ extension RawSpan {
   /// - Returns: A span starting after the specified number of bytes.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")

@@ -258,11 +258,11 @@ public struct OSLogMessage :
   }
 }
 
-@usableFromInline
+@unsafe @usableFromInline
 internal typealias ByteBufferPointer = UnsafeMutablePointer<UInt8>
-@usableFromInline
+@unsafe @usableFromInline
 internal typealias ObjectStorage<T> = UnsafeMutablePointer<T>?
-@usableFromInline
+@unsafe @usableFromInline
 internal typealias ArgumentClosures =
   [(inout ByteBufferPointer,
     inout ObjectStorage<NSObject>,
@@ -281,10 +281,10 @@ internal struct OSLogArguments {
   /// captured arguments at the pointed location. The closures also accept an
   /// array of AnyObject to store references to auxiliary storage created during
   /// serialization.
-  @usableFromInline
+  @unsafe @usableFromInline
   internal var argumentClosures: ArgumentClosures
 
-  @_semantics("constant_evaluable")
+  @safe(unchecked) @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
   internal init() {
@@ -293,7 +293,7 @@ internal struct OSLogArguments {
 
   /// Append a byte-sized header, constructed by
   /// `OSLogMessage.appendInterpolation`, to the tracked array of closures.
-  @_semantics("constant_evaluable")
+  @safe(unchecked) @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
   internal mutating func append(_ header: UInt8) {
@@ -307,7 +307,7 @@ internal struct OSLogArguments {
 
 /// Serialize a UInt8 value at the buffer location pointed to by `bufferPosition`,
 /// and increment the `bufferPosition` with the byte size of the serialized value.
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 @inline(__always)
 internal func serialize(
   _ value: UInt8,
@@ -322,7 +322,7 @@ internal func serialize(
 // are used to hold onto NSObjects and Strings that are interpolated in the log
 // message until the end of the log call.
 
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 @inline(__always)
 internal func createStorage<T>(
   capacity: Int,
@@ -334,7 +334,7 @@ internal func createStorage<T>(
       UnsafeMutablePointer<T>.allocate(capacity: capacity)
 }
 
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 @inline(__always)
 internal func initializeAndAdvance<T>(
   _ storageOpt: inout ObjectStorage<T>,
@@ -347,7 +347,7 @@ internal func initializeAndAdvance<T>(
   }
 }
 
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 @inline(__always)
 internal func destroyStorage<T>(_ storageOpt: ObjectStorage<T>, count: Int) {
   // This if statement should get optimized away.

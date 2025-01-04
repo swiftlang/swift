@@ -143,7 +143,7 @@ internal struct SwiftBacktrace {
     return "\(secs).\(d1)\(d2)"
   }
 
-  static func measureDuration(_ body: () -> ()) -> timespec {
+  @safe(unchecked) static func measureDuration(_ body: () -> ()) -> timespec {
     var startTime = timespec()
     var endTime = timespec()
 
@@ -456,14 +456,14 @@ Generate a backtrace for the parent process.
     }
   }
 
-  static func unblockSignals() {
+  @safe(unchecked) static func unblockSignals() {
     var mask = sigset_t()
 
     sigfillset(&mask)
     sigprocmask(SIG_UNBLOCK, &mask, nil)
   }
 
-  static func main() {
+  @safe(unchecked) static func main() {
     unblockSignals()
     parseArguments()
 
@@ -614,7 +614,7 @@ Generate a backtrace for the parent process.
   }
 
   #if os(Linux) || os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-  static func setRawMode() -> termios {
+  @safe(unchecked) static func setRawMode() -> termios {
     var oldAttrs = termios()
     tcgetattr(0, &oldAttrs)
 
@@ -631,12 +631,12 @@ Generate a backtrace for the parent process.
     return oldAttrs
   }
 
-  static func resetInputMode(mode: termios) {
+  @safe(unchecked) static func resetInputMode(mode: termios) {
     var theMode = mode
     tcsetattr(0, TCSANOW, &theMode)
   }
 
-  static func waitForKey(_ message: String, timeout: Int?) -> Int32? {
+  @safe(unchecked) static func waitForKey(_ message: String, timeout: Int?) -> Int32? {
     let oldMode = setRawMode()
 
     defer {
@@ -679,7 +679,7 @@ Generate a backtrace for the parent process.
   }
   #endif
 
-  static func backtraceFormatter() -> BacktraceFormatter {
+  @safe(unchecked) static func backtraceFormatter() -> BacktraceFormatter {
     var terminalSize = winsize(ws_row: 24, ws_col: 80,
                                ws_xpixel: 1024, ws_ypixel: 768)
     _ = ioctl(0, CUnsignedLong(TIOCGWINSZ), &terminalSize)

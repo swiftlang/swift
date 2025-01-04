@@ -34,9 +34,9 @@ public protocol UnsafeCxxInputIterator: Equatable {
   func successor() -> Self
 }
 
-extension UnsafePointer: UnsafeCxxInputIterator {}
+@unsafe extension UnsafePointer: UnsafeCxxInputIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxInputIterator {}
+@unsafe extension UnsafeMutablePointer: UnsafeCxxInputIterator {}
 
 extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
   public typealias Pointee = Wrapped.Pointee
@@ -63,7 +63,7 @@ public protocol UnsafeCxxMutableInputIterator: UnsafeCxxInputIterator {
   override var pointee: Pointee { get set }
 }
 
-extension UnsafeMutablePointer: UnsafeCxxMutableInputIterator {}
+@unsafe extension UnsafeMutablePointer: UnsafeCxxMutableInputIterator {}
 
 /// Bridged C++ iterator that allows computing the distance between two of its
 /// instances, and advancing an instance by a given number of elements.
@@ -79,14 +79,14 @@ public protocol UnsafeCxxRandomAccessIterator: UnsafeCxxInputIterator {
   static func +=(lhs: inout Self, rhs: Distance)
 }
 
-extension UnsafePointer: UnsafeCxxRandomAccessIterator {}
+@unsafe extension UnsafePointer: UnsafeCxxRandomAccessIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator {}
+@unsafe extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator {}
 
 public protocol UnsafeCxxMutableRandomAccessIterator:
 UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator {}
+@unsafe extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator {}
 
 /// Bridged C++ iterator that allows traversing elements of a random access
 /// collection that are stored in contiguous memory segments.

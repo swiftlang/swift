@@ -196,7 +196,7 @@ extension _StringGuts {
   /// inconsistent with `_opaqueCharacterStride(endingAt:)`. On the other hand,
   /// this behavior makes this suitable for use in substrings whose start index
   /// itself does not fall on a cluster boundary.
-  @usableFromInline @inline(__always)
+  @safe(unchecked) @usableFromInline @inline(__always)
   @_effects(releasenone)
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
     _internalInvariant(i < endIndex._encodedOffset)
@@ -218,7 +218,7 @@ extension _StringGuts {
     return _opaqueComplexCharacterStride(startingAt: i)
   }
 
-  @_effects(releasenone) @inline(never)
+  @safe(unchecked) @_effects(releasenone) @inline(never)
   internal func _opaqueComplexCharacterStride(startingAt i: Int) -> Int {
     if _slowPath(isForeign) {
       return _foreignOpaqueCharacterStride(startingAt: i)
@@ -243,7 +243,7 @@ extension _StringGuts {
   /// Note: unlike `_opaqueCharacterStride(startingAt:)`, this method always
   /// finds a correct grapheme cluster boundary.
 
-  @usableFromInline @inline(__always)
+  @safe(unchecked) @usableFromInline @inline(__always)
   @_effects(releasenone)
   internal func _opaqueCharacterStride(endingAt i: Int) -> Int {
     if i <= 1 {
@@ -266,7 +266,7 @@ extension _StringGuts {
     return _opaqueComplexCharacterStride(endingAt: i)
   }
 
-  @_effects(releasenone) @inline(never)
+  @safe(unchecked) @_effects(releasenone) @inline(never)
   internal func _opaqueComplexCharacterStride(endingAt i: Int) -> Int {
     if _slowPath(isForeign) {
       return _foreignOpaqueCharacterStride(endingAt: i)
@@ -291,7 +291,7 @@ extension _StringGuts {
   /// Note: unlike `_opaqueCharacterStride(startingAt:)`, this method always
   /// finds a correct grapheme cluster boundary within the substring defined by
   /// the specified bounds.
-  @_effects(releasenone)
+  @safe(unchecked) @_effects(releasenone)
   internal func _opaqueCharacterStride(
     endingAt i: Int,
     in bounds: Range<Int>
@@ -585,7 +585,7 @@ extension Unicode {
     ///
     /// - Warning: This function does not validate that the buffer contains
     ///    valid UTF-8 data; its behavior is undefined if given invalid input.
-    @_effects(releasenone)
+    @unsafe @_effects(releasenone)
     public mutating func _firstBreak(
       inUncheckedUnsafeUTF8Buffer buffer: UnsafeBufferPointer<UInt8>,
       startingAt start: Int = 0

@@ -45,8 +45,8 @@ public struct _stdlib_thread_barrier_t {
 #elseif os(WASI)
   // pthread is currently not available on WASI
 #else
-  var mutex: UnsafeMutablePointer<pthread_mutex_t>?
-  var cond: UnsafeMutablePointer<pthread_cond_t>?
+  @unsafe var mutex: UnsafeMutablePointer<pthread_mutex_t>?
+  @unsafe var cond: UnsafeMutablePointer<pthread_cond_t>?
 #endif
 
   /// The number of threads to synchronize.
@@ -60,7 +60,7 @@ public struct _stdlib_thread_barrier_t {
   public init() {}
 }
 
-public func _stdlib_thread_barrier_init(
+@unsafe public func _stdlib_thread_barrier_init(
   _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>,
   _ count: CUnsignedInt
 ) -> CInt {
@@ -93,7 +93,7 @@ public func _stdlib_thread_barrier_init(
 }
 
 #if !os(Windows) && !os(WASI)
-private func _stdlib_thread_barrier_mutex_and_cond_init(_ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>) -> CInt {
+@unsafe private func _stdlib_thread_barrier_mutex_and_cond_init(_ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>) -> CInt {
   guard pthread_mutex_init(barrier.pointee.mutex!, nil) == 0 else {
     return -1
   }
@@ -105,7 +105,7 @@ private func _stdlib_thread_barrier_mutex_and_cond_init(_ barrier: UnsafeMutable
 }
 #endif
 
-public func _stdlib_thread_barrier_destroy(
+@unsafe public func _stdlib_thread_barrier_destroy(
   _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>
 ) {
 #if os(Windows)
@@ -131,7 +131,7 @@ public func _stdlib_thread_barrier_destroy(
   return
 }
 
-public func _stdlib_thread_barrier_wait(
+@unsafe public func _stdlib_thread_barrier_wait(
   _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>
 ) -> CInt {
 #if os(Windows)

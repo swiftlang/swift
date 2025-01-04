@@ -29,7 +29,7 @@ internal func isLoggingEnabled() -> Bool { true }
 
 /// A closure that does nothing. Meant to be used as the default assertion of
 /// `_osLogTestHelper`.
-public let _noopClosure = { (x : String, y : UnsafeBufferPointer<UInt8>) in return }
+@safe(unchecked) public let _noopClosure = { (x : String, y : UnsafeBufferPointer<UInt8>) in return }
 
 /// A test helper that constructs a byte buffer and a format string from an
 /// instance of `OSLogMessage` using the same logic as the new os log APIs,
@@ -39,7 +39,7 @@ public let _noopClosure = { (x : String, y : UnsafeBufferPointer<UInt8>) in retu
 ///   - message: An instance of `OSLogMessage` created from string interpolation
 ///   - assertion: A closure that takes a format string and a pointer to a
 ///     byte buffer and asserts a condition.
-@_semantics("oslog.requires_constant_arguments")
+@unsafe @_semantics("oslog.requires_constant_arguments")
 @_transparent
 @_optimize(none)
 public // @testable
@@ -98,7 +98,7 @@ func _osLogTestHelper(
 }
 
 /// A function that pretends to be _os_log_impl.
-@inline(never)
+@unsafe @inline(never)
 @usableFromInline
 internal func _os_log_impl_test(
   _ assertion: (String, UnsafeBufferPointer<UInt8>) -> Void,
@@ -119,7 +119,7 @@ internal func _os_log_impl_test(
 /// A function that pretends to be os_signpost(.animationBegin, ...). The purpose
 /// of this function is to test whether the OSLogOptimization pass works properly
 /// on the special case of animation begin signposts.
-@_transparent
+@safe(unchecked) @_transparent
 public func _osSignpostAnimationBeginTestHelper(
   _ format: AnimationFormatString.MyLogMessage,
   _ arguments: CVarArg...
@@ -128,7 +128,7 @@ public func _osSignpostAnimationBeginTestHelper(
                                 arguments: arguments)
 }
 
-@usableFromInline
+@unsafe @usableFromInline
 internal func _animationBeginSignpostHelper(
   formatStringPointer: UnsafePointer<CChar>,
   arguments: [CVarArg]
@@ -151,10 +151,10 @@ public enum AnimationFormatString {
   @frozen
   @_semantics("oslog.message.type")
   public struct MyLogMessage : ExpressibleByStringLiteral {
-    @usableFromInline
+    @unsafe @usableFromInline
     var formatStringPointer: UnsafePointer<CChar>
 
-    @_transparent
+    @safe(unchecked) @_transparent
     public init(stringLiteral value: String) {
       let message =
         OSLogTestHelper.OSLogMessage(

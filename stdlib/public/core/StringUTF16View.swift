@@ -325,7 +325,7 @@ extension String.UTF16View: BidirectionalCollection {
     return _nativeGetOffset(for: endIndex)
   }
 
-  internal func _indexRange(
+  @safe(unchecked) internal func _indexRange(
     for offsets: Range<Int>,
     from start: Index
   ) -> Range<Index> {
@@ -357,7 +357,7 @@ extension String.UTF16View: BidirectionalCollection {
     return Range(uncheckedBounds: (lower, upper))
   }
 
-  internal func _offsetRange(
+  @safe(unchecked) internal func _offsetRange(
     for range: Range<Index>,
     from start: Index
   ) -> Range<Int> {
@@ -723,7 +723,7 @@ extension _StringGuts {
 extension String.UTF16View {
   
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
-  @inline(__always)
+  @unsafe @inline(__always)
   internal func _utf16Length<U: SIMD, S: SIMD>(
     readPtr: inout UnsafeRawPointer,
     endPtr: UnsafeRawPointer,
@@ -756,7 +756,7 @@ extension String.UTF16View {
   }
 #endif
 
-  internal func _utf16Distance(from start: Index, to end: Index) -> Int {
+  @safe(unchecked) internal func _utf16Distance(from start: Index, to end: Index) -> Int {
     _internalInvariant(end.transcodedOffset == 0 || end.transcodedOffset == 1)
         
     return (end.transcodedOffset - start.transcodedOffset) + _guts.withFastUTF8(
@@ -835,7 +835,7 @@ extension String.UTF16View {
   ///    `breadcrumbStride / 2` UTF-16 code units. (In addition to the O(log(n))
   ///    cost of looking up the nearest breadcrumb, and the amortizable O(n)
   ///    cost of generating the breadcrumbs in the first place.)
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   @_effects(releasenone)
   internal func _nativeGetOffset(for idx: Index) -> Int {
     _internalInvariant(idx._encodedOffset <= _guts.count)
@@ -877,7 +877,7 @@ extension String.UTF16View {
   ///    units. (In addition to the O(1) cost of looking up the nearest
   ///    breadcrumb, and the amortizable O(n) cost of generating the
   ///    breadcrumbs in the first place.)
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   @_effects(releasenone)
   internal func _nativeGetIndex(for offset: Int) -> Index {
     _precondition(offset >= 0, "String index is out of bounds")
@@ -952,7 +952,7 @@ extension String.UTF16View {
   // means that the indices are part of the UTF16View.indices -- they are either
   // scalar-aligned or transcoded (e.g. derived from the UTF-16 view). They do
   // not need to go through an alignment check.
-  internal func _nativeCopy(
+  @unsafe internal func _nativeCopy(
     into buffer: UnsafeMutableBufferPointer<UInt16>,
     alignedRange range: Range<String.Index>
   ) {

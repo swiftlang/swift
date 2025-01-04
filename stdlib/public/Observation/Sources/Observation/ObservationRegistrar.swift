@@ -213,7 +213,7 @@ public struct ObservationRegistrar: Sendable {
   /// - Parameters:
   ///   - subject: An instance of an observable type.
   ///   - keyPath: The key path of an observed property.
-  public func access<Subject: Observable, Member>(
+  @safe(unchecked) public func access<Subject: Observable, Member>(
       _ subject: Subject,
       keyPath: KeyPath<Subject, Member>
   ) {

@@ -121,7 +121,7 @@ extension StringProtocol {
 }
 
 extension String {
-  public func hasPrefix(_ prefix: String) -> Bool {
+  @safe(unchecked) public func hasPrefix(_ prefix: String) -> Bool {
     if _fastPath(self._guts.isNFCFastUTF8 && prefix._guts.isNFCFastUTF8) {
       guard prefix._guts.count <= self._guts.count else { return false }
       let isPrefix = prefix._guts.withFastUTF8 { nfcPrefix in
@@ -139,7 +139,7 @@ extension String {
     return starts(with: prefix)
   }
 
-  public func hasSuffix(_ suffix: String) -> Bool {
+  @safe(unchecked) public func hasSuffix(_ suffix: String) -> Bool {
     if _fastPath(self._guts.isNFCFastUTF8 && suffix._guts.isNFCFastUTF8) {
       let suffixStart = self._guts.count - suffix._guts.count
       guard suffixStart >= 0 else { return false }

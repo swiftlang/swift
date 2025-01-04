@@ -153,7 +153,7 @@ extension Unicode.UTF16 {
     return isLeadSurrogate(x) || isTrailSurrogate(x)
   }
 
-  @inlinable
+  @unsafe @inlinable
   public // @testable
   static func _copy<T: _StringElement, U: _StringElement>(
     source: UnsafeMutablePointer<T>,
@@ -325,7 +325,7 @@ extension Unicode.UTF16: Unicode.Encoding {
     return EncodedScalar(_storage: r, _bitCount: 32)
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   public static func transcode<FromEncoding: Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type

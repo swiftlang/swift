@@ -28,7 +28,7 @@ import Android
 #elseif canImport(WASILibc)
 import WASILibc
 #endif
-let (platform_read, platform_write, platform_close) = (read, write, close)
+@unsafe let (platform_read, platform_write, platform_close) = (read, write, close)
 #endif 
 
 #if os(Windows)
@@ -121,7 +121,7 @@ public struct _FDInputStream {
     return nil
   }
 
-  public mutating func read() {
+  @safe(unchecked) public mutating func read() {
     let minFree = 128
     var bufferFree = _buffer.count - _bufferUsed
     if bufferFree < minFree {
@@ -213,7 +213,7 @@ public struct _FDOutputStream : TextOutputStream {
     self.fd = fd
   }
 
-  public mutating func write(_ string: String) {
+  @safe(unchecked) public mutating func write(_ string: String) {
     let utf8CStr = string.utf8CString
     utf8CStr.withUnsafeBufferPointer {
       (utf8CStr) -> Void in

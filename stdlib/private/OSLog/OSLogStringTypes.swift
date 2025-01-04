@@ -123,7 +123,7 @@ extension OSLogArguments {
   /// Append an (autoclosured) interpolated expression of String type, passed to
   /// `OSLogMessage.appendInterpolation`, to the array of closures tracked
   /// by this instance.
-  @_semantics("constant_evaluable")
+  @safe(unchecked) @_semantics("constant_evaluable")
   @inlinable
   @_optimize(none)
   internal mutating func append(_ value: @escaping () -> String) {
@@ -151,7 +151,7 @@ internal func pointerSizeInBytes() -> Int {
 
 /// Serialize a stable pointer to the string `stringValue` at the buffer location
 /// pointed to by `bufferPosition`.
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 @inline(__always)
 internal func serialize(
   _ stringValue: String,
@@ -173,7 +173,7 @@ internal func serialize(
 /// Return a pointer that points to a contiguous sequence of null-terminated,
 /// UTF8 characters. If necessary, extends the lifetime of `stringValue` by
 /// using `stringArgumentOwners`.
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 @inline(never)
 internal func getNullTerminatedUTF8Pointer(
   _ stringValue: String,

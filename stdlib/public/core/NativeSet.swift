@@ -101,7 +101,7 @@ extension _NativeSet { // Primitive fields
   }
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
-  @inlinable
+  @unsafe @inlinable
   internal var _elements: UnsafeMutablePointer<Element> {
     return _storage._rawElements.assumingMemoryBound(to: Element.self)
   }
@@ -114,7 +114,7 @@ extension _NativeSet { // Primitive fields
 }
 
 extension _NativeSet { // Low-level unchecked operations
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func uncheckedElement(at bucket: Bucket) -> Element {
     defer { _fixLifetime(self) }
@@ -122,7 +122,7 @@ extension _NativeSet { // Low-level unchecked operations
     return _elements[bucket.offset]
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func uncheckedInitialize(
     at bucket: Bucket,
@@ -132,7 +132,7 @@ extension _NativeSet { // Low-level unchecked operations
     (_elements + bucket.offset).initialize(to: element)
   }
 
-  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @safe(unchecked) @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
   @inline(__always)
   internal func uncheckedAssign(
     at bucket: Bucket,
@@ -179,7 +179,7 @@ extension _NativeSet { // Low-level lookup operations
 }
 
 extension _NativeSet { // ensureUnique
-  @inlinable
+  @safe(unchecked) @inlinable
   internal mutating func resize(capacity: Int) {
     let capacity = Swift.max(capacity, self.capacity)
     let result = _NativeSet(_SetStorage<Element>.resize(
@@ -437,7 +437,7 @@ extension _NativeSet { // Insertions
     _unsafeInsertNew(element, at: bucket)
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   internal mutating func update(
     with element: __owned Element,
     isUnique: Bool
@@ -518,7 +518,7 @@ extension _NativeSet: _HashTableDelegate {
     return hashValue(for: uncheckedElement(at: bucket))
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func moveEntry(from source: Bucket, to target: Bucket) {
     (_elements + target.offset)
@@ -536,7 +536,7 @@ extension _NativeSet { // Deletion
     invalidateIndices()
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal mutating func uncheckedRemove(
     at bucket: Bucket,
@@ -549,7 +549,7 @@ extension _NativeSet { // Deletion
     return old
   }
 
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   internal mutating func removeAll(isUnique: Bool) {
     guard isUnique else {
       let scale = self._storage._scale

@@ -64,7 +64,7 @@ public protocol Actor: AnyObject, Sendable {
   ///
   /// - SeeAlso: ``SerialExecutor``
   /// - SeeAlso: ``TaskExecutor``
-  nonisolated var unownedExecutor: UnownedSerialExecutor { get }
+  @unsafe nonisolated var unownedExecutor: UnownedSerialExecutor { get }
 }
 
 /// Called to initialize the default actor instance in an actor.

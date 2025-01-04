@@ -16,7 +16,7 @@
 
 @usableFromInline
 internal protocol _HasContiguousBytes {
-  func withUnsafeBytes<R>(
+  @unsafe func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R
 
@@ -41,7 +41,7 @@ extension Array: _HasContiguousBytes {
   }
 }
 extension ContiguousArray: _HasContiguousBytes {}
-extension UnsafeBufferPointer: _HasContiguousBytes {
+@unsafe extension UnsafeBufferPointer: _HasContiguousBytes {
   @inlinable @inline(__always)
   func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
@@ -51,7 +51,7 @@ extension UnsafeBufferPointer: _HasContiguousBytes {
     return try body(UnsafeRawBufferPointer(start: ptr, count: len))
   }
 }
-extension UnsafeMutableBufferPointer: _HasContiguousBytes {
+@unsafe extension UnsafeMutableBufferPointer: _HasContiguousBytes {
   @inlinable @inline(__always)
   func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
@@ -61,7 +61,7 @@ extension UnsafeMutableBufferPointer: _HasContiguousBytes {
     return try body(UnsafeRawBufferPointer(start: ptr, count: len))
   }
 }
-extension UnsafeRawBufferPointer: _HasContiguousBytes {
+@unsafe extension UnsafeRawBufferPointer: _HasContiguousBytes {
   @inlinable @inline(__always)
   func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
@@ -69,7 +69,7 @@ extension UnsafeRawBufferPointer: _HasContiguousBytes {
     return try body(self)
   }
 }
-extension UnsafeMutableRawBufferPointer: _HasContiguousBytes {
+@unsafe extension UnsafeMutableRawBufferPointer: _HasContiguousBytes {
   @inlinable @inline(__always)
   func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
@@ -83,7 +83,7 @@ extension String: _HasContiguousBytes {
     @inline(__always) get { return self._guts.isFastUTF8 }
   }
 
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   internal func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
@@ -97,7 +97,7 @@ extension Substring: _HasContiguousBytes {
     @inline(__always) get { return self._wholeGuts.isFastUTF8 }
   }
 
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   internal func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {

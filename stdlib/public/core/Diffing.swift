@@ -224,7 +224,7 @@ private struct _V {
   }
 }
 
-@available(SwiftStdlib 5.1, *)
+@safe(unchecked) @available(SwiftStdlib 5.1, *)
 private func _myers<C,D>(
   from old: C, to new: D,
   using cmp: (C.Element, D.Element) -> Bool

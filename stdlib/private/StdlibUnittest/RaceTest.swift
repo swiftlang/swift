@@ -593,7 +593,7 @@ class _InterruptibleSleep {
 
   /// Sleep for durationInSeconds or until another
   /// thread calls wake(), whichever comes first.
-  func sleep(durationInSeconds duration: Int) {
+  @safe(unchecked) func sleep(durationInSeconds duration: Int) {
     if completed {
       return
     }
@@ -613,7 +613,7 @@ class _InterruptibleSleep {
   }
 
   /// Wake the thread in sleep().
-  func wake() {
+  @safe(unchecked) func wake() {
     if completed { return }
 
     let buffer: [UInt8] = [1]
@@ -623,7 +623,7 @@ class _InterruptibleSleep {
 }
 #endif
 
-public func runRaceTest<RT : RaceTestWithPerTrialData>(
+@safe(unchecked) public func runRaceTest<RT : RaceTestWithPerTrialData>(
   _: RT.Type,
   trials: Int,
   timeoutInSeconds: Int? = nil,

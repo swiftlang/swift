@@ -19,7 +19,7 @@ extension std.string {
   ///
   /// - Complexity: O(*n*), where *n* is the number of UTF-8 code units in the
   ///   Swift string.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public init(_ string: String) {
     self = string.withCString(encodedAs: UTF8.self) { buffer in
 #if os(Windows)
@@ -33,7 +33,7 @@ extension std.string {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   public init(_ string: UnsafePointer<CChar>?) {
     if let str = string {
 #if os(Windows)
@@ -121,7 +121,7 @@ extension std.string: Equatable, Comparable {
     lhs.append(rhs)
   }
 
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func append(_ other: std.string) {
     __appendUnsafe(other) // ignore the returned pointer
   }
@@ -150,7 +150,7 @@ extension std.u16string: Equatable, Comparable {
     lhs.append(rhs)
   }
 
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func append(_ other: std.u16string) {
     __appendUnsafe(other) // ignore the returned pointer
   }
@@ -179,7 +179,7 @@ extension std.u32string: Equatable, Comparable {
     lhs.append(rhs)
   }
 
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public mutating func append(_ other: std.u32string) {
     __appendUnsafe(other) // ignore the returned pointer
   }
@@ -275,7 +275,7 @@ extension String {
   /// (`"\u{FFFD}"`).
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ string.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public init(_ cxxString: std.string) {
     let buffer = UnsafeBufferPointer<CChar>(
       start: cxxString.__c_strUnsafe(),
@@ -294,7 +294,7 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ UTF-16
   ///   string.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public init(_ cxxU16String: std.u16string) {
     let buffer = UnsafeBufferPointer<UInt16>(
       start: cxxU16String.__dataUnsafe(),
@@ -311,7 +311,7 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ UTF-32
   ///   string.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public init(_ cxxU32String: std.u32string) {
     let buffer = UnsafeBufferPointer<Unicode.Scalar>(
       start: cxxU32String.__dataUnsafe(),
@@ -334,7 +334,7 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ string
   ///   view.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public init(_ cxxStringView: std.string_view) {
     let buffer = UnsafeBufferPointer<CChar>(
       start: cxxStringView.__dataUnsafe(),
@@ -354,7 +354,7 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ UTF-16
   ///   string view.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public init(_ cxxU16StringView: std.u16string_view) {
     let buffer = UnsafeBufferPointer<UInt16>(
       start: cxxU16StringView.__dataUnsafe(),
@@ -372,7 +372,7 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the number of bytes in the C++ UTF-32
   ///   string view.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public init(_ cxxU32StringView: std.u32string_view) {
     let buffer = UnsafeBufferPointer<Unicode.Scalar>(
       start: cxxU32StringView.__dataUnsafe(),

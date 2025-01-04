@@ -28,7 +28,7 @@ class MemoryImageSource<M: MemoryReader>: ImageSource {
     self.reader = reader
   }
 
-  public func fetch(from addr: Address,
+  @unsafe public func fetch(from addr: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
     try reader.fetch(from: addr, into: buffer)
   }

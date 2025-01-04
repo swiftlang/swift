@@ -71,12 +71,12 @@ public protocol GlobalActor {
   /// of the underlying actor.
   ///
   /// - SeeAlso: ``SerialExecutor``
-  static var sharedUnownedExecutor: UnownedSerialExecutor { get }
+  @unsafe static var sharedUnownedExecutor: UnownedSerialExecutor { get }
 }
 
 @available(SwiftStdlib 5.1, *)
 extension GlobalActor {
-  public static var sharedUnownedExecutor: UnownedSerialExecutor {
+  @unsafe public static var sharedUnownedExecutor: UnownedSerialExecutor {
     shared.unownedExecutor
   }
 }

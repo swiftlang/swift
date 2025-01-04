@@ -25,7 +25,7 @@ import WASILibc
 import CRT
 #endif
 
-public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CInt {
+@safe(unchecked) public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CInt {
 #if os(Android) || os(Haiku) || os(Windows) || os(WASI)
   preconditionFailure("mkstemps doesn't work on your platform")
 #else
@@ -78,7 +78,7 @@ public struct _stdlib_fd_set {
       ~UInt(1 << (fdInt % _stdlib_fd_set._wordBits))
   }
 
-  public mutating func zero() {
+  @safe(unchecked) public mutating func zero() {
     let count = _data.count
     return _data.withUnsafeMutableBufferPointer {
       (_data) in
@@ -90,7 +90,7 @@ public struct _stdlib_fd_set {
   }
 }
 
-public func _stdlib_select(
+@unsafe public func _stdlib_select(
   _ readfds: inout _stdlib_fd_set, _ writefds: inout _stdlib_fd_set,
   _ errorfds: inout _stdlib_fd_set, _ timeout: UnsafeMutablePointer<timeval>?
 ) -> CInt {
@@ -126,7 +126,7 @@ public func _stdlib_select(
 
 
 /// Swift-y wrapper around pipe(2)
-public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
+@safe(unchecked) public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
   var fds: [CInt] = [0, 0]
   let ret = fds.withUnsafeMutableBufferPointer { unsafeFds -> CInt in
 #if os(Windows)

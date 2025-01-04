@@ -32,16 +32,16 @@ import Swift
 
   /// Fill the specified buffer with data from the specified location in
   /// the source.
-  func fetch(from address: Address,
+  @unsafe func fetch(from address: Address,
              into buffer: UnsafeMutableRawBufferPointer) throws
 
   /// Fill the specified buffer with data from the specified location in
   /// the source.
-  func fetch<T>(from address: Address,
+  @unsafe func fetch<T>(from address: Address,
                 into buffer: UnsafeMutableBufferPointer<T>) throws
 
   /// Write data from the specified location in the source through a pointer
-  func fetch<T>(from addr: Address,
+  @unsafe func fetch<T>(from addr: Address,
                 into pointer: UnsafeMutablePointer<T>) throws
 
   /// Fetch an array of Ts from the specified location in the source
@@ -56,18 +56,18 @@ import Swift
 
 extension MemoryReader {
 
-  public func fetch<T>(from address: Address,
+  @unsafe public func fetch<T>(from address: Address,
                        into buffer: UnsafeMutableBufferPointer<T>) throws {
     try fetch(from: address, into: UnsafeMutableRawBufferPointer(buffer))
   }
 
-  public func fetch<T>(from addr: Address,
+  @unsafe public func fetch<T>(from addr: Address,
                        into pointer: UnsafeMutablePointer<T>) throws {
     try fetch(from: addr,
               into: UnsafeMutableBufferPointer(start: pointer, count: 1))
   }
 
-  public func fetch<T>(from addr: Address, count: Int, as: T.Type) throws -> [T] {
+  @safe(unchecked) public func fetch<T>(from addr: Address, count: Int, as: T.Type) throws -> [T] {
     let array = try Array<T>(unsafeUninitializedCapacity: count){
       buffer, initializedCount in
 
@@ -79,7 +79,7 @@ extension MemoryReader {
     return array
   }
 
-  public func fetch<T>(from addr: Address, as: T.Type) throws -> T {
+  @safe(unchecked) public func fetch<T>(from addr: Address, as: T.Type) throws -> T {
     return try withUnsafeTemporaryAllocation(of: T.self, capacity: 1) { buf in
       try fetch(from: addr, into: buf)
       return buf[0]
@@ -106,7 +106,7 @@ extension MemoryReader {
 @_spi(MemoryReaders) public struct UnsafeLocalMemoryReader: MemoryReader {
   public init() {}
 
-  public func fetch(from address: Address,
+  @unsafe public func fetch(from address: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
     buffer.baseAddress!.copyMemory(
       from: UnsafeRawPointer(bitPattern: UInt(address))!,
@@ -128,7 +128,7 @@ extension MemoryReader {
     self.task = task as! task_t
   }
 
-  public func fetch(from address: Address,
+  @unsafe public func fetch(from address: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
     let size = buffer.count
     var sizeOut = UInt64(0)
@@ -150,7 +150,7 @@ extension MemoryReader {
   public typealias Address = UInt64
   public typealias Size = UInt64
 
-  public func fetch(from address: Address,
+  @unsafe public func fetch(from address: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
     let reader = RemoteMemoryReader(task: mach_task_self())
     return try reader.fetch(from: address, into: buffer)

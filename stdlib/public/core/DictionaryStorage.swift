@@ -67,13 +67,13 @@ internal class __RawDictionaryStorage: __SwiftNativeNSDictionary {
   internal final var _seed: Int
 
   /// A raw pointer to the start of the tail-allocated hash buffer holding keys.
-  @usableFromInline
+  @unsafe @usableFromInline
   @nonobjc
   internal final var _rawKeys: UnsafeMutableRawPointer
 
   /// A raw pointer to the start of the tail-allocated hash buffer holding
   /// values.
-  @usableFromInline
+  @unsafe @usableFromInline
   @nonobjc
   internal final var _rawValues: UnsafeMutableRawPointer
 
@@ -90,7 +90,7 @@ internal class __RawDictionaryStorage: __SwiftNativeNSDictionary {
     @inline(__always) get { return 1 &<< _scale }
   }
 
-  @inlinable
+  @unsafe @inlinable
   @nonobjc
   internal final var _metadata: UnsafeMutablePointer<_HashTable.Word> {
     @inline(__always) get {
@@ -126,7 +126,7 @@ internal class __EmptyDictionarySingleton: __RawDictionaryStorage {
 
 #if _runtime(_ObjC)
   @objc
-  internal required init(
+  @unsafe internal required init(
     objects: UnsafePointer<AnyObject?>,
     forKeys: UnsafeRawPointer,
     count: Int
@@ -138,7 +138,7 @@ internal class __EmptyDictionarySingleton: __RawDictionaryStorage {
 
 #if _runtime(_ObjC)
 extension __EmptyDictionarySingleton: _NSDictionaryCore {
-  @objc(copyWithZone:)
+  @unsafe @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     return self
   }
@@ -148,7 +148,7 @@ extension __EmptyDictionarySingleton: _NSDictionaryCore {
     return 0
   }
 
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
@@ -177,7 +177,7 @@ extension __EmptyDictionarySingleton: _NSDictionaryCore {
     return __SwiftEmptyNSEnumerator()
   }
 
-  @objc(getObjects:andKeys:count:)
+  @unsafe @objc(getObjects:andKeys:count:)
   internal func getObjects(
     _ objects: UnsafeMutablePointer<AnyObject>?,
     andKeys keys: UnsafeMutablePointer<AnyObject>?,
@@ -221,7 +221,7 @@ extension __RawDictionaryStorage {
       Builtin.addressof(&_swiftEmptyDictionarySingleton))
   }
   
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @inline(__always)
   internal final func uncheckedKey<Key: Hashable>(at bucket: _HashTable.Bucket) -> Key {
     defer { _fixLifetime(self) }
@@ -261,7 +261,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     _internalInvariantFailure("This class cannot be directly initialized")
   }
 
-  deinit {
+  @safe(unchecked) deinit {
     guard _count > 0 else { return }
     if !_isPOD(Key.self) {
       let keys = self._keys
@@ -279,7 +279,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     _fixLifetime(self)
   }
 
-  @inlinable
+  @unsafe @inlinable
   final internal var _keys: UnsafeMutablePointer<Key> {
     @inline(__always)
     get {
@@ -287,7 +287,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     }
   }
 
-  @inlinable
+  @unsafe @inlinable
   final internal var _values: UnsafeMutablePointer<Value> {
     @inline(__always)
     get {
@@ -301,7 +301,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
 
 #if _runtime(_ObjC)
   @objc
-  internal required init(
+  @unsafe internal required init(
     objects: UnsafePointer<AnyObject?>,
     forKeys: UnsafeRawPointer,
     count: Int
@@ -309,7 +309,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     _internalInvariantFailure("This class cannot be directly initialized")
   }
 
-  @objc(copyWithZone:)
+  @unsafe @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     return self
   }
@@ -324,7 +324,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     return _SwiftDictionaryNSEnumerator<Key, Value>(asNative)
   }
 
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
@@ -378,7 +378,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     return _bridgeAnythingToObjectiveC(value)
   }
 
-  @objc(getObjects:andKeys:count:)
+  @unsafe @objc(getObjects:andKeys:count:)
   internal func getObjects(
     _ objects: UnsafeMutablePointer<AnyObject>?,
     andKeys keys: UnsafeMutablePointer<AnyObject>?,
@@ -457,7 +457,7 @@ extension _DictionaryStorage {
   }
 #endif
 
-  static internal func allocate(
+  @safe(unchecked) static internal func allocate(
     scale: Int8,
     age: Int32?,
     seed: Int?

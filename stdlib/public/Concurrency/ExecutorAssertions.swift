@@ -44,7 +44,7 @@ extension SerialExecutor {
   ///           the file where this method was called.
   ///   - line: The line number to print if the assertion fails The default value is
   ///           the line where this method was called.
-  @available(SwiftStdlib 5.1, *)
+  @safe(unchecked) @available(SwiftStdlib 5.1, *)
   #if !$Embedded
   @backDeployed(before: SwiftStdlib 5.9)
   #endif
@@ -93,7 +93,7 @@ extension Actor {
   ///           where this method was called.
   ///   - line: The line number to print if the assertion fails The default is
   ///           where this method was called.
-  @available(SwiftStdlib 5.1, *)
+  @safe(unchecked) @available(SwiftStdlib 5.1, *)
   #if !$Embedded
   @backDeployed(before: SwiftStdlib 5.9)
   #endif
@@ -185,7 +185,7 @@ extension SerialExecutor {
   ///           where this method was called.
   ///   - line: The line number to print if the assertion fails The default is
   ///           where this method was called.
-  @available(SwiftStdlib 5.1, *)
+  @safe(unchecked) @available(SwiftStdlib 5.1, *)
   #if !$Embedded
   @backDeployed(before: SwiftStdlib 5.9)
   #endif
@@ -234,7 +234,7 @@ extension Actor {
   ///           where this method was called.
   ///   - line: The line number to print if the assertion fails The default is
   ///           where this method was called.
-  @available(SwiftStdlib 5.1, *)
+  @safe(unchecked) @available(SwiftStdlib 5.1, *)
   #if !$Embedded
   @backDeployed(before: SwiftStdlib 5.9)
   #endif
@@ -341,7 +341,7 @@ extension Actor {
   ///           where this method was called.
   /// - Returns: the return value of the `operation`
   /// - Throws: rethrows the `Error` thrown by the operation if it threw
-  @available(SwiftStdlib 5.1, *)
+  @safe(unchecked) @available(SwiftStdlib 5.1, *)
   @_alwaysEmitIntoClient
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
   @_unavailableInEmbedded

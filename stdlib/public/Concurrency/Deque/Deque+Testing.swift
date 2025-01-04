@@ -47,7 +47,7 @@ extension _Deque {
   /// as to allow exhaustive input/output tests for `Deque`'s members.
   /// This isn't intended to be used outside of `Deque`'s own test target.
   // @_spi(Testing)
-  init<S: Sequence>(
+  @safe(unchecked) init<S: Sequence>(
     _capacity capacity: Int,
     startSlot: Int,
     contents: S

@@ -48,7 +48,7 @@ extension _Pointer {
   /// Creates a new typed pointer from the given opaque pointer.
   ///
   /// - Parameter from: The opaque pointer to convert to a typed pointer.
-  @_transparent
+  @unsafe @_transparent
   public init(_ from: OpaquePointer) {
     self.init(from._rawValue)
   }
@@ -57,7 +57,7 @@ extension _Pointer {
   ///
   /// - Parameter from: The opaque pointer to convert to a typed pointer. If
   ///   `from` is `nil`, the result of this initializer is `nil`.
-  @_transparent
+  @unsafe @_transparent
   public init?(_ from: OpaquePointer?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
@@ -426,7 +426,7 @@ func _convertInOutToPointerArgument<
 /// This always produces a non-null pointer, even if the array doesn't have any
 /// storage.
 #if !$Embedded
-@_transparent
+@safe(unchecked) @_transparent
 public // COMPILER_INTRINSIC
 func _convertConstArrayToPointerArgument<
   FromElement,
@@ -445,7 +445,7 @@ func _convertConstArrayToPointerArgument<
   return (owner, validPointer)
 }
 #else
-@_transparent
+@safe(unchecked) @_transparent
 public // COMPILER_INTRINSIC
 func _convertConstArrayToPointerArgument<
   FromElement,
@@ -469,7 +469,7 @@ func _convertConstArrayToPointerArgument<
 ///
 /// This always produces a non-null pointer, even if the array's length is 0.
 #if !$Embedded
-@_transparent
+@safe(unchecked) @_transparent
 public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
   FromElement,
@@ -485,7 +485,7 @@ func _convertMutableArrayToPointerArgument<
   return _convertConstArrayToPointerArgument(a)
 }
 #else
-@_transparent
+@safe(unchecked) @_transparent
 public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
   FromElement,

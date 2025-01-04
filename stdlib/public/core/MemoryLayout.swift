@@ -257,25 +257,25 @@ extension MemoryLayout where T: ~Copyable {
     return value & ~UInt(bitPattern: _alignmentMask)
   }
 
-  internal static func _roundingUpToAlignment(_ value: UnsafeRawPointer) -> UnsafeRawPointer {
+  @unsafe internal static func _roundingUpToAlignment(_ value: UnsafeRawPointer) -> UnsafeRawPointer {
     return UnsafeRawPointer(bitPattern:
      _roundingUpToAlignment(UInt(bitPattern: value))).unsafelyUnwrapped
   }
-  internal static func _roundingDownToAlignment(_ value: UnsafeRawPointer) -> UnsafeRawPointer {
+  @unsafe internal static func _roundingDownToAlignment(_ value: UnsafeRawPointer) -> UnsafeRawPointer {
     return UnsafeRawPointer(bitPattern:
      _roundingDownToAlignment(UInt(bitPattern: value))).unsafelyUnwrapped
   }
 
-  internal static func _roundingUpToAlignment(_ value: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer {
+  @unsafe internal static func _roundingUpToAlignment(_ value: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(bitPattern:
      _roundingUpToAlignment(UInt(bitPattern: value))).unsafelyUnwrapped
   }
-  internal static func _roundingDownToAlignment(_ value: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer {
+  @unsafe internal static func _roundingDownToAlignment(_ value: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(bitPattern:
      _roundingDownToAlignment(UInt(bitPattern: value))).unsafelyUnwrapped
   }
 
-  internal static func _roundingUpBaseToAlignment(_ value: UnsafeRawBufferPointer) -> UnsafeRawBufferPointer {
+  @unsafe internal static func _roundingUpBaseToAlignment(_ value: UnsafeRawBufferPointer) -> UnsafeRawBufferPointer {
     let baseAddressBits = Int(bitPattern: value.baseAddress)
     var misalignment = baseAddressBits & _alignmentMask
     if misalignment != 0 {
@@ -287,7 +287,7 @@ extension MemoryLayout where T: ~Copyable {
     return value
   }
 
-  internal static func _roundingUpBaseToAlignment(_ value: UnsafeMutableRawBufferPointer) -> UnsafeMutableRawBufferPointer {
+  @unsafe internal static func _roundingUpBaseToAlignment(_ value: UnsafeMutableRawBufferPointer) -> UnsafeMutableRawBufferPointer {
     let baseAddressBits = Int(bitPattern: value.baseAddress)
     var misalignment = baseAddressBits & _alignmentMask
     if misalignment != 0 {

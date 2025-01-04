@@ -107,7 +107,7 @@ class Target {
 
   var mcontext: MContext
 
-  static func getTask(pid: pid_t) -> task_t? {
+  @safe(unchecked) static func getTask(pid: pid_t) -> task_t? {
     var port: task_t = 0
     let kr = task_read_for_pid(mach_task_self_, pid, &port)
     if kr != KERN_SUCCESS {
@@ -116,7 +116,7 @@ class Target {
     return port
   }
 
-  static func getProcessName(pid: pid_t) -> String {
+  @safe(unchecked) static func getProcessName(pid: pid_t) -> String {
     let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: 4096)
     defer {
       buffer.deallocate()
@@ -129,7 +129,7 @@ class Target {
     }
   }
 
-  static func isPrivileged(pid: pid_t) -> Bool {
+  @safe(unchecked) static func isPrivileged(pid: pid_t) -> Bool {
     var flags = UInt32(0)
 
     guard csops(pid,
@@ -201,7 +201,7 @@ class Target {
     fetchThreads(limit: limit, top: top, cache: cache, symbolicate: symbolicate)
   }
 
-  func fetchThreads(
+  @safe(unchecked) func fetchThreads(
     limit: Int?, top: Int, cache: Bool,
     symbolicate: SwiftBacktrace.Symbolication
   ) {
@@ -379,7 +379,7 @@ class Target {
     }
   }
 
-  public func withDebugger(_ body: () -> ()) throws {
+  @safe(unchecked) public func withDebugger(_ body: () -> ()) throws {
     #if os(macOS)
     return try withTemporaryDirectory(pattern: "/tmp/backtrace.XXXXXXXX") {
       tmpdir in
@@ -419,7 +419,7 @@ class Target {
   }
 }
 
-private func mach_thread_info<T>(_ thread: thread_t,
+@safe(unchecked) private func mach_thread_info<T>(_ thread: thread_t,
                                  _ flavor: CInt,
                                  _ result: inout T) -> kern_return_t {
   var count: mach_msg_type_number_t

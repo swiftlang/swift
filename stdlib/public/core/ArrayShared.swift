@@ -31,7 +31,7 @@ public struct _DependenceToken {
 /// This function is referenced by the compiler to allocate array literals.
 ///
 /// - Precondition: `storage` is `_ContiguousArrayStorage`.
-@inlinable // FIXME(inline-always)
+@safe(unchecked) @inlinable // FIXME(inline-always)
 @inline(__always)
 @_semantics("array.uninitialized_intrinsic")
 public // COMPILER_INTRINSIC
@@ -136,7 +136,7 @@ extension Collection {
 }
 
 extension _ArrayBufferProtocol {
-  @inlinable // FIXME: @useableFromInline (https://github.com/apple/swift/issues/50130).
+  @safe(unchecked) @inlinable // FIXME: @useableFromInline (https://github.com/apple/swift/issues/50130).
   @inline(never)
   internal mutating func _arrayOutOfPlaceReplace<C: Collection>(
     _ bounds: Range<Int>,
@@ -265,7 +265,7 @@ extension _ArrayBufferProtocol {
   ///
   /// As an optimization, may move elements out of source rather than
   /// copying when it isUniquelyReferenced.
-  @inline(never)
+  @unsafe @inline(never)
   @inlinable // @specializable
   internal mutating func _arrayOutOfPlaceUpdate(
     _ dest: inout _ContiguousArrayBuffer<Element>,
@@ -337,7 +337,7 @@ extension _ArrayBufferProtocol {
 }
 
 extension _ArrayBufferProtocol {
-  @inline(never)
+  @safe(unchecked) @inline(never)
   @usableFromInline
   internal mutating func _outlinedMakeUniqueBuffer(bufferCount: Int) {
 
@@ -352,7 +352,7 @@ extension _ArrayBufferProtocol {
   }
 
   /// Append items from `newItems` to a buffer.
-  @inlinable
+  @safe(unchecked) @inlinable
   internal mutating func _arrayAppendSequence<S: Sequence>(
     _ newItems: __owned S
   ) where S.Element == Element {

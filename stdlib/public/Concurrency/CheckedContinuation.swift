@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_continuation_logFailedCheck")
 internal func logFailedCheck(_ message: UnsafeRawPointer)
 
@@ -25,7 +25,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
 
   private init() { fatalError("must use create") }
 
-  private static func _create(continuation: UnsafeRawPointer, function: String)
+  @unsafe private static func _create(continuation: UnsafeRawPointer, function: String)
       -> CheckedContinuationCanary {
     let instance = Builtin.allocWithTailElems_1(CheckedContinuationCanary.self,
       1._builtinWordValue,
@@ -36,11 +36,11 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
     return instance
   }
 
-  private var _continuationPtr: UnsafeMutablePointer<UnsafeRawPointer?> {
+  @unsafe private var _continuationPtr: UnsafeMutablePointer<UnsafeRawPointer?> {
     return UnsafeMutablePointer<UnsafeRawPointer?>(
       Builtin.projectTailElems(self, (UnsafeRawPointer?, String).self))
   }
-  private var _functionPtr: UnsafeMutablePointer<String> {
+  @unsafe private var _functionPtr: UnsafeMutablePointer<String> {
     let tailPtr = UnsafeMutableRawPointer(
       Builtin.projectTailElems(self, (UnsafeRawPointer?, String).self))
 
@@ -50,7 +50,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
     return functionPtr.assumingMemoryBound(to: String.self)
   }
 
-  internal static func create<T, E>(continuation: UnsafeContinuation<T, E>,
+  @unsafe internal static func create<T, E>(continuation: UnsafeContinuation<T, E>,
                                  function: String) -> CheckedContinuationCanary {
     return _create(
         continuation: unsafeBitCast(continuation, to: UnsafeRawPointer.self),
@@ -63,7 +63,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
 
   // Take the continuation away from the container, or return nil if it's
   // already been taken.
-  internal func takeContinuation<T, E>() -> UnsafeContinuation<T, E>? {
+  @unsafe internal func takeContinuation<T, E>() -> UnsafeContinuation<T, E>? {
     // Atomically exchange the current continuation value with a null pointer.
     let rawContinuationPtr = unsafeBitCast(_continuationPtr,
       to: Builtin.RawPointer.self)
@@ -73,7 +73,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
     return unsafeBitCast(rawOld, to: UnsafeContinuation<T, E>?.self)
   }
 
-  deinit {
+  @safe(unchecked) deinit {
     _functionPtr.deinitialize(count: 1)
     // Log if the continuation was never consumed before the instance was
     // destructed.
@@ -143,7 +143,7 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
   ///   - function: A string identifying the declaration that is the notional
   ///     source for the continuation, used to identify the continuation in
   ///     runtime diagnostics related to misuse of this continuation.
-  public init(continuation: UnsafeContinuation<T, E>, function: String = #function) {
+  @unsafe public init(continuation: UnsafeContinuation<T, E>, function: String = #function) {
     canary = CheckedContinuationCanary.create(
       continuation: continuation,
       function: function)
@@ -161,7 +161,7 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
   /// After `resume` enqueues the task, control immediately returns to
   /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
-  public func resume(returning value: sending T) {
+  @safe(unchecked) public func resume(returning value: sending T) {
     if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
       c.resume(returning: value)
     } else {
@@ -185,7 +185,7 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
   /// After `resume` enqueues the task, control immediately returns to
   /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
-  public func resume(throwing error: __owned E) {
+  @safe(unchecked) public func resume(throwing error: __owned E) {
     if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
       c.resume(throwing: error)
     } else {
@@ -290,7 +290,7 @@ extension CheckedContinuation {
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
-@inlinable
+@safe(unchecked) @inlinable
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
@@ -313,7 +313,7 @@ public func withCheckedContinuation<T>(
 //
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
-@available(SwiftStdlib 5.1, *)
+@safe(unchecked) @available(SwiftStdlib 5.1, *)
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @_silgen_name("$ss23withCheckedContinuation8function_xSS_yScCyxs5NeverOGXEtYalF")
 public func _unsafeInheritExecutor_withCheckedContinuation<T>(
@@ -354,7 +354,7 @@ public func _unsafeInheritExecutor_withCheckedContinuation<T>(
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
-@inlinable
+@safe(unchecked) @inlinable
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
@@ -377,7 +377,7 @@ public func withCheckedThrowingContinuation<T>(
 //
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
-@available(SwiftStdlib 5.1, *)
+@safe(unchecked) @available(SwiftStdlib 5.1, *)
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @_silgen_name("$ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF")
 public func _unsafeInheritExecutor_withCheckedThrowingContinuation<T>(
@@ -392,7 +392,7 @@ public func _unsafeInheritExecutor_withCheckedThrowingContinuation<T>(
 #if _runtime(_ObjC)
 
 // Intrinsics used by SILGen to create, resume, or fail checked continuations.
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 internal func _createCheckedContinuation<T>(
   _ continuation: __owned UnsafeContinuation<T, Never>
@@ -400,7 +400,7 @@ internal func _createCheckedContinuation<T>(
   return CheckedContinuation(continuation: continuation)
 }
 
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 internal func _createCheckedThrowingContinuation<T>(
   _ continuation: __owned UnsafeContinuation<T, Error>

@@ -16,13 +16,13 @@ import Swift
 
 extension _Deque {
   internal struct _UnsafeHandle {
-    let _header: UnsafeMutablePointer<_DequeBufferHeader>
-    let _elements: UnsafeMutablePointer<Element>
+    @unsafe let _header: UnsafeMutablePointer<_DequeBufferHeader>
+    @unsafe let _elements: UnsafeMutablePointer<Element>
     #if DEBUG
     let _isMutable: Bool
     #endif
 
-    init(
+    @unsafe init(
       header: UnsafeMutablePointer<_DequeBufferHeader>,
       elements: UnsafeMutablePointer<Element>,
       isMutable: Bool
@@ -65,24 +65,24 @@ extension _Deque._UnsafeHandle {
     nonmutating set { _header.pointee.startSlot = newValue }
   }
 
-  func ptr(at slot: Slot) -> UnsafeMutablePointer<Element> {
+  @unsafe func ptr(at slot: Slot) -> UnsafeMutablePointer<Element> {
     assert(slot.position >= 0 && slot.position <= capacity)
     return _elements + slot.position
   }
 }
 
 extension _Deque._UnsafeHandle {
-  var mutableBuffer: UnsafeMutableBufferPointer<Element> {
+  @unsafe var mutableBuffer: UnsafeMutableBufferPointer<Element> {
     assertMutable()
     return .init(start: _elements, count: _header.pointee.capacity)
   }
 
-  internal func buffer(for range: Range<Slot>) -> UnsafeBufferPointer<Element> {
+  @unsafe internal func buffer(for range: Range<Slot>) -> UnsafeBufferPointer<Element> {
     assert(range.upperBound.position <= capacity)
     return .init(start: _elements + range.lowerBound.position, count: range._count)
   }
 
-  internal func mutableBuffer(for range: Range<Slot>) -> UnsafeMutableBufferPointer<Element> {
+  @unsafe internal func mutableBuffer(for range: Range<Slot>) -> UnsafeMutableBufferPointer<Element> {
     assertMutable()
     return .init(mutating: buffer(for: range))
   }
@@ -143,7 +143,7 @@ extension _Deque._UnsafeHandle {
 }
 
 extension _Deque._UnsafeHandle {
-  internal func segments() -> _UnsafeWrappedBuffer<Element> {
+  @safe(unchecked) internal func segments() -> _UnsafeWrappedBuffer<Element> {
     let wrap = capacity - startSlot.position
     if count <= wrap {
       return .init(start: ptr(at: startSlot), count: count)
@@ -152,7 +152,7 @@ extension _Deque._UnsafeHandle {
                  second: ptr(at: .zero), count: count - wrap)
   }
 
-  internal func segments(
+  @safe(unchecked) internal func segments(
     forOffsets offsets: Range<Int>
   ) -> _UnsafeWrappedBuffer<Element> {
     assert(offsets.lowerBound >= 0 && offsets.upperBound <= count)
@@ -179,7 +179,7 @@ extension _Deque._UnsafeHandle {
 }
 
 extension _Deque._UnsafeHandle {
-  internal func availableSegments() -> _UnsafeMutableWrappedBuffer<Element> {
+  @safe(unchecked) internal func availableSegments() -> _UnsafeMutableWrappedBuffer<Element> {
     assertMutable()
     let endSlot = self.endSlot
     guard count < capacity else { return .init(start: ptr(at: endSlot), count: 0) }
@@ -192,7 +192,7 @@ extension _Deque._UnsafeHandle {
 
 
 extension _Deque._UnsafeHandle {
-  @discardableResult
+  @unsafe @discardableResult
   func initialize(
     at start: Slot,
     from source: UnsafeBufferPointer<Element>
@@ -203,7 +203,7 @@ extension _Deque._UnsafeHandle {
     return Slot(at: start.position + source.count)
   }
 
-  @discardableResult
+  @unsafe @discardableResult
   func moveInitialize(
     at start: Slot,
     from source: UnsafeMutableBufferPointer<Element>
@@ -214,7 +214,7 @@ extension _Deque._UnsafeHandle {
     return Slot(at: start.position + source.count)
   }
 
-  @discardableResult
+  @safe(unchecked) @discardableResult
   func move(
     from source: Slot,
     to target: Slot,
@@ -234,7 +234,7 @@ extension _Deque._UnsafeHandle {
 extension _Deque._UnsafeHandle {
   /// Copy elements into a new storage instance without changing capacity or
   /// layout.
-  internal func copyElements() -> _Deque._Storage {
+  @safe(unchecked) internal func copyElements() -> _Deque._Storage {
     let object = _DequeBuffer<Element>.create(
       minimumCapacity: capacity,
       makingHeaderWith: { _ in header })
@@ -252,7 +252,7 @@ extension _Deque._UnsafeHandle {
 
   /// Copy elements into a new storage instance with the specified minimum
   /// capacity.
-  internal func copyElements(minimumCapacity: Int) -> _Deque._Storage {
+  @safe(unchecked) internal func copyElements(minimumCapacity: Int) -> _Deque._Storage {
     assert(minimumCapacity >= count)
     let object = _DequeBuffer<Element>.create(
       minimumCapacity: minimumCapacity,
@@ -283,7 +283,7 @@ extension _Deque._UnsafeHandle {
   /// Move elements into a new storage instance with the specified minimum
   /// capacity. Existing indices in `self` won't necessarily be valid in the
   /// result. `self` is left empty.
-  internal func moveElements(minimumCapacity: Int) -> _Deque._Storage {
+  @safe(unchecked) internal func moveElements(minimumCapacity: Int) -> _Deque._Storage {
     assertMutable()
     let count = self.count
     assert(minimumCapacity >= count)
@@ -315,7 +315,7 @@ extension _Deque._UnsafeHandle {
 }
 
 extension _Deque._UnsafeHandle {
-  internal func withUnsafeSegment<R>(
+  @unsafe internal func withUnsafeSegment<R>(
     startingAt start: Int,
     maximumCount: Int?,
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -363,7 +363,7 @@ extension _Deque._UnsafeHandle {
   ///
   /// This function does not validate its input arguments in release builds. Nor
   /// does it ensure that the storage buffer is uniquely referenced.
-  internal func uncheckedAppend(_ element: Element) {
+  @safe(unchecked) internal func uncheckedAppend(_ element: Element) {
     assertMutable()
     assert(count < capacity)
     ptr(at: endSlot).initialize(to: element)
@@ -375,7 +375,7 @@ extension _Deque._UnsafeHandle {
   ///
   /// This function does not validate its input arguments in release builds. Nor
   /// does it ensure that the storage buffer is uniquely referenced.
-  internal func uncheckedAppend(contentsOf source: UnsafeBufferPointer<Element>) {
+  @unsafe internal func uncheckedAppend(contentsOf source: UnsafeBufferPointer<Element>) {
     assertMutable()
     assert(count + source.count <= capacity)
     guard source.count > 0 else { return }
@@ -389,7 +389,7 @@ extension _Deque._UnsafeHandle {
 // MARK: Prepending
 
 extension _Deque._UnsafeHandle {
-  internal func uncheckedPrepend(_ element: Element) {
+  @safe(unchecked) internal func uncheckedPrepend(_ element: Element) {
     assertMutable()
     assert(count < capacity)
     let slot = self.slot(before: startSlot)
@@ -403,7 +403,7 @@ extension _Deque._UnsafeHandle {
   ///
   /// This function does not validate its input arguments in release builds. Nor
   /// does it ensure that the storage buffer is uniquely referenced.
-  internal func uncheckedPrepend(contentsOf source: UnsafeBufferPointer<Element>) {
+  @unsafe internal func uncheckedPrepend(contentsOf source: UnsafeBufferPointer<Element>) {
     assertMutable()
     assert(count + source.count <= capacity)
     guard source.count > 0 else { return }
@@ -444,7 +444,7 @@ extension _Deque._UnsafeHandle {
     gap.initialize(from: newElements)
   }
 
-  internal func mutableWrappedBuffer(
+  @safe(unchecked) internal func mutableWrappedBuffer(
     between start: Slot,
     and end: Slot
   ) -> _UnsafeMutableWrappedBuffer<Element> {
@@ -597,7 +597,7 @@ extension _Deque._UnsafeHandle {
 // MARK: Removal
 
 extension _Deque._UnsafeHandle {
-  internal func uncheckedRemoveFirst() -> Element {
+  @safe(unchecked) internal func uncheckedRemoveFirst() -> Element {
     assertMutable()
     assert(count > 0)
     let result = ptr(at: startSlot).move()
@@ -606,7 +606,7 @@ extension _Deque._UnsafeHandle {
     return result
   }
 
-  internal func uncheckedRemoveLast() -> Element {
+  @safe(unchecked) internal func uncheckedRemoveLast() -> Element {
     assertMutable()
     assert(count > 0)
     let slot = self.slot(forOffset: count - 1)

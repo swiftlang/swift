@@ -17,7 +17,7 @@ import Builtin
 @usableFromInline
 @_rawLayout(like: Value, movesAsLike)
 internal struct _Cell<Value: ~Copyable>: ~Copyable {
-  @available(SwiftStdlib 6.0, *)
+  @unsafe @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal var _address: UnsafeMutablePointer<Value> {
@@ -31,14 +31,14 @@ internal struct _Cell<Value: ~Copyable>: ~Copyable {
     Builtin.addressOfRawLayout(self)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal init(_ initialValue: consuming Value) {
     _address.initialize(to: initialValue)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   deinit {

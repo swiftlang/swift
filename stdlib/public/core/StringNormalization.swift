@@ -30,7 +30,7 @@ extension Unicode.Scalar {
   }
 }
 
-extension UnsafeBufferPointer where Element == UInt8 {
+@unsafe extension UnsafeBufferPointer where Element == UInt8 {
   internal func hasNormalizationBoundary(before offset: Int) -> Bool {
     if offset == 0 || offset == count {
       return true

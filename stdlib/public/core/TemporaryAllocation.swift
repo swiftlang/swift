@@ -209,7 +209,7 @@ internal func _withUnprotectedUnsafeTemporaryAllocation<
   }
 }
 
-@_alwaysEmitIntoClient @_transparent
+@safe(unchecked) @_alwaysEmitIntoClient @_transparent
 internal func _fallBackToHeapAllocation<R: ~Copyable>(
   byteCount: Int,
   alignment: Int,
@@ -258,7 +258,7 @@ internal func _fallBackToHeapAllocation<R: ~Copyable>(
 /// The buffer pointer passed to `body` (as well as any pointers to elements in
 /// the buffer) must not escape. It will be deallocated when `body` returns and
 /// cannot be used afterward.
-@_alwaysEmitIntoClient @_transparent
+@unsafe @_alwaysEmitIntoClient @_transparent
 public func withUnsafeTemporaryAllocation<R: ~Copyable>(
   byteCount: Int,
   alignment: Int,
@@ -282,7 +282,7 @@ public func withUnsafeTemporaryAllocation<R: ~Copyable>(
 ///
 /// This function is similar to `withUnsafeTemporaryAllocation`, except that it
 /// doesn't trigger stack protection for the stack allocated memory.
-@_alwaysEmitIntoClient @_transparent
+@unsafe @_alwaysEmitIntoClient @_transparent
 public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable>(
   byteCount: Int,
   alignment: Int,
@@ -332,7 +332,7 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable>(
 /// The buffer pointer passed to `body` (as well as any pointers to elements in
 /// the buffer) must not escape. It will be deallocated when `body` returns and
 /// cannot be used afterward.
-@_alwaysEmitIntoClient @_transparent
+@unsafe @_alwaysEmitIntoClient @_transparent
 public func withUnsafeTemporaryAllocation<
   T: ~Copyable,R: ~Copyable
 >(
@@ -359,7 +359,7 @@ public func withUnsafeTemporaryAllocation<
 ///
 /// This function is similar to `withUnsafeTemporaryAllocation`, except that it
 /// doesn't trigger stack protection for the stack allocated memory.
-@_alwaysEmitIntoClient @_transparent
+@unsafe @_alwaysEmitIntoClient @_transparent
 public func _withUnprotectedUnsafeTemporaryAllocation<
   T: ~Copyable, R: ~Copyable
 >(

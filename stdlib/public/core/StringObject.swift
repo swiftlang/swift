@@ -944,14 +944,14 @@ extension _StringObject {
       discriminatedObjectRawBits & Nibbles.largeAddressMask)
   }
 
-  @inline(__always)
+  @unsafe @inline(__always)
   @_alwaysEmitIntoClient
   internal var largeAddress: UnsafeRawPointer {
     UnsafeRawPointer(bitPattern: largeAddressBits)
       ._unsafelyUnwrappedUnchecked
   }
 
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   internal var nativeUTF8Start: UnsafePointer<UInt8> {
     _internalInvariant(largeFastIsTailAllocated)
     return UnsafePointer(
@@ -959,14 +959,14 @@ extension _StringObject {
     )._unsafelyUnwrappedUnchecked
   }
 
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   internal var nativeUTF8: UnsafeBufferPointer<UInt8> {
     _internalInvariant(largeFastIsTailAllocated)
     return UnsafeBufferPointer(start: nativeUTF8Start, count: largeCount)
   }
 
   // Resilient way to fetch a pointer
-  @usableFromInline @inline(never)
+  @unsafe @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func getSharedUTF8Start() -> UnsafePointer<UInt8> {
     _internalInvariant(largeFastIsShared)
@@ -985,7 +985,7 @@ extension _StringObject {
     return withSharedStorage { $0.start }
   }
 
-  @usableFromInline
+  @unsafe @usableFromInline
   internal var sharedUTF8: UnsafeBufferPointer<UInt8> {
     @_effects(releasenone) @inline(never) get {
       _internalInvariant(largeFastIsShared)
@@ -1016,7 +1016,7 @@ extension _StringObject {
 
   /// Call `body` with the native storage object of `self`, without retaining
   /// it.
-  @inline(__always)
+  @safe(unchecked) @inline(__always)
   internal func withNativeStorage<R>(
     _ body: (__StringStorage) -> R
   ) -> R {
@@ -1053,7 +1053,7 @@ extension _StringObject {
 #endif
   }
 
-  @inline(__always)
+  @safe(unchecked) @inline(__always)
   internal func withSharedStorage<R>(
     _ body: (__SharedStringStorage) -> R
   ) -> R {
@@ -1091,7 +1091,7 @@ extension _StringObject {
 
   /// Call `body` with the bridged Cocoa object in `self`, without retaining
   /// it.
-  @inline(__always)
+  @safe(unchecked) @inline(__always)
   @_unavailableInEmbedded
   internal func withCocoaObject<R>(
     _ body: (AnyObject) -> R
@@ -1179,7 +1179,7 @@ extension _StringObject {
   }
 
   // Get access to fast UTF-8 contents for large strings which provide it.
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   internal var fastUTF8: UnsafeBufferPointer<UInt8> {
     _internalInvariant(self.isLarge && self.providesFastUTF8)
     guard _fastPath(self.largeFastIsTailAllocated) else {
@@ -1229,7 +1229,7 @@ extension _StringObject {
 
 // Object creation
 extension _StringObject {
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   internal init(immortal bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
     let countAndFlags = CountAndFlags(
       immortalCount: bufPtr.count, isASCII: isASCII)
@@ -1353,7 +1353,7 @@ extension _StringObject {
   #if !INTERNAL_CHECKS_ENABLED
   @inlinable @inline(__always) internal func _invariantCheck() {}
   #else
-  @usableFromInline @inline(never) @_effects(releasenone)
+  @safe(unchecked) @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
     #if _pointerBitWidth(_64)
     _internalInvariant(MemoryLayout<_StringObject>.size == 16)
@@ -1443,7 +1443,7 @@ extension _StringObject {
   }
   #endif // INTERNAL_CHECKS_ENABLED
 
-  @inline(never)
+  @safe(unchecked) @inline(never)
   internal func _dump() {
 #if INTERNAL_CHECKS_ENABLED && !SWIFT_STDLIB_STATIC_PRINT
     let raw = self.rawBits

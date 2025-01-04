@@ -183,7 +183,7 @@ extension _ArrayBuffer {
   /// `_growArrayCapacity`, but at least kept at `minimumCapacity`.
   ///
   /// This buffer is consumed, i.e. it's released.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @inline(never)
   @_semantics("optimize.sil.specialize.owned2guarantee.never")
   internal __consuming func _consumeAndCreateNew(
@@ -299,7 +299,7 @@ extension _ArrayBuffer {
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer "past the end" of the
   /// just-initialized memory.
-  @inlinable
+  @unsafe @inlinable
   @discardableResult
   __consuming internal func _copyContents(
     subRange bounds: Range<Int>,
@@ -317,7 +317,7 @@ extension _ArrayBuffer {
     return UnsafeMutableRawPointer(result).assumingMemoryBound(to: Element.self)
   }
 
-  @inlinable
+  @unsafe @inlinable
   internal __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
@@ -352,7 +352,7 @@ extension _ArrayBuffer {
   /// A pointer to the first element.
   ///
   /// - Precondition: The elements are known to be stored contiguously.
-  @inlinable
+  @unsafe @inlinable
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
     _internalInvariant(_isNative, "must be a native buffer")
     return _native.firstElementAddress
@@ -361,13 +361,13 @@ extension _ArrayBuffer {
   /// A mutable pointer to the first element.
   ///
   /// - Precondition: the buffer must be mutable.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   internal var mutableFirstElementAddress: UnsafeMutablePointer<Element> {
     _internalInvariant(_isNative, "must be a native buffer")
     return _native.mutableFirstElementAddress
   }
 
-  @inlinable
+  @unsafe @inlinable
   internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
     return _fastPath(_isNative) ? firstElementAddress : nil
   }
@@ -494,7 +494,7 @@ extension _ArrayBuffer {
     return _native.mutableCapacity
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func getElement(_ i: Int, wasNativeTypeChecked: Bool) -> Element {
     if _fastPath(wasNativeTypeChecked) {
@@ -569,7 +569,7 @@ extension _ArrayBuffer {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
-  @usableFromInline
+  @unsafe @usableFromInline
   @_silgen_name("$ss12_ArrayBufferV010withUnsafeB7Pointeryqd__qd__SRyxGKXEKlF")
   internal func __abi_withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -585,7 +585,7 @@ extension _ArrayBuffer {
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   internal func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -599,7 +599,7 @@ extension _ArrayBuffer {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
-  @usableFromInline
+  @unsafe @usableFromInline
   @_silgen_name("$ss12_ArrayBufferV017withUnsafeMutableB7Pointeryqd__qd__SryxGKXEKlF")
   internal mutating func __abi_withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
@@ -611,7 +611,7 @@ extension _ArrayBuffer {
   /// over the underlying contiguous storage.
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   internal mutating func withUnsafeMutableBufferPointer<R, E>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -642,7 +642,7 @@ extension _ArrayBuffer {
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
-  @inlinable
+  @unsafe @inlinable
   internal var identity: UnsafeRawPointer {
     if _isNative {
       return _native.identity

@@ -16,7 +16,7 @@ import Swift
 @available(SwiftStdlib 5.7, *)
 @_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
-  @available(SwiftStdlib 5.7, *)
+  @safe(unchecked) @available(SwiftStdlib 5.7, *)
   internal static func _sleep(
     until seconds: Int64, _ nanoseconds: Int64,
     tolerance: Duration?,

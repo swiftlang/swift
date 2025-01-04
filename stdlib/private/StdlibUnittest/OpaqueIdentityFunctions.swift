@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_silgen_name("getPointer")
+@unsafe @_silgen_name("getPointer")
 func _getPointer(_ x: OpaquePointer) -> OpaquePointer
 
-public func _opaqueIdentity<T>(_ x: T) -> T {
+@safe(unchecked) public func _opaqueIdentity<T>(_ x: T) -> T {
   let ptr = UnsafeMutablePointer<T>.allocate(capacity: 1)
   ptr.initialize(to: x)
   let result =
@@ -23,11 +23,11 @@ public func _opaqueIdentity<T>(_ x: T) -> T {
   return result
 }
 
-func _blackHolePtr<T>(_ x: UnsafePointer<T>) {
+@unsafe func _blackHolePtr<T>(_ x: UnsafePointer<T>) {
   _ = _getPointer(OpaquePointer(x))
 }
 
-public func _blackHole<T>(_ x: T) {
+@safe(unchecked) public func _blackHole<T>(_ x: T) {
   var x = x
   _blackHolePtr(&x)
 }
@@ -82,6 +82,6 @@ public func getFloat64(_ x: Float64) -> Float64 { return _opaqueIdentity(x) }
 public func getFloat80(_ x: Float80) -> Float80 { return _opaqueIdentity(x) }
 #endif
 
-public func getPointer(_ x: OpaquePointer) -> OpaquePointer {
+@unsafe public func getPointer(_ x: OpaquePointer) -> OpaquePointer {
   return _opaqueIdentity(x)
 }

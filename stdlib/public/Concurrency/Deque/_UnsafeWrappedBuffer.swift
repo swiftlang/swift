@@ -15,11 +15,11 @@
 import Swift
 
 internal struct _UnsafeWrappedBuffer<Element> {
-  internal let first: UnsafeBufferPointer<Element>
+  @unsafe internal let first: UnsafeBufferPointer<Element>
 
-  internal let second: UnsafeBufferPointer<Element>?
+  @unsafe internal let second: UnsafeBufferPointer<Element>?
 
-  internal init(
+  @unsafe internal init(
     _ first: UnsafeBufferPointer<Element>,
     _ second: UnsafeBufferPointer<Element>? = nil
   ) {
@@ -28,14 +28,14 @@ internal struct _UnsafeWrappedBuffer<Element> {
     assert(first.count > 0 || second == nil)
   }
 
-  internal init(
+  @unsafe internal init(
     start: UnsafePointer<Element>,
     count: Int
   ) {
     self.init(UnsafeBufferPointer(start: start, count: count))
   }
 
-  internal init(
+  @unsafe internal init(
     first start1: UnsafePointer<Element>,
     count count1: Int,
     second start2: UnsafePointer<Element>,
@@ -49,11 +49,11 @@ internal struct _UnsafeWrappedBuffer<Element> {
 }
 
 internal struct _UnsafeMutableWrappedBuffer<Element> {
-  internal let first: UnsafeMutableBufferPointer<Element>
+  @unsafe internal let first: UnsafeMutableBufferPointer<Element>
 
-  internal let second: UnsafeMutableBufferPointer<Element>?
+  @unsafe internal let second: UnsafeMutableBufferPointer<Element>?
 
-  internal init(
+  @unsafe internal init(
     _ first: UnsafeMutableBufferPointer<Element>,
     _ second: UnsafeMutableBufferPointer<Element>? = nil
   ) {
@@ -62,14 +62,14 @@ internal struct _UnsafeMutableWrappedBuffer<Element> {
     assert(first.count > 0 || second == nil)
   }
 
-  internal init(
+  @unsafe internal init(
     start: UnsafeMutablePointer<Element>,
     count: Int
   ) {
     self.init(UnsafeMutableBufferPointer(start: start, count: count))
   }
 
-  internal init(
+  @unsafe internal init(
     first start1: UnsafeMutablePointer<Element>,
     count count1: Int,
     second start2: UnsafeMutablePointer<Element>,
@@ -79,7 +79,7 @@ internal struct _UnsafeMutableWrappedBuffer<Element> {
               UnsafeMutableBufferPointer(start: start2, count: count2))
   }
 
-  internal init(mutating buffer: _UnsafeWrappedBuffer<Element>) {
+  @safe(unchecked) internal init(mutating buffer: _UnsafeWrappedBuffer<Element>) {
     self.init(.init(mutating: buffer.first),
               buffer.second.map { .init(mutating: $0) })
   }
@@ -88,7 +88,7 @@ internal struct _UnsafeMutableWrappedBuffer<Element> {
 extension _UnsafeMutableWrappedBuffer {
   internal var count: Int { first.count + (second?.count ?? 0) }
 
-  internal func prefix(_ n: Int) -> Self {
+  @safe(unchecked) internal func prefix(_ n: Int) -> Self {
     assert(n >= 0)
     if n >= self.count {
       return self
@@ -99,7 +99,7 @@ extension _UnsafeMutableWrappedBuffer {
     return Self(first, second!.prefix(n - first.count)._rebased())
   }
 
-  internal func suffix(_ n: Int) -> Self {
+  @safe(unchecked) internal func suffix(_ n: Int) -> Self {
     assert(n >= 0)
     if n >= self.count {
       return self
@@ -115,12 +115,12 @@ extension _UnsafeMutableWrappedBuffer {
 }
 
 extension _UnsafeMutableWrappedBuffer {
-  internal func deinitialize() {
+  @safe(unchecked) internal func deinitialize() {
     first._deinitializeAll()
     second?._deinitializeAll()
   }
 
-  internal func initialize<I: IteratorProtocol>(
+  @safe(unchecked) internal func initialize<I: IteratorProtocol>(
     fromPrefixOf iterator: inout I
   ) -> Int
   where I.Element == Element {
@@ -141,7 +141,7 @@ extension _UnsafeMutableWrappedBuffer {
     return wrapped ? first.count + copied : copied
   }
 
-  internal func initialize<S: Sequence>(
+  @safe(unchecked) internal func initialize<S: Sequence>(
     fromSequencePrefix elements: __owned S
   ) -> (iterator: S.Iterator, count: Int)
   where S.Element == Element {
@@ -168,7 +168,7 @@ extension _UnsafeMutableWrappedBuffer {
     return (it, copied)
   }
 
-  internal func initialize<C: Collection>(
+  @safe(unchecked) internal func initialize<C: Collection>(
     from elements: __owned C
   ) where C.Element == Element {
     assert(self.count == elements.count)

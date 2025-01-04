@@ -378,7 +378,7 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   // this function.
   /// Implementation synthesized by the compiler.
   /// Not intended to be invoked explicitly from user code!
-  func invokeHandlerOnReturn(
+  @unsafe func invokeHandlerOnReturn(
     handler: ResultHandler,
     resultBuffer: UnsafeRawPointer,
     metatype: Any.Type
@@ -420,7 +420,7 @@ extension DistributedActorSystem {
   ///           Throws ``ExecuteDistributedTargetMissingAccessorError`` if the `target`
   ///           does not resolve to a valid distributed function accessor, i.e. the
   ///           call identifier is incorrect, corrupted, or simply not present in this process.
-  public func executeDistributedTarget<Act>(
+  @safe(unchecked) public func executeDistributedTarget<Act>(
     on actor: Act,
     target: RemoteCallTarget,
     invocationDecoder: inout InvocationDecoder,
@@ -648,7 +648,7 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
   }
 }
 
-@available(SwiftStdlib 5.7, *)
+@unsafe @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_execute_target")
 func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
   on actor: AnyObject, // : DistributedActor

@@ -42,7 +42,7 @@ extension DistributedActor {
   ///           where this method was called.
   ///   - line: The line number to print if the assertion fails The default is
   ///           where this method was called.
-  @available(SwiftStdlib 5.9, *)
+  @safe(unchecked) @available(SwiftStdlib 5.9, *)
   public nonisolated func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -89,7 +89,7 @@ extension DistributedActor {
   ///           where this method was called.
   ///   - line: The line number to print if the assertion fails The default is
   ///           where this method was called.
-  @available(SwiftStdlib 5.9, *)
+  @safe(unchecked) @available(SwiftStdlib 5.9, *)
   @_transparent
   public nonisolated func assertIsolated(
       _ message: @autoclosure () -> String = String(),
@@ -151,7 +151,7 @@ extension DistributedActor {
   ///           where this method was called.
   /// - Returns: the return value of the `operation`
   /// - Throws: rethrows the `Error` thrown by the operation if it threw
-  @available(SwiftStdlib 5.9, *)
+  @safe(unchecked) @available(SwiftStdlib 5.9, *)
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'distributed actor' instead")
   @_alwaysEmitIntoClient
   public nonisolated func assumeIsolated<T : Sendable>(

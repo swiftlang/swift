@@ -44,7 +44,7 @@ extension String {
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     A pointer to a null-terminated sequence of UTF-8 code units.
-  public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
+  @unsafe public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
     let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
     let buffer = UnsafeBufferPointer(start: nullTerminatedUTF8, count: len)
     self = buffer.withMemoryRebound(to: UInt8.self) {
@@ -65,7 +65,7 @@ extension String {
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     An array containing a null-terminated sequence of UTF-8 code units.
-  @inlinable
+  @safe(unchecked) @inlinable
   @_alwaysEmitIntoClient
   @available(swift, deprecated: 6, message:
     "Use String(decoding: array, as: UTF8.self) instead, after truncating the null termination."
@@ -76,7 +76,7 @@ extension String {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   internal init(_checkingCString bytes: UnsafeBufferPointer<UInt8>) {
     guard let length = bytes.firstIndex(of: 0) else {
       _preconditionFailure(
@@ -111,7 +111,7 @@ extension String {
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     A pointer to a null-terminated sequence of UTF-8 code units.
-  public init(cString nullTerminatedUTF8: UnsafePointer<UInt8>) {
+  @unsafe public init(cString nullTerminatedUTF8: UnsafePointer<UInt8>) {
     let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
     self = String._fromUTF8Repairing(
       UnsafeBufferPointer(start: nullTerminatedUTF8, count: len)).0
@@ -129,7 +129,7 @@ extension String {
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     An array containing a null-terminated UTF-8 code unit sequence.
-  @inlinable
+  @safe(unchecked) @inlinable
   @_alwaysEmitIntoClient
   @available(swift, deprecated: 6, message:
     "Use String(decoding: array, as: UTF8.self) instead, after truncating the null termination."
@@ -140,7 +140,7 @@ extension String {
     }
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "Use a copy of the String argument")
   public init(cString nullTerminatedUTF8: String) {
@@ -186,7 +186,7 @@ extension String {
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     A pointer to a null-terminated sequence of UTF-8 code units.
-  @_silgen_name("$sSS14validatingUTF8SSSgSPys4Int8VG_tcfC")
+  @unsafe @_silgen_name("$sSS14validatingUTF8SSSgSPys4Int8VG_tcfC")
   public init?(validatingCString nullTerminatedUTF8: UnsafePointer<CChar>) {
     let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
     let validated = nullTerminatedUTF8.withMemoryRebound(
@@ -228,7 +228,7 @@ extension String {
   ///
   /// - Parameter cString:
   ///     A pointer to a null-terminated sequence of UTF-8 code units.
-  @inlinable
+  @unsafe @inlinable
   @_alwaysEmitIntoClient
   @available(swift, deprecated: 6, renamed: "String.init(validatingCString:)")
   @_silgen_name("_swift_se0405_String_validatingUTF8")
@@ -248,7 +248,7 @@ extension String {
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     An array containing a null-terminated sequence of UTF-8 code units.
-  @inlinable
+  @safe(unchecked) @inlinable
   @_alwaysEmitIntoClient
   @available(swift, deprecated: 6, message:
     "Use String(validating: array, as: UTF8.self) instead, after truncating the null termination."
@@ -287,7 +287,7 @@ extension String {
     self.init(validatingCString: cString)
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "Use a copy of the String argument")
   public init?(validatingCString nullTerminatedUTF8: String) {
@@ -362,7 +362,7 @@ extension String {
   /// - Returns: A tuple with the new string and a Boolean value that indicates
   ///   whether any repairs were made. If `isRepairing` is `false` and an
   ///   ill-formed sequence is detected, this method returns `nil`.
-  @_specialize(where Encoding == Unicode.UTF8)
+  @unsafe @_specialize(where Encoding == Unicode.UTF8)
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable // Fold away specializations
   public static func decodeCString<Encoding: _UnicodeEncoding>(
@@ -396,7 +396,7 @@ extension String {
       codeUnits, encoding: encoding, repair: isRepairing)
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @_alwaysEmitIntoClient
   public static func decodeCString<Encoding: _UnicodeEncoding>(
     _ cString: [Encoding.CodeUnit],
@@ -430,7 +430,7 @@ extension String {
     }
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "Use a copy of the String argument")
   public static func decodeCString<Encoding: _UnicodeEncoding>(
@@ -473,7 +473,7 @@ extension String {
   ///     code units encoded in `encoding`.
   ///   - encoding: The encoding in which the code units should be
   ///     interpreted.
-  @_specialize(where Encoding == Unicode.UTF8)
+  @unsafe @_specialize(where Encoding == Unicode.UTF8)
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable // Fold away specializations
   public init<Encoding: Unicode.Encoding>(
@@ -511,7 +511,7 @@ extension String {
     self = String.decodeCString(nullTerminatedCodeUnits, as: encoding)!.0
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "Use a copy of the String argument")
   public init<Encoding: _UnicodeEncoding>(
@@ -539,7 +539,7 @@ extension String {
   }
 }
 
-extension UnsafePointer where Pointee == UInt8 {
+@unsafe extension UnsafePointer where Pointee == UInt8 {
   @inlinable
   internal var _asCChar: UnsafePointer<CChar> {
     @inline(__always) get {
@@ -547,7 +547,7 @@ extension UnsafePointer where Pointee == UInt8 {
     }
   }
 }
-extension UnsafePointer where Pointee == CChar {
+@unsafe extension UnsafePointer where Pointee == CChar {
   @inlinable
   internal var _asUInt8: UnsafePointer<UInt8> {
     @inline(__always) get {

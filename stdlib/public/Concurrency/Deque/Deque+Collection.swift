@@ -72,7 +72,7 @@ extension _Deque: Sequence {
     /// exists.
     ///
     /// Once `nil` has been returned, all subsequent calls return `nil`.
-    mutating func next() -> Element? {
+    @safe(unchecked) mutating func next() -> Element? {
       if _nextSlot == _endSlot {
         guard _swapSegment() else { return nil }
       }
@@ -92,7 +92,7 @@ extension _Deque: Sequence {
     Iterator(_base: self)
   }
 
-  __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
+  @safe(unchecked) __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     ContiguousArray(unsafeUninitializedCapacity: _storage.count) { target, count in
       _storage.read { source in
         let segments = source.segments()
@@ -108,7 +108,7 @@ extension _Deque: Sequence {
     }
   }
 
-  __consuming func _copyContents(
+  @unsafe __consuming func _copyContents(
     initializing target: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     _storage.read { source in
@@ -140,7 +140,7 @@ extension _Deque: Sequence {
   ///
   /// - Complexity: O(1) when this instance has a unique reference to its
   ///    underlying storage; O(`count`) otherwise.
-  func withContiguousStorageIfAvailable<R>(
+  @unsafe func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try _storage.read { handle in
@@ -381,7 +381,7 @@ extension _Deque: MutableCollection {
   ///
   /// - Complexity: O(1) when this instance has a unique reference to its
   ///    underlying storage; O(`count`) otherwise.
-  mutating func swapAt(_ i: Int, _ j: Int) {
+  @safe(unchecked) mutating func swapAt(_ i: Int, _ j: Int) {
     precondition(i >= 0 && i < count, "Index out of bounds")
     precondition(j >= 0 && j < count, "Index out of bounds")
     _storage.ensureUnique()
@@ -412,7 +412,7 @@ extension _Deque: MutableCollection {
   /// - Complexity: O(1) when this instance has a unique reference to its
   ///    underlying storage; O(`count`) otherwise. (Not counting the call to
   ///    `body`.)
-  mutating func withContiguousMutableStorageIfAvailable<R>(
+  @unsafe mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     _storage.ensureUnique()
@@ -432,7 +432,7 @@ extension _Deque: MutableCollection {
     }
   }
 
-  mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+  @unsafe mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withContiguousMutableStorageIfAvailable(body)
@@ -529,7 +529,7 @@ extension _Deque: RangeReplaceableCollection {
   ///      or greater.
   ///
   /// - Complexity: O(`count`)
-  init(repeating repeatedValue: Element, count: Int) {
+  @safe(unchecked) init(repeating repeatedValue: Element, count: Int) {
     precondition(count >= 0)
     self.init(minimumCapacity: count)
     _storage.update { handle in
@@ -558,7 +558,7 @@ extension _Deque: RangeReplaceableCollection {
   ///   - elements: The collection of elements to turn into a deque.
   ///
   /// - Complexity: O(`elements.count`)
-  init<C: Collection>(_ elements: C) where C.Element == Element {
+  @safe(unchecked) init<C: Collection>(_ elements: C) where C.Element == Element {
     let c = elements.count
     guard c > 0 else { _storage = _Storage(); return }
     self._storage = _Storage(minimumCapacity: c)
@@ -619,7 +619,7 @@ extension _Deque: RangeReplaceableCollection {
   /// - Parameter newElements: The elements to append to the deque.
   ///
   /// - Complexity: Amortized O(`newElements.count`).
-  mutating func append<S: Sequence>(contentsOf newElements: S) where S.Element == Element {
+  @safe(unchecked) mutating func append<S: Sequence>(contentsOf newElements: S) where S.Element == Element {
     let done: Void? = newElements._withContiguousStorageIfAvailable_SR14663 { source in
       _storage.ensureUnique(minimumCapacity: count + source.count)
       _storage.update { $0.uncheckedAppend(contentsOf: source) }
@@ -660,7 +660,7 @@ extension _Deque: RangeReplaceableCollection {
   /// - Parameter newElements: The elements to append to the deque.
   ///
   /// - Complexity: Amortized O(`newElements.count`).
-  mutating func append<C: Collection>(contentsOf newElements: C) where C.Element == Element {
+  @safe(unchecked) mutating func append<C: Collection>(contentsOf newElements: C) where C.Element == Element {
     let done: Void? = newElements._withContiguousStorageIfAvailable_SR14663 { source in
       _storage.ensureUnique(minimumCapacity: count + source.count)
       _storage.update { $0.uncheckedAppend(contentsOf: source) }
@@ -692,7 +692,7 @@ extension _Deque: RangeReplaceableCollection {
   ///    towards the beginning or the end of the deque to minimize the number of
   ///    elements that need to be moved. When inserting at the start or the end,
   ///    this reduces the complexity to amortized O(1).
-  mutating func insert(_ newElement: Element, at index: Int) {
+  @safe(unchecked) mutating func insert(_ newElement: Element, at index: Int) {
     precondition(index >= 0 && index <= count,
                  "Can't insert element at invalid index")
     _storage.ensureUnique(minimumCapacity: count + 1)

@@ -66,7 +66,7 @@ import Swift
 /// as resuming a continuation, may acquire these same internal locks.
 /// Therefore, if a cancellation handler must acquire a lock, other code should
 /// not cancel tasks or resume continuations while holding that lock.
-@available(SwiftStdlib 5.1, *)
+@safe(unchecked) @available(SwiftStdlib 5.1, *)
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
@@ -89,7 +89,7 @@ public func withTaskCancellationHandler<T>(
 //
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
-@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
+@safe(unchecked) @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("$ss27withTaskCancellationHandler9operation8onCancelxxyYaKXE_yyYbXEtYaKlF")
 public func _unsafeInheritExecutor_withTaskCancellationHandler<T>(
@@ -157,12 +157,12 @@ public struct CancellationError: Error {
   public init() {}
 }
 
-@usableFromInline
+@unsafe @usableFromInline
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_addCancellationHandler")
 func _taskAddCancellationHandler(handler: () -> Void) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
 
-@usableFromInline
+@unsafe @usableFromInline
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_removeCancellationHandler")
 func _taskRemoveCancellationHandler(

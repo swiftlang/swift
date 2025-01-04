@@ -81,7 +81,7 @@ extension Mutex where Value: ~Copyable {
   ///   acquired the lock.
   ///
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func withLock<Result: ~Copyable, E: Error>(
@@ -128,7 +128,7 @@ extension Mutex where Value: ~Copyable {
   ///
   /// - Returns: The return value, if any, of the `body` closure parameter
   ///   or nil if the lock couldn't be acquired.
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func withLockIfAvailable<Result: ~Copyable, E: Error>(

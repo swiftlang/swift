@@ -16,7 +16,7 @@
 
 import SwiftShims
 
-@inline(__always)
+@unsafe @inline(__always)
 internal func _loadPartialUnalignedUInt64LE(
   _ p: UnsafeRawPointer,
   byteCount: Int
@@ -209,7 +209,7 @@ extension Hasher {
       }
     }
 
-    @inline(__always)
+    @unsafe @inline(__always)
     internal mutating func combine(bytes: UnsafeRawBufferPointer) {
       var remaining = bytes.count
       guard remaining > 0 else { return }
@@ -254,7 +254,7 @@ extension Hasher {
 }
 
 #if $Embedded
-@usableFromInline
+@safe(unchecked) @usableFromInline
 var _swift_stdlib_Hashing_parameters: _SwiftHashingParameters = {
   var seed0: UInt64 = 0, seed1: UInt64 = 0
   swift_stdlib_random(&seed0, MemoryLayout<UInt64>.size)
@@ -394,7 +394,7 @@ public struct Hasher {
   /// hasher state.
   ///
   /// - Parameter bytes: A raw memory buffer.
-  @_effects(releasenone)
+  @unsafe @_effects(releasenone)
   public mutating func combine(bytes: UnsafeRawBufferPointer) {
     _core.combine(bytes: bytes)
   }
@@ -464,7 +464,7 @@ public struct Hasher {
     return Int(truncatingIfNeeded: state.finalize(tailAndByteCount: tbc.value))
   }
 
-  @_effects(readnone)
+  @unsafe @_effects(readnone)
   @usableFromInline
   internal static func _hash(
     seed: Int,
