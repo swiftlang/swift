@@ -99,7 +99,7 @@ std::optional<bool> forEachModuleSearchPath(
         callback) {
   for (const auto &path : Ctx.SearchPathOpts.getImportSearchPaths())
     if (auto result =
-            callback(path, ModuleSearchPathKind::Import, /*isSystem=*/false))
+            callback(path.Path, ModuleSearchPathKind::Import, path.IsSystem))
       return result;
 
   for (const auto &path : Ctx.SearchPathOpts.getFrameworkSearchPaths())

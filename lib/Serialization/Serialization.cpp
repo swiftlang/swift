@@ -1335,8 +1335,8 @@ void Serializer::writeInputBlock() {
       SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
                       PathObfuscator.obfuscate(PathMapper.remapPath(framepath.Path)));
     for (const auto &path : searchPathOpts.getImportSearchPaths())
-      SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false,
-                      PathObfuscator.obfuscate(PathMapper.remapPath(path)));
+      SearchPath.emit(ScratchRecord, /*framework=*/false, path.IsSystem,
+                      PathObfuscator.obfuscate(PathMapper.remapPath(path.Path)));
   }
 
   // Note: We're not using StringMap here because we don't need to own the

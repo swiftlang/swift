@@ -350,7 +350,11 @@ int main(int argc, char *argv[]) {
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
 
   Invocation.setSDKPath(options::SDK);
-  Invocation.setImportSearchPaths(options::ImportPaths);
+  std::vector<SearchPathOptions::SearchPath> ImportPaths;
+  for (const auto &path : options::ImportPaths) {
+    ImportPaths.push_back({path, /*isSystem=*/false});
+  }
+  Invocation.setImportSearchPaths(ImportPaths);
   if (!options::Triple.empty())
     Invocation.setTargetTriple(options::Triple);
 
