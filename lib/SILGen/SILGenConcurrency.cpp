@@ -15,7 +15,7 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ProtocolConformance.h"

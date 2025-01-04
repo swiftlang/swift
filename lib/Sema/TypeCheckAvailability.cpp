@@ -23,6 +23,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsParse.h"

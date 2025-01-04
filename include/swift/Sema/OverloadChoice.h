@@ -18,11 +18,11 @@
 #ifndef SWIFT_SEMA_OVERLOADCHOICE_H
 #define SWIFT_SEMA_OVERLOADCHOICE_H
 
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/FunctionRefInfo.h"
 #include "swift/AST/Types.h"
+#include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
 
