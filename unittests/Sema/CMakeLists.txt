@@ -4,6 +4,7 @@ add_swift_unittest(swiftSemaTests
   BindingInferenceTests.cpp
   ConstraintGenerationTests.cpp
   ConstraintSimplificationTests.cpp
+  ConstraintSystemDumpTests.cpp
   UnresolvedMemberLookupTests.cpp
   PlaceholderTypeInferenceTests.cpp
   SolutionFilteringTests.cpp
