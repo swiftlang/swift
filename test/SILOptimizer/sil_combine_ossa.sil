@@ -2855,7 +2855,21 @@ bb0(%0 : @owned $Klass):
   %2 = open_existential_ref %1 : $AnyObject to $@opened("7CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self
   %f = function_ref @use_generic_obj_guaranteed : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
   apply %f<@opened("7CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self>(%2) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+  %3 = unchecked_ref_cast %2 : $@opened("7CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self to $Builtin.NativeObject
+  return %3 : $Builtin.NativeObject
+}
 
+// CHECK-LABEL: sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned4 :
+// CHECK:     apply {{.*}}<Klass>
+// CHECK: } // end sil function 'collapse_existential_pack_unpack_unchecked_ref_cast_owned4'
+sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned4 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Klass):
+  %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
+  %f1 = function_ref @use_anyobject_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
+  apply %f1(%1) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("7CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self
+  %f2 = function_ref @use_generic_obj_guaranteed : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+  apply %f2<@opened("7CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self>(%2) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
   %3 = unchecked_ref_cast %2 : $@opened("7CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self to $Builtin.NativeObject
   return %3 : $Builtin.NativeObject
 }
