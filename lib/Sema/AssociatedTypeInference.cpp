@@ -37,6 +37,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -45,9 +46,9 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"

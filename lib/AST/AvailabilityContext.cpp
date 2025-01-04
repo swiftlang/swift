@@ -13,6 +13,7 @@
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityContextStorage.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Assertions.h"
 

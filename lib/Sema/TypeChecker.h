@@ -20,7 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericParamList.h"
