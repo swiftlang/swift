@@ -1704,6 +1704,9 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t RelativeProtocolWitnessTable = 0xb830; // = 47152
 
   const uint16_t TypeLayoutString = 0x8b65; // = 35685
+
+  /// Isolated deinit body function pointer
+  const uint16_t DeinitWorkFunction = 0x8438; // = 33848
 }
 
 /// The number of arguments that will be passed directly to a generic
