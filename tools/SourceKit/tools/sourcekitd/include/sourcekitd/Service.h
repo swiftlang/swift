@@ -14,6 +14,7 @@
 #define LLVM_SOURCEKITD_SERVICE_H
 
 #include "SourceKit/Support/CancellationToken.h"
+#include "sourcekitd/plugin.h"
 #include "sourcekitd/sourcekitd.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -34,6 +35,22 @@ void initializeService(
     std::function<void(sourcekitd_response_t)> postNotification);
 /// Shutdown the service.
 void shutdownService();
+
+/// Register a custom request handler. Must be called only during plugin
+/// loading.
+void pluginRegisterRequestHandler(
+    sourcekitd_cancellable_request_handler_t handler);
+
+/// Register a cancellation handler that will be called when a request is
+/// cancelled.
+/// This function is called even for cancelled requests that are handled by
+/// sourcekitd itself and not the plugin. If the plugin doesn't know the request
+/// handle to be cancelled, it should ignore the cancellation request.
+/// Must be called only during plugin loading.
+void pluginRegisterCancellationHandler(
+    sourcekitd_cancellation_handler_t handler);
+
+void *pluginGetOpaqueSwiftIDEInspectionInstance();
 
 typedef std::function<void(sourcekitd_response_t)> ResponseReceiver;
 
