@@ -48,7 +48,7 @@ using SourceKit::SourceKitCancellationToken;
 static const unsigned ProtocolMajorVersion = 1;
 static const unsigned ProtocolMinorVersion = 0;
 
-enum class CustomBufferKind {
+enum class CustomBufferKind : size_t {
   TokenAnnotationsArray,
   DeclarationsArray,
   DocSupportAnnotationArray,
@@ -259,6 +259,8 @@ struct PluginInitParams {
 
 void loadPlugins(llvm::ArrayRef<std::string> registeredPlugins,
                  PluginInitParams &pluginParams);
+
+VariantFunctions *getPluginVariantFunctions(size_t BufKind);
 }
 
 #endif

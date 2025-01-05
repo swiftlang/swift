@@ -670,19 +670,6 @@ sourcekitd_response_get_value(sourcekitd_response_t resp) {
   ((const void*)(((const uint64_t*)xpc_data_get_bytes_ptr(xobj))+1))
 #define CUSTOM_BUF_SIZE(xobj) (xpc_data_get_length(xobj) - sizeof(uint64_t))
 
-// Note: only modified during plugin loading.
-static std::vector<VariantFunctions *> PluginVariantFunctions;
-
-VariantFunctions *getPluginVariantFunctions(size_t BufKind) {
-  size_t index = BufKind - (size_t)CustomBufferKind::CustomBufferKind_End;
-  if (index >= PluginVariantFunctions.size() ||
-      PluginVariantFunctions[index] == nullptr) {
-    llvm::report_fatal_error(
-        "unknown custom buffer kind; possible plugin loading failure");
-  }
-  return PluginVariantFunctions[index];
-}
-
 static sourcekitd_variant_type_t XPCVar_get_type(sourcekitd_variant_t var) {
   xpc_object_t obj = XPC_OBJ(var);
   
@@ -1059,18 +1046,6 @@ sourcekitd_variant_type_t sourcekitd_request_get_type(sourcekitd_object_t obj) {
   if (XType == XPC_TYPE_NULL)
     return SOURCEKITD_VARIANT_TYPE_NULL;
   llvm::report_fatal_error("unkown sourcekitd_object_t type");
-}
-
-void sourcekitd::pluginRegisterCustomBufferKind(
-    uint64_t kind, sourcekitd_variant_functions_t funcs) {
-  auto index = kind - (uint64_t)CustomBufferKind::CustomBufferKind_End;
-  if (index < PluginVariantFunctions.size()) {
-    assert(PluginVariantFunctions[index] == nullptr &&
-           "overwriting existing buffer");
-  } else {
-    PluginVariantFunctions.resize(index + 1);
-  }
-  PluginVariantFunctions[index] = static_cast<VariantFunctions *>(funcs);
 }
 
 void sourcekitd_response_dictionary_set_custom_buffer(

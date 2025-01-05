@@ -17,6 +17,7 @@
 #define NOMINMAX
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Windows/WindowsSupport.h"
+#include "swift/Basic/LLVM.h"
 #include <windows.h>
 #else
 #include <dlfcn.h>

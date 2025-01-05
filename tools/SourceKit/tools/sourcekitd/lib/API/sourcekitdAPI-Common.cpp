@@ -896,7 +896,7 @@ void YAMLRequestParser::initError(StringRef Desc, llvm::yaml::Node *Node,
 sourcekitd_variant_functions_t sourcekitd_variant_functions_create() {
   auto *vfuncs = new VariantFunctions();
   // Zero-initialize.
-  bzero(vfuncs, sizeof(VariantFunctions));
+  memset(vfuncs, 0, sizeof(VariantFunctions));
   return vfuncs;
 }
 
@@ -1132,4 +1132,31 @@ PluginInitParams::PluginInitParams(
     customBufferStart = std::max(customBufferStart, kind + 1);
   };
   this->opaqueIDEInspectionInstance = opaqueIDEInspectionInstance;
+}
+
+// MARK: Plugin variant functions
+
+// Note: only modified during plugin loading.
+static std::vector<VariantFunctions *> PluginVariantFunctions;
+
+VariantFunctions *sourcekitd::getPluginVariantFunctions(size_t BufKind) {
+  size_t index = BufKind - (size_t)CustomBufferKind::CustomBufferKind_End;
+  if (index >= PluginVariantFunctions.size() ||
+      PluginVariantFunctions[index] == nullptr) {
+    llvm::report_fatal_error(
+        "unknown custom buffer kind; possible plugin loading failure");
+  }
+  return PluginVariantFunctions[index];
+}
+
+void sourcekitd::pluginRegisterCustomBufferKind(
+    uint64_t kind, sourcekitd_variant_functions_t funcs) {
+  auto index = kind - (uint64_t)CustomBufferKind::CustomBufferKind_End;
+  if (index < PluginVariantFunctions.size()) {
+    assert(PluginVariantFunctions[index] == nullptr &&
+           "overwriting existing buffer");
+  } else {
+    PluginVariantFunctions.resize(index + 1);
+  }
+  PluginVariantFunctions[index] = static_cast<VariantFunctions *>(funcs);
 }
