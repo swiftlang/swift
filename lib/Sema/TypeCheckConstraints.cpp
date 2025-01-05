@@ -790,11 +790,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                    TypeCheckExprOptions options) {
   SyntacticElementTarget target =
       PBD ? SyntacticElementTarget::forInitialization(
-                initializer, patternType, PBD, patternNumber,
-                /*bindPatternVarsOneWay=*/false)
+                initializer, patternType, PBD, patternNumber)
           : SyntacticElementTarget::forInitialization(
-                initializer, DC, patternType, pattern,
-                /*bindPatternVarsOneWay=*/false);
+                initializer, DC, patternType, pattern);
 
   // Type-check the initializer.
   auto resultTarget = typeCheckExpression(target, options);
@@ -892,10 +890,25 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
     return true;
   };
 
-  auto target = SyntacticElementTarget::forForEachPreamble(
-      stmt, dc, /*ignoreWhereClause=*/false, packElementEnv);
+  auto target =
+      SyntacticElementTarget::forForEachPreamble(stmt, dc, packElementEnv);
   if (!typeCheckTarget(target))
     return failed();
+
+  if (auto *where = stmt->getWhere()) {
+    auto boolType = dc->getASTContext().getBoolType();
+    if (!boolType)
+      return failed();
+
+    SyntacticElementTarget whereClause(stmt->getWhere(), dc,
+                                       {boolType, CTP_Condition},
+                                       /*isDiscarded=*/false);
+    auto result = typeCheckTarget(whereClause);
+    if (!result)
+      return true;
+
+    stmt->setWhere(result->getAsExpr());
+  }
 
   // Check to see if the sequence expr is throwing (in async context),
   // if so require the stmt to have a `try`.
