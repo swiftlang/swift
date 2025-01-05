@@ -114,10 +114,6 @@ private:
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
 
-      /// Whether to bind the variables encountered within the pattern to
-      /// fresh type variables via one-way constraints.
-      bool bindPatternVarsOneWay;
-
       union {
         struct {
           /// The pattern binding declaration for an initialization, if any.
@@ -165,10 +161,9 @@ private:
       ForEachStmt *stmt;
       DeclContext *dc;
       Pattern *pattern;
-      bool ignoreWhereClause;
       GenericEnvironment *packElementEnv;
       ForEachStmtInfo info;
-    } forEachStmt;
+    } forEachPreamble;
 
     PatternBindingDecl *patternBinding;
   };
@@ -246,35 +241,33 @@ public:
   }
 
   SyntacticElementTarget(ForEachStmt *stmt, DeclContext *dc,
-                         bool ignoreWhereClause,
                          GenericEnvironment *packElementEnv)
       : kind(Kind::forEachPreamble) {
-    forEachStmt.stmt = stmt;
-    forEachStmt.dc = dc;
-    forEachStmt.ignoreWhereClause = ignoreWhereClause;
-    forEachStmt.packElementEnv = packElementEnv;
+    forEachPreamble.stmt = stmt;
+    forEachPreamble.dc = dc;
+    forEachPreamble.packElementEnv = packElementEnv;
   }
 
   /// Form a target for the initialization of a pattern from an expression.
   static SyntacticElementTarget
   forInitialization(Expr *initializer, DeclContext *dc, Type patternType,
-                    Pattern *pattern, bool bindPatternVarsOneWay);
+                    Pattern *pattern);
 
   /// Form a target for the initialization of a pattern binding entry from
   /// an expression.
   static SyntacticElementTarget
   forInitialization(Expr *initializer, Type patternType,
                     PatternBindingDecl *patternBinding,
-                    unsigned patternBindingIndex, bool bindPatternVarsOneWay);
+                    unsigned patternBindingIndex);
 
   /// Form an expression target for a ReturnStmt.
   static SyntacticElementTarget
   forReturn(ReturnStmt *returnStmt, Type contextTy, DeclContext *dc);
 
-  /// Form a target for the preamble of a for-in loop, excluding its body.
+  /// Form a target for the preamble of a for-in loop, excluding its where
+  /// clause and body.
   static SyntacticElementTarget
   forForEachPreamble(ForEachStmt *stmt, DeclContext *dc,
-                     bool ignoreWhereClause = false,
                      GenericEnvironment *packElementEnv = nullptr);
 
   /// Form a target for a property with an attached property wrapper that is
@@ -376,7 +369,7 @@ public:
     }
 
     case Kind::forEachPreamble:
-      return forEachStmt.dc;
+      return forEachPreamble.dc;
     }
     llvm_unreachable("invalid decl context type");
   }
@@ -500,16 +493,6 @@ public:
     return false;
   }
 
-  /// Whether to bind the types of any variables within the pattern via
-  /// one-way constraints.
-  bool shouldBindPatternVarsOneWay() const {
-    if (kind == Kind::expression)
-      return expression.bindPatternVarsOneWay;
-    if (kind == Kind::forEachPreamble)
-      return !ignoreForEachWhereClause() && forEachStmt.stmt->getWhere();
-    return false;
-  }
-
   /// Whether or not an opaque value placeholder should be injected into the
   /// first \c wrappedValue argument of an apply expression so the initializer
   /// expression can be turned into a property wrapper generator function.
@@ -555,24 +538,19 @@ public:
     return expression.initialization.patternBindingIndex;
   }
 
-  bool ignoreForEachWhereClause() const {
-    assert(isForEachPreamble());
-    return forEachStmt.ignoreWhereClause;
-  }
-
   GenericEnvironment *getPackElementEnv() const {
     assert(isForEachPreamble());
-    return forEachStmt.packElementEnv;
+    return forEachPreamble.packElementEnv;
   }
 
   const ForEachStmtInfo &getForEachStmtInfo() const {
     assert(isForEachPreamble());
-    return forEachStmt.info;
+    return forEachPreamble.info;
   }
 
   ForEachStmtInfo &getForEachStmtInfo() {
     assert(isForEachPreamble());
-    return forEachStmt.info;
+    return forEachPreamble.info;
   }
 
   /// Whether this context infers an opaque return type.
@@ -599,7 +577,7 @@ public:
       return getInitializationPattern();
 
     if (kind == Kind::forEachPreamble)
-      return forEachStmt.pattern;
+      return forEachPreamble.pattern;
 
     return nullptr;
   }
@@ -612,7 +590,7 @@ public:
     }
 
     if (kind == Kind::forEachPreamble) {
-      forEachStmt.pattern = pattern;
+      forEachPreamble.pattern = pattern;
       return;
     }
 
@@ -743,7 +721,7 @@ public:
       return nullptr;
 
     case Kind::forEachPreamble:
-      return forEachStmt.stmt;
+      return forEachPreamble.stmt;
     }
     llvm_unreachable("invalid case label type");
   }
@@ -855,7 +833,7 @@ public:
 
     // For-in preamble target doesn't cover the body.
     case Kind::forEachPreamble:
-      auto *stmt = forEachStmt.stmt;
+      auto *stmt = forEachPreamble.stmt;
       SourceLoc startLoc = stmt->getForLoc();
       SourceLoc endLoc = stmt->getParsedSequence()->getEndLoc();
 
@@ -898,7 +876,7 @@ public:
     }
 
     case Kind::forEachPreamble:
-      return forEachStmt.stmt->getStartLoc();
+      return forEachPreamble.stmt->getStartLoc();
     }
     llvm_unreachable("invalid target type");
   }
