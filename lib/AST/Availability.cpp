@@ -145,21 +145,23 @@ mergeIntoInferredVersion(const std::optional<llvm::VersionTuple> &Version,
 /// Merge an attribute's availability with an existing inferred availability
 /// so that the new inferred availability is at least as available as
 /// the attribute requires.
-static void mergeWithInferredAvailability(const AvailableAttr *Attr,
+static void mergeWithInferredAvailability(SemanticAvailableAttr Attr,
                                           InferredAvailability &Inferred) {
-  Inferred.PlatformAgnostic
-    = static_cast<PlatformAgnosticAvailabilityKind>(
+  auto *ParsedAttr = Attr.getParsedAttr();
+  Inferred.PlatformAgnostic = static_cast<PlatformAgnosticAvailabilityKind>(
       std::max(static_cast<unsigned>(Inferred.PlatformAgnostic),
-               static_cast<unsigned>(Attr->getPlatformAgnosticAvailability())));
+               static_cast<unsigned>(
+                   ParsedAttr->getPlatformAgnosticAvailability())));
 
   // The merge of two introduction versions is the maximum of the two versions.
-  if (mergeIntoInferredVersion(Attr->Introduced, Inferred.Introduced, std::max)) {
-    Inferred.IsSPI = Attr->isSPI();
+  if (mergeIntoInferredVersion(Attr.getIntroduced(), Inferred.Introduced,
+                               std::max)) {
+    Inferred.IsSPI = ParsedAttr->isSPI();
   }
 
   // The merge of deprecated and obsoleted versions takes the minimum.
-  mergeIntoInferredVersion(Attr->Deprecated, Inferred.Deprecated, std::min);
-  mergeIntoInferredVersion(Attr->Obsoleted, Inferred.Obsoleted, std::min);
+  mergeIntoInferredVersion(Attr.getDeprecated(), Inferred.Deprecated, std::min);
+  mergeIntoInferredVersion(Attr.getObsoleted(), Inferred.Obsoleted, std::min);
 }
 
 /// Create an implicit availability attribute for the given platform
@@ -204,36 +206,34 @@ void AvailabilityInference::applyInferredAvailableAttrs(
 
   // Iterate over the declarations and infer required availability on
   // a per-platform basis.
+  // FIXME: [availability] Generalize to AvailabilityDomain.
   std::map<PlatformKind, InferredAvailability> Inferred;
   for (const Decl *D : InferredFromDecls) {
-    llvm::SmallVector<const AvailableAttr *, 8> MergedAttrs;
+    llvm::SmallVector<SemanticAvailableAttr, 8> MergedAttrs;
 
     do {
-      llvm::SmallVector<const AvailableAttr *, 8> PendingAttrs;
+      llvm::SmallVector<SemanticAvailableAttr, 8> PendingAttrs;
 
-      for (const DeclAttribute *Attr : D->getAttrs()) {
-        auto *AvAttr = dyn_cast<AvailableAttr>(Attr);
-        if (!AvAttr || AvAttr->isInvalid())
-          continue;
-
+      for (auto AvAttr :
+           D->getSemanticAvailableAttrs()) {
         // Skip an attribute from an outer declaration if it is for a platform
         // that was already handled implicitly by an attribute from an inner
         // declaration.
-        if (llvm::any_of(
-                MergedAttrs, [&AvAttr](const AvailableAttr *MergedAttr) {
-                  return inheritsAvailabilityFromPlatform(
-                      AvAttr->getPlatform(), MergedAttr->getPlatform());
-                }))
+        if (llvm::any_of(MergedAttrs,
+                         [&AvAttr](SemanticAvailableAttr MergedAttr) {
+                           return inheritsAvailabilityFromPlatform(
+                               AvAttr.getPlatform(), MergedAttr.getPlatform());
+                         }))
           continue;
 
-        mergeWithInferredAvailability(AvAttr, Inferred[AvAttr->getPlatform()]);
+        mergeWithInferredAvailability(AvAttr, Inferred[AvAttr.getPlatform()]);
         PendingAttrs.push_back(AvAttr);
 
-        if (Message.empty() && !AvAttr->Message.empty())
-          Message = AvAttr->Message;
+        if (Message.empty() && !AvAttr.getMessage().empty())
+          Message = AvAttr.getMessage();
 
-        if (Rename.empty() && !AvAttr->Rename.empty())
-          Rename = AvAttr->Rename;
+        if (Rename.empty() && !AvAttr.getRename().empty())
+          Rename = AvAttr.getRename();
       }
 
       MergedAttrs.append(PendingAttrs);
