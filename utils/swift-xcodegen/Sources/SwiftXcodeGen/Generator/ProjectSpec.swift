@@ -206,9 +206,7 @@ extension ProjectSpec {
     guard let path = mapPath(path, for: "Clang target") else { return }
     let name = name ?? path.fileName
     clangTargetSources.append(ClangTargetSource(
-      at: path, named: name,
-      mayHaveUnbuildableFiles: mayHaveUnbuildableFiles,
-      inferArgs: inferArgs
+      at: path, named: name, mayHaveUnbuildableFiles: mayHaveUnbuildableFiles
     ))
   }
 

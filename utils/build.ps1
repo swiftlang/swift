@@ -1201,7 +1201,7 @@ function Build-CMakeProject {
     }
 
     if ($UseBuiltCompilers.Contains("Swift")) {
-      $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$(Get-CMarkBinaryCache $Arch)\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
+      $env:Path = "$($BuildArch.SDKInstallRoot)\usr\bin;$(Get-CMarkBinaryCache $BuildArch)\src;$($BuildArch.ToolchainInstallRoot)\usr\bin;$(Get-PinnedToolchainRuntime);${env:Path}"
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
       $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
@@ -1524,7 +1524,6 @@ function Build-Compilers() {
         SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
-        SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS = "YES";
         SWIFT_ENABLE_SYNCHRONIZATION = "YES";
         SWIFT_ENABLE_VOLATILE = "YES";
         SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
@@ -1835,7 +1834,6 @@ function Build-Runtime([Platform]$Platform, $Arch) {
         SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
-        SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS = "YES";
         SWIFT_ENABLE_SYNCHRONIZATION = "YES";
         SWIFT_ENABLE_VOLATILE = "YES";
         SWIFT_NATIVE_SWIFT_TOOLS_PATH = (Join-Path -Path $CompilersBinaryCache -ChildPath "bin");
@@ -1928,6 +1926,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -UseBuiltCompilers ASM,C,CXX,Swift `
         -SwiftSDK:$SDKRoot `
         -Defines (@{
+          CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
           ENABLE_TESTING = "NO";
           FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
           CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
@@ -1969,7 +1968,7 @@ function Build-FoundationMacros() {
 
   $SwiftSDK = $null
   if ($Build) {
-    $SwiftSDK = $BuildArch.SDKInstallRoot
+    $SwiftSDK = $(Get-PinnedToolchainSDK)
   }
 
   $InstallDir = $null
@@ -2621,7 +2620,7 @@ function Build-TestingMacros() {
 
   $SwiftSDK = $null
   if ($Build) {
-    $SwiftSDK = $BuildArch.SDKInstallRoot
+    $SwiftSDK = $(Get-PinnedToolchainSDK)
   }
 
   $Targets = if ($Build) {

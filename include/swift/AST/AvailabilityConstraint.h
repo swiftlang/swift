@@ -17,7 +17,7 @@
 #ifndef SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 #define SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LLVM.h"
 

@@ -56,7 +56,7 @@ private func run<InstType: SILCombineSimplifyable>(_ instType: InstType.Type,
 private func registerForSILCombine<InstType: SILCombineSimplifyable>(
       _ instType: InstType.Type,
       _ runFn: @escaping (@convention(c) (BridgedInstructionPassCtxt) -> ())) {
-  String(describing: instType)._withBridgedStringRef { instClassStr in
+  "\(instType)"._withBridgedStringRef { instClassStr in
     SILCombine_registerInstructionPass(instClassStr, runFn)
   }
 }
@@ -117,6 +117,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(DestructureTupleInst.self, { run(DestructureTupleInst.self, $0) })
   registerForSILCombine(TypeValueInst.self, { run(TypeValueInst.self, $0) })
   registerForSILCombine(ClassifyBridgeObjectInst.self, { run(ClassifyBridgeObjectInst.self, $0) })
+  registerForSILCombine(PointerToAddressInst.self,  { run(PointerToAddressInst.self, $0) })
   registerForSILCombine(UncheckedEnumDataInst.self, { run(UncheckedEnumDataInst.self, $0) })
 
   // Test passes

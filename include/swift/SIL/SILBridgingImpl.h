@@ -22,6 +22,7 @@
 #include "SILBridging.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BasicBridging.h"
@@ -283,12 +284,11 @@ BridgedType::EnumElementIterator BridgedType::EnumElementIterator::getNext() con
   return bridge(std::next(unbridge(*this)));
 }
 
-BridgedType BridgedType::createObjectType(BridgedCanType canTy) {
-  return swift::SILType::getPrimitiveObjectType(canTy.unbridged());
-}
-
-BridgedType BridgedType::createAddressType(BridgedCanType canTy) {
-  return swift::SILType::getPrimitiveAddressType(canTy.unbridged());
+BridgedType BridgedType::createSILType(BridgedCanType canTy) {
+  auto ty = canTy.unbridged();
+  if (ty->isLegalSILType())
+    return swift::SILType::getPrimitiveObjectType(ty);
+  return swift::SILType();
 }
 
 BridgedOwnedString BridgedType::getDebugDescription() const {
@@ -419,10 +419,6 @@ bool BridgedType::isVoid() const {
 
 bool BridgedType::isEmpty(BridgedFunction f) const {
   return unbridged().isEmpty(*f.getFunction());
-}
-
-BridgedType::TraitResult BridgedType::canBeClass() const {
-  return (TraitResult)unbridged().canBeClass();
 }
 
 bool BridgedType::isMoveOnly() const {
@@ -912,7 +908,10 @@ bool BridgedFunction::isResilientNominalDecl(BridgedDeclObj decl) const {
                                                            getFunction()->getResilienceExpansion());
 }
 
-BridgedType BridgedFunction::getLoweredType(BridgedASTType type) const {
+BridgedType BridgedFunction::getLoweredType(BridgedASTType type, bool maximallyAbstracted) const {
+  if (maximallyAbstracted) {
+    return BridgedType(getFunction()->getLoweredType(swift::Lowering::AbstractionPattern::getOpaque(), type.type));
+  }
   return BridgedType(getFunction()->getLoweredType(type.type));
 }
 
@@ -922,6 +921,14 @@ BridgedType BridgedFunction::getLoweredType(BridgedType type) const {
 
 swift::SILFunction * _Nullable OptionalBridgedFunction::getFunction() const {
   return static_cast<swift::SILFunction *>(obj);
+}
+
+BridgedFunction::OptionalSourceFileKind BridgedFunction::getSourceFileKind() const {
+  if (auto *dc = getFunction()->getDeclContext()) {
+    if (auto *sourceFile = dc->getParentSourceFile())
+      return (OptionalSourceFileKind)sourceFile->Kind;
+  }
+  return OptionalSourceFileKind::None;
 }
 
 //===----------------------------------------------------------------------===//
@@ -977,24 +984,7 @@ SwiftInt BridgedMultiValueResult::getIndex() const {
 }
 
 //===----------------------------------------------------------------------===//
-//                                BridgedTypeArray
-//===----------------------------------------------------------------------===//
-
-BridgedTypeArray 
-BridgedTypeArray::fromReplacementTypes(BridgedSubstitutionMap substMap) {
-  return {substMap.unbridged().getReplacementTypes()};
-}
-
-BridgedType BridgedTypeArray::getAt(SwiftInt index) const {
-  swift::Type origTy = typeArray.unbridged<swift::Type>()[index];
-  auto ty = origTy->getCanonicalType();
-  if (ty->isLegalSILType())
-    return swift::SILType::getPrimitiveObjectType(ty);
-  return swift::SILType();
-}
-
-//===----------------------------------------------------------------------===//
-//                                BridgedTypeArray
+//                              BridgedSILTypeArray
 //===----------------------------------------------------------------------===//
 
 BridgedType BridgedSILTypeArray::getAt(SwiftInt index) const {
@@ -1142,12 +1132,33 @@ BridgedInstruction::IntrinsicID BridgedInstruction::BuiltinInst_getIntrinsicID()
   }
 }
 
+BridgedStringRef BridgedInstruction::BuiltinInst_getName() const {
+  return getAs<swift::BuiltinInst>()->getName().str();
+}
+
 BridgedSubstitutionMap BridgedInstruction::BuiltinInst_getSubstitutionMap() const {
   return getAs<swift::BuiltinInst>()->getSubstitutions();
 }
 
 bool BridgedInstruction::PointerToAddressInst_isStrict() const {
   return getAs<swift::PointerToAddressInst>()->isStrict();
+}
+
+bool BridgedInstruction::PointerToAddressInst_isInvariant() const {
+  return getAs<swift::PointerToAddressInst>()->isInvariant();
+}
+
+uint64_t BridgedInstruction::PointerToAddressInst_getAlignment() const {
+  auto maybeAlign = getAs<swift::PointerToAddressInst>()->alignment();
+  if (maybeAlign.has_value()) {
+    assert(maybeAlign->value() != 0);
+    return maybeAlign->value();
+  }
+  return 0;
+}
+
+void BridgedInstruction::PointerToAddressInst_setAlignment(uint64_t alignment) const {
+  getAs<swift::PointerToAddressInst>()->setAlignment(llvm::MaybeAlign(alignment));
 }
 
 bool BridgedInstruction::AddressToPointerInst_needsStackProtection() const {
@@ -1929,6 +1940,17 @@ swift::SILLocation BridgedBuilder::regularLoc() const {
   return swift::RegularLocation(loc.getLoc().getLocation());
 }
 
+BridgedInstruction BridgedBuilder::createBuiltin(BridgedStringRef name, BridgedType type,
+                                                 BridgedSubstitutionMap subs,
+                                                 BridgedValueArray arguments) const {
+  llvm::SmallVector<swift::SILValue, 16> argValues;
+  auto builder = unbridged();
+  auto ident = builder.getASTContext().getIdentifier(name.unbridged());
+  return {builder.createBuiltin(
+      regularLoc(), ident, type.unbridged(),
+      subs.unbridged(), arguments.getValues(argValues))};
+}
+
 BridgedInstruction BridgedBuilder::createBuiltinBinaryFunction(BridgedStringRef name,
                                                BridgedType operandType, BridgedType resultType,
                                                BridgedValueArray arguments) const {
@@ -1990,9 +2012,28 @@ BridgedInstruction BridgedBuilder::createAddressToPointer(BridgedValue address, 
                                              needsStackProtection)};
 }
 
+BridgedInstruction BridgedBuilder::createPointerToAddress(BridgedValue pointer, BridgedType addressTy,
+                                                          bool isStrict, bool isInvariant,
+                                                          uint64_t alignment) const {
+  return {unbridged().createPointerToAddress(regularLoc(), pointer.getSILValue(), addressTy.unbridged(),
+                                             isStrict, isInvariant,
+                                             alignment == 0 ? llvm::MaybeAlign() : llvm::Align(alignment))};
+}
+
+BridgedInstruction BridgedBuilder::createIndexAddr(BridgedValue base, BridgedValue index,
+                                                   bool needsStackProtection) const {
+  return {unbridged().createIndexAddr(regularLoc(), base.getSILValue(), index.getSILValue(),
+                                      needsStackProtection)};
+}
+
 BridgedInstruction BridgedBuilder::createUncheckedRefCast(BridgedValue op, BridgedType type) const {
   return {unbridged().createUncheckedRefCast(regularLoc(), op.getSILValue(),
                                              type.unbridged())};
+}
+
+BridgedInstruction BridgedBuilder::createUncheckedAddrCast(BridgedValue op, BridgedType type) const {
+  return {unbridged().createUncheckedAddrCast(regularLoc(), op.getSILValue(),
+                                              type.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType type) const {

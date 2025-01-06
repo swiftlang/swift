@@ -797,3 +797,13 @@ Added: _$ss7RawSpanV9byteCountSivpMV
 Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
+
+// _SwiftifyInfo enum for _SwiftifyImports macro
+Added: _$ss13_SwiftifyInfoO11nonescapingyABSi_tcABmFWC
+Added: _$ss13_SwiftifyInfoO7endedByyABSi_SitcABmFWC
+Added: _$ss13_SwiftifyInfoO7sizedByyABSi_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO9countedByyABSi_SStcABmFWC
+Added: _$ss13_SwiftifyInfoOMa
+Added: _$ss13_SwiftifyInfoOMn
+Added: _$ss13_SwiftifyInfoON
+

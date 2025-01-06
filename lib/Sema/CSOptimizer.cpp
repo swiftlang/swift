@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/Basic/OptionSet.h"
@@ -59,6 +60,12 @@ static bool isIntegerType(Type type) {
 
 static bool isFloatType(Type type) {
   return type->isFloat() || type->isDouble() || type->isFloat80();
+}
+
+static bool isUnboundArrayType(Type type) {
+  if (auto *UGT = type->getAs<UnboundGenericType>())
+    return UGT->getDecl() == type->getASTContext().getArrayDecl();
+  return false;
 }
 
 static bool isSupportedOperator(Constraint *disjunction) {
@@ -298,9 +305,19 @@ static void determineBestChoicesInContext(
           case ExprKind::Binary:
           case ExprKind::PrefixUnary:
           case ExprKind::PostfixUnary:
-          case ExprKind::UnresolvedDot:
-            recordResult(disjunction, {/*score=*/1.0});
+          case ExprKind::UnresolvedDot: {
+            llvm::SmallVector<Constraint *, 2> favoredChoices;
+            // Favor choices that don't require application.
+            llvm::copy_if(
+                disjunction->getNestedConstraints(),
+                std::back_inserter(favoredChoices), [](Constraint *choice) {
+                  auto *decl = getOverloadChoiceDecl(choice);
+                  return decl &&
+                         !decl->getInterfaceType()->is<AnyFunctionType>();
+                });
+            recordResult(disjunction, {/*score=*/1.0, favoredChoices});
             continue;
+          }
 
           default:
             break;
@@ -536,6 +553,30 @@ static void determineBestChoicesInContext(
         if (candidateType->isCGFloat() && paramType->isDouble()) {
           return options.contains(MatchFlag::Literal) ? 0.2 : 0.9;
         }
+      }
+
+      // Match `[...]` to Array<...> and/or `ExpressibleByArrayLiteral`
+      // conforming types.
+      if (options.contains(MatchFlag::OnParam) &&
+          options.contains(MatchFlag::Literal) &&
+          isUnboundArrayType(candidateType)) {
+        // If an exact match is requested favor only `[...]` to `Array<...>`
+        // since everything else is going to increase to score.
+        if (options.contains(MatchFlag::ExactOnly))
+          return paramType->isArrayType() ? 1 : 0;
+
+        // Otherwise, check if the other side conforms to
+        // `ExpressibleByArrayLiteral` protocol (in some way).
+        // We want an overly optimistic result here to avoid
+        // under-favoring.
+        auto &ctx = cs.getASTContext();
+        return checkConformanceWithoutContext(
+                   paramType,
+                   ctx.getProtocol(
+                       KnownProtocolKind::ExpressibleByArrayLiteral),
+                   /*allowMissing=*/true)
+                   ? 0.3
+                   : 0;
       }
 
       if (options.contains(MatchFlag::ExactOnly))

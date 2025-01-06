@@ -141,3 +141,229 @@ exit:
 die:
   unreachable
 }
+
+// CHECK-LABEL: sil [ossa] @unreachable_def : {{.*}} {
+// CHECK:       bb2:
+// CHECK-NEXT:    [[DEF:%[^,]+]] = apply
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_value [dead_end] [[DEF]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_def'
+sil [ossa] @unreachable_def : $@convention(thin) () -> () {
+entry:
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+
+nowhere:
+  %def = apply undef() : $@convention(thin) () -> (@owned C)
+  br die
+
+die:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unreachable_def_2 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] :
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK-NEXT:    unreachable
+// CHECK:       [[RIGHT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_def_2'
+sil [ossa] @unreachable_def_2 : $@convention(thin) () -> () {
+entry:
+  %t = tuple ()
+  return %t : $()
+
+not(%c : @owned $C):
+  cond_br undef, left, right
+
+left:
+  unreachable
+
+right:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unreachable_def_3 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] :
+// CHECK:         cond_br
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK-NEXT:    unreachable
+// CHECK:       [[RIGHT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_def_3'
+sil [ossa] @unreachable_def_3 : $@convention(thin) () -> () {
+entry:
+  %t = tuple ()
+  return %t : $()
+
+header(%c : @owned $C):
+  br body
+
+body:
+  cond_br undef, die, backedge
+
+backedge:
+  br header(%c)
+
+die:
+  cond_br undef, left, right
+
+left:
+  unreachable
+
+right:
+  unreachable
+}
+
+// Ensure that `header` is completed before `postloop` (postloop would
+// erroneously be added as a root if a search for loops wasn't done).
+// CHECK-LABEL: sil [ossa] @unreachable_def_4 : {{.*}} {
+// CHECK:         [[C2:%[^,]+]] = apply
+// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] :
+// CHECK:         cond_br
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C2]]
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK-NEXT:    unreachable
+// CHECK:       [[RIGHT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C2]]
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_def_4'
+sil [ossa] @unreachable_def_4 : $@convention(thin) () -> () {
+entry:
+  %t = tuple ()
+  return %t : $()
+
+// Put this here so it appears before the loop when iterating over the
+// function's blocks.
+postloop:
+  %c2 = apply undef() : $@convention(thin) () -> (@owned C)
+  br die
+
+header(%c : @owned $C):
+  br body
+
+body:
+  cond_br undef, postloop, backedge
+
+backedge:
+  br header(%c)
+
+die:
+  cond_br undef, left, right
+
+left:
+  unreachable
+
+right:
+  unreachable
+}
+
+// Check that values backwards reachable from dead-end loops are completed.
+// CHECK-LABEL: sil [ossa] @unreachable_def_5 : {{.*}} {
+// CHECK:         apply undef([[C:%[^)]+]])
+// CHECK-NEXT:    extend_lifetime [[C]]
+// CHECK-LABEL: } // end sil function 'unreachable_def_5'
+sil [ossa] @unreachable_def_5 : $@convention(thin) () -> () {
+entry:
+  %t = tuple ()
+  return %t : $()
+
+header:
+  %c = apply undef() : $@convention(thin) () -> (@owned C)
+  br body
+
+body:
+  cond_br undef, die, backedge
+
+backedge:
+  destroy_value %c
+  br header
+
+die:
+  br deadend_header
+
+deadend_header:
+  apply undef(%c) : $@convention(thin) (@guaranteed C) -> ()
+  br deadend_backedge
+
+deadend_backedge:
+  br deadend_header
+}
+
+// CHECK-LABEL: sil [ossa] @unreachable_def_6 : {{.*}} {
+// CHECK:         [[C2:%[^,]+]] = apply
+// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] : @owned
+// CHECK:       {{bb[0-9]+}}([[C3:%[^,]+]] : @owned
+// CHECK:         cond_br
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C2]]
+// CHECK-NEXT:    destroy_value [dead_end] [[C3]]
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK-NEXT:    unreachable
+// CHECK:       [[RIGHT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C2]]
+// CHECK-NEXT:    destroy_value [dead_end] [[C3]]
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_def_6'
+sil [ossa] @unreachable_def_6 : $@convention(thin) () -> () {
+entry:
+  %t = tuple ()
+  return %t : $()
+
+// Put this here so it appears before the loop when iterating over the
+// function's blocks.
+postloop:
+  %c2 = apply undef() : $@convention(thin) () -> (@owned C)
+  br die
+
+header_1(%c : @owned $C):
+  br body_1
+
+body_1:
+  cond_br undef, postloop_1, backedge_1
+
+backedge_1:
+  br header_1(%c)
+
+postloop_1:
+  br postloop
+
+header_2(%c3 : @owned $C):
+  br body_2
+
+body_2:
+  cond_br undef, postloop_2, backedge_2
+
+backedge_2:
+  br header_2(%c3)
+
+postloop_2:
+  br postloop
+
+die:
+  apply undef(%c) : $@convention(thin) (@guaranteed C) -> ()
+  apply undef(%c3) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, left, right
+
+left:
+  unreachable
+
+right:
+  unreachable
+}

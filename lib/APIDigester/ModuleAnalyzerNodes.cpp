@@ -1339,14 +1339,16 @@ std::optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
 // check for if it has @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 static bool isABIPlaceHolder(Decl *D) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
-  for (auto *ATT: D->getAttrs()) {
-    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->getPlatform() != PlatformKind::none && AVA->Introduced &&
-          AVA->Introduced->getMajor() == 9999) {
-        Platforms.insert(AVA->getPlatform());
-      }
+  for (auto semanticAttr : D->getSemanticAvailableAttrs()) {
+    auto attr = semanticAttr.getParsedAttr();
+    auto domain = semanticAttr.getDomain();
+    if (domain.isPlatform() && attr->Introduced &&
+        attr->Introduced->getMajor() == 9999) {
+      Platforms.insert(attr->getPlatform());
     }
   }
+
+  // FIXME: This probably isn't correct anymore, now that visionOS exists
   return Platforms.size() == 4;
 }
 
@@ -1361,11 +1363,11 @@ static bool isABIPlaceholderRecursive(Decl *D) {
 StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
   if (!D)
     return StringRef();
-  for (auto *ATT: D->getAttrs()) {
-    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->getPlatform() == Kind && AVA->Introduced) {
-        return buffer(AVA->Introduced->getAsString());
-      }
+  for (auto semanticAttr : D->getSemanticAvailableAttrs()) {
+    auto attr = semanticAttr.getParsedAttr();
+    auto domain = semanticAttr.getDomain();
+    if (domain.getPlatformKind() == Kind && attr->Introduced) {
+      return buffer(attr->Introduced->getAsString());
     }
   }
   return StringRef();
@@ -1374,11 +1376,12 @@ StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
 StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
   if (!D)
     return StringRef();
-  for (auto *ATT: D->getAttrs()) {
-    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->isLanguageVersionSpecific() && AVA->Introduced) {
-        return buffer(AVA->Introduced->getAsString());
-      }
+  for (auto semanticAttr : D->getSemanticAvailableAttrs()) {
+    auto attr = semanticAttr.getParsedAttr();
+    auto domain = semanticAttr.getDomain();
+
+    if (domain.isSwiftLanguage() && attr->Introduced) {
+      return buffer(attr->Introduced->getAsString());
     }
   }
   return getLanguageIntroVersion(D->getDeclContext()->getAsDecl());

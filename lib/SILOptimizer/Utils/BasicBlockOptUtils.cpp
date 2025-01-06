@@ -10,13 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/SIL/LoopInfo.h"
+#include "swift/SIL/StackList.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
-#include "swift/SIL/LoopInfo.h"
 
 using namespace swift;
 
@@ -25,9 +26,11 @@ using namespace swift;
 bool ReachableBlocks::visit(function_ref<bool(SILBasicBlock *)> visitor) {
   // Walk over the CFG, starting at the entry block, until all reachable blocks
   // are visited.
-  SILBasicBlock *entryBB = visited.getFunction()->getEntryBlock();
-  SmallVector<SILBasicBlock *, 8> worklist = {entryBB};
-  visited.insert(entryBB);
+  auto *function = visited.getFunction();
+  auto *entry = function->getEntryBlock();
+  StackList<SILBasicBlock *> worklist(function);
+  worklist.push_back(entry);
+  visited.insert(entry);
   while (!worklist.empty()) {
     SILBasicBlock *bb = worklist.pop_back_val();
     if (!visitor(bb))
@@ -39,6 +42,12 @@ bool ReachableBlocks::visit(function_ref<bool(SILBasicBlock *)> visitor) {
     }
   }
   return true;
+}
+
+void ReachableBlocks::compute() {
+  // Visit all the blocks without doing any extra work.
+  visit([](SILBasicBlock *) { return true; });
+  isComputed = true;
 }
 
 ReachingReturnBlocks::ReachingReturnBlocks(SILFunction *function)
@@ -57,15 +66,14 @@ ReachingReturnBlocks::ReachingReturnBlocks(SILFunction *function)
 
 bool swift::removeUnreachableBlocks(SILFunction &f) {
   ReachableBlocks reachable(&f);
-  // Visit all the blocks without doing any extra work.
-  reachable.visit([](SILBasicBlock *) { return true; });
+  reachable.compute();
 
   // Remove the blocks we never reached. Assume the entry block is visited.
   // Reachable's visited set contains dangling pointers during this loop.
   bool changed = false;
   for (auto ii = std::next(f.begin()), end = f.end(); ii != end;) {
     auto *bb = &*ii++;
-    if (!reachable.isVisited(bb)) {
+    if (!reachable.isReachable(bb)) {
       bb->removeDeadBlock();
       changed = true;
     }

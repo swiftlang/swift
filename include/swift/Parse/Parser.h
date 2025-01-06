@@ -933,7 +933,7 @@ public:
   bool isStartOfGetSetAccessor();
 
   /// Flags that control the parsing of declarations.
-  enum ParseDeclFlags {
+  enum ParseDeclFlags : uint16_t {
     PD_Default              = 0,
     PD_AllowTopLevel        = 1 << 1,
     PD_HasContainerType     = 1 << 2,
@@ -944,6 +944,7 @@ public:
     PD_InExtension          = 1 << 7,
     PD_InStruct             = 1 << 8,
     PD_InEnum               = 1 << 9,
+    PD_StubOnly             = 1 << 10,
   };
 
   /// Options that control the parsing of declarations.
@@ -953,20 +954,24 @@ public:
 
   ParserStatus parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
                          bool IfConfigsAreDeclAttrs,
-                         llvm::function_ref<void(Decl *)> Handler);
+                         llvm::function_ref<void(Decl *)> Handler,
+                         bool stubOnly = false);
 
   std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
 
   bool parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
                            Diag<> LBraceDiag, Diag<> RBraceDiag,
-                           IterableDeclContext *IDC);
+                           IterableDeclContext *IDC,
+                           ParseDeclOptions Flags);
 
   bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
                                  bool &HasNestedClassDeclarations,
-                                 bool &HasDerivativeDeclarations);
+                                 bool &HasDerivativeDeclarations,
+                                 ParseDeclOptions Flags);
 
-  bool canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations);
+  bool canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations,
+                                   ParseDeclOptions Flags);
 
   bool delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                             IterableDeclContext *IDC);
@@ -1318,7 +1323,8 @@ public:
                                        bool HasFuncKeyword = true);
   BodyAndFingerprint
   parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
-  void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
+  void parseAbstractFunctionBody(AbstractFunctionDecl *AFD,
+                                 ParseDeclOptions Flags);
   BodyAndFingerprint
   parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
 

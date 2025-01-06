@@ -38,11 +38,13 @@ using namespace constraints;
 ConstraintGraph::ConstraintGraph(ConstraintSystem &cs) : CS(cs) { }
 
 ConstraintGraph::~ConstraintGraph() {
-  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
-    auto &impl = TypeVariables[i]->getImpl();
-    delete impl.getGraphNode();
-    impl.setGraphNode(nullptr);
+#ifndef NDEBUG
+  for (unsigned i = 0, n = CS.TypeVariables.size(); i != n; ++i) {
+    auto &impl = CS.TypeVariables[i]->getImpl();
+    ASSERT(impl.getGraphNode() == nullptr);
   }
+#endif
+
   for (auto *node : FreeList) {
     delete node;
   }
@@ -70,12 +72,7 @@ void ConstraintGraph::addTypeVariable(TypeVariableType *typeVar) {
     FreeList.pop_back();
     nodePtr->initTypeVariable(typeVar);
   }
-  unsigned index = TypeVariables.size();
   impl.setGraphNode(nodePtr);
-  impl.setGraphIndex(index);
-
-  // Record this type variable.
-  TypeVariables.push_back(typeVar);
 
   if (CS.solverState)
     CS.recordChange(SolverTrail::Change::AddedTypeVariable(typeVar));
@@ -83,17 +80,8 @@ void ConstraintGraph::addTypeVariable(TypeVariableType *typeVar) {
 
 ConstraintGraphNode &
 ConstraintGraph::operator[](TypeVariableType *typeVar) {
-  // Check whether we've already created a node for this type variable.
-  auto &impl = typeVar->getImpl();
-  auto *nodePtr = impl.getGraphNode();
-  if (!nodePtr) {
-    llvm::errs() << "Type variable $T" << impl.getID() << " not in constraint graph\n";
-    abort();
-  }
+  auto *nodePtr = typeVar->getImpl().getGraphNode();
   ASSERT(nodePtr->TypeVar == typeVar && "Use-after-free");
-  DEBUG_ASSERT(impl.getGraphIndex() < TypeVariables.size() && "Out-of-bounds index");
-  DEBUG_ASSERT(TypeVariables[impl.getGraphIndex()] == typeVar &&
-               "Type variable mismatch");
   return *nodePtr;
 }
 
@@ -372,17 +360,10 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
 void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
   // Remove this node.
   auto &impl = typeVar->getImpl();
-  unsigned index = impl.getGraphIndex();
   auto *node = impl.getGraphNode();
   node->reset();
   FreeList.push_back(node);
   impl.setGraphNode(nullptr);
-
-  // Remove this type variable from the list.
-  unsigned lastIndex = TypeVariables.size()-1;
-  if (index < lastIndex)
-    TypeVariables[index] = TypeVariables[lastIndex];
-  TypeVariables.pop_back();
 }
 
 void ConstraintGraph::addConstraint(Constraint *constraint) {
@@ -590,20 +571,17 @@ void ConstraintGraph::retractBindings(TypeVariableType *typeVar,
 ///
 /// \param cg The constraint graph.
 /// \param typeVar The type variable we're searching from.
-/// \param preVisitNode Called before traversing a node. Must return \c
-/// false when the node has already been visited.
-/// \param visitConstraint Called before considering a constraint. If it
-/// returns \c false, that constraint will be skipped.
+/// \param visitConstraint Called before considering a constraint.
 /// \param visitedConstraints Set of already-visited constraints, used
 /// internally to avoid duplicated work.
 static void depthFirstSearch(
     ConstraintGraph &cg,
     TypeVariableType *typeVar,
-    llvm::function_ref<bool(TypeVariableType *)> preVisitNode,
-    llvm::function_ref<bool(Constraint *)> visitConstraint,
+    llvm::function_ref<void(Constraint *)> visitConstraint,
+    llvm::SmallPtrSet<TypeVariableType *, 4> &typeVars,
     llvm::SmallPtrSet<Constraint *, 8> &visitedConstraints) {
   // Visit this node. If we've already seen it, bail out.
-  if (!preVisitNode(typeVar))
+  if (!typeVars.insert(typeVar).second)
     return;
 
   // Local function to visit adjacent type variables.
@@ -613,21 +591,18 @@ static void depthFirstSearch(
         continue;
 
       // Recurse into this node.
-      depthFirstSearch(cg, adj, preVisitNode, visitConstraint,
-                       visitedConstraints);
+      depthFirstSearch(cg, adj, visitConstraint, typeVars, visitedConstraints);
     }
   };
 
-  // Walk all of the constraints associated with this node to find related
-  // nodes.
+  // Walk all of the constraints associated with this node.
   auto &node = cg[typeVar];
   for (auto constraint : node.getConstraints()) {
     // If we've already seen this constraint, skip it.
     if (!visitedConstraints.insert(constraint).second)
       continue;
 
-    if (visitConstraint(constraint))
-      visitAdjacencies(constraint->getTypeVariables());
+    visitConstraint(constraint);
   }
 
   // Visit all of the other nodes in the equivalence class.
@@ -650,26 +625,6 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     TypeVariableType *typeVar, GatheringKind kind,
     llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
   llvm::TinyPtrVector<Constraint *> constraints;
-  // Whether we should consider this constraint at all.
-  auto shouldConsiderConstraint = [&](Constraint *constraint) {
-    // For a one-way constraint, only consider it when the left-hand side of
-    // the binding is one of the type variables currently under consideration,
-    // as only such constraints need solving for this component. Note that we
-    // don't perform any other filtering, as the constraint system should be
-    // responsible for checking any other conditions.
-    if (constraint->isOneWayConstraint()) {
-      auto lhsTypeVar = constraint->getFirstType()->castTo<TypeVariableType>();
-      return CS.isActiveTypeVariable(lhsTypeVar);
-    }
-
-    return true;
-  };
-
-  auto acceptConstraint = [&](Constraint *constraint) {
-    return shouldConsiderConstraint(constraint) &&
-        acceptConstraintFn(constraint);
-  };
-
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
   llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
 
@@ -678,17 +633,11 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     // constraints involving both it and its fixed bindings.
     depthFirstSearch(
         *this, typeVar,
-        [&](TypeVariableType *typeVar) {
-          return typeVars.insert(typeVar).second;
-        },
         [&](Constraint *constraint) {
-          if (acceptConstraint(constraint))
+          if (acceptConstraintFn(constraint))
             constraints.push_back(constraint);
-
-          // Don't recurse into the constraint's type variables.
-          return false;
         },
-        visitedConstraints);
+        typeVars, visitedConstraints);
     return constraints;
   }
 
@@ -702,7 +651,7 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
 
     for (auto constraint : (*this)[adjTypeVar].getConstraints()) {
       if (visitedConstraints.insert(constraint).second &&
-          acceptConstraint(constraint))
+          acceptConstraintFn(constraint))
         constraints.push_back(constraint);
     }
   };
@@ -717,7 +666,7 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
 
     for (auto constraint : node.getConstraints()) {
       if (visitedConstraints.insert(constraint).second &&
-          acceptConstraint(constraint))
+          acceptConstraintFn(constraint))
         constraints.push_back(constraint);
     }
 
@@ -740,36 +689,9 @@ namespace {
     ConstraintGraph &cg;
     ArrayRef<TypeVariableType *> typeVars;
 
-    /// A mapping from each type variable to its representative in a union-find
-    /// data structure, excluding entries where the type variable is its own
-    /// representative.
-    mutable llvm::SmallDenseMap<TypeVariableType *, TypeVariableType *>
-        representatives;
-
-    // Figure out which components have unbound type variables and/or
-    // constraints. These are the only components we want to report.
-    llvm::SmallDenseSet<TypeVariableType *> validComponents;
-
-    /// The complete set of constraints that were visited while computing
-    /// connected components.
-    llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
-
-    /// Describes the one-way incoming and outcoming adjacencies of
-    /// a component within the directed graph of one-way constraints.
-    struct OneWayComponent {
-      /// The (uniqued) set of type variable representatives to which this
-      /// component has an outgoing edge.
-      TinyPtrVector<TypeVariableType *> outAdjacencies;
-
-      /// The (uniqued) set of type variable representatives from which this
-      /// component has an incoming edge.
-      TinyPtrVector<TypeVariableType *> inAdjacencies;
-    };
-
-    // Adjacency list representation of the directed graph of edges for
-    // one-way constraints, using type variable representatives as the
-    // nodes.
-    llvm::SmallDenseMap<TypeVariableType *, OneWayComponent> oneWayDigraph;
+    /// The number of connected components discovered so far. Decremented when
+    /// we merge equivalence classes.
+    unsigned validComponentCount = 0;
 
   public:
     using Component = ConstraintGraph::Component;
@@ -780,14 +702,7 @@ namespace {
                         ArrayRef<TypeVariableType *> typeVars)
         : cg(cg), typeVars(typeVars)
     {
-      auto oneWayConstraints = connectedComponents();
-
-      // If there were no one-way constraints, we're done.
-      if (oneWayConstraints.empty())
-        return;
-
-      // Build the directed one-way constraint graph.
-      buildOneWayConstraintGraph(oneWayConstraints);
+      connectedComponents();
     }
 
     /// Retrieve the set of components.
@@ -795,10 +710,9 @@ namespace {
       // The final return value.
       SmallVector<Component, 1> flatComponents;
 
-
       // We don't actually need to partition the graph into components if
       // there are fewer than 2.
-      if (validComponents.size() < 2 && cg.getOrphanedConstraints().empty())
+      if (validComponentCount < 2 && cg.getOrphanedConstraints().empty())
         return flatComponents;
 
       // Mapping from representatives to components.
@@ -809,8 +723,8 @@ namespace {
       for (auto typeVar : typeVars) {
         // Find the representative. If we aren't creating a type variable
         // for this component, skip it.
-        auto rep = findRepresentative(typeVar);
-        if (validComponents.count(rep) == 0)
+        auto rep = typeVar->getImpl().getComponent();
+        if (!rep->getImpl().isValidComponent())
           continue;
 
         auto pair = components.insert({rep, Component(components.size())});
@@ -839,49 +753,9 @@ namespace {
         if (constraintTypeVars.empty())
           continue;
 
-        TypeVariableType *typeVar;
-        if (constraint.isOneWayConstraint()) {
-          // For one-way constraints, associate the constraint with the
-          // left-hand type variable.
-          typeVar = constraint.getFirstType()->castTo<TypeVariableType>();
-        } else {
-          typeVar = constraintTypeVars.front();
-        }
-
-        auto rep = findRepresentative(typeVar);
+        TypeVariableType *typeVar = constraintTypeVars.front();
+        auto rep = typeVar->getImpl().getComponent();
         getComponent(rep).addConstraint(&constraint);
-      }
-
-      // If we have any one-way constraint information, compute the ordering
-      // of representative type variables needed to respect one-way
-      // constraints while solving.
-      if (!oneWayDigraph.empty()) {
-        // Sort the representative type variables based on the disjunction
-        // count, so
-        std::sort(representativeTypeVars.begin(), representativeTypeVars.end(),
-                  [&](TypeVariableType *lhs, TypeVariableType *rhs) {
-                    return getComponent(lhs).getNumDisjunctions() >
-                        getComponent(rhs).getNumDisjunctions();
-                  });
-        
-        representativeTypeVars =
-            computeOneWayComponentOrdering(representativeTypeVars);
-
-        // Fill in one-way dependency information for all of the components.
-        for (auto typeVar : representativeTypeVars) {
-          auto knownOneWayComponent = oneWayDigraph.find(typeVar);
-          if (knownOneWayComponent == oneWayDigraph.end())
-            continue;
-
-          auto &oneWayComponent = knownOneWayComponent->second;
-          auto &component = getComponent(typeVar);
-          for (auto inAdj : oneWayComponent.inAdjacencies) {
-            if (validComponents.count(inAdj) == 0)
-              continue;
-
-            component.recordDependency(getComponent(inAdj));
-          }
-        }
       }
 
       // Flatten the set of components.
@@ -906,33 +780,13 @@ namespace {
       // sort the orphaned constraints at the back. In the absence of
       // one-way constraints, sort everything.
       if (components.size() > 1) {
-        auto sortStart = oneWayDigraph.empty()
-            ? flatComponents.begin()
-            : flatComponents.end() - cg.getOrphanedConstraints().size();
-        std::sort(sortStart, flatComponents.end(),
+        std::sort(flatComponents.begin(), flatComponents.end(),
                   [&](const Component &lhs, const Component &rhs) {
                     return lhs.getNumDisjunctions() > rhs.getNumDisjunctions();
                   });
       }
 
       return flatComponents;
-    }
-
-    /// Find the representative for the given type variable within the set
-    /// of representatives in a union-find data structure.
-    TypeVariableType *findRepresentative(TypeVariableType *typeVar) const {
-      // If we don't have a record of this type variable, it is it's own
-      // representative.
-      auto known = representatives.find(typeVar);
-      if (known == representatives.end() || known->second == typeVar)
-        return typeVar;
-
-      // Find the representative of the parent.
-      auto parent = known->second;
-      auto rep = findRepresentative(parent);
-      representatives[typeVar] = rep;
-
-      return rep;
     }
 
   private:
@@ -942,330 +796,69 @@ namespace {
     /// \returns true if the two components were separate and have now been
     /// joined, \c false if they were already in the same set.
     bool unionSets(TypeVariableType *typeVar1, TypeVariableType *typeVar2) {
-      auto rep1 = findRepresentative(typeVar1);
-      auto rep2 = findRepresentative(typeVar2);
+      auto rep1 = typeVar1->getImpl().getComponent();
+      auto rep2 = typeVar2->getImpl().getComponent();
       if (rep1 == rep2)
         return false;
 
       // Reparent the type variable with the higher ID. The actual choice doesn't
       // matter, but this makes debugging easier.
-      if (rep1->getID() < rep2->getID()) {
-        validComponents.erase(rep2);
-        representatives[rep2] = rep1;
-      } else {
-        validComponents.erase(rep1);
-        representatives[rep1] = rep2;
+      if (rep1->getID() > rep2->getID())
+        std::swap(rep1, rep2);
+
+      if (rep2->getImpl().isValidComponent()) {
+        // If both are valid components, decrement the valid component counter
+        // by one. Otherwise, propagate the valid component flag.
+        if (!rep1->getImpl().markValidComponent()) {
+          ASSERT(validComponentCount > 0);
+          --validComponentCount;
+        }
       }
+
+      rep2->getImpl().setComponent(rep1);
+
       return true;
     }
 
-    /// Perform the connected components algorithm, skipping one-way
-    /// constraints.
-    ///
-    /// \returns the set of one-way constraints that were skipped.
-    TinyPtrVector<Constraint *> connectedComponents() {
-      TinyPtrVector<Constraint *> oneWayConstraints;
-
+    /// Compute the connected components of the graph.
+    void connectedComponents() {
       auto &cs = cg.getConstraintSystem();
 
-      // Perform a depth-first search from each type variable to identify
-      // what component it is in.
       for (auto typeVar : typeVars) {
-        // If we've already assigned a representative to this type variable,
-        // we're done.
-        if (representatives.count(typeVar) > 0)
-          continue;
+        auto &impl = typeVar->getImpl();
+        if (auto *rep = impl.getRepresentativeOrFixed().dyn_cast<TypeVariableType *>()) {
+          impl.setComponent(rep);
+          if (typeVar == rep) {
+            if (impl.markValidComponent())
+              ++validComponentCount;
+          }
+        } else {
+          impl.setComponent(typeVar);
+        }
+      }
 
-        // Perform a depth-first search to mark those type variables that are
-        // in the same component as this type variable.
-        depthFirstSearch(
-            cg, typeVar,
-            [&](TypeVariableType *found) {
-              // If we have already seen this node, we're done.
-              auto inserted = representatives.insert({found, typeVar});
-              assert((inserted.second || inserted.first->second == typeVar) &&
-                     "Wrong component?");
-
-              if (inserted.second)
-                if (!cs.getFixedType(found))
-                  validComponents.insert(typeVar);
-
-              return inserted.second;
-            },
-            [&](Constraint *constraint) {
-              // Record and skip one-way constraints.
-              if (constraint->isOneWayConstraint()) {
-                oneWayConstraints.push_back(constraint);
-                return false;
-              }
-
-              return true;
-            },
-            visitedConstraints);
+      for (auto typeVar : typeVars) {
+        auto &impl = typeVar->getImpl();
+        if (auto fixedType = impl.getRepresentativeOrFixed().dyn_cast<TypeBase *>()) {
+          auto &node = cg[typeVar];
+          for (auto otherTypeVar : node.getReferencedVars()) {
+            unionSets(typeVar, otherTypeVar);
+          }
+        }
       }
 
       for (auto &constraint : cs.getConstraints()) {
-        if (constraint.getKind() == ConstraintKind::Disjunction ||
-            constraint.getKind() == ConstraintKind::Conjunction) {
-          for (auto typeVar : constraint.getTypeVariables()) {
-            auto rep = findRepresentative(typeVar);
-            if (validComponents.insert(rep).second)
-              ASSERT(cs.getFixedType(typeVar));
-          }
-        }
+        auto typeVars = constraint.getTypeVariables();
+        if (typeVars.empty())
+          continue;
+
+        auto *firstTypeVar = typeVars[0]->getImpl().getComponent();
+        if (firstTypeVar->getImpl().markValidComponent())
+          ++validComponentCount;
+
+        for (auto *otherTypeVar : typeVars.slice(1))
+          unionSets(firstTypeVar, otherTypeVar);
       }
-
-      return oneWayConstraints;
-    }
-
-    /// Insert the given type variable into the given vector if it isn't
-    /// already present.
-    static void insertIfUnique(TinyPtrVector<TypeVariableType *> &vector,
-                               TypeVariableType *typeVar) {
-      if (std::find(vector.begin(), vector.end(), typeVar) == vector.end())
-        vector.push_back(typeVar);
-    }
-
-    /// Retrieve the (uniqued) set of type variable representations that occur
-    /// within the given type.
-    TinyPtrVector<TypeVariableType *>
-    getRepresentativesInType(Type type) const {
-      TinyPtrVector<TypeVariableType *> results;
-
-      SmallPtrSet<TypeVariableType *, 2> typeVars;
-      type->getTypeVariables(typeVars);
-      for (auto typeVar : typeVars) {
-        auto rep = findRepresentative(typeVar);
-        insertIfUnique(results, rep);
-      }
-
-      return results;
-    }
-
-    /// Add all of the one-way constraints to the one-way digraph
-    void addOneWayConstraintEdges(ArrayRef<Constraint *> oneWayConstraints) {
-      for (auto constraint : oneWayConstraints) {
-        auto lhsTypeReps =
-            getRepresentativesInType(constraint->getFirstType());
-        auto rhsTypeReps =
-            getRepresentativesInType(constraint->getSecondType());
-
-        // Add an edge from the type representatives on the right-hand side
-        // of the one-way constraint to the type representatives on the
-        // left-hand side, because the right-hand type variables need to
-        // be solved before the left-hand type variables.
-        for (auto lhsTypeRep : lhsTypeReps) {
-          for (auto rhsTypeRep : rhsTypeReps) {
-            if (lhsTypeRep == rhsTypeRep)
-              continue;
-
-            insertIfUnique(oneWayDigraph[rhsTypeRep].outAdjacencies,lhsTypeRep);
-            insertIfUnique(oneWayDigraph[lhsTypeRep].inAdjacencies,rhsTypeRep);
-          }
-        }
-      }
-    }
-
-    using TypeVariablePair = std::pair<TypeVariableType *, TypeVariableType *>;
-
-    /// Build the directed graph of one-way constraints among components.
-    void buildOneWayConstraintGraph(ArrayRef<Constraint *> oneWayConstraints) {
-      auto &cs = cg.getConstraintSystem();
-      auto &ctx = cs.getASTContext();
-      bool contractedCycle = false;
-      do {
-        // Construct the one-way digraph from scratch.
-        oneWayDigraph.clear();
-        addOneWayConstraintEdges(oneWayConstraints);
-
-        // Minimize the in-adjacencies, detecting cycles along the way.
-        SmallVector<TypeVariablePair, 4> cycleEdges;
-        removeIndirectOneWayInAdjacencies(cycleEdges);
-
-        // For any contractions we need to perform due to cycles, perform a
-        // union the connected components based on the type variable pairs.
-        contractedCycle = false;
-        for (const auto &edge : cycleEdges) {
-          if (unionSets(edge.first, edge.second)) {
-            if (cs.isDebugMode()) {
-              auto &log = llvm::errs();
-              if (cs.solverState)
-                log.indent(cs.solverState->getCurrentIndent());
-
-              log << "Collapsing one-way components for $T"
-                  << edge.first->getID() << " and $T" << edge.second->getID()
-                  << " due to cycle.\n";
-            }
-
-            if (ctx.Stats) {
-              ++ctx.Stats->getFrontendCounters()
-                  .NumCyclicOneWayComponentsCollapsed;
-            }
-
-            contractedCycle = true;
-          }
-        }
-      } while (contractedCycle);
-    }
-
-    /// Perform a depth-first search to produce a from the given type variable,
-    /// notifying the function object.
-    ///
-    /// \param getAdjacencies Called to retrieve the set of type variables
-    /// that are adjacent to the given type variable.
-    ///
-    /// \param preVisit Called before visiting the adjacencies of the given
-    /// type variable. When it returns \c true, the adjacencies of this type
-    /// variable will be visited. When \c false, the adjacencies will not be
-    /// visited and \c postVisit will not be called.
-    ///
-    /// \param postVisit Called after visiting the adjacencies of the given
-    /// type variable.
-    static void postorderDepthFirstSearchRec(
-        TypeVariableType *typeVar,
-        llvm::function_ref<
-          ArrayRef<TypeVariableType *>(TypeVariableType *)> getAdjacencies,
-        llvm::function_ref<bool(TypeVariableType *)> preVisit,
-        llvm::function_ref<void(TypeVariableType *)> postVisit) {
-      if (!preVisit(typeVar))
-        return;
-
-      for (auto adj : getAdjacencies(typeVar)) {
-        postorderDepthFirstSearchRec(adj, getAdjacencies, preVisit, postVisit);
-      }
-
-      postVisit(typeVar);
-    }
-
-    /// Minimize the incoming adjacencies for one of the nodes in the one-way
-    /// directed graph by eliminating any in-adjacencies that can also be
-    /// found indirectly.
-    void removeIndirectOneWayInAdjacencies(
-        TypeVariableType *typeVar,
-        OneWayComponent &component,
-        SmallVectorImpl<TypeVariablePair> &cycleEdges) {
-      // Perform a depth-first search from each of the in adjacencies to
-      // this type variable, traversing each of the one-way edges backwards
-      // to find all of the components whose type variables must be
-      // bound before this component can be solved.
-      SmallPtrSet<TypeVariableType *, 4> visited;
-      SmallPtrSet<TypeVariableType *, 4> indirectlyReachable;
-      SmallVector<TypeVariableType *, 4> currentPath;
-      for (auto inAdj : component.inAdjacencies) {
-        postorderDepthFirstSearchRec(
-            inAdj,
-            [&](TypeVariableType *typeVar) -> ArrayRef<TypeVariableType *> {
-              // Traverse the outgoing adjacencies for the subcomponent
-              auto oneWayComponent = oneWayDigraph.find(typeVar);
-              if (oneWayComponent == oneWayDigraph.end()) {
-                return { };
-              }
-
-              return oneWayComponent->second.inAdjacencies;
-            },
-            [&](TypeVariableType *typeVar) {
-              // If we haven't seen this type variable yet, add it to the
-              // path.
-              if (visited.insert(typeVar).second) {
-                currentPath.push_back(typeVar);
-                return true;
-              }
-
-              // Add edges between this type variable and every other type
-              // variable in the path.
-              for (auto otherTypeVar : llvm::reverse(currentPath)) {
-                // When we run into our own type variable, we're done.
-                if (otherTypeVar == typeVar)
-                  break;
-
-                cycleEdges.push_back({typeVar, otherTypeVar});
-              }
-
-              return false;
-            },
-            [&](TypeVariableType *dependsOn) {
-              // Remove this type variable from the path.
-              assert(currentPath.back() == dependsOn);
-              currentPath.pop_back();
-
-              // Don't record dependency on ourselves.
-              if (dependsOn == inAdj)
-                return;
-
-              indirectlyReachable.insert(dependsOn);
-            });
-
-        // Remove any in-adjacency of this component that is indirectly
-        // reachable.
-        component.inAdjacencies.erase(
-            std::remove_if(component.inAdjacencies.begin(),
-                           component.inAdjacencies.end(),
-                           [&](TypeVariableType *inAdj) {
-                             return indirectlyReachable.count(inAdj) > 0;
-                           }),
-            component.inAdjacencies.end());
-      }
-    }
-
-    /// Minimize the incoming adjacencies for all of the nodes in the one-way
-    /// directed graph by eliminating any in-adjacencies that can also be
-    /// found indirectly.
-    void removeIndirectOneWayInAdjacencies(
-        SmallVectorImpl<TypeVariablePair> &cycleEdges)  {
-      for (auto &oneWayEntry : oneWayDigraph) {
-        auto typeVar = oneWayEntry.first;
-        auto &component = oneWayEntry.second;
-        removeIndirectOneWayInAdjacencies(typeVar, component, cycleEdges);
-      }
-    }
-
-    /// Compute the order in which the components should be visited to respect
-    /// one-way constraints.
-    ///
-    /// \param representativeTypeVars the set of type variables that
-    /// represent the components, in a preferred ordering that does not
-    /// account for one-way constraints.
-    /// \returns the set of type variables that represent the components, in
-    /// an ordering that ensures that components containing type variables
-    /// that occur on the left-hand side of a one-way constraint will be
-    /// solved after the components for type variables on the right-hand
-    /// side of that constraint.
-    SmallVector<TypeVariableType *, 4> computeOneWayComponentOrdering(
-        ArrayRef<TypeVariableType *> representativeTypeVars) const {
-      SmallVector<TypeVariableType *, 4> orderedReps;
-      orderedReps.reserve(representativeTypeVars.size());
-      SmallPtrSet<TypeVariableType *, 4> visited;
-      for (auto rep : llvm::reverse(representativeTypeVars)) {
-        // Perform a postorder depth-first search through the one-way digraph,
-        // starting at this representative, to establish the dependency
-        // ordering amongst components that are reachable
-        // to establish the dependency ordering for the representative type
-        // variables.
-        postorderDepthFirstSearchRec(
-            rep,
-            [&](TypeVariableType *typeVar) -> ArrayRef<TypeVariableType *> {
-              // Traverse the outgoing adjacencies for the subcomponent
-              assert(typeVar == findRepresentative(typeVar));
-              auto oneWayComponent = oneWayDigraph.find(typeVar);
-              if (oneWayComponent == oneWayDigraph.end()) {
-                return { };
-              }
-
-              return oneWayComponent->second.outAdjacencies;
-            },
-            [&](TypeVariableType *typeVar) {
-              return visited.insert(typeVar).second;
-            },
-            [&](TypeVariableType *typeVar) {
-              // Record this type variable, if it's one of the representative
-              // type variables.
-              if (validComponents.count(typeVar) > 0)
-                orderedReps.push_back(typeVar);
-            });
-      }
-
-      assert(orderedReps.size() == representativeTypeVars.size());
-      return orderedReps;
     }
   };
 }
@@ -1275,10 +868,6 @@ void ConstraintGraph::Component::addConstraint(Constraint *constraint) {
     ++numDisjunctions;
 
   constraints.push_back(constraint);
-}
-
-void ConstraintGraph::Component::recordDependency(const Component &component) {
-  dependencies.push_back(component.solutionIndex);
 }
 
 SmallVector<ConstraintGraph::Component, 1>
@@ -1534,20 +1123,6 @@ void ConstraintGraph::printConnectedComponents(
                [&] {
                  out << ' ';
                });
-
-    auto dependencies = component.getDependencies();
-    if (dependencies.empty())
-      continue;
-
-    SmallVector<unsigned, 4> indices{dependencies.begin(), dependencies.end()};
-    // Sort dependencies so output is stable.
-    llvm::sort(indices);
-
-    // Print all of the one-way components.
-    out << " depends on ";
-    llvm::interleave(
-        indices, [&out](unsigned index) { out << index; },
-        [&out] { out << ", "; });
   }
 }
 
@@ -1648,7 +1223,7 @@ void ConstraintGraph::verify() {
   // Verify that the type variables are either representatives or represented
   // within their representative's equivalence class.
   // FIXME: Also check to make sure the equivalence classes aren't too large?
-  for (auto typeVar : TypeVariables) {
+  for (auto typeVar : CS.TypeVariables) {
     auto typeVarRep = CS.getRepresentative(typeVar);
     auto &repNode = (*this)[typeVarRep];
     if (typeVar != typeVarRep) {
@@ -1669,24 +1244,15 @@ void ConstraintGraph::verify() {
     }
   }
 
-  // Verify that our type variable map/vector are in sync.
-  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
-    auto typeVar = TypeVariables[i];
-    auto &impl = typeVar->getImpl();
-    requireSameValue(impl.getGraphIndex(), i, "wrong graph node index");
-    require(impl.getGraphNode(), "null graph node");
-  }
-
   // Verify consistency of all of the nodes in the graph.
-  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
-    auto typeVar = TypeVariables[i];
+  for (auto typeVar : CS.TypeVariables) {
     auto &impl = typeVar->getImpl();
     impl.getGraphNode()->verify(*this);
   }
 
   // Collect all of the constraints known to the constraint graph.
   llvm::SmallPtrSet<Constraint *, 4> knownConstraints;
-  for (auto typeVar : getTypeVariables()) {
+  for (auto typeVar : CS.TypeVariables) {
     for (auto constraint : (*this)[typeVar].getConstraints())
       knownConstraints.insert(constraint);
   }

@@ -514,7 +514,7 @@ bb1(%newborrow : @guaranteed $Klass, %borrow2 : @guaranteed $Klass):
 // Here %newborrowo and %newborrowi are both dead phis.
 // First end_borrow for the incoming value of %newborrowi is added
 // It is non straight forward to find the insert pt for the end_borrow of the incoming value of %newborrowo
-// This may not be important once CanonicalizeOSSALifetime supports rewrite of multi-block borrows. 
+// This may not be important once CanonicalizeOSSALifetime supports rewrite of multi-block borrows.
 sil [ossa] @dce_nestedborrowlifetime3 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %borrowo = begin_borrow %0 : $Klass
@@ -752,7 +752,7 @@ exit:
 sil hidden [ossa] @add_end_borrow_after_destroy_value : $@convention(thin) (Builtin.Int1, @owned Klass, @owned Klass) -> () {
 bb0(%condition : $Builtin.Int1, %instance_1 : @owned $Klass, %instance_2 : @owned $Klass):
   %lifetime_1 = begin_borrow %instance_1 : $Klass
-  
+
   %copy_1 = copy_value %lifetime_1 : $Klass
   %stack_addr = alloc_stack $Klass
   store %copy_1 to [init] %stack_addr : $*Klass
@@ -1124,7 +1124,7 @@ sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 sil [ossa] @test_forwarded_phi1 : $@convention(thin) (@owned Wrapper1) -> () {
 bb0(%0 : @owned $Wrapper1):
   %outer = begin_borrow %0 : $Wrapper1
-  br bb1 
+  br bb1
 
 bb1:
   %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
@@ -1144,13 +1144,13 @@ bb3(%phi3 : @guaranteed $Klass, %phi4 : @guaranteed $Wrapper1):
 }
 
 // CHECK-LABEL: sil [ossa] @test_forwarded_phi2 :
-// CHECK: br bb3 
+// CHECK: br bb3
 // CHECK: end_borrow
 // CHECK-LABEL: } // end sil function 'test_forwarded_phi2'
 sil [ossa] @test_forwarded_phi2 : $@convention(thin) (@owned Wrapper1) -> () {
 bb0(%0 : @owned $Wrapper1):
   %outer = begin_borrow %0 : $Wrapper1
-  br bb1 
+  br bb1
 
 bb1:
   br bb2(%outer : $Wrapper1)
@@ -1202,7 +1202,7 @@ bb3(%phi2 : @guaranteed $Klass, %phi3 : @guaranteed $Wrapper1):
 sil [ossa] @test_loadborrow_dep : $@convention(thin) (@in Wrapper1) -> () {
 bb0(%0 : $*Wrapper1):
   %outer = load_borrow %0 : $*Wrapper1
-  br bb1 
+  br bb1
 
 bb1:
   %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
@@ -1411,3 +1411,34 @@ bb5(%16 : @reborrow $FakeOptional<Klass>, %17 : @reborrow $FakeOptional<Klass>):
   return %23
 }
 
+struct String {
+  var guts: Builtin.AnyObject
+}
+
+sil [_semantics "string.makeUTF8"] [ossa] @makeString : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
+
+// CHECK-LABEL: sil [ossa] @uncompletedDeadStrings
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'uncompletedDeadStrings'
+sil [ossa] @uncompletedDeadStrings : $@convention(thin) () -> () {
+  %first_ptr = string_literal utf8 "first"
+  %first_len = integer_literal $Builtin.Word, 5
+  %makeString = function_ref @makeString : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
+  %first = apply %makeString(%first_ptr, %first_len) : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
+  cond_br undef, nope, yep
+
+nope:
+  destroy_value %first
+  %second_ptr = string_literal utf8 "second"
+  %second_len = integer_literal $Builtin.Word, 6
+  %second = apply %makeString(%second_ptr, %second_len) : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
+  br this(%second)
+
+yep:
+  br this(%first)
+
+this(%string : @owned $String):
+  destroy_value %string
+  %retval = tuple ()
+  return %retval
+}

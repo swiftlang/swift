@@ -257,6 +257,9 @@ private:
       for (const Decl *member : members) {
         if (member->getModuleContext()->isStdlibModule())
           break;
+        auto VD = dyn_cast<ValueDecl>(member);
+        if (!VD || !shouldInclude(VD))
+          continue;
         // TODO: support nested classes.
         if (isa<ClassDecl>(member))
           continue;
@@ -1685,7 +1688,9 @@ public:
       hasPrintedAnything = true;
     };
 
-    for (auto AvAttr : D->getAttrs().getAttributes<AvailableAttr>()) {
+    for (auto semanticAttr : D->getSemanticAvailableAttrs()) {
+      auto AvAttr = semanticAttr.getParsedAttr();
+
       if (AvAttr->getPlatform() == PlatformKind::none) {
         if (AvAttr->getPlatformAgnosticAvailability() ==
             PlatformAgnosticAvailabilityKind::Unavailable) {

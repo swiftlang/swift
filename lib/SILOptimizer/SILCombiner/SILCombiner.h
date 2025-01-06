@@ -257,7 +257,6 @@ public:
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
-  SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
   SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
@@ -364,8 +363,6 @@ public:
   SILInstruction *tryFoldComposedUnaryForwardingInstChain(
       SingleValueInstruction *user, SingleValueInstruction *value,
       function_ref<SILValue()> newValueGenerator);
-
-  SILInstruction *optimizeAlignment(PointerToAddressInst *ptrAdrInst);
 
   InstModCallbacks &getInstModCallbacks() { return deleter.getCallbacks(); }
 

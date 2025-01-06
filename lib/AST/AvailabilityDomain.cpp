@@ -11,28 +11,19 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 
 using namespace swift;
 
-AvailabilityDomain
-Decl::getDomainForAvailableAttr(const AvailableAttr *attr) const {
-  if (attr->hasPlatform())
-    return AvailabilityDomain::forPlatform(attr->getPlatform());
-
-  switch (attr->getPlatformAgnosticAvailability()) {
-  case PlatformAgnosticAvailabilityKind::Deprecated:
-  case PlatformAgnosticAvailabilityKind::Unavailable:
-  case PlatformAgnosticAvailabilityKind::NoAsync:
-  case PlatformAgnosticAvailabilityKind::None:
-    return AvailabilityDomain::forUniversal();
-
-  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-    return AvailabilityDomain::forSwiftLanguage();
-
-  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-    return AvailabilityDomain::forPackageDescription();
+bool AvailabilityDomain::isActive(ASTContext &ctx) const {
+  switch (kind) {
+  case Kind::Universal:
+  case Kind::SwiftLanguage:
+  case Kind::PackageDescription:
+    return true;
+  case Kind::Platform:
+    return isPlatformActive(getPlatformKind(), ctx.LangOpts);
   }
 }
 

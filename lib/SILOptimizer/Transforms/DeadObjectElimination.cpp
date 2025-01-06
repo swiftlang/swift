@@ -204,6 +204,10 @@ static DestructorEffects doesDestructorHaveSideEffects(AllocRefInstBase *ARI) {
         continue;
       }
 
+      if (isa<BeginBorrowInst>(I) || isa<EndBorrowInst>(I) || isa<EndLifetimeInst>(I)) {
+        continue;
+      }
+
       // dealloc_ref on self can be ignored, but dealloc_ref on anything else
       // cannot be eliminated.
       if (auto *DeallocRef = dyn_cast<DeallocRefInst>(&I)) {

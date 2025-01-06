@@ -1075,10 +1075,6 @@ def experimental_print_full_convention :
           " arguments, regardless of whether they were written in the source."
           " Also requires -use-clang-function-types to be enabled.">;
 
-def experimental_one_way_closure_params :
-  Flag<["-"], "experimental-one-way-closure-params">,
-  HelpText<"Enable experimental support for one-way closure parameters">;
-
 def force_public_linkage : Flag<["-"], "force-public-linkage">,
    HelpText<"Force public linkage for private symbols. Used by LLDB.">;
 

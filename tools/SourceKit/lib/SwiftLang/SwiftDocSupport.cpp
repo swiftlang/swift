@@ -219,6 +219,11 @@ public:
     assert(!EntitiesStack.empty());
     TextEntity Entity = std::move(EntitiesStack.back());
     EntitiesStack.pop_back();
+
+    // We only care about API for documentation purposes.
+    if (!ABIRoleInfo(D).providesAPI())
+      return;
+
     unsigned EndOffset = OS.tell();
     Entity.Range.Length = EndOffset - Entity.Range.Offset;
     if (EntitiesStack.empty()) {

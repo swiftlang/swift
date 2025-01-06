@@ -24,14 +24,6 @@ In order to build on Linux, some additional parameters must be passed to the bui
 swift build -Xswiftc -I$(git rev-parse --show-toplevel)/include/swift/SwiftRemoteMirror -Xlinker -lswiftRemoteMirror
 ~~~
 
-#### CMake
-
-In order to build on Windows with CMake, some additional parameters must be passed to the build tool to locate the necessary Swift modules.
-
-~~~
-cmake -B out -G Ninja -S . -D ArgumentParser_DIR=... -D CMAKE_Swift_FLAGS="-Xcc -I%SDKROOT%\usr\include\swift\SwiftRemoteMirror"
-~~~
-
 #### Android
 
 To cross-compile swift-inspect for Android on Windows, some additional parameters must be passed to the build tool to locate the toolchain and necessary libraries.
@@ -50,6 +42,23 @@ swift build --triple %ANDROID_ARCH%-unknown-linux-android%ANDROID_API_LEVEL% ^
     -Xcc -I%SWIFT_ANDROID_SDK_ROOT%\usr\include\swift\SwiftRemoteMirror ^
     -Xlinker %SWIFT_ANDROID_SDK_ROOT%\usr\lib\swift\android\%ANDROID_ARCH%\libswiftRemoteMirror.so
 ~~~
+
+#### CMake
+
+In order to build on Windows with CMake, some additional parameters must be passed to the build tool to locate the necessary Swift modules.
+
+~~~
+cmake -B out -G Ninja -S . -D ArgumentParser_DIR=... -D CMAKE_Swift_FLAGS="-Xcc -I%SDKROOT%\usr\include\swift\SwiftRemoteMirror"
+~~~
+
+In order to build on Linux with CMake, some additional parameters must be passed to the build tool to locate the necessary Swift modules.
+
+~~~
+cmake -B out -G Ninja -S . -D ArgumentParser_DIR=... -D CMAKE_Swift_FLAGS="-Xcc -I$(git rev-parse --show-toplevel)/include/swift/SwiftRemoteMirror"
+~~~
+
+Building with CMake requires a local copy of [swift-argument-parser](https://github.com/apple/swift-argument-parser) built with CMake.
+The `ArumentParser_DIR=` definition must refer to the `cmake/modules` sub-directory of the swift-argument-parser build output directory.
 
 ### Using
 

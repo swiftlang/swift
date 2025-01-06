@@ -242,7 +242,11 @@ int sil_func_extractor_main(ArrayRef<const char *> argv, void *MainAddr) {
   Invocation.setMainExecutablePath(llvm::sys::fs::getMainExecutable(argv[0], MainAddr));
 
   // Give the context the list of search paths to use for modules.
-  Invocation.setImportSearchPaths(options.ImportPaths);
+  std::vector<SearchPathOptions::SearchPath> ImportPaths;
+  for (const auto &path : options.ImportPaths) {
+    ImportPaths.push_back({path, /*isSystem=*/false});
+  }
+  Invocation.setImportSearchPaths(ImportPaths);
   // Set the SDK path and target if given.
   if (options.SDKPath.getNumOccurrences() == 0) {
     const char *SDKROOT = getenv("SDKROOT");

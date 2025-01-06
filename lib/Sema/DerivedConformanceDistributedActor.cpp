@@ -16,15 +16,16 @@
 
 #include "CodeSynthesis.h"
 #include "DerivedConformances.h"
-#include "TypeChecker.h"
-#include "swift/Strings.h"
 #include "TypeCheckDistributed.h"
+#include "TypeChecker.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/DistributedDecl.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Strings.h"
 
 using namespace swift;
 

@@ -3504,6 +3504,8 @@ public:
    bool isLargeLoadableType(SILType ty);
    bool isPotentiallyCArray(SILType ty);
 
+   void propagate(PostOrderFunctionInfo &po);
+
 private:
   bool isLargeLoadableTypeOld(SILType ty);
 
@@ -3543,6 +3545,32 @@ private:
     return 0;
   }
 };
+}
+
+void LargeLoadableHeuristic::propagate(PostOrderFunctionInfo &po) {
+  if (!UseAggressiveHeuristic)
+    return;
+
+  for (auto *BB : po.getPostOrder()) {
+    for (auto &I : llvm::reverse(*BB)) {
+      switch (I.getKind()) {
+      case SILInstructionKind::TupleExtractInst:
+      case SILInstructionKind::StructExtractInst: {
+        auto &proj = cast<SingleValueInstruction>(I);
+        if (isLargeLoadableType(proj.getType())) {
+          auto opdTy = proj.getOperand(0)->getType();
+          auto entry = largeTypeProperties[opdTy];
+          entry.setNumRegisters(65535);
+          largeTypeProperties[opdTy] = entry;
+        }
+      }
+      break;
+
+      default:
+        continue;
+      }
+    }
+  }
 }
 
 void LargeLoadableHeuristic::visit(SILArgument *arg) {
@@ -4659,6 +4687,9 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
     // Delete replaced instructions.
     opts.deleteInstructions();
 
+    PostOrderFunctionInfo postorderInfo(&currF);
+    heuristic.propagate(postorderInfo);
+
     AddressAssignment assignment(heuristic, irgenModule, currF);
 
     // Assign addresses to basic block arguments.
@@ -4729,7 +4760,6 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
     }
 
     // Asign addresses to non-address SSA values.
-    PostOrderFunctionInfo postorderInfo(&currF);
     for (auto *BB : postorderInfo.getReversePostOrder()) {
       SmallVector<SILInstruction *, 32> origInsts;
       for (SILInstruction &i : *BB) {

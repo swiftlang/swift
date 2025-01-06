@@ -19,7 +19,7 @@
 
 #include "swift/AST/ArgumentList.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
@@ -6410,33 +6410,6 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::SingleValueStmt;
-  }
-};
-
-/// Expression node that effects a "one-way" constraint in
-/// the constraint system, allowing type information to flow from the
-/// subexpression outward but not the other way.
-///
-/// One-way expressions are generally implicit and synthetic, introduced by
-/// the type checker. However, there is a built-in expression of the
-/// form \c Builtin.one_way(x) that forms a one-way constraint coming out
-/// of expression `x` that can be used for testing purposes.
-class OneWayExpr : public Expr {
-  Expr *SubExpr;
-
-public:
-  /// Construct an implicit one-way expression from the given subexpression.
-  OneWayExpr(Expr *subExpr)
-     : Expr(ExprKind::OneWay, /*isImplicit=*/true), SubExpr(subExpr) { }
-
-  SourceLoc getLoc() const { return SubExpr->getLoc(); }
-  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
-
-  Expr *getSubExpr() const { return SubExpr; }
-  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::OneWay;
   }
 };
 

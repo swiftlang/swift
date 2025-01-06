@@ -3104,6 +3104,7 @@ done:
 
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
         llvm_unreachable("Not isolated");
       }
@@ -3409,6 +3410,34 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
   return lvExpr;
 }
 
+ManagedValue
+SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
+                                                     ValueOwnership ownership) {
+  // If the function takes an addressable parameter, and its argument is
+  // a reference to an addressable declaration with compatible ownership,
+  // forward the address along in-place.
+  if (arg.isExpr()) {
+    auto origExpr = std::move(arg).asKnownExpr();
+    auto expr = origExpr;
+    
+    if (auto le = dyn_cast<LoadExpr>(expr)) {
+      expr = le->getSubExpr();
+    }
+    if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
+      if (auto param = dyn_cast<ParamDecl>(dre->getDecl())) {
+        if (VarLocs.count(param)
+            && VarLocs[param].addressable
+            && param->getValueOwnership() == ownership) {
+          auto addr = VarLocs[param].value;
+          return ManagedValue::forBorrowedAddressRValue(addr);
+        }
+      }
+    }
+    arg = ArgumentSource(origExpr);
+  }
+  return ManagedValue();
+}
+
 namespace {
 
 class ArgEmitter {
@@ -3445,6 +3474,7 @@ public:
   // origParamType is a parameter type.
   void
   emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType,
+                bool addressable,
                 std::optional<AnyFunctionType::Param> param = std::nullopt) {
     // If this is delayed default argument, prepare to emit the default argument
     // generator later.
@@ -3460,7 +3490,7 @@ public:
       maybeEmitForeignArgument();
       return;
     }
-    emit(std::move(arg), origParamType, param);
+    emit(std::move(arg), origParamType, addressable, param);
     maybeEmitForeignArgument();
   }
 
@@ -3486,7 +3516,9 @@ public:
       // single argument.
       if (!origFormalParamType.isPackExpansion()) {
         emitSingleArg(std::move(argSources[nextArgSourceIndex]),
-                      origFormalParamType, params[nextArgSourceIndex]);
+                    origFormalParamType,
+                    origFormalType.isFunctionParamAddressable(SGF.SGM.Types, i),
+                    params[nextArgSourceIndex]);
         ++nextArgSourceIndex;
         // Otherwise we need to emit a pack argument.
       } else {
@@ -3505,29 +3537,17 @@ public:
 
 private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType,
+            bool isAddressable,
             std::optional<AnyFunctionType::Param> origParam = std::nullopt) {
-    if (origParam && origParam->isAddressable()) {
+    if (isAddressable && origParam) {
       // If the function takes an addressable parameter, and its argument is
       // a reference to an addressable declaration with compatible ownership,
       // forward the address along in-place.
-      if (arg.isExpr()) {
-        auto expr = std::move(arg).asKnownExpr();
-        
-        if (auto le = dyn_cast<LoadExpr>(expr)) {
-          expr = le->getSubExpr();
-        }
-        if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
-          if (auto param = dyn_cast<ParamDecl>(dre->getDecl())) {
-            if (param->isAddressable()
-              && param->getValueOwnership() == origParam->getValueOwnership()) {
-              auto addr = SGF.VarLocs[param].value;
-              claimNextParameters(1);
-              Args.push_back(ManagedValue::forBorrowedAddressRValue(addr));
-              return;
-            }
-          }
-        }
-        arg = ArgumentSource(expr);
+      if (auto addr = SGF.tryEmitAddressableParameterAsAddress(std::move(arg),
+                                             origParam->getValueOwnership())) {
+        claimNextParameters(1);
+        Args.push_back(addr);
+        return;
       }
     }
             
@@ -3656,7 +3676,8 @@ private:
       if (!origElt.isOrigPackExpansion()) {
         expander.withElement(origElt.getSubstIndex(),
                              [&](ArgumentSource &&eltSource) {
-          emit(std::move(eltSource), origElt.getOrigType());
+          emit(std::move(eltSource), origElt.getOrigType(),
+               /*addressable*/ false);
         });
         return;
       }
@@ -4459,7 +4480,8 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                  info.paramsToEmit, loweredArgs, delayedArgs, ForeignInfo{});
 
   emitter.emitSingleArg(ArgumentSource(info.loc, std::move(value)),
-                        info.origResultType);
+                        info.origResultType,
+                        /*addressable*/ false);
   assert(delayedArgs.empty());
   
   // Splice the emitted default argument into the argument list.
@@ -4781,6 +4803,8 @@ struct ParamLowering {
     Params = Params.slice(0, Params.size() - count);
     return ClaimedParamsRef(result, (unsigned)-1);
   }
+
+  void claimImplicitParameters() { Params = Params.drop_front(); }
 
   ArrayRef<SILParameterInfo>
   claimCaptureParams(ArrayRef<ManagedValue> captures) {
@@ -5444,6 +5468,18 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
       options |= ApplyFlags::DoesNotAwait;
     }
 
+    // Before we do anything, claim the implicit parameters. This prevents us
+    // from attempting to handle the implicit parameters when we emit explicit
+    // parameters.
+    //
+    // NOTE: The actual work needs to be done /after/ we emit the normal
+    // parameters since we are going to reverse the order.
+    if (auto isolated = substFnType->maybeGetIsolatedParameter();
+        isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
+      assert(SGF.ExpectedExecutor.isNecessary());
+      paramLowering.claimImplicitParameters();
+    }
+
     // Collect the captures, if any.
     if (callee.hasCaptures()) {
       (void)paramLowering.claimCaptureParams(callee.getCaptures());
@@ -5473,6 +5509,18 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     // Claim the method formal params.
     std::move(*callSite).emit(SGF, origFormalType, substFnType, paramLowering,
                               args.back(), delayedArgs, siteForeignError);
+  }
+
+  // Now, actually handle the implicit parameters.
+  if (auto isolated = substFnType->maybeGetIsolatedParameter();
+      isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
+    auto executor =
+        ManagedValue::forBorrowedObjectRValue(SGF.ExpectedExecutor.getEager());
+    args.push_back({});
+    // NOTE: Even though this calls emitActorInstanceIsolation, this also
+    // handles glboal actor isolated cases.
+    args.back().push_back(SGF.emitActorInstanceIsolation(
+        callSite->Loc, executor, executor.getType().getASTType()));
   }
 
   uncurriedLoc = callSite->Loc;
@@ -5746,6 +5794,7 @@ RValue SILGenFunction::emitApply(
 
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
       llvm_unreachable("Not isolated");
       break;
@@ -6106,7 +6155,8 @@ void SILGenFunction::emitYield(SILLocation loc,
                      yieldArgs, delayedArgs, ForeignInfo{});
 
   for (auto i : indices(valueSources)) {
-    emitter.emitSingleArg(std::move(valueSources[i]), origTypes[i]);
+    emitter.emitSingleArg(std::move(valueSources[i]), origTypes[i],
+                          /*addressable*/ false);
   }
 
   if (!delayedArgs.empty())

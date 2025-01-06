@@ -14,11 +14,12 @@
 // aspects of declarations.
 //
 //===----------------------------------------------------------------------===//
-#include "TypeCheckObjC.h"
-#include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckObjC.h"
 #include "TypeCheckProtocol.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -504,6 +505,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
     llvm_unreachable("decl cannot have dynamic isolation");
 
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     return false;

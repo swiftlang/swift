@@ -484,17 +484,24 @@ public:
     SmallVector<ValueDecl *, 2> localFuncsAndTypes;
     SmallVector<VarDecl *, 2> localVars;
 
+    auto addDecl = [&](ValueDecl *vd) {
+      if (isa<FuncDecl>(vd)  || isa<TypeDecl>(vd)) {
+        localFuncsAndTypes.push_back(vd);
+      } else if (auto *var = dyn_cast<VarDecl>(vd)) {
+        localVars.push_back(var);
+      }
+    };
+
     // All types and functions are visible anywhere within a brace statement
     // scope. When ordering matters (i.e. var decl) we will have split the brace
     // statement into nested scopes.
     for (auto braceElement : bs->getElements()) {
       if (auto localBinding = braceElement.dyn_cast<Decl *>()) {
         if (auto *vd = dyn_cast<ValueDecl>(localBinding)) {
-          if (isa<FuncDecl>(vd)  || isa<TypeDecl>(vd)) {
-            localFuncsAndTypes.push_back(vd);
-          } else if (auto *var = dyn_cast<VarDecl>(localBinding)) {
-            localVars.push_back(var);
-          }
+          addDecl(vd);
+          auto abiRole = ABIRoleInfo(vd);
+          if (!abiRole.providesABI())
+            addDecl(abiRole.getCounterpart());
         }
       }
     }
@@ -616,6 +623,9 @@ void ScopeCreator::addChildrenForKnownAttributes(Decl *decl,
 
     if (isa<CustomAttr>(attr))
       relevantAttrs.push_back(attr);
+
+    if (isa<ABIAttr>(attr))
+      relevantAttrs.push_back(attr);
   }
 
   // Decl::getAttrs() is a linked list with head insertion, so the
@@ -634,6 +644,9 @@ void ScopeCreator::addChildrenForKnownAttributes(Decl *decl,
     } else if (auto *customAttr = dyn_cast<CustomAttr>(attr)) {
       constructExpandAndInsert<CustomAttributeScope>(
           parent, customAttr, decl);
+    } else if (auto *abiAttr = dyn_cast<ABIAttr>(attr)) {
+      constructExpandAndInsert<ABIAttributeScope>(
+          parent, abiAttr, decl);
     }
   }
 }
@@ -742,6 +755,7 @@ CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
 CREATES_NEW_INSERTION_POINT(BraceStmtScope)
 CREATES_NEW_INSERTION_POINT(TopLevelCodeScope)
 CREATES_NEW_INSERTION_POINT(ConditionalClausePatternUseScope)
+CREATES_NEW_INSERTION_POINT(ABIAttributeScope)
 
 NO_NEW_INSERTION_POINT(FunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
@@ -970,6 +984,26 @@ TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
   return {body, "So next top level code scope and put its decls in its body "
                 "under a guard statement scope (etc) from the last top level "
                 "code scope"};
+}
+
+AnnotatedInsertionPoint
+ABIAttributeScope::expandAScopeThatCreatesANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  SourceLoc endLoc;
+  // Get the decl we're attached to.
+  if (auto parent = getParent().getPtrOrNull())
+    // Get the enclosing scope for that decl.
+    if (auto grandparent = parent->getParent().getPtrOrNull())
+      // If we're lexically scoped, that's what defines the end of the child's
+      // scope.
+      endLoc = grandparent->getSourceRangeOfThisASTNode().End;
+
+  auto child = scopeCreator.addToScopeTreeAndReturnInsertionPoint(attr->abiDecl,
+                                                                  this, endLoc);
+  return {child, "@abi attribute can contain scopes which create new insertion "
+                 "points; any such scopes should have the same scope they "
+                 "would have if they were siblings of the decl the attribute "
+                 "is attached to"};
 }
 
 #pragma mark expandAScopeThatDoesNotCreateANewInsertionPoint

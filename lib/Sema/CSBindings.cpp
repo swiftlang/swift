@@ -1949,21 +1949,6 @@ void PotentialBindings::infer(ConstraintSystem &CS,
 
     break;
   }
-
-  case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam: {
-    // Don't produce any bindings if this type variable is on the left-hand
-    // side of a one-way binding.
-    auto firstType = constraint->getFirstType();
-    if (auto *tv = firstType->getAs<TypeVariableType>()) {
-      if (tv->getImpl().getRepresentative(nullptr) == TypeVar) {
-        DelayedBy.push_back(constraint);
-        break;
-      }
-    }
-
-    break;
-  }
   }
 }
 
@@ -2197,16 +2182,27 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     out << "] ";
 
   if (involvesTypeVariables()) {
-    out << "[involves_type_vars: ";
-    interleave(AdjacentVars,
-               [&](const auto *typeVar) { out << typeVar->getString(PO); },
-               [&out]() { out << ", "; });
+    out << "[adjacent to: ";
+    if (AdjacentVars.empty()) {
+      out << "<none>";
+    } else {
+      SmallVector<TypeVariableType *> adjacentVars(AdjacentVars.begin(),
+                                                   AdjacentVars.end());
+      llvm::sort(adjacentVars,
+                 [](const TypeVariableType *lhs, const TypeVariableType *rhs) {
+                   return lhs->getID() < rhs->getID();
+                 });
+      interleave(
+          adjacentVars,
+          [&](const auto *typeVar) { out << typeVar->getString(PO); },
+          [&out]() { out << ", "; });
+    }
     out << "] ";
   }
 
   auto numDefaultable = getNumViableDefaultableBindings();
   if (numDefaultable > 0)
-    out << "[#defaultable_bindings: " << numDefaultable << "] ";
+    out << "[defaultable bindings: " << numDefaultable << "] ";
 
   struct PrintableBinding {
   private:
@@ -2252,7 +2248,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     }
   };
 
-  out << "[with possible bindings: ";
+  out << "[potential bindings: ";
   SmallVector<PrintableBinding, 2> potentialBindings;
   for (const auto &binding : Bindings) {
     switch (binding.Kind) {
@@ -2276,7 +2272,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     }
   }
   if (potentialBindings.empty()) {
-    out << "<empty>";
+    out << "<none>";
   } else {
     interleave(
         potentialBindings,

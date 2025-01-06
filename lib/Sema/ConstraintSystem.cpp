@@ -117,7 +117,7 @@ ConstraintSystem::ConstraintSystem(DeclContext *dc,
   : Context(dc->getASTContext()), DC(dc), Options(options),
     diagnosticTransaction(diagnosticTransaction),
     Arena(dc->getASTContext(), Allocator),
-    CG(*new ConstraintGraph(*this))
+    CG(*this)
 {
   assert(DC && "context required");
   // Respect the global debugging flag, but turn off debugging while
@@ -131,7 +131,11 @@ ConstraintSystem::ConstraintSystem(DeclContext *dc,
 }
 
 ConstraintSystem::~ConstraintSystem() {
-  delete &CG;
+  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
+    auto &impl = TypeVariables[i]->getImpl();
+    delete impl.getGraphNode();
+    impl.setGraphNode(nullptr);
+  }
 }
 
 void ConstraintSystem::startExpressionTimer(ExpressionTimer::AnchorType anchor) {
@@ -849,8 +853,9 @@ ConstraintLocator *ConstraintSystem::getOpenOpaqueLocator(
       { LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl) }, 0);
 }
 
-std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
-    Type type, ConstraintLocator *locator) {
+std::pair<Type, OpenedArchetypeType *>
+ConstraintSystem::openAnyExistentialType(Type type,
+                                         ConstraintLocator *locator) {
   Type result = OpenedArchetypeType::getAny(type);
   Type t = result;
   while (t->is<MetatypeType>())
@@ -1102,7 +1107,7 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
   if (getRepresentative(typeVar) != typeVar)
     return nullptr;
 
-  auto &CG = getConstraintGraph();
+  auto &CG = const_cast<ConstraintSystem *>(this)->getConstraintGraph();
   auto &result = CG[typeVar];
   auto equivalence = result.getEquivalenceClass();
   auto member = llvm::find_if(equivalence, [=](TypeVariableType *eq) {
@@ -1717,14 +1722,29 @@ void Solution::recordSingleArgMatchingChoice(ConstraintLocator *locator) {
        MatchCallArgumentResult::forArity(1)});
 }
 
-Type Solution::simplifyType(Type type) const {
+Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
+  // If we've been asked for an interface type, start by mapping any archetypes
+  // out of context.
+  if (wantInterfaceType)
+    type = type->mapTypeOutOfContext();
+
   if (!(type->hasTypeVariable() || type->hasPlaceholder()))
     return type;
 
   // Map type variables to fixed types from bindings.
   auto &cs = getConstraintSystem();
-  auto resolvedType = cs.simplifyTypeImpl(
-      type, [&](TypeVariableType *tvt) -> Type { return getFixedType(tvt); });
+  auto resolvedType =
+      cs.simplifyTypeImpl(type, [&](TypeVariableType *tvt) -> Type {
+        // If we want the interface type, use the generic parameter if we
+        // have one, otherwise map the fixed type out of context.
+        if (wantInterfaceType) {
+          if (auto *gp = tvt->getImpl().getGenericParameter())
+            return gp;
+          return getFixedType(tvt)->mapTypeOutOfContext();
+        }
+        return getFixedType(tvt);
+      });
+  ASSERT(!(wantInterfaceType && resolvedType->hasPrimaryArchetype()));
 
   // Placeholders shouldn't be reachable through a solution, they are only
   // useful to determine what went wrong exactly.
@@ -1832,39 +1852,6 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
 
     return typeVar;
   });
-
-  // Logic to determine the contextual type inside buildBlock result builders:
-  //
-  // When completing inside a result builder, the result builder
-  //   @ViewBuilder var body: some View {
-  //     Text("Foo")
-  //     #^COMPLETE^#
-  //   }
-  // gets rewritten to
-  //   @ViewBuilder var body: some View {
-  //     let $__builder2: Text
-  //     let $__builder0 = Text("Foo")
-  //     let $__builder1 = #^COMPLETE^#
-  //     $__builder2 = ViewBuilder.buildBlock($__builder0, $__builder1)
-  //     return $__builder2
-  //   }
-  // Inside the constraint system
-  //     let $__builder1 = #^COMPLETE^#
-  // gets type checked without context, so we can't know the contextual type for
-  // the code completion token. But we know that $__builder1 (and thus the type
-  // of #^COMPLETE^#) is used as the second argument to ViewBuilder.buildBlock,
-  // so we can extract the contextual type from that call. To do this, figure
-  // out the type variable that is used for $__builder1 in the buildBlock call.
-  // This type variable is connected to the type variable of $__builder1's
-  // definition by a one-way constraint.
-  if (auto TV = Ty->getAs<TypeVariableType>()) {
-    for (auto constraint : CS.getConstraintGraph()[TV].getConstraints()) {
-      if (constraint->getKind() == ConstraintKind::OneWayEqual &&
-          constraint->getSecondType()->isEqual(TV)) {
-        return simplifyTypeForCodeCompletion(constraint->getFirstType());
-      }
-    }
-  }
 
   // Remove any remaining type variables and placeholders
   Ty = simplifyType(Ty);
@@ -3385,8 +3372,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
-    case ConstraintLocator::ApplyFunction:
-    case ConstraintLocator::FunctionResult:
+    case ConstraintLocator::ApplyFunction: {
       // Extract application function.
       if (auto applyExpr = getAsExpr<ApplyExpr>(anchor)) {
         anchor = applyExpr->getFn();
@@ -3408,7 +3394,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       }
 
       break;
-
+    }
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::LValueConversion:
     case ConstraintLocator::DynamicType:
@@ -3673,6 +3659,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::SynthesizedArgument:
       break;
 
+    case ConstraintLocator::FunctionResult:
     case ConstraintLocator::DynamicLookupResult:
     case ConstraintLocator::KeyPathComponentResult:
       break;
@@ -4003,32 +3990,6 @@ ASTNode ConstraintSystem::includingParentApply(ASTNode node) {
   return node;
 }
 
-Type Solution::resolveInterfaceType(Type type) const {
-  auto resolvedType = type.transformRec([&](Type type) -> std::optional<Type> {
-    if (auto *tvt = type->getAs<TypeVariableType>()) {
-      // If this type variable is for a generic parameter, return that.
-      if (auto *gp = tvt->getImpl().getGenericParameter())
-        return gp;
-
-      // Otherwise resolve its fixed type, mapped out of context.
-      auto fixed = simplifyType(tvt);
-      return resolveInterfaceType(fixed->mapTypeOutOfContext());
-    }
-    if (auto *dmt = type->getAs<DependentMemberType>()) {
-      // For a dependent member, first resolve the base.
-      auto newBase = resolveInterfaceType(dmt->getBase());
-
-      // Then reconstruct using its associated type.
-      assert(dmt->getAssocType());
-      return DependentMemberType::get(newBase, dmt->getAssocType());
-    }
-    return std::nullopt;
-  });
-
-  assert(!resolvedType->hasArchetype());
-  return resolvedType;
-}
-
 std::optional<FunctionArgApplyInfo>
 Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // It's only valid to use `&` in argument positions, but we need
@@ -4121,13 +4082,12 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto *callee = choice ? choice->getDeclOrNull() : nullptr;
   if (callee && callee->hasInterfaceType()) {
     // If we have a callee with an interface type, we can use it. This is
-    // preferable to resolveInterfaceType, as this will allow us to get a
-    // GenericFunctionType for generic decls.
+    // preferable to simplifyType for the function, as this will allow us to get
+    // a GenericFunctionType for generic decls.
     //
     // Note that it's possible to find a callee without an interface type. This
     // can happen for example with closure parameters, where the interface type
-    // isn't set until the solution is applied. In that case, use
-    // resolveInterfaceType.
+    // isn't set until the solution is applied. In that case, use simplifyType.
     fnInterfaceType = callee->getInterfaceType();
 
     // Strip off the curried self parameter if necessary.
@@ -4148,7 +4108,7 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     }
 #endif
   } else {
-    fnInterfaceType = resolveInterfaceType(rawFnType);
+    fnInterfaceType = simplifyType(rawFnType, /*wantInterfaceType*/ true);
   }
 
   auto argIdx = applyArgElt->getArgIdx();
@@ -5093,6 +5053,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       switch (getActorIsolation(storage)) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
         break;
 

@@ -120,7 +120,6 @@ void SplitterStep::computeFollowupSteps(
   // Take the orphaned constraints, because they'll go into a component now.
   OrphanedConstraints = CG.takeOrphanedConstraints();
 
-  IncludeInMergedResults.resize(numComponents, true);
   Components.resize(numComponents);
   PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
       new SmallVector<Solution, 4>[numComponents]);
@@ -129,26 +128,9 @@ void SplitterStep::computeFollowupSteps(
   for (unsigned i : indices(components)) {
     unsigned solutionIndex = components[i].solutionIndex;
 
-    // If there are no dependencies, build a normal component step.
-    if (components[i].getDependencies().empty()) {
-      steps.push_back(std::make_unique<ComponentStep>(
-          CS, solutionIndex, &Components[i], std::move(components[i]),
-          PartialSolutions[solutionIndex]));
-      continue;
-    }
-
-    // Note that the partial results from any dependencies of this component
-    // need not be included in the final merged results, because they'll
-    // already be part of the partial results for this component.
-    for (auto dependsOn : components[i].getDependencies()) {
-      IncludeInMergedResults[dependsOn] = false;
-    }
-
-    // Otherwise, build a dependent component "splitter" step, which
-    // handles all combinations of incoming partial solutions.
-    steps.push_back(std::make_unique<DependentComponentSplitterStep>(
-        CS, &Components[i], solutionIndex, std::move(components[i]),
-        llvm::MutableArrayRef(PartialSolutions.get(), numComponents)));
+    steps.push_back(std::make_unique<ComponentStep>(
+        CS, solutionIndex, &Components[i], std::move(components[i]),
+        PartialSolutions[solutionIndex]));
   }
 
   assert(CS.InactiveConstraints.empty() && "Missed a constraint");
@@ -217,8 +199,7 @@ bool SplitterStep::mergePartialSolutions() const {
   SmallVector<unsigned, 2> countsVec;
   countsVec.reserve(numComponents);
   for (unsigned idx : range(numComponents)) {
-    countsVec.push_back(
-        IncludeInMergedResults[idx] ? PartialSolutions[idx].size() : 1);
+    countsVec.push_back(PartialSolutions[idx].size());
   }
 
   // Produce all combinations of partial solutions.
@@ -231,9 +212,6 @@ bool SplitterStep::mergePartialSolutions() const {
     // solutions.
     ConstraintSystem::SolverScope scope(CS);
     for (unsigned i : range(numComponents)) {
-      if (!IncludeInMergedResults[i])
-        continue;
-
       CS.replaySolution(PartialSolutions[i][indices[i]]);
     }
 
@@ -265,86 +243,14 @@ bool SplitterStep::mergePartialSolutions() const {
   return anySolutions;
 }
 
-StepResult DependentComponentSplitterStep::take(bool prevFailed) {
-  // "split" is considered a failure if previous step failed,
-  // or there is a failure recorded by constraint system, or
-  // system can't be simplified.
-  if (prevFailed || CS.getFailedConstraint() || CS.simplify())
-    return done(/*isSuccess=*/false);
-
-  // Figure out the sets of partial solutions that this component depends on.
-  SmallVector<const SmallVector<Solution, 4> *, 2> dependsOnSets;
-  for (auto index : Component.getDependencies()) {
-    dependsOnSets.push_back(&AllPartialSolutions[index]);
-  }
-
-  // Produce all combinations of partial solutions for the inputs.
-  SmallVector<std::unique_ptr<SolverStep>, 4> followup;
-  SmallVector<unsigned, 2> indices(Component.getDependencies().size(), 0);
-  auto dependsOnSetsRef = llvm::ArrayRef(dependsOnSets);
-  do {
-    // Form the set of input partial solutions.
-    SmallVector<const Solution *, 2> dependsOnSolutions;
-    for (auto index : swift::indices(indices)) {
-      dependsOnSolutions.push_back(&(*dependsOnSets[index])[indices[index]]);
-    }
-    ContextualSolutions.push_back(std::make_unique<SmallVector<Solution, 2>>());
-
-    followup.push_back(std::make_unique<ComponentStep>(
-        CS, Index, Constraints, Component, std::move(dependsOnSolutions),
-        *ContextualSolutions.back()));
-  } while (nextCombination(dependsOnSetsRef, indices));
-
-  /// Wait until all of the component steps are done.
-  return suspend(followup);
-}
-
-StepResult DependentComponentSplitterStep::resume(bool prevFailed) {
-  for (auto &ComponentStepSolutions : ContextualSolutions) {
-    Solutions.append(std::make_move_iterator(ComponentStepSolutions->begin()),
-                     std::make_move_iterator(ComponentStepSolutions->end()));
-  }
-  return done(/*isSuccess=*/!Solutions.empty());
-}
-
-void DependentComponentSplitterStep::print(llvm::raw_ostream &Out) {
-  Out << "DependentComponentSplitterStep for dependencies on [";
-  interleave(
-      Component.getDependencies(), [&](unsigned index) { Out << index; },
-      [&] { Out << ", "; });
-  Out << "]\n";
-}
-
 StepResult ComponentStep::take(bool prevFailed) {
   // One of the previous components created by "split"
   // failed, it means that we can't solve this component.
-  if ((prevFailed && DependsOnPartialSolutions.empty()) ||
-      CS.isTooComplex(Solutions) || CS.worseThanBestSolution())
+  if (prevFailed || CS.isTooComplex(Solutions) || CS.worseThanBestSolution())
     return done(/*isSuccess=*/false);
 
   // Setup active scope, only if previous component didn't fail.
   setupScope();
-
-  // If there are any dependent partial solutions to compose, do so now.
-  if (!DependsOnPartialSolutions.empty()) {
-    for (auto partial : DependsOnPartialSolutions) {
-      CS.replaySolution(*partial);
-    }
-
-    // Activate all of the one-way constraints.
-    SmallVector<Constraint *, 4> oneWayConstraints;
-    for (auto &constraint : CS.InactiveConstraints) {
-      if (constraint.isOneWayConstraint())
-        oneWayConstraints.push_back(&constraint);
-    }
-    for (auto constraint : oneWayConstraints) {
-      CS.activateConstraint(constraint);
-    }
-
-    // Simplify again.
-    if (CS.failedConstraint || CS.simplify())
-      return done(/*isSuccess=*/false);
-  }
 
   /// Try to figure out what this step is going to be,
   /// after the scope has been established.

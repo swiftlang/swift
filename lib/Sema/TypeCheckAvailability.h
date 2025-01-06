@@ -13,7 +13,7 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 #define SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 
-#include "swift/AST/AttrKind.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/DeclContext.h"
@@ -26,7 +26,6 @@
 
 namespace swift {
   class ApplyExpr;
-  class AvailableAttr;
   class Expr;
   class ClosureExpr;
   class InFlightDiagnostic;
@@ -37,6 +36,7 @@ namespace swift {
   class SubstitutionMap;
   class Type;
   class TypeRepr;
+  class UnsafeUse;
   class ValueDecl;
 
 enum class DeclAvailabilityFlag : uint8_t {
@@ -198,7 +198,8 @@ public:
   /// is not also unavailable in the same way, then this returns the specific
   /// `@available` attribute that makes the decl unavailable. Otherwise, returns
   /// nullptr.
-  const AvailableAttr *shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
+  std::optional<SemanticAvailableAttr>
+  shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
 };
 
 /// Check if a declaration is exported as part of a module's external interface.
@@ -265,6 +266,12 @@ bool checkTypeMetadataAvailability(Type type, SourceRange loc,
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);
+
+/// Determine the enclosing context that allows for some use of an unsafe
+/// construct, and whether that reference is in the definition (true) vs.
+/// in the interface (false) of that context.
+std::pair<const Decl *, bool /*inDefinition*/>
+enclosingContextForUnsafe(SourceLoc referenceLoc, const DeclContext *referenceDC);
 
 } // namespace swift
 

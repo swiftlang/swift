@@ -20,6 +20,7 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Identifier.h"
@@ -31,6 +32,7 @@
 #include "swift/AST/StorageImpl.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/EnumTraits.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -490,6 +492,8 @@ public:
   LLVM_READNONE
   static bool canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK);
 
+  static std::optional<Feature> getRequiredFeature(DeclAttrKind DK);
+
   /// Returns the source name of the attribute, without the @ or any arguments.
   StringRef getAttrName() const;
 
@@ -782,12 +786,6 @@ public:
   /// Indicates where the Obsoleted version was specified.
   const SourceRange ObsoletedRange;
 
-  /// Whether this is a language-version-specific entity.
-  bool isLanguageVersionSpecific() const;
-
-  /// Whether this is a PackageDescription version specific entity.
-  bool isPackageDescriptionVersionSpecific() const;
-
   /// Whether this is an unconditionally unavailable entity.
   bool isUnconditionallyUnavailable() const;
 
@@ -830,17 +828,6 @@ public:
 
   /// Returns true if this attribute is active given the current platform.
   bool isActivePlatform(const ASTContext &ctx) const;
-
-  /// Returns the active version from the AST context corresponding to
-  /// the available kind. For example, this will return the effective language
-  /// version for swift version-specific availability kind, PackageDescription
-  /// version for PackageDescription version-specific availability.
-  llvm::VersionTuple getActiveVersion(const ASTContext &ctx) const;
-
-  /// Compare this attribute's version information against the platform or
-  /// language version (assuming the this attribute pertains to the active
-  /// platform).
-  AvailableVersionComparison getVersionAvailability(const ASTContext &ctx) const;
 
   /// Create an AvailableAttr that indicates specific availability
   /// for all platforms.
@@ -2891,6 +2878,12 @@ template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
       return cast<ATTR>(Attr);
     return std::nullopt;
   }
+
+  std::optional<ATTR *> operator()(DeclAttribute *Attr) {
+    if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
+      return cast<ATTR>(Attr);
+    return std::nullopt;
+  }
 };
 
 /// The @_allowFeatureSuppression(Foo, Bar) attribute.  The feature
@@ -2922,6 +2915,31 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(AllowFeatureSuppressionAttr)
+};
+
+/// Defines the @abi attribute.
+class ABIAttr : public DeclAttribute {
+public:
+  ABIAttr(Decl *abiDecl, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+      : DeclAttribute(DeclAttrKind::ABI, AtLoc, Range, Implicit),
+        abiDecl(abiDecl)
+  { }
+
+  ABIAttr(Decl *abiDecl, bool Implicit)
+      : ABIAttr(abiDecl, SourceLoc(), SourceRange(), Implicit) {}
+
+  /// The declaration which will be used to compute a mangled name.
+  ///
+  /// \note For a \c VarDecl with a parent \c PatternBindingDecl , this should
+  /// point to the parent \c PatternBindingDecl . (That accommodates the way
+  /// sibling \c VarDecl s share attributes.)
+  Decl *abiDecl;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::ABI;
+  }
+
+  UNIMPLEMENTED_CLONE(ABIAttr)
 };
 
 /// Attributes that may be applied to declarations.
@@ -3063,17 +3081,25 @@ public:
   }
 
 public:
-  template <typename ATTR, bool AllowInvalid>
+  template <typename ATTR, typename Iterator, bool AllowInvalid>
   using AttributeKindRange =
-      OptionalTransformRange<iterator_range<const_iterator>,
+      OptionalTransformRange<iterator_range<Iterator>,
                              ToAttributeKind<ATTR, AllowInvalid>,
-                             const_iterator>;
+                             Iterator>;
 
   /// Return a range with all attributes in DeclAttributes with AttrKind
   /// ATTR.
   template <typename ATTR, bool AllowInvalid = false>
-  AttributeKindRange<ATTR, AllowInvalid> getAttributes() const {
-    return AttributeKindRange<ATTR, AllowInvalid>(
+  AttributeKindRange<ATTR, const_iterator, AllowInvalid> getAttributes() const {
+    return AttributeKindRange<ATTR, const_iterator, AllowInvalid>(
+        make_range(begin(), end()), ToAttributeKind<ATTR, AllowInvalid>());
+  }
+
+  /// Return a range with all attributes in DeclAttributes with AttrKind
+  /// ATTR.
+  template <typename ATTR, bool AllowInvalid = false>
+  AttributeKindRange<ATTR, iterator, AllowInvalid> getAttributes() {
+    return AttributeKindRange<ATTR, iterator, AllowInvalid>(
         make_range(begin(), end()), ToAttributeKind<ATTR, AllowInvalid>());
   }
 
@@ -3188,6 +3214,137 @@ public:
   bool hasAttribute(bool allowInvalid = false) const {
     return getAttribute<AttrType>(allowInvalid) != nullptr;
   }
+};
+
+/// A wrapper for `AvailableAttr` that is enriched with additional semantic
+/// informaton, like its corresponding `AvailabilityDomain`.
+class SemanticAvailableAttr final {
+  const AvailableAttr *attr;
+  const AvailabilityDomain domain;
+
+public:
+  SemanticAvailableAttr(const AvailableAttr *attr, AvailabilityDomain domain)
+      : attr(attr), domain(domain) {
+    assert(attr);
+  }
+
+  const AvailableAttr *getParsedAttr() const { return attr; }
+  const AvailabilityDomain getDomain() const { return domain; }
+
+  std::optional<llvm::VersionTuple> getIntroduced() const {
+    return attr->Introduced;
+  }
+
+  std::optional<llvm::VersionTuple> getDeprecated() const {
+    return attr->Deprecated;
+  }
+
+  std::optional<llvm::VersionTuple> getObsoleted() const {
+    return attr->Obsoleted;
+  }
+
+  /// Returns the `message:` field of the attribute, or an empty string.
+  StringRef getMessage() const { return attr->Message; }
+
+  /// Returns the `rename:` field of the attribute, or an empty string.
+  StringRef getRename() const { return attr->Rename; }
+
+  /// Returns the platform kind that the attribute applies to, or
+  /// `PlatformKind::none` if the attribute is not platform specific.
+  bool isPlatformSpecific() const { return getDomain().isPlatform(); }
+
+  /// Returns the platform kind that the attribute applies to, or
+  /// `PlatformKind::none` if the attribute is not platform specific.
+  PlatformKind getPlatform() const { return getDomain().getPlatformKind(); }
+
+  /// Whether this is attribute indicates unavailability in all versions.
+  bool isUnconditionallyUnavailable() const {
+    return attr->isUnconditionallyUnavailable();
+  }
+
+  /// Whether this is attribute indicates deprecation in all versions.
+  bool isUnconditionallyDeprecated() const {
+    return attr->isUnconditionallyDeprecated();
+  }
+
+  /// Whether this is a `noasync` attribute.
+  bool isNoAsync() const { return attr->isNoAsync(); }
+
+  /// Whether this attribute has an introduced, deprecated, or obsoleted
+  /// version.
+  bool isVersionSpecific() const {
+    return attr->Introduced || attr->Deprecated || attr->Obsoleted;
+  }
+
+  /// Whether this is a language mode specific attribute.
+  bool isSwiftLanguageModeSpecific() const {
+    return getDomain().isSwiftLanguage() && isVersionSpecific();
+  }
+
+  /// Whether this is a PackageDescription version specific attribute.
+  bool isPackageDescriptionVersionSpecific() const {
+    return getDomain().isPackageDescription() && isVersionSpecific();
+  }
+
+  /// Whether this attribute was spelled `@_unavailableInEmbedded`.
+  bool isEmbeddedSpecific() const { return attr->isForEmbedded(); }
+
+  /// Returns the active version from the AST context corresponding to
+  /// the available kind. For example, this will return the effective language
+  /// version for swift version-specific availability kind, PackageDescription
+  /// version for PackageDescription version-specific availability.
+  llvm::VersionTuple getActiveVersion(const ASTContext &ctx) const;
+
+  /// Compare this attribute's version information against the platform or
+  /// language version (assuming the this attribute pertains to the active
+  /// platform).
+  AvailableVersionComparison
+  getVersionAvailability(const ASTContext &ctx) const;
+
+  /// Returns true if this attribute is considered active in the current
+  /// compilation context.
+  bool isActive(ASTContext &ctx) const;
+
+  bool operator==(const SemanticAvailableAttr &other) const {
+    return other.attr == attr;
+  }
+
+  bool operator!=(const SemanticAvailableAttr &other) const {
+    return other.attr != attr;
+  }
+};
+
+/// An iterable range of `SemanticAvailableAttr`s.
+class SemanticAvailableAttributes {
+public:
+  class Filter final {
+    const Decl *decl;
+    bool includeInactive;
+
+  public:
+    Filter(const Decl *decl, bool includeInactive)
+        : decl(decl), includeInactive(includeInactive) {}
+
+    std::optional<SemanticAvailableAttr>
+    operator()(const DeclAttribute *attr) const;
+  };
+
+  using Range =
+      OptionalTransformRange<iterator_range<DeclAttributes::const_iterator>,
+                             Filter>;
+
+private:
+  Range attrRange;
+
+public:
+  SemanticAvailableAttributes(const DeclAttributes &attrs, const Decl *decl,
+                              bool includeInactive = false)
+      : attrRange(make_range(attrs.begin(), attrs.end()),
+                  Filter(decl, includeInactive)) {}
+
+  Range::iterator begin() const { return attrRange.begin(); }
+  Range::iterator end() const { return attrRange.end(); }
+  bool empty() const { return attrRange.empty(); }
 };
 
 class alignas(1 << AttrAlignInBits) TypeAttribute

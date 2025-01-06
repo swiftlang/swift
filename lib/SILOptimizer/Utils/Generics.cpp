@@ -3507,6 +3507,13 @@ void swift::trySpecializeApplyOfGeneric(
       }
       if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
         SILValue result = NewPAI;
+        if (NewPAI->getFunction()->hasOwnership()) {
+          auto convention = ApplySite(PAI).getCaptureConvention(*Use);
+          if (convention == SILArgumentConvention::Direct_Guaranteed) {
+            SILBuilderWithScope builder(Apply.getInstruction());
+            result = builder.createCopyValue(Apply.getLoc(), result);
+          }
+        }
         if (SpecializedF.hasTypeReplacements()) {
           SILBuilderWithScope builder(Apply.getInstruction());
           auto fnType = PAI->getType();

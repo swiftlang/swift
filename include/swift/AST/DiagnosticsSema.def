@@ -313,6 +313,10 @@ ERROR(addressable_not_enabled,none,
       "@_addressable is an experimental feature", ())
 ERROR(addressableSelf_not_on_method,none,
       "@_addressableSelf cannot be applied to non-member declarations", ())
+ERROR(addressable_types_not_enabled,none,
+      "@_addressableForDependencies is an experimental feature", ())
+ERROR(class_cannot_be_addressable_for_dependencies,none,
+      "a class cannot be @_addressableForDependencies", ())
 
 ERROR(unsupported_closure_attr,none,
       "%select{attribute |}0 '%1' is not supported on a closure",
@@ -5792,22 +5796,19 @@ ERROR(non_sendable_type,none,
 ERROR(sendable_raw_storage,none,
       "struct %0 with @_rawLayout does not conform to the 'Sendable' protocol", (DeclName))
 
+ERROR(typeattr_not_inheritance_clause,none,
+      "'%0' attribute only applies in inheritance clauses", (StringRef))
+ERROR(typeattr_not_existential,none,
+      "'%0' attribute cannot apply to non-protocol type %1", (StringRef, Type))
+
 WARNING(unchecked_conformance_not_special,none,
       "@unchecked conformance to %0 has no meaning", (Type))
 WARNING(restate_unchecked_sendable,none,
         "class %0 must restate inherited '@unchecked Sendable' conformance",
         (DeclName))
-ERROR(unchecked_not_inheritance_clause,none,
-      "'unchecked' attribute only applies in inheritance clauses", ())
-ERROR(unchecked_not_existential,none,
-      "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
 
 WARNING(preconcurrency_conformance_not_used,none,
         "@preconcurrency attribute on conformance to %0 has no effect", (Type))
-ERROR(preconcurrency_not_inheritance_clause,none,
-      "'preconcurrency' attribute only applies in inheritance clauses", ())
-ERROR(preconcurrency_not_existential,none,
-      "'preconcurrency' attribute cannot apply to non-protocol type %0", (Type))
 
 ERROR(redundant_any_in_existential,none,
        "redundant 'any' in type %0",
@@ -7570,13 +7571,17 @@ ERROR(cannot_convert_default_value_type_to_argument_type, none,
 // MARK: Back deployment
 //------------------------------------------------------------------------------
 
-ERROR(attr_incompatible_with_back_deploy,none,
-      "'%0' cannot be applied to a back deployed %1",
-      (DeclAttribute, DescriptiveDeclKind))
+ERROR(attr_incompatible_with_back_deployed,none,
+      "'%0' cannot be applied to a back deployed %kind1",
+      (DeclAttribute, const Decl *))
 
-WARNING(backdeployed_opaque_result_not_supported,none,
-      "'%0' is unsupported on a %1 with a 'some' return type",
-      (DeclAttribute, DescriptiveDeclKind))
+WARNING(back_deployed_opaque_result_not_supported,none,
+      "'%0' cannot be applied to %kind1 because it has a 'some' return type",
+      (DeclAttribute, const ValueDecl *))
+
+ERROR(back_deployed_requires_body,none,
+      "'%0' requires that %kind1 have a body",
+      (DeclAttribute, const ValueDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: Implicit opening of existential types
@@ -8072,28 +8077,63 @@ NOTE(sending_function_result_with_sending_param_note, none,
 //------------------------------------------------------------------------------
 ERROR(unsafe_attr_disabled,none,
       "attribute requires '-enable-experimental-feature AllowUnsafeAttribute'", ())
-GROUPED_WARNING(override_safe_withunsafe,Unsafe,none,
-      "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
-GROUPED_WARNING(witness_unsafe,Unsafe,none,
+
+GROUPED_WARNING(decl_involves_unsafe,Unsafe,none,
+      "%kindbase0 involves unsafe code; "
+      "use %select{'@unsafe' to indicate that its use is not memory-safe|"
+      "'@safe(unchecked)' to assert that the code is memory-safe}1",
+      (const Decl *, bool))
+NOTE(note_reference_to_unsafe_decl,none,
+      "%select{reference|call}0 to unsafe %kind1",
+      (bool, const ValueDecl *))
+NOTE(note_reference_to_unsafe_typed_decl,none,
+     "%select{reference|call}0 to %kind1 involves unsafe type %2",
+     (bool, const ValueDecl *, Type))
+NOTE(note_reference_to_unsafe_through_typealias,none,
+     "reference to %kind0 whose underlying type involves unsafe type %1",
+     (const ValueDecl *, Type))
+NOTE(note_reference_to_nonisolated_unsafe,none,
+     "reference to nonisolated(unsafe) %kind0 is unsafe in concurrently-executing code",
+     (const ValueDecl *))
+NOTE(note_reference_unowned_unsafe,none,
+     "reference to unowned(unsafe) %kind0 is unsafe", (const ValueDecl *))
+NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
+     "@unsafe conformance of %0 to %kind1 involves unsafe code",
+     (Type, const ValueDecl *))
+GROUPED_WARNING(conformance_involves_unsafe,Unsafe,none,
+     "conformance of %0 to %kind1 involves unsafe code; use '@unsafe' to "
+     "indicate that the conformance is not memory-safe",
+     (Type, const ValueDecl *))
+NOTE(note_witness_unsafe,none,
      "unsafe %0 %1 cannot satisfy safe requirement",
       (DescriptiveDeclKind, DeclName))
-GROUPED_WARNING(type_witness_unsafe,Unsafe,none,
+NOTE(note_type_witness_unsafe,none,
       "unsafe type %0 cannot satisfy safe associated type %1",
       (Type, DeclName))
-GROUPED_WARNING(unchecked_conformance_is_unsafe,Unsafe,none,
-      "@unchecked conformance involves unsafe code", ())
-GROUPED_WARNING(unowned_unsafe_is_unsafe,Unsafe,none,
-      "unowned(unsafe) involves unsafe code", ())
-GROUPED_WARNING(nonisolated_unsafe_is_unsafe,Unsafe,none,
-      "nonisolated(unsafe) involves unsafe code", ())
+
+GROUPED_WARNING(override_safe_withunsafe,Unsafe,none,
+      "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
+GROUPED_WARNING(use_of_unsafe_conformance_is_unsafe,Unsafe,none,
+      "@unsafe conformance of %0 to %kind1 involves unsafe code",
+       (Type, const ValueDecl *))
+GROUPED_WARNING(reference_unowned_unsafe,Unsafe,none,
+      "reference to unowned(unsafe) %kind0 is unsafe", (const ValueDecl *))
+GROUPED_WARNING(reference_to_nonisolated_unsafe,Unsafe,none,
+      "reference to nonisolated(unsafe) %kind0 is unsafe in concurrently-executing code",
+       (const ValueDecl *))
 GROUPED_WARNING(reference_to_unsafe_decl,Unsafe,none,
       "%select{reference|call}0 to unsafe %kindbase1",
       (bool, const ValueDecl *))
 GROUPED_WARNING(reference_to_unsafe_typed_decl,Unsafe,none,
       "%select{reference|call}0 to %kindbase1 involves unsafe type %2",
       (bool, const ValueDecl *, Type))
-NOTE(unsafe_decl_here,none,
-     "unsafe %kindbase0 declared here", (const ValueDecl *))
+GROUPED_WARNING(reference_to_unsafe_through_typealias,Unsafe,none,
+     "reference to %kind0 whose underlying type involves unsafe type %1",
+     (const ValueDecl *, Type))
+GROUPED_WARNING(preconcurrency_import_unsafe,Unsafe,none,
+      "@preconcurrency import is not memory-safe because it can silently "
+      "introduce data races; use '@safe(unchecked)' to assert that the "
+      "code is memory-safe", ())
 NOTE(encapsulate_unsafe_in_enclosing_context,none,
      "make %kindbase0 @safe(unchecked) to allow it to use unsafe constructs in its definition",
      (const Decl *))
@@ -8134,6 +8174,41 @@ ERROR(availability_value_generic_type_only_version_newer, none,
       (StringRef, llvm::VersionTuple))
 ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
+
+//===----------------------------------------------------------------------===//
+// MARK: @abi Attribute
+//===----------------------------------------------------------------------===//
+
+ERROR(attr_abi_mismatched_kind,none,
+      "cannot give %kind0 the ABI of a %1",
+      (Decl *, DescriptiveDeclKind))
+
+ERROR(attr_abi_mismatched_arity,none,
+      "cannot give %kind0 the ABI of a %kindonly0 with a different number of "
+      "low-level parameters",
+      (ValueDecl *))
+
+ERROR(attr_abi_mismatched_throws,none,
+      "cannot give %0 the ABI of a %kindonly0 which %select{cannot|can}1 throw",
+      (ValueDecl *, /*abiCanThrow=*/bool))
+
+ERROR(attr_abi_mismatched_async,none,
+      "cannot give %0 the ABI of %select{a non-async|an async}1 %kindonly0",
+      (ValueDecl *, /*abiIsAsync=*/bool))
+
+ERROR(attr_abi_mismatched_pbd_size,none,
+      "cannot give pattern binding the ABI of a binding with "
+      "%select{more|fewer}0 patterns",
+      (/*abiHasExtra=*/bool))
+
+ERROR(attr_abi_mismatched_var,none,
+      "no match for %select{%kind0 in the ABI|ABI %kind0}1",
+      (ValueDecl *, /*isABI=*/bool))
+
+ERROR(attr_abi_incompatible_with_silgen_name,none,
+      "cannot use '@_silgen_name' and '@abi' on the same %0 because they serve "
+      "the same purpose",
+      (DescriptiveDeclKind))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

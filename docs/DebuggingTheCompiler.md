@@ -173,13 +173,13 @@ constraints and present the final type checked solution, e.g.:
 
 Score: <default 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>
 Type Variables:
-   ($T0 [attributes: [literal: integer]] [with possible bindings: (default type of literal) Int]) @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
+   ($T0 [attributes: [literal: integer]] [potential bindings: (default type of literal) Int]) @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
 
 Inactive Constraints:
   $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
 
   (Potential Binding(s): 
-    ($T0 [attributes: [literal: integer]] [with possible bindings: (default type of literal) Int])
+    ($T0 [attributes: [literal: integer]] [potential bindings: (default type of literal) Int])
   (attempting type variable $T0 := Int
     (considering: $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
       (simplification result:
