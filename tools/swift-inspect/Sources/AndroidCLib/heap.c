@@ -44,43 +44,41 @@
  * ------------
  */
 
+#if !__has_builtin(__builtin_debugtrap)
+#error("compiler support for __builtin_debugtrap is required")
+#endif
+
 #define MAX_VALID_IDX 0
 #define NEXT_FREE_IDX 1
 #define HEADER_SIZE 2
 #define ENTRY_SIZE  2
 
-#if defined(__aarch64__) || defined(__ARM64__) || defined(_M_ARM64)
-#define DEBUG_BREAK() asm("brk #0x0")
-#elif defined(_M_X64) || defined(__amd64__) || defined(__x86_64__) || defined(_M_AMD64)
-#define DEBUG_BREAK() asm("int3; nop")
-#else
-#error("only aarch64 and x86_64 are supported")
-#endif
-
 // Callback for malloc_iterate. Because this function is meant to be copied to
 // a different process for execution, it must not make any function calls. It
 // could be written as asm, but simple C is more readable/maintainable and
 // should consistently compile to movable, position-independent code.
-static void heap_iterate_callback(unsigned long base, unsigned long size, void *arg) {
+void heap_iterate_callback(unsigned long base, unsigned long size, void *arg) {
   volatile uint64_t *data = (uint64_t*)arg;
   while (data[NEXT_FREE_IDX] >= data[MAX_VALID_IDX]) {
     // SIGTRAP indicates the buffer is full and needs to be drained before more
     // entries can be written.
-    DEBUG_BREAK();
+    __builtin_debugtrap();
+    asm volatile("nop");
   }
   data[data[NEXT_FREE_IDX]++] = base;
   data[data[NEXT_FREE_IDX]++] = size;
+  asm volatile(".global heap_iterate_callback_end");
+  asm volatile("heap_iterate_callback_end:");
 }
-
-// Placeholer function to mark the end of the remote callback code.
-static void heap_iterate_callback_end() {}
 
 void* heap_iterate_callback_start() {
   return (void*)heap_iterate_callback;
 }
 
 size_t heap_iterate_callback_len() {
-  return (size_t)(heap_iterate_callback_end - heap_iterate_callback);
+  extern char heap_iterate_callback_end;
+  return (uintptr_t)&heap_iterate_callback_end - (uintptr_t)heap_iterate_callback
+    + sizeof(uintptr_t);
 }
 
 bool heap_iterate_metadata_init(void* data, size_t len) {
