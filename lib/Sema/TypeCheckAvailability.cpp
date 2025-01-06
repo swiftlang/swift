@@ -2376,16 +2376,16 @@ diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
 
 /// Returns the availability attribute indicating deprecation of the
 /// declaration is deprecated or null otherwise.
-static const AvailableAttr *getDeprecated(const Decl *D) {
+static std::optional<SemanticAvailableAttr> getDeprecated(const Decl *D) {
   auto &Ctx = D->getASTContext();
   if (auto Attr = D->getDeprecatedAttr())
-    return Attr->getParsedAttr();
+    return Attr;
 
   if (Ctx.LangOpts.WarnSoftDeprecated) {
     // When -warn-soft-deprecated is specified, treat any declaration that is
     // deprecated in the future as deprecated.
     if (auto Attr = D->getSoftDeprecatedAttr())
-      return Attr->getParsedAttr();
+      return Attr;
   }
 
   // Treat extensions methods as deprecated if their extension
@@ -2395,18 +2395,17 @@ static const AvailableAttr *getDeprecated(const Decl *D) {
     return getDeprecated(ED);
   }
 
-  return nullptr;
+  return std::nullopt;
 }
 
 static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
                                      SourceRange referenceRange,
                                      const ValueDecl *renamedDecl,
-                                     const AvailableAttr *attr,
-                                     const Expr *call) {
+                                     StringRef newName, const Expr *call) {
   if (isa<AccessorDecl>(renamedDecl))
     return;
 
-  ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
+  ParsedDeclName parsed = swift::parseDeclName(newName);
   if (!parsed)
     return;
 
@@ -2514,7 +2513,6 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     // let's just prepend it, otherwise we'll end up with an incorrect fix-it.
     auto base = sourceMgr.extractText(selfExprRange);
     if (!base.empty() && base.front() == '.') {
-      auto newName = attr->Rename;
       // If this is not a rename, let's not
       // even try to emit a fix-it because
       // it's going to be invalid.
@@ -2764,9 +2762,9 @@ namespace {
 } // end anonymous namespace
 
 static std::optional<ReplacementDeclKind>
-describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
+describeRename(ASTContext &ctx, StringRef newName, const ValueDecl *D,
                SmallVectorImpl<char> &nameBuf) {
-  ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
+  ParsedDeclName parsed = swift::parseDeclName(newName);
   if (!parsed)
     return std::nullopt;
 
@@ -2809,7 +2807,7 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
                                  const ExportContext &Where,
                                  const ValueDecl *DeprecatedDecl,
                                  const Expr *Call) {
-  const AvailableAttr *Attr = getDeprecated(DeprecatedDecl);
+  auto Attr = getDeprecated(DeprecatedDecl);
   if (!Attr)
     return;
 
@@ -2835,57 +2833,60 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
   if (shouldIgnoreDeprecationOfConcurrencyDecl(DeprecatedDecl, ReferenceDC))
     return;
 
-  StringRef Platform = Attr->prettyPlatformString();
+  StringRef Platform = Attr->getDomain().getNameForDiagnostics();
   llvm::VersionTuple DeprecatedVersion;
-  if (Attr->Deprecated)
-    DeprecatedVersion = Attr->Deprecated.value();
+  if (Attr->getDeprecated())
+    DeprecatedVersion = Attr->getDeprecated().value();
 
-  if (Attr->Message.empty() && Attr->Rename.empty()) {
-    Context.Diags.diagnose(
-             ReferenceRange.Start, diag::availability_deprecated,
-             DeprecatedDecl, Attr->hasPlatform(), Platform,
-             Attr->Deprecated.has_value(), DeprecatedVersion,
-             /*message*/ StringRef())
-        .highlight(Attr->getRange());
+  auto Message = Attr->getMessage();
+  auto NewName = Attr->getRename();
+  if (Message.empty() && NewName.empty()) {
+    Context.Diags
+        .diagnose(ReferenceRange.Start, diag::availability_deprecated,
+                  DeprecatedDecl, Attr->isPlatformSpecific(), Platform,
+                  Attr->getDeprecated().has_value(), DeprecatedVersion,
+                  /*message*/ StringRef())
+        .highlight(Attr->getParsedAttr()->getRange());
     return;
   }
 
+  // FIXME: [availability] Remap before emitting diagnostic above.
   llvm::VersionTuple RemappedDeprecatedVersion;
   if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-      Attr, Context, Platform, RemappedDeprecatedVersion))
+          Attr->getParsedAttr(), Context, Platform, RemappedDeprecatedVersion))
     DeprecatedVersion = RemappedDeprecatedVersion;
 
   SmallString<32> newNameBuf;
   std::optional<ReplacementDeclKind> replacementDeclKind =
-      describeRename(Context, Attr, /*decl*/ nullptr, newNameBuf);
-  StringRef newName = replacementDeclKind ? newNameBuf.str() : Attr->Rename;
+      describeRename(Context, NewName, /*decl*/ nullptr, newNameBuf);
+  StringRef newName = replacementDeclKind ? newNameBuf.str() : NewName;
 
-  if (!Attr->Message.empty()) {
-    EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-    Context.Diags.diagnose(
-             ReferenceRange.Start, diag::availability_deprecated,
-             DeprecatedDecl, Attr->hasPlatform(), Platform,
-             Attr->Deprecated.has_value(), DeprecatedVersion,
-             EncodedMessage.Message)
-        .highlight(Attr->getRange());
+  if (!Message.empty()) {
+    EncodedDiagnosticMessage EncodedMessage(Message);
+    Context.Diags
+        .diagnose(ReferenceRange.Start, diag::availability_deprecated,
+                  DeprecatedDecl, Attr->isPlatformSpecific(), Platform,
+                  Attr->getDeprecated().has_value(), DeprecatedVersion,
+                  EncodedMessage.Message)
+        .highlight(Attr->getParsedAttr()->getRange());
   } else {
     unsigned rawReplaceKind = static_cast<unsigned>(
         replacementDeclKind.value_or(ReplacementDeclKind::None));
-    Context.Diags.diagnose(
-             ReferenceRange.Start, diag::availability_deprecated_rename,
-             DeprecatedDecl, Attr->hasPlatform(), Platform,
-             Attr->Deprecated.has_value(), DeprecatedVersion,
-             replacementDeclKind.has_value(), rawReplaceKind, newName)
-      .highlight(Attr->getRange());
+    Context.Diags
+        .diagnose(ReferenceRange.Start, diag::availability_deprecated_rename,
+                  DeprecatedDecl, Attr->isPlatformSpecific(), Platform,
+                  Attr->getDeprecated().has_value(), DeprecatedVersion,
+                  replacementDeclKind.has_value(), rawReplaceKind, newName)
+        .highlight(Attr->getParsedAttr()->getRange());
   }
 
-  if (!Attr->Rename.empty() && !isa<AccessorDecl>(DeprecatedDecl)) {
+  if (!NewName.empty() && !isa<AccessorDecl>(DeprecatedDecl)) {
     auto renameDiag = Context.Diags.diagnose(
                                ReferenceRange.Start,
                                diag::note_deprecated_rename,
                                newName);
     fixItAvailableAttrRename(renameDiag, ReferenceRange, DeprecatedDecl,
-                             Attr, Call);
+                             NewName, Call);
   }
 }
 
@@ -2894,7 +2895,7 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
                                  const RootProtocolConformance *rootConf,
                                  const ExtensionDecl *ext,
                                  const ExportContext &where) {
-  const AvailableAttr *attr = getDeprecated(ext);
+  auto attr = getDeprecated(ext);
   if (!attr)
     return false;
 
@@ -2920,33 +2921,34 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
   auto type = rootConf->getType();
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
 
-  StringRef platform = attr->prettyPlatformString();
+  StringRef platform = attr->getDomain().getNameForDiagnostics();
   llvm::VersionTuple deprecatedVersion;
-  if (attr->Deprecated)
-    deprecatedVersion = attr->Deprecated.value();
+  if (attr->getDeprecated())
+    deprecatedVersion = attr->getDeprecated().value();
 
   llvm::VersionTuple remappedDeprecatedVersion;
   if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-      attr, ctx, platform, remappedDeprecatedVersion))
+          attr->getParsedAttr(), ctx, platform, remappedDeprecatedVersion))
     deprecatedVersion = remappedDeprecatedVersion;
 
-  if (attr->Message.empty()) {
-    ctx.Diags.diagnose(
-             loc, diag::conformance_availability_deprecated,
-             type, proto, attr->hasPlatform(), platform,
-             attr->Deprecated.has_value(), deprecatedVersion,
-             /*message*/ StringRef())
-        .highlight(attr->getRange());
+  auto message = attr->getMessage();
+  if (message.empty()) {
+    ctx.Diags
+        .diagnose(loc, diag::conformance_availability_deprecated, type, proto,
+                  attr->isPlatformSpecific(), platform,
+                  attr->getDeprecated().has_value(), deprecatedVersion,
+                  /*message*/ StringRef())
+        .highlight(attr->getParsedAttr()->getRange());
     return true;
   }
 
-  EncodedDiagnosticMessage encodedMessage(attr->Message);
-  ctx.Diags.diagnose(
-      loc, diag::conformance_availability_deprecated,
-      type, proto, attr->hasPlatform(), platform,
-      attr->Deprecated.has_value(), deprecatedVersion,
-      encodedMessage.Message)
-    .highlight(attr->getRange());
+  EncodedDiagnosticMessage encodedMessage(message);
+  ctx.Diags
+      .diagnose(loc, diag::conformance_availability_deprecated, type, proto,
+                attr->isPlatformSpecific(), platform,
+                attr->getDeprecated().has_value(), deprecatedVersion,
+                encodedMessage.Message)
+      .highlight(attr->getParsedAttr()->getRange());
   return true;
 }
 
@@ -3003,7 +3005,7 @@ static bool diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
       D, R, Where, Flags, [=](InFlightDiagnostic &diag) {
         auto attr = D->getUnavailableAttr();
         assert(attr);
-        fixItAvailableAttrRename(diag, R, D, attr->getParsedAttr(), call);
+        fixItAvailableAttrRename(diag, R, D, attr->getRename(), call);
       });
 }
 
@@ -3559,7 +3561,7 @@ bool diagnoseExplicitUnavailability(
   if (!Attr->Rename.empty()) {
     SmallString<32> newNameBuf;
     std::optional<ReplacementDeclKind> replaceKind =
-        describeRename(ctx, Attr, D, newNameBuf);
+        describeRename(ctx, Attr->Rename, D, newNameBuf);
     unsigned rawReplaceKind = static_cast<unsigned>(
         replaceKind.value_or(ReplacementDeclKind::None));
     StringRef newName = replaceKind ? newNameBuf.str() : Attr->Rename;
@@ -4168,7 +4170,7 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
     diag.warnUntilSwiftVersion(6);
 
     if (!attr->getRename().empty()) {
-      fixItAvailableAttrRename(diag, R, D, attr->getParsedAttr(), call);
+      fixItAvailableAttrRename(diag, R, D, attr->getRename(), call);
     }
     return true;
   }
