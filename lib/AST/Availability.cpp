@@ -430,11 +430,11 @@ bool AvailabilityInference::updateBeforePlatformForFallback(
   return false;
 }
 
-std::optional<SemanticAvailableAttr>
-Decl::getAvailableAttrForPlatformIntroduction() const {
+static std::optional<SemanticAvailableAttr>
+getDeclAvailableAttrForPlatformIntroduction(const Decl *D) {
   std::optional<SemanticAvailableAttr> bestAvailAttr;
 
-  auto D = abstractSyntaxDeclForAvailableAttribute(this);
+  D = abstractSyntaxDeclForAvailableAttribute(D);
 
   for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
     if (!attr.isPlatformSpecific() || !attr.getIntroduced())
@@ -790,9 +790,9 @@ AvailabilityRange AvailabilityInference::annotatedAvailableRangeForAttr(
   return AvailabilityRange::alwaysAvailable();
 }
 
-static std::optional<SemanticAvailableAttr>
-attrForAvailableRange(const Decl *D) {
-  if (auto attr = D->getAvailableAttrForPlatformIntroduction())
+std::optional<SemanticAvailableAttr>
+Decl::getAvailableAttrForPlatformIntroduction() const {
+  if (auto attr = getDeclAvailableAttrForPlatformIntroduction(this))
     return attr;
 
   // Unlike other declarations, extensions can be used without referring to them
@@ -803,31 +803,24 @@ attrForAvailableRange(const Decl *D) {
   // itself. This check relies on the fact that we cannot have nested
   // extensions.
 
-  DeclContext *DC = D->getDeclContext();
+  DeclContext *DC = getDeclContext();
   if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-    if (auto attr = ED->getAvailableAttrForPlatformIntroduction())
+    if (auto attr = getDeclAvailableAttrForPlatformIntroduction(ED))
       return attr;
   }
 
   return std::nullopt;
 }
 
-std::pair<AvailabilityRange, const AvailableAttr *>
-AvailabilityInference::availableRangeAndAttr(const Decl *D) {
-  if (auto rangeAttr = attrForAvailableRange(D))
-    return {rangeAttr->getIntroducedRange(D->getASTContext()),
-            rangeAttr->getParsedAttr()};
-
-  // Treat unannotated declarations as always available.
-  return {AvailabilityRange::alwaysAvailable(), nullptr};
-}
-
 AvailabilityRange AvailabilityInference::availableRange(const Decl *D) {
-  return availableRangeAndAttr(D).first;
+  if (auto attr = D->getAvailableAttrForPlatformIntroduction())
+    return attr->getIntroducedRange(D->getASTContext());
+
+  return AvailabilityRange::alwaysAvailable();
 }
 
 bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
-  if (auto attr = attrForAvailableRange(D))
+  if (auto attr = D->getAvailableAttrForPlatformIntroduction())
     return attr->getParsedAttr()->isSPI();
 
   return false;

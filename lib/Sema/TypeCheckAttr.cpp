@@ -2264,10 +2264,10 @@ static Decl *getEnclosingDeclForDecl(Decl *D) {
   return D->getDeclContext()->getInnermostDeclarationDeclContext();
 }
 
-static std::optional<std::pair<const AvailableAttr *, const Decl *>>
+static std::optional<std::pair<SemanticAvailableAttr, const Decl *>>
 getSemanticAvailableRangeDeclAndAttr(const Decl *decl) {
   if (auto attr = decl->getAvailableAttrForPlatformIntroduction())
-    return std::make_pair(attr->getParsedAttr(), decl);
+    return std::make_pair(*attr, decl);
 
   if (auto *parent =
           AvailabilityInference::parentDeclForInferredAvailability(decl))
@@ -2383,11 +2383,8 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (auto *parent = getEnclosingDeclForDecl(D)) {
     if (auto enclosingAvailable =
             getSemanticAvailableRangeDeclAndAttr(parent)) {
-      const Decl *enclosingDecl = enclosingAvailable.value().second;
-      SemanticAvailableAttr enclosingAttr =
-          enclosingDecl
-              ->getSemanticAvailableAttr(enclosingAvailable.value().first)
-              .value();
+      SemanticAvailableAttr enclosingAttr = enclosingAvailable->first;
+      const Decl *enclosingDecl = enclosingAvailable->second;
       EnclosingAnnotatedRange.emplace(enclosingAttr.getIntroducedRange(Ctx));
       if (!AttrRange.isContainedIn(*EnclosingAnnotatedRange)) {
         auto limit = DiagnosticBehavior::Unspecified;
@@ -5021,7 +5018,7 @@ void AttributeChecker::checkBackDeployedAttrs(
             getSemanticAvailableRangeDeclAndAttr(VD)) {
       auto beforePlatformString = prettyPlatformString(Attr->Platform);
       auto beforeVersion = Attr->Version;
-      auto availableAttr = availableRangeAttrPair.value().first;
+      auto availableAttr = availableRangeAttrPair.value().first.getParsedAttr();
       auto introVersion = availableAttr->Introduced.value();
       StringRef introPlatformString = availableAttr->prettyPlatformString();
 

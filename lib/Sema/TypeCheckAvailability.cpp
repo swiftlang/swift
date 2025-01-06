@@ -3182,10 +3182,11 @@ swift::getUnsatisfiedAvailabilityConstraint(
   }
 
   // Check whether the declaration is available in a newer platform version.
-  auto rangeAndAttr = AvailabilityInference::availableRangeAndAttr(decl);
-  if (!availabilityContext.getPlatformRange().isContainedIn(rangeAndAttr.first))
-    return AvailabilityConstraint::forIntroducedInNewerVersion(
-        decl->getSemanticAvailableAttr(rangeAndAttr.second).value());
+  if (auto rangeAttr = decl->getAvailableAttrForPlatformIntroduction()) {
+    auto range = rangeAttr->getIntroducedRange(ctx);
+    if (!availabilityContext.getPlatformRange().isContainedIn(range))
+      return AvailabilityConstraint::forIntroducedInNewerVersion(*rangeAttr);
+  }
 
   return std::nullopt;
 }
