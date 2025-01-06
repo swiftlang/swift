@@ -427,7 +427,7 @@ namespace {
 class InheritedProtocolCollector {
   static const StringLiteral DummyProtocolName;
 
-  using AvailableAttrList = TinyPtrVector<const AvailableAttr *>;
+  using AvailableAttrList = SmallVector<SemanticAvailableAttr>;
   using OriginallyDefinedInAttrList =
       TinyPtrVector<const OriginallyDefinedInAttr *>;
   using ProtocolAndAvailability =
@@ -451,14 +451,13 @@ class InheritedProtocolCollector {
 
     cache.emplace();
     while (D) {
-      for (auto semanticAttr : D->getSemanticAvailableAttrs()) {
-        auto nextAttr = semanticAttr.getParsedAttr();
-
+      for (auto nextAttr : D->getSemanticAvailableAttrs()) {
         // FIXME: This is just approximating the effects of nested availability
         // attributes for the same platform; formally they'd need to be merged.
-        bool alreadyHasMoreSpecificAttrForThisPlatform =
-            llvm::any_of(*cache, [nextAttr](const AvailableAttr *existingAttr) {
-              return existingAttr->getPlatform() == nextAttr->getPlatform();
+        // FIXME: [availability] This should compare availability domains.
+        bool alreadyHasMoreSpecificAttrForThisPlatform = llvm::any_of(
+            *cache, [nextAttr](SemanticAvailableAttr existingAttr) {
+              return existingAttr.getPlatform() == nextAttr.getPlatform();
             });
         if (alreadyHasMoreSpecificAttrForThisPlatform)
           continue;
@@ -785,8 +784,9 @@ public:
 
     // Build up synthesized DeclAttributes for the extension.
     TinyPtrVector<const DeclAttribute *> clonedAttrs;
-    for (auto *attr : availability) {
-      clonedAttrs.push_back(attr->clone(ctx, /*implicit*/ true));
+    for (auto attr : availability) {
+      clonedAttrs.push_back(
+          attr.getParsedAttr()->clone(ctx, /*implicit*/ true));
     }
     for (auto *attr : proto->getAttrs().getAttributes<SPIAccessControlAttr>()) {
       clonedAttrs.push_back(attr->clone(ctx, /*implicit*/ true));

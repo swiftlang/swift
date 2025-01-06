@@ -3221,7 +3221,7 @@ public:
 /// informaton, like its corresponding `AvailabilityDomain`.
 class SemanticAvailableAttr final {
   const AvailableAttr *attr;
-  const AvailabilityDomain domain;
+  AvailabilityDomain domain;
 
 public:
   SemanticAvailableAttr(const AvailableAttr *attr, AvailabilityDomain domain)
