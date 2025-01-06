@@ -3860,10 +3860,9 @@ public:
                               DeclAvailabilityFlags flags = std::nullopt) const;
 
 private:
-  bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
-                             const AvailableAttr *Attr) const;
+  bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R) const;
   bool diagnoseMemoryLayoutMigration(const ValueDecl *D, SourceRange R,
-                                     const AvailableAttr *Attr,
+                                     SemanticAvailableAttr,
                                      const ApplyExpr *call) const;
 
   /// Walks up from a potential callee to the enclosing ApplyExpr.
@@ -4099,11 +4098,10 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
     return false;
 
   if (auto attr = D->getUnavailableAttr()) {
-    auto parsedAttr = attr->getParsedAttr();
-    if (diagnoseIncDecRemoval(D, R, parsedAttr))
+    if (diagnoseIncDecRemoval(D, R))
       return true;
     if (isa_and_nonnull<ApplyExpr>(call) &&
-        diagnoseMemoryLayoutMigration(D, R, parsedAttr, cast<ApplyExpr>(call)))
+        diagnoseMemoryLayoutMigration(D, R, *attr, cast<ApplyExpr>(call)))
       return true;
   }
 
@@ -4363,8 +4361,7 @@ static bool isIntegerOrFloatingPointType(Type ty) {
 /// If this is a call to an unavailable ++ / -- operator, try to diagnose it
 /// with a fixit hint and return true.  If not, or if we fail, return false.
 bool
-ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
-                                              const AvailableAttr *Attr) const {
+ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R) const {
   // We can only produce a fixit if we're talking about ++ or --.
   bool isInc = D->getBaseName() == "++";
   if (!isInc && D->getBaseName() != "--")
@@ -4423,7 +4420,7 @@ ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
 bool
 ExprAvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
                                                       SourceRange R,
-                                                      const AvailableAttr *Attr,
+                                                      SemanticAvailableAttr Attr,
                                                       const ApplyExpr *call) const {
 
   if (!D->getModuleContext()->isStdlibModule())
@@ -4446,7 +4443,7 @@ ExprAvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
   if (!subject)
     return false;
 
-  EncodedDiagnosticMessage EncodedMessage(Attr->Message);
+  EncodedDiagnosticMessage EncodedMessage(Attr.getMessage());
   auto diag =
       Context.Diags.diagnose(
           R.Start, diag::availability_decl_unavailable, D, true, "",
