@@ -2378,16 +2378,17 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
   std::optional<AvailabilityRange> EnclosingAnnotatedRange;
-  AvailabilityRange AttrRange =
-      AvailabilityInference::availableRange(attr, Ctx);
+  AvailabilityRange AttrRange = semanticAttr->getIntroducedRange(Ctx);
 
   if (auto *parent = getEnclosingDeclForDecl(D)) {
     if (auto enclosingAvailable =
             getSemanticAvailableRangeDeclAndAttr(parent)) {
-      const AvailableAttr *enclosingAttr = enclosingAvailable.value().first;
       const Decl *enclosingDecl = enclosingAvailable.value().second;
-      EnclosingAnnotatedRange.emplace(
-          AvailabilityInference::availableRange(enclosingAttr, Ctx));
+      SemanticAvailableAttr enclosingAttr =
+          enclosingDecl
+              ->getSemanticAvailableAttr(enclosingAvailable.value().first)
+              .value();
+      EnclosingAnnotatedRange.emplace(enclosingAttr.getIntroducedRange(Ctx));
       if (!AttrRange.isContainedIn(*EnclosingAnnotatedRange)) {
         auto limit = DiagnosticBehavior::Unspecified;
         if (D->isImplicit()) {

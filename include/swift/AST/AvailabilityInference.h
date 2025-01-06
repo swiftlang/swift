@@ -55,13 +55,6 @@ public:
   /// Returns true is the declaration is `@_spi_available`.
   static bool isAvailableAsSPI(const Decl *D);
 
-  /// Returns the range of platform versions in which a declaration with the
-  /// given `@available` attribute is available.
-  ///
-  /// NOTE: The attribute must be active on the current platform.
-  static AvailabilityRange availableRange(const AvailableAttr *attr,
-                                          ASTContext &C);
-
   /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration
   /// has no availability annotation.

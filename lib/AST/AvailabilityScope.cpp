@@ -357,8 +357,7 @@ AvailabilityScope::getExplicitAvailabilityRange() const {
   case Reason::Decl: {
     auto decl = Node.getAsDecl();
     if (auto attr = decl->getAvailableAttrForPlatformIntroduction())
-      return AvailabilityInference::availableRange(attr->getParsedAttr(),
-                                                   decl->getASTContext());
+      return attr->getIntroducedRange(decl->getASTContext());
 
     return std::nullopt;
   }

@@ -80,7 +80,7 @@ AvailabilityConstraint::getRequiredNewerAvailabilityRange(
   case Kind::Obsoleted:
     return std::nullopt;
   case Kind::IntroducedInNewerVersion:
-    return AvailabilityInference::availableRange(attr.getParsedAttr(), ctx);
+    return attr.getIntroducedRange(ctx);
   }
 }
 
@@ -453,7 +453,7 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D) {
   if (!bestAvailAttr)
     return std::nullopt;
 
-  return availableRange(bestAvailAttr->getParsedAttr(), D->getASTContext());
+  return bestAvailAttr->getIntroducedRange(D->getASTContext());
 }
 
 bool Decl::isAvailableAsSPI() const {
@@ -785,7 +785,7 @@ AvailabilityRange AvailabilityInference::annotatedAvailableRangeForAttr(
   }
 
   if (bestAvailAttr)
-    return availableRange(bestAvailAttr->getParsedAttr(), ctx);
+    return bestAvailAttr->getIntroducedRange(ctx);
 
   return AvailabilityRange::alwaysAvailable();
 }
@@ -814,10 +814,9 @@ attrForAvailableRange(const Decl *D) {
 
 std::pair<AvailabilityRange, const AvailableAttr *>
 AvailabilityInference::availableRangeAndAttr(const Decl *D) {
-  if (auto rangeAttr = attrForAvailableRange(D)) {
-    auto attr = rangeAttr->getParsedAttr();
-    return {availableRange(attr, D->getASTContext()), attr};
-  }
+  if (auto rangeAttr = attrForAvailableRange(D))
+    return {rangeAttr->getIntroducedRange(D->getASTContext()),
+            rangeAttr->getParsedAttr()};
 
   // Treat unannotated declarations as always available.
   return {AvailabilityRange::alwaysAvailable(), nullptr};
@@ -835,8 +834,8 @@ bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
 }
 
 AvailabilityRange
-AvailabilityInference::availableRange(const AvailableAttr *attr,
-                                      ASTContext &Ctx) {
+SemanticAvailableAttr::getIntroducedRange(ASTContext &Ctx) const {
+  auto *attr = getParsedAttr();
   assert(attr->isActivePlatform(Ctx));
 
   llvm::VersionTuple IntroducedVersion = attr->Introduced.value();
