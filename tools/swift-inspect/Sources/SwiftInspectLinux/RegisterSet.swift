@@ -19,7 +19,10 @@ public typealias RegisterSet = user_pt_regs
 extension RegisterSet {
   public static var trapInstructionSize: UInt { return 4 }  // brk #0x0
 
-  public func setupCall(_ ptrace: PTrace, to funcAddr: UInt64, with args: [UInt64], returnTo returnAddr: UInt64) throws -> RegisterSet {
+  public func setupCall(
+    _ ptrace: borrowing PTrace, to funcAddr: UInt64, with args: [UInt64],
+    returnTo returnAddr: UInt64
+  ) throws -> RegisterSet {
     // The first 8 arguments are passed in regsters. Any additional arguments
     // must be pushed on the stack, which is not implemented.
     precondition(args.count <= 8)
@@ -53,7 +56,10 @@ public typealias RegisterSet = pt_regs
 extension RegisterSet {
   public static var trapInstructionSize: UInt { return 1 }  // int3
 
-  public func setupCall(_ ptrace: PTrace, to funcAddr: UInt64, with args: [UInt64], returnTo returnAddr: UInt64) throws -> RegisterSet {
+  public func setupCall(
+    _ ptrace: borrowing PTrace, to funcAddr: UInt64, with args: [UInt64],
+    returnTo returnAddr: UInt64
+  ) throws -> RegisterSet {
     // The first 6 arguments are passed in registers. Any additional arguments
     // must be pushed on the stack, which is not implemented.
     precondition(args.count <= 6)

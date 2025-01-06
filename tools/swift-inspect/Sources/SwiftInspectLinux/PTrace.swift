@@ -13,7 +13,13 @@
 import Foundation
 import LinuxSystemHeaders
 
-public class PTrace {
+// Provides scoped access to a PTrace object.
+public func withPTracedProcess(pid: pid_t, _ closure: (consuming PTrace) throws -> Void) throws {
+  let ptrace = try PTrace(pid)
+  try closure(ptrace)
+}
+
+public struct PTrace: ~Copyable {
   enum PTraceError: Error {
     case operationFailure(_ command: CInt, pid: pid_t, errno: CInt = get_errno())
     case waitFailure(pid: pid_t, errno: CInt = get_errno())
@@ -22,15 +28,10 @@ public class PTrace {
 
   let pid: pid_t
 
-  // Provides scoped access to a PTrace object.
-  public static func withAttachedProcess(pid: pid_t, _ closure: (PTrace) throws -> Void) throws {
-    let ptrace = try PTrace(pid);
-    try closure(ptrace)
-  }
-
   // Initializing a PTrace instance attaches to the target process, waits for
   // it to stop, and leaves it in a stopped state. The caller may resume the
   // process by calling cont().
+  // NOTE: clients must use withPTracedProcess instead of direct initialization.
   init(_ pid: pid_t) throws {
     guard ptrace_attach(pid) != -1 else {
       throw PTraceError.operationFailure(PTRACE_ATTACH, pid: pid)
@@ -108,7 +109,8 @@ public class PTrace {
   // is stopped with a SIGTRAP signal. In this case, the caller is responsible
   // for taking action on the signal.
   public func jump(
-    to address: UInt64, with args: [UInt64] = [], _ callback: (() throws -> Void)? = nil
+    to address: UInt64, with args: [UInt64] = [],
+    _ callback: ((borrowing PTrace) throws -> Void)? = nil
   ) throws -> UInt64 {
     let origRegs = try self.getRegSet()
     defer { try? self.setRegSet(regSet: origRegs) }
@@ -140,7 +142,7 @@ public class PTrace {
       guard wStopSig(status) == SIGTRAP, let callback = callback else { break }
 
       // give the caller the opportunity to handle SIGTRAP
-      try callback()
+      try callback(self)
     }
 
     let sigInfo = try self.getSigInfo()
