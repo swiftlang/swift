@@ -171,12 +171,12 @@ def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
-  
+
 def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
   HelpText<"Automatically import declared cross-import overlays.">;
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
   HelpText<"Do not automatically import declared cross-import overlays.">;
-  
+
 def enable_testable_attr_requires_testable_module :
   Flag<["-"], "enable-testable-attr-requires-testable-module">,
   HelpText<"Enable checking of @testable">;
@@ -196,7 +196,7 @@ def enable_target_os_checking :
 def disable_target_os_checking :
   Flag<["-"], "disable-target-os-checking">,
   HelpText<"Disable checking the target OS of serialized modules">;
-  
+
 def crosscheck_unqualified_lookup : Flag<["-"], "crosscheck-unqualified-lookup">,
   HelpText<"Compare legacy DeclContext- to ASTScope-based unqualified name lookup (for debugging)">;
 
@@ -384,9 +384,9 @@ def public_autolink_library :
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
 
-def enable_experimental_swift_based_closure_specialization : 
+def enable_experimental_swift_based_closure_specialization :
   Flag<["-"], "experimental-swift-based-closure-specialization">,
-  HelpText<"Use the experimental Swift based closure-specialization optimization pass instead of the existing C++ one">; 
+  HelpText<"Use the experimental Swift based closure-specialization optimization pass instead of the existing C++ one">;
 
 def checked_async_objc_bridging : Joined<["-"], "checked-async-objc-bridging=">,
   HelpText<"Control whether checked continuations are used when bridging "
@@ -898,7 +898,7 @@ def disable_concrete_type_metadata_mangled_name_accessors : Flag<["-"], "disable
 def disable_standard_substitutions_in_reflection_mangling : Flag<["-"], "disable-standard-substitutions-in-reflection-mangling">,
   HelpText<"Disable referencing stdlib symbols via mangled names in reflection mangling">,
   Flags<[FrontendOption, HelpHidden]>;
-  
+
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
 
@@ -938,13 +938,13 @@ def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
 
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
-  
+
 def sil_verify_none : Flag<["-"], "sil-verify-none">,
   HelpText<"Completely disable SIL verification">;
 
 def sil_ownership_verify_all : Flag<["-"], "sil-ownership-verify-all">,
   HelpText<"Verify ownership after each transform">;
-  
+
 def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
   HelpText<"Verify all SubstitutionMaps on construction">;
 
@@ -1163,7 +1163,7 @@ def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
 def bridging_header_directory_for_print: Separate<["-"], "bridging-header-directory-for-print">, MetaVarName<"<path>">,
     HelpText<"Directory for bridging header to be printed in compatibility header">;
 
-def entry_point_function_name: Separate<["-"], "entry-point-function-name">, MetaVarName<"<string>">, 
+def entry_point_function_name: Separate<["-"], "entry-point-function-name">, MetaVarName<"<string>">,
     HelpText<"Name of the entry point function">;
 
 def target_sdk_version : Separate<["-"], "target-sdk-version">,
@@ -1449,6 +1449,12 @@ def no_scanner_module_validation: Flag<["-"], "no-scanner-module-validation">,
 def module_load_mode: Separate<["-"], "module-load-mode">,
     MetaVarName<"only-interface|prefer-interface|prefer-serialized|only-serialized">,
     HelpText<"Module loading mode">;
+
+def scanner_output_dir: Separate<["-"], "scanner-output-dir">,
+  HelpText<"Directory for generated files from swift dependency scanner">;
+def scanner_debug_write_output: Flag<["-"], "scanner-debug-write-output">,
+  HelpText<"Write generated output from scanner for debugging purpose">,
+  Flags<[HelpHidden]>;
 
 def platform_availability_inheritance_map_path
   : Separate<["-"], "platform-availability-inheritance-map-path">, MetaVarName<"<path>">,

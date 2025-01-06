@@ -18,6 +18,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/Feature.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Range.h"
@@ -817,4 +818,15 @@ ClangImporterOptions::getReducedExtraArgsForSwiftModuleDependency() const {
   }
 
   return filtered_args;
+}
+
+std::string ClangImporterOptions::getPCHInputPath() const {
+  if (!BridgingHeaderPCH.empty())
+    return BridgingHeaderPCH;
+
+  if (llvm::sys::path::extension(BridgingHeader)
+          .ends_with(file_types::getExtension(file_types::TY_PCH)))
+    return BridgingHeader;
+
+  return {};
 }
