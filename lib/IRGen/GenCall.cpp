@@ -2142,9 +2142,9 @@ void SignatureExpansion::expandAsyncReturnType() {
       } else {
         ParamIRTypes.push_back(combined.combinedTy);
       }
+      addErrorResult();
+      return;
     }
-    addErrorResult();
-    return;
   }
 
   if (native.requiresIndirect() || native.empty()) {

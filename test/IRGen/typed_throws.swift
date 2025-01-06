@@ -285,3 +285,13 @@ func callClosureAsync<T>(t: T) async {
     return t
   }
 }
+
+enum LargeError: Error {
+  case x
+  case y(Int64, Int64, Int64, Int64, Int64)
+}
+
+// Used to crash the compiler because
+func callClosureAsyncIndirectError(f: () async throws(LargeError) -> Int) async throws(LargeError) -> Int {
+  return try await f()
+}
