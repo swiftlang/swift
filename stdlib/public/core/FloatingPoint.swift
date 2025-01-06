@@ -1048,6 +1048,9 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// - Every value except for NaN and `+infinity` compares less than
   ///   `+infinity`.
   ///
+  /// The following example shows the behavior of the `isLess(than:)` method
+  /// with different kinds of values:
+  ///
   ///     let x = 15.0
   ///     x.isLess(than: 20.0)
   ///     // true
@@ -1077,6 +1080,9 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///   when called on NaN or when NaN is passed as `other`.
   /// - `-infinity` compares less than or equal to all values except NaN.
   /// - Every value except NaN compares less than or equal to `+infinity`.
+  ///
+  /// The following example shows the behavior of the `isLessThanOrEqualTo(_:)`
+  /// method with different kinds of values:
   ///
   ///     let x = 15.0
   ///     x.isLessThanOrEqualTo(20.0)
