@@ -68,7 +68,7 @@ AvailabilityRange AvailabilityRange::forRuntimeTarget(const ASTContext &Ctx) {
 }
 
 PlatformKind AvailabilityConstraint::getPlatform() const {
-  return attr->getPlatform();
+  return attr.getPlatform();
 }
 
 std::optional<AvailabilityRange>
@@ -80,7 +80,7 @@ AvailabilityConstraint::getRequiredNewerAvailabilityRange(
   case Kind::Obsoleted:
     return std::nullopt;
   case Kind::IntroducedInNewerVersion:
-    return AvailabilityInference::availableRange(attr, ctx);
+    return AvailabilityInference::availableRange(attr.getParsedAttr(), ctx);
   }
 }
 
@@ -96,10 +96,10 @@ bool AvailabilityConstraint::isConditionallySatisfiable() const {
 }
 
 bool AvailabilityConstraint::isActiveForRuntimeQueries(ASTContext &ctx) const {
-  if (attr->getPlatform() == PlatformKind::none)
+  if (attr.getPlatform() == PlatformKind::none)
     return true;
 
-  return swift::isPlatformActive(attr->getPlatform(), ctx.LangOpts,
+  return swift::isPlatformActive(attr.getPlatform(), ctx.LangOpts,
                                  /*forTargetVariant=*/false,
                                  /*forRuntimeQuery=*/true);
 }

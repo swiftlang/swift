@@ -3163,7 +3163,6 @@ swift::getUnsatisfiedAvailabilityConstraint(
                                                  *attr))
       return std::nullopt;
 
-    auto parsedAttr = attr->getParsedAttr();
     switch (attr->getVersionAvailability(ctx)) {
     case AvailableVersionComparison::Available:
     case AvailableVersionComparison::PotentiallyUnavailable:
@@ -3173,12 +3172,12 @@ swift::getUnsatisfiedAvailabilityConstraint(
       if ((attr->isSwiftLanguageModeSpecific() ||
            attr->isPackageDescriptionVersionSpecific()) &&
           attr->getIntroduced().has_value())
-        return AvailabilityConstraint::forRequiresVersion(parsedAttr);
+        return AvailabilityConstraint::forRequiresVersion(*attr);
 
-      return AvailabilityConstraint::forAlwaysUnavailable(parsedAttr);
+      return AvailabilityConstraint::forAlwaysUnavailable(*attr);
 
     case AvailableVersionComparison::Obsoleted:
-      return AvailabilityConstraint::forObsoleted(parsedAttr);
+      return AvailabilityConstraint::forObsoleted(*attr);
     }
   }
 
@@ -3186,7 +3185,7 @@ swift::getUnsatisfiedAvailabilityConstraint(
   auto rangeAndAttr = AvailabilityInference::availableRangeAndAttr(decl);
   if (!availabilityContext.getPlatformRange().isContainedIn(rangeAndAttr.first))
     return AvailabilityConstraint::forIntroducedInNewerVersion(
-        rangeAndAttr.second);
+        decl->getSemanticAvailableAttr(rangeAndAttr.second).value());
 
   return std::nullopt;
 }
