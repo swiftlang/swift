@@ -3333,7 +3333,19 @@ getInfoForUsedFileNames(const ModuleDecl *module) {
 
 static void computeFileID(const ModuleDecl *module, StringRef name,
                           SmallVectorImpl<char> &result) {
-  result.assign(module->getNameStr().begin(), module->getNameStr().end());
+  // The module might alias itself (e.g., to use a raw identifier as the name
+  // that it references itself with in its own source code), so we need to look
+  // that up.
+  Identifier moduleName = module->getASTContext().getRealModuleName(
+      module->getName(),
+      ASTContext::ModuleAliasLookupOption::aliasFromRealName);
+  if (moduleName.mustAlwaysBeEscaped()) {
+    result.push_back('`');
+    result.append(moduleName.str().begin(), moduleName.str().end());
+    result.push_back('`');
+  } else {
+    result.assign(moduleName.str().begin(), moduleName.str().end());
+  }
   result.push_back('/');
   result.append(name.begin(), name.end());
 }
