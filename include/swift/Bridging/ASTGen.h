@@ -98,6 +98,13 @@ intptr_t swift_ASTGen_configuredRegions(
 void swift_ASTGen_freeConfiguredRegions(
     BridgedIfConfigClauseRangeInfo *_Nullable regions, intptr_t numRegions);
 
+bool swift_ASTGen_validateUnqualifiedLookup(
+    void *_Nonnull sourceFile,
+    BridgedASTContext astContext,
+    BridgedSourceLoc sourceLoc,
+    bool finishInSequentialScope,
+    BridgedArrayRef astScopeResultRef);
+
 size_t
 swift_ASTGen_virtualFiles(void *_Nonnull sourceFile,
                           BridgedVirtualFile *_Nullable *_Nonnull virtualFiles);
