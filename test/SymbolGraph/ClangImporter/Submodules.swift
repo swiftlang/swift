@@ -11,7 +11,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-symbolgraph-extract -sdk %clang-importer-sdk -module-name Mixed.Submodule -I %S/Inputs/Submodules -output-dir %t -pretty-print -v
-// RUN: %FileCheck %s --input-file %t/Submodule.symbols.json --check-prefix SUBMODULE
+// RUN: %FileCheck %s --input-file %t/Mixed.Submodule.symbols.json --check-prefix SUBMODULE
 
 // REQUIRES: objc_interop
 
@@ -22,4 +22,5 @@
 
 public func someFunc() {}
 
-// SUBMODULE: "precise": "c:@innerVar"
+// SUBMODULE-DAG: "name": "Mixed.Submodule"
+// SUBMODULE-DAG: "precise": "c:@innerVar"

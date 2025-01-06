@@ -31,14 +31,16 @@ namespace {
 int serializeSymbolGraph(SymbolGraph &SG,
                          const SymbolGraphOptions &Options) {
   SmallString<256> FileName;
-  FileName.append(SG.M.getNameStr());
+  FileName.append(getFullModuleName(&SG.M));
   if (SG.ExtendedModule.has_value()) {
     FileName.push_back('@');
-    FileName.append(SG.ExtendedModule.value()->getNameStr());
+//    FileName.append(SG.ExtendedModule.value()->getNameStr());
+    FileName.append(getFullModuleName(SG.ExtendedModule.value()));
   } else if (SG.DeclaringModule.has_value()) {
     // Treat cross-import overlay modules as "extensions" of their declaring module
     FileName.push_back('@');
-    FileName.append(SG.DeclaringModule.value()->getNameStr());
+//    FileName.append(SG.DeclaringModule.value()->getNameStr());
+    FileName.append(getFullModuleName(SG.DeclaringModule.value()));
   }
   FileName.append(".symbols.json");
 

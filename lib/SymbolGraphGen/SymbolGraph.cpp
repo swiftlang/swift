@@ -585,14 +585,14 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
     OS.attributeObject("module", [&](){
       if (DeclaringModule) {
         // A cross-import overlay can be considered part of its declaring module
-        OS.attribute("name", (*DeclaringModule)->getNameStr());
+        OS.attribute("name", getFullModuleName(*DeclaringModule));
         std::vector<StringRef> B;
         for (auto BModule : BystanderModules) {
           B.push_back(BModule.str());
         }
         OS.attribute("bystanders", B);
       } else {
-        OS.attribute("name", M.getNameStr());
+        OS.attribute("name", getFullModuleName(&M));
       }
       AttributeRAII Platform("platform", OS);
 

@@ -21,6 +21,8 @@
 
 #include "SymbolGraph.h"
 
+#include <string>
+
 namespace swift {
 
 class Decl;
@@ -135,6 +137,16 @@ public:
   /// correctly fetch owning submodules.
   virtual ModuleDecl *getRealModuleOf(const Decl *D) const;
 };
+
+LLVM_ATTRIBUTE_USED
+static std::string getFullModuleName(const ModuleDecl *M) {
+    if (!M) return "";
+
+    std::string fullName;
+    llvm::raw_string_ostream OS(fullName);
+    M->getReverseFullModuleName().printForward(OS);
+    return fullName;
+}
 
 } // end namespace symbolgraphgen
 } // end namespace swift
