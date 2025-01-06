@@ -63,11 +63,8 @@ bool clangModuleExports(const clang::Module *ClangParent, const clang::Module *C
     }
   }
 
-  if (ClangParent->Exports.empty() && !std::holds_alternative<std::monostate>(ClangParent->Umbrella) && CM->isSubModuleOf(ClangParent)) {
-    // HACK: Some SDK modules use an 'umbrella header' in place of an 'export *' declaration.
-    // This is not the same thing, and the submodules are not actually being exported from the
-    // umbrella header, but we're not doing complete dependency tracking here. To provide a proper
-    // view into the symbols of this module, treat this umbrella declaration as an 'export *'.
+  if (ClangParent->Exports.empty() && CM->isSubModuleOf(ClangParent)) {
+    // HACK: In the absence of an explicit export statement, consider any submodule to be exported.
     return true;
   }
 
