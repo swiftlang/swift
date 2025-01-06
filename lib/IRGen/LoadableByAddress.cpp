@@ -3422,6 +3422,9 @@ private:
   uint16_t numRegisters = 0;
 
 public:
+  static uint16_t MaxNumUses = 65535;
+  static uint16_t MaxNumRegisters = 65535;
+
   void addConstructor() {
     sawConstructor = true;
   }
@@ -3458,17 +3461,19 @@ public:
   }
 
   void addUse() {
-    if (use == 65535)
+    if (use == MaxNumUses)
       return;
     ++use;
   }
   uint16_t numUses() const {
     return use;
   }
-
+  void setAsVeryLargeType() {
+    setNumRegisters(MaxNumRegisters);
+  }
   void setNumRegisters(unsigned regs) {
-    if (regs > 65535) {
-      regs = 65535;
+    if (regs > MaxNumRegisters) {
+      numRegisters = MaxNumRegisters;
       return;
     }
     numRegisters = regs;
@@ -3560,7 +3565,7 @@ void LargeLoadableHeuristic::propagate(PostOrderFunctionInfo &po) {
         if (isLargeLoadableType(proj.getType())) {
           auto opdTy = proj.getOperand(0)->getType();
           auto entry = largeTypeProperties[opdTy];
-          entry.setNumRegisters(65535);
+          entry.setAsVeryLargeType();
           largeTypeProperties[opdTy] = entry;
         }
       }
@@ -3612,7 +3617,7 @@ void LargeLoadableHeuristic::visit(SILInstruction *i) {
       if (numRegisters(resTy) > NumRegistersLargeType) {
         // Force the source type to be indirect.
         auto entry = largeTypeProperties[opdTy];
-        entry.setNumRegisters(65535);
+        entry.setAsVeryLargeType();
         largeTypeProperties[opdTy] = entry;
         return;
       }
