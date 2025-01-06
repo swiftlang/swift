@@ -10,9 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <signal.h>
+#pragma once
+
+#include <errno.h>
 
 static inline
-void* siginfo_si_addr(siginfo_t siginfo) {
-  return siginfo.si_addr;
+int get_errno() {
+  return errno;
 }
