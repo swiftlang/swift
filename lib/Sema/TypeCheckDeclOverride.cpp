@@ -1919,13 +1919,14 @@ enum class OverrideUnavailabilityStatus {
   Ignored,
 };
 
-static std::pair<OverrideUnavailabilityStatus, const AvailableAttr *>
+static std::pair<OverrideUnavailabilityStatus,
+                 std::optional<SemanticAvailableAttr>>
 checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
   if (auto *overrideParent = override->getDeclContext()->getAsDecl()) {
     // If the parent of the override is unavailable, then the unavailability of
     // the override decl is irrelevant.
     if (overrideParent->isSemanticallyUnavailable())
-      return {OverrideUnavailabilityStatus::Ignored, nullptr};
+      return {OverrideUnavailabilityStatus::Ignored, std::nullopt};
   }
 
   if (auto *baseAccessor = dyn_cast<AccessorDecl>(base)) {
@@ -1933,7 +1934,7 @@ checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
     // the diagnostics for the explicit accessors that availability was inferred
     // from.
     if (baseAccessor->isImplicit())
-      return {OverrideUnavailabilityStatus::Ignored, nullptr};
+      return {OverrideUnavailabilityStatus::Ignored, std::nullopt};
 
     if (auto *overrideAccessor = dyn_cast<AccessorDecl>(override)) {
       // If base and override are accessors, check whether the unavailability of
@@ -1942,7 +1943,7 @@ checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
       if (checkOverrideUnavailability(overrideAccessor->getStorage(),
                                       baseAccessor->getStorage())
               .first != OverrideUnavailabilityStatus::Compatible)
-        return {OverrideUnavailabilityStatus::Ignored, nullptr};
+        return {OverrideUnavailabilityStatus::Ignored, std::nullopt};
     }
   }
 
@@ -1950,10 +1951,9 @@ checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
   auto overrideUnavailableAttr = override->getUnavailableAttr();
 
   if (baseUnavailableAttr && !overrideUnavailableAttr)
-    return {OverrideUnavailabilityStatus::BaseUnavailable,
-            baseUnavailableAttr->getParsedAttr()};
+    return {OverrideUnavailabilityStatus::BaseUnavailable, baseUnavailableAttr};
 
-  return {OverrideUnavailabilityStatus::Compatible, nullptr};
+  return {OverrideUnavailabilityStatus::Compatible, std::nullopt};
 }
 
 static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
@@ -2226,11 +2226,11 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // FIXME: Possibly should extend to more availability checking.
   auto unavailabilityStatusAndAttr =
       checkOverrideUnavailability(override, base);
-  auto *unavailableAttr = unavailabilityStatusAndAttr.second;
+  auto unavailableAttr = unavailabilityStatusAndAttr.second;
 
   switch (unavailabilityStatusAndAttr.first) {
   case OverrideUnavailabilityStatus::BaseUnavailable: {
-    diagnoseOverrideOfUnavailableDecl(override, base, unavailableAttr);
+    diagnoseOverrideOfUnavailableDecl(override, base, unavailableAttr.value());
 
     if (isUnavailableInAllVersions(base)) {
       auto modifier = override->getAttrs().getAttribute<OverrideAttr>();

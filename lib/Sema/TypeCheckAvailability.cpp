@@ -2954,11 +2954,11 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
 
 void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
                                               const ValueDecl *base,
-                                              const AvailableAttr *attr) {
+                                              SemanticAvailableAttr attr) {
   ASTContext &ctx = override->getASTContext();
   auto &diags = ctx.Diags;
-  if (attr->Rename.empty()) {
-    EncodedDiagnosticMessage EncodedMessage(attr->Message);
+  if (attr.getRename().empty()) {
+    EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
     diags.diagnose(override, diag::override_unavailable,
                    override->getBaseName(), EncodedMessage.Message);
 
@@ -2970,7 +2970,7 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
   diagnoseExplicitUnavailability(
       base, override->getLoc(), where,
       /*Flags*/ std::nullopt, [&](InFlightDiagnostic &diag) {
-        ParsedDeclName parsedName = parseDeclName(attr->Rename);
+        ParsedDeclName parsedName = parseDeclName(attr.getRename());
         if (!parsedName || parsedName.isPropertyAccessor() ||
             parsedName.isMember() || parsedName.isOperator()) {
           return;
