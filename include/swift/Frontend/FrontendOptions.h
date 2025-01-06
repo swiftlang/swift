@@ -54,6 +54,9 @@ public:
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
 
+  /// An Objective-C pch to import and make implicitly visible.
+  std::string ImplicitObjCPCHPath;
+
   /// The map of aliases and real names of imported or referenced modules.
   llvm::StringMap<StringRef> ModuleAliasMap;
 
@@ -368,6 +371,9 @@ public:
 
   /// Emit remarks indicating use of the serialized module dependency scanning cache.
   bool EmitDependencyScannerCacheRemarks = false;
+
+  /// The path at which the dependency scanner can write generated files.
+  std::string ScannerOutputDir;
 
   /// Whether the dependency scanner invocation should resolve imports
   /// to filesystem modules in parallel.

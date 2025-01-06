@@ -16,6 +16,7 @@
 
 #include "swift/Option/Options.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/CAS/TreeEntry.h"

@@ -161,6 +161,8 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.SerializedDependencyScannerCachePath = A->getValue();
   }
 
+  Opts.ScannerOutputDir = Args.getLastArgValue(OPT_scanner_output_dir);
+
   Opts.DisableCrossModuleIncrementalBuild |=
       Args.hasArg(OPT_disable_incremental_imports);
 
@@ -397,11 +399,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeLLVMArgs();
 
   Opts.EmitSymbolGraph |= Args.hasArg(OPT_emit_symbol_graph);
-  
+
   if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {
     Opts.SymbolGraphOutputDir = A->getValue();
   }
-  
+
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbolsInSymbolGraph = Args.hasArg(OPT_include_spi_symbols);
 
@@ -845,12 +847,25 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
   return false;
 }
 
+static inline bool isPCHFilenameExtension(StringRef path) {
+  return llvm::sys::path::extension(path)
+    .ends_with(file_types::getExtension(file_types::TY_PCH));
+}
+
 void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
-    Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs();
+    // Legacy support for passing PCH file through `-import-objc-header`.
+    if (isPCHFilenameExtension(A->getValue()))
+      Opts.ImplicitObjCPCHPath = A->getValue();
+    else
+      Opts.ImplicitObjCHeaderPath = A->getValue();
+    // If `-import-object-header` is used, it means the module has a direct
+    // bridging header dependency and it can be serialized into binary module.
+    Opts.SerializeBridgingHeader |= true;
   }
+  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_pch))
+    Opts.ImplicitObjCPCHPath = A->getValue();
 }
 void ArgsToFrontendOptionsConverter::
 computeImplicitImportModuleNames(OptSpecifier id, bool isTestable) {
@@ -879,7 +894,7 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
     // ModuleAliasMap should initially be empty as setting
     // it should be called only once
     options.ModuleAliasMap.clear();
-    
+
     auto validate = [&options, &diags](StringRef value, bool allowModuleName) -> bool
     {
       if (!allowModuleName) {
@@ -897,14 +912,14 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
       }
       return true;
     };
-    
+
     for (auto item: args) {
       auto str = StringRef(item);
       // splits to an alias and its real name
       auto pair = str.split('=');
       auto lhs = pair.first;
       auto rhs = pair.second;
-      
+
       if (rhs.empty()) { // '=' is missing
         diags.diagnose(SourceLoc(), diag::error_module_alias_invalid_format, str);
         return false;
@@ -912,7 +927,7 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
       if (!validate(lhs, false) || !validate(rhs, true)) {
         return false;
       }
-      
+
       // First, add the real name as a key to prevent it from being
       // used as an alias
       if (!options.ModuleAliasMap.insert({rhs, StringRef()}).second) {

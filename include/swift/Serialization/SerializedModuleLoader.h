@@ -436,7 +436,7 @@ public:
   getFilenameForPrivateDecl(const Decl *decl) const override;
 
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
-  
+
   virtual OpaqueTypeDecl *
   lookupOpaqueResultType(StringRef MangledName) override;
 
@@ -583,6 +583,11 @@ bool extractCompilerFlagsFromInterface(
 
 /// Extract the user module version number from an interface file.
 llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);
+
+/// Extract embedded bridging header from binary module.
+std::string
+extractEmbeddedBridgingHeaderContent(std::unique_ptr<llvm::MemoryBuffer> file,
+                                     ASTContext &Context);
 } // end namespace swift
 
 #endif

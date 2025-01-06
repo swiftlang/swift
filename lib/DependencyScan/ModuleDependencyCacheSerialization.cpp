@@ -169,7 +169,7 @@ bool ModuleDependenciesCacheDeserializer::readMetadata(StringRef scannerContextH
   if (majorVersion != MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR ||
       minorVersion != MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR)
     return true;
-  
+
   std::string readScannerContextHash = BlobData.str();
   if (readScannerContextHash != scannerContextHash)
     return true;
@@ -255,8 +255,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
         auto bridgingSourceFiles = getStringArray(bridgingSourceFilesArrayID);
         if (!bridgingSourceFiles)
           llvm::report_fatal_error("Bad bridging source files");
-        for (const auto &file : *bridgingSourceFiles)
-          moduleDep.addHeaderSourceFile(file);
+        moduleDep.setHeaderSourceFiles(*bridgingSourceFiles);
 
         // Add bridging module dependencies
         auto bridgingModuleDeps =
@@ -584,13 +583,15 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       unsigned extraPCMArgsArrayID, bridgingHeaderFileID, sourceFilesArrayID,
           bridgingSourceFilesArrayID, bridgingModuleDependenciesArrayID,
           CASFileSystemRootID, bridgingHeaderIncludeTreeID,
-          buildCommandLineArrayID, bridgingHeaderBuildCommandLineArrayID;
+          buildCommandLineArrayID, bridgingHeaderBuildCommandLineArrayID,
+          chainedBridgingHeaderPathID, chainedBridgingHeaderContentID;
       SwiftSourceModuleDetailsLayout::readRecord(
           Scratch, extraPCMArgsArrayID, bridgingHeaderFileID,
           sourceFilesArrayID, bridgingSourceFilesArrayID,
           bridgingModuleDependenciesArrayID, CASFileSystemRootID,
           bridgingHeaderIncludeTreeID, buildCommandLineArrayID,
-          bridgingHeaderBuildCommandLineArrayID);
+          bridgingHeaderBuildCommandLineArrayID, chainedBridgingHeaderPathID,
+          chainedBridgingHeaderContentID);
 
       auto extraPCMArgs = getStringArray(extraPCMArgsArrayID);
       if (!extraPCMArgs)
@@ -628,6 +629,15 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
         llvm::report_fatal_error("Bad bridging source files");
       for (const auto &file : *sourceFiles)
         moduleDep.addSourceFile(file);
+
+      // Add chained bridging header.
+      auto chainedBridgingHeaderPath =
+          getIdentifier(chainedBridgingHeaderPathID);
+      auto chainedBridgingHeaderContent =
+          getIdentifier(chainedBridgingHeaderContentID);
+      if (chainedBridgingHeaderPath && chainedBridgingHeaderContent)
+        moduleDep.setChainedBridgingHeaderBuffer(*chainedBridgingHeaderPath,
+                                                 *chainedBridgingHeaderContent);
 
       addCommonDependencyInfo(moduleDep);
       addSwiftCommonDependencyInfo(moduleDep);
@@ -707,8 +717,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       if (!headerImportsSourceFiles)
         llvm::report_fatal_error(
             "Bad binary direct dependencies: no header import source files");
-      for (const auto &depSource : *headerImportsSourceFiles)
-        moduleDep.addHeaderSourceFile(depSource);
+      moduleDep.setHeaderSourceFiles(*headerImportsSourceFiles);
 
       cache.recordDependency(currentModuleName, std::move(moduleDep));
       hasCurrentModule = false;
@@ -1510,7 +1519,9 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
                              ModuleIdentifierArrayKind::BuildCommandLine),
         getIdentifierArrayID(
             moduleID,
-            ModuleIdentifierArrayKind::BridgingHeaderBuildCommandLine));
+            ModuleIdentifierArrayKind::BridgingHeaderBuildCommandLine),
+        getIdentifier(swiftSourceDeps->chainedBridgingHeaderPath),
+        getIdentifier(swiftSourceDeps->chainedBridgingHeaderContent));
     break;
   }
   case swift::ModuleDependencyKind::SwiftBinary: {
@@ -1837,6 +1848,8 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
             swiftSourceDeps->bridgingHeaderBuildCommandLine);
         addIdentifier(
             swiftSourceDeps->textualModuleDetails.CASFileSystemRootID);
+        addIdentifier(swiftSourceDeps->chainedBridgingHeaderPath);
+        addIdentifier(swiftSourceDeps->chainedBridgingHeaderContent);
         break;
       }
       case swift::ModuleDependencyKind::Clang: {

@@ -152,7 +152,7 @@ void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
   writeJSONValue(out, fieldName, indentLevel);
   out << ": ";
   auto updatedIndentLevel = indentLevel;
-  
+
   if (nested) {
     // This is a hack to "fix" a format for a value that should be a nested
     // set of strings. Currently only capturedPCMArgs (clang) is expected to
@@ -434,15 +434,16 @@ void writeJSON(llvm::raw_ostream &out,
       writeJSONSingleField(out, "contextHash", swiftTextualDeps->context_hash,
                            5,
                            /*trailingComma=*/true);
-      bool hasBridgingHeaderPath =
-          swiftTextualDeps->bridging_header_path.data &&
-          get_C_string(swiftTextualDeps->bridging_header_path)[0] != '\0';
+      bool hasBridgingHeader =
+          (swiftTextualDeps->bridging_header_path.data &&
+           get_C_string(swiftTextualDeps->bridging_header_path)[0] != '\0') ||
+          swiftTextualDeps->bridging_pch_command_line->count != 0;
       bool hasOverlayDependencies =
           swiftTextualDeps->swift_overlay_module_dependencies &&
           swiftTextualDeps->swift_overlay_module_dependencies->count > 0;
       bool commaAfterBridgingHeaderPath = hasOverlayDependencies;
       bool commaAfterExtraPcmArgs =
-          hasBridgingHeaderPath || commaAfterBridgingHeaderPath;
+          hasBridgingHeader || commaAfterBridgingHeaderPath;
       bool commaAfterFramework =
           swiftTextualDeps->extra_pcm_args->count != 0 || commaAfterExtraPcmArgs;
 
@@ -454,6 +455,11 @@ void writeJSON(llvm::raw_ostream &out,
       if (swiftTextualDeps->module_cache_key.length != 0) {
         writeJSONSingleField(out, "moduleCacheKey",
                              swiftTextualDeps->module_cache_key, 5,
+                             /*trailingComma=*/true);
+      }
+      if (swiftTextualDeps->chained_bridging_header_path.length != 0) {
+        writeJSONSingleField(out, "chainedBridgingHeaderPath",
+                             swiftTextualDeps->chained_bridging_header_path, 5,
                              /*trailingComma=*/true);
       }
       writeJSONSingleField(out, "userModuleVersion",
@@ -480,7 +486,7 @@ void writeJSON(llvm::raw_ostream &out,
         out << (commaAfterExtraPcmArgs ? "],\n" : "]\n");
       }
       /// Bridging header and its source file dependencies, if any.
-      if (hasBridgingHeaderPath) {
+      if (hasBridgingHeader) {
         out.indent(5 * 2);
         out << "\"bridgingHeader\": {\n";
         writeJSONSingleField(out, "path",

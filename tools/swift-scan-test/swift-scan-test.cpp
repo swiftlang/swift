@@ -34,6 +34,7 @@ enum Actions {
   cache_query,
   replay_result,
   scan_dependency,
+  get_chained_bridging_header,
 };
 
 llvm::cl::OptionCategory Category("swift-scan-test Options");
@@ -55,7 +56,9 @@ llvm::cl::opt<Actions>
                                       "compute cache key from index"),
                             clEnumVal(cache_query, "cache query"),
                             clEnumVal(replay_result, "replay result"),
-                            clEnumVal(scan_dependency, "scan dependency")),
+                            clEnumVal(scan_dependency, "scan dependency"),
+                            clEnumVal(get_chained_bridging_header,
+                                      "get cached bridging header")),
            llvm::cl::cat(Category));
 llvm::cl::list<std::string>
     SwiftCommands(llvm::cl::Positional, llvm::cl::desc("<swift-frontend args>"),
@@ -197,7 +200,8 @@ static int action_replay_result(swiftscan_cas_t cas, const char *key,
 }
 
 static int action_scan_dependency(std::vector<const char *> &Args,
-                                  StringRef WorkingDirectory) {
+                                  StringRef WorkingDirectory,
+                                  bool PrintChainedBridgingHeader) {
   auto scanner = swiftscan_scanner_create();
   auto invocation = swiftscan_scan_invocation_create();
   auto error = [&](StringRef msg) {
@@ -235,7 +239,22 @@ static int action_scan_dependency(std::vector<const char *> &Args,
     llvm::errs() << swift::c_string_utils::get_C_string(msg) << "\n";
   }
 
-  swift::dependencies::writeJSON(llvm::outs(), graph);
+  if (PrintChainedBridgingHeader) {
+    auto deps = swiftscan_dependency_graph_get_dependencies(graph);
+    if (!deps || deps->count < 1)
+      error("failed to get dependencies");
+    // Assume the main module is the first only.
+    auto details = swiftscan_module_info_get_details(deps->modules[0]);
+    auto kind = swiftscan_module_detail_get_kind(details);
+    if (kind != SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL)
+      error("not the correct dependency kind");
+
+    auto content =
+        swiftscan_swift_textual_detail_get_chained_bridging_header_content(
+            details);
+    llvm::outs() << toString(content);
+  } else
+    swift::dependencies::writeJSON(llvm::outs(), graph);
 
   swiftscan_scan_invocation_dispose(invocation);
   swiftscan_scanner_dispose(scanner);
@@ -249,7 +268,8 @@ createArgs(ArrayRef<std::string> Cmd, StringSaver &Saver, Actions Action) {
 
   // Quote all the arguments before passing to scanner. The scanner is currently
   // tokenize the command-line again before parsing.
-  bool Quoted = Action == Actions::scan_dependency;
+  bool Quoted = (Action == Actions::scan_dependency ||
+                 Action == Actions::get_chained_bridging_header);
 
   std::vector<const char *> Args;
   for (auto A : Cmd) {
@@ -301,7 +321,9 @@ int main(int argc, char *argv[]) {
         Ret += action_replay_result(cas, CASID.c_str(), Args);
         break;
       case scan_dependency:
-        Ret += action_scan_dependency(Args, WorkingDirectory);
+      case get_chained_bridging_header:
+        Ret += action_scan_dependency(Args, WorkingDirectory,
+                                      Action == get_chained_bridging_header);
       }
     });
   }

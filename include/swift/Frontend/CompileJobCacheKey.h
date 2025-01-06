@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/FileTypes.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/raw_ostream.h"
@@ -49,6 +50,7 @@ createCompileJobCacheKeyForOutput(llvm::cas::ObjectStore &CAS,
 llvm::Error printCompileJobCacheKey(llvm::cas::ObjectStore &CAS,
                                     llvm::cas::ObjectRef Key,
                                     llvm::raw_ostream &os);
+
 } // namespace swift
 
 #endif
