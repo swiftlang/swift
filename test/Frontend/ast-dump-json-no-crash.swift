@@ -5,9 +5,10 @@
 // issues are discovered in the future.
 //
 // This file should not contain top-level code, since it contains a `@main`
-// type.
+// type. It should also not contain code that requires Obj-C; put that in
+// ast-dump-json-objc-no-crash.swift instead.
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target %target-swift-5.9-abi-triple -swift-version 6 -I %S/Inputs/dependencies -parse-as-library -dump-ast -dump-ast-format json %s -module-name main -o -
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target %target-swift-5.9-abi-triple -swift-version 6 -I %S/Inputs/dependencies -parse-as-library -dump-ast -dump-ast-format json %s -module-name main -o - >/dev/null
 
 struct E: Error {}
 
@@ -60,7 +61,7 @@ protocol P1 {
 
     associatedtype A1
     associatedtype A2 = Int
-    associatedtype A3: BinaryInteger
+    associatedtype A3: BinaryInteger where A3: Codable
 }
 protocol P2: AnyObject where Self: C1 {}
 
