@@ -23,6 +23,16 @@
 #include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/NamespaceMacros.h"
 
+#ifndef NDEBUG
+
+// NOTE: We can include swift/Basic/Debug.h here since
+// swift/Demangling/Demangle.h already includes the one dependency of Debug.h:
+// llvm/Support/Compiler.h... so we are not introducing a new dependency on
+// LLVM.
+#include "swift/Basic/Debug.h"
+
+#endif
+
 //#define NODE_FACTORY_DEBUGGING
 
 using namespace swift::Demangle;
@@ -416,6 +426,12 @@ protected:
   int NumWords = 0;
   
   std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
+
+#ifndef NDEBUG
+  /// Only for use in the debugger when attempting to see the remaining string
+  /// left to be demangled.
+  SWIFT_DEBUG_HELPER(StringRef getRemainingText() const);
+#endif
 
   bool nextIf(StringRef str) {
     if (!Text.substr(Pos).starts_with(str)) return false;

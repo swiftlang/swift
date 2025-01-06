@@ -4472,3 +4472,11 @@ NodePointer Demangler::demangleIntegerType() {
 
   return createType(integer);
 }
+
+#ifndef NDEBUG
+
+StringRef Demangler::getRemainingText() const {
+  return Text.drop_front(Pos);
+}
+
+#endif
