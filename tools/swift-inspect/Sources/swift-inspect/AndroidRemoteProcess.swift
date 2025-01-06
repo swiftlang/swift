@@ -49,8 +49,6 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
     }
   }
 
-  let ptrace: SwiftInspectLinux.PTrace
-
   // We call mmap/munmap in the remote process to alloc/free memory for our own
   // use without impacting existing allocations in the remote process.
   lazy var mmapSymbol: RemoteSymbol = RemoteSymbol("mmap", self.symbolCache)
@@ -63,16 +61,6 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
   lazy var mallocEnableSymbol: RemoteSymbol = RemoteSymbol("malloc_enable", self.symbolCache)
   lazy var mallocIterateSymbol: RemoteSymbol = RemoteSymbol("malloc_iterate", self.symbolCache)
 
-  override init?(processId: ProcessIdentifier) {
-    do {
-      self.ptrace = try SwiftInspectLinux.PTrace(process: processId)
-    } catch {
-      print("failed initialization: \(error)")
-      return nil
-    }
-    super.init(processId: processId)
-  }
-
   // Linux and Android have no supported method to enumerate allocations in the
   // heap of a remote process. Android does, however, support the malloc_iterate
   // API, which enumerates allocations in the current process. We leverage this
@@ -81,26 +69,27 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
   override internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
     var regionCount = 0
     var allocCount = 0
-    for entry in self.memoryMap.entries {
-      // Limiting malloc_iterate calls to only memory regions that are known
-      // to contain heap allocations is not strictly necessary but it does
-      // significantly improve the speed of heap iteration.
-      guard entry.isHeapRegion() else { continue }
+    do {
+      try PTrace.withAttachedProcess(pid: self.processIdentifier) { ptrace in
+        for entry in self.memoryMap.entries {
+          // Limiting malloc_iterate calls to only memory regions that are known
+          // to contain heap allocations is not strictly necessary but it does
+          // significantly improve the speed of heap iteration.
+          guard entry.isHeapRegion() else { continue }
 
-      // collect all of the allocations in this heap region
-      let allocations: [(base: swift_addr_t, len: UInt64)]
-      do {
-        allocations = try self.iterateHeapRegion(region: entry)
-        regionCount += 1
-      } catch {
-        print("failed iterating remote heap: \(error)")
-        return
+          // collect all of the allocations in this heap region
+          let allocations: [(base: swift_addr_t, len: UInt64)]
+          allocations = try self.iterateHeapRegion(ptrace, region: entry)
+          regionCount += 1
+          allocCount += allocations.count
+
+          // process all of the collected allocations
+          for alloc in allocations { body(alloc.base, alloc.len) }
+        }
       }
-
-      allocCount += allocations.count
-
-      // process all of the collected allocations
-      for alloc in allocations { body(alloc.base, alloc.len) }
+    } catch {
+      print("failed iterating remote heap: \(error)")
+      return
     }
 
     if regionCount == 0 {
@@ -116,16 +105,16 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
 
   // Iterate a single heap region in the remote process and return an array
   // of (base, len) pairs describing each heap allocation in the region.
-  internal func iterateHeapRegion(region: MemoryMap.Entry) throws -> [(
+  internal func iterateHeapRegion(_ ptrace: PTrace, region: MemoryMap.Entry) throws -> [(
     base: swift_addr_t, len: UInt64
   )] {
     // Allocate a page-sized buffer in the remote process that malloc_iterate
     // will populaate with metadata describing each heap entry it enumerates.
     let dataLen = sysconf(Int32(_SC_PAGESIZE))
     let remoteDataAddr = try self.mmapRemote(
-      len: dataLen, prot: PROT_READ | PROT_WRITE, flags: MAP_ANON | MAP_PRIVATE)
+      ptrace, len: dataLen, prot: PROT_READ | PROT_WRITE, flags: MAP_ANON | MAP_PRIVATE)
     defer {
-      _ = try? self.munmapRemote(addr: remoteDataAddr, len: dataLen)
+      _ = try? self.munmapRemote(ptrace, addr: remoteDataAddr, len: dataLen)
     }
 
     // Allocate and inialize a local buffer that will be used to copy metadata
@@ -142,9 +131,9 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
     // executed in the remote process.
     let codeLen = heap_iterate_callback_len()
     let remoteCodeAddr = try mmapRemote(
-      len: codeLen, prot: PROT_READ | PROT_WRITE | PROT_EXEC, flags: MAP_ANON | MAP_PRIVATE)
+      ptrace, len: codeLen, prot: PROT_READ | PROT_WRITE | PROT_EXEC, flags: MAP_ANON | MAP_PRIVATE)
     defer {
-      _ = try? self.munmapRemote(addr: remoteCodeAddr, len: codeLen)
+      _ = try? self.munmapRemote(ptrace, addr: remoteCodeAddr, len: codeLen)
     }
 
     // Copy the malloc_iterate callback implementation to the remote process.
@@ -158,9 +147,9 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
 
     // Disable malloc/free while enumerating the region to get a consistent
     // snapshot of existing allocations.
-    try self.mallocDisableRemote()
+    try self.mallocDisableRemote(ptrace)
     defer {
-      _ = try? self.mallocEnableRemote()
+      _ = try? self.mallocEnableRemote(ptrace)
     }
 
     // Collects (base, len) pairs describing each heap allocation in the remote
@@ -169,7 +158,7 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
 
     let regionLen = region.endAddr - region.startAddr
     let args = [region.startAddr, regionLen, remoteCodeAddr, remoteDataAddr]
-    _ = try self.ptrace.callRemoteFunction(at: mallocIterateAddr, with: args) {
+    _ = try ptrace.jump(to: mallocIterateAddr, with: args) {
       // This callback is invoked when a SIGTRAP is encountered in the remote
       // process. In this context, this signal indicates there is no more room
       // in the allocated metadata region (see AndroidCLib/heap.c).
@@ -183,11 +172,11 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
       }
       try self.process.writeMem(remoteAddr: remoteDataAddr, localAddr: buffer, len: UInt(dataLen))
 
-      var regs = try self.ptrace.getRegSet()
+      var regs = try ptrace.getRegSet()
       regs.step(RegisterSet.trapInstructionSize)
 
-      try self.ptrace.setRegSet(regSet: regs)
-      try self.ptrace.cont()
+      try ptrace.setRegSet(regSet: regs)
+      try ptrace.cont()
     }
 
     try self.process.readMem(remoteAddr: remoteDataAddr, localAddr: buffer, len: UInt(dataLen))
@@ -219,37 +208,37 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
   }
 
   // call mmap in the remote process with the provided arguments
-  internal func mmapRemote(len: Int, prot: Int32, flags: Int32) throws -> UInt64 {
+  internal func mmapRemote(_ ptrace: PTrace, len: Int, prot: Int32, flags: Int32) throws -> UInt64 {
     guard let sym = self.mmapSymbol.addr else {
       throw RemoteProcessError.missingSymbol(self.mmapSymbol.name)
     }
     let args = [0, UInt64(len), UInt64(prot), UInt64(flags)]
-    return try self.ptrace.callRemoteFunction(at: sym, with: args)
+    return try ptrace.jump(to: sym, with: args)
   }
 
   // call munmap in the remote process with the provdied arguments
-  internal func munmapRemote(addr: UInt64, len: Int) throws -> UInt64 {
+  internal func munmapRemote(_ ptrace: PTrace, addr: UInt64, len: Int) throws -> UInt64 {
     guard let sym = self.munmapSymbol.addr else {
       throw RemoteProcessError.missingSymbol(self.munmapSymbol.name)
     }
     let args: [UInt64] = [addr, UInt64(len)]
-    return try self.ptrace.callRemoteFunction(at: sym, with: args)
+    return try ptrace.jump(to: sym, with: args)
   }
 
   // call malloc_disable in the remote process
-  internal func mallocDisableRemote() throws {
+  internal func mallocDisableRemote(_ ptrace: PTrace) throws {
     guard let sym = self.mallocDisableSymbol.addr else {
       throw RemoteProcessError.missingSymbol(self.mallocDisableSymbol.name)
     }
-    _ = try self.ptrace.callRemoteFunction(at: sym)
+    _ = try ptrace.jump(to: sym)
   }
 
   // call malloc_enable in the remote process
-  internal func mallocEnableRemote() throws {
+  internal func mallocEnableRemote(_ ptrace: PTrace) throws {
     guard let sym = self.mallocEnableSymbol.addr else {
       throw RemoteProcessError.missingSymbol(self.mallocEnableSymbol.name)
     }
-    _ = try self.ptrace.callRemoteFunction(at: sym)
+    _ = try ptrace.jump(to: sym)
   }
 }
 

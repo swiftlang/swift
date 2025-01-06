@@ -19,10 +19,11 @@ public typealias RegisterSet = user_pt_regs
 extension RegisterSet {
   public static var trapInstructionSize: UInt { return 4 }  // brk #0x0
 
-  public func setupCall(
-    _ ptrace: PTrace, to funcAddr: UInt64, with args: [UInt64], returnTo returnAddr: UInt64
-  ) throws -> RegisterSet {
-    precondition(args.count <= 6)
+  public func setupCall(_ ptrace: PTrace, to funcAddr: UInt64, with args: [UInt64], returnTo returnAddr: UInt64) throws -> RegisterSet {
+    // The first 8 arguments are passed in regsters. Any additional arguments
+    // must be pushed on the stack, which is not implemented.
+    precondition(args.count <= 8)
+
     var registers = self
     registers.regs.0 = args.count > 0 ? args[0] : 0
     registers.regs.1 = args.count > 1 ? args[1] : 0
@@ -30,6 +31,8 @@ extension RegisterSet {
     registers.regs.3 = args.count > 3 ? args[3] : 0
     registers.regs.4 = args.count > 4 ? args[4] : 0
     registers.regs.5 = args.count > 5 ? args[5] : 0
+    registers.regs.6 = args.count > 6 ? args[6] : 0
+    registers.regs.7 = args.count > 7 ? args[7] : 0
     registers.pc = funcAddr
     registers.regs.30 = returnAddr  // link register (x30)
     return registers
@@ -50,10 +53,11 @@ public typealias RegisterSet = pt_regs
 extension RegisterSet {
   public static var trapInstructionSize: UInt { return 1 }  // int3
 
-  public func setupCall(
-    _ ptrace: PTrace, to funcAddr: UInt64, with args: [UInt64], returnTo returnAddr: UInt64
-  ) throws -> RegisterSet {
+  public func setupCall(_ ptrace: PTrace, to funcAddr: UInt64, with args: [UInt64], returnTo returnAddr: UInt64) throws -> RegisterSet {
+    // The first 6 arguments are passed in registers. Any additional arguments
+    // must be pushed on the stack, which is not implemented.
     precondition(args.count <= 6)
+
     var registers = self
     registers.rdi = UInt(args.count > 0 ? args[0] : 0)
     registers.rsi = UInt(args.count > 1 ? args[1] : 0)

@@ -15,25 +15,31 @@ import LinuxSystemHeaders
 
 public class PTrace {
   enum PTraceError: Error {
-    case ptraceFailure(_ command: Int32, pid: pid_t, errno: Int32 = get_errno())
-    case waitFailure(pid: pid_t, errno: Int32 = get_errno())
-    case unexpectedWaitStatus(pid: pid_t, status: Int32, sigInfo: siginfo_t? = nil)
+    case operationFailure(_ command: CInt, pid: pid_t, errno: CInt = get_errno())
+    case waitFailure(pid: pid_t, errno: CInt = get_errno())
+    case unexpectedWaitStatus(pid: pid_t, status: CInt, sigInfo: siginfo_t? = nil)
   }
 
   let pid: pid_t
 
+  // Provides scoped access to a PTrace object.
+  public static func withAttachedProcess(pid: pid_t, _ closure: (PTrace) throws -> Void) throws {
+    let ptrace = try PTrace(pid);
+    try closure(ptrace)
+  }
+
   // Initializing a PTrace instance attaches to the target process, waits for
   // it to stop, and leaves it in a stopped state. The caller may resume the
   // process by calling cont().
-  public init(process pid: pid_t) throws {
+  init(_ pid: pid_t) throws {
     guard ptrace_attach(pid) != -1 else {
-      throw PTraceError.ptraceFailure(PTRACE_ATTACH, pid: pid)
+      throw PTraceError.operationFailure(PTRACE_ATTACH, pid: pid)
     }
 
     while true {
-      var status: Int32 = 0
+      var status: CInt = 0
       let result = waitpid(pid, &status, 0)
-      guard result != -1 else {
+      if result == -1 {
         if get_errno() == EINTR { continue }
         throw PTraceError.waitFailure(pid: pid)
       }
@@ -49,29 +55,29 @@ public class PTrace {
   deinit { _ = ptrace_detach(self.pid) }
 
   public func cont() throws {
-    guard ptrace_cont(self.pid) != -1 else {
-      throw PTraceError.ptraceFailure(PTRACE_CONT, pid: self.pid)
+    if ptrace_cont(self.pid) == -1 {
+      throw PTraceError.operationFailure(PTRACE_CONT, pid: self.pid)
     }
   }
 
   public func interrupt() throws {
-    guard ptrace_interrupt(self.pid) != -1 else {
-      throw PTraceError.ptraceFailure(PTRACE_INTERRUPT, pid: self.pid)
+    if ptrace_interrupt(self.pid) == -1 {
+      throw PTraceError.operationFailure(PTRACE_INTERRUPT, pid: self.pid)
     }
   }
 
   public func getSigInfo() throws -> siginfo_t {
     var sigInfo = siginfo_t()
-    guard ptrace_getsiginfo(self.pid, &sigInfo) != -1 else {
-      throw PTraceError.ptraceFailure(PTRACE_GETSIGINFO, pid: self.pid)
+    if ptrace_getsiginfo(self.pid, &sigInfo) == -1 {
+      throw PTraceError.operationFailure(PTRACE_GETSIGINFO, pid: self.pid)
     }
 
     return sigInfo
   }
 
   public func pokeData(addr: UInt64, value: UInt64) throws {
-    guard ptrace_pokedata(self.pid, UInt(addr), UInt(value)) != -1 else {
-      throw PTraceError.ptraceFailure(PTRACE_POKEDATA, pid: self.pid)
+    if ptrace_pokedata(self.pid, UInt(addr), UInt(value)) == -1 {
+      throw PTraceError.operationFailure(PTRACE_POKEDATA, pid: self.pid)
     }
   }
 
@@ -79,8 +85,8 @@ public class PTrace {
     var regSet = RegisterSet()
     try withUnsafeMutableBytes(of: &regSet) {
       var vec = iovec(iov_base: $0.baseAddress!, iov_len: MemoryLayout<RegisterSet>.size)
-      guard ptrace_getregset(self.pid, NT_PRSTATUS, &vec) != -1 else {
-        throw PTraceError.ptraceFailure(PTRACE_GETREGSET, pid: self.pid)
+      if ptrace_getregset(self.pid, NT_PRSTATUS, &vec) == -1 {
+        throw PTraceError.operationFailure(PTRACE_GETREGSET, pid: self.pid)
       }
     }
 
@@ -91,21 +97,19 @@ public class PTrace {
     var regSetCopy = regSet
     try withUnsafeMutableBytes(of: &regSetCopy) {
       var vec = iovec(iov_base: $0.baseAddress!, iov_len: MemoryLayout<RegisterSet>.size)
-      guard ptrace_setregset(self.pid, NT_PRSTATUS, &vec) != -1 else {
-        throw PTraceError.ptraceFailure(PTRACE_SETREGSET, pid: self.pid)
+      if ptrace_setregset(self.pid, NT_PRSTATUS, &vec) == -1 {
+        throw PTraceError.operationFailure(PTRACE_SETREGSET, pid: self.pid)
       }
     }
   }
 
-  // Call the function at the specified address in the attached process. Caller
-  // may pass up to six 8-byte arguments. The optional callback is invoked when
-  // the process is stopped with a SIGTRAP signal. In this case, the caller is
-  // responsible for taking action on the signal.
-  public func callRemoteFunction(
-    at address: UInt64, with args: [UInt64] = [], onTrap callback: (() throws -> Void)? = nil
+  // Call the function at the specified address in the attached process with the
+  // provided argument array. The optional callback is invoked when the process
+  // is stopped with a SIGTRAP signal. In this case, the caller is responsible
+  // for taking action on the signal.
+  public func jump(
+    to address: UInt64, with args: [UInt64] = [], _ callback: (() throws -> Void)? = nil
   ) throws -> UInt64 {
-    precondition(args.count <= 6, "callRemoteFunction supports max of 6 arguments")
-
     let origRegs = try self.getRegSet()
     defer { try? self.setRegSet(regSet: origRegs) }
 
@@ -119,7 +123,7 @@ public class PTrace {
     try self.setRegSet(regSet: newRegs)
     try self.cont()
 
-    var status: Int32 = 0
+    var status: CInt = 0
     while true {
       let result = waitpid(self.pid, &status, 0)
       guard result != -1 else {
