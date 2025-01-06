@@ -311,18 +311,16 @@ class SearchPathOptions {
   friend class ASTContext;
 
 public:
-  struct FrameworkSearchPath {
+  struct SearchPath {
     std::string Path;
     bool IsSystem = false;
-    FrameworkSearchPath(StringRef path, bool isSystem)
-    : Path(path), IsSystem(isSystem) {}
+    SearchPath(StringRef path, bool isSystem)
+        : Path(path), IsSystem(isSystem) {}
 
-    friend bool operator ==(const FrameworkSearchPath &LHS,
-                            const FrameworkSearchPath &RHS) {
+    friend bool operator==(const SearchPath &LHS, const SearchPath &RHS) {
       return LHS.Path == RHS.Path && LHS.IsSystem == RHS.IsSystem;
     }
-    friend bool operator !=(const FrameworkSearchPath &LHS,
-                            const FrameworkSearchPath &RHS) {
+    friend bool operator!=(const SearchPath &LHS, const SearchPath &RHS) {
       return !(LHS == RHS);
     }
   };
@@ -332,23 +330,23 @@ private:
 
   /// Path to the SDK which is being built against.
   ///
-  /// Must me modified through setter to keep \c SearchPathLookup in sync.
+  /// Must be modified through setter to keep \c Lookup in sync.
   std::string SDKPath;
 
   /// Path(s) which should be searched for modules.
   ///
-  /// Must me modified through setter to keep \c SearchPathLookup in sync.
-  std::vector<std::string> ImportSearchPaths;
+  /// Must be modified through setter to keep \c Lookup in sync.
+  std::vector<SearchPath> ImportSearchPaths;
 
   /// Path(s) which should be searched for frameworks.
   ///
-  /// Must me modified through setter to keep \c SearchPathLookup in sync.
-  std::vector<FrameworkSearchPath> FrameworkSearchPaths;
+  /// Must be modified through setter to keep \c Lookup in sync.
+  std::vector<SearchPath> FrameworkSearchPaths;
 
   /// Paths to search for stdlib modules. One of these will be
   /// compiler-relative.
   ///
-  /// Must me modified through setter to keep \c SearchPathLookup in sync.
+  /// Must be modified through setter to keep \c Lookup in sync.
   std::vector<std::string> RuntimeLibraryImportPaths;
 
   /// When on Darwin the framework paths that are implicitly imported.
@@ -369,17 +367,16 @@ private:
 
   /// Add a single import search path. Must only be called from
   /// \c ASTContext::addSearchPath.
-  void addImportSearchPath(StringRef Path, llvm::vfs::FileSystem *FS) {
-    ImportSearchPaths.push_back(Path.str());
-    Lookup.searchPathAdded(FS, ImportSearchPaths.back(),
-                           ModuleSearchPathKind::Import, /*isSystem=*/false,
+  void addImportSearchPath(SearchPath Path, llvm::vfs::FileSystem *FS) {
+    ImportSearchPaths.push_back(Path);
+    Lookup.searchPathAdded(FS, ImportSearchPaths.back().Path,
+                           ModuleSearchPathKind::Import, Path.IsSystem,
                            ImportSearchPaths.size() - 1);
   }
 
   /// Add a single framework search path. Must only be called from
   /// \c ASTContext::addSearchPath.
-  void addFrameworkSearchPath(FrameworkSearchPath NewPath,
-                              llvm::vfs::FileSystem *FS) {
+  void addFrameworkSearchPath(SearchPath NewPath, llvm::vfs::FileSystem *FS) {
     FrameworkSearchPaths.push_back(NewPath);
     Lookup.searchPathAdded(FS, FrameworkSearchPaths.back().Path,
                            ModuleSearchPathKind::Framework, NewPath.IsSystem,
@@ -448,21 +445,21 @@ public:
     SysRoot = sysroot;
   }
 
-  ArrayRef<std::string> getImportSearchPaths() const {
+  ArrayRef<SearchPath> getImportSearchPaths() const {
     return ImportSearchPaths;
   }
 
-  void setImportSearchPaths(std::vector<std::string> NewImportSearchPaths) {
+  void setImportSearchPaths(std::vector<SearchPath> NewImportSearchPaths) {
     ImportSearchPaths = NewImportSearchPaths;
     Lookup.searchPathsDidChange();
   }
 
-  ArrayRef<FrameworkSearchPath> getFrameworkSearchPaths() const {
+  ArrayRef<SearchPath> getFrameworkSearchPaths() const {
     return FrameworkSearchPaths;
   }
 
-  void setFrameworkSearchPaths(
-      std::vector<FrameworkSearchPath> NewFrameworkSearchPaths) {
+  void
+  setFrameworkSearchPaths(std::vector<SearchPath> NewFrameworkSearchPaths) {
     FrameworkSearchPaths = NewFrameworkSearchPaths;
     Lookup.searchPathsDidChange();
   }
@@ -597,8 +594,7 @@ public:
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS) const;
 
 private:
-  static StringRef
-  pathStringFromFrameworkSearchPath(const FrameworkSearchPath &next) {
+  static StringRef pathStringFromSearchPath(const SearchPath &next) {
     return next.Path;
   };
 
@@ -609,17 +605,16 @@ public:
     using llvm::hash_combine;
     using llvm::hash_combine_range;
 
-    using FrameworkPathView = ArrayRefView<FrameworkSearchPath, StringRef,
-                                           pathStringFromFrameworkSearchPath>;
-    FrameworkPathView frameworkPathsOnly{FrameworkSearchPaths};
+    using SearchPathView =
+        ArrayRefView<SearchPath, StringRef, pathStringFromSearchPath>;
+    SearchPathView importPathsOnly{ImportSearchPaths};
+    SearchPathView frameworkPathsOnly{FrameworkSearchPaths};
 
     return hash_combine(SDKPath,
-                        hash_combine_range(ImportSearchPaths.begin(),
-                                           ImportSearchPaths.end()),
-                        hash_combine_range(VFSOverlayFiles.begin(),
-                                           VFSOverlayFiles.end()),
-                        // FIXME: Should we include the system-ness of framework
+                        // FIXME: Should we include the system-ness of
                         // search paths too?
+                        hash_combine_range(importPathsOnly.begin(), importPathsOnly.end()),
+                        hash_combine_range(VFSOverlayFiles.begin(), VFSOverlayFiles.end()),
                         hash_combine_range(frameworkPathsOnly.begin(),
                                            frameworkPathsOnly.end()),
                         hash_combine_range(LibrarySearchPaths.begin(),
