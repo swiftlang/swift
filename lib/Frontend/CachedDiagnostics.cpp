@@ -330,7 +330,7 @@ unsigned DiagnosticSerializer::getFileIDFromBufferID(SourceManager &SM,
 
   auto &Buf = SM.getLLVMSourceMgr().getBufferInfo(Idx);
   auto Filename = Buf.Buffer->getBufferIdentifier();
-  bool IsFileBacked = SM.getFileSystem()->exists(Filename);
+  bool IsFileBacked = !Filename.empty() && SM.getFileSystem()->exists(Filename);
 
   // Construct and add to files. If there is an IncludeLoc, the file from
   // IncludeLoc is added before current file.
