@@ -1914,6 +1914,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                                 llvm::StringSet<> ProtocolReqAllowlist,
                                 bool DisableFailOnError,
                                 bool CompilerStyleDiags,
+                                bool ExplicitErrOnABIBreakage,
                                 StringRef SerializedDiagPath,
                                 StringRef BreakageAllowlistPath,
                                 bool DebugMapping) {
@@ -1936,11 +1937,16 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     Ctx.getDiags().diagnose(SourceLoc(), diag::cannot_read_allowlist,
                             BreakageAllowlistPath);
   }
+  auto shouldDowngrade = false;
+  // If explicitly specified, avoid downgrading ABI breakage errors to warnings.
+  if (ExplicitErrOnABIBreakage) {
+    shouldDowngrade = false;
+  }
   auto pConsumer = std::make_unique<FilteringDiagnosticConsumer>(
       createDiagConsumer(*OS, FailOnError, DisableFailOnError, CompilerStyleDiags,
                          SerializedDiagPath),
       std::move(allowedBreakages),
-      /*DowngradeToWarning*/false);
+      /*DowngradeToWarning*/shouldDowngrade);
   SWIFT_DEFER { pConsumer->finishProcessing(); };
   Ctx.addDiagConsumer(*pConsumer);
   Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
@@ -1962,6 +1968,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
                                 llvm::StringSet<> ProtocolReqAllowlist,
                                 bool DisableFailOnError,
                                 bool CompilerStyleDiags,
+                                bool ExplicitErrOnABIBreakage,
                                 StringRef SerializedDiagPath,
                                 StringRef BreakageAllowlistPath,
                                 bool DebugMapping) {
@@ -1980,7 +1987,8 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   RightCollector.deSerialize(RightPath);
   return diagnoseModuleChange(
       Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(), OutputPath,
-      std::move(ProtocolReqAllowlist), DisableFailOnError, CompilerStyleDiags, SerializedDiagPath,
+      std::move(ProtocolReqAllowlist), DisableFailOnError,
+      ExplicitErrOnABIBreakage, CompilerStyleDiags, SerializedDiagPath,
       BreakageAllowlistPath, DebugMapping);
 }
 
@@ -2240,6 +2248,7 @@ private:
   std::string OutputFile;
   std::string OutputDir;
   bool CompilerStyleDiags;
+  bool ExplicitErrOnABIBreakage;
   std::string SerializedDiagPath;
   std::string BaselineFilePath;
   std::string BaselineDirPath;
@@ -2339,6 +2348,7 @@ public:
     OutputFile = ParsedArgs.getLastArgValue(OPT_o).str();
     OutputDir = ParsedArgs.getLastArgValue(OPT_output_dir).str();
     CompilerStyleDiags = ParsedArgs.hasArg(OPT_compiler_style_diags);
+    ExplicitErrOnABIBreakage = ParsedArgs.hasArg(OPT_error_on_abi_breakage);
     SerializedDiagPath =
         ParsedArgs.getLastArgValue(OPT_serialize_diagnostics_path).str();
     BaselineFilePath = ParsedArgs.getLastArgValue(OPT_baseline_path).str();
@@ -2578,21 +2588,24 @@ public:
         return diagnoseModuleChange(
             SDKJsonPaths[0], SDKJsonPaths[1], OutputFile, CheckerOpts,
             std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
+            ExplicitErrOnABIBreakage, SerializedDiagPath,
+            BreakageAllowlistPath, DebugMapping);
       }
       case ComparisonInputMode::BaselineJson: {
         SDKContext Ctx(CheckerOpts);
         return diagnoseModuleChange(
             Ctx, getBaselineFromJson(Ctx), getSDKRoot(Ctx, false), OutputFile,
             std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
+            ExplicitErrOnABIBreakage, SerializedDiagPath, BreakageAllowlistPath,
+            DebugMapping);
       }
       case ComparisonInputMode::BothLoad: {
         SDKContext Ctx(CheckerOpts);
         return diagnoseModuleChange(
             Ctx, getSDKRoot(Ctx, true), getSDKRoot(Ctx, false), OutputFile,
             std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
+            ExplicitErrOnABIBreakage, SerializedDiagPath, BreakageAllowlistPath,
+            DebugMapping);
       }
       }
     }
