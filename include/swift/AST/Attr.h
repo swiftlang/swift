@@ -827,9 +827,6 @@ public:
     return swift::prettyPlatformString(getPlatform());
   }
 
-  /// Returns true if this attribute is active given the current platform.
-  bool isActivePlatform(const ASTContext &ctx) const;
-
   /// Create an AvailableAttr that indicates specific availability
   /// for all platforms.
   static AvailableAttr *

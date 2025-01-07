@@ -2148,10 +2148,6 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
       /*SPI=*/false);
 }
 
-bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
-  return isPlatformActive(getPlatform(), ctx.LangOpts);
-}
-
 bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
                                         bool forTargetVariant) const {
   return isPlatformActive(Platform, ctx.LangOpts, forTargetVariant);

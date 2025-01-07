@@ -317,25 +317,17 @@ ExportContext::getExportabilityReason() const {
   return std::nullopt;
 }
 
-/// Returns the first availability attribute on the declaration that is active
-/// on the target platform.
-static const AvailableAttr *getActiveAvailableAttribute(const Decl *D,
-                                                        ASTContext &AC) {
+/// Returns true if there is any availability attribute on the declaration
+/// that is active.
+static bool hasActiveAvailableAttribute(const Decl *D, ASTContext &ctx) {
   D = abstractSyntaxDeclForAvailableAttribute(D);
 
-  for (auto Attr : D->getAttrs())
-    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-      if (!AvAttr->isInvalid() && AvAttr->isActivePlatform(AC)) {
-        return AvAttr;
-      }
-    }
-  return nullptr;
-}
+  for (auto Attr : D->getSemanticAvailableAttrs()) {
+    if (Attr.isActive(ctx))
+      return true;
+  }
 
-/// Returns true if there is any availability attribute on the declaration
-/// that is active on the target platform.
-static bool hasActiveAvailableAttribute(const Decl *D, ASTContext &AC) {
-  return getActiveAvailableAttribute(D, AC);
+  return false;
 }
 
 static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
@@ -1979,7 +1971,7 @@ fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
   if (TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D).has_value())
     return;
 
-  if (getActiveAvailableAttribute(D, Context)) {
+  if (hasActiveAvailableAttribute(D, Context)) {
     // For QoI, in future should emit a fixit to update the existing attribute.
     return;
   }

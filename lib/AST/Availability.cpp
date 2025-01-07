@@ -829,7 +829,7 @@ bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
 AvailabilityRange
 SemanticAvailableAttr::getIntroducedRange(ASTContext &Ctx) const {
   auto *attr = getParsedAttr();
-  assert(attr->isActivePlatform(Ctx));
+  assert(domain.isActive(Ctx));
 
   llvm::VersionTuple IntroducedVersion = attr->Introduced.value();
   StringRef Platform = attr->prettyPlatformString();
