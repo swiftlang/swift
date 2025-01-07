@@ -38,4 +38,6 @@
 // You will normally add new entries in 'abi/macOS/x86_64/concurrency.swift' instead
 // of this file. This file is dedicated for assert only symbols.
 
+//===----------------------------------------------------------------------===//
 // _Concurrency Symbols
+//===----------------------------------------------------------------------===//

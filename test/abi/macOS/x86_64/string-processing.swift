@@ -34,19 +34,9 @@
 // Thank you for your help ensuring the stdlib remains compatible with its past!
 //                                            -- Your friendly stdlib engineers
 
+//===----------------------------------------------------------------------===//
 // _StringProcessing Symbols
-
-// _StringProcessing.Regex._literalPattern.getter : Swift.String?
-Added: _$s17_StringProcessing5RegexV15_literalPatternSSSgvg
-
-// property descriptor for _StringProcessing.Regex._literalPattern : Swift.String?
-Added: _$s17_StringProcessing5RegexV15_literalPatternSSSgvpMV
-
-// _StringProcessing.Regex._nsreCompatibility.getter : _StringProcessing.Regex<A>
-Added: _$s17_StringProcessing5RegexV18_nsreCompatibilityACyxGvg
-
-// property descriptor for _StringProcessing.Regex._nsreCompatibility : _StringProcessing.Regex<A>
-Added: _$s17_StringProcessing5RegexV18_nsreCompatibilityACyxGvpMV
+//===----------------------------------------------------------------------===//
 
 // Add property descriptors for static properties
 Added: _$s17_StringProcessing15_CompileOptionsV13enableMetricsACvpZMV

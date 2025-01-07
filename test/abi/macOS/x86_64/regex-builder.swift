@@ -34,7 +34,9 @@
 // Thank you for your help ensuring the stdlib remains compatible with its past!
 //                                            -- Your friendly stdlib engineers
 
+//===----------------------------------------------------------------------===//
 // RegexBuilder Symbols
+//===----------------------------------------------------------------------===//
 
 // Add property descriptors for static properties
 Added: _$s12RegexBuilder6AnchorV11startOfLineACvpZMV

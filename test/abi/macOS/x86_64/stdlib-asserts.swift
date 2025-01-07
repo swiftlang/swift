@@ -38,7 +38,9 @@
 // You will normally add new entries in 'abi/macOS/x86_64/stdlib.swift' instead
 // of this file. This file is dedicated for assert only symbols.
 
-// Standard Library Symbols
+//===----------------------------------------------------------------------===//
+// Swift Symbols
+//===----------------------------------------------------------------------===//
 
 // class __StaticArrayStorage
 Added: _$ss20__StaticArrayStorageC12_doNotCallMeAByt_tcfC

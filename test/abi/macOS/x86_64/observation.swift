@@ -34,10 +34,6 @@
 // Thank you for your help ensuring the stdlib remains compatible with its past!
 //                                            -- Your friendly stdlib engineers
 
+//===----------------------------------------------------------------------===//
 // Observation Symbols
-
-// Observation.ObservationTracking.changed.getter : Swift.AnyKeyPath?
-Added: _$s11Observation0A8TrackingV7changeds10AnyKeyPathCSgvg
-
-// property descriptor for Observation.ObservationTracking.changed : Swift.AnyKeyPath?
-Added: _$s11Observation0A8TrackingV7changeds10AnyKeyPathCSgvpMV
+//===----------------------------------------------------------------------===//
