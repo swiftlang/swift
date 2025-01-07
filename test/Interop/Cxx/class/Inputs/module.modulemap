@@ -151,3 +151,9 @@ module Closure {
   header "closure.h"
   requires cplusplus
 }
+
+module PIMPL {
+  header "pimpl.h"
+  requires cplusplus
+  export *
+}
