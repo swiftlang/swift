@@ -26,8 +26,6 @@ import CRT
 @_spi(Internal) import Runtime
 @_spi(MemoryReaders) import Runtime
 
-// ###TODO: Escape JSON strings
-
 extension SwiftBacktrace {
 
   static func outputJSONCrashLog() {
@@ -277,7 +275,7 @@ extension SwiftBacktrace {
     }
 
     if !capturedBytes.isEmpty && !(args.sanitize ?? false) {
-      write(#"", capturedMemory": {"#)
+      write(#", "capturedMemory": {"#)
       var first = true
       for (address, bytes) in capturedBytes {
         let formattedBytes = bytes
@@ -290,7 +288,7 @@ extension SwiftBacktrace {
         }
         write(" \"\(hex(address))\": \"\(formattedBytes)\"")
       }
-      write(" }, ")
+      write(" }")
     }
 
     func outputJSONImage(_ image: Backtrace.Image, first: Bool) {
