@@ -739,6 +739,9 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     if (SILPrintTypes)
       return true;
 
+    if (Ctx.printAllTypes())
+      return true;
+
     if (!V)
       return false;
 
@@ -3377,9 +3380,8 @@ void SILBasicBlock::printID(SILPrintContext &Ctx, bool newline) const {
 
 /// Pretty-print the SILFunction to errs.
 void SILFunction::dump(bool Verbose) const {
-  SILPrintContext Ctx(
-      llvm::errs(),
-      SILPrintContext::OptionSet({{Verbose, SILPrintContext::Flag::Verbose}}));
+  SILPrintContext Ctx(llvm::errs(),
+                      {{Verbose, SILPrintContext::Flag::Verbose}});
   print(Ctx);
 }
 

@@ -43,6 +43,9 @@ public:
 
     /// See \ref FrontendOptions.PrintFullConvention.
     PrintFullConvention = 0x8,
+
+    /// Print out all types that normally would be surpressed.
+    PrintAllTypes = 0x10,
   };
 
   using OptionSet = OptionSet<Flag>;
@@ -122,6 +125,10 @@ public:
   bool printFullConvention() const {
     return Options.contains(Flag::PrintFullConvention);
   }
+
+  /// Returns true if we should print out all SIL types that normally would be
+  /// suppressed.
+  bool printAllTypes() const { return Options.contains(Flag::PrintAllTypes); }
 
   SILPrintContext::ID getID(const SILBasicBlock *Block);
 
