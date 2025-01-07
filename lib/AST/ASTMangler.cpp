@@ -3047,7 +3047,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       // `ClassTemplateSpecializationDecl`'s name does not include information about
       // template arguments, and in order to prevent name clashes we use the
       // name of the Swift decl which does include template arguments.
-      appendIdentifier(nominal->getName().str());
+      appendIdentifier(nominal->getName().str(),
+                       /*allowRawIdentifiers=*/false);
     } else {
       appendIdentifier(namedDecl->getName());
     }
@@ -3072,7 +3073,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       // imported as enums, be consistent.
       appendOperator("O");
     } else if (isa<clang::ClassTemplateDecl>(namedDecl)) {
-      appendIdentifier(nominal->getName().str());
+      appendIdentifier(nominal->getName().str(),
+                       /*allowRawIdentifiers=*/false);
     } else {
       llvm_unreachable("unknown imported Clang type");
     }

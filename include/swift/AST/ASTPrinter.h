@@ -293,7 +293,8 @@ public:
   void printEscapedStringLiteral(StringRef str);
 
   void printName(Identifier Name,
-                 PrintNameContext Context = PrintNameContext::Normal);
+                 PrintNameContext Context = PrintNameContext::Normal,
+                 bool IsSpecializedCxxType = false);
 
   void setIndent(unsigned NumSpaces) {
     CurrentIndentation = NumSpaces;
@@ -446,7 +447,8 @@ void printWithCompatibilityFeatureChecks(ASTPrinter &printer,
 
 /// Determine whether we need to escape the given name within the given
 /// context, by wrapping it in backticks.
-bool escapeIdentifierInContext(Identifier name, PrintNameContext context);
+bool escapeIdentifierInContext(Identifier name, PrintNameContext context,
+                               bool isSpecializedCxxType = false);
 
 } // namespace swift
 
