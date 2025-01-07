@@ -423,12 +423,12 @@ extension LifetimeDependence.Scope {
   /// Ignore "irrelevent" borrow scopes: load_borrow or begin_borrow without [var_decl]
   func ignoreBorrowScope(_ context: some Context) -> LifetimeDependence.Scope? {
     guard case let .borrowed(beginBorrowVal) = self else {
-      return self
+      return nil
     }
     switch beginBorrowVal {
     case let .beginBorrow(bb):
       if bb.isFromVarDecl {
-        return self
+        return nil
       }
       return LifetimeDependence.Scope(base: bb.borrowedValue, context).ignoreBorrowScope(context)
     case let .loadBorrow(lb):
