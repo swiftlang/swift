@@ -5221,7 +5221,8 @@ public:
   /// property wrapper type by applying the property wrapper.
   TypeMatchResult applyPropertyWrapperToParameter(
       Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
-      ConstraintKind matchKind, ConstraintLocatorBuilder locator);
+      ConstraintKind matchKind, ConstraintLocator *locator,
+      ConstraintLocator *calleeLocator);
 
   /// Used by applyPropertyWrapperToParameter() to update appliedPropertyWrappers
   /// and record a change in the trail.
