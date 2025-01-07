@@ -2548,9 +2548,10 @@ static CanSILFunctionType getSILFunctionType(
     }
   } else if (substFnInterfaceType->isCoroutine()) { // Derive yield type for function type
     coroutineKind = SILCoroutineKind::YieldOnce;
+    auto sig = origType.hasGenericSignature() ? origType.getGenericSignature() : genericSig;
     auto origYieldType = origType.getFunctionResultType().getType()->castTo<YieldResultType>();
-    auto reducedYieldType = genericSig.getReducedType(origYieldType->getResultType());
-    coroutineOrigYieldType = AbstractionPattern(genericSig, reducedYieldType);
+    auto reducedYieldType = sig.getReducedType(origYieldType->getResultType());
+    coroutineOrigYieldType = AbstractionPattern(sig, reducedYieldType);
 
     auto yieldType = substFnInterfaceType->getResult()->castTo<YieldResultType>();
     auto valueType = yieldType->getResultType();
