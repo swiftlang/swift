@@ -358,6 +358,15 @@ inferIsolationInfoForTempAllocStack(AllocStackInst *asi) {
 
 SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto fas = FullApplySite::isa(inst)) {
+    // Before we do anything, see if we have a sending result. In such a case,
+    // our full apply site result must be disconnected.
+    //
+    // NOTE: This handles the direct case of a sending result. The indirect case
+    // is handled above.
+    if (fas.getSubstCalleeType()->hasSendingResult())
+      return SILIsolationInfo::getDisconnected(
+          false /*is unsafe non isolated*/);
+
     // Check if we have SIL based "faked" isolation crossings that we use for
     // testing purposes.
     //
