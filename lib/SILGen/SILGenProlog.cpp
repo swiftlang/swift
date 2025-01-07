@@ -210,9 +210,7 @@ public:
       return handleInOut(origType, substType, pd->isAddressable());
     }
     // Addressability also suppresses exploding the parameter.
-    if ((SGF.getASTContext().LangOpts.hasFeature(Feature::AddressableTypes)
-         || SGF.getASTContext().LangOpts.hasFeature(Feature::AddressableParameters))
-        && isAddressable) {
+    if (isAddressable) {
       return handleScalar(claimNextParameter(),
                           AbstractionPattern::getOpaque(), substType,
                           /*emitInto*/ nullptr,
@@ -740,15 +738,12 @@ private:
       // addressability can be implied by a scoped dependency.
       bool isAddressable = false;
       
-      if (SGF.getASTContext().LangOpts.hasFeature(Feature::AddressableTypes)
-          || SGF.getASTContext().LangOpts.hasFeature(Feature::AddressableParameters)) {
-        isAddressable = pd->isAddressable()
-          || (ScopedDependencies.contains(pd)
-              && SGF.getTypeLowering(origType, substType)
-                    .getRecursiveProperties().isAddressableForDependencies());
-        if (isAddressable) {
-          AddressableParams.insert(pd);
-        }
+      isAddressable = pd->isAddressable()
+        || (ScopedDependencies.contains(pd)
+            && SGF.getTypeLowering(origType, substType)
+                  .getRecursiveProperties().isAddressableForDependencies());
+      if (isAddressable) {
+        AddressableParams.insert(pd);
       }
       paramValue = argEmitter.handleParam(origType, substType, pd,
                                           isAddressable);
