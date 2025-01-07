@@ -120,7 +120,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   // top
   16,
 
-  // sanitize,
+  // sanitize
   SanitizePaths::Preset,
 
   // preset
@@ -129,14 +129,20 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   // cache
   true,
 
-  // outputTo,
+  // outputTo
   OutputTo::Auto,
 
   // symbolicate
   Symbolication::Full,
 
+  // format
+  OutputFormat::Text,
+
   // swiftBacktracePath
   NULL,
+
+  // outputPath
+  NULL
 };
 
 }
@@ -724,6 +730,16 @@ _swift_processBacktracingSetting(llvm::StringRef key,
     }
   } else if (key.equals_insensitive("symbolicate")) {
     _swift_backtraceSettings.symbolicate = parseSymbolication(value);
+  } else if (key.equals_insensitive("format")) {
+    if (value.equals_insensitive("text")) {
+      _swift_backtraceSettings.format = OutputFormat::Text;
+    } else if (value.equals_insensitive("json")) {
+      _swift_backtraceSettings.format = OutputFormat::JSON;
+    } else {
+      swift::warning(0,
+                     "swift runtime: unknown backtrace format '%.*s'\n",
+                     static_cast<int>(value.size()), value.data());
+    }
 #if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
   } else if (key.equals_insensitive("swift-backtrace")) {
     size_t len = value.size();
