@@ -72,6 +72,15 @@ if(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER)
     Leaks.mm)
 endif()
 
+# runtime/Paths.cpp uses `SWIFT_ARCH` and `SWIFT_LIB_SUBDIR` to find the
+# subdirectory under `libexec` in which to find the backtracer.
+# Fail the configuration if it isn't set appropriately.
+# TODO: In the future, we might consider moving the backtracer up to
+# `libexec/swift` and drop the platform/architecture specific subdirectories
+if(SwiftCore_ENABLE_FILESYSTEM_SUPPORT AND (NOT SwiftCore_ARCH_SUBDIR OR NOT SwiftCore_PLATFORM_SUBDIR))
+  message(SEND_ERROR "Filesystem support requires setting `SwiftCore_ARCH_SUBDIR` and `SwiftCore_PLATFORM_SUBDIR`")
+endif()
+
 # TODO: Probably worth considering putting half of these in a RuntimeConfig.h.in
 #       file rather than pushing them through macro flags.
 target_compile_definitions(swiftRuntime
@@ -86,7 +95,10 @@ target_compile_definitions(swiftRuntime
     $<$<BOOL:${SwiftCore_ENABLE_STDLIB_TRACING}>:-DSWIFT_STDLIB_TRACING>
     $<$<BOOL:${SwiftCore_ENABLE_SHORT_MANGLING_LOOKUPS}>:-DSWIFT_STDLIB_SHORT_MANGLING_LOOKUPS>
     $<$<BOOL:${SwiftCore_HAS_DLADDR}>:-DSWIFT_STDLIB_HAS_DLADDR>
-    $<$<BOOL:${SwiftCore_HAS_DLSYM}>:-DSWIFT_STDLIB_HAS_DLSYM>)
+    $<$<BOOL:${SwiftCore_HAS_DLSYM}>:-DSWIFT_STDLIB_HAS_DLSYM>
+    $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_STDLIB_HAS_FILESYSTEM>
+    $<$<AND:$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>,$<COMPILE_LANGUAGE:C,CXX>>:-DSWIFT_ARCH="${SwiftCore_ARCH_SUBDIR}">
+    $<$<AND:$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>,$<COMPILE_LANGUAGE:C,CXX>>:-DSWIFT_LIB_SUBDIR="${SwiftCore_PLATFORM_SUBDIR}">)
 
 target_include_directories(swiftRuntime PRIVATE
   "${PROJECT_BINARY_DIR}/include"
