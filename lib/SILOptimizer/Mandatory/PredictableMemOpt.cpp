@@ -3169,9 +3169,12 @@ static AllocationInst *getOptimizableAllocation(SILInstruction *i) {
 }
 
 bool swift::optimizeMemoryAccesses(SILFunction *fn) {
+  if (!fn->hasOwnership()) {
+    return false;
+  }
+
   bool changed = false;
   DeadEndBlocks deadEndBlocks(fn);
-
   InstructionDeleter deleter;
   for (auto &bb : *fn) {
     for (SILInstruction &inst : bb.deletableInstructions()) {
@@ -3209,6 +3212,9 @@ bool swift::optimizeMemoryAccesses(SILFunction *fn) {
 }
 
 bool swift::eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo) {
+  if (!fn->hasOwnership()) {
+    return false;
+  }
   bool changed = false;
   DeadEndBlocks deadEndBlocks(fn);
 
