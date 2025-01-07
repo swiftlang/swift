@@ -3313,6 +3313,9 @@ public:
   /// compilation context.
   bool isActive(ASTContext &ctx) const;
 
+  /// Whether this attribute was spelled `@_spi_available`.
+  bool isSPI() const { return attr->isSPI(); }
+
   bool operator==(const SemanticAvailableAttr &other) const {
     return other.attr == attr;
   }

@@ -156,7 +156,7 @@ static void mergeWithInferredAvailability(SemanticAvailableAttr Attr,
   // The merge of two introduction versions is the maximum of the two versions.
   if (mergeIntoInferredVersion(Attr.getIntroduced(), Inferred.Introduced,
                                std::max)) {
-    Inferred.IsSPI = ParsedAttr->isSPI();
+    Inferred.IsSPI = Attr.isSPI();
   }
 
   // The merge of deprecated and obsoleted versions takes the minimum.
@@ -821,7 +821,7 @@ AvailabilityRange AvailabilityInference::availableRange(const Decl *D) {
 
 bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
   if (auto attr = D->getAvailableAttrForPlatformIntroduction())
-    return attr->getParsedAttr()->isSPI();
+    return attr->isSPI();
 
   return false;
 }

@@ -421,7 +421,7 @@ void DeclAttributes::dump(const Decl *D) const {
 LLVM_READONLY
 static bool isShortAvailable(const SemanticAvailableAttr &attr) {
   auto parsedAttr = attr.getParsedAttr();
-  if (parsedAttr->isSPI())
+  if (attr.isSPI())
     return false;
 
   if (!attr.getIntroduced().has_value())
