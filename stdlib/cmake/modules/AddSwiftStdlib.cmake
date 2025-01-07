@@ -2072,7 +2072,7 @@ function(add_swift_target_library name)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-lexical-lifetimes=false")
   endif()
 
-  if (NOT DEFINED IMPORTS_NON_OSSA)
+  if (NOT SWIFTLIB_IMPORTS_NON_OSSA)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
   endif()
 
