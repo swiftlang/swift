@@ -182,3 +182,82 @@ struct TestGeneral {
     accepts_any(test.data)
   }
 }
+
+extension Dictionary where Key == String, Value == Any {
+  subscript<T>(entry object: T) -> T? {
+    get { nil }
+    set { }
+  }
+
+  var test: Int? {
+    get { nil }
+    set { }
+  }
+
+  mutating func testMutating() {}
+}
+
+func test_subscript_computed_property_and_mutating_access(u: User) {
+  // CHECK:  [[DICT_GETTER:%.*]] = class_method %0, #User.dict!getter : (User) -> () -> [String : any Sendable], $@convention(method) (@guaranteed User) -> @owned Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[DICT:%.*]] = apply [[DICT_GETTER]]({{.*}}) : $@convention(method) (@guaranteed User) -> @owned Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[ANY_DICT:%.*]] = unchecked_bitwise_cast [[DICT]] to $Dictionary<String, Any>
+  // CHECK-NEXT: [[ANY_DICT_COPY:%.*]] = copy_value [[ANY_DICT]]
+  // CHECK-NEXT: [[BORROWED_COPY:%.*]] = begin_borrow [[ANY_DICT_COPY]]
+  // CHECK: [[SUBSCRIPT_GETTER:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszypRs_rlE5entryqd__Sgqd___tcluig
+  // CHECK-NEXT: {{.*}} = apply [[SUBSCRIPT_GETTER]]<String, Any, String>({{.*}}, [[BORROWED_COPY]])
+  _ = u.dict[entry: ""]
+
+  // CHECK: [[DICT_GETTER:%.*]] = class_method %0, #User.dict!modify : (User) -> () -> (), $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK-NEXT: ([[DICT_ADDR:%.*]], {{.*}}) = begin_apply [[DICT_GETTER]]({{.*}}) : $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[ANY_DICT:%.*]] = alloc_stack $Dictionary<String, Any>
+  // CHECK-NEXT: [[LOADED_DICT:%.*]] = load [copy] [[DICT_ADDR]]
+  // CHECK-NEXT: [[ANY_LOADED_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_DICT]] to $Dictionary<String, Any>
+  // CHECK-NEXT: [[COPIED_ANY_DICT:%.*]] = copy_value [[ANY_LOADED_DICT]]
+  // CHECK-NEXT: store [[COPIED_ANY_DICT]] to [init] [[ANY_DICT]]
+  // CHECK: [[SUBSCRIPT_SETTER:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszypRs_rlE5entryqd__Sgqd___tcluis
+  // CHECK-NEXT: %48 = apply [[SUBSCRIPT_SETTER]]<String, Any, Int>({{.*}}, [[ANY_DICT]])
+  // CHECK-NEXT: [[LOADED_ANY_DICT:%.*]] = load [take] [[ANY_DICT]]
+  // CHECK-NEXT: [[SENDABLE_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_ANY_DICT]] to $Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[COPIED_SENDABLE_DICT:%.*]] = copy_value [[SENDABLE_DICT]]
+  // CHECK-NEXT: assign [[COPIED_SENDABLE_DICT]] to [[DICT_ADDR]]
+  u.dict[entry: 42] = 42
+
+  // CHECK: [[DICT_GETTER:%.*]] = class_method %0, #User.dict!getter : (User) -> () -> [String : any Sendable], $@convention(method) (@guaranteed User) -> @owned Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[SENDABLE_DICT:%.*]] = apply [[DICT_GETTER]]({{.*}}) : $@convention(method) (@guaranteed User) -> @owned Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[DICT_CAST_TO_ANY:%.*]] = unchecked_bitwise_cast [[SENDABLE_DICT]] to $Dictionary<String, Any>
+  // CHECK-NEXT: [[ANY_DICT_COPY:%.*]] = copy_value [[DICT_CAST_TO_ANY]]
+  // CHECK-NEXT: [[ANY_DICT:%.*]] = begin_borrow [[ANY_DICT_COPY]]
+  // CHECK: [[GETTER:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszypRs_rlE4testSiSgvg
+  // CHECK-NEXT: {{.*}} = apply [[GETTER]]([[ANY_DICT]]) : $@convention(method) (@guaranteed Dictionary<String, Any>) -> Optional<Int>
+  _ = u.dict.test
+
+  // CHECK: [[DICT_GETTER:%.*]] = class_method %0, #User.dict!modify : (User) -> () -> (), $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK-NEXT: ([[DICT:%.*]], {{.*}}) = begin_apply [[DICT_GETTER]]({{.*}}) : $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[ANY_DICT:%.*]] = alloc_stack $Dictionary<String, Any>
+  // CHECK-NEXT: [[LOADED_DICT:%.*]] = load [copy] [[DICT]]
+  // CHECK-NEXT: [[CASTED_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_DICT]] to $Dictionary<String, Any>
+  // CHECK-NEXT: [[COPIED_CASTED_DICT:%.*]] = copy_value [[CASTED_DICT]]
+  // CHECK-NEXT: store [[COPIED_CASTED_DICT]] to [init] [[ANY_DICT]]
+  // CHECK: [[SETTER:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszypRs_rlE4testSiSgvs
+  // CHECK-NEXT: {{.*}} = apply [[SETTER]]({{.*}}, [[ANY_DICT]]) : $@convention(method) (Optional<Int>, @inout Dictionary<String, Any>) -> ()
+  // CHECK-NEXT: [[LOADED_ANY_DICT:%.*]] = load [take] [[ANY_DICT]]
+  // CHECK-NEXT: [[SENDABLE_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_ANY_DICT]] to $Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[COPIED_SENDABLE_DICT:%.*]] = copy_value [[SENDABLE_DICT]]
+  // CHECK-NEXT: assign [[COPIED_SENDABLE_DICT]] to [[DICT]]
+  u.dict.test = 42
+
+  // CHECK: [[DICT_GETTER:%.*]] = class_method %0, #User.dict!modify : (User) -> () -> (), $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK-NEXT: ([[DICT:%.*]], {{.*}}) = begin_apply [[DICT_GETTER:%.*]](%0) : $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[ANY_DICT:%.*]] = alloc_stack $Dictionary<String, Any>
+  // CHECK-NEXT: [[LOADED_DICT:%.*]] = load [copy] [[DICT]]
+  // CHECK-NEXT: [[CASTED_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_DICT]] to $Dictionary<String, Any>
+  // CHECK-NEXT: [[COPIED_DICT:%.*]] = copy_value [[CASTED_DICT]]
+  // CHECK-NEXT: store [[COPIED_DICT]] to [init] [[ANY_DICT]]
+  // CHECK: [[MUTATING_METHOD:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszypRs_rlE12testMutatingyyF : $@convention(method) (@inout Dictionary<String, Any>) -> ()
+  // CHECK-NEXT: %101 = apply [[MUTATING_METHOD]]([[ANY_DICT]]) : $@convention(method) (@inout Dictionary<String, Any>) -> ()
+  // CHECK-NEXT: [[LOADED_ANY_DICT:%.*]] = load [take] [[ANY_DICT]]
+  // CHECK-NEXT: [[SENDABLE_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_ANY_DICT]] to $Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[COPIED_SENDABLE_DICT:%.*]] = copy_value [[SENDABLE_DICT]]
+  // CHECK-NEXT: assign [[COPIED_SENDABLE_DICT]] to [[DICT]]
+  u.dict.testMutating()
+}
