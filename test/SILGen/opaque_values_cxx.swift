@@ -7,14 +7,14 @@
 
 import Cxx
 
-// CHECK-LABEL: sil {{.*}}[ossa] @$sSo3stdO3__1O0055vectorCUnsignedIntallocatorCUnsignedInt_iqGBpboaivxaEhaV3Cxx0B8SequenceSCAgHP13__beginUnsafe11RawIteratorQzyFTW : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] @$sSo3stdO3__1O0065vectorCUnsignedIntstd__1allocatorCUnsignedInt_dDGIrdqahddCJdFaAjaV3Cxx0B8SequenceSCAgHP13__beginUnsafe11RawIteratorQzyFTW : {{.*}} {
 // CHECK:       bb0([[VECTOR_ADDR:%[^,]+]] :
 // CHECK:         [[VECTOR:%[^,]+]] = load_borrow [[VECTOR_ADDR]]
 // CHECK:         [[BEGIN_FN:%[^,]+]] = function_ref
 // CHECK:         [[BEGIN:%[^,]+]] = apply [[BEGIN_FN]]([[VECTOR]])
 // CHECK:         end_borrow [[VECTOR]]
 // CHECK:         return [[BEGIN]]
-// CHECK-LABEL: } // end sil function '$sSo3stdO3__1O0055vectorCUnsignedIntallocatorCUnsignedInt_iqGBpboaivxaEhaV3Cxx0B8SequenceSCAgHP13__beginUnsafe11RawIteratorQzyFTW'
+// CHECK-LABEL: } // end sil function '$sSo3stdO3__1O0065vectorCUnsignedIntstd__1allocatorCUnsignedInt_dDGIrdqahddCJdFaAjaV3Cxx0B8SequenceSCAgHP13__beginUnsafe11RawIteratorQzyFTW'
 // CHECK-LABEL: sil {{.*}}[ossa] @$sSo3stdO{{(3__1O)?}}0047___wrap_iterUnsafePointerCUnsignedInt_heCInnaEgaVSQSCSQ2eeoiySbx_xtFZTW : {{.*}} {
 // CHECK:       bb0([[LHS:%[^,]+]] : $std.__1.__wrap_iter<UnsafePointer<CUnsignedInt>>, [[RHS:%[^,]+]] :
 // CHECK:         [[CALLEE:%[^,]+]] = function_ref @$sSo2eeoiySbSo3stdO{{(3__1O)?}}0047___wrap_iterUnsafePointerCUnsignedInt_heCInnaEgaV_AGtFTO

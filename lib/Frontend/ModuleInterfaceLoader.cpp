@@ -1513,8 +1513,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
 static bool readSwiftInterfaceVersionAndArgs(
     SourceManager &SM, DiagnosticEngine &Diags, llvm::StringSaver &ArgSaver,
     SwiftInterfaceInfo &interfaceInfo, StringRef interfacePath,
-    SourceLoc diagnosticLoc, llvm::Triple preferredTarget,
-    std::optional<llvm::Triple> preferredTargetVariant) {
+    SourceLoc diagnosticLoc, llvm::Triple preferredTarget) {
   llvm::vfs::FileSystem &fs = *SM.getFileSystem();
   auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
   if (!FileOrError) {
@@ -1538,8 +1537,7 @@ static bool readSwiftInterfaceVersionAndArgs(
 
   if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver,
                                         interfaceInfo.Arguments,
-                                        preferredTarget,
-                                        preferredTargetVariant)) {
+                                        preferredTarget)) {
     InterfaceSubContextDelegateImpl::diagnose(
         interfacePath, diagnosticLoc, SM, &Diags,
         diag::error_extracting_version_from_module_interface);
@@ -1623,8 +1621,7 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
   readSwiftInterfaceVersionAndArgs(
       Instance.getSourceMgr(), Instance.getDiags(), ArgSaver, InterfaceInfo,
       interfacePath, SourceLoc(),
-      Instance.getInvocation().getLangOptions().Target,
-      Instance.getInvocation().getLangOptions().TargetVariant);
+      Instance.getInvocation().getLangOptions().Target);
 
   auto Builder = ExplicitModuleInterfaceBuilder(
       Instance, &Instance.getDiags(), Instance.getSourceMgr(),
@@ -1671,15 +1668,6 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     // So the Swift interface should know that as well to load these PCMs properly.
     GenericArgs.push_back("-clang-target");
     GenericArgs.push_back(triple);
-  }
-
-  if (LangOpts.TargetVariant.has_value()) {
-    genericSubInvocation.getLangOptions().TargetVariant = LangOpts.TargetVariant;
-    auto variantTriple = ArgSaver.save(genericSubInvocation.getLangOptions().TargetVariant->str());
-    if (!variantTriple.empty()) {
-      GenericArgs.push_back("-target-variant");
-      GenericArgs.push_back(variantTriple);
-    }
   }
 
   // Inherit the target SDK name and version
@@ -1821,8 +1809,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
     StringRef interfacePath, SourceLoc diagnosticLoc) {
   if (readSwiftInterfaceVersionAndArgs(SM, *Diags, ArgSaver, interfaceInfo,
                                        interfacePath, diagnosticLoc,
-                                       subInvocation.getLangOptions().Target,
-                                       subInvocation.getLangOptions().TargetVariant))
+                                       subInvocation.getLangOptions().Target))
     return true;
 
   // Prior to Swift 5.9, swiftinterfaces were always built (accidentally) with

@@ -1242,14 +1242,15 @@ extractBuilderValueIfExists(const swift::NominalTypeDecl *TypeDecl,
   ;
 }
 
-void writeAttrInformation(llvm::json::OStream &JSON,
-                          const DeclAttributes &Attrs) {
-  auto availableAttr = Attrs.getAttributes<AvailableAttr>();
-  if (availableAttr.empty())
+void writeAvailabilityAttributes(llvm::json::OStream &JSON, const Decl &decl) {
+  auto semanticAttrs = decl.getSemanticAvailableAttrs();
+  if (semanticAttrs.empty())
     return;
 
   JSON.attributeArray("availabilityAttributes", [&] {
-    for (const AvailableAttr *attr : availableAttr) {
+    for (auto semanticAttr : semanticAttrs) {
+      auto attr = semanticAttr.getParsedAttr();
+
       JSON.object([&] {
         if (!attr->platformString().empty())
           JSON.attribute("platform", attr->platformString());
@@ -1370,7 +1371,7 @@ void writeProperties(llvm::json::OStream &JSON,
         }
         writePropertyWrapperAttributes(JSON, PropertyInfo.PropertyWrappers,
                                        decl->getASTContext());
-        writeAttrInformation(JSON, decl->getAttrs());
+        writeAvailabilityAttributes(JSON, *decl);
       });
     }
   });
@@ -1450,7 +1451,7 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
         writeAssociatedTypeAliases(JSON, *NomTypeDecl);
         writeProperties(JSON, TypeInfo, *NomTypeDecl);
         writeEnumCases(JSON, TypeInfo.EnumElements);
-        writeAttrInformation(JSON, NomTypeDecl->getAttrs());
+        writeAvailabilityAttributes(JSON, *NomTypeDecl);
       });
     }
   });

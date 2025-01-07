@@ -169,6 +169,20 @@ extension Sequence where Element == Operand {
   public var endingLifetime: LazyFilterSequence<Self> {
     return self.lazy.filter { $0.endsLifetime }
   }
+
+  public var users: LazyMapSequence<Self, Instruction> {
+    return self.lazy.map { $0.instruction }
+  }
+
+  // This intentinally returns a Sequence of `Instruction` and not a Sequence of `I` to be able to use
+  // it as argument to `InstructionSet.insert(contentsOf:)`.
+  public func users<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, Instruction> {
+    self.lazy.filter{ $0.instruction is I }.users
+  }
+}
+
+extension Value {
+  public var users: LazyMapSequence<UseList, Instruction> { uses.users }
 }
 
 extension Operand {

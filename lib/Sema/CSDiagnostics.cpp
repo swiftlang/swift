@@ -3569,8 +3569,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
       // Create a fake conformance for this type to the given protocol.
       auto conformance = getASTContext().getNormalConformance(
           nominal->getSelfInterfaceType(), protocol, SourceLoc(), nominal,
-          ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
-          /*isPreconcurrency=*/false);
+          ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
 
       // Resolve the conformance to generate fixits.
       evaluateOrDefault(getASTContext().evaluator,
@@ -3832,14 +3831,6 @@ bool FunctionTypeMismatch::diagnoseAsError() {
   return true;
 }
 
-bool AutoClosureForwardingFailure::diagnoseAsError() {
-  auto argRange = getSourceRange();
-  emitDiagnostic(diag::invalid_autoclosure_forwarding)
-      .highlight(argRange)
-      .fixItInsertAfter(argRange.End, "()");
-  return true;
-}
-
 bool AutoClosurePointerConversionFailure::diagnoseAsError() {
   auto diagnostic = diag::invalid_autoclosure_pointer_conversion;
   emitDiagnostic(diagnostic, getFromType(), getToType())
@@ -3903,18 +3894,11 @@ bool MissingCallFailure::diagnoseAsError() {
       return true;
     }
 
-    case ConstraintLocator::FunctionResult: {
-      path = path.drop_back();
-      if (path.back().getKind() != ConstraintLocator::AutoclosureResult)
-        break;
-
-      LLVM_FALLTHROUGH;
-    }
-
     case ConstraintLocator::AutoclosureResult: {
-      auto loc = getConstraintLocator(getRawAnchor(), path.drop_back());
-      AutoClosureForwardingFailure failure(getSolution(), loc);
-      return failure.diagnoseAsError();
+      emitDiagnostic(diag::invalid_autoclosure_forwarding)
+          .highlight(getSourceRange())
+          .fixItInsertAfter(insertLoc, "()");
+      return true;
     }
     default:
       break;

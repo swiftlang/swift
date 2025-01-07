@@ -246,7 +246,7 @@ public struct Strct {
 // CHECK-NEXT: namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: // Type metadata accessor for NonTrivialTemplateTrivial
-// CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo2nsO0037NonTrivialTemplateTrivialinNS_CsGGkdcVMa(swift::_impl::MetadataRequestTy) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo2nsO0042NonTrivialTemplatensTrivialinNS_HlGFlenawcVMa(swift::_impl::MetadataRequestTy) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace _impl
@@ -258,7 +258,7 @@ public struct Strct {
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<ns::NonTrivialTemplateTrivial> {
 // CHECK-NEXT:   static SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
-// CHECK-NEXT:     return _impl::$sSo2nsO0037NonTrivialTemplateTrivialinNS_CsGGkdcVMa(0)._0;
+// CHECK-NEXT:     return _impl::$sSo2nsO0042NonTrivialTemplatensTrivialinNS_HlGFlenawcVMa(0)._0;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
@@ -273,7 +273,7 @@ public struct Strct {
 // CHECK-NEXT: SWIFT_INLINE_THUNK ns::NonTrivialTemplate<ns::TrivialinNS> retNonTrivial2() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialTemplate<ns::TrivialinNS>)) char storage[sizeof(ns::NonTrivialTemplate<ns::TrivialinNS>)];
 // CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<ns::NonTrivialTemplate<ns::TrivialinNS> *>(storage);
-// CHECK-NEXT: _impl::$s8UseCxxTy14retNonTrivial2So2nsO0037NonTrivialTemplateTrivialinNS_CsGGkdcVyF(storage);
+// CHECK-NEXT: _impl::$s8UseCxxTy14retNonTrivial2So2nsO0042NonTrivialTemplatensTrivialinNS_HlGFlenawcVyF(storage);
 // CHECK-NEXT: ns::NonTrivialTemplate<ns::TrivialinNS> result(static_cast<ns::NonTrivialTemplate<ns::TrivialinNS> &&>(*storageObjectPtr));
 // CHECK-NEXT: storageObjectPtr->~NonTrivialTemplate();
 // CHECK-NEXT: return result;
@@ -312,7 +312,7 @@ public struct Strct {
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK void takeNonTrivial2(const ns::NonTrivialTemplate<ns::TrivialinNS>& x) noexcept SWIFT_SYMBOL({{.*}}) {
-// CHECK-NEXT:   _impl::$s8UseCxxTy15takeNonTrivial2yySo2nsO0037NonTrivialTemplateTrivialinNS_CsGGkdcVF(swift::_impl::getOpaquePointer(x));
+// CHECK-NEXT:   _impl::$s8UseCxxTy15takeNonTrivial2yySo2nsO0042NonTrivialTemplatensTrivialinNS_HlGFlenawcVF(swift::_impl::getOpaquePointer(x));
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK void takeSimpleScopedEnum(const SimpleScopedEnum& x) noexcept SWIFT_SYMBOL({{.*}}) {

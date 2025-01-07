@@ -492,27 +492,38 @@ static ManagedValue emitBuiltinAddressOfBorrowBuiltins(SILGenFunction &SGF,
   auto argument = (*argsOrError)[0];
 
   SILValue addr;
-  // Try to borrow the argument at +0. We only support if it's
-  // naturally emitted borrowed in memory.
-  auto borrow = SGF.emitRValue(argument, SGFContext::AllowGuaranteedPlusZero)
-     .getAsSingleValue(SGF, argument);
-  if (!SGF.F.getConventions().useLoweredAddresses()) {
-    auto &context = SGF.getASTContext();
-    auto identifier =
-        stackProtected
-            ? context.getIdentifier("addressOfBorrowOpaque")
-            : context.getIdentifier("unprotectedAddressOfBorrowOpaque");
-    auto builtin = SGF.B.createBuiltin(loc, identifier, rawPointerType,
-                                       substitutions, {borrow.getValue()});
-    return ManagedValue::forObjectRValueWithoutOwnership(builtin);
-  }
+  // Try to borrow the argument at +0 indirect.
+  // If the argument is a reference to a borrowed addressable parameter, then
+  // use that parameter's stable address.
+  if (auto addressableAddr = SGF.tryEmitAddressableParameterAsAddress(
+                                                      ArgumentSource(argument),
+                                                      ValueOwnership::Shared)) {
+    addr = addressableAddr.getValue();
+  } else {
+    // We otherwise only support the builtin applied to values that
+    // are naturally emitted borrowed in memory. (But it would probably be good
+    // to phase this out since it's not really well-defined how long
+    // the resulting pointer is good for without something like addressability.)
+    auto borrow = SGF.emitRValue(argument, SGFContext::AllowGuaranteedPlusZero)
+       .getAsSingleValue(SGF, argument);
+    if (!SGF.F.getConventions().useLoweredAddresses()) {
+      auto &context = SGF.getASTContext();
+      auto identifier =
+          stackProtected
+              ? context.getIdentifier("addressOfBorrowOpaque")
+              : context.getIdentifier("unprotectedAddressOfBorrowOpaque");
+      auto builtin = SGF.B.createBuiltin(loc, identifier, rawPointerType,
+                                         substitutions, {borrow.getValue()});
+      return ManagedValue::forObjectRValueWithoutOwnership(builtin);
+    }
 
-  if (!borrow.isPlusZero() || !borrow.getType().isAddress()) {
-    SGF.SGM.diagnose(argument->getLoc(), diag::non_borrowed_indirect_addressof);
-    return SGF.emitUndef(rawPointerType);
-  }
+    if (!borrow.isPlusZero() || !borrow.getType().isAddress()) {
+      SGF.SGM.diagnose(argument->getLoc(), diag::non_borrowed_indirect_addressof);
+      return SGF.emitUndef(rawPointerType);
+    }
   
-  addr = borrow.getValue();
+    addr = borrow.getValue();
+  }
   
   // Take the address argument and cast it to RawPointer.
   SILValue result = SGF.B.createAddressToPointer(loc, addr, rawPointerType,

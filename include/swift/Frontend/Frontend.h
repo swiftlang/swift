@@ -187,7 +187,8 @@ public:
     return ClangImporterOpts.ClangScannerModuleCachePath;
   }
 
-  void setImportSearchPaths(const std::vector<std::string> &Paths) {
+  void setImportSearchPaths(
+      const std::vector<SearchPathOptions::SearchPath> &Paths) {
     SearchPathOpts.setImportSearchPaths(Paths);
   }
 
@@ -196,16 +197,16 @@ public:
     SearchPathOpts.DeserializedPathRecoverer = obfuscator;
   }
 
-  ArrayRef<std::string> getImportSearchPaths() const {
+  ArrayRef<SearchPathOptions::SearchPath> getImportSearchPaths() const {
     return SearchPathOpts.getImportSearchPaths();
   }
 
   void setFrameworkSearchPaths(
-             const std::vector<SearchPathOptions::FrameworkSearchPath> &Paths) {
+      const std::vector<SearchPathOptions::SearchPath> &Paths) {
     SearchPathOpts.setFrameworkSearchPaths(Paths);
   }
 
-  ArrayRef<SearchPathOptions::FrameworkSearchPath> getFrameworkSearchPaths() const {
+  ArrayRef<SearchPathOptions::SearchPath> getFrameworkSearchPaths() const {
     return SearchPathOpts.getFrameworkSearchPaths();
   }
 

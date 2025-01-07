@@ -38,10 +38,32 @@ class SILLoopInfo;
 /// Compute the set of reachable blocks.
 class ReachableBlocks {
   BasicBlockSet visited;
+  bool isComputed;
 
 public:
-  ReachableBlocks(SILFunction *function) : visited(function) {}
+  ReachableBlocks(SILFunction *function)
+      : visited(function), isComputed(false) {}
 
+  /// Populate `visited` with the blocks reachable in the function.
+  void compute();
+
+  /// Whether `block` is reachable from the entry block.
+  bool isReachable(SILBasicBlock *block) const {
+    assert(isComputed);
+    return visited.contains(block);
+  }
+
+  bool hasUnreachableBlocks() const {
+    assert(isComputed);
+    for (auto &block : *visited.getFunction()) {
+      if (!isReachable(&block)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+private:
   /// Invoke \p visitor for each reachable block in \p f in worklist order (at
   /// least one predecessor has been visited--defs are always visited before
   /// uses except for phi-type block args). The \p visitor takes a block
@@ -50,9 +72,6 @@ public:
   ///
   /// Returns true if all reachable blocks were visited.
   bool visit(function_ref<bool(SILBasicBlock *)> visitor);
-
-  /// Return true if \p bb has been visited.
-  bool isVisited(SILBasicBlock *bb) const { return visited.contains(bb); }
 };
 
 /// Computes the set of blocks from which a path to the return-block exists.

@@ -260,8 +260,7 @@ private extension LoadInst {
 private func remove(copy: CopyValueInst, collectedUses: Uses, liverange: InstructionRange) {
   let context = collectedUses.context
   replaceMoveWithBorrow(of: copy, replacedBy: copy.fromValue, liverange: liverange, collectedUses: collectedUses)
-  copy.uses.replaceAll(with: copy.fromValue, context)
-  context.erase(instruction: copy)
+  copy.replace(with: copy.fromValue, context)
 
   for forwardingUse in collectedUses.forwardingUses {
     forwardingUse.changeOwnership(from: .owned, to: .guaranteed, context)
@@ -301,8 +300,7 @@ private func replaceMoveWithBorrow(
                                       isLexical: moveInst.isLexical,
                                       hasPointerEscape: moveInst.hasPointerEscape,
                                       isFromVarDecl: moveInst.isFromVarDecl)
-  moveInst.uses.replaceAll(with: bbi, context)
-  context.erase(instruction: moveInst)
+  moveInst.replace(with: bbi, context)
   createEndBorrows(for: bbi, atEndOf: liverange, collectedUses: collectedUses)
 }
 

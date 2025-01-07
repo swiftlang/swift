@@ -863,8 +863,6 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::NoImplicitCopy);
     Opts.enableFeature(Feature::OldOwnershipOperatorSpellings);
   }
-  if (Args.hasArg(OPT_experimental_one_way_closure_params))
-    Opts.enableFeature(Feature::OneWayClosureParameters);
   if (Args.hasArg(OPT_enable_experimental_forward_mode_differentiation))
     Opts.enableFeature(Feature::ForwardModeDifferentiation);
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
@@ -2145,13 +2143,16 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     return std::string(fullPath.str());
   };
 
-  std::vector<std::string> ImportSearchPaths(Opts.getImportSearchPaths());
-  for (const Arg *A : Args.filtered(OPT_I)) {
-    ImportSearchPaths.push_back(resolveSearchPath(A->getValue()));
+  std::vector<SearchPathOptions::SearchPath> ImportSearchPaths(
+      Opts.getImportSearchPaths());
+  for (const Arg *A : Args.filtered(OPT_I, OPT_Isystem)) {
+    ImportSearchPaths.push_back(
+        {resolveSearchPath(A->getValue()),
+         /*isSystem=*/A->getOption().getID() == OPT_Isystem});
   }
   Opts.setImportSearchPaths(ImportSearchPaths);
 
-  std::vector<SearchPathOptions::FrameworkSearchPath> FrameworkSearchPaths(
+  std::vector<SearchPathOptions::SearchPath> FrameworkSearchPaths(
       Opts.getFrameworkSearchPaths());
   for (const Arg *A : Args.filtered(OPT_F, OPT_Fsystem)) {
     FrameworkSearchPaths.push_back(
@@ -3833,6 +3834,13 @@ bool CompilerInvocation::parseArgs(
     if (SILOpts.NoAllocations) {
       Diags.diagnose(SourceLoc(), diag::no_allocations_without_embedded);
       return true;
+    }
+  }
+
+  if (LangOpts.hasFeature(Feature::WarnUnsafe)) {
+    if (SILOpts.RemoveRuntimeAsserts ||
+        SILOpts.AssertConfig == SILOptions::Unchecked) {
+      Diags.diagnose(SourceLoc(), diag::Ounchecked_with_strict_safety);
     }
   }
 

@@ -1078,17 +1078,6 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose situations when @autoclosure argument is passed to @autoclosure
-/// parameter directly without calling it first.
-class AutoClosureForwardingFailure final : public FailureDiagnostic {
-public:
-  AutoClosureForwardingFailure(const Solution &solution,
-                               ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator) {}
-
-  bool diagnoseAsError() override;
-};
-
 /// Diagnose invalid pointer conversions for an autoclosure result type.
 ///
 /// \code

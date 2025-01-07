@@ -60,31 +60,31 @@ using SpanOfIntAlias = SpanOfInt;
 import Test
 import CoreFoundation
 
-// expected-note@+1{{make global function 'useUnsafeParam' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
-func useUnsafeParam(x: Unannotated) { // expected-warning{{reference to unsafe struct 'Unannotated'}}
+// expected-warning@+1{{global function 'useUnsafeParam' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+func useUnsafeParam(x: Unannotated) { // expected-note{{reference to unsafe struct 'Unannotated'}}
 }
 
-// expected-note@+2{{make global function 'useUnsafeParam2' @unsafe to indicate that its use is not memory-safe}}{{10:1-1=@unsafe }}
+// expected-warning@+2{{global function 'useUnsafeParam2' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{10:1-1=@unsafe }}
 @available(SwiftStdlib 5.8, *)
-func useUnsafeParam2(x: UnsafeReference) { // expected-warning{{reference to unsafe class 'UnsafeReference'}}
+func useUnsafeParam2(x: UnsafeReference) { // expected-note{{reference to unsafe class 'UnsafeReference'}}
 }
 
-// expected-note@+1{{make global function 'useUnsafeParam3' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
-func useUnsafeParam3(x: UnknownEscapabilityAggregate) { // expected-warning{{reference to unsafe struct 'UnknownEscapabilityAggregate'}}
+// expected-warning@+1{{global function 'useUnsafeParam3' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+func useUnsafeParam3(x: UnknownEscapabilityAggregate) { // expected-note{{reference to unsafe struct 'UnknownEscapabilityAggregate'}}
 }
 
-// expected-note@+1{{make global function 'useSafeParams' @safe(unchecked) to allow it to use unsafe constructs in its definition}}{{1-1=@safe(unchecked) }}
+// expected-warning@+1{{global function 'useSafeParams' involves unsafe code; use '@safe(unchecked)' to assert that the code is memory-safe}}{{1-1=@safe(unchecked) }}
 func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer) {
-    let _ = c.__beginUnsafe() // expected-warning{{call to unsafe instance method '__beginUnsafe'}}
+    let _ = c.__beginUnsafe() // expected-note{{call to unsafe instance method '__beginUnsafe()'}}
 }
 
 func useCfType(x: CFArray) {
 }
 
-// expected-note@+1{{make global function 'useCppSpan' @unsafe to indicate that its use is not memory-safe}}
-func useCppSpan(x: SpanOfInt) { // expected-warning{{reference to unsafe type alias 'SpanOfInt'}}
+// expected-warning@+1{{global function 'useCppSpan' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}
+func useCppSpan(x: SpanOfInt) { // expected-note{{reference to unsafe type alias 'SpanOfInt'}}
 }
 
-// expected-note@+1{{make global function 'useCppSpan2' @unsafe to indicate that its use is not memory-safe}}
-func useCppSpan2(x: SpanOfIntAlias) { // expected-warning{{reference to unsafe type alias 'SpanOfIntAlias'}}
+// expected-warning@+1{{global function 'useCppSpan2' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}
+func useCppSpan2(x: SpanOfIntAlias) { // expected-note{{reference to unsafe type alias 'SpanOfIntAlias'}}
 }

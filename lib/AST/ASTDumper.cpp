@@ -967,9 +967,10 @@ namespace {
     }
 
     /// Print an unnamed field containing a node's name, read from a declaration.
-    void printDeclName(const ValueDecl *D, bool leadingSpace = true) {
-      if (D->getName()) {
-        printName(D->getName(), leadingSpace);
+    void printDeclName(const Decl *D, bool leadingSpace = true) {
+      auto VD = dyn_cast<ValueDecl>(D);
+      if (VD && VD->getName()) {
+        printName(VD->getName(), leadingSpace);
       } else {
         if (leadingSpace)
           OS << ' ';
@@ -979,7 +980,7 @@ namespace {
     }
 
     /// Print a field containing a node's name, read from a declaration.
-    void printDeclNameField(const ValueDecl *D, StringRef name) {
+    void printDeclNameField(const Decl *D, StringRef name) {
       printFieldRaw([&](raw_ostream &os) {
         printDeclName(D, /*leadingSpace=*/false);
       }, name);
@@ -990,6 +991,7 @@ namespace {
                            TerminalColor Color = DeclColor) {
       printFieldQuotedRaw([&](raw_ostream &OS) { declRef.dump(OS); }, label,
                           Color);
+      printFlag(!ABIRoleInfo(declRef.getDecl()).providesAPI(), "abi_only_decl");
     }
 
     void printThrowDest(ThrownErrorDestination throws, bool wantNothrow) {
@@ -1184,6 +1186,8 @@ namespace {
         else
           printFieldQuoted(implAttr->CategoryName.str(), label);
       }
+
+      printFlag(!ABIRoleInfo(D).providesAPI(), "abi_only");
 
       printSourceRange(D->getSourceRange(), &D->getASTContext());
       printFlag(D->TrailingSemiLoc.isValid(), "trailing_semi",
@@ -1383,9 +1387,13 @@ namespace {
           OS << "\")";
         });
       }
-      auto lifetimeString = getDumpString(VD->getLifetimeAnnotation());
-      if (!lifetimeString.empty())
-        printFlag(lifetimeString);
+      // In some cases, getLifetimeAnnotation() can fail before extension
+      // binding. hasResolvedImports() approximates an extension binding check.
+      if (VD->getModuleContext()->hasResolvedImports()) {
+        auto lifetimeString = getDumpString(VD->getLifetimeAnnotation());
+        if (!lifetimeString.empty())
+          printFlag(lifetimeString);
+      }
     }
 
     void printCommon(NominalTypeDecl *NTD, const char *Name, StringRef Label,
@@ -1905,8 +1913,13 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::ExtensionDecl:
-    if (auto extendedNominal = cast<ExtensionDecl>(dc)->getExtendedNominal()) {
+    if (auto repr = cast<ExtensionDecl>(dc)->getExtendedTypeRepr()) {
+      repr->print(os);
+    } else if (cast<ExtensionDecl>(dc)->hasBeenBound()) {
+      auto extendedNominal = cast<ExtensionDecl>(dc)->getExtendedNominal();
       printName(os, extendedNominal->getName());
+    } else {
+      os << "<unbound>";
     }
     os << " extension";
     break;
@@ -2946,6 +2959,10 @@ public:
       printFlag(true, "dynamically_isolated", CapturesColor);
       break;
 
+    case ActorIsolation::CallerIsolationInheriting:
+      printFlag(true, "isolated_to_caller_isolation", CapturesColor);
+      break;
+
     case ActorIsolation::ActorInstance:
       printFieldQuoted(isolation.getActorInstance()->printRef(),
                        "actor_isolated", CapturesColor);
@@ -3323,12 +3340,6 @@ public:
   void visitSingleValueStmtExpr(SingleValueStmtExpr *E, StringRef label) {
     printCommon(E, "single_value_stmt_expr", label);
     printRec(E->getStmt(), &E->getDeclContext()->getASTContext());
-    printFoot();
-  }
-
-  void visitOneWayExpr(OneWayExpr *E, StringRef label) {
-    printCommon(E, "one_way_expr", label);
-    printRec(E->getSubExpr());
     printFoot();
   }
 
@@ -3743,6 +3754,7 @@ public:
 
   TRIVIAL_ATTR_PRINTER(Actor, actor)
   TRIVIAL_ATTR_PRINTER(AddressableSelf, _addressableSelf)
+  TRIVIAL_ATTR_PRINTER(AddressableForDependencies, _addressableForDependencies)
   TRIVIAL_ATTR_PRINTER(AlwaysEmitConformanceMetadata,
                        always_emit_conformance_metadata)
   TRIVIAL_ATTR_PRINTER(AlwaysEmitIntoClient, always_emit_into_client)
@@ -3853,6 +3865,11 @@ public:
 
 #undef TRIVIAL_ATTR_PRINTER
 
+  void visitABIAttr(ABIAttr *Attr, StringRef label) {
+    printCommon(Attr, "abi_attr", label);
+    printRec(Attr->abiDecl, "decl");
+    printFoot();
+  }
   void visitAccessControlAttr(AccessControlAttr *Attr, StringRef label) {
     printCommon(Attr, "access_control_attr", label);
     printField(Attr->getAccess(), "access_level");

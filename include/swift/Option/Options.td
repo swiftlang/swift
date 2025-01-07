@@ -338,6 +338,11 @@ def I : JoinedOrSeparate<["-"], "I">,
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<I>;
 
+def Isystem : Separate<["-"], "Isystem">,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
+         SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Add directory to the system import search path">;
+
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;
@@ -791,11 +796,6 @@ def enable_experimental_concise_pound_file : Flag<["-"],
     "enable-experimental-concise-pound-file">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
-
-def enable_experimental_bounds_safety_interop :
-  Flag<["-"], "enable-experimental-bounds-safety-interop">,
-  Flags<[NoDriverOption, FrontendOption, HelpHidden, ModuleInterfaceOption]>,
-  HelpText<"Enable experimental C bounds safety interop code generation and config directives">;
 
 def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
@@ -1662,7 +1662,7 @@ def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
 
 def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput, HelpHidden]>,
+         SupplementaryOutput, HelpHidden, CacheInvariant]>,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
 
@@ -1789,6 +1789,10 @@ def input_paths: Separate<["-", "--"], "input-paths">,
 def compiler_style_diags: Flag<["-", "--"], "compiler-style-diags">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Print compiler style diagnostics to stderr.">;
+
+def error_on_abi_breakage: Flag<["-", "--"], "error-on-abi-breakage">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Always treat ABI checker issues as errors">;
 
 def json: Flag<["-", "--"], "json">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,

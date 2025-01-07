@@ -558,3 +558,39 @@ bb6:
   fix_lifetime %6 : $E2
   unreachable
 }
+
+// CHECK-LABEL: sil [ossa] @test_update_borrowed_from :
+// CHECK:       bb3([[A1:%.*]] : @guaranteed $C, [[A2:%.*]] : @reborrow $C):
+// CHECK-DAG:     = borrowed [[A2]] : $C from ()
+// CHECK-DAG:     = borrowed [[A1]] : $C from ([[A2]] : $C)
+// CHECK:       } // end sil function 'test_update_borrowed_from'
+sil [ossa] @test_update_borrowed_from : $@convention(thin) (Builtin.Int1, @inout C) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $*C):
+  cond_br %0, bb2, bb1
+
+bb1:
+  br bb3
+
+bb2:
+  %4 = load [take] %1
+  store %4 to [init] %1
+  br bb3
+
+bb3:
+  %7 = load_borrow %1
+  cond_br %0, bb5, bb4
+
+bb4:
+  br bb6(%7)
+
+bb5:
+  %10 = unchecked_ref_cast %7 to $C
+  br bb6(%10)
+
+bb6(%12 : @guaranteed $C):
+  %13 = borrowed %12 from (%7)
+  end_borrow %7
+  %15 = tuple ()
+  return %15
+}
+

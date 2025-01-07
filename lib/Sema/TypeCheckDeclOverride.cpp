@@ -19,15 +19,18 @@
 #include "TypeCheckDecl.h"
 #include "TypeCheckEffects.h"
 #include "TypeCheckObjC.h"
+#include "TypeCheckUnsafe.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
 using namespace swift;
 
@@ -242,15 +245,15 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
 
 static bool isUnavailableInAllVersions(ValueDecl *decl) {
   ASTContext &ctx = decl->getASTContext();
-  auto *attr = decl->getUnavailableAttr();
-
+  auto attr = decl->getUnavailableAttr();
   if (!attr)
     return false;
+
   if (attr->isUnconditionallyUnavailable())
     return true;
 
-  return attr->getVersionAvailability(ctx)
-             == AvailableVersionComparison::Unavailable;
+  return attr->getVersionAvailability(ctx) ==
+         AvailableVersionComparison::Unavailable;
 }
 
 /// Perform basic checking to determine whether a declaration can override a
@@ -1738,7 +1741,12 @@ namespace  {
     UNINTERESTING_ATTR(AddressableSelf)
     UNINTERESTING_ATTR(Unsafe)
     UNINTERESTING_ATTR(Safe)
+    UNINTERESTING_ATTR(AddressableForDependencies)
 #undef UNINTERESTING_ATTR
+
+    void visitABIAttr(ABIAttr *attr) {
+      // TODO: Match or infer
+    }
 
     void visitAvailableAttr(AvailableAttr *attr) {
       // FIXME: Check that this declaration is at least as available as the
@@ -1938,11 +1946,12 @@ checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
     }
   }
 
-  auto *baseUnavailableAttr = base->getUnavailableAttr();
-  auto *overrideUnavailableAttr = override->getUnavailableAttr();
+  auto baseUnavailableAttr = base->getUnavailableAttr();
+  auto overrideUnavailableAttr = override->getUnavailableAttr();
 
   if (baseUnavailableAttr && !overrideUnavailableAttr)
-    return {OverrideUnavailabilityStatus::BaseUnavailable, baseUnavailableAttr};
+    return {OverrideUnavailabilityStatus::BaseUnavailable,
+            baseUnavailableAttr->getParsedAttr()};
 
   return {OverrideUnavailabilityStatus::Compatible, nullptr};
 }
@@ -2243,23 +2252,20 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     diagnoseOverrideForAvailability(override, base);
   }
 
-  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      override->isUnsafe() && !base->isUnsafe()) {
-    // Don't diagnose @unsafe overrides if the subclass is @unsafe.
-    auto overridingClass = override->getDeclContext()->getSelfClassDecl();
-    bool shouldDiagnose = !overridingClass || !overridingClass->allowsUnsafe();
+  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+    // If the override is unsafe but the base declaration is not, then the
+    // inheritance itself is unsafe.
+    auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
+    ConcreteDeclRef overrideRef(override);
+    ConcreteDeclRef baseRef(base, subs);
+    if (isUnsafe(overrideRef) && !isUnsafe(baseRef)) {
+      // Don't diagnose @unsafe overrides if the subclass is @unsafe.
+      auto overridingClass = override->getDeclContext()->getSelfClassDecl();
+      bool shouldDiagnose = !overridingClass || !overridingClass->allowsUnsafe();
 
-    if (shouldDiagnose) {
-      override->diagnose(diag::override_safe_withunsafe,
-                         base->getDescriptiveKind());
-      if (overridingClass) {
-        overridingClass->diagnose(
-            diag::make_subclass_unsafe, overridingClass->getName()
-        ).fixItInsert(
-            overridingClass->getAttributeInsertionLoc(false), "@unsafe ");
+      if (shouldDiagnose) {
+        diagnoseUnsafeUse(UnsafeUse::forOverride(override, base));
       }
-
-      base->diagnose(diag::overridden_here);
     }
   }
   /// Check attributes associated with the base; some may need to merged with

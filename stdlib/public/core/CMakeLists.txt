@@ -230,6 +230,7 @@ split_embedded_sources(
   EMBEDDED Int128.swift
   EMBEDDED Mirror.swift
     NORMAL PlaygroundDisplay.swift
+  EMBEDDED SwiftifyImport.swift
     NORMAL CommandLine.swift
   EMBEDDED SliceBuffer.swift
   EMBEDDED StaticBigInt.swift
@@ -261,11 +262,6 @@ if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
 
   list(APPEND SWIFTLIB_EMBEDDED_SOURCES SIMDVector.swift)
   list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
-endif()
-
-if (SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
-  list(APPEND SWIFTLIB_SOURCES PointerBounds.swift)
-  list(APPEND SWIFTLIB_EMBEDDED_SOURCES PointerBounds.swift)
 endif()
 
 # Freestanding and Linux/Android builds both have failures to resolve.
@@ -433,6 +429,15 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(SWIFT_STDLIB_STABLE_ABI OFF)
   set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
   set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
+
+  # Under Embedded Swift, all stdlib APIs should be available always. Replace
+  # all availability macros with very very old OS versions.
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED)
+  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
+    string(REGEX REPLACE ":.*" ":macOS 10.9, iOS 7.0, watchOS 2.0, tvOS 9.0, visionOS 1.0" replaced "${def}")
+    list(APPEND SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED "${replaced}")
+  endforeach()
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED}")
 
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")

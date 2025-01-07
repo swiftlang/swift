@@ -27,6 +27,7 @@
 namespace swift {
 
 class PersistentParserState;
+struct SourceFileExtras;
 
 /// Kind of import affecting how a decl can be reexported.
 ///
@@ -243,6 +244,9 @@ private:
   /// Storage for \c HasImportsMatchingFlagRequest.
   ImportOptions cachedImportOptions;
 
+  /// Extra information for the source file, allocated as needed.
+  SourceFileExtras *extras = nullptr;
+
   friend ASTContext;
 
 public:
@@ -367,6 +371,11 @@ public:
   /// identifiers in this source file, including virtual filenames introduced by
   /// \c #sourceLocation(file:) declarations.
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
+
+  /// Retrieve "extra" information associated with this source file, which is
+  /// lazily and separately constructed. Use this for scratch information
+  /// that isn't needed for all source files.
+  SourceFileExtras &getExtras() const;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, unsigned bufferID,
              ParsingOptions parsingOpts = {}, bool isPrimary = false);

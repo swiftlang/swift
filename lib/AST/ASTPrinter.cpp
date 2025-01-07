@@ -1230,6 +1230,18 @@ static bool hasLessAccessibleSetter(const AbstractStorageDecl *ASD) {
   return ASD->getSetterFormalAccess() < ASD->getFormalAccess();
 }
 
+bool canPrintSyntheticSILGenName(const Decl *D) {
+  ASSERT(!D->getAttrs().hasAttribute<SILGenNameAttr>());
+
+  // Only print on functions, and only those functions with no barriers to use.
+  if (auto FD = dyn_cast<AbstractFunctionDecl>(D); !FD
+        || FD->getAttrs().hasAttribute<BackDeployedAttr>()
+        || FD->getOpaqueResultTypeDecl())
+    return false;
+
+  return true;
+}
+
 void PrintAST::printAttributes(const Decl *D) {
   if (Options.SkipAttributes)
     return;
@@ -1246,6 +1258,27 @@ void PrintAST::printAttributes(const Decl *D) {
   // ExcludeCustomAttrList stores instances of attributes, which are specific
   // for each decl They cannot be shared across different decls.
   assert(Options.ExcludeCustomAttrList.empty());
+
+  if (Options.PrintSyntheticSILGenName
+        && !D->getAttrs().hasAttribute<SILGenNameAttr>()) {
+    if (canPrintSyntheticSILGenName(D)) {
+      auto mangledName = Mangle::ASTMangler(D->getASTContext())
+                            .mangleAnyDecl(cast<ValueDecl>(D), /*prefix=*/true,
+                                           /*respectOriginallyDefinedIn=*/true);
+      Printer.printAttrName("@_silgen_name");
+      Printer << "(";
+      Printer.printEscapedStringLiteral(mangledName);
+      Printer << ")\n";
+    }
+    else {
+      Printer.printAttrName("@available");
+      Printer << "(*, unavailable, message: ";
+      Printer.printEscapedStringLiteral(
+          "this compiler cannot match the ABI specified by the @abi attribute");
+      Printer << ")\n";
+      Options.ExcludeAttrList.push_back(DeclAttrKind::Available);
+    }
+  }
 
   if (Options.PrintImplicitAttrs) {
 
@@ -2840,6 +2873,10 @@ void PrintAST::printInherited(const Decl *decl) {
         Printer << "@retroactive ";
       if (inherited.isPreconcurrency())
         Printer << "@preconcurrency ";
+      if (inherited.isUnsafe())
+        Printer << "@unsafe ";
+      if (inherited.isSafe())
+        Printer << "@safe(unchecked) ";
       if (inherited.isSuppressed())
         Printer << "~";
     });
@@ -3137,6 +3174,16 @@ suppressingFeatureCoroutineAccessors(PrintOptions &options,
                                      llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressCoroutineAccessors, true);
   action();
+}
+
+static void
+suppressingFeatureABIAttribute(PrintOptions &options,
+                               llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.PrintSyntheticSILGenName, true);
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DeclAttrKind::ABI);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
 /// Suppress the printing of a particular feature.
@@ -3910,6 +3957,8 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 void PrintAST::printParameterList(ParameterList *PL,
                                   ArrayRef<AnyFunctionType::Param> params,
                                   bool isAPINameByDefault) {
+  llvm::SaveAndRestore<bool> scope(Options.PrintSyntheticSILGenName, false);
+
   Printer.printStructurePre(PrintStructureKind::FunctionParameterList);
   SWIFT_DEFER {
     Printer.printStructurePost(PrintStructureKind::FunctionParameterList);
@@ -4837,10 +4886,6 @@ void PrintAST::visitCoerceExpr(CoerceExpr *expr) {
   visit(expr->getSubExpr());
   Printer << " as ";
   printType(expr->getCastType());
-}
-
-void PrintAST::visitOneWayExpr(OneWayExpr *expr) {
-  llvm_unreachable("Not representable in source code");
 }
 
 void PrintAST::printClosure(AbstractClosureExpr *closure, CaptureListExpr *captureList) {
@@ -7534,6 +7579,11 @@ void SILParameterInfo::print(
     Printer.printLifetimeDependence(*lifetimeDependence);
   }
 
+  if (options.contains(SILParameterInfo::ImplicitLeading)) {
+    options -= SILParameterInfo::ImplicitLeading;
+    Printer << "@sil_implicit_leading_param ";
+  }
+
   // If we did not handle a case in Options, this code was not updated
   // appropriately.
   assert(!bool(options) && "Code not updated for introduced option");
@@ -7760,8 +7810,7 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
   if (auto superclassTy = genericSig->getSuperclassBound(
         proto->getSelfInterfaceType())) {
     Results.emplace_back(TypeLoc::withoutLoc(superclassTy),
-                         /*isUnchecked=*/false,
-                         /*isRetroactive=*/false,
+                         ProtocolConformanceOptions(),
                          /*isPreconcurrency=*/false);
   }
 
@@ -7780,9 +7829,7 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
     }
 
     Results.emplace_back(TypeLoc::withoutLoc(inherited->getDeclaredInterfaceType()),
-                         /*isUnchecked=*/false,
-                         /*isRetroactive=*/false,
-                         /*isPreconcurrency=*/false);
+                      ProtocolConformanceOptions());
   }
 
   for (auto ip : inverses) {
@@ -7793,9 +7840,7 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
         ctx, ArrayRef<Type>(), singleton,
         /*hasExplicitAnyObject=*/false);
     Results.emplace_back(TypeLoc::withoutLoc(inverseTy),
-                         /*isUnchecked=*/false,
-                         /*isRetroactive=*/false,
-                         /*isPreconcurrency=*/false);
+                         ProtocolConformanceOptions());
   }
 }
 
@@ -7909,10 +7954,11 @@ swift::getInheritedForPrinting(
     if (proto->getInvertibleProtocolKind())
       continue;
 
+    ProtocolConformanceOptions options;
+    if (isUnchecked)
+      options |= ProtocolConformanceFlags::Unchecked;
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                       isUnchecked,
-                       /*isRetroactive=*/false,
-                       /*isPreconcurrency=*/false});
+                       options});
   }
 }
 

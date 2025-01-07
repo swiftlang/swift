@@ -747,10 +747,6 @@ option(SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   "Enable experimental SwiftParser validation by default"
   FALSE)
 
-option(SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS
-  "Enable experimental safe wrappers around external functions"
-  FALSE)
-
 cmake_dependent_option(SWIFT_BUILD_SOURCEKIT
   "Build SourceKit" TRUE
   "SWIFT_ENABLE_DISPATCH" FALSE)
@@ -1397,7 +1393,6 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Observation Support:                ${SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION}")
   message(STATUS "Synchronization Support:            ${SWIFT_ENABLE_SYNCHRONIZATION}")
   message(STATUS "Volatile Support:                   ${SWIFT_ENABLE_VOLATILE}")
-  message(STATUS "Pointer Bounds Support:             ${SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
@@ -1616,7 +1611,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
           -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
           -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
-          -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS})
+          -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
+          -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM})
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}" swift-frontend)
       endif()

@@ -5469,11 +5469,6 @@ namespace {
       llvm_unreachable("Handled by the walker directly");
     }
 
-    Expr *visitOneWayExpr(OneWayExpr *E) {
-      auto type = simplifyType(cs.getType(E));
-      return coerceToType(E->getSubExpr(), type, cs.getConstraintLocator(E));
-    }
-
     Expr *visitTapExpr(TapExpr *E) {
       auto type = simplifyType(cs.getType(E));
 
@@ -9252,9 +9247,9 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
 }
 
 static std::optional<SequenceIterationInfo>
-applySolutionToForEachStmt(ForEachStmt *stmt, SequenceIterationInfo info,
-                           DeclContext *dc,
-                           SyntacticElementTargetRewriter &rewriter) {
+applySolutionToForEachStmtPreamble(ForEachStmt *stmt,
+                                   SequenceIterationInfo info, DeclContext *dc,
+                                   SyntacticElementTargetRewriter &rewriter) {
   auto &solution = rewriter.getSolution();
   auto &cs = solution.getConstraintSystem();
   auto &ctx = cs.getASTContext();
@@ -9379,23 +9374,12 @@ applySolutionToForEachStmt(ForEachStmt *stmt, SequenceIterationInfo info,
          "Couldn't find sequence conformance");
   stmt->setSequenceConformance(type, sequenceConformance);
 
-  // Apply the solution to the filtering condition, if there is one.
-  if (auto *whereExpr = stmt->getWhere()) {
-    auto whereTarget = *cs.getTargetFor(whereExpr);
-
-    auto rewrittenTarget = rewriter.rewriteTarget(whereTarget);
-    if (!rewrittenTarget)
-      return std::nullopt;
-
-    stmt->setWhere(rewrittenTarget->getAsExpr());
-  }
-
   return info;
 }
 
 static std::optional<PackIterationInfo>
-applySolutionToForEachStmt(ForEachStmt *stmt, PackIterationInfo info,
-                           SyntacticElementTargetRewriter &rewriter) {
+applySolutionToForEachStmtPreamble(ForEachStmt *stmt, PackIterationInfo info,
+                                   SyntacticElementTargetRewriter &rewriter) {
   auto &solution = rewriter.getSolution();
   auto &cs = solution.getConstraintSystem();
   auto *sequenceExpr = stmt->getParsedSequence();
@@ -9417,8 +9401,8 @@ applySolutionToForEachStmt(ForEachStmt *stmt, PackIterationInfo info,
 ///
 /// \returns the resulting initialization expression.
 static std::optional<SyntacticElementTarget>
-applySolutionToForEachStmt(SyntacticElementTarget target,
-                           SyntacticElementTargetRewriter &rewriter) {
+applySolutionToForEachStmtPreamble(SyntacticElementTarget target,
+                                   SyntacticElementTargetRewriter &rewriter) {
   auto resultTarget = target;
   auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
   auto *stmt = target.getAsForEachStmt();
@@ -9426,7 +9410,7 @@ applySolutionToForEachStmt(SyntacticElementTarget target,
   Type rewrittenPatternType;
 
   if (auto *info = forEachStmtInfo.dyn_cast<SequenceIterationInfo>()) {
-    auto resultInfo = applySolutionToForEachStmt(
+    auto resultInfo = applySolutionToForEachStmtPreamble(
         stmt, *info, target.getDeclContext(), rewriter);
     if (!resultInfo) {
       return std::nullopt;
@@ -9435,7 +9419,7 @@ applySolutionToForEachStmt(SyntacticElementTarget target,
     forEachStmtInfo = *resultInfo;
     rewrittenPatternType = resultInfo->initType;
   } else {
-    auto resultInfo = applySolutionToForEachStmt(
+    auto resultInfo = applySolutionToForEachStmtPreamble(
         stmt, forEachStmtInfo.get<PackIterationInfo>(), rewriter);
     if (!resultInfo) {
       return std::nullopt;
@@ -9669,11 +9653,12 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
 
     return std::nullopt;
   } else if (auto *forEach = target.getAsForEachStmt()) {
-    auto forEachResultTarget = applySolutionToForEachStmt(target, *this);
-    if (!forEachResultTarget)
+    auto forEachPreambleResultTarget =
+        applySolutionToForEachStmtPreamble(target, *this);
+    if (!forEachPreambleResultTarget)
       return std::nullopt;
 
-    result = *forEachResultTarget;
+    result = *forEachPreambleResultTarget;
   } else {
     auto fn = *target.getAsFunction();
     if (rewriteFunction(fn))

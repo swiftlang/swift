@@ -1,16 +1,13 @@
 // RUN: %target-sil-opt                                      \
 // RUN:     %s                                               \
 // RUN:     -enable-experimental-feature LifetimeDependence   \
-// RUN:     -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN: |                                                    \
 // RUN: %target-sil-opt                                      \
 // RUN:     -enable-experimental-feature LifetimeDependence   \
-// RUN:     -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN: |                                                    \
 // RUN: %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 // For -enable-experimental-feature LifetimeDependence
 

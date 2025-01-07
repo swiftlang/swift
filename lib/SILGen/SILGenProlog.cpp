@@ -98,13 +98,18 @@ struct LoweredParamGenerator {
   ParamDecl *paramDecl = nullptr;
   bool isNoImplicitCopy = false;
   LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None;
+  bool isImplicitParameter = false;
 
   void configureParamData(ParamDecl *paramDecl, bool isNoImplicitCopy,
                           LifetimeAnnotation lifetimeAnnotation) {
     this->paramDecl = paramDecl;
     this->isNoImplicitCopy = isNoImplicitCopy;
     this->lifetimeAnnotation = lifetimeAnnotation;
+    this->isImplicitParameter = false;
   }
+
+  void configureParamDataForImplicitParam() { isImplicitParameter = true; }
+
   void resetParamData() {
     configureParamData(nullptr, false, LifetimeAnnotation::None);
   }
@@ -112,20 +117,27 @@ struct LoweredParamGenerator {
   ManagedValue claimNext() {
     auto parameterInfo = parameterTypes.claimNext();
 
-    // We should only be called without a param decl when pulling
-    // pack parameters out for multiple formal parameters (or a single
-    // formal parameter pack).
+    // We should only be called without a param decl when pulling pack
+    // parameters out for multiple formal parameters (or a single formal
+    // parameter pack) or if we have an implicit parameter.
+    //
     // TODO: preserve the parameters captured by the pack into the SIL
     // representation.
-    bool isFormalParameterPack = (paramDecl == nullptr);
+    bool isFormalParameterPack = (paramDecl == nullptr) && !isImplicitParameter;
     assert(!isFormalParameterPack || parameterInfo.isPack());
 
     auto paramType =
         SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         paramType, paramDecl, isNoImplicitCopy, lifetimeAnnotation,
-        /*isClosureCapture*/ false, isFormalParameterPack);
+        /*isClosureCapture*/ false, isFormalParameterPack, isImplicitParameter);
     return mv;
+  }
+
+  std::optional<SILParameterInfo> peek() const {
+    if (isFinished())
+      return {};
+    return parameterTypes.get();
   }
 
   bool isFinished() const {
@@ -192,14 +204,17 @@ public:
   }
 
   ManagedValue handleParam(AbstractionPattern origType, CanType substType,
-                           ParamDecl *pd) {
+                           ParamDecl *pd, bool isAddressable) {
     // Note: inouts of tuples are not exploded, so we bypass visit().
     if (pd->isInOut()) {
       return handleInOut(origType, substType, pd->isAddressable());
     }
-    // `@_addressable` also suppresses exploding the parameter.
-    if (pd->isAddressable()) {
-      return handleScalar(claimNextParameter(), origType, substType,
+    // Addressability also suppresses exploding the parameter.
+    if ((SGF.getASTContext().LangOpts.hasFeature(Feature::AddressableTypes)
+         || SGF.getASTContext().LangOpts.hasFeature(Feature::AddressableParameters))
+        && isAddressable) {
+      return handleScalar(claimNextParameter(),
+                          AbstractionPattern::getOpaque(), substType,
                           /*emitInto*/ nullptr,
                           /*inout*/ false, /*addressable*/ true);
     }
@@ -617,10 +632,15 @@ class ArgumentInitHelper {
 
   std::optional<FunctionInputGenerator> FormalParamTypes;
 
+  SmallPtrSet<ParamDecl *, 2> ScopedDependencies;
+  SmallPtrSet<ParamDecl *, 2> AddressableParams;
+
 public:
   ArgumentInitHelper(SILGenFunction &SGF,
-                     unsigned numIgnoredTrailingParameters)
-      : SGF(SGF), loweredParams(SGF, numIgnoredTrailingParameters) {}
+                     unsigned numIgnoredTrailingParameters,
+                     llvm::SmallPtrSet<ParamDecl*, 2> &&scopedDependencies)
+      : SGF(SGF), loweredParams(SGF, numIgnoredTrailingParameters),
+        ScopedDependencies(std::move(scopedDependencies)) {}
 
   /// Emit the given list of parameters.
   unsigned emitParams(std::optional<AbstractionPattern> origFnType,
@@ -655,6 +675,17 @@ public:
                                /*ignore final*/ false);
     }
 
+    // Go through all of our implicit SIL parameters and emit them. These do not
+    // exist in the AST and always appear in between the results and the
+    // explicit parameters.
+    while (auto param = loweredParams.peek()) {
+      if (!param->hasOption(SILParameterInfo::ImplicitLeading))
+        break;
+      loweredParams.configureParamDataForImplicitParam();
+      loweredParams.advance();
+      loweredParams.resetParamData();
+    }
+
     // Emit each of the function's explicit parameters in order.
     if (paramList) {
       for (auto *param : *paramList)
@@ -668,6 +699,11 @@ public:
 
     if (FormalParamTypes) FormalParamTypes->finish();
     loweredParams.finish();
+    
+    for (auto addressableParam : AddressableParams) {
+      assert(SGF.VarLocs.contains(addressableParam));
+      SGF.VarLocs[addressableParam].addressable = true;
+    }
 
     return ArgNo;
   }
@@ -700,7 +736,22 @@ private:
       auto origType = (FormalParamTypes ? FormalParamTypes->getOrigType()
                                         : AbstractionPattern(substType));
 
-      paramValue = argEmitter.handleParam(origType, substType, pd);
+      // A parameter can be directly marked as addressable, or its
+      // addressability can be implied by a scoped dependency.
+      bool isAddressable = false;
+      
+      if (SGF.getASTContext().LangOpts.hasFeature(Feature::AddressableTypes)
+          || SGF.getASTContext().LangOpts.hasFeature(Feature::AddressableParameters)) {
+        isAddressable = pd->isAddressable()
+          || (ScopedDependencies.contains(pd)
+              && SGF.getTypeLowering(origType, substType)
+                    .getRecursiveProperties().isAddressableForDependencies());
+        if (isAddressable) {
+          AddressableParams.insert(pd);
+        }
+      }
+      paramValue = argEmitter.handleParam(origType, substType, pd,
+                                          isAddressable);
     }
 
     // Reset the parameter data on the lowered parameter generator.
@@ -1596,10 +1647,32 @@ uint16_t SILGenFunction::emitBasicProlog(
       F.getConventions().hasIndirectSILErrorResults()) {
     emitIndirectErrorParameter(*this, *errorType, *origErrorType, DC);
   }
+  
+  // Parameters with scoped dependencies may lower differently.
+  llvm::SmallPtrSet<ParamDecl *, 2> scopedDependencyParams;
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(DC)) {
+    if (auto deps = afd->getLifetimeDependencies()) {
+      for (auto &dep : *deps) {
+        auto scoped = dep.getScopeIndices();
+        if (!scoped) {
+          continue;
+        }
+        for (unsigned i = 0, e = paramList->size(); i < e; ++i) {
+          if (scoped->contains(i)) {
+            scopedDependencyParams.insert((*paramList)[i]);
+          }
+        }
+        if (scoped->contains(paramList->size())) {
+          scopedDependencyParams.insert(selfParam);
+        }
+      }
+    }
+  }
 
   // Emit the argument variables in calling convention order.
   unsigned ArgNo =
-    ArgumentInitHelper(*this, numIgnoredTrailingParameters)
+    ArgumentInitHelper(*this, numIgnoredTrailingParameters,
+                       std::move(scopedDependencyParams))
       .emitParams(origClosureType, paramList, selfParam);
 
   // Record the ArgNo of the artificial $error inout argument. 

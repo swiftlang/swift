@@ -20,6 +20,7 @@
 #include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -7226,9 +7227,9 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
     return;
   // Dig out the Objective-C superclass.
   SmallVector<ValueDecl *, 4> results;
-  superDecl->lookupQualified(superDecl, DeclNameRef(decl->getName()),
-                             decl->getLoc(), NL_QualifiedDefault,
-                             results);
+  superDecl->lookupQualified(
+      superDecl, DeclNameRef(decl->getName()), decl->getLoc(),
+      NL_QualifiedDefault | NL_IgnoreMissingImports, results);
   for (auto member : results) {
     if (member->getKind() != decl->getKind() ||
         member->isInstanceMember() != decl->isInstanceMember() ||
@@ -7672,8 +7673,7 @@ void SwiftDeclConverter::importObjCProtocols(
       addProtocols(proto, protocols, knownProtocols);
       inheritedTypes.push_back(
           InheritedEntry(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                         /*isUnchecked=*/false, /*isRetroactive=*/false,
-                         /*isPreconcurrency=*/false));
+                         ProtocolConformanceOptions()));
     }
   }
 
@@ -8552,8 +8552,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         auto conformance = SwiftContext.getNormalConformance(
             ty, protocol, nominal->getLoc(), nominal->getDeclContextForModule(),
             ProtocolConformanceState::Complete,
-            /*isUnchecked=*/false,
-            /*isPreconcurrency=*/false);
+            ProtocolConformanceOptions());
         conformance->setSourceKindAndImplyingConformance(
             ConformanceEntryKind::Synthesized, nullptr);
 
@@ -8673,16 +8672,16 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
 }
 
 namespace {
-class PointerParamInfoPrinter {
+class SwiftifyInfoPrinter {
 public:
   clang::ASTContext &ctx;
   llvm::raw_ostream &out;
   bool firstParam = true;
-  PointerParamInfoPrinter(clang::ASTContext &ctx, llvm::raw_ostream &out)
+  SwiftifyInfoPrinter(clang::ASTContext &ctx, llvm::raw_ostream &out)
       : ctx(ctx), out(out) {
-    out << "@PointerBounds(";
+    out << "@_SwiftifyImport(";
   }
-  ~PointerParamInfoPrinter() { out << ")"; }
+  ~SwiftifyInfoPrinter() { out << ")"; }
 
   void printCountedBy(const clang::CountAttributedType *CAT,
                       size_t pointerIndex) {
@@ -8725,7 +8724,7 @@ void ClangImporter::Implementation::importBoundsAttributes(
   {
     llvm::raw_svector_ostream out(MacroString);
 
-    PointerParamInfoPrinter printer(getClangASTContext(), out);
+    SwiftifyInfoPrinter printer(getClangASTContext(), out);
     for (auto [index, param] : llvm::enumerate(ClangDecl->parameters())) {
       if (auto CAT = param->getType()->getAs<clang::CountAttributedType>()) {
         printer.printCountedBy(CAT, index);
@@ -10104,12 +10103,15 @@ void ClangImporter::Implementation::loadAllConformances(
   for (auto *protocol : getImportedProtocols(decl)) {
     // FIXME: Build a superclass conformance if the superclass
     // conforms.
+    ProtocolConformanceOptions options;
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable))
+      options |= ProtocolConformanceFlags::Unchecked;
+
     auto conformance = SwiftContext.getNormalConformance(
         dc->getDeclaredInterfaceType(),
         protocol, SourceLoc(), dc,
         ProtocolConformanceState::Incomplete,
-        protocol->isSpecificProtocol(KnownProtocolKind::Sendable),
-        /*isPreconcurrency=*/false);
+        options);
     conformance->setLazyLoader(this, /*context*/0);
     conformance->setState(ProtocolConformanceState::Complete);
     Conformances.push_back(conformance);

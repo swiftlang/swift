@@ -13,6 +13,7 @@
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityContextStorage.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Assertions.h"
 
@@ -57,10 +58,10 @@ bool AvailabilityContext::PlatformInfo::constrainWith(const Decl *decl) {
   if (auto range = AvailabilityInference::annotatedAvailableRange(decl))
     isConstrained |= constrainRange(Range, *range);
 
-  if (auto *attr = decl->getUnavailableAttr()) {
+  if (auto attr = decl->getUnavailableAttr()) {
     isConstrained |= constrainUnavailability(attr->getPlatform());
     isConstrained |=
-        CONSTRAIN_BOOL(IsUnavailableInEmbedded, attr->isForEmbedded());
+        CONSTRAIN_BOOL(IsUnavailableInEmbedded, attr->isEmbeddedSpecific());
   }
 
   isConstrained |= CONSTRAIN_BOOL(IsDeprecated, decl->isDeprecated());

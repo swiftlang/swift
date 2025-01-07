@@ -3,12 +3,10 @@
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN:   -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer
