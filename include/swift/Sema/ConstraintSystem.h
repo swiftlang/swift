@@ -1613,6 +1613,13 @@ public:
   /// A map from argument expressions to their applied property wrapper expressions.
   llvm::DenseMap<ASTNode, SmallVector<AppliedPropertyWrapper, 2>> appliedPropertyWrappers;
 
+  ArrayRef<AppliedPropertyWrapper> getAppliedPropertyWrappers(ASTNode anchor) {
+    auto found = appliedPropertyWrappers.find(anchor);
+    if (found != appliedPropertyWrappers.end())
+      return found->second;
+    return ArrayRef<AppliedPropertyWrapper>();
+  }
+
   /// A mapping from the constraint locators for references to various
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument lists for the call to that locator.
