@@ -904,11 +904,15 @@ static Type applyGenericArguments(Type type,
     auto parameterized =
         ParameterizedProtocolType::get(ctx, protoType, argTys);
 
+    // FIXME: Can this not be done in ExistentialTypeSyntaxChecker?
     if (resolution.getOptions().isConstraintImplicitExistential() &&
         !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-      diags.diagnose(loc, diag::existential_requires_any, parameterized,
-                     ExistentialType::get(parameterized),
-                     /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
+      diags
+          .diagnose(loc, diag::existential_requires_any, parameterized,
+                    ExistentialType::get(parameterized),
+                    /*isAlias=*/isa<TypeAliasType>(type.getPointer()))
+          .warnUntilSwiftVersion(7);
+
       return ErrorType::get(ctx);
     }
 
@@ -6161,16 +6165,13 @@ class ExistentialTypeSyntaxChecker : public ASTWalker {
   ASTContext &Ctx;
   const bool checkStatements;
   bool hitTopStmt;
-  const bool downgradeErrorsToWarnings;
 
   unsigned exprCount = 0;
   llvm::SmallVector<TypeRepr *, 4> reprStack;
     
 public:
-  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements,
-                               bool downgradeErrorsToWarnings = false)
-      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false),
-        downgradeErrorsToWarnings(downgradeErrorsToWarnings) {}
+  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements)
+      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) {}
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::ArgumentsAndExpansion;
@@ -6361,42 +6362,42 @@ private:
   /// \param constraintTy The constraint type that is missing the keyword.
   /// \param isInverted Whether the constraint type is an object of an `~`
   ///  inversion.
-  static DiagnosticBehavior getDiagnosticBehaviorForMissingAnyOrSomeKeyword(
-      Type constraintTy, bool isInverted, ASTContext &ctx) {
+  static bool shouldDiagnoseMissingAnyOrSomeKeyword(Type constraintTy,
+                                                    bool isInverted,
+                                                    ASTContext &ctx) {
     // `Any` and `AnyObject` are always exempt from `any` syntax.
     if (constraintTy->isAny() || constraintTy->isAnyObject()) {
-      return DiagnosticBehavior::Ignore;
+      return false;
     }
 
-    // If the type is inverted, a missing `any` or `some` is an error.
+    // A missing `any` or `some` is always diagnosed if this feature is enabled.
+    if (ctx.LangOpts.hasFeature(Feature::ExistentialAny)) {
+      return true;
+    }
+
+    // If the type is inverted, a missing `any` or `some` is always diagnosed.
     if (isInverted) {
-      return DiagnosticBehavior::Error;
+      return true;
     }
 
     // If one of the protocols is inverted, a missing `any` or `some` is
-    // an error.
+    // always diagnosed.
     if (auto *PCT = constraintTy->getAs<ProtocolCompositionType>()) {
       if (!PCT->getInverses().empty()) {
-        return DiagnosticBehavior::Error;
+        return true;
       }
     }
 
     // If one of the protocols has "Self or associated type" requirements,
-    // a missing `any` or `some` is an error.
+    // a missing `any` or `some` is always diagnosed.
     auto layout = constraintTy->getExistentialLayout();
     for (auto *protoDecl : layout.getProtocols()) {
       if (protoDecl->hasSelfOrAssociatedTypeRequirements()) {
-        return DiagnosticBehavior::Error;
+        return true;
       }
     }
 
-    if (ctx.LangOpts.hasFeature(Feature::ExistentialAny)) {
-      // For anything else, a missing `any` or `some` is a warning if this
-      // feature is enabled.
-      return DiagnosticBehavior::Warning;
-    }
-
-    return DiagnosticBehavior::Ignore;
+    return false;
   }
 
   void checkDeclRefTypeRepr(DeclRefTypeRepr *T) const {
@@ -6447,18 +6448,9 @@ private:
       return dyn_cast<InverseTypeRepr>(*it);
     }();
 
-    DiagnosticBehavior behavior =
-        this->getDiagnosticBehaviorForMissingAnyOrSomeKeyword(
-            type, /*isInverted=*/outerInversion, this->Ctx);
-
-    if (behavior == DiagnosticBehavior::Ignore) {
+    if (!shouldDiagnoseMissingAnyOrSomeKeyword(
+            type, /*isInverted=*/outerInversion, this->Ctx)) {
       return;
-    }
-
-    // If we were asked to downgrade errors, respect it.
-    if (behavior == DiagnosticBehavior::Error &&
-        this->downgradeErrorsToWarnings) {
-      behavior = DiagnosticBehavior::Warning;
     }
 
     std::optional<InFlightDiagnostic> diag;
@@ -6472,7 +6464,7 @@ private:
                                       /*isAlias=*/isa<TypeAliasDecl>(decl)));
     }
 
-    diag->limitBehaviorUntilSwiftVersion(behavior, 7);
+    diag->warnUntilSwiftVersion(7);
     emitInsertAnyFixit(*diag, T);
   }
 
@@ -6549,14 +6541,7 @@ void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt,
   if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
     return;
 
-  // Previously we missed this diagnostic on 'catch' statements, downgrade
-  // to a warning until Swift 7.
-  auto downgradeErrorsToWarnings = false;
-  if (auto *CS = dyn_cast<CaseStmt>(stmt))
-    downgradeErrorsToWarnings = CS->getParentKind() == CaseParentKind::DoCatch;
-
-  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true,
-                                       downgradeErrorsToWarnings);
+  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true);
   stmt->walk(checker);
 }
 
