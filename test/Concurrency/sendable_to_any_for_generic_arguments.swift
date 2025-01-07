@@ -150,3 +150,28 @@ struct TestGeneral {
     let _: S<((Any) -> Void) -> Void> = funcInFunc // Ok
   }
 }
+
+// Make sure that properties and subscripts and mutating methods work.
+extension Dictionary where Key == String, Value == Any {
+  subscript<T>(entry object: T) -> T? {
+    get { nil }
+    set { }
+  }
+
+  var test: Int? {
+    get { nil }
+    set { }
+  }
+
+  mutating func testMutating() {}
+}
+
+func test_subscript_computed_property_and_mutating_access(u: User) {
+  _ = u.dict[entry: ""] // Ok
+  u.dict[entry: 42] = 42 // Ok
+
+  _ = u.dict.test // Ok
+  u.dict.test = 42 // Ok
+
+  u.dict.testMutating() // Ok
+}
