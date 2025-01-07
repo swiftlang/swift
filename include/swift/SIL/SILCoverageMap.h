@@ -176,7 +176,10 @@ public:
   /// Print the coverage map.
   void print(llvm::raw_ostream &OS, bool Verbose = false,
              bool ShouldSort = false) const {
-    SILPrintContext Ctx(OS, Verbose, ShouldSort);
+    SILPrintContext Ctx(OS,
+                        SILPrintContext::OptionSet(
+                            {{Verbose, SILPrintContext::Flag::Verbose},
+                             {ShouldSort, SILPrintContext::Flag::SortedSIL}}));
     print(Ctx);
   }
 

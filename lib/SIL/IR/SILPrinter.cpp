@@ -3377,7 +3377,9 @@ void SILBasicBlock::printID(SILPrintContext &Ctx, bool newline) const {
 
 /// Pretty-print the SILFunction to errs.
 void SILFunction::dump(bool Verbose) const {
-  SILPrintContext Ctx(llvm::errs(), Verbose);
+  SILPrintContext Ctx(
+      llvm::errs(),
+      SILPrintContext::OptionSet({{Verbose, SILPrintContext::Flag::Verbose}}));
   print(Ctx);
 }
 
@@ -3706,7 +3708,8 @@ void SILGlobalVariable::printName(raw_ostream &OS) const {
       
 /// Pretty-print the SILModule to errs.
 void SILModule::dump(bool Verbose) const {
-  SILPrintContext Ctx(llvm::errs(), Verbose);
+  SILPrintContext Ctx(llvm::errs(),
+                      {{Verbose, SILPrintContext::Flag::Verbose}});
   print(Ctx);
 }
 
@@ -3714,7 +3717,7 @@ void SILModule::dump(const char *FileName, bool Verbose,
                      bool PrintASTDecls) const {
   std::error_code EC;
   llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::OF_None);
-  SILPrintContext Ctx(os, Verbose);
+  SILPrintContext Ctx(os, {{Verbose, SILPrintContext::Flag::Verbose}});
   print(Ctx, getSwiftModule(), PrintASTDecls);
 }
 
@@ -4563,22 +4566,12 @@ void KeyPathPatternComponent::print(SILPrintContext &ctxt) const {
 // SILPrintContext members
 //===----------------------------------------------------------------------===//
 
-SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
-                                 bool SortedSIL, bool PrintFullConvention)
-    : OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
-      DebugInfo(SILPrintDebugInfo), PrintFullConvention(PrintFullConvention) {}
-
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, const SILOptions &Opts)
-    : OutStream(OS), Verbose(Opts.EmitVerboseSIL),
-      SortedSIL(Opts.EmitSortedSIL),
-      DebugInfo(Opts.PrintDebugInfo || SILPrintDebugInfo),
-      PrintFullConvention(Opts.PrintFullConvention) {}
-
-SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
-                                 bool SortedSIL, bool DebugInfo,
-                                 bool PrintFullConvention)
-    : OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
-      DebugInfo(DebugInfo), PrintFullConvention(PrintFullConvention) {}
+    : OutStream(OS),
+      Options({{Opts.EmitVerboseSIL, Flag::Verbose},
+               {Opts.EmitSortedSIL, Flag::SortedSIL},
+               {Opts.PrintDebugInfo || SILPrintDebugInfo, Flag::DebugInfo},
+               {Opts.PrintFullConvention, Flag::PrintFullConvention}}) {}
 
 void SILPrintContext::setContext(const void *FunctionOrBlock) {
   if (FunctionOrBlock != ContextFunctionOrBlock) {

@@ -67,6 +67,13 @@ public:
   constexpr OptionSet(std::initializer_list<Flags> flags)
       : Storage(combineFlags(flags)) {}
 
+  /// Create an option set from a set of (bool, Flag) set pairs. Used to
+  /// initialize an option set from a set of boolean parameters when updating
+  /// older APIs that pass many boolean parameters to use an option set instead.
+  constexpr OptionSet(
+      std::initializer_list<std::pair<bool, Flags>> boolAndFlags)
+      : Storage(combineFlags(boolAndFlags)) {}
+
   /// Create an option set from raw storage.
   explicit constexpr OptionSet(StorageType storage) : Storage(storage) {}
 
@@ -100,6 +107,13 @@ public:
   /// Check if this option set contains the exact same options as the given set.
   constexpr bool containsOnly(OptionSet set) const {
     return Storage == set.Storage;
+  }
+
+  /// `|=` with \p rhs if value is set. Used for converting from boolean flags
+  /// to option set flags.
+  constexpr void conditionalSet(bool value, OptionSet rhs) {
+    if (value)
+      *this |= rhs;
   }
 
   // '==' and '!=' are deliberately not defined because they provide a pitfall
@@ -150,6 +164,15 @@ private:
     OptionSet result;
     for (Flags flag : flags)
       result |= flag;
+    return result.Storage;
+  }
+
+  static constexpr StorageType
+  combineFlags(const std::initializer_list<std::pair<bool, Flags>> &flags) {
+    OptionSet result;
+    for (std::pair<bool, Flags> flag : flags)
+      if (flag.first)
+        result |= flag.second;
     return result.Storage;
   }
 
