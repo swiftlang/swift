@@ -30,9 +30,11 @@ extern "C" {
 #if __LLP64__
 typedef unsigned long long _swift_shims_CFHashCode;
 typedef signed long long _swift_shims_CFIndex;
+
 #else
 typedef unsigned long _swift_shims_CFHashCode;
 typedef signed long _swift_shims_CFIndex;
+
 #endif
 
 // Consider creating SwiftMacTypes.h for these
@@ -74,7 +76,7 @@ _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
 SWIFT_RUNTIME_STDLIB_API
 __swift_uint8_t
 _swift_stdlib_dyld_is_objc_constant_string(const void * _Nonnull addr);
-  
+
 #endif // __OBJC2__
 
 #ifdef __cplusplus

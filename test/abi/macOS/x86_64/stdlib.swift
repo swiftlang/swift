@@ -808,3 +808,5 @@ Added: _$ss13_SwiftifyInfoOMa
 Added: _$ss13_SwiftifyInfoOMn
 Added: _$ss13_SwiftifyInfoON
 
+// Eager-lazy Array bridging
+Added: _$ss12_ArrayBufferV14associationKeySVvpZMV
