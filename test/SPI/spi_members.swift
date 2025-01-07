@@ -8,10 +8,26 @@ public struct Wrapper<T> {
 }
 
 @_spi(Foo)
+@propertyWrapper
+public struct SPIWrapper<T> {
+  // expected-note@-1 2 {{generic struct declared here}}
+  public init(wrappedValue: T) {}
+
+  public var wrappedValue: T { fatalError() }
+  // expected-note@-1 2 {{property declared here}}
+}
+
+@_spi(Foo)
 public class SPIType {
   // expected-note@-1 16{{class declared here}}
 
   public init() {}
+}
+
+public struct PublicType {
+  public init() {}
+
+  @_spi(Foo) public func spiFunc() {}
 }
 
 public struct ResilientStructSPIMembers {
@@ -26,6 +42,34 @@ public struct ResilientStructSPIMembers {
   @_spi(Foo) public lazy var lazyProperty2: SPIType = SPIType()
   @_spi(Foo) @Wrapper public var wrappedProperty1: SPIType
   @_spi(Foo) @Wrapper public var wrappedProperty2 = SPIType()
+  @_spi(Foo) @SPIWrapper public var wrappedProperty3 = SPIType()
+
+  @SPIWrapper public var wrappedProperty4: PublicType
+  // expected-error@-1 {{cannot use generic struct 'SPIWrapper' as property wrapper here; it is SPI}}
+  // expected-error@-2 {{cannot use property 'wrappedValue' here; it is SPI}}
+
+  @_spi(Foo) public var inlinableGet: Int {
+    @inlinable
+    get {
+      let _ = SPIType()
+      let t = PublicType()
+      t.spiFunc()
+      return 42
+    }
+  }
+
+  public var inlinablePublicGet: Int {
+    @inlinable
+    get {
+      let _ = SPIType()
+      // expected-error@-1 {{class 'SPIType' cannot be used in an '@inlinable' function because it is SPI}}
+      // expected-error@-2 {{initializer 'init()' cannot be used in an '@inlinable' function because it is SPI}}
+      let t = PublicType()
+      t.spiFunc()
+      // expected-error@-1 {{instance method 'spiFunc()' cannot be used in an '@inlinable' function because it is SPI}}
+      return 42
+    }
+  }
 }
 
 @frozen public struct FrozenStructSPIMembers {
@@ -53,6 +97,9 @@ public struct ResilientStructSPIMembers {
 
   @_spi(Foo) @Wrapper public var wrappedProperty2 = SPIType()
   // expected-error@-1 {{stored property 'wrappedProperty2' cannot be declared '@_spi' in a '@frozen' struct}}
+
+  @_spi(Foo) @SPIWrapper public var wrappedProperty3 = SPIType()
+  // expected-error@-1 {{stored property 'wrappedProperty3' cannot be declared '@_spi' in a '@frozen' struct}}
 }
 
 @frozen public struct FrozenStructPublicMembers {
@@ -81,6 +128,10 @@ public struct ResilientStructSPIMembers {
   // expected-error@-1 {{cannot use class 'SPIType' here; it is SPI}}
   // expected-error@-2 {{class 'SPIType' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
   // expected-error@-3 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
+
+  @SPIWrapper public var wrappedProperty3: PublicType
+  // expected-error@-1 {{cannot use generic struct 'SPIWrapper' as property wrapper here; it is SPI}}
+  // expected-error@-2 {{cannot use property 'wrappedValue' here; it is SPI}}
 }
 
 @frozen public struct FrozenStructPrivateMembers {
