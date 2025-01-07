@@ -2264,10 +2264,10 @@ static Decl *getEnclosingDeclForDecl(Decl *D) {
   return D->getDeclContext()->getInnermostDeclarationDeclContext();
 }
 
-static std::optional<std::pair<const AvailableAttr *, const Decl *>>
+static std::optional<std::pair<SemanticAvailableAttr, const Decl *>>
 getSemanticAvailableRangeDeclAndAttr(const Decl *decl) {
-  if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(decl))
-    return std::make_pair(attr, decl);
+  if (auto attr = decl->getAvailableAttrForPlatformIntroduction())
+    return std::make_pair(*attr, decl);
 
   if (auto *parent =
           AvailabilityInference::parentDeclForInferredAvailability(decl))
@@ -2378,16 +2378,14 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
   std::optional<AvailabilityRange> EnclosingAnnotatedRange;
-  AvailabilityRange AttrRange =
-      AvailabilityInference::availableRange(attr, Ctx);
+  AvailabilityRange AttrRange = semanticAttr->getIntroducedRange(Ctx);
 
   if (auto *parent = getEnclosingDeclForDecl(D)) {
     if (auto enclosingAvailable =
             getSemanticAvailableRangeDeclAndAttr(parent)) {
-      const AvailableAttr *enclosingAttr = enclosingAvailable.value().first;
-      const Decl *enclosingDecl = enclosingAvailable.value().second;
-      EnclosingAnnotatedRange.emplace(
-          AvailabilityInference::availableRange(enclosingAttr, Ctx));
+      SemanticAvailableAttr enclosingAttr = enclosingAvailable->first;
+      const Decl *enclosingDecl = enclosingAvailable->second;
+      EnclosingAnnotatedRange.emplace(enclosingAttr.getIntroducedRange(Ctx));
       if (!AttrRange.isContainedIn(*EnclosingAnnotatedRange)) {
         auto limit = DiagnosticBehavior::Unspecified;
         if (D->isImplicit()) {
@@ -5020,7 +5018,7 @@ void AttributeChecker::checkBackDeployedAttrs(
             getSemanticAvailableRangeDeclAndAttr(VD)) {
       auto beforePlatformString = prettyPlatformString(Attr->Platform);
       auto beforeVersion = Attr->Version;
-      auto availableAttr = availableRangeAttrPair.value().first;
+      auto availableAttr = availableRangeAttrPair.value().first.getParsedAttr();
       auto introVersion = availableAttr->Introduced.value();
       StringRef introPlatformString = availableAttr->prettyPlatformString();
 

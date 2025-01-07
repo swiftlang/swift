@@ -240,7 +240,7 @@ bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 /// unavailable declaration.
 void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
                                        const ValueDecl *base,
-                                       const AvailableAttr *attr);
+                                       SemanticAvailableAttr attr);
 
 /// Checks whether a declaration should be considered unavailable when referred
 /// to in the given declaration context and availability context and, if so,

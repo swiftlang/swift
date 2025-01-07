@@ -21,6 +21,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Identifier.h"
@@ -3220,7 +3221,7 @@ public:
 /// informaton, like its corresponding `AvailabilityDomain`.
 class SemanticAvailableAttr final {
   const AvailableAttr *attr;
-  const AvailabilityDomain domain;
+  AvailabilityDomain domain;
 
 public:
   SemanticAvailableAttr(const AvailableAttr *attr, AvailabilityDomain domain)
@@ -3231,14 +3232,21 @@ public:
   const AvailableAttr *getParsedAttr() const { return attr; }
   const AvailabilityDomain getDomain() const { return domain; }
 
+  /// The version tuple written in source for the `introduced:` component.
   std::optional<llvm::VersionTuple> getIntroduced() const {
     return attr->Introduced;
   }
 
+  /// Returns the effective range in which the declaration with this attribute
+  /// was introduced.
+  AvailabilityRange getIntroducedRange(ASTContext &Ctx) const;
+
+  /// The version tuple written in source for the `deprecated:` component.
   std::optional<llvm::VersionTuple> getDeprecated() const {
     return attr->Deprecated;
   }
 
+  /// The version tuple written in source for the `obsoleted:` component.
   std::optional<llvm::VersionTuple> getObsoleted() const {
     return attr->Obsoleted;
   }
