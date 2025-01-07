@@ -68,7 +68,7 @@ AvailabilityRange AvailabilityRange::forRuntimeTarget(const ASTContext &Ctx) {
 }
 
 PlatformKind AvailabilityConstraint::getPlatform() const {
-  return attr->getPlatform();
+  return attr.getPlatform();
 }
 
 std::optional<AvailabilityRange>
@@ -80,7 +80,7 @@ AvailabilityConstraint::getRequiredNewerAvailabilityRange(
   case Kind::Obsoleted:
     return std::nullopt;
   case Kind::IntroducedInNewerVersion:
-    return AvailabilityInference::availableRange(attr, ctx);
+    return attr.getIntroducedRange(ctx);
   }
 }
 
@@ -96,10 +96,10 @@ bool AvailabilityConstraint::isConditionallySatisfiable() const {
 }
 
 bool AvailabilityConstraint::isActiveForRuntimeQueries(ASTContext &ctx) const {
-  if (attr->getPlatform() == PlatformKind::none)
+  if (attr.getPlatform() == PlatformKind::none)
     return true;
 
-  return swift::isPlatformActive(attr->getPlatform(), ctx.LangOpts,
+  return swift::isPlatformActive(attr.getPlatform(), ctx.LangOpts,
                                  /*forTargetVariant=*/false,
                                  /*forRuntimeQuery=*/true);
 }
@@ -145,21 +145,23 @@ mergeIntoInferredVersion(const std::optional<llvm::VersionTuple> &Version,
 /// Merge an attribute's availability with an existing inferred availability
 /// so that the new inferred availability is at least as available as
 /// the attribute requires.
-static void mergeWithInferredAvailability(const AvailableAttr *Attr,
+static void mergeWithInferredAvailability(SemanticAvailableAttr Attr,
                                           InferredAvailability &Inferred) {
-  Inferred.PlatformAgnostic
-    = static_cast<PlatformAgnosticAvailabilityKind>(
+  auto *ParsedAttr = Attr.getParsedAttr();
+  Inferred.PlatformAgnostic = static_cast<PlatformAgnosticAvailabilityKind>(
       std::max(static_cast<unsigned>(Inferred.PlatformAgnostic),
-               static_cast<unsigned>(Attr->getPlatformAgnosticAvailability())));
+               static_cast<unsigned>(
+                   ParsedAttr->getPlatformAgnosticAvailability())));
 
   // The merge of two introduction versions is the maximum of the two versions.
-  if (mergeIntoInferredVersion(Attr->Introduced, Inferred.Introduced, std::max)) {
-    Inferred.IsSPI = Attr->isSPI();
+  if (mergeIntoInferredVersion(Attr.getIntroduced(), Inferred.Introduced,
+                               std::max)) {
+    Inferred.IsSPI = ParsedAttr->isSPI();
   }
 
   // The merge of deprecated and obsoleted versions takes the minimum.
-  mergeIntoInferredVersion(Attr->Deprecated, Inferred.Deprecated, std::min);
-  mergeIntoInferredVersion(Attr->Obsoleted, Inferred.Obsoleted, std::min);
+  mergeIntoInferredVersion(Attr.getDeprecated(), Inferred.Deprecated, std::min);
+  mergeIntoInferredVersion(Attr.getObsoleted(), Inferred.Obsoleted, std::min);
 }
 
 /// Create an implicit availability attribute for the given platform
@@ -204,36 +206,34 @@ void AvailabilityInference::applyInferredAvailableAttrs(
 
   // Iterate over the declarations and infer required availability on
   // a per-platform basis.
+  // FIXME: [availability] Generalize to AvailabilityDomain.
   std::map<PlatformKind, InferredAvailability> Inferred;
   for (const Decl *D : InferredFromDecls) {
-    llvm::SmallVector<const AvailableAttr *, 8> MergedAttrs;
+    llvm::SmallVector<SemanticAvailableAttr, 8> MergedAttrs;
 
     do {
-      llvm::SmallVector<const AvailableAttr *, 8> PendingAttrs;
+      llvm::SmallVector<SemanticAvailableAttr, 8> PendingAttrs;
 
-      for (const DeclAttribute *Attr : D->getAttrs()) {
-        auto *AvAttr = dyn_cast<AvailableAttr>(Attr);
-        if (!AvAttr || AvAttr->isInvalid())
-          continue;
-
+      for (auto AvAttr :
+           D->getSemanticAvailableAttrs()) {
         // Skip an attribute from an outer declaration if it is for a platform
         // that was already handled implicitly by an attribute from an inner
         // declaration.
-        if (llvm::any_of(
-                MergedAttrs, [&AvAttr](const AvailableAttr *MergedAttr) {
-                  return inheritsAvailabilityFromPlatform(
-                      AvAttr->getPlatform(), MergedAttr->getPlatform());
-                }))
+        if (llvm::any_of(MergedAttrs,
+                         [&AvAttr](SemanticAvailableAttr MergedAttr) {
+                           return inheritsAvailabilityFromPlatform(
+                               AvAttr.getPlatform(), MergedAttr.getPlatform());
+                         }))
           continue;
 
-        mergeWithInferredAvailability(AvAttr, Inferred[AvAttr->getPlatform()]);
+        mergeWithInferredAvailability(AvAttr, Inferred[AvAttr.getPlatform()]);
         PendingAttrs.push_back(AvAttr);
 
-        if (Message.empty() && !AvAttr->Message.empty())
-          Message = AvAttr->Message;
+        if (Message.empty() && !AvAttr.getMessage().empty())
+          Message = AvAttr.getMessage();
 
-        if (Rename.empty() && !AvAttr->Rename.empty())
-          Rename = AvAttr->Rename;
+        if (Rename.empty() && !AvAttr.getRename().empty())
+          Rename = AvAttr.getRename();
       }
 
       MergedAttrs.append(PendingAttrs);
@@ -430,8 +430,8 @@ bool AvailabilityInference::updateBeforePlatformForFallback(
   return false;
 }
 
-const AvailableAttr *
-AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D) {
+static std::optional<SemanticAvailableAttr>
+getDeclAvailableAttrForPlatformIntroduction(const Decl *D) {
   std::optional<SemanticAvailableAttr> bestAvailAttr;
 
   D = abstractSyntaxDeclForAvailableAttribute(D);
@@ -444,16 +444,16 @@ AvailabilityInference::attrForAnnotatedAvailableRange(const Decl *D) {
       bestAvailAttr.emplace(attr);
   }
 
-  return bestAvailAttr ? bestAvailAttr->getParsedAttr() : nullptr;
+  return bestAvailAttr;
 }
 
 std::optional<AvailabilityRange>
 AvailabilityInference::annotatedAvailableRange(const Decl *D) {
-  auto bestAvailAttr = attrForAnnotatedAvailableRange(D);
+  auto bestAvailAttr = D->getAvailableAttrForPlatformIntroduction();
   if (!bestAvailAttr)
     return std::nullopt;
 
-  return availableRange(bestAvailAttr, D->getASTContext());
+  return bestAvailAttr->getIntroducedRange(D->getASTContext());
 }
 
 bool Decl::isAvailableAsSPI() const {
@@ -785,13 +785,14 @@ AvailabilityRange AvailabilityInference::annotatedAvailableRangeForAttr(
   }
 
   if (bestAvailAttr)
-    return availableRange(bestAvailAttr->getParsedAttr(), ctx);
+    return bestAvailAttr->getIntroducedRange(ctx);
 
   return AvailabilityRange::alwaysAvailable();
 }
 
-static const AvailableAttr *attrForAvailableRange(const Decl *D) {
-  if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(D))
+std::optional<SemanticAvailableAttr>
+Decl::getAvailableAttrForPlatformIntroduction() const {
+  if (auto attr = getDeclAvailableAttrForPlatformIntroduction(this))
     return attr;
 
   // Unlike other declarations, extensions can be used without referring to them
@@ -802,39 +803,32 @@ static const AvailableAttr *attrForAvailableRange(const Decl *D) {
   // itself. This check relies on the fact that we cannot have nested
   // extensions.
 
-  DeclContext *DC = D->getDeclContext();
+  DeclContext *DC = getDeclContext();
   if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-    if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(ED))
+    if (auto attr = getDeclAvailableAttrForPlatformIntroduction(ED))
       return attr;
   }
 
-  return nullptr;
-}
-
-std::pair<AvailabilityRange, const AvailableAttr *>
-AvailabilityInference::availableRangeAndAttr(const Decl *D) {
-  if (auto attr = attrForAvailableRange(D)) {
-    return {availableRange(attr, D->getASTContext()), attr};
-  }
-
-  // Treat unannotated declarations as always available.
-  return {AvailabilityRange::alwaysAvailable(), nullptr};
+  return std::nullopt;
 }
 
 AvailabilityRange AvailabilityInference::availableRange(const Decl *D) {
-  return availableRangeAndAttr(D).first;
+  if (auto attr = D->getAvailableAttrForPlatformIntroduction())
+    return attr->getIntroducedRange(D->getASTContext());
+
+  return AvailabilityRange::alwaysAvailable();
 }
 
 bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
-  if (auto attr = attrForAvailableRange(D))
-    return attr->isSPI();
+  if (auto attr = D->getAvailableAttrForPlatformIntroduction())
+    return attr->getParsedAttr()->isSPI();
 
   return false;
 }
 
 AvailabilityRange
-AvailabilityInference::availableRange(const AvailableAttr *attr,
-                                      ASTContext &Ctx) {
+SemanticAvailableAttr::getIntroducedRange(ASTContext &Ctx) const {
+  auto *attr = getParsedAttr();
   assert(attr->isActivePlatform(Ctx));
 
   llvm::VersionTuple IntroducedVersion = attr->Introduced.value();

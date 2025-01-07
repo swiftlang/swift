@@ -4408,8 +4408,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
 
     case CheckKind::Unavailable: {
-      auto *attr = requirement->getUnavailableAttr()->getParsedAttr();
-      diagnoseOverrideOfUnavailableDecl(witness, requirement, attr);
+      diagnoseOverrideOfUnavailableDecl(
+          witness, requirement, requirement->getUnavailableAttr().value());
       break;
     }
 

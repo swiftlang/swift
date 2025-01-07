@@ -1243,38 +1243,37 @@ extractBuilderValueIfExists(const swift::NominalTypeDecl *TypeDecl,
 }
 
 void writeAvailabilityAttributes(llvm::json::OStream &JSON, const Decl &decl) {
-  auto semanticAttrs = decl.getSemanticAvailableAttrs();
-  if (semanticAttrs.empty())
+  auto attrs = decl.getSemanticAvailableAttrs();
+  if (attrs.empty())
     return;
 
   JSON.attributeArray("availabilityAttributes", [&] {
-    for (auto semanticAttr : semanticAttrs) {
-      auto attr = semanticAttr.getParsedAttr();
-
+    for (auto attr : attrs) {
       JSON.object([&] {
-        if (!attr->platformString().empty())
-          JSON.attribute("platform", attr->platformString());
+        auto domainName = attr.getDomain().getNameForAttributePrinting();
+        if (!domainName.empty())
+          JSON.attribute("platform", domainName);
 
-        if (!attr->Message.empty())
-          JSON.attribute("message", attr->Message);
+        if (!attr.getMessage().empty())
+          JSON.attribute("message", attr.getMessage());
 
-        if (!attr->Rename.empty())
-          JSON.attribute("rename", attr->Rename);
+        if (!attr.getRename().empty())
+          JSON.attribute("rename", attr.getRename());
 
-        if (attr->Introduced.has_value())
+        if (attr.getIntroduced().has_value())
           JSON.attribute("introducedVersion",
-                         attr->Introduced.value().getAsString());
+                         attr.getIntroduced().value().getAsString());
 
-        if (attr->Deprecated.has_value())
+        if (attr.getDeprecated().has_value())
           JSON.attribute("deprecatedVersion",
-                         attr->Deprecated.value().getAsString());
+                         attr.getDeprecated().value().getAsString());
 
-        if (attr->Obsoleted.has_value())
+        if (attr.getObsoleted().has_value())
           JSON.attribute("obsoletedVersion",
-                         attr->Obsoleted.value().getAsString());
+                         attr.getObsoleted().value().getAsString());
 
-        JSON.attribute("isUnavailable", attr->isUnconditionallyUnavailable());
-        JSON.attribute("isDeprecated", attr->isUnconditionallyDeprecated());
+        JSON.attribute("isUnavailable", attr.isUnconditionallyUnavailable());
+        JSON.attribute("isDeprecated", attr.isUnconditionallyDeprecated());
       });
     }
   });

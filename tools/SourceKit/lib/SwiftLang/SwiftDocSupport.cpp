@@ -656,18 +656,17 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
   }
 }
 
-static ArrayRef<const DeclAttribute*>
-getDeclAttributes(const Decl *D, std::vector<const DeclAttribute*> &Scratch) {
-  for (auto Attr : D->getAttrs()) {
+static ArrayRef<SemanticAvailableAttr>
+getAvailableAttrs(const Decl *D, std::vector<SemanticAvailableAttr> &Scratch) {
+  for (auto Attr : D->getSemanticAvailableAttrs()) {
     Scratch.push_back(Attr);
   }
+  // FIXME: [availability] Special-casing enums and deprecation here is weird.
   // For enum elements, inherit their parent enum decls' deprecated attributes.
   if (auto *DE = dyn_cast<EnumElementDecl>(D)) {
-    for (auto Attr : DE->getParentEnum()->getAttrs()) {
-      if (auto Avail = dyn_cast<AvailableAttr>(Attr)) {
-        if (Avail->Deprecated || Avail->isUnconditionallyDeprecated()) {
-          Scratch.push_back(Attr);
-        }
+    for (auto Attr : DE->getParentEnum()->getSemanticAvailableAttrs()) {
+      if (Attr.getDeprecated() || Attr.isUnconditionallyDeprecated()) {
+        Scratch.push_back(Attr);
       }
     }
   }
@@ -676,10 +675,8 @@ getDeclAttributes(const Decl *D, std::vector<const DeclAttribute*> &Scratch) {
 }
 
 // Only reports @available.
-// FIXME: Handle all attributes.
-static void reportAttributes(ASTContext &Ctx,
-                             const Decl *D,
-                             DocInfoConsumer &Consumer) {
+static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
+                                         DocInfoConsumer &Consumer) {
   static UIdent AvailableAttrKind("source.lang.swift.attribute.availability");
   static UIdent PlatformIOS("source.availability.platform.ios");
   static UIdent PlatformMacCatalyst("source.availability.platform.maccatalyst");
@@ -693,61 +690,75 @@ static void reportAttributes(ASTContext &Ctx,
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
   static UIdent PlatformOpenBSD("source.availability.platform.openbsd");
   static UIdent PlatformWindows("source.availability.platform.windows");
-  std::vector<const DeclAttribute*> Scratch;
+  std::vector<SemanticAvailableAttr> Scratch;
 
-  for (auto Attr : getDeclAttributes(D, Scratch)) {
-    if (auto Av = dyn_cast<AvailableAttr>(Attr)) {
-      UIdent PlatformUID;
-      switch (Av->getPlatform()) {
-      case PlatformKind::none:
-        PlatformUID = UIdent(); break;
-      case PlatformKind::iOS:
-        PlatformUID = PlatformIOS; break;
-      case PlatformKind::macCatalyst:
-        PlatformUID = PlatformMacCatalyst; break;
-      case PlatformKind::macOS:
-        PlatformUID = PlatformOSX; break;
-      case PlatformKind::tvOS:
-        PlatformUID = PlatformtvOS; break;
-      case PlatformKind::watchOS:
-        PlatformUID = PlatformWatchOS; break;
-      case PlatformKind::iOSApplicationExtension:
-        PlatformUID = PlatformIOSAppExt; break;
-      case PlatformKind::visionOS:
-        // FIXME: Formal platform support in SourceKit is needed.
-        PlatformUID = UIdent(); break;
-      case PlatformKind::macCatalystApplicationExtension:
-        PlatformUID = PlatformMacCatalystAppExt; break;
-      case PlatformKind::macOSApplicationExtension:
-        PlatformUID = PlatformOSXAppExt; break;
-      case PlatformKind::tvOSApplicationExtension:
-        PlatformUID = PlatformtvOSAppExt; break;
-      case PlatformKind::watchOSApplicationExtension:
-        PlatformUID = PlatformWatchOSAppExt; break;
-      case PlatformKind::visionOSApplicationExtension:
-        // FIXME: Formal platform support in SourceKit is needed.
-        PlatformUID = UIdent(); break;
-      case PlatformKind::OpenBSD:
-        PlatformUID = PlatformOpenBSD; break;
-      case PlatformKind::Windows:
-        PlatformUID = PlatformWindows; break;
-      }
-
-      AvailableAttrInfo Info;
-      Info.AttrKind = AvailableAttrKind;
-      Info.IsUnavailable = Av->isUnconditionallyUnavailable();
-      Info.IsDeprecated = Av->isUnconditionallyDeprecated();
-      Info.Platform = PlatformUID;
-      Info.Message = Av->Message;
-      if (Av->Introduced)
-        Info.Introduced = *Av->Introduced;
-      if (Av->Deprecated)
-        Info.Deprecated = *Av->Deprecated;
-      if (Av->Obsoleted)
-        Info.Obsoleted = *Av->Obsoleted;
-
-      Consumer.handleAvailableAttribute(Info);
+  for (auto Attr : getAvailableAttrs(D, Scratch)) {
+    UIdent PlatformUID;
+    switch (Attr.getPlatform()) {
+    case PlatformKind::none:
+      PlatformUID = UIdent();
+      break;
+    case PlatformKind::iOS:
+      PlatformUID = PlatformIOS;
+      break;
+    case PlatformKind::macCatalyst:
+      PlatformUID = PlatformMacCatalyst;
+      break;
+    case PlatformKind::macOS:
+      PlatformUID = PlatformOSX;
+      break;
+    case PlatformKind::tvOS:
+      PlatformUID = PlatformtvOS;
+      break;
+    case PlatformKind::watchOS:
+      PlatformUID = PlatformWatchOS;
+      break;
+    case PlatformKind::iOSApplicationExtension:
+      PlatformUID = PlatformIOSAppExt;
+      break;
+    case PlatformKind::visionOS:
+      // FIXME: Formal platform support in SourceKit is needed.
+      PlatformUID = UIdent();
+      break;
+    case PlatformKind::macCatalystApplicationExtension:
+      PlatformUID = PlatformMacCatalystAppExt;
+      break;
+    case PlatformKind::macOSApplicationExtension:
+      PlatformUID = PlatformOSXAppExt;
+      break;
+    case PlatformKind::tvOSApplicationExtension:
+      PlatformUID = PlatformtvOSAppExt;
+      break;
+    case PlatformKind::watchOSApplicationExtension:
+      PlatformUID = PlatformWatchOSAppExt;
+      break;
+    case PlatformKind::visionOSApplicationExtension:
+      // FIXME: Formal platform support in SourceKit is needed.
+      PlatformUID = UIdent();
+      break;
+    case PlatformKind::OpenBSD:
+      PlatformUID = PlatformOpenBSD;
+      break;
+    case PlatformKind::Windows:
+      PlatformUID = PlatformWindows;
+      break;
     }
+    // FIXME: [availability] Handle other availability domains?
+
+    AvailableAttrInfo Info;
+    Info.AttrKind = AvailableAttrKind;
+    Info.IsUnavailable = Attr.isUnconditionallyUnavailable();
+    Info.IsDeprecated = Attr.isUnconditionallyDeprecated();
+    Info.Platform = PlatformUID;
+    Info.Message = Attr.getMessage();
+    if (Attr.getIntroduced())
+      Info.Introduced = Attr.getIntroduced().value();
+    if (Attr.getDeprecated())
+      Info.Deprecated = Attr.getDeprecated().value();
+    if (Attr.getObsoleted())
+      Info.Obsoleted = Attr.getObsoleted().value();
+
+    Consumer.handleAvailableAttribute(Info);
   }
 }
 
@@ -764,7 +775,7 @@ static void reportDocEntities(ASTContext &Ctx,
                                                 : TypeOrExtensionDecl(),
                   Consumer);
     reportDocEntities(Ctx, Entity.SubEntities, Consumer);
-    reportAttributes(Ctx, Entity.Dcl, Consumer);
+    reportAvailabilityAttributes(Ctx, Entity.Dcl, Consumer);
     Consumer.finishSourceEntity(EntInfo.Kind);
   }
 }

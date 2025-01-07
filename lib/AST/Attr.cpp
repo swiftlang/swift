@@ -419,27 +419,27 @@ void DeclAttributes::dump(const Decl *D) const {
 /// introduction version and does not support deprecation, obsoletion, or
 /// messages.
 LLVM_READONLY
-static bool isShortAvailable(const SemanticAvailableAttr &semanticAttr) {
-  auto *AvailAttr = semanticAttr.getParsedAttr();
-  if (AvailAttr->isSPI())
+static bool isShortAvailable(const SemanticAvailableAttr &attr) {
+  auto parsedAttr = attr.getParsedAttr();
+  if (parsedAttr->isSPI())
     return false;
 
-  if (!AvailAttr->Introduced.has_value())
+  if (!attr.getIntroduced().has_value())
     return false;
 
-  if (AvailAttr->Deprecated.has_value())
+  if (attr.getDeprecated().has_value())
     return false;
 
-  if (AvailAttr->Obsoleted.has_value())
+  if (attr.getObsoleted().has_value())
     return false;
 
-  if (!AvailAttr->Message.empty())
+  if (!attr.getMessage().empty())
     return false;
 
-  if (!AvailAttr->Rename.empty())
+  if (!attr.getRename().empty())
     return false;
 
-  switch (AvailAttr->getPlatformAgnosticAvailability()) {
+  switch (parsedAttr->getPlatformAgnosticAvailability()) {
   case PlatformAgnosticAvailabilityKind::Deprecated:
   case PlatformAgnosticAvailabilityKind::Unavailable:
   case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
@@ -939,40 +939,39 @@ SemanticAvailableAttributes::Filter::operator()(
   return *semanticAttr;
 }
 
-static void printAvailableAttr(const Decl *D,
-                               const SemanticAvailableAttr &SemanticAttr,
+static void printAvailableAttr(const Decl *D, const SemanticAvailableAttr &Attr,
                                ASTPrinter &Printer,
                                const PrintOptions &Options) {
-  auto Attr = SemanticAttr.getParsedAttr();
-  auto Domain = SemanticAttr.getDomain();
+  auto ParsedAttr = Attr.getParsedAttr();
+  auto Domain = Attr.getDomain();
 
   // The parser rejects `@available(swift, unavailable)`, so when printing
   // attributes that are universally unavailable in Swift, we must print them
   // as universally unavailable instead.
   // FIXME: Reconsider this, it's a weird special case.
-  if (Domain.isSwiftLanguage() && Attr->isUnconditionallyUnavailable())
+  if (Domain.isSwiftLanguage() && Attr.isUnconditionallyUnavailable())
     Printer << "*";
   else
     Printer << Domain.getNameForAttributePrinting();
 
-  if (Attr->isUnconditionallyUnavailable())
+  if (Attr.isUnconditionallyUnavailable())
     Printer << ", unavailable";
-  else if (Attr->isUnconditionallyDeprecated())
+  else if (Attr.isUnconditionallyDeprecated())
     Printer << ", deprecated";
-  else if (Attr->isNoAsync())
+  else if (Attr.isNoAsync())
     Printer << ", noasync";
 
-  if (Attr->Introduced)
-    Printer << ", introduced: " << Attr->Introduced.value().getAsString();
-  if (Attr->Deprecated)
-    Printer << ", deprecated: " << Attr->Deprecated.value().getAsString();
-  if (Attr->Obsoleted)
-    Printer << ", obsoleted: " << Attr->Obsoleted.value().getAsString();
+  if (Attr.getIntroduced())
+    Printer << ", introduced: " << Attr.getIntroduced().value().getAsString();
+  if (Attr.getDeprecated())
+    Printer << ", deprecated: " << Attr.getDeprecated().value().getAsString();
+  if (Attr.getObsoleted())
+    Printer << ", obsoleted: " << Attr.getObsoleted().value().getAsString();
 
-  if (!Attr->Rename.empty()) {
-    Printer << ", renamed: \"" << Attr->Rename << "\"";
+  if (!Attr.getRename().empty()) {
+    Printer << ", renamed: \"" << Attr.getRename() << "\"";
   } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (auto *renamedDecl = VD->getRenamedDecl(Attr)) {
+    if (auto *renamedDecl = VD->getRenamedDecl(ParsedAttr)) {
       Printer << ", renamed: \"";
       if (auto *Accessor = dyn_cast<AccessorDecl>(renamedDecl)) {
         SmallString<32> Name;
@@ -989,10 +988,10 @@ static void printAvailableAttr(const Decl *D,
   // If there's no message, but this is specifically an imported
   // "unavailable in Swift" attribute, synthesize a message to look good in
   // the generated interface.
-  if (!Attr->Message.empty()) {
+  if (!Attr.getMessage().empty()) {
     Printer << ", message: ";
-    Printer.printEscapedStringLiteral(Attr->Message);
-  } else if (Domain.isSwiftLanguage() && Attr->isUnconditionallyUnavailable())
+    Printer.printEscapedStringLiteral(Attr.getMessage());
+  } else if (Domain.isSwiftLanguage() && Attr.isUnconditionallyUnavailable())
     Printer << ", message: \"Not available in Swift\"";
 }
 

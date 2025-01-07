@@ -6648,20 +6648,19 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
            ? enclosing->getDeclContext()->getAsDecl()
            : nullptr) {
     bool anyPlatformSpecificAttrs = false;
-    for (auto semanticAttr : enclosing->getSemanticAvailableAttrs()) {
-      auto available = semanticAttr.getParsedAttr();
-
-      if (available->getPlatform() == PlatformKind::none)
+    for (auto available : enclosing->getSemanticAvailableAttrs()) {
+      // FIXME: [availability] Generalize to AvailabilityDomain.
+      if (available.getPlatform() == PlatformKind::none)
         continue;
 
       auto attr = new (ctx) AvailableAttr(
-          SourceLoc(), SourceRange(), available->getPlatform(),
-          available->Message,
-          /*Rename=*/"", available->Introduced.value_or(noVersion),
-          SourceRange(), available->Deprecated.value_or(noVersion),
-          SourceRange(), available->Obsoleted.value_or(noVersion),
+          SourceLoc(), SourceRange(), available.getPlatform(),
+          available.getMessage(),
+          /*Rename=*/"", available.getIntroduced().value_or(noVersion),
+          SourceRange(), available.getDeprecated().value_or(noVersion),
+          SourceRange(), available.getObsoleted().value_or(noVersion),
           SourceRange(), PlatformAgnosticAvailabilityKind::Unavailable,
-          /*Implicit=*/true, available->isSPI());
+          /*Implicit=*/true, available.getParsedAttr()->isSPI());
       ext->getAttrs().add(attr);
       anyPlatformSpecificAttrs = true;
     }

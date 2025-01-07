@@ -637,17 +637,15 @@ void getAvailabilities(const Decl *D,
                        bool IsParent) {
   // DeclAttributes is a linked list in reverse order from where they
   // appeared in the source. Let's re-reverse them.
-  SmallVector<const AvailableAttr *, 4> AvAttrs;
-  for (const auto *Attr : D->getAttrs()) {
-    if (const auto *AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-      AvAttrs.push_back(AvAttr);
-    }
+  SmallVector<SemanticAvailableAttr, 4> AvAttrs;
+  for (auto Attr : D->getSemanticAvailableAttrs(/*includeInactive=*/true)) {
+    AvAttrs.push_back(Attr);
   }
   std::reverse(AvAttrs.begin(), AvAttrs.end());
 
   // Now go through them in source order.
-  for (auto *AvAttr : AvAttrs) {
-    Availability NewAvailability(*AvAttr);
+  for (auto AvAttr : AvAttrs) {
+    Availability NewAvailability(AvAttr);
     if (NewAvailability.empty()) {
       continue;
     }

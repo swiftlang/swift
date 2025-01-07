@@ -46,25 +46,8 @@ public:
   /// Returns the range of platform versions in which the decl is available.
   static AvailabilityRange availableRange(const Decl *D);
 
-  /// Returns the range of platform versions in which the decl is available and
-  /// the attribute which determined this range (which may be `nullptr` if the
-  /// declaration is always available.
-  static std::pair<AvailabilityRange, const AvailableAttr *>
-  availableRangeAndAttr(const Decl *D);
-
   /// Returns true is the declaration is `@_spi_available`.
   static bool isAvailableAsSPI(const Decl *D);
-
-  /// Returns the range of platform versions in which a declaration with the
-  /// given `@available` attribute is available.
-  ///
-  /// NOTE: The attribute must be active on the current platform.
-  static AvailabilityRange availableRange(const AvailableAttr *attr,
-                                          ASTContext &C);
-
-  /// Returns the attribute that should be used to determine the availability
-  /// range of the given declaration, or nullptr if there is none.
-  static const AvailableAttr *attrForAnnotatedAvailableRange(const Decl *D);
 
   /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration

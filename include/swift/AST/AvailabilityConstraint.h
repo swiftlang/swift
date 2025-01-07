@@ -60,32 +60,32 @@ public:
 
 private:
   Kind kind;
-  const AvailableAttr *attr;
+  SemanticAvailableAttr attr;
 
-  AvailabilityConstraint(Kind kind, const AvailableAttr *attr)
+  AvailabilityConstraint(Kind kind, SemanticAvailableAttr attr)
       : kind(kind), attr(attr) {};
 
 public:
   static AvailabilityConstraint
-  forAlwaysUnavailable(const AvailableAttr *attr) {
+  forAlwaysUnavailable(SemanticAvailableAttr attr) {
     return AvailabilityConstraint(Kind::AlwaysUnavailable, attr);
   }
 
-  static AvailabilityConstraint forObsoleted(const AvailableAttr *attr) {
+  static AvailabilityConstraint forObsoleted(SemanticAvailableAttr attr) {
     return AvailabilityConstraint(Kind::Obsoleted, attr);
   }
 
-  static AvailabilityConstraint forRequiresVersion(const AvailableAttr *attr) {
+  static AvailabilityConstraint forRequiresVersion(SemanticAvailableAttr attr) {
     return AvailabilityConstraint(Kind::RequiresVersion, attr);
   }
 
   static AvailabilityConstraint
-  forIntroducedInNewerVersion(const AvailableAttr *attr) {
+  forIntroducedInNewerVersion(SemanticAvailableAttr attr) {
     return AvailabilityConstraint(Kind::IntroducedInNewerVersion, attr);
   }
 
   Kind getKind() const { return kind; }
-  const AvailableAttr *getAttr() const { return attr; }
+  SemanticAvailableAttr getAttr() const { return attr; }
 
   /// Returns the platform that this constraint applies to, or
   /// `PlatformKind::none` if it is not platform specific.

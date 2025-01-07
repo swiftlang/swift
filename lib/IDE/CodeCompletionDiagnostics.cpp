@@ -56,7 +56,8 @@ public:
                  llvm::raw_ostream &Out, Diag<ArgTypes...> ID,
                  typename swift::detail::PassArgument<ArgTypes>::type... VArgs);
 
-  bool getDiagnosticForDeprecated(const ValueDecl *D, const AvailableAttr *Attr,
+  bool getDiagnosticForDeprecated(const ValueDecl *D,
+                                  SemanticAvailableAttr Attr,
                                   bool isSoftDeprecated,
                                   CodeCompletionDiagnosticSeverity &severity,
                                   llvm::raw_ostream &Out);
@@ -81,40 +82,40 @@ bool CodeCompletionDiagnostics::getDiagnostics(
 }
 
 bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
-    const ValueDecl *D, const AvailableAttr *Attr, bool isSoftDeprecated,
+    const ValueDecl *D, SemanticAvailableAttr Attr, bool isSoftDeprecated,
     CodeCompletionDiagnosticSeverity &severity, llvm::raw_ostream &Out) {
-  assert(Attr);
-
   // FIXME: Code completion doesn't offer accessors. It only emits 'VarDecl's.
   // So getter/setter specific availability doesn't work in code completion.
 
-  StringRef Platform = Attr->prettyPlatformString();
+  StringRef Platform = Attr.getDomain().getNameForDiagnostics();
   llvm::VersionTuple DeprecatedVersion;
-  if (Attr->Deprecated)
-    DeprecatedVersion = Attr->Deprecated.value();
+  if (Attr.getDeprecated())
+    DeprecatedVersion = Attr.getDeprecated().value();
 
   llvm::VersionTuple RemappedDeprecatedVersion;
   if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-      Attr, Ctx, Platform, RemappedDeprecatedVersion))
+          Attr.getParsedAttr(), Ctx, Platform, RemappedDeprecatedVersion))
     DeprecatedVersion = RemappedDeprecatedVersion;
 
+  auto Message = Attr.getMessage();
+  auto NewName = Attr.getRename();
   if (!isSoftDeprecated) {
-    if (Attr->Message.empty() && Attr->Rename.empty()) {
-      getDiagnostics(severity, Out, diag::availability_deprecated,
-                     D, Attr->hasPlatform(), Platform,
-                     Attr->Deprecated.has_value(), DeprecatedVersion,
+    if (Message.empty() && NewName.empty()) {
+      getDiagnostics(severity, Out, diag::availability_deprecated, D,
+                     Attr.isPlatformSpecific(), Platform,
+                     Attr.getDeprecated().has_value(), DeprecatedVersion,
                      /*message*/ StringRef());
-    } else if (!Attr->Message.empty()) {
-      EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      getDiagnostics(severity, Out, diag::availability_deprecated,
-                     D, Attr->hasPlatform(), Platform,
-                     Attr->Deprecated.has_value(), DeprecatedVersion,
+    } else if (!Message.empty()) {
+      EncodedDiagnosticMessage EncodedMessage(Message);
+      getDiagnostics(severity, Out, diag::availability_deprecated, D,
+                     Attr.isPlatformSpecific(), Platform,
+                     Attr.getDeprecated().has_value(), DeprecatedVersion,
                      EncodedMessage.Message);
     } else {
-      getDiagnostics(severity, Out, diag::availability_deprecated_rename,
-                     D, Attr->hasPlatform(), Platform,
-                     Attr->Deprecated.has_value(), DeprecatedVersion, false,
-                     /*ReplaceKind*/ 0, Attr->Rename);
+      getDiagnostics(severity, Out, diag::availability_deprecated_rename, D,
+                     Attr.isPlatformSpecific(), Platform,
+                     Attr.getDeprecated().has_value(), DeprecatedVersion, false,
+                     /*ReplaceKind*/ 0, NewName);
     }
   } else {
     // '100000' is used as a version number in API that will be deprecated in an
@@ -123,36 +124,34 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
     static llvm::VersionTuple DISTANT_FUTURE_VESION(100000);
     bool isDistantFuture = DeprecatedVersion >= DISTANT_FUTURE_VESION;
 
-    if (Attr->Message.empty() && Attr->Rename.empty()) {
-      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated,
-                     D, Attr->hasPlatform(), Platform,
-                     !isDistantFuture, DeprecatedVersion,
+    if (Message.empty() && NewName.empty()) {
+      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated, D,
+                     Attr.isPlatformSpecific(), Platform, !isDistantFuture,
+                     DeprecatedVersion,
                      /*message*/ StringRef());
-    } else if (!Attr->Message.empty()) {
-      EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated,
-                     D, Attr->hasPlatform(), Platform,
-                     !isDistantFuture, DeprecatedVersion,
-                     EncodedMessage.Message);
+    } else if (!Message.empty()) {
+      EncodedDiagnosticMessage EncodedMessage(Message);
+      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated, D,
+                     Attr.isPlatformSpecific(), Platform, !isDistantFuture,
+                     DeprecatedVersion, EncodedMessage.Message);
     } else {
-      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated_rename,
-                     D, Attr->hasPlatform(), Platform,
-                     !isDistantFuture, DeprecatedVersion, Attr->Rename);
+      getDiagnostics(severity, Out,
+                     diag::ide_availability_softdeprecated_rename, D,
+                     Attr.isPlatformSpecific(), Platform, !isDistantFuture,
+                     DeprecatedVersion, NewName);
     }
   }
-  return false;;
+  return false;
 }
 
 bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
     const ValueDecl *D, CodeCompletionDiagnosticSeverity &severity,
     llvm::raw_ostream &Out) {
   if (auto attr = D->getDeprecatedAttr())
-    return getDiagnosticForDeprecated(D, attr->getParsedAttr(), false, severity,
-                                      Out);
+    return getDiagnosticForDeprecated(D, *attr, false, severity, Out);
 
   if (auto attr = D->getSoftDeprecatedAttr())
-    return getDiagnosticForDeprecated(D, attr->getParsedAttr(), true, severity,
-                                      Out);
+    return getDiagnosticForDeprecated(D, *attr, true, severity, Out);
 
   return true;
 }
