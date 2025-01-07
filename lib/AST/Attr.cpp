@@ -1172,21 +1172,20 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DeclAttrKind::Available: {
-    auto Attr = cast<AvailableAttr>(this);
-    auto SemanticAttr = D->getSemanticAvailableAttr(Attr);
-    if (!SemanticAttr)
+    auto Attr = D->getSemanticAvailableAttr(cast<AvailableAttr>(this));
+    if (!Attr)
       return false;
 
     if (Options.printPublicInterface() && Attr->isSPI()) {
-      assert(Attr->hasPlatform());
-      assert(Attr->Introduced.has_value());
+      assert(Attr->isPlatformSpecific());
+      assert(Attr->getIntroduced().has_value());
       Printer.printAttrName("@available");
       Printer << "(";
-      Printer << Attr->platformString();
+      Printer << Attr->getDomain().getNameForAttributePrinting();
       Printer << ", unavailable)";
       break;
     }
-    if (Attr->isForEmbedded()) {
+    if (Attr->getParsedAttr()->isForEmbedded()) {
       std::string atUnavailableInEmbedded =
           (llvm::Twine("@") + UNAVAILABLE_IN_EMBEDDED_ATTRNAME).str();
       Printer.printAttrName(atUnavailableInEmbedded);
@@ -1200,7 +1199,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer.printAttrName("@available");
     }
     Printer << "(";
-    printAvailableAttr(D, *SemanticAttr, Printer, Options);
+    printAvailableAttr(D, *Attr, Printer, Options);
     Printer << ")";
     break;
   }
