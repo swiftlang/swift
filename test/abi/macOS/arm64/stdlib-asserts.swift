@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/arm64/libswiftCore.dylib > %t/symbols
 // RUN: %abi-symbol-checker %s %t/symbols --base %S/stdlib.swift
-// RUN: diff -u %S/../../Inputs/macOS/arm64/stdlib/baseline-asserts %t/symbols
+// RUN: diff -u %S/../../DO-NOT-EDIT-THIS/macOS/arm64/stdlib/baseline-asserts %t/symbols
 
 // REQUIRES: swift_stdlib_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-arm64

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/arm64/libswift_Builtin_float.dylib > %t/symbols
 // RUN: %abi-symbol-checker %s %t/symbols
-// RUN: diff -u %S/../../Inputs/macOS/arm64/builtin_float/baseline %t/symbols
+// RUN: diff -u %S/../../DO-NOT-EDIT-THIS/macOS/arm64/builtin_float/baseline %t/symbols
 
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-arm64

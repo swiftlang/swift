@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/x86_64/libswift_Concurrency.dylib > %t/symbols
 // RUN: %abi-symbol-checker %s %t/symbols --base %S/concurrency.swift
-// RUN: diff -u %S/../../Inputs/macOS/x86_64/concurrency/baseline-asserts %t/symbols
+// RUN: diff -u %S/../../DO-NOT-EDIT-THIS/macOS/x86_64/concurrency/baseline-asserts %t/symbols
 
 // REQUIRES: swift_stdlib_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-x86_64
