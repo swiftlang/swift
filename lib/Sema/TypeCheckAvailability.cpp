@@ -3035,7 +3035,7 @@ public:
       : DiagnosticStatus(status), Attr(attr) {};
 
   Status getStatus() const { return DiagnosticStatus; }
-  const AvailableAttr *getAttr() const { return Attr.getParsedAttr(); }
+  SemanticAvailableAttr getAttr() const { return Attr; }
   AvailabilityDomain getDomain() const { return Attr.getDomain(); }
   StringRef getDomainName() const {
     return getDomain().getNameForDiagnostics();
@@ -3116,14 +3116,14 @@ bool diagnoseExplicitUnavailability(
       diagnosticInfo->shouldHideDomainNameInUnversionedDiagnostics()
           ? ""
           : versionedPlatform;
-  const AvailableAttr *attr = diagnosticInfo->getAttr();
+  auto attr = diagnosticInfo->getAttr();
 
   // Downgrade unavailable Sendable conformance diagnostics where
   // appropriate.
   auto behavior =
       behaviorLimitForExplicitUnavailability(rootConf, where.getDeclContext());
 
-  EncodedDiagnosticMessage EncodedMessage(attr->Message);
+  EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
   diags
       .diagnose(loc, diag::conformance_availability_unavailable, type, proto,
                 platform.empty(), platform, EncodedMessage.Message)
@@ -3135,17 +3135,17 @@ bool diagnoseExplicitUnavailability(
     diags
         .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
                   proto)
-        .highlight(attr->getRange());
+        .highlight(attr.getParsedAttr()->getRange());
     break;
   case UnavailabilityDiagnosticInfo::Status::IntroducedInVersion:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
-                   type, proto, versionedPlatform, *attr->Introduced);
+                   type, proto, versionedPlatform, *attr.getIntroduced());
     break;
   case UnavailabilityDiagnosticInfo::Status::Obsoleted:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
-                  versionedPlatform, *attr->Obsoleted)
-        .highlight(attr->getRange());
+                  versionedPlatform, *attr.getObsoleted())
+        .highlight(attr.getParsedAttr()->getRange());
     break;
   }
   return true;
@@ -3532,9 +3532,8 @@ bool diagnoseExplicitUnavailability(
   if (!diagnosticInfo)
     return false;
 
-  auto *Attr = diagnosticInfo->getAttr();
-  if (Attr->getPlatformAgnosticAvailability() ==
-      PlatformAgnosticAvailabilityKind::UnavailableInSwift) {
+  auto Attr = diagnosticInfo->getAttr();
+  if (Attr.getDomain().isSwiftLanguage() && !Attr.isVersionSpecific()) {
     if (shouldAllowReferenceToUnavailableInSwiftDeclaration(D, Where))
       return false;
   }
@@ -3558,20 +3557,21 @@ bool diagnoseExplicitUnavailability(
                   ? DiagnosticBehavior::Warning
                   : DiagnosticBehavior::Unspecified;
 
-  if (!Attr->Rename.empty()) {
+  auto message = Attr.getMessage();
+  auto rename = Attr.getRename();
+  if (!rename.empty()) {
     SmallString<32> newNameBuf;
     std::optional<ReplacementDeclKind> replaceKind =
-        describeRename(ctx, Attr->Rename, D, newNameBuf);
+        describeRename(ctx, Attr.getRename(), D, newNameBuf);
     unsigned rawReplaceKind = static_cast<unsigned>(
         replaceKind.value_or(ReplacementDeclKind::None));
-    StringRef newName = replaceKind ? newNameBuf.str() : Attr->Rename;
-      EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      auto diag =
-          diags.diagnose(Loc, diag::availability_decl_unavailable_rename,
-                         D, replaceKind.has_value(),
-                         rawReplaceKind, newName, EncodedMessage.Message);
-      diag.limitBehavior(limit);
-      attachRenameFixIts(diag);
+    StringRef newName = replaceKind ? newNameBuf.str() : rename;
+    EncodedDiagnosticMessage EncodedMessage(message);
+    auto diag = diags.diagnose(Loc, diag::availability_decl_unavailable_rename,
+                               D, replaceKind.has_value(), rawReplaceKind,
+                               newName, EncodedMessage.Message);
+    diag.limitBehavior(limit);
+    attachRenameFixIts(diag);
   } else if (isSubscriptReturningString(D, ctx)) {
     diags.diagnose(Loc, diag::availability_string_subscript_migration)
       .highlight(R)
@@ -3582,8 +3582,9 @@ bool diagnoseExplicitUnavailability(
     return true;
   } else {
     auto unavailableDiagnosticPlatform = platform;
-    AvailabilityInference::updatePlatformStringForFallback(Attr, ctx, unavailableDiagnosticPlatform);
-    EncodedDiagnosticMessage EncodedMessage(Attr->Message);
+    AvailabilityInference::updatePlatformStringForFallback(
+        Attr.getParsedAttr(), ctx, unavailableDiagnosticPlatform);
+    EncodedDiagnosticMessage EncodedMessage(message);
     diags
         .diagnose(Loc, diag::availability_decl_unavailable, D, platform.empty(),
                   unavailableDiagnosticPlatform, EncodedMessage.Message)
@@ -3591,22 +3592,23 @@ bool diagnoseExplicitUnavailability(
         .limitBehavior(limit);
   }
 
+  auto sourceRange = Attr.getParsedAttr()->getRange();
   switch (diagnosticInfo->getStatus()) {
   case UnavailabilityDiagnosticInfo::Status::AlwaysUnavailable:
     diags.diagnose(D, diag::availability_marked_unavailable, D)
-        .highlight(Attr->getRange());
+        .highlight(sourceRange);
     break;
   case UnavailabilityDiagnosticInfo::Status::IntroducedInVersion:
     diags
         .diagnose(D, diag::availability_introduced_in_version, D,
-                  versionedPlatform, *Attr->Introduced)
-        .highlight(Attr->getRange());
+                  versionedPlatform, *Attr.getIntroduced())
+        .highlight(sourceRange);
     break;
   case UnavailabilityDiagnosticInfo::Status::Obsoleted:
     diags
         .diagnose(D, diag::availability_obsoleted, D, versionedPlatform,
-                  *Attr->Obsoleted)
-        .highlight(Attr->getRange());
+                  *Attr.getObsoleted())
+        .highlight(sourceRange);
     break;
   }
   return true;
