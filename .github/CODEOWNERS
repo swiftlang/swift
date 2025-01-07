@@ -31,6 +31,11 @@
 # TODO: /LICENSE.txt
 # TODO: /README.md
 
+# Runtimes
+/Runtimes/**/CMakeLists.txt                @etcwilde @compnerd @edymtt @justice-adams-apple
+/Runtimes/**/*.cmake                       @etcwilde @compnerd @edymtt @justice-adams-apple
+/Runtimes/Core/cmake/caches/Vendors/Apple/ @etcwilde @shahmishal @edymtt @justice-adams-apple
+
 # SwiftCompilerSources
 /SwiftCompilerSources                     @eeckstein
 
