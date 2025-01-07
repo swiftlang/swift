@@ -191,6 +191,8 @@ typedef const char *(*sourcekitd_uid_get_string_ptr_t)(sourcekitd_uid_t);
 typedef void *sourcekitd_plugin_initialize_params_t;
 typedef void (*sourcekitd_plugin_initialize_t)(
     sourcekitd_plugin_initialize_params_t);
+typedef void (*sourcekitd_plugin_initialize_2_t)(
+    sourcekitd_plugin_initialize_params_t, const char *sourcekit_path);
 
 SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL bool
     sourcekitd_plugin_initialize_is_client_only(

@@ -27,6 +27,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/YAMLParser.h"
 #include <mutex>
+#include <dlfcn.h>
 
 using namespace SourceKit;
 using namespace sourcekitd;
@@ -268,6 +269,8 @@ bool sourcekitd::shutdownClient() {
   return true;
 }
 
+extern "C" const char __dso_handle[];
+
 static void loadPlugin(StringRef plugin, PluginInitParams &pluginParams) {
   std::string err;
   auto *handle = swift::loadLibrary(plugin.str().c_str(), &err);
@@ -277,17 +280,27 @@ static void loadPlugin(StringRef plugin, PluginInitParams &pluginParams) {
     return;
   }
 
-  auto *plugin_init = (sourcekitd_plugin_initialize_t)swift::getAddressOfSymbol(
-      handle, "sourcekitd_plugin_initialize");
-  if (!plugin_init) {
-    LOG_WARN("plugin-loading",
-             "plugin '"
-                 << plugin
-                 << "' missing expected symbol: sourcekitd_plugin_initialize");
+  auto *plugin_init_2 = (sourcekitd_plugin_initialize_2_t)swift::getAddressOfSymbol(
+      handle, "sourcekitd_plugin_initialize_2");
+  if (plugin_init_2) {
+    Dl_info dlinfo;
+    dladdr(__dso_handle, &dlinfo);
+    plugin_init_2(&pluginParams, dlinfo.dli_fname);
     return;
   }
 
-  plugin_init(&pluginParams);
+  // Fall back to the legacy sourcekitd_plugin_initialize function.
+  auto *plugin_init = (sourcekitd_plugin_initialize_t)swift::getAddressOfSymbol(
+      handle, "sourcekitd_plugin_initialize");
+  if (plugin_init) {
+    plugin_init(&pluginParams);
+    return;
+  }
+
+  LOG_WARN("plugin-loading",
+           "plugin '"
+              << plugin
+              << "' missing expected symbol: sourcekitd_plugin_initialize_2 or sourcekitd_plugin_initialize");
 }
 
 void sourcekitd::loadPlugins(ArrayRef<std::string> registeredPlugins,

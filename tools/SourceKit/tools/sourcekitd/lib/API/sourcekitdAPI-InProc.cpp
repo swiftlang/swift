@@ -518,7 +518,11 @@ sourcekitd_request_dictionary_get_value(sourcekitd_object_t dict,
 
 const char *sourcekitd_request_dictionary_get_string(sourcekitd_object_t dict,
                                                      sourcekitd_uid_t key) {
-  return static_cast<SKDObject *>(dict)->get(key)->getCString();
+  auto value = static_cast<SKDObject *>(dict)->get(key);
+  if (!value) {
+    return nullptr;
+  }
+  return value->getCString();
 }
 
 int64_t sourcekitd_request_dictionary_get_int64(sourcekitd_object_t dict,
