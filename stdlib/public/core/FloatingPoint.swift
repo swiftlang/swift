@@ -938,8 +938,8 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///
   /// For more information about the available rounding rules, see the
   /// `FloatingPointRoundingRule` enumeration. To round a value using the
-  /// default "schoolbook rounding", you can use the shorter `rounded()`
-  /// method instead.
+  /// default "schoolbook rounding" of `.toNearestOrAwayFromZero`, you can use
+  /// the shorter `rounded()` method instead.
   ///
   ///     print(x.rounded())
   ///     // Prints "7.0"
@@ -974,8 +974,8 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///
   /// For more information about the available rounding rules, see the
   /// `FloatingPointRoundingRule` enumeration. To round a value using the
-  /// default "schoolbook rounding", you can use the shorter `round()` method
-  /// instead.
+  /// default "schoolbook rounding" of `.toNearestOrAwayFromZero`, you can use
+  /// the shorter `round()` method instead.
   ///
   ///     var w1 = 6.5
   ///     w1.round()
@@ -1048,6 +1048,9 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// - Every value except for NaN and `+infinity` compares less than
   ///   `+infinity`.
   ///
+  /// The following example shows the behavior of the `isLess(than:)` method
+  /// with different kinds of values:
+  ///
   ///     let x = 15.0
   ///     x.isLess(than: 20.0)
   ///     // true
@@ -1077,6 +1080,9 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///   when called on NaN or when NaN is passed as `other`.
   /// - `-infinity` compares less than or equal to all values except NaN.
   /// - Every value except NaN compares less than or equal to `+infinity`.
+  ///
+  /// The following example shows the behavior of the `isLessThanOrEqualTo(_:)`
+  /// method with different kinds of values:
   ///
   ///     let x = 15.0
   ///     x.isLessThanOrEqualTo(20.0)

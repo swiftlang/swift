@@ -2475,7 +2475,7 @@ public:
     if (!ResourceDir.empty()) {
       InitInvoke.setRuntimeResourcePath(ResourceDir);
     }
-    std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
+    std::vector<SearchPathOptions::SearchPath> FramePaths;
     for (const auto &path : CCSystemFrameworkPaths) {
       FramePaths.push_back({path, /*isSystem=*/true});
     }
@@ -2483,12 +2483,20 @@ public:
       for (const auto &path : BaselineFrameworkPaths) {
         FramePaths.push_back({path, /*isSystem=*/false});
       }
-      InitInvoke.setImportSearchPaths(BaselineModuleInputPaths);
+      std::vector<SearchPathOptions::SearchPath> ImportPaths;
+      for (const auto &path : BaselineModuleInputPaths) {
+        ImportPaths.push_back({path, /*isSystem=*/false});
+      }
+      InitInvoke.setImportSearchPaths(ImportPaths);
     } else {
       for (const auto &path : FrameworkPaths) {
         FramePaths.push_back({path, /*isSystem=*/false});
       }
-      InitInvoke.setImportSearchPaths(ModuleInputPaths);
+      std::vector<SearchPathOptions::SearchPath> ImportPaths;
+      for (const auto &path : ModuleInputPaths) {
+        ImportPaths.push_back({path, /*isSystem=*/false});
+      }
+      InitInvoke.setImportSearchPaths(ImportPaths);
     }
     InitInvoke.setFrameworkSearchPaths(FramePaths);
     if (!ModuleList.empty()) {

@@ -971,8 +971,12 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
     else
       addArgPair("-F", FramePath.Path);
   }
-  for (const auto &Path : SPOpts.getImportSearchPaths())
-    addArgPair("-I", Path);
+  for (const auto &Path : SPOpts.getImportSearchPaths()) {
+    if (Path.IsSystem)
+      addArgPair("-Isystem", Path.Path);
+    else
+      addArgPair("-I", Path.Path);
+  }
 
   const auto &ClangOpts = Invocation.getClangImporterOptions();
   addArgPair("-module-cache-path", ClangOpts.ModuleCachePath);

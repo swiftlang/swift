@@ -61,6 +61,7 @@ set(SwiftCore_VENDOR_MODULE_DIR "${SwiftCore_CMAKE_MODULES_DIR}/vendor"
   CACHE FILEPATH "Location for private build system extension")
 
 include(GNUInstallDirs)
+include(CheckSymbolExists)
 include(AvailabilityMacros)
 include(CompilerSettings)
 include(DefaultSettings)
@@ -68,6 +69,9 @@ include(EmitSwiftInterface)
 include(PlatformInfo)
 include(gyb)
 include(Plist)
+
+check_symbol_exists("dladdr" "dlfcn.h" SwiftCore_HAS_DLADDR)
+check_symbol_exists("dlsym" "dlfcn.h" SwiftCore_HAS_DLSYM)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
