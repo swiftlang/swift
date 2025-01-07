@@ -817,11 +817,6 @@ public:
   /// platform.
   bool hasPlatform() const { return getPlatform() != PlatformKind::none; }
 
-  /// Returns the human-readable string for the platform of the attribute.
-  StringRef prettyPlatformString() const {
-    return swift::prettyPlatformString(getPlatform());
-  }
-
   /// Create an AvailableAttr that indicates specific availability
   /// for all platforms.
   static AvailableAttr *

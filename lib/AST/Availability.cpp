@@ -832,7 +832,7 @@ SemanticAvailableAttr::getIntroducedRange(ASTContext &Ctx) const {
   assert(domain.isActive(Ctx));
 
   llvm::VersionTuple IntroducedVersion = attr->Introduced.value();
-  StringRef Platform = attr->prettyPlatformString();
+  StringRef Platform;
   llvm::VersionTuple RemappedIntroducedVersion;
   if (AvailabilityInference::updateIntroducedPlatformForFallback(
       attr, Ctx, Platform, RemappedIntroducedVersion))

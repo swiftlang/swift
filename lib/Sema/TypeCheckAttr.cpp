@@ -5018,21 +5018,24 @@ void AttributeChecker::checkBackDeployedAttrs(
             getSemanticAvailableRangeDeclAndAttr(VD)) {
       auto beforePlatformString = prettyPlatformString(Attr->Platform);
       auto beforeVersion = Attr->Version;
-      auto availableAttr = availableRangeAttrPair.value().first.getParsedAttr();
-      auto introVersion = availableAttr->Introduced.value();
-      StringRef introPlatformString = availableAttr->prettyPlatformString();
+      auto availableAttr = availableRangeAttrPair.value().first;
+      auto introVersion = availableAttr.getIntroduced().value();
+      StringRef introPlatformString =
+          availableAttr.getDomain().getNameForDiagnostics();
 
       AvailabilityInference::updateBeforePlatformForFallback(
           Attr, Ctx, beforePlatformString, beforeVersion);
       AvailabilityInference::updateIntroducedPlatformForFallback(
-          availableAttr, Ctx, introPlatformString, introVersion);
+          availableAttr.getParsedAttr(), Ctx, introPlatformString,
+          introVersion);
 
       if (Attr->Version <= introVersion) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
                  Attr, VD, beforePlatformString, beforeVersion);
-        diagnose(availableAttr->AtLoc, diag::availability_introduced_in_version,
-                 VD, introPlatformString, introVersion)
-            .highlight(availableAttr->getRange());
+        diagnose(availableAttr.getParsedAttr()->AtLoc,
+                 diag::availability_introduced_in_version, VD,
+                 introPlatformString, introVersion)
+            .highlight(availableAttr.getParsedAttr()->getRange());
         continue;
       }
     }
