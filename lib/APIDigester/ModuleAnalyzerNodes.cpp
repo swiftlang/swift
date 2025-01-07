@@ -1339,16 +1339,14 @@ std::optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
 // check for if it has @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 static bool isABIPlaceHolder(Decl *D) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
-  for (auto semanticAttr : D->getSemanticAvailableAttrs()) {
-    auto attr = semanticAttr.getParsedAttr();
-    auto domain = semanticAttr.getDomain();
-    if (domain.isPlatform() && attr->Introduced &&
-        attr->Introduced->getMajor() == 9999) {
-      Platforms.insert(attr->getPlatform());
+  for (auto attr : D->getSemanticAvailableAttrs()) {
+    if (attr.isPlatformSpecific() && attr.getIntroduced().has_value() &&
+        attr.getIntroduced()->getMajor() == 9999) {
+      Platforms.insert(attr.getPlatform());
     }
   }
 
-  // FIXME: This probably isn't correct anymore, now that visionOS exists
+  // FIXME: [availability] This probably isn't correct now that visionOS exists
   return Platforms.size() == 4;
 }
 
