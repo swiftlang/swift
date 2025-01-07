@@ -2276,16 +2276,19 @@ getSemanticAvailableRangeDeclAndAttr(const Decl *decl) {
   return std::nullopt;
 }
 
-void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
+void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
 
-  // FIXME: This seems like it could be diagnosed during parsing instead.
-  while (attr->isSPI()) {
-    if (attr->hasPlatform() && attr->Introduced.has_value())
-      break;
-    diagnoseAndRemoveAttr(attr, diag::spi_available_malformed);
-    break;
+  auto attr = D->getSemanticAvailableAttr(parsedAttr);
+  if (!attr)
+    return;
+
+  if (attr->isSPI()) {
+    if (!attr->isPlatformSpecific() || !attr->getIntroduced().has_value()) {
+      diagnoseAndRemoveAttr(parsedAttr, diag::spi_available_malformed);
+      return;
+    }
   }
 
   if (attr->isNoAsync()) {
@@ -2312,7 +2315,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     // deinit's may not be unavailable from async contexts
     if (isa<DestructorDecl>(D)) {
       D->getASTContext().Diags.diagnose(
-          D->getLoc(), diag::invalid_decl_attribute, attr);
+          D->getLoc(), diag::invalid_decl_attribute, parsedAttr);
     }
   }
 
@@ -2323,11 +2326,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     return;
 
   // The remaining diagnostics are only for attributes that are active.
-  auto semanticAttr = D->getSemanticAvailableAttr(attr);
-  if (!semanticAttr)
-    return;
-
-  if (!semanticAttr->isActive(Ctx))
+  if (!attr->isActive(Ctx))
     return;
 
   // Make sure there isn't a more specific attribute we should be using instead.
@@ -2335,20 +2334,20 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // we're checking an iOS attribute while building for macCatalyst.
   if (attr->getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::macCatalyst, Ctx.LangOpts)) {
-    if (semanticAttr != D->getActiveAvailableAttrForCurrentPlatform()) {
+    if (attr != D->getActiveAvailableAttrForCurrentPlatform()) {
       return;
     }
   }
 
   if (attr->getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
-    if (semanticAttr != D->getActiveAvailableAttrForCurrentPlatform()) {
+    if (attr != D->getActiveAvailableAttrForCurrentPlatform()) {
       return;
     }
   }
 
-  SourceLoc attrLoc = attr->getLocation();
-  auto versionAvailability = semanticAttr->getVersionAvailability(Ctx);
+  SourceLoc attrLoc = parsedAttr->getLocation();
+  auto versionAvailability = attr->getVersionAvailability(Ctx);
   if (versionAvailability == AvailableVersionComparison::Obsoleted ||
       versionAvailability == AvailableVersionComparison::Unavailable) {
     if (auto cannotBeUnavailable =
@@ -2360,7 +2359,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     if (auto *PD = dyn_cast<ProtocolDecl>(DC)) {
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         if (VD->isProtocolRequirement() && !PD->isObjC()) {
-          diagnoseAndRemoveAttr(attr,
+          diagnoseAndRemoveAttr(parsedAttr,
                                 diag::unavailable_method_non_objc_protocol);
           return;
         }
@@ -2370,7 +2369,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
 
   // The remaining diagnostics are only for attributes with introduced versions
   // for specific platforms.
-  if (!attr->hasPlatform() || !attr->Introduced.has_value())
+  if (!attr->isPlatformSpecific() || !attr->getIntroduced().has_value())
     return;
 
   // Find the innermost enclosing declaration with an availability
@@ -2378,7 +2377,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
   std::optional<AvailabilityRange> EnclosingAnnotatedRange;
-  AvailabilityRange AttrRange = semanticAttr->getIntroducedRange(Ctx);
+  AvailabilityRange AttrRange = attr->getIntroducedRange(Ctx);
 
   if (auto *parent = getEnclosingDeclForDecl(D)) {
     if (auto enclosingAvailable =
@@ -2399,7 +2398,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
             limit = DiagnosticBehavior::Warning;
         }
         diagnose(D->isImplicit() ? enclosingDecl->getLoc()
-                                 : attr->getLocation(),
+                                 : parsedAttr->getLocation(),
                  diag::availability_decl_more_than_enclosing,
                  D->getDescriptiveKind())
             .limitBehavior(limit);

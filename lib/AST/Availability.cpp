@@ -468,8 +468,9 @@ Decl::getSemanticAvailableAttrs(bool includeInactive) const {
 std::optional<SemanticAvailableAttr>
 Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
   auto domainForAvailableAttr = [](const AvailableAttr *attr) {
-    if (attr->hasPlatform())
-      return AvailabilityDomain::forPlatform(attr->getPlatform());
+    auto platform = attr->getPlatform();
+    if (platform != PlatformKind::none)
+      return AvailabilityDomain::forPlatform(platform);
 
     switch (attr->getPlatformAgnosticAvailability()) {
     case PlatformAgnosticAvailabilityKind::Deprecated:
