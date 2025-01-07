@@ -1846,6 +1846,9 @@ public:
   /// locator.
   ArgumentList *getArgumentList(ConstraintLocator *locator) const;
 
+  std::optional<ConversionRestrictionKind>
+  getConversionRestriction(CanType type1, CanType type2) const;
+
   SWIFT_DEBUG_DUMP;
 
   /// Dump this solution.
