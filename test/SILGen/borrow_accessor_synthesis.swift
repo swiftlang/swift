@@ -112,21 +112,21 @@ func testP1(_ p: some P) {
 // CHECK: sil hidden [ossa] @$s25borrow_accessor_synthesis6testP2yyxzAA1PRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> () {
 // CHECK: bb0([[REG0:%.*]] : $*τ_0_0):
 // CHECK:   [[REG2:%.*]] = begin_access [modify] [unknown] [[REG0]]
-// CHECK:   [[REG3:%.*]] = witness_method $τ_0_0, #P.prop1!modify : <Self where Self : P> (inout Self) -> () -> () : $@yield_once @convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
+// CHECK:   [[REG3:%.*]] = witness_method $τ_0_0, #P.prop1!modify : <Self where Self : P> (inout Self) -> @yield_once () -> inout @yields Self.Element : $@yield_once @convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
 // CHECK:   ([[REG4]], [[REG5]]) = begin_apply [[REG3]]<τ_0_0>([[REG2]]) : $@yield_once @convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
 // CHECK:   [[REG6:%.*]] = function_ref @$s25borrow_accessor_synthesis6mutateyyxzRi_zlF : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@inout τ_0_0) -> ()
 // CHECK:   [[REG7:%.*]] = apply [[REG6]]<(τ_0_0).Element>([[REG4]]) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@inout τ_0_0) -> ()
 // CHECK:   [[REG8:%.*]] = end_apply [[REG5]] as $()
 // CHECK:   end_access [[REG2]]
 // CHECK:   [[REG10:%.*]] = begin_access [modify] [unknown] [[REG0]]
-// CHECK:   [[REG11:%.*]] = witness_method $τ_0_0, #P.prop2!modify : <Self where Self : P> (inout Self) -> () -> () : $@yield_once @convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
+// CHECK:   [[REG11:%.*]] = witness_method $τ_0_0, #P.prop2!modify : <Self where Self : P> (inout Self) -> @yield_once () -> inout @yields Self.Element : $@yield_once @convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
 // CHECK:   ([[REG12:%.*]], [[REG13:%.*]]) = begin_apply [[REG11]]<τ_0_0>([[REG10]]) : $@yield_once @convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
 // CHECK:   [[REG14:%.*]] = function_ref @$s25borrow_accessor_synthesis6mutateyyxzRi_zlF : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@inout τ_0_0) -> ()
 // CHECK:   [[REG15:%.*]] = apply [[REG14]]<(τ_0_0).Element>([[REG12]]) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@inout τ_0_0) -> ()
 // CHECK:   [[REG16:%.*]] = end_apply [[REG13]] as $()
 // CHECK:   end_access [[REG10]]
 // CHECK:   [[REG18:%.*]] = begin_access [modify] [unknown] [[REG0]]
-// CHECK:   [[REG19:%.*]] = witness_method $τ_0_0, #P.prop3!modify : <Self where Self : P> (inout Self) -> () -> () : $@yield_once @convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
+// CHECK:   [[REG19:%.*]] = witness_method $τ_0_0, #P.prop3!modify : <Self where Self : P> (inout Self) -> @yield_once () -> inout @yields Self.Element : $@yield_once @convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
 // CHECK:   ([[REG20:%.*]], [[REG21:%.*]]) = begin_apply [[REG19]]<τ_0_0>([[REG18]]) : $@yield_once @convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
 // CHECK:   [[REG22:%.*]] = function_ref @$s25borrow_accessor_synthesis6mutateyyxzRi_zlF : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@inout τ_0_0) -> ()
 // CHECK:   [[REG23:%.*]] = apply [[REG22]]<(τ_0_0).Element>([[REG20]]) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@inout τ_0_0) -> ()
@@ -188,19 +188,19 @@ func testP3(_ p: inout some P) {
 
 // CHECK: sil hidden [ossa] @$s25borrow_accessor_synthesis8testNCP1yyxAA3NCPRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : NCP> (@in_guaranteed τ_0_0) -> () {
 // CHECK: bb0([[REG0:%.*]] : $*τ_0_0):
-// CHECK:   [[REG2:%.*]] = witness_method $τ_0_0, #NCP.prop1!read : <Self where Self : NCP, Self : ~Copyable> (Self) -> () -> () : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
+// CHECK:   [[REG2:%.*]] = witness_method $τ_0_0, #NCP.prop1!read : <Self where Self : NCP, Self : ~Copyable> (Self) -> @yield_once () -> @yields Self.Element : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
 // CHECK:   ([[REG3:%.*]], [[REG4:%.*]]) = begin_apply [[REG2]]<τ_0_0>([[REG0]]) : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
 // CHECK:   [[REG5:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG3]]
 // CHECK:   [[REG6:%.*]] = function_ref @$s25borrow_accessor_synthesis3useyyxRi_zlF : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> ()
 // CHECK:   [[REG7:%.*]] = apply [[REG6]]<(τ_0_0).Element>([[REG5]]) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> ()
 // CHECK:   [[REG8:%.*]] = end_apply [[REG4]] as $()
-// CHECK:   [[REG9:%.*]] = witness_method $τ_0_0, #NCP.prop2!read : <Self where Self : NCP, Self : ~Copyable> (Self) -> () -> () : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
+// CHECK:   [[REG9:%.*]] = witness_method $τ_0_0, #NCP.prop2!read : <Self where Self : NCP, Self : ~Copyable> (Self) -> @yield_once () -> @yields Self.Element : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
 // CHECK:   ([[REG10:%.*]], [[REG11:%.*]]) = begin_apply [[REG9]]<τ_0_0>([[REG0]]) : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
 // CHECK:   [[REG12:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG10]]
 // CHECK:   [[REG13:%.*]] = function_ref @$s25borrow_accessor_synthesis3useyyxRi_zlF : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> ()
 // CHECK:   [[REG14:%.*]] = apply [[REG13]]<(τ_0_0).Element>([[REG12]]) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> ()
 // CHECK:   [[REG15:%.*]] = end_apply [[REG11]] as $()
-// CHECK:   [[REG16:%.*]] = witness_method $τ_0_0, #NCP.prop3!read : <Self where Self : NCP, Self : ~Copyable> (Self) -> () -> () : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
+// CHECK:   [[REG16:%.*]] = witness_method $τ_0_0, #NCP.prop3!read : <Self where Self : NCP, Self : ~Copyable> (Self) -> @yield_once () -> @yields Self.Element : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
 // CHECK:   [[REG19:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG17]]
 // CHECK:   [[REG20:%.*]] = function_ref @$s25borrow_accessor_synthesis3useyyxRi_zlF : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> ()
 // CHECK:   [[REG21:%.*]] = apply [[REG20]]<(τ_0_0).Element>([[REG19]]) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> ()
@@ -215,7 +215,7 @@ func testNCP1(_ p: some NCP) {
 // CHECK: sil hidden [ossa] @$s25borrow_accessor_synthesis8testNCP2yyxzAA3NCPRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : NCP> (@inout τ_0_0) -> () {
 // CHECK: bb0([[REG0:%.*]] : $*τ_0_0):
 // CHECK:   [[REG2:%.*]] = begin_access [modify] [unknown] [[REG0]]
-// CHECK:   [[REG3:%.*]] = witness_method $τ_0_0, #NCP.prop1!modify : <Self where Self : NCP, Self : ~Copyable> (inout Self) -> () -> () : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
+// CHECK:   [[REG3:%.*]] = witness_method $τ_0_0, #NCP.prop1!modify : <Self where Self : NCP, Self : ~Copyable> (inout Self) -> @yield_once () -> inout @yields Self.Element : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
 // CHECK:   ([[REG4:%.*]], [[REG5:%.*]]) = begin_apply [[REG3]]<τ_0_0>([[REG2]]) : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
 // CHECK:   [[REG6:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG4]]
 // CHECK:   [[REG7:%.*]] = function_ref @$s25borrow_accessor_synthesis6mutateyyxzRi_zlF : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@inout τ_0_0) -> ()
@@ -223,7 +223,7 @@ func testNCP1(_ p: some NCP) {
 // CHECK:   [[REG9:%.*]] = end_apply [[REG5]] as $()
 // CHECK:   end_access [[REG2]]
 // CHECK:   [[REG11:%.*]] = begin_access [modify] [unknown] [[REG0]]
-// CHECK:   [[REG12:%.*]] = witness_method $τ_0_0, #NCP.prop2!modify : <Self where Self : NCP, Self : ~Copyable> (inout Self) -> () -> () : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
+// CHECK:   [[REG12:%.*]] = witness_method $τ_0_0, #NCP.prop2!modify : <Self where Self : NCP, Self : ~Copyable> (inout Self) -> @yield_once () -> inout @yields Self.Element : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
 // CHECK:   ([[REG13:%.*]], [[REG14:%.*]]) = begin_apply [[REG12]]<τ_0_0>([[REG11]]) : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
 // CHECK:   [[REG15:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG13]]
 // CHECK:   [[REG16:%.*]] = function_ref @$s25borrow_accessor_synthesis6mutateyyxzRi_zlF : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@inout τ_0_0) -> ()
@@ -231,7 +231,7 @@ func testNCP1(_ p: some NCP) {
 // CHECK:   [[REG18:%.*]] = end_apply [[REG14]] as $()
 // CHECK:   end_access [[REG11]]
 // CHECK:   [[REG20:%.*]] = begin_access [modify] [unknown] [[REG0]]
-// CHECK:   [[REG21:%.*]] = witness_method $τ_0_0, #NCP.prop3!modify : <Self where Self : NCP, Self : ~Copyable> (inout Self) -> () -> () : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
+// CHECK:   [[REG21:%.*]] = witness_method $τ_0_0, #NCP.prop3!modify : <Self where Self : NCP, Self : ~Copyable> (inout Self) -> @yield_once () -> inout @yields Self.Element : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
 // CHECK:   ([[REG22:%.*]], [[REG23:%.*]]) = begin_apply [[REG21]]<τ_0_0>([[REG20]]) : $@yield_once @convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@inout τ_0_0) -> @yields @inout τ_0_0.Element
 // CHECK:   [[REG24:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG22]]
 // CHECK:   [[REG25:%.*]] = function_ref @$s25borrow_accessor_synthesis6mutateyyxzRi_zlF : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@inout τ_0_0) -> ()
@@ -464,7 +464,7 @@ public struct RigidWrapper<T: ~Copyable>: Container & ~Copyable {
 
 // CHECK: sil hidden [ossa] @$s25borrow_accessor_synthesis13testContaineryyx_SitAA0E0RzlF : $@convention(thin) <T where T : Container> (@in_guaranteed T, Int) -> () {
 // CHECK: bb0([[REG0:%.*]] : $*T, [[REG1:%.*]] : $Int):
-// CHECK:   [[REG4:%.*]] = witness_method $T, #Container.subscript!read : <Self where Self : Container, Self : ~Copyable> (Self) -> (Int) -> () : $@yield_once @convention(witness_method: Container) <τ_0_0 where τ_0_0 : Container, τ_0_0 : ~Copyable> (Int, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
+// CHECK:   [[REG4:%.*]] = witness_method $T, #Container.subscript!read : <Self where Self : Container, Self : ~Copyable> (Self) -> @yield_once (Int) -> @yields Self.Element : $@yield_once @convention(witness_method: Container) <τ_0_0 where τ_0_0 : Container, τ_0_0 : ~Copyable> (Int, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
 // CHECK:   ([[REG5:%.*]], [[REG6:%.*]]) = begin_apply [[REG4]]<T>([[REG1]], [[REG0]]) : $@yield_once @convention(witness_method: Container) <τ_0_0 where τ_0_0 : Container, τ_0_0 : ~Copyable> (Int, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
 // CHECK:   [[REG7:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG5]]
 // CHECK:   [[REG8:%.*]] = function_ref @$s25borrow_accessor_synthesis3useyyxRi_zlF : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> ()

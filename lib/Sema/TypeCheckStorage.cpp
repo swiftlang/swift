@@ -2751,7 +2751,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
 
   // Coroutine accessors yields storage value types
   const Type retTy = YieldResultType::get(storage->getValueInterfaceType(),
-                                          kind == AccessorKind::Modify);
+                                          isYieldingMutableAccessor(kind));
 
   auto *accessor = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(), kind, storage,
