@@ -38,4 +38,6 @@
 // You will normally add new entries in 'abi/macOS/arm64/builtin_float.swift' instead
 // of this file. This file is dedicated for assert only symbols.
 
+//===----------------------------------------------------------------------===//
 // _Builtin_float Symbols
+//===----------------------------------------------------------------------===//

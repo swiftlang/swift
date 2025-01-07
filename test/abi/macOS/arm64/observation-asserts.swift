@@ -39,4 +39,6 @@
 // You will normally add new entries in 'abi/macOS/arm64/observation.swift' instead
 // of this file. This file is dedicated for assert only symbols.
 
+//===----------------------------------------------------------------------===//
 // Observation Symbols
+//===----------------------------------------------------------------------===//

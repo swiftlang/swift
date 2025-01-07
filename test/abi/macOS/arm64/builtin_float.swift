@@ -34,4 +34,6 @@
 // Thank you for your help ensuring the stdlib remains compatible with its past!
 //                                            -- Your friendly stdlib engineers
 
+//===----------------------------------------------------------------------===//
 // _Builtin_float Symbols
+//===----------------------------------------------------------------------===//
