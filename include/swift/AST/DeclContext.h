@@ -261,7 +261,8 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
   friend class Initializer; // uses setParent
   friend class AutoClosureExpr; // uses setParent
   friend class AbstractClosureExpr; // uses setParent
-  
+  friend class Decl; // uses setParent
+
   template<class A, class B, class C>
   friend struct ::llvm::CastInfo;
   

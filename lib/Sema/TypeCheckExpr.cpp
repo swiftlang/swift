@@ -772,7 +772,7 @@ Expr *CallerSideDefaultArgExprRequest::evaluate(
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), paramTy);
   }
   if (param->getDefaultArgumentKind() == DefaultArgumentKind::ExpressionMacro) {
-    TypeChecker::contextualizeCallSideDefaultArgument(dc, initExpr);
+    TypeChecker::contextualizeExpr(initExpr, dc);
     TypeChecker::checkCallerSideDefaultArgumentEffects(dc, initExpr);
   }
   return initExpr;
