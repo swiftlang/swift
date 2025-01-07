@@ -314,7 +314,7 @@ struct CxxSpanThunkBuilder: BoundsCheckedThunkBuilder {
         "unable to desugar type with name '\(typeName)'", node: node)
     }
 
-    let parsedDesugaredType = try TypeSyntax("\(raw: desugaredType)")
+    let parsedDesugaredType = TypeSyntax("\(raw: desugaredType)")
     types[index] = TypeSyntax(IdentifierTypeSyntax(name: "Span",
       genericArgumentClause: parsedDesugaredType.as(IdentifierTypeSyntax.self)!.genericArgumentClause))
     return try base.buildFunctionSignature(types, variant)
@@ -679,7 +679,7 @@ public struct SwiftifyImportMacro: PeerMacro {
           }
           dict[key.representedLiteralValue!] = value.representedLiteralValue!
         }
-      default:
+      @unknown default:
         throw DiagnosticError("unknown dictionary literal", node: dictExpr)
     }
     return dict
