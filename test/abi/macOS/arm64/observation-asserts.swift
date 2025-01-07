@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/arm64/libswiftObservation.dylib > %t/symbols
 // RUN: %abi-symbol-checker %s %t/symbols --base %S/observation.swift
-// RUN: diff -u %S/../../Inputs/macOS/arm64/observation/baseline-asserts %t/symbols
+// RUN: diff -u %S/../../DO-NOT-EDIT-THIS/macOS/arm64/observation/baseline-asserts %t/symbols
 
 // REQUIRES: swift_stdlib_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-arm64
@@ -39,4 +39,6 @@
 // You will normally add new entries in 'abi/macOS/arm64/observation.swift' instead
 // of this file. This file is dedicated for assert only symbols.
 
+//===----------------------------------------------------------------------===//
 // Observation Symbols
+//===----------------------------------------------------------------------===//

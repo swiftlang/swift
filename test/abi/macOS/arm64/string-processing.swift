@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/arm64/libswift_StringProcessing.dylib > %t/symbols
 // RUN: %abi-symbol-checker %s %t/symbols
-// RUN: diff -u %S/../../Inputs/macOS/arm64/string-processing/baseline %t/symbols
+// RUN: diff -u %S/../../DO-NOT-EDIT-THIS/macOS/arm64/string-processing/baseline %t/symbols
 
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-arm64
@@ -34,19 +34,9 @@
 // Thank you for your help ensuring the stdlib remains compatible with its past!
 //                                            -- Your friendly stdlib engineers
 
+//===----------------------------------------------------------------------===//
 // _StringProcessing Symbols
-
-// _StringProcessing.Regex._literalPattern.getter : Swift.String?
-Added: _$s17_StringProcessing5RegexV15_literalPatternSSSgvg
-
-// property descriptor for _StringProcessing.Regex._literalPattern : Swift.String?
-Added: _$s17_StringProcessing5RegexV15_literalPatternSSSgvpMV
-
-// _StringProcessing.Regex._nsreCompatibility.getter : _StringProcessing.Regex<A>
-Added: _$s17_StringProcessing5RegexV18_nsreCompatibilityACyxGvg
-
-// property descriptor for _StringProcessing.Regex._nsreCompatibility : _StringProcessing.Regex<A>
-Added: _$s17_StringProcessing5RegexV18_nsreCompatibilityACyxGvpMV
+//===----------------------------------------------------------------------===//
 
 // Add property descriptors for static properties
 Added: _$s17_StringProcessing15_CompileOptionsV13enableMetricsACvpZMV

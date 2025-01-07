@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/x86_64/libswiftObservation.dylib > %t/symbols
 // RUN: %abi-symbol-checker %s %t/symbols
-// RUN: diff -u %S/../../Inputs/macOS/x86_64/observation/baseline %t/symbols
+// RUN: diff -u %S/../../DO-NOT-EDIT-THIS/macOS/x86_64/observation/baseline %t/symbols
 
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-x86_64
@@ -34,10 +34,6 @@
 // Thank you for your help ensuring the stdlib remains compatible with its past!
 //                                            -- Your friendly stdlib engineers
 
+//===----------------------------------------------------------------------===//
 // Observation Symbols
-
-// Observation.ObservationTracking.changed.getter : Swift.AnyKeyPath?
-Added: _$s11Observation0A8TrackingV7changeds10AnyKeyPathCSgvg
-
-// property descriptor for Observation.ObservationTracking.changed : Swift.AnyKeyPath?
-Added: _$s11Observation0A8TrackingV7changeds10AnyKeyPathCSgvpMV
+//===----------------------------------------------------------------------===//
