@@ -7273,7 +7273,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
     }
 
     if (var->getAttrs().hasAttribute<LazyAttr>()) {
-      diagnoseAndRemoveAttr(attr, diag::nonisolated_lazy)
+      diagnose(attr->getLocation(), diag::nonisolated_lazy)
         .warnUntilSwiftVersion(6);
       return;
     }
