@@ -571,12 +571,9 @@ const Decl *Decl::getInnermostDeclWithAvailability() const {
 
 std::optional<llvm::VersionTuple>
 Decl::getIntroducedOSVersion(PlatformKind Kind) const {
-  for (auto *attr: getAttrs()) {
-    if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-      if (ava->getPlatform() == Kind && ava->Introduced) {
-        return ava->Introduced;
-      }
-    }
+  for (auto attr : getSemanticAvailableAttrs()) {
+    if (attr.getPlatform() == Kind && attr.getIntroduced().has_value())
+      return attr.getIntroduced();
   }
   return std::nullopt;
 }
