@@ -51,7 +51,9 @@ public:
     using namespace RuntimeConstants;
 #define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT,     \
                  MEMORY_EFFECTS)                                               \
-  linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT);
+  linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT);                            \
+  if (getModule()->getASTContext().hadError())                                  \
+    return;
 
 #define RETURNS(...)
 #define ARGS(...)

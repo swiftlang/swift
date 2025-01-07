@@ -57,6 +57,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
@@ -100,12 +101,32 @@ void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
 
 /// Deserialize a function and add it to the worklist for processing.
 void SILLinkerVisitor::maybeAddFunctionToWorklist(
-    SILFunction *F, SerializedKind_t callerSerializedKind) {
+    SILFunction *F, SerializedKind_t callerSerializedKind, SILFunction *caller) {
   SILLinkage linkage = F->getLinkage();
-  ASSERT((callerSerializedKind == IsNotSerialized ||
+
+  // Originally this was an assert. But it can happen if the user "re-defines"
+  // an existing function with a wrong linkage, e.g. using `@_cdecl`.
+  if(!(callerSerializedKind == IsNotSerialized ||
             F->hasValidLinkageForFragileRef(callerSerializedKind) ||
-            hasSharedVisibility(linkage) || F->isExternForwardDeclaration()) &&
-         "called function has wrong linkage for serialized function");
+            hasSharedVisibility(linkage) || F->isExternForwardDeclaration())) {
+    StringRef name = "a serialized function";
+    llvm::SmallVector<char> scratch;
+
+    if (caller) {
+      name = caller->getName();
+      if (SILDeclRef declRef = caller->getDeclRef()) {
+        if (auto *decl = declRef.getDecl()) {
+          name = decl->getName().getString(scratch);
+        }
+      }
+    }
+    F->getModule().getASTContext().Diags.diagnose(
+      F->getLocation().getSourceLoc(),
+      diag::wrong_linkage_for_serialized_function, name);
+    hasError = true;
+    return;
+  }
+
   if (!F->isExternalDeclaration()) {
     // The function is already in the module, so no need to de-serialized it.
     // But check if we need to set the IsSerialized flag.
@@ -218,19 +239,22 @@ void SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
 
 void SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
   maybeAddFunctionToWorklist(FRI->getReferencedFunction(),
-                             FRI->getFunction()->getSerializedKind());
+                             FRI->getFunction()->getSerializedKind(),
+                             FRI->getFunction());
 }
 
 void SILLinkerVisitor::visitDynamicFunctionRefInst(
     DynamicFunctionRefInst *FRI) {
   maybeAddFunctionToWorklist(FRI->getInitiallyReferencedFunction(),
-                             FRI->getFunction()->getSerializedKind());
+                             FRI->getFunction()->getSerializedKind(),
+                             FRI->getFunction());
 }
 
 void SILLinkerVisitor::visitPreviousDynamicFunctionRefInst(
     PreviousDynamicFunctionRefInst *FRI) {
   maybeAddFunctionToWorklist(FRI->getInitiallyReferencedFunction(),
-                             FRI->getFunction()->getSerializedKind());
+                             FRI->getFunction()->getSerializedKind(),
+                             FRI->getFunction());
 }
 
 // Eagerly visiting all used conformances leads to a large blowup
@@ -470,6 +494,9 @@ void SILLinkerVisitor::process() {
     for (auto &BB : *Fn) {
       for (auto &I : BB) {
         visit(&I);
+
+        if (hasError)
+          return;
       }
     }
   }
