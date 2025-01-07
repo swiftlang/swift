@@ -1340,7 +1340,7 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
 
   // Walk the checked initializer and contextualize any closures
   // we saw there.
-  TypeChecker::contextualizeInitializer(dc, initExpr);
+  TypeChecker::contextualizeExpr(initExpr, dc);
   TypeChecker::checkInitializerEffects(dc, initExpr);
 
   return initExpr;

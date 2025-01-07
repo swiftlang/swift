@@ -768,6 +768,9 @@ void Decl::setInvalid() {
 
 void Decl::setDeclContext(DeclContext *DC) { 
   Context = DC;
+  // If this Decl is also a DeclContext, we need to update its parent too.
+  if (auto *thisDC = dyn_cast<DeclContext>(this))
+    thisDC->setParent(DC);
 }
 
 bool Decl::isUserAccessible() const {

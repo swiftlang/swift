@@ -619,7 +619,7 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
 
   if (auto *initContext = binding->getInitContext(i)) {
     auto *init = binding->getInit(i);
-    TypeChecker::contextualizeInitializer(initContext, init);
+    TypeChecker::contextualizeExpr(init, initContext);
   }
 }
 
@@ -1661,75 +1661,6 @@ synthesizeRead2CoroutineGetterBody(AccessorDecl *getter, ASTContext &ctx) {
   return synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
 }
 
-namespace {
-  /// This ASTWalker explores an expression tree looking for expressions (which
-  /// are DeclContext's) and changes their parent DeclContext to NewDC.
-  /// TODO: We ought to consider merging this with
-  /// ContextualizeClosuresAndMacros, or better yet removing it in favor of
-  /// avoiding the recontextualization for lazy vars.
-  class RecontextualizeClosures : public ASTWalker {
-    DeclContext *NewDC;
-  public:
-    RecontextualizeClosures(DeclContext *NewDC) : NewDC(NewDC) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::ArgumentsAndExpansion;
-    }
-
-    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      // If we find a closure, update its declcontext and do *not* walk into it.
-      if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
-        CE->setParent(NewDC);
-        return Action::SkipNode(E);
-      }
-
-      return Action::Continue(E);
-    }
-
-    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-      if (auto *EP = dyn_cast<ExprPattern>(P))
-        EP->setDeclContext(NewDC);
-      if (auto *EP = dyn_cast<EnumElementPattern>(P))
-        EP->setDeclContext(NewDC);
-
-      return Action::Continue(P);
-    }
-
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      // The ASTWalker doesn't walk the case body variables, contextualize them
-      // ourselves.
-      if (auto *CS = dyn_cast<CaseStmt>(S)) {
-        for (auto *CaseVar : CS->getCaseBodyVariablesOrEmptyArray())
-          CaseVar->setDeclContext(NewDC);
-      }
-      // A few statements store DeclContexts, update them.
-      if (auto *BS = dyn_cast<BreakStmt>(S))
-        BS->setDeclContext(NewDC);
-      if (auto *CS = dyn_cast<ContinueStmt>(S))
-        CS->setDeclContext(NewDC);
-      if (auto *FS = dyn_cast<FallthroughStmt>(S))
-        FS->setDeclContext(NewDC);
-
-      return Action::Continue(S);
-    }
-
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      D->setDeclContext(NewDC);
-
-      // Auxiliary decls need to have their contexts adjusted too.
-      if (auto *VD = dyn_cast<VarDecl>(D)) {
-        VD->visitAuxiliaryDecls([&](VarDecl *D) {
-          D->setDeclContext(NewDC);
-        });
-      }
-
-      // Skip walking the children of any Decls that are also DeclContexts,
-      // they will already have the right parent.
-      return Action::SkipNodeIf(isa<DeclContext>(D));
-    }
-  };
-} // end anonymous namespace
-
 /// Synthesize the getter for a lazy property with the specified storage
 /// vardecl.
 static std::pair<BraceStmt *, bool>
@@ -1801,12 +1732,13 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
     InitValue = new (Ctx) ErrorExpr(SourceRange(), Tmp2VD->getTypeInContext());
   }
 
-  // Recontextualize any closure declcontexts nested in the initializer to
-  // realize that they are in the getter function.
+  // We may have stolen the self decl from a PatternBindingInitializer,
+  // re-parent it here.
   if (Get->hasImplicitSelfDecl())
     Get->getImplicitSelfDecl()->setDeclContext(Get);
 
-  InitValue->walk(RecontextualizeClosures(Get));
+  // Also re-contextualize any nodes nested in the initializer.
+  TypeChecker::contextualizeExpr(InitValue, Get);
 
   // Wrap the initializer in a LazyInitializerExpr to avoid walking it twice.
   auto initType = InitValue->getType();
@@ -3201,7 +3133,7 @@ static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
   // will be done in visitPatternBindingDecl.
   if (!contextualize)
     return;
-  TypeChecker::contextualizeInitializer(initContext, initializer);
+  TypeChecker::contextualizeExpr(initializer, initContext);
   checkPropertyWrapperActorIsolation(wrappedVar, initializer);
   TypeChecker::checkInitializerEffects(initContext, initializer);
 }
