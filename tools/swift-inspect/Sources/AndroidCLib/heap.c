@@ -57,18 +57,18 @@
 // a different process for execution, it must not make any function calls. It
 // could be written as asm, but simple C is more readable/maintainable and
 // should consistently compile to movable, position-independent code.
-void heap_iterate_callback(unsigned long base, unsigned long size, void *arg) {
+static void heap_iterate_callback(unsigned long base, unsigned long size, void *arg) {
   volatile uint64_t *data = (uint64_t*)arg;
   while (data[NEXT_FREE_IDX] >= data[MAX_VALID_IDX]) {
     // SIGTRAP indicates the buffer is full and needs to be drained before more
     // entries can be written.
     __builtin_debugtrap();
-    asm volatile("nop");
+    __asm__ __volatile__("nop");
   }
   data[data[NEXT_FREE_IDX]++] = base;
   data[data[NEXT_FREE_IDX]++] = size;
-  asm volatile(".global heap_iterate_callback_end");
-  asm volatile("heap_iterate_callback_end:");
+  __asm__ __volatile(".local heap_iterate_callback_end");
+  __asm__ __volatile__("heap_iterate_callback_end:");
 }
 
 void* heap_iterate_callback_start() {
@@ -97,12 +97,12 @@ bool heap_iterate_metadata_process(
   void* data, size_t len, void* callback_context, heap_iterate_entry_callback_t callback) {
   uint64_t *metadata = data;
   const uint64_t max_entries = len / sizeof(uint64_t);
+  const uint64_t end_index = metadata[NEXT_FREE_IDX];
 
-  if (metadata[MAX_VALID_IDX] != max_entries ||
-      metadata[NEXT_FREE_IDX] > max_entries)
+  if (metadata[MAX_VALID_IDX] != max_entries || end_index > max_entries)
     return false;
 
-  for (size_t i = HEADER_SIZE; i < metadata[NEXT_FREE_IDX]; i += ENTRY_SIZE) {
+  for (size_t i = HEADER_SIZE; i < end_index; i += ENTRY_SIZE) {
     const uint64_t base = metadata[i];
     const uint64_t size = metadata[i + 1];
     callback(callback_context, base, size);
