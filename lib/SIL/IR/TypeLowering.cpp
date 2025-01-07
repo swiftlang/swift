@@ -2510,6 +2510,7 @@ namespace {
       }
 
       if (D->isCxxNonTrivial()) {
+        properties.setAddressableForDependencies();
         properties.setAddressOnly();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
@@ -2549,6 +2550,10 @@ namespace {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         return handleAddressOnly(structType, properties);
+      }
+      
+      if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
+        properties.setAddressableForDependencies();
       }
 
       auto subMap = structType->getContextSubstitutionMap();
@@ -2619,6 +2624,10 @@ namespace {
 
       if (handleResilience(enumType, D, properties))
         return handleAddressOnly(enumType, properties);
+
+      if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
+        properties.setAddressableForDependencies();
+      }
 
       // [is_or_contains_pack_unsubstituted] Visit the elements of the
       // unsubstituted type to find pack types which would be substituted away.
