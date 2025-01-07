@@ -316,12 +316,12 @@ target_compile_definitions(swiftCore PRIVATE
 target_compile_options(swiftCore PRIVATE
   "$<$<AND:$<BOOL:${BUILD_SHARED_LIBS}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -DswiftCore_EXPORTS>")
 
-target_link_libraries(swiftCore PRIVATE swiftShims)
 target_link_libraries(swiftCore
   PRIVATE
     swiftRuntime
     swiftLLVMSupport
     swiftDemangling
+    swiftShims
     swiftStdlibStubs
     swiftThreading)
 target_link_options(swiftCore PRIVATE
