@@ -461,6 +461,12 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
         liveness.updateForUse(user, /*lifetimeEnding=*/true);
         return true;
       }
+      auto *mdi = dyn_cast<MarkDependenceInst>(user);
+      if (mdi && mdi->hasUnresolvedEscape()) {
+        // mark_dependence [unresolved] instructions can appear outside the
+        // lifetime of an access scope.
+        return true;
+      }
       liveness.updateForUse(user, /*lifetimeEnding=*/false);
       for (auto result : user->getResults()) {
         auto shouldComplete =
