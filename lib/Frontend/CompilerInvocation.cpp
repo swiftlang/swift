@@ -3840,7 +3840,15 @@ bool CompilerInvocation::parseArgs(
   if (LangOpts.hasFeature(Feature::WarnUnsafe)) {
     if (SILOpts.RemoveRuntimeAsserts ||
         SILOpts.AssertConfig == SILOptions::Unchecked) {
-      Diags.diagnose(SourceLoc(), diag::Ounchecked_with_strict_safety);
+      Diags.diagnose(SourceLoc(),
+                     diag::command_line_conflicts_with_strict_safety,
+                     "-Ounchecked");
+    }
+
+    if (!LangOpts.EnableAccessControl) {
+      Diags.diagnose(SourceLoc(),
+                     diag::command_line_conflicts_with_strict_safety,
+                     "-disable-access-control");
     }
   }
 

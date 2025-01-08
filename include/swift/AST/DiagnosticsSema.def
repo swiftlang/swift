@@ -8097,6 +8097,8 @@ NOTE(note_reference_to_nonisolated_unsafe,none,
      (const ValueDecl *))
 NOTE(note_reference_unowned_unsafe,none,
      "reference to unowned(unsafe) %kind0 is unsafe", (const ValueDecl *))
+NOTE(note_reference_exclusivity_unchecked,none,
+     "reference to @exclusivity(unchecked) %kind0 is unsafe", (const ValueDecl *))
 NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
      "@unsafe conformance of %0 to %kind1 involves unsafe code",
      (Type, const ValueDecl *))
@@ -8118,6 +8120,9 @@ GROUPED_WARNING(use_of_unsafe_conformance_is_unsafe,Unsafe,none,
        (Type, const ValueDecl *))
 GROUPED_WARNING(reference_unowned_unsafe,Unsafe,none,
       "reference to unowned(unsafe) %kind0 is unsafe", (const ValueDecl *))
+GROUPED_WARNING(reference_exclusivity_unchecked,Unsafe,none,
+      "reference to @exclusivity(unchecked) %kind0 is unsafe", (const ValueDecl *))
+
 GROUPED_WARNING(reference_to_nonisolated_unsafe,Unsafe,none,
       "reference to nonisolated(unsafe) %kind0 is unsafe in concurrently-executing code",
        (const ValueDecl *))
