@@ -770,20 +770,18 @@ private:
     std::string introduced, obsoleted;
     bool hasFallbackUnavailability = false;
     auto platform = targetPlatform(module->getASTContext().LangOpts);
-    for (auto *attr : decl->getAttrs()) {
-      if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-        if (ava->getPlatform() == PlatformKind::none) {
-          hasFallbackUnavailability = ava->isUnconditionallyUnavailable();
-          continue;
-        }
-        if (ava->getPlatform() != platform)
-          continue;
-        unavailable = ava->isUnconditionallyUnavailable();
-        if (ava->Introduced)
-          introduced = ava->Introduced->getAsString();
-        if (ava->Obsoleted)
-          obsoleted = ava->Obsoleted->getAsString();
+    for (auto attr : decl->getSemanticAvailableAttrs()) {
+      if (!attr.isPlatformSpecific()) {
+        hasFallbackUnavailability = attr.isUnconditionallyUnavailable();
+        continue;
       }
+      if (attr.getPlatform() != platform)
+        continue;
+      unavailable = attr.isUnconditionallyUnavailable();
+      if (attr.getIntroduced())
+        introduced = attr.getIntroduced()->getAsString();
+      if (attr.getObsoleted())
+        obsoleted = attr.getObsoleted()->getAsString();
     }
     return {introduced, obsoleted,
             unavailable.value_or(hasFallbackUnavailability)};

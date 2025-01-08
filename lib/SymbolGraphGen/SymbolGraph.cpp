@@ -839,16 +839,14 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
   return false;
 }
 
-/// FIXME: This should use Decl::getUnavailableAttr() or similar.
+/// FIXME: [availability] This should use Decl::getUnavailableAttr() or similar.
 bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) const {
-  return llvm::any_of(D->getAttrs(), [](const auto *Attr) { 
-    if (const auto *AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-      return !AvAttr->hasPlatform()
-        && AvAttr->isUnconditionallyUnavailable();
-    }
+  for (auto Attr : D->getSemanticAvailableAttrs()) {
+    if (!Attr.isPlatformSpecific() && Attr.isUnconditionallyUnavailable())
+      return true;
+  }
 
-    return false;
-  });
+  return false;
 }
 
 /// Returns `true` if the symbol should be included as a node in the graph.

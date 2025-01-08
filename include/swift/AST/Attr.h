@@ -813,23 +813,6 @@ public:
         Bits.AvailableAttr.PlatformAgnostic);
   }
 
-  /// Returns true if the availability applies to a specific
-  /// platform.
-  bool hasPlatform() const { return getPlatform() != PlatformKind::none; }
-
-  /// Returns the string for the platform of the attribute.
-  StringRef platformString() const {
-    return swift::platformString(getPlatform());
-  }
-
-  /// Returns the human-readable string for the platform of the attribute.
-  StringRef prettyPlatformString() const {
-    return swift::prettyPlatformString(getPlatform());
-  }
-
-  /// Returns true if this attribute is active given the current platform.
-  bool isActivePlatform(const ASTContext &ctx) const;
-
   /// Create an AvailableAttr that indicates specific availability
   /// for all platforms.
   static AvailableAttr *
@@ -3239,7 +3222,7 @@ public:
 
   /// Returns the effective range in which the declaration with this attribute
   /// was introduced.
-  AvailabilityRange getIntroducedRange(ASTContext &Ctx) const;
+  AvailabilityRange getIntroducedRange(const ASTContext &Ctx) const;
 
   /// The version tuple written in source for the `deprecated:` component.
   std::optional<llvm::VersionTuple> getDeprecated() const {
@@ -3312,6 +3295,9 @@ public:
   /// Returns true if this attribute is considered active in the current
   /// compilation context.
   bool isActive(ASTContext &ctx) const;
+
+  /// Whether this attribute was spelled `@_spi_available`.
+  bool isSPI() const { return attr->isSPI(); }
 
   bool operator==(const SemanticAvailableAttr &other) const {
     return other.attr == attr;

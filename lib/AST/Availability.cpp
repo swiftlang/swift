@@ -156,7 +156,7 @@ static void mergeWithInferredAvailability(SemanticAvailableAttr Attr,
   // The merge of two introduction versions is the maximum of the two versions.
   if (mergeIntoInferredVersion(Attr.getIntroduced(), Inferred.Introduced,
                                std::max)) {
-    Inferred.IsSPI = ParsedAttr->isSPI();
+    Inferred.IsSPI = Attr.isSPI();
   }
 
   // The merge of deprecated and obsoleted versions takes the minimum.
@@ -345,10 +345,10 @@ getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
 }
 
 bool AvailabilityInference::updateIntroducedPlatformForFallback(
-    const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform,
-    llvm::VersionTuple &PlatformVer) {
-  std::optional<llvm::VersionTuple> IntroducedVersion = attr->Introduced;
-  if (attr->getPlatform() == PlatformKind::iOS &&
+    const SemanticAvailableAttr &attr, const ASTContext &Ctx,
+    llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer) {
+  std::optional<llvm::VersionTuple> IntroducedVersion = attr.getIntroduced();
+  if (attr.getPlatform() == PlatformKind::iOS &&
       IntroducedVersion.has_value() &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     // We re-map the iOS introduced version to the corresponding visionOS version
@@ -365,10 +365,10 @@ bool AvailabilityInference::updateIntroducedPlatformForFallback(
 }
 
 bool AvailabilityInference::updateDeprecatedPlatformForFallback(
-    const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform,
-    llvm::VersionTuple &PlatformVer) {
-  std::optional<llvm::VersionTuple> DeprecatedVersion = attr->Deprecated;
-  if (attr->getPlatform() == PlatformKind::iOS &&
+    const SemanticAvailableAttr &attr, const ASTContext &Ctx,
+    llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer) {
+  std::optional<llvm::VersionTuple> DeprecatedVersion = attr.getDeprecated();
+  if (attr.getPlatform() == PlatformKind::iOS &&
       DeprecatedVersion.has_value() &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     // We re-map the iOS deprecated version to the corresponding visionOS version
@@ -385,11 +385,10 @@ bool AvailabilityInference::updateDeprecatedPlatformForFallback(
 }
 
 bool AvailabilityInference::updateObsoletedPlatformForFallback(
-    const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform,
-    llvm::VersionTuple &PlatformVer) {
-  std::optional<llvm::VersionTuple> ObsoletedVersion = attr->Obsoleted;
-  if (attr->getPlatform() == PlatformKind::iOS &&
-      ObsoletedVersion.has_value() &&
+    const SemanticAvailableAttr &attr, const ASTContext &Ctx,
+    llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer) {
+  std::optional<llvm::VersionTuple> ObsoletedVersion = attr.getObsoleted();
+  if (attr.getPlatform() == PlatformKind::iOS && ObsoletedVersion.has_value() &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     // We re-map the iOS obsoleted version to the corresponding visionOS version
     auto PotentiallyRemappedObsoletedVersion =
@@ -405,8 +404,9 @@ bool AvailabilityInference::updateObsoletedPlatformForFallback(
 }
 
 void AvailabilityInference::updatePlatformStringForFallback(
-    const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform) {
-  if (attr->getPlatform() == PlatformKind::iOS &&
+    const SemanticAvailableAttr &attr, const ASTContext &Ctx,
+    llvm::StringRef &Platform) {
+  if (attr.getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     Platform = swift::prettyPlatformString(PlatformKind::visionOS);
   }
@@ -468,8 +468,9 @@ Decl::getSemanticAvailableAttrs(bool includeInactive) const {
 std::optional<SemanticAvailableAttr>
 Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
   auto domainForAvailableAttr = [](const AvailableAttr *attr) {
-    if (attr->hasPlatform())
-      return AvailabilityDomain::forPlatform(attr->getPlatform());
+    auto platform = attr->getPlatform();
+    if (platform != PlatformKind::none)
+      return AvailabilityDomain::forPlatform(platform);
 
     switch (attr->getPlatformAgnosticAvailability()) {
     case PlatformAgnosticAvailabilityKind::Deprecated:
@@ -530,8 +531,7 @@ std::optional<SemanticAvailableAttr> Decl::getDeprecatedAttr() const {
     StringRef deprecatedPlatform;
     llvm::VersionTuple remappedDeprecatedVersion;
     if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-            attr.getParsedAttr(), ctx, deprecatedPlatform,
-            remappedDeprecatedVersion))
+            attr, ctx, deprecatedPlatform, remappedDeprecatedVersion))
       deprecatedVersion = remappedDeprecatedVersion;
 
     if (!deprecatedVersion.has_value())
@@ -821,21 +821,24 @@ AvailabilityRange AvailabilityInference::availableRange(const Decl *D) {
 
 bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
   if (auto attr = D->getAvailableAttrForPlatformIntroduction())
-    return attr->getParsedAttr()->isSPI();
+    return attr->isSPI();
 
   return false;
 }
 
 AvailabilityRange
-SemanticAvailableAttr::getIntroducedRange(ASTContext &Ctx) const {
+SemanticAvailableAttr::getIntroducedRange(const ASTContext &Ctx) const {
+  assert(domain.isActive(Ctx));
+
   auto *attr = getParsedAttr();
-  assert(attr->isActivePlatform(Ctx));
+  if (!attr->Introduced.has_value())
+    return AvailabilityRange::alwaysAvailable();
 
   llvm::VersionTuple IntroducedVersion = attr->Introduced.value();
-  StringRef Platform = attr->prettyPlatformString();
+  StringRef Platform;
   llvm::VersionTuple RemappedIntroducedVersion;
   if (AvailabilityInference::updateIntroducedPlatformForFallback(
-      attr, Ctx, Platform, RemappedIntroducedVersion))
+          *this, Ctx, Platform, RemappedIntroducedVersion))
     IntroducedVersion = RemappedIntroducedVersion;
 
   return AvailabilityRange{VersionRange::allGTE(IntroducedVersion)};
