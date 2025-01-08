@@ -50,6 +50,7 @@ static bool isUnsafeUseInDefinition(const UnsafeUse &use) {
   case UnsafeUse::CallToUnsafe:
   case UnsafeUse::NonisolatedUnsafe:
   case UnsafeUse::UnownedUnsafe:
+  case UnsafeUse::ExclusivityUnchecked:
   case UnsafeUse::UnsafeConformance:
     return enclosingContextForUnsafe(use).second;
   }
@@ -98,6 +99,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
         use.getKind() == UnsafeUse::CallToUnsafe ||
         use.getKind() == UnsafeUse::NonisolatedUnsafe ||
         use.getKind() == UnsafeUse::UnownedUnsafe ||
+        use.getKind() == UnsafeUse::ExclusivityUnchecked ||
         use.getKind() == UnsafeUse::UnsafeConformance) {
       auto [enclosingDecl, _] = enclosingContextForUnsafe(
           use.getLocation(), use.getDeclContext());
@@ -178,6 +180,21 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     return;
   }
 
+  case UnsafeUse::ExclusivityUnchecked: {
+    auto var = cast<VarDecl>(use.getDecl());
+    ASTContext &ctx = var->getASTContext();
+    ctx.Diags.diagnose(
+        use.getLocation(),
+        asNote ? diag::note_reference_exclusivity_unchecked
+               : diag::reference_exclusivity_unchecked,
+        var);
+    if (!asNote) {
+      var->diagnose(diag::make_enclosing_context_unsafe, var)
+        .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
+    }
+    return;
+  }
+      
   case UnsafeUse::NonisolatedUnsafe: {
     auto decl = use.getDecl();
     ASTContext &ctx = decl->getASTContext();

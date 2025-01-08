@@ -4258,6 +4258,17 @@ diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
           return;
         }
       }
+
+      // @exclusivity(unchecked) is unsafe.
+      if (auto exclusivityAttr =
+              var->getAttrs().getAttribute<ExclusivityAttr>()) {
+        if (exclusivityAttr->getMode() == ExclusivityAttr::Unchecked) {
+          diagnoseUnsafeUse(
+              UnsafeUse::forExclusivityUnchecked(var, R.Start,
+                                                 Where.getDeclContext()));
+          return;
+        }
+      }
     }
   }
 }
