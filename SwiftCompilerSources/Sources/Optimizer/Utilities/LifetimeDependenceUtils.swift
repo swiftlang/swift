@@ -394,6 +394,8 @@ extension LifetimeDependence.Scope {
       self = .borrowed(BeginBorrowValue(bbi)!)
     case is MoveValueInst:
       self = .owned(introducer)
+    case let bai as BeginAccessInst:
+      self = .access(bai)
     default:
       self = .unknown(introducer)
     }
