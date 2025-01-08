@@ -567,6 +567,84 @@ extension _ArrayBuffer {
     }
   }
 
+  @inlinable @_alwaysEmitIntoClient
+  static var associationKey: UnsafeRawPointer {
+    //We never dereference this, we just need an address to use as a unique key
+    UnsafeRawPointer(Builtin.addressof(&_swiftEmptyArrayStorage))
+  }
+  
+  @inlinable @_alwaysEmitIntoClient
+  internal func getAssociatedBuffer() -> _ContiguousArrayBuffer<Element>? {
+    let getter = unsafeBitCast(
+      getGetAssociatedObjectPtr(),
+      to: (@convention(c)(
+        AnyObject,
+        UnsafeRawPointer
+      ) -> UnsafeRawPointer?).self
+    )
+    if let assocPtr = getter(
+      _storage.objCInstance,
+      _ArrayBuffer.associationKey
+    ) {
+      let buffer = assocPtr.loadUnaligned(
+        as: _ContiguousArrayStorage<Element>.self
+      )
+      return _ContiguousArrayBuffer(buffer)
+    }
+    return nil
+  }
+  
+  @inlinable @_alwaysEmitIntoClient
+  internal func setAssociatedBuffer(_ buffer: _ContiguousArrayBuffer<Element>) {
+    let setter = unsafeBitCast(getSetAssociatedObjectPtr(), to: (@convention(c)(
+      AnyObject,
+      UnsafeRawPointer,
+      AnyObject?,
+      UInt
+    ) -> Void).self)
+    setter(
+      _storage.objCInstance,
+      _ArrayBuffer.associationKey,
+      buffer._storage,
+      1 //OBJC_ASSOCIATION_RETAIN_NONATOMIC
+    )
+  }
+  
+  @_alwaysEmitIntoClient @inline(never)
+  internal func withUnsafeBufferPointer_nonNative<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    let unwrapped: _ContiguousArrayBuffer<Element>
+    // libobjc already provides the necessary memory barriers for
+    // double checked locking to be safe, per comments on
+    // https://github.com/swiftlang/swift/pull/75148
+    if let associatedBuffer = getAssociatedBuffer() {
+      unwrapped = associatedBuffer
+    } else {
+      let lock = _storage.objCInstance
+      objc_sync_enter(lock)
+      var associatedBuffer = getAssociatedBuffer()
+      if let associatedBuffer {
+        unwrapped = associatedBuffer
+      } else {
+        associatedBuffer = ContiguousArray(self)._buffer
+        unwrapped = associatedBuffer.unsafelyUnwrapped
+        setAssociatedBuffer(unwrapped)
+      }
+      defer { _fixLifetime(unwrapped) }
+      objc_sync_exit(lock)
+    }
+    return try body(
+      UnsafeBufferPointer(
+        start: unwrapped.firstElementAddress,
+        count: unwrapped.count
+      )
+    )
+  }
+  
+  /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
+  /// underlying contiguous storage.  If no such storage exists, it is
+  /// created on-demand.
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @usableFromInline
@@ -594,7 +672,7 @@ extension _ArrayBuffer {
       return try body(
         UnsafeBufferPointer(start: firstElementAddress, count: count))
     }
-    return try ContiguousArray(self).withUnsafeBufferPointer(body)
+    return try withUnsafeBufferPointer_nonNative(body)
   }
 
   // Superseded by the typed-throws version of this function, but retained
