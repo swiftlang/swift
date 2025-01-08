@@ -74,6 +74,11 @@ enum class DiagnosticOptions {
 
   /// A diagnostic warning about an unused element.
   NoUsage,
+
+  /// The diagnostic should be ignored by default, but will be re-enabled
+  /// by various warning options (-Wwarning, -Werror). This only makes sense
+  /// for warnings.
+  DefaultIgnore,
 };
 struct StoredDiagnosticInfo {
   DiagnosticKind kind : 2;
@@ -82,15 +87,17 @@ struct StoredDiagnosticInfo {
   bool isAPIDigesterBreakage : 1;
   bool isDeprecation : 1;
   bool isNoUsage : 1;
+  bool defaultIgnore : 1;
   DiagGroupID groupID;
 
   constexpr StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken,
                                  bool fatal, bool isAPIDigesterBreakage,
                                  bool deprecation, bool noUsage,
-                                 DiagGroupID groupID)
+                                 bool defaultIgnore, DiagGroupID groupID)
       : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal),
         isAPIDigesterBreakage(isAPIDigesterBreakage),
-        isDeprecation(deprecation), isNoUsage(noUsage), groupID(groupID) {}
+        isDeprecation(deprecation), isNoUsage(noUsage),
+        defaultIgnore(defaultIgnore), groupID(groupID) {}
   constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts,
                                  DiagGroupID groupID)
       : StoredDiagnosticInfo(k,
@@ -98,7 +105,9 @@ struct StoredDiagnosticInfo {
                              opts == DiagnosticOptions::Fatal,
                              opts == DiagnosticOptions::APIDigesterBreakage,
                              opts == DiagnosticOptions::Deprecation,
-                             opts == DiagnosticOptions::NoUsage, groupID) {}
+                             opts == DiagnosticOptions::NoUsage,
+                             opts == DiagnosticOptions::DefaultIgnore,
+                             groupID) {}
 };
 } // end anonymous namespace
 
@@ -168,8 +177,12 @@ static constexpr EducationalNotes<NumDiagIDs> _EducationalNotes =
 static constexpr auto educationalNotes = _EducationalNotes.value;
 
 DiagnosticState::DiagnosticState() {
-  // Initialize our ignored diagnostics to default
-  ignoredDiagnostics.resize(NumDiagIDs);
+  // Initialize our ignored diagnostics to defaults
+  ignoredDiagnostics.reserve(NumDiagIDs);
+  for (const auto &info : storedDiagnosticInfos) {
+    ignoredDiagnostics.push_back(info.defaultIgnore);
+  }
+
   // Initialize warningsAsErrors to default
   warningsAsErrors.resize(DiagGroupsCount);
 }
@@ -547,6 +560,9 @@ void DiagnosticEngine::setWarningsAsErrorsRules(
           groupID && *groupID != DiagGroupID::no_group) {
         getDiagGroupInfoByID(*groupID).traverseDepthFirst([&](auto group) {
           state.setWarningsAsErrorsForDiagGroupID(*groupID, isEnabled);
+          for (DiagID diagID : group.diagnostics) {
+            state.setIgnoredDiagnostic(diagID, false);
+          }
         });
       } else {
         unknownGroups.push_back(std::string(name));
