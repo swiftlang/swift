@@ -70,6 +70,7 @@ include(PlatformInfo)
 include(gyb)
 include(Plist)
 
+check_symbol_exists("asl_log" "asl.h" SwiftCore_HAS_ASL)
 check_symbol_exists("dladdr" "dlfcn.h" SwiftCore_HAS_DLADDR)
 check_symbol_exists("dlsym" "dlfcn.h" SwiftCore_HAS_DLSYM)
 

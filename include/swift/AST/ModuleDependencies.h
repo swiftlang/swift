@@ -176,13 +176,6 @@ class ModuleDependencyInfoStorageBase {
 public:
   const ModuleDependencyKind dependencyKind;
 
-  ModuleDependencyInfoStorageBase(ModuleDependencyKind dependencyKind,
-                                  ArrayRef<LinkLibrary> linkLibraries,
-                                  StringRef moduleCacheKey = "")
-      : dependencyKind(dependencyKind), linkLibraries(linkLibraries),
-        moduleCacheKey(moduleCacheKey.str()),
-        finalized(false) {}
-
   ModuleDependencyInfoStorageBase(
       ModuleDependencyKind dependencyKind,
       ArrayRef<ScannerImportStatementInfo> moduleImports,
@@ -303,11 +296,14 @@ public:
   SwiftInterfaceModuleDependenciesStorage(
       StringRef moduleOutputPath, StringRef swiftInterfaceFile,
       ArrayRef<StringRef> compiledModuleCandidates,
+      ArrayRef<ScannerImportStatementInfo> moduleImports,
+      ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<StringRef> buildCommandLine, ArrayRef<LinkLibrary> linkLibraries,
       ArrayRef<StringRef> extraPCMArgs, StringRef contextHash, bool isFramework,
       bool isStatic, StringRef RootID, StringRef moduleCacheKey,
       StringRef userModuleVersion)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftInterface,
+                                        moduleImports, optionalModuleImports,
                                         linkLibraries, moduleCacheKey),
         moduleOutputPath(moduleOutputPath),
         swiftInterfaceFile(swiftInterfaceFile),
@@ -350,9 +346,12 @@ public:
 
   SwiftSourceModuleDependenciesStorage(
       StringRef RootID, ArrayRef<StringRef> buildCommandLine,
+      ArrayRef<ScannerImportStatementInfo> moduleImports,
+      ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<StringRef> bridgingHeaderBuildCommandLine,
       ArrayRef<StringRef> extraPCMArgs)
-      : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftSource, {}),
+      : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftSource,
+                                        moduleImports, optionalModuleImports, {}),
         textualModuleDetails(extraPCMArgs, buildCommandLine, RootID),
         testableImports(llvm::StringSet<>()),
         bridgingHeaderBuildCommandLine(bridgingHeaderBuildCommandLine.begin(),
@@ -500,6 +499,7 @@ public:
                                StringRef clangIncludeTreeRoot,
                                StringRef moduleCacheKey, bool IsSystem)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::Clang,
+                                        {}, {},
                                         linkLibraries, moduleCacheKey),
         pcmOutputPath(pcmOutputPath), mappedPCMPath(mappedPCMPath),
         moduleMapFile(moduleMapFile), contextHash(contextHash),
@@ -531,7 +531,7 @@ public:
   SwiftPlaceholderModuleDependencyStorage(StringRef compiledModulePath,
                                           StringRef moduleDocPath,
                                           StringRef sourceInfoPath)
-      : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftPlaceholder,
+      : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftPlaceholder, {}, {},
                                         {}),
         compiledModulePath(compiledModulePath), moduleDocPath(moduleDocPath),
         sourceInfoPath(sourceInfoPath) {}
@@ -586,6 +586,8 @@ public:
   static ModuleDependencyInfo forSwiftInterfaceModule(
       StringRef moduleOutputPath, StringRef swiftInterfaceFile,
       ArrayRef<StringRef> compiledCandidates, ArrayRef<StringRef> buildCommands,
+      ArrayRef<ScannerImportStatementInfo> moduleImports,
+      ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<LinkLibrary> linkLibraries, ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash, bool isFramework, bool isStatic,
       StringRef CASFileSystemRootID, StringRef moduleCacheKey,
@@ -593,6 +595,7 @@ public:
     return ModuleDependencyInfo(
         std::make_unique<SwiftInterfaceModuleDependenciesStorage>(
             moduleOutputPath, swiftInterfaceFile, compiledCandidates,
+            moduleImports, optionalModuleImports,
             buildCommands, linkLibraries, extraPCMArgs, contextHash,
             isFramework, isStatic, CASFileSystemRootID, moduleCacheKey,
             userModuleVersion));
@@ -619,12 +622,26 @@ public:
   static ModuleDependencyInfo
   forSwiftSourceModule(const std::string &CASFileSystemRootID,
                        ArrayRef<StringRef> buildCommands,
+                       ArrayRef<ScannerImportStatementInfo> moduleImports,
+                       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
                        ArrayRef<StringRef> bridgingHeaderBuildCommands,
                        ArrayRef<StringRef> extraPCMArgs) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftSourceModuleDependenciesStorage>(
-            CASFileSystemRootID, buildCommands, bridgingHeaderBuildCommands,
+            CASFileSystemRootID, buildCommands, moduleImports,
+            optionalModuleImports, bridgingHeaderBuildCommands,
             extraPCMArgs));
+  }
+
+  static ModuleDependencyInfo
+  forSwiftSourceModule() {
+    return ModuleDependencyInfo(
+        std::make_unique<SwiftSourceModuleDependenciesStorage>(
+             StringRef(), ArrayRef<StringRef>(),
+             ArrayRef<ScannerImportStatementInfo>(),
+             ArrayRef<ScannerImportStatementInfo>(),
+             ArrayRef<StringRef>(),
+             ArrayRef<StringRef>()));
   }
 
   /// Describe the module dependencies for a Clang module that can be
@@ -768,6 +785,15 @@ public:
   void
   setLinkLibraries(const ArrayRef<LinkLibrary> linkLibraries) {
     storage->linkLibraries.assign(linkLibraries.begin(), linkLibraries.end());
+  }
+  
+  const ArrayRef<std::string> getAuxiliaryFiles() const {
+    return storage->auxiliaryFiles;
+  }
+  
+  void
+  setAuxiliaryFiles(const ArrayRef<std::string> auxiliaryFiles) {
+    storage->auxiliaryFiles.assign(auxiliaryFiles.begin(), auxiliaryFiles.end());
   }
 
   bool isStaticLibrary() const {
