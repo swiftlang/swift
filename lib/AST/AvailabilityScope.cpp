@@ -295,21 +295,19 @@ static SourceRange getAvailabilityConditionVersionSourceRange(
 }
 
 static SourceRange
-getAvailabilityConditionVersionSourceRange(const DeclAttributes &DeclAttrs,
-                                           PlatformKind Platform,
+getAvailabilityConditionVersionSourceRange(const Decl *D, PlatformKind Platform,
                                            const llvm::VersionTuple &Version) {
   SourceRange Range;
-  for (auto *Attr : DeclAttrs) {
-    if (auto *AA = dyn_cast<AvailableAttr>(Attr)) {
-      if (AA->Introduced.has_value() && AA->Introduced.value() == Version &&
-          AA->getPlatform() == Platform) {
+  for (auto Attr : D->getSemanticAvailableAttrs()) {
+    if (Attr.getIntroduced().has_value() &&
+        Attr.getIntroduced().value() == Version &&
+        Attr.getPlatform() == Platform) {
 
-        // More than one: return invalid range.
-        if (Range.isValid())
-          return SourceRange();
-        else
-          Range = AA->IntroducedRange;
-      }
+      // More than one: return invalid range.
+      if (Range.isValid())
+        return SourceRange();
+      else
+        Range = Attr.getParsedAttr()->IntroducedRange;
     }
   }
   return Range;
@@ -319,8 +317,8 @@ SourceRange AvailabilityScope::getAvailabilityConditionVersionSourceRange(
     PlatformKind Platform, const llvm::VersionTuple &Version) const {
   switch (getReason()) {
   case Reason::Decl:
-    return ::getAvailabilityConditionVersionSourceRange(
-        Node.getAsDecl()->getAttrs(), Platform, Version);
+    return ::getAvailabilityConditionVersionSourceRange(Node.getAsDecl(),
+                                                        Platform, Version);
 
   case Reason::IfStmtThenBranch:
   case Reason::IfStmtElseBranch:

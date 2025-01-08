@@ -16,7 +16,7 @@
 
 using namespace swift;
 
-bool AvailabilityDomain::isActive(ASTContext &ctx) const {
+bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   switch (kind) {
   case Kind::Universal:
   case Kind::SwiftLanguage:

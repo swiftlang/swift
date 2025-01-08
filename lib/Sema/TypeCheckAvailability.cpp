@@ -317,25 +317,17 @@ ExportContext::getExportabilityReason() const {
   return std::nullopt;
 }
 
-/// Returns the first availability attribute on the declaration that is active
-/// on the target platform.
-static const AvailableAttr *getActiveAvailableAttribute(const Decl *D,
-                                                        ASTContext &AC) {
+/// Returns true if there is any availability attribute on the declaration
+/// that is active.
+static bool hasActiveAvailableAttribute(const Decl *D, ASTContext &ctx) {
   D = abstractSyntaxDeclForAvailableAttribute(D);
 
-  for (auto Attr : D->getAttrs())
-    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-      if (!AvAttr->isInvalid() && AvAttr->isActivePlatform(AC)) {
-        return AvAttr;
-      }
-    }
-  return nullptr;
-}
+  for (auto Attr : D->getSemanticAvailableAttrs()) {
+    if (Attr.isActive(ctx))
+      return true;
+  }
 
-/// Returns true if there is any availability attribute on the declaration
-/// that is active on the target platform.
-static bool hasActiveAvailableAttribute(const Decl *D, ASTContext &AC) {
-  return getActiveAvailableAttribute(D, AC);
+  return false;
 }
 
 static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
@@ -1979,7 +1971,7 @@ fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
   if (TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D).has_value())
     return;
 
-  if (getActiveAvailableAttribute(D, Context)) {
+  if (hasActiveAvailableAttribute(D, Context)) {
     // For QoI, in future should emit a fixit to update the existing attribute.
     return;
   }
@@ -2853,7 +2845,7 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
   // FIXME: [availability] Remap before emitting diagnostic above.
   llvm::VersionTuple RemappedDeprecatedVersion;
   if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-          Attr->getParsedAttr(), Context, Platform, RemappedDeprecatedVersion))
+          *Attr, Context, Platform, RemappedDeprecatedVersion))
     DeprecatedVersion = RemappedDeprecatedVersion;
 
   SmallString<32> newNameBuf;
@@ -2928,7 +2920,7 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
 
   llvm::VersionTuple remappedDeprecatedVersion;
   if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-          attr->getParsedAttr(), ctx, platform, remappedDeprecatedVersion))
+          *attr, ctx, platform, remappedDeprecatedVersion))
     deprecatedVersion = remappedDeprecatedVersion;
 
   auto message = attr->getMessage();
@@ -3583,7 +3575,7 @@ bool diagnoseExplicitUnavailability(
   } else {
     auto unavailableDiagnosticPlatform = platform;
     AvailabilityInference::updatePlatformStringForFallback(
-        Attr.getParsedAttr(), ctx, unavailableDiagnosticPlatform);
+        Attr, ctx, unavailableDiagnosticPlatform);
     EncodedDiagnosticMessage EncodedMessage(message);
     diags
         .diagnose(Loc, diag::availability_decl_unavailable, D, platform.empty(),

@@ -421,7 +421,7 @@ void DeclAttributes::dump(const Decl *D) const {
 LLVM_READONLY
 static bool isShortAvailable(const SemanticAvailableAttr &attr) {
   auto parsedAttr = attr.getParsedAttr();
-  if (parsedAttr->isSPI())
+  if (attr.isSPI())
     return false;
 
   if (!attr.getIntroduced().has_value())
@@ -741,11 +741,16 @@ static void printDifferentiableAttrArguments(
 
 /// Returns the `PlatformKind` referenced by \p attr if applicable, or
 /// `std::nullopt` otherwise.
-static std::optional<PlatformKind>
-referencedPlatform(const DeclAttribute *attr) {
+static std::optional<PlatformKind> referencedPlatform(const DeclAttribute *attr,
+                                                      const Decl *D) {
   switch (attr->getKind()) {
   case DeclAttrKind::Available:
-    return static_cast<const AvailableAttr *>(attr)->getPlatform();
+    if (auto semanticAttr = D->getSemanticAvailableAttr(
+            static_cast<const AvailableAttr *>(attr))) {
+      if (semanticAttr->isPlatformSpecific())
+        return semanticAttr->getPlatform();
+    }
+    return std::nullopt;
   case DeclAttrKind::BackDeployed:
     return static_cast<const BackDeployedAttr *>(attr)->Platform;
   case DeclAttrKind::OriginallyDefinedIn:
@@ -757,8 +762,8 @@ referencedPlatform(const DeclAttribute *attr) {
 
 /// Returns true if \p attr contains a reference to a `PlatformKind` that should
 /// be considered SPI.
-static bool referencesSPIPlatform(const DeclAttribute *attr) {
-  if (auto platform = referencedPlatform(attr))
+static bool referencesSPIPlatform(const DeclAttribute *attr, const Decl *D) {
+  if (auto platform = referencedPlatform(attr, D))
     return isPlatformSPI(*platform);
   return false;
 }
@@ -805,7 +810,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     // In the public interfaces of -library-level=api modules, skip attributes
     // that reference SPI platforms.
     if (Options.printPublicInterface() && libraryLevelAPI &&
-        referencesSPIPlatform(DA))
+        referencesSPIPlatform(DA, D))
       continue;
 
     // If we're supposed to suppress expanded macros, check whether this is
@@ -1172,21 +1177,20 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DeclAttrKind::Available: {
-    auto Attr = cast<AvailableAttr>(this);
-    auto SemanticAttr = D->getSemanticAvailableAttr(Attr);
-    if (!SemanticAttr)
+    auto Attr = D->getSemanticAvailableAttr(cast<AvailableAttr>(this));
+    if (!Attr)
       return false;
 
     if (Options.printPublicInterface() && Attr->isSPI()) {
-      assert(Attr->hasPlatform());
-      assert(Attr->Introduced.has_value());
+      assert(Attr->isPlatformSpecific());
+      assert(Attr->getIntroduced().has_value());
       Printer.printAttrName("@available");
       Printer << "(";
-      Printer << Attr->platformString();
+      Printer << Attr->getDomain().getNameForAttributePrinting();
       Printer << ", unavailable)";
       break;
     }
-    if (Attr->isForEmbedded()) {
+    if (Attr->getParsedAttr()->isForEmbedded()) {
       std::string atUnavailableInEmbedded =
           (llvm::Twine("@") + UNAVAILABLE_IN_EMBEDDED_ATTRNAME).str();
       Printer.printAttrName(atUnavailableInEmbedded);
@@ -1200,7 +1204,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer.printAttrName("@available");
     }
     Printer << "(";
-    printAvailableAttr(D, *SemanticAttr, Printer, Options);
+    printAvailableAttr(D, *Attr, Printer, Options);
     Printer << ")";
     break;
   }
@@ -2148,10 +2152,6 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
       /*SPI=*/false);
 }
 
-bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
-  return isPlatformActive(getPlatform(), ctx.LangOpts);
-}
-
 bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
                                         bool forTargetVariant) const {
   return isPlatformActive(Platform, ctx.LangOpts, forTargetVariant);
@@ -2261,7 +2261,7 @@ SemanticAvailableAttr::getVersionAvailability(const ASTContext &ctx) const {
   StringRef ObsoletedPlatform;
   llvm::VersionTuple RemappedObsoletedVersion;
   if (AvailabilityInference::updateObsoletedPlatformForFallback(
-          attr, ctx, ObsoletedPlatform, RemappedObsoletedVersion))
+          *this, ctx, ObsoletedPlatform, RemappedObsoletedVersion))
     ObsoletedVersion = RemappedObsoletedVersion;
 
   // If this entity was obsoleted before or at the query platform version,
@@ -2273,7 +2273,7 @@ SemanticAvailableAttr::getVersionAvailability(const ASTContext &ctx) const {
   StringRef IntroducedPlatform;
   llvm::VersionTuple RemappedIntroducedVersion;
   if (AvailabilityInference::updateIntroducedPlatformForFallback(
-          attr, ctx, IntroducedPlatform, RemappedIntroducedVersion))
+          *this, ctx, IntroducedPlatform, RemappedIntroducedVersion))
     IntroducedVersion = RemappedIntroducedVersion;
 
   // If this entity was introduced after the query version and we're doing a
