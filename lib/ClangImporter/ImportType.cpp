@@ -1669,7 +1669,7 @@ static ImportedType adjustTypeForConcreteImport(
   // optional type.
   bool isIUO = false;
   if (importKind != ImportTypeKind::Typedef && optKind != OTK_None &&
-      canImportAsOptional(hint)) {
+      canImportAsOptional(hint) && !importedType->isForeignReferenceType()) {
     isIUO = optKind == OTK_ImplicitlyUnwrappedOptional;
     importedType = OptionalType::get(importedType);
   }

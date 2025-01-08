@@ -39,6 +39,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 
@@ -603,11 +604,7 @@ clang::QualType ClangTypeConverter::convertPointerType(BoundGenericType *type,
                                                        bool templateArgument) {
   auto args = type->getGenericArgs();
   assert(args.size() == 1 && "Optional should have 1 generic argument.");
-  auto argCanonicalTy = args[0]->getCanonicalType();
-
-  auto convertType = [&](auto t) {
-    return templateArgument ? convertTemplateArgument(t) : convert(t);
-  };
+  auto argType = args[0]->getCanonicalType();
 
   enum class StructKind {
     Invalid,
@@ -630,28 +627,35 @@ clang::QualType ClangTypeConverter::convertPointerType(BoundGenericType *type,
     return clang::QualType();
 
   case StructKind::Unmanaged:
-    return convertType(argCanonicalTy);
+    return templateArgument ? clang::QualType() : convert(argType);
 
-  case StructKind::UnsafeMutablePointer:
-  case StructKind::AutoreleasingUnsafeMutablePointer: {
-    auto clangTy = convertType(argCanonicalTy);
+  case StructKind::AutoreleasingUnsafeMutablePointer:
+    if (templateArgument)
+      return clang::QualType();
+    LLVM_FALLTHROUGH;
+
+  case StructKind::UnsafeMutablePointer: {
+    auto clangTy = templateArgument ? convertTemplateArgument(argType) : convert(argType);
     if (clangTy.isNull())
       return clang::QualType();
     return ClangASTContext.getPointerType(clangTy);
   }
   case StructKind::UnsafePointer: {
-    auto clangTy = convertType(argCanonicalTy);
+    auto clangTy = templateArgument ? convertTemplateArgument(argType) : convert(argType);
     if (clangTy.isNull())
       return clang::QualType();
     return ClangASTContext.getPointerType(clangTy.withConst());
   }
 
   case StructKind::CFunctionPointer: {
+    if (templateArgument)
+      return clang::QualType();
+
     auto &clangCtx = ClangASTContext;
 
     clang::QualType functionTy;
-    if (isa<SILFunctionType>(argCanonicalTy->getCanonicalType())) {
-      functionTy = convertType(argCanonicalTy);
+    if (isa<SILFunctionType>(argType->getCanonicalType())) {
+      functionTy = convert(argType);
       if (functionTy.isNull())
         return clang::QualType();
     } else {
