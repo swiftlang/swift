@@ -78,7 +78,9 @@ set(CoreLibs
   CompatibilityOverride
   stubs
   CommandLineSupport
-  core)
+  core
+  Concurrency
+  Concurrency/InternalShims)
 
   # Add these as we get them building
   # core
