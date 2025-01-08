@@ -22,6 +22,7 @@
 ///     let b = a + CollectionOfOne(toAdd)
 ///     // b == [1, 2, 3, 4, 100]
 @frozen // trivial-implementation
+@_addressableForDependencies
 public struct CollectionOfOne<Element> {
   @usableFromInline // trivial-implementation
   internal var _element: Element
