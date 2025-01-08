@@ -394,6 +394,8 @@ extension LifetimeDependence.Scope {
       self = .borrowed(BeginBorrowValue(bbi)!)
     case is MoveValueInst:
       self = .owned(introducer)
+    case let bai as BeginAccessInst:
+      self = .access(bai)
     default:
       self = .unknown(introducer)
     }
@@ -423,12 +425,12 @@ extension LifetimeDependence.Scope {
   /// Ignore "irrelevent" borrow scopes: load_borrow or begin_borrow without [var_decl]
   func ignoreBorrowScope(_ context: some Context) -> LifetimeDependence.Scope? {
     guard case let .borrowed(beginBorrowVal) = self else {
-      return self
+      return nil
     }
     switch beginBorrowVal {
     case let .beginBorrow(bb):
       if bb.isFromVarDecl {
-        return self
+        return nil
       }
       return LifetimeDependence.Scope(base: bb.borrowedValue, context).ignoreBorrowScope(context)
     case let .loadBorrow(lb):

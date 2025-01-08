@@ -119,9 +119,8 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
       continue
     }
     // Redirect the dependence base to ignore irrelevant borrow scopes.
-    guard let newLifetimeDep = markDep.rewriteSkippingBorrow(scope: innerLifetimeDep.scope, context) else {
-      continue
-    }
+    let newLifetimeDep = markDep.rewriteSkippingBorrow(scope: innerLifetimeDep.scope, context)
+
     // Recursively sink enclosing end_access, end_borrow, or end_apply.
     let args = extendScopes(dependence: newLifetimeDep, localReachabilityCache, context)
 
@@ -135,9 +134,9 @@ private extension MarkDependenceInst {
   ///
   /// Note: this could be done as a general simplification, e.g. after inlining. But currently this is only relevant for
   /// diagnostics.
-  func rewriteSkippingBorrow(scope: LifetimeDependence.Scope, _ context: FunctionPassContext) -> LifetimeDependence? {
+  func rewriteSkippingBorrow(scope: LifetimeDependence.Scope, _ context: FunctionPassContext) -> LifetimeDependence {
     guard let newScope = scope.ignoreBorrowScope(context) else {
-      return nil
+      return LifetimeDependence(scope: scope, dependentValue: self)
     }
     let newBase = newScope.parentValue
     if newBase != self.baseOperand.value {

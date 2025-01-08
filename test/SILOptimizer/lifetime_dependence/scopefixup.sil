@@ -81,3 +81,42 @@ bb2:
   destroy_value %10
   unwind
 }
+
+sil @pointeeAddressor : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+
+// Test dependence on a loaded trivial value. The dependence scope should not be on the access scope, which is narrower
+// than the scoped of the loaded value.
+//
+// CHECK-LABEL: sil hidden [ossa] @testTrivialAccess : $@convention(thin) (UnsafePointer<Int64>) -> () {
+// CHECK: bb0(%0 : $UnsafePointer<Int64>):
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown]
+// CHECK:   [[LD:%.*]] = load [trivial] [[ACCESS]]
+// CHECK:   [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*Int64
+// CHECK:   [[MD:%.*]] = mark_dependence [unresolved] [[ADR]] on [[LD]]
+// CHECK:   [[ACCESS2:%.*]] = begin_access [read] [unsafe] [[MD]]
+// CHECK:   end_access [[ACCESS2]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK-LABEL: } // end sil function 'testTrivialAccess'
+sil hidden [ossa] @testTrivialAccess : $@convention(thin) (UnsafePointer<Int64>) -> () {
+bb0(%0 : $UnsafePointer<Int64>):
+  debug_value %0, let, name "p", argno 1
+  %2 = alloc_box ${ var UnsafePointer<Int64> }, var, name "ptr"
+  %3 = begin_borrow [var_decl] %2
+  %4 = project_box %3, 0
+  store %0 to [trivial] %4
+  %6 = begin_access [read] [unknown] %4
+  %7 = load [trivial] %6
+  end_access %6
+  %9 = function_ref @pointeeAddressor : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+  %10 = apply %9<Int64>(%7) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
+  %11 = struct_extract %10, #UnsafePointer._rawValue
+  %12 = pointer_to_address %11 to [strict] $*Int64
+  %13 = mark_dependence [unresolved] %12 on %7
+  %14 = begin_access [read] [unsafe] %13
+  %15 = load [trivial] %14
+  end_access %14
+  end_borrow %3
+  destroy_value %2
+  %19 = tuple ()
+  return %19
+}
