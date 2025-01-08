@@ -1779,20 +1779,17 @@ private:
              ParameterTypeFlags origFlags) {
     assert(!isa<InOutType>(substType));
 
-    if (TC.Context.LangOpts.hasFeature(Feature::AddressableTypes)
-        || TC.Context.LangOpts.hasFeature(Feature::AddressableParameters)) {
-      // If the parameter is marked addressable, lower it with maximal
-      // abstraction.
-      if (origFlags.isAddressable()) {
+    // If the parameter is marked addressable, lower it with maximal
+    // abstraction.
+    if (origFlags.isAddressable()) {
+      origType = AbstractionPattern::getOpaque();
+    } else if (hasScopedDependency) {
+      // If there is a scoped dependency on this parameter, and the parameter
+      // is addressable-for-dependencies, then lower it with maximal abstraction
+      // as well.
+      auto &initialSubstTL = TC.getTypeLowering(origType, substType, expansion);
+      if (initialSubstTL.getRecursiveProperties().isAddressableForDependencies()) {
         origType = AbstractionPattern::getOpaque();
-      } else if (hasScopedDependency) {
-        // If there is a scoped dependency on this parameter, and the parameter
-        // is addressable-for-dependencies, then lower it with maximal abstraction
-        // as well.
-        auto &initialSubstTL = TC.getTypeLowering(origType, substType, expansion);
-        if (initialSubstTL.getRecursiveProperties().isAddressableForDependencies()) {
-          origType = AbstractionPattern::getOpaque();
-        }
       }
     }
 

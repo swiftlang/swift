@@ -222,7 +222,7 @@ public:
             IsNotTypeExpansionSensitive,
         HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer,
         IsLexical_t isLexical = IsNotLexical, HasPack_t hasPack = HasNoPack,
-        IsAddressableForDependencies_t isAFD = IsAddressableForDependencies)
+        IsAddressableForDependencies_t isAFD = IsNotAddressableForDependencies)
         : Flags((isTrivial ? 0U : NonTrivialFlag) |
                 (isFixedABI ? 0U : NonFixedABIFlag) |
                 (isAddressOnly ? AddressOnlyFlag : 0U) |

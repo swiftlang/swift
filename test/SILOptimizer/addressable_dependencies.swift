@@ -6,6 +6,27 @@
 
 import Builtin
 
+struct NodeRef: ~Escapable {
+    private var parent: UnsafePointer<Node>
+
+    // CHECK-LABEL: sil {{.*}}@${{.*}}7NodeRefV4node{{.*}}fC :
+    // CHECK-SAME:    (@in_guaranteed Node,
+    @lifetime(borrow node)
+    init(node: borrowing Node) {
+        // CHECK: bb0(%0 : @noImplicitCopy $*Node,
+        // CHECK:   [[RAW_PTR:%.*]] = address_to_pointer {{.*}}%0
+        // CHECK:   struct $UnsafePointer<Node> ([[RAW_PTR]])
+        self.parent = UnsafePointer(Builtin.addressOfBorrow(node))
+    }
+
+    // CHECK-LABEL: sil {{.*}}@${{.*}}7NodeRefV9allocated{{.*}}fC :
+    // CHECK-SAME:    (@guaranteed AllocatedNode,
+    @lifetime(borrow allocated)
+    init(allocated: borrowing AllocatedNode) {
+        self.parent = allocated.node
+    }
+}
+
 @_addressableForDependencies
 struct Node {
     var id: String
@@ -23,16 +44,17 @@ struct Node {
     }
 }
 
-struct NodeRef: ~Escapable {
-    private var parent: UnsafePointer<Node>
+// not addressable for dependencies
+struct AllocatedNode: ~Copyable {
+    fileprivate var node: UnsafePointer<Node>
 
-    // CHECK-LABEL: sil {{.*}}@${{.*}}7NodeRefV4node{{.*}}fC :
-    // CHECK-SAME:    (@in_guaranteed Node,
-    @lifetime(borrow node)
-    init(node: borrowing Node) {
-        // CHECK: bb0(%0 : @noImplicitCopy $*Node,
-        // CHECK:   [[RAW_PTR:%.*]] = address_to_pointer {{.*}}%0
-        // CHECK:   struct $UnsafePointer<Node> ([[RAW_PTR]])
-        self.parent = UnsafePointer(Builtin.addressOfBorrow(node))
+    var ref: NodeRef {
+      // CHECK-LABEL: sil {{.*}}@${{.*}}13AllocatedNodeV3ref{{.*}}Vvg :
+      // CHECK-SAME:    (@guaranteed AllocatedNode) ->
+      @lifetime(borrow self)
+      borrowing get {
+        return NodeRef(allocated: self)
+      }
     }
 }
+
