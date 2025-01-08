@@ -2996,14 +2996,15 @@ namespace {
               CanSILFunctionType loweredType, SubstitutionMap subs) {
       LoweredInfos = loweredType->getUnsubstitutedType(SGM.M)->getYields();
 
-      auto accessor = cast<AccessorDecl>(function.getDecl());
-      auto storage = accessor->getStorage();
+      auto origFd = cast<FuncDecl>(function.getDecl());
+      auto sig = origFd->getGenericSignatureOfContext().getCanonicalSignature();
 
-      OrigTypes.push_back(
-        SGM.Types.getAbstractionPattern(storage, /*nonobjc*/ true));
+      auto origYieldType = origFd->getYieldsInterfaceType()->castTo<YieldResultType>();
+      auto reducedYieldType = sig.getReducedType(origYieldType->getResultType());
+      OrigTypes.emplace_back(sig, reducedYieldType);
 
       SmallVector<AnyFunctionType::Yield, 1> yieldsBuffer;
-      auto yields = AnyFunctionRef(accessor).getYieldResults(yieldsBuffer);
+      auto yields = AnyFunctionRef(origFd).getYieldResults(yieldsBuffer);
       assert(yields.size() == 1);
       Yields.push_back(yields[0].getCanonical().subst(subs).asParam());
     }
@@ -6655,10 +6656,6 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   SILType substFnType = fnRef->getType().substGenericArgs(
       M, subs, thunk->getTypeExpansionContext());
 
-  // Apply function argument.
-  auto apply =
-      thunkSGF.emitApplyWithRethrow(loc, fnRef, substFnType, subs, arguments);
-
   // Self reordering thunk is necessary if wrt at least two parameters,
   // including self.
   auto shouldReorderSelf = [&]() {
@@ -6695,18 +6692,66 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     thunkSGF.B.createReturn(loc, retValue);
   };
 
-  if (!reorderSelf && linearMapFnType == targetLinearMapFnType) {
-    SmallVector<SILValue, 8> results;
+  SmallVector<SILValue, 8> results;
+  if (customDerivativeFnTy->isCoroutine()) {
+    assert(kind == AutoDiffDerivativeFunctionKind::VJP &&
+          "only support VJP custom coroutine derivatives");
+
+    SmallVector<SILValue, 1> yields;
+    // Start inner coroutine execution till the suspend point
+    auto tokenAndCleanups = thunkSGF.emitBeginApplyWithRethrow(
+      loc, fnRef, substFnType /*fnRef->getType()*/,
+      subs, arguments, yields);
+    auto token = std::get<0>(tokenAndCleanups);
+    auto abortCleanup = std::get<1>(tokenAndCleanups);
+    auto allocation = std::get<2>(tokenAndCleanups);
+    auto deallocCleanup = std::get<3>(tokenAndCleanups);
+
+    // Forward yields
+    auto *customDerivativeAFD =
+      cast<AbstractFunctionDecl>(customDerivativeFn->getDeclContext()->getAsDecl());
+    auto thunkTy = thunkSGF.F.getLoweredFunctionType();
+    YieldInfo innerYieldInfo(*this, SILDeclRef(customDerivativeAFD), fnRefType,
+                             subs);
+    // FIXME: We do not have Decl for the thunk as it is generated entirely at SIL level.
+    // Fix the yield info in case when reabstraction of yields would be required
+    YieldInfo outerYieldInfo(*this, SILDeclRef(customDerivativeAFD), thunkTy,
+                             thunk->getForwardingSubstitutionMap());
+    translateYields(thunkSGF, loc, yields, innerYieldInfo, outerYieldInfo);
+
+    // Kill the normal abort cleanup without emitting it. translateYields() will
+    // produce proper abort_apply & cleanups for inner coroutine call in the
+    // unwind block, and for normal return we're doing it manually below
+    thunkSGF.Cleanups.setCleanupState(abortCleanup, CleanupState::Dead);
+    if (allocation) {
+      thunkSGF.Cleanups.setCleanupState(deallocCleanup, CleanupState::Dead);
+    }
+
+    // End the inner coroutine normally.
+    auto resultTy =
+      thunk->mapTypeIntoContext(
+        fnRefType->getAllResultsSubstType(M,
+                                          thunkSGF.getTypeExpansionContext()));
+    auto endApply =
+      thunkSGF.emitEndApplyWithRethrow(loc, token, allocation, resultTy);
+
+    extractAllElements(endApply, loc, thunkSGF.B, results);
+  } else {
+    // Apply function argument.
+    auto apply =
+      thunkSGF.emitApplyWithRethrow(loc, fnRef, substFnType, subs, arguments);
+
     extractAllElements(apply, loc, thunkSGF.B, results);
-    auto result = joinElements(results, thunkSGF.B, apply.getLoc());
+  }
+
+  if (!reorderSelf && linearMapFnType == targetLinearMapFnType) {
+    auto result = joinElements(results, thunkSGF.B, loc);
     createReturn(result);
     return thunk;
   }
 
   // Otherwise, apply reabstraction/self reordering thunk to linear map.
-  SmallVector<SILValue, 8> directResults;
-  extractAllElements(apply, loc, thunkSGF.B, directResults);
-  auto linearMap = thunkSGF.emitManagedRValueWithCleanup(directResults.back());
+  auto linearMap = thunkSGF.emitManagedRValueWithCleanup(results.back());
   assert(linearMap.getType().castTo<SILFunctionType>() == linearMapFnType);
   auto linearMapKind = kind.getLinearMapKind();
   linearMap = thunkSGF.getThunkedAutoDiffLinearMap(
@@ -6736,10 +6781,10 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   }
 
   // Return original results and thunked differential/pullback.
-  if (directResults.size() > 1) {
-    auto originalDirectResults = ArrayRef<SILValue>(directResults).drop_back(1);
+  if (results.size() > 1) {
+    auto originalDirectResults = ArrayRef<SILValue>(results).drop_back(1);
     auto originalDirectResult =
-        joinElements(originalDirectResults, thunkSGF.B, apply.getLoc());
+        joinElements(originalDirectResults, thunkSGF.B, loc);
     auto thunkResult = joinElements(
         {originalDirectResult, linearMap.forward(thunkSGF)}, thunkSGF.B, loc);
     createReturn(thunkResult);
