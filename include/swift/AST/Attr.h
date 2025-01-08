@@ -813,14 +813,36 @@ public:
         Bits.AvailableAttr.PlatformAgnostic);
   }
 
-  /// Create an AvailableAttr that indicates specific availability
-  /// for all platforms.
-  static AvailableAttr *
-  createPlatformAgnostic(ASTContext &C, StringRef Message, StringRef Rename = "",
-                      PlatformAgnosticAvailabilityKind Reason
-                         = PlatformAgnosticAvailabilityKind::Unavailable,
-                         llvm::VersionTuple Obsoleted
-                         = llvm::VersionTuple());
+  /// Create an `AvailableAttr` that specifies universal unavailability, e.g.
+  /// `@available(*, unavailable)`.
+  static AvailableAttr *createUniversallyUnavailable(ASTContext &C,
+                                                     StringRef Message,
+                                                     StringRef Rename = "");
+
+  /// Create an `AvailableAttr` that specifies universal deprecation, e.g.
+  /// `@available(*, deprecated)`.
+  static AvailableAttr *createUniversallyDeprecated(ASTContext &C,
+                                                    StringRef Message,
+                                                    StringRef Rename = "");
+
+  /// Create an `AvailableAttr` that specifies unavailability in Swift, e.g.
+  /// `@available(swift, unavailable)`.
+  static AvailableAttr *createUnavailableInSwift(ASTContext &C,
+                                                 StringRef Message,
+                                                 StringRef Rename = "");
+
+  /// Create an `AvailableAttr` that specifies availability associated with
+  /// Swift language modes, e.g. `@available(swift, obsoleted: 6)`.
+  static AvailableAttr *createSwiftLanguageModeVersioned(
+      ASTContext &C, StringRef Message, StringRef Rename,
+      llvm::VersionTuple Introduced, llvm::VersionTuple Obsoleted);
+
+  /// Create an `AvailableAttr` that specifies versioned availability for a
+  /// particular platform, e.g. `@available(macOS, introduced: 13)`.
+  static AvailableAttr *createPlatformVersioned(
+      ASTContext &C, PlatformKind Platform, StringRef Message, StringRef Rename,
+      llvm::VersionTuple Introduced, llvm::VersionTuple Deprecated,
+      llvm::VersionTuple Obsoleted);
 
   AvailableAttr *clone(ASTContext &C, bool implicit) const;
   AvailableAttr *clone(ASTContext &C) const {

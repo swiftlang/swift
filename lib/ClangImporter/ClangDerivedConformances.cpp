@@ -1269,7 +1269,8 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
   if (!importedConstructor)
     return;
 
-  auto attr = AvailableAttr::createPlatformAgnostic(importedConstructor->getASTContext(), "use 'init(_:)' instead.", "", PlatformAgnosticAvailabilityKind::Deprecated);
+  auto attr = AvailableAttr::createUniversallyDeprecated(
+      importedConstructor->getASTContext(), "use 'init(_:)' instead.", "");
   importedConstructor->getAttrs().add(attr);
 
   decl->addMember(importedConstructor);
