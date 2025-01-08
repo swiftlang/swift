@@ -589,9 +589,9 @@ ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",
       (StringRef))
 
-GROUPED_WARNING(Ounchecked_with_strict_safety,Unsafe,none,
-      "'-Ounchecked' is not memory-safe and should not be combined with "
-      "strict memory safety checking", ())
+GROUPED_WARNING(command_line_conflicts_with_strict_safety,Unsafe,none,
+      "'%0' is not memory-safe and should not be combined with "
+      "strict memory safety checking", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

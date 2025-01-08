@@ -108,7 +108,8 @@ target_include_directories(swiftRuntime PRIVATE
 
 target_link_libraries(swiftRuntime PRIVATE
   $<$<PLATFORM_ID:Windows>:User32>
-  swiftShims)
+  swiftShims
+  swiftDemangling)
 
 # FIXME: Refactor so that we're not pulling sources from the compiler files
 target_sources(swiftRuntime PRIVATE

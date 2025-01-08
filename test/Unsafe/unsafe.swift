@@ -97,6 +97,19 @@ struct SuperHolder {
 }
 
 // -----------------------------------------------------------------------
+// Dynamic exclusivity check suppression
+// -----------------------------------------------------------------------
+class ExclusivityChecking {
+  @exclusivity(unchecked) var value: Int = 0
+
+  // expected-warning@+1{{instance method 'next' involves unsafe code; use '@safe(unchecked)' to assert that the code is memory-safe}}
+  func next() -> Int {
+    value += 1 // expected-note{{reference to @exclusivity(unchecked) property 'value' is unsafe}}
+    return value  // expected-note{{reference to @exclusivity(unchecked) property 'value' is unsafe}}
+  }
+}
+
+// -----------------------------------------------------------------------
 // Inheritance of @unsafe
 // -----------------------------------------------------------------------
 @unsafe class UnsafeSuper {

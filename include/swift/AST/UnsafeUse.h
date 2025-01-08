@@ -39,6 +39,8 @@ public:
     UnsafeConformance,
     /// A reference to an unowned(unsafe) entity.
     UnownedUnsafe,
+    /// A reference to an @exclusivity(unchecked) entity.
+    ExclusivityUnchecked,
     /// A reference to a nonisolated(unsafe) entity.
     NonisolatedUnsafe,
     /// A reference to an unsafe declaration.
@@ -111,6 +113,7 @@ private:
       SourceLoc location
   ) {
     assert(kind == UnownedUnsafe ||
+           kind == ExclusivityUnchecked ||
            kind == NonisolatedUnsafe ||
            kind == ReferenceToUnsafe ||
            kind == ReferenceToUnsafeThroughTypealias ||
@@ -166,6 +169,12 @@ public:
     return forReference(UnownedUnsafe, dc, decl, Type(), location);
   }
 
+  static UnsafeUse forExclusivityUnchecked(const Decl *decl,
+                                           SourceLoc location,
+                                           DeclContext *dc) {
+    return forReference(ExclusivityUnchecked, dc, decl, Type(), location);
+  }
+
   static UnsafeUse forNonisolatedUnsafe(const Decl *decl,
                                         SourceLoc location,
                                         DeclContext *dc) {
@@ -215,6 +224,7 @@ public:
             (const char *)storage.typeWitness.location));
 
     case UnownedUnsafe:
+    case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
     case ReferenceToUnsafeThroughTypealias:
@@ -238,6 +248,7 @@ public:
       return storage.typeWitness.assocType;
 
     case UnownedUnsafe:
+    case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
     case ReferenceToUnsafeThroughTypealias:
@@ -262,6 +273,7 @@ public:
   DeclContext *getDeclContext() const {
     switch (getKind()) {
     case UnownedUnsafe:
+    case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
     case ReferenceToUnsafeThroughTypealias:
@@ -294,6 +306,7 @@ public:
 
     case TypeWitness:
     case UnownedUnsafe:
+    case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
     case ReferenceToUnsafeThroughTypealias:
@@ -319,6 +332,7 @@ public:
       return storage.typeWitness.type;
 
     case UnownedUnsafe:
+    case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
     case ReferenceToUnsafeThroughTypealias:
@@ -342,6 +356,7 @@ public:
 
     case Override:
     case UnownedUnsafe:
+    case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
     case ReferenceToUnsafeThroughTypealias:
