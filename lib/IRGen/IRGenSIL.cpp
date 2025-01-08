@@ -4786,7 +4786,11 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
   const auto &coroutine = getLoweredCoroutine(i->getTokenResult());
   bool isAbort = ei == nullptr;
 
-  auto sig = Signature::forCoroutineContinuation(IGM, i->getOrigCalleeType());
+  // Lower the return value in the callee's generic context.
+  auto origCalleeType = i->getOrigCalleeType();
+  GenericContextScope scope(IGM, origCalleeType->getInvocationGenericSignature());
+
+  auto sig = Signature::forCoroutineContinuation(IGM, origCalleeType);
 
   // Cast the continuation pointer to the right function pointer type.
   auto continuation = coroutine.Continuation;
@@ -4794,7 +4798,7 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
                                        sig.getType()->getPointerTo());
 
   auto schemaAndEntity =
-    getCoroutineResumeFunctionPointerAuth(IGM, i->getOrigCalleeType());
+    getCoroutineResumeFunctionPointerAuth(IGM, origCalleeType);
   auto pointerAuth = PointerAuthInfo::emit(*this, schemaAndEntity.first,
                                            coroutine.getBuffer().getAddress(),
                                            schemaAndEntity.second);
