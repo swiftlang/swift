@@ -364,6 +364,8 @@ def incremental : Flag<["-"], "incremental">,
   HelpText<"Perform an incremental build if possible">;
 
 def nostdimport : Flag<["-"], "nostdimport">, Flags<[FrontendOption]>,
+  HelpText<"Don't search the standard library or toolchain import paths for modules">;
+def nostdlibimport : Flag<["-"], "nostdlibimport">, Flags<[FrontendOption]>,
   HelpText<"Don't search the standard library import path for modules">;
 
 def output_file_map : Separate<["-"], "output-file-map">,

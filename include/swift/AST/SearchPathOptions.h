@@ -504,6 +504,9 @@ public:
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;
 
+  /// Don't include SDK paths in the RuntimeLibraryImportPaths
+  bool ExcludeSDKPathsFromRuntimeLibraryImportPaths = false;
+
   /// Scanner Prefix Mapper.
   std::vector<std::string> ScannerPrefixMapper;
 
