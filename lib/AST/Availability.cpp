@@ -345,10 +345,10 @@ getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
 }
 
 bool AvailabilityInference::updateIntroducedPlatformForFallback(
-    const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform,
-    llvm::VersionTuple &PlatformVer) {
-  std::optional<llvm::VersionTuple> IntroducedVersion = attr->Introduced;
-  if (attr->getPlatform() == PlatformKind::iOS &&
+    const SemanticAvailableAttr &attr, const ASTContext &Ctx,
+    llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer) {
+  std::optional<llvm::VersionTuple> IntroducedVersion = attr.getIntroduced();
+  if (attr.getPlatform() == PlatformKind::iOS &&
       IntroducedVersion.has_value() &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     // We re-map the iOS introduced version to the corresponding visionOS version
@@ -365,10 +365,10 @@ bool AvailabilityInference::updateIntroducedPlatformForFallback(
 }
 
 bool AvailabilityInference::updateDeprecatedPlatformForFallback(
-    const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform,
-    llvm::VersionTuple &PlatformVer) {
-  std::optional<llvm::VersionTuple> DeprecatedVersion = attr->Deprecated;
-  if (attr->getPlatform() == PlatformKind::iOS &&
+    const SemanticAvailableAttr &attr, const ASTContext &Ctx,
+    llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer) {
+  std::optional<llvm::VersionTuple> DeprecatedVersion = attr.getDeprecated();
+  if (attr.getPlatform() == PlatformKind::iOS &&
       DeprecatedVersion.has_value() &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     // We re-map the iOS deprecated version to the corresponding visionOS version
@@ -385,11 +385,10 @@ bool AvailabilityInference::updateDeprecatedPlatformForFallback(
 }
 
 bool AvailabilityInference::updateObsoletedPlatformForFallback(
-    const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform,
-    llvm::VersionTuple &PlatformVer) {
-  std::optional<llvm::VersionTuple> ObsoletedVersion = attr->Obsoleted;
-  if (attr->getPlatform() == PlatformKind::iOS &&
-      ObsoletedVersion.has_value() &&
+    const SemanticAvailableAttr &attr, const ASTContext &Ctx,
+    llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer) {
+  std::optional<llvm::VersionTuple> ObsoletedVersion = attr.getObsoleted();
+  if (attr.getPlatform() == PlatformKind::iOS && ObsoletedVersion.has_value() &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     // We re-map the iOS obsoleted version to the corresponding visionOS version
     auto PotentiallyRemappedObsoletedVersion =
@@ -405,8 +404,9 @@ bool AvailabilityInference::updateObsoletedPlatformForFallback(
 }
 
 void AvailabilityInference::updatePlatformStringForFallback(
-    const AvailableAttr *attr, const ASTContext &Ctx, llvm::StringRef &Platform) {
-  if (attr->getPlatform() == PlatformKind::iOS &&
+    const SemanticAvailableAttr &attr, const ASTContext &Ctx,
+    llvm::StringRef &Platform) {
+  if (attr.getPlatform() == PlatformKind::iOS &&
       isPlatformActive(PlatformKind::visionOS, Ctx.LangOpts)) {
     Platform = swift::prettyPlatformString(PlatformKind::visionOS);
   }
@@ -531,8 +531,7 @@ std::optional<SemanticAvailableAttr> Decl::getDeprecatedAttr() const {
     StringRef deprecatedPlatform;
     llvm::VersionTuple remappedDeprecatedVersion;
     if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-            attr.getParsedAttr(), ctx, deprecatedPlatform,
-            remappedDeprecatedVersion))
+            attr, ctx, deprecatedPlatform, remappedDeprecatedVersion))
       deprecatedVersion = remappedDeprecatedVersion;
 
     if (!deprecatedVersion.has_value())
@@ -839,7 +838,7 @@ SemanticAvailableAttr::getIntroducedRange(const ASTContext &Ctx) const {
   StringRef Platform;
   llvm::VersionTuple RemappedIntroducedVersion;
   if (AvailabilityInference::updateIntroducedPlatformForFallback(
-      attr, Ctx, Platform, RemappedIntroducedVersion))
+          *this, Ctx, Platform, RemappedIntroducedVersion))
     IntroducedVersion = RemappedIntroducedVersion;
 
   return AvailabilityRange{VersionRange::allGTE(IntroducedVersion)};

@@ -2845,7 +2845,7 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
   // FIXME: [availability] Remap before emitting diagnostic above.
   llvm::VersionTuple RemappedDeprecatedVersion;
   if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-          Attr->getParsedAttr(), Context, Platform, RemappedDeprecatedVersion))
+          *Attr, Context, Platform, RemappedDeprecatedVersion))
     DeprecatedVersion = RemappedDeprecatedVersion;
 
   SmallString<32> newNameBuf;
@@ -2920,7 +2920,7 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
 
   llvm::VersionTuple remappedDeprecatedVersion;
   if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-          attr->getParsedAttr(), ctx, platform, remappedDeprecatedVersion))
+          *attr, ctx, platform, remappedDeprecatedVersion))
     deprecatedVersion = remappedDeprecatedVersion;
 
   auto message = attr->getMessage();
@@ -3575,7 +3575,7 @@ bool diagnoseExplicitUnavailability(
   } else {
     auto unavailableDiagnosticPlatform = platform;
     AvailabilityInference::updatePlatformStringForFallback(
-        Attr.getParsedAttr(), ctx, unavailableDiagnosticPlatform);
+        Attr, ctx, unavailableDiagnosticPlatform);
     EncodedDiagnosticMessage EncodedMessage(message);
     diags
         .diagnose(Loc, diag::availability_decl_unavailable, D, platform.empty(),

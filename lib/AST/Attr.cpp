@@ -2261,7 +2261,7 @@ SemanticAvailableAttr::getVersionAvailability(const ASTContext &ctx) const {
   StringRef ObsoletedPlatform;
   llvm::VersionTuple RemappedObsoletedVersion;
   if (AvailabilityInference::updateObsoletedPlatformForFallback(
-          attr, ctx, ObsoletedPlatform, RemappedObsoletedVersion))
+          *this, ctx, ObsoletedPlatform, RemappedObsoletedVersion))
     ObsoletedVersion = RemappedObsoletedVersion;
 
   // If this entity was obsoleted before or at the query platform version,
@@ -2273,7 +2273,7 @@ SemanticAvailableAttr::getVersionAvailability(const ASTContext &ctx) const {
   StringRef IntroducedPlatform;
   llvm::VersionTuple RemappedIntroducedVersion;
   if (AvailabilityInference::updateIntroducedPlatformForFallback(
-          attr, ctx, IntroducedPlatform, RemappedIntroducedVersion))
+          *this, ctx, IntroducedPlatform, RemappedIntroducedVersion))
     IntroducedVersion = RemappedIntroducedVersion;
 
   // If this entity was introduced after the query version and we're doing a

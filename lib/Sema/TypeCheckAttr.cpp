@@ -5025,8 +5025,7 @@ void AttributeChecker::checkBackDeployedAttrs(
       AvailabilityInference::updateBeforePlatformForFallback(
           Attr, Ctx, beforePlatformString, beforeVersion);
       AvailabilityInference::updateIntroducedPlatformForFallback(
-          availableAttr.getParsedAttr(), Ctx, introPlatformString,
-          introVersion);
+          availableAttr, Ctx, introPlatformString, introVersion);
 
       if (Attr->Version <= introVersion) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
