@@ -4656,13 +4656,19 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
     getAdjustedFormalAccess(this, /*useDC=*/nullptr,
                             /*treatUsableFromInlineAsPublic=*/true);
 
+  const bool debuggerSupport = getASTContext().LangOpts.DebuggerSupport;
+
   // Handle @testable/@_private(sourceFile:)
   switch (effectiveAccess) {
   case AccessLevel::Open:
   case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Internal:
-    if (getModuleContext()->isTestingEnabled() ||
+    // When compiling code for the debugger, ignore if testing is enabled for
+    // the purposes of calculating the effective access, otherwise the generated
+    // code might access a property through a dispatch thunk even if the
+    // property is private, and the thunk doesn't exist.
+    if ((getModuleContext()->isTestingEnabled() && !debuggerSupport) ||
         getModuleContext()->arePrivateImportsEnabled())
       effectiveAccess = getMaximallyOpenAccessFor(this);
     break;
