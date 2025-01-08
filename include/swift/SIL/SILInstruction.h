@@ -1195,9 +1195,12 @@ public:
 };
 
 struct SILNodeOffsetChecker {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
   static_assert(offsetof(SingleValueInstruction, kind) ==
                 offsetof(NonSingleValueInstruction, kind),
                 "wrong SILNode layout in SILInstruction");
+#pragma clang diagnostic pop
 };
 
 inline SILNodePointer::SILNodePointer(const SingleValueInstruction *svi) :
