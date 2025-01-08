@@ -4771,6 +4771,19 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
     return cache(TangentSpace::getTuple(tupleType));
   }
 
+  // Yield result types are a bit special, but essentially tangent spaces of
+  // yields are yields of tangent space type.
+  if (auto *yieldResTy = getAs<YieldResultType>()) {
+    auto objectTanTy =
+      yieldResTy->getResultType()->getAutoDiffTangentSpace(lookupConformance);
+    if (!objectTanTy)
+      return cache(std::nullopt);
+
+    auto *yieldTanType = YieldResultType::get(objectTanTy->getType(),
+                                              yieldResTy->isInOut());
+    return cache(TangentSpace::getTangentVector(yieldTanType));
+  }
+
   // For `Differentiable`-conforming types: the tangent space is the
   // `TangentVector` associated type.
   auto *differentiableProtocol =
@@ -4993,6 +5006,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
 
   // Compute the result linear map function type.
   FunctionType *linearMapType;
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo info;
   switch (kind) {
   case AutoDiffLinearMapKind::Differential: {
     // Compute the differential type, returned by JVP functions.
@@ -5051,6 +5066,9 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     // Case 2: original function has wrt `inout` parameters.
     // - Original: `(T0, inout T1, ...) -> R`
     // - Pullback: `(R.Tan, inout T1.Tan) -> (T0.Tan, ...)`
+    //
+    // Special case: yields. They act as parameters, so will
+    // always be on result side.
     SmallVector<TupleTypeElt, 4> pullbackResults;
     SmallVector<AnyFunctionType::Param, 2> semanticResultParams;
     for (auto i : range(diffParams.size())) {
@@ -5073,6 +5091,33 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
       }
       pullbackResults.emplace_back(paramTan->getType());
     }
+    // First accumulate ordinary result (not-semantic result parameters) as
+    // pullback parameters.
+    SmallVector<FunctionType::Param, 2> pullbackParams;
+    for (auto i : range(resultTanTypes.size())) {
+      auto resultTanType = resultTanTypes[i];
+      auto flags = ParameterTypeFlags().withInOut(false);
+      if (resultTanType->is<YieldResultType>()) {
+        pullbackResults.emplace_back(resultTanType);
+        info = info.withCoroutine(true);
+      } else {
+        pullbackParams.push_back(AnyFunctionType::Param(
+                                   resultTanType, Identifier(), flags));
+      }
+    }
+    // Then append semantic result parameters.
+    for (auto i : range(semanticResultParams.size())) {
+      auto semanticResultParam = semanticResultParams[i];
+      auto semanticResultParamType = semanticResultParam.getPlainType();
+      auto semanticResultParamTan =
+          semanticResultParamType->getAutoDiffTangentSpace(lookupConformance);
+      assert(!semanticResultParamType->is<YieldResultType>() &&
+             "yields are always expected on result side");
+      auto flags = ParameterTypeFlags().withInOut(true);
+      pullbackParams.push_back(AnyFunctionType::Param(
+          semanticResultParamTan->getType(), Identifier(), flags));
+    }
+
     Type pullbackResult;
     if (pullbackResults.empty()) {
       pullbackResult = ctx.TheEmptyTupleType;
@@ -5081,26 +5126,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     } else {
       pullbackResult = TupleType::get(pullbackResults, ctx);
     }
-    // First accumulate non-inout results as pullback parameters.
-    SmallVector<FunctionType::Param, 2> pullbackParams;
-    for (auto i : range(resultTanTypes.size())) {
-      auto resultTanType = resultTanTypes[i];
-      auto flags = ParameterTypeFlags().withInOut(false);
-      pullbackParams.push_back(AnyFunctionType::Param(
-          resultTanType, Identifier(), flags));
-    }
-    // Then append semantic result parameters.
-    for (auto i : range(semanticResultParams.size())) {
-      auto semanticResultParam = semanticResultParams[i];
-      auto semanticResultParamType = semanticResultParam.getPlainType();
-      auto semanticResultParamTan =
-          semanticResultParamType->getAutoDiffTangentSpace(lookupConformance);
-      auto flags = ParameterTypeFlags().withInOut(true);
-      pullbackParams.push_back(AnyFunctionType::Param(
-          semanticResultParamTan->getType(), Identifier(), flags));
-    }
-    // FIXME: Verify ExtInfo state is correct, not working by accident.
-    FunctionType::ExtInfo info;
+
     linearMapType = FunctionType::get(pullbackParams, pullbackResult, info);
     break;
   }
