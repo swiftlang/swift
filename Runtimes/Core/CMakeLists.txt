@@ -135,10 +135,12 @@ add_compile_definitions(
 add_compile_options(
   $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
   $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
-  $<$<COMPILE_LANGUAGE:CXX>:-funwind-tables>
-  "$<$<AND:$<COMPILE_LANGUAGE:Swift>,$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>>:SHELL:-Xfrontend -disable-objc-interop>"
-  "$<$<AND:$<COMPILE_LANGUAGE:Swift>,$<PLATFORM_ID:Windows>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
-  $<$<AND:$<COMPILE_LANGUAGE:Swift>,$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>>:-enable-library-evolution>)
+  $<$<COMPILE_LANGUAGE:CXX>:-funwind-tables>)
+
+add_compile_options(
+  "$<$<AND:$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -disable-objc-interop>"
+  "$<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
+  "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>")
 
 include_directories(include)
 
