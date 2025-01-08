@@ -741,11 +741,16 @@ static void printDifferentiableAttrArguments(
 
 /// Returns the `PlatformKind` referenced by \p attr if applicable, or
 /// `std::nullopt` otherwise.
-static std::optional<PlatformKind>
-referencedPlatform(const DeclAttribute *attr) {
+static std::optional<PlatformKind> referencedPlatform(const DeclAttribute *attr,
+                                                      const Decl *D) {
   switch (attr->getKind()) {
   case DeclAttrKind::Available:
-    return static_cast<const AvailableAttr *>(attr)->getPlatform();
+    if (auto semanticAttr = D->getSemanticAvailableAttr(
+            static_cast<const AvailableAttr *>(attr))) {
+      if (semanticAttr->isPlatformSpecific())
+        return semanticAttr->getPlatform();
+    }
+    return std::nullopt;
   case DeclAttrKind::BackDeployed:
     return static_cast<const BackDeployedAttr *>(attr)->Platform;
   case DeclAttrKind::OriginallyDefinedIn:
@@ -757,8 +762,8 @@ referencedPlatform(const DeclAttribute *attr) {
 
 /// Returns true if \p attr contains a reference to a `PlatformKind` that should
 /// be considered SPI.
-static bool referencesSPIPlatform(const DeclAttribute *attr) {
-  if (auto platform = referencedPlatform(attr))
+static bool referencesSPIPlatform(const DeclAttribute *attr, const Decl *D) {
+  if (auto platform = referencedPlatform(attr, D))
     return isPlatformSPI(*platform);
   return false;
 }
@@ -805,7 +810,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     // In the public interfaces of -library-level=api modules, skip attributes
     // that reference SPI platforms.
     if (Options.printPublicInterface() && libraryLevelAPI &&
-        referencesSPIPlatform(DA))
+        referencesSPIPlatform(DA, D))
       continue;
 
     // If we're supposed to suppress expanded macros, check whether this is
