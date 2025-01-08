@@ -85,7 +85,35 @@ struct NSSwiftUnavailableStruct {
   int secrets;
 } __attribute__((availability(swift, unavailable)));
 
+struct UnavailableOniOS {
+  int foobar;
+} __attribute__((availability(ios,unavailable)));
+
+struct UnavailableOnMacCatalystOnly {
+  int foobar;
+} __attribute__((availability(maccatalyst,unavailable)));
+
+struct AvailableOnMacCatalystOnly {
+  int foobar;
+} __attribute__((availability(maccatalyst, introduced=13.1))) __attribute__((availability(ios, unavailable)));
+
 void unavailableWithOS() __attribute__((availability(ios, deprecated=8.0))) __attribute__((availability(swift, unavailable))) __attribute__((availability(macosx, deprecated=10.10))) ;
+
+void availableOnIOSButUnavailableOnmacCatalyst() __attribute__((availability(ios,introduced=7.0))) __attribute__((availability(maccatalyst,unavailable)));
+
+void availableOnIOSButDeprecatedOnmacCatalyst() __attribute__((availability(ios,introduced=7.0))) __attribute__((availability(maccatalyst,deprecated=9.0)));
+
+void unavailableOnIOS() __attribute__((availability(ios,unavailable)));
+
+void deprecatedOniOSButNotOnmacCatalyst() __attribute__((availability(ios,deprecated=13.1))) __attribute__((availability(maccatalyst,introduced=13.1)));
+
+void availableOnIOSButUnavailableOniOSAppExtension() __attribute__((availability(ios,introduced=7.0))) __attribute__((availability(ios_app_extension,unavailable)));
+
+void availableOnIOSButDeprecatedOniOSAppExtension() __attribute__((availability(ios,introduced=7.0))) __attribute__((availability(ios_app_extension,deprecated=7.0)));
+
+void availableOnIOSAppExtensionButUnavailableOnmacCatalystAppExtension() __attribute__((availability(ios_app_extension,introduced=7.0))) __attribute__((availability(maccatalyst_app_extension,unavailable)));
+
+void availableOnIOSAppExtensionButDeprecatedOnmacCatalystAppExtension() __attribute__((availability(ios_app_extension,introduced=7.0))) __attribute__((availability(maccatalyst_app_extension,deprecated=7.0)));
 
 typedef NS_ENUM(NSInteger, NSEnumAddedCasesIn2017) {
     NSEnumAddedCasesIn2017ExistingCaseOne,

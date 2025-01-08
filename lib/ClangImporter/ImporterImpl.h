@@ -338,7 +338,7 @@ public:
   /// unavailable.
   bool treatDeprecatedAsUnavailable(const clang::Decl *clangDecl,
                                     const llvm::VersionTuple &version,
-                                    bool isAsync) const;
+                                    bool isAsync, bool isAvailabilityImplicit) const;
 
   /// The message to embed for implicitly unavailability if a deprecated
   /// API is now unavailable.
