@@ -67,6 +67,7 @@ static void heap_iterate_callback(unsigned long base, unsigned long size, void *
   }
   data[data[NEXT_FREE_IDX]++] = base;
   data[data[NEXT_FREE_IDX]++] = size;
+  __asm__ __volatile__(".align 8");
   __asm__ __volatile__(".local heap_iterate_callback_end");
   __asm__ __volatile__("heap_iterate_callback_end:");
 }
