@@ -3222,7 +3222,7 @@ public:
 
   /// Returns the effective range in which the declaration with this attribute
   /// was introduced.
-  AvailabilityRange getIntroducedRange(ASTContext &Ctx) const;
+  AvailabilityRange getIntroducedRange(const ASTContext &Ctx) const;
 
   /// The version tuple written in source for the `deprecated:` component.
   std::optional<llvm::VersionTuple> getDeprecated() const {

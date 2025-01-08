@@ -88,7 +88,7 @@ public:
 
   /// Returns true if this domain is considered active in the current
   /// compilation context.
-  bool isActive(ASTContext &ctx) const;
+  bool isActive(const ASTContext &ctx) const;
 
   /// Returns the string to use in diagnostics to identify the domain. May
   /// return an empty string.

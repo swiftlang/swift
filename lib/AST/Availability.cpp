@@ -828,9 +828,12 @@ bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
 }
 
 AvailabilityRange
-SemanticAvailableAttr::getIntroducedRange(ASTContext &Ctx) const {
-  auto *attr = getParsedAttr();
+SemanticAvailableAttr::getIntroducedRange(const ASTContext &Ctx) const {
   assert(domain.isActive(Ctx));
+
+  auto *attr = getParsedAttr();
+  if (!attr->Introduced.has_value())
+    return AvailabilityRange::alwaysAvailable();
 
   llvm::VersionTuple IntroducedVersion = attr->Introduced.value();
   StringRef Platform;
