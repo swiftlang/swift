@@ -1906,3 +1906,30 @@ func offByOneWithImplicitPartialApply() {
       }
   }
 }
+
+// We should not error in either of the cases below due to sending.
+func testIndirectAndDirectSendingResultsWithGlobalActor() async {
+  @MainActor
+  struct S {
+    let ns = NonSendableKlass()
+
+    func getNonSendableKlassIndirect<T>() -> sending T {
+      fatalError()
+    }
+    func getNonSendableKlassDirect() -> sending NonSendableKlass {
+      fatalError()
+    }
+  }
+
+  let s = await S()
+  let ns: NonSendableKlass = await s.getNonSendableKlassDirect()
+
+  Task.detached {
+    _ = ns
+  }
+
+  let ns2: NonSendableKlass = await s.getNonSendableKlassIndirect()
+  Task.detached {
+    _ = ns2
+  }
+}
