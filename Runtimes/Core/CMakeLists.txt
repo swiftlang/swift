@@ -62,6 +62,7 @@ set(SwiftCore_VENDOR_MODULE_DIR "${SwiftCore_CMAKE_MODULES_DIR}/vendor"
 
 include(GNUInstallDirs)
 include(CheckSymbolExists)
+include(CheckIncludeFileCXX)
 include(AvailabilityMacros)
 include(CompilerSettings)
 include(DefaultSettings)
@@ -73,6 +74,8 @@ include(Plist)
 check_symbol_exists("asl_log" "asl.h" SwiftCore_HAS_ASL)
 check_symbol_exists("dladdr" "dlfcn.h" SwiftCore_HAS_DLADDR)
 check_symbol_exists("dlsym" "dlfcn.h" SwiftCore_HAS_DLSYM)
+
+check_include_file_cxx("clocale" SwiftCore_HAS_LOCALE)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
