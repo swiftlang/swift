@@ -534,8 +534,9 @@ namespace swift {
       gatherArgs(VArgs...);
     }
 
-    /*implicit*/Diagnostic(DiagID ID, ArrayRef<DiagnosticArgument> Args)
-      : ID(ID), Args(Args.begin(), Args.end()) {}
+    Diagnostic(DiagID ID, ArrayRef<DiagnosticArgument> Args) : Diagnostic(ID) {
+      this->Args.append(Args.begin(), Args.end());
+    }
 
     template <class... ArgTypes>
     static Diagnostic fromTuple(Diag<ArgTypes...> id,
