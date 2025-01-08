@@ -215,6 +215,7 @@ LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
 LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
 LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
 SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
+LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
