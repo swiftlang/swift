@@ -3737,6 +3737,10 @@ static bool matchSendableExistentialToAnyInGenericArgumentPosition(
             return isPreconcurrencyContext(
                 cs.getConstraintLocator(UDE->getBase()));
           }
+          if (auto *SE = getAsExpr<SubscriptExpr>(calleeLoc->getAnchor())) {
+            return isPreconcurrencyContext(
+                cs.getConstraintLocator(SE->getBase()));
+          }
           return false;
         }
 

@@ -12,6 +12,20 @@ class C {
 
 extension Dictionary where Key == String, Value == Any {
   func answer() -> Int { self["a"] as! Int }
+
+  subscript(entry e: String) -> (any Sendable)? {
+    get { self["Entry#" + e] }
+    set { self["Entry#" + e] = newValue }
+  }
+
+  var entryB: (any Sendable)? {
+    get { self["Entry#B"] }
+    set { self["Entry#B"] = newValue }
+  }
+
+  mutating func addEntry() {
+    self["ultimate question"] = "???"
+  }
 }
 
 extension Array where Element == Any {
@@ -29,12 +43,35 @@ struct Test {
 
 
 func test() {
-  let c = C()
+  var c = C()
 
   print(c.dict.answer())
   // CHECK: 42
   print(c.arr.answer())
   // CHECK: 42
+
+  print(c.dict[entry: "A"] ?? "no A")
+  // CHECK: no A
+
+  // Insert a new value
+  c.dict[entry: "A"] = "forty two"
+
+  // Make sure that the dictionary got mutated
+  print(c.dict[entry: "A"] ?? "no A")
+  // CHECK: forty two
+
+  print(c.dict.entryB ?? "no B")
+  // CHECK: no B
+
+  // Insert new value
+  c.dict.entryB = (q: "", a: 42)
+
+  print(c.dict.entryB ?? "no B")
+  // CHECK: (q: "", a: 42)
+
+  c.dict.addEntry()
+  print(c.dict["ultimate question"] ?? "no question")
+  // CHECK: ???
 
   let v1 = Test(data: S(v: 42))
   let v2 = Test(data: S(v: "ultimate question"))

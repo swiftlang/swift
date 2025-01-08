@@ -3949,6 +3949,14 @@ ArgumentList *Solution::getArgumentList(ConstraintLocator *locator) const {
   return nullptr;
 }
 
+std::optional<ConversionRestrictionKind>
+Solution::getConversionRestriction(CanType type1, CanType type2) const {
+  auto restriction = ConstraintRestrictions.find({type1, type2});
+  if (restriction != ConstraintRestrictions.end())
+    return restriction->second;
+  return std::nullopt;
+}
+
 #ifndef NDEBUG
 /// Given an apply expr, returns true if it is expected to have a direct callee
 /// overload, resolvable using `getChoiceFor`. Otherwise, returns false.
