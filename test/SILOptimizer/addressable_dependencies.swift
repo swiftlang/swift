@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature BuiltinModule -enable-experimental-feature LifetimeDependence -enable-experimental-feature AddressableTypes %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature BuiltinModule -enable-experimental-feature LifetimeDependence -enable-experimental-feature AddressableTypes -enable-experimental-feature ValueGenerics %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BuiltinModule
 // REQUIRES: swift_feature_AddressableTypes
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_ValueGenerics
 
 import Builtin
 
@@ -58,3 +59,22 @@ struct AllocatedNode: ~Copyable {
     }
 }
 
+struct Schmector {
+    // structurally addressable-for-dependencies by virtue of containing a
+    // Builtin.FixedArray
+    private var elements: Builtin.FixedArray<10, Int>
+
+    var storage: Spam {
+        // CHECK-LABEL: sil {{.*}}@${{.*}}9SchmectorV7storage{{.*}}Vvg :
+        // CHECK-SAME:    (@in_guaranteed Schmector) ->
+        @lifetime(borrow self)
+        borrowing get {
+            return Spam(base: UnsafePointer(Builtin.addressOfBorrow(self)), count: 10)
+        }
+    }
+}
+
+struct Spam: ~Escapable {
+    @_unsafeNonescapableResult
+    init(base: UnsafePointer<Int>, count: Int) {}
+}

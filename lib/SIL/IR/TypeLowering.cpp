@@ -389,6 +389,11 @@ namespace {
       
       props = mergeIsTypeExpansionSensitive(isSensitive, props);
       
+      // Fixed array regions are implied to be addressable-for-dependencies,
+      // since the developer probably wants to be able to form Spans etc.
+      // over them.
+      props.setAddressableForDependencies();
+      
       // If the size isn't a known literal, then the layout is also dependent,
       // so make it address-only. If the size is massive, also treat it as
       // address-only since there's little practical benefit to passing around
@@ -2540,6 +2545,7 @@ namespace {
       // If the type has raw storage, it is move-only and address-only.
       if (D->getAttrs().hasAttribute<RawLayoutAttr>()) {
         properties.setAddressOnly();
+        properties.setAddressableForDependencies();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         return handleMoveOnlyAddressOnly(structType, properties);
