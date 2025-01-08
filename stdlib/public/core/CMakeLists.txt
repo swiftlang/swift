@@ -157,6 +157,7 @@ split_embedded_sources(
   EMBEDDED Span/RawSpan.swift
   EMBEDDED Span/Span.swift
   EMBEDDED Span/Properties/ArrayTypeExtensions.swift
+  EMBEDDED Span/Properties/InlineTypeExtensions.swift
   EMBEDDED Span/Properties/UnsafeBufferPointerExtensions.swift
   EMBEDDED StaticString.swift
   EMBEDDED StaticPrint.swift
@@ -319,7 +320,7 @@ list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concis
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
-list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableTypes")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
