@@ -213,6 +213,11 @@ bool ArgsToFrontendOptionsConverter::convert(
             .Case("json", FrontendOptions::ASTFormat::JSON)
             .Case("json-zlib", FrontendOptions::ASTFormat::JSONZlib)
             .Default(FrontendOptions::ASTFormat::Default);
+    if (Opts.DumpASTFormat != FrontendOptions::ASTFormat::Default &&
+        !Args.hasArg(OPT_dump_ast)) {
+      Diags.diagnose(SourceLoc(), diag::ast_format_requires_dump_ast);
+      return true;
+    }
     if (Opts.DumpASTFormat == FrontendOptions::ASTFormat::JSONZlib &&
         !llvm::compression::zlib::isAvailable()) {
       Diags.diagnose(SourceLoc(), diag::zlib_not_supported);

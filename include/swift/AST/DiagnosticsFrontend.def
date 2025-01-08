@@ -606,5 +606,8 @@ GROUPED_WARNING(command_line_conflicts_with_strict_safety,Unsafe,none,
 ERROR(zlib_not_supported,none,
        "this compiler was not built with zlib compression support enabled", ())
 
+ERROR(ast_format_requires_dump_ast,none,
+      "structured AST formats are only supported when using -dump-ast", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
