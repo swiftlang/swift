@@ -327,6 +327,7 @@ UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
 UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
 UNINTERESTING_FEATURE(TrailingComma)
+UNINTERESTING_FEATURE(RawIdentifiers)
 
 static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<UnsafeAttr>();
