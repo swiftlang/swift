@@ -71,7 +71,16 @@
 /include/swift/AST/*Protocol*                      @hborla @slavapestov
 /include/swift/AST/*Requirement*                   @hborla @slavapestov
 /include/swift/AST/*Substitution*                  @slavapestov
+/include/swift/AST/DiagnosticGroup*                @DougGregor
+/include/swift/AST/DiagnosticsClangImporter.def    @zoecarver @hyp @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun
+/include/swift/AST/DiagnosticsDriver.def           @artemcm
+/include/swift/AST/DiagnosticsFrontend.def         @artemcm @tshortli
+/include/swift/AST/DiagnosticsIDE.def              @ahoppen @bnbarham @hamishknight @rintaro
+/include/swift/AST/DiagnosticsIRGen.def            @rjmccall
+/include/swift/AST/DiagnosticsModuleDiffer.def     @nkcsgexi
 /include/swift/AST/DiagnosticsParse.def            @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/include/swift/AST/DiagnosticsRefactoring.def      @ahoppen @bnbarham @hamishknight @rintaro
+/include/swift/AST/DiagnosticsSIL.def              @jckarter
 /include/swift/AST/Evaluator*                      @CodaFi @slavapestov
 /include/swift/Basic/                              @DougGregor
 /include/swift/Basic/Features.def                  @DougGregor @hborla
