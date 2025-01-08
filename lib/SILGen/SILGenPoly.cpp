@@ -108,6 +108,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/SILArgument.h"
@@ -6474,14 +6475,75 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   }
 
   auto *linearMapArg = thunk->getArgumentsWithoutIndirectResults().back();
-  auto *apply = thunkSGF.B.createApply(loc, linearMapArg, SubstitutionMap(),
-                                       arguments);
+
+  // Extract all direct results.
+  SmallVector<SILValue, 4> directResults;
+  FullApplySite fas;
+  if (fromType->isCoroutine()) {
+    SmallVector<SILValue, 1> yields;
+    // Start inner coroutine execution till the suspend point
+    SubstitutionMap subs = thunk->getForwardingSubstitutionMap();
+    SILType substFnType = linearMapArg->getType().substGenericArgs(
+      thunkSGF.getModule(), subs, thunk->getTypeExpansionContext());
+    auto tokenAndCleanups = thunkSGF.emitBeginApplyWithRethrow(
+      loc, linearMapArg, substFnType,
+      SubstitutionMap(), arguments, yields);
+    auto token = std::get<0>(tokenAndCleanups);
+    auto abortCleanup = std::get<1>(tokenAndCleanups);
+    auto allocation = std::get<2>(tokenAndCleanups);
+    auto deallocCleanup = std::get<3>(tokenAndCleanups);
+
+    {
+      SmallVector<ManagedValue, 1> yieldMVs;
+
+      // Prepare a destination for the unwind; use the current cleanup stack
+      // as the depth so that we branch right to it.
+      SILBasicBlock *unwindBB = thunkSGF.createBasicBlock(FunctionSection::Postmatter);
+      JumpDest unwindDest(unwindBB, thunkSGF.Cleanups.getCleanupsDepth(),
+                          CleanupLocation(loc));
+
+      manageYields(thunkSGF, yields, substFnType.castTo<SILFunctionType>()->getYields(),
+                   yieldMVs);
+
+      // Emit the yield.
+      thunkSGF.emitRawYield(loc, yieldMVs, unwindDest, /*unique*/ true);
+
+      // Emit the unwind block.
+      {
+        SILGenSavedInsertionPoint savedIP(thunkSGF, unwindBB,
+                                          FunctionSection::Postmatter);
+
+        // Emit all active cleanups.
+        thunkSGF.Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
+        thunkSGF.B.createUnwind(loc);
+      }
+    }
+
+    // Kill the normal abort cleanup without emitting it.
+    thunkSGF.Cleanups.setCleanupState(abortCleanup, CleanupState::Dead);
+    if (allocation) {
+      thunkSGF.Cleanups.setCleanupState(deallocCleanup, CleanupState::Dead);
+    }
+
+    // End the inner coroutine normally.
+    auto resultTy =
+      thunk->mapTypeIntoContext(
+        fromType->getAllResultsSubstType(thunkSGF.getModule(),
+                                         thunkSGF.getTypeExpansionContext()));
+    auto endApply =
+      thunkSGF.emitEndApplyWithRethrow(loc, token, allocation, resultTy);
+
+    extractAllElements(endApply, loc, thunkSGF.B, directResults);
+    fas = token->getParent<BeginApplyInst>();
+  } else {
+    auto *apply = thunkSGF.B.createApply(loc, linearMapArg, SubstitutionMap(),
+                                         arguments);
+    extractAllElements(apply, loc, thunkSGF.B, directResults);
+    fas = apply;
+  }
 
   // Get return elements.
   SmallVector<SILValue, 4> results;
-  // Extract all direct results.
-  SmallVector<SILValue, 4> directResults;
-  extractAllElements(apply, loc, thunkSGF.B, directResults);
 
   // Handle self reordering.
   // For pullbacks: rotate direct results if self is direct.
@@ -6500,7 +6562,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   }
 
   auto fromDirResultsIter = directResults.begin();
-  auto fromIndResultsIter = apply->getIndirectSILResults().begin();
+  auto fromIndResultsIter = fas.getIndirectSILResults().begin();
   auto toIndResultsIter = thunkIndirectResults.begin();
   // Reabstract results.
   for (unsigned resIdx : range(toType->getNumResults())) {
