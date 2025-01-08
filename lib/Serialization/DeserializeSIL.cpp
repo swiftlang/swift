@@ -5135,7 +5135,8 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
                        ArrayRef<unsigned>(parameterAndResultIndices)
                            .take_front(numParameterIndices));
   auto numResults = originalFnType->getNumResults() +
-                    originalFnType->getNumIndirectMutatingParameters();
+                    originalFnType->getNumIndirectMutatingParameters() +
+                    originalFnType->getNumYields();
   auto *resultIndices =
       IndexSubset::get(MF->getContext(), numResults,
                        ArrayRef<unsigned>(parameterAndResultIndices)
