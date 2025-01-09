@@ -2150,8 +2150,8 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // usable from Swift, even though it is imported.
     if (!decl->isUnavailable()) {
       StringRef unavailabilityMsgRef = "return type is unavailable in Swift";
-      auto ua =
-          AvailableAttr::createPlatformAgnostic(ctx, unavailabilityMsgRef);
+      auto ua = AvailableAttr::createUniversallyUnavailable(
+          ctx, unavailabilityMsgRef);
       decl->getAttrs().add(ua);
     }
 
