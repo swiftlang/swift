@@ -237,7 +237,7 @@ extension OuterProtocol {
 
 struct ConformsToOuterProtocol : OuterProtocol {
   typealias Hen = Int
-  func f() { let _ = InnerProtocol.self } // expected-error {{use of protocol 'InnerProtocol' as a type must be written 'any InnerProtocol'}}
+  func f() { let _ = InnerProtocol.self } // expected-warning {{use of protocol 'InnerProtocol' as a type must be written 'any InnerProtocol'}}
 }
 
 extension OuterProtocol {
