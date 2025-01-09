@@ -4462,10 +4462,11 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
     if (Context.LangOpts.hasFeature(Feature::Embedded)) {
       StringRef Message = "unavailable in embedded Swift", Renamed;
       auto attr = new (Context) AvailableAttr(
-          AtLoc, SourceRange(AtLoc, attrLoc), PlatformKind::none, Message,
-          Renamed, llvm::VersionTuple(), SourceRange(), llvm::VersionTuple(),
-          SourceRange(), llvm::VersionTuple(), SourceRange(),
-          PlatformAgnosticAvailabilityKind::Unavailable,
+          AtLoc, SourceRange(AtLoc, attrLoc),
+          AvailabilityDomain::forUniversal(), AvailableAttr::Kind::Unavailable,
+          Message, Renamed, llvm::VersionTuple(), SourceRange(),
+          llvm::VersionTuple(), SourceRange(), llvm::VersionTuple(),
+          SourceRange(),
           /*Implicit=*/false, /*IsSPI=*/false, /*IsForEmbedded=*/true);
       Attributes.add(attr);
     }

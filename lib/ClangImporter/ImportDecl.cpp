@@ -7997,13 +7997,14 @@ void addCompletionHandlerAttribute(Decl *asyncImport,
       continue;
 
     llvm::VersionTuple NoVersion;
-    auto *attr = new (SwiftContext)
-        AvailableAttr(SourceLoc(), SourceRange(), PlatformKind::none,
-                      /*Message=*/"", /*Rename=*/"", /*Introduced=*/NoVersion,
-                      SourceRange(), /*Deprecated=*/NoVersion, SourceRange(),
-                      /*Obsoleted=*/NoVersion, SourceRange(),
-                      PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true,
-                      /*SPI=*/false);
+    auto *attr = new (SwiftContext) AvailableAttr(
+        SourceLoc(), SourceRange(), AvailabilityDomain::forUniversal(),
+        AvailableAttr::Kind::Default,
+        /*Message=*/"", /*Rename=*/"", /*Introduced=*/NoVersion, SourceRange(),
+        /*Deprecated=*/NoVersion, SourceRange(),
+        /*Obsoleted=*/NoVersion, SourceRange(),
+        /*Implicit=*/true,
+        /*SPI=*/false);
 
     afd->setRenamedDecl(attr, asyncFunc);
     afd->getAttrs().add(attr);

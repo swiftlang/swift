@@ -743,6 +743,20 @@ enum class PlatformAgnosticAvailabilityKind : uint8_t {
 /// Defines the @available attribute.
 class AvailableAttr : public DeclAttribute {
 public:
+  enum class Kind : uint8_t {
+    /// The attribute does not specify `deprecated`, `unavailable`,
+    /// or `noasync`. Instead, it may specify `introduced:`, `deprecated:`, or
+    /// `obsoleted:` versions or it may simply have a `rename:` field.
+    Default,
+    /// The attribute specifies unconditional deprecation.
+    Deprecated,
+    /// The attribute specifies unconditional unavailability.
+    Unavailable,
+    /// The attribute specifies unavailability in asynchronous contexts.
+    NoAsync,
+  };
+
+public:
   AvailableAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
                 StringRef Message, StringRef Rename,
                 const llvm::VersionTuple &Introduced,
@@ -751,6 +765,15 @@ public:
                 SourceRange DeprecatedRange,
                 const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
                 PlatformAgnosticAvailabilityKind PlatformAgnostic,
+                bool Implicit, bool IsSPI, bool IsForEmbedded = false);
+
+  AvailableAttr(SourceLoc AtLoc, SourceRange Range,
+                const AvailabilityDomain &Domain, Kind Kind, StringRef Message,
+                StringRef Rename, const llvm::VersionTuple &Introduced,
+                SourceRange IntroducedRange,
+                const llvm::VersionTuple &Deprecated,
+                SourceRange DeprecatedRange,
+                const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
                 bool Implicit, bool IsSPI, bool IsForEmbedded = false);
 
   /// The optional message.
