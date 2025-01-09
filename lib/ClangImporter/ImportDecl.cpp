@@ -60,6 +60,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
+#include "clang/AST/PrettyPrinter.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -71,10 +72,12 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Path.h"
 
 #include <algorithm>
+#include <utility>
 
 #define DEBUG_TYPE "Clang module importer"
 
@@ -130,6 +133,7 @@ createFuncOrAccessor(ClangImporter::Implementation &impl, SourceLoc funcLoc,
   impl.importSwiftAttrAttributes(decl);
   if (hasBoundsAnnotation)
     impl.importBoundsAttributes(decl);
+  impl.importSpanAttributes(decl);
 
   return decl;
 }
@@ -8698,11 +8702,7 @@ public:
 
   void printCountedBy(const clang::CountAttributedType *CAT,
                       size_t pointerIndex) {
-    if (!firstParam) {
-      out << ", ";
-    } else {
-      firstParam = false;
-    }
+    printSeparator();
     clang::Expr *countExpr = CAT->getCountExpr();
     bool isSizedBy = CAT->isCountInBytes();
     out << ".";
@@ -8720,8 +8720,75 @@ public:
         out, {}, {ctx.getLangOpts()}); // TODO: map clang::Expr to Swift Expr
     out << "\")";
   }
+
+  void printNonEscaping(int idx) {
+    printSeparator();
+    out << ".nonescaping(pointer: " << idx << ")";
+  }
+
+  void printTypeMapping(const llvm::StringMap<std::string> &mapping) {
+    printSeparator();
+    out << "typeMappings: [";
+    if (mapping.empty()) {
+      out << ":]";
+      return;
+    }
+    llvm::interleaveComma(mapping, out, [&](const auto &entry) {
+      out << '"' << entry.getKey() << "\" : \"" << entry.getValue() << '"';
+    });
+    out << "]";
+  }
+
+private:
+  void printSeparator() {
+    if (!firstParam) {
+      out << ", ";
+    } else {
+      firstParam = false;
+    }
+  }
 };
 } // namespace
+
+void ClangImporter::Implementation::importSpanAttributes(FuncDecl *MappedDecl) {
+  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
+    return;
+  auto ClangDecl =
+      dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
+  if (!ClangDecl)
+    return;
+
+  llvm::SmallString<128> MacroString;
+  bool attachMacro = false;
+  {
+    llvm::raw_svector_ostream out(MacroString);
+    llvm::StringMap<std::string> typeMapping;
+
+    SwiftifyInfoPrinter printer(getClangASTContext(), out);
+    for (auto [index, param] : llvm::enumerate(ClangDecl->parameters())) {
+      auto paramTy = param->getType();
+      const auto *decl = paramTy->getAsTagDecl();
+      if (!decl || !decl->isInStdNamespace())
+        continue;
+      if (decl->getName() != "span")
+        continue;
+      if (param->hasAttr<clang::NoEscapeAttr>()) {
+        printer.printNonEscaping(index + 1);
+        clang::PrintingPolicy policy(param->getASTContext().getLangOpts());
+        policy.SuppressTagKeyword = true;
+        auto param = MappedDecl->getParameters()->get(index);
+        typeMapping.insert(std::make_pair(
+            paramTy.getAsString(policy),
+            param->getInterfaceType()->getDesugaredType()->getString()));
+        attachMacro = true;
+      }
+    }
+    printer.printTypeMapping(typeMapping);
+  }
+
+  if (attachMacro)
+    importNontrivialAttribute(MappedDecl, MacroString);
+}
 
 void ClangImporter::Implementation::importBoundsAttributes(
     FuncDecl *MappedDecl) {

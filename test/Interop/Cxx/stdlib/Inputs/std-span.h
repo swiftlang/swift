@@ -54,4 +54,6 @@ inline SpanOfInt initSpan(int arr[], size_t size) {
 
 inline struct SpanBox getStructSpanBox() { return {iarray, iarray, sarray, sarray}; }
 
+void funcWithSafeWrapper(SpanOfInt s [[clang::noescape]]) {}
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H
