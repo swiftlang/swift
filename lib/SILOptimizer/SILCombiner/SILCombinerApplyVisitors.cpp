@@ -149,6 +149,13 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   if (SubstCalleeTy->hasArchetype() || ConvertCalleeTy->hasArchetype())
     return nullptr;
 
+  // If we converted from a non-throwing to a throwing function which is
+  // try_apply'd, rewriting would require changing the CFG.  Bail for now.
+  if (!ConvertCalleeTy->hasErrorResult() && isa<TryApplyInst>(AI)) {
+    assert(SubstCalleeTy->hasErrorResult());
+    return nullptr;
+  }
+
   // Ok, we can now perform our transformation. Grab AI's operands and the
   // relevant types from the ConvertFunction function type and AI.
   Builder.setCurrentDebugScope(AI.getDebugScope());
@@ -240,7 +247,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       
       Builder.createBranch(AI.getLoc(), TAI->getNormalBB(), branchArgs);
     }
-    
+
+    Builder.setInsertionPoint(AI.getInstruction());
     return Builder.createTryApply(AI.getLoc(), funcOper, SubstitutionMap(), Args,
                                   normalBB, TAI->getErrorBB(),
                                   TAI->getApplyOptions());
@@ -1622,6 +1630,10 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   // from visitPartialApplyInst(), so bail here.
   if (isa<PartialApplyInst>(AI->getCallee()))
     return nullptr;
+
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee())) {
+    return optimizeApplyOfConvertFunctionInst(AI, CFI);
+  }
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *Fn = AI->getReferencedFunctionOrNull();
