@@ -52,19 +52,20 @@ struct MyContainer {
     int end() const { return -1; }
 };
 
-using SpanOfInt = Unannotated;
+using SpanOfInt = std::span<int>;
 using SpanOfIntAlias = SpanOfInt;
 
 //--- test.swift
 
 import Test
 import CoreFoundation
+import CxxStdlib
 
 // expected-warning@+1{{global function 'useUnsafeParam' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
 func useUnsafeParam(x: Unannotated) { // expected-note{{reference to unsafe struct 'Unannotated'}}
 }
 
-// expected-warning@+2{{global function 'useUnsafeParam2' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{10:1-1=@unsafe }}
+// expected-warning@+2{{global function 'useUnsafeParam2' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{11:1-1=@unsafe }}
 @available(SwiftStdlib 5.8, *)
 func useUnsafeParam2(x: UnsafeReference) { // expected-note{{reference to unsafe class 'UnsafeReference'}}
 }
@@ -79,6 +80,9 @@ func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer)
 }
 
 func useCfType(x: CFArray) {
+}
+
+func useString(x: std.string) {
 }
 
 // expected-warning@+1{{global function 'useCppSpan' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}
