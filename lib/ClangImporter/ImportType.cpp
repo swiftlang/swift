@@ -634,6 +634,10 @@ namespace {
     }
 
     ImportResult VisitConstantArrayType(const clang::ConstantArrayType *type) {
+      // FIXME: Map to a real fixed-size Swift array type when we have those.
+      // Importing as a tuple at least fills the right amount of space, and
+      // we can cheese static-offset "indexing" using .$n operations.
+
       Type elementType = Impl.importTypeIgnoreIUO(
           type->getElementType(), ImportTypeKind::Value, addImportDiagnostic,
           AllowNSUIntegerAsInt, Bridgeability::None, ImportTypeAttrs());
@@ -642,24 +646,14 @@ namespace {
 
       auto size = type->getSize().getZExtValue();
 
-      if (size == 1)
-        return elementType;
-
-      auto &ctx = elementType->getASTContext();
-
-      if (ctx.LangOpts.hasFeature(Feature::ImportCArraysAsVectors)) {
-        auto vector = cast<StructDecl>(ctx.getVectorDecl());
-        auto countType = IntegerType::get(std::to_string(size),
-                                          /* isNegative */ false, ctx);
-        return BoundGenericStructType::get(vector, /* parent */ nullptr,
-                                           {countType, elementType});
-      }
-
       // An array of size N is imported as an N-element tuple which
       // takes very long to compile. We chose 4096 as the upper limit because
       // we don't want to break arrays of size PATH_MAX.
       if (size > 4096)
         return Type();
+
+      if (size == 1)
+        return elementType;
 
       SmallVector<TupleTypeElt, 8> elts{static_cast<size_t>(size), elementType};
       return TupleType::get(elts, elementType->getASTContext());

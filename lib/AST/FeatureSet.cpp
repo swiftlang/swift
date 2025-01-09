@@ -69,7 +69,6 @@ UNINTERESTING_FEATURE(ExistentialAny)
 UNINTERESTING_FEATURE(InferSendableFromCaptures)
 UNINTERESTING_FEATURE(ImplicitOpenExistentials)
 UNINTERESTING_FEATURE(MemberImportVisibility)
-UNINTERESTING_FEATURE(ImportCArraysAsVectors) // fixme?
 
 // ----------------------------------------------------------------------------
 // MARK: - Experimental Features

@@ -2,8 +2,8 @@
 
 // REQUIRES: swift_feature_ValueGenerics
 
-struct VerySmallVector<T> {
-  var inline: Vector<16, T?>
+struct VerySmallSlab<T> {
+  var inline: Slab<16, T?>
   var count = 0
 
   init() {
@@ -12,10 +12,10 @@ struct VerySmallVector<T> {
 }
 
 //===----------------------------------------------------------------------===//
-// VerySmallVector<T> initializeBufferWithCopyOfBuffer
+// VerySmallSlab<T> initializeBufferWithCopyOfBuffer
 //===----------------------------------------------------------------------===//
 
-// CHECK-LABEL: define {{.*}} ptr @"$s17array_type_layout15VerySmallVectorVwCP"(ptr{{.*}} %dest, ptr{{.*}} %src, ptr{{.*}} %"VerySmallVector<T>")
+// CHECK-LABEL: define {{.*}} ptr @"$s17array_type_layout13VerySmallSlabVwCP"(ptr{{.*}} %dest, ptr{{.*}} %src, ptr{{.*}} %"VerySmallSlab<T>")
 // CHECK:         [[FLAGS:%.*]] = load i32, ptr {{.*}}
 // CHECK-NEXT:    [[INLINE_BIT:%.*]] = and i32 [[FLAGS]], 131072
 // CHECK-NEXT:    [[IS_INLINE:%.*]] = icmp eq i32 [[INLINE_BIT]], 0

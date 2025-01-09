@@ -4598,17 +4598,17 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
-static RValue emitVectorLiteral(SILGenFunction &SGF, CollectionExpr *E,
-                                SGFContext C) {
+static RValue emitSlabLiteral(SILGenFunction &SGF, CollectionExpr *E,
+                              SGFContext C) {
   ArgumentScope scope(SGF, E);
 
-  auto vectorType = E->getType()->castTo<BoundGenericType>();
-  auto loweredVectorType = SGF.getLoweredType(vectorType);
-  auto elementType = vectorType->getGenericArgs()[1]->getCanonicalType();
+  auto slabType = E->getType()->castTo<BoundGenericType>();
+  auto loweredSlabType = SGF.getLoweredType(slabType);
+  auto elementType = slabType->getGenericArgs()[1]->getCanonicalType();
   auto loweredElementType = SGF.getLoweredType(elementType);
   auto &eltTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(), elementType);
 
-  SILValue alloc = SGF.emitTemporaryAllocation(E, loweredVectorType);
+  SILValue alloc = SGF.emitTemporaryAllocation(E, loweredSlabType);
   SILValue addr = SGF.B.createUncheckedAddrCast(E, alloc,
                                             loweredElementType.getAddressType());
 
@@ -4641,31 +4641,31 @@ static RValue emitVectorLiteral(SILGenFunction &SGF, CollectionExpr *E,
         .forwardInto(SGF, AbstractionPattern::getOpaque(), &init, eltTL);
   }
 
-  // Kill the per-element cleanups. The vector will take ownership of them.
+  // Kill the per-element cleanups. The slab will take ownership of them.
   for (auto destCleanup : cleanups)
     SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
 
-  SILValue vectorVal;
+  SILValue slabVal;
 
-  // If the vector is naturally address-only, then we can adopt the stack slot
+  // If the slab is naturally address-only, then we can adopt the stack slot
   // as the value directly.
-  if (loweredVectorType.isAddressOnly(SGF.F)) {
-    vectorVal = SGF.B.createUncheckedAddrCast(E, alloc, loweredVectorType);
+  if (loweredSlabType.isAddressOnly(SGF.F)) {
+    slabVal = SGF.B.createUncheckedAddrCast(E, alloc, loweredSlabType);
   } else {
-    // Otherwise, this vector is loadable. Load it.
-    vectorVal = SGF.B.createTrivialLoadOr(E, alloc, LoadOwnershipQualifier::Take);
+    // Otherwise, this slab is loadable. Load it.
+    slabVal = SGF.B.createTrivialLoadOr(E, alloc, LoadOwnershipQualifier::Take);
   }
 
-  auto vectorMV = SGF.emitManagedRValueWithCleanup(vectorVal);
-  auto vector = RValue(SGF, E, vectorMV);
+  auto slabMV = SGF.emitManagedRValueWithCleanup(slabVal);
+  auto slab = RValue(SGF, E, slabMV);
 
-  return scope.popPreservingValue(std::move(vector));
+  return scope.popPreservingValue(std::move(slab));
 }
 
 RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
-  // Handle 'Vector' literals separately.
-  if (E->getType()->isVector()) {
-    return emitVectorLiteral(SGF, E, C);
+  // Handle 'Slab' literals separately.
+  if (E->getType()->isSlab()) {
+    return emitSlabLiteral(SGF, E, C);
   }
 
   auto loc = SILLocation(E);

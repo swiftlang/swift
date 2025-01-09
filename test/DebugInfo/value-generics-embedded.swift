@@ -2,14 +2,14 @@
 
 // REQUIR123ES: swift_feature_ValueGenerics
 
-// CHECK-DAG: !DICompositeType({{.*}}templateParams: ![[VECTOR_PARAMS:.*]], {{.*}}identifier: "$ss6VectorVy$0_4main8MySpriteVGD"
-// CHECK-DAG: ![[VECTOR_PARAMS]] = !{![[COUNT_PARAM:.*]], ![[ELEMENT_PARAM:.*]]}
+// CHECK-DAG: !DICompositeType({{.*}}templateParams: ![[SLAB_PARAMS:.*]], {{.*}}identifier: "$es4SlabVy$0_4main8MySpriteVGD"
+// CHECK-DAG: ![[SLAB_PARAMS]] = !{![[COUNT_PARAM:.*]], ![[ELEMENT_PARAM:.*]]}
 // CHECK-DAG: ![[COUNT_PARAM]] = !DITemplateTypeParameter(type: ![[COUNT_TYPE:.*]])
-// CHECK-DAG: ![[COUNT_TYPE]] = !DICompositeType({{.*}}name: "$s$0_D"
+// CHECK-DAG: ![[COUNT_TYPE]] = !DICompositeType({{.*}}name: "$e$0_D"
 // CHECK-DAG: ![[ELEMENT_PARAM]] = !DITemplateTypeParameter(type: ![[ELEMENT_TYPE:.*]])
-// CHECK-DAG: ![[ELEMENT_TYPE]] = !DICompositeType({{.*}}name: "MySprite", {{.*}}identifier: "$s4main8MySpriteVD"
+// CHECK-DAG: ![[ELEMENT_TYPE]] = !DICompositeType({{.*}}name: "MySprite", {{.*}}identifier: "$e4main8MySpriteVD"
 struct MySprites {
-  var bricks: Vector<1,MySprite>
+  var bricks: Slab<1, MySprite>
 }
 
 struct MySprite {
@@ -19,6 +19,6 @@ struct MySprite {
 nonisolated(unsafe)
 var sprites: MySprites? = nil
 public func foo() {
-    let bricks: Vector<1,MySprite> = [MySprite()]
+    let bricks: Slab<1, MySprite> = [MySprite()]
     sprites = .init(bricks: bricks)
 }

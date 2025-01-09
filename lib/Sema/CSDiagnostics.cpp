@@ -9572,7 +9572,7 @@ bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
   return true;
 }
 
-bool IncorrectVectorLiteralCount::diagnoseAsError() {
-  emitDiagnostic(diag::vector_literal_incorrect_count, lhsCount, rhsCount);
+bool IncorrectSlabLiteralCount::diagnoseAsError() {
+  emitDiagnostic(diag::slab_literal_incorrect_count, lhsCount, rhsCount);
   return true;
 }

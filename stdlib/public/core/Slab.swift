@@ -13,26 +13,26 @@
 /// A fixed-size array.
 @available(SwiftStdlib 6.1, *)
 @frozen
-public struct Vector<let count: Int, Element: ~Copyable>: ~Copyable {
+public struct Slab<let count: Int, Element: ~Copyable>: ~Copyable {
   @usableFromInline
   let storage: Builtin.FixedArray<count, Element>
 }
 
 @available(SwiftStdlib 6.1, *)
-extension Vector: Copyable where Element: Copyable {}
+extension Slab: Copyable where Element: Copyable {}
 
 @available(SwiftStdlib 6.1, *)
-extension Vector: BitwiseCopyable where Element: BitwiseCopyable {}
+extension Slab: BitwiseCopyable where Element: BitwiseCopyable {}
 
 @available(SwiftStdlib 6.1, *)
-extension Vector: @unchecked Sendable where Element: Sendable & ~Copyable {}
+extension Slab: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
 //===----------------------------------------------------------------------===//
 // Address & Buffer
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.1, *)
-extension Vector where Element: ~Copyable {
+extension Slab where Element: ~Copyable {
   /// Returns a read-only pointer to the first element in the vector.
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
@@ -89,7 +89,7 @@ extension Vector where Element: ~Copyable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.1, *)
-extension Vector where Element: ~Copyable {
+extension Slab where Element: ~Copyable {
   /// Initializes every element in this vector running the given closure value
   /// that returns the element to emplace at the given index.
   ///
@@ -106,7 +106,7 @@ extension Vector where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public init<E: Error>(_ body: (Int) throws(E) -> Element) throws(E) {
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = Vector<count, Element>._initializationBuffer(start: rawPtr)
+      let buffer = Slab<count, Element>._initializationBuffer(start: rawPtr)
 
       for i in 0 ..< count {
         do throws(E) {
@@ -119,46 +119,6 @@ extension Vector where Element: ~Copyable {
           }
 
           // Throw the error we were given back out to the caller.
-          throw error
-        }
-      }
-    }
-  }
-
-  /// Initializes every element in this vector by running the closure with the
-  /// passed in mutable state.
-  ///
-  /// This will call the closure 'count' times, where 'count' is the static
-  /// count of the vector, to initialize every element by passing the closure
-  /// an inout reference to the passed state. The closure is allowed to throw
-  /// an error at any point during initialization at which point the vector will
-  /// stop initialization, deinitialize every currently initialized element, and
-  /// throw the given error back out to the caller.
-  ///
-  /// - Parameter state: The mutable state that can be altered during each
-  ///                    iteration of the closure initializing the vector.
-  /// - Parameter next: A closure that passes in an inout reference to the
-  ///                   user given mutable state which returns an owned
-  ///                   `Element` instance to insert into the vector.
-  @available(SwiftStdlib 6.1, *)
-  @_alwaysEmitIntoClient
-  public init<State: ~Copyable, E: Error>(
-    expand state: consuming State,
-    with next: (inout State) throws(E) -> Element
-  ) throws(E) {
-    self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = Vector<count, Element>._initializationBuffer(start: rawPtr)
-
-      for i in 0 ..< count {
-        do throws(E) {
-          try buffer.initializeElement(at: i, to: next(&state))
-        } catch {
-          // The closure threw an error. We need to deinitialize every element
-          // we've initialized up to this point.
-          for j in 0 ..< i {
-            buffer.deinitializeElement(at: j)
-          }
-
           throw error
         }
       }
@@ -184,8 +144,8 @@ extension Vector where Element: ~Copyable {
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   public init<E: Error>(
-    unfold first: consuming Element,
-    with next: (borrowing Element) throws(E) -> Element
+    first: consuming Element,
+    next: (borrowing Element) throws(E) -> Element
   ) throws(E) {
     // FIXME: We should be able to mark 'Builtin.emplace' as '@once' or something
     //        to give the compiler enough information to know we will only run
@@ -194,13 +154,13 @@ extension Vector where Element: ~Copyable {
     var o: Element? = first
 
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = Vector<count, Element>._initializationBuffer(start: rawPtr)
+      let buffer = Slab<count, Element>._initializationBuffer(start: rawPtr)
 
       buffer.initializeElement(at: 0, to: o.take()._consumingUncheckedUnwrapped())
 
       for i in 1 ..< count {
         do throws(E) {
-          try buffer.initializeElement(at: i, to: next(buffer[0]))
+          try buffer.initializeElement(at: i, to: next(buffer[i &- 1]))
         } catch {
           // The closure threw an error. We need to deinitialize every element
           // we've initialized up to this point.
@@ -216,7 +176,7 @@ extension Vector where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.1, *)
-extension Vector where Element: Copyable {
+extension Slab where Element: Copyable {
   /// Initializes every element in this vector to a copy of the given value.
   ///
   /// - Parameter value: The instance to initialize this vector with.
@@ -224,7 +184,7 @@ extension Vector where Element: Copyable {
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
     self = Builtin.emplace {
-      let buffer = Vector<count, Element>._initializationBuffer(start: $0)
+      let buffer = Slab<count, Element>._initializationBuffer(start: $0)
 
       buffer.initialize(repeating: value)
     }
@@ -236,7 +196,7 @@ extension Vector where Element: Copyable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.1, *)
-extension Vector where Element: ~Copyable {
+extension Slab where Element: ~Copyable {
   /// A type representing the collection's elements.
   @available(SwiftStdlib 6.1, *)
   public typealias Element = Element
@@ -248,11 +208,6 @@ extension Vector where Element: ~Copyable {
   /// argument.
   @available(SwiftStdlib 6.1, *)
   public typealias Index = Int
-
-  /// A type that represents the indices that are valid for subscripting the
-  /// collection, in ascending order.
-  @available(SwiftStdlib 6.1, *)
-  public typealias Indices = Range<Int>
 
   /// The number of elements in the collection.
   @available(SwiftStdlib 6.1, *)
@@ -325,7 +280,7 @@ extension Vector where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public var indices: Range<Int> {
-    startIndex ..< endIndex
+    Range(_uncheckedBounds: (0, count))
   }
 
   /// Returns the position immediately after the given index.
@@ -372,20 +327,21 @@ extension Vector where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.1, *)
+  @_addressableSelf
   @_alwaysEmitIntoClient
   public subscript(_ i: Int) -> Element {
     @_transparent
-    _read {
-      _precondition(startIndex <= i && i < endIndex, "Index out of bounds")
+    unsafeAddress {
+      _precondition(indices.contains(i), "Index out of bounds")
 
-      yield ((address + i).pointee)
+      return address + i
     }
 
     @_transparent
-    _modify {
-      _precondition(startIndex <= i && i < endIndex, "Index out of bounds")
+    unsafeMutableAddress {
+      _precondition(indices.contains(i), "Index out of bounds")
 
-      yield &(mutableAddress + i).pointee
+      return mutableAddress + i
     }
   }
 }
@@ -395,61 +351,7 @@ extension Vector where Element: ~Copyable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.1, *)
-extension Vector where Element: ~Copyable {
-  /// Returns the result of combining the elements of the vector using the
-  /// given closure.
-  ///
-  /// Use the `reduce(into:_:)` method to produce a single value from the
-  /// elements of an entire vector. For example, you can use this method on a
-  /// vector of integers to filter adjacent equal entries or count frequencies.
-  ///
-  /// The `updateAccumulatingResult` closure is called sequentially with a
-  /// mutable accumulating value initialized to `initialResult` and each element
-  /// of the vector. This example shows how to build a dictionary of letter
-  /// frequencies of a vector.
-  ///
-  ///     let letters: Vector = ["a", "b", "r", "a", "c", "a", "d", "a", "b", "r", "a"]
-  ///     let letterCount = letters.reduce(into: [:]) { counts, letter in
-  ///         counts[letter, default: 0] += 1
-  ///     }
-  ///     // letterCount == ["a": 5, "b": 2, "r": 2, "c": 1, "d": 1]
-  ///
-  /// When `letters.reduce(into:_:)` is called, the following steps occur:
-  ///
-  /// 1. The `updateAccumulatingResult` closure is called with the initial
-  ///    accumulating value---`[:]` in this case---and the first character of
-  ///    `letters`, modifying the accumulating value by setting `1` for the key
-  ///    `"a"`.
-  /// 2. The closure is called again repeatedly with the updated accumulating
-  ///    value and each element of the vector.
-  /// 3. When the vector is exhausted, the accumulating value is returned to
-  ///    the caller.
-  ///
-  /// If the vector has no elements, `updateAccumulatingResult` is never
-  /// executed and `initialResult` is the result of the call to
-  /// `reduce(into:_:)`.
-  ///
-  /// - Parameters:
-  ///   - initialResult: The value to use as the initial accumulating value.
-  ///   - updateAccumulatingResult: A closure that updates the accumulating
-  ///     value with an element of the vector.
-  /// - Returns: The final accumulated value. If the vector has no elements,
-  ///   the result is `initialResult`.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @available(SwiftStdlib 6.1, *)
-  @_alwaysEmitIntoClient
-  public func reduce<Result: ~Copyable, E: Error>(
-    into initialResult: consuming Result,
-    _ updateAccumulatingResult: (inout Result, borrowing Element) throws(E) -> ()
-  ) throws(E) -> Result {
-    for i in 0 ..< count {
-      try updateAccumulatingResult(&initialResult, self[i])
-    }
-
-    return initialResult
-  }
-
+extension Slab where Element: ~Copyable {
   /// Exchanges the values at the specified indices of the vector.
   ///
   /// Both parameters must be valid indices of the vector and not
@@ -467,7 +369,7 @@ extension Vector where Element: ~Copyable {
     _ i: Int,
     _ j: Int
   ) {
-    guard i != j else {
+    guard i != j, indices.contains(i), indices.contains(j) else {
       return
     }
 
@@ -483,7 +385,7 @@ extension Vector where Element: ~Copyable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.1, *)
-extension Vector where Element: ~Copyable {
+extension Slab where Element: ~Copyable {
   /// Calls a closure with a pointer to the vector's contiguous storage.
   ///
   /// Often, the optimizer can eliminate bounds checks within a vector
@@ -494,7 +396,7 @@ extension Vector where Element: ~Copyable {
   /// buffer pointer:
   ///
   ///     // "[1, 2, 3, 4, 5]"
-  ///     let numbers = Vector<5, Int> {
+  ///     let numbers = Slab<5, Int> {
   ///       $0 + 1
   ///     }
   ///
@@ -520,7 +422,7 @@ extension Vector where Element: ~Copyable {
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public borrowing func withUnsafeBufferPointer<Result, E: Error>(
+  public borrowing func _withUnsafeBufferPointer<Result, E: Error>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
     try body(buffer)
@@ -538,7 +440,7 @@ extension Vector where Element: ~Copyable {
   /// the vector:
   ///
   ///     // "[1, 2, 3, 4, 5]"
-  ///     var numbers = Vector<5, Int> {
+  ///     var numbers = Slab<5, Int> {
   ///       $0 + 1
   ///     }
   ///
@@ -569,81 +471,9 @@ extension Vector where Element: ~Copyable {
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public mutating func withUnsafeMutableBufferPointer<Result, E: Error>(
+  public mutating func _withUnsafeMutableBufferPointer<Result, E: Error>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
     try body(mutableBuffer)
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Equatable
-//===----------------------------------------------------------------------===//
-
-@available(SwiftStdlib 6.1, *)
-extension Vector where Element: Equatable {
-  /// Returns a Boolean value indicating whether two vectors contain the same
-  /// elements in the same order.
-  ///
-  /// You can use the equal-to operator (`==`) to compare any two vectors
-  /// that store the same, `Equatable`-conforming element type.
-  ///
-  /// - Parameters:
-  ///   - lhs: A vector to compare.
-  ///   - rhs: Another vector to compare.
-  @available(SwiftStdlib 6.1, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public static func ==(
-    lhs: borrowing Vector<count, Element>,
-    rhs: borrowing Vector<count, Element>
-  ) -> Bool {
-    // No need for a count check because these are statically guaranteed to have
-    // the same count...
-
-    for i in 0 ..< count {
-      guard lhs[i] == rhs[i] else {
-        return false
-      }
-    }
-
-    return true
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// CustomStringConvertible and CustomDebugStringConvertible APIs
-//===----------------------------------------------------------------------===//
-
-@available(SwiftStdlib 6.1, *)
-extension Vector where Element: CustomDebugStringConvertible {
-  /// A textual representation of the vector and its elements.
-  @available(SwiftStdlib 6.1, *)
-  @_alwaysEmitIntoClient // FIXME: Remove this once 'Vector' actually conforms
-                         //        to 'CustomStringConvertible'.
-  public var description: String {
-    var result = "["
-    var isFirst = true
-
-    for i in 0 ..< count {
-      if !isFirst {
-        result += ", "
-      } else {
-        isFirst = false
-      }
-
-      result += self[i].debugDescription
-    }
-
-    result += "]"
-    return result
-  }
-
-  /// A textual representation of the vector and its elements.
-  @available(SwiftStdlib 6.1, *)
-  @_alwaysEmitIntoClient // FIXME: Remove this once 'Vector' actually conforms
-                         //        to 'CustomDebugStringConvertible'.
-  public var debugDescription: String {
-    description
   }
 }

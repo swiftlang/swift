@@ -1666,10 +1666,10 @@ struct TypeSimplifier {
         auto *proto = assocType->getProtocol();
         auto conformance = CS.lookupConformance(lookupBaseType, proto);
         if (!conformance) {
-          // Special case: When building vector literals, we go through the same
+          // Special case: When building slab literals, we go through the same
           // array literal machinery, so there will be a conversion constraint
           // for the element to ExpressibleByArrayLiteral.ArrayLiteralType.
-          if (lookupBaseType->isVector()) {
+          if (lookupBaseType->isSlab()) {
             auto &ctx = CS.getASTContext();
             auto arrayProto =
                 ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);

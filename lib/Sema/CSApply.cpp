@@ -3794,8 +3794,8 @@ namespace {
       Type arrayTy = cs.getType(expr);
       Type elementType;
 
-      if (arrayTy->isVector()) {
-        // <let Count: Int, Element>
+      if (arrayTy->isSlab()) {
+        // <let count: Int, Element>
         elementType = arrayTy->castTo<BoundGenericStructType>()->getGenericArgs()[1];
       } else {
         ProtocolDecl *arrayProto = TypeChecker::getProtocol(

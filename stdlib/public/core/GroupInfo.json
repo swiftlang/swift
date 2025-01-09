@@ -257,7 +257,7 @@
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
-    "Vector.swift"
+    "Slab.swift"
   ],
   "Result": [
     "Result.swift"

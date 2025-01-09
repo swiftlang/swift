@@ -7246,7 +7246,7 @@ public:
   /// Returns \c true if this type parameter is declared as a value.
   ///
   /// \code
-  /// struct Vector<Element, let N: Int>
+  /// struct Slab<let count: Int, Element: ~Copyable>
   /// \endcode
   bool isValue() const {
     return ParamKind == GenericTypeParamKind::Value;

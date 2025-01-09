@@ -4,25 +4,25 @@
 
 import Builtin
 
-struct Vector<let N: Int, Element: ~Copyable>: ~Copyable {
+struct Slab<let N: Int, Element: ~Copyable>: ~Copyable {
   let storage: Builtin.FixedArray<N, Element>
 }
 
-extension Vector: Copyable where Element: Copyable {}
+extension Slab: Copyable where Element: Copyable {}
 
 // CHECK-DAG: !DICompositeType({{.*}}name: "Builtin.FixedArray", {{.*}}identifier: "$sxq_BVD"
 func genericBA<let N: Int, Element>(_: Builtin.FixedArray<N, Element>) {}
 
-// CHECK-DAG: !DICompositeType({{.*}}name: "$s4main6VectorVyxq_GD"
-func genericV<let N: Int, Element>(_: Vector<N, Element>) {}
+// CHECK-DAG: !DICompositeType({{.*}}name: "$s4main4SlabVyxq_GD"
+func genericV<let N: Int, Element>(_: Slab<N, Element>) {}
 
 // CHECK-DAG: !DICompositeType({{.*}}name: "Builtin.FixedArray", {{.*}}identifier: "$s$3_SiBVD"
 func concreteBA(_: Builtin.FixedArray<4, Int>) {}
 
-// CHECK-DAG: !DICompositeType({{.*}}name: "$s4main6VectorVy$1_SiGD", {{.*}}templateParams: ![[VECTOR_PARAMS:.*]])
-// CHECK-DAG: ![[VECTOR_PARAMS]] = !{![[COUNT_PARAM:.*]], ![[ELEMENT_PARAM:.*]]}
+// CHECK-DAG: !DICompositeType({{.*}}name: "$s4main4SlabVy$1_SiGD", {{.*}}templateParams: ![[SLAB_PARAMS:.*]])
+// CHECK-DAG: ![[SLAB_PARAMS]] = !{![[COUNT_PARAM:.*]], ![[ELEMENT_PARAM:.*]]}
 // CHECK-DAG: ![[COUNT_PARAM]] = !DITemplateTypeParameter(type: ![[COUNT_TYPE:.*]])
 // CHECK-DAG: ![[COUNT_TYPE]] = !DICompositeType({{.*}}name: "$s$1_D"
 // CHECK-DAG: ![[ELEMENT_PARAM]] = !DITemplateTypeParameter(type: ![[ELEMENT_TYPE:.*]])
 // CHECK-DAG: ![[ELEMENT_TYPE]] = !DICompositeType({{.*}}name: "$sSiD"
-func concreteV(_: Vector<2, Int>) {}
+func concreteV(_: Slab<2, Int>) {}

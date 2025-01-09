@@ -811,7 +811,7 @@ Type TypeBase::isArrayType() {
     if (isArray())
       return boundStruct->getGenericArgs()[0];
 
-    if (isVector())
+    if (isSlab())
       return boundStruct->getGenericArgs()[1];
   }
   return Type();

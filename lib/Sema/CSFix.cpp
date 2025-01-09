@@ -2723,16 +2723,16 @@ IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
       IgnoreKeyPathSubscriptIndexMismatch(cs, argType, locator);
 }
 
-AllowVectorLiteralCountMismatch *
-AllowVectorLiteralCountMismatch::create(ConstraintSystem &cs, Type lhsCount,
-                                        Type rhsCount,
-                                        ConstraintLocator *locator) {
+AllowSlabLiteralCountMismatch *
+AllowSlabLiteralCountMismatch::create(ConstraintSystem &cs, Type lhsCount,
+                                      Type rhsCount,
+                                      ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowVectorLiteralCountMismatch(cs, lhsCount, rhsCount, locator);
+      AllowSlabLiteralCountMismatch(cs, lhsCount, rhsCount, locator);
 }
 
-bool AllowVectorLiteralCountMismatch::diagnose(const Solution &solution,
-                                               bool asNote) const {
-  IncorrectVectorLiteralCount failure(solution, lhsCount, rhsCount, getLocator());
+bool AllowSlabLiteralCountMismatch::diagnose(const Solution &solution,
+                                             bool asNote) const {
+  IncorrectSlabLiteralCount failure(solution, lhsCount, rhsCount, getLocator());
   return failure.diagnose(asNote);
 }

@@ -225,7 +225,6 @@ UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
-UPCOMING_FEATURE(ImportCArraysAsVectors, 453, 7)
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
