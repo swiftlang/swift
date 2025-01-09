@@ -2134,22 +2134,60 @@ AvailableAttr::AvailableAttr(
 
 #undef INIT_VER_TUPLE
 
-AvailableAttr *
-AvailableAttr::createPlatformAgnostic(ASTContext &C,
-                                   StringRef Message,
-                                   StringRef Rename,
-                                   PlatformAgnosticAvailabilityKind Kind,
-                                   llvm::VersionTuple Obsoleted) {
-  assert(Kind != PlatformAgnosticAvailabilityKind::None);
-  llvm::VersionTuple NoVersion;
-  if (Kind == PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
-    assert(!Obsoleted.empty());
-  }
+AvailableAttr *AvailableAttr::createUniversallyUnavailable(ASTContext &C,
+                                                           StringRef Message,
+                                                           StringRef Rename) {
   return new (C) AvailableAttr(
       SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
-      /*Introduced=*/NoVersion, SourceRange(), /*Deprecated=*/NoVersion,
-      SourceRange(), Obsoleted, SourceRange(), Kind, /*Implicit=*/false,
+      /*Introduced=*/{}, SourceRange(), /*Deprecated=*/{}, SourceRange(),
+      /*Obsoleted=*/{}, SourceRange(),
+      PlatformAgnosticAvailabilityKind::Unavailable, /*Implicit=*/false,
       /*SPI=*/false);
+}
+
+AvailableAttr *AvailableAttr::createUniversallyDeprecated(ASTContext &C,
+                                                          StringRef Message,
+                                                          StringRef Rename) {
+  return new (C) AvailableAttr(
+      SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
+      /*Introduced=*/{}, SourceRange(), /*Deprecated=*/{}, SourceRange(),
+      /*Obsoleted=*/{}, SourceRange(),
+      PlatformAgnosticAvailabilityKind::Deprecated, /*Implicit=*/false,
+      /*SPI=*/false);
+}
+
+AvailableAttr *AvailableAttr::createUnavailableInSwift(ASTContext &C,
+                                                       StringRef Message,
+                                                       StringRef Rename) {
+  return new (C) AvailableAttr(
+      SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
+      /*Introduced=*/{}, SourceRange(), /*Deprecated=*/{}, SourceRange(),
+      /*Obsoleted=*/{}, SourceRange(),
+      PlatformAgnosticAvailabilityKind::UnavailableInSwift, /*Implicit=*/false,
+      /*SPI=*/false);
+}
+
+AvailableAttr *AvailableAttr::createSwiftLanguageModeVersioned(
+    ASTContext &C, StringRef Message, StringRef Rename,
+    llvm::VersionTuple Introduced, llvm::VersionTuple Obsoleted) {
+  return new (C) AvailableAttr(
+      SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
+      Introduced, SourceRange(), /*Deprecated=*/{}, SourceRange(), Obsoleted,
+      SourceRange(), PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
+      /*Implicit=*/false,
+      /*SPI=*/false);
+}
+
+AvailableAttr *AvailableAttr::createPlatformVersioned(
+    ASTContext &C, PlatformKind Platform, StringRef Message, StringRef Rename,
+    llvm::VersionTuple Introduced, llvm::VersionTuple Deprecated,
+    llvm::VersionTuple Obsoleted) {
+  return new (C) AvailableAttr(SourceLoc(), SourceRange(), Platform, Message,
+                               Rename, Introduced, SourceRange(), Deprecated,
+                               SourceRange(), Obsoleted, SourceRange(),
+                               PlatformAgnosticAvailabilityKind::None,
+                               /*Implicit=*/false,
+                               /*SPI=*/false);
 }
 
 bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,

@@ -6672,13 +6672,8 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
 
   // Add the blanket "unavailable".
 
-  auto attr = new (ctx) AvailableAttr(
-      SourceLoc(), SourceRange(), PlatformKind::none, /*Message*/ "",
-      /*Rename=*/"", /*Introduced=*/noVersion, SourceRange(),
-      /*Deprecated=*/noVersion, SourceRange(), /*Obsoleted=*/noVersion,
-      SourceRange(), PlatformAgnosticAvailabilityKind::Unavailable,
-      /*Implicit=*/false, /*SPI=*/false);
-  ext->getAttrs().add(attr);
+  ext->getAttrs().add(
+      AvailableAttr::createUniversallyUnavailable(ctx, /*Message=*/""));
 }
 
 ProtocolConformance *swift::deriveImplicitSendableConformance(
