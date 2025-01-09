@@ -211,8 +211,14 @@ private struct ValidationTestCase {
 
 if #available(SwiftStdlib 6.1, *) {
   suite.test("UTF8Span/encoding errors") {
-    func test(_ t: ValidationTestCase) {
-      t.run()
+    func test(
+      _ bytes: Array<UInt8>,
+      _ errors: ValidationError...,
+      _ file: String = #file, line: UInt = #line
+    ) {
+      ValidationTestCase(
+        bytes, errors, file, line
+      ).run()
     }
 
     // Valid string

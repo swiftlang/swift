@@ -68,6 +68,12 @@ struct ContentEquivalenceTestCase {
       }
       expectNil(stringRevIter.next(), stackTrace: loc)
 
+      // TODO: test various skip(by) API
+
+      // TODO: test reset variants
+
+      // TODO: test prefix/suffix
+
     }
   }
 
@@ -87,6 +93,12 @@ struct ContentEquivalenceTestCase {
         expectEqual(char, stringRevIter.next(), stackTrace: loc)
       }
       expectNil(stringRevIter.next(), stackTrace: loc)
+
+
+      // TODO: test various skip(by) API
+
+
+      // TODO: test reset variants
     }
   }
 
@@ -94,6 +106,8 @@ struct ContentEquivalenceTestCase {
     testBytes()
     testScalars()
     testCharacters()
+
+    // TODO: test grapheme break iterator
   }
 
 }

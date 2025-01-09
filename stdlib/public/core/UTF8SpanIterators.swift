@@ -33,7 +33,7 @@ extension UTF8Span {
       guard currentCodeUnitOffset < codeUnits.count else { return nil }
 
       _internalInvariant(codeUnits.isScalarAligned(currentCodeUnitOffset))
-      let (result, newPos) = codeUnits.unsafeBaseAddress._decodeScalar(startingAt: currentCodeUnitOffset)
+      let (result, newPos) = codeUnits._start()._decodeScalar(startingAt: currentCodeUnitOffset)
       self.currentCodeUnitOffset = newPos
       return result
     }
@@ -48,7 +48,7 @@ extension UTF8Span {
       guard currentCodeUnitOffset > 0 else { return nil }
 
       _internalInvariant(codeUnits.isScalarAligned(currentCodeUnitOffset))
-      let (result, newPos) = codeUnits.unsafeBaseAddress._decodeScalar(endingAt: currentCodeUnitOffset)
+      let (result, newPos) = codeUnits._start()._decodeScalar(endingAt: currentCodeUnitOffset)
       self.currentCodeUnitOffset = newPos
       return result
     }
@@ -204,7 +204,7 @@ extension UTF8Span {
       guard currentCodeUnitOffset < codeUnits.count else { return nil }
 
       _internalInvariant(codeUnits.isScalarAligned(currentCodeUnitOffset))
-      let (result, newPos) = codeUnits.unsafeBaseAddress._decodeCharacter(
+      let (result, newPos) = codeUnits._start()._decodeCharacter(
         startingAt: currentCodeUnitOffset,
         limitedBy: codeUnits.count
       )
@@ -222,7 +222,7 @@ extension UTF8Span {
       guard currentCodeUnitOffset > 0 else { return nil }
 
       _internalInvariant(codeUnits.isScalarAligned(currentCodeUnitOffset))
-      let (result, newPos) = codeUnits.unsafeBaseAddress._decodeCharacter(
+      let (result, newPos) = codeUnits._start()._decodeCharacter(
         endingAt: currentCodeUnitOffset,
         limitedBy: codeUnits.count)
       self.currentCodeUnitOffset = newPos

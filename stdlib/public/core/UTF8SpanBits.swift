@@ -73,7 +73,7 @@ extension UTF8Span {
 
     // TODO: use faster internal algorithm
     let normalized = _str._nfcCodeUnits
-    guard unsafeBaseAddress._urbp(
+    guard _start()._urbp(
       0..<count
     ).elementsEqual(normalized) else {
       return false

@@ -5,7 +5,7 @@
 @frozen
 @available(SwiftStdlib 6.1, *)
 public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
-  public var unsafeBaseAddress: UnsafeRawPointer
+  public var unsafeBaseAddress: UnsafeRawPointer?
 
   /*
    A bit-packed count and flags (such as isASCII)
@@ -50,9 +50,18 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
 
     _invariantCheck()
   }
+
+  // FIXME: we need to make sure ALL API are nil safe, that is they
+  // at least check the count first
+  @_alwaysEmitIntoClient
+  internal func _start() -> UnsafeRawPointer {
+    unsafeBaseAddress._unsafelyUnwrappedUnchecked
+  }
 }
 
 // TODO: init strategy: underscored public that use lifetime annotations
+
+// TODO: try to convert code to be ran on Span instead of URP
 
 @available(SwiftStdlib 6.1, *)
 extension UTF8Span {
@@ -61,13 +70,18 @@ extension UTF8Span {
   public init(
     _validating codeUnits: consuming Span<UInt8>
   ) throws(UTF8.EncodingError) {
-    // TODO: handle empty/null span
+    guard let ptr = codeUnits._pointer else {
+      self.unsafeBaseAddress = nil
+      self._countAndFlags = 0
+      return
+    }
 
-    self.unsafeBaseAddress = .init(codeUnits._start())
-
+    // FIXME: handle empty/null span
+    let basePtr = codeUnits._start()
     let count = codeUnits._count
-    let isASCII = try unsafeBaseAddress._validateUTF8(limitedBy: count)
+    let isASCII = try basePtr._validateUTF8(limitedBy: count)
 
+    self.unsafeBaseAddress = .init(basePtr)
     self._countAndFlags = UInt64(truncatingIfNeeded: count)
     if isASCII {
       _setIsASCII()
@@ -153,7 +167,7 @@ extension UTF8Span {
 @available(SwiftStdlib 6.1, *)
 extension UTF8Span {
   // HACK: working around lack of internals
-  internal var _str: String { unsafeBaseAddress._str(0..<count) }
+  internal var _str: String { _start()._str(0..<count) }
 
   /// Whether `self` is equivalent to `other` under Unicode Canonical
   /// Equivalence.
@@ -197,7 +211,7 @@ extension UTF8Span {
   >(
     _ body: (_ buffer: /*borrowing*/ UnsafeBufferPointer<UInt8>) throws(E) -> Result
   ) throws(E) -> Result {
-    try body(unsafeBaseAddress._ubp(0..<count))
+    try body(_start()._ubp(0..<count))
   }
 
   // TODO: withSpan or similar?
@@ -212,7 +226,7 @@ extension UTF8Span {
 #if DEBUG
     if isNullTerminatedCString {
       _internalInvariant(
-        unsafeBaseAddress.load(fromByteOffset: count, as: UInt8.self) == 0)
+        _start().load(fromByteOffset: count, as: UInt8.self) == 0)
       // TODO: byte scan for no interior nulls...
     }
 #endif
