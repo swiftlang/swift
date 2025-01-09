@@ -44,22 +44,22 @@ public protocol CxxSpan<Element> {
   associatedtype Size: BinaryInteger
 
   init()
-  init(_ unsafePointer : UnsafePointer<Element>, _ count: Size)
+  @unsafe init(_ unsafePointer : UnsafePointer<Element>, _ count: Size)
 
   func size() -> Size
-  func __dataUnsafe() -> UnsafePointer<Element>?
+  @unsafe func __dataUnsafe() -> UnsafePointer<Element>?
 }
 
 extension CxxSpan {
   /// Creates a C++ span from a Swift UnsafeBufferPointer
-  @inlinable
+  @unsafe @inlinable
   public init(_ unsafeBufferPointer: UnsafeBufferPointer<Element>) {
     precondition(unsafeBufferPointer.baseAddress != nil, 
                   "UnsafeBufferPointer should not point to nil")
     self.init(unsafeBufferPointer.baseAddress!, Size(unsafeBufferPointer.count))
   }
 
-  @inlinable
+  @unsafe @inlinable
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
     precondition(unsafeMutableBufferPointer.baseAddress != nil, 
                   "UnsafeMutableBufferPointer should not point to nil")
@@ -97,12 +97,12 @@ public protocol CxxMutableSpan<Element> {
   associatedtype Size: BinaryInteger
 
   init()
-  init(_ unsafeMutablePointer : UnsafeMutablePointer<Element>, _ count: Size)
+  @unsafe init(_ unsafeMutablePointer : UnsafeMutablePointer<Element>, _ count: Size)
 }
 
 extension CxxMutableSpan {
   /// Creates a C++ span from a Swift UnsafeMutableBufferPointer
-  @inlinable
+  @unsafe @inlinable
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
     precondition(unsafeMutableBufferPointer.baseAddress != nil, 
                   "UnsafeMutableBufferPointer should not point to nil")

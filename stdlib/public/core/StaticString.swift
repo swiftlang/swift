@@ -128,7 +128,7 @@ public struct StaticString: Sendable {
   ///
   /// - Important: Accessing this property when `hasPointerRepresentation` is
   ///   `false` triggers a runtime error.
-  @_transparent
+  @unsafe @_transparent
   public var utf8Start: UnsafePointer<UInt8> {
     _precondition(
       hasPointerRepresentation,
@@ -197,7 +197,7 @@ public struct StaticString: Sendable {
   ///   `withUTF8Buffer(_:)` method. The pointer argument is valid only for the
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure.
-  @_transparent
+  @unsafe @_transparent
   public func withUTF8Buffer<R>(
     _ body: (UnsafeBufferPointer<UInt8>) -> R
   ) -> R {

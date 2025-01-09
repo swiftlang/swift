@@ -17,7 +17,7 @@ import _Concurrency
 @usableFromInline
 internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
   static let _shared: DistributedRemoteActorReferenceExecutor = DistributedRemoteActorReferenceExecutor()
-  static var sharedUnownedExecutor: UnownedSerialExecutor {
+  @unsafe static var sharedUnownedExecutor: UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: _shared)
   }
 
@@ -37,7 +37,7 @@ internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
   }
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
+  @unsafe public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: self)
   }
 }
@@ -53,7 +53,7 @@ internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
 /// If one intends to use a distributed actor's executor to schedule work on it,
 /// one should programmatically ensure that that actor is local, e.g. using the `whenLocal`
 /// functionality of distributed actors, or by other means (e.g. "knowing that it definitely must be local")
-@available(SwiftStdlib 5.9, *)
+@unsafe @available(SwiftStdlib 5.9, *)
 public func buildDefaultDistributedRemoteActorExecutor<Act>(
     _ actor: Act
 ) -> UnownedSerialExecutor where Act: DistributedActor {

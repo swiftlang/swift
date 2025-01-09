@@ -40,7 +40,7 @@ extension Substring {
 }
 
 extension String {
-  @available(*, unavailable, renamed: "String.withUTF8")
+  @safe(unchecked) @available(*, unavailable, renamed: "String.withUTF8")
   @inlinable
   internal func _withUTF8<R>(
     _ body: (UnsafeBufferPointer<UInt8>) throws -> R
@@ -51,7 +51,7 @@ extension String {
 }
 
 extension Substring {
-  @available(*, unavailable, renamed: "Substring.withUTF8")
+  @safe(unchecked) @available(*, unavailable, renamed: "Substring.withUTF8")
   @inlinable
   internal func _withUTF8<R>(
     _ body: (UnsafeBufferPointer<UInt8>) throws -> R
@@ -73,7 +73,7 @@ internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
 }
 
 extension String {
-  @usableFromInline // Never actually used in inlinable code...
+  @unsafe @usableFromInline // Never actually used in inlinable code...
   internal func _nativeCopyUTF16CodeUnits(
     into buffer: UnsafeMutableBufferPointer<UInt16>,
     range: Range<String.Index>

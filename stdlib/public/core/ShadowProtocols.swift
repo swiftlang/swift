@@ -29,7 +29,7 @@ internal protocol _ShadowProtocol {}
 /// A shadow for the `NSFastEnumeration` protocol.
 @objc
 internal protocol _NSFastEnumeration: _ShadowProtocol {
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
@@ -44,12 +44,12 @@ internal protocol _NSEnumerator: _ShadowProtocol {
 }
 
 /// A token that can be used for `NSZone*`.
-internal typealias _SwiftNSZone = OpaquePointer
+@unsafe internal typealias _SwiftNSZone = OpaquePointer
 
 /// A shadow for the `NSCopying` protocol.
 @objc
 internal protocol _NSCopying: _ShadowProtocol {
-  @objc(copyWithZone:)
+  @unsafe @objc(copyWithZone:)
   func copy(with zone: _SwiftNSZone?) -> AnyObject
 }
 
@@ -63,9 +63,9 @@ internal protocol _NSArrayCore: _NSCopying, _NSFastEnumeration {
   @objc(objectAtIndex:)
   func objectAt(_ index: Int) -> AnyObject
 
-  func getObjects(_: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
+  @unsafe func getObjects(_: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
 
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   override func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
@@ -84,7 +84,7 @@ internal protocol _NSDictionaryCore: _NSCopying, _NSFastEnumeration {
   // NSDictionary subclass.
 
   // The designated initializer of `NSDictionary`.
-  init(
+  @unsafe init(
     objects: UnsafePointer<AnyObject?>,
     forKeys: UnsafeRawPointer, count: Int)
 
@@ -97,17 +97,17 @@ internal protocol _NSDictionaryCore: _NSCopying, _NSFastEnumeration {
 
   // We also override the following methods for efficiency.
 
-  @objc(copyWithZone:)
+  @unsafe @objc(copyWithZone:)
   override func copy(with zone: _SwiftNSZone?) -> AnyObject
 
-  @objc(getObjects:andKeys:count:)
+  @unsafe @objc(getObjects:andKeys:count:)
   func getObjects(
     _ objects: UnsafeMutablePointer<AnyObject>?,
     andKeys keys: UnsafeMutablePointer<AnyObject>?,
     count: Int
   )
 
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   override func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
@@ -126,7 +126,7 @@ internal protocol _NSDictionaryCore: _NSCopying, _NSFastEnumeration {
 internal protocol _NSDictionary: _NSDictionaryCore {
   // Note! This API's type is different from what is imported by the clang
   // importer.
-  override func getObjects(
+  @unsafe override func getObjects(
     _ objects: UnsafeMutablePointer<AnyObject>?,
     andKeys keys: UnsafeMutablePointer<AnyObject>?,
     count: Int)
@@ -143,7 +143,7 @@ internal protocol _NSSetCore: _NSCopying, _NSFastEnumeration {
   // NSSet subclass.
 
   // The designated initializer of `NSSet`.
-  init(objects: UnsafePointer<AnyObject?>, count: Int)
+  @unsafe init(objects: UnsafePointer<AnyObject?>, count: Int)
 
   var count: Int { get }
   func member(_ object: AnyObject) -> AnyObject?
@@ -151,10 +151,10 @@ internal protocol _NSSetCore: _NSCopying, _NSFastEnumeration {
 
   // We also override the following methods for efficiency.
 
-  @objc(copyWithZone:)
+  @unsafe @objc(copyWithZone:)
   override func copy(with zone: _SwiftNSZone?) -> AnyObject
 
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   override func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
@@ -171,12 +171,12 @@ internal protocol _NSSetCore: _NSCopying, _NSFastEnumeration {
 /// supplies.
 @unsafe_no_objc_tagged_pointer @objc
 internal protocol _NSSet: _NSSetCore {
-  @objc(getObjects:count:) func getObjects(
+  @unsafe @objc(getObjects:count:) func getObjects(
     _ buffer: UnsafeMutablePointer<AnyObject>,
     count: Int
   )
 
-  @objc(getObjects:) func getObjects(
+  @unsafe @objc(getObjects:) func getObjects(
     _ buffer: UnsafeMutablePointer<AnyObject>
   )
 }
@@ -189,7 +189,7 @@ internal protocol _NSNumber {
   var floatValue: Float { get }
   var unsignedLongLongValue: UInt64 { get }
   var longLongValue: Int64 { get }
-  var objCType: UnsafePointer<Int8> { get }
+  @unsafe var objCType: UnsafePointer<Int8> { get }
 }
 
 #else

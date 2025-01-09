@@ -108,7 +108,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
   ///   is sometimes conservative and may return `nil` even when
   ///   contiguous storage exists, e.g., if array doesn't have a smart
   /// implementation of countByEnumerating.
-  internal func contiguousStorage(
+  @unsafe internal func contiguousStorage(
     _ subRange: Range<Int>
   ) -> UnsafeMutablePointer<AnyObject>?
   {
@@ -130,7 +130,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
       : nil
   }
 
-  @usableFromInline
+  @unsafe @usableFromInline
   __consuming internal func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<AnyObject>
@@ -153,7 +153,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   internal __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {

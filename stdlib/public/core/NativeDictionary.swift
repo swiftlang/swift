@@ -98,12 +98,12 @@ extension _NativeDictionary { // Primitive fields
   }
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
-  @inlinable
+  @unsafe @inlinable
   internal var _keys: UnsafeMutablePointer<Key> {
     return _storage._rawKeys.assumingMemoryBound(to: Key.self)
   }
 
-  @inlinable
+  @unsafe @inlinable
   internal var _values: UnsafeMutablePointer<Value> {
     return _storage._rawValues.assumingMemoryBound(to: Value.self)
   }
@@ -116,7 +116,7 @@ extension _NativeDictionary { // Primitive fields
 }
 
 extension _NativeDictionary { // Low-level unchecked operations
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func uncheckedKey(at bucket: Bucket) -> Key {
     defer { _fixLifetime(self) }
@@ -124,7 +124,7 @@ extension _NativeDictionary { // Low-level unchecked operations
     return _keys[bucket.offset]
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func uncheckedValue(at bucket: Bucket) -> Value {
     defer { _fixLifetime(self) }
@@ -132,7 +132,7 @@ extension _NativeDictionary { // Low-level unchecked operations
     return _values[bucket.offset]
   }
 
-  @inlinable // FIXME(inline-always) was usableFromInline
+  @safe(unchecked) @inlinable // FIXME(inline-always) was usableFromInline
   @inline(__always)
   internal func uncheckedInitialize(
     at bucket: Bucket,
@@ -144,7 +144,7 @@ extension _NativeDictionary { // Low-level unchecked operations
     (_values + bucket.offset).initialize(to: value)
   }
 
-  @inlinable // FIXME(inline-always) was usableFromInline
+  @safe(unchecked) @inlinable // FIXME(inline-always) was usableFromInline
   @inline(__always)
   internal func uncheckedDestroy(at bucket: Bucket) {
     defer { _fixLifetime(self) }
@@ -182,7 +182,7 @@ extension _NativeDictionary { // Low-level lookup operations
 }
 
 extension _NativeDictionary { // ensureUnique
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @inline(never)
   internal mutating func _copyOrMoveAndResize(
     capacity: Int,
@@ -494,7 +494,7 @@ extension _NativeDictionary { // Insertions
   /// Insert a new element into uniquely held storage, replacing an existing
   /// value (if any).  Storage must be uniquely referenced with adequate
   /// capacity.
-  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @safe(unchecked) @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
   internal mutating func _unsafeUpdate(
     key: __owned Key,
     value: __owned Value
@@ -565,7 +565,7 @@ extension _NativeDictionary { // Insertions
     _storage._count += 1
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   internal mutating func updateValue(
     _ value: __owned Value,
     forKey key: Key,
@@ -581,7 +581,7 @@ extension _NativeDictionary { // Insertions
     return nil
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   internal mutating func setValue(
     _ value: __owned Value,
     forKey key: Key,
@@ -597,7 +597,7 @@ extension _NativeDictionary { // Insertions
 }
 
 extension _NativeDictionary {
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal mutating func swapValuesAt(
     _ a: Bucket,
@@ -678,7 +678,7 @@ extension _NativeDictionary: _HashTableDelegate {
     return hashValue(for: uncheckedKey(at: bucket))
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func moveEntry(from source: Bucket, to target: Bucket) {
     _internalInvariant(hashTable.isValid(source))
@@ -689,7 +689,7 @@ extension _NativeDictionary: _HashTableDelegate {
       .moveInitialize(from: _values + source.offset, count: 1)
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func swapEntry(_ left: Bucket, with right: Bucket) {
     _internalInvariant(hashTable.isValid(left))
@@ -710,7 +710,7 @@ extension _NativeDictionary { // Deletion
     invalidateIndices()
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @_semantics("optimize.sil.specialize.generic.size.never")
   internal mutating func uncheckedRemove(
     at bucket: Bucket,
@@ -725,7 +725,7 @@ extension _NativeDictionary { // Deletion
     return (oldKey, oldValue)
   }
 
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   internal mutating func removeAll(isUnique: Bool) {
     guard isUnique else {
       let scale = self._storage._scale
@@ -764,7 +764,7 @@ extension _NativeDictionary { // High-level operations
     return result
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   internal mutating func merge<S: Sequence>(
     _ keysAndValues: __owned S,
     isUnique: Bool,
@@ -791,7 +791,7 @@ extension _NativeDictionary { // High-level operations
     }
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal init<S: Sequence>(
     grouping values: __owned S,

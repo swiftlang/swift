@@ -260,14 +260,14 @@ extension Task where Failure == Never {
 
 @available(SwiftStdlib 5.1, *)
 extension Task: Hashable {
-  public func hash(into hasher: inout Hasher) {
+  @safe(unchecked) public func hash(into hasher: inout Hasher) {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 
 @available(SwiftStdlib 5.1, *)
 extension Task: Equatable {
-  public static func ==(lhs: Self, rhs: Self) -> Bool {
+  @safe(unchecked) public static func ==(lhs: Self, rhs: Self) -> Bool {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
       UnsafeRawPointer(Builtin.bridgeToRawPointer(rhs._task))
   }
@@ -659,7 +659,7 @@ extension Task where Failure == Never {
   ///   - priority: The priority of the task.
   ///     Pass `nil` to use the priority from `Task.currentPriority`.
   ///   - operation: The operation to perform.
-  @discardableResult
+  @safe(unchecked) @discardableResult
   @_alwaysEmitIntoClient
   public init(
     priority: TaskPriority? = nil,
@@ -722,7 +722,7 @@ extension Task where Failure == Error {
   ///   - priority: The priority of the task.
   ///     Pass `nil` to use the priority from `Task.currentPriority`.
   ///   - operation: The operation to perform.
-  @discardableResult
+  @safe(unchecked) @discardableResult
   @_alwaysEmitIntoClient
   public init(
     priority: TaskPriority? = nil,
@@ -784,7 +784,7 @@ extension Task where Failure == Never {
   ///   - operation: The operation to perform.
   ///
   /// - Returns: A reference to the task.
-  @discardableResult
+  @safe(unchecked) @discardableResult
   @_alwaysEmitIntoClient
   public static func detached(
     priority: TaskPriority? = nil,
@@ -846,7 +846,7 @@ extension Task where Failure == Error {
   ///   - operation: The operation to perform.
   ///
   /// - Returns: A reference to the task.
-  @discardableResult
+  @safe(unchecked) @discardableResult
   @_alwaysEmitIntoClient
   public static func detached(
     priority: TaskPriority? = nil,
@@ -930,7 +930,7 @@ extension Task where Success == Never, Failure == Never {
 ///     for the `withUnsafeCurrentTask(body:)` function.
 ///
 /// - Returns: The return value, if any, of the `body` closure.
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) rethrows -> T {
   guard let _task = _getCurrentAsyncTask() else {
     return try body(nil)
@@ -944,7 +944,7 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
   return try body(UnsafeCurrentTask(_task))
 }
 
-@available(SwiftStdlib 6.0, *)
+@unsafe @available(SwiftStdlib 6.0, *)
 public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> T) async rethrows -> T {
   guard let _task = _getCurrentAsyncTask() else {
     return try await body(nil)
@@ -1027,14 +1027,14 @@ public struct UnsafeCurrentTask {
 @available(*, unavailable)
 extension UnsafeCurrentTask: Sendable { }
 
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 extension UnsafeCurrentTask: Hashable {
   public func hash(into hasher: inout Hasher) {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 
-@available(SwiftStdlib 5.1, *)
+@unsafe @available(SwiftStdlib 5.1, *)
 extension UnsafeCurrentTask: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
@@ -1085,7 +1085,7 @@ internal func _getMainExecutor() -> Builtin.Executor
 ///
 /// It is used by default used by tasks and default actors,
 /// unless other executors are specified.
-@available(SwiftStdlib 6.0, *)
+@safe(unchecked) @available(SwiftStdlib 6.0, *)
 @usableFromInline
 internal func _getGenericSerialExecutor() -> Builtin.Executor {
   // The `SerialExecutorRef` to "default generic executor" is guaranteed
@@ -1290,7 +1290,7 @@ internal func _taskIsOnMainActor() -> Bool {
 /// NOTE: For this to be safe, we need our function to not have any return value
 /// and that includes an error return value. So we cannot accept throwing
 /// functions here.
-@_alwaysEmitIntoClient
+@safe(unchecked) @_alwaysEmitIntoClient
 @available(SwiftStdlib 9999, *)
 public func _taskRunOnMainActor(operation: @escaping @MainActor () -> ()) {
   typealias YesActor = @MainActor () -> ()

@@ -98,7 +98,7 @@ extension _StringGuts {
   }
 
   // Grow to accommodate at least `n` code units
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   internal mutating func grow(_ n: Int) {
     defer {
       self._invariantCheck()
@@ -138,7 +138,7 @@ extension _StringGuts {
     _foreignGrow(growthTarget)
   }
 
-  @inline(never) // slow-path
+  @safe(unchecked) @inline(never) // slow-path
   private mutating func _foreignGrow(_ n: Int) {
     let newString = String(_uninitializedCapacity: n) { buffer in
       guard let count = _foreignCopyUTF8(into: buffer) else {
@@ -201,7 +201,7 @@ extension _StringGuts {
     append(_StringGutsSlice(other))
   }
 
-  @inline(never)
+  @safe(unchecked) @inline(never)
   @_effects(readonly)
   private func _foreignConvertedToSmall() -> _SmallString {
     let smol = String(_uninitializedCapacity: _SmallString.capacity) { buffer in
@@ -214,7 +214,7 @@ extension _StringGuts {
     return smol._guts.asSmall
   }
 
-  private func _convertedToSmall() -> _SmallString {
+  @safe(unchecked) private func _convertedToSmall() -> _SmallString {
     _internalInvariant(utf8Count <= _SmallString.capacity)
     if _fastPath(isSmall) {
       return asSmall
@@ -225,7 +225,7 @@ extension _StringGuts {
     return _foreignConvertedToSmall()
   }
 
-  internal mutating func append(_ slicedOther: _StringGutsSlice) {
+  @safe(unchecked) internal mutating func append(_ slicedOther: _StringGutsSlice) {
     defer { self._invariantCheck() }
 
     let otherCount = slicedOther.utf8Count
@@ -280,7 +280,7 @@ extension _StringGuts {
     _foreignAppendInPlace(slicedOther)
   }
 
-  internal mutating func appendInPlace(
+  @unsafe internal mutating func appendInPlace(
     _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) {
     updateNativeStorage { $0.appendInPlace(other, isASCII: isASCII) }
@@ -328,7 +328,7 @@ extension _StringGuts {
   }
 
   // - Returns: The encoded offset range of the replaced contents in the result.
-  @discardableResult
+  @safe(unchecked) @discardableResult
   internal mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
@@ -371,7 +371,7 @@ extension _StringGuts {
   }
 
   // - Returns: The encoded offset range of the replaced contents in the result.
-  @discardableResult
+  @safe(unchecked) @discardableResult
   internal mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
@@ -425,7 +425,7 @@ extension _StringGuts {
   }
 
   // - Returns: The encoded offset range of the replaced contents in the result.
-  internal mutating func uniqueNativeReplaceSubrange(
+  @unsafe internal mutating func uniqueNativeReplaceSubrange(
     _ bounds: Range<Index>,
     with codeUnits: UnsafeBufferPointer<UInt8>,
     isASCII: Bool

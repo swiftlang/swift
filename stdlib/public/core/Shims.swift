@@ -17,7 +17,7 @@
 import SwiftShims
 
 #if _runtime(_ObjC)
-@inlinable
+@safe(unchecked) @inlinable
 internal func _makeSwiftNSFastEnumerationState()
    -> _SwiftNSFastEnumerationState {
   return _SwiftNSFastEnumerationState(
@@ -32,12 +32,12 @@ internal var _fastEnumerationStorageMutationsTarget: CUnsignedLong = 0
 
 /// A dummy pointer to be used as `mutationsPtr` in fast enumeration
 /// implementations.
-@usableFromInline
+@unsafe @usableFromInline
 internal let _fastEnumerationStorageMutationsPtr =
   UnsafeMutablePointer<CUnsignedLong>(Builtin.addressof(&_fastEnumerationStorageMutationsTarget))
 #endif
 
-@usableFromInline @_alwaysEmitIntoClient
+@unsafe @usableFromInline @_alwaysEmitIntoClient
 internal func _mallocSize(ofAllocation ptr: UnsafeRawPointer) -> Int? {
   return _swift_stdlib_has_malloc_size() ? _swift_stdlib_malloc_size(ptr) : nil
 }

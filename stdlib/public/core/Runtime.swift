@@ -20,7 +20,7 @@ import SwiftShims
 // Atomics
 //===----------------------------------------------------------------------===//
 
-@_transparent
+@unsafe @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtr(
   object target: UnsafeMutablePointer<UnsafeRawPointer?>,
@@ -63,7 +63,7 @@ func _stdlib_atomicCompareExchangeStrongPtr(
 /// If the conditions above are not met, the code will still compile, but the
 /// compare-and-exchange instruction will operate on the writeback buffer, and
 /// you will get a *race* while doing writeback into shared memory.
-@_transparent
+@unsafe @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtr<T>(
   object target: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
@@ -107,7 +107,7 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
 /// If the conditions above are not met, the code will still compile, but the
 /// compare-and-exchange instruction will operate on the writeback buffer, and
 /// you will get a *race* while doing writeback into shared memory.
-@_transparent
+@unsafe @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtr<T>(
   object target: UnsafeMutablePointer<UnsafeMutablePointer<T>?>,
@@ -124,7 +124,7 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
     desired: UnsafeRawPointer(desired))
 }
 
-@_transparent
+@unsafe @_transparent
 @discardableResult
 @_unavailableInEmbedded
 public // @testable
@@ -152,7 +152,7 @@ func _stdlib_atomicInitializeARCRef(
   return wonRace
 }
 
-@_transparent
+@unsafe @_transparent
 @_unavailableInEmbedded
 public // @testable
 func _stdlib_atomicLoadARCRef(
@@ -165,7 +165,7 @@ func _stdlib_atomicLoadARCRef(
   return nil
 }
 
-@_transparent
+@unsafe @_transparent
 @_alwaysEmitIntoClient
 @discardableResult
 public func _stdlib_atomicAcquiringInitializeARCRef<T: AnyObject>(
@@ -192,7 +192,7 @@ public func _stdlib_atomicAcquiringInitializeARCRef<T: AnyObject>(
   return Unmanaged<T>.fromOpaque(ptr)
 }
 
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 @_transparent
 public func _stdlib_atomicAcquiringLoadARCRef<T: AnyObject>(
   object target: UnsafeMutablePointer<T?>
@@ -244,7 +244,7 @@ internal struct _Buffer32 {
 
   internal init() {}
 
-  internal mutating func withBytes<Result>(
+  @unsafe internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result {
     return try withUnsafeMutablePointer(to: &self) {
@@ -330,7 +330,7 @@ internal struct _Buffer72 {
 
   internal init() {}
 
-  internal mutating func withBytes<Result>(
+  @unsafe internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result {
     return try withUnsafeMutablePointer(to: &self) {
@@ -350,7 +350,7 @@ typealias _CFloat16Argument = Float32
 typealias _CFloat16Argument = Float16
 #endif
 
-@available(SwiftStdlib 5.3, *)
+@unsafe @available(SwiftStdlib 5.3, *)
 @_silgen_name("swift_float16ToString")
 internal func _float16ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
@@ -359,7 +359,7 @@ internal func _float16ToStringImpl(
   _ debug: Bool
 ) -> Int
 
-@available(SwiftStdlib 5.3, *)
+@safe(unchecked) @available(SwiftStdlib 5.3, *)
 internal func _float16ToString(
   _ value: Float16,
   debug: Bool
@@ -377,7 +377,7 @@ internal func _float16ToString(
 // guaranteed to fit into an Int. This is part of the ABI, so we can't
 // trivially change it to Int. Callers can safely convert the result
 // to any integer type without checks, however.
-@_silgen_name("swift_float32ToString")
+@unsafe @_silgen_name("swift_float32ToString")
 internal func _float32ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
@@ -385,7 +385,7 @@ internal func _float32ToStringImpl(
   _ debug: Bool
 ) -> UInt64
 
-internal func _float32ToString(
+@safe(unchecked) internal func _float32ToString(
   _ value: Float32,
   debug: Bool
 ) -> (buffer: _Buffer32, length: Int) {
@@ -401,7 +401,7 @@ internal func _float32ToString(
 // guaranteed to fit into an Int. This is part of the ABI, so we can't
 // trivially change it to Int. Callers can safely convert the result
 // to any integer type without checks, however.
-@_silgen_name("swift_float64ToString")
+@unsafe @_silgen_name("swift_float64ToString")
 internal func _float64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
@@ -409,7 +409,7 @@ internal func _float64ToStringImpl(
   _ debug: Bool
 ) -> UInt64
 
-internal func _float64ToString(
+@safe(unchecked) internal func _float64ToString(
   _ value: Float64,
   debug: Bool
 ) -> (buffer: _Buffer32, length: Int) {
@@ -429,6 +429,7 @@ internal func _float64ToString(
 // trivially change it to Int. Callers can safely convert the result
 // to any integer type without checks, however.
 @_silgen_name("swift_float80ToString")
+@unsafe
 internal func _float80ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
@@ -436,6 +437,7 @@ internal func _float80ToStringImpl(
   _ debug: Bool
 ) -> UInt64
 
+@safe(unchecked)
 internal func _float80ToString(
   _ value: Float80,
   debug: Bool
@@ -454,7 +456,7 @@ internal func _float80ToString(
 // guaranteed to fit into an Int. This is part of the ABI, so we can't
 // trivially change it to Int. Callers can safely convert the result
 // to any integer type without checks, however.
-@_silgen_name("swift_int64ToString")
+@unsafe @_silgen_name("swift_int64ToString")
 internal func _int64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
@@ -463,7 +465,7 @@ internal func _int64ToStringImpl(
   _ uppercase: Bool
 ) -> UInt64
 #else
-internal func _int64ToStringImpl(
+@unsafe internal func _int64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Int64,
@@ -474,7 +476,7 @@ internal func _int64ToStringImpl(
 }
 #endif
 
-internal func _int64ToString(
+@safe(unchecked) internal func _int64ToString(
   _ value: Int64,
   radix: Int64 = 10,
   uppercase: Bool = false
@@ -503,7 +505,7 @@ internal func _int64ToString(
 // guaranteed to fit into an Int. This is part of the ABI, so we can't
 // trivially change it to Int. Callers can safely convert the result
 // to any integer type without checks, however.
-@_silgen_name("swift_uint64ToString")
+@unsafe @_silgen_name("swift_uint64ToString")
 internal func _uint64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
@@ -512,7 +514,7 @@ internal func _uint64ToStringImpl(
   _ uppercase: Bool
 ) -> UInt64
 #else
-internal func _uint64ToStringImpl(
+@unsafe internal func _uint64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: UInt64,
@@ -523,7 +525,7 @@ internal func _uint64ToStringImpl(
 }
 #endif
 
-public // @testable
+@safe(unchecked) public // @testable
 func _uint64ToString(
     _ value: UInt64,
     radix: Int64 = 10,
@@ -548,7 +550,7 @@ func _uint64ToString(
   }
 }
 
-@inlinable
+@safe(unchecked) @inlinable
 internal func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
     UInt64(

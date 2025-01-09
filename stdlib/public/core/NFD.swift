@@ -349,7 +349,7 @@ extension Unicode._NFDNormalizer {
     }
   }
 
-  @inline(never)
+  @safe(unchecked) @inline(never)
   private mutating func decomposeSlow(
     _ original: ScalarAndNormData
   ) {

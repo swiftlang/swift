@@ -32,7 +32,7 @@ extension _StringGuts {
     return String.Index(_encodedOffset: start)
   }
 
-  @inline(never)
+  @safe(unchecked) @inline(never)
   @_effects(releasenone)
   internal func nextWordIndex(startingAt i: Int) -> Int {
     if _slowPath(isForeign) {
@@ -75,7 +75,7 @@ extension _StringGuts {
 #endif
   }
 
-  internal func previousWordIndex(endingAt i: Int) -> Int {
+  @safe(unchecked) internal func previousWordIndex(endingAt i: Int) -> Int {
     if _slowPath(isForeign) {
       return _foreignPreviousWordIndex(endingAt: i)
     }

@@ -42,12 +42,12 @@ import Swift
 @globalActor public final actor MainActor: GlobalActor {
   public static let shared = MainActor()
 
-  @inlinable
+  @unsafe @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
     return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
   }
 
-  @inlinable
+  @unsafe @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
     return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
   }
@@ -122,7 +122,7 @@ extension MainActor {
   ///           where this method was called.
   /// - Returns: the return value of the `operation`
   /// - Throws: rethrows the `Error` thrown by the operation if it threw
-  @available(SwiftStdlib 5.1, *)
+  @safe(unchecked) @available(SwiftStdlib 5.1, *)
   @_alwaysEmitIntoClient
   @_unavailableFromAsync(message: "await the call to the @MainActor closure directly")
   public static func assumeIsolated<T : Sendable>(

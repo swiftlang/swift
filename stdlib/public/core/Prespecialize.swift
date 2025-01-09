@@ -2,7 +2,7 @@
 private func consume<T>(_ t: T) {
     withExtendedLifetime(t) { t in }
 }
-@usableFromInline
+@safe(unchecked) @usableFromInline
 internal func _prespecialize() {
   consume(Array<()>.self)
   consume(Array<(Optional<String>, Any)>.self)
@@ -165,7 +165,7 @@ extension _ArrayBuffer {
   @usableFromInline
   func __specialize_class__consumeAndCreateNew(bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool) -> _ArrayBuffer<Element> { Builtin.unreachable() }
 
-  @_specialize(exported: true,
+  @unsafe @_specialize(exported: true,
                availability: SwiftStdlib 5.9, *;
                target: _copyContents(initializing:),
                where @_noMetadata Element : _Class)
@@ -175,7 +175,7 @@ extension _ArrayBuffer {
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) { Builtin.unreachable() }
 
-  @_specialize(exported: true,
+  @unsafe @_specialize(exported: true,
                availability: SwiftStdlib 5.9, *;
                target: _copyContents(subRange:initializing:),
                where @_noMetadata Element : _Class)

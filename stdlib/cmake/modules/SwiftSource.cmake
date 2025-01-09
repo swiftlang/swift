@@ -629,6 +629,8 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "SuppressedAssociatedTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "SE427NoInferenceOnExtension")
   list(APPEND swift_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
+  list(APPEND swift_flags "-enable-experimental-feature" "WarnUnsafe")
+
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")
 
@@ -1054,6 +1056,21 @@ function(_compile_swift_files
     set(copy_legacy_layouts_dep)
   endif()
 
+  # Produce a file that applies all Fix-Its, as a convenience.
+  set(swift_compile_only_outputs)
+  set(swift_compile_only_flags)
+
+  string(REGEX REPLACE "${CMAKE_C_OUTPUT_EXTENSION}$" ".remap" swift_fixit_file ${SWIFTFILE_OUTPUT})
+
+  list(APPEND swift_compile_only_flags
+    "-Xfrontend;-emit-fixits-path;-Xfrontend;${swift_fixit_file};-Xfrontend;-fixit-all")
+  list(APPEND swift_compile_only_outputs ${swift_fixit_file})
+
+  if (SWIFTFILE_ONLY_SWIFTMODULE)
+    list(APPEND swift_module_flags ${swift_compile_only_flags})
+    list(APPEND module_outputs ${swift_fixit_file})
+  endif()
+
   if(NOT SWIFTFILE_ONLY_SWIFTMODULE)
   add_custom_command_target(
       dependency_target
@@ -1061,10 +1078,10 @@ function(_compile_swift_files
       COMMAND
         ${set_environment_args}
         "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
-        "${swift_compiler_tool}" "${main_command}" ${swift_flags}
+        "${swift_compiler_tool}" "${main_command}" ${swift_flags} ${swift_compile_only_flags}
         ${output_option} ${embed_bitcode_option} "@${file_path}"
       ${command_touch_standard_outputs}
-      OUTPUT ${standard_outputs}
+      OUTPUT ${standard_outputs} ${swift_compile_only_outputs}
       DEPENDS
         "${line_directive_tool}"
         "${file_path_target}"

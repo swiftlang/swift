@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Called by the casting machinery.
-@_silgen_name("_swift_arrayDownCastIndirect")
+@unsafe @_silgen_name("_swift_arrayDownCastIndirect")
 internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Array<SourceValue>>,
   _ target: UnsafeMutablePointer<Array<TargetValue>>) {
@@ -53,7 +53,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
 }
 
 /// Called by the casting machinery.
-@_silgen_name("_swift_arrayDownCastConditionalIndirect")
+@unsafe @_silgen_name("_swift_arrayDownCastConditionalIndirect")
 internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Array<SourceValue>>,
   _ target: UnsafeMutablePointer<Array<TargetValue>>

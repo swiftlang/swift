@@ -28,10 +28,10 @@ public struct _stdlib_ShardedAtomicCounter {
   // Using an array causes retains/releases, which create contention on the
   // reference count.
   // FIXME: guard every element against false sharing.
-  var _shardsPtr: UnsafeMutablePointer<Int>
+  @unsafe var _shardsPtr: UnsafeMutablePointer<Int>
   var _shardsCount: Int
 
-  public init() {
+  @safe(unchecked) public init() {
     let hardwareConcurrency = _stdlib_getHardwareConcurrency()
     let count = max(8, hardwareConcurrency * hardwareConcurrency)
     let shards = UnsafeMutablePointer<Int>.allocate(capacity: count)
@@ -42,19 +42,19 @@ public struct _stdlib_ShardedAtomicCounter {
     self._shardsCount = count
   }
 
-  public func `deinit`() {
+  @safe(unchecked) public func `deinit`() {
     self._shardsPtr.deinitialize(count: self._shardsCount)
     self._shardsPtr.deallocate()
   }
 
-  public func add(_ operand: Int, randomInt: Int) {
+  @safe(unchecked) public func add(_ operand: Int, randomInt: Int) {
     let shardIndex = Int(UInt(bitPattern: randomInt) % UInt(self._shardsCount))
     _ = _swift_stdlib_atomicFetchAddInt(
       object: self._shardsPtr + shardIndex, operand: operand)
   }
 
   // FIXME: non-atomic as a whole!
-  public func getSum() -> Int {
+  @safe(unchecked) public func getSum() -> Int {
     var result = 0
     let shards = self._shardsPtr
     let count = self._shardsCount

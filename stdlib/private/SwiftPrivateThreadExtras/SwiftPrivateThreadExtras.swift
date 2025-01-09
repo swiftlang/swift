@@ -36,7 +36,7 @@ internal class ThreadBlockContext {
   /// Execute the block, and return an `UnsafeMutablePointer` to memory
   /// allocated with `UnsafeMutablePointer.alloc` containing the result of the
   /// block.
-  func run() -> UnsafeMutableRawPointer { fatalError("abstract") }
+  @unsafe func run() -> UnsafeMutableRawPointer { fatalError("abstract") }
 }
 
 internal class ThreadBlockContextImpl<Argument, Result>: ThreadBlockContext {
@@ -49,7 +49,7 @@ internal class ThreadBlockContextImpl<Argument, Result>: ThreadBlockContext {
     super.init()
   }
 
-  override func run() -> UnsafeMutableRawPointer {
+  @unsafe override func run() -> UnsafeMutableRawPointer {
     let result = UnsafeMutablePointer<Result>.allocate(capacity: 1)
     result.initialize(to: block(arg))
     return UnsafeMutableRawPointer(result)
@@ -57,7 +57,7 @@ internal class ThreadBlockContextImpl<Argument, Result>: ThreadBlockContext {
 }
 
 /// Entry point for `pthread_create` that invokes a block context.
-internal func invokeBlockContext(
+@unsafe internal func invokeBlockContext(
   _ contextAsVoidPointer: UnsafeMutableRawPointer?
 ) -> UnsafeMutableRawPointer! {
   // The context is passed in +1; we're responsible for releasing it.
@@ -71,21 +71,21 @@ internal func invokeBlockContext(
 #if os(Windows)
 public typealias ThreadHandle = HANDLE
 #else
-public typealias ThreadHandle = pthread_t
+@unsafe public typealias ThreadHandle = pthread_t
 
 #if (os(Linux) && !canImport(Musl)) || os(Android)
 internal func _make_pthread_t() -> pthread_t {
   return pthread_t()
 }
 #else
-internal func _make_pthread_t() -> pthread_t? {
+@unsafe internal func _make_pthread_t() -> pthread_t? {
   return nil
 }
 #endif
 #endif
 
 /// Block-based wrapper for `pthread_create`.
-public func _stdlib_thread_create_block<Argument, Result>(
+@unsafe public func _stdlib_thread_create_block<Argument, Result>(
   _ start_routine: @escaping (Argument) -> Result,
   _ arg: Argument
 ) -> (CInt, ThreadHandle?) {
@@ -120,7 +120,7 @@ public func _stdlib_thread_create_block<Argument, Result>(
 }
 
 /// Block-based wrapper for `pthread_join`.
-public func _stdlib_thread_join<Result>(
+@unsafe public func _stdlib_thread_join<Result>(
   _ thread: ThreadHandle,
   _ resultType: Result.Type
 ) -> (CInt, Result?) {
@@ -160,12 +160,12 @@ public func _stdlib_thread_join<Result>(
 public class _stdlib_Barrier {
   var _threadBarrier: _stdlib_thread_barrier_t
 
-  var _threadBarrierPtr: UnsafeMutablePointer<_stdlib_thread_barrier_t> {
+  @unsafe var _threadBarrierPtr: UnsafeMutablePointer<_stdlib_thread_barrier_t> {
     return _getUnsafePointerToStoredProperties(self)
       .assumingMemoryBound(to: _stdlib_thread_barrier_t.self)
   }
 
-  public init(threadCount: Int) {
+  @safe(unchecked) public init(threadCount: Int) {
     self._threadBarrier = _stdlib_thread_barrier_t()
     let ret = _stdlib_thread_barrier_init(
       _threadBarrierPtr, CUnsignedInt(threadCount))
@@ -174,11 +174,11 @@ public class _stdlib_Barrier {
     }
   }
 
-  deinit {
+  @safe(unchecked) deinit {
     _stdlib_thread_barrier_destroy(_threadBarrierPtr)
   }
 
-  public func wait() {
+  @safe(unchecked) public func wait() {
     let ret = _stdlib_thread_barrier_wait(_threadBarrierPtr)
     if !(ret == 0 || ret == _stdlib_THREAD_BARRIER_SERIAL_THREAD) {
       fatalError("_stdlib_thread_barrier_wait() failed")

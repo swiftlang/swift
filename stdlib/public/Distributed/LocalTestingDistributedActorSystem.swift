@@ -238,7 +238,7 @@ public struct LocalTestingDistributedActorSystemError: DistributedActorSystemErr
 @available(SwiftStdlib 5.7, *)
 fileprivate class _Lock {
   #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-  private let underlying: UnsafeMutablePointer<os_unfair_lock>
+  @unsafe private let underlying: UnsafeMutablePointer<os_unfair_lock>
   #elseif os(Windows)
   private let underlying: UnsafeMutablePointer<SRWLOCK>
   #elseif os(WASI)
@@ -249,7 +249,7 @@ fileprivate class _Lock {
   private let underlying: UnsafeMutablePointer<pthread_mutex_t>
   #endif
 
-  init() {
+  @safe(unchecked) init() {
     #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
     self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
     self.underlying.initialize(to: os_unfair_lock())
@@ -266,7 +266,7 @@ fileprivate class _Lock {
     #endif
   }
 
-  deinit {
+  @safe(unchecked) deinit {
     #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
     // `os_unfair_lock`s do not need to be explicitly destroyed
     #elseif os(Windows)
@@ -286,7 +286,7 @@ fileprivate class _Lock {
   }
 
 
-  @discardableResult
+  @safe(unchecked) @discardableResult
   func withLock<T>(_ body: () -> T) -> T {
     #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
     os_unfair_lock_lock(self.underlying)

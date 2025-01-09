@@ -197,7 +197,7 @@ extension Equatable {
 }
 
 // Called by the SwiftValue implementation.
-@_silgen_name("_swift_stdlib_Equatable_isEqual_indirect")
+@unsafe @_silgen_name("_swift_stdlib_Equatable_isEqual_indirect")
 internal func Equatable_isEqual_indirect<T: Equatable>(
   _ lhs: UnsafePointer<T>,
   _ rhs: UnsafePointer<T>

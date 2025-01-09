@@ -242,7 +242,7 @@ extension MutableCollection where Self: RandomAccessCollection {
   ///   lost.
   ///
   /// - Complexity: O(*n* log *n*), where *n* is the length of the collection.
-  @inlinable
+  @safe(unchecked) @inlinable
   public mutating func sort(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows {
@@ -342,7 +342,7 @@ extension MutableCollection where Self: BidirectionalCollection {
 /// - Precondition: `buffer` must point to a region of memory at least as large
 ///   as `min(mid - lo, hi - mid)`.
 /// - Postcondition: `lo..<hi` is sorted according to `areInIncreasingOrder`.
-@discardableResult
+@unsafe @discardableResult
 @inlinable
 internal func _merge<Element>(
   low: UnsafeMutablePointer<Element>,
@@ -510,7 +510,7 @@ internal func _findNextRun<C: RandomAccessCollection>(
   return(current, isDescending)
 }
 
-extension UnsafeMutableBufferPointer {
+@unsafe extension UnsafeMutableBufferPointer {
   // FIXME(ABI): unused return value
   /// Merges the elements at `runs[i]` and `runs[i - 1]`, using `buffer` as
   /// out-of-place storage.

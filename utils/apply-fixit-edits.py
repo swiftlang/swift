@@ -32,7 +32,7 @@ def apply_edits(path):
 
     edits_per_file = collections.defaultdict(list)
     for remap_file in remap_files:
-        with open(remap_file) as f:
+        with open(remap_file, 'rb') as f:
             json_data = f.read()
         curr_edits = json.loads(json_data)
         for ed in curr_edits:
@@ -45,13 +45,13 @@ def apply_edits(path):
     for fname, edits in edits_per_file.items():
         print('Updating', fname)
         edits.sort(reverse=True)
-        with open(fname) as f:
+        with open(fname, 'rb') as f:
             file_data = f.read()
         for ed in edits:
             offset, length, text = ed
-            file_data = file_data[:offset] + str(text) + \
+            file_data = file_data[:offset] + bytes(text, 'utf-8') + \
                 file_data[offset + length:]
-        with open(fname, 'w') as f:
+        with open(fname, 'wb') as f:
             f.write(file_data)
     return 0
 

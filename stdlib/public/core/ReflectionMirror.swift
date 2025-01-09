@@ -14,7 +14,7 @@
 
 import SwiftShims
 
-internal func _isClassType(_ type: Any.Type) -> Bool {
+@safe(unchecked) internal func _isClassType(_ type: Any.Type) -> Bool {
   // a thick metatype is represented with a pointer metadata structure,
   // so this unsafeBitCast is a safe operation here.
   return swift_isClassType(unsafeBitCast(type, to: UnsafeRawPointer.self))
@@ -32,7 +32,7 @@ internal func _getChildCount<T>(_: T, type: Any.Type) -> Int
 @_silgen_name("swift_reflectionMirror_recursiveCount")
 internal func _getRecursiveChildCount(_: Any.Type) -> Int
 
-@_silgen_name("swift_reflectionMirror_recursiveChildMetadata")
+@unsafe @_silgen_name("swift_reflectionMirror_recursiveChildMetadata")
 internal func _getChildMetadata(
   _: Any.Type,
   index: Int,
@@ -45,9 +45,9 @@ internal func _getChildOffset(
   index: Int
 ) -> Int
 
-internal typealias NameFreeFunc = @convention(c) (UnsafePointer<CChar>?) -> Void
+@unsafe internal typealias NameFreeFunc = @convention(c) (UnsafePointer<CChar>?) -> Void
 
-@_silgen_name("swift_reflectionMirror_subscript")
+@unsafe @_silgen_name("swift_reflectionMirror_subscript")
 internal func _getChild<T>(
   of: T,
   type: Any.Type,
@@ -60,7 +60,7 @@ internal func _getChild<T>(
 @_silgen_name("swift_reflectionMirror_displayStyle")
 internal func _getDisplayStyle<T>(_: T) -> CChar
 
-internal func getChild<T>(of value: T, type: Any.Type, index: Int) -> (label: String?, value: Any) {
+@safe(unchecked) internal func getChild<T>(of value: T, type: Any.Type, index: Int) -> (label: String?, value: Any) {
   var nameC: UnsafePointer<CChar>? = nil
   var freeFunc: NameFreeFunc? = nil
   
@@ -75,16 +75,16 @@ internal func getChild<T>(of value: T, type: Any.Type, index: Int) -> (label: St
 @_silgen_name("swift_reflectionMirror_quickLookObject")
 internal func _getQuickLookObject<T>(_: T) -> AnyObject?
 
-@_silgen_name("_swift_stdlib_NSObject_isKindOfClass")
+@unsafe @_silgen_name("_swift_stdlib_NSObject_isKindOfClass")
 internal func _isImpl(_ object: AnyObject, kindOf: UnsafePointer<CChar>) -> Bool
 
-internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
+@safe(unchecked) internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
   return `class`.withCString {
     return _isImpl(object, kindOf: $0)
   }
 }
 
-internal func _getClassPlaygroundQuickLook(
+@safe(unchecked) internal func _getClassPlaygroundQuickLook(
   _ object: AnyObject
 ) -> _PlaygroundQuickLook? {
   if _is(object, kindOf: "NSNumber") {
@@ -268,7 +268,7 @@ extension _MetadataKind: Sendable {}
 ///     and the `_MetadataKind` of the field's type.
 /// - Returns: `true` if every invocation of `body` returns `true`; otherwise,
 ///   `false`.
-@available(SwiftStdlib 5.2, *)
+@unsafe @available(SwiftStdlib 5.2, *)
 @discardableResult
 @_spi(Reflection)
 public func _forEachField(
@@ -316,7 +316,7 @@ public func _forEachField(
 ///     of the field and an erased keypath for it.
 /// - Returns: `true` if every invocation of `body` returns `true`; otherwise,
 ///   `false`.
-@available(SwiftStdlib 5.4, *)
+@unsafe @available(SwiftStdlib 5.4, *)
 @discardableResult
 @_spi(Reflection)
 public func _forEachFieldWithKeyPath<Root>(

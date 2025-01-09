@@ -28,16 +28,19 @@ public final class _stdlib_AtomicInt {
     _value = value
   }
 
+  @safe(unchecked)
   public func store(_ desired: Int) {
     return _swift_stdlib_atomicStoreInt(object: _valuePtr, desired: desired)
   }
 
+  @safe(unchecked)
   public func load() -> Int {
     return _swift_stdlib_atomicLoadInt(object: _valuePtr)
   }
 
 % for operation_name, operation in [ ('Add', '+'), ('And', '&'), ('Or', '|'), ('Xor', '^') ]:
   @discardableResult
+  @safe(unchecked)
   public func fetchAnd${operation_name}(_ operand: Int) -> Int {
     return _swift_stdlib_atomicFetch${operation_name}Int(
       object: _valuePtr,
@@ -49,6 +52,7 @@ public final class _stdlib_AtomicInt {
   }
 % end
 
+  @safe(unchecked)
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
     var expectedVar = expected
     let result = _swift_stdlib_atomicCompareExchangeStrongInt(
@@ -64,6 +68,7 @@ public final class _stdlib_AtomicInt {
 extension _stdlib_AtomicInt: Sendable {}
 
 @usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
+@unsafe
 internal func _swift_stdlib_atomicCompareExchangeStrongInt(
   object target: UnsafeMutablePointer<Int>,
   expected: UnsafeMutablePointer<Int>,
@@ -84,6 +89,7 @@ internal func _swift_stdlib_atomicCompareExchangeStrongInt(
 
 // FIXME: ideally it should not be here, at the very least not public, but
 // @usableFromInline internal to be used by SwiftPrivate._stdlib_AtomicInt
+@unsafe
 public // Existing uses outside stdlib
 func _swift_stdlib_atomicLoadInt(
   object target: UnsafeMutablePointer<Int>) -> Int {
@@ -99,6 +105,7 @@ func _swift_stdlib_atomicLoadInt(
 }
 
 @usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
+@unsafe
 internal func _swift_stdlib_atomicStoreInt(
   object target: UnsafeMutablePointer<Int>,
   desired: Int) {
@@ -115,6 +122,7 @@ internal func _swift_stdlib_atomicStoreInt(
 // Warning: no overflow checking.
 // FIXME: ideally it should not be here, at the very least not public, but
 // @usableFromInline internal to be used by SwiftPrivate._stdlib_AtomicInt
+@unsafe
 public // Existing uses outside stdlib
 func _swift_stdlib_atomicFetch${operation}Int(
   object target: UnsafeMutablePointer<Int>,
@@ -137,6 +145,7 @@ func _swift_stdlib_atomicFetch${operation}Int(
 %   for bits in [ 32, 64 ]:
 
 // Warning: no overflow checking.
+@unsafe
 @usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
 internal func _swift_stdlib_atomicFetch${operation}Int${bits}(
   object target: UnsafeMutablePointer<Int${bits}>,

@@ -173,7 +173,7 @@ extension Unicode {
     }
 
     // A buffer pointer to the UTF8 decomposition string.
-    var utf8: UnsafeBufferPointer<UInt8> {
+    @unsafe var utf8: UnsafeBufferPointer<UInt8> {
       let decompPtr = _swift_stdlib_nfd_decompositions._unsafelyUnwrappedUnchecked
 
       // This size is the utf8 length of the decomposition.

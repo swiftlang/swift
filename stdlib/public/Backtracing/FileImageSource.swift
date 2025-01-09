@@ -24,7 +24,7 @@ enum FileImageSourceError: Error {
 }
 
 class FileImageSource: ImageSource {
-  private var _mapping: UnsafeRawBufferPointer
+  @unsafe private var _mapping: UnsafeRawBufferPointer
 
   public var isMappedImage: Bool { return false }
 
@@ -35,7 +35,7 @@ class FileImageSource: ImageSource {
     return Bounds(base: 0, size: Size(_mapping.count))
   }
 
-  public init(path: String) throws {
+  @safe(unchecked) public init(path: String) throws {
     _path = path
     let fd = _swift_open(path, O_RDONLY, 0)
     if fd < 0 {
@@ -53,12 +53,12 @@ class FileImageSource: ImageSource {
     _mapping = UnsafeRawBufferPointer(start: base, count: Int(size))
   }
 
-  deinit {
+  @safe(unchecked) deinit {
     munmap(UnsafeMutableRawPointer(mutating: _mapping.baseAddress),
            _mapping.count)
   }
 
-  public func fetch(from addr: Address,
+  @unsafe public func fetch(from addr: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
     let start = Int(addr)
     guard _mapping.indices.contains(start) else {

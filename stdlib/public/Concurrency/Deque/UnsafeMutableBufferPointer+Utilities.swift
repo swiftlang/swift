@@ -15,20 +15,20 @@
 import Swift
 
 extension Collection {
-  internal func _rebased<Element>() -> UnsafeBufferPointer<Element>
+  @unsafe internal func _rebased<Element>() -> UnsafeBufferPointer<Element>
   where Self == UnsafeBufferPointer<Element>.SubSequence {
     .init(rebasing: self)
   }
 }
 
 extension Collection {
-  internal func _rebased<Element>() -> UnsafeMutableBufferPointer<Element>
+  @unsafe internal func _rebased<Element>() -> UnsafeMutableBufferPointer<Element>
   where Self == UnsafeMutableBufferPointer<Element>.SubSequence {
     .init(rebasing: self)
   }
 }
 
-extension UnsafeMutableBufferPointer {
+@unsafe extension UnsafeMutableBufferPointer {
   internal func _initialize(from source: UnsafeBufferPointer<Element>) {
     assert(source.count == count)
     guard source.count > 0 else { return }

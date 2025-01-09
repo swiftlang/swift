@@ -259,7 +259,7 @@ public protocol DistributedActor: AnyObject, Sendable, Identifiable, Hashable
   /// eliminated, and rearranged with other work, and they may even
   /// be introduced when not strictly required.  Visible side effects
   /// are therefore strongly discouraged within this property.
-  @available(SwiftStdlib 5.9, *)
+  @unsafe @available(SwiftStdlib 5.9, *)
   nonisolated var unownedExecutor: UnownedSerialExecutor { get }
 
   /// Resolves the passed in `id` against the `system`, returning
@@ -402,7 +402,7 @@ extension DistributedActor {
 /// distributed actor
 @available(SwiftStdlib 5.7, *)
 extension DistributedActor {
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @_implements(Actor, unownedExecutor)
   public nonisolated var __actorUnownedExecutor: UnownedSerialExecutor {
     if #available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *) {

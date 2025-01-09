@@ -418,7 +418,7 @@ extension String {
   // This force type-casts element to UInt8, since we cannot currently
   // communicate to the type checker that we proved this with our dynamic
   // check in String(decoding:as:).
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @inline(never) // slow-path
   internal static func _fromNonContiguousUnsafeBitcastUTF8Repairing<
     C: Collection
@@ -440,7 +440,7 @@ extension String {
   ///     specified in `sourceEncoding`.
   ///   - sourceEncoding: The encoding in which `codeUnits` should be
   ///     interpreted.
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always) // Eliminate dynamic type check when possible
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
@@ -512,7 +512,7 @@ extension String {
   ///   - codeUnits: A sequence of code units that encode a `String`
   ///   - encoding: A conformer to `Unicode.Encoding` to be used
   ///               to decode `codeUnits`.
-  @inlinable
+  @safe(unchecked) @inlinable
   @available(SwiftStdlib 6.0, *)
   public init?<Encoding: Unicode.Encoding>(
     validating codeUnits: some Sequence<Encoding.CodeUnit>,
@@ -574,7 +574,7 @@ extension String {
   ///   - codeUnits: A sequence of code units that encode a `String`
   ///   - encoding: A conformer to `Unicode.Encoding` that can decode
   ///               `codeUnits` as `UInt8`
-  @inlinable
+  @safe(unchecked) @inlinable
   @available(SwiftStdlib 6.0, *)
   public init?<Encoding>(
     validating codeUnits: some Sequence<Int8>,
@@ -641,7 +641,7 @@ extension String {
   ///   - initializer: A closure that accepts a buffer covering uninitialized
   ///     memory with room for `capacity` UTF-8 code units, initializes
   ///     that memory, and returns the number of initialized elements.
-  @inline(__always)
+  @unsafe @inline(__always)
   @available(SwiftStdlib 5.3, *)
   public init(
     unsafeUninitializedCapacity capacity: Int,
@@ -655,7 +655,7 @@ extension String {
     )
   }
 
-  @inline(__always)
+  @unsafe @inline(__always)
   internal init(
     _uninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
@@ -697,7 +697,7 @@ extension String {
   ///   - targetEncoding: The encoding in which the code units should be
   ///     interpreted.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
+  @unsafe @inlinable
   @inline(__always) // Eliminate dynamic type check when possible
   public func withCString<Result, TargetEncoding: Unicode.Encoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
@@ -715,7 +715,7 @@ extension String {
     return try _slowWithCString(encodedAs: targetEncoding, body)
   }
 
-  @usableFromInline @inline(never) // slow-path
+  @unsafe @usableFromInline @inline(never) // slow-path
   @_effects(releasenone)
   internal func _slowWithCString<Result, TargetEncoding: Unicode.Encoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
@@ -745,7 +745,7 @@ extension String: _ExpressibleByBuiltinUnicodeScalarLiteral {
     self.init(Unicode.Scalar(_unchecked: UInt32(value)))
   }
 
-  @inlinable @inline(__always)
+  @safe(unchecked) @inlinable @inline(__always)
   public init(_ scalar: Unicode.Scalar) {
     self = scalar.withUTF8CodeUnits { String._uncheckedFromUTF8($0) }
   }
@@ -767,7 +767,7 @@ extension String: _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
 }
 
 extension String: _ExpressibleByBuiltinStringLiteral {
-  @inlinable @inline(__always)
+  @safe(unchecked) @inlinable @inline(__always)
   @_effects(readonly) @_semantics("string.makeUTF8")
   public init(
     _builtinStringLiteral start: Builtin.RawPointer,
@@ -1002,7 +1002,7 @@ extension String {
   /// - Returns: A lowercase copy of the string.
   ///
   /// - Complexity: O(*n*)
-  @_effects(releasenone)
+  @safe(unchecked) @_effects(releasenone)
   public func lowercased() -> String {
     if _fastPath(_guts.isFastASCII) {
       return _guts.withFastUTF8 { utf8 in
@@ -1036,7 +1036,7 @@ extension String {
   /// - Returns: An uppercase copy of the string.
   ///
   /// - Complexity: O(*n*)
-  @_effects(releasenone)
+  @safe(unchecked) @_effects(releasenone)
   public func uppercased() -> String {
     if _fastPath(_guts.isFastASCII) {
       return _guts.withFastUTF8 { utf8 in
@@ -1111,7 +1111,7 @@ extension _StringGutsSlice {
     return true
   }
 
-  internal func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
+  @safe(unchecked) internal func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
     let substring = String(_guts)[range]
     // Fast path: If we're already NFC (or ASCII), then we don't need to do
     // anything at all.
@@ -1163,7 +1163,7 @@ extension _StringGutsSlice {
     }
   }
 
-  internal func _fastNFCCheck(_ isNFCQC: inout Bool, _ prevCCC: inout UInt8) {
+  @safe(unchecked) internal func _fastNFCCheck(_ isNFCQC: inout Bool, _ prevCCC: inout UInt8) {
     withFastUTF8 { utf8 in
       var position = 0
 

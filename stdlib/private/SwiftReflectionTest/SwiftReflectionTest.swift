@@ -46,7 +46,7 @@ typealias MachHeader = mach_header
 ///   image.
 /// - Returns: A `Section` containing the address and size, or `nil` if there
 ///   is no section by the given name.
-internal func getSectionInfo(_ name: String,
+@unsafe internal func getSectionInfo(_ name: String,
   _ imageHeader: UnsafePointer<MachHeader>) -> Section? {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   var size: UInt = 0
@@ -60,7 +60,7 @@ internal func getSectionInfo(_ name: String,
 ///
 /// - Parameter i: The index of the loaded image as reported by Dyld.
 /// - Returns: The image name, address, and size.
-internal func getAddressInfoForImage(atIndex i: UInt32) ->
+@unsafe internal func getAddressInfoForImage(atIndex i: UInt32) ->
         (name: String, address: UnsafeMutablePointer<UInt8>?, size: UInt) {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let header = unsafeBitCast(_dyld_get_image_header(i),
@@ -72,7 +72,7 @@ internal func getAddressInfoForImage(atIndex i: UInt32) ->
 }
 
 /// Send all loadedimages loaded in the current process.
-internal func sendImages() {
+@safe(unchecked) internal func sendImages() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let infos = (0..<getImageCount()).map(getAddressInfoForImage)
 
@@ -100,7 +100,7 @@ internal func sendImages() {
 /// - Parameter i: The index of the loaded image as reported by Dyld.
 /// - Returns: A `ReflectionInfo` containing the locations of all of the
 ///   needed sections, or `nil` if the image doesn't contain all of them.
-internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
+@safe(unchecked) internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let header = unsafeBitCast(_dyld_get_image_header(i),
     to: UnsafePointer<MachHeader>.self)
@@ -125,7 +125,7 @@ internal func getImageCount() -> UInt32 {
   return _dyld_image_count()
 }
 
-let rtldDefault = UnsafeMutableRawPointer(bitPattern: Int(-2))
+@unsafe let rtldDefault = UnsafeMutableRawPointer(bitPattern: Int(-2))
 #elseif !os(Windows)
 import SwiftShims
 #if canImport(Glibc)
@@ -214,7 +214,7 @@ public enum InstanceKind: UInt8 {
 /// Represents a section in a loaded image in this process.
 internal struct Section {
   /// The absolute start address of the section's data in this address space.
-  let startAddress: UnsafeRawPointer
+  @unsafe let startAddress: UnsafeRawPointer
 
   /// The size of the section in bytes.
   let size: UInt
@@ -245,7 +245,7 @@ internal struct ReflectionInfo : Sequence {
   }
 }
 
-internal func sendBytes<T>(from address: UnsafePointer<T>, count: Int) {
+@unsafe internal func sendBytes<T>(from address: UnsafePointer<T>, count: Int) {
   var source = UnsafeRawPointer(address)
   var bytesLeft = count
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
@@ -261,7 +261,7 @@ internal func sendBytes<T>(from address: UnsafePointer<T>, count: Int) {
 }
 
 /// Send the address of an object to the parent.
-internal func sendAddress(of instance: AnyObject) {
+@safe(unchecked) internal func sendAddress(of instance: AnyObject) {
   debugLog("BEGIN \(#function)")
   defer { debugLog("END \(#function)") }
   var address = Unmanaged.passUnretained(instance).toOpaque()
@@ -269,14 +269,14 @@ internal func sendAddress(of instance: AnyObject) {
 }
 
 /// Send the `value`'s bits to the parent.
-internal func sendValue<T>(_ value: T) {
+@safe(unchecked) internal func sendValue<T>(_ value: T) {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   var value = value
   sendBytes(from: &value, count: MemoryLayout<T>.size)
 }
 
 /// Read a word-sized unsigned integer from the parent.
-internal func readUInt() -> UInt {
+@safe(unchecked) internal func readUInt() -> UInt {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   var value: UInt = 0
   fread(&value, MemoryLayout<UInt>.size, 1, stdin)
@@ -285,7 +285,7 @@ internal func readUInt() -> UInt {
 
 /// Send all known `ReflectionInfo`s for all images loaded in the current
 /// process.
-internal func sendReflectionInfos() {
+@safe(unchecked) internal func sendReflectionInfos() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let infos = (0..<getImageCount()).compactMap(getReflectionInfoForImage)
 
@@ -302,7 +302,7 @@ internal func sendReflectionInfos() {
   }
 }
 
-internal func printErrnoAndExit() {
+@safe(unchecked) internal func printErrnoAndExit() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let errorCString = strerror(errno)!
   let message = String(validatingCString: errorCString)! + "\n"
@@ -313,7 +313,7 @@ internal func printErrnoAndExit() {
 }
 
 /// Retrieve the address and count from the parent and send the bytes back.
-internal func sendBytes() {
+@safe(unchecked) internal func sendBytes() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let address = readUInt()
   let count = Int(readUInt())
@@ -332,7 +332,7 @@ internal func sendBytes() {
 }
 
 /// Send the address of a symbol loaded in this process.
-internal func sendSymbolAddress() {
+@safe(unchecked) internal func sendSymbolAddress() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let name = readLine()!
   name.withCString {
@@ -343,7 +343,7 @@ internal func sendSymbolAddress() {
 }
 
 /// Send the length of a string to the parent.
-internal func sendStringLength() {
+@safe(unchecked) internal func sendStringLength() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let address = readUInt()
   let cString = UnsafePointer<CChar>(bitPattern: address)!
@@ -355,7 +355,7 @@ internal func sendStringLength() {
 }
 
 /// Send the size of this architecture's pointer type.
-internal func sendPointerSize() {
+@safe(unchecked) internal func sendPointerSize() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let pointerSize = UInt8(MemoryLayout<UnsafeRawPointer>.size)
   sendValue(pointerSize)
@@ -410,7 +410,7 @@ internal func reflect(instanceAddress: UInt,
 ///
 /// This reflects the stored properties of the immediate class.
 /// The superclass is not (yet?) visited.
-public func reflect(object: AnyObject) {
+@safe(unchecked) public func reflect(object: AnyObject) {
   defer { _fixLifetime(object) }
   let address = Unmanaged.passUnretained(object).toOpaque()
   let addressValue = UInt(bitPattern: address)
@@ -473,7 +473,7 @@ public func reflect(object: AnyObject) {
 ///
 /// If shouldUnwrapClassExistential is set to true, this exercises 
 /// projectExistentialAndUnwrapClass instead of projectExistential.
-public func reflect<T>(any: T, kind: InstanceKind = .Existential, 
+@safe(unchecked) public func reflect<T>(any: T, kind: InstanceKind = .Existential, 
     shouldUnwrapClassExistential: Bool = false) {
   let any: Any = any
   let anyPointer = UnsafeMutablePointer<Any>.allocate(capacity: MemoryLayout<Any>.size)
@@ -507,7 +507,7 @@ public func reflect<T>(any: T, kind: InstanceKind = .Existential,
 //
 // Following that is the instance that conforms to `Error`,
 // rounding up to its alignment.
-public func reflect<T: Error>(error: T) {
+@safe(unchecked) public func reflect<T: Error>(error: T) {
   let error: Error = error
   let errorPointerValue = unsafeBitCast(error, to: UInt.self)
   reflect(instanceAddress: errorPointerValue, kind: .ErrorExistential)
@@ -517,7 +517,7 @@ public func reflect<T: Error>(error: T) {
 // Like reflect<T: Error>(error: T), but calls projectExistentialAndUnwrapClass 
 // instead of projectExistential and adds an extra level of indirection, which is
 // what projectExistentialAndUnwrapClass expects.
-public func reflectUnwrappingClassExistential<T: Error>(error: T) {
+@safe(unchecked) public func reflectUnwrappingClassExistential<T: Error>(error: T) {
   let error: Error = error
   let errorPointerValue = unsafeBitCast(error, to: UInt.self)
   let anyPointer = UnsafeMutablePointer<Any>.allocate(capacity: MemoryLayout<Any>.size)
@@ -563,13 +563,13 @@ struct ThickFunction3 {
 }
 
 struct ThickFunctionParts {
-  var function: UnsafeRawPointer
-  var context: Optional<UnsafeRawPointer>
+  @unsafe var function: UnsafeRawPointer
+  @unsafe var context: Optional<UnsafeRawPointer>
 }
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: @escaping () -> Void) {
+@safe(unchecked) public func reflect(function: @escaping () -> Void) {
   let fn = UnsafeMutablePointer<ThickFunction0>.allocate(
     capacity: MemoryLayout<ThickFunction0>.size)
   fn.initialize(to: ThickFunction0(function: function))
@@ -586,7 +586,7 @@ public func reflect(function: @escaping () -> Void) {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: @escaping (Int) -> Void) {
+@safe(unchecked) public func reflect(function: @escaping (Int) -> Void) {
   let fn =
   UnsafeMutablePointer<ThickFunction1>.allocate(
     capacity: MemoryLayout<ThickFunction1>.size)
@@ -604,7 +604,7 @@ public func reflect(function: @escaping (Int) -> Void) {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: @escaping (Int, String) -> Void) {
+@safe(unchecked) public func reflect(function: @escaping (Int, String) -> Void) {
   let fn = UnsafeMutablePointer<ThickFunction2>.allocate(
       capacity: MemoryLayout<ThickFunction2>.size)
   fn.initialize(to: ThickFunction2(function: function))
@@ -621,7 +621,7 @@ public func reflect(function: @escaping (Int, String) -> Void) {
 
 /// Reflect a closure context. The given function must be a Swift-native
 /// @convention(thick) function value.
-public func reflect(function: @escaping (Int, String, AnyObject?) -> Void) {
+@safe(unchecked) public func reflect(function: @escaping (Int, String, AnyObject?) -> Void) {
   let fn = UnsafeMutablePointer<ThickFunction3>.allocate(
       capacity: MemoryLayout<ThickFunction3>.size)
   fn.initialize(to: ThickFunction3(function: function))

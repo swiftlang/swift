@@ -30,10 +30,10 @@ public struct Span<Element: ~Copyable & ~Escapable>
   /// valid and not mutated as long as this `Span` exists.
   /// The memory at `_pointer` must be initialized
   /// as `_count` instances of `Element`.
-  @usableFromInline
+  @unsafe @usableFromInline
   internal let _pointer: UnsafeRawPointer?
 
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   internal func _start() -> UnsafeRawPointer {
     _pointer._unsafelyUnwrappedUnchecked
   }
@@ -47,7 +47,7 @@ public struct Span<Element: ~Copyable & ~Escapable>
   internal let _count: Int
 
   /// FIXME: Remove once supported old compilers can recognize lifetime dependence 
-  @_unsafeNonescapableResult
+  @safe(unchecked) @_unsafeNonescapableResult
   @_alwaysEmitIntoClient
   @inline(__always)
   internal init() {
@@ -68,7 +68,7 @@ public struct Span<Element: ~Copyable & ~Escapable>
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized element.
   ///   - count: the number of initialized elements in the span.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @inline(__always)
   @lifetime(borrow pointer)
   internal init(
@@ -94,7 +94,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeBufferPointer` to initialized elements.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
@@ -120,7 +120,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeMutableBufferPointer` to initialized elements.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
@@ -142,7 +142,7 @@ extension Span where Element: ~Copyable {
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized element.
   ///   - count: the number of initialized elements in the span.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
   public init(
     _unsafeStart pointer: UnsafePointer<Element>,
@@ -168,7 +168,7 @@ extension Span {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeBufferPointer` to initialized elements.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
     _unsafeElements buffer: borrowing Slice<UnsafeBufferPointer<Element>>
@@ -188,7 +188,7 @@ extension Span {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeMutableBufferPointer` to initialized elements.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
     _unsafeElements buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>
@@ -216,7 +216,7 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: UnsafeRawBufferPointer
@@ -251,7 +251,7 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
@@ -277,7 +277,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized element.
   ///   - byteCount: the number of initialized elements in the span.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
   public init(
     _unsafeStart pointer: UnsafeRawPointer,
@@ -303,7 +303,7 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeRawBufferPointer>
@@ -327,7 +327,7 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
@@ -344,7 +344,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - bytes: An existing `RawSpan`, which will define both this
   ///            `Span`'s lifetime and the memory it represents.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @lifetime(bytes)
   public init(_bytes bytes: consuming RawSpan) {
     let rawBuffer =
@@ -491,7 +491,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over the items within `bounds`
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(_ bounds: Range<Index>) -> Self {
     _precondition(
@@ -604,7 +604,7 @@ extension Span where Element: ~Copyable  {
   ///   for the `withUnsafeBufferPointer(_:)` method. The closure's
   ///   parameter is valid only for the duration of its execution.
   /// - Returns: The return value of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
@@ -636,7 +636,7 @@ extension Span where Element: BitwiseCopyable {
   ///   The closure's parameter is valid only for the duration of
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
@@ -650,7 +650,7 @@ extension Span where Element: BitwiseCopyable {
 extension Span where Element: ~Copyable {
   /// Returns a Boolean value indicating whether two `Span` instances
   /// refer to the same region in memory.
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public func isIdentical(to other: Self) -> Bool {
     (self._pointer == other._pointer) && (self._count == other._count)
   }
@@ -661,7 +661,7 @@ extension Span where Element: ~Copyable {
   /// Parameters:
   /// - span: a span that may be a subrange of `self`
   /// Returns: A range of indices within `self`, or `nil`
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public func indices(of other: borrowing Self) -> Range<Index>? {
     if other._count > _count { return nil }
     guard let spanStart = other._pointer, _count > 0 else {
@@ -697,7 +697,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
@@ -719,7 +719,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span leaving off the specified number of elements at the end.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
@@ -742,7 +742,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
@@ -769,7 +769,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span starting after the specified number of elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")

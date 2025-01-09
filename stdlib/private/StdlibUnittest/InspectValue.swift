@@ -12,10 +12,10 @@
 
 // namespace
 public enum SwiftRuntime {
-  @_silgen_name("getMetadataKindOf")
+  @unsafe @_silgen_name("getMetadataKindOf")
   private static func _metadataKind<T>(of value: T) -> UnsafePointer<CChar>
 
-  public static func metadataKind<T>(of value: T) -> String {
+  @safe(unchecked) public static func metadataKind<T>(of value: T) -> String {
     return String(validatingCString: _metadataKind(of: value))!
   }
 }

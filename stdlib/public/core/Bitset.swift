@@ -19,13 +19,13 @@
 @frozen
 @usableFromInline // @testable
 internal struct _UnsafeBitset {
-  @usableFromInline
+  @unsafe @usableFromInline
   internal let words: UnsafeMutablePointer<Word>
 
   @usableFromInline
   internal let wordCount: Int
 
-  @inlinable
+  @unsafe @inlinable
   @inline(__always)
   internal init(words: UnsafeMutablePointer<Word>, wordCount: Int) {
     self.words = words
@@ -92,7 +92,7 @@ extension _UnsafeBitset {
     return element >= 0 && element <= capacity
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func uncheckedContains(_ element: Int) -> Bool {
     _internalInvariant(isValid(element))
@@ -100,7 +100,7 @@ extension _UnsafeBitset {
     return words[word].uncheckedContains(bit)
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   @discardableResult
   internal func uncheckedInsert(_ element: Int) -> Bool {
@@ -109,7 +109,7 @@ extension _UnsafeBitset {
     return words[word].uncheckedInsert(bit)
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   @discardableResult
   internal func uncheckedRemove(_ element: Int) -> Bool {
@@ -118,7 +118,7 @@ extension _UnsafeBitset {
     return words[word].uncheckedRemove(bit)
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func clear() {
     words.update(repeating: .empty, count: wordCount)
@@ -158,14 +158,14 @@ extension _UnsafeBitset: Sequence {
     @usableFromInline
     internal var word: Word
 
-    @inlinable
+    @safe(unchecked) @inlinable
     internal init(_ bitset: _UnsafeBitset) {
       self.bitset = bitset
       self.index = 0
       self.word = bitset.wordCount > 0 ? bitset.words[0] : .empty
     }
 
-    @inlinable
+    @safe(unchecked) @inlinable
     internal mutating func next() -> Int? {
       if let bit = word.next() {
         return _UnsafeBitset.join(word: index, bit: bit)
@@ -349,7 +349,7 @@ extension _UnsafeBitset.Word: Sequence, IteratorProtocol {
 }
 
 extension _UnsafeBitset {
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @inline(__always)
   internal static func _withTemporaryUninitializedBitset<R>(
     wordCount: Int,
@@ -381,7 +381,7 @@ extension _UnsafeBitset {
 }
 
 extension _UnsafeBitset {
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   @inline(__always)
   internal static func withTemporaryCopy<R>(
     of original: _UnsafeBitset,

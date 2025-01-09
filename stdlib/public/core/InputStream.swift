@@ -28,7 +28,7 @@ import SwiftShims
 ///   or character combinations are preserved. The default is `true`.
 /// - Returns: The string of characters read from standard input. If EOF has
 ///   already been reached when `readLine()` is called, the result is `nil`.
-public func readLine(strippingNewline: Bool = true) -> String? {
+@safe(unchecked) public func readLine(strippingNewline: Bool = true) -> String? {
   var utf8Start: UnsafeMutablePointer<UInt8>?
   let utf8Count = swift_stdlib_readLine_stdin(&utf8Start)
   defer {

@@ -840,7 +840,7 @@ func _stdlib_getline() -> String? {
   }
 }
 
-func _printDebuggingAdvice(_ fullTestName: String) {
+@safe(unchecked) func _printDebuggingAdvice(_ fullTestName: String) {
   print("To debug, run:")
   var invocation = [CommandLine.arguments[0]]
 #if os(Windows)
@@ -878,7 +878,7 @@ func _installTrapInterceptor()
 #endif
 
 // Avoid serializing references to objc_setUncaughtExceptionHandler in SIL.
-@inline(never)
+@safe(unchecked) @inline(never)
 func _childProcess() {
   _installTrapInterceptor()
 
@@ -933,7 +933,7 @@ func _childProcess() {
 }
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
-@available(SwiftStdlib 5.1, *)
+@safe(unchecked) @available(SwiftStdlib 5.1, *)
 @inline(never)
 func _childProcessAsync() async {
   _installTrapInterceptor()
@@ -1053,7 +1053,7 @@ class _ParentProcess {
     return status
   }
 
-  internal func _readFromChild(
+  @safe(unchecked) internal func _readFromChild(
     onStdoutLine: @escaping (String) -> (done: Bool, Void),
     onStderrLine: @escaping (String) -> (done: Bool, Void)
   ) {

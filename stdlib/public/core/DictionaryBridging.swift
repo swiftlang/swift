@@ -16,7 +16,7 @@ import SwiftShims
 
 /// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the
 /// autorelease pool.
-internal func _stdlib_NSDictionary_allKeys(
+@safe(unchecked) internal func _stdlib_NSDictionary_allKeys(
   _ object: AnyObject
 ) -> _BridgingBuffer {
   let nsd = unsafeBitCast(object, to: _NSDictionary.self)
@@ -27,7 +27,7 @@ internal func _stdlib_NSDictionary_allKeys(
 }
 
 extension _NativeDictionary { // Bridging
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   __consuming internal func bridged() -> AnyObject {
     _connectOrphanedFoundationSubclassesIfNeeded()
     // We can zero-cost bridge if our keys are verbatim
@@ -105,7 +105,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     return self.bridgedKey(at: bucket)
   }
 
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
@@ -170,7 +170,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   }
 
   @objc
-  internal required init(
+  @unsafe internal required init(
     objects: UnsafePointer<AnyObject?>,
     forKeys: UnsafeRawPointer,
     count: Int
@@ -178,13 +178,13 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     _internalInvariantFailure("don't call this designated initializer")
   }
 
-  @nonobjc
+  @unsafe @nonobjc
   private var _bridgedKeysPtr: UnsafeMutablePointer<AnyObject?> {
     return _getUnsafePointerToStoredProperties(self)
       .assumingMemoryBound(to: Optional<AnyObject>.self)
   }
 
-  @nonobjc
+  @unsafe @nonobjc
   private var _bridgedValuesPtr: UnsafeMutablePointer<AnyObject?> {
     return _bridgedKeysPtr + 1
   }
@@ -208,13 +208,13 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   }
 
   /// Attach a buffer for bridged Dictionary keys.
-  @nonobjc
+  @safe(unchecked) @nonobjc
   private func _initializeBridgedKeys(_ storage: __BridgingHashBuffer) {
     _stdlib_atomicInitializeARCRef(object: _bridgedKeysPtr, desired: storage)
   }
 
   /// Attach a buffer for bridged Dictionary values.
-  @nonobjc
+  @safe(unchecked) @nonobjc
   private func _initializeBridgedValues(_ storage: __BridgingHashBuffer) {
     _stdlib_atomicInitializeARCRef(object: _bridgedValuesPtr, desired: storage)
   }
@@ -258,7 +258,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     return _bridgedValues!
   }
 
-  @objc(copyWithZone:)
+  @unsafe @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
     // having `NSDictionary` type, which is immutable.
@@ -305,7 +305,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     return _SwiftDictionaryNSEnumerator<Key, Value>(self)
   }
 
-  @objc(getObjects:andKeys:count:)
+  @unsafe @objc(getObjects:andKeys:count:)
   internal func getObjects(
     _ objects: UnsafeMutablePointer<AnyObject>?,
     andKeys keys: UnsafeMutablePointer<AnyObject>?,
@@ -345,7 +345,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     }
   }
 
-  @objc(enumerateKeysAndObjectsWithOptions:usingBlock:)
+  @unsafe @objc(enumerateKeysAndObjectsWithOptions:usingBlock:)
   internal func enumerateKeysAndObjects(
     options: Int,
     using block: @convention(block) (
@@ -375,7 +375,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     return native.count
   }
 
-  @objc(countByEnumeratingWithState:objects:count:)
+  @unsafe @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?,
@@ -519,13 +519,13 @@ extension __CocoaDictionary: _DictionaryBuffer {
     return nsd.count
   }
 
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   internal func contains(_ key: Key) -> Bool {
     let nsd = unsafeBitCast(object, to: _NSDictionary.self)
     return nsd.object(forKey: key) != nil
   }
 
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   internal func lookup(_ key: Key) -> Value? {
     let nsd = unsafeBitCast(object, to: _NSDictionary.self)
     return nsd.object(forKey: key)
@@ -705,13 +705,13 @@ extension __CocoaDictionary: Sequence {
 
     internal let base: __CocoaDictionary
 
-    internal var _fastEnumerationStatePtr:
+    @unsafe internal var _fastEnumerationStatePtr:
       UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
       return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
         to: _SwiftNSFastEnumerationState.self)
     }
 
-    internal var _fastEnumerationStackBufPtr:
+    @unsafe internal var _fastEnumerationStackBufPtr:
       UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
       return UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
       .assumingMemoryBound(to: _CocoaFastEnumerationStackBuf.self)
@@ -743,7 +743,7 @@ extension __CocoaDictionary.Iterator: IteratorProtocol {
   @usableFromInline
   internal typealias Element = (key: AnyObject, value: AnyObject)
 
-  @usableFromInline
+  @safe(unchecked) @usableFromInline
   internal func nextKey() -> AnyObject? {
     if itemIndex < 0 {
       return nil

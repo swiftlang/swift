@@ -210,7 +210,7 @@ extension DefaultStringInterpolation: TextOutputStream {
     _storage.append(string)
   }
   
-  public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
+  @unsafe public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
     _storage._guts.append(_StringGuts(buffer, isASCII: true))
   }
 }

@@ -223,7 +223,7 @@ extension ArraySlice {
 #endif
   }
 
-  @inlinable
+  @unsafe @inlinable
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
     return _buffer.subscriptBaseAddress + index
@@ -274,13 +274,13 @@ extension ArraySlice: _ArrayProtocol {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
-  @inlinable
+  @unsafe @inlinable
   public var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? {
     @inline(__always) // FIXME(TODO: JIRA): Hack around test failure
     get { return _buffer.firstElementAddressIfContiguous }
   }
 
-  @inlinable
+  @unsafe @inlinable
   internal var _baseAddress: UnsafeMutablePointer<Element> {
     return _buffer.firstElementAddress
   }
@@ -696,7 +696,7 @@ extension ArraySlice: RangeReplaceableCollection {
   ///   - repeatedValue: The element to repeat.
   ///   - count: The number of times to repeat the value passed in the
   ///     `repeating` parameter. `count` must be zero or greater.
-  @inlinable
+  @safe(unchecked) @inlinable
   @_semantics("array.init")
   public init(repeating repeatedValue: Element, count: Int) {
     _precondition(count >= 0, "Can't construct ArraySlice with count < 0")
@@ -746,7 +746,7 @@ extension ArraySlice: RangeReplaceableCollection {
 
   /// Entry point for `Array` literal construction; builds and returns
   /// a ArraySlice of `count` uninitialized elements.
-  @inlinable
+  @unsafe @inlinable
   @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
     _ count: Int
@@ -824,7 +824,7 @@ extension ArraySlice: RangeReplaceableCollection {
   /// - Parameter minimumCapacity: The requested number of elements to store.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the array.
-  @inlinable
+  @safe(unchecked) @inlinable
   @_semantics("array.mutate_unknown")
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
     if !_buffer.beginCOWMutation() || _buffer.capacity < minimumCapacity {
@@ -844,7 +844,7 @@ extension ArraySlice: RangeReplaceableCollection {
   /// Copy the contents of the current buffer to a new unique mutable buffer.
   /// The count of the new buffer is set to `oldCount`, the capacity of the
   /// new buffer is big enough to hold 'oldCount' + 1 elements.
-  @inline(never)
+  @safe(unchecked) @inline(never)
   @inlinable // @specializable
   internal mutating func _copyToNewBuffer(oldCount: Int) {
     let newCount = oldCount &+ 1
@@ -882,7 +882,7 @@ extension ArraySlice: RangeReplaceableCollection {
     }
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @_semantics("array.mutate_unknown")
   internal mutating func _appendElementAssumeUniqueAndCapacity(
     _ oldCount: Int,
@@ -942,7 +942,7 @@ extension ArraySlice: RangeReplaceableCollection {
   /// - Complexity: O(*m*) on average, where *m* is the length of
   ///   `newElements`, over many calls to `append(contentsOf:)` on the same
   ///   array.
-  @inlinable
+  @safe(unchecked) @inlinable
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
@@ -1085,7 +1085,7 @@ extension ArraySlice: RangeReplaceableCollection {
 
   //===--- algorithms -----------------------------------------------------===//
 
-  @inlinable
+  @unsafe @inlinable
   @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
@@ -1096,7 +1096,7 @@ extension ArraySlice: RangeReplaceableCollection {
     }
   }
 
-  @inlinable
+  @unsafe @inlinable
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1106,7 +1106,7 @@ extension ArraySlice: RangeReplaceableCollection {
     }
   }
 
-  @inlinable
+  @unsafe @inlinable
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1152,7 +1152,7 @@ extension ArraySlice: CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 extension ArraySlice {
-  @usableFromInline @_transparent
+  @unsafe @usableFromInline @_transparent
   internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
@@ -1166,7 +1166,7 @@ extension ArraySlice {
 extension ArraySlice {
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
-  @usableFromInline
+  @unsafe @usableFromInline
   @_disfavoredOverload
   func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -1203,7 +1203,7 @@ extension ArraySlice {
   ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
   ///   valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   public func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -1212,7 +1212,7 @@ extension ArraySlice {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
-  @_semantics("array.withUnsafeMutableBufferPointer")
+  @unsafe @_semantics("array.withUnsafeMutableBufferPointer")
   @usableFromInline
   @inline(__always)
   @_silgen_name("$ss10ArraySliceV30withUnsafeMutableBufferPointeryqd__qd__SryxGzKXEKlF")
@@ -1258,7 +1258,7 @@ extension ArraySlice {
   ///   method. The pointer argument is valid only for the duration of the
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_semantics("array.withUnsafeMutableBufferPointer")
+  @unsafe @_semantics("array.withUnsafeMutableBufferPointer")
   @_alwaysEmitIntoClient
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
@@ -1289,7 +1289,7 @@ extension ArraySlice {
     return try body(&inoutBufferPointer)
   }
 
-  @inlinable
+  @unsafe @inlinable
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
@@ -1393,7 +1393,7 @@ extension ArraySlice: Equatable where Element: Equatable {
   /// - Parameters:
   ///   - lhs: An array to compare.
   ///   - rhs: Another array to compare.
-  @inlinable
+  @safe(unchecked) @inlinable
   public static func ==(lhs: ArraySlice<Element>, rhs: ArraySlice<Element>) -> Bool {
     let lhsCount = lhs.count
     if lhsCount != rhs.count {
@@ -1479,7 +1479,7 @@ extension ArraySlice {
   ///   The argument is valid only for the duration of the closure's
   ///   execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
+  @unsafe @inlinable
   public mutating func withUnsafeMutableBytes<R>(
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
@@ -1515,7 +1515,7 @@ extension ArraySlice {
   ///   used as the return value for the `withUnsafeBytes(_:)` method. The
   ///   argument is valid only for the duration of the closure's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
+  @unsafe @inlinable
   public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
@@ -1544,7 +1544,7 @@ extension ArraySlice {
   // This allows us to test the `_copyContents` implementation in
   // `_SliceBuffer`. (It's like `_copyToContiguousArray` but it always makes a
   // copy.)
-  @_alwaysEmitIntoClient
+  @safe(unchecked) @_alwaysEmitIntoClient
   public func _copyToNewArray() -> [Element] {
     Array(unsafeUninitializedCapacity: self.count) { buffer, count in
       var (it, c) = self._buffer._copyContents(initializing: buffer)

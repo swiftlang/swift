@@ -29,7 +29,7 @@ internal typealias _BridgingBuffer
 @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
 extension ManagedBufferPointer
 where Header == _BridgingBufferHeader, Element == AnyObject {
-  internal init(_ count: Int) {
+  @safe(unchecked) internal init(_ count: Int) {
     self.init(
       _uncheckedBufferClass: __BridgingBufferStorage.self,
       minimumCapacity: count)
@@ -56,7 +56,7 @@ where Header == _BridgingBufferHeader, Element == AnyObject {
     }
   }
 
-  internal var baseAddress: UnsafeMutablePointer<Element> {
+  @unsafe internal var baseAddress: UnsafeMutablePointer<Element> {
     @inline(__always)
     get {
       return withUnsafeMutablePointerToElements { $0 }

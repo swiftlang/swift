@@ -40,7 +40,7 @@ extension _Deque {
   ///       - initializedCount: The count of initialized elements in the deque,
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.
-  init(
+  @unsafe init(
     unsafeUninitializedCapacity capacity: Int,
     initializingWith initializer:
       (inout UnsafeMutableBufferPointer<Element>, inout Int) throws -> Void
@@ -131,7 +131,7 @@ extension _Deque {
   /// - Complexity: Amortized O(`newElements.count`).
   ///
   /// - SeeAlso: `append(contentsOf:)`
-  mutating func prepend<C: Collection>(contentsOf newElements: C) where C.Element == Element {
+  @safe(unchecked) mutating func prepend<C: Collection>(contentsOf newElements: C) where C.Element == Element {
     let done: Void? = newElements._withContiguousStorageIfAvailable_SR14663 { source in
       _storage.ensureUnique(minimumCapacity: count + source.count)
       _storage.update { $0.uncheckedPrepend(contentsOf: source) }
@@ -165,7 +165,7 @@ extension _Deque {
   /// - Complexity: Amortized O(`newElements.count`).
   ///
   /// - SeeAlso: `append(contentsOf:)`
-  mutating func prepend<S: Sequence>(contentsOf newElements: S) where S.Element == Element {
+  @safe(unchecked) mutating func prepend<S: Sequence>(contentsOf newElements: S) where S.Element == Element {
     let done: Void? = newElements._withContiguousStorageIfAvailable_SR14663 { source in
       _storage.ensureUnique(minimumCapacity: count + source.count)
       _storage.update { $0.uncheckedPrepend(contentsOf: source) }

@@ -342,7 +342,7 @@ extension SignedNumeric {
 ///
 /// - Parameter x: A signed number.
 /// - Returns: The absolute value of `x`.
-@inlinable
+@safe(unchecked) @inlinable
 public func abs<T: SignedNumeric & Comparable>(_ x: T) -> T {
   if T.self == T.Magnitude.self {
     return unsafeBitCast(x.magnitude, to: T.self)
@@ -1378,7 +1378,7 @@ extension BinaryInteger {
 //===----------------------------------------------------------------------===//
 
 extension BinaryInteger {
-  internal func _description(radix: Int, uppercase: Bool) -> String {
+  @safe(unchecked) internal func _description(radix: Int, uppercase: Bool) -> String {
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
 
     if bitWidth <= 64 {

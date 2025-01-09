@@ -5024,5 +5024,15 @@ swift::enclosingContextForUnsafe(
   if (!decl)
     return { nullptr, false };
 
-  return { decl, versionCheckNode.has_value() };
+  bool inDefinition = versionCheckNode.has_value();
+  if (!inDefinition) {
+    // Look harder to see if this is within a function body.
+    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      if (func->hasBody() &&
+          ctx.SourceMgr.containsLoc(func->getBodySourceRange(), referenceLoc))
+        inDefinition = true;
+    }
+  }
+
+  return { decl, inDefinition };
 }

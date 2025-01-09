@@ -49,7 +49,7 @@ extension Unicode.ASCII: Unicode.Encoding {
     return EncodedScalar(UInt8(truncatingIfNeeded: source.value))
   }
 
-  @inline(__always)
+  @safe(unchecked) @inline(__always)
   @inlinable
   public static func transcode<FromEncoding: Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type

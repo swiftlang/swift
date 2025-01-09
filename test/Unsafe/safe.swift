@@ -56,6 +56,11 @@ struct HasProperties {
   }()
 }
 
+// expected-warning@+1{{global function 'safeInterface' involves unsafe code; use '@safe(unchecked)' to assert that the code is memory-safe}}
+func safeInterface()  {
+  func inner(_: UnsafeType) { } // expected-note{{reference to unsafe struct 'UnsafeType'}}
+}
+
 // Parsing issues
 @safe // expected-error{{expected '(' in 'safe' attribute}}
 func bad1() { }

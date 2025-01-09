@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 internal func _parseIntegerDigits<Result: FixedWidthInteger>(
   ascii codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
 ) -> Result? {
@@ -56,7 +56,7 @@ internal func _parseIntegerDigits<Result: FixedWidthInteger>(
   return result
 }
 
-@_alwaysEmitIntoClient
+@unsafe @_alwaysEmitIntoClient
 @inline(__always)
 internal func _parseInteger<Result: FixedWidthInteger>(
   ascii codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
@@ -80,7 +80,7 @@ internal func _parseInteger<Result: FixedWidthInteger>(
   return _parseIntegerDigits(ascii: codeUnits, radix: radix, isNegative: false)
 }
 
-@_alwaysEmitIntoClient
+@safe(unchecked) @_alwaysEmitIntoClient
 @inline(never)
 internal func _parseInteger<S: StringProtocol, Result: FixedWidthInteger>(
   ascii text: S, radix: Int
@@ -122,7 +122,7 @@ extension FixedWidthInteger {
   ///     `radix`.
   ///   - radix: The radix, or base, to use for converting `text` to an integer
   ///     value. `radix` must be in the range `2...36`. The default is 10.
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")

@@ -482,7 +482,7 @@ extension Substring: StringProtocol {
   ///
   /// - Parameter nullTerminatedUTF8: A pointer to a sequence of contiguous,
   ///   UTF-8 encoded bytes ending just before the first zero byte.
-  public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
+  @unsafe public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
     self.init(String(cString: nullTerminatedUTF8))
   }
 
@@ -495,7 +495,7 @@ extension Substring: StringProtocol {
   ///     before the first zero code unit.
   ///   - sourceEncoding: The encoding in which the code units should be
   ///     interpreted.
-  @inlinable // specialization
+  @unsafe @inlinable // specialization
   public init<Encoding: _UnicodeEncoding>(
     decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type
@@ -517,7 +517,7 @@ extension Substring: StringProtocol {
   ///   `withCString(_:)` method. The pointer argument is valid only for the
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // specialization
+  @unsafe @inlinable // specialization
   public func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
@@ -541,7 +541,7 @@ extension Substring: StringProtocol {
   ///   - targetEncoding: The encoding in which the code units should be
   ///     interpreted.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // specialization
+  @unsafe @inlinable // specialization
   public func withCString<Result, TargetEncoding: _UnicodeEncoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
@@ -703,7 +703,7 @@ extension Substring.UTF8View: BidirectionalCollection {
     return _base.distance(from: start, to: end)
   }
 
-  @_alwaysEmitIntoClient
+  @unsafe @_alwaysEmitIntoClient
   @inlinable
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R

@@ -87,7 +87,7 @@ internal func _fatalErrorFlags() -> UInt32 {
 /// This function should not be inlined in desktop Swift because it is cold and
 /// inlining just bloats code. In Embedded Swift, we force inlining as this
 /// function is typically just a trap (in release configurations).
-@usableFromInline
+@safe(unchecked) @usableFromInline
 #if !$Embedded
 @inline(never)
 #else
@@ -130,7 +130,7 @@ internal func _assertionFailure(
 /// This function should not be inlined in desktop Swift because it is cold and
 /// inlining just bloats code. In Embedded Swift, we force inlining as this
 /// function is typically just a trap (in release configurations).
-@usableFromInline
+@safe(unchecked) @usableFromInline
 #if !$Embedded
 @inline(never)
 #else
@@ -168,7 +168,7 @@ internal func _assertionFailure(
 /// This function should not be inlined in desktop Swift because it is cold and
 /// inlining just bloats code. In Embedded Swift, we force inlining as this
 /// function is typically just a trap (in release configurations).
-@usableFromInline
+@safe(unchecked) @usableFromInline
 #if !$Embedded
 @inline(never)
 #else
@@ -234,7 +234,7 @@ internal func _fatalErrorMessage(
 
 /// Prints a fatal error message when an unimplemented initializer gets
 /// called by the Objective-C runtime.
-@_transparent
+@safe(unchecked) @_transparent
 public // COMPILER_INTRINSIC
 func _unimplementedInitializer(className: StaticString,
                                initName: StaticString = #function,

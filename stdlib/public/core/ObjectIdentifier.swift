@@ -61,7 +61,7 @@ public struct ObjectIdentifier: Sendable {
   ///
   /// - Parameters:
   ///   - x: A metatype.
-  @inlinable // trivial-implementation
+  @safe(unchecked) @inlinable // trivial-implementation
   public init(_ x: Any.Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
@@ -79,7 +79,7 @@ public struct ObjectIdentifier: Sendable {
     self._value = Builtin.bridgeToRawPointer(x)
   }
 
-  @inlinable // trivial-implementation
+  @safe(unchecked) @inlinable // trivial-implementation
   public init<Object>(_ x: Object.Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }

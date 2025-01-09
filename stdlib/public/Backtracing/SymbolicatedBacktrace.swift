@@ -203,7 +203,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     }
 
     /// Demangle the raw name, if possible.
-    private func demangleRawName() -> String {
+    @safe(unchecked) private func demangleRawName() -> String {
       var length: size_t = 0
       if let demangled = _swift_backtrace_demangle(rawName, rawName.utf8.count,
                                                    nil, &length) {
@@ -291,7 +291,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
   #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   /// Convert a build ID to a CFUUIDBytes.
-  private static func uuidBytesFromBuildID(_ buildID: [UInt8])
+  @safe(unchecked) private static func uuidBytesFromBuildID(_ buildID: [UInt8])
     -> CFUUIDBytes {
     return withUnsafeTemporaryAllocation(of: CFUUIDBytes.self,
                                          capacity: 1) { buf in

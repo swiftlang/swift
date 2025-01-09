@@ -87,6 +87,7 @@ internal enum _PtrAuth {
   /// discriminator.  Not all bits of the inputs are guaranteed to
   /// contribute to the result.
   @_transparent
+  @unsafe
   static func blend(pointer: UnsafeRawPointer,
                     discriminator: UInt64) -> UInt64 {
     return UInt64(Builtin.int_ptrauth_blend(
@@ -97,6 +98,7 @@ internal enum _PtrAuth {
   /// Sign an unauthenticated pointer.
   @_semantics("no.preserve.debugger") // Relies on inlining this function.
   @_transparent
+  @unsafe
   static func sign(pointer: UnsafeRawPointer,
                    key: Key,
                    discriminator: UInt64) -> UnsafeRawPointer {
@@ -112,6 +114,7 @@ internal enum _PtrAuth {
   /// Authenticate a pointer using one scheme and resign it using another.
   @_transparent
   @_semantics("no.preserve.debugger") // Relies on inlining this function.
+  @unsafe
   static func authenticateAndResign(pointer: UnsafeRawPointer,
                                 oldKey: Key,
                                 oldDiscriminator: UInt64,
@@ -139,14 +142,14 @@ internal enum _PtrAuth {
   /// Blend a pointer and a small integer to form a new extra-data
   /// discriminator.  Not all bits of the inputs are guaranteed to
   /// contribute to the result.
-  @_transparent
+  @unsafe @_transparent
   static func blend(pointer _: UnsafeRawPointer,
                     discriminator _: UInt64) -> UInt64{
     return 0
   }
 
   /// Sign an unauthenticated pointer.
-  @_transparent
+  @unsafe @_transparent
   static func sign(pointer: UnsafeRawPointer,
                    key: Key,
                    discriminator: UInt64) -> UnsafeRawPointer {
@@ -154,7 +157,7 @@ internal enum _PtrAuth {
   }
 
   /// Authenticate a pointer using one scheme and resign it using another.
-  @_transparent
+  @unsafe @_transparent
   static func authenticateAndResign(pointer: UnsafeRawPointer,
                                 oldKey: Key,
                                 oldDiscriminator: UInt64,
@@ -175,7 +178,7 @@ internal enum _PtrAuth {
 
 // Helpers for working with authenticated function pointers.
 
-extension UnsafeRawPointer {
+@unsafe extension UnsafeRawPointer {
   /// Load a function pointer from memory that has been authenticated
   /// specifically for its given address.
   @_semantics("no.preserve.debugger") // Don't keep the generic version alive
@@ -226,7 +229,7 @@ extension UnsafeRawPointer {
 
 }
 
-extension UnsafeMutableRawPointer {
+@unsafe extension UnsafeMutableRawPointer {
   /// Copy a function pointer from memory that has been authenticated
   /// specifically for its given address.
   internal func _copyAddressDiscriminatedFunctionPointer(

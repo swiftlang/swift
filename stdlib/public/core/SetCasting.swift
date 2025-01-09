@@ -57,7 +57,7 @@ public func _setUpCast<DerivedValue, BaseValue>(
 }
 
 /// Called by the casting machinery.
-@_silgen_name("_swift_setDownCastIndirect")
+@unsafe @_silgen_name("_swift_setDownCastIndirect")
 @_unavailableInEmbedded
 internal func _setDownCastIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Set<SourceValue>>,
@@ -101,7 +101,7 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
 }
 
 /// Called by the casting machinery.
-@_silgen_name("_swift_setDownCastConditionalIndirect")
+@unsafe @_silgen_name("_swift_setDownCastConditionalIndirect")
 @_unavailableInEmbedded
 internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Set<SourceValue>>,

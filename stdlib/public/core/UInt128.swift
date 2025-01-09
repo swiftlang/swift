@@ -41,7 +41,7 @@ public struct UInt128: Sendable {
     return UInt64(Builtin.trunc_Int128_Int64(shifted._value))
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @safe(unchecked) @available(SwiftStdlib 6.0, *)
   @_transparent
   public init(_low: UInt64, _high: UInt64) {
 #if _endian(little)

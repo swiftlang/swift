@@ -15,7 +15,7 @@
 import Swift
 
 internal class _DequeBuffer<Element>: ManagedBuffer<_DequeBufferHeader, Element> {
-  deinit {
+  @safe(unchecked) deinit {
     self.withUnsafeMutablePointers { header, elements in
       header.pointee._checkInvariants()
 

@@ -18,7 +18,7 @@ internal var _cocoaASCIIEncoding:UInt { 1 } /* NSASCIIStringEncoding */
 internal var _cocoaUTF8Encoding:UInt { 4 } /* NSUTF8StringEncoding */
 
 extension String {
-  @available(SwiftStdlib 5.6, *)
+  @safe(unchecked) @available(SwiftStdlib 5.6, *)
   @_spi(Foundation)
   public init?(_nativeStorage: AnyObject) {
     let knownOther = _KnownCocoaString(_nativeStorage)
@@ -41,7 +41,7 @@ extension String {
 
 // ObjC interfaces.
 extension _AbstractStringStorage {
-  @inline(__always)
+  @unsafe @inline(__always)
   @_effects(releasenone)
   internal func _getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>, _ aRange: _SwiftNSRange
@@ -62,7 +62,7 @@ extension _AbstractStringStorage {
       range: range)
   }
 
-  @inline(__always)
+  @unsafe @inline(__always)
   @_effects(releasenone)
   internal func _getCString(
     _ outputPtr: UnsafeMutablePointer<UInt8>, _ maxLength: Int, _ encoding: UInt
@@ -79,7 +79,7 @@ extension _AbstractStringStorage {
     }
   }
 
-  @inline(__always)
+  @unsafe @inline(__always)
   @_effects(readonly)
   internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     switch (encoding, isASCII) {
@@ -91,7 +91,7 @@ extension _AbstractStringStorage {
     }
   }
 
-  @_effects(readonly)
+  @safe(unchecked) @_effects(readonly)
   internal func _nativeIsEqual<T:_AbstractStringStorage>(
     _ nativeOther: T
   ) -> Int8 {
@@ -102,7 +102,7 @@ extension _AbstractStringStorage {
       (memcmp(start, nativeOther.start, count) == 0)) ? 1 : 0
   }
 
-  @inline(__always)
+  @safe(unchecked) @inline(__always)
   @_effects(readonly)
   internal func _isEqual(_ other: AnyObject?) -> Int8 {
     guard let other = other else {
@@ -184,7 +184,7 @@ extension __StringStorage {
     return str.utf16[str._toUTF16Index(offset)]
   }
 
-  @objc(getCharacters:range:)
+  @unsafe @objc(getCharacters:range:)
   @_effects(releasenone)
   final internal func getCharacters(
    _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
@@ -192,7 +192,7 @@ extension __StringStorage {
     _getCharacters(buffer, aRange)
   }
 
-  @objc(_fastCStringContents:)
+  @unsafe @objc(_fastCStringContents:)
   @_effects(readonly)
   final internal func _fastCStringContents(
     _ requiresNulTermination: Int8
@@ -203,19 +203,19 @@ extension __StringStorage {
     return nil
   }
 
-  @objc(UTF8String)
+  @unsafe @objc(UTF8String)
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8>? {
     return start
   }
 
-  @objc(cStringUsingEncoding:)
+  @unsafe @objc(cStringUsingEncoding:)
   @_effects(readonly)
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     return _cString(encoding: encoding)
   }
 
-  @objc(getCString:maxLength:encoding:)
+  @unsafe @objc(getCString:maxLength:encoding:)
   @_effects(releasenone)
   final internal func getCString(
     _ outputPtr: UnsafeMutablePointer<UInt8>, maxLength: Int, encoding: UInt
@@ -245,7 +245,7 @@ extension __StringStorage {
     return _isEqual(other)
   }
 
-  @objc(copyWithZone:)
+  @unsafe @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // While __StringStorage instances aren't immutable in general,
     // mutations may only occur when instances are uniquely referenced.
@@ -280,7 +280,7 @@ extension __SharedStringStorage {
     return str.utf16[str._toUTF16Index(offset)]
   }
 
-  @objc(getCharacters:range:)
+  @unsafe @objc(getCharacters:range:)
   @_effects(releasenone)
   final internal func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
@@ -298,7 +298,7 @@ extension __SharedStringStorage {
     }
   }
 
-  @objc(_fastCStringContents:)
+  @unsafe @objc(_fastCStringContents:)
   @_effects(readonly)
   final internal func _fastCStringContents(
     _ requiresNulTermination: Int8
@@ -309,19 +309,19 @@ extension __SharedStringStorage {
     return nil
   }
 
-  @objc(UTF8String)
+  @unsafe @objc(UTF8String)
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8>? {
     return start
   }
 
-  @objc(cStringUsingEncoding:)
+  @unsafe @objc(cStringUsingEncoding:)
   @_effects(readonly)
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     return _cString(encoding: encoding)
   }
 
-  @objc(getCString:maxLength:encoding:)
+  @unsafe @objc(getCString:maxLength:encoding:)
   @_effects(releasenone)
   final internal func getCString(
     _ outputPtr: UnsafeMutablePointer<UInt8>, maxLength: Int, encoding: UInt
@@ -341,7 +341,7 @@ extension __SharedStringStorage {
     return _isEqual(other)
   }
 
-  @objc(copyWithZone:)
+  @unsafe @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // While __StringStorage instances aren't immutable in general,
     // mutations may only occur when instances are uniquely referenced.

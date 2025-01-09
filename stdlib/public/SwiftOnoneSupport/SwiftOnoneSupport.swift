@@ -121,7 +121,7 @@ extension Array {
   func _prespecializeArray(arrayLiteral: Element...) {}
 
   // init(_unsafeUninitializedCapacity: Swift.Int, initializingWith: (inout Swift.UnsafeMutableBufferPointer<A>, inout Swift.Int) throws -> ()) throws -> [A]
-  @_semantics("prespecialize.$sSa28_unsafeUninitializedCapacity16initializingWithSayxGSi_ySryxGz_SiztKXEtKcfC")
+  @unsafe @_semantics("prespecialize.$sSa28_unsafeUninitializedCapacity16initializingWithSayxGSi_ySryxGz_SiztKXEtKcfC")
   func _prespecializeArray(capacity: Int, generator: (inout UnsafeMutableBufferPointer<Element>, inout Int) throws -> ()) {}
 
   // removeAll(keepingCapacity: Swift.Bool) -> ()
@@ -169,7 +169,7 @@ extension Array {
   // _withUnsafeMutableBufferPointerIfSupported<A>(
   //   (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1
   // ) throws -> A1?
-  @_semantics("prespecialize.$sSa42_withUnsafeMutableBufferPointerIfSupportedyqd__Sgqd__SryxGzKXEKlF")
+  @unsafe @_semantics("prespecialize.$sSa42_withUnsafeMutableBufferPointerIfSupportedyqd__Sgqd__SryxGzKXEKlF")
   func _prespecializeArray<R>(with: (inout UnsafeMutableBufferPointer<Element>) throws -> R) {}
 } // extension Array
 
@@ -187,7 +187,7 @@ extension _ContiguousArrayBuffer {
   func _prespecializeContiguousArrayBuffer() {}
 
   // _copyContents(subRange: Swift.Range<Swift.Int>, initializing: Swift.UnsafeMutablePointer<A>) -> Swift.UnsafeMutablePointer<A>
-  @_semantics("prespecialize.$ss22_ContiguousArrayBufferV13_copyContents8subRange12initializingSpyxGSnySiG_AFtF")
+  @unsafe @_semantics("prespecialize.$ss22_ContiguousArrayBufferV13_copyContents8subRange12initializingSpyxGSnySiG_AFtF")
   func _prespecializeContiguousArrayBuffer(range: Range<Int>, pointer: UnsafeMutablePointer<Element>) {}
 
   // _initStorageHeader(count: Swift.Int, capacity: Swift.Int) -> ()
@@ -238,7 +238,7 @@ extension _ArrayBuffer {
   func _prespecializeArrayBuffer(range: Range<Int>) {}
 
   // _copyContents(subRange: Swift.Range<Swift.Int>, initializing: Swift.UnsafeMutablePointer<A>) -> Swift.UnsafeMutablePointer<A>
-  @_semantics("prespecialize.$ss12_ArrayBufferV13_copyContents8subRange12initializingSpyxGSnySiG_AFtF")
+  @unsafe @_semantics("prespecialize.$ss12_ArrayBufferV13_copyContents8subRange12initializingSpyxGSnySiG_AFtF")
   func _prespecializeArrayBuffer(range: Range<Int>, pointer: UnsafeMutablePointer<Element>) {}
 
   // _checkInoutAndNativeTypeCheckedBounds(_: Swift.Int, wasNativeTypeChecked: Swift.Bool) -> ()
@@ -303,7 +303,7 @@ func _prespecializeIndexingIterator<Elements>(_ x: IndexingIterator<Elements>) w
 // passing them to the above generic proxy functions.
 // =============================================================================
 
-func prespecializeCollections<T>(_ element: T) {
+@safe(unchecked) func prespecializeCollections<T>(_ element: T) {
   var umbp = UnsafeMutableBufferPointer<T>.allocate(capacity: 1)
   let cmp = { (_: T, _: T) in return false }
   umbp._prespecializeMutableBirectionalCollection(range: 0..<0)

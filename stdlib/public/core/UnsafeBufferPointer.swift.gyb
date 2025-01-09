@@ -112,11 +112,14 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
 
 // FIXME: The ASTPrinter should print this synthesized conformance.
 // rdar://140291657
+@unsafe
 extension Unsafe${Mutable}BufferPointer: BitwiseCopyable where Element: ~Copyable {}
 
 @available(*, unavailable)
+@unsafe
 extension Unsafe${Mutable}BufferPointer: Sendable where Element: ~Copyable {}
 
+@unsafe
 extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// A pointer to the first element of the buffer.
   ///
@@ -130,6 +133,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 }
 
 %if not mutable:
+@unsafe
 extension UnsafeBufferPointer {
   /// An iterator for the elements in the buffer referenced by an
   /// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer` instance.
@@ -150,8 +154,10 @@ extension UnsafeBufferPointer {
 }
 
 @available(*, unavailable)
+@unsafe
 extension UnsafeBufferPointer.Iterator: Sendable {}
 
+@unsafe
 extension UnsafeBufferPointer.Iterator: IteratorProtocol {
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
@@ -172,11 +178,13 @@ extension UnsafeBufferPointer.Iterator: IteratorProtocol {
   }
 }
 %else:
+@unsafe
 extension UnsafeMutableBufferPointer {
   public typealias Iterator = UnsafeBufferPointer<Element>.Iterator
 }
 %end
 
+@unsafe
 extension Unsafe${Mutable}BufferPointer: Sequence {
   /// Returns an iterator over the elements of this buffer.
   ///
@@ -218,6 +226,7 @@ extension Unsafe${Mutable}BufferPointer: Sequence {
   }
 }
 
+@unsafe
 extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   public typealias Index = Int
 
@@ -461,6 +470,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 
 }
 
+@unsafe
 extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// Constructs a standalone buffer pointer over the items within the supplied
   /// range of positions in the memory region addressed by this buffer pointer.
@@ -553,6 +563,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   }
 }
 
+@unsafe
 extension Unsafe${Mutable}BufferPointer {
   /// Accesses the element at the specified position.
   ///
@@ -633,6 +644,7 @@ extension Unsafe${Mutable}BufferPointer {
   }
 }
 
+@unsafe
 extension Unsafe${Mutable}BufferPointer:
   Collection,
 %if Mutable:
@@ -750,6 +762,7 @@ extension Unsafe${Mutable}BufferPointer:
 %  end
 }
 
+@unsafe
 extension Unsafe${Mutable}BufferPointer {
 %  if not Mutable:
   /// Creates a buffer over the same memory as the given buffer slice.
@@ -818,6 +831,7 @@ extension Unsafe${Mutable}BufferPointer {
   }
 }
 
+@unsafe
 extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// Deallocates the memory block previously allocated at this buffer pointer’s
   /// base address.
@@ -836,6 +850,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 }
 
 % if Mutable:
+@unsafe
 extension UnsafeMutableBufferPointer where Element: ~Copyable {
   /// Allocates uninitialized memory for the specified number of instances of
   /// type `Element`.
@@ -868,6 +883,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
   }
 }
 
+@unsafe
 extension UnsafeMutableBufferPointer {
   /// Initializes every element in this buffer's memory to a copy of the given
   /// value.
@@ -968,6 +984,7 @@ extension UnsafeMutableBufferPointer {
   }
 }
 
+@unsafe
 extension UnsafeMutableBufferPointer {
   /// Updates every element of this buffer's initialized memory.
   ///
@@ -996,6 +1013,7 @@ extension UnsafeMutableBufferPointer {
   }
 }
 
+@unsafe
 extension UnsafeMutableBufferPointer {
   /// Updates the buffer's initialized memory with the given elements.
   ///
@@ -1086,6 +1104,7 @@ extension UnsafeMutableBufferPointer {
   }
 }
 
+@unsafe
 extension UnsafeMutableBufferPointer where Element: ~Copyable {
   /// Moves every element of an initialized source buffer into the uninitialized
   /// memory referenced by this buffer, leaving the source memory uninitialized
@@ -1130,6 +1149,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
   }
 }
 
+@unsafe
 extension UnsafeMutableBufferPointer {
   /// Moves every element of an initialized source buffer into the
   /// uninitialized memory referenced by this buffer, leaving the source memory
@@ -1165,6 +1185,7 @@ extension UnsafeMutableBufferPointer {
   }
 }
 
+@unsafe
 extension UnsafeMutableBufferPointer where Element: ~Copyable {
   /// Updates this buffer's initialized memory initialized memory by moving
   /// every element from the source buffer, leaving the source memory
@@ -1206,6 +1227,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
   }
 }
 
+@unsafe
 extension UnsafeMutableBufferPointer {
   /// Updates this buffer's initialized memory initialized memory by
   /// moving every element from the source buffer slice,
@@ -1237,6 +1259,7 @@ extension UnsafeMutableBufferPointer {
   }
 }
 
+@unsafe
 extension UnsafeMutableBufferPointer where Element: ~Copyable {
   /// Deinitializes every instance in this buffer.
   ///
@@ -1307,6 +1330,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
 }
 % end
 
+@unsafe
 extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// Executes the given closure while temporarily binding the memory referenced
   /// by this buffer to the given type.
@@ -1395,6 +1419,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   }
 }
 
+@unsafe
 extension Unsafe${Mutable}BufferPointer {
   // This unavailable implementation uses the expected mangled name
   // of `withMemoryRebound<T, Result>(to:_:)`, and provides
@@ -1417,6 +1442,7 @@ extension Unsafe${Mutable}BufferPointer {
 
 @_unavailableInEmbedded
 @_preInverseGenerics
+@unsafe
 extension Unsafe${Mutable}BufferPointer: CustomDebugStringConvertible
 where Element: ~Copyable {
   /// A textual representation of the buffer, suitable for debugging.

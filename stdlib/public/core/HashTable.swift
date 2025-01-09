@@ -22,13 +22,13 @@ internal struct _HashTable {
   @usableFromInline
   internal typealias Word = _UnsafeBitset.Word
 
-  @usableFromInline
+  @unsafe @usableFromInline
   internal var words: UnsafeMutablePointer<Word>
 
   @usableFromInline
   internal let bucketMask: Int
 
-  @inlinable
+  @unsafe @inlinable
   @inline(__always)
   internal init(words: UnsafeMutablePointer<Word>, bucketCount: Int) {
     _internalInvariant(bucketCount > 0 && bucketCount & (bucketCount - 1) == 0,
@@ -104,7 +104,7 @@ extension _HashTable {
     return Int32(truncatingIfNeeded: hash)
   }
 
-  internal static func hashSeed(
+  @safe(unchecked) internal static func hashSeed(
     for object: Builtin.NativeObject,
     scale: Int8
   ) -> Int {
@@ -240,7 +240,7 @@ extension _HashTable: Sequence {
     @usableFromInline
     var word: Word
 
-    @inlinable
+    @safe(unchecked) @inlinable
     @inline(__always)
     init(_ hashTable: _HashTable) {
       self.hashTable = hashTable
@@ -251,7 +251,7 @@ extension _HashTable: Sequence {
       }
     }
 
-    @inlinable
+    @safe(unchecked) @inlinable
     @inline(__always)
     internal mutating func next() -> Bucket? {
       if let bit = word.next() {
@@ -285,7 +285,7 @@ extension _HashTable {
     return bucket.offset >= 0 && bucket.offset < bucketCount
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func _isOccupied(_ bucket: Bucket) -> Bool {
     _internalInvariant(isValid(bucket))
@@ -305,7 +305,7 @@ extension _HashTable {
       "Attempting to access Collection elements using an invalid Index")
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func _firstOccupiedBucket(fromWord word: Int) -> Bucket {
     _internalInvariant(word >= 0 && word <= wordCount)
@@ -319,7 +319,7 @@ extension _HashTable {
     return endBucket
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   internal func occupiedBucket(after bucket: Bucket) -> Bucket {
     _internalInvariant(isValid(bucket))
     let word = bucket.word
@@ -361,7 +361,7 @@ extension _HashTable {
 }
 
 extension _HashTable {
-  @inlinable
+  @safe(unchecked) @inlinable
   internal func previousHole(before bucket: Bucket) -> Bucket {
     _internalInvariant(isValid(bucket))
     // Note that if we have only a single partial word, its out-of-bounds bits
@@ -388,7 +388,7 @@ extension _HashTable {
     }
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   internal func nextHole(atOrAfter bucket: Bucket) -> Bucket {
     _internalInvariant(isValid(bucket))
     // Note that if we have only a single partial word, its out-of-bounds bits
@@ -417,7 +417,7 @@ extension _HashTable {
 }
 
 extension _HashTable {
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   @_effects(releasenone)
   internal func copyContents(of other: _HashTable) {
@@ -436,14 +436,14 @@ extension _HashTable {
   }
 
   /// Insert a new entry for an element at `index`.
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func insert(_ bucket: Bucket) {
     _internalInvariant(!isOccupied(bucket))
     words[bucket.word].uncheckedInsert(bucket.bit)
   }
 
-  @inlinable
+  @safe(unchecked) @inlinable
   @inline(__always)
   internal func clear() {
     if bucketCount < Word.capacity {
@@ -456,7 +456,7 @@ extension _HashTable {
     }
   }
 
-  @inline(__always)
+  @safe(unchecked) @inline(__always)
   @inlinable
   internal func delete<D: _HashTableDelegate>(
     at bucket: Bucket,

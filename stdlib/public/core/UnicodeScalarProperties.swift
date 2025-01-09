@@ -751,7 +751,7 @@ extension Unicode.Scalar.Properties {
     static let titlecase = _CaseMapping(rawValue: 2)
   }
 
-  fileprivate func _getMapping(_ mapping: _CaseMapping) -> String {
+  @safe(unchecked) fileprivate func _getMapping(_ mapping: _CaseMapping) -> String {
     // First, check if our scalar has a special mapping where it's mapped to
     // more than 1 scalar.
     var specialMappingLength = 0

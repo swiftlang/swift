@@ -74,7 +74,7 @@ extension Dictionary {
   ///   - body: A closure that can initialize the dictionary's elements. This
   ///     closure must return the count of the initialized elements, starting at
   ///     the beginning of the buffer.
-  @_alwaysEmitIntoClient // Introduced in 5.1
+  @unsafe @_alwaysEmitIntoClient // Introduced in 5.1
   public // SPI(Foundation)
   init(
     _unsafeUninitializedCapacity capacity: Int,
@@ -92,7 +92,7 @@ extension Dictionary {
 }
 
 extension _NativeDictionary {
-  @_alwaysEmitIntoClient // Introduced in 5.1
+  @unsafe @_alwaysEmitIntoClient // Introduced in 5.1
   internal init(
     _unsafeUninitializedCapacity capacity: Int,
     allowingDuplicates: Bool,

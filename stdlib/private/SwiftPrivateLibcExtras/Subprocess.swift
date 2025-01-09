@@ -188,31 +188,31 @@ public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
 #if os(Linux)
 typealias _stdlib_posix_spawn_file_actions_t = posix_spawn_file_actions_t
 #else
-typealias _stdlib_posix_spawn_file_actions_t = posix_spawn_file_actions_t?
+@unsafe typealias _stdlib_posix_spawn_file_actions_t = posix_spawn_file_actions_t?
 #endif
 
-@_silgen_name("_stdlib_posix_spawn_file_actions_init")
+@unsafe @_silgen_name("_stdlib_posix_spawn_file_actions_init")
 internal func _stdlib_posix_spawn_file_actions_init(
   _ file_actions: UnsafeMutablePointer<_stdlib_posix_spawn_file_actions_t>
 ) -> CInt
 
-@_silgen_name("_stdlib_posix_spawn_file_actions_destroy")
+@unsafe @_silgen_name("_stdlib_posix_spawn_file_actions_destroy")
 internal func _stdlib_posix_spawn_file_actions_destroy(
   _ file_actions: UnsafeMutablePointer<_stdlib_posix_spawn_file_actions_t>
 ) -> CInt
 
-@_silgen_name("_stdlib_posix_spawn_file_actions_addclose")
+@unsafe @_silgen_name("_stdlib_posix_spawn_file_actions_addclose")
 internal func _stdlib_posix_spawn_file_actions_addclose(
   _ file_actions: UnsafeMutablePointer<_stdlib_posix_spawn_file_actions_t>,
   _ filedes: CInt) -> CInt
 
-@_silgen_name("_stdlib_posix_spawn_file_actions_adddup2")
+@unsafe @_silgen_name("_stdlib_posix_spawn_file_actions_adddup2")
 internal func _stdlib_posix_spawn_file_actions_adddup2(
   _ file_actions: UnsafeMutablePointer<_stdlib_posix_spawn_file_actions_t>,
   _ filedes: CInt,
   _ newfiledes: CInt) -> CInt
 
-@_silgen_name("_stdlib_posix_spawn")
+@unsafe @_silgen_name("_stdlib_posix_spawn")
 internal func _stdlib_posix_spawn(
   _ pid: UnsafeMutablePointer<pid_t>?,
   _ file: UnsafePointer<Int8>,
@@ -223,7 +223,7 @@ internal func _stdlib_posix_spawn(
 #endif
 
 /// Calls POSIX `pipe()`.
-func posixPipe() -> (readFD: CInt, writeFD: CInt) {
+@safe(unchecked) func posixPipe() -> (readFD: CInt, writeFD: CInt) {
   var fds: [CInt] = [ -1, -1 ]
   if pipe(&fds) != 0 {
     preconditionFailure("pipe() failed")
@@ -257,7 +257,7 @@ func print(_ s: String) {
 
 /// Start the same executable as a child process, redirecting its stdout and
 /// stderr.
-public func spawnChild(_ args: [String])
+@safe(unchecked) public func spawnChild(_ args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
   // The stdout, stdin, and stderr from the child process will be redirected
   // to these pipes.
@@ -450,14 +450,14 @@ internal func _make_posix_spawn_file_actions_t()
   return posix_spawn_file_actions_t()
 }
 #else
-internal func _make_posix_spawn_file_actions_t()
+@unsafe internal func _make_posix_spawn_file_actions_t()
   -> _stdlib_posix_spawn_file_actions_t {
   return nil
 }
 #endif
 #endif
 
-public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
+@safe(unchecked) public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
   var status: CInt = 0
 #if os(Cygwin)
   withUnsafeMutablePointer(to: &status) {

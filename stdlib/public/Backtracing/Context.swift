@@ -112,7 +112,7 @@ extension Context {
 // in C so that the layout is fixed) get imported as tuples.
 
 extension x86_64_gprs {
-  func getR(_ ndx: Int) -> UInt64 {
+  @safe(unchecked) func getR(_ ndx: Int) -> UInt64 {
     return withUnsafePointer(to: _r) {
       $0.withMemoryRebound(to: UInt64.self, capacity: 16) {
         $0[ndx]
@@ -120,7 +120,7 @@ extension x86_64_gprs {
     }
   }
 
-  mutating func setR(_ ndx: Int, to value: UInt64) {
+  @safe(unchecked) mutating func setR(_ ndx: Int, to value: UInt64) {
     withUnsafeMutablePointer(to: &_r) {
       $0.withMemoryRebound(to: UInt64.self, capacity: 16) {
         $0[ndx] = value
@@ -131,7 +131,7 @@ extension x86_64_gprs {
 }
 
 extension i386_gprs {
-  func getR(_ ndx: Int) -> UInt32 {
+  @safe(unchecked) func getR(_ ndx: Int) -> UInt32 {
     return withUnsafePointer(to: _r) {
       $0.withMemoryRebound(to: UInt32.self, capacity: 8) {
         $0[ndx]
@@ -139,7 +139,7 @@ extension i386_gprs {
     }
   }
 
-  mutating func setR(_ ndx: Int, to value: UInt32) {
+  @safe(unchecked) mutating func setR(_ ndx: Int, to value: UInt32) {
     withUnsafeMutablePointer(to: &_r) {
       $0.withMemoryRebound(to: UInt32.self, capacity: 8) {
         $0[ndx] = value
@@ -150,7 +150,7 @@ extension i386_gprs {
 }
 
 extension arm64_gprs {
-  func getX(_ ndx: Int) -> UInt64 {
+  @safe(unchecked) func getX(_ ndx: Int) -> UInt64 {
     return withUnsafePointer(to: _x) {
       $0.withMemoryRebound(to: UInt64.self, capacity: 32) {
         $0[ndx]
@@ -158,7 +158,7 @@ extension arm64_gprs {
     }
   }
 
-  mutating func setX(_ ndx: Int, to value: UInt64) {
+  @safe(unchecked) mutating func setX(_ ndx: Int, to value: UInt64) {
     withUnsafeMutablePointer(to: &_x) {
       $0.withMemoryRebound(to: UInt64.self, capacity: 32) {
         $0[ndx] = value
@@ -169,7 +169,7 @@ extension arm64_gprs {
 }
 
 extension arm_gprs {
-  func getR(_ ndx: Int) -> UInt32 {
+  @safe(unchecked) func getR(_ ndx: Int) -> UInt32 {
     return withUnsafePointer(to: _r) {
       $0.withMemoryRebound(to: UInt32.self, capacity: 16) {
         $0[ndx]
@@ -177,7 +177,7 @@ extension arm_gprs {
     }
   }
 
-  mutating func setR(_ ndx: Int, to value: UInt32) {
+  @safe(unchecked) mutating func setR(_ ndx: Int, to value: UInt32) {
     withUnsafeMutablePointer(to: &_r) {
       $0.withMemoryRebound(to: UInt32.self, capacity: 16) {
         $0[ndx] = value
@@ -543,7 +543,7 @@ extension arm_gprs {
     gprs.valid &= ~(UInt32(1) << ndx)
   }
 
-  public func getRegister(_ register: Register) -> GPRValue? {
+  @safe(unchecked) public func getRegister(_ register: Register) -> GPRValue? {
     if !isValid(register) {
       return nil
     }
@@ -563,7 +563,7 @@ extension arm_gprs {
     }
   }
 
-  public mutating func setRegister(_ register: Register, to value: GPRValue?) {
+  @safe(unchecked) public mutating func setRegister(_ register: Register, to value: GPRValue?) {
     if let value = value {
       switch register {
         case .eax ... .edi:
@@ -669,7 +669,7 @@ extension arm_gprs {
     self.init(from: mctx.ss)
   }
 
-  init(from state: darwin_arm64_thread_state) {
+  @safe(unchecked) init(from state: darwin_arm64_thread_state) {
     withUnsafeMutablePointer(to: &gprs._x) {
       $0.withMemoryRebound(to: UInt64.self, capacity: 32){ to in
         withUnsafePointer(to: state._x) {
@@ -975,7 +975,7 @@ extension arm_gprs {
 // .. Darwin specifics .........................................................
 
 #if (os(macOS) || os(iOS) || os(watchOS) || os(tvOS))
-private func thread_get_state<T>(_ thread: thread_t,
+@safe(unchecked) private func thread_get_state<T>(_ thread: thread_t,
                                  _ flavor: CInt,
                                  _ result: inout T) -> kern_return_t {
   var count: mach_msg_type_number_t

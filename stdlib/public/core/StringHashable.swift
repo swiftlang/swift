@@ -18,7 +18,7 @@ extension String: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  public func hash(into hasher: inout Hasher) {
+  @safe(unchecked) public func hash(into hasher: inout Hasher) {
     if _fastPath(self._guts.isNFCFastUTF8) {
       self._guts.withFastUTF8 {
         hasher.combine(bytes: UnsafeRawBufferPointer($0))
@@ -44,7 +44,7 @@ extension StringProtocol {
 }
 
 extension _StringGutsSlice {
-  @_effects(releasenone) @inline(never) // slow-path
+  @safe(unchecked) @_effects(releasenone) @inline(never) // slow-path
   internal func _normalizedHash(into hasher: inout Hasher) {
     if self.isNFCFastUTF8 {
       self.withFastUTF8 {

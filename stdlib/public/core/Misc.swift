@@ -47,7 +47,7 @@ public func _autorelease(_ x: AnyObject) {
 #endif
 
 
-@available(SwiftStdlib 5.7, *)
+@unsafe @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_getFunctionFullNameFromMangledName")
 public // SPI (Distributed)
 func _getFunctionFullNameFromMangledNameImpl(
@@ -56,7 +56,7 @@ func _getFunctionFullNameFromMangledNameImpl(
 
 /// Given a function's mangled name, return a human readable name.
 /// Used e.g. by Distributed.RemoteCallTarget to hide mangled names.
-@available(SwiftStdlib 5.7, *)
+@safe(unchecked) @available(SwiftStdlib 5.7, *)
 @_unavailableInEmbedded
 public // SPI (Distributed)
 func _getFunctionFullNameFromMangledName(mangledName: String) -> String? {
@@ -81,12 +81,12 @@ func _getFunctionFullNameFromMangledName(mangledName: String) -> String? {
 // with type names that we are nested in.
 // But we can place it behind #if _runtime(_Native) and remove it from ABI on
 // Apple platforms, deferring discussions mentioned above.
-@_silgen_name("swift_getTypeName")
+@unsafe @_silgen_name("swift_getTypeName")
 public func _getTypeName(_ type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the demangled qualified name of a metatype.
-@_semantics("typeName")
+@safe(unchecked) @_semantics("typeName")
 @_unavailableInEmbedded
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
@@ -95,14 +95,14 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
     UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
 
-@available(SwiftStdlib 5.3, *)
+@unsafe @available(SwiftStdlib 5.3, *)
 @_silgen_name("swift_getMangledTypeName")
 @_preInverseGenerics
 public func _getMangledTypeName(_ type: any ~Copyable.Type)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the mangled name for a given type.
-@available(SwiftStdlib 5.3, *)
+@safe(unchecked) @available(SwiftStdlib 5.3, *)
 @_unavailableInEmbedded
 @_preInverseGenerics
 public // SPI
@@ -123,7 +123,7 @@ func _mangledTypeName(_ type: any ~Copyable.Type) -> String? {
 /// Lookup a class given a name. Until the demangled encoding of type
 /// names is stabilized, this is limited to top-level class names (Foo.bar).
 @_unavailableInEmbedded
-public // SPI(Foundation)
+@safe(unchecked) public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
@@ -132,13 +132,13 @@ func _typeByName(_ name: String) -> Any.Type? {
   }
 }
 
-@_silgen_name("swift_stdlib_getTypeByMangledNameUntrusted")
+@unsafe @_silgen_name("swift_stdlib_getTypeByMangledNameUntrusted")
 internal func _getTypeByMangledNameUntrusted(
   _ name: UnsafePointer<UInt8>,
   _ nameLength: UInt)
   -> Any.Type?
 
-@_silgen_name("swift_getTypeByMangledNameInEnvironment")
+@unsafe @_silgen_name("swift_getTypeByMangledNameInEnvironment")
 public func _getTypeByMangledNameInEnvironment(
   _ name: UnsafePointer<UInt8>,
   _ nameLength: UInt,
@@ -146,7 +146,7 @@ public func _getTypeByMangledNameInEnvironment(
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
 
-@_silgen_name("swift_getTypeByMangledNameInContext")
+@unsafe @_silgen_name("swift_getTypeByMangledNameInContext")
 public func _getTypeByMangledNameInContext(
   _ name: UnsafePointer<UInt8>,
   _ nameLength: UInt,

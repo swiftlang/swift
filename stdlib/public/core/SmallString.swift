@@ -138,7 +138,7 @@ extension _SmallString {
   #if !INTERNAL_CHECKS_ENABLED
   @inlinable @inline(__always) internal func _invariantCheck() {}
   #else
-  @usableFromInline @inline(never) @_effects(releasenone)
+  @safe(unchecked) @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
     _internalInvariant(count <= _SmallString.capacity)
     _internalInvariant(isASCII == computeIsASCII())
@@ -217,7 +217,7 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
 }
 
 extension _SmallString {
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   internal func withUTF8<Result>(
     _ f: (UnsafeBufferPointer<UInt8>) throws -> Result
   ) rethrows -> Result {
@@ -239,7 +239,7 @@ extension _SmallString {
   // Overwrite stored code units, including uninitialized. `f` should return the
   // new count. This will re-establish the invariant after `f` that all bits
   // between the last code unit and the discriminator are unset.
-  @inline(__always)
+  @unsafe @inline(__always)
   fileprivate mutating func withMutableCapacity(
     _ f: (UnsafeMutableRawBufferPointer) throws -> Int
   ) rethrows {
@@ -288,7 +288,7 @@ extension _SmallString {
   }
 
   // Direct from UTF-8
-  @inlinable @inline(__always)
+  @unsafe @inlinable @inline(__always)
   internal init?(_ input: UnsafeBufferPointer<UInt8>) {
     if input.isEmpty {
       self.init()
@@ -307,7 +307,7 @@ extension _SmallString {
     self.init(leading: leading, trailing: trailing, count: count)
   }
 
-  @inline(__always)
+  @unsafe @inline(__always)
   internal init(
     initializingUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
@@ -345,7 +345,7 @@ extension _SmallString {
 extension _SmallString {
   // Resiliently create from a tagged cocoa string
   //
-  @_effects(readonly) // @opaque
+  @safe(unchecked) @_effects(readonly) // @opaque
   @usableFromInline // testable
   internal init?(taggedCocoa cocoa: AnyObject) {
     self.init()
@@ -367,7 +367,7 @@ extension _SmallString {
     self._invariantCheck()
   }
   
-  @_effects(readonly) // @opaque
+  @safe(unchecked) @_effects(readonly) // @opaque
   internal init?(taggedASCIICocoa cocoa: AnyObject) {
     self.init()
     var success = true
@@ -421,7 +421,7 @@ extension UInt64 {
   }
 }
 
-@inlinable @inline(__always)
+@unsafe @inlinable @inline(__always)
 internal func _bytesToUInt64(
   _ input: UnsafePointer<UInt8>,
   _ c: Int
