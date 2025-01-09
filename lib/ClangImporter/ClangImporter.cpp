@@ -5075,6 +5075,7 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
 }
 
 static const llvm::StringMap<std::vector<int>> STLConditionalEscapableParams{
+    {"basic_string", {0}},
     {"vector", {0}},
     {"array", {0}},
     {"inplace_vector", {0}},
