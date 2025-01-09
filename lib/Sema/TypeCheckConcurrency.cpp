@@ -942,24 +942,8 @@ bool swift::diagnoseSendabilityErrorBasedOn(
 }
 
 void swift::diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
-  if (!shouldDiagnosePreconcurrencyImports(sf))
-    return;
-
-  ASTContext &ctx = sf.getASTContext();
-
-  if (ctx.TypeCheckerOpts.SkipFunctionBodies != FunctionBodySkipping::None)
-    return;
-
-  for (const auto &import : sf.getImports()) {
-    if (import.options.contains(ImportFlags::Preconcurrency) &&
-        import.importLoc.isValid() &&
-        !sf.hasImportUsedPreconcurrency(import)) {
-      ctx.Diags.diagnose(
-          import.importLoc, diag::remove_predates_concurrency_import,
-          import.module.importedModule->getName())
-        .fixItRemove(import.preconcurrencyRange);
-    }
-  }
+  // NOTE: Disabled in Swift 6.0.
+  return;
 }
 
 /// Produce a diagnostic for a single instance of a non-Sendable type where
