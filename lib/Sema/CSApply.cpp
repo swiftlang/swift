@@ -1190,8 +1190,8 @@ namespace {
         calleeFnTy = calleeFnTy->getResult()->castTo<FunctionType>();
       }
 
-      const auto &appliedPropertyWrappers =
-          solution.appliedPropertyWrappers[locator.getAnchor()];
+      auto appliedPropertyWrappers =
+          solution.getAppliedPropertyWrappers(locator.getAnchor());
       const auto calleeDeclRef = resolveConcreteDeclRef(
           dyn_cast<AbstractFunctionDecl>(declOrClosure), locator);
 
@@ -2328,8 +2328,8 @@ namespace {
                                   ->castTo<FunctionType>();
       auto fullSubscriptTy = openedFullFnType->getResult()
                                   ->castTo<FunctionType>();
-      auto &appliedWrappers =
-          solution.appliedPropertyWrappers[memberLoc->getAnchor()];
+      auto appliedWrappers =
+          solution.getAppliedPropertyWrappers(memberLoc->getAnchor());
       args = coerceCallArguments(
           args, fullSubscriptTy, subscriptRef, nullptr,
           locator.withPathElement(ConstraintLocator::ApplyArgument),
@@ -6290,6 +6290,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       auto *paramDecl = getParameterAt(callee, paramIdx);
       assert(paramDecl);
 
+      ASSERT(appliedWrapperIndex < appliedPropertyWrappers.size());
       auto appliedWrapper = appliedPropertyWrappers[appliedWrapperIndex++];
       auto wrapperType = solution.simplifyType(appliedWrapper.wrapperType);
       auto initKind = appliedWrapper.initKind;
@@ -8195,7 +8196,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         // Resolve into a DynamicTypeExpr.
         auto args = apply->getArgs();
 
-        auto &appliedWrappers = solution.appliedPropertyWrappers[calleeLocator.getAnchor()];
+        auto appliedWrappers = solution.getAppliedPropertyWrappers(
+            calleeLocator.getAnchor());
         auto fnType = cs.getType(fn)->getAs<FunctionType>();
         args = coerceCallArguments(
             args, fnType, declRef, apply,
@@ -8391,7 +8393,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // For function application, convert the argument to the input type of
   // the function.
   if (auto fnType = cs.getType(fn)->getAs<FunctionType>()) {
-    auto &appliedWrappers = solution.appliedPropertyWrappers[calleeLocator.getAnchor()];
+    auto appliedWrappers = solution.getAppliedPropertyWrappers(
+        calleeLocator.getAnchor());
+
     args = coerceCallArguments(
         args, fnType, callee, apply,
         locator.withPathElement(ConstraintLocator::ApplyArgument),
