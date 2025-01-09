@@ -3422,8 +3422,8 @@ private:
   uint16_t numRegisters = 0;
 
 public:
-  static uint16_t MaxNumUses = 65535;
-  static uint16_t MaxNumRegisters = 65535;
+  static uint16_t MaxNumUses;
+  static uint16_t MaxNumRegisters;
 
   void addConstructor() {
     sawConstructor = true;
@@ -3483,6 +3483,9 @@ public:
   }
 };
 }
+
+uint16_t Properties::MaxNumUses = 65535;
+uint16_t Properties::MaxNumRegisters = 65535;
 
 namespace {
 class LargeLoadableHeuristic {
