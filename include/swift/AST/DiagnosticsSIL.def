@@ -408,6 +408,8 @@ ERROR(embedded_swift_allocating,none,
       "cannot use allocating operation in -no-allocations mode", ())
 ERROR(embedded_capture_of_generic_value_with_deinit,none,
       "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
+ERROR(wrong_linkage_for_serialized_function,none,
+      "function has wrong linkage to be called from %0", (StringRef))
 NOTE(performance_called_from,none,
       "called from here", ())
 
