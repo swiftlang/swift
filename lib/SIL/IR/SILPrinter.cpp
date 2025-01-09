@@ -816,6 +816,14 @@ public:
     printedBlocks.insert(block);
   }
 
+  bool shouldPrintDebugInfo() {
+    if (SILPrintDebugInfo)
+      return true;
+    if (Ctx.printDebugInfo())
+      return true;
+    return false;
+  }
+
   //===--------------------------------------------------------------------===//
   // Big entrypoints.
   void print(const SILFunction *F) {
@@ -1287,8 +1295,8 @@ public:
     visit(const_cast<SILInstruction*>(I));
 
     // Maybe print debugging information.
-    if (Ctx.printDebugInfo() && !I->isDeleted()
-        && !I->isStaticInitializerInst()) {
+    if (shouldPrintDebugInfo() && !I->isDeleted() &&
+        !I->isStaticInitializerInst()) {
       auto &SM = I->getModule().getASTContext().SourceMgr;
       printDebugLocRef(I->getLoc(), SM);
       printDebugScopeRef(I->getDebugScope(), SM);
@@ -1481,7 +1489,7 @@ public:
       else
         *this << ", var";
 
-      if ((Var->Loc || Var->Scope) && SM && Ctx.printDebugInfo()) {
+      if ((Var->Loc || Var->Scope) && SM && shouldPrintDebugInfo()) {
         *this << ", (name \"" << Var->Name << '"';
         if (Var->Loc)
           printDebugLocRef(*Var->Loc, *SM);
@@ -3449,11 +3457,12 @@ static void printClangQualifiedNameCommentIfPresent(llvm::raw_ostream &OS,
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
-  if (PrintCtx.printDebugInfo()) {
+  SILPrinter P(PrintCtx);
+
+  if (P.shouldPrintDebugInfo()) {
     auto &SM = getModule().getASTContext().SourceMgr;
     for (auto &BB : *this)
       for (auto &I : BB) {
-        SILPrinter P(PrintCtx);
         P.printDebugScope(I.getDebugScope(), SM);
       }
     OS << "\n";
@@ -3467,7 +3476,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
 
   OS << "// " << demangleSymbol(getName());
-  if (PrintCtx.printDebugInfo()) {
+  if (P.shouldPrintDebugInfo()) {
     auto &SM = getModule().getASTContext().SourceMgr;
     SILPrinter P(PrintCtx);
     P.printDebugLocRef(getLocation(), SM);
@@ -4572,7 +4581,7 @@ SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, const SILOptions &Opts)
     : OutStream(OS),
       Options({{Opts.EmitVerboseSIL, Flag::Verbose},
                {Opts.EmitSortedSIL, Flag::SortedSIL},
-               {Opts.PrintDebugInfo || SILPrintDebugInfo, Flag::DebugInfo},
+               {Opts.PrintDebugInfo, Flag::DebugInfo},
                {Opts.PrintFullConvention, Flag::PrintFullConvention}}) {}
 
 void SILPrintContext::setContext(const void *FunctionOrBlock) {
