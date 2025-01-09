@@ -735,7 +735,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     return *this;
   }
 
-  bool needPrintTypeFor(SILValue V) {
+  bool shouldPrintType(SILValue V) {
     if (SILPrintTypes)
       return true;
 
@@ -776,7 +776,7 @@ public:
   }
 
   SILValuePrinterInfo getIDAndType(SILValue V) {
-    return {Ctx.getID(V), V ? V->getType() : SILType(), needPrintTypeFor(V)};
+    return {Ctx.getID(V), V ? V->getType() : SILType(), shouldPrintType(V)};
   }
   SILValuePrinterInfo getIDAndForcedPrintedType(SILValue V) {
     return {Ctx.getID(V), V ? V->getType() : SILType(), /*needPrintType=*/true};
