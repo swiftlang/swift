@@ -52,7 +52,7 @@ entry(%input : $*Input):
 // CHECK:       bb0([[C:%[^,]+]] :
 // CHECK:         [[BORROW_MAYBE_C:%[^,]+]] = function_ref @borrowMaybeC
 // CHECK:         [[B:%[^,]+]] = begin_borrow [[C]]
-// CHECK:         [[MAYBE_B:%[^,]+]] = unchecked_ref_cast [[B]] to $Optional<C>
+// CHECK:         [[MAYBE_B:%[^,]+]] = unchecked_ref_cast [[B]] : $C to $Optional<C>
 // CHECK:         apply [[BORROW_MAYBE_C]]([[MAYBE_B]])
 // CHECK:         end_borrow [[B]]
 // CHECK:         destroy_value [[C]]
@@ -60,12 +60,12 @@ entry(%input : $*Input):
 sil [ossa] @convert_function__to_optional__owned_as_guaranteed__1 : $@convention(thin) (@owned C) -> () {
 entry(%c : @owned $C):
   %borrowMaybeC = function_ref @borrowMaybeC : $@convention(thin) (@guaranteed Optional<C>) -> ()
-  %borrowC = convert_function %borrowMaybeC to $@convention(thin) (@guaranteed C) -> ()
+  %borrowC = convert_function %borrowMaybeC : $@convention(thin) (@guaranteed Optional<C>) -> () to $@convention(thin) (@guaranteed C) -> ()
   %void = apply %borrowC(%c) : $@convention(thin) (@guaranteed C) -> ()
   specify_test "sil_combine_instruction %void"
-  destroy_value %c
+  destroy_value %c : $C
   %retval = tuple ()
-  return %retval
+  return %retval : $()
 }
 
 // CHECK-LABEL: sil [ossa] @convert_function__to_optional__owned_as_guaranteed__2 : {{.*}} {
@@ -75,9 +75,9 @@ entry(%c : @owned $C):
 // CHECK-SAME:  ):
 // CHECK:       [[BORROW_MAYBE_C2:%[^,]+]] = function_ref @borrowMaybeC2
 // CHECK:       [[B:%[^,]+]] = begin_borrow [[C]]
-// CHECK:       [[MAYBE_B:%[^,]+]] = unchecked_ref_cast [[B]] to $Optional<C>
+// CHECK:       [[MAYBE_B:%[^,]+]] = unchecked_ref_cast [[B]] : $C to $Optional<C>
 // CHECK:       [[B2:%[^,]+]] = begin_borrow [[C2]]
-// CHECK:       [[MAYBE_B2:%[^,]+]] = unchecked_ref_cast [[B2]] to $Optional<C>
+// CHECK:       [[MAYBE_B2:%[^,]+]] = unchecked_ref_cast [[B2]] : $C to $Optional<C>
 // CHECK:       apply [[BORROW_MAYBE_C2]]([[MAYBE_B]], [[MAYBE_B2]])
 // CHECK:       end_borrow [[B]]
 // CHECK:       end_borrow [[B2]]
@@ -87,20 +87,20 @@ entry(%c : @owned $C):
 sil [ossa] @convert_function__to_optional__owned_as_guaranteed__2 : $@convention(thin) (@owned C, @owned C) -> () {
 entry(%c : @owned $C, %c2 : @owned $C):
   %borrowMaybeC2 = function_ref @borrowMaybeC2 : $@convention(thin) (@guaranteed Optional<C>, @guaranteed Optional<C>) -> ()
-  %borrowC2 = convert_function %borrowMaybeC2 to $@convention(thin) (@guaranteed C, @guaranteed C) -> ()
+  %borrowC2 = convert_function %borrowMaybeC2 : $@convention(thin) (@guaranteed Optional<C>, @guaranteed Optional<C>) -> () to $@convention(thin) (@guaranteed C, @guaranteed C) -> ()
   %void = apply %borrowC2(%c, %c2) : $@convention(thin) (@guaranteed C, @guaranteed C) -> ()
   specify_test "sil_combine_instruction %void"
-  destroy_value %c
-  destroy_value %c2
+  destroy_value %c : $C
+  destroy_value %c2 : $C
   %retval = tuple ()
-  return %retval
+  return %retval : $()
 }
 
 // CHECK-LABEL: sil [ossa] @convert_function__to_optional__owned_as_guaranteed__3 : {{.*}} {
 // CHECK:       bb0([[C:%[^,]+]] :
 // CHECK:         [[BORROW_MAYBE_C:%[^,]+]] = function_ref @borrowMaybeCThrowing
 // CHECK:         [[B:%[^,]+]] = begin_borrow [[C]]
-// CHECK:         [[MAYBE_B:%[^,]+]] = unchecked_ref_cast [[B]] to $Optional<C>
+// CHECK:         [[MAYBE_B:%[^,]+]] = unchecked_ref_cast [[B]] : $C to $Optional<C>
 // CHECK:         try_apply [[BORROW_MAYBE_C]]([[MAYBE_B]])
 // CHECK:             normal [[SUCCESS:bb[0-9]+]]
 // CHECK:             error [[FAILURE:bb[0-9]+]]
@@ -115,20 +115,20 @@ entry(%c : @owned $C, %c2 : @owned $C):
 sil [ossa] @convert_function__to_optional__owned_as_guaranteed__3 : $@convention(thin) (@owned C) -> (@error Error) {
 entry(%c : @owned $C):
   %borrowMaybeC = function_ref @borrowMaybeCThrowing : $@convention(thin) (@guaranteed Optional<C>) -> (@error Error)
-  %borrowC = convert_function %borrowMaybeC to $@convention(thin) (@guaranteed C) -> (@error Error)
+  %borrowC = convert_function %borrowMaybeC : $@convention(thin) (@guaranteed Optional<C>) -> (@error Error) to $@convention(thin) (@guaranteed C) -> (@error Error)
   specify_test "sil_combine_instruction @instruction"
   try_apply %borrowC(%c) : $@convention(thin) (@guaranteed C) -> (@error Error),
     normal success,
     error failure
 
 success(%void : $()):
-  destroy_value %c
+  destroy_value %c : $C
   %retval = tuple ()
-  return %retval
+  return %retval : $()
 
 failure(%error : @owned $Error):
-  destroy_value %c
-  throw %error
+  destroy_value %c : $C
+  throw %error : $Error
 }
 
 // CHECK-LABEL: sil [ossa] @convert_function__to_optional__owned_as_guaranteed__4 : {{.*}} {
@@ -138,9 +138,9 @@ failure(%error : @owned $Error):
 // CHECK-SAME:  ):
 // CHECK:         [[BORROW_MAYBE_C2:%[^,]+]] = function_ref @borrowMaybeC2Throwing
 // CHECK:         [[B:%[^,]+]] = begin_borrow [[C]]
-// CHECK:         [[MAYBE_B:%[^,]+]] = unchecked_ref_cast [[B]] to $Optional<C>
+// CHECK:         [[MAYBE_B:%[^,]+]] = unchecked_ref_cast [[B]] : $C to $Optional<C>
 // CHECK:         [[B2:%[^,]+]] = begin_borrow [[C2]]
-// CHECK:         [[MAYBE_B2:%[^,]+]] = unchecked_ref_cast [[B2]] to $Optional<C>
+// CHECK:         [[MAYBE_B2:%[^,]+]] = unchecked_ref_cast [[B2]] : $C to $Optional<C>
 // CHECK:         try_apply [[BORROW_MAYBE_C2]]([[MAYBE_B]], [[MAYBE_B2]])
 // CHECK:             normal [[SUCCESS:bb[0-9]+]]
 // CHECK:             error [[FAILURE:bb[0-9]+]]
@@ -159,20 +159,20 @@ failure(%error : @owned $Error):
 sil [ossa] @convert_function__to_optional__owned_as_guaranteed__4 : $@convention(thin) (@owned C, @owned C) -> (@error Error) {
 entry(%c : @owned $C, %c2 : @owned $C):
   %borrowMaybeC2 = function_ref @borrowMaybeC2Throwing : $@convention(thin) (@guaranteed Optional<C>, @guaranteed Optional<C>) -> (@error Error)
-  %borrowC2 = convert_function %borrowMaybeC2 to $@convention(thin) (@guaranteed C, @guaranteed C) -> (@error Error)
+  %borrowC2 = convert_function %borrowMaybeC2 : $@convention(thin) (@guaranteed Optional<C>, @guaranteed Optional<C>) -> (@error Error) to $@convention(thin) (@guaranteed C, @guaranteed C) -> (@error Error)
   specify_test "sil_combine_instruction @instruction"
   try_apply %borrowC2(%c, %c2) : $@convention(thin) (@guaranteed C, @guaranteed C) -> (@error Error),
     normal success,
     error failure
 
 success(%void : $()):
-  destroy_value %c
-  destroy_value %c2
+  destroy_value %c : $C
+  destroy_value %c2 : $C
   %retval = tuple ()
-  return %retval
+  return %retval : $()
 
 failure(%error : @owned $Error):
-  destroy_value %c
-  destroy_value %c2
-  throw %error
+  destroy_value %c : $C
+  destroy_value %c2 : $C
+  throw %error : $Error
 }
