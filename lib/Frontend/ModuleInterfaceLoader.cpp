@@ -936,8 +936,17 @@ class ModuleInterfaceLoaderImpl {
         } else if (isInResourceDir(adjacentMod) &&
                    loadMode == ModuleLoadingMode::PreferSerialized &&
                    !version::isCurrentCompilerTagged() &&
-                   rebuildInfo.getOrInsertCandidateModule(adjacentMod).serializationStatus !=
-                     serialization::Status::SDKMismatch) {
+                   rebuildInfo.getOrInsertCandidateModule(adjacentMod)
+                           .serializationStatus !=
+                       serialization::Status::SDKMismatch &&
+                   // FIXME (meg-gupta): We need to support recompilation of
+                   // modules in the resource directory if the mismatch is due
+                   // to importing a non-ossa module to an ossa module. This is
+                   // needed during ossa bringup, once -enable-ossa-modules is
+                   // on by default, this can be deleted.
+                   rebuildInfo.getOrInsertCandidateModule(adjacentMod)
+                           .serializationStatus !=
+                       serialization::Status::NotInOSSA) {
           // Special-case here: If we're loading a .swiftmodule from the resource
           // dir adjacent to the compiler, defer to the serialized loader instead
           // of falling back. This is to support local development of Swift,
