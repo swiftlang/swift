@@ -203,6 +203,7 @@
     "Span.swift",
     "ArrayTypeExtensions.swift",
     "InlineTypeExtensions.swift",
+    "StringFamilyExtensions.swift",
     "UnsafeBufferPointerExtensions.swift"
   ],
   "Protocols": [
