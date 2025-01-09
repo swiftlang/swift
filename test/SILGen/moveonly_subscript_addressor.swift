@@ -12,8 +12,7 @@ func load(b: UnsafeMutableBufferPointer<Foo>) -> Int {
     // Ensure the borrowing invocation of `load` happens within the access to
     // the pointed-at memory.
     // CHECK: [[PTR:%.*]] = pointer_to_address
-    // CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[PTR]] on %0
-    // CHECK: [[BEGIN:%.*]] = begin_access [read] [unsafe] [[MD]]
+    // CHECK: [[BEGIN:%.*]] = begin_access [read] [unsafe] [[PTR]]
     // CHECK: [[FN:%.*]] = function_ref @load
     // CHECK: apply [[FN]]
     // CHECK: end_access [[BEGIN]]

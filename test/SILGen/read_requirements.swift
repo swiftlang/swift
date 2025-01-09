@@ -1190,8 +1190,7 @@ public struct ImplAUnsafeAddressors : P1 {
 // CHECK:         [[UNSAFE_POINTER:%[^,]+]] = apply [[UNSAFE_ADDRESSOR]]([[SELF]])
 // CHECK:         [[RAW_POINTER:%[^,]+]] = struct_extract [[UNSAFE_POINTER]] : $UnsafePointer<U>, #UnsafePointer._rawValue
 // CHECK:         [[ADDR:%[^,]+]] = pointer_to_address [[RAW_POINTER]]
-// CHECK:         [[MD:%.*]] = mark_dependence [unresolved] [[ADDR]] : $*U on [[SELF]]
-// CHECK:         [[ACCESS_UNCHECKED:%[^,]+]] = begin_access [read] [unsafe] [[MD]]
+// CHECK:         [[ACCESS_UNCHECKED:%[^,]+]] = begin_access [read] [unsafe] [[ADDR]]
 // CHECK:         [[ACCESS:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS_UNCHECKED]]
 // CHECK:         [[VALUE:%[^,]+]] = load [copy] [[ACCESS]]
 // CHECK:         yield [[VALUE]]
@@ -1214,8 +1213,7 @@ public struct ImplAUnsafeAddressors : P1 {
 // CHECK:         [[UNSAFE_POINTER:%[^,]+]] = apply [[UNSAFE_ADDRESSOR]]([[SELF]])
 // CHECK:         [[RAW_POINTER:%[^,]+]] = struct_extract [[UNSAFE_POINTER]] : $UnsafePointer<U>, #UnsafePointer._rawValue
 // CHECK:         [[ADDR:%[^,]+]] = pointer_to_address [[RAW_POINTER]]
-// CHECK:         [[MD:%.*]] = mark_dependence [unresolved] [[ADDR]] : $*U on [[SELF]]
-// CHECK:         [[ACCESS_UNCHECKED:%[^,]+]] = begin_access [read] [unsafe] [[MD]]
+// CHECK:         [[ACCESS_UNCHECKED:%[^,]+]] = begin_access [read] [unsafe] [[ADDR]]
 // CHECK:         [[ACCESS:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS_UNCHECKED]]
 // CHECK:         [[VALUE:%[^,]+]] = load [copy] [[ACCESS]]
 // CHECK:         yield [[VALUE]]
@@ -1301,8 +1299,7 @@ public struct ImplBUnsafeAddressors : P2 {
 // CHECK:         [[RAW_POINTER:%[^,]+]] = struct_extract [[UNSAFE_POINTER]]
 // CHECK:             #UnsafePointer._rawValue
 // CHECK:         [[ADDR:%[^,]+]] = pointer_to_address [[RAW_POINTER]]
-// CHECK:         [[MD:%.*]] = mark_dependence [unresolved] [[ADDR]] : $*U on [[SELF]]
-// CHECK:         [[ACCESS_UNCHECKED:%[^,]+]] = begin_access [read] [unsafe] [[MD]]
+// CHECK:         [[ACCESS_UNCHECKED:%[^,]+]] = begin_access [read] [unsafe] [[ADDR]]
 // CHECK:         [[ACCESS:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS_UNCHECKED]]
 // CHECK:         [[VALUE:%[^,]+]] = load [copy] [[ACCESS]]
 // CHECK:         yield [[VALUE]]
@@ -1371,8 +1368,7 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK:         [[RAW_POINTER:%[^,]+]] = struct_extract [[UNSAFE_POINTER]]
 // CHECK:             #UnsafePointer._rawValue
 // CHECK:         [[ADDR:%[^,]+]] = pointer_to_address [[RAW_POINTER]]
-// CHECK:         [[MD:%.*]] = mark_dependence [unresolved] [[ADDR]] : $*U on [[SELF]]
-// CHECK:         [[ACCESS_UNCHECKED:%[^,]+]] = begin_access [read] [unsafe] [[MD]]
+// CHECK:         [[ACCESS_UNCHECKED:%[^,]+]] = begin_access [read] [unsafe] [[ADDR]]
 // CHECK:         [[ACCESS:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS_UNCHECKED]]
 // CHECK:         [[VALUE:%[^,]+]] = load [copy] [[ACCESS]]
 // CHECK:         yield [[VALUE]]
@@ -1396,8 +1392,7 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK:         [[RAW_POINTER:%[^,]+]] = struct_extract [[UNSAFE_POINTER]]
 // CHECK:             #UnsafePointer._rawValue
 // CHECK:         [[ADDR:%[^,]+]] = pointer_to_address [[RAW_POINTER]]
-// CHECK:         [[MD:%.*]] = mark_dependence [unresolved] [[ADDR]] : $*U on [[SELF]]
-// CHECK:         [[ACCESS_UNCHECKED:%[^,]+]] = begin_access [read] [unsafe] [[MD]]
+// CHECK:         [[ACCESS_UNCHECKED:%[^,]+]] = begin_access [read] [unsafe] [[ADDR]]
 // CHECK:         [[ACCESS:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS_UNCHECKED]]
 // CHECK:         [[VALUE:%[^,]+]] = load [copy] [[ACCESS]]
 // CHECK:         yield [[VALUE]]
