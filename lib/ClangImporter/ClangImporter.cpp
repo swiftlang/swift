@@ -8128,16 +8128,24 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     }
   }
 
-  if (retainReleaseAttrs.empty()) {
+  if (retainReleaseAttrs.empty())
     return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
-  } else if (retainReleaseAttrs.size() > 1) {
-    return {CustomRefCountingOperationResult::tooManyAttributes, nullptr, ""};
+
+  auto extractName = [&](const clang::SwiftAttrAttr *attr) {
+    return attr->getAttribute().drop_front(operationStr.size()).str();
+  };
+
+  if (retainReleaseAttrs.size() > 1) {
+    auto firstAttrName = extractName(retainReleaseAttrs.front());
+    if (!std::all_of(retainReleaseAttrs.begin(), retainReleaseAttrs.end(),
+                     [&](const clang::SwiftAttrAttr *attr) {
+                       return extractName(attr) == firstAttrName;
+                     })) {
+      return {CustomRefCountingOperationResult::tooManyAttributes, nullptr, ""};
+    }
   }
 
-  auto name = retainReleaseAttrs.front()
-                  ->getAttribute()
-                  .drop_front(StringRef(operationStr).size())
-                  .str();
+  auto name = extractName(retainReleaseAttrs.front());
 
   if (name == "immortal")
     return {CustomRefCountingOperationResult::immortal, nullptr, name};

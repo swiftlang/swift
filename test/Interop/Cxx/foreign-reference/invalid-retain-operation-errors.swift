@@ -215,6 +215,17 @@ void release2(MultipleRetainReleaseAttrFRT *v);
 
 struct
     __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:retain1")))
+    __attribute__((swift_attr("retain:retain1")))
+    __attribute__((swift_attr("release:release1")))
+    __attribute__((swift_attr("release:release1")))
+MultipleRetainReleaseAttrSameFunctionFRT {};
+
+void retain1(MultipleRetainReleaseAttrSameFunctionFRT *v);
+void release1(MultipleRetainReleaseAttrSameFunctionFRT *v);
+
+struct
+    __attribute__((swift_attr("import_reference")))
     __attribute__((swift_attr("retain:Uretain")))
     __attribute__((swift_attr("release:Urelease")))
 UnimportedRetainRelease {};
@@ -304,6 +315,11 @@ public func testMultipleRetainRelease(x: MultipleRetainReleaseFRT) {}
 // CHECK: error: reference type 'MultipleRetainReleaseAttrFRT' must have only one 'release:' Swift attribute
 @available(macOS 13.3, *)
 public func testMultipleRetainRelease(x: MultipleRetainReleaseAttrFRT) {}
+
+@available(macOS 13.3, *)
+public func testMultipleRetainRelease(x: MultipleRetainReleaseAttrSameFunctionFRT) {}
+// CHECK-NOT: error: reference type 'MultipleRetainReleaseAttrSameFunctionFRT' must have only one 'retain:' Swift attribute
+// CHECK-NOT: error: reference type 'MultipleRetainReleaseAttrSameFunctionFRT' must have only one 'release:' Swift attribute
 
 // CHECK: error: cannot find retain function 'Uretain' for reference type 'UnimportedRetainRelease'
 // CHECK: note: function uses foreign reference type 'UnimportedRetainRelease' as a value in a parameter types which breaks 'swift_shared_reference' contract
