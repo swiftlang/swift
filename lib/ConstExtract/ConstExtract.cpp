@@ -487,6 +487,11 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       }
       break;
     }
+
+    case ExprKind::DerivedToBase: {
+      auto derivedExpr = cast<DerivedToBaseExpr>(expr);
+      return extractCompileTimeValue(derivedExpr->getSubExpr());
+    }
     default: {
       break;
     }
