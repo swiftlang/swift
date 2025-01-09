@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -89,6 +89,7 @@ extension String {
   ///     print(String(s1.utf8.prefix(15))!)
   ///     // Prints "They call me 'B"
   @frozen
+  @_addressableForDependencies
   public struct UTF8View: Sendable {
     @usableFromInline
     internal var _guts: _StringGuts
@@ -314,6 +315,31 @@ extension String.UTF8View {
       return _guts.count
     }
     return _foreignCount()
+  }
+}
+
+extension String.UTF8View {
+
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<UTF8.CodeUnit> {
+    @lifetime(borrow self)
+    borrowing get {
+      let count = _guts.count
+      if _guts.isSmall {
+        let a = Builtin.addressOfBorrow(self)
+        let address = unsafe UnsafePointer<UTF8.CodeUnit>(a)
+        let span = unsafe Span(_unsafeStart: address, count: count)
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+      else if _guts.isFastUTF8 {
+        let buffer = unsafe _guts._object.fastUTF8
+        _internalInvariant(count == buffer.count)
+        let span = unsafe Span(_unsafeElements: buffer)
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+      // handle other Objective-C bridging cases here
+      fatalError("Some bridged Strings are not supported at this time")
+    }
   }
 }
 
