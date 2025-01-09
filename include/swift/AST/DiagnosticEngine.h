@@ -67,6 +67,8 @@ namespace swift {
   /// this enumeration type that uniquely identifies it.
   enum class DiagID : uint32_t;
 
+  enum class DiagGroupID : uint16_t;
+
   /// Describes a diagnostic along with its argument types.
   ///
   /// The diagnostics header introduces instances of this type for each 
@@ -498,6 +500,7 @@ namespace swift {
 
   private:
     DiagID ID;
+    DiagGroupID GroupID;
     SmallVector<DiagnosticArgument, 3> Args;
     SmallVector<CharSourceRange, 2> Ranges;
     SmallVector<FixIt, 2> FixIts;
@@ -510,7 +513,16 @@ namespace swift {
     friend DiagnosticEngine;
     friend class InFlightDiagnostic;
 
-    Diagnostic(DiagID ID) : ID(ID) {}
+    /// Constructs a Diagnostic with DiagGroupID infered from DiagID.
+    Diagnostic(DiagID ID);
+
+  protected:
+    /// Only use this constructor privately in this class or in unit tests by
+    /// subclassing.
+    /// In unit tests, it is used as a means for associating diagnostics with
+    /// groups and, thus, circumventing the need to otherwise define mock
+    /// diagnostics, which is not accounted for in the current design.
+    Diagnostic(DiagID ID, DiagGroupID GroupID) : ID(ID), GroupID(GroupID) {}
 
   public:
     // All constructors are intentionally implicit.
@@ -522,8 +534,9 @@ namespace swift {
       gatherArgs(VArgs...);
     }
 
-    /*implicit*/Diagnostic(DiagID ID, ArrayRef<DiagnosticArgument> Args)
-      : ID(ID), Args(Args.begin(), Args.end()) {}
+    Diagnostic(DiagID ID, ArrayRef<DiagnosticArgument> Args) : Diagnostic(ID) {
+      this->Args.append(Args.begin(), Args.end());
+    }
 
     template <class... ArgTypes>
     static Diagnostic fromTuple(Diag<ArgTypes...> id,
@@ -535,6 +548,7 @@ namespace swift {
     
     // Accessors.
     DiagID getID() const { return ID; }
+    DiagGroupID getGroupID() const { return GroupID; }
     ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
     ArrayRef<CharSourceRange> getRanges() const { return Ranges; }
     ArrayRef<FixIt> getFixIts() const { return FixIts; }
@@ -896,7 +910,9 @@ namespace swift {
     /// Don't emit any remarks
     bool suppressRemarks = false;
 
-    /// Treat these warnings as errors. Indices here correspond to DiagID enum
+    /// A mapping from `DiagGroupID` identifiers to Boolean values indicating
+    /// whether warnings belonging to the respective diagnostic groups should be
+    /// escalated to errors.
     llvm::BitVector warningsAsErrors;
 
     /// Whether a fatal error has occurred
@@ -938,16 +954,23 @@ namespace swift {
     void setSuppressRemarks(bool val) { suppressRemarks = val; }
     bool getSuppressRemarks() const { return suppressRemarks; }
 
-    /// Whether a warning should be upgraded to an error or not
-    void setWarningAsErrorForDiagID(DiagID id, bool value) {
+    /// Sets whether warnings belonging to the diagnostic group identified by
+    /// `id` should be escalated to errors.
+    void setWarningsAsErrorsForDiagGroupID(DiagGroupID id, bool value) {
       warningsAsErrors[(unsigned)id] = value;
     }
-    bool getWarningAsErrorForDiagID(DiagID id) {
+
+    /// Returns a Boolean value indicating whether warnings belonging to the
+    /// diagnostic group identified by `id` should be escalated to errors.
+    bool getWarningsAsErrorsForDiagGroupID(DiagGroupID id) {
       return warningsAsErrors[(unsigned)id];
     }
 
-    /// Whether all warnings should be upgraded to errors or not
+    /// Whether all warnings should be upgraded to errors or not.
     void setAllWarningsAsErrors(bool value) {
+      // This works as intended because every diagnostic belongs to either a
+      // custom group or the top-level `DiagGroupID::no_group`, which is also
+      // a group.
       if (value) {
         warningsAsErrors.set();
       } else {
@@ -1434,7 +1457,8 @@ namespace swift {
 
     /// Generate DiagnosticInfo for a Diagnostic to be passed to consumers.
     std::optional<DiagnosticInfo>
-    diagnosticInfoForDiagnostic(const Diagnostic &diagnostic);
+    diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
+                                bool includeDiagnosticName);
 
     /// Send \c diag to all diagnostic consumers.
     void emitDiagnostic(const Diagnostic &diag);
@@ -1460,9 +1484,16 @@ namespace swift {
   public:
     DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
 
-    llvm::StringRef
-    diagnosticStringFor(const DiagID id,
-                        PrintDiagnosticNamesMode printDiagnosticNamesMode);
+    /// Get a localized format string for a given `DiagID`. If no localization
+    /// available returns the default string for that `DiagID`.
+    llvm::StringRef diagnosticStringFor(DiagID id);
+
+    /// Get a localized format string with an optional diagnostic name appended
+    /// to it. The diagnostic name type is defined by
+    /// `PrintDiagnosticNamesMode`.
+    llvm::StringRef diagnosticStringWithNameFor(
+        DiagID id, DiagGroupID groupID,
+        PrintDiagnosticNamesMode printDiagnosticNamesMode);
 
     static llvm::StringRef diagnosticIDStringFor(const DiagID id);
 
