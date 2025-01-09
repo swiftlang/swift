@@ -173,7 +173,9 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   auto newOpParamTypes = convertConventions.getParameterSILTypes(context);
 
   llvm::SmallVector<SILValue, 8> Args;
-  auto convertOp = [&](SILValue Op, SILType OldOpType, SILType NewOpType) {
+  llvm::SmallVector<BeginBorrowInst *, 8> Borrows;
+  auto convertOp = [&](SILValue Op, SILType OldOpType, SILType NewOpType,
+                       OperandOwnership ownership) {
     // Convert function takes refs to refs, address to addresses, and leaves
     // other types alone.
     if (OldOpType.isAddress()) {
@@ -181,6 +183,12 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(UAC);
     } else if (OldOpType.getASTType() != NewOpType.getASTType()) {
+      if (Op->getOwnershipKind() == OwnershipKind::Owned &&
+          !ownership.getOwnershipConstraint().isConsuming()) {
+        auto borrow = Builder.createBeginBorrow(AI.getLoc(), Op);
+        Op = borrow;
+        Borrows.push_back(borrow);
+      }
       auto URC =
           Builder.createUncheckedForwardingCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
@@ -194,14 +202,21 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   auto newRetI = newOpRetTypes.begin();
   auto oldRetI = oldOpRetTypes.begin();
   
+  auto getCurrentOperand = [&OpI, &AI]() -> Operand & {
+    return AI.getInstruction()
+        ->getAllOperands()[OpI + ApplyInst::getArgumentOperandNumber()];
+  };
+
   for (auto e = newOpRetTypes.end(); newRetI != e;
        ++OpI, ++newRetI, ++oldRetI) {
-    convertOp(Ops[OpI], *oldRetI, *newRetI);
+    convertOp(Ops[OpI], *oldRetI, *newRetI,
+              getCurrentOperand().getOperandOwnership());
   }
 
   if (oldIndirectErrorResultType) {
     assert(newIndirectErrorResultType);
-    convertOp(Ops[OpI], oldIndirectErrorResultType, newIndirectErrorResultType);
+    convertOp(Ops[OpI], oldIndirectErrorResultType, newIndirectErrorResultType,
+              getCurrentOperand().getOperandOwnership());
     ++OpI;
   }
 
@@ -209,7 +224,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   auto oldParamI = oldOpParamTypes.begin();
   for (auto e = newOpParamTypes.end(); newParamI != e;
        ++OpI, ++newParamI, ++oldParamI) {
-    convertOp(Ops[OpI], *oldParamI, *newParamI);
+    convertOp(Ops[OpI], *oldParamI, *newParamI,
+              getCurrentOperand().getOperandOwnership());
   }
 
   // Convert the direct results if they changed.
@@ -249,9 +265,20 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
     }
 
     Builder.setInsertionPoint(AI.getInstruction());
-    return Builder.createTryApply(AI.getLoc(), funcOper, SubstitutionMap(), Args,
-                                  normalBB, TAI->getErrorBB(),
-                                  TAI->getApplyOptions());
+    auto *result = Builder.createTryApply(
+        AI.getLoc(), funcOper, SubstitutionMap(), Args, normalBB,
+        TAI->getErrorBB(), TAI->getApplyOptions());
+    if (!Borrows.empty()) {
+      Builder.setInsertionPoint(&TAI->getErrorBB()->front());
+      for (auto *borrow : Borrows) {
+        Builder.createEndBorrow(AI.getLoc(), borrow);
+      }
+      Builder.setInsertionPoint(&TAI->getNormalBB()->front());
+      for (auto *borrow : Borrows) {
+        Builder.createEndBorrow(AI.getLoc(), borrow);
+      }
+    }
+    return result;
   }
 
   // Match the throwing bit of the underlying function_ref. We assume that if
@@ -270,6 +297,11 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       Builder.createUncheckedForwardingCast(AI.getLoc(), NAI, oldResultTy);
   }
   
+  Builder.setInsertionPoint(AI->getNextInstruction());
+  for (auto *borrow : Borrows) {
+    Builder.createEndBorrow(AI.getLoc(), borrow);
+  }
+
   return result;
 }
 
