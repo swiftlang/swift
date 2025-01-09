@@ -958,7 +958,7 @@ static void determineBestChoicesInContext(
           // Preferring outer disjunction first works better in situations
           // when contextual type for the whole chain becomes available at
           // some point during solving at it would allow for faster pruning.
-          if (score > 0 && onlyLiteralCandidates)
+          if (score > 0 && onlyLiteralCandidates && decl->isOperator())
             score = 0.1;
 
           // If one of the result types matches exactly, that's a good
