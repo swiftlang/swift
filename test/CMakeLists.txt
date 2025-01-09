@@ -82,9 +82,9 @@ function(get_test_dependencies SDK result_var_name)
 
   set(deps_binaries)
 
-  if (SWIFT_ENABLE_BACKTRACING)
+  if (SWIFT_BUILD_LIBEXEC AND SWIFT_ENABLE_BACKTRACING)
     list(APPEND deps_binaries
-      swift-backtrace)
+      "swift-backtrace-${SDK}")
   endif()
 
   if (SWIFT_INCLUDE_TOOLS)
