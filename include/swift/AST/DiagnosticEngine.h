@@ -21,7 +21,6 @@
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
-#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/PrintDiagnosticNamesMode.h"
 #include "swift/Basic/Statistic.h"
@@ -67,6 +66,8 @@ namespace swift {
   /// Each of the diagnostics described in Diagnostics.def has an entry in
   /// this enumeration type that uniquely identifies it.
   enum class DiagID : uint32_t;
+
+  enum class DiagGroupID : uint16_t;
 
   /// Describes a diagnostic along with its argument types.
   ///
@@ -512,10 +513,16 @@ namespace swift {
     friend DiagnosticEngine;
     friend class InFlightDiagnostic;
 
-    Diagnostic(DiagID ID, DiagGroupID GroupID) : ID(ID), GroupID(GroupID) {}
-
     /// Constructs a Diagnostic with DiagGroupID infered from DiagID.
     Diagnostic(DiagID ID);
+
+  protected:
+    /// Only use this constructor privately in this class or in unit tests by
+    /// subclassing.
+    /// In unit tests, it is used as a means for associating diagnostics with
+    /// groups and, thus, circumventing the need to otherwise define mock
+    /// diagnostics, which is not accounted for in the current design.
+    Diagnostic(DiagID ID, DiagGroupID GroupID) : ID(ID), GroupID(GroupID) {}
 
   public:
     // All constructors are intentionally implicit.
@@ -527,8 +534,9 @@ namespace swift {
       gatherArgs(VArgs...);
     }
 
-    /*implicit*/Diagnostic(DiagID ID, ArrayRef<DiagnosticArgument> Args)
-      : ID(ID), Args(Args.begin(), Args.end()) {}
+    Diagnostic(DiagID ID, ArrayRef<DiagnosticArgument> Args) : Diagnostic(ID) {
+      this->Args.append(Args.begin(), Args.end());
+    }
 
     template <class... ArgTypes>
     static Diagnostic fromTuple(Diag<ArgTypes...> id,
@@ -902,7 +910,9 @@ namespace swift {
     /// Don't emit any remarks
     bool suppressRemarks = false;
 
-    /// Treat these warnings as errors. Indices here correspond to DiagID enum
+    /// A mapping from `DiagGroupID` identifiers to Boolean values indicating
+    /// whether warnings belonging to the respective diagnostic groups should be
+    /// escalated to errors.
     llvm::BitVector warningsAsErrors;
 
     /// Whether a fatal error has occurred
@@ -944,16 +954,23 @@ namespace swift {
     void setSuppressRemarks(bool val) { suppressRemarks = val; }
     bool getSuppressRemarks() const { return suppressRemarks; }
 
-    /// Whether a warning should be upgraded to an error or not
-    void setWarningAsErrorForDiagID(DiagID id, bool value) {
+    /// Sets whether warnings belonging to the diagnostic group identified by
+    /// `id` should be escalated to errors.
+    void setWarningsAsErrorsForDiagGroupID(DiagGroupID id, bool value) {
       warningsAsErrors[(unsigned)id] = value;
     }
-    bool getWarningAsErrorForDiagID(DiagID id) {
+
+    /// Returns a Boolean value indicating whether warnings belonging to the
+    /// diagnostic group identified by `id` should be escalated to errors.
+    bool getWarningsAsErrorsForDiagGroupID(DiagGroupID id) {
       return warningsAsErrors[(unsigned)id];
     }
 
-    /// Whether all warnings should be upgraded to errors or not
+    /// Whether all warnings should be upgraded to errors or not.
     void setAllWarningsAsErrors(bool value) {
+      // This works as intended because every diagnostic belongs to either a
+      // custom group or the top-level `DiagGroupID::no_group`, which is also
+      // a group.
       if (value) {
         warningsAsErrors.set();
       } else {
