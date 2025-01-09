@@ -1298,6 +1298,25 @@ public:
     }
     llvm_unreachable("unhandled ownership");
   }
+
+  // Determines owned/unowned ResultConvention of the returned value based on
+  // returns_retained/returns_unretained attribute.
+  std::optional<ResultConvention>
+  getCxxRefConventionWithAttrs(const TypeLowering &tl,
+                               const clang::Decl *decl) const {
+    if (tl.getLoweredType().isForeignReferenceType() && decl->hasAttrs()) {
+      for (const auto *attr : decl->getAttrs()) {
+        if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+          if (swiftAttr->getAttribute() == "returns_unretained") {
+            return ResultConvention::Unowned;
+          } else if (swiftAttr->getAttribute() == "returns_retained") {
+            return ResultConvention::Owned;
+          }
+        }
+      }
+    }
+    return std::nullopt;
+  }
 };
 
 /// A visitor for breaking down formal result types into a SILResultInfo
@@ -3335,7 +3354,8 @@ public:
       return ResultConvention::Owned;
 
     if (tl.getLoweredType().isForeignReferenceType())
-      return ResultConvention::Unowned;
+      return getCxxRefConventionWithAttrs(tl, Method)
+          .value_or(ResultConvention::Unowned);
 
     return ResultConvention::Autoreleased;
   }
@@ -3374,25 +3394,6 @@ protected:
   CFunctionTypeConventions(ConventionsKind kind,
                            const clang::FunctionType *type)
     : Conventions(kind), FnType(type) {}
-
-  // Determines owned/unowned ResultConvention of the returned value based on
-  // returns_retained/returns_unretained attribute.
-  std::optional<ResultConvention>
-  getForeignReferenceTypeResultConventionWithAttributes(
-      const TypeLowering &tl, const clang::FunctionDecl *decl) const {
-    if (tl.getLoweredType().isForeignReferenceType() && decl->hasAttrs()) {
-      for (const auto *attr : decl->getAttrs()) {
-        if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-          if (swiftAttr->getAttribute() == "returns_unretained") {
-            return ResultConvention::Unowned;
-          } else if (swiftAttr->getAttribute() == "returns_retained") {
-            return ResultConvention::Owned;
-          }
-        }
-      }
-    }
-    return std::nullopt;
-  }
 
 public:
   CFunctionTypeConventions(const clang::FunctionType *type)
@@ -3511,11 +3512,7 @@ public:
       return ResultConvention::Indirect;
     }
 
-    // Explicitly setting the ownership of the returned FRT if the C++
-    // global/free function has either swift_attr("returns_retained") or
-    // ("returns_unretained") attribute.
-    if (auto resultConventionOpt =
-            getForeignReferenceTypeResultConventionWithAttributes(tl, TheDecl))
+    if (auto resultConventionOpt = getCxxRefConventionWithAttrs(tl, TheDecl))
       return *resultConventionOpt;
 
     if (isCFTypedef(tl, TheDecl->getReturnType())) {
@@ -3597,11 +3594,8 @@ public:
       return ResultConvention::Indirect;
     }
 
-    // Explicitly setting the ownership of the returned FRT if the C++ member
-    // method has either swift_attr("returns_retained") or
-    // ("returns_unretained") attribute.
     if (auto resultConventionOpt =
-            getForeignReferenceTypeResultConventionWithAttributes(resultTL, TheDecl))
+            getCxxRefConventionWithAttrs(resultTL, TheDecl))
       return *resultConventionOpt;
 
     if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>() &&
