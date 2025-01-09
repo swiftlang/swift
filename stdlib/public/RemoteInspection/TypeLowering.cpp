@@ -2595,8 +2595,9 @@ public:
 
   const TypeInfo *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     auto elementTI = visit(BA->getElementType());
+    auto size = cast<IntegerTypeRef>(BA->getSizeType())->getValue();
 
-    return TC.makeTypeInfo<ArrayTypeInfo>(BA->getSize(), elementTI);
+    return TC.makeTypeInfo<ArrayTypeInfo>(size, elementTI);
   }
 };
 

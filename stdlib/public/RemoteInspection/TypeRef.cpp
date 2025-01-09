@@ -404,7 +404,7 @@ public:
 
   void visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     printHeader("builtin_fixed_array");
-    printField("size", std::to_string(BA->getSize()));
+    printRec(BA->getSizeType());
     printRec(BA->getElementType());
     stream << ")";
   }
@@ -1086,10 +1086,7 @@ public:
   Demangle::NodePointer visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     auto ba = Dem.createNode(Node::Kind::BuiltinFixedArray);
 
-    auto size = Dem.createNode(Node::Kind::Type);
-    size->addChild(createInteger(BA->getSize()), Dem);
-    ba->addChild(size, Dem);
-
+    ba->addChild(visit(BA->getSizeType()), Dem);
     ba->addChild(visit(BA->getElementType()), Dem);
 
     return ba;
@@ -1327,7 +1324,7 @@ public:
   }
 
   const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
-    return BuiltinFixedArrayTypeRef::create(Builder, BA->getSize(),
+    return BuiltinFixedArrayTypeRef::create(Builder, visit(BA->getSizeType()),
                                             visit(BA->getElementType()));
   }
 };
@@ -1590,7 +1587,7 @@ public:
   }
 
   const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
-    return BuiltinFixedArrayTypeRef::create(Builder, BA->getSize(),
+    return BuiltinFixedArrayTypeRef::create(Builder, visit(BA->getSizeType()),
                                             visit(BA->getElementType()));
   }
 };

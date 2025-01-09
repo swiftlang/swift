@@ -938,9 +938,7 @@ public:
 
   const TypeRef *createBuiltinFixedArrayType(const TypeRef *size,
                                              const TypeRef *element) {
-    auto integer = cast<IntegerTypeRef>(size);
-    return BuiltinFixedArrayTypeRef::create(*this, integer->getValue(),
-                                            element);
+    return BuiltinFixedArrayTypeRef::create(*this, size, element);
   }
 
   // Construct a bound generic type ref along with the parent type info

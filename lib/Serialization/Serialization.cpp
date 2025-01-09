@@ -958,6 +958,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_OPEN_PACK_ELEMENT);
   BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_GET);
   BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_SET);
+  BLOCK_RECORD(sil_block, SIL_TYPE_VALUE);
   BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE);
   BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE_REF);
   BLOCK_RECORD(sil_block, SIL_SOURCE_LOC);

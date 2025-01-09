@@ -15,7 +15,7 @@
 @frozen
 public struct Slab<let count: Int, Element: ~Copyable>: ~Copyable {
   @usableFromInline
-  let storage: Builtin.FixedArray<count, Element>
+  internal let _storage: Builtin.FixedArray<count, Element>
 }
 
 @available(SwiftStdlib 6.1, *)
@@ -37,7 +37,7 @@ extension Slab where Element: ~Copyable {
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   @_transparent
-  var address: UnsafePointer<Element> {
+  internal var _address: UnsafePointer<Element> {
     UnsafePointer<Element>(Builtin.unprotectedAddressOfBorrow(self))
   }
 
@@ -45,15 +45,15 @@ extension Slab where Element: ~Copyable {
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   @_transparent
-  var buffer: UnsafeBufferPointer<Element> {
-    UnsafeBufferPointer<Element>(start: address, count: count)
+  internal var _buffer: UnsafeBufferPointer<Element> {
+    UnsafeBufferPointer<Element>(start: _address, count: count)
   }
 
   /// Returns a mutable pointer to the first element in the vector.
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   @_transparent
-  var mutableAddress: UnsafeMutablePointer<Element> {
+  internal var _mutableAddress: UnsafeMutablePointer<Element> {
     mutating get {
       UnsafeMutablePointer<Element>(Builtin.unprotectedAddressOf(&self))
     }
@@ -63,9 +63,9 @@ extension Slab where Element: ~Copyable {
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   @_transparent
-  var mutableBuffer: UnsafeMutableBufferPointer<Element> {
+  internal var _mutableBuffer: UnsafeMutableBufferPointer<Element> {
     mutating get {
-      UnsafeMutableBufferPointer<Element>(start: mutableAddress, count: count)
+      UnsafeMutableBufferPointer<Element>(start: _mutableAddress, count: count)
     }
   }
 
@@ -74,7 +74,7 @@ extension Slab where Element: ~Copyable {
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   @_transparent
-  static func _initializationBuffer(
+  internal static func _initializationBuffer(
     start: Builtin.RawPointer
   ) -> UnsafeMutableBufferPointer<Element> {
     UnsafeMutableBufferPointer<Element>(
@@ -197,7 +197,7 @@ extension Slab where Element: Copyable {
 
 @available(SwiftStdlib 6.1, *)
 extension Slab where Element: ~Copyable {
-  /// A type representing the collection's elements.
+  /// The type of the container's elements.
   @available(SwiftStdlib 6.1, *)
   public typealias Element = Element
 
@@ -292,7 +292,7 @@ extension Slab where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func index(after i: Int) -> Int {
-    i + 1
+    i &+ 1
   }
 
   /// Returns the position immediately before the given index.
@@ -304,7 +304,7 @@ extension Slab where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func index(before i: Int) -> Int {
-    i - 1
+    i &- 1
   }
 
   /// Accesses the element at the specified position.
@@ -334,14 +334,14 @@ extension Slab where Element: ~Copyable {
     unsafeAddress {
       _precondition(indices.contains(i), "Index out of bounds")
 
-      return address + i
+      return _address + i
     }
 
     @_transparent
     unsafeMutableAddress {
       _precondition(indices.contains(i), "Index out of bounds")
 
-      return mutableAddress + i
+      return _mutableAddress + i
     }
   }
 }
@@ -369,14 +369,17 @@ extension Slab where Element: ~Copyable {
     _ i: Int,
     _ j: Int
   ) {
-    guard i != j, indices.contains(i), indices.contains(j) else {
+    guard i != j else {
       return
     }
 
-    let ithElement = mutableBuffer.moveElement(from: i)
-    let jthElement = mutableBuffer.moveElement(from: j)
-    mutableBuffer.initializeElement(at: i, to: jthElement)
-    mutableBuffer.initializeElement(at: j, to: ithElement)
+    _precondition(indices.contains(i), "Index out of bounds")
+    _precondition(indices.contains(j), "Index out of bounds")
+
+    let ithElement = _mutableBuffer.moveElement(from: i)
+    let jthElement = _mutableBuffer.moveElement(from: j)
+    _mutableBuffer.initializeElement(at: i, to: jthElement)
+    _mutableBuffer.initializeElement(at: j, to: ithElement)
   }
 }
 
@@ -422,10 +425,10 @@ extension Slab where Element: ~Copyable {
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public borrowing func _withUnsafeBufferPointer<Result, E: Error>(
+  public borrowing func _withUnsafeBufferPointer<Result: ~Copyable, E: Error>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
-    try body(buffer)
+    try body(_buffer)
   }
 
   /// Calls the given closure with a pointer to the vector's mutable contiguous
@@ -471,9 +474,9 @@ extension Slab where Element: ~Copyable {
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public mutating func _withUnsafeMutableBufferPointer<Result, E: Error>(
+  public mutating func _withUnsafeMutableBufferPointer<Result: ~Copyable, E: Error>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
-    try body(mutableBuffer)
+    try body(_mutableBuffer)
   }
 }

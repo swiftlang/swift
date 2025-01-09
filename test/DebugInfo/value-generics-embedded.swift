@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend %s -target %target-cpu-apple-macos14 -emit-ir -g -enable-experimental-feature ValueGenerics -enable-experimental-feature Embedded -wmo -disable-availability-checking -o - | %FileCheck %s
 
-// REQUIR123ES: swift_feature_ValueGenerics
+// REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_ValueGenerics
 
 // CHECK-DAG: !DICompositeType({{.*}}templateParams: ![[SLAB_PARAMS:.*]], {{.*}}identifier: "$es4SlabVy$0_4main8MySpriteVGD"
 // CHECK-DAG: ![[SLAB_PARAMS]] = !{![[COUNT_PARAM:.*]], ![[ELEMENT_PARAM:.*]]}

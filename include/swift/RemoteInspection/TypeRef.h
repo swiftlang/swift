@@ -1123,27 +1123,28 @@ public:
 };
 
 class BuiltinFixedArrayTypeRef final : public TypeRef {
-  intptr_t Size;
+  const TypeRef *Size;
   const TypeRef *Element;
 
-  static TypeRefID Profile(const intptr_t &Size, const TypeRef *Element) {
+  static TypeRefID Profile(const TypeRef *Size, const TypeRef *Element) {
     TypeRefID ID;
-    ID.addInteger((uint64_t)Size);
+    ID.addPointer(Size);
     ID.addPointer(Element);
     return ID;
   }
 
 public:
-  BuiltinFixedArrayTypeRef(const intptr_t &Size, const TypeRef *Element)
+  BuiltinFixedArrayTypeRef(const TypeRef *Size, const TypeRef *Element)
     : TypeRef(TypeRefKind::BuiltinFixedArray), Size(Size), Element(Element) {}
 
   template <typename Allocator>
-  static const BuiltinFixedArrayTypeRef *create(Allocator &A, intptr_t Size,
+  static const BuiltinFixedArrayTypeRef *create(Allocator &A,
+                                                const TypeRef *Size,
                                                 const TypeRef *Element) {
     FIND_OR_CREATE_TYPEREF(A, BuiltinFixedArrayTypeRef, Size, Element);
   }
 
-  const intptr_t &getSize() const {
+  const TypeRef *getSizeType() const {
     return Size;
   }
 
