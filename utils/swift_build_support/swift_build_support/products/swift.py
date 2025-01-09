@@ -10,6 +10,8 @@
 #
 # ----------------------------------------------------------------------------
 
+from build_swift.build_swift.constants import SWIFT_REPO_NAME
+
 from . import cmark
 from . import earlyswiftdriver
 from . import libcxx
@@ -95,6 +97,14 @@ class Swift(product.Product):
             self._enable_experimental_parser_validation)
 
         self._handle_swift_debuginfo_non_lto_args()
+
+    @classmethod
+    def product_source_name(cls):
+        """product_source_name() -> str
+
+        The name of the source code directory of this product.
+        """
+        return SWIFT_REPO_NAME
 
     @classmethod
     def is_build_script_impl_product(cls):
