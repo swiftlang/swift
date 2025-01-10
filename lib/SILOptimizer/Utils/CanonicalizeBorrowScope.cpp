@@ -218,8 +218,6 @@ SILValue CanonicalizeBorrowScope::findDefInBorrowScope(SILValue value) {
 ///
 /// \p innerValue is either the initial begin_borrow, or a forwarding operation
 /// within the borrow scope.
-///
-/// Note: This must always return true when innerValue is a function argument.
 template <typename Visitor>
 bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
                                                    Visitor &visitor) {
@@ -277,14 +275,12 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::PointerEscape:
         // Pointer escapes are only allowed if they use the guaranteed value,
         // which means that the escaped value must be confined to the current
-        // borrow scope. visitBorrowScopeUses must never return false when
-        // borrowedValue is a SILFunctionArgument.
+        // borrow scope.
         if (use->get()->getOwnershipKind() != OwnershipKind::Guaranteed &&
             !isa<SILFunctionArgument>(borrowedValue.value)) {
           return false;
         }
         if (!visitor.visitUse(use)) {
-          assert(!isa<SILFunctionArgument>(borrowedValue.value));
           return false;
         }
         break;
@@ -293,7 +289,6 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::ForwardingConsume:
         if (CanonicalizeBorrowScope::isRewritableOSSAForward(user)) {
           if (!visitor.visitForwardingUse(use)) {
-            assert(!isa<SILFunctionArgument>(borrowedValue.value));
             return false;
           }
           break;
@@ -306,7 +301,6 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::BitwiseEscape:
       case OperandOwnership::DestroyingConsume:
         if (!visitor.visitUse(use)) {
-          assert(!isa<SILFunctionArgument>(borrowedValue.value));
           return false;
         }
         break;
@@ -480,7 +474,9 @@ public:
       if (!hasValueOwnership(result)) {
         continue;
       }
-      scope.visitBorrowScopeUses(result, *this);
+      if (!scope.visitBorrowScopeUses(result, *this)) {
+        return false;
+      }
     }
     // Update this operand bypassing any copies.
     SILValue value = use->get();
@@ -796,9 +792,7 @@ bool CanonicalizeBorrowScope::consolidateBorrowScope() {
   if (outerUseInsts.empty()) {
     RewriteInnerBorrowUses innerRewriter(*this);
     beginVisitBorrowScopeUses(); // reset the def/use worklist
-    bool succeed = visitBorrowScopeUses(borrowedValue.value, innerRewriter);
-    assert(succeed && "should be filtered by FindBorrowScopeUses");
-    return true;
+    return visitBorrowScopeUses(borrowedValue.value, innerRewriter);
   }
   LLVM_DEBUG(llvm::dbgs() << "  Outer uses:\n";
              for (SILInstruction *inst
@@ -826,9 +820,7 @@ bool CanonicalizeBorrowScope::canonicalizeFunctionArgument(
   RewriteInnerBorrowUses innerRewriter(*this);
   beginVisitBorrowScopeUses(); // reset the def/use worklist
 
-  bool succeed = visitBorrowScopeUses(borrowedValue.value, innerRewriter);
-  assert(succeed && "must always succeed for function arguments");
-  return true;
+  return visitBorrowScopeUses(borrowedValue.value, innerRewriter);
 }
 
 /// Canonicalize a worklist of extended lifetimes. This iterates after rewriting
