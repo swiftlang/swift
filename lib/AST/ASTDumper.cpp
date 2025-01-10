@@ -2528,6 +2528,11 @@ public:
     printRec(E->getSubExpr());
     printFoot();
   }
+  void visitUnsafeExpr(UnsafeExpr *E, StringRef label) {
+    printCommon(E, "unsafe_expr", label);
+    printRec(E->getSubExpr());
+    printFoot();
+  }
   void visitConsumeExpr(ConsumeExpr *E, StringRef label) {
     printCommon(E, "consume_expr", label);
     printRec(E->getSubExpr());

@@ -74,13 +74,11 @@ private:
     struct {
       TypeBase *type;
       void *conformanceRef;
-      DeclContext *declContext;
       const void *location;
     } conformance;
 
     struct {
       const Decl *decl;
-      DeclContext *declContext;
       TypeBase *type;
       const void *location;
     } entity;
@@ -107,7 +105,6 @@ private:
 
   static UnsafeUse forReference(
       Kind kind,
-      DeclContext *dc,
       const Decl *decl,
       Type type,
       SourceLoc location
@@ -121,7 +118,6 @@ private:
 
     UnsafeUse result(kind);
     result.storage.entity.decl = decl;
-    result.storage.entity.declContext = dc;
     result.storage.entity.type = type.getPointer();
     result.storage.entity.location = location.getOpaquePointerValue();
     return result;
@@ -152,49 +148,41 @@ public:
 
   static UnsafeUse forConformance(Type subjectType,
                                   ProtocolConformanceRef conformance,
-                                  SourceLoc location,
-                                  DeclContext *dc) {
+                                  SourceLoc location) {
     assert(subjectType);
     UnsafeUse result(UnsafeConformance);
     result.storage.conformance.type = subjectType.getPointer();
     result.storage.conformance.conformanceRef = conformance.getOpaqueValue();
-    result.storage.conformance.declContext = dc;
     result.storage.conformance.location = location.getOpaquePointerValue();
     return result;
   }
 
-  static UnsafeUse forUnownedUnsafe(const Decl *decl,
-                                    SourceLoc location,
-                                    DeclContext *dc) {
-    return forReference(UnownedUnsafe, dc, decl, Type(), location);
+  static UnsafeUse forUnownedUnsafe(const Decl *decl, SourceLoc location) {
+    return forReference(UnownedUnsafe, decl, Type(), location);
   }
 
   static UnsafeUse forExclusivityUnchecked(const Decl *decl,
-                                           SourceLoc location,
-                                           DeclContext *dc) {
-    return forReference(ExclusivityUnchecked, dc, decl, Type(), location);
+                                           SourceLoc location) {
+    return forReference(ExclusivityUnchecked, decl, Type(), location);
   }
 
   static UnsafeUse forNonisolatedUnsafe(const Decl *decl,
-                                        SourceLoc location,
-                                        DeclContext *dc) {
-    return forReference(NonisolatedUnsafe, dc, decl, Type(), location);
+                                        SourceLoc location) {
+    return forReference(NonisolatedUnsafe, decl, Type(), location);
   }
 
   static UnsafeUse forReferenceToUnsafe(const Decl *decl,
                                         bool isCall,
-                                        DeclContext *dc,
                                         Type type,
                                         SourceLoc location) {
-    return forReference(isCall ? CallToUnsafe: ReferenceToUnsafe, dc,
+    return forReference(isCall ? CallToUnsafe: ReferenceToUnsafe,
                         decl, type, location);
   }
 
   static UnsafeUse forReferenceToUnsafeThroughTypealias(const Decl *decl,
-                                        DeclContext *dc,
                                         Type type,
                                         SourceLoc location) {
-    return forReference(ReferenceToUnsafeThroughTypealias, dc,
+    return forReference(ReferenceToUnsafeThroughTypealias,
                         decl, type, location);
   }
 
@@ -267,32 +255,6 @@ public:
   const AssociatedTypeDecl *getAssociatedType() const {
     assert(getKind() == TypeWitness);
     return storage.typeWitness.assocType;
-  }
-
-  /// Retrieve the declaration context in which the reference occurs.
-  DeclContext *getDeclContext() const {
-    switch (getKind()) {
-    case UnownedUnsafe:
-    case ExclusivityUnchecked:
-    case NonisolatedUnsafe:
-    case ReferenceToUnsafe:
-    case ReferenceToUnsafeThroughTypealias:
-    case CallToUnsafe:
-      return storage.entity.declContext;
-
-    case Override:
-      return getDecl()->getDeclContext();
-
-    case Witness:
-    case TypeWitness:
-      return getConformance().getConcrete()->getDeclContext();
-
-    case UnsafeConformance:
-      return storage.conformance.declContext;
-
-    case PreconcurrencyImport:
-      return storage.importDecl->getDeclContext();
-    }
   }
 
   /// Get the original declaration for an issue with a polymorphic

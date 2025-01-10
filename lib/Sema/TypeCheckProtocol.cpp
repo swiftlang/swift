@@ -2597,7 +2597,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
           conformance->getType(), Proto)
       .fixItInsert(conformance->getProtocolNameLoc(), "@unsafe ");
       for (const auto& unsafeUse : unsafeUses)
-        diagnoseUnsafeUse(unsafeUse, /*asNote=*/true);
+        diagnoseUnsafeUse(unsafeUse);
     }
   }
 }

@@ -1,8 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -print-diagnostic-groups
 
-// Make sure everything compiles without error when unsafe code is allowed.
-// RUN: %target-swift-frontend -typecheck -enable-experimental-feature AllowUnsafeAttribute -warnings-as-errors %s
-
 // REQUIRES: swift_feature_AllowUnsafeAttribute
 // REQUIRES: swift_feature_WarnUnsafe
 
@@ -14,12 +11,12 @@ struct UnsafeType { }
 
 // expected-note@+1{{reference to unsafe struct 'UnsafeType'}}
 func iAmImpliedUnsafe() -> UnsafeType? { nil }
-// expected-warning@-1{{global function 'iAmImpliedUnsafe' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe [Unsafe]}}{{1-1=@unsafe }}
+// expected-warning@-1{{global function 'iAmImpliedUnsafe' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}{{1-1=@unsafe }}
 
 @unsafe
 func labeledUnsafe(_: UnsafeType) {
-  iAmUnsafe()
-  let _ = iAmImpliedUnsafe()
+  unsafe iAmUnsafe()
+  let _ = unsafe iAmImpliedUnsafe()
 }
 
 
@@ -95,13 +92,12 @@ struct UnsafeOuter {
   func f(_: UnsafeType) { } // okay
 
   @unsafe func g(_ y: UnsafeType) {
-    let x: UnsafeType = y
-    let _ = x
+    @unsafe let x: UnsafeType = unsafe y
+    let _ = unsafe x
   }
 }
 
-// expected-warning@+1{{extension of struct 'UnsafeOuter' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
-extension UnsafeOuter { // expected-note{{reference to unsafe struct 'UnsafeOuter'}}
+extension UnsafeOuter {
   func h(_: UnsafeType) { }
 }
 

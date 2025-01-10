@@ -4817,6 +4817,11 @@ void PrintAST::visitAwaitExpr(AwaitExpr *expr) {
   visit(expr->getSubExpr());
 }
 
+void PrintAST::visitUnsafeExpr(UnsafeExpr *expr) {
+  Printer << "unsafe ";
+  visit(expr->getSubExpr());
+}
+
 void PrintAST::visitConsumeExpr(ConsumeExpr *expr) {
   Printer << "consume ";
   visit(expr->getSubExpr());
