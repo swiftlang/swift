@@ -2106,20 +2106,18 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
 #define INIT_VER_TUPLE(X) X(X.empty() ? std::optional<llvm::VersionTuple>() : X)
 
 AvailableAttr::AvailableAttr(
-    SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
-    StringRef Message, StringRef Rename,
+    SourceLoc AtLoc, SourceRange Range, const AvailabilityDomain &Domain,
+    Kind Kind, StringRef Message, StringRef Rename,
     const llvm::VersionTuple &Introduced, SourceRange IntroducedRange,
     const llvm::VersionTuple &Deprecated, SourceRange DeprecatedRange,
     const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
-    PlatformAgnosticAvailabilityKind PlatformAgnostic, bool Implicit,
-    bool IsSPI, bool IsForEmbedded)
+    bool Implicit, bool IsSPI, bool IsForEmbedded)
     : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
-      Message(Message), Rename(Rename),
+      Domain(Domain), Message(Message), Rename(Rename),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange) {
-  Bits.AvailableAttr.Platform = static_cast<uint8_t>(Platform);
-  Bits.AvailableAttr.PlatformAgnostic = static_cast<uint8_t>(PlatformAgnostic);
+  Bits.AvailableAttr.Kind = static_cast<uint8_t>(Kind);
   Bits.AvailableAttr.HasComputedRenamedDecl = false;
   Bits.AvailableAttr.HasRenamedDecl = false;
   Bits.AvailableAttr.IsSPI = IsSPI;
@@ -2128,51 +2126,9 @@ AvailableAttr::AvailableAttr(
     // FIXME: [availability] The IsForEmbedded bit should be removed when
     // it can be represented with AvailabilityDomain (rdar://138802876)
     Bits.AvailableAttr.IsForEmbedded = true;
-    assert(getPlatform() == PlatformKind::none);
+    assert(Domain.isUniversal());
   }
 }
-
-static PlatformAgnosticAvailabilityKind
-platformAgnosticFromDomainAndKind(const AvailabilityDomain &Domain,
-                                  AvailableAttr::Kind Kind) {
-  switch (Kind) {
-  case swift::AvailableAttr::Kind::NoAsync:
-    return PlatformAgnosticAvailabilityKind::NoAsync;
-
-  case swift::AvailableAttr::Kind::Default:
-    if (Domain.isSwiftLanguage()) {
-      return PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
-    } else if (Domain.isPackageDescription()) {
-      return PlatformAgnosticAvailabilityKind::
-          PackageDescriptionVersionSpecific;
-    }
-    return PlatformAgnosticAvailabilityKind::None;
-
-  case swift::AvailableAttr::Kind::Deprecated:
-    return PlatformAgnosticAvailabilityKind::Deprecated;
-
-  case swift::AvailableAttr::Kind::Unavailable:
-    if (Domain.isSwiftLanguage()) {
-      return PlatformAgnosticAvailabilityKind::UnavailableInSwift;
-    } else if (Domain.isUniversal() || Domain.isPlatform()) {
-      return PlatformAgnosticAvailabilityKind::Unavailable;
-    }
-    llvm_unreachable("unexpected domain for unavailable attr");
-  }
-}
-
-AvailableAttr::AvailableAttr(
-    SourceLoc AtLoc, SourceRange Range, const AvailabilityDomain &Domain,
-    Kind Kind, StringRef Message, StringRef Rename,
-    const llvm::VersionTuple &Introduced, SourceRange IntroducedRange,
-    const llvm::VersionTuple &Deprecated, SourceRange DeprecatedRange,
-    const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
-    bool Implicit, bool IsSPI, bool IsForEmbedded)
-    : AvailableAttr(AtLoc, Range, Domain.getPlatformKind(), Message, Rename,
-                    Introduced, IntroducedRange, Deprecated, DeprecatedRange,
-                    Obsoleted, ObsoletedRange,
-                    platformAgnosticFromDomainAndKind(Domain, Kind), Implicit,
-                    IsSPI, IsForEmbedded) {}
 
 #undef INIT_VER_TUPLE
 
@@ -2241,16 +2197,16 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 }
 
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
-  return new (C) AvailableAttr(
-      implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
-      getPlatform(), Message, Rename,
-      Introduced ? *Introduced : llvm::VersionTuple(),
-      implicit ? SourceRange() : IntroducedRange,
-      Deprecated ? *Deprecated : llvm::VersionTuple(),
-      implicit ? SourceRange() : DeprecatedRange,
-      Obsoleted ? *Obsoleted : llvm::VersionTuple(),
-      implicit ? SourceRange() : ObsoletedRange,
-      getPlatformAgnosticAvailability(), implicit, isSPI(), isForEmbedded());
+  return new (C) AvailableAttr(implicit ? SourceLoc() : AtLoc,
+                               implicit ? SourceRange() : getRange(), Domain,
+                               getKind(), Message, Rename,
+                               Introduced ? *Introduced : llvm::VersionTuple(),
+                               implicit ? SourceRange() : IntroducedRange,
+                               Deprecated ? *Deprecated : llvm::VersionTuple(),
+                               implicit ? SourceRange() : DeprecatedRange,
+                               Obsoleted ? *Obsoleted : llvm::VersionTuple(),
+                               implicit ? SourceRange() : ObsoletedRange,
+                               implicit, isSPI(), isForEmbedded());
 }
 
 std::optional<OriginallyDefinedInAttr::ActiveVersion>

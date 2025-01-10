@@ -151,12 +151,9 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 8+8+1+1+1+1,
-      /// A `PlatformKind` value.
-      Platform : 8,
-
-      /// A `PlatformAgnosticAvailabilityKind` value.
-      PlatformAgnostic : 8,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1,
+      /// An `AvailableAttr::Kind` value.
+      Kind : 4,
 
       /// State storage for `RenamedDeclRequest`.
       HasComputedRenamedDecl : 1,
@@ -742,6 +739,8 @@ enum class PlatformAgnosticAvailabilityKind : uint8_t {
 
 /// Defines the @available attribute.
 class AvailableAttr : public DeclAttribute {
+  AvailabilityDomain Domain;
+
 public:
   enum class Kind : uint8_t {
     /// The attribute does not specify `deprecated`, `unavailable`,
@@ -755,17 +754,6 @@ public:
     /// The attribute specifies unavailability in asynchronous contexts.
     NoAsync,
   };
-
-public:
-  AvailableAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
-                StringRef Message, StringRef Rename,
-                const llvm::VersionTuple &Introduced,
-                SourceRange IntroducedRange,
-                const llvm::VersionTuple &Deprecated,
-                SourceRange DeprecatedRange,
-                const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
-                PlatformAgnosticAvailabilityKind PlatformAgnostic,
-                bool Implicit, bool IsSPI, bool IsForEmbedded = false);
 
   AvailableAttr(SourceLoc AtLoc, SourceRange Range,
                 const AvailabilityDomain &Domain, Kind Kind, StringRef Message,
@@ -826,31 +814,47 @@ public:
   bool isForEmbedded() const { return Bits.AvailableAttr.IsForEmbedded; }
 
   /// Returns the platform that the attribute applies to (may be `none`).
-  PlatformKind getPlatform() const {
-    return static_cast<PlatformKind>(Bits.AvailableAttr.Platform);
-  }
+  PlatformKind getPlatform() const { return Domain.getPlatformKind(); }
+
+  /// Returns the `AvailabilityDomain` associated with the attribute, or
+  /// `std::nullopt` if it has either not yet been resolved or could not be
+  /// resolved successfully.
+  std::optional<AvailabilityDomain> getCachedDomain() const { return Domain; }
+
+  /// Returns the kind of availability the attribute specifies.
+  Kind getKind() const { return static_cast<Kind>(Bits.AvailableAttr.Kind); }
 
   /// Returns the platform-agnostic availability.
   PlatformAgnosticAvailabilityKind getPlatformAgnosticAvailability() const {
-    return static_cast<PlatformAgnosticAvailabilityKind>(
-        Bits.AvailableAttr.PlatformAgnostic);
-  }
+    // FIXME: [availability] Remove this method entirely.
+    switch (getKind()) {
+    case Kind::Default:
+      if (Domain.isSwiftLanguage())
+        return PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+      else if (Domain.isPackageDescription())
+        return PlatformAgnosticAvailabilityKind::
+            PackageDescriptionVersionSpecific;
+      else if (Domain.isUniversal() || Domain.isPlatform())
+        return PlatformAgnosticAvailabilityKind::None;
 
-  /// Returns the kind of availability the attribute specifies.
-  Kind getKind() const {
-    switch (getPlatformAgnosticAvailability()) {
-    case PlatformAgnosticAvailabilityKind::None:
-    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-      return Kind::Default;
-    case PlatformAgnosticAvailabilityKind::Deprecated:
-      return Kind::Deprecated;
-    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-    case PlatformAgnosticAvailabilityKind::Unavailable:
-      return Kind::Unavailable;
-    case PlatformAgnosticAvailabilityKind::NoAsync:
-      return Kind::NoAsync;
+      break;
+
+    case Kind::Deprecated:
+      return PlatformAgnosticAvailabilityKind::Deprecated;
+
+    case Kind::Unavailable:
+      if (Domain.isSwiftLanguage())
+        return PlatformAgnosticAvailabilityKind::UnavailableInSwift;
+      else if (Domain.isUniversal() || Domain.isPlatform())
+        return PlatformAgnosticAvailabilityKind::Unavailable;
+
+      break;
+
+    case Kind::NoAsync:
+      return PlatformAgnosticAvailabilityKind::NoAsync;
     }
+
+    llvm_unreachable("unsupported AvailabilityDomain and Kind");
   }
 
   /// Create an `AvailableAttr` that specifies universal unavailability, e.g.
