@@ -2005,9 +2005,10 @@ class AllowInvalidRefInKeyPath final : public ConstraintFix {
     // Allow a reference to a declaration with mutating getter as
     // a key path component.
     MutatingGetter,
-    // Allow a reference to a method (instance or static) as
-    // a key path component.
-    Initializer,
+    // Allow a reference to a mutating method.
+    MutatingMethod,
+    // Allow a reference to an async or throwing method.
+    AsyncOrThrowsMethod,
     // Allow a reference to an enum case as a key path component.
     EnumCase,
   } Kind;
@@ -2033,6 +2034,10 @@ public:
              "path component";
     case RefKind::EnumCase:
       return "allow reference to an enum case as a key path component";
+    case RefKind::MutatingMethod:
+      return "allow reference to mutating method";
+    case RefKind::AsyncOrThrowsMethod:
+      return "allow reference to async or throwing method";
     }
     llvm_unreachable("covered switch");
   }
