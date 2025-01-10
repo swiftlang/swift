@@ -57,6 +57,8 @@ private:
   };
 
 public:
+  AvailabilityDomain() {}
+
   static AvailabilityDomain forUniversal() {
     return AvailabilityDomain(Kind::Universal);
   }
