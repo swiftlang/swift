@@ -964,8 +964,7 @@ private:
     // Are we already constrained by the deployment target and the declaration
     // doesn't explicitly allow unsafe constructs in its definition, adding
     // new contexts won't change availability.
-    bool allowsUnsafe = declHasSafeAttr(D);
-    if (isCurrentScopeContainedByDeploymentTarget() && !allowsUnsafe)
+    if (isCurrentScopeContainedByDeploymentTarget())
       return;
 
     // Enumerate all of the body scopes to apply availability.
@@ -979,11 +978,6 @@ private:
           bodyIsDeploymentTarget(decl)) {
         availability.constrainWithPlatformRange(
              AvailabilityRange::forDeploymentTarget(Context), Context);
-      }
-
-      // Allow unsafe if appropriate for this body.
-      if (allowsUnsafe) {
-        availability.constrainWithAllowsUnsafe(Context);
       }
 
       nodesAndScopes.push_back({
