@@ -394,7 +394,7 @@ protected:
 
 } // namespace
 
-/// Erase users from \p outerUseInsts that are not within the borrow scope.
+/// Erase users from \p outerUseInsts that are actually within the borrow scope.
 void CanonicalizeBorrowScope::filterOuterBorrowUseInsts(
     OuterUsers &outerUseInsts) {
   auto *beginBorrow = cast<BeginBorrowInst>(borrowedValue.value);
