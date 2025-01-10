@@ -2710,8 +2710,9 @@ WARNING(add_predates_concurrency_import,none,
      "add '@preconcurrency' to %select{suppress|treat}0 "
      "'Sendable'-related %select{warnings|errors}0 from module %1"
      "%select{| as warnings}0", (bool, Identifier))
-WARNING(remove_predates_concurrency_import,none,
-     "'@preconcurrency' attribute on module %0 has no effect", (Identifier))
+GROUPED_WARNING(remove_predates_concurrency_import,PreconcurrencyImport,
+                DefaultIgnore,
+                "'@preconcurrency' attribute on module %0 has no effect", (Identifier))
 NOTE(add_preconcurrency_to_conformance,none,
      "add '@preconcurrency' to the %0 conformance to defer isolation checking to run time", (DeclName))
 WARNING(remove_public_import,none,
