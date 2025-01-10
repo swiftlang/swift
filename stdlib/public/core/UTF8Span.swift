@@ -261,8 +261,12 @@ extension RawSpan.Cursor {
 
 @available(SwiftStdlib 6.1, *)
 extension UTF8Span {
-  static func ~=(_ lhs: UTF8Span, _ rhs: StaticString) -> Bool {
-    fatalError()
+  public static func ~=(_ lhs: StaticString, _ rhs: UTF8Span) -> Bool {
+    return lhs.withUTF8Buffer { str in
+      rhs.withUnsafeBufferPointer { span in
+        str.elementsEqual(span)
+      }
+    }
   }
 
   // Not doing == between two UTFSpan, as pointerness 
