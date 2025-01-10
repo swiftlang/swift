@@ -595,6 +595,7 @@ func testRequireOptional1(_ a : Int?) -> Int {
   // CHECK-NEXT:    // function_ref statements.abort() -> Swift.Never
   // CHECK-NEXT:    [[FUNC_REF:%.*]] = function_ref @$s10statements5aborts5NeverOyF
   // CHECK-NEXT:    apply [[FUNC_REF]]() : $@convention(thin) () -> Never
+  // CHECK-NEXT:    ignored_use
   // CHECK-NEXT:    unreachable
   return t
 }
@@ -620,6 +621,7 @@ func testRequireOptional2(_ a : String?) -> String {
   // CHECK-NEXT:   // function_ref statements.abort() -> Swift.Never
   // CHECK-NEXT:   [[ABORT_FUNC:%.*]] = function_ref @$s10statements5aborts5NeverOyF
   // CHECK-NEXT:   [[NEVER:%.*]] = apply [[ABORT_FUNC]]()
+  // CHECK-NEXT:   ignored_use
   // CHECK-NEXT:   unreachable
   return t
 }
@@ -776,6 +778,7 @@ func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
   // CHECK-NEXT:   debug_value [[MV_1]] : $Int, let, name "x"
   // CHECK-NEXT:   [[MV_2:%.*]] = move_value [var_decl] [[PAYLOAD_2]] : $Int
   // CHECK-NEXT:   debug_value [[MV_2]] : $Int, let, name "y"
+  // CHECK-NEXT:   ignored_use
   // CHECK-NEXT:   extend_lifetime [[MV_2]] : $Int
   // CHECK-NEXT:   extend_lifetime [[MV_1]] : $Int
   // CHECK-NEXT:   return [[MV_1]] : $Int
