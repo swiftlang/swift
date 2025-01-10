@@ -468,6 +468,10 @@ public:
         // Look through optional evaluations.
       } else if (auto optionalEval = dyn_cast<OptionalEvaluationExpr>(fn)) {
         fn = optionalEval->getSubExpr()->getValueProvidingExpr();
+        // Look through actor isolation erasures.
+      } else if (auto actorIsolationErasure =
+                     dyn_cast<ActorIsolationErasureExpr>(fn)) {
+        fn = actorIsolationErasure->getSubExpr()->getValueProvidingExpr();
       } else {
         break;
       }
