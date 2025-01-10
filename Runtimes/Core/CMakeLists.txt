@@ -135,10 +135,35 @@ add_compile_definitions(
 add_compile_options(
   $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
   $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
-  $<$<COMPILE_LANGUAGE:CXX>:-funwind-tables>
-  "$<$<AND:$<COMPILE_LANGUAGE:Swift>,$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>>:SHELL:-Xfrontend -disable-objc-interop>"
-  "$<$<AND:$<COMPILE_LANGUAGE:Swift>,$<PLATFORM_ID:Windows>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
-  $<$<AND:$<COMPILE_LANGUAGE:Swift>,$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>>:-enable-library-evolution>)
+  $<$<COMPILE_LANGUAGE:CXX>:-funwind-tables>)
+
+add_compile_options(
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-library-level api>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-runtime-compatibility-version none>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature MemberImportVisibility>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature TypedThrows>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Macros>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature FreestandingMacros>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BitwiseCopyable>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Extern>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-backtracing-module-import>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -empty-abi-descriptor>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
+  "$<$<AND:$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -disable-objc-interop>"
+  "$<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
+  "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>")
 
 include_directories(include)
 
