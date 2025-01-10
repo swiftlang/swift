@@ -638,9 +638,31 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
 
   mutating func walkUp(address: Value) -> WalkResult {
     if let beginAccess = address.definingInstruction as? BeginAccessInst {
+      // Treat calls to unsafe[Mutable]Address like a projection of 'self' rather than a separate variable access.
+      if let addressorSelf = beginAccess.unsafeAddressorSelf {
+        return walkUp(valueOrAddress: addressorSelf)
+      }
       return introducer(beginAccess, nil)
     }
     return walkUpDefault(address: address)
+  }
+}
+
+private extension BeginAccessInst {
+  // Recognize an access scope for a unsafe addressor:
+  // %adr = pointer_to_address
+  // %md = mark_dependence %adr
+  // begin_access [unsafe] %md
+  var unsafeAddressorSelf: Value? {
+    guard isUnsafe else {
+      return nil
+    }
+    let accessBaseAndScopes = address.accessBaseWithScopes
+    guard case .pointer = accessBaseAndScopes.base,
+          case let .dependence(markDep) = accessBaseAndScopes.scopes.first else {
+      return nil
+    }
+    return markDep.base
   }
 }
 

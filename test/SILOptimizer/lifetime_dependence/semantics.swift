@@ -74,6 +74,34 @@ extension Array {
   }
 }
 
+struct Inner {
+  var p: UnsafePointer<Int>
+
+  @lifetime(borrow self)
+  borrowing func span() -> Span<Int> {
+    Span(base: p, count: 1)
+  }
+}
+
+struct Outer {
+  let inner: Inner
+  let fakePointer: UnsafePointer<Inner>
+
+  var innerAddress: Inner {
+    unsafeAddress {
+      fakePointer
+    }
+  }
+  /* TODO: rdar://137608270 Add Builtin.addressof() support for @addressable arguments
+  @addressableSelf
+  var innerAddress: Inner {
+    unsafeAddress {
+      Builtin.addressof(inner)
+    }
+  }
+  */
+}
+
 func parse(_ span: Span<Int>) {}
 
 // =============================================================================
@@ -171,4 +199,18 @@ func testTrivialScope<T>(a: Array<T>) -> Span<T> {
   // expected-error @-1{{lifetime-dependent value escapes its scope}}
   // expected-note  @-3{{it depends on the lifetime of variable 'p'}}
   // expected-note  @-3{{this use causes the lifetime-dependent value to escape}}
+}
+
+// =============================================================================
+// Scoped dependence on property access
+// =============================================================================
+
+@lifetime(borrow outer)
+func testBorrowComponent(outer: Outer) -> Span<Int> {
+  outer.inner.span()
+}
+
+@lifetime(borrow outer)
+func testBorrowAddressComponent(outer: Outer) -> Span<Int> {
+  outer.innerAddress.span()
 }
