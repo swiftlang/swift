@@ -1934,11 +1934,13 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   // If we don't have a discriminator, and either
   //   1. We have ill-formed code and we're able to assign a discriminator, or
   //   2. We are in a macro expansion buffer
+  //   3. We are within top-level code where there's nothing to anchor to
   //
   // then assign the next discriminator now.
   if (getRawDiscriminator() == InvalidDiscriminator &&
       (ctx.Diags.hadAnyError() ||
-       getParentSourceFile()->getFulfilledMacroRole() != std::nullopt)) {
+       getParentSourceFile()->getFulfilledMacroRole() != std::nullopt ||
+       getParent()->isModuleScopeContext())) {
     auto discriminator = ctx.getNextDiscriminator(getParent());
     ctx.setMaxAssignedDiscriminator(getParent(), discriminator + 1);
     const_cast<AbstractClosureExpr *>(this)->
