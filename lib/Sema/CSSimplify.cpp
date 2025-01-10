@@ -10825,9 +10825,6 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // which means MetatypeType has to be added after finding a type variable.
     if (baseLocator->isLastElement<LocatorPathElt::MemberRefBase>())
       baseType = MetatypeType::get(baseType);
-  } else if (isExpr<KeyPathExpr>(anchor)) {
-    // Key path can't refer to initializers e.g. `\Type.init`
-    return AllowInvalidRefInKeyPath::forRef(cs, baseType, init, locator);
   }
 
   if (!baseType)

@@ -2541,6 +2541,8 @@ private:
       case KeyPathExpr::Component::Kind::Invalid:
       case KeyPathExpr::Component::Kind::UnresolvedMember:
       case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+      case KeyPathExpr::Component::Kind::UnresolvedApply:
+      case KeyPathExpr::Component::Kind::Apply:
       case KeyPathExpr::Component::Kind::OptionalChain:
       case KeyPathExpr::Component::Kind::OptionalWrap:
       case KeyPathExpr::Component::Kind::OptionalForce:
