@@ -8938,9 +8938,9 @@ void ClangImporter::Implementation::importAttributes(
         continue;
 
       // Is this declaration marked platform-agnostically unavailable?
-      auto PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
+      auto AttrKind = AvailableAttr::Kind::Default;
       if (avail->getUnavailable()) {
-        PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
+        AttrKind = AvailableAttr::Kind::Unavailable;
         AnyUnavailable = true;
       }
 
@@ -8950,14 +8950,13 @@ void ClangImporter::Implementation::importAttributes(
                               avail->getLoc(), "__SPI_AVAILABLE");
 
       StringRef message = avail->getMessage();
-
       llvm::VersionTuple deprecated = avail->getDeprecated();
 
       if (!deprecated.empty()) {
         if (platformAvailability.treatDeprecatedAsUnavailable(
                 ClangDecl, deprecated, isAsync)) {
+          AttrKind = AvailableAttr::Kind::Unavailable;
           AnyUnavailable = true;
-          PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
           if (message.empty()) {
             if (isAsync) {
               message =
@@ -8978,11 +8977,12 @@ void ClangImporter::Implementation::importAttributes(
       if (!replacement.empty())
         swiftReplacement = getSwiftNameFromClangName(replacement);
 
-      auto AvAttr = new (C) AvailableAttr(
-          SourceLoc(), SourceRange(), platformK.value(), message,
-          swiftReplacement, introduced, SourceRange(), deprecated,
-          SourceRange(), obsoleted, SourceRange(), PlatformAgnostic,
-          /*Implicit=*/false, EnableClangSPI && IsSPI);
+      auto AvAttr = new (C)
+          AvailableAttr(SourceLoc(), SourceRange(),
+                        AvailabilityDomain::forPlatform(*platformK), AttrKind,
+                        message, swiftReplacement, introduced, SourceRange(),
+                        deprecated, SourceRange(), obsoleted, SourceRange(),
+                        /*Implicit=*/false, EnableClangSPI && IsSPI);
 
       MappedDecl->getAttrs().add(AvAttr);
     }
