@@ -1721,12 +1721,17 @@ class ImplicitSelfUsageChecker : public BaseDiagnosticWalker {
   /// these diagnostics.
   SmallPtrSet<Expr *, 16> UnwrapStmtImplicitSelfExprs;
 
+  /// The number of parent macros.
+  unsigned MacroDepth = 0;
+
 public:
   explicit ImplicitSelfUsageChecker(ASTContext &Ctx, AbstractClosureExpr *ACE)
       : Ctx(Ctx), Closures() {
     if (ACE)
       Closures.push_back(ACE);
   }
+
+  bool isInMacro() const { return MacroDepth > 0; }
 
   static bool
   implicitWeakSelfReferenceIsValid510(const DeclRefExpr *DRE,
@@ -2219,7 +2224,35 @@ public:
     return isClosureRequiringSelfQualification(E);
   }
 
+  template <typename... ArgTypes>
+  InFlightDiagnostic diagnoseImplicitSelfUse(
+      SourceLoc loc, Expr *base, AbstractClosureExpr *closure,
+      Diag<ArgTypes...> ID,
+      typename detail::PassArgument<ArgTypes>::type... Args) {
+    std::optional<unsigned> warnUntilVersion;
+    // Prior to Swift 6, we may need to downgrade to a warning for compatibility
+    // with the 5.10 diagnostic behavior.
+    if (!Ctx.isSwiftVersionAtLeast(6) &&
+        invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
+      warnUntilVersion.emplace(6);
+    }
+    // Prior to Swift 7, downgrade to a warning if we're in a macro to preserve
+    // compatibility with the Swift 6 diagnostic behavior where we previously
+    // skipped diagnosing.
+    if (!Ctx.isSwiftVersionAtLeast(7) && isInMacro())
+      warnUntilVersion.emplace(7);
+
+    auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
+    if (warnUntilVersion)
+      diag.warnUntilSwiftVersion(*warnUntilVersion);
+
+    return diag;
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    if (isa<MacroExpansionExpr>(E))
+      MacroDepth += 1;
+
     if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
       if (shouldRecordClosure(CE))
         Closures.push_back(CE);
@@ -2249,12 +2282,10 @@ public:
         selfDRE = dyn_cast_or_null<DeclRefExpr>(MRE->getBase());
         auto baseName = MRE->getMember().getDecl()->getBaseName();
         memberLoc = MRE->getLoc();
-        Diags
-            .diagnose(memberLoc,
-                      diag::property_use_in_closure_without_explicit_self,
-                      baseName.getIdentifier())
-            .warnUntilSwiftVersionIf(
-                invalidImplicitSelfShouldOnlyWarn510(MRE->getBase(), ACE), 6);
+        diagnoseImplicitSelfUse(
+            memberLoc, MRE->getBase(), ACE,
+            diag::property_use_in_closure_without_explicit_self,
+            baseName.getIdentifier());
       }
 
     // Handle method calls with a specific diagnostic + fixit.
@@ -2264,12 +2295,10 @@ public:
         selfDRE = dyn_cast_or_null<DeclRefExpr>(DSCE->getBase());
         auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
         memberLoc = DSCE->getLoc();
-        Diags
-            .diagnose(DSCE->getLoc(),
-                      diag::method_call_in_closure_without_explicit_self,
-                      MethodExpr->getDecl()->getBaseIdentifier())
-            .warnUntilSwiftVersionIf(
-                invalidImplicitSelfShouldOnlyWarn510(DSCE->getBase(), ACE), 6);
+        diagnoseImplicitSelfUse(
+            memberLoc, DSCE->getBase(), ACE,
+            diag::method_call_in_closure_without_explicit_self,
+            MethodExpr->getDecl()->getBaseIdentifier());
       }
 
     if (memberLoc.isValid()) {
@@ -2284,14 +2313,18 @@ public:
     }
 
     if (!selfDeclAllowsImplicitSelf(E, ACE)) {
-      Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure)
-          .warnUntilSwiftVersionIf(invalidImplicitSelfShouldOnlyWarn510(E, ACE),
-                                   6);
+      diagnoseImplicitSelfUse(E->getLoc(), E, ACE,
+                              diag::implicit_use_of_self_in_closure);
     }
     return Action::Continue(E);
   }
 
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    if (isa<MacroExpansionExpr>(E)) {
+      assert(isInMacro());
+      MacroDepth -= 1;
+    }
+
     auto *ACE = dyn_cast<AbstractClosureExpr>(E);
     if (!ACE) {
       return Action::Continue(E);
@@ -2302,6 +2335,21 @@ public:
       Closures.pop_back();
     }
     return Action::Continue(E);
+  }
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    if (isa<MacroExpansionDecl>(D))
+      MacroDepth += 1;
+
+    return BaseDiagnosticWalker::walkToDeclPre(D);
+  }
+
+  PostWalkAction walkToDeclPost(Decl *D) override {
+    if (isa<MacroExpansionDecl>(D)) {
+      assert(isInMacro());
+      MacroDepth -= 1;
+    }
+    return Action::Continue();
   }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
