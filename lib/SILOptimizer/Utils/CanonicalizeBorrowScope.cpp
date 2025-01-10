@@ -445,6 +445,10 @@ public:
     }
     SILValue def = scope.findDefInBorrowScope(value);
     if (use->isConsuming()) {
+      if (use->get()->getType().isMoveOnly()) {
+        // Can't produce a copy of a non-copyable value on demand.  Bail out.
+        return false;
+      }
       // All in-scope consuming uses need a unique copy in the same block.
       auto *copy = dyn_cast<CopyValueInst>(use->get());
       if (copy && copy->hasOneUse() && copy->getParent() == user->getParent()) {
@@ -822,6 +826,22 @@ bool CanonicalizeBorrowScope::canonicalizeFunctionArgument(
 
   return visitBorrowScopeUses(borrowedValue.value, innerRewriter);
 }
+
+namespace swift::test {
+// Arguments:
+// - SILFunctionArgument: function argument to canonicalize
+// Dumps:
+// - function after argument canonicalization
+static FunctionTest CanonicalizeFunctionArgumentTest(
+    "canonicalize_function_argument",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *argument = cast<SILFunctionArgument>(arguments.takeBlockArgument());
+      InstructionDeleter deleter;
+      CanonicalizeBorrowScope canonicalizer(&function, deleter);
+      canonicalizer.canonicalizeFunctionArgument(argument);
+      function.print(llvm::outs());
+    });
+} // end namespace swift::test
 
 /// Canonicalize a worklist of extended lifetimes. This iterates after rewriting
 /// borrow scopes to handle new outer copies and new owned lifetimes from
