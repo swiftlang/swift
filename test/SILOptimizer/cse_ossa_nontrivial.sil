@@ -1010,3 +1010,26 @@ bb0:
  return %t : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_aggreate_tail_addr :
+// CHECK: ref_tail_addr
+// CHECK: ref_tail_addr
+// CHECK-LABEL: } // end sil function 'test_aggreate_tail_addr'
+sil [ossa] @test_aggreate_tail_addr : $@convention(thin) (@owned _NativeDictionary<Int, Klass>) -> () {
+bb0(%0 : @owned $_NativeDictionary<Int, Klass>):
+  %1 = move_value [lexical] %0 : $_NativeDictionary<Int, Klass>
+  %2 = begin_borrow %1 : $_NativeDictionary<Int, Klass>
+  %3 = struct_extract %2 : $_NativeDictionary<Int, Klass>, #_NativeDictionary._storage
+  %4 = copy_value %3 : $__RawDictionaryStorage
+  %5 = ref_tail_addr %3 : $__RawDictionaryStorage, $_UnsafeBitset.Word
+  %6 = load [trivial] %5 : $*_UnsafeBitset.Word
+  end_borrow %2 : $_NativeDictionary<Int, Klass>
+  %8 = begin_borrow %4 : $__RawDictionaryStorage
+  %9 = ref_tail_addr %8 : $__RawDictionaryStorage, $_UnsafeBitset.Word
+  %10 = struct_element_addr %9 : $*_UnsafeBitset.Word, #_UnsafeBitset.Word.value
+  %11 = struct_element_addr %10 : $*UInt, #UInt._value
+  %12 = load [trivial] %11 : $*Builtin.Int64
+  end_borrow %8 : $__RawDictionaryStorage
+  destroy_value %4 : $__RawDictionaryStorage
+  destroy_value %1 : $_NativeDictionary<Int, Klass>
+  unreachable
+}
