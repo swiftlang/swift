@@ -35,3 +35,31 @@ extension String.UTF8View {
     }
   }
 }
+
+extension Substring.UTF8View {
+
+  @available(SwiftStdlib 6.1, *)
+  public var storage: Span<UTF8.CodeUnit> {
+    @_alwaysEmitIntoClient
+    @lifetime(borrow self)
+    borrowing get {
+      let start = _slice._startIndex._encodedOffset
+      let end = _slice._endIndex._encodedOffset
+      if _wholeGuts.isSmall {
+        let a = Builtin.addressOfBorrow(self)
+        let offset = start &+ (MemoryLayout<String.Index>.stride &<< 1)
+        let address = UnsafePointer<UTF8.CodeUnit>(a).advanced(by: offset)
+        let span = Span(_unsafeStart: address, count: end &- start)
+        return _overrideLifetime(span, borrowing: self)
+      }
+      else if _wholeGuts.isFastUTF8 {
+        let buffer = _wholeGuts._object.fastUTF8.extracting(start..<end)
+        let count = end &- start
+        _internalInvariant(count == buffer.count)
+        let span = Span(_unsafeElements: buffer)
+        return _overrideLifetime(span, borrowing: self)
+      }
+      fatalError()
+    }
+  }
+}
