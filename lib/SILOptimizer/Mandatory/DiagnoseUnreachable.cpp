@@ -775,6 +775,14 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
     if (isa<EndBorrowInst>(currInst))
       return false;
 
+    // If we have an ignored use whose operand is our no return call, ignore it.
+    if (auto *i = dyn_cast<IgnoredUseInst>(currInst)) {
+      if (auto *svi = dyn_cast<SingleValueInstruction>(i->getOperand());
+          svi && getAsCallToNoReturn(svi)) {
+        return false;
+      }
+    }
+
     // destroy_value [dead_end] instructions are inserted at the availability
     // boundary by lifetime completion.  Such instructions correctly mark the
     // lifetime boundary of the destroyed value and never arise from dead user

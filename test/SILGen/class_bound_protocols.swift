@@ -198,6 +198,7 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   // CHECK-NEXT: end_borrow
   // CHECK-NEXT: destroy_addr
   // CHECK-NEXT: end_access [[X_ADDR]] : $*any InheritsMutatingMethod
+  // CHECK-NEXT: ignored_use [[RESULT_VALUE]]
   // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened("{{.*}}", any InheritsMutatingMethod) Self
   _ = x.mutatingCounter
 
