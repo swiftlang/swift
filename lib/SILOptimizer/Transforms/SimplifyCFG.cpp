@@ -3850,11 +3850,21 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
   // An argument has one result value. We need to replace this with the *value*
   // of the incoming block(s).
   LLVM_DEBUG(llvm::dbgs() << "replace arg with incoming value:" << *A);
-  if (auto *bfi = getBorrowedFromUser(A)) {
-    bfi->replaceAllUsesWith(A);
-    bfi->eraseFromParent();
+  while (!A->use_empty()) {
+    Operand *op = *A->use_begin();
+    if (auto *bfi = dyn_cast<BorrowedFromInst>(op->getUser())) {
+      if (op->getOperandNumber() == 0) {
+        bfi->replaceAllUsesWith(V);
+        bfi->eraseFromParent();
+        continue;
+      }
+      if (auto *prevBfi = dyn_cast<BorrowedFromInst>(V)) {
+        op->set(prevBfi->getBorrowedValue());
+        continue;
+      }
+    }
+    op->set(V);
   }
-  A->replaceAllUsesWith(V);
 }
 
 bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {

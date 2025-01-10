@@ -164,7 +164,11 @@ private struct MutatingUsesWalker : AddressDefUseWalker {
 
       for use in startInst.uses {
         if let phi = Phi(using: use) {
-          linearLiveranges.pushIfNotVisited(phi.borrowedFrom!)
+          if let bf = phi.borrowedFrom {
+            linearLiveranges.pushIfNotVisited(bf)
+          } else {
+            require(false, "missing borrowed-from for \(phi.value)")
+          }
         }
       }
     }
