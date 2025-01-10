@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -630,6 +630,7 @@ extension Substring: LosslessStringConvertible {
 
 extension Substring {
   @frozen
+  @_addressableForDependencies
   public struct UTF8View: Sendable {
     @usableFromInline
     internal var _slice: Slice<String.UTF8View>
@@ -746,6 +747,34 @@ extension Substring.UTF8View: BidirectionalCollection {
     // FIXME(strings): tests.
     let r = _wholeGuts.validateSubscalarRange(r, in: _bounds)
     return Substring.UTF8View(_slice.base, _bounds: r)
+  }
+}
+
+extension Substring.UTF8View {
+
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<UTF8.CodeUnit> {
+    @lifetime(borrow self)
+    borrowing get {
+      let start = _slice._startIndex._encodedOffset
+      let end = _slice._endIndex._encodedOffset
+      if _wholeGuts.isSmall {
+        let a = Builtin.addressOfBorrow(self)
+        let offset = start &+ (MemoryLayout<String.Index>.stride &<< 1)
+        let address = unsafe UnsafePointer<UTF8.CodeUnit>(a).advanced(by: offset)
+        let span = unsafe Span(_unsafeStart: address, count: end &- start)
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+      else if _wholeGuts.isFastUTF8 {
+        let buffer = unsafe _wholeGuts._object.fastUTF8.extracting(start..<end)
+        let count = end &- start
+        _internalInvariant(count == buffer.count)
+        let span = unsafe Span(_unsafeElements: buffer)
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+      // handle other Objective-C bridging cases here
+      fatalError("Some bridged Strings are not supported at this time")
+    }
   }
 }
 
