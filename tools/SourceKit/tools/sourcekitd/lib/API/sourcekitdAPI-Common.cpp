@@ -27,7 +27,13 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/YAMLParser.h"
 #include <mutex>
+
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#define NOMINMAX
+#include <Windows.h>
+#else
 #include <dlfcn.h>
+#endif
 
 using namespace SourceKit;
 using namespace sourcekitd;
@@ -271,6 +277,31 @@ bool sourcekitd::shutdownClient() {
 
 extern "C" const char __dso_handle[];
 
+static void withCurrentLibraryPath(llvm::function_ref<void(const char *)> body) {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  char path[MAX_PATH];
+  HMODULE currentModule = NULL;
+
+  if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+          GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+          (LPCWSTR) &withCurrentLibraryPath, &currentModule) == 0) {
+      int error = GetLastError();
+      LOG_WARN("plugin-loading", "failed to determine current Windows module. Error: " << error);
+      return body(nullptr);
+  }
+  if (GetModuleFileNameA(currentModule, path, sizeof(path)) == 0) {
+      int error = GetLastError();
+      LOG_WARN("plugin-loading", "failed to path of current Windows module. Error: " << error);
+      return body(nullptr);
+  }
+  return body(path);
+#else
+  Dl_info dlinfo;
+  dladdr(__dso_handle, &dlinfo);
+  return body(dlinfo.dli_fname);
+#endif
+}
+
 static void loadPlugin(StringRef plugin, PluginInitParams &pluginParams) {
   std::string err;
   auto *handle = swift::loadLibrary(plugin.str().c_str(), &err);
@@ -283,9 +314,9 @@ static void loadPlugin(StringRef plugin, PluginInitParams &pluginParams) {
   auto *plugin_init_2 = (sourcekitd_plugin_initialize_2_t)swift::getAddressOfSymbol(
       handle, "sourcekitd_plugin_initialize_2");
   if (plugin_init_2) {
-    Dl_info dlinfo;
-    dladdr(__dso_handle, &dlinfo);
-    plugin_init_2(&pluginParams, dlinfo.dli_fname);
+    withCurrentLibraryPath([&](const char *currentLibraryPath) {
+      plugin_init_2(&pluginParams, currentLibraryPath);
+    });
     return;
   }
 
