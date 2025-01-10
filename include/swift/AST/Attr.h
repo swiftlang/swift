@@ -836,6 +836,23 @@ public:
         Bits.AvailableAttr.PlatformAgnostic);
   }
 
+  /// Returns the kind of availability the attribute specifies.
+  Kind getKind() const {
+    switch (getPlatformAgnosticAvailability()) {
+    case PlatformAgnosticAvailabilityKind::None:
+    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
+      return Kind::Default;
+    case PlatformAgnosticAvailabilityKind::Deprecated:
+      return Kind::Deprecated;
+    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+    case PlatformAgnosticAvailabilityKind::Unavailable:
+      return Kind::Unavailable;
+    case PlatformAgnosticAvailabilityKind::NoAsync:
+      return Kind::NoAsync;
+    }
+  }
+
   /// Create an `AvailableAttr` that specifies universal unavailability, e.g.
   /// `@available(*, unavailable)`.
   static AvailableAttr *createUniversallyUnavailable(ASTContext &C,

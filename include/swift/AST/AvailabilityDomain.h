@@ -33,14 +33,14 @@ public:
     /// universally unavailable or deprecated, for example.
     Universal,
 
-    /// Represents availability for a specific operating system platform.
-    Platform,
-
     /// Represents availability with respect to Swift language mode.
     SwiftLanguage,
 
     /// Represents PackageDescription availability.
     PackageDescription,
+
+    /// Represents availability for a specific operating system platform.
+    Platform,
   };
 
 private:
@@ -98,6 +98,40 @@ public:
 
   /// Returns the string to use when printing an `@available` attribute.
   llvm::StringRef getNameForAttributePrinting() const;
+
+  bool operator==(const AvailabilityDomain &other) const {
+    if (getKind() != other.getKind())
+      return false;
+
+    switch (getKind()) {
+    case Kind::Universal:
+    case Kind::SwiftLanguage:
+    case Kind::PackageDescription:
+      // These availability domains are singletons.
+      return true;
+    case Kind::Platform:
+      return getPlatformKind() == other.getPlatformKind();
+    }
+  }
+
+  bool operator!=(const AvailabilityDomain &other) const {
+    return !(*this == other);
+  }
+
+  bool operator<(const AvailabilityDomain &other) const {
+    if (getKind() != other.getKind())
+      return getKind() < other.getKind();
+
+    switch (getKind()) {
+    case Kind::Universal:
+    case Kind::SwiftLanguage:
+    case Kind::PackageDescription:
+      // These availability domains are singletons.
+      return false;
+    case Kind::Platform:
+      return getPlatformKind() < other.getPlatformKind();
+    }
+  }
 };
 
 } // end namespace swift
