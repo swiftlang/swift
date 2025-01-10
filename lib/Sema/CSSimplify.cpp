@@ -9756,6 +9756,24 @@ static bool mayBeForKeyPathSubscriptWithoutLabel(ConstraintSystem &cs,
   return false;
 }
 
+static bool isForKeyPathConstructor(ConstraintSystem &cs,
+                                    ConstraintLocator *locator) {
+  if (!locator || !locator->getAnchor())
+    return false;
+
+  if (auto *CE = getAsExpr<CallExpr>(locator->getAnchor())) {
+    if (auto *ctorRef = dyn_cast<DeclRefExpr>(CE->getFn())) {
+      if (auto *ctor = dyn_cast<ConstructorDecl>(ctorRef->getDecl())) {
+        if (CE->getArgs()->isUnary() &&
+            CE->getArgs()->getLabel(0) == cs.getASTContext().Id_keyPath) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 /// Determine whether all of the given candidate overloads
 /// found through conditional conformances of a given base type.
 /// This is useful to figure out whether it makes sense to
@@ -10122,6 +10140,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       if (memberLocator &&
           UnevaluatedRootExprs.count(getAsExpr(memberLocator->getAnchor()))) {
         hasInstanceMembers = true;
+      }
+
+      // If we have an initializer keypath component, allow as candidate.
+      if (auto *ctor = dyn_cast<ConstructorDecl>(decl)) {
+        if (isForKeyPathConstructor(*this, memberLocator))
+          return result.addViable(candidate);
       }
     } else {
       // Otherwise, we can access all instance members.
@@ -10758,9 +10782,6 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // which means MetatypeType has to be added after finding a type variable.
     if (baseLocator->isLastElement<LocatorPathElt::MemberRefBase>())
       baseType = MetatypeType::get(baseType);
-  } else if (isExpr<KeyPathExpr>(anchor)) {
-    // Key path can't refer to initializers e.g. `\Type.init`
-    return AllowInvalidRefInKeyPath::forRef(cs, baseType, init, locator);
   }
 
   if (!baseType)
