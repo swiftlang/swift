@@ -344,7 +344,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             if (asd->getEffectfulGetAccessor()) {
               Ctx.Diags.diagnose(component.getLoc(),
                                  diag::effectful_keypath_component,
-                                 asd->getDescriptiveKind());
+                                 asd->getDescriptiveKind(),
+                                 /*dynamic member lookup*/ false);
               Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
                                  asd->getDescriptiveKind());
             }
