@@ -155,6 +155,11 @@ RUNTIME_VERSION(
   FUTURE
 )
 
+RUNTIME_VERSION(
+  (6, 2),
+  FUTURE
+)
+
 END_MAJOR_VERSION(6)
 
 // .......................................................................... //
