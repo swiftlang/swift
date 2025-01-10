@@ -2119,3 +2119,43 @@ bb0(%0 : @owned $Klass):
   unreachable
 }
 
+// CHECK-LABEL: sil [ossa] @end_borrows_in_liferange_exit_block :
+// CHECK:         %1 = load_borrow %0
+// CHECK:         %2 = begin_borrow [lexical] %1
+// CHECK:       bb1({{.*}} : @guaranteed $C):
+// CHECK-NEXT:    end_borrow %2
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow %2
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       } // end sil function 'end_borrows_in_liferange_exit_block'
+sil [ossa] @end_borrows_in_liferange_exit_block : $@convention(thin) (@in_guaranteed Optional<C>) -> () {
+bb0(%0 : $*Optional<C>):
+  %1 = load [copy] %0
+  %2 = move_value [lexical] %1
+  switch_enum %2, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%4 : @owned $C):
+  destroy_value %4
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @lifetime_ending_enum_data :
+// CHECK:         %1 = load_borrow %0
+// CHECK-NEXT:    %2 = unchecked_enum_data %1
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       } // end sil function 'lifetime_ending_enum_data'
+sil [ossa] @lifetime_ending_enum_data : $@convention(method) (@in_guaranteed MultiPayload) -> MyInt {
+bb0(%0 : $*MultiPayload):
+  %1 = load [copy] %0
+  %2 = unchecked_enum_data %1, #MultiPayload.b!enumelt
+  return %2
+}
+
