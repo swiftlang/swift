@@ -324,7 +324,7 @@ extension Optional where Wrapped: ~Copyable {
   }
 }
 
-extension Optional {
+extension Optional where Wrapped: ~Escapable {
   /// The wrapped value of this instance, unwrapped without checking whether
   /// the instance is `nil`.
   ///
@@ -349,6 +349,7 @@ extension Optional {
   ///   will never be equal to `nil` and only after you've tried using the
   ///   postfix `!` operator.
   @inlinable
+  @_preInverseGenerics
   @unsafe
   public var unsafelyUnwrapped: Wrapped {
     @inline(__always)
@@ -361,7 +362,7 @@ extension Optional {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   // FIXME(NCG): Do we want this? It seems like we do. Make this public.
   @_alwaysEmitIntoClient
   public consuming func _consumingUnsafelyUnwrap() -> Wrapped {
@@ -374,12 +375,13 @@ extension Optional where Wrapped: ~Copyable {
   }
 }
 
-extension Optional {
+extension Optional where Wrapped: ~Escapable {
   /// - Returns: `unsafelyUnwrapped`.
   ///
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
   @inlinable
+  @_preInverseGenerics
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
     get {
