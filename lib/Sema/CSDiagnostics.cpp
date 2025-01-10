@@ -6415,8 +6415,14 @@ bool InvalidMemberWithMutatingGetterInKeyPath::diagnoseAsError() {
   return true;
 }
 
-bool InvalidMethodRefInKeyPath::diagnoseAsError() {
-  emitDiagnostic(diag::expr_keypath_not_property, getMember(),
+bool InvalidMutatingMethodRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(diag::expr_keypath_mutating_method, getMember(),
+                 isForKeyPathDynamicMemberLookup());
+  return true;
+}
+
+bool InvalidAsyncOrThrowsMethodRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(diag::effectful_keypath_component, getKind(),
                  isForKeyPathDynamicMemberLookup());
   return true;
 }

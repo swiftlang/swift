@@ -1251,9 +1251,13 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
                                                      getLocator());
     return failure.diagnose(asNote);
   }
-
-  case RefKind::Initializer: {
-    InvalidMethodRefInKeyPath failure(solution, Member, getLocator());
+  case RefKind::MutatingMethod: {
+    InvalidMutatingMethodRefInKeyPath failure(solution, Member, getLocator());
+    return failure.diagnose(asNote);
+  }
+  case RefKind::AsyncOrThrowsMethod: {
+    InvalidAsyncOrThrowsMethodRefInKeyPath failure(solution, Member,
+                                                   getLocator());
     return failure.diagnose(asNote);
   }
   }
@@ -1317,6 +1321,22 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
     if (storage->isGetterMutating())
       return AllowInvalidRefInKeyPath::create(
           cs, baseType, RefKind::MutatingGetter, member, locator);
+  }
+
+  // Referencing mutating, throws or async method members is not currently
+  // allowed.
+  if (auto method = dyn_cast<FuncDecl>(member)) {
+    if (method->isAsyncContext())
+      return AllowInvalidRefInKeyPath::create(
+          cs, baseType, RefKind::AsyncOrThrowsMethod, member, locator);
+    if (auto methodType = method->getInterfaceType()->getAs<AnyFunctionType>()) {
+      if (methodType->getResult()->getAs<AnyFunctionType>()->isThrowing())
+        return AllowInvalidRefInKeyPath::create(
+            cs, baseType, RefKind::AsyncOrThrowsMethod, member, locator);
+    }
+    if (method->isMutating())
+      return AllowInvalidRefInKeyPath::create(
+          cs, baseType, RefKind::MutatingMethod, member, locator);
   }
 
   return nullptr;
