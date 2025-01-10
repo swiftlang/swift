@@ -586,7 +586,7 @@ extension _ArrayBuffer {
       _storage.objCInstance,
       _ArrayBuffer.associationKey
     ) {
-      let buffer = assocPtr.loadUnaligned(
+      let buffer = assocPtr.load(
         as: _ContiguousArrayStorage<Element>.self
       )
       return _ContiguousArrayBuffer(buffer)
