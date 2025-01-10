@@ -117,7 +117,7 @@ struct LifetimeDependence : CustomStringConvertible {
     case yield(Value)
     /// An owned value whose OSSA lifetime encloses nonescapable values, or a trivial variable introduced by move_value.
     case owned(Value)
-    /// An borrowed value whose OSSA lifetime encloses nonescapable values, or a trivial variable introduced by
+    /// A borrowed value whose OSSA lifetime encloses nonescapable values, or a trivial variable introduced by
     /// begin_borrow.
     case borrowed(BeginBorrowValue)
     /// Singly-initialized addressable storage (likely for an
@@ -313,10 +313,15 @@ extension LifetimeDependence.Scope {
 
   private init(address: Value, _ context: some Context) {
     switch address.enclosingAccessScope {
-    case let .scope(access):
+    case let .access(access):
       self = .access(access)
     case let .base(accessBase):
       self = Self(accessBase: accessBase, address: address, context)
+    case let .dependence(markDep):
+      // The current dependence only represents the forwarded address. If the mark_dependence instruction encoutered
+      // here is [unresolved], then a separate LifetimeDependence.Scope will be created for it, and if it is [escaping],
+      // then it is ignored for the purpose of lifetime dependence.
+      self.init(address: markDep.value, context)
     }
   }
 
@@ -1151,7 +1156,7 @@ extension LifetimeDependenceDefUseWalker {
 
     // Get the local variable access that encloses this store.
     var storeAccess = storedOperand.instruction
-    if case let .scope(beginAccess) = storeAddress.enclosingAccessScope {
+    if case let .access(beginAccess) = storeAddress.enclosingAccessScope {
       storeAccess = beginAccess
     }
     if !localReachability.gatherAllReachableUses(of: storeAccess, in: &accessStack) {
