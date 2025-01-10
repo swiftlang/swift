@@ -2146,3 +2146,16 @@ bb3:
   %r = tuple ()
   return %r
 }
+
+// CHECK-LABEL: sil [ossa] @lifetime_ending_enum_data :
+// CHECK:         %1 = load_borrow %0
+// CHECK-NEXT:    %2 = unchecked_enum_data %1
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       } // end sil function 'lifetime_ending_enum_data'
+sil [ossa] @lifetime_ending_enum_data : $@convention(method) (@in_guaranteed MultiPayload) -> MyInt {
+bb0(%0 : $*MultiPayload):
+  %1 = load [copy] %0
+  %2 = unchecked_enum_data %1, #MultiPayload.b!enumelt
+  return %2
+}
+

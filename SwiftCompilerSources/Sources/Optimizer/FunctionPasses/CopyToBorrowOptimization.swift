@@ -185,6 +185,11 @@ private struct Uses {
       for succ in termInst.successors where !succ.arguments.contains(where: {$0.ownership == .owned}) {
         nonDestroyingLiverangeExits.append(succ.instructions.first!)
       }
+    } else if !forwardingInst.forwardedResults.contains(where: { $0.ownership == .owned }) {
+      // The forwarding instruction has no owned result, which means it ends the lifetime of its owned operand.
+      // This can happen with an `unchecked_enum_data` which extracts a trivial payload out of a
+      // non-trivial enum.
+      nonDestroyingLiverangeExits.append(forwardingInst.next!)
     }
   }
 
