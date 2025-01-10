@@ -5619,27 +5619,31 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   DECODE_VER_TUPLE(Deprecated)
   DECODE_VER_TUPLE(Obsoleted)
 
-  PlatformAgnosticAvailabilityKind platformAgnostic;
+  AvailableAttr::Kind kind;
   if (isUnavailable)
-    platformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
+    kind = AvailableAttr::Kind::Unavailable;
   else if (isDeprecated)
-    platformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
+    kind = AvailableAttr::Kind::Deprecated;
   else if (isNoAsync)
-    platformAgnostic = PlatformAgnosticAvailabilityKind::NoAsync;
-  else if (platform == PlatformKind::none &&
-           (!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty()))
-    platformAgnostic =
-        isPackageDescriptionVersionSpecific
-            ? PlatformAgnosticAvailabilityKind::
-                  PackageDescriptionVersionSpecific
-            : PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+    kind = AvailableAttr::Kind::NoAsync;
   else
-    platformAgnostic = PlatformAgnosticAvailabilityKind::None;
+    kind = AvailableAttr::Kind::Default;
 
-  auto attr = new (ctx) AvailableAttr(
-      SourceLoc(), SourceRange(), platform, message, rename, Introduced,
-      SourceRange(), Deprecated, SourceRange(), Obsoleted, SourceRange(),
-      platformAgnostic, isImplicit, isSPI, isForEmbedded);
+  AvailabilityDomain domain;
+  if (platform != PlatformKind::none) {
+    domain = AvailabilityDomain::forPlatform(platform);
+  } else if (!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty()) {
+    domain = isPackageDescriptionVersionSpecific
+                 ? AvailabilityDomain::forPackageDescription()
+                 : AvailabilityDomain::forSwiftLanguage();
+  } else {
+    domain = AvailabilityDomain::forUniversal();
+  }
+
+  auto attr = new (ctx)
+      AvailableAttr(SourceLoc(), SourceRange(), domain, kind, message, rename,
+                    Introduced, SourceRange(), Deprecated, SourceRange(),
+                    Obsoleted, SourceRange(), isImplicit, isSPI, isForEmbedded);
   return attr;
 }
 
