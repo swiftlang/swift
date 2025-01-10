@@ -96,29 +96,29 @@ bool CanonicalizeBorrowScope::isRewritableOSSAForward(SILInstruction *inst) {
   if (inst->getNumOperands() != 1)
     return false;
 
-  if (isa<OwnershipForwardingSingleValueInstruction>(inst) ||
-      isa<OwnershipForwardingMultipleValueInstruction>(inst)) {
-    Operand *forwardedOper = &inst->getOperandRef(0);
-    // Trivial conversions do not need to be hoisted out of a borrow scope.
-    auto operOwnership = forwardedOper->getOperandOwnership();
-    if (operOwnership == OperandOwnership::TrivialUse)
-      return false;
-    // Don't mess with unowned conversions. They need to be copied immediately.
-    if (operOwnership != OperandOwnership::GuaranteedForwarding &&
-        operOwnership != OperandOwnership::ForwardingConsume) {
-      return false;
-    }
-    assert(operOwnership == OperandOwnership::GuaranteedForwarding ||
-           operOwnership == OperandOwnership::ForwardingConsume);
+  if (!isa<OwnershipForwardingSingleValueInstruction>(inst) &&
+      !isa<OwnershipForwardingMultipleValueInstruction>(inst))
+    return false;
 
-    // Filter instructions that belong to a Forwarding*ValueInst mixin but
-    // cannot be converted to forward owned value (struct_extract).
-    if (!canOpcodeForwardOwnedValues(forwardedOper))
-      return false;
-
-    return true;
+  Operand *forwardedOper = &inst->getOperandRef(0);
+  // Trivial conversions do not need to be hoisted out of a borrow scope.
+  auto operOwnership = forwardedOper->getOperandOwnership();
+  if (operOwnership == OperandOwnership::TrivialUse)
+    return false;
+  // Don't mess with unowned conversions. They need to be copied immediately.
+  if (operOwnership != OperandOwnership::GuaranteedForwarding &&
+      operOwnership != OperandOwnership::ForwardingConsume) {
+    return false;
   }
-  return false;
+  assert(operOwnership == OperandOwnership::GuaranteedForwarding ||
+         operOwnership == OperandOwnership::ForwardingConsume);
+
+  // Filter instructions that belong to a Forwarding*ValueInst mixin but
+  // cannot be converted to forward owned value (struct_extract).
+  if (!canOpcodeForwardOwnedValues(forwardedOper))
+    return false;
+
+  return true;
 }
 
 /// Return the root of a borrowed extended lifetime for \p def or invalid.
