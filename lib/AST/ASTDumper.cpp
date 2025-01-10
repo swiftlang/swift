@@ -3892,11 +3892,37 @@ public:
   }
   void visitAvailableAttr(AvailableAttr *Attr, StringRef label) {
     printCommon(Attr, "available_attr", label);
-    printField(Attr->getPlatform(), "platform");
-    if (!Attr->Message.empty())
-      printFieldQuoted(Attr->Message, "message");
-    if (!Attr->Rename.empty())
-      printFieldQuoted(Attr->Rename, "rename");
+    switch (Attr->getPlatformAgnosticAvailability()) {
+    case PlatformAgnosticAvailabilityKind::None:
+    case PlatformAgnosticAvailabilityKind::Deprecated:
+    case PlatformAgnosticAvailabilityKind::Unavailable:
+    case PlatformAgnosticAvailabilityKind::NoAsync:
+      printField(Attr->getPlatform(), "platform");
+      break;
+    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+      printFieldQuoted("swift", "platform");
+      break;
+    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
+      printFieldQuoted("_PackageDescription", "platform");
+      break;
+    }
+    switch (Attr->getPlatformAgnosticAvailability()) {
+    case PlatformAgnosticAvailabilityKind::Deprecated:
+      printFlag("deprecated");
+      break;
+    case PlatformAgnosticAvailabilityKind::Unavailable:
+    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+      printFlag("unavailable");
+      break;
+    case PlatformAgnosticAvailabilityKind::NoAsync:
+      printFlag("noasync");
+      break;
+    case PlatformAgnosticAvailabilityKind::None:
+    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
+      break;
+    }
     if (Attr->Introduced.has_value())
       printFieldRaw(
           [&](auto &out) { out << Attr->Introduced.value().getAsString(); },
@@ -3909,6 +3935,10 @@ public:
       printFieldRaw(
           [&](auto &out) { out << Attr->Obsoleted.value().getAsString(); },
           "obsoleted");
+    if (!Attr->Message.empty())
+      printFieldQuoted(Attr->Message, "message");
+    if (!Attr->Rename.empty())
+      printFieldQuoted(Attr->Rename, "rename");
     printFoot();
   }
   void visitBackDeployedAttr(BackDeployedAttr *Attr, StringRef label) {
