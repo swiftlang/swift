@@ -121,3 +121,19 @@ extension SIMD64 {
     }
   }
 }
+
+@available(SwiftStdlib 6.2, *)
+extension Slab where Element: ~Copyable {
+
+  @available(SwiftStdlib 6.2, *)
+  public var storage: Span<Element> {
+    @_alwaysEmitIntoClient
+    @_addressableSelf
+    @lifetime(borrow self)
+    borrowing get {
+      let pointer = _address
+      let span = Span(_unsafeStart: pointer, count: count)
+      return _overrideLifetime(span, borrowing: self)
+    }
+  }
+}
