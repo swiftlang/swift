@@ -1820,10 +1820,6 @@ public:
     return getOptions().contains(ProtocolConformanceFlags::Unsafe);
   }
 
-  bool isSafe() const {
-    return getOptions().contains(ProtocolConformanceFlags::Safe);
-  }
-
   bool isSuppressed() const { return IsSuppressed; }
 
   void setOption(ProtocolConformanceFlags flag) {

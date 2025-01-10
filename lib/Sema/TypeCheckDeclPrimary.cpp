@@ -2456,8 +2456,7 @@ public:
     // concurrency checking enabled.
     if (ID->preconcurrency() &&
         Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        Ctx.LangOpts.hasFeature(Feature::WarnUnsafe) && !
-        ID->getAttrs().hasAttribute<SafeAttr>()) {
+        Ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
       diagnoseUnsafeUse(UnsafeUse::forPreconcurrencyImport(ID));
     }
   }

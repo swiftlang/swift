@@ -4144,11 +4144,6 @@ public:
     }
     printFoot();
   }
-  void visitSafeAttr(SafeAttr *Attr, StringRef label) {
-    printCommon(Attr, "safe_attr", label);
-    printFieldQuoted(Attr->message, "message");
-    printFoot();
-  }
   void visitSILGenNameAttr(SILGenNameAttr *Attr, StringRef label) {
     printCommon(Attr, "silgen_name_attr", label);
     printFlag(Attr->Raw, "raw");

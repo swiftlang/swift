@@ -8,9 +8,7 @@
 // REQUIRES: swift_feature_WarnUnsafe
 // REQUIRES: swift_feature_AllowUnsafeAttribute
 
-@preconcurrency import unsafe_swift_decls // expected-warning{{@preconcurrency import is not memory-safe because it can silently introduce data races; use '@safe(unchecked)' to assert that the code is memory-safe}}{{1-1=@safe(unchecked) }}
-
-@safe(unchecked) @preconcurrency import unsafe_swift_decls // okay
+@preconcurrency import unsafe_swift_decls // expected-warning{{@preconcurrency import is not memory-safe because it can silently introduce data races}}
 
 class C: @unchecked Sendable {
   var counter: Int = 0

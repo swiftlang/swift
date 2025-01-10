@@ -2875,8 +2875,6 @@ void PrintAST::printInherited(const Decl *decl) {
         Printer << "@preconcurrency ";
       if (inherited.isUnsafe())
         Printer << "@unsafe ";
-      if (inherited.isSafe())
-        Printer << "@safe(unchecked) ";
       if (inherited.isSuppressed())
         Printer << "~";
     });

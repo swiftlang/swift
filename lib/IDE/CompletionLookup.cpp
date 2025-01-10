@@ -3182,7 +3182,6 @@ void CompletionLookup::getTypeAttributeKeywordCompletions(
       case TypeAttrKind::Preconcurrency:
       case TypeAttrKind::Unchecked:
       case TypeAttrKind::Unsafe:
-      case TypeAttrKind::Safe:
         // These attributes are only available in inheritance clasuses.
         return;
       default:

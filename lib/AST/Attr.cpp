@@ -1637,18 +1637,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DeclAttrKind::Safe: {
-    auto *attr = cast<SafeAttr>(this);
-    Printer.printAttrName("@safe");
-    Printer << "(unchecked";
-    if (!attr->message.empty()) {
-      Printer << ", message: ";
-      Printer.printEscapedStringLiteral(attr->message);
-    }
-    Printer << ")";
-    break;
-  }
-
   case DeclAttrKind::ABI: {
     auto *attr = cast<ABIAttr>(this);
     Printer << "@abi(";
@@ -1810,8 +1798,6 @@ StringRef DeclAttribute::getAttrName() const {
     AccessLevel access = cast<AbstractAccessControlAttr>(this)->getAccess();
     return getAccessLevelSpelling(access);
   }
-  case DeclAttrKind::Safe:
-    return "safe";
   case DeclAttrKind::SPIAccessControl:
     return "_spi";
   case DeclAttrKind::ReferenceOwnership:
