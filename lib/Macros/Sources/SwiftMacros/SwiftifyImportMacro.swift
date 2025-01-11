@@ -29,7 +29,7 @@ protocol ParamInfo: CustomStringConvertible {
 
   func getBoundsCheckedThunkBuilder(
     _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax,
-    _ variant: Variant
+    _ skipTrivialCount: Bool
   ) -> BoundsCheckedThunkBuilder
 }
 
@@ -64,15 +64,15 @@ struct CxxSpan: ParamInfo {
 
   func getBoundsCheckedThunkBuilder(
     _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax,
-    _ variant: Variant
+    _ skipTrivialCount: Bool
   ) -> BoundsCheckedThunkBuilder {
     switch pointerIndex {
     case .param(let i):
     CxxSpanThunkBuilder(base: base, index: i - 1, signature: funcDecl.signature,
-      typeMappings: typeMappings, node: original)
+      typeMappings: typeMappings, node: original, nonescaping: nonescaping)
     case .return:
     CxxSpanThunkBuilder(base: base, index: -1, signature: funcDecl.signature,
-      typeMappings: typeMappings, node: original)
+      typeMappings: typeMappings, node: original, nonescaping: nonescaping)
     }
   }
 }
@@ -93,19 +93,19 @@ struct CountedBy: ParamInfo {
 
   func getBoundsCheckedThunkBuilder(
     _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax,
-    _ variant: Variant
+    _ skipTrivialCount: Bool
   ) -> BoundsCheckedThunkBuilder {
     switch pointerIndex {
     case .param(let i):
       return CountedOrSizedPointerThunkBuilder(
         base: base, index: i-1, countExpr: count,
         signature: funcDecl.signature,
-        nonescaping: nonescaping, isSizedBy: sizedBy, variant: variant)
+        nonescaping: nonescaping, isSizedBy: sizedBy, skipTrivialCount: skipTrivialCount)
     case .return:
       return CountedOrSizedReturnPointerThunkBuilder(
         base: base, countExpr: count,
         signature: funcDecl.signature,
-        nonescaping: nonescaping, isSizedBy: sizedBy, variant: variant)
+        nonescaping: nonescaping, isSizedBy: sizedBy)
     }
   }
 }
@@ -216,13 +216,13 @@ func getSafePointerName(mut: Mutability, generateSpan: Bool, isRaw: Bool) -> Tok
   }
 }
 
-func transformType(_ prev: TypeSyntax, _ variant: Variant, _ isSizedBy: Bool) throws -> TypeSyntax {
+func transformType(_ prev: TypeSyntax, _ generateSpan: Bool, _ isSizedBy: Bool) throws -> TypeSyntax {
   if let optType = prev.as(OptionalTypeSyntax.self) {
     return TypeSyntax(
-      optType.with(\.wrappedType, try transformType(optType.wrappedType, variant, isSizedBy)))
+      optType.with(\.wrappedType, try transformType(optType.wrappedType, generateSpan, isSizedBy)))
   }
   if let impOptType = prev.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
-    return try transformType(impOptType.wrappedType, variant, isSizedBy)
+    return try transformType(impOptType.wrappedType, generateSpan, isSizedBy)
   }
   let name = try getTypeName(prev)
   let text = name.text
@@ -239,16 +239,11 @@ func transformType(_ prev: TypeSyntax, _ variant: Variant, _ isSizedBy: Bool) th
       "expected Unsafe[Mutable][Raw]Pointer type for type \(prev)"
         + " - first type token is '\(text)'", node: name)
   }
-  let token = getSafePointerName(mut: kind, generateSpan: variant.generateSpan, isRaw: isSizedBy)
+  let token = getSafePointerName(mut: kind, generateSpan: generateSpan, isRaw: isSizedBy)
   if isSizedBy {
     return TypeSyntax(IdentifierTypeSyntax(name: token))
   }
   return replaceTypeName(prev, token)
-}
-
-struct Variant {
-  public let generateSpan: Bool
-  public let skipTrivialCount: Bool
 }
 
 protocol BoundsCheckedThunkBuilder {
@@ -282,8 +277,7 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax
-  {
+    -> FunctionSignatureSyntax {
     var newParams = base.signature.parameterClause.parameters.enumerated().filter {
       let type = argTypes[$0.offset]
       // filter out deleted parameters, i.e. ones where argTypes[i] _contains_ nil
@@ -332,12 +326,14 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
   }
 }
 
-struct CxxSpanThunkBuilder: BoundsCheckedThunkBuilder {
+struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
   public let base: BoundsCheckedThunkBuilder
   public let index: Int
   public let signature: FunctionSignatureSyntax
-  public let typeMappings: [String: String] 
+  public let typeMappings: [String: String]
   public let node: SyntaxProtocol
+  public let nonescaping: Bool
+  let isSizedBy: Bool = false
 
   func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
     return []
@@ -346,8 +342,7 @@ struct CxxSpanThunkBuilder: BoundsCheckedThunkBuilder {
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
     -> FunctionSignatureSyntax {
     var types = argTypes
-    let param = getParam(signature, index)
-    let typeName = try getTypeName(param.type).text;
+    let typeName = try getTypeName(oldType).text
     guard let desugaredType = typeMappings[typeName] else {
       throw DiagnosticError(
         "unable to desugar type with name '\(typeName)'", node: node)
@@ -362,10 +357,9 @@ struct CxxSpanThunkBuilder: BoundsCheckedThunkBuilder {
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
     var args = pointerArgs
-    let param = getParam(signature, index)
-    let typeName = try getTypeName(param.type).text;
+    let typeName = try getTypeName(oldType).text
     assert(args[index] == nil)
-    args[index] = ExprSyntax("\(raw: typeName)(\(raw: param.secondName ?? param.firstName))")
+    args[index] = ExprSyntax("\(raw: typeName)(\(raw: name))")
     return try base.buildFunctionCall(args)
   }
 }
@@ -376,15 +370,35 @@ protocol PointerBoundsThunkBuilder: BoundsCheckedThunkBuilder {
   var nullable: Bool { get }
   var signature: FunctionSignatureSyntax { get }
   var nonescaping: Bool { get }
-  var variant: Variant { get }
   var isSizedBy: Bool { get }
+  var generateSpan: Bool { get }
 }
 
 extension PointerBoundsThunkBuilder {
   var nullable: Bool { return oldType.is(OptionalTypeSyntax.self) }
 
   var newType: TypeSyntax { get throws {
-    return try transformType(oldType, variant, isSizedBy) }
+    return try transformType(oldType, generateSpan, isSizedBy) }
+  }
+}
+
+protocol ParamPointerBoundsThunkBuilder: PointerBoundsThunkBuilder {
+  var index: Int { get }
+}
+
+extension ParamPointerBoundsThunkBuilder {
+  var generateSpan: Bool { nonescaping }
+
+  var param: FunctionParameterSyntax {
+    return getParam(signature, index)
+  }
+
+  var oldType: TypeSyntax {
+    return param.type
+  }
+
+  var name: TokenSyntax {
+    return param.secondName ?? param.firstName
   }
 }
 
@@ -394,7 +408,8 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   public let signature: FunctionSignatureSyntax
   public let nonescaping: Bool
   public let isSizedBy: Bool
-  public let variant: Variant
+
+  var generateSpan: Bool = false // needs more lifetime information
 
   var oldType: TypeSyntax {
     return signature.returnClause!.type
@@ -419,33 +434,20 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   }
 }
 
-struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
+struct CountedOrSizedPointerThunkBuilder: ParamPointerBoundsThunkBuilder {
   public let base: BoundsCheckedThunkBuilder
   public let index: Int
   public let countExpr: ExprSyntax
   public let signature: FunctionSignatureSyntax
   public let nonescaping: Bool
   public let isSizedBy: Bool
-  public let variant: Variant
-  
-  var param: FunctionParameterSyntax {
-    return getParam(signature, index)
-  }
-
-  var oldType: TypeSyntax {
-    return param.type
-  }
-
-  var name: TokenSyntax {
-    return param.secondName ?? param.firstName
-  }
+  public let skipTrivialCount: Bool
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax
-  {
+    -> FunctionSignatureSyntax {
     var types = argTypes
     types[index] = try newType
-    if variant.skipTrivialCount {
+    if skipTrivialCount {
       if let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
         let i = try getParameterIndexForDeclRef(signature.parameterClause.parameters, countVar)
         types[i] = nil as TypeSyntax?
@@ -512,7 +514,7 @@ struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
   }
 
   func getCount() -> ExprSyntax {
-    let countName = isSizedBy && variant.generateSpan ? "byteCount" : "count"
+    let countName = isSizedBy && generateSpan ? "byteCount" : "count"
     if nullable {
       return ExprSyntax("\(name)?.\(raw: countName) ?? 0")
     }
@@ -545,10 +547,9 @@ struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
     return ExprSyntax("\(name).baseAddress!")
   }
 
-  func buildFunctionCall(_ argOverrides: [Int: ExprSyntax]) throws -> ExprSyntax
-  {
+  func buildFunctionCall(_ argOverrides: [Int: ExprSyntax]) throws -> ExprSyntax {
     var args = argOverrides
-    if variant.skipTrivialCount {
+    if skipTrivialCount {
       assert(
         countExpr.is(DeclReferenceExprSyntax.self) || countExpr.is(IntegerLiteralExprSyntax.self))
       if let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
@@ -558,7 +559,7 @@ struct CountedOrSizedPointerThunkBuilder: PointerBoundsThunkBuilder {
       }
     }
     assert(args[index] == nil)
-    if variant.generateSpan {
+    if generateSpan {
       assert(nonescaping)
       let unwrappedCall = try buildUnwrapCall(args)
       if nullable {
@@ -831,10 +832,6 @@ public struct SwiftifyImportMacro: PeerMacro {
     }
   }
 
-  static func hasSafeVariants(_ parsedArgs: [ParamInfo]) -> Bool {
-    return parsedArgs.contains { $0.nonescaping }
-  }
-
   static func hasTrivialCountVariants(_ parsedArgs: [ParamInfo]) -> Bool {
     let countExprs = parsedArgs.compactMap {
       switch $0 {
@@ -933,18 +930,16 @@ public struct SwiftifyImportMacro: PeerMacro {
       try checkArgs(parsedArgs, funcDecl)
       let baseBuilder = FunctionCallBuilder(funcDecl)
 
-      let variant = Variant(
-        generateSpan: hasSafeVariants(parsedArgs),
-        skipTrivialCount: hasTrivialCountVariants(parsedArgs))
+      let skipTrivialCount = hasTrivialCountVariants(parsedArgs)
 
       let builder: BoundsCheckedThunkBuilder = parsedArgs.reduce(
         baseBuilder,
         { (prev, parsedArg) in
-          parsedArg.getBoundsCheckedThunkBuilder(prev, funcDecl, variant)
+          parsedArg.getBoundsCheckedThunkBuilder(prev, funcDecl, skipTrivialCount)
         })
       let newSignature = try builder.buildFunctionSignature([:], nil)
       let checks =
-        variant.skipTrivialCount
+        skipTrivialCount
         ? [] as [CodeBlockItemSyntax]
         : try builder.buildBoundsChecks().map { e in
           CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
