@@ -9,7 +9,7 @@ struct Foo { var x: String }
 struct Bar { var foo: Foo }
 
 struct Dep: ~Escapable {
-    var x: Int
+    var x: Int = 0
 
     @lifetime(immortal)
     init() { }
@@ -98,3 +98,11 @@ extension Bar {
         return bar.dependencyOnSelf()
     }
 }
+
+// CHECK-LABEL: sil {{.*}}@$s28addressable_for_dependencies14defaulArgument1iySi_tFfA_ :
+// CHECK-SAME: $@convention(thin) () -> Int {
+
+// CHECK-LABEL: sil {{.*}}@$s28addressable_for_dependencies14defaulArgument1iySi_tF :
+// CHECK-SAME: $@convention(thin) (Int) -> @lifetime(borrow 0) () {
+@lifetime(borrow i)
+func defaulArgument(i: Int = 0) {}
