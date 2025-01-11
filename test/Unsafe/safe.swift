@@ -60,6 +60,18 @@ struct HasProperties {
   }()
 }
 
+protocol P { }
+
+extension Int: @unsafe P { }
+
+func acceptP(_: some P) { }
+
+func testConformance(i: Int) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  acceptP(i) // expected-note{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+}
+
+
 // Parsing of `unsafe` expressions.
 func testUnsafePositionError() -> Int {
   return 3 + unsafe unsafeInt() // expected-error{{'unsafe' cannot appear to the right of a non-assignment operator}}
