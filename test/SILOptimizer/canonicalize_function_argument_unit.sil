@@ -26,11 +26,11 @@ struct NC : ~Copyable {
 sil [ossa] @consume_move_only : $@convention(thin) (@guaranteed C) -> () {
 bb0(%c : @guaranteed $C):
   specify_test "canonicalize_function_argument @argument"
-  %copy = copy_value %c
-  %nc = struct $NC (%copy)
+  %copy = copy_value %c : $C
+  %nc = struct $NC (%copy : $C)
   apply undef(%nc) : $@convention(thin) (@owned NC) -> ()
   %retval = tuple ()
-  return %retval
+  return %retval : $()
 }
 
 // CHECK-LABEL: begin running test {{.*}} on borrow_move_only
@@ -44,12 +44,12 @@ bb0(%c : @guaranteed $C):
 sil [ossa] @borrow_move_only : $@convention(thin) (@guaranteed C) -> () {
 bb0(%c : @guaranteed $C):
   specify_test "canonicalize_function_argument @argument"
-  %copy = copy_value %c
-  %nc = struct $NC (%copy)
+  %copy = copy_value %c : $C
+  %nc = struct $NC (%copy : $C)
   apply undef(%nc) : $@convention(thin) (@guaranteed NC) -> ()
-  destroy_value %nc
+  destroy_value %nc : $NC
   %retval = tuple ()
-  return %retval
+  return %retval : $()
 }
 
 // CHECK-LABEL: begin running test {{.*}} on consume_and_borrow_move_only
@@ -67,13 +67,13 @@ bb0(%c : @guaranteed $C):
 sil [ossa] @consume_and_borrow_move_only : $@convention(thin) (@guaranteed C) -> () {
 bb0(%c : @guaranteed $C):
   specify_test "canonicalize_function_argument @argument"
-  %copy1 = copy_value %c
-  %nc1 = struct $NC (%copy1)
+  %copy1 = copy_value %c : $C
+  %nc1 = struct $NC (%copy1 : $C)
   apply undef(%nc1) : $@convention(thin) (@guaranteed NC) -> ()
-  destroy_value %nc1
-  %copy2 = copy_value %c
-  %nc2 = struct $NC (%copy2)
+  destroy_value %nc1 : $NC
+  %copy2 = copy_value %c : $C
+  %nc2 = struct $NC (%copy2 : $C)
   apply undef(%nc2) : $@convention(thin) (@owned NC) -> ()
   %retval = tuple ()
-  return %retval
+  return %retval : $()
 }
