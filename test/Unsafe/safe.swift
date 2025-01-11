@@ -81,6 +81,16 @@ func returnsExistentialP() -> any P {
   // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
+class MyRange {
+  @unsafe init(unchecked bounds: Range<Int>) { }
+
+  convenience init(_ bounds: Range<Int>) {
+    // bounds check
+    self.init(unchecked: bounds) // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+    // expected-note@-1{{reference to unsafe initializer 'init(unchecked:)'}}
+  }
+}
+
 // Parsing of `unsafe` expressions.
 func testUnsafePositionError() -> Int {
   return 3 + unsafe unsafeInt() // expected-error{{'unsafe' cannot appear to the right of a non-assignment operator}}

@@ -591,6 +591,22 @@ public:
       recurse = asImpl().checkWithSubstitutionMap(E, UTO->substitutions);
     } else if (auto *EE = dyn_cast<ErasureExpr>(E)) {
       recurse = asImpl().checkWithConformances(E, EE->getConformances());
+    } else if (auto *OCD = dyn_cast<OtherConstructorDeclRefExpr>(E)) {
+      recurse = asImpl().checkDeclRef(OCD, OCD->getDeclRef(), OCD->getLoc(),
+                                      /*isImplicitlyAsync=*/false,
+                                      /*isImplicitlyThrows=*/false);
+    } else if (auto *ME = dyn_cast<MacroExpansionExpr>(E)) {
+      recurse = asImpl().checkDeclRef(ME, ME->getMacroRef(), ME->getLoc(),
+                                      /*isImplicitlyAsync=*/false,
+                                      /*isImplicitlyThrows=*/false);
+    } else if (auto *LE = dyn_cast<LiteralExpr>(E)) {
+      recurse = asImpl().checkDeclRef(LE, LE->getInitializer(), LE->getLoc(),
+                                      /*isImplicitlyAsync=*/false,
+                                      /*isImplicitlyThrows=*/false);
+    } else if (auto *CE = dyn_cast<CollectionExpr>(E)) {
+      recurse = asImpl().checkDeclRef(CE, CE->getInitializer(), CE->getLoc(),
+                                      /*isImplicitlyAsync=*/false,
+                                      /*isImplicitlyThrows=*/false);
     }
     // Error handling validation (via checkTopLevelEffects) happens after
     // type checking. If an unchecked expression is still around, the code was
@@ -1879,7 +1895,7 @@ private:
           Self.classifyDeclRef(
             declRef, loc, isImplicitlyAsync, isImplicitlyThrows
           ).onlyThrowing());
-      return ShouldNotRecurse;
+      return ShouldRecurse;
     }
     ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
       return ShouldRecurse;
@@ -2006,7 +2022,7 @@ private:
           AsyncKind = ConditionalEffectKind::Always;
       }
 
-      return ShouldNotRecurse;
+      return ShouldRecurse;
     }
     ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
       AsyncKind = ConditionalEffectKind::Always;
@@ -3634,7 +3650,7 @@ private:
         declRefExpr->setThrows(throwDest);
     }
 
-    return ShouldNotRecurse;
+    return ShouldRecurse;
   }
 
   ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
