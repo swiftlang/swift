@@ -283,6 +283,13 @@ BridgedUnresolvedSpecializeExpr BridgedUnresolvedSpecializeExpr_createParsed(
       cArguments.unbridged<TypeRepr *>(), cRAngleLoc.unbridged());
 }
 
+BridgedUnsafeExpr BridgedUnsafeExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cUnsafeLoc,
+                                               BridgedExpr cSubExpr) {
+  return new (cContext.unbridged())
+      UnsafeExpr(cUnsafeLoc.unbridged(), cSubExpr.unbridged());
+}
+
 BridgedInOutExpr BridgedInOutExpr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cLoc,
                                                BridgedExpr cSubExpr) {

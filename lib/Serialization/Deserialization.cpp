@@ -3302,8 +3302,8 @@ class DeclDeserializer {
 
       // The next bits are the protocol conformance options.
       // Update the mask below whenever this changes.
-      static_assert(NumProtocolConformanceOptions == 5);
-      ProtocolConformanceOptions options(rawID & 0x1F);
+      static_assert(NumProtocolConformanceOptions == 4);
+      ProtocolConformanceOptions options(rawID & 0x0F);
       rawID = rawID >> NumProtocolConformanceOptions;
 
       TypeID typeID = rawID;
@@ -6306,15 +6306,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         serialization::decls_block::NonisolatedDeclAttrLayout::readRecord(
             scratch, isUnsafe, isImplicit);
         Attr = new (ctx) NonisolatedAttr(isUnsafe, isImplicit);
-        break;
-      }
-
-      case decls_block::Safe_DECL_ATTR: {
-        bool isImplicit;
-        serialization::decls_block::SafeDeclAttrLayout::readRecord(
-            scratch, isImplicit);
-        Attr = new (ctx) SafeAttr(SourceLoc(), SourceRange(), blobData,
-                                  isImplicit);
         break;
       }
 

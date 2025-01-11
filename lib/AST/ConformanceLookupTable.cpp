@@ -328,8 +328,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
               addProtocol(proto, found.Loc,
                           source.withUncheckedLoc(found.uncheckedLoc)
                                 .withPreconcurrencyLoc(found.preconcurrencyLoc)
-                                .withUnsafeLoc(found.unsafeLoc)
-                                .withSafeRange(found.safeRange));
+                                .withUnsafeLoc(found.unsafeLoc));
             }
           }
 

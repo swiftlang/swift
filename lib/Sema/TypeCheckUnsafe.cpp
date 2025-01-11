@@ -15,108 +15,25 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckType.h"
 #include "TypeCheckUnsafe.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Effects.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/SourceFileExtras.h"
 
 using namespace swift;
 
-static std::pair<const Decl *, bool /*inDefinition*/>
-enclosingContextForUnsafe(const UnsafeUse &use) {
-  return swift::enclosingContextForUnsafe(use.getLocation(),
-                                          use.getDeclContext());
-}
-
-/// Whether this particular unsafe use occurs within the definition of an
-/// entity, but not in its signature, meaning that the unsafety could be
-/// encapsulated.
-static bool isUnsafeUseInDefinition(const UnsafeUse &use) {
-  switch (use.getKind()) {
-  case UnsafeUse::Override:
-  case UnsafeUse::Witness:
-  case UnsafeUse::TypeWitness:
-    case UnsafeUse::PreconcurrencyImport:
-    // Never part of the definition. These are always part of the interface.
-    return false;
-
-  case UnsafeUse::ReferenceToUnsafe:
-  case UnsafeUse::ReferenceToUnsafeThroughTypealias:
-  case UnsafeUse::CallToUnsafe:
-  case UnsafeUse::NonisolatedUnsafe:
-  case UnsafeUse::UnownedUnsafe:
-  case UnsafeUse::ExclusivityUnchecked:
-  case UnsafeUse::UnsafeConformance:
-    return enclosingContextForUnsafe(use).second;
-  }
-}
-
-
-static void suggestUnsafeOnEnclosingDecl(
-    SourceLoc referenceLoc, const DeclContext *referenceDC) {
-  const Decl *decl = nullptr;
-  bool inDefinition = false;
-  std::tie(decl, inDefinition) = enclosingContextForUnsafe(
-      referenceLoc, referenceDC);
-  if (!decl)
-    return;
-
-  if (inDefinition) {
-    // The unsafe construct is inside the body of the entity, so suggest
-    // @safe(unchecked) on the declaration.
-    decl->diagnose(diag::encapsulate_unsafe_in_enclosing_context, decl)
-      .fixItInsert(decl->getAttributeInsertionLoc(false),
-                   "@safe(unchecked) ");
-  } else {
-    // The unsafe construct is not part of the body, so
-    decl->diagnose(diag::make_enclosing_context_unsafe, decl)
-      .fixItInsert(decl->getAttributeInsertionLoc(false), "@unsafe ");
-  }
-}
-
-/// Retrieve the extra information
-static SourceFileExtras *getSourceFileExtrasFor(const Decl *decl) {
-  auto dc = decl->getDeclContext();
-  auto sf = dc->getOutermostParentSourceFile();
-  if (!sf)
-    return nullptr;
-
-  return &sf->getExtras();
-}
-
-void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
-  if (!asNote) {
-    // If we can associate this unsafe use within a particular declaration, do so.
-    // It will be diagnosed later, along with all other unsafe uses within this
-    // same declaration.
-    if (use.getKind() == UnsafeUse::ReferenceToUnsafe ||
-        use.getKind() == UnsafeUse::ReferenceToUnsafeThroughTypealias ||
-        use.getKind() == UnsafeUse::CallToUnsafe ||
-        use.getKind() == UnsafeUse::NonisolatedUnsafe ||
-        use.getKind() == UnsafeUse::UnownedUnsafe ||
-        use.getKind() == UnsafeUse::ExclusivityUnchecked ||
-        use.getKind() == UnsafeUse::UnsafeConformance) {
-      auto [enclosingDecl, _] = enclosingContextForUnsafe(
-          use.getLocation(), use.getDeclContext());
-      if (enclosingDecl) {
-        if (auto extras = getSourceFileExtrasFor(enclosingDecl)) {
-          extras->unsafeUses[enclosingDecl].push_back(use);
-        }
-        return;
-      }
-    }
-  }
-
+void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
   switch (use.getKind()) {
   case UnsafeUse::Override: {
     auto override = use.getDecl();
     override->diagnose(
-        diag::override_safe_withunsafe, override->getDescriptiveKind());
+        diag::override_safe_with_unsafe, override->getDescriptiveKind());
     if (auto overridingClass = override->getDeclContext()->getSelfClassDecl()) {
       overridingClass->diagnose(
           diag::make_subclass_unsafe, overridingClass->getName()
@@ -128,7 +45,6 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
   }
 
   case UnsafeUse::Witness: {
-    assert(asNote && "Can only be diagnosed with a note");
     auto witness = cast<ValueDecl>(use.getDecl());
     witness->diagnose(diag::note_witness_unsafe,
                       witness->getDescriptiveKind(),
@@ -137,15 +53,12 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
   }
 
   case UnsafeUse::TypeWitness: {
-    assert(asNote && "Can only be diagnosed with a note");
     auto assocType = use.getAssociatedType();
     auto loc = use.getLocation();
     auto type = use.getType();
-    auto conformance = use.getConformance().getConcrete();
     ASTContext &ctx = assocType->getASTContext();
 
-    diagnoseUnsafeType(ctx, loc, type, conformance->getDeclContext(),
-                       [&](Type specificType) {
+    diagnoseUnsafeType(ctx, loc, type, [&](Type specificType) {
       ctx.Diags.diagnose(
           loc, diag::note_type_witness_unsafe, specificType,
           assocType->getName());
@@ -158,8 +71,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     ASTContext &ctx = conformance.getRequirement()->getASTContext();
     ctx.Diags.diagnose(
         use.getLocation(),
-        asNote ? diag::note_use_of_unsafe_conformance_is_unsafe
-               : diag::use_of_unsafe_conformance_is_unsafe,
+        diag::note_use_of_unsafe_conformance_is_unsafe,
         use.getType(),
         conformance.getRequirement());
     return;
@@ -170,13 +82,8 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     ASTContext &ctx = var->getASTContext();
     ctx.Diags.diagnose(
         use.getLocation(),
-        asNote ? diag::note_reference_unowned_unsafe
-               : diag::reference_unowned_unsafe,
+        diag::note_reference_unowned_unsafe,
         var);
-    if (!asNote) {
-      var->diagnose(diag::make_enclosing_context_unsafe, var)
-        .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
-    }
     return;
   }
 
@@ -185,13 +92,8 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     ASTContext &ctx = var->getASTContext();
     ctx.Diags.diagnose(
         use.getLocation(),
-        asNote ? diag::note_reference_exclusivity_unchecked
-               : diag::reference_exclusivity_unchecked,
+        diag::note_reference_exclusivity_unchecked,
         var);
-    if (!asNote) {
-      var->diagnose(diag::make_enclosing_context_unsafe, var)
-        .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
-    }
     return;
   }
       
@@ -200,15 +102,8 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     ASTContext &ctx = decl->getASTContext();
     ctx.Diags.diagnose(
         use.getLocation(),
-        asNote ? diag::note_reference_to_nonisolated_unsafe
-               : diag::note_reference_to_nonisolated_unsafe,
+        diag::note_reference_to_nonisolated_unsafe,
         cast<ValueDecl>(decl));
-    if (!asNote) {
-      if (auto var = dyn_cast<VarDecl>(decl)) {
-        var->diagnose(diag::make_enclosing_context_unsafe, var)
-          .fixItInsert(var->getAttributeInsertionLoc(false), "@unsafe ");
-      }
-    }
     return;
   }
   case UnsafeUse::ReferenceToUnsafeThroughTypealias: {
@@ -216,12 +111,10 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     ASTContext &ctx = typealias->getASTContext();
     diagnoseUnsafeType(
         ctx, use.getLocation(), use.getType(),
-        use.getDeclContext(),
         [&](Type specificType) {
           ctx.Diags.diagnose(
               use.getLocation(),
-              asNote ? diag::note_reference_to_unsafe_through_typealias
-                     : diag::reference_to_unsafe_through_typealias,
+              diag::note_reference_to_unsafe_through_typealias,
               typealias, specificType);
         });
     return;
@@ -237,24 +130,17 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
     if (type) {
       diagnoseUnsafeType(
           ctx, loc, type,
-          use.getDeclContext(),
           [&](Type specificType) {
             ctx.Diags.diagnose(
                 loc,
-                asNote ? diag::note_reference_to_unsafe_typed_decl
-                       : diag::reference_to_unsafe_typed_decl,
+                diag::note_reference_to_unsafe_typed_decl,
                 isCall, decl, specificType);
           });
     } else {
       ctx.Diags.diagnose(
           loc,
-          asNote ? diag::note_reference_to_unsafe_decl
-                 : diag::reference_to_unsafe_decl,
+          diag::note_reference_to_unsafe_decl,
           isCall, decl);
-    }
-
-    if (!asNote) {
-      suggestUnsafeOnEnclosingDecl(loc, use.getDeclContext());
     }
 
     return;
@@ -262,60 +148,158 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use, bool asNote) {
 
   case UnsafeUse::PreconcurrencyImport: {
     auto importDecl = cast<ImportDecl>(use.getDecl());
-    importDecl->diagnose(diag::preconcurrency_import_unsafe)
-      .fixItInsert(importDecl->getAttributeInsertionLoc(false),
-                   "@safe(unchecked) ");
+    importDecl->diagnose(diag::preconcurrency_import_unsafe);
     return;
   }
   }
 }
 
-void swift::diagnoseUnsafeUsesIn(const Decl *decl) {
-  auto *extras = getSourceFileExtrasFor(decl);
-  if (!extras)
-    return;
+/// Determine whether a reference to the given variable is treated as
+/// nonisolated(unsafe).
+static bool isReferenceToNonisolatedUnsafe(ValueDecl *decl) {
+  auto isolation = getActorIsolationForReference(
+      decl, decl->getDeclContext());
+  if (!isolation.isNonisolated())
+    return false;
 
-  auto known = extras->unsafeUses.find(decl);
-  if (known == extras->unsafeUses.end())
-    return;
+  auto attr = decl->getAttrs().getAttribute<NonisolatedAttr>();
+  return attr && attr->isUnsafe();
+}
 
-  // Take the unsafe uses.
-  auto unsafeUses = std::move(known->second);
-  extras->unsafeUses.erase(known);
-  if (unsafeUses.empty())
-    return;
+bool swift::enumerateUnsafeUses(ConcreteDeclRef declRef,
+                                SourceLoc loc,
+                                bool isCall,
+                                llvm::function_ref<bool(UnsafeUse)> fn) {
+  // If the declaration is explicitly unsafe, note that.
+  auto decl = declRef.getDecl();
+  if (decl->isUnsafe()) {
+    (void)fn(
+        UnsafeUse::forReferenceToUnsafe(
+          decl, isCall && !isa<ParamDecl>(decl), Type(), loc));
 
-  // Determine whether all of the uses are in the definition.
-  bool canEncapsulateUnsafety = std::all_of(
-      unsafeUses.begin(), unsafeUses.end(), isUnsafeUseInDefinition);
-  StringRef fixItStr = canEncapsulateUnsafety
-      ? "@safe(unchecked) "
-      : "@unsafe ";
-  decl->diagnose(diag::decl_involves_unsafe, decl, canEncapsulateUnsafety)
-    .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/false),
-                 fixItStr);
-
-  for (const auto &unsafeUse : unsafeUses) {
-    diagnoseUnsafeUse(unsafeUse, /*asNote=*/true);
+    // A declaration being explicitly marked @unsafe always stops enumerating
+    // safety issues, because it causes too much noise.
+    return true;
   }
+
+  // If the type of this declaration involves unsafe types, diagnose that.
+  ASTContext &ctx = decl->getASTContext();
+  auto subs = declRef.getSubstitutions();
+  {
+    auto type = decl->getInterfaceType();
+    if (subs)
+      type = type.subst(subs);
+
+    bool shouldReturnTrue = false;
+    diagnoseUnsafeType(ctx, loc, type, [&](Type unsafeType) {
+      if (fn(UnsafeUse::forReferenceToUnsafe(
+               decl, isCall && !isa<ParamDecl>(decl), unsafeType, loc)))
+        shouldReturnTrue = true;
+    });
+
+    if (shouldReturnTrue)
+      return true;
+  }
+
+  // Check for any unsafe conformances in substitutions.
+  if (enumerateUnsafeUses(subs, loc, fn))
+    return true;
+
+  // Additional checking for various declaration kinds.
+  if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
+    // Use of a nonisolated(unsafe) declaration is unsafe, but is only
+    // diagnosed as such under strict concurrency.
+    if (ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
+        isReferenceToNonisolatedUnsafe(valueDecl)) {
+      if (fn(UnsafeUse::forNonisolatedUnsafe(valueDecl, loc)))
+        return true;
+    }
+
+    if (auto var = dyn_cast<VarDecl>(valueDecl)) {
+      // unowned(unsafe) is unsafe (duh).
+      if (auto ownershipAttr =
+              var->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+        if (ownershipAttr->get() == ReferenceOwnership::Unmanaged) {
+          if (fn(UnsafeUse::forUnownedUnsafe(var, loc)))
+            return true;
+        }
+      }
+
+      // @exclusivity(unchecked) is unsafe.
+      if (auto exclusivityAttr =
+              var->getAttrs().getAttribute<ExclusivityAttr>()) {
+        if (exclusivityAttr->getMode() == ExclusivityAttr::Unchecked) {
+          if (fn(UnsafeUse::forExclusivityUnchecked(var, loc)))
+            return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+/// Visit all of the unsafe conformances within this conformance.
+static bool forEachUnsafeConformance(
+    ProtocolConformanceRef conformance,
+    llvm::function_ref<bool(ProtocolConformance *)> body) {
+  if (conformance.isInvalid() || conformance.isAbstract())
+    return false;
+
+  if (conformance.isPack()) {
+    for (auto packConf : conformance.getPack()->getPatternConformances()) {
+      if (forEachUnsafeConformance(packConf, body))
+        return true;
+    }
+
+    return false;
+  }
+
+  // Is this an unsafe conformance?
+  ProtocolConformance *concreteConf = conformance.getConcrete();
+  RootProtocolConformance *rootConf = concreteConf->getRootConformance();
+  if (auto normalConf = dyn_cast<NormalProtocolConformance>(rootConf)) {
+    if (normalConf->isUnsafe() && body(concreteConf))
+      return true;
+  }
+
+  // Check conformances that are part of this conformance.
+  auto subMap = concreteConf->getSubstitutionMap();
+  for (auto subConf : subMap.getConformances()) {
+    if (forEachUnsafeConformance(subConf, body))
+      return true;
+  }
+
+  return false;
+}
+
+bool swift::enumerateUnsafeUses(SubstitutionMap subs,
+                                SourceLoc loc,
+                                llvm::function_ref<bool(UnsafeUse)> fn) {
+  // FIXME: Check replacement types?
+  for (auto conformance : subs.getConformances()) {
+    if (!conformance.hasEffect(EffectKind::Unsafe))
+      continue;
+
+    if (forEachUnsafeConformance(
+            conformance, [&](ProtocolConformance *unsafeConformance) {
+              return fn(
+                  UnsafeUse::forConformance(
+                    unsafeConformance->getType(),
+                    ProtocolConformanceRef(unsafeConformance), loc));
+            })) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 bool swift::isUnsafe(ConcreteDeclRef declRef) {
-  auto decl = declRef.getDecl();
-  if (!decl)
-    return false;
-
-  // Is the declaration explicitly @unsafe?
-  if (decl->isUnsafe())
+  return enumerateUnsafeUses(
+      declRef, SourceLoc(), /*isCall=*/false, [&](UnsafeUse) {
     return true;
-
-  auto type = decl->getInterfaceType();
-  if (auto subs = declRef.getSubstitutions())
-    type = type.subst(subs);
-  if (type->isUnsafe())
-    return true;
-
-  return false;
+  });
 }
 
 bool swift::isUnsafeInConformance(const ValueDecl *requirement,
@@ -333,5 +317,11 @@ bool swift::isUnsafeInConformance(const ValueDecl *requirement,
   } else {
     requirementTypeInContext = requirementType.subst(requirementSubs);
   }
-  return requirementTypeInContext->isUnsafe();
+
+  bool hasUnsafeType = false;
+  diagnoseUnsafeType(requirement->getASTContext(), conformance->getLoc(),
+                     requirementTypeInContext, [&](Type unsafeType) {
+    hasUnsafeType = true;
+  });
+  return hasUnsafeType;
 }

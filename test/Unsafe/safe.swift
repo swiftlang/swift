@@ -9,27 +9,31 @@ func unsafeFunction() { }
 @unsafe
 struct UnsafeType { }
 
-@safe(unchecked)
 func f() {
-  unsafeFunction()
+  unsafe unsafeFunction()
 }
 
-@safe(unchecked, message: "I was careful")
 func g() {
-  unsafeFunction()
+  unsafe unsafeFunction()
 }
 
-// expected-warning@+2{{global function 'h' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe [Unsafe]}}
-@safe(unchecked, message: "I was careful")
+// expected-warning@+1{{global function 'h' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}
 func h(_: UnsafeType) { // expected-note{{reference to unsafe struct 'UnsafeType'}}
-  unsafeFunction()
+// expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  unsafeFunction() // expected-note{{reference to unsafe global function 'unsafeFunction()'}}
+
+  // okay
+  unsafe unsafeFunction()
+
+  // expected-warning@+1{{no unsafe operations occur within 'unsafe' expression}}
+  unsafe g()
 }
 
-// expected-warning@+1 {{global function 'rethrowing' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+// expected-warning@+1 {{global function 'rethrowing' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}{{1-1=@unsafe }}
 func rethrowing(body: (UnsafeType) throws -> Void) rethrows { } // expected-note{{reference to unsafe struct 'UnsafeType'}}
 
 class HasStatics {
-  // expected-warning@+1{{static method 'f' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe [Unsafe]}}{{3-3=@unsafe }}
+  // expected-warning@+1{{static method 'f' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe }}{{3-3=@unsafe }}
   static internal func f(_: UnsafeType) { } // expected-note{{reference to unsafe struct 'UnsafeType'}}
 
   
@@ -39,41 +43,25 @@ class HasStatics {
 func unsafeInt() -> Int { 5 }
 
 struct HasProperties {
-  @safe(unchecked) var computed: Int {
-    unsafeInt()
+  var computed: Int {
+    unsafe unsafeInt()
   }
 
   @unsafe var computedUnsafe: Int {
-    unsafeInt()
+    unsafe unsafeInt()
   }
 
-  @safe(unchecked) static var blah: Int = {
-    unsafeInt()
+  static var blah: Int = {
+    unsafe unsafeInt()
   }()
 
   @unsafe static var blahUnsafe: Int = {
-    unsafeInt()
+    unsafe unsafeInt()
   }()
 }
 
-// Parsing issues
-@safe // expected-error{{expected '(' in 'safe' attribute}}
-func bad1() { }
+// Parsing of `unsafe` expressions.
+func testUnsafePositionError() -> Int {
+  return 3 + unsafe unsafeInt() // expected-error{{'unsafe' cannot appear to the right of a non-assignment operator}}
+}
 
-@safe() // expected-error{{'@safe' attribute must be written as '@safe(unchecked)'}}
-func bad2() { }
-
-@safe(blah) // expected-error{{'@safe' attribute must be written as '@safe(unchecked)'}}
-func bad3() { }
-
-@safe(5) // expected-error{{'@safe' attribute must be written as '@safe(unchecked)'}}
-func bad4() { }
-
-@safe(unchecked, blah) // expected-error{{unknown option 'blah' for attribute 'safe'}}
-func bad5() { }
-
-@safe(unchecked, message) // expected-error{{expected ':' after label 'message'}}
-func bad6() { }
-
-@safe(unchecked, message: "a\(b)") // expected-error{{message cannot be an interpolated string literal}}
-func bad7() { }

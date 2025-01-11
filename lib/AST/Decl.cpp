@@ -1094,10 +1094,6 @@ bool Decl::isUnsafe() const {
       false);
 }
 
-bool Decl::allowsUnsafe() const {
-  return isUnsafe();
-}
-
 Type AbstractFunctionDecl::getThrownInterfaceType() const {
   if (!getThrownTypeRepr())
     return ThrownType.getType();
@@ -1680,8 +1676,6 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
       setOption(ProtocolConformanceFlags::Retroactive);
     if (typeRepr->findAttrLoc(TypeAttrKind::Unsafe).isValid())
       setOption(ProtocolConformanceFlags::Unsafe);
-    if (typeRepr->findAttrLoc(TypeAttrKind::Safe).isValid())
-      setOption(ProtocolConformanceFlags::Safe);
     if (typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency).isValid())
       setOption(ProtocolConformanceFlags::Preconcurrency);
   }

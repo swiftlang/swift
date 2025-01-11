@@ -1207,10 +1207,6 @@ public:
   /// used in a "safe" dialect.
   bool isUnsafe() const;
 
-  /// Whether this declaration explicitly states that it is allowed to contain
-  /// unsafe code.
-  bool allowsUnsafe() const;
-
 private:
   bool isUnsafeComputed() const {
     return Bits.Decl.IsUnsafeComputed;
@@ -1824,10 +1820,6 @@ public:
     return getOptions().contains(ProtocolConformanceFlags::Unsafe);
   }
 
-  bool isSafe() const {
-    return getOptions().contains(ProtocolConformanceFlags::Safe);
-  }
-
   bool isSuppressed() const { return IsSuppressed; }
 
   void setOption(ProtocolConformanceFlags flag) {
@@ -1957,7 +1949,6 @@ class ExtensionDecl final : public GenericContext, public Decl,
   friend class Decl;
 public:
   using Decl::getASTContext;
-  using Decl::allowsUnsafe;
 
   /// Create a new extension declaration.
   static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
@@ -3435,7 +3426,6 @@ public:
   using DeclContext::operator new;
   using DeclContext::operator delete;
   using TypeDecl::getDeclaredInterfaceType;
-  using Decl::allowsUnsafe;
 
   static bool classof(const DeclContext *C) {
     if (auto D = C->getAsDecl())

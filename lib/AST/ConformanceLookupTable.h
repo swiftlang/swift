@@ -98,9 +98,6 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// The location of the "unsafe" attribute, if there is one.
     SourceLoc unsafeLoc;
 
-    /// The range of the "@safe(unchecked)" attribute, if there is one.
-    SourceRange safeRange;
-
     ConformanceSource(void *ptr, ConformanceEntryKind kind)
       : Storage(ptr), Kind(kind) { }
 
@@ -168,15 +165,6 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
       return result;
     }
 
-    /// Return a new conformance source with the given range of
-    /// "@safe(unchecked)".
-    ConformanceSource withSafeRange(SourceRange safeRange) {
-      ConformanceSource result(*this);
-      if (safeRange.isValid())
-        result.safeRange = safeRange;
-      return result;
-    }
-
     ProtocolConformanceOptions getOptions() const {
       ProtocolConformanceOptions options;
       if (getUncheckedLoc().isValid())
@@ -185,8 +173,6 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
         options |= ProtocolConformanceFlags::Preconcurrency;
       if (getUnsafeLoc().isValid() || isUnsafeContext(getDeclContext()))
         options |= ProtocolConformanceFlags::Unsafe;
-      if (getSafeRange().isValid())
-        options |= ProtocolConformanceFlags::Safe;
       return options;
     }
 
@@ -240,11 +226,6 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// The location of the @unsafe attribute, if any.
     SourceLoc getUnsafeLoc() const {
       return unsafeLoc;
-    }
-
-    /// The range of the @safe(unchecked) attribute, if any.
-    SourceRange getSafeRange() const {
-      return safeRange;
     }
 
     /// For an inherited conformance, retrieve the class declaration
