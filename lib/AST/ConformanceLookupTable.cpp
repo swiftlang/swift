@@ -53,18 +53,6 @@ DeclContext *ConformanceLookupTable::ConformanceSource::getDeclContext() const {
   llvm_unreachable("Unhandled ConformanceEntryKind in switch.");
 }
 
-bool ConformanceLookupTable::ConformanceSource::isUnsafeContext(DeclContext *dc) {
-  if (auto enclosingNominal = dc->getSelfNominalTypeDecl())
-    if (enclosingNominal->isUnsafe())
-      return true;
-
-  if (auto ext = dyn_cast<ExtensionDecl>(dc))
-    if (ext->getAttrs().hasAttribute<UnsafeAttr>())
-      return true;
-
-  return false;
-}
-
 ProtocolDecl *ConformanceLookupTable::ConformanceEntry::getProtocol() const {
   if (auto protocol = Conformance.dyn_cast<ProtocolDecl *>())
     return protocol;

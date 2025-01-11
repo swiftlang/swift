@@ -583,6 +583,10 @@ public:
       recurse = ShouldRecurse;
     } else if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
       recurse = asImpl().checkSingleValueStmtExpr(SVE);
+    } else if (auto *UTO = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
+      recurse = asImpl().checkWithSubstitutionMap(E, UTO->substitutions);
+    } else if (auto *EE = dyn_cast<ErasureExpr>(E)) {
+      recurse = asImpl().checkWithConformances(E, EE->getConformances());
     }
     // Error handling validation (via checkTopLevelEffects) happens after
     // type checking. If an unchecked expression is still around, the code was
@@ -1100,6 +1104,32 @@ public:
   static Classification forInvalidCode() {
     Classification result;
     result.IsInvalid = true;
+    return result;
+  }
+
+  /// Used when all we have is a substitution map. This can only find
+  /// "unsafe" uses.
+  static Classification forSubstitutionMap(SubstitutionMap subs,
+                                           SourceLoc loc) {
+    Classification result;
+    enumerateUnsafeUses(subs, loc, [&](UnsafeUse use) {
+      result.recordUnsafeUse(use);
+      return false;
+    });
+    return result;
+  }
+
+  /// Used when all we have is are conformances. This can only find
+  /// "unsafe" uses.
+  static Classification forConformances(
+      ArrayRef<ProtocolConformanceRef> conformances,
+      SourceLoc loc
+  ) {
+    Classification result;
+    enumerateUnsafeUses(conformances, loc, [&](UnsafeUse use) {
+      result.recordUnsafeUse(use);
+      return false;
+    });
     return result;
   }
 
@@ -1854,6 +1884,16 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkWithSubstitutionMap(Expr *E, SubstitutionMap subs) {
+      return ShouldRecurse;
+    }
+
+    ShouldRecurse_t checkWithConformances(
+        Expr *E,
+        ArrayRef<ProtocolConformanceRef> conformances) {
+      return ShouldRecurse;
+    }
+
     ConditionalEffectKind checkExhaustiveDoBody(DoCatchStmt *S) {
       // All errors thrown by the do body are caught, but any errors thrown
       // by the catch bodies are bounded by the throwing kind of the do body.
@@ -1972,6 +2012,16 @@ private:
     }
 
     ShouldRecurse_t checkSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
+      return ShouldRecurse;
+    }
+
+    ShouldRecurse_t checkWithSubstitutionMap(Expr *E, SubstitutionMap subs) {
+      return ShouldRecurse;
+    }
+
+    ShouldRecurse_t checkWithConformances(
+        Expr *E,
+        ArrayRef<ProtocolConformanceRef> conformances) {
       return ShouldRecurse;
     }
 
@@ -3378,6 +3428,22 @@ private:
     SVE->getStmt()->walk(*this);
     scope.preserveCoverageFromSingleValueStmtExpr();
     return ShouldNotRecurse;
+  }
+
+  ShouldRecurse_t checkWithSubstitutionMap(Expr *E, SubstitutionMap subs) {
+    auto classification = Classification::forSubstitutionMap(
+        subs, E->getLoc());
+    checkEffectSite(E, /*requiresTry=*/false, classification);
+    return ShouldRecurse;
+  }
+
+  ShouldRecurse_t checkWithConformances(
+      Expr *E,
+      ArrayRef<ProtocolConformanceRef> conformances) {
+    auto classification = Classification::forConformances(
+        conformances, E->getLoc());
+    checkEffectSite(E, /*requiresTry=*/false, classification);
+    return ShouldRecurse;
   }
 
   ConditionalEffectKind checkExhaustiveDoBody(DoCatchStmt *S) {

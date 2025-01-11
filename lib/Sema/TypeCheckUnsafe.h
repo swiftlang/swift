@@ -36,8 +36,17 @@ bool enumerateUnsafeUses(ConcreteDeclRef declRef,
                          bool isCall,
                          llvm::function_ref<bool(UnsafeUse)> fn);
 
+/// Enumerate all of the unsafe uses that occur within this array of protocol
+/// conformances.
+///
+/// The given `fn` will be called with each unsafe use. If it returns `true`
+/// for any use, this function will return `true` immediately. Otherwise,
+/// it will return `false` once all unsafe uses have been emitted.
+bool enumerateUnsafeUses(ArrayRef<ProtocolConformanceRef> conformances,
+                         SourceLoc loc,
+                         llvm::function_ref<bool(UnsafeUse)> fn);
+
 /// Enumerate all of the unsafe uses that occur within this substitution map.
-/// reference.
 ///
 /// The given `fn` will be called with each unsafe use. If it returns `true`
 /// for any use, this function will return `true` immediately. Otherwise,

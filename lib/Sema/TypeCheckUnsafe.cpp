@@ -273,11 +273,10 @@ static bool forEachUnsafeConformance(
   return false;
 }
 
-bool swift::enumerateUnsafeUses(SubstitutionMap subs,
+bool swift::enumerateUnsafeUses(ArrayRef<ProtocolConformanceRef> conformances,
                                 SourceLoc loc,
                                 llvm::function_ref<bool(UnsafeUse)> fn) {
-  // FIXME: Check replacement types?
-  for (auto conformance : subs.getConformances()) {
+  for (auto conformance : conformances) {
     if (!conformance.hasEffect(EffectKind::Unsafe))
       continue;
 
@@ -291,6 +290,18 @@ bool swift::enumerateUnsafeUses(SubstitutionMap subs,
       return true;
     }
   }
+
+  return false;
+}
+
+bool swift::enumerateUnsafeUses(SubstitutionMap subs,
+                                SourceLoc loc,
+                                llvm::function_ref<bool(UnsafeUse)> fn) {
+  // FIXME: Check replacement types?
+
+  // Check conformances.
+  if (enumerateUnsafeUses(subs.getConformances(), loc, fn))
+    return true;
 
   return false;
 }

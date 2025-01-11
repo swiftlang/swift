@@ -171,7 +171,7 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
         options |= ProtocolConformanceFlags::Unchecked;
       if (getPreconcurrencyLoc().isValid())
         options |= ProtocolConformanceFlags::Preconcurrency;
-      if (getUnsafeLoc().isValid() || isUnsafeContext(getDeclContext()))
+      if (getUnsafeLoc().isValid())
         options |= ProtocolConformanceFlags::Unsafe;
       return options;
     }
@@ -264,10 +264,6 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// Get the declaration context that this conformance will be
     /// associated with.
     DeclContext *getDeclContext() const;
-
-  private:
-    /// Whether this declaration context is @unsafe.
-    static bool isUnsafeContext(DeclContext *dc);
   };
 
   /// An entry in the conformance table.

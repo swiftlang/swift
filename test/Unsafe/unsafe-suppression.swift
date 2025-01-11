@@ -60,10 +60,19 @@ extension S3: P {
 
 struct S4 { }
 
-@unsafe
-extension S4: P {
+extension S4: @unsafe P {
   @unsafe
   func protoMethod() { } // okay
+}
+
+protocol P2 {
+  func proto2Method()
+}
+
+@unsafe
+extension S4: P2 { // expected-warning{{conformance of 'S4' to protocol 'P2' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe}}
+  @unsafe
+  func proto2Method() { } // expected-note{{unsafe instance method}}
 }
 
 

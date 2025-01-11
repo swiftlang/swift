@@ -71,6 +71,15 @@ func testConformance(i: Int) {
   acceptP(i) // expected-note{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
+func returnsOpaqueP() -> some P {
+  5 // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+}
+
+func returnsExistentialP() -> any P {
+  5 // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+}
 
 // Parsing of `unsafe` expressions.
 func testUnsafePositionError() -> Int {
