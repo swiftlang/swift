@@ -1081,6 +1081,10 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
+def ExperimentalSkipDeserializationChecksForPackageCMO : Flag<["-"], "experimental-skip-deserialization-checks-for-package-cmo">,
+  Flags<[FrontendOption]>,
+  HelpText<"Skip deserialization checks for package-cmo; use only for experimental purposes">;
+
 def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
   Flags<[FrontendOption]>,
   HelpText<"Deprecated; use -package-cmo instead">;
