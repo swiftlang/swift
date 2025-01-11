@@ -124,6 +124,13 @@ func metatypes() {
   let _: Any.Type = unsafe UnsafeType.self
 }
 
+func testKeyPath() {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = \HasProperties.computedUnsafe // expected-note{{reference to unsafe property 'computedUnsafe'}}
+
+  _ = unsafe \HasProperties.computedUnsafe
+}
+
 // Parsing of `unsafe` expressions.
 func testUnsafePositionError() -> Int {
   return 3 + unsafe unsafeInt() // expected-error{{'unsafe' cannot appear to the right of a non-assignment operator}}
