@@ -814,6 +814,33 @@ Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
+// Span-providing properties
+Added: _$sSR7storages4SpanVyxGvg
+Added: _$sSR7storages4SpanVyxGvpMV
+Added: _$sSS8UTF8ViewV7storages4SpanVys5UInt8VGvpMV
+Added: _$sSW5bytess7RawSpanVvg
+Added: _$sSW5bytess7RawSpanVvpMV
+Added: _$sSa7storages4SpanVyxGvg
+Added: _$sSa7storages4SpanVyxGvpMV
+Added: _$sSr7storages4SpanVyxGvg
+Added: _$sSr7storages4SpanVyxGvpMV
+Added: _$sSs8UTF8ViewV7storages4SpanVys5UInt8VGvpMV
+Added: _$sSw5bytess7RawSpanVvg
+Added: _$sSw5bytess7RawSpanVvpMV
+Added: _$ss10ArraySliceV7storages4SpanVyxGvg
+Added: _$ss10ArraySliceV7storages4SpanVyxGvpMV
+Added: _$ss15CollectionOfOneV7storages4SpanVyxGvpMV
+Added: _$ss15ContiguousArrayV7storages4SpanVyxGvg
+Added: _$ss15ContiguousArrayV7storages4SpanVyxGvpMV
+Added: _$ss4SpanVss15BitwiseCopyableRzlE5bytess03RawA0VvpMV
+Added: _$ss5SIMD2V7storages4SpanVyxGvpMV
+Added: _$ss5SIMD3V7storages4SpanVyxGvpMV
+Added: _$ss5SIMD4V7storages4SpanVyxGvpMV
+Added: _$ss5SIMD8V7storages4SpanVyxGvpMV
+Added: _$ss6SIMD16V7storages4SpanVyxGvpMV
+Added: _$ss6SIMD32V7storages4SpanVyxGvpMV
+Added: _$ss6SIMD64V7storages4SpanVyxGvpMV
+
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
 Added: _$ss13_SwiftifyExprO6returnyA2BmFWC

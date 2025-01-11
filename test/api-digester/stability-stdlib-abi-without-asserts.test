@@ -822,6 +822,17 @@ Func _SliceBuffer.withUnsafeMutableBufferPointer(_:) has mangled name changing f
 
 Struct String.Index has added a conformance to an existing protocol CustomDebugStringConvertible
 
+Struct CollectionOfOne is now with @_addressableForDependencies
+Struct SIMD2 is now with @_addressableForDependencies
+Struct SIMD3 is now with @_addressableForDependencies
+Struct SIMD4 is now with @_addressableForDependencies
+Struct SIMD8 is now with @_addressableForDependencies
+Struct SIMD16 is now with @_addressableForDependencies
+Struct SIMD32 is now with @_addressableForDependencies
+Struct SIMD64 is now with @_addressableForDependencies
+Struct String.UTF8View is now with @_addressableForDependencies
+Struct Substring.UTF8View is now with @_addressableForDependencies
+
 Enum _SwiftifyInfo is a new API without @available attribute
 Enum _SwiftifyExpr is a new API without @available attribute
 Enum _DependenceType is a new API without @available attribute
