@@ -638,6 +638,13 @@ public:
     return findOwnershipReferenceRoot(getReference());
   }
 
+  /// Return the OSSA root of the reference being accessed
+  /// looking through struct_extract, tuple_extract, etc.
+  /// Precondition: isReference() is true.
+  SILValue getOwnershipReferenceAggregate() const {
+    return findOwnershipReferenceAggregate(getReference());
+  }
+  
   /// Return the storage root of the reference being accessed.
   ///
   /// Precondition: isReference() is true.
