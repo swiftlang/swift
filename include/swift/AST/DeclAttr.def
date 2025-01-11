@@ -531,11 +531,7 @@ SIMPLE_DECL_ATTR(_addressableForDependencies, AddressableForDependencies,
   OnNominalType | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UserInaccessible,
   163)
 
-DECL_ATTR(safe, Safe,
-  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType |
-  OnExtension | OnTypeAlias | OnImport | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
-  164)
+// 164 was the never-shipped @safe attribute and can be reused
 
 DECL_ATTR(abi, ABI,
   OnAbstractFunction | OnVar /* will eventually add types */ | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,

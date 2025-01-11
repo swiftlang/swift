@@ -62,6 +62,9 @@ enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose potential decl unavailability if that unavailability
   /// would only occur at or below the deployment target.
   AllowPotentiallyUnavailableAtOrBelowDeploymentTarget = 1 << 4,
+
+  /// Don't perform "unsafe" checking.
+  DisableUnsafeChecking = 1 << 5,
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
@@ -106,14 +109,16 @@ class ExportContext {
   DeclContext *DC;
   AvailabilityContext Availability;
   FragileFunctionKind FragileKind;
+  llvm::SmallVectorImpl<UnsafeUse> *UnsafeUses;
   unsigned SPI : 1;
   unsigned Exported : 1;
   unsigned Implicit : 1;
   unsigned Reason : 3;
 
   ExportContext(DeclContext *DC, AvailabilityContext availability,
-                FragileFunctionKind kind, bool spi, bool exported,
-                bool implicit);
+                FragileFunctionKind kind,
+                llvm::SmallVectorImpl<UnsafeUse> *unsafeUses,
+                bool spi, bool exported, bool implicit);
 
 public:
 
@@ -122,7 +127,8 @@ public:
   ///
   /// If the declaration is exported, the resulting context is restricted to
   /// referencing exported types only. Otherwise it can reference anything.
-  static ExportContext forDeclSignature(Decl *D);
+  static ExportContext forDeclSignature(
+      Decl *D, llvm::SmallVectorImpl<UnsafeUse> *unsafeUses);
 
   /// Create an instance describing the declarations that can be referenced
   /// from the given function's body.
@@ -165,6 +171,12 @@ public:
 
   /// If not 'None', the context has the inlinable function body restriction.
   FragileFunctionKind getFragileFunctionKind() const { return FragileKind; }
+
+  /// Retrieve a pointer to the vector where any unsafe uses should be stored.
+  /// When NULL, we shouldn't be checking
+  llvm::SmallVectorImpl<UnsafeUse> *getUnsafeUses() const {
+    return UnsafeUses;
+  }
 
   /// If true, the context is part of a synthesized declaration, and
   /// availability checking should be disabled.
@@ -266,12 +278,6 @@ bool checkTypeMetadataAvailability(Type type, SourceRange loc,
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);
-
-/// Determine the enclosing context that allows for some use of an unsafe
-/// construct, and whether that reference is in the definition (true) vs.
-/// in the interface (false) of that context.
-std::pair<const Decl *, bool /*inDefinition*/>
-enclosingContextForUnsafe(SourceLoc referenceLoc, const DeclContext *referenceDC);
 
 } // namespace swift
 

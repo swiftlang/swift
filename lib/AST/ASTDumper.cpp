@@ -2528,6 +2528,11 @@ public:
     printRec(E->getSubExpr());
     printFoot();
   }
+  void visitUnsafeExpr(UnsafeExpr *E, StringRef label) {
+    printCommon(E, "unsafe_expr", label);
+    printRec(E->getSubExpr());
+    printFoot();
+  }
   void visitConsumeExpr(ConsumeExpr *E, StringRef label) {
     printCommon(E, "consume_expr", label);
     printRec(E->getSubExpr());
@@ -4137,11 +4142,6 @@ public:
     if (Attr->Proto) {
       printFieldRaw([&](auto &out) { Attr->Proto->dumpRef(out); }, "");
     }
-    printFoot();
-  }
-  void visitSafeAttr(SafeAttr *Attr, StringRef label) {
-    printCommon(Attr, "safe_attr", label);
-    printFieldQuoted(Attr->message, "message");
     printFoot();
   }
   void visitSILGenNameAttr(SILGenNameAttr *Attr, StringRef label) {

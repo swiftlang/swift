@@ -79,10 +79,14 @@ static bool
 diagnoseTypeReprAvailability(const TypeRepr *T, const ExportContext &where,
                              DeclAvailabilityFlags flags = std::nullopt);
 
-ExportContext::ExportContext(DeclContext *DC, AvailabilityContext availability,
-                             FragileFunctionKind kind, bool spi, bool exported,
+ExportContext::ExportContext(DeclContext *DC,
+                             AvailabilityContext availability,
+                             FragileFunctionKind kind,
+                             llvm::SmallVectorImpl<UnsafeUse> *unsafeUses,
+                             bool spi, bool exported,
                              bool implicit)
-    : DC(DC), Availability(availability), FragileKind(kind) {
+    : DC(DC), Availability(availability), FragileKind(kind),
+      UnsafeUses(unsafeUses) {
   SPI = spi;
   Exported = exported;
   Implicit = implicit;
@@ -239,7 +243,8 @@ static void computeExportContextBits(ASTContext &Ctx, Decl *D, bool *spi,
   }
 }
 
-ExportContext ExportContext::forDeclSignature(Decl *D) {
+ExportContext ExportContext::forDeclSignature(
+    Decl *D, llvm::SmallVectorImpl<UnsafeUse> *unsafeUses) {
   auto &Ctx = D->getASTContext();
 
   auto *DC = D->getInnermostDeclContext();
@@ -255,8 +260,8 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
 
   bool exported = ::isExported(D);
 
-  return ExportContext(DC, availabilityContext, fragileKind, spi, exported,
-                       implicit);
+  return ExportContext(DC, availabilityContext, fragileKind, unsafeUses,
+                       spi, exported, implicit);
 }
 
 ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
@@ -271,14 +276,15 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
 
   bool exported = false;
 
-  return ExportContext(DC, availabilityContext, fragileKind, spi, exported,
-                       implicit);
+  return ExportContext(DC, availabilityContext, fragileKind, nullptr,
+                       spi, exported, implicit);
 }
 
 ExportContext ExportContext::forConformance(DeclContext *DC,
                                             ProtocolDecl *proto) {
   assert(isa<ExtensionDecl>(DC) || isa<NominalTypeDecl>(DC));
-  auto where = forDeclSignature(DC->getInnermostDeclarationDeclContext());
+  auto where = forDeclSignature(DC->getInnermostDeclarationDeclContext(),
+                                nullptr);
 
   where.Exported &= proto->getFormalAccessScope(
       DC, /*usableFromInlineAsPublic*/true).isPublic();
@@ -937,29 +943,11 @@ private:
     return true;
   }
 
-  /// Determine whether the given declaration has the @safe attribute.
-  static bool declHasSafeAttr(Decl *decl) {
-    if (decl->getAttrs().hasAttribute<SafeAttr>())
-      return true;
-
-    if (auto accessor = dyn_cast<AccessorDecl>(decl))
-      return declHasSafeAttr(accessor->getStorage());
-
-    // Attributes for pattern binding declarations are on the first variable.
-    if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
-      if (auto var = pbd->getAnchoringVarDecl(0))
-        return declHasSafeAttr(var);
-    }
-
-    return false;
-  }
-
   void buildContextsForBodyOfDecl(Decl *D) {
     // Are we already constrained by the deployment target and the declaration
     // doesn't explicitly allow unsafe constructs in its definition, adding
     // new contexts won't change availability.
-    bool allowsUnsafe = declHasSafeAttr(D);
-    if (isCurrentScopeContainedByDeploymentTarget() && !allowsUnsafe)
+    if (isCurrentScopeContainedByDeploymentTarget())
       return;
 
     // Enumerate all of the body scopes to apply availability.
@@ -973,11 +961,6 @@ private:
           bodyIsDeploymentTarget(decl)) {
         availability.constrainWithPlatformRange(
              AvailabilityRange::forDeploymentTarget(Context), Context);
-      }
-
-      // Allow unsafe if appropriate for this body.
-      if (allowsUnsafe) {
-        availability.constrainWithAllowsUnsafe(Context);
       }
 
       nodesAndScopes.push_back({
@@ -2958,7 +2941,7 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
     return;
   }
 
-  ExportContext where = ExportContext::forDeclSignature(override);
+  ExportContext where = ExportContext::forDeclSignature(override, nullptr);
   diagnoseExplicitUnavailability(
       base, override->getLoc(), where,
       /*Flags*/ std::nullopt, [&](InFlightDiagnostic &diag) {
@@ -4071,6 +4054,22 @@ private:
 };
 } // end anonymous namespace
 
+/// Diagnose uses of unsafe declarations.
+static void
+diagnoseDeclUnsafe(ConcreteDeclRef declRef, SourceRange R,
+                   const Expr *call, const ExportContext &Where) {
+  auto unsafeUses = Where.getUnsafeUses();
+  if (!unsafeUses)
+    return;
+
+  SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+  enumerateUnsafeUses(declRef, diagLoc, call != nullptr,
+                      [&](UnsafeUse unsafeUse) {
+    unsafeUses->push_back(unsafeUse);
+    return false;
+  });
+}
+
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
@@ -4099,24 +4098,12 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
       return true;
   }
 
-  if (diagnoseDeclAvailability(D, R, call, Where, Flags))
-      return true;
+  if (diagnoseDeclAvailability(
+          D, R, call, Where,
+          Flags | DeclAvailabilityFlag::DisableUnsafeChecking))
+    return true;
 
-  // If the declaration itself is "safe" but we don't disallow unsafe uses,
-  // check whether it traffics in unsafe types.
-  ASTContext &ctx = D->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe) && !D->isUnsafe() &&
-      !Where.getAvailability().allowsUnsafe()) {
-    auto type = D->getInterfaceType();
-    if (auto subs = declRef.getSubstitutions())
-      type = type.subst(subs);
-    if (type->isUnsafe()) {
-      diagnoseUnsafeUse(
-          UnsafeUse::forReferenceToUnsafe(
-            D, call != nullptr && !isa<ParamDecl>(D), Where.getDeclContext(),
-            type, R.Start));
-    }
-  }
+  diagnoseDeclUnsafe(declRef, R, call, Where);
 
   if (R.isValid()) {
     if (diagnoseSubstitutionMapAvailability(
@@ -4183,90 +4170,6 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
   return true;
 }
 
-/// Determine whether a reference to the given variable is treated as
-/// nonisolated(unsafe).
-static bool isReferenceToNonisolatedUnsafe(
-    ValueDecl *decl,
-    DeclContext *fromDC
-) {
-  auto isolation = getActorIsolationForReference(decl, fromDC);
-  if (!isolation.isNonisolated())
-    return false;
-
-  auto attr = decl->getAttrs().getAttribute<NonisolatedAttr>();
-  return attr && attr->isUnsafe();
-}
-
-/// Diagnose uses of unsafe declarations.
-static void
-diagnoseDeclUnsafe(const ValueDecl *D, SourceRange R,
-                   const Expr *call, const ExportContext &Where) {
-  ASTContext &ctx = D->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
-    return;
-
-  if (Where.getAvailability().allowsUnsafe())
-    return;
-
-  SourceLoc diagLoc = call ? call->getLoc() : R.Start;
-  if (D->isUnsafe()) {
-    diagnoseUnsafeUse(
-        UnsafeUse::forReferenceToUnsafe(
-          D, call != nullptr, Where.getDeclContext(), Type(), diagLoc));
-    return;
-  }
-
-  if (auto valueDecl = dyn_cast<ValueDecl>(D)) {
-    // A typealias that is not itself @unsafe but references an unsafe type
-    // is diagnosed separately.
-    if (auto typealias = dyn_cast<TypeAliasDecl>(valueDecl)) {
-      if (Type underlying = typealias->getUnderlyingType()) {
-        if (underlying->isUnsafe()) {
-          diagnoseUnsafeUse(
-              UnsafeUse::forReferenceToUnsafeThroughTypealias(
-                D, Where.getDeclContext(), underlying, diagLoc));
-          return;
-        }
-      }
-    }
-
-    // Use of a nonisolated(unsafe) declaration is unsafe, but is only
-    // diagnosed as such under strict concurrency.
-    if (ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        isReferenceToNonisolatedUnsafe(const_cast<ValueDecl *>(valueDecl),
-                                       Where.getDeclContext())) {
-      diagnoseUnsafeUse(
-          UnsafeUse::forNonisolatedUnsafe(
-          valueDecl, R.Start, Where.getDeclContext()));
-      return;
-    }
-
-    if (auto var = dyn_cast<VarDecl>(valueDecl)) {
-      // unowned(unsafe) is unsafe (duh).
-      if (auto ownershipAttr =
-              var->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
-        if (ownershipAttr->get() == ReferenceOwnership::Unmanaged) {
-          diagnoseUnsafeUse(
-              UnsafeUse::forUnownedUnsafe(var, R.Start,
-                                          Where.getDeclContext()));
-          return;
-        }
-      }
-
-      // @exclusivity(unchecked) is unsafe.
-      if (auto exclusivityAttr =
-              var->getAttrs().getAttribute<ExclusivityAttr>()) {
-        if (exclusivityAttr->getMode() == ExclusivityAttr::Unchecked) {
-          diagnoseUnsafeUse(
-              UnsafeUse::forExclusivityUnchecked(var, R.Start,
-                                                 Where.getDeclContext()));
-          return;
-        }
-      }
-    }
-  }
-}
-
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
@@ -4310,7 +4213,8 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (diagnoseDeclAsyncAvailability(D, R, call, Where))
     return true;
 
-  diagnoseDeclUnsafe(D, R, call, Where);
+  if (!Flags.contains(DeclAvailabilityFlag::DisableUnsafeChecking))
+    diagnoseDeclUnsafe(const_cast<ValueDecl *>(D), R, call, Where);
 
   // Make sure not to diagnose an accessor's deprecation if we already
   // complained about the property/subscript.
@@ -4788,15 +4692,13 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   }
 
   // Strict memory safety checking.
-  if (!where.getAvailability().allowsUnsafe() &&
-      ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+  if (auto unsafeUses = where.getUnsafeUses()) {
     if (auto normalConf = dyn_cast<NormalProtocolConformance>(rootConf)) {
       // @unsafe conformances are considered... unsafe.
       if (normalConf->isUnsafe()) {
-        diagnoseUnsafeUse(
+        unsafeUses->push_back(
             UnsafeUse::forConformance(
-              concreteConf->getType(), conformance, loc,
-              where.getDeclContext()));
+              concreteConf->getType(), conformance, loc));
       }
     }
   }
@@ -5004,25 +4906,4 @@ void swift::checkExplicitAvailability(Decl *decl) {
       diag.fixItInsert(InsertLoc, AttrText);
     }
   }
-}
-
-std::pair<const Decl *, bool /*inDefinition*/>
-swift::enclosingContextForUnsafe(
-    SourceLoc referenceLoc, const DeclContext *referenceDC) {
-  if (referenceLoc.isInvalid())
-    return { nullptr, false };
-
-  ASTContext &ctx = referenceDC->getASTContext();
-  std::optional<ASTNode> versionCheckNode;
-  const Decl *memberLevelDecl = nullptr;
-  const Decl *typeLevelDecl = nullptr;
-  findAvailabilityFixItNodes(
-      referenceLoc, referenceDC, ctx.SourceMgr,
-      versionCheckNode, memberLevelDecl, typeLevelDecl);
-
-  auto decl = memberLevelDecl ? memberLevelDecl : typeLevelDecl;
-  if (!decl)
-    return { nullptr, false };
-
-  return { decl, versionCheckNode.has_value() };
 }

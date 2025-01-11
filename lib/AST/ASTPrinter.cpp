@@ -2875,8 +2875,6 @@ void PrintAST::printInherited(const Decl *decl) {
         Printer << "@preconcurrency ";
       if (inherited.isUnsafe())
         Printer << "@unsafe ";
-      if (inherited.isSafe())
-        Printer << "@safe(unchecked) ";
       if (inherited.isSuppressed())
         Printer << "~";
     });
@@ -4814,6 +4812,11 @@ void PrintAST::visitArrowExpr(ArrowExpr *expr) {
 
 void PrintAST::visitAwaitExpr(AwaitExpr *expr) {
   Printer << "await ";
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitUnsafeExpr(UnsafeExpr *expr) {
+  Printer << "unsafe ";
   visit(expr->getSubExpr());
 }
 

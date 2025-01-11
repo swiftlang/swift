@@ -527,7 +527,6 @@ public:
   void visitWeakLinkedAttr(WeakLinkedAttr *attr);
   void visitSILGenNameAttr(SILGenNameAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
-  void visitSafeAttr(SafeAttr *attr);
   void visitLifetimeAttr(LifetimeAttr *attr);
   void visitAddressableSelfAttr(AddressableSelfAttr *attr);
   void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
@@ -3242,7 +3241,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     return nullptr;
   }
 
-  auto where = ExportContext::forDeclSignature(D);
+  auto where = ExportContext::forDeclSignature(D, nullptr);
   diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where,
                            std::nullopt);
 
@@ -7917,13 +7916,6 @@ void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
 }
 
 void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
-  if (Ctx.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
-    return;
-
-  diagnoseAndRemoveAttr(attr, diag::unsafe_attr_disabled);
-}
-
-void AttributeChecker::visitSafeAttr(SafeAttr *attr) {
   if (Ctx.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
     return;
 

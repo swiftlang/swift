@@ -4523,7 +4523,7 @@ WARNING(nan_comparison_both_nan, none,
        (StringRef, bool))
 
 // If you change this, also change enum TryKindForDiagnostics.
-#define TRY_KIND_SELECT(SUB) "%select{try|try!|try?|await}" #SUB
+#define TRY_KIND_SELECT(SUB) "%select{try|try!|try?|await|unsafe}" #SUB
 
 ERROR(try_rhs,none,
       "'" TRY_KIND_SELECT(0) "' cannot appear to the right of a "
@@ -8079,11 +8079,6 @@ NOTE(sending_function_result_with_sending_param_note, none,
 ERROR(unsafe_attr_disabled,none,
       "attribute requires '-enable-experimental-feature AllowUnsafeAttribute'", ())
 
-GROUPED_WARNING(decl_involves_unsafe,Unsafe,none,
-      "%kindbase0 involves unsafe code; "
-      "use %select{'@unsafe' to indicate that its use is not memory-safe|"
-      "'@safe(unchecked)' to assert that the code is memory-safe}1",
-      (const Decl *, bool))
 NOTE(note_reference_to_unsafe_decl,none,
       "%select{reference|call}0 to unsafe %kind1",
       (bool, const ValueDecl *))
@@ -8103,6 +8098,12 @@ NOTE(note_reference_exclusivity_unchecked,none,
 NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
      "@unsafe conformance of %0 to %kind1 involves unsafe code",
      (Type, const ValueDecl *))
+
+GROUPED_WARNING(decl_signature_involves_unsafe,Unsafe,none,
+      "%kindbase0 has an interface that is not memory-safe; "
+      "use '@unsafe' to indicate that its use is unsafe",
+      (const Decl *))
+
 GROUPED_WARNING(conformance_involves_unsafe,Unsafe,none,
      "conformance of %0 to %kind1 involves unsafe code; use '@unsafe' to "
      "indicate that the conformance is not memory-safe",
@@ -8114,44 +8115,19 @@ NOTE(note_type_witness_unsafe,none,
       "unsafe type %0 cannot satisfy safe associated type %1",
       (Type, DeclName))
 
-GROUPED_WARNING(override_safe_withunsafe,Unsafe,none,
+GROUPED_WARNING(override_safe_with_unsafe,Unsafe,none,
       "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
-GROUPED_WARNING(use_of_unsafe_conformance_is_unsafe,Unsafe,none,
-      "@unsafe conformance of %0 to %kind1 involves unsafe code",
-       (Type, const ValueDecl *))
-GROUPED_WARNING(reference_unowned_unsafe,Unsafe,none,
-      "reference to unowned(unsafe) %kind0 is unsafe", (const ValueDecl *))
-GROUPED_WARNING(reference_exclusivity_unchecked,Unsafe,none,
-      "reference to @exclusivity(unchecked) %kind0 is unsafe", (const ValueDecl *))
 
-GROUPED_WARNING(reference_to_nonisolated_unsafe,Unsafe,none,
-      "reference to nonisolated(unsafe) %kind0 is unsafe in concurrently-executing code",
-       (const ValueDecl *))
-GROUPED_WARNING(reference_to_unsafe_decl,Unsafe,none,
-      "%select{reference|call}0 to unsafe %kindbase1",
-      (bool, const ValueDecl *))
-GROUPED_WARNING(reference_to_unsafe_typed_decl,Unsafe,none,
-      "%select{reference|call}0 to %kindbase1 involves unsafe type %2",
-      (bool, const ValueDecl *, Type))
-GROUPED_WARNING(reference_to_unsafe_through_typealias,Unsafe,none,
-     "reference to %kind0 whose underlying type involves unsafe type %1",
-     (const ValueDecl *, Type))
 GROUPED_WARNING(preconcurrency_import_unsafe,Unsafe,none,
       "@preconcurrency import is not memory-safe because it can silently "
-      "introduce data races; use '@safe(unchecked)' to assert that the "
-      "code is memory-safe", ())
-NOTE(encapsulate_unsafe_in_enclosing_context,none,
-     "make %kindbase0 @safe(unchecked) to allow it to use unsafe constructs in its definition",
-     (const Decl *))
-NOTE(make_enclosing_context_unsafe,none,
-     "make %kindbase0 @unsafe to indicate that its use is not memory-safe",
-     (const Decl *))
+      "introduce data races", ())
+GROUPED_WARNING(unsafe_without_unsafe,Unsafe,none,
+      "expression uses unsafe constructs but is not marked with 'unsafe'", ())
+WARNING(no_unsafe_in_unsafe,none,
+        "no unsafe operations occur within 'unsafe' expression", ())
 NOTE(make_subclass_unsafe,none,
      "make class %0 @unsafe to allow unsafe overrides of safe superclass methods",
      (DeclName))
-NOTE(make_conforming_context_unsafe,none,
-     "make the enclosing %0 @unsafe to allow unsafe conformance to protocol %1",
-     (DescriptiveDeclKind, DeclName))
 
 //===----------------------------------------------------------------------===//
 // MARK: Value Generics

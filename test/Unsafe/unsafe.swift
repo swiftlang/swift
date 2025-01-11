@@ -50,7 +50,10 @@ struct ConformsToMultiP { }
 // expected-warning@+1{{conformance of 'ConformsToMultiP' to protocol 'MultiP' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{29-29=@unsafe }}
 extension ConformsToMultiP: MultiP {
   // expected-note@-1{{unsafe type 'UnsafeSuper' cannot satisfy safe associated type 'Ptr'}}
-  @unsafe func f() -> UnsafeSuper { .init() }
+  @unsafe func f() -> UnsafeSuper {
+    .init() // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+    // expected-note@-1{{reference to unsafe initializer 'init()'}}
+  }
 }
 
 protocol GenericP {
@@ -85,13 +88,13 @@ struct SuperHolder {
   unowned var s1: Super
   unowned(unsafe) var s2: Super
 
-  // expected-warning@+1{{instance method 'getSuper2' involves unsafe code; use '@safe(unchecked)' to assert that the code is memory-safe}}
   func getSuper2() -> Super {
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
     return s2 // expected-note{{reference to unowned(unsafe) property 's2' is unsafe}}
   }
 
-  // expected-warning@+1{{instance method 'getSuper2b' involves unsafe code; use '@safe(unchecked)' to assert that the code is memory-safe}}
   func getSuper2b() -> Super {
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{5-5=unsafe }}
     s2 // expected-note{{reference to unowned(unsafe) property 's2' is unsafe}}
   }
 }
@@ -102,9 +105,10 @@ struct SuperHolder {
 class ExclusivityChecking {
   @exclusivity(unchecked) var value: Int = 0
 
-  // expected-warning@+1{{instance method 'next' involves unsafe code; use '@safe(unchecked)' to assert that the code is memory-safe}}
   func next() -> Int {
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{5-5=unsafe }}
     value += 1 // expected-note{{reference to @exclusivity(unchecked) property 'value' is unsafe}}
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
     return value  // expected-note{{reference to @exclusivity(unchecked) property 'value' is unsafe}}
   }
 }
@@ -116,8 +120,8 @@ class ExclusivityChecking {
   func f() { }
 };
 
-class UnsafeSub: UnsafeSuper { } // expected-warning{{class 'UnsafeSub' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
-// expected-note@-1{{reference to unsafe class 'UnsafeSuper'}}
+// TODO: diagnose the need for @unsafe when there's an unsafe superclass.
+class UnsafeSub: UnsafeSuper { }
 
 // -----------------------------------------------------------------------
 // Declaration references
@@ -125,29 +129,37 @@ class UnsafeSub: UnsafeSuper { } // expected-warning{{class 'UnsafeSub' involves
 @unsafe func unsafeF() { }
 @unsafe var unsafeVar: Int = 0
 
-// expected-warning@+1{{global function 'testMe' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe [Unsafe]}}{{1-1=@unsafe }}
+
+// expected-warning@+1{{global function 'testMe' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}{{1-1=@unsafe }}
 func testMe(
   _ pointer: PointerType, // expected-note{{reference to unsafe struct 'PointerType'}}
   _ unsafeSuper: UnsafeSuper // expected-note{{reference to unsafe class 'UnsafeSuper'}}
-) { 
-  unsafeF() // expected-note{{call to unsafe global function 'unsafeF()'}}
+) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
+  unsafeF() // expected-note{{reference to unsafe global function 'unsafeF()'}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
   _ = unsafeVar // expected-note{{reference to unsafe var 'unsafeVar'}}
-  unsafeSuper.f() // expected-note{{call to unsafe instance method 'f()'}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
+  unsafeSuper.f() // expected-note{{reference to unsafe instance method 'f()'}}
   // expected-note@-1{{reference to parameter 'unsafeSuper' involves unsafe type 'UnsafeSuper'}}
 
-  _ = getPointers() // expected-note{{call to global function 'getPointers()' involves unsafe type 'PointerType'}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
+  _ = getPointers() // expected-note{{reference to global function 'getPointers()' involves unsafe type 'PointerType'}}
 }
 
 // -----------------------------------------------------------------------
 // Various declaration kinds
 // -----------------------------------------------------------------------
-// expected-warning@+1{{type alias 'SuperUnsafe' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+
+// expected-warning@+1{{type alias 'SuperUnsafe' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}
 typealias SuperUnsafe = UnsafeSuper // expected-note{{reference to unsafe class 'UnsafeSuper'}}
+
 @unsafe typealias SuperUnsafe2 = UnsafeSuper
 
 enum HasUnsafeThings {
-// expected-warning@+1{{enum case 'one' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
-case one(UnsafeSuper) // expected-note{{reference to unsafe class 'UnsafeSuper'}}
+
+// expected-warning@+1{{enum case 'one' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe }}{{1-1=@unsafe }}
+case one(UnsafeSuper)  // expected-note{{reference to unsafe class 'UnsafeSuper'}}
 
 @unsafe case two(UnsafeSuper)
 }
