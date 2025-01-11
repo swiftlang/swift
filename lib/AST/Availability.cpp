@@ -109,12 +109,14 @@ namespace {
 /// The inferred availability required to access a group of declarations
 /// on a single platform.
 struct InferredAvailability {
-  PlatformAgnosticAvailabilityKind PlatformAgnostic
-    = PlatformAgnosticAvailabilityKind::None;
+  AvailableAttr::Kind Kind = AvailableAttr::Kind::Default;
 
   std::optional<llvm::VersionTuple> Introduced;
   std::optional<llvm::VersionTuple> Deprecated;
   std::optional<llvm::VersionTuple> Obsoleted;
+
+  StringRef Message;
+  StringRef Rename;
   bool IsSPI = false;
 };
 
@@ -148,10 +150,9 @@ mergeIntoInferredVersion(const std::optional<llvm::VersionTuple> &Version,
 static void mergeWithInferredAvailability(SemanticAvailableAttr Attr,
                                           InferredAvailability &Inferred) {
   auto *ParsedAttr = Attr.getParsedAttr();
-  Inferred.PlatformAgnostic = static_cast<PlatformAgnosticAvailabilityKind>(
-      std::max(static_cast<unsigned>(Inferred.PlatformAgnostic),
-               static_cast<unsigned>(
-                   ParsedAttr->getPlatformAgnosticAvailability())));
+  Inferred.Kind = static_cast<AvailableAttr::Kind>(
+      std::max(static_cast<unsigned>(Inferred.Kind),
+               static_cast<unsigned>(ParsedAttr->getKind())));
 
   // The merge of two introduction versions is the maximum of the two versions.
   if (mergeIntoInferredVersion(Attr.getIntroduced(), Inferred.Introduced,
@@ -162,21 +163,24 @@ static void mergeWithInferredAvailability(SemanticAvailableAttr Attr,
   // The merge of deprecated and obsoleted versions takes the minimum.
   mergeIntoInferredVersion(Attr.getDeprecated(), Inferred.Deprecated, std::min);
   mergeIntoInferredVersion(Attr.getObsoleted(), Inferred.Obsoleted, std::min);
+
+  if (Inferred.Message.empty() && !Attr.getMessage().empty())
+    Inferred.Message = Attr.getMessage();
+
+  if (Inferred.Rename.empty() && !Attr.getRename().empty())
+    Inferred.Rename = Attr.getRename();
 }
 
-/// Create an implicit availability attribute for the given platform
+/// Create an implicit availability attribute for the given domain
 /// and with the inferred availability.
-static AvailableAttr *createAvailableAttr(PlatformKind Platform,
+static AvailableAttr *createAvailableAttr(AvailabilityDomain Domain,
                                           const InferredAvailability &Inferred,
-                                          StringRef Message, 
-                                          StringRef Rename,
-                                          ValueDecl *RenameDecl,
                                           ASTContext &Context) {
   // If there is no information that would go into the availability attribute,
   // don't create one.
-  if (Inferred.PlatformAgnostic == PlatformAgnosticAvailabilityKind::None &&
-      !Inferred.Introduced && !Inferred.Deprecated && !Inferred.Obsoleted &&
-      Message.empty() && Rename.empty() && !RenameDecl)
+  if (Inferred.Kind == AvailableAttr::Kind::Default && !Inferred.Introduced &&
+      !Inferred.Deprecated && !Inferred.Obsoleted && Inferred.Message.empty() &&
+      Inferred.Rename.empty())
     return nullptr;
 
   llvm::VersionTuple Introduced =
@@ -186,36 +190,26 @@ static AvailableAttr *createAvailableAttr(PlatformKind Platform,
   llvm::VersionTuple Obsoleted =
       Inferred.Obsoleted.value_or(llvm::VersionTuple());
 
-  return new (Context)
-      AvailableAttr(SourceLoc(), SourceRange(), Platform, Message, Rename,
-                    Introduced, SourceRange(), Deprecated, SourceRange(),
-                    Obsoleted, SourceRange(), Inferred.PlatformAgnostic,
-                    /*Implicit=*/true, Inferred.IsSPI);
+  return new (Context) AvailableAttr(
+      SourceLoc(), SourceRange(), Domain, Inferred.Kind, Inferred.Message,
+      Inferred.Rename, Introduced, SourceRange(), Deprecated, SourceRange(),
+      Obsoleted, SourceRange(), /*Implicit=*/true, Inferred.IsSPI);
 }
 
 void AvailabilityInference::applyInferredAvailableAttrs(
     Decl *ToDecl, ArrayRef<const Decl *> InferredFromDecls) {
   auto &Context = ToDecl->getASTContext();
 
-  // Let the new AvailabilityAttr inherit the message and rename.
-  // The first encountered message / rename will win; this matches the 
-  // behaviour of diagnostics for 'non-inherited' AvailabilityAttrs.
-  StringRef Message;
-  StringRef Rename;
-  ValueDecl *RenameDecl = nullptr;
-
   // Iterate over the declarations and infer required availability on
   // a per-platform basis.
-  // FIXME: [availability] Generalize to AvailabilityDomain.
-  std::map<PlatformKind, InferredAvailability> Inferred;
+  std::map<AvailabilityDomain, InferredAvailability> Inferred;
   for (const Decl *D : InferredFromDecls) {
     llvm::SmallVector<SemanticAvailableAttr, 8> MergedAttrs;
 
     do {
       llvm::SmallVector<SemanticAvailableAttr, 8> PendingAttrs;
 
-      for (auto AvAttr :
-           D->getSemanticAvailableAttrs()) {
+      for (auto AvAttr : D->getSemanticAvailableAttrs()) {
         // Skip an attribute from an outer declaration if it is for a platform
         // that was already handled implicitly by an attribute from an inner
         // declaration.
@@ -226,14 +220,8 @@ void AvailabilityInference::applyInferredAvailableAttrs(
                          }))
           continue;
 
-        mergeWithInferredAvailability(AvAttr, Inferred[AvAttr.getPlatform()]);
+        mergeWithInferredAvailability(AvAttr, Inferred[AvAttr.getDomain()]);
         PendingAttrs.push_back(AvAttr);
-
-        if (Message.empty() && !AvAttr.getMessage().empty())
-          Message = AvAttr.getMessage();
-
-        if (Rename.empty() && !AvAttr.getRename().empty())
-          Rename = AvAttr.getRename();
       }
 
       MergedAttrs.append(PendingAttrs);
@@ -245,20 +233,12 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   }
 
   DeclAttributes &Attrs = ToDecl->getAttrs();
-  auto *ToValueDecl = dyn_cast<ValueDecl>(ToDecl);
 
   // Create an availability attribute for each observed platform and add
   // to ToDecl.
   for (auto &Pair : Inferred) {
-    auto *Attr = createAvailableAttr(Pair.first, Pair.second, Message,
-                                     Rename, RenameDecl, Context);
-
-    if (Attr) {
-      if (RenameDecl && ToValueDecl)
-        ToValueDecl->setRenamedDecl(Attr, RenameDecl);
-
+    if (auto Attr = createAvailableAttr(Pair.first, Pair.second, Context))
       Attrs.add(Attr);
-    }
   }
 }
 
@@ -467,27 +447,9 @@ Decl::getSemanticAvailableAttrs(bool includeInactive) const {
 
 std::optional<SemanticAvailableAttr>
 Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
-  auto domainForAvailableAttr = [](const AvailableAttr *attr) {
-    auto platform = attr->getPlatform();
-    if (platform != PlatformKind::none)
-      return AvailabilityDomain::forPlatform(platform);
-
-    switch (attr->getPlatformAgnosticAvailability()) {
-    case PlatformAgnosticAvailabilityKind::Deprecated:
-    case PlatformAgnosticAvailabilityKind::Unavailable:
-    case PlatformAgnosticAvailabilityKind::NoAsync:
-    case PlatformAgnosticAvailabilityKind::None:
-      return AvailabilityDomain::forUniversal();
-
-    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-      return AvailabilityDomain::forSwiftLanguage();
-
-    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-      return AvailabilityDomain::forPackageDescription();
-    }
-  };
-  return SemanticAvailableAttr(attr, domainForAvailableAttr(attr));
+  if (auto domain = attr->getCachedDomain())
+    return SemanticAvailableAttr(attr, *domain);
+  return std::nullopt;
 }
 
 std::optional<SemanticAvailableAttr>

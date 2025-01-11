@@ -6654,12 +6654,13 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
         continue;
 
       auto attr = new (ctx) AvailableAttr(
-          SourceLoc(), SourceRange(), available.getPlatform(),
-          available.getMessage(),
+          SourceLoc(), SourceRange(),
+          AvailabilityDomain::forPlatform(available.getPlatform()),
+          AvailableAttr::Kind::Unavailable, available.getMessage(),
           /*Rename=*/"", available.getIntroduced().value_or(noVersion),
           SourceRange(), available.getDeprecated().value_or(noVersion),
           SourceRange(), available.getObsoleted().value_or(noVersion),
-          SourceRange(), PlatformAgnosticAvailabilityKind::Unavailable,
+          SourceRange(),
           /*Implicit=*/true, available.getParsedAttr()->isSPI());
       ext->getAttrs().add(attr);
       anyPlatformSpecificAttrs = true;
