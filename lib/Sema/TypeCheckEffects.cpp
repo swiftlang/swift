@@ -576,7 +576,11 @@ public:
     } else if (auto lookup = dyn_cast<LookupExpr>(E)) {
       recurse = asImpl().checkLookup(lookup);
     } else if (auto declRef = dyn_cast<DeclRefExpr>(E)) {
-      recurse = asImpl().checkDeclRef(declRef);
+      recurse = asImpl().checkDeclRef(declRef,
+                                      declRef->getDeclRef(),
+                                      declRef->getLoc(),
+                                      declRef->isImplicitlyAsync().has_value(),
+                                      declRef->isImplicitlyThrows());
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
     } else if (auto macroExpansionExpr = dyn_cast<MacroExpansionExpr>(E)) {
@@ -1363,41 +1367,48 @@ public:
     return classification;
   }
 
-  Classification classifyDeclRef(DeclRefExpr *E) {
-    if (!E->getDecl())
+  Classification classifyDeclRef(ConcreteDeclRef declRef, SourceLoc loc,
+                                 bool isImplicitlyAsync,
+                                 bool isImplicitlyThrows) {
+    if (!declRef)
       return Classification::forInvalidCode();
 
     Classification classification;
     PotentialEffectReason reason = PotentialEffectReason::forPropertyAccess();
-    ConcreteDeclRef declRef = E->getDeclRef();
 
     if (auto getter = getEffectfulGetOnlyAccessor(declRef)) {
       reason = getKindOfEffectfulProp(declRef);
       classification = Classification::forDeclRef(
-          getter, ConditionalEffectKind::Always, reason, E->getLoc());
+          getter, ConditionalEffectKind::Always, reason, loc);
     } else if (isa<VarDecl>(declRef.getDecl())) {
       // Handle async let.
       reason = PotentialEffectReason::forAsyncLet();
       classification = Classification::forDeclRef(
-          declRef, ConditionalEffectKind::Always, reason, E->getLoc());
+          declRef, ConditionalEffectKind::Always, reason, loc);
     }
 
     classification.setDowngradeToWarning(
-        downgradeAsyncAccessToWarning(E->getDecl()));
+        downgradeAsyncAccessToWarning(declRef.getDecl()));
 
     classification.mergeImplicitEffects(
-        E->getDeclRef().getDecl()->getASTContext(),
-        E->isImplicitlyAsync().has_value(), E->isImplicitlyThrows(),
+        declRef.getDecl()->getASTContext(),
+        isImplicitlyAsync, isImplicitlyThrows,
         reason);
 
     if (!classification.hasUnsafe()) {
       classification.merge(
           Classification::forDeclRef(
-            declRef, ConditionalEffectKind::Always, reason, E->getLoc(),
+            declRef, ConditionalEffectKind::Always, reason, loc,
             EffectKind::Unsafe));
     }
 
     return classification;
+  }
+
+  Classification classifyDeclRef(DeclRefExpr *E) {
+    return classifyDeclRef(
+        E->getDeclRef(), E->getLoc(), E->isImplicitlyAsync().has_value(),
+        E->isImplicitlyThrows());
   }
 
   Classification classifyThrow(ThrowStmt *S) {
@@ -1860,8 +1871,14 @@ private:
       classification.merge(Self.classifyLookup(E).onlyThrowing());
       return ShouldRecurse;
     }
-    ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
-      classification.merge(Self.classifyDeclRef(E).onlyThrowing());
+    ShouldRecurse_t checkDeclRef(Expr *expr,
+                                 ConcreteDeclRef declRef, SourceLoc loc,
+                                 bool isImplicitlyAsync,
+                                 bool isImplicitlyThrows) {
+      classification.merge(
+          Self.classifyDeclRef(
+            declRef, loc, isImplicitlyAsync, isImplicitlyThrows
+          ).onlyThrowing());
       return ShouldNotRecurse;
     }
     ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
@@ -1978,10 +1995,13 @@ private:
 
       return ShouldRecurse;
     }
-    ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
-      if (E->isImplicitlyAsync()) {
+    ShouldRecurse_t checkDeclRef(Expr *expr,
+                                 ConcreteDeclRef declRef, SourceLoc loc,
+                                 bool isImplicitlyAsync,
+                                 bool isImplicitlyThrows) {
+      if (isImplicitlyAsync) {
         AsyncKind = ConditionalEffectKind::Always;
-      } else if (auto getter = getEffectfulGetOnlyAccessor(E->getDeclRef())) {
+      } else if (auto getter = getEffectfulGetOnlyAccessor(declRef)) {
         if (cast<AccessorDecl>(getter.getDecl())->hasAsync())
           AsyncKind = ConditionalEffectKind::Always;
       }
@@ -3601,11 +3621,17 @@ private:
     return ShouldRecurse;
   }
 
-  ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
-    if (auto classification = getApplyClassifier().classifyDeclRef(E)) {
+  ShouldRecurse_t checkDeclRef(Expr *expr,
+                               ConcreteDeclRef declRef, SourceLoc loc,
+                               bool isImplicitlyAsync,
+                               bool isImplicitlyThrows) {
+    if (auto classification = getApplyClassifier().classifyDeclRef(
+          declRef, loc, isImplicitlyAsync, isImplicitlyThrows)) {
       auto throwDest = checkEffectSite(
-          E, classification.hasThrows(), classification);
-      E->setThrows(throwDest);
+          expr, classification.hasThrows(), classification);
+
+      if (auto declRefExpr = dyn_cast<DeclRefExpr>(expr))
+        declRefExpr->setThrows(throwDest);
     }
 
     return ShouldNotRecurse;
