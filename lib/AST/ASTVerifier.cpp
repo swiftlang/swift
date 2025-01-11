@@ -1098,7 +1098,7 @@ public:
       auto func = Functions.back();
       Type resultType;
       if (auto *FD = dyn_cast<FuncDecl>(func)) {
-        resultType = FD->getResultInterfaceType();
+        resultType = FD->getResultInterfaceTypeWithoutYields();
         resultType = FD->mapTypeIntoContext(resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();

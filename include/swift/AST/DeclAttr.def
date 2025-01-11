@@ -542,7 +542,11 @@ DECL_ATTR(abi, ABI,
   165)
 DECL_ATTR_FEATURE_REQUIREMENT(ABI, ABIAttribute)
 
-LAST_DECL_ATTR(ABI)
+SIMPLE_DECL_ATTR(yield_once, Coroutine,
+  OnFunc | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  166)
+
+LAST_DECL_ATTR(Coroutine)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

@@ -188,6 +188,8 @@ extension ASTGenVisitor {
         fatalError("unimplemented")
       case .unavailableFromAsync:
         return handle(self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute)
+      case .coroutine:
+        fatalError("unimplemented")
 
       // Simple attributes.
       case .addressableSelf,

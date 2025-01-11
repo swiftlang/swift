@@ -798,7 +798,7 @@ public func f_54819<Scalar: Differentiable>(
 #endif
 
 //===----------------------------------------------------------------------===//
-// Coroutines (SIL function yields, `begin_apply`) (not yet supported)
+// Coroutines (SIL function yields, `begin_apply`)
 //===----------------------------------------------------------------------===//
 
 struct HasReadAccessors: Differentiable {
@@ -838,8 +838,6 @@ func testModifyAccessorCoroutines(_ x: HasModifyAccessors) -> Float {
 func TF_1078(array: [Float], x: Float) -> Float {
   var array = array
   // Array subscript assignment below calls `Array.subscript.modify`.
-  // expected-error @+2 {{expression is not differentiable}}
-  // expected-note @+1 {{cannot differentiate functions that have not been marked '@differentiable' and that are defined in other files}}
   array[0] = x
   return array[0]
 }
@@ -849,8 +847,6 @@ func TF_1078(array: [Float], x: Float) -> Float {
 func TF_1115(_ x: Float) -> Float {
   var array: [Float] = [0]
   // Array subscript assignment below calls `Array.subscript.modify`.
-  // expected-error @+2 {{expression is not differentiable}}
-  // expected-note @+1 {{cannot differentiate functions that have not been marked '@differentiable' and that are defined in other files}}
   array[0] = x
   return array[0]
 }

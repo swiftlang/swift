@@ -607,6 +607,11 @@ namespace {
                          IsTypeExpansionSensitive_t) {
       llvm_unreachable("shouldn't get an inout type here");
     }
+    RetTy visitYieldResultType(CanYieldResultType type,
+                               AbstractionPattern origType,
+                               IsTypeExpansionSensitive_t) {
+      llvm_unreachable("shouldn't get an yield here");
+    }
     RetTy visitErrorType(CanErrorType type,
                          AbstractionPattern origType,
                          IsTypeExpansionSensitive_t isSensitive) {
@@ -4056,6 +4061,7 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
           .withIsolation(funcType->getIsolation())
           .withLifetimeDependencies(funcType->getLifetimeDependencies())
           .withSendingResult(funcType->hasSendingResult())
+          .withCoroutine(funcType->isCoroutine())
           .build();
 
   return CanAnyFunctionType::get(

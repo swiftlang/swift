@@ -7713,6 +7713,8 @@ public:
   /// attribute.
   bool isTransparent() const;
 
+  bool isCoroutine() const;
+
   // Expose our import as member status
   ImportAsMemberStatus getImportAsMemberStatus() const {
     return ImportAsMemberStatus(Bits.AbstractFunctionDecl.IAMStatus);
@@ -8331,8 +8333,14 @@ public:
     return FnRetType.getSourceRange();
   }
 
-  /// Retrieve the result interface type of this function.
+  /// Retrieve the full result interface type of this function, including yields
   Type getResultInterfaceType() const;
+
+  /// Same as above, but without @yields
+  Type getResultInterfaceTypeWithoutYields() const;
+
+  /// Same as above, but only yields
+  Type getYieldsInterfaceType() const;
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation.  This check is a syntactic rather than type-based check,

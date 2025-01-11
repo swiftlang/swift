@@ -198,17 +198,10 @@ void LifetimeDependenceInfo::getConcatenatedData(
   }
 }
 
-static Type getResultOrYield(AbstractFunctionDecl *afd) {
-  if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
-    if (accessor->isCoroutine()) {
-      auto yieldTyInContext = accessor->mapTypeIntoContext(
-          accessor->getStorage()->getValueInterfaceType());
-      return yieldTyInContext;
-    }
-  }
+static Type getResultWithoutYield(AbstractFunctionDecl *afd) {
   Type resultType;
   if (auto fn = dyn_cast<FuncDecl>(afd)) {
-    resultType = fn->getResultInterfaceType();
+    resultType = fn->getResultInterfaceTypeWithoutYields();
   } else {
     auto ctor = cast<ConstructorDecl>(afd);
     resultType = ctor->getResultInterfaceType();
@@ -216,8 +209,15 @@ static Type getResultOrYield(AbstractFunctionDecl *afd) {
   return afd->mapTypeIntoContext(resultType);
 }
 
+static Type getYields(AbstractFunctionDecl *afd) {
+  if (auto fn = dyn_cast<FuncDecl>(afd))
+    return afd->mapTypeIntoContext(fn->getYieldsInterfaceType());
+
+  return TupleType::getEmpty(afd->getASTContext());;
+}
+
 static bool hasEscapableResultOrYield(AbstractFunctionDecl *afd) {
-  auto resultType = getResultOrYield(afd);
+  auto resultType = getResultWithoutYield(afd);
   // FIXME: This check is temporary until rdar://139976667 is fixed.
   // ModuleType created with ModuleType::get methods are ~Copyable and
   // ~Escapable because the Copyable and Escapable conformance is not added to
@@ -225,7 +225,14 @@ static bool hasEscapableResultOrYield(AbstractFunctionDecl *afd) {
   if (resultType->is<ModuleType>()) {
     return true;
   }
-  return resultType->isEscapable();
+  if (!resultType->isEscapable())
+    return false;
+
+  resultType = getYields(afd);
+  if (auto *yieldResult = resultType->getAs<YieldResultType>())
+    resultType = yieldResult->getResultType();
+
+  return resultType->is<ModuleType>() || resultType->isEscapable();
 }
 
 static std::optional<LifetimeDependenceKind>
@@ -512,7 +519,8 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     return std::nullopt;
   }
 
-  if (getResultOrYield(afd)->hasError()) {
+  if (getResultWithoutYield(afd)->hasError() ||
+      getYields(afd)->hasError()) {
     return std::nullopt;
   }
 

@@ -255,11 +255,22 @@ public:
       for (auto calleeYield : BeginApply->getYieldedValues()) {
         calleeYield->replaceAllUsesWith(SILUndef::get(calleeYield));
       }
+
+      if (EndApply)
+        EndApply->replaceAllUsesWith(SILUndef::get(EndApply));
     }
 
     // Remove the resumption sites.
-    if (EndApply)
+    if (EndApply) {
+      // All potential users of end_apply should've been replaced above. The only
+      // case where we might end with more users is when end_apply itself is
+      // unreachable. Make sure the function is well-formed and replace the
+      // results with undef.
+      if (!EndApply->use_empty())
+        EndApply->replaceAllUsesWith(SILUndef::get(EndApply));
+
       EndApply->eraseFromParent();
+    }
     if (AbortApply)
       AbortApply->eraseFromParent();
     for (auto *EndBorrow : EndBorrows)

@@ -17,7 +17,7 @@ func read<T>(_ c : () -> T) -> T { c() }
 // disabled: ok!
 var im : Int {
   modify { // expected-enabled-error{{variable with a 'modify' accessor must also have a getter, addressor, or 'read' accessor}}
-    1 // expected-enabled-warning{{integer literal is unused}}
+    1 // expected-enabled-error{{unexpected non-void return value in void function}}
   }
 }
 
@@ -25,6 +25,6 @@ var im : Int {
 // disabled: ok!
 var ir : Int {
   read {
-    1 // expected-enabled-warning{{integer literal is unused}}
+    1 // expected-enabled-error{{unexpected non-void return value in void function}}
   }
 }

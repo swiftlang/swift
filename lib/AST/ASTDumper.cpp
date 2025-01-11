@@ -18,6 +18,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -1704,6 +1705,7 @@ namespace {
     void printCommonFD(FuncDecl *FD, const char *type, StringRef Label) {
       printCommonAFD(FD, type, Label);
       printFlag(FD->isStatic(), "type");
+      printFlag(FD->isCoroutine(), "@yield_once");
     }
 
     void visitFuncDecl(FuncDecl *FD, StringRef label) {
@@ -3767,6 +3769,7 @@ public:
   TRIVIAL_ATTR_PRINTER(CompilerInitialized, compiler_initialized)
   TRIVIAL_ATTR_PRINTER(Consuming, consuming)
   TRIVIAL_ATTR_PRINTER(Convenience, convenience)
+  TRIVIAL_ATTR_PRINTER(Coroutine, coroutine)
   TRIVIAL_ATTR_PRINTER(DiscardableResult, discardable_result)
   TRIVIAL_ATTR_PRINTER(DisfavoredOverload, disfavored_overload)
   TRIVIAL_ATTR_PRINTER(DistributedActor, distributed_actor)
@@ -4677,6 +4680,13 @@ namespace {
       printFoot();
     }
 
+    void visitYieldResultType(YieldResultType *T, StringRef label) {
+      printCommon("yield", label);
+      printFlag(T->isInOut(), "inout");
+      printRec(T->getResultType(), "type");
+      printFoot();
+    }
+
     TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
 
     void visitPlaceholderType(PlaceholderType *T, StringRef label) {
@@ -5053,7 +5063,7 @@ namespace {
     }
 
     void printAnyFunctionTypeCommonRec(AnyFunctionType *T, StringRef label,
-                                    StringRef name) {
+                                       StringRef name) {
       printCommon(name, label);
 
       if (T->hasExtInfo()) {
@@ -5068,6 +5078,25 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
+        printFlag(T->isCoroutine(), "@yield_once");
+        if (T->isDifferentiable()) {
+          switch (T->getDifferentiabilityKind()) {
+          default:
+            llvm_unreachable("unexpected differentiability kind");
+          case DifferentiabilityKind::Reverse:
+            printFlag("@differentiable(reverse)");
+            break;
+          case DifferentiabilityKind::Forward:
+            printFlag("@differentiable(_forward)");
+            break;
+          case DifferentiabilityKind::Linear:
+            printFlag("@differentiable(_linear)");
+            break;
+          case DifferentiabilityKind::Normal:
+            printFlag("@differentiable");
+            break;
+          }
+        }
       }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), "global_actor");

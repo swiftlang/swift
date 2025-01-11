@@ -407,6 +407,8 @@ NODE(DependentGenericInverseConformanceRequirement)
 NODE(Integer)
 NODE(NegativeInteger)
 NODE(DependentGenericParamValueMarker)
+NODE(YieldResult)
+NODE(Coroutine)
 
 #undef CONTEXT_NODE
 #undef NODE

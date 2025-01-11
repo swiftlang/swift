@@ -36,9 +36,23 @@ ArrayAutoDiffTests.test("ArraySubscript") {
     return array[0] + array[1] + array[2]
   }
 
+  func modifyArray(_ array: [Float]) -> Float {
+    var array = array
+    var result: Float = 0
+    for index in withoutDerivative(at: 0 ..< array.count) {
+      let multiplier = 1.0 + Float(index)
+      array[index] *= multiplier
+      result += array[index]
+    }
+
+    return result
+  }
   expectEqual(
     FloatArrayTan([1, 1, 1, 0, 0, 0]),
     gradient(at: [2, 3, 4, 5, 6, 7], of: sumFirstThree))
+  expectEqual(
+    FloatArrayTan([1, 2, 3]),
+    gradient(at: [1, 1, 1], of: modifyArray))
 }
 
 ArrayAutoDiffTests.test("ArrayLiteral") {

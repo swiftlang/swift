@@ -20,6 +20,7 @@
 
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/Types.h"
 
 namespace swift {
 
@@ -953,6 +954,16 @@ case TypeKind::Id:
 
       return objectTy.getPointer() == inout->getObjectType().getPointer() ?
         t : InOutType::get(objectTy);
+    }
+
+    case TypeKind::YieldResult: {
+      auto yield = cast<YieldResultType>(base);
+      auto objectTy = doIt(yield->getResultType(), TypePosition::Invariant);
+      if (!objectTy || objectTy->hasError())
+        return objectTy;
+
+      return objectTy.getPointer() == yield->getResultType().getPointer() ?
+        t : YieldResultType::get(objectTy, yield->isInOut());
     }
 
     case TypeKind::Existential: {

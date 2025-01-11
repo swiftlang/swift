@@ -787,8 +787,7 @@ class C : Abstractable {
 // CHECK-NEXT:   [[THUNKED_NEW_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[NEW_FN_CONV]])
 // CHECK-NEXT:   store [[THUNKED_NEW_FN]] to [init] [[ADDR]] :
 // CHECK-NEXT:   dealloc_stack [[TEMP]]
-// CHECK-NEXT:   end_apply [[TOKEN]]
-// CHECK-NEXT:   [[TUPLE:%.*]] = tuple ()
+// CHECK-NEXT:   [[TUPLE:%.*]] = end_apply [[TOKEN]]
 // CHECK-NEXT:   end_borrow [[SELF]] : $C
 // CHECK-NEXT:   return [[TUPLE]]
 

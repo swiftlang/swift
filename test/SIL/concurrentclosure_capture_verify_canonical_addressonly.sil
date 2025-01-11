@@ -74,7 +74,7 @@ bb0(%0 : $*T):
   destroy_value %15 : $@Sendable @callee_guaranteed () -> () // id: %22
   destroy_value %11 : $F                          // id: %23
   %24 = begin_access [modify] [dynamic] %9 : $*T  // users: %31, %26
-  %25 = witness_method $T, #MyProt.k!modify : <Self where Self : MyProt> (inout Self) -> () -> () : $@yield_once @convention(witness_method: MyProt) <τ_0_0 where τ_0_0 : MyProt> (@inout τ_0_0) -> @yields @inout FakeOptional<Klass> // user: %26
+  %25 = witness_method $T, #MyProt.k!modify : <Self where Self : MyProt> (inout Self) -> @yield_once () -> inout @yields FakeOptional<Klass> : $@yield_once @convention(witness_method: MyProt) <τ_0_0 where τ_0_0 : MyProt> (@inout τ_0_0) -> @yields @inout FakeOptional<Klass> // user: %26
   (%26, %27) = begin_apply %25<T>(%24) : $@yield_once @convention(witness_method: MyProt) <τ_0_0 where τ_0_0 : MyProt> (@inout τ_0_0) -> @yields @inout FakeOptional<Klass> // users: %29, %30
   // function_ref inoutUserOptKlass(_:)
   %28 = function_ref @$s37concurrentfunction_capturediagnostics17inoutUserOptKlassyyAA0F0CSgzF : $@convention(thin) (@inout FakeOptional<Klass>) -> () // user: %29

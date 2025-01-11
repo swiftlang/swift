@@ -465,8 +465,8 @@
                 "children": [
                   {
                     "kind": "TypeNominal",
-                    "name": "Void",
-                    "printedName": "()"
+                    "name": "YieldResult",
+                    "printedName": "inout @yields cake.C1?"
                   }
                 ],
                 "declKind": "Accessor",
@@ -561,8 +561,8 @@
                 "children": [
                   {
                     "kind": "TypeNominal",
-                    "name": "Void",
-                    "printedName": "()"
+                    "name": "YieldResult",
+                    "printedName": "inout @yields cake.C1"
                   }
                 ],
                 "declKind": "Accessor",
@@ -967,8 +967,8 @@
                 "children": [
                   {
                     "kind": "TypeNominal",
-                    "name": "Void",
-                    "printedName": "()"
+                    "name": "YieldResult",
+                    "printedName": "inout @yields Swift.Int"
                   }
                 ],
                 "declKind": "Accessor",
@@ -1341,8 +1341,8 @@
                 "children": [
                   {
                     "kind": "TypeNominal",
-                    "name": "Void",
-                    "printedName": "()"
+                    "name": "YieldResult",
+                    "printedName": "inout @yields Swift.Int"
                   },
                   {
                     "kind": "TypeNominal",

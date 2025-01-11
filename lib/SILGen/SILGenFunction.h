@@ -2196,9 +2196,10 @@ public:
   emitBeginApplyWithRethrow(SILLocation loc, SILValue fn, SILType substFnType,
                             SubstitutionMap subs, ArrayRef<SILValue> args,
                             SmallVectorImpl<SILValue> &yields);
-  void emitEndApplyWithRethrow(SILLocation loc,
-                               MultipleValueInstructionResult *token,
-                               SILValue allocation);
+  SILValue emitEndApplyWithRethrow(SILLocation loc,
+                                   MultipleValueInstructionResult *token,
+                                   SILValue allocation,
+                                   SILType resultType);
 
   ManagedValue emitExtractFunctionIsolation(SILLocation loc,
                                         ArgumentSource &&fnValue);

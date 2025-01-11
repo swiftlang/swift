@@ -451,10 +451,10 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     fatalError()
   }
 
-  // expected-error @+1 {{cannot register derivative for _modify accessor}}
   @derivative(of: computedProperty._modify)
-  mutating func vjpPropertyModify(_ newValue: T) -> (
-    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  @yield_once
+  mutating func vjpPropertyModify() -> (
+    value: inout @yields T, pullback: @yield_once (inout TangentVector) -> inout @yields T.TangentVector
   ) {
     fatalError()
   }

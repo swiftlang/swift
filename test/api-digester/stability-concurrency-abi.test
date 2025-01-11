@@ -125,6 +125,44 @@ Func withThrowingTaskGroup(of:returning:body:) has parameter 2 type change from 
 Func withTaskGroup(of:returning:body:) has been renamed to Func withTaskGroup(of:returning:isolation:body:)
 Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B' to '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.TaskGroup<A>) async -> B) async -> B'
 
+Accessor AsyncCompactMapSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncDropFirstSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncDropFirstSequence.Iterator.count.Modify() has return type change from () to inout @yields Swift.Int
+Accessor AsyncDropWhileSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncDropWhileSequence.Iterator.predicate.Modify() has return type change from () to inout @yields ((τ_0_0.Element) async -> Swift.Bool)?
+Accessor AsyncFilterSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncFlatMapSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncFlatMapSequence.Iterator.currentIterator.Modify() has return type change from () to inout @yields τ_0_1.AsyncIterator?
+Accessor AsyncFlatMapSequence.Iterator.finished.Modify() has return type change from () to inout @yields Swift.Bool
+Accessor AsyncMapSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncPrefixSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncPrefixSequence.Iterator.remaining.Modify() has return type change from () to inout @yields Swift.Int
+Accessor AsyncPrefixWhileSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncPrefixWhileSequence.Iterator.predicateHasFailed.Modify() has return type change from () to inout @yields Swift.Bool
+Accessor AsyncStream.Continuation.onTermination.Modify() has return type change from () to inout @yields ((_Concurrency.AsyncStream<τ_0_0>.Continuation.Termination) -> ())?
+Accessor AsyncThrowingCompactMapSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncThrowingCompactMapSequence.Iterator.finished.Modify() has return type change from () to inout @yields Swift.Bool
+Accessor AsyncThrowingDropWhileSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncThrowingDropWhileSequence.Iterator.doneDropping.Modify() has return type change from () to inout @yields Swift.Bool
+Accessor AsyncThrowingDropWhileSequence.Iterator.finished.Modify() has return type change from () to inout @yields Swift.Bool
+Accessor AsyncThrowingFilterSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncThrowingFilterSequence.Iterator.finished.Modify() has return type change from () to inout @yields Swift.Bool
+Accessor AsyncThrowingFlatMapSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncThrowingFlatMapSequence.Iterator.currentIterator.Modify() has return type change from () to inout @yields τ_0_1.AsyncIterator?
+Accessor AsyncThrowingFlatMapSequence.Iterator.finished.Modify() has return type change from () to inout @yields Swift.Bool
+Accessor AsyncThrowingMapSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncThrowingMapSequence.Iterator.finished.Modify() has return type change from () to inout @yields Swift.Bool
+Accessor AsyncThrowingPrefixWhileSequence.Iterator.baseIterator.Modify() has return type change from () to inout @yields τ_0_0.AsyncIterator
+Accessor AsyncThrowingPrefixWhileSequence.Iterator.predicateHasFailed.Modify() has return type change from () to inout @yields Swift.Bool
+Accessor AsyncThrowingStream.Continuation.onTermination.Modify() has return type change from () to inout @yields ((_Concurrency.AsyncThrowingStream<τ_0_0, τ_0_1>.Continuation.Termination) -> ())?
+Accessor TaskGroup.Iterator.finished.Modify() has return type change from () to inout @yields Swift.Bool
+Accessor TaskGroup.Iterator.group.Modify() has return type change from () to inout @yields _Concurrency.TaskGroup<τ_0_0>
+Accessor TaskPriority.rawValue.Modify() has return type change from () to inout @yields Swift.UInt8
+Accessor ThrowingTaskGroup.Iterator.finished.Modify() has return type change from () to inout @yields Swift.Bool
+Accessor ThrowingTaskGroup.Iterator.group.Modify() has return type change from () to inout @yields _Concurrency.ThrowingTaskGroup<τ_0_0, τ_0_1>
+Accessor UnownedSerialExecutor.executor.Modify() has return type change from () to inout @yields Builtin.Executor
+Accessor UnsafeContinuation.context.Modify() has return type change from () to inout @yields Builtin.RawUnsafeContinuation
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
 

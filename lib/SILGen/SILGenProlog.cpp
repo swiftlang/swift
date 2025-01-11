@@ -1539,6 +1539,10 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
 
   assert(!resultType->is<PackExpansionType>());
 
+  // Skip yields, they are emitted elsewhere
+  if (resultType->is<YieldResultType>())
+    return;
+
   // If the return type is address-only, emit the indirect return argument.
 
   // The calling convention always uses minimal resilience expansion.
@@ -1625,7 +1629,7 @@ uint16_t SILGenFunction::emitBasicProlog(
     ? origClosureType->getFunctionResultType()
     : AbstractionPattern(genericSig.getCanonicalSignature(),
                          resultType->getCanonicalType());
-  
+
   emitIndirectResultParameters(*this, resultType, origResultType, DC);
 
   std::optional<AbstractionPattern> origErrorType;
