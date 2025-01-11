@@ -12,7 +12,7 @@
 
 extension CollectionOfOne {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Element> {
     @_alwaysEmitIntoClient
     @lifetime(borrow self)
@@ -26,7 +26,7 @@ extension CollectionOfOne {
 
 extension SIMD2 {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Scalar> {
     @_alwaysEmitIntoClient
     @lifetime(borrow self)
@@ -40,7 +40,7 @@ extension SIMD2 {
 
 extension SIMD3 {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Scalar> {
     @_alwaysEmitIntoClient
     @lifetime(borrow self)
@@ -54,7 +54,7 @@ extension SIMD3 {
 
 extension SIMD4 {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Scalar> {
     @_alwaysEmitIntoClient
     @lifetime(borrow self)
@@ -68,7 +68,7 @@ extension SIMD4 {
 
 extension SIMD8 {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Scalar> {
     @_alwaysEmitIntoClient
     @lifetime(borrow self)
@@ -82,7 +82,7 @@ extension SIMD8 {
 
 extension SIMD16 {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Scalar> {
     @_alwaysEmitIntoClient
     @lifetime(borrow self)
@@ -96,7 +96,7 @@ extension SIMD16 {
 
 extension SIMD32 {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Scalar> {
     @_alwaysEmitIntoClient
     @lifetime(borrow self)
@@ -110,7 +110,7 @@ extension SIMD32 {
 
 extension SIMD64 {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Scalar> {
     @_alwaysEmitIntoClient
     @lifetime(borrow self)

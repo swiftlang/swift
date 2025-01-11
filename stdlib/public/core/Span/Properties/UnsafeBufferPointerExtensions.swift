@@ -12,7 +12,7 @@
 
 extension UnsafeBufferPointer {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Element> {
     @lifetime(borrow self)
     get {
@@ -24,7 +24,7 @@ extension UnsafeBufferPointer {
 
 extension UnsafeMutableBufferPointer {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Element> {
     @lifetime(borrow self)
     get {
@@ -36,7 +36,7 @@ extension UnsafeMutableBufferPointer {
 
 extension UnsafeRawBufferPointer {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var bytes: RawSpan {
     @lifetime(borrow self)
     get {
@@ -48,7 +48,7 @@ extension UnsafeRawBufferPointer {
 
 extension UnsafeMutableRawBufferPointer {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var bytes: RawSpan {
     @lifetime(borrow self)
     get {
