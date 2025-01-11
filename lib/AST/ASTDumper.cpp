@@ -3897,11 +3897,23 @@ public:
   }
   void visitAvailableAttr(AvailableAttr *Attr, StringRef label) {
     printCommon(Attr, "available_attr", label);
-    printField(Attr->getPlatform(), "platform");
-    if (!Attr->Message.empty())
-      printFieldQuoted(Attr->Message, "message");
-    if (!Attr->Rename.empty())
-      printFieldQuoted(Attr->Rename, "rename");
+
+    if (auto domain = Attr->getCachedDomain())
+      printField(domain->getNameForAttributePrinting(), "platform");
+
+    switch (Attr->getKind()) {
+    case swift::AvailableAttr::Kind::Default:
+      break;
+    case swift::AvailableAttr::Kind::Deprecated:
+      printFlag("deprecated");
+      break;
+    case swift::AvailableAttr::Kind::Unavailable:
+      printFlag("unavailable");
+      break;
+    case swift::AvailableAttr::Kind::NoAsync:
+      printFlag("noasync");
+      break;
+    }
     if (Attr->Introduced.has_value())
       printFieldRaw(
           [&](auto &out) { out << Attr->Introduced.value().getAsString(); },
@@ -3914,6 +3926,10 @@ public:
       printFieldRaw(
           [&](auto &out) { out << Attr->Obsoleted.value().getAsString(); },
           "obsoleted");
+    if (!Attr->Message.empty())
+      printFieldQuoted(Attr->Message, "message");
+    if (!Attr->Rename.empty())
+      printFieldQuoted(Attr->Rename, "rename");
     printFoot();
   }
   void visitBackDeployedAttr(BackDeployedAttr *Attr, StringRef label) {

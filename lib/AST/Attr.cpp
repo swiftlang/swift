@@ -439,15 +439,12 @@ static bool isShortAvailable(const SemanticAvailableAttr &attr) {
   if (!attr.getRename().empty())
     return false;
 
-  switch (parsedAttr->getPlatformAgnosticAvailability()) {
-  case PlatformAgnosticAvailabilityKind::Deprecated:
-  case PlatformAgnosticAvailabilityKind::Unavailable:
-  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-  case PlatformAgnosticAvailabilityKind::NoAsync:
+  switch (parsedAttr->getKind()) {
+  case AvailableAttr::Kind::NoAsync:
+  case AvailableAttr::Kind::Deprecated:
+  case AvailableAttr::Kind::Unavailable:
     return false;
-  case PlatformAgnosticAvailabilityKind::None:
-  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
+  case AvailableAttr::Kind::Default:
     return true;
   }
 
@@ -2092,29 +2089,27 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
 #define INIT_VER_TUPLE(X) X(X.empty() ? std::optional<llvm::VersionTuple>() : X)
 
 AvailableAttr::AvailableAttr(
-    SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
-    StringRef Message, StringRef Rename,
+    SourceLoc AtLoc, SourceRange Range, const AvailabilityDomain &Domain,
+    Kind Kind, StringRef Message, StringRef Rename,
     const llvm::VersionTuple &Introduced, SourceRange IntroducedRange,
     const llvm::VersionTuple &Deprecated, SourceRange DeprecatedRange,
     const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
-    PlatformAgnosticAvailabilityKind PlatformAgnostic, bool Implicit,
-    bool IsSPI, bool IsForEmbedded)
+    bool Implicit, bool IsSPI, bool IsForEmbedded)
     : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
-      Message(Message), Rename(Rename),
+      Domain(Domain), Message(Message), Rename(Rename),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange) {
-  Bits.AvailableAttr.Platform = static_cast<uint8_t>(Platform);
-  Bits.AvailableAttr.PlatformAgnostic = static_cast<uint8_t>(PlatformAgnostic);
+  Bits.AvailableAttr.Kind = static_cast<uint8_t>(Kind);
   Bits.AvailableAttr.HasComputedRenamedDecl = false;
   Bits.AvailableAttr.HasRenamedDecl = false;
   Bits.AvailableAttr.IsSPI = IsSPI;
 
   if (IsForEmbedded) {
-    // FIXME: The IsForEmbedded bit should be removed when library availability
-    // conditions are implemented (rdar://138802876)
+    // FIXME: [availability] The IsForEmbedded bit should be removed when
+    // it can be represented with AvailabilityDomain (rdar://138802876)
     Bits.AvailableAttr.IsForEmbedded = true;
-    assert(getPlatform() == PlatformKind::none);
+    assert(Domain.isUniversal());
   }
 }
 
@@ -2124,10 +2119,11 @@ AvailableAttr *AvailableAttr::createUniversallyUnavailable(ASTContext &C,
                                                            StringRef Message,
                                                            StringRef Rename) {
   return new (C) AvailableAttr(
-      SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
+      SourceLoc(), SourceRange(), AvailabilityDomain::forUniversal(),
+      Kind::Unavailable, Message, Rename,
       /*Introduced=*/{}, SourceRange(), /*Deprecated=*/{}, SourceRange(),
       /*Obsoleted=*/{}, SourceRange(),
-      PlatformAgnosticAvailabilityKind::Unavailable, /*Implicit=*/false,
+      /*Implicit=*/false,
       /*SPI=*/false);
 }
 
@@ -2135,10 +2131,11 @@ AvailableAttr *AvailableAttr::createUniversallyDeprecated(ASTContext &C,
                                                           StringRef Message,
                                                           StringRef Rename) {
   return new (C) AvailableAttr(
-      SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
+      SourceLoc(), SourceRange(), AvailabilityDomain::forUniversal(),
+      Kind::Deprecated, Message, Rename,
       /*Introduced=*/{}, SourceRange(), /*Deprecated=*/{}, SourceRange(),
       /*Obsoleted=*/{}, SourceRange(),
-      PlatformAgnosticAvailabilityKind::Deprecated, /*Implicit=*/false,
+      /*Implicit=*/false,
       /*SPI=*/false);
 }
 
@@ -2146,10 +2143,11 @@ AvailableAttr *AvailableAttr::createUnavailableInSwift(ASTContext &C,
                                                        StringRef Message,
                                                        StringRef Rename) {
   return new (C) AvailableAttr(
-      SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
+      SourceLoc(), SourceRange(), AvailabilityDomain::forSwiftLanguage(),
+      Kind::Unavailable, Message, Rename,
       /*Introduced=*/{}, SourceRange(), /*Deprecated=*/{}, SourceRange(),
       /*Obsoleted=*/{}, SourceRange(),
-      PlatformAgnosticAvailabilityKind::UnavailableInSwift, /*Implicit=*/false,
+      /*Implicit=*/false,
       /*SPI=*/false);
 }
 
@@ -2157,9 +2155,9 @@ AvailableAttr *AvailableAttr::createSwiftLanguageModeVersioned(
     ASTContext &C, StringRef Message, StringRef Rename,
     llvm::VersionTuple Introduced, llvm::VersionTuple Obsoleted) {
   return new (C) AvailableAttr(
-      SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
-      Introduced, SourceRange(), /*Deprecated=*/{}, SourceRange(), Obsoleted,
-      SourceRange(), PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
+      SourceLoc(), SourceRange(), AvailabilityDomain::forSwiftLanguage(),
+      Kind::Default, Message, Rename, Introduced, SourceRange(),
+      /*Deprecated=*/{}, SourceRange(), Obsoleted, SourceRange(),
       /*Implicit=*/false,
       /*SPI=*/false);
 }
@@ -2168,12 +2166,12 @@ AvailableAttr *AvailableAttr::createPlatformVersioned(
     ASTContext &C, PlatformKind Platform, StringRef Message, StringRef Rename,
     llvm::VersionTuple Introduced, llvm::VersionTuple Deprecated,
     llvm::VersionTuple Obsoleted) {
-  return new (C) AvailableAttr(SourceLoc(), SourceRange(), Platform, Message,
-                               Rename, Introduced, SourceRange(), Deprecated,
-                               SourceRange(), Obsoleted, SourceRange(),
-                               PlatformAgnosticAvailabilityKind::None,
-                               /*Implicit=*/false,
-                               /*SPI=*/false);
+  return new (C) AvailableAttr(
+      SourceLoc(), SourceRange(), AvailabilityDomain::forPlatform(Platform),
+      Kind::Default, Message, Rename, Introduced, SourceRange(), Deprecated,
+      SourceRange(), Obsoleted, SourceRange(),
+      /*Implicit=*/false,
+      /*SPI=*/false);
 }
 
 bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
@@ -2182,16 +2180,16 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 }
 
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
-  return new (C) AvailableAttr(
-      implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
-      getPlatform(), Message, Rename,
-      Introduced ? *Introduced : llvm::VersionTuple(),
-      implicit ? SourceRange() : IntroducedRange,
-      Deprecated ? *Deprecated : llvm::VersionTuple(),
-      implicit ? SourceRange() : DeprecatedRange,
-      Obsoleted ? *Obsoleted : llvm::VersionTuple(),
-      implicit ? SourceRange() : ObsoletedRange,
-      getPlatformAgnosticAvailability(), implicit, isSPI(), isForEmbedded());
+  return new (C) AvailableAttr(implicit ? SourceLoc() : AtLoc,
+                               implicit ? SourceRange() : getRange(), Domain,
+                               getKind(), Message, Rename,
+                               Introduced ? *Introduced : llvm::VersionTuple(),
+                               implicit ? SourceRange() : IntroducedRange,
+                               Deprecated ? *Deprecated : llvm::VersionTuple(),
+                               implicit ? SourceRange() : DeprecatedRange,
+                               Obsoleted ? *Obsoleted : llvm::VersionTuple(),
+                               implicit ? SourceRange() : ObsoletedRange,
+                               implicit, isSPI(), isForEmbedded());
 }
 
 std::optional<OriginallyDefinedInAttr::ActiveVersion>
@@ -2223,42 +2221,42 @@ OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,
 }
 
 bool AvailableAttr::isUnconditionallyUnavailable() const {
-  switch (getPlatformAgnosticAvailability()) {
-  case PlatformAgnosticAvailabilityKind::None:
-  case PlatformAgnosticAvailabilityKind::Deprecated:
-  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-  case PlatformAgnosticAvailabilityKind::NoAsync:
+  switch (getKind()) {
+  case Kind::Default:
+  case Kind::Deprecated:
+  case Kind::NoAsync:
     return false;
-
-  case PlatformAgnosticAvailabilityKind::Unavailable:
-  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+  case Kind::Unavailable:
     return true;
   }
 
-  llvm_unreachable("Unhandled PlatformAgnosticAvailabilityKind in switch.");
+  llvm_unreachable("Unhandled AvailableAttr::Kind in switch.");
 }
 
 bool AvailableAttr::isUnconditionallyDeprecated() const {
-  switch (getPlatformAgnosticAvailability()) {
-  case PlatformAgnosticAvailabilityKind::None:
-  case PlatformAgnosticAvailabilityKind::Unavailable:
-  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-  case PlatformAgnosticAvailabilityKind::NoAsync:
+  switch (getKind()) {
+  case Kind::Default:
+  case Kind::Unavailable:
+  case Kind::NoAsync:
     return false;
-
-  case PlatformAgnosticAvailabilityKind::Deprecated:
+  case Kind::Deprecated:
     return true;
   }
 
-  llvm_unreachable("Unhandled PlatformAgnosticAvailabilityKind in switch.");
+  llvm_unreachable("Unhandled AvailableAttr::Kind in switch.");
 }
 
 bool AvailableAttr::isNoAsync() const {
-  return getPlatformAgnosticAvailability() ==
-         PlatformAgnosticAvailabilityKind::NoAsync;
+  switch (getKind()) {
+  case Kind::Default:
+  case Kind::Deprecated:
+  case Kind::Unavailable:
+    return false;
+  case Kind::NoAsync:
+    return true;
+  }
+
+  llvm_unreachable("Unhandled AvailableAttr::Kind in switch.");
 }
 
 llvm::VersionTuple

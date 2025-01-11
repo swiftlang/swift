@@ -31,12 +31,12 @@ llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
   switch (kind) {
   case Kind::Universal:
     return "";
-  case Kind::Platform:
-    return swift::prettyPlatformString(getPlatformKind());
   case Kind::SwiftLanguage:
     return "Swift";
   case Kind::PackageDescription:
     return "PackageDescription";
+  case Kind::Platform:
+    return swift::prettyPlatformString(getPlatformKind());
   }
 }
 
@@ -44,11 +44,11 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
   switch (kind) {
   case Kind::Universal:
     return "*";
-  case Kind::Platform:
-    return swift::platformString(getPlatformKind());
   case Kind::SwiftLanguage:
     return "swift";
   case Kind::PackageDescription:
     return "_PackageDescription";
+  case Kind::Platform:
+    return swift::platformString(getPlatformKind());
   }
 }
