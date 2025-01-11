@@ -68,11 +68,12 @@ struct CxxSpan: ParamInfo {
   ) -> BoundsCheckedThunkBuilder {
     switch pointerIndex {
     case .param(let i):
-    CxxSpanThunkBuilder(base: base, index: i - 1, signature: funcDecl.signature,
-      typeMappings: typeMappings, node: original, nonescaping: nonescaping)
+      return CxxSpanThunkBuilder(base: base, index: i - 1, signature: funcDecl.signature,
+        typeMappings: typeMappings, node: original, nonescaping: nonescaping)
     case .return:
-    CxxSpanThunkBuilder(base: base, index: -1, signature: funcDecl.signature,
-      typeMappings: typeMappings, node: original, nonescaping: nonescaping)
+      // TODO: actually implement std::span in return position
+      return CxxSpanThunkBuilder(base: base, index: -1, signature: funcDecl.signature,
+        typeMappings: typeMappings, node: original, nonescaping: nonescaping)
     }
   }
 }
