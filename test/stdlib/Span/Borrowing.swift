@@ -13,6 +13,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature Span -enable-experimental-feature LifetimeDependence -typecheck %s -verify
 
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Span
 
 import StdlibUnittest
 
