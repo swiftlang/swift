@@ -39,6 +39,8 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Sema/Sema.h"
+
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 
 using namespace swift;
@@ -547,115 +549,77 @@ ClangTypeConverter::visitBoundGenericClassType(BoundGenericClassType *type) {
 
 clang::QualType
 ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
-  // N.B. the only supported conversions are for Optional<T>, SIMD*<T>, and
-  // *Pointer<T>.
-
-  if (type->getDecl()->isOptionalDecl())
-    return convertOptionalType(type);
-
+  // The only supported conversions are for T?, SIMD*<T>, and *Pointer<T>,
+  // so there should only be a single generic type argument.
   if (type->getGenericArgs().size() != 1)
-    // Must've got something other than a SIMD*<T> or *Pointer<T>
     return clang::QualType();
 
-  if (type->getDecl()->getName().str().starts_with("SIMD"))
-    return convertSIMDType(type, /*templateArgument=*/false);
+  auto argType = type->getGenericArgs()[0]->getCanonicalType();
 
-  // Assume this is some kind of *Pointer<T> type
-  return convertPointerType(type, /*templateArgument=*/false);
-}
+  if (type->getDecl()->isOptionalDecl()) {
+    auto innerTy = convert(argType);
+    if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()) ||
+        argType->isForeignReferenceType())
+      return innerTy;
+    return clang::QualType();
+  }
 
-clang::QualType
-ClangTypeConverter::convertOptionalType(BoundGenericType *type) {
-  assert(type->getDecl()->isOptionalDecl());
+  if (auto kind = classifyPointer(type))
+    return convertPointerType(argType, kind.value(), /*templateArgument=*/false);
 
-  auto args = type->getGenericArgs();
-  assert(args.size() == 1 && "Optional should have 1 generic argument.");
+  if (auto width = classifySIMD(type))
+    return convertSIMDType(argType, width.value(), /*templateArgument=*/false);
 
-  clang::QualType innerTy = convert(args[0]);
-  if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()) ||
-      args[0]->isForeignReferenceType())
-    return innerTy;
   return clang::QualType();
 }
 
-clang::QualType ClangTypeConverter::convertSIMDType(BoundGenericType *type,
+clang::QualType ClangTypeConverter::convertSIMDType(CanType scalarType,
+                                                    unsigned width,
                                                     bool templateArgument) {
-  auto args = type->getGenericArgs();
-  assert(args.size() == 1 && "SIMD types should have 1 generic argument.");
-
-  clang::QualType scalarTy =
-      templateArgument ? convertTemplateArgument(args[0]->getCanonicalType())
-                       : convert(args[0]->getCanonicalType());
+  clang::QualType scalarTy = templateArgument ? convertTemplateArgument(scalarType)
+                                              : convert(scalarType);
   if (scalarTy.isNull())
     return clang::QualType();
 
-  unsigned numElts;
-  auto numEltsString = type->getDecl()->getName().str();
-  numEltsString.consume_front("SIMD");
-  if (/*failed to*/ numEltsString.getAsInteger<unsigned>(10, numElts))
-    return clang::QualType();
-
-  auto vectorTy = ClangASTContext.getVectorType(scalarTy, numElts,
+  auto vectorTy = ClangASTContext.getVectorType(scalarTy, width,
                                                 clang::VectorKind::Generic);
   return vectorTy;
 }
 
-clang::QualType ClangTypeConverter::convertPointerType(BoundGenericType *type,
+clang::QualType ClangTypeConverter::convertPointerType(CanType pointeeType,
+                                                       PointerKind kind,
                                                        bool templateArgument) {
-  auto args = type->getGenericArgs();
-  assert(args.size() == 1 && "Optional should have 1 generic argument.");
-  auto argType = args[0]->getCanonicalType();
-
-  enum class StructKind {
-    Invalid,
-    UnsafeMutablePointer,
-    UnsafePointer,
-    AutoreleasingUnsafeMutablePointer,
-    Unmanaged,
-    CFunctionPointer,
-  } kind = llvm::StringSwitch<StructKind>(type->getDecl()->getName().str())
-               .Case("UnsafeMutablePointer", StructKind::UnsafeMutablePointer)
-               .Case("UnsafePointer", StructKind::UnsafePointer)
-               .Case("AutoreleasingUnsafeMutablePointer",
-                     StructKind::AutoreleasingUnsafeMutablePointer)
-               .Case("Unmanaged", StructKind::Unmanaged)
-               .Case("CFunctionPointer", StructKind::CFunctionPointer)
-               .Default(StructKind::Invalid);
-
   switch (kind) {
-  case StructKind::Invalid:
-    return clang::QualType();
+  case PointerKind::Unmanaged:
+    return templateArgument ? clang::QualType() : convert(pointeeType);
 
-  case StructKind::Unmanaged:
-    return templateArgument ? clang::QualType() : convert(argType);
-
-  case StructKind::AutoreleasingUnsafeMutablePointer:
+  case PointerKind::AutoreleasingUnsafeMutablePointer:
     if (templateArgument)
       return clang::QualType();
     LLVM_FALLTHROUGH;
 
-  case StructKind::UnsafeMutablePointer: {
-    auto clangTy = templateArgument ? convertTemplateArgument(argType) : convert(argType);
+  case PointerKind::UnsafeMutablePointer: {
+    auto clangTy = templateArgument ? convertTemplateArgument(pointeeType) : convert(pointeeType);
     if (clangTy.isNull())
       return clang::QualType();
     return ClangASTContext.getPointerType(clangTy);
   }
-  case StructKind::UnsafePointer: {
-    auto clangTy = templateArgument ? convertTemplateArgument(argType) : convert(argType);
+  case PointerKind::UnsafePointer: {
+    auto clangTy = templateArgument ? convertTemplateArgument(pointeeType) : convert(pointeeType);
     if (clangTy.isNull())
       return clang::QualType();
     return ClangASTContext.getPointerType(clangTy.withConst());
   }
 
-  case StructKind::CFunctionPointer: {
+  case PointerKind::CFunctionPointer: {
     if (templateArgument)
       return clang::QualType();
 
     auto &clangCtx = ClangASTContext;
 
     clang::QualType functionTy;
-    if (isa<SILFunctionType>(argType->getCanonicalType())) {
-      functionTy = convert(argType);
+    if (isa<SILFunctionType>(pointeeType->getCanonicalType())) {
+      functionTy = convert(pointeeType);
       if (functionTy.isNull())
         return clang::QualType();
     } else {
@@ -986,23 +950,37 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
     return withCache([&]() { return reverseBuiltinTypeMapping(structType); });
   }
 
+  // TODO: function pointers are not yet supported, but they should be.
+
   if (auto boundGenericType = type->getAs<BoundGenericType>()) {
-    // optionsl types are not (yet) supported
-    if (boundGenericType->getDecl()->isOptionalDecl())
-      return clang::QualType();
-
     if (boundGenericType->getGenericArgs().size() != 1)
-      // Must've got something other than a SIMD*<T> or *Pointer<T>
+      // Must've got something other than a T?, *Pointer<T>, or SIMD*<T>
       return clang::QualType();
 
-    if (boundGenericType->getDecl()->getName().str().starts_with("SIMD"))
+    auto argType = boundGenericType->getGenericArgs()[0]->getCanonicalType();
+
+    if (boundGenericType->getDecl()->isOptionalDecl()) {
+      if (auto kind = classifyPointer(argType))
+        return withCache([&]() {
+          auto pointeeType = argType->getAs<BoundGenericType>()->getGenericArgs()[0]->getCanonicalType();
+          return convertPointerType(pointeeType, kind.value(), /*templateArgument=*/true);
+        });
+
+      // Arbitrary optional types are not (yet) supported
+      return clang::QualType();
+    }
+
+    if (auto kind = classifyPointer(boundGenericType))
       return withCache([&]() {
-        return convertSIMDType(boundGenericType, /*templateArgument=*/true);
+        return convertPointerType(argType, kind.value(), /*templateArgument=*/true);
       });
 
-    return withCache([&]() {
-      return convertPointerType(boundGenericType, /*templateArgument=*/true);
-    });
+    if (auto width = classifySIMD(boundGenericType))
+      return withCache([&]() {
+        return convertSIMDType(argType, width.value(), /*templateArgument=*/true);
+      });
+
+    return clang::QualType();
   }
 
   // Most types cannot be used to instantiate C++ function templates; give up.
@@ -1049,4 +1027,37 @@ ClangTypeConverter::getClangTemplateArguments(
     errorInfo->failedTypes.push_back(type);
   });
   return errorInfo;
+}
+
+std::optional<ClangTypeConverter::PointerKind> ClangTypeConverter::classifyPointer(Type type) {
+  auto generic = type->getAs<BoundGenericType>();
+  if (!generic || generic->getGenericArgs().size() != 1)
+    // Must have got something other than a *Pointer<T>
+    return std::nullopt;
+
+  return llvm::StringSwitch<std::optional<PointerKind>>(generic->getDecl()->getName().str())
+               .Case("UnsafeMutablePointer", PointerKind::UnsafeMutablePointer)
+               .Case("UnsafePointer", PointerKind::UnsafePointer)
+               .Case("AutoreleasingUnsafeMutablePointer",
+                     PointerKind::AutoreleasingUnsafeMutablePointer)
+               .Case("Unmanaged", PointerKind::Unmanaged)
+               .Case("CFunctionPointer", PointerKind::CFunctionPointer)
+               .Default(std::nullopt);
+}
+
+std::optional<unsigned> ClangTypeConverter::classifySIMD(Type type) {
+  auto generic = type->getAs<BoundGenericType>();
+  if (!generic || generic->getGenericArgs().size() != 1)
+    // Must have got something other than a SIMD*<T>
+    return std::nullopt;
+
+  auto name = generic->getDecl()->getName().str();
+  if (!name.starts_with("SIMD"))
+    return std::nullopt;
+  name.consume_front("SIMD");
+  
+  unsigned width;
+  if (/*failed to*/ name.getAsInteger<unsigned>(10, width))
+    return std::nullopt;
+  return width;
 }

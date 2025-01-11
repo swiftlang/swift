@@ -97,6 +97,18 @@ public:
       SmallVectorImpl<clang::TemplateArgument> &templateArgs);
 
 private:
+  enum class PointerKind {
+    UnsafeMutablePointer,
+    UnsafePointer,
+    AutoreleasingUnsafeMutablePointer,
+    Unmanaged,
+    CFunctionPointer,
+  };
+
+  std::optional<PointerKind> classifyPointer(Type type);
+
+  std::optional<unsigned> classifySIMD(Type type);
+
   friend ASTContext; // HACK: expose `convert` method to ASTContext
 
   clang::QualType convert(Type type);
@@ -108,11 +120,9 @@ private:
 
   clang::QualType convertClangDecl(Type type, const clang::Decl *decl);
 
-  clang::QualType convertOptionalType(BoundGenericType *type);
+  clang::QualType convertSIMDType(CanType scalarType, unsigned width, bool templateArgument);
 
-  clang::QualType convertSIMDType(BoundGenericType *type, bool templateArgument);
-
-  clang::QualType convertPointerType(BoundGenericType *type, bool templateArgument);
+  clang::QualType convertPointerType(CanType pointeeType, PointerKind kind, bool templateArgument);
 
   void registerExportedClangDecl(Decl *swiftDecl,
                                  const clang::Decl *clangDecl);
