@@ -23,15 +23,30 @@ func takesCxxClass(x: CxxClass) { takesValue(x) }
 func takesFRT(x: FRT) { takesValue(x) }
 // CHECK: define {{.*}} void @{{.*}}8takesFRT{{.*}}
 
-// func takesUnsafeMutablePointer(x: UnsafeMutablePointer<FRT>) { takesValue(x) } // crashes
-
-// func takesUnsafePointer(x: UnsafePointer<FRT>) { takesValue(x) } // crashes
-
-// func takesAutoreleasingUnsafeMutablePointer(x: AutoreleasingUnsafeMutablePointer<FRT>) { takesValue(x) } // crashes
-
-// func takesUnmanaged(x: Unmanaged<FRT>) { takesValue(x) } // crashes
-
-// func takesOptional(x: FRT?) { takesValue(x) } // crashes
-
 func takesSIMD(x: SIMD32<Int32>) { takesValue(x) }
 // CHECK: define {{.*}} void @{{.*}}9takesSIMD{{.*}}
+
+func takesPtrToStruct(x: UnsafePointer<PlainStruct>) { takesValue(x) }
+// CHECK: define {{.*}} void @{{.*}}16takesPtrToStruct{{.*}}
+
+func takesPtrToClass(x: UnsafePointer<CxxClass>) { takesValue(x) }
+// CHECK: define {{.*}} void @{{.*}}15takesPtrToClass{{.*}}
+
+func takesPtrToFRT(x: UnsafePointer<FRT>) { takesValue(x) }
+// CHECK: define {{.*}} void @{{.*}}13takesPtrToFRT{{.*}}
+
+func takesMutPtrToStruct(x: UnsafeMutablePointer<PlainStruct>) { takesValue(x) }
+// CHECK: define {{.*}} void @{{.*}}19takesMutPtrToStruct{{.*}}
+
+func takesMutPtrToClass(x: UnsafeMutablePointer<CxxClass>) { takesValue(x) }
+// CHECK: define {{.*}} void @{{.*}}18takesMutPtrToClass{{.*}}
+
+func takesMutPtrToFRT(x: UnsafeMutablePointer<FRT>) { takesValue(x) }
+// CHECK: define {{.*}} void @{{.*}}16takesMutPtrToFRT{{.*}}
+
+// TODO: optional pointers are not yet supported but they should be
+// func takesCPtr() { takesValue(intPtr) }
+func takesCPtr() { let swiftPtr = intPtr!; takesValue(swiftPtr) }
+
+// TODO: function pointers are not yet supported but they should be
+// func takesCFnPtr() { takesValue(functionPtr) }

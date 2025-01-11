@@ -15,6 +15,9 @@ template <class T> void expectsConstCharPtr(T str) { takesString(str); }
 template <long x> void hasNonTypeTemplateParameter() {}
 template <long x = 0> void hasDefaultedNonTypeTemplateParameter() {}
 
+int *intPtr;
+int (*functionPtr)(void);
+
 // We cannot yet use this in Swift but, make sure we don't crash when parsing
 // it.
 template <class R, class T, class U> R templateParameterReturnType(T a, U b) {
