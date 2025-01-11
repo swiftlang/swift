@@ -31,7 +31,7 @@ extension String.UTF8View {
         return _overrideLifetime(span, borrowing: self)
       }
       // handle other Objective-C bridging cases here
-      fatalError()
+      fatalError("Some bridged Strings are not supported at this time")
     }
   }
 }
@@ -59,7 +59,8 @@ extension Substring.UTF8View {
         let span = Span(_unsafeElements: buffer)
         return _overrideLifetime(span, borrowing: self)
       }
-      fatalError()
+      // handle other Objective-C bridging cases here
+      fatalError("Some bridged Strings are not supported at this time")
     }
   }
 }
