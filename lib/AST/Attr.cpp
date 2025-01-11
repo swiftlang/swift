@@ -439,15 +439,12 @@ static bool isShortAvailable(const SemanticAvailableAttr &attr) {
   if (!attr.getRename().empty())
     return false;
 
-  switch (parsedAttr->getPlatformAgnosticAvailability()) {
-  case PlatformAgnosticAvailabilityKind::Deprecated:
-  case PlatformAgnosticAvailabilityKind::Unavailable:
-  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-  case PlatformAgnosticAvailabilityKind::NoAsync:
+  switch (parsedAttr->getKind()) {
+  case AvailableAttr::Kind::NoAsync:
+  case AvailableAttr::Kind::Deprecated:
+  case AvailableAttr::Kind::Unavailable:
     return false;
-  case PlatformAgnosticAvailabilityKind::None:
-  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
+  case AvailableAttr::Kind::Default:
     return true;
   }
 
@@ -2238,42 +2235,42 @@ OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,
 }
 
 bool AvailableAttr::isUnconditionallyUnavailable() const {
-  switch (getPlatformAgnosticAvailability()) {
-  case PlatformAgnosticAvailabilityKind::None:
-  case PlatformAgnosticAvailabilityKind::Deprecated:
-  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-  case PlatformAgnosticAvailabilityKind::NoAsync:
+  switch (getKind()) {
+  case Kind::Default:
+  case Kind::Deprecated:
+  case Kind::NoAsync:
     return false;
-
-  case PlatformAgnosticAvailabilityKind::Unavailable:
-  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+  case Kind::Unavailable:
     return true;
   }
 
-  llvm_unreachable("Unhandled PlatformAgnosticAvailabilityKind in switch.");
+  llvm_unreachable("Unhandled AvailableAttr::Kind in switch.");
 }
 
 bool AvailableAttr::isUnconditionallyDeprecated() const {
-  switch (getPlatformAgnosticAvailability()) {
-  case PlatformAgnosticAvailabilityKind::None:
-  case PlatformAgnosticAvailabilityKind::Unavailable:
-  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-  case PlatformAgnosticAvailabilityKind::NoAsync:
+  switch (getKind()) {
+  case Kind::Default:
+  case Kind::Unavailable:
+  case Kind::NoAsync:
     return false;
-
-  case PlatformAgnosticAvailabilityKind::Deprecated:
+  case Kind::Deprecated:
     return true;
   }
 
-  llvm_unreachable("Unhandled PlatformAgnosticAvailabilityKind in switch.");
+  llvm_unreachable("Unhandled AvailableAttr::Kind in switch.");
 }
 
 bool AvailableAttr::isNoAsync() const {
-  return getPlatformAgnosticAvailability() ==
-         PlatformAgnosticAvailabilityKind::NoAsync;
+  switch (getKind()) {
+  case Kind::Default:
+  case Kind::Deprecated:
+  case Kind::Unavailable:
+    return false;
+  case Kind::NoAsync:
+    return true;
+  }
+
+  llvm_unreachable("Unhandled AvailableAttr::Kind in switch.");
 }
 
 llvm::VersionTuple

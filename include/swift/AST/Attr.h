@@ -716,27 +716,6 @@ enum class AvailableVersionComparison {
   Obsoleted,
 };
 
-/// Describes the platform-agnostic availability of a declaration.
-enum class PlatformAgnosticAvailabilityKind : uint8_t {
-  /// The associated availability attribute is not platform-agnostic.
-  None,
-  /// The declaration is deprecated, but can still be used.
-  Deprecated,
-  /// The declaration is unavailable in Swift, specifically
-  UnavailableInSwift,
-  /// The declaration is available in some but not all versions
-  /// of Swift, as specified by the VersionTuple members.
-  SwiftVersionSpecific,
-  /// The declaration is available in some but not all versions
-  /// of SwiftPM's PackageDescription library, as specified by
-  /// the VersionTuple members.
-  PackageDescriptionVersionSpecific,
-  /// The declaration is unavailable for other reasons.
-  Unavailable,
-  /// The declaration is unavailable from asynchronous contexts
-  NoAsync,
-};
-
 /// Defines the @available attribute.
 class AvailableAttr : public DeclAttribute {
   AvailabilityDomain Domain;
@@ -823,39 +802,6 @@ public:
 
   /// Returns the kind of availability the attribute specifies.
   Kind getKind() const { return static_cast<Kind>(Bits.AvailableAttr.Kind); }
-
-  /// Returns the platform-agnostic availability.
-  PlatformAgnosticAvailabilityKind getPlatformAgnosticAvailability() const {
-    // FIXME: [availability] Remove this method entirely.
-    switch (getKind()) {
-    case Kind::Default:
-      if (Domain.isSwiftLanguage())
-        return PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
-      else if (Domain.isPackageDescription())
-        return PlatformAgnosticAvailabilityKind::
-            PackageDescriptionVersionSpecific;
-      else if (Domain.isUniversal() || Domain.isPlatform())
-        return PlatformAgnosticAvailabilityKind::None;
-
-      break;
-
-    case Kind::Deprecated:
-      return PlatformAgnosticAvailabilityKind::Deprecated;
-
-    case Kind::Unavailable:
-      if (Domain.isSwiftLanguage())
-        return PlatformAgnosticAvailabilityKind::UnavailableInSwift;
-      else if (Domain.isUniversal() || Domain.isPlatform())
-        return PlatformAgnosticAvailabilityKind::Unavailable;
-
-      break;
-
-    case Kind::NoAsync:
-      return PlatformAgnosticAvailabilityKind::NoAsync;
-    }
-
-    llvm_unreachable("unsupported AvailabilityDomain and Kind");
-  }
 
   /// Create an `AvailableAttr` that specifies universal unavailability, e.g.
   /// `@available(*, unavailable)`.

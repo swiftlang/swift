@@ -3058,10 +3058,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       assert(theAttr->Rename.empty() || !theAttr->hasCachedRenamedDecl());
 
-      bool isPackageDescriptionVersionSpecific =
-          theAttr->getPlatformAgnosticAvailability() ==
-          PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific;
+      auto domain = theAttr->getCachedDomain();
+      assert(domain);
 
+      // FIXME: [availability] Serialize domain and kind directly.
       llvm::SmallString<32> blob;
       blob.append(theAttr->Message);
       blob.append(theAttr->Rename);
@@ -3072,7 +3072,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isUnconditionallyUnavailable(),
           theAttr->isUnconditionallyDeprecated(),
           theAttr->isNoAsync(),
-          isPackageDescriptionVersionSpecific,
+          domain->isPackageDescription(),
           theAttr->isSPI(),
           theAttr->isForEmbedded(),
           LIST_VER_TUPLE_PIECES(Introduced),

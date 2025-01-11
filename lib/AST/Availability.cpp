@@ -447,27 +447,9 @@ Decl::getSemanticAvailableAttrs(bool includeInactive) const {
 
 std::optional<SemanticAvailableAttr>
 Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
-  auto domainForAvailableAttr = [](const AvailableAttr *attr) {
-    auto platform = attr->getPlatform();
-    if (platform != PlatformKind::none)
-      return AvailabilityDomain::forPlatform(platform);
-
-    switch (attr->getPlatformAgnosticAvailability()) {
-    case PlatformAgnosticAvailabilityKind::Deprecated:
-    case PlatformAgnosticAvailabilityKind::Unavailable:
-    case PlatformAgnosticAvailabilityKind::NoAsync:
-    case PlatformAgnosticAvailabilityKind::None:
-      return AvailabilityDomain::forUniversal();
-
-    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-      return AvailabilityDomain::forSwiftLanguage();
-
-    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-      return AvailabilityDomain::forPackageDescription();
-    }
-  };
-  return SemanticAvailableAttr(attr, domainForAvailableAttr(attr));
+  if (auto domain = attr->getCachedDomain())
+    return SemanticAvailableAttr(attr, *domain);
+  return std::nullopt;
 }
 
 std::optional<SemanticAvailableAttr>

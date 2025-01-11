@@ -3892,35 +3892,21 @@ public:
   }
   void visitAvailableAttr(AvailableAttr *Attr, StringRef label) {
     printCommon(Attr, "available_attr", label);
-    switch (Attr->getPlatformAgnosticAvailability()) {
-    case PlatformAgnosticAvailabilityKind::None:
-    case PlatformAgnosticAvailabilityKind::Deprecated:
-    case PlatformAgnosticAvailabilityKind::Unavailable:
-    case PlatformAgnosticAvailabilityKind::NoAsync:
-      printField(Attr->getPlatform(), "platform");
+
+    if (auto domain = Attr->getCachedDomain())
+      printField(domain->getNameForAttributePrinting(), "platform");
+
+    switch (Attr->getKind()) {
+    case swift::AvailableAttr::Kind::Default:
       break;
-    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-      printFieldQuoted("swift", "platform");
-      break;
-    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-      printFieldQuoted("_PackageDescription", "platform");
-      break;
-    }
-    switch (Attr->getPlatformAgnosticAvailability()) {
-    case PlatformAgnosticAvailabilityKind::Deprecated:
+    case swift::AvailableAttr::Kind::Deprecated:
       printFlag("deprecated");
       break;
-    case PlatformAgnosticAvailabilityKind::Unavailable:
-    case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+    case swift::AvailableAttr::Kind::Unavailable:
       printFlag("unavailable");
       break;
-    case PlatformAgnosticAvailabilityKind::NoAsync:
+    case swift::AvailableAttr::Kind::NoAsync:
       printFlag("noasync");
-      break;
-    case PlatformAgnosticAvailabilityKind::None:
-    case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-    case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
       break;
     }
     if (Attr->Introduced.has_value())
