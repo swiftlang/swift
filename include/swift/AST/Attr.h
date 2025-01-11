@@ -792,9 +792,6 @@ public:
   /// Whether this attribute was spelled `@_unavailableInEmbedded`.
   bool isForEmbedded() const { return Bits.AvailableAttr.IsForEmbedded; }
 
-  /// Returns the platform that the attribute applies to (may be `none`).
-  PlatformKind getPlatform() const { return Domain.getPlatformKind(); }
-
   /// Returns the `AvailabilityDomain` associated with the attribute, or
   /// `std::nullopt` if it has either not yet been resolved or could not be
   /// resolved successfully.
