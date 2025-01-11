@@ -741,8 +741,14 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 
     NodePointer result = Dem.createNode(Node::Kind::ReturnType);
     result->addChild(resultTy, Dem);
-    
+
     auto funcNode = Dem.createNode(kind);
+    // Add the components of the function-signature production in the same
+    // order that the demangler would.
+    // TODO: C function type would go here
+    if (func->getExtendedFlags().hasSendingResult())
+      funcNode->addChild(Dem.createNode(Node::Kind::SendingResultFunctionType),
+                         Dem);
     if (func->hasGlobalActor()) {
       auto globalActorTypeNode =
           _swift_buildDemanglingForMetadata(func->getGlobalActor(), Dem);
@@ -797,10 +803,6 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     }
     if (func->isAsync())
       funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
-
-    if (func->getExtendedFlags().hasSendingResult())
-      funcNode->addChild(Dem.createNode(Node::Kind::SendingResultFunctionType),
-                         Dem);
 
     funcNode->addChild(parameters, Dem);
     funcNode->addChild(result, Dem);
