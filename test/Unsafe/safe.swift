@@ -81,6 +81,19 @@ func returnsExistentialP() -> any P {
   // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
+struct UnsafeAsSequence: @unsafe Sequence, IteratorProtocol {
+  mutating func next() -> Int? { nil }
+}
+
+func testUnsafeAsSequenceForEach() {
+  let uas = UnsafeAsSequence()
+
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
+  for _ in uas { } // expected-note{{conformance}}
+
+  for _ in unsafe uas { } // okay
+}
+
 class MyRange {
   @unsafe init(unchecked bounds: Range<Int>) { }
 

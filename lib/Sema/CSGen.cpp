@@ -3663,6 +3663,15 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   ASTContext &ctx = cs.getASTContext();
   bool isAsync = stmt->getAwaitLoc().isValid();
   auto *sequenceExpr = stmt->getParsedSequence();
+
+  // If we have an unsafe expression for the sequence, lift it out of the
+  // sequence expression. We'll put it back after we've introduced the
+  // various calls.
+  UnsafeExpr *unsafeExpr = dyn_cast<UnsafeExpr>(sequenceExpr);
+  if (unsafeExpr) {
+    sequenceExpr = unsafeExpr->getSubExpr();
+  }
+
   auto contextualLocator = cs.getConstraintLocator(
       sequenceExpr, LocatorPathElt::ContextualType(CTP_ForEachSequence));
   auto elementLocator = cs.getConstraintLocator(
@@ -3712,8 +3721,14 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
         ctx, sequenceExpr, makeIterator->getName());
     makeIteratorRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
-    auto *makeIteratorCall =
+    Expr *makeIteratorCall =
         CallExpr::createImplicitEmpty(ctx, makeIteratorRef);
+
+    // Swap in the 'unsafe' expression.
+    if (unsafeExpr) {
+      unsafeExpr->setSubExpr(makeIteratorCall);
+      makeIteratorCall = unsafeExpr;
+    }
 
     Pattern *pattern = NamedPattern::createImplicit(ctx, makeIteratorVar);
     auto *PB = PatternBindingDecl::createImplicit(

@@ -3091,6 +3091,9 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   llvm::MapVector<Expr *, std::vector<UnsafeUse>> uncoveredUnsafeUses;
 
   static bool isEffectAnchor(Expr *e) {
+    if (e->getLoc().isInvalid())
+      return false;
+
     return isa<AbstractClosureExpr>(e) || isa<DiscardAssignmentExpr>(e) ||
            isa<AssignExpr>(e) || (isa<DeclRefExpr>(e) && e->isImplicit());
   }
@@ -3757,11 +3760,23 @@ private:
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
                                     CurContext.isWithinInterpolatedString());
+
+        // Figure out a location to use if the unsafe use didn't have one.
+        SourceLoc replacementLoc;
+        if (anchor)
+          replacementLoc = anchor->getLoc();
+        if (replacementLoc.isInvalid())
+          replacementLoc = E.getStartLoc();
+
         auto &anchorUncovered = uncoveredUnsafeUses[anchor];
-        anchorUncovered.insert(
-            anchorUncovered.end(),
-            classification.getUnsafeUses().begin(),
-            classification.getUnsafeUses().end());
+        for (UnsafeUse unsafeUse : classification.getUnsafeUses()) {
+          // If we don't have a source location for this use, use the
+          // anchor instead.
+          if (unsafeUse.getLocation().isInvalid())
+            unsafeUse.replaceLocation(replacementLoc);
+
+          anchorUncovered.push_back(unsafeUse);
+        }
       }
       break;
     }
@@ -3940,6 +3955,16 @@ private:
   }
 
   ShouldRecurse_t checkForEach(ForEachStmt *S) {
+    // Reparent the type-checked sequence on the parsed sequence, so we can
+    // find an anchor.
+    if (auto typeCheckedExpr = S->getTypeCheckedSequence()) {
+      parentMap = typeCheckedExpr->getParentMap();
+
+      if (auto parsedSequence = S->getParsedSequence()) {
+        parentMap[typeCheckedExpr] = parsedSequence;
+      }
+    }
+
     if (!S->getAwaitLoc().isValid())
       return ShouldRecurse;
 
