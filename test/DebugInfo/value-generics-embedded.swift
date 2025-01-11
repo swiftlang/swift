@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -target %target-cpu-apple-macos14 -emit-ir -g -enable-experimental-feature ValueGenerics -enable-experimental-feature Embedded -wmo -disable-availability-checking -o - | %FileCheck %s
 
+// REQUIRES: OS=macosx
+
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_ValueGenerics
 
