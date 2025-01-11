@@ -64,6 +64,12 @@ bool isUnsafe(ConcreteDeclRef declRef);
 bool isUnsafeInConformance(const ValueDecl *requirement,
                            const Witness &witness,
                            NormalProtocolConformance *conformance);
+
+/// If the given type involves an unsafe type, diagnose it by calling the
+/// diagnose function with the most specific unsafe type that can be provided.
+void diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
+                        llvm::function_ref<void(Type)> diagnose);
+
 }
 
 #endif // SWIFT_SEMA_TYPE_CHECK_UNSAFE_H

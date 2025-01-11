@@ -8093,6 +8093,9 @@ NOTE(note_reference_to_unsafe_typed_decl,none,
 NOTE(note_reference_to_unsafe_through_typealias,none,
      "reference to %kind0 whose underlying type involves unsafe type %1",
      (const ValueDecl *, Type))
+NOTE(note_reference_to_unsafe_type,none,
+     "reference to unsafe type %0",
+     (Type))
 NOTE(note_reference_to_nonisolated_unsafe,none,
      "reference to nonisolated(unsafe) %kind0 is unsafe in concurrently-executing code",
      (const ValueDecl *))

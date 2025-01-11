@@ -104,6 +104,26 @@ class MyRange {
   }
 }
 
+func casting(value: Any, i: Int) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = value as? UnsafeType // expected-note{{reference to unsafe type 'UnsafeType'}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = value as! UnsafeType // expected-note{{reference to unsafe type 'UnsafeType'}}
+
+  _ = unsafe value as? UnsafeType
+  _ = unsafe value as! UnsafeType
+
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = i as any P // expected-note{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+}
+
+func metatypes() {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  let _: Any.Type = UnsafeType.self // expected-note{{reference to unsafe type 'UnsafeType'}}
+
+  let _: Any.Type = unsafe UnsafeType.self
+}
+
 // Parsing of `unsafe` expressions.
 func testUnsafePositionError() -> Int {
   return 3 + unsafe unsafeInt() // expected-error{{'unsafe' cannot appear to the right of a non-assignment operator}}

@@ -607,6 +607,12 @@ public:
       recurse = asImpl().checkDeclRef(CE, CE->getInitializer(), CE->getLoc(),
                                       /*isImplicitlyAsync=*/false,
                                       /*isImplicitlyThrows=*/false);
+    } else if (auto ECE = dyn_cast<ExplicitCastExpr>(E)) {
+      recurse = asImpl().checkType(E, ECE->getCastTypeRepr(), ECE->getCastType());
+    } else if (auto TE = dyn_cast<TypeExpr>(E)) {
+      if (!TE->isImplicit()) {
+        recurse = asImpl().checkType(TE, TE->getTypeRepr(), TE->getInstanceType());
+      }
     }
     // Error handling validation (via checkTopLevelEffects) happens after
     // type checking. If an unchecked expression is still around, the code was
@@ -1139,7 +1145,7 @@ public:
     return result;
   }
 
-  /// Used when all we have is are conformances. This can only find
+  /// Used when all we have are conformances. This can only find
   /// "unsafe" uses.
   static Classification forConformances(
       ArrayRef<ProtocolConformanceRef> conformances,
@@ -1149,6 +1155,18 @@ public:
     enumerateUnsafeUses(conformances, loc, [&](UnsafeUse use) {
       result.recordUnsafeUse(use);
       return false;
+    });
+    return result;
+  }
+
+  /// Used when all we have are conformances. This can only find
+  /// "unsafe" uses.
+  static Classification forType(Type type, SourceLoc loc) {
+    Classification result;
+    diagnoseUnsafeType(type->getASTContext(), loc, type, [&](Type unsafeType) {
+      result.recordUnsafeUse(
+          UnsafeUse::forReferenceToUnsafe(
+            nullptr, /*isCall=*/false, unsafeType, loc));
     });
     return result;
   }
@@ -1927,6 +1945,10 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+      return ShouldRecurse;
+    }
+
     ConditionalEffectKind checkExhaustiveDoBody(DoCatchStmt *S) {
       // All errors thrown by the do body are caught, but any errors thrown
       // by the catch bodies are bounded by the throwing kind of the do body.
@@ -2058,6 +2080,10 @@ private:
     ShouldRecurse_t checkWithConformances(
         Expr *E,
         ArrayRef<ProtocolConformanceRef> conformances) {
+      return ShouldRecurse;
+    }
+
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
       return ShouldRecurse;
     }
 
@@ -3481,6 +3507,13 @@ private:
       ArrayRef<ProtocolConformanceRef> conformances) {
     auto classification = Classification::forConformances(
         conformances, E->getLoc());
+    checkEffectSite(E, /*requiresTry=*/false, classification);
+    return ShouldRecurse;
+  }
+
+  ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+    SourceLoc loc = typeRepr ? typeRepr->getLoc() : E->getLoc();
+    auto classification = Classification::forType(type, loc);
     checkEffectSite(E, /*requiresTry=*/false, classification);
     return ShouldRecurse;
   }
