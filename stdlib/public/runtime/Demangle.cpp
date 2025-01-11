@@ -949,7 +949,11 @@ char *swift_demangle(const char *mangledName,
 
   // If the output buffer is not provided, malloc memory ourselves.
   if (outputBuffer == nullptr || *outputBufferSize == 0) {
+#if defined(_WIN32)
+    return _strdup(result.c_str());
+#else
     return strdup(result.c_str());
+#endif
   }
 
   // Copy into the provided buffer.
