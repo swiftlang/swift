@@ -769,6 +769,7 @@ Added: _$ss7UnicodeO5ASCIIO27encodedReplacementCharacters15CollectionOfOneVys5UI
 Added: _$ss7UnicodeO5UTF16O27encodedReplacementCharacters11_UIntBufferVys6UInt16VGvpZMV
 Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UInt32VGvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
 
 // SE-0445 Improving printed descriptions of String.Index
 Added: _$sSS5IndexV16debugDescriptionSSvpMV
