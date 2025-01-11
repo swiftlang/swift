@@ -5057,11 +5057,9 @@ void ConstraintSystem::removePropertyWrapper(Expr *anchor) {
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::applyPropertyWrapperToParameter(
     Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
-    ConstraintKind matchKind, ConstraintLocatorBuilder locator) {
-  Expr *anchor = getAsExpr(locator.getAnchor());
-  if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
-    anchor = apply->getFn();
-  }
+    ConstraintKind matchKind, ConstraintLocator *locator,
+    ConstraintLocator *calleeLocator) {
+  Expr *anchor = getAsExpr(calleeLocator->getAnchor());
 
   if (argLabel.hasDollarPrefix() && (!param || !param->hasExternalPropertyWrapper())) {
     if (!shouldAttemptFixes())

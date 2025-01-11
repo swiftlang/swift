@@ -1820,7 +1820,9 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         assert(param);
         if (cs.applyPropertyWrapperToParameter(paramTy, argTy,
                                                const_cast<ParamDecl *>(param),
-                                               argLabel, subKind, loc)
+                                               argLabel, subKind,
+                                               cs.getConstraintLocator(loc),
+                                               calleeLocator)
                 .isFailure()) {
           return cs.getTypeMatchFailure(loc);
         }
@@ -11920,6 +11922,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       auto result = applyPropertyWrapperToParameter(backingType, param.getParameterType(),
                                                     paramDecl, paramDecl->getName(),
                                                     ConstraintKind::Equal,
+                                                    getConstraintLocator(closure),
                                                     getConstraintLocator(closure));
       if (result.isFailure())
         return false;
