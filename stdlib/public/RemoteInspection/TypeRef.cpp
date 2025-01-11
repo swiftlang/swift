@@ -766,6 +766,15 @@ public:
 
     auto funcNode = Dem.createNode(kind);
 
+    // This needs to use the same order as the demangler.
+
+    // TODO: the C function type would go here
+
+    if (F->getExtFlags().hasSendingResult()) {
+      auto node = Dem.createNode(Node::Kind::SendingResultFunctionType);
+      funcNode->addChild(node, Dem);
+    }
+
     if (auto globalActor = F->getGlobalActor()) {
       auto node = Dem.createNode(Node::Kind::GlobalActorFunctionType);
       auto globalActorNode = visit(globalActor);
@@ -773,9 +782,6 @@ public:
       funcNode->addChild(node, Dem);
     } else if (F->getExtFlags().isIsolatedAny()) {
       auto node = Dem.createNode(Node::Kind::IsolatedAnyFunctionType);
-      funcNode->addChild(node, Dem);
-    } else if (F->getExtFlags().hasSendingResult()) {
-      auto node = Dem.createNode(Node::Kind::SendingResultFunctionType);
       funcNode->addChild(node, Dem);
     }
 
