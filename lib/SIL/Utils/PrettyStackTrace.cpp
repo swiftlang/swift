@@ -96,7 +96,7 @@ void PrettyStackTraceSILFunction::printFunctionInfo(llvm::raw_ostream &out) cons
   if (SILPrintOnError)
     func->print(out);
   if (SILPrintModuleOnError)
-    func->getModule().print(out);
+    func->getModule().print(out, func->getModule().getSwiftModule());
 }
 
 void PrettyStackTraceSILNode::print(llvm::raw_ostream &out) const {
