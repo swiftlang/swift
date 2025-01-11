@@ -512,11 +512,12 @@ void SILCombiner::processInstruction(SILInstruction *I,
 
 namespace swift::test {
 // Arguments:
-// - instruction: the instruction to be canonicalized
+// - instruction: the instruction to be visited
 // Dumps:
-// - the function after the canonicalization is attempted
-static FunctionTest SILCombineCanonicalizeInstruction(
-    "sil_combine_instruction", [](auto &function, auto &arguments, auto &test) {
+// - the function after the visitation is attempted
+static FunctionTest SILCombineVisitInstruction(
+    "sil_combine_visit_instruction",
+    [](auto &function, auto &arguments, auto &test) {
       SILCombiner combiner(test.getPass(), false, false);
       auto inst = arguments.takeInstruction();
       combiner.Builder.setInsertionPoint(inst);
