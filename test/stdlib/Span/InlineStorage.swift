@@ -13,6 +13,9 @@
 // RUN: %target-run-stdlib-swift(-enable-experimental-feature LifetimeDependence -enable-experimental-feature Span -enable-experimental-feature AddressableTypes)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_AddressableTypes
+// REQUIRES: swift_feature_Span
 
 import StdlibUnittest
 
