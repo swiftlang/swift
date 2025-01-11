@@ -12,7 +12,7 @@
 
 extension String.UTF8View {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<UTF8.CodeUnit> {
     @_alwaysEmitIntoClient
     @lifetime(borrow self)
@@ -38,7 +38,7 @@ extension String.UTF8View {
 
 extension Substring.UTF8View {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<UTF8.CodeUnit> {
     @_alwaysEmitIntoClient
     @lifetime(borrow self)

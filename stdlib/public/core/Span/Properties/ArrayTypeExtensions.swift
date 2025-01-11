@@ -12,7 +12,7 @@
 
 extension ContiguousArray {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Element> {
     get {
       let (pointer, count) = (_buffer.firstElementAddress, _buffer.count)
@@ -24,7 +24,7 @@ extension ContiguousArray {
 
 extension ArraySlice {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Element> {
     get {
       let (pointer, count) = (_buffer.firstElementAddress, _buffer.count)
@@ -40,7 +40,7 @@ import SwiftShims
 
 extension Array {
 
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: Span<Element> {
     get {
 #if _runtime(_ObjC)
