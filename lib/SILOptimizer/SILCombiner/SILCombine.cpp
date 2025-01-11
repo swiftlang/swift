@@ -120,6 +120,8 @@ void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
 //                               Implementation
 //===----------------------------------------------------------------------===//
 
+namespace swift {
+
 // Define a CanonicalizeInstruction subclass for use in SILCombine.
 class SILCombineCanonicalize final : CanonicalizeInstruction {
   SmallSILInstructionWorklist<256> &Worklist;
@@ -161,6 +163,8 @@ public:
     return changed;
   }
 };
+
+} // end namespace swift
 
 SILCombiner::SILCombiner(SILFunctionTransform *trans,
                          bool removeCondFails, bool enableCopyPropagation) :
