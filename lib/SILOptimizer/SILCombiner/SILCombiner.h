@@ -412,6 +412,9 @@ private:
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
 
+  void processInstruction(SILInstruction *instruction,
+                          SILCombineCanonicalize &scCanonicalize,
+                          bool &MadeChange);
   /// Add reachable code to the worklist. Meant to be used when starting to
   /// process a new function.
   void addReachableCodeToWorklist(SILBasicBlock *BB);
