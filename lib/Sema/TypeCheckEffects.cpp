@@ -3112,9 +3112,6 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// context.
   ConditionalEffectKind MaxThrowingKind;
 
-  /// All of the unsafe uses within the current context.
-  SmallVector<UnsafeUse, 2> UnsafeUses;
-
   struct DiagnosticInfo {
     DiagnosticInfo(Expr &failingExpr,
                    PotentialEffectReason reason,
@@ -3192,7 +3189,6 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     ContextFlags OldFlags;
     ConditionalEffectKind OldMaxThrowingKind;
     SourceLoc OldAwaitLoc;
-    SmallVector<UnsafeUse, 2> OldUnsafeUses;
     SourceLoc OldUnsafeLoc;
 
   public:
@@ -3201,7 +3197,6 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
           OldRethrowsDC(self.RethrowsDC), OldReasyncDC(self.ReasyncDC),
           OldFlags(self.Flags), OldMaxThrowingKind(self.MaxThrowingKind),
           OldAwaitLoc(self.CurContext.awaitLoc),
-          OldUnsafeUses(self.UnsafeUses),
           OldUnsafeLoc(self.CurContext.unsafeLoc) {
       if (newContext) self.CurContext = *newContext;
     }
@@ -3244,7 +3239,6 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     void resetCoverage() {
       Self.Flags.reset();
       Self.MaxThrowingKind = ConditionalEffectKind::None;
-      Self.UnsafeUses.clear();
     }
 
     void resetCoverageForAutoclosureBody() {
@@ -3304,7 +3298,6 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
 
       OldFlags.mergeFrom(ContextFlags::HasAnyUnsafeSite, Self.Flags);
-      mergeUnsafeUses(OldUnsafeUses, Self.UnsafeUses);
     }
 
     void preserveCoverageFromNonExhaustiveCatch() {
@@ -3327,7 +3320,6 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       OldFlags.mergeFrom(ContextFlags::throwFlags(), Self.Flags);
       OldFlags.mergeFrom(ContextFlags::unsafeFlags(), Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
-      mergeUnsafeUses(OldUnsafeUses, Self.UnsafeUses);
 
       preserveDiagnoseErrorOnTryFlag();
     }
@@ -3347,13 +3339,11 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       OldFlags.mergeFrom(ContextFlags::asyncAwaitFlags(), Self.Flags);
       OldFlags.mergeFrom(ContextFlags::unsafeFlags(), Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
-      mergeUnsafeUses(OldUnsafeUses, Self.UnsafeUses);
     }
 
     void preserveCoverageFromOptionalOrForcedTryOperand() {
       OldFlags.mergeFrom(ContextFlags::asyncAwaitFlags(), Self.Flags);
       OldFlags.mergeFrom(ContextFlags::unsafeFlags(), Self.Flags);
-      mergeUnsafeUses(OldUnsafeUses, Self.UnsafeUses);
     }
 
     void preserveCoverageFromInterpolatedString() {
@@ -3364,7 +3354,6 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       OldFlags.mergeFrom(ContextFlags::HasAnyUnsafeSite, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::HasAnyUnsafe, Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
-      mergeUnsafeUses(OldUnsafeUses, Self.UnsafeUses);
 
       preserveDiagnoseErrorOnTryFlag();
     }
@@ -3379,14 +3368,8 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.ReasyncDC = OldReasyncDC;
       Self.Flags = OldFlags;
       Self.MaxThrowingKind = OldMaxThrowingKind;
-      Self.UnsafeUses = OldUnsafeUses;
       Self.CurContext.awaitLoc = OldAwaitLoc;
       Self.CurContext.unsafeLoc = OldUnsafeLoc;
-    }
-
-    static void mergeUnsafeUses(SmallVectorImpl<UnsafeUse> &intoUses,
-                                ArrayRef<UnsafeUse> fromUses) {
-      intoUses.insert(intoUses.end(), fromUses.begin(), fromUses.end());
     }
   };
 
