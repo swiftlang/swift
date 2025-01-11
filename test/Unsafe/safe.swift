@@ -131,8 +131,18 @@ func testKeyPath() {
   _ = unsafe \HasProperties.computedUnsafe
 }
 
+func takesAutoclosure<T>(_ body: @autoclosure () -> T) { }
+
+func testAutoclosure() {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{20-20=unsafe }}
+  takesAutoclosure(unsafeFunction()) // expected-note{{reference to unsafe global function 'unsafeFunction()'}}
+
+  unsafe takesAutoclosure(unsafeFunction())
+
+  takesAutoclosure(unsafe unsafeFunction())
+}
+
 // Parsing of `unsafe` expressions.
 func testUnsafePositionError() -> Int {
   return 3 + unsafe unsafeInt() // expected-error{{'unsafe' cannot appear to the right of a non-assignment operator}}
 }
-

@@ -3277,7 +3277,8 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       // the autoclosure expression itself, and the autoclosure must be
       // 'async'.
 
-      // FIXME: 'unsafe' should do what with autoclosures?
+      OldFlags.mergeFrom(ContextFlags::HasAnyUnsafe, Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::HasAnyUnsafeSite, Self.Flags);
     }
 
     void setCoverageForSingleValueStmtExpr() {
