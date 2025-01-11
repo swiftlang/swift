@@ -915,6 +915,12 @@ protected:
         ++firstChildIdx;
       }
 
+      if (Node->getChild(firstChildIdx)->getKind() ==
+          NodeKind::SendingResultFunctionType) {
+        extFlags = extFlags.withSendingResult();
+        ++firstChildIdx;
+      }
+
       BuiltType globalActorType = BuiltType();
       if (Node->getChild(firstChildIdx)->getKind() ==
           NodeKind::GlobalActorFunctionType) {
@@ -934,12 +940,6 @@ protected:
       } else if (Node->getChild(firstChildIdx)->getKind() ==
                  NodeKind::IsolatedAnyFunctionType) {
         extFlags = extFlags.withIsolatedAny();
-        ++firstChildIdx;
-      }
-
-      if (Node->getChild(firstChildIdx)->getKind() ==
-          NodeKind::SendingResultFunctionType) {
-        extFlags = extFlags.withSendingResult();
         ++firstChildIdx;
       }
 
