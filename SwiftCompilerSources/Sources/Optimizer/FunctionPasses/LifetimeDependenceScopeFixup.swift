@@ -274,7 +274,8 @@ private extension LifetimeDependence.Scope {
     case let .access(beginAccess):
       // Finding the access base also finds all intermediate nested scopes; there is no need to recursively call
       // gatherExtensions().
-      let (accessBase, nestedAccesses) = beginAccess.accessBaseWithScopes
+      let accessBaseAndScopes = beginAccess.accessBaseWithScopes
+      let accessBase = accessBaseAndScopes.base
       let ownerAddress: Value
       var dependsOnArg: FunctionArgument? = nil
       switch accessBase {
@@ -287,13 +288,18 @@ private extension LifetimeDependence.Scope {
            .pointer, .index:
         ownerAddress = accessBase.address!
       }
-      assert(!nestedAccesses.isEmpty)
-      for nestedAccess in nestedAccesses {
-        innerScopes.push(.access(nestedAccess))
+      assert(!accessBaseAndScopes.scopes.isEmpty)
+      for nestedScope in accessBaseAndScopes.scopes {
+        switch nestedScope {
+        case let .access(beginAccess):
+          innerScopes.push(.access(beginAccess))
+        case .dependence, .base:
+          // ignore recursive mark_dependence base for the purpose of extending scopes. This pass will extend the base
+          // of that mark_dependence (if it is unresolved) later as a separate LifetimeDependence.Scope.
+          break
+        }
       }
-      // This is the outermost scope. We only see nested access scopes after inlining.
-      //
-      // TODO: could we have a nested access within an yielded inout address?
+      // TODO: could we have a nested access within an yielded inout address prior to inlining?
       return SingleInlineArray(element: ScopeExtension(owner: ownerAddress, nestedScopes: innerScopes,
                                                        dependsOnArg: dependsOnArg))
     case let .borrowed(beginBorrow):
