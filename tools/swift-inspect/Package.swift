@@ -37,7 +37,8 @@ let package = Package(
             name: "AndroidCLib",
             path: "Sources/AndroidCLib",
             publicHeadersPath: "include",
-            cSettings: [.unsafeFlags(["-fPIC"])]),
+            cSettings: [.unsafeFlags(["-fPIC"])],
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-TSources/AndroidCLib/section-text-remote.ld"])]),
         .systemLibrary(
             name: "SwiftInspectClientInterface"),
         .testTarget(

@@ -54,32 +54,40 @@
 #define ENTRY_SIZE  2
 
 // Callback for malloc_iterate. Because this function is meant to be copied to
-// a different process for execution, it must not make any function calls. It
-// could be written as asm, but simple C is more readable/maintainable and
-// should consistently compile to movable, position-independent code.
+// a different process for execution, it must not make any function calls to
+// ensure compiles to simple, position-independent code. It is implemented in C
+// for readability/maintainability. It is placed in its own code section to
+// simplify calculating its size.
+__attribute__((noinline, used, section(".text.remote")))
 static void heap_iterate_callback(unsigned long base, unsigned long size, void *arg) {
   volatile uint64_t *data = (uint64_t*)arg;
   while (data[NEXT_FREE_IDX] >= data[MAX_VALID_IDX]) {
     // SIGTRAP indicates the buffer is full and needs to be drained before more
     // entries can be written.
     __builtin_debugtrap();
+
+    // After the SIGTRAP, the signal handler advances the instruction pointer
+    // (PC) to the next instruction. Inserting a nop instruction here ensures
+    // the CPU has a clear, executable instruction to process, which avoids
+    // potential speculative execution or pipeline issues that could arise if
+    // the next instruction were a control transfer like a branch or jump.
     __asm__ __volatile__("nop");
   }
   data[data[NEXT_FREE_IDX]++] = base;
   data[data[NEXT_FREE_IDX]++] = size;
-  __asm__ __volatile__(".align 8");
-  __asm__ __volatile__(".local heap_iterate_callback_end");
-  __asm__ __volatile__("heap_iterate_callback_end:");
 }
+
+// Linker-populated symbol defined in section-text-remote.ld. Used to calculate
+// the size of the heap_iterate_callback function when copying it to a remote
+// process for execution.
+extern char _remote_code_section_end;
 
 void* heap_iterate_callback_start() {
   return (void*)heap_iterate_callback;
 }
 
 size_t heap_iterate_callback_len() {
-  extern char heap_iterate_callback_end;
-  return (uintptr_t)&heap_iterate_callback_end - (uintptr_t)heap_iterate_callback
-    + sizeof(uintptr_t);
+  return (uintptr_t)&_remote_code_section_end - (uintptr_t)heap_iterate_callback;
 }
 
 bool heap_iterate_metadata_init(void* data, size_t len) {
