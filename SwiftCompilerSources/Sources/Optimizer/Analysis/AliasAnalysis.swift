@@ -603,7 +603,7 @@ private enum ImmutableScope {
 
   init?(for basedAddress: Value, _ context: FunctionPassContext) {
     switch basedAddress.enclosingAccessScope {
-    case .scope(let beginAccess):
+    case .access(let beginAccess):
       if beginAccess.isUnsafe {
         return nil
       }
@@ -652,6 +652,9 @@ private enum ImmutableScope {
           return nil
         }
       }
+      case .dependence(let markDep):
+        // ignore mark_dependence for the purpose of alias analysis.
+        self.init(for: markDep.value, context)
     }
   }
 
