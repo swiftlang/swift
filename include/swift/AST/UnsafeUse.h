@@ -225,6 +225,33 @@ public:
     }
   }
 
+  /// Replace the location, if possible.
+  void replaceLocation(SourceLoc loc) {
+    switch (getKind()) {
+    case Override:
+    case Witness:
+    case PreconcurrencyImport:
+      // Cannot replace location.
+      return;
+
+    case UnsafeConformance:
+      storage.conformance.location = loc.getOpaquePointerValue();
+      break;
+
+    case TypeWitness:
+      storage.typeWitness.location = loc.getOpaquePointerValue();
+      break;
+
+    case UnownedUnsafe:
+    case ExclusivityUnchecked:
+    case NonisolatedUnsafe:
+    case ReferenceToUnsafe:
+    case ReferenceToUnsafeThroughTypealias:
+    case CallToUnsafe:
+      storage.entity.location = loc.getOpaquePointerValue();
+    }
+  }
+
   /// Get the main declaration, when there is one.
   const Decl *getDecl() const {
     switch (getKind()) {
