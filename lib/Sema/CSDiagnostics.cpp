@@ -9571,3 +9571,8 @@ bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
   emitDiagnostic(diag::cannot_convert_type_to_keypath_subscript_index, ArgType);
   return true;
 }
+
+bool IncorrectSlabLiteralCount::diagnoseAsError() {
+  emitDiagnostic(diag::slab_literal_incorrect_count, lhsCount, rhsCount);
+  return true;
+}
