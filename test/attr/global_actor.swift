@@ -3,7 +3,6 @@
 // REQUIRES: swift_feature_IsolatedDeinit
 
 actor SomeActor { }
-
 // -----------------------------------------------------------------------
 // @globalActor attribute itself.
 // -----------------------------------------------------------------------
