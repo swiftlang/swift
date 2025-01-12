@@ -8702,7 +8702,9 @@ public:
 
   void printNonEscaping(int idx) {
     printSeparator();
-    out << ".nonescaping(pointer: " << idx << ")";
+    out << ".nonescaping(pointer: ";
+    printParamOrReturn(idx);
+    out << ")";
   }
 
   void printTypeMapping(const llvm::StringMap<std::string> &mapping) {
@@ -8759,7 +8761,7 @@ void ClangImporter::Implementation::importSpanAttributes(FuncDecl *MappedDecl) {
       if (decl->getName() != "span")
         continue;
       if (param->hasAttr<clang::NoEscapeAttr>()) {
-        printer.printNonEscaping(index + 1);
+        printer.printNonEscaping(index);
         clang::PrintingPolicy policy(param->getASTContext().getLangOpts());
         policy.SuppressTagKeyword = true;
         auto param = MappedDecl->getParameters()->get(index);
