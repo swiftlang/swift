@@ -50,7 +50,7 @@ struct VerySmallSlab<T> {
 // CHECK-NEXT:  [[END_LOOP_BB]]:
 // CHECK:         [[DEST_COUNT_PTR:%.*]] = getelementptr inbounds i8, ptr %dest, i32 {{%.*}}
 // CHECK:         [[SRC_COUNT_PTR:%.*]] = getelementptr inbounds i8, ptr %src, i32 {{%.*}}
-// CHECK-NEXT:    call void @llvm.memcpy{{.*}}(ptr{{.*}} [[DEST_COUNT_PTR]], ptr{{.*}} [[SRC_COUNT_PTR]], i{{64|32}} 8, i1 false)
+// CHECK-NEXT:    call void @llvm.memcpy{{.*}}(ptr{{.*}} [[DEST_COUNT_PTR]], ptr{{.*}} [[SRC_COUNT_PTR]], i{{64 8|32 4}}, i1 false)
 // CHECK-NEXT:    br label %[[CONT_BB]]
 // CHECK-EMPTY:
 // CHECK-NEXT:  [[CONT_BB]]:
