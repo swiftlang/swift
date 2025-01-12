@@ -4598,7 +4598,76 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
+static RValue emitSlabLiteral(SILGenFunction &SGF, CollectionExpr *E,
+                              SGFContext C) {
+  ArgumentScope scope(SGF, E);
+
+  auto slabType = E->getType()->castTo<BoundGenericType>();
+  auto loweredSlabType = SGF.getLoweredType(slabType);
+  auto elementType = slabType->getGenericArgs()[1]->getCanonicalType();
+  auto loweredElementType = SGF.getLoweredType(elementType);
+  auto &eltTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(), elementType);
+
+  SILValue alloc = SGF.emitTemporaryAllocation(E, loweredSlabType);
+  SILValue addr = SGF.B.createUncheckedAddrCast(E, alloc,
+                                            loweredElementType.getAddressType());
+
+  // Cleanups for any elements that have been initialized so far.
+  SmallVector<CleanupHandle, 8> cleanups;
+
+  for (unsigned index : range(E->getNumElements())) {
+    auto destAddr = addr;
+
+    if (index != 0) {
+      SILValue indexValue = SGF.B.createIntegerLiteral(
+          E, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+      destAddr = SGF.B.createIndexAddr(E, addr, indexValue,
+                                   /*needsStackProtection=*/ false);
+    }
+
+    // Create a dormant cleanup for the value in case we exit before the
+    // full vector has been constructed.
+
+    CleanupHandle destCleanup = CleanupHandle::invalid();
+    if (!eltTL.isTrivial()) {
+      destCleanup = SGF.enterDestroyCleanup(destAddr);
+      SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
+      cleanups.push_back(destCleanup);
+    }
+
+    TemporaryInitialization init(destAddr, destCleanup);
+
+    ArgumentSource(E->getElements()[index])
+        .forwardInto(SGF, AbstractionPattern::getOpaque(), &init, eltTL);
+  }
+
+  // Kill the per-element cleanups. The slab will take ownership of them.
+  for (auto destCleanup : cleanups)
+    SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
+
+  SILValue slabVal;
+
+  // If the slab is naturally address-only, then we can adopt the stack slot
+  // as the value directly.
+  if (loweredSlabType.isAddressOnly(SGF.F)) {
+    slabVal = SGF.B.createUncheckedAddrCast(E, alloc, loweredSlabType);
+  } else {
+    // Otherwise, this slab is loadable. Load it.
+    slabVal = SGF.B.createTrivialLoadOr(E, alloc, LoadOwnershipQualifier::Take);
+  }
+
+  auto slabMV = SGF.emitManagedRValueWithCleanup(slabVal);
+  auto slab = RValue(SGF, E, slabMV);
+
+  return scope.popPreservingValue(std::move(slab));
+}
+
 RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
+  // Handle 'Slab' literals separately.
+  if (E->getType()->isSlab()) {
+    return emitSlabLiteral(SGF, E, C);
+  }
+
   auto loc = SILLocation(E);
   ArgumentScope scope(SGF, loc);
 

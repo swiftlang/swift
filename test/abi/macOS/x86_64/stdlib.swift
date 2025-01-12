@@ -811,3 +811,15 @@ Added: _$ss13_SwiftifyInfoON
 
 // Eager-lazy Array bridging
 Added: _$ss12_ArrayBufferV14associationKeySVvpZMV
+
+// Slab metadata accessor
+Added: _$ss4SlabVMa
+
+// Slab nominal type descriptor
+Added: _$ss4SlabVMn
+
+// Slab.count property descriptor
+Added: _$ss4SlabVsRi__rlE5countSivpZMV
+
+// Slab._storage _read accessor
+Added: _$ss4SlabVsRi__rlE8_storagexq_BVvr

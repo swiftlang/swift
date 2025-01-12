@@ -808,8 +808,11 @@ CanType CanType::wrapInOptionalTypeImpl(CanType type) {
 
 Type TypeBase::isArrayType() {
   if (auto boundStruct = getAs<BoundGenericStructType>()) {
-    if (boundStruct->getDecl() == getASTContext().getArrayDecl())
+    if (isArray())
       return boundStruct->getGenericArgs()[0];
+
+    if (isSlab())
+      return boundStruct->getGenericArgs()[1];
   }
   return Type();
 }
