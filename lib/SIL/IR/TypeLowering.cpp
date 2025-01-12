@@ -393,12 +393,16 @@ namespace {
       // so make it address-only. If the size is massive, also treat it as
       // address-only since there's little practical benefit to passing around
       // huge amounts of data "directly".
-      auto fixedSize = type->getFixedInhabitedSize();
-      if (!type->isFixedNegativeSize()
-          && (!fixedSize.has_value()
-              || *fixedSize > BuiltinFixedArrayType::MaximumLoadableSize)) {
-        props.setAddressOnly();
-      }
+      // auto fixedSize = type->getFixedInhabitedSize();
+      // if (!type->isFixedNegativeSize()
+      //     && (!fixedSize.has_value()
+      //         || *fixedSize > BuiltinFixedArrayType::MaximumLoadableSize)) {
+      //   props.setAddressOnly();
+      // }
+
+      // HACK (ALEX): TEMPORARILY MAKE ALL VECTORS ADDRESS ONLY
+      props.setAddressOnly();
+
       return props;
     }
     
