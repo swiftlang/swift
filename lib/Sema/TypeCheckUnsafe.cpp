@@ -123,11 +123,11 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
   case UnsafeUse::ReferenceToUnsafe:
   case UnsafeUse::CallToUnsafe: {
     bool isCall = use.getKind() == UnsafeUse::CallToUnsafe;
-    auto decl = cast<ValueDecl>(use.getDecl());
+    auto decl = cast_or_null<ValueDecl>(use.getDecl());
     auto loc = use.getLocation();
     Type type = use.getType();
-    ASTContext &ctx = decl->getASTContext();
-    if (type) {
+    ASTContext &ctx = decl ? decl->getASTContext() : type->getASTContext();
+    if (type && decl) {
       diagnoseUnsafeType(
           ctx, loc, type,
           [&](Type specificType) {
@@ -136,6 +136,11 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
                 diag::note_reference_to_unsafe_typed_decl,
                 isCall, decl, specificType);
           });
+    } else if (type) {
+      ctx.Diags.diagnose(
+          loc,
+          diag::note_reference_to_unsafe_type,
+          type);
     } else {
       ctx.Diags.diagnose(
           loc,
@@ -273,11 +278,10 @@ static bool forEachUnsafeConformance(
   return false;
 }
 
-bool swift::enumerateUnsafeUses(SubstitutionMap subs,
+bool swift::enumerateUnsafeUses(ArrayRef<ProtocolConformanceRef> conformances,
                                 SourceLoc loc,
                                 llvm::function_ref<bool(UnsafeUse)> fn) {
-  // FIXME: Check replacement types?
-  for (auto conformance : subs.getConformances()) {
+  for (auto conformance : conformances) {
     if (!conformance.hasEffect(EffectKind::Unsafe))
       continue;
 
@@ -291,6 +295,18 @@ bool swift::enumerateUnsafeUses(SubstitutionMap subs,
       return true;
     }
   }
+
+  return false;
+}
+
+bool swift::enumerateUnsafeUses(SubstitutionMap subs,
+                                SourceLoc loc,
+                                llvm::function_ref<bool(UnsafeUse)> fn) {
+  // FIXME: Check replacement types?
+
+  // Check conformances.
+  if (enumerateUnsafeUses(subs.getConformances(), loc, fn))
+    return true;
 
   return false;
 }
@@ -324,4 +340,28 @@ bool swift::isUnsafeInConformance(const ValueDecl *requirement,
     hasUnsafeType = true;
   });
   return hasUnsafeType;
+}
+
+void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
+                               llvm::function_ref<void(Type)> diagnose) {
+  if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
+    return;
+
+  if (!type->isUnsafe() && !type->getCanonicalType()->isUnsafe())
+    return;
+
+  // Look for a specific @unsafe nominal type.
+  Type specificType;
+  type.findIf([&specificType](Type type) {
+    if (auto typeDecl = type->getAnyNominal()) {
+      if (typeDecl->isUnsafe()) {
+        specificType = type;
+        return false;
+      }
+    }
+
+    return false;
+  });
+
+  diagnose(specificType ? specificType : type);
 }

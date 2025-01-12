@@ -36,8 +36,17 @@ bool enumerateUnsafeUses(ConcreteDeclRef declRef,
                          bool isCall,
                          llvm::function_ref<bool(UnsafeUse)> fn);
 
+/// Enumerate all of the unsafe uses that occur within this array of protocol
+/// conformances.
+///
+/// The given `fn` will be called with each unsafe use. If it returns `true`
+/// for any use, this function will return `true` immediately. Otherwise,
+/// it will return `false` once all unsafe uses have been emitted.
+bool enumerateUnsafeUses(ArrayRef<ProtocolConformanceRef> conformances,
+                         SourceLoc loc,
+                         llvm::function_ref<bool(UnsafeUse)> fn);
+
 /// Enumerate all of the unsafe uses that occur within this substitution map.
-/// reference.
 ///
 /// The given `fn` will be called with each unsafe use. If it returns `true`
 /// for any use, this function will return `true` immediately. Otherwise,
@@ -55,6 +64,12 @@ bool isUnsafe(ConcreteDeclRef declRef);
 bool isUnsafeInConformance(const ValueDecl *requirement,
                            const Witness &witness,
                            NormalProtocolConformance *conformance);
+
+/// If the given type involves an unsafe type, diagnose it by calling the
+/// diagnose function with the most specific unsafe type that can be provided.
+void diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
+                        llvm::function_ref<void(Type)> diagnose);
+
 }
 
 #endif // SWIFT_SEMA_TYPE_CHECK_UNSAFE_H
