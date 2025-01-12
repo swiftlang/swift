@@ -579,6 +579,7 @@ public:
       recurse = asImpl().checkDeclRef(declRef,
                                       declRef->getDeclRef(),
                                       declRef->getLoc(),
+                                      /*isEvaluated=*/true,
                                       declRef->isImplicitlyAsync().has_value(),
                                       declRef->isImplicitlyThrows());
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
@@ -593,18 +594,22 @@ public:
       recurse = asImpl().checkWithConformances(E, EE->getConformances());
     } else if (auto *OCD = dyn_cast<OtherConstructorDeclRefExpr>(E)) {
       recurse = asImpl().checkDeclRef(OCD, OCD->getDeclRef(), OCD->getLoc(),
+                                      /*isEvaluated=*/true,
                                       /*isImplicitlyAsync=*/false,
                                       /*isImplicitlyThrows=*/false);
     } else if (auto *ME = dyn_cast<MacroExpansionExpr>(E)) {
       recurse = asImpl().checkDeclRef(ME, ME->getMacroRef(), ME->getLoc(),
+                                      /*isEvaluated=*/false,
                                       /*isImplicitlyAsync=*/false,
                                       /*isImplicitlyThrows=*/false);
     } else if (auto *LE = dyn_cast<LiteralExpr>(E)) {
       recurse = asImpl().checkDeclRef(LE, LE->getInitializer(), LE->getLoc(),
+                                      /*isEvaluated=*/false,
                                       /*isImplicitlyAsync=*/false,
                                       /*isImplicitlyThrows=*/false);
     } else if (auto *CE = dyn_cast<CollectionExpr>(E)) {
       recurse = asImpl().checkDeclRef(CE, CE->getInitializer(), CE->getLoc(),
+                                      /*isEvaluated=*/false,
                                       /*isImplicitlyAsync=*/false,
                                       /*isImplicitlyThrows=*/false);
     } else if (auto ECE = dyn_cast<ExplicitCastExpr>(E)) {
@@ -620,6 +625,7 @@ public:
         case KeyPathExpr::Component::Kind::Subscript: {
           (void)asImpl().checkDeclRef(KPE, component.getDeclRef(),
                                       component.getLoc(),
+                                      /*isEvaluated=*/false,
                                       /*isImplicitlyAsync=*/false,
                                       /*isImplicitlyThrows=*/false);
           break;
@@ -1188,11 +1194,13 @@ public:
   /// "unsafe" uses.
   static Classification forType(Type type, SourceLoc loc) {
     Classification result;
-    diagnoseUnsafeType(type->getASTContext(), loc, type, [&](Type unsafeType) {
-      result.recordUnsafeUse(
-          UnsafeUse::forReferenceToUnsafe(
-            nullptr, /*isCall=*/false, unsafeType, loc));
-    });
+    if (type) {
+      diagnoseUnsafeType(type->getASTContext(), loc, type, [&](Type unsafeType) {
+        result.recordUnsafeUse(
+            UnsafeUse::forReferenceToUnsafe(
+              nullptr, /*isCall=*/false, unsafeType, loc));
+      });
+    }
     return result;
   }
 
@@ -1932,12 +1940,16 @@ private:
     }
     ShouldRecurse_t checkDeclRef(Expr *expr,
                                  ConcreteDeclRef declRef, SourceLoc loc,
+                                 bool isEvaluated,
                                  bool isImplicitlyAsync,
                                  bool isImplicitlyThrows) {
-      classification.merge(
-          Self.classifyDeclRef(
-            declRef, loc, isImplicitlyAsync, isImplicitlyThrows
-          ).onlyThrowing());
+      if (isEvaluated) {
+        classification.merge(
+            Self.classifyDeclRef(
+              declRef, loc, isImplicitlyAsync, isImplicitlyThrows
+            ).onlyThrowing());
+      }
+
       return ShouldRecurse;
     }
     ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
@@ -2060,13 +2072,16 @@ private:
     }
     ShouldRecurse_t checkDeclRef(Expr *expr,
                                  ConcreteDeclRef declRef, SourceLoc loc,
+                                 bool isEvaluated,
                                  bool isImplicitlyAsync,
                                  bool isImplicitlyThrows) {
-      if (isImplicitlyAsync) {
-        AsyncKind = ConditionalEffectKind::Always;
-      } else if (auto getter = getEffectfulGetOnlyAccessor(declRef)) {
-        if (cast<AccessorDecl>(getter.getDecl())->hasAsync())
+      if (isEvaluated) {
+        if (isImplicitlyAsync) {
           AsyncKind = ConditionalEffectKind::Always;
+        } else if (auto getter = getEffectfulGetOnlyAccessor(declRef)) {
+          if (cast<AccessorDecl>(getter.getDecl())->hasAsync())
+            AsyncKind = ConditionalEffectKind::Always;
+        }
       }
 
       return ShouldRecurse;
@@ -3684,10 +3699,15 @@ private:
 
   ShouldRecurse_t checkDeclRef(Expr *expr,
                                ConcreteDeclRef declRef, SourceLoc loc,
+                               bool isEvaluated,
                                bool isImplicitlyAsync,
                                bool isImplicitlyThrows) {
     if (auto classification = getApplyClassifier().classifyDeclRef(
           declRef, loc, isImplicitlyAsync, isImplicitlyThrows)) {
+      // If we aren't evaluating the reference, we only care about 'unsafe'.
+      if (!isEvaluated)
+        classification = classification.onlyUnsafe();
+
       auto throwDest = checkEffectSite(
           expr, classification.hasThrows(), classification);
 
