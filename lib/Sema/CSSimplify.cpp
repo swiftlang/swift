@@ -4222,7 +4222,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
   // Finally, check parameterized protocol requirements.
   if (!layout.getParameterizedProtocols().empty()) {
-    SmallVector<std::pair<AssociatedTypeDecl *, Type>, 4> fromReqs;
+    SmallVector<std::pair<Identifier, Type>, 4> fromReqs;
 
     if (type1->isExistentialType()) {
       auto fromLayout = type1->getExistentialLayout();
@@ -4233,8 +4233,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
         for (unsigned i : indices(argTypes)) {
           auto argType = argTypes[i];
-          auto *assocType = assocTypes[i]->getAssociatedTypeAnchor();
-          fromReqs.push_back(std::make_pair(assocType, argType));
+          fromReqs.push_back(std::make_pair(assocTypes[i]->getName(), argType));
         }
       }
     }
@@ -4249,10 +4248,9 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
         for (unsigned i : indices(argTypes)) {
           auto argType = argTypes[i];
-          auto *assocType = assocTypes[i]->getAssociatedTypeAnchor();
           bool found = false;
           for (auto fromReq : fromReqs) {
-            if (fromReq.first == assocType) {
+            if (fromReq.first == assocTypes[i]->getName()) {
               // FIXME: Extend the locator path to point to the argument
               // inducing the requirement.
               auto result = matchTypes(fromReq.second, argType,
