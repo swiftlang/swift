@@ -2727,3 +2727,13 @@ IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
   return new (cs.getAllocator())
       IgnoreKeyPathSubscriptIndexMismatch(cs, argType, locator);
 }
+
+bool Rdar141962317_Fix::diagnose(const Solution &solution, bool asNote) const {
+  Rdar141962317_Warning warning(solution, getLocator());
+  return warning.diagnose(asNote);
+}
+
+Rdar141962317_Fix *Rdar141962317_Fix::create(ConstraintSystem &cs,
+                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator()) Rdar141962317_Fix(cs, locator);
+}

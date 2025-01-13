@@ -8107,5 +8107,11 @@ ERROR(availability_value_generic_type_only_version_newer, none,
 ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
+
+WARNING(rdar141962317,none,
+        "calling %base0 with an existential value is not supported; call it "
+        "with a generic value instead; this will be an error in a future Swift "
+        "release", (const ValueDecl *))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -34,8 +34,15 @@ public:
   /// example, "func foo(x: Int) -> () -> Self?" has a covariant 'Self' result.
   bool hasCovariantSelfResult;
 
+  bool is_rdar141962317;
+
   OptionalTypePosition selfRef;
   OptionalTypePosition assocTypeRef;
+
+  static GenericParameterReferenceInfo for_rdar141962317() {
+    return GenericParameterReferenceInfo(false, std::nullopt, std::nullopt,
+                                         true);
+  }
 
   /// A reference to 'Self'.
   static GenericParameterReferenceInfo forSelfRef(TypePosition position) {
@@ -64,9 +71,12 @@ public:
         assocTypeRef(std::nullopt) {}
 
 private:
-  GenericParameterReferenceInfo(bool hasCovariantSelfResult, OptionalTypePosition selfRef,
-                    OptionalTypePosition assocTypeRef)
-      : hasCovariantSelfResult(hasCovariantSelfResult), selfRef(selfRef),
+  GenericParameterReferenceInfo(bool hasCovariantSelfResult,
+                                OptionalTypePosition selfRef,
+                                OptionalTypePosition assocTypeRef,
+                                bool is_rdar141962317 = false)
+      : hasCovariantSelfResult(hasCovariantSelfResult),
+        is_rdar141962317(is_rdar141962317), selfRef(selfRef),
         assocTypeRef(assocTypeRef) {}
 };
 
@@ -117,8 +127,8 @@ using OpenedExistentialAdjustments =
 /// variable (from the opened parameter type) the existential type that needs
 /// to be opened (from the argument type), and the adjustments that need to be
 /// applied to the existential type after it is opened.
-std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
-                                Type, OpenedExistentialAdjustments>>
+std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *, Type,
+                         OpenedExistentialAdjustments, bool>>
 canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                Type paramTy, Type argTy);
 

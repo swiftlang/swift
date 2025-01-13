@@ -9525,3 +9525,10 @@ bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
   emitDiagnostic(diag::cannot_convert_type_to_keypath_subscript_index, ArgType);
   return true;
 }
+
+bool Rdar141962317_Warning::diagnoseAsError() {
+  auto overload = *getCalleeOverloadChoiceIfAvailable(getLocator());
+
+  emitDiagnostic(diag::rdar141962317, overload.choice.getDecl());
+  return true;
+}

@@ -489,6 +489,8 @@ enum class FixKind : uint8_t {
   /// sending result, but is passed a function typed parameter without a sending
   /// result.
   AllowSendingMismatch,
+
+  Rdar141962317,
 };
 
 class ConstraintFix {
@@ -3868,6 +3870,20 @@ public:
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreKeyPathSubscriptIndexMismatch;
   }
+};
+
+class Rdar141962317_Fix final : public ConstraintFix {
+  Rdar141962317_Fix(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::Rdar141962317, locator,
+                      FixBehavior::AlwaysWarning) {}
+
+public:
+  std::string getName() const override { return "rdar://141962317"; }
+
+  static Rdar141962317_Fix *create(ConstraintSystem &cs,
+                                   ConstraintLocator *locator);
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 };
 
 } // end namespace constraints

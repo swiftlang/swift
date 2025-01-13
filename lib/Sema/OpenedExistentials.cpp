@@ -30,6 +30,7 @@ using namespace swift;
 GenericParameterReferenceInfo &
 GenericParameterReferenceInfo::operator|=(const GenericParameterReferenceInfo &other) {
   hasCovariantSelfResult |= other.hasCovariantSelfResult;
+  is_rdar141962317 |= other.is_rdar141962317;
   if (other.selfRef > selfRef) {
     selfRef = other.selfRef;
   }
@@ -95,6 +96,33 @@ static GenericParameterReferenceInfo findGenericParameterReferencesInFunction(
     TypePosition paramPos = position.flipped();
     if (skipParamIndex && paramIdx < *skipParamIndex)
       paramPos = TypePosition::Invariant;
+
+    // Narrow compatibility hack for rdar://141962317. 'BoundGeneric<Pack{T}>?'.
+    if (paramPos == TypePosition::Contravariant) {
+      if (auto *optionalTy =
+              dyn_cast<OptionalType>(param.getParameterType().getPointer())) {
+        if (auto *boundGenericTy = dyn_cast<BoundGenericType>(
+                optionalTy->getBaseType().getPointer())) {
+          const auto genericArgs = boundGenericTy->getGenericArgs();
+          if (genericArgs.size() == 1) {
+            if (auto *packTy =
+                    dyn_cast<PackType>(genericArgs.front().getPointer())) {
+              const auto elementTypes = packTy->getElementTypes();
+              if (elementTypes.size() == 1) {
+                if (isa<GenericTypeParamType>(
+                        elementTypes.front().getPointer())) {
+                  if (elementTypes.front()->isEqual(origParam)) {
+                    inputInfo |=
+                        GenericParameterReferenceInfo::for_rdar141962317();
+                    continue;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
 
     inputInfo |= ::findGenericParameterReferencesRec(
         genericSig, origParam, openedParam, param.getParameterType(), paramPos,
@@ -551,10 +579,10 @@ bool swift::isMemberAvailableOnExistential(
   return true;
 }
 
-std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
-                                Type, OpenedExistentialAdjustments>>
+std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *, Type,
+                         OpenedExistentialAdjustments, bool>>
 swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
-	                                  Type paramTy, Type argTy) {
+                                      Type paramTy, Type argTy) {
   if (!callee)
     return std::nullopt;
 
@@ -690,7 +718,8 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
       referenceInfo.assocTypeRef > TypePosition::Covariant)
     return std::nullopt;
 
-  return std::make_tuple(genericParam, paramTypeVar, argTy, adjustments);
+  return std::make_tuple(genericParam, paramTypeVar, argTy, adjustments,
+                         referenceInfo.is_rdar141962317);
 }
 
 /// For each occurrence of a type **type** in `refTy` that satisfies

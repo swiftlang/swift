@@ -3239,6 +3239,13 @@ public:
   bool diagnoseAsError() override;
 };
 
+struct Rdar141962317_Warning final : public FailureDiagnostic {
+  Rdar141962317_Warning(const Solution &solution, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator, FixBehavior::AlwaysWarning) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
