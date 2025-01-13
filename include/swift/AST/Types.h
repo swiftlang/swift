@@ -4842,12 +4842,12 @@ public:
   SILType getSILStorageInterfaceType() const;
   /// Return a version of this result info with the type replaced.
   SILResultInfo getWithInterfaceType(CanType type) const {
-    return SILResultInfo(type, getConvention());
+    return SILResultInfo(type, getConvention(), getOptions());
   }
 
   /// Return a version of this result info with the convention replaced.
   SILResultInfo getWithConvention(ResultConvention c) const {
-    return SILResultInfo(getInterfaceType(), c);
+    return SILResultInfo(getInterfaceType(), c, getOptions());
   }
 
   // Does this result convention require indirect storage? This reflects a
