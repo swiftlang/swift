@@ -1183,11 +1183,12 @@ bool swift::diagnoseNonSendableTypesInReference(
     // Check the result type of a function.
     if (auto func = dyn_cast<FuncDecl>(function)) {
       if (funcCheckOptions.contains(FunctionCheckKind::Results)) {
-        if (func->hasSendingResult())
-          return true;
-
         // only check results if funcCheckKind specifies so
         Type resultType = func->getResultInterfaceType().subst(subs);
+
+        if (func->hasSendingResult() && !resultType->hasError())
+          return true;
+
         if (diagnoseNonSendableTypes(
             resultType, fromDC, derivedConformanceType,
             refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
