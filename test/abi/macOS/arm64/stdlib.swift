@@ -800,10 +800,15 @@ Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
 // _SwiftifyInfo enum for _SwiftifyImports macro
-Added: _$ss13_SwiftifyInfoO11nonescapingyABSi_tcABmFWC
-Added: _$ss13_SwiftifyInfoO7endedByyABSi_SitcABmFWC
-Added: _$ss13_SwiftifyInfoO7sizedByyABSi_SStcABmFWC
-Added: _$ss13_SwiftifyInfoO9countedByyABSi_SStcABmFWC
+Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
+Added: _$ss13_SwiftifyExprO6returnyA2BmFWC
+Added: _$ss13_SwiftifyExprOMa
+Added: _$ss13_SwiftifyExprOMn
+Added: _$ss13_SwiftifyExprON
+Added: _$ss13_SwiftifyInfoO11nonescapingyABs01_A4ExprO_tcABmFWC
+Added: _$ss13_SwiftifyInfoO7endedByyABs01_A4ExprO_SitcABmFWC
+Added: _$ss13_SwiftifyInfoO7sizedByyABs01_A4ExprO_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoOMa
 Added: _$ss13_SwiftifyInfoOMn
 Added: _$ss13_SwiftifyInfoON
