@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature BuiltinModule -enable-experimental-feature LifetimeDependence -enable-experimental-feature AddressableTypes -enable-experimental-feature ValueGenerics %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -disable-access-control -enable-experimental-feature BuiltinModule -enable-experimental-feature LifetimeDependence -enable-experimental-feature AddressableTypes -enable-experimental-feature ValueGenerics %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BuiltinModule
 // REQUIRES: swift_feature_AddressableTypes
@@ -69,12 +69,14 @@ struct Schmector {
         // CHECK-SAME:    (@in_guaranteed Schmector) ->
         @lifetime(borrow self)
         borrowing get {
-            return Spam(base: UnsafePointer(Builtin.addressOfBorrow(self)), count: 10)
+            let pointer = UnsafePointer<Int>(Builtin.addressOfBorrow(self))
+            let spam = Spam(base: pointer, count: 10)
+            return _overrideLifetime(spam, borrowing: self)
         }
     }
 }
 
 struct Spam: ~Escapable {
-    @_unsafeNonescapableResult
+    @lifetime(borrow base)
     init(base: UnsafePointer<Int>, count: Int) {}
 }
