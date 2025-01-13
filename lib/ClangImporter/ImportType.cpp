@@ -1669,7 +1669,7 @@ static ImportedType adjustTypeForConcreteImport(
   // optional type.
   bool isIUO = false;
   if (importKind != ImportTypeKind::Typedef && optKind != OTK_None &&
-      canImportAsOptional(hint) && !importedType->isForeignReferenceType()) {
+      canImportAsOptional(hint)) {
     isIUO = optKind == OTK_ImplicitlyUnwrappedOptional;
     importedType = OptionalType::get(importedType);
   }
@@ -2739,8 +2739,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
     bool knownNonNull = !nonNullArgs.empty() && nonNullArgs[index];
     // Specialized templates need to match the args/result exactly.
-    /*knownNonNull |= clangDecl->isFunctionTemplateSpecialization();*/
-    // FIXME: for CI test, DO NOT MERGE ME
+    knownNonNull |= clangDecl->isFunctionTemplateSpecialization();
 
     // Check nullability of the parameter.
     OptionalTypeKind optionalityOfParam =
