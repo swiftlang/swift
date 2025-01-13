@@ -39,13 +39,13 @@ actor OtherActor: SyncProtocol {
   // expected-note@-1{{add '@preconcurrency' to the 'SyncProtocol' conformance to defer isolation checking to run time}}{{19-19=@preconcurrency }}
 
   var propertyB: Int = 17
-  // expected-error@-1{{actor-isolated property 'propertyB' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{actor-isolated property 'propertyB' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
 
   var propertyA: Int { 17 }
-  // expected-error@-1{{actor-isolated property 'propertyA' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{actor-isolated property 'propertyA' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
 
   func syncMethodA() { }
-  // expected-error@-1{{actor-isolated instance method 'syncMethodA()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{actor-isolated instance method 'syncMethodA()' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
   // expected-note@-2{{add 'nonisolated' to 'syncMethodA()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
 
   // nonisolated methods are okay.
@@ -53,19 +53,19 @@ actor OtherActor: SyncProtocol {
   nonisolated func syncMethodC() -> Int { 5 }
 
   func syncMethodE() -> Void { }
-  // expected-error@-1{{actor-isolated instance method 'syncMethodE()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{actor-isolated instance method 'syncMethodE()' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
   // expected-note@-2{{add 'nonisolated' to 'syncMethodE()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
 
   func syncMethodF(param: String) -> Int { 5 }
-  // expected-error@-1{{actor-isolated instance method 'syncMethodF(param:)' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{actor-isolated instance method 'syncMethodF(param:)' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
   // expected-note@-2{{add 'nonisolated' to 'syncMethodF(param:)' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
 
   func syncMethodG() { }
-  // expected-error@-1{{actor-isolated instance method 'syncMethodG()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{actor-isolated instance method 'syncMethodG()' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
   // expected-note@-2{{add 'nonisolated' to 'syncMethodG()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
 
   subscript (index: Int) -> String { "\(index)" }
-  // expected-error@-1{{actor-isolated subscript 'subscript(_:)' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{actor-isolated subscript 'subscript(_:)' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
   // expected-note@-2{{add 'nonisolated' to 'subscript(_:)' to make this subscript not isolated to the actor}}{{3-3=nonisolated }}
 
   // Static methods and properties are okay.

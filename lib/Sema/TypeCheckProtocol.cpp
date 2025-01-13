@@ -3444,10 +3444,12 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
 
   // Complain that this witness cannot conform to the requirement due to
   // actor isolation.
-  witness->diagnose(diag::actor_isolated_witness,
-                    isDistributed && !isDistributedDecl(witness),
-                    refResult.isolation, witness, requirementIsolation)
-    .limitBehaviorUntilSwiftVersion(behavior, 6);
+  witness
+      ->diagnose(diag::actor_isolated_witness,
+                 isDistributed && !isDistributedDecl(witness),
+                 refResult.isolation, witness, requirementIsolation,
+                 Conformance->getProtocol())
+      .limitBehaviorUntilSwiftVersion(behavior, 6);
 
   // If we need 'distributed' on the witness, add it.
   if (missingOptions.contains(MissingFlags::WitnessDistributed)) {
