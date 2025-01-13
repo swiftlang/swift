@@ -2739,7 +2739,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
     bool knownNonNull = !nonNullArgs.empty() && nonNullArgs[index];
     // Specialized templates need to match the args/result exactly.
-    knownNonNull |= clangDecl->isFunctionTemplateSpecialization();
+    /*knownNonNull |= clangDecl->isFunctionTemplateSpecialization();*/
+    // FIXME: for CI test, DO NOT MERGE ME
 
     // Check nullability of the parameter.
     OptionalTypeKind optionalityOfParam =
