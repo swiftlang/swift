@@ -3252,6 +3252,27 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// A stopgap warning for the following case, where the invariant reference to
+/// `T` is temporarily ignored for compatibility:
+///
+/// \code
+/// struct S<each T> {}
+/// protocol P {}
+/// func open<T: P>(_: T.Type, _: S<T>? = nil) {}
+/// //                              ^
+/// let meta: any P.Type
+/// open(meta) // OK for now.
+/// \endcode
+///
+struct WarnAboutExistentialOpenedForCallArgumentUntilFutureRelease final
+    : public FailureDiagnostic {
+  WarnAboutExistentialOpenedForCallArgumentUntilFutureRelease(
+      const Solution &solution, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator, FixBehavior::AlwaysWarning) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

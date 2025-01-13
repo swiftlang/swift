@@ -1441,7 +1441,7 @@ public:
   }
 };
 
-static std::optional<std::pair<TypeVariableType *, Type>>
+static std::optional<std::tuple<TypeVariableType *, Type, bool>>
 shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                   Type paramTy, Type argTy, Expr *argExpr,
                                   ConstraintSystem &cs) {
@@ -1820,7 +1820,9 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         // My kingdom for a decent "if let" in C++.
         TypeVariableType *typeVar;
         Type bindingTy;
-        std::tie(typeVar, bindingTy) = *typeVarAndBindingTy;
+        bool isStopgapCompatibilityException;
+        std::tie(typeVar, bindingTy, isStopgapCompatibilityException) =
+            *typeVarAndBindingTy;
 
         OpenedArchetypeType *openedArchetype;
 
@@ -1838,6 +1840,14 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         });
 
         openedExistentials.push_back({typeVar, openedArchetype});
+
+        // If we sanctioned opening due to a stopgap compatibility exception,
+        // warn about it so folks can spot and fix the problem.
+        if (isStopgapCompatibilityException) {
+          cs.recordFix(
+              AllowOpeningExistentialForCallArgumentUntilFutureRelease::create(
+                  cs, cs.getConstraintLocator(loc)));
+        }
       }
 
       // If we have a compound function reference (e.g `fn($x:)`), respect
@@ -15406,6 +15416,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowFunctionSpecialization:
   case FixKind::IgnoreGenericSpecializationArityMismatch:
   case FixKind::IgnoreKeyPathSubscriptIndexMismatch:
+  case FixKind::AllowOpeningExistentialForCallArgumentUntilFutureRelease:
   case FixKind::AllowMemberRefOnExistential: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }

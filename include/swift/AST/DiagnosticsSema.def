@@ -155,6 +155,11 @@ ERROR(could_not_use_member_on_existential,none,
 FIXIT(replace_with_type,"%0",(Type))
 FIXIT(insert_type_qualification,"%0.",(Type))
 
+ERROR(cannot_open_existential_for_call_arg,none,
+      "calling %base0 with an existential value is not supported; call it "
+      "with a generic value instead; this will be an error in a future Swift "
+      "release", (const ValueDecl *))
+
 ERROR(candidate_inaccessible,none,
       "%base0 is inaccessible due to "
       "'%select{private|fileprivate|internal|package|@_spi|@_spi}1' protection level",

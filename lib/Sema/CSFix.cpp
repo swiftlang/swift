@@ -2736,3 +2736,17 @@ bool AllowSlabLiteralCountMismatch::diagnose(const Solution &solution,
   IncorrectSlabLiteralCount failure(solution, lhsCount, rhsCount, getLocator());
   return failure.diagnose(asNote);
 }
+
+bool AllowOpeningExistentialForCallArgumentUntilFutureRelease::diagnose(
+    const Solution &solution, bool asNote) const {
+  WarnAboutExistentialOpenedForCallArgumentUntilFutureRelease warning(
+      solution, getLocator());
+  return warning.diagnose(asNote);
+}
+
+AllowOpeningExistentialForCallArgumentUntilFutureRelease *
+AllowOpeningExistentialForCallArgumentUntilFutureRelease::create(
+    ConstraintSystem &cs, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowOpeningExistentialForCallArgumentUntilFutureRelease(cs, locator);
+}

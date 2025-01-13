@@ -487,6 +487,9 @@ enum class FixKind : uint8_t {
   /// Ignore when a 'Slab' literal has mismatched number of elements to the
   /// type it's attempting to bind to.
   AllowSlabLiteralCountMismatch,
+
+  /// See associated class.
+  AllowOpeningExistentialForCallArgumentUntilFutureRelease,
 };
 
 class ConstraintFix {
@@ -3862,6 +3865,43 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowSlabLiteralCountMismatch;
+  }
+};
+
+/// A stopgap warning fix for the following case, where the invariant reference
+/// to `T` is temporarily ignored for compatibility:
+///
+/// \code
+/// struct S<each T> {}
+/// protocol P {}
+/// func open<T: P>(_: T.Type, _: S<T>? = nil) {}
+/// //                              ^
+/// let meta: any P.Type
+/// open(meta) // OK for now.
+/// \endcode
+///
+class AllowOpeningExistentialForCallArgumentUntilFutureRelease final
+    : public ConstraintFix {
+  AllowOpeningExistentialForCallArgumentUntilFutureRelease(
+      ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(
+            cs,
+            FixKind::AllowOpeningExistentialForCallArgumentUntilFutureRelease,
+            locator, FixBehavior::AlwaysWarning) {}
+
+public:
+  std::string getName() const override {
+    return "allow opening existential for call argument until future release";
+  }
+
+  static AllowOpeningExistentialForCallArgumentUntilFutureRelease *
+  create(ConstraintSystem &cs, ConstraintLocator *locator);
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() ==
+           FixKind::AllowOpeningExistentialForCallArgumentUntilFutureRelease;
   }
 };
 

@@ -38,10 +38,25 @@ class GenericParameterReferenceInfo final {
   /// 'Self' in 'func foo(Int) -> () -> Self?'.
   bool HasCovariantGenericParamResult;
 
+  /// Field to keep track of whether we hit the following case, where the
+  /// invariant reference to `T` is temporarily ignored for compatibility:
+  ///
+  /// \code
+  /// struct S<each T> {}
+  /// protocol P {}
+  /// func open<T: P>(_: T.Type, _: S<T>? = nil) {}
+  /// //                              ^
+  /// let meta: any P.Type
+  /// open(meta) // OK for now.
+  /// \endcode
+  ///
+  bool HasIgnoredInvariantRefForCompatibility;
+
   GenericParameterReferenceInfo(uint8_t DirectRefs, uint8_t DepMemberTyRefs,
                                 bool HasCovariantGenericParamResult)
       : DirectRefs(DirectRefs), DepMemberTyRefs(DepMemberTyRefs),
-        HasCovariantGenericParamResult(HasCovariantGenericParamResult) {}
+        HasCovariantGenericParamResult(HasCovariantGenericParamResult),
+        HasIgnoredInvariantRefForCompatibility(false) {}
 
 public:
   GenericParameterReferenceInfo()
@@ -92,6 +107,13 @@ public:
 
   bool hasCovariantGenericParamResult() const {
     return HasCovariantGenericParamResult;
+  }
+
+  bool hasIgnoredInvariantRefForCompatibility() const {
+    return HasIgnoredInvariantRefForCompatibility;
+  }
+  void setHasIgnoredInvariantRefForCompatibility(bool value) {
+    HasIgnoredInvariantRefForCompatibility = value;
   }
 
   GenericParameterReferenceInfo &
@@ -146,7 +168,7 @@ isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member);
 ///
 /// \returns If opening is supported, returns the type variable representing the
 /// generic parameter type, and the unopened type it binds to.
-std::optional<std::pair<TypeVariableType *, Type>>
+std::optional<std::tuple<TypeVariableType *, Type, bool>>
 canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                Type paramTy, Type argTy);
 

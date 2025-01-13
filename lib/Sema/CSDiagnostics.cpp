@@ -9576,3 +9576,13 @@ bool IncorrectSlabLiteralCount::diagnoseAsError() {
   emitDiagnostic(diag::slab_literal_incorrect_count, lhsCount, rhsCount);
   return true;
 }
+
+bool WarnAboutExistentialOpenedForCallArgumentUntilFutureRelease::
+    diagnoseAsError() {
+  auto overload = *getCalleeOverloadChoiceIfAvailable(getLocator());
+
+  emitDiagnostic(diag::cannot_open_existential_for_call_arg,
+                 overload.choice.getDecl())
+      .warnUntilFutureSwiftCompiler();
+  return true;
+}

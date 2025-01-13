@@ -32,7 +32,8 @@ GenericParameterReferenceInfo::operator|=(const GenericParameterReferenceInfo &o
   DirectRefs |= other.DirectRefs;
   DepMemberTyRefs |= other.DepMemberTyRefs;
   HasCovariantGenericParamResult |= other.HasCovariantGenericParamResult;
-
+  HasIgnoredInvariantRefForCompatibility |=
+      other.HasIgnoredInvariantRefForCompatibility;
   return *this;
 }
 
@@ -92,6 +93,42 @@ static GenericParameterReferenceInfo findGenericParameterReferencesInFunction(
     TypePosition paramPos = position.flipped();
     if (skipParamIndex && paramIdx < *skipParamIndex)
       paramPos = TypePosition::Invariant;
+
+    // Narrow stopgap compatibility exception for the following case:
+    //
+    //   struct S<each T> {}
+    //   protocol P {}
+    //   func open<T: P>(_: T.Type, _: S<T>? = nil) {}
+    //   //                              ^
+    //   let meta: any P.Type
+    //   open(meta)
+    //
+    // If this is a 'BoundGeneric<Pack{T}>?' in contravariant position,
+    // ignore the invariant reference to 'T' and record that we hit the case.
+    if (paramPos == TypePosition::Contravariant) {
+      if (auto *optionalTy =
+              dyn_cast<OptionalType>(param.getParameterType().getPointer())) {
+        if (auto *boundGenericTy = dyn_cast<BoundGenericType>(
+                optionalTy->getBaseType().getPointer())) {
+          const auto genericArgs = boundGenericTy->getGenericArgs();
+          if (genericArgs.size() == 1) {
+            if (auto *packTy =
+                    dyn_cast<PackType>(genericArgs.front().getPointer())) {
+              const auto elementTypes = packTy->getElementTypes();
+              if (elementTypes.size() == 1) {
+                if (isa<GenericTypeParamType>(
+                        elementTypes.front().getPointer())) {
+                  if (elementTypes.front()->isEqual(origParam)) {
+                    inputInfo.setHasIgnoredInvariantRefForCompatibility(true);
+                    continue;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
 
     inputInfo |= ::findGenericParameterReferencesRec(
         genericSig, origParam, openedParam, param.getParameterType(), paramPos,
@@ -590,7 +627,7 @@ swift::isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member) {
   return result;
 }
 
-std::optional<std::pair<TypeVariableType *, Type>>
+std::optional<std::tuple<TypeVariableType *, Type, bool>>
 swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                       Type paramTy, Type argTy) {
   if (!callee)
@@ -718,7 +755,8 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (referenceInfo.hasNonCovariantRef())
     return std::nullopt;
 
-  return std::pair(typeVar, bindingTy);
+  return std::tuple(typeVar, bindingTy,
+                    referenceInfo.hasIgnoredInvariantRefForCompatibility());
 }
 
 /// For each occurrence of a type **type** in `refTy` that satisfies
