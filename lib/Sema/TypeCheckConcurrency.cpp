@@ -1166,6 +1166,9 @@ bool swift::diagnoseNonSendableTypesInReference(
     if (funcCheckOptions.contains(FunctionCheckKind::Params)) {
       // only check params if funcCheckKind specifies so
       for (auto param : *function->getParameters()) {
+        if (param->isSending())
+          return true;
+
         Type paramType = param->getInterfaceType().subst(subs);
         if (diagnoseNonSendableTypes(
                 paramType, fromDC, derivedConformanceType,
@@ -1179,6 +1182,9 @@ bool swift::diagnoseNonSendableTypesInReference(
     // Check the result type of a function.
     if (auto func = dyn_cast<FuncDecl>(function)) {
       if (funcCheckOptions.contains(FunctionCheckKind::Results)) {
+        if (func->hasSendingResult())
+          return true;
+
         // only check results if funcCheckKind specifies so
         Type resultType = func->getResultInterfaceType().subst(subs);
         if (diagnoseNonSendableTypes(
