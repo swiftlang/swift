@@ -5,7 +5,7 @@
 void simple(int len, int * __counted_by(len) p);
 
 void swiftAttr(int len, int *p) __attribute__((
-    swift_attr("@_SwiftifyImport(.countedBy(pointer: 2, count: \"len\"))")));
+    swift_attr("@_SwiftifyImport(.countedBy(pointer: .param(2), count: \"len\"))")));
 
 void shared(int len, int * __counted_by(len) p1, int * __counted_by(len) p2);
 
@@ -16,3 +16,5 @@ void nullUnspecified(int len, int * __counted_by(len) _Null_unspecified p);
 void nonnull(int len, int * __counted_by(len) _Nonnull p);
 
 void nullable(int len, int * __counted_by(len) _Nullable p);
+
+int * __counted_by(len) returnPointer(int len);

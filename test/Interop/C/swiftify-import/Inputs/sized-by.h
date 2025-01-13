@@ -4,8 +4,8 @@
 
 void simple(int len, void * __sized_by(len) p);
 
-void swiftAttr(int len, void *p) __attribute__((
-    swift_attr("@_SwiftifyImport(.sizedBy(pointer: 2, size: \"len\"))")));
+void swiftAttr(int len, void *p) __attribute__((swift_attr(
+    "@_SwiftifyImport(.sizedBy(pointer: .param(2), size: \"len\"))")));
 
 void shared(int len, void * __sized_by(len) p1, void * __sized_by(len) p2);
 
