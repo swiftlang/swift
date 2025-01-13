@@ -657,6 +657,8 @@ static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
 
 void LangOptions::setCxxInteropFromArgs(ArgList &Args,
                                         swift::DiagnosticEngine &Diags) {
+  enableFeature(Feature::SpanConversions);
+
   if (Arg *A = Args.getLastArg(options::OPT_cxx_interoperability_mode)) {
     if (Args.hasArg(options::OPT_enable_experimental_cxx_interop)) {
       Diags.diagnose(SourceLoc(), diag::dont_enable_interop_and_compat);

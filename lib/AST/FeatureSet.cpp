@@ -349,6 +349,7 @@ static bool usesFeatureABIAttribute(Decl *decl) {
 UNINTERESTING_FEATURE(WarnUnsafe)
 UNINTERESTING_FEATURE(SafeInterop)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
+UNINTERESTING_FEATURE(SpanConversions)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(CoroutineAccessorsAllocateInCallee)

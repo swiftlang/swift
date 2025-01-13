@@ -77,6 +77,7 @@ extension CxxSpan {
   }
 }
 
+#if $SpanConversions
 @available(SwiftStdlib 6.1, *)
 extension Span {
   @_alwaysEmitIntoClient
@@ -91,6 +92,7 @@ extension Span {
     self = _overrideLifetime(newSpan, borrowing: span)
   }
 }
+#endif
 
 public protocol CxxMutableSpan<Element> {
   associatedtype Element

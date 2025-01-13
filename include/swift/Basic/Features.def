@@ -413,6 +413,11 @@ EXPERIMENTAL_FEATURE(SafeInterop, true)
 // generate Swift wrappers with safe pointer types.
 EXPERIMENTAL_FEATURE(SafeInteropWrappers, false)
 
+/// Enables converting a C++ span to Swift's span.
+/// We need this for maintaining compatibility between the Swift 6.1 compiler
+/// and the 6.2 stdlib implementation.
+EXPERIMENTAL_FEATURE(SpanConversions, false)
+
 /// Ignore resilience errors due to C++ types.
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 

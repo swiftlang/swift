@@ -660,6 +660,7 @@ StdSpanTestSuite.test("Convert between Swift and C++ span types") {
   guard #available(SwiftStdlib 6.1, *) else {
     return
   }
+  #if $SpanConversions
   do {
     var arr: [Int32] = [1, 2, 3]
     arr.withUnsafeMutableBufferPointer{ ubpointer in
@@ -672,6 +673,7 @@ StdSpanTestSuite.test("Convert between Swift and C++ span types") {
       expectEqual(swiftSpan[2], 3)
     }
   }
+  #endif
   do {
     var arr: [Int32] = [1, 2, 3]
     arr.withUnsafeMutableBufferPointer{ ubpointer in
