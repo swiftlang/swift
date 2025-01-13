@@ -5,7 +5,7 @@
 class NonSendableKlass1 {}
 
 protocol P1 {
-    func bar(_ a: sending NonSendableKlass1) async -> sending NonSendableKlass1
+  func bar(_ a: sending NonSendableKlass1) async -> sending NonSendableKlass1
 }
 
 @MainActor
@@ -50,3 +50,27 @@ actor P4Actor: P4 {
   // expected-error@-2 {{non-sendable parameter type 'NonSendableKlass4' cannot be sent from caller of protocol requirement 'bar' into actor-isolated implementation}}
 }
 
+class NonSendableKlass5 {}
+// expected-note@-1 {{class 'NonSendableKlass5' does not conform to the 'Sendable' protocol}}
+
+
+protocol P5 {
+  func bar(_ a: sending NonSendableKlass5, _ b: NonSendableKlass5) async -> sending NonSendableKlass5
+}
+
+@MainActor
+class P5Class: P5 {
+  func bar(_ a: sending NonSendableKlass5, _ b: NonSendableKlass5) async -> sending NonSendableKlass5 { a }
+  // expected-error@-1 {{non-sendable parameter type 'NonSendableKlass5' cannot be sent from caller of protocol requirement 'bar' into main actor-isolated implementation}}
+}
+
+class NonSendableKlass6 {}
+
+protocol P6 {
+  func bar(_ a: sending NonSendableKlass6, _ b: sending NonSendableKlass6) async -> sending NonSendableKlass6
+}
+
+@MainActor
+class P6Class: P6 {
+  func bar(_ a: sending NonSendableKlass6, _ b: sending NonSendableKlass6) async -> sending NonSendableKlass6 { a }
+}

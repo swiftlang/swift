@@ -1166,10 +1166,11 @@ bool swift::diagnoseNonSendableTypesInReference(
     if (funcCheckOptions.contains(FunctionCheckKind::Params)) {
       // only check params if funcCheckKind specifies so
       for (auto param : *function->getParameters()) {
-        if (param->isSending())
-          return true;
-
         Type paramType = param->getInterfaceType().subst(subs);
+        if (param->isSending() && !paramType->hasError()) {
+          continue;
+        }
+
         if (diagnoseNonSendableTypes(
                 paramType, fromDC, derivedConformanceType,
                 refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
