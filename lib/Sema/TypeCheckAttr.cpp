@@ -7281,8 +7281,8 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
     }
 
     if (var->getAttrs().hasAttribute<LazyAttr>()) {
-      diagnoseAndRemoveAttr(attr, diag::nonisolated_lazy)
-        .warnUntilSwiftVersionIf(attr->isImplicit(), 6);
+      diagnose(attr->getLocation(), diag::nonisolated_lazy)
+        .warnUntilSwiftVersion(6);
       return;
     }
 
