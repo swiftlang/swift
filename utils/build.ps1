@@ -1536,7 +1536,7 @@ function Build-Compilers() {
   }
 
   Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'Identifier': '${ToolchainIdentifier}' }), encoding='utf-8'))" `
-      -OutFile "$(Arch.ToolchainInstallRoot)\ToolchainInfo.plist"
+      -OutFile "$($Arch.ToolchainInstallRoot)\ToolchainInfo.plist"
 }
 
 # Reference: https://github.com/microsoft/mimalloc/tree/dev/bin#minject
