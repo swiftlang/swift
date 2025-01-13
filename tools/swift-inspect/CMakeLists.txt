@@ -34,8 +34,6 @@ if (ANDROID)
     Sources/AndroidCLib/heap.c)
   target_include_directories(AndroidCLib PUBLIC
     Sources/AndroidCLib/include)
-  target_link_options(AndroidCLib PUBLIC
-    "-Xlinker" "-T${CMAKE_SOURCE_DIR}/Sources/AndroidCLib/section-text-remote.ld")
   set_property(TARGET AndroidCLib PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()
 

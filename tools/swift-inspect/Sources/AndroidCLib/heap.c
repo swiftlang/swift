@@ -58,7 +58,7 @@
 // ensure compiles to simple, position-independent code. It is implemented in C
 // for readability/maintainability. It is placed in its own code section to
 // simplify calculating its size.
-__attribute__((noinline, used, section(".text.remote")))
+__attribute__((noinline, used, section("heap_iterator")))
 static void heap_iterate_callback(unsigned long base, unsigned long size, void *arg) {
   volatile uint64_t *data = (uint64_t*)arg;
   while (data[NEXT_FREE_IDX] >= data[MAX_VALID_IDX]) {
@@ -77,17 +77,16 @@ static void heap_iterate_callback(unsigned long base, unsigned long size, void *
   data[data[NEXT_FREE_IDX]++] = size;
 }
 
-// Linker-populated symbol defined in section-text-remote.ld. Used to calculate
-// the size of the heap_iterate_callback function when copying it to a remote
-// process for execution.
-extern char _remote_code_section_end;
+// Both clang and gcc implicitly define __start- and __stop- prefixed symbols
+// that mark the start and end of user defined sections.
+extern char __stop_heap_iterator[];
 
 void* heap_iterate_callback_start() {
   return (void*)heap_iterate_callback;
 }
 
 size_t heap_iterate_callback_len() {
-  return (uintptr_t)&_remote_code_section_end - (uintptr_t)heap_iterate_callback;
+  return (uintptr_t)__stop_heap_iterator - (uintptr_t)heap_iterate_callback;
 }
 
 bool heap_iterate_metadata_init(void* data, size_t len) {
