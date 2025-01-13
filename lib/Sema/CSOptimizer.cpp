@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -527,10 +527,11 @@ static void determineBestChoicesInContext(
     // type matches a parameter type (i.e. when partially resolved generic
     // types are matched) this function is going to produce \c std::nullopt
     // instead of `0` that indicates "not a match".
-    std::function<std::optional<double>(GenericSignature, Type, Type,
-                                        MatchOptions)>
+    std::function<std::optional<double>(GenericSignature, ValueDecl *, Type,
+                                        Type, MatchOptions)>
         scoreCandidateMatch =
-            [&](GenericSignature genericSig, Type candidateType, Type paramType,
+            [&](GenericSignature genericSig, ValueDecl *choice,
+                Type candidateType, Type paramType,
                 MatchOptions options) -> std::optional<double> {
       auto areEqual = [&](Type a, Type b) {
         return a->getDesugaredType()->isEqual(b->getDesugaredType());
@@ -618,13 +619,12 @@ static void determineBestChoicesInContext(
 
         if (!candidateOptionals.empty() || !paramOptionals.empty()) {
           if (paramOptionals.size() >= candidateOptionals.size()) {
-            auto score = scoreCandidateMatch(genericSig, candidateType,
+            auto score = scoreCandidateMatch(genericSig, choice, candidateType,
                                              paramType, options);
             // Injection lowers the score slightly to comply with
             // old behavior where exact matches on operator parameter
             // types were always preferred.
-            return score == 1 && isOperatorDisjunction(disjunction) ? 0.9
-                                                                    : score;
+            return score == 1 && choice->isOperator() ? 0.9 : score;
           }
 
           // Optionality mismatch.
@@ -746,7 +746,7 @@ static void determineBestChoicesInContext(
         // everything else the solver should try both concrete and
         // generic and disambiguate during ranking.
         if (result == CheckRequirementsResult::Success)
-          return isOperatorDisjunction(disjunction) ? 0.9 : 1.0;
+          return choice->isOperator() ? 0.9 : 1.0;
 
         return 0;
       }
@@ -914,7 +914,7 @@ static void determineBestChoicesInContext(
                 options |= MatchFlag::DisableCGFloatDoubleConversion;
 
               auto candidateScore = scoreCandidateMatch(
-                  genericSig, candidateType, paramType, options);
+                  genericSig, decl, candidateType, paramType, options);
 
               if (!candidateScore)
                 continue;
@@ -958,7 +958,7 @@ static void determineBestChoicesInContext(
           // Preferring outer disjunction first works better in situations
           // when contextual type for the whole chain becomes available at
           // some point during solving at it would allow for faster pruning.
-          if (score > 0 && onlyLiteralCandidates)
+          if (score > 0 && onlyLiteralCandidates && decl->isOperator())
             score = 0.1;
 
           // If one of the result types matches exactly, that's a good
@@ -984,7 +984,7 @@ static void determineBestChoicesInContext(
                           ->isCGFloat())
                     return false;
 
-                  return scoreCandidateMatch(genericSig,
+                  return scoreCandidateMatch(genericSig, decl,
                                              overloadType->getResult(),
                                              candidateResultTy,
                                              /*options=*/{}) > 0;
