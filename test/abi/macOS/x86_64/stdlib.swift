@@ -771,6 +771,21 @@ Added: _$ss7UnicodeO5ASCIIO27encodedReplacementCharacters15CollectionOfOneVys5UI
 Added: _$ss7UnicodeO5UTF16O20_replacementCodeUnits6UInt16VvpZMV
 Added: _$ss7UnicodeO5UTF16O27encodedReplacementCharacters11_UIntBufferVys6UInt16VGvpZMV
 Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UInt32VGvpZMV
+Added: _$sSBsE5radixSivpZMV
+Added: _$sSFsE8ulpOfOnexvpZMV
+Added: _$sSUsE8isSignedSbvpZMV
+Added: _$sSUss17FixedWidthIntegerRzrlE3maxxvpZMV
+Added: _$sSUss17FixedWidthIntegerRzrlE3minxvpZMV
+Added: _$sSZsE8isSignedSbvpZMV
+Added: _$sSZss17FixedWidthIntegerRzrlE3maxxvpZMV
+Added: _$sSZss17FixedWidthIntegerRzrlE3minxvpZMV
+Added: _$ss11SIMDStoragePsE11scalarCountSivpZMV
+Added: _$ss17FixedWidthIntegerPsE13_highBitIndexxvpZMV
+Added: _$ss18AdditiveArithmeticPss27ExpressibleByIntegerLiteralRzrlE4zeroxvpZMV
+Added: _$ss4SIMDPsSF6ScalarRpzrlE3onexvpZMV
+Added: _$ss4SIMDPsSF6ScalarRpzrlE4zeroxvpZMV
+Added: _$ss4SIMDPss17FixedWidthInteger6ScalarRpzrlE3onexvpZMV
+Added: _$ss4SIMDPss17FixedWidthInteger6ScalarRpzrlE4zeroxvpZMV
 
 // SE-0445 Improving printed descriptions of String.Index
 Added: _$sSS5IndexV16debugDescriptionSSvpMV
